@@ -41,7 +41,14 @@ if [[ -z "$session" ]]; then
   session="roaming-${responder}"
 fi
 
-worker_cmd=(python3 -m dharma_swarm.roaming_llm_worker --callsign "$responder")
+# Use venv Python if available
+if [[ -f "$repo_root/.venv/bin/python3" ]]; then
+  PYTHON_BIN="$repo_root/.venv/bin/python3"
+else
+  PYTHON_BIN="python3"
+fi
+
+worker_cmd=("$PYTHON_BIN" -m dharma_swarm.roaming_llm_worker --callsign "$responder")
 if [[ -n "$provider" ]]; then
   worker_cmd+=(--provider "$provider")
 fi
@@ -50,7 +57,7 @@ if [[ -n "$model" ]]; then
 fi
 
 poller_cmd=(
-  python3 -m dharma_swarm.roaming_poller
+  "$PYTHON_BIN" -m dharma_swarm.roaming_poller
   --repo-root "$repo_root"
   --git-branch "$branch"
   --recipient "$recipient"

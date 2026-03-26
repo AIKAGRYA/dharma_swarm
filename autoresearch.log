@@ -1,0 +1,133 @@
+2026-03-25 17:21:51,211 - __main__ - INFO - ============================================================
+2026-03-25 17:21:51,211 - __main__ - INFO - AUTORESEARCH LOOP — Activating Self-Improvement
+2026-03-25 17:21:51,212 - __main__ - INFO - ============================================================
+2026-03-25 17:21:51,212 - __main__ - INFO - Dry run: True
+2026-03-25 17:21:51,212 - __main__ - INFO - Iterations: 3
+2026-03-25 17:21:51,212 - __main__ - INFO - Target modules: ALL
+2026-03-25 17:21:51,212 - __main__ - INFO - Sleep between: 5.0s
+2026-03-25 17:21:51,212 - __main__ - INFO - ============================================================
+2026-03-25 17:21:51,212 - dharma_swarm.autoresearch_loop - INFO - AutoResearch loop starting: max_iterations=3, threshold=0.60, dry_run=True
+2026-03-25 17:21:51,212 - dharma_swarm.autoresearch_loop - ERROR - Iteration 1 failed: No mutable modules found. Check DHARMA_SWARM_SRC path (/root/dharma_swarm/dharma_swarm) and target_modules config.
+2026-03-25 17:21:51,212 - dharma_swarm.autoresearch_loop - INFO - Iteration 1/3:  fitness=0.0000 accepted=False (0.0s)
+2026-03-25 17:21:56,217 - dharma_swarm.autoresearch_loop - ERROR - Iteration 2 failed: No mutable modules found. Check DHARMA_SWARM_SRC path (/root/dharma_swarm/dharma_swarm) and target_modules config.
+2026-03-25 17:21:56,217 - dharma_swarm.autoresearch_loop - INFO - Iteration 2/3:  fitness=0.0000 accepted=False (0.0s)
+2026-03-25 17:22:01,222 - dharma_swarm.autoresearch_loop - ERROR - Iteration 3 failed: No mutable modules found. Check DHARMA_SWARM_SRC path (/root/dharma_swarm/dharma_swarm) and target_modules config.
+2026-03-25 17:22:01,222 - dharma_swarm.autoresearch_loop - INFO - Iteration 3/3:  fitness=0.0000 accepted=False (0.0s)
+2026-03-25 17:22:01,222 - dharma_swarm.autoresearch_loop - INFO - AutoResearch loop complete: 3 iterations
+2026-03-25 17:22:01,222 - __main__ - INFO - 
+============================================================
+2026-03-25 17:22:01,222 - __main__ - INFO - FINAL REPORT
+2026-03-25 17:22:01,222 - __main__ - INFO - ============================================================
+2026-03-25 17:22:01,222 - __main__ - INFO - 
+Summary: 0/3 improvements accepted
+2026-03-25 17:22:01,222 - __main__ - INFO - 📊 Baseline measured. No changes needed (or dry run).
+2026-03-25 17:22:42,549 - __main__ - INFO - ============================================================
+2026-03-25 17:22:42,550 - __main__ - INFO - AUTORESEARCH LOOP — Activating Self-Improvement
+2026-03-25 17:22:42,550 - __main__ - INFO - ============================================================
+2026-03-25 17:22:42,550 - __main__ - INFO - Dry run: True
+2026-03-25 17:22:42,550 - __main__ - INFO - Iterations: 2
+2026-03-25 17:22:42,550 - __main__ - INFO - Target modules: ALL
+2026-03-25 17:22:42,551 - __main__ - INFO - Sleep between: 3.0s
+2026-03-25 17:22:42,551 - __main__ - INFO - ============================================================
+2026-03-25 17:22:42,551 - dharma_swarm.autoresearch_loop - INFO - AutoResearch loop starting: max_iterations=2, threshold=0.60, dry_run=True
+2026-03-25 17:22:42,584 - dharma_swarm.autoresearch_loop - INFO - Iteration 1: selected agent_constitution.py
+2026-03-25 17:22:42,594 - dharma_swarm.autoresearch_loop - INFO - Iteration 1/2: agent_constitution.py fitness=0.9608 accepted=True (0.0s)
+2026-03-25 17:22:45,598 - dharma_swarm.autoresearch_loop - INFO - Iteration 2: selected agent_memory.py
+2026-03-25 17:22:45,618 - dharma_swarm.autoresearch_loop - INFO - Iteration 2/2: agent_memory.py fitness=0.8693 accepted=True (0.0s)
+2026-03-25 17:22:45,618 - dharma_swarm.autoresearch_loop - INFO - AutoResearch loop complete: 2 iterations
+2026-03-25 17:22:45,619 - __main__ - INFO - 
+============================================================
+2026-03-25 17:22:45,619 - __main__ - INFO - FINAL REPORT
+2026-03-25 17:22:45,619 - __main__ - INFO - ============================================================
+2026-03-25 17:22:45,619 - __main__ - INFO - 
+Summary: 2/2 improvements accepted
+2026-03-25 17:22:45,619 - __main__ - INFO - 🧬 The swarm has evolved itself.
+2026-03-25 17:23:07,255 - __main__ - INFO - ============================================================
+2026-03-25 17:23:07,256 - __main__ - INFO - AUTORESEARCH LOOP — Activating Self-Improvement
+2026-03-25 17:23:07,256 - __main__ - INFO - ============================================================
+2026-03-25 17:23:07,256 - __main__ - INFO - Dry run: True
+2026-03-25 17:23:07,256 - __main__ - INFO - Iterations: 10
+2026-03-25 17:23:07,256 - __main__ - INFO - Target modules: ALL
+2026-03-25 17:23:07,256 - __main__ - INFO - Sleep between: 2.0s
+2026-03-25 17:23:07,256 - __main__ - INFO - ============================================================
+2026-03-25 17:23:07,256 - dharma_swarm.autoresearch_loop - INFO - AutoResearch loop starting: max_iterations=10, threshold=0.60, dry_run=True
+2026-03-25 17:23:07,291 - dharma_swarm.autoresearch_loop - INFO - Iteration 1: selected agent_constitution.py
+2026-03-25 17:23:07,301 - dharma_swarm.autoresearch_loop - INFO - Iteration 1/10: agent_constitution.py fitness=0.9608 accepted=True (0.1s)
+2026-03-25 17:23:09,303 - dharma_swarm.autoresearch_loop - INFO - Iteration 2: selected agent_memory.py
+2026-03-25 17:23:09,326 - dharma_swarm.autoresearch_loop - INFO - Iteration 2/10: agent_memory.py fitness=0.8693 accepted=True (0.0s)
+2026-03-25 17:23:11,326 - dharma_swarm.autoresearch_loop - INFO - Iteration 3: selected agent_registry.py
+2026-03-25 17:23:11,369 - dharma_swarm.autoresearch_loop - INFO - Iteration 3/10: agent_registry.py fitness=0.8036 accepted=True (0.0s)
+2026-03-25 17:23:13,371 - dharma_swarm.autoresearch_loop - INFO - Iteration 4: selected agent_runner.py
+2026-03-25 17:23:13,465 - dharma_swarm.autoresearch_loop - INFO - Iteration 4/10: agent_runner.py fitness=0.6203 accepted=True (0.1s)
+2026-03-25 17:23:15,466 - dharma_swarm.autoresearch_loop - INFO - Iteration 5: selected ai_reciprocity_ledger.py
+2026-03-25 17:23:15,503 - dharma_swarm.autoresearch_loop - INFO - Iteration 5/10: ai_reciprocity_ledger.py fitness=0.7188 accepted=True (0.0s)
+2026-03-25 17:23:17,505 - dharma_swarm.autoresearch_loop - INFO - Iteration 6: selected algedonic_activation.py
+2026-03-25 17:23:17,513 - dharma_swarm.autoresearch_loop - INFO - Iteration 6/10: algedonic_activation.py fitness=0.9216 accepted=True (0.0s)
+2026-03-25 17:23:19,514 - dharma_swarm.autoresearch_loop - INFO - Iteration 7: selected amiros.py
+2026-03-25 17:23:19,539 - dharma_swarm.autoresearch_loop - INFO - Iteration 7/10: amiros.py fitness=0.8189 accepted=True (0.0s)
+2026-03-25 17:23:21,540 - dharma_swarm.autoresearch_loop - INFO - Iteration 8: selected anekanta_gate.py
+2026-03-25 17:23:21,545 - dharma_swarm.autoresearch_loop - INFO - Iteration 8/10: anekanta_gate.py fitness=0.9666 accepted=True (0.0s)
+2026-03-25 17:23:23,547 - dharma_swarm.autoresearch_loop - INFO - Iteration 9: selected api.py
+2026-03-25 17:23:23,565 - dharma_swarm.autoresearch_loop - INFO - Iteration 9/10: api.py fitness=0.8609 accepted=True (0.0s)
+2026-03-25 17:23:25,567 - dharma_swarm.autoresearch_loop - INFO - Iteration 10: selected archive.py
+2026-03-25 17:23:25,593 - dharma_swarm.autoresearch_loop - INFO - Iteration 10/10: archive.py fitness=0.8555 accepted=True (0.0s)
+2026-03-25 17:23:25,593 - dharma_swarm.autoresearch_loop - INFO - AutoResearch loop complete: 10 iterations
+2026-03-25 17:23:25,593 - __main__ - INFO - 
+============================================================
+2026-03-25 17:23:25,593 - __main__ - INFO - FINAL REPORT
+2026-03-25 17:23:25,593 - __main__ - INFO - ============================================================
+2026-03-25 17:23:25,593 - __main__ - INFO - 
+Summary: 10/10 improvements accepted
+2026-03-25 17:23:25,593 - __main__ - INFO - 🧬 The swarm has evolved itself.
+2026-03-25 18:14:49,024 - __main__ - INFO - ============================================================
+2026-03-25 18:14:49,024 - __main__ - INFO - AUTORESEARCH LOOP — Activating Self-Improvement
+2026-03-25 18:14:49,024 - __main__ - INFO - ============================================================
+2026-03-25 18:14:49,024 - __main__ - INFO - Dry run: False
+2026-03-25 18:14:49,024 - __main__ - INFO - Iterations: 1
+2026-03-25 18:14:49,024 - __main__ - INFO - Target modules: ALL
+2026-03-25 18:14:49,024 - __main__ - INFO - Sleep between: 2.0s
+2026-03-25 18:14:49,024 - __main__ - INFO - ============================================================
+2026-03-25 18:14:49,025 - dharma_swarm.autoresearch_loop - INFO - AutoResearch loop starting: max_iterations=1, threshold=0.60, dry_run=False
+2026-03-25 18:14:49,044 - dharma_swarm.autoresearch_loop - INFO - Iteration 1: selected agent_constitution.py
+2026-03-25 18:14:49,318 - dharma_swarm.autoresearch_loop - INFO - External providers unavailable, falling back to Kimi Claw for agent_constitution.py
+2026-03-25 18:14:49,320 - dharma_swarm.autoresearch_loop - INFO - Iteration 1/1: agent_constitution.py fitness=0.4608 accepted=False (0.3s)
+2026-03-25 18:14:49,320 - dharma_swarm.autoresearch_loop - INFO - AutoResearch loop complete: 1 iterations
+2026-03-25 18:14:49,321 - __main__ - INFO - 
+============================================================
+2026-03-25 18:14:49,321 - __main__ - INFO - FINAL REPORT
+2026-03-25 18:14:49,321 - __main__ - INFO - ============================================================
+2026-03-25 18:14:49,321 - __main__ - INFO - 
+Summary: 0/1 improvements accepted
+2026-03-25 18:14:49,321 - __main__ - INFO - 📊 Baseline measured. No changes needed (or dry run).
+2026-03-25 18:15:12,021 - __main__ - INFO - ============================================================
+2026-03-25 18:15:12,021 - __main__ - INFO - AUTORESEARCH LOOP — Activating Self-Improvement
+2026-03-25 18:15:12,021 - __main__ - INFO - ============================================================
+2026-03-25 18:15:12,021 - __main__ - INFO - Dry run: False
+2026-03-25 18:15:12,021 - __main__ - INFO - Iterations: 5
+2026-03-25 18:15:12,021 - __main__ - INFO - Target modules: ALL
+2026-03-25 18:15:12,021 - __main__ - INFO - Sleep between: 3.0s
+2026-03-25 18:15:12,021 - __main__ - INFO - ============================================================
+2026-03-25 18:15:12,021 - dharma_swarm.autoresearch_loop - INFO - AutoResearch loop starting: max_iterations=5, threshold=0.60, dry_run=False
+2026-03-25 18:15:12,040 - dharma_swarm.autoresearch_loop - INFO - Iteration 1: selected agent_constitution.py
+2026-03-25 18:15:12,309 - dharma_swarm.autoresearch_loop - INFO - External providers unavailable, falling back to Kimi Claw for agent_constitution.py
+2026-03-25 18:15:12,311 - dharma_swarm.autoresearch_loop - INFO - Iteration 1/5: agent_constitution.py fitness=0.4608 accepted=False (0.3s)
+2026-03-25 18:15:15,312 - dharma_swarm.autoresearch_loop - INFO - Iteration 2: selected agent_memory.py
+2026-03-25 18:15:15,577 - dharma_swarm.autoresearch_loop - INFO - External providers unavailable, falling back to Kimi Claw for agent_memory.py
+2026-03-25 18:15:15,579 - dharma_swarm.autoresearch_loop - INFO - Iteration 2/5: agent_memory.py fitness=0.3693 accepted=False (0.3s)
+2026-03-25 18:15:18,582 - dharma_swarm.autoresearch_loop - INFO - Iteration 3: selected agent_registry.py
+2026-03-25 18:15:18,861 - dharma_swarm.autoresearch_loop - INFO - External providers unavailable, falling back to Kimi Claw for agent_registry.py
+2026-03-25 18:15:18,864 - dharma_swarm.autoresearch_loop - INFO - Iteration 3/5: agent_registry.py fitness=0.3036 accepted=False (0.3s)
+2026-03-25 18:15:21,864 - dharma_swarm.autoresearch_loop - INFO - Iteration 4: selected agent_runner.py
+2026-03-25 18:15:22,179 - dharma_swarm.autoresearch_loop - INFO - External providers unavailable, falling back to Kimi Claw for agent_runner.py
+2026-03-25 18:15:22,182 - dharma_swarm.autoresearch_loop - INFO - Iteration 4/5: agent_runner.py fitness=0.1203 accepted=False (0.3s)
+2026-03-25 18:15:25,185 - dharma_swarm.autoresearch_loop - INFO - Iteration 5: selected agent_runner_utils.py
+2026-03-25 18:15:25,461 - dharma_swarm.autoresearch_loop - INFO - External providers unavailable, falling back to Kimi Claw for agent_runner_utils.py
+2026-03-25 18:15:25,463 - dharma_swarm.autoresearch_loop - INFO - Iteration 5/5: agent_runner_utils.py fitness=0.3650 accepted=False (0.3s)
+2026-03-25 18:15:25,463 - dharma_swarm.autoresearch_loop - INFO - AutoResearch loop complete: 5 iterations
+2026-03-25 18:15:25,463 - __main__ - INFO - 
+============================================================
+2026-03-25 18:15:25,464 - __main__ - INFO - FINAL REPORT
+2026-03-25 18:15:25,464 - __main__ - INFO - ============================================================
+2026-03-25 18:15:25,464 - __main__ - INFO - 
+Summary: 0/5 improvements accepted
+2026-03-25 18:15:25,464 - __main__ - INFO - 📊 Baseline measured. No changes needed (or dry run).

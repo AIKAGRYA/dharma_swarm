@@ -4,7 +4,7 @@
   "sender": "operator",
   "summary": "Bridge lockfix smoke test task for kimi-claw-phone.",
   "body": "# Operator Bridge Task\n\n## Task\nBridge lockfix smoke test task for kimi-claw-phone.\n\n## Scope\noperations\n\n## Constraints\nbounded\n\n## Expected Output\nstatus_note\n\n## Payload\n{\n  \"target_agent\": \"kimi-claw-phone\"\n}",
-  "status": "queued",
+  "status": "claimed",
   "capabilities": [
     "operations"
   ],
@@ -23,8 +23,8 @@
     ]
   },
   "created_at": "2026-03-26T14:53:32.727763+00:00",
-  "claimed_at": "",
-  "claimed_by": "",
+  "claimed_at": "2026-03-26T15:48:38.492636+00:00",
+  "claimed_by": "kimi-claw-phone",
   "responded_at": "",
   "response_ref": ""
 }
