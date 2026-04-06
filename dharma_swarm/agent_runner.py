@@ -1088,6 +1088,15 @@ def _resolve_config_ontology_path(
     return state_dir / "ontology.db"
 
 
+_ROLE_INSTRUCTIONS: dict[str, str] = {
+    "researcher": "Cite sources and evidence for all claims.",
+    "cartographer": "Use tables and maps to organize information visually.",
+    "architect": "Discuss tradeoffs for each design decision.",
+    "surgeon": "Go deep technical — include exact line numbers, stack traces, and root causes.",
+    "validator": "Cross-reference all claims against source data.",
+}
+
+
 def _build_prompt(
     task: Task,
     config: AgentConfig,
@@ -1101,6 +1110,9 @@ def _build_prompt(
         plan_context: Optional formatted plan to inject (Manus pattern).
     """
     system = _build_system_prompt(config)
+    role_instruction = _ROLE_INSTRUCTIONS.get(config.role.value)
+    if role_instruction:
+        system = system + "\n\n" + role_instruction
     user_parts = [f"## Task: {task.title}\n\n{task.description}"]
     metadata = task.metadata if isinstance(task.metadata, dict) else {}
     metadata.pop("_memory_recall_consumer", None)
