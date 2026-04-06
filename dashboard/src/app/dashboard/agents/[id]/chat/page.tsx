@@ -101,37 +101,52 @@ export default function AgentChatPage() {
                     : "bg-sumi-800 text-torinoko"
                 }`}
               >
+                {/* ── Trace / CoT Panel ── */}
                 {msg.toolEvents && msg.toolEvents.length > 0 && (
-                  <div className="mb-2 flex flex-wrap gap-1">
+                  <div className="mb-2 rounded-lg border border-sumi-700/30 bg-sumi-900/60 p-2 space-y-1.5">
+                    <p className="text-[9px] font-semibold uppercase tracking-widest text-sumi-600 mb-1">
+                      Trace ({msg.toolEvents.length} step{msg.toolEvents.length !== 1 ? "s" : ""})
+                    </p>
                     {msg.toolEvents.map((te, i) => (
-                      <span
-                        key={i}
-                        className="rounded-full px-2 py-0.5 text-[9px] font-medium"
-                        style={{
-                          color: te.type === "call" ? colors.kinpaku : colors.rokusho,
-                          backgroundColor:
-                            te.type === "call"
-                              ? `color-mix(in srgb, ${colors.kinpaku} 12%, transparent)`
-                              : `color-mix(in srgb, ${colors.rokusho} 12%, transparent)`,
-                        }}
-                      >
-                        {te.type === "call" ? "\u25B6" : "\u2713"} {te.name}
-                      </span>
+                      <div key={i} className="flex items-start gap-2">
+                        <span
+                          className="mt-0.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full"
+                          style={{
+                            backgroundColor: te.type === "call" ? colors.kinpaku : colors.rokusho,
+                            boxShadow: `0 0 4px ${te.type === "call" ? colors.kinpaku : colors.rokusho}60`,
+                          }}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-mono text-[10px] font-semibold" style={{ color: te.type === "call" ? colors.kinpaku : colors.rokusho }}>
+                              {te.type === "call" ? "\u25B6 call" : "\u2713 result"}
+                            </span>
+                            <span className="font-mono text-[10px] text-torinoko">{te.name}</span>
+                          </div>
+                          {te.type === "call" && te.args && (
+                            <pre className="mt-0.5 overflow-x-auto text-[9px] text-sumi-600 font-mono leading-tight">
+                              {JSON.stringify(te.args, null, 0).slice(0, 200)}
+                            </pre>
+                          )}
+                          {te.type === "result" && te.summary && (
+                            <p className="mt-0.5 text-[9px] text-sumi-600 truncate" title={te.summary}>
+                              {te.summary.slice(0, 150)}
+                            </p>
+                          )}
+                        </div>
+                      </div>
                     ))}
+                    {isStreaming && msg.id === messages[messages.length - 1]?.id && !msg.content && (
+                      <div className="flex items-center gap-2 pt-1">
+                        <div className="h-3 w-3 animate-spin rounded-full border border-kinpaku/30 border-t-kinpaku" />
+                        <span className="text-[10px] text-kitsurubami animate-pulse">Executing...</span>
+                      </div>
+                    )}
                   </div>
                 )}
                 <div className="whitespace-pre-wrap text-sm leading-relaxed">
                   {msg.content}
                 </div>
-                {msg.role === "assistant" &&
-                  isStreaming &&
-                  msg.id === messages[messages.length - 1]?.id &&
-                  (msg.toolEvents?.length ?? 0) > 0 &&
-                  !msg.content && (
-                    <p className="text-[10px] text-kitsurubami animate-pulse mt-1">
-                      Running tools...
-                    </p>
-                  )}
                 {msg.role === "assistant" &&
                   isStreaming &&
                   msg === messages[messages.length - 1] &&
