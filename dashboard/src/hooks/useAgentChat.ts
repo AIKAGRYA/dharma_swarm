@@ -176,9 +176,19 @@ export function useAgentChat(agentId: string) {
 
       try {
         const allMsgs = [...store.getMessages(agentId)].slice(0, -1); // exclude empty assistant
-        const apiMessages = allMsgs
+        const nonEmpty = allMsgs
           .filter((m) => m.content && m.content.trim().length > 0)
           .map((m) => ({ role: m.role, content: m.content }));
+        // Merge consecutive same-role messages (LLM APIs require alternating user/assistant)
+        const apiMessages: { role: string; content: string }[] = [];
+        for (const m of nonEmpty) {
+          const prev = apiMessages[apiMessages.length - 1];
+          if (prev && prev.role === m.role) {
+            prev.content += "\n" + m.content;
+          } else {
+            apiMessages.push({ ...m });
+          }
+        }
         // Keep only last 20 messages to avoid context overflow
         const trimmedMessages = apiMessages.slice(-20);
 
