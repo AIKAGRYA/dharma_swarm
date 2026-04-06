@@ -533,9 +533,20 @@ class SearchRouter:
                 if results:
                     logger.info("web_search via %s: %d results", b.name, len(results))
                     return results
+                else:
+                    logger.debug("Backend %s returned no results, falling back", b.name)
             except Exception as exc:
-                logger.warning("Backend %s failed, trying next: %s", b.name, exc)
-                continue
+                logger.warning("Backend %s failed, falling back: %s", b.name, exc)
+
+        # Final fallback: arXiv (always available, no key needed)
+        logger.info("All general backends failed or empty, falling back to arXiv")
+        try:
+            results = await self.arxiv.search(query, max_results)
+            if results:
+                logger.info("web_search via arxiv (fallback): %d results", len(results))
+                return results
+        except Exception as exc:
+            logger.warning("arXiv fallback failed: %s", exc)
 
         logger.warning("All search backends failed for query: %s", query)
         return []
