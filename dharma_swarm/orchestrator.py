@@ -31,6 +31,7 @@ from dharma_swarm.models import (
     Message,
     Task,
     TaskDispatch,
+    TaskPriority,
     TaskStatus,
     TopologyType,
     _new_id,
@@ -1958,6 +1959,29 @@ class Orchestrator:
                 runner.run_task(task),
                 timeout=timeout_seconds,
             )
+            # Quality gate: minimum result length by priority
+            _quality_thresholds = {
+                TaskPriority.HIGH: 500,
+                TaskPriority.URGENT: 500,
+                TaskPriority.NORMAL: 200,
+                TaskPriority.LOW: 50,
+            }
+            _min_len = _quality_thresholds.get(task.priority, 200)
+            if len(result or "") < _min_len:
+                _qg_error = (
+                    f"insufficient_output: result length {len(result or '')} "
+                    f"below minimum {_min_len} for priority {task.priority}"
+                )
+                if self._pool is not None:
+                    await self._pool.release(td.agent_id)
+                self._active_dispatches.pop(td.task_id, None)
+                await self._handle_task_failure(
+                    td=td,
+                    task=task,
+                    error=_qg_error,
+                    source="quality_gate",
+                )
+                return
             try:
                 from dharma_swarm.mission_contract import (
                     honors_checkpoint_passed,
