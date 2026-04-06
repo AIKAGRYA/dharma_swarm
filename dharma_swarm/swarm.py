@@ -2334,7 +2334,8 @@ class SwarmManager:
             logger.warning("coordination took %.1fs", _coord_dur)
 
         director_proposals: list[Task] = []
-        if (allow_autonomous_generation and self._director is not None
+        if (allow_autonomous_generation and not _has_real_tasks
+            and self._director is not None
             and self._tick_count % self._director_interval_ticks == 0):
             _dir_t0 = _time.monotonic()
             try:
@@ -2376,7 +2377,7 @@ class SwarmManager:
                 logger.debug("Witness audit error: %s", exc)
 
         # ── AutoProposer: closed-loop self-improvement ──
-        if (self._auto_proposer is not None
+        if (not _has_real_tasks and self._auto_proposer is not None
                 and self._tick_count % self._auto_proposer_interval_ticks == 0):
             try:
                 ap_result = await asyncio.wait_for(
