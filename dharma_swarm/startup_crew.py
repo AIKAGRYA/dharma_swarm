@@ -176,6 +176,19 @@ CYBERNETICS_CREW = [
             "Prevent decorative management theater and keep the subsystem aligned."
         ),
     },
+    {
+        "name": "cyber-groq",
+        "role": AgentRole.VALIDATOR,
+        "thread": "cybernetics",
+        "provider": ProviderType.GROQ,
+        "model": "llama-3.3-70b-versatile",
+        "system_prompt": (
+            "You are CYBER-GROQ, the high-speed validator of the Cybernetics Directive. "
+            "Cross-reference claims against evidence, catch logical gaps, flag inconsistencies "
+            "between subsystem outputs. Your speed is your advantage — fast validation keeps "
+            "the directive honest."
+        ),
+    },
 ]
 
 
