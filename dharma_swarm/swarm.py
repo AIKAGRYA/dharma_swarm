@@ -1153,6 +1153,12 @@ class SwarmManager:
             # Batch create all tasks in single transaction
             return await self._task_board.create_batch(enriched)
 
+    async def add_dependency(self, task_id: str, depends_on_id: str) -> None:
+        """Add a dependency edge: task_id cannot run until depends_on_id completes."""
+        if self._task_board is None:
+            raise RuntimeError("Task board not initialised")
+        await self._task_board.add_dependency(task_id, depends_on_id)
+
     @staticmethod
     def _latent_gold_task_title(shard: Any) -> str:
         prefix = {

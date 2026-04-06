@@ -456,6 +456,20 @@ async def create_seed_tasks(swarm) -> list:
     # Create all tasks in single batch (single transaction)
     tasks = await swarm.create_task_batch(task_specs)
 
+    # Wire dependencies: differentiation (idx 3) waits for companies + research;
+    # synthesis (idx 4) waits for all four preceding tasks.
+    if len(tasks) >= 5:
+        t_companies, t_research, t_deepdive, t_diff, t_synth = (
+            tasks[0], tasks[1], tasks[2], tasks[3], tasks[4],
+        )
+        await swarm.add_dependency(t_diff.id, t_companies.id)
+        await swarm.add_dependency(t_diff.id, t_research.id)
+        await swarm.add_dependency(t_synth.id, t_companies.id)
+        await swarm.add_dependency(t_synth.id, t_research.id)
+        await swarm.add_dependency(t_synth.id, t_deepdive.id)
+        await swarm.add_dependency(t_synth.id, t_diff.id)
+        logger.info("Wired dependencies: diff->companies,research; synth->all four")
+
     # Log results
     for spec in SEED_TASKS:
         logger.info("Created seed task: %s", spec["title"])
