@@ -2302,4 +2302,47 @@ class Orchestrator:
                 error=reason,
                 source="claim_timeout",
             )
+
+        # Force-fail tasks stuck in RUNNING state for more than 300 seconds.
+        stuck: list[tuple[Task, float]] = []
+        if self._board is not None:
+            try:
+                running_tasks = await self._board.list_tasks(status=TaskStatus.RUNNING)
+                now_utc = datetime.now(timezone.utc)
+                for _rt in running_tasks:
+                    age_s = (now_utc - _rt.updated_at).total_seconds()
+                    if age_s > 300:
+                        stuck.append((_rt, age_s))
+            except Exception as exc:
+                logger.warning("_collect_completed: stuck-task scan failed: %s", exc)
+
+        for _task, _age_s in stuck:
+            _task_id = _task.id
+            _reason = f"Task stuck in RUNNING state for {int(_age_s)}s — forcing failure"
+            if _task_id in self._running_tasks:
+                self._running_tasks[_task_id].cancel()
+                self._running_tasks.pop(_task_id, None)
+            _td = self._active_dispatches.pop(_task_id, None)
+            if _td is not None:
+                if self._pool is not None:
+                    await self._pool.release(_td.agent_id)
+                await self._handle_task_failure(
+                    td=_td,
+                    task=_task,
+                    error=_reason,
+                    source="stuck_task_timeout",
+                )
+            else:
+                try:
+                    await self._board.fail(_task_id, error=_reason)
+                except Exception as exc:
+                    logger.warning(
+                        "_collect_completed: direct fail for stuck task %s: %s",
+                        _task_id, exc,
+                    )
+            logger.warning(
+                "Stuck task %s force-failed after %ds in RUNNING state",
+                _task_id, int(_age_s),
+            )
+
         return len(done_tasks), len(stale)
