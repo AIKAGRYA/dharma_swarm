@@ -1710,7 +1710,14 @@ class AgentRunner:
         if tool_name == "read_file":
             path = _resolve_local_tool_path(str(parameters.get("path", "")), workdir=workdir)
             if not path.exists():
-                return f"ERROR: File not found: {path}"
+                task_desc = (task.description or "").lower()
+                if "wait" in task_desc or "retry" in task_desc:
+                    for _attempt in range(3):
+                        await asyncio.sleep(60)
+                        if path.exists():
+                            break
+                if not path.exists():
+                    return f"ERROR: File not found: {path}"
             if not path.is_file():
                 return f"ERROR: Not a file: {path}"
             try:
