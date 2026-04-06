@@ -1379,15 +1379,20 @@ def _provider_can_execute_local_tooling(
 
 def _tool_loop_max_rounds(task: Task, config: AgentConfig) -> int:
     metadata = _task_metadata(task)
+    priority_default = (
+        16
+        if task.priority in {TaskPriority.HIGH, TaskPriority.URGENT}
+        else 8
+    )
     raw = (
         metadata.get("max_tool_rounds")
         or config.metadata.get("max_tool_rounds")
-        or 8
+        or priority_default
     )
     try:
         return max(1, min(32, int(raw)))
     except (TypeError, ValueError):
-        return 8
+        return priority_default
 
 
 def _local_tool_workdir(task: Task, config: AgentConfig) -> Path:
