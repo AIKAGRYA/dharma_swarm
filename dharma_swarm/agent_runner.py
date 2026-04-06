@@ -1692,6 +1692,18 @@ class AgentRunner:
         *,
         task: Task,
     ) -> str:
+        try:
+            return await self._execute_local_tool_impl(tool_name, parameters, task=task)
+        except Exception as exc:
+            return f"ERROR: {tool_name} failed: {exc}"
+
+    async def _execute_local_tool_impl(
+        self,
+        tool_name: str,
+        parameters: dict[str, Any],
+        *,
+        task: Task,
+    ) -> str:
         workdir = _local_tool_workdir(task, self._config)
 
         if tool_name == "read_file":
