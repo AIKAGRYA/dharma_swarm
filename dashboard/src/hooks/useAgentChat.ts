@@ -162,6 +162,13 @@ export function useAgentChat(agentId: string) {
       const controller = new AbortController();
       abortRef.current = controller;
 
+      // 60-second client-side timeout — kill hung connections
+      const timeoutId = setTimeout(() => {
+        controller.abort();
+        store.setError(agentId, "Request timed out after 60 seconds. Try again.");
+        store.setStreaming(agentId, false);
+      }, 60_000);
+
       try {
         const allMsgs = [...store.getMessages(agentId)].slice(0, -1); // exclude empty assistant
         const apiMessages = allMsgs
@@ -251,6 +258,7 @@ export function useAgentChat(agentId: string) {
           store.setError(agentId, (err as Error).message);
         }
       } finally {
+        clearTimeout(timeoutId);
         store.setStreaming(agentId, false);
         abortRef.current = null;
       }
