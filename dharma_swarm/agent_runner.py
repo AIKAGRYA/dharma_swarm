@@ -17,6 +17,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
+from pydantic import ValidationError
 from dharma_swarm.contracts.intelligence_agents import communication_topics
 from dharma_swarm.models import (
     AgentConfig,
@@ -1841,10 +1842,29 @@ class AgentRunner:
         last_route_decision: Any | None = None
 
         for round_index in range(1, _tool_loop_max_rounds(task, self._config) + 1):
-            route_request, route_decision, response = await self._invoke_provider(
-                task,
-                current_request,
-            )
+            try:
+                route_request, route_decision, response = await self._invoke_provider(
+                    task,
+                    current_request,
+                )
+            except (ValidationError, RuntimeError) as exc:
+                logger.warning(
+                    "Tool loop provider call failed (%s); retrying as plain completion",
+                    exc,
+                )
+                stripped_messages = [
+                    {k: v for k, v in msg.items() if k != "tool_calls"}
+                    for msg in current_request.messages
+                    if msg.get("role") != "tool"
+                ]
+                plain_request = current_request.model_copy(
+                    update={"messages": stripped_messages, "tools": None}
+                )
+                route_request, route_decision, response = await self._invoke_provider(
+                    task,
+                    plain_request,
+                )
+                return last_route_request, last_route_decision, response, response.content
             if route_request is not None:
                 last_route_request = route_request
             if route_decision is not None:
