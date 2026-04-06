@@ -162,12 +162,17 @@ export function useAgentChat(agentId: string) {
       const controller = new AbortController();
       abortRef.current = controller;
 
-      // 60-second client-side timeout — kill hung connections
-      const timeoutId = setTimeout(() => {
-        controller.abort();
-        store.setError(agentId, "Request timed out after 60 seconds. Try again.");
-        store.setStreaming(agentId, false);
-      }, 60_000);
+      // Activity-based timeout: reset every time we receive data.
+      // Only kills truly dead connections — not slow tool loops.
+      let lastActivity = Date.now();
+      const IDLE_TIMEOUT = 90_000; // 90s of NO data = dead
+      const timeoutId = setInterval(() => {
+        if (Date.now() - lastActivity > IDLE_TIMEOUT) {
+          controller.abort();
+          store.setError(agentId, "Connection idle for 90s with no data. The tool loop may have stalled. Try again.");
+          store.setStreaming(agentId, false);
+        }
+      }, 5_000);
 
       try {
         const allMsgs = [...store.getMessages(agentId)].slice(0, -1); // exclude empty assistant
@@ -202,6 +207,7 @@ export function useAgentChat(agentId: string) {
           const { done, value } = await reader.read();
           if (done) break;
 
+          lastActivity = Date.now();
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split("\n");
           buffer = lines.pop() ?? "";
@@ -258,7 +264,7 @@ export function useAgentChat(agentId: string) {
           store.setError(agentId, (err as Error).message);
         }
       } finally {
-        clearTimeout(timeoutId);
+        clearInterval(timeoutId);
         store.setStreaming(agentId, false);
         abortRef.current = null;
       }
