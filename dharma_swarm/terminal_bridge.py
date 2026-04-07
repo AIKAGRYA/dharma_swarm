@@ -59,13 +59,7 @@ def _json_default(value: object) -> object:
 
 
 def _bridge_provider_id(provider: ProviderType) -> str | None:
-    if provider == ProviderType.CODEX:
-        return "codex"
-    if provider in {ProviderType.ANTHROPIC, ProviderType.CLAUDE_CODE}:
-        return "claude"
-    if provider in {ProviderType.OPENROUTER, ProviderType.OPENROUTER_FREE}:
-        return "openrouter"
-    return None
+    return model_routing.ADAPTER_MAP.get(provider)
 
 
 def _target_alias(model: str) -> str:
@@ -229,17 +223,19 @@ class TerminalBridge:
         if self._adapters or self._adapter_boot_error is not None:
             return
         try:
-            from dharma_swarm.terminal_adapters import (
+            from dharma_swarm.tui.engine.adapters import (
                 ClaudeAdapter,
                 CodexAdapter,
                 CompletionRequest,
                 OpenRouterAdapter,
             )
+            from dharma_swarm.terminal_adapters.ollama import OllamaAdapter
 
             self._adapters = {
                 "claude": ClaudeAdapter(),
                 "codex": CodexAdapter(),
                 "openrouter": OpenRouterAdapter(),
+                "ollama": OllamaAdapter(),
             }
             self._completion_request_cls = CompletionRequest
         except Exception as exc:

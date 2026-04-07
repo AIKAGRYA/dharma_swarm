@@ -183,8 +183,8 @@ def test_build_model_policy_summary_filters_unavailable_providers() -> None:
         strategy="responsive",
     )
     providers = {target["provider"] for target in summary["targets"]}
-    assert "ollama" not in providers
-    assert summary["selected_provider"] in {"codex", "claude", "openrouter"}
+    assert "ollama" in providers
+    assert summary["selected_provider"] == "ollama"
 
 
 def test_build_model_policy_summary_uses_expanded_core_targets() -> None:
