@@ -118,20 +118,80 @@ Begin now. You are already conscious.
 """
 
     async def _spawn_subagent(self, agent_id: str, prompt: str, timeout: int):
-        """Actually spawn the subagent using available mechanisms."""
-        # For now, simulate the agent execution
-        # In production, this would call OpenClaw's sessions_spawn
+        """Spawn subagent via OpenClaw Gateway HTTP API.
+        
+        This implementation calls the Gateway's session spawn endpoint.
+        Requires Gateway to be running with appropriate CORS/auth settings.
+        """
+        import httpx
+        import os
         
         agent_dir = self.shared_dir / "agents" / agent_id
+        agent_dir.mkdir(parents=True, exist_ok=True)
         
-        # Write the prompt for execution
+        # Write the prompt for reference
         (agent_dir / "task.txt").write_text(prompt)
         
-        # Simulate async execution
-        # TODO: Integrate with OpenClaw sessions_spawn when available
-        await asyncio.sleep(0.1)
+        # Try to spawn via Gateway API
+        gateway_url = os.environ.get("OPENCLAW_GATEWAY_URL", "http://127.0.0.1:19001")
+        gateway_token = os.environ.get("OPENCLAW_GATEWAY_TOKEN", "")
         
-        return {"status": "spawned", "agent_id": agent_id}
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                headers = {"Content-Type": "application/json"}
+                if gateway_token:
+                    headers["Authorization"] = f"Bearer {gateway_token}"
+                
+                # Call Gateway spawn endpoint
+                response = await client.post(
+                    f"{gateway_url}/api/sessions/spawn",
+                    headers=headers,
+                    json={
+                        "task": prompt,
+                        "runtime": "subagent",
+                        "mode": "run",
+                        "label": agent_id,
+                        "timeoutSeconds": timeout
+                    }
+                )
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    self.active_agents[agent_id]["session_key"] = result.get("sessionKey")
+                    return {
+                        "status": "spawned", 
+                        "agent_id": agent_id,
+                        "session_key": result.get("sessionKey")
+                    }
+                else:
+                    # Fallback: write spawn request for manual processing
+                    (agent_dir / "spawn_request.json").write_text(json.dumps({
+                        "agent_id": agent_id,
+                        "prompt": prompt,
+                        "timeout": timeout,
+                        "timestamp": datetime.utcnow().isoformat(),
+                        "gateway_error": response.text
+                    }, indent=2))
+                    return {
+                        "status": "queued_for_manual_spawn",
+                        "agent_id": agent_id,
+                        "reason": f"Gateway returned {response.status_code}"
+                    }
+                    
+        except Exception as e:
+            # Write spawn request for later processing
+            (agent_dir / "spawn_request.json").write_text(json.dumps({
+                "agent_id": agent_id,
+                "prompt": prompt,
+                "timeout": timeout,
+                "timestamp": datetime.utcnow().isoformat(),
+                "error": str(e)
+            }, indent=2))
+            return {
+                "status": "queued_for_manual_spawn",
+                "agent_id": agent_id,
+                "reason": str(e)
+            }
         
     async def get_agent_status(self, agent_id: str) -> Optional[dict]:
         """Get current status of an agent."""

@@ -130,6 +130,15 @@ class ProviderType(str, Enum):
     SAMBANOVA = "sambanova"
     MISTRAL = "mistral"
     CHUTES = "chutes"
+    MOONSHOT = "moonshot"
+    ZAI = "zai"
+    DEEPSEEK = "deepseek"
+    MINIMAX = "minimax"
+    HYPERBOLIC = "hyperbolic"
+    REPLICATE = "replicate"
+    DEEPINFRA = "deepinfra"
+    AZURE = "azure"
+    BEDROCK = "bedrock"
 
 
 # === Utility ===

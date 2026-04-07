@@ -29,22 +29,45 @@ DEFAULT_TEMPERATURE = 0.2
 
 OPENCLAW_CONFIG_ENV = "ROAMING_OPENCLAW_CONFIG"
 
+# Try to import centralized api_keys module
+try:
+    from dharma_swarm.api_keys import get_llm_key, provider_available, best_available_provider
+    _API_KEYS_AVAILABLE = True
+except ImportError:
+    _API_KEYS_AVAILABLE = False
+
 PROVIDER_ENV_KEYS: dict[str, str] = {
     "moonshot": "MOONSHOT_API_KEY",
     "openrouter": "OPENROUTER_API_KEY",
     "openai": "OPENAI_API_KEY",
+    "siliconflow": "SILICONFLOW_API_KEY",
 }
 
 PROVIDER_BASE_URLS: dict[str, str] = {
-    "moonshot": "https://api.moonshot.ai/v1",
+    "moonshot": "https://api.kimi.com/coding/v1",
     "openrouter": "https://openrouter.ai/api/v1",
     "openai": "https://api.openai.com/v1",
+    "ollama": "https://ollama.com",
+    "siliconflow": "https://api.siliconflow.cn/v1",
 }
 
 PROVIDER_DEFAULT_MODELS: dict[str, str] = {
     "moonshot": "kimi-k2.5",
     "openrouter": "moonshotai/kimi-k2.5",
     "openai": "gpt-4.1-mini",
+    "ollama": "llama3.2",
+    "siliconflow": "THUDM/GLM-4-9B-Chat",
+    "zai": "glm-5-turbo",
+    "deepseek": "deepseek-chat",
+    "minimax": "minimax-m2.7",
+    "groq": "llama-3.3-70b-versatile",
+    "cerebras": "llama-3.3-70b",
+    "together": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+    "fireworks": "accounts/fireworks/models/llama-v3p3-70b-instruct",
+    "hyperbolic": "deepseek-ai/DeepSeek-V3.2",
+    "deepinfra": "meta-llama/Llama-3.3-70B-Instruct",
+    "mistral": "mistral-large-latest",
+    "sambanova": "Meta-Llama-3.3-70B-Instruct",
 }
 
 
@@ -93,10 +116,33 @@ def _infer_provider(*, requested_provider: str, requested_model: str, env: dict[
     for candidate in ("moonshot", "openrouter", "openai"):
         if _resolve_api_key(candidate, env=env, config=config):
             return candidate
-    return "openrouter"
+    # Check for Z.AI (GLM-5-Turbo)
+    if env.get("ZAI_API_KEY", "").strip():
+        return "zai"
+    # Check for SiliconFlow (free tier)
+    if env.get("SILICONFLOW_API_KEY", "").strip():
+        return "siliconflow"
+    # Check for Ollama cloud availability
+    ollama_base = env.get("OLLAMA_BASE_URL", "").strip() or "https://ollama.com"
+    if ollama_base:
+        return "ollama"
+    return "siliconflow"
 
 
 def _resolve_api_key(provider: str, *, env: dict[str, str], config: dict[str, Any]) -> str:
+    """Resolve API key using centralized api_keys module if available."""
+    # Ollama doesn't need an API key for the public endpoint
+    if provider == "ollama":
+        return "ollama-cloud-public"
+    
+    # Try centralized api_keys module first
+    if _API_KEYS_AVAILABLE:
+        from dharma_swarm.api_keys import get_llm_key
+        key = get_llm_key(provider, env=env)
+        if key:
+            return key
+    
+    # Fallback to local resolution
     env_key = PROVIDER_ENV_KEYS.get(provider, "")
     if env_key and env.get(env_key, "").strip():
         return env[env_key].strip()
@@ -141,7 +187,7 @@ def resolve_provider_config(
         or str(((entry.get("models") or [{}])[0]).get("id") or "")
         or PROVIDER_DEFAULT_MODELS.get(chosen_provider, "")
     )
-    if not api_key:
+    if not api_key and chosen_provider != "ollama":
         raise RuntimeError(f"No API key available for provider '{chosen_provider}'")
     if not base_url:
         raise RuntimeError(f"No base URL available for provider '{chosen_provider}'")
@@ -201,23 +247,51 @@ def request_chat_completion(
     max_tokens: int = DEFAULT_MAX_TOKENS,
     timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS,
 ) -> str:
-    payload = json.dumps(
-        {
-            "model": config.model,
-            "messages": messages,
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-        }
-    ).encode("utf-8")
-    req = urlrequest.Request(
-        url=f"{config.base_url}/chat/completions",
-        data=payload,
-        method="POST",
-        headers={
-            "Authorization": f"Bearer {config.api_key}",
-            "Content-Type": "application/json",
-        },
-    )
+    # Determine endpoint based on provider
+    if config.provider == "ollama":
+        # Ollama uses native API
+        endpoint = f"{config.base_url}/api/chat"
+        # Convert messages to Ollama format
+        ollama_messages = []
+        for msg in messages:
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+            ollama_messages.append({"role": role, "content": content})
+        payload = json.dumps(
+            {
+                "model": config.model,
+                "messages": ollama_messages,
+                "stream": False,
+            }
+        ).encode("utf-8")
+        req = urlrequest.Request(
+            url=endpoint,
+            data=payload,
+            method="POST",
+            headers={
+                "Content-Type": "application/json",
+            },
+        )
+    else:
+        # Standard OpenAI-compatible endpoint
+        payload = json.dumps(
+            {
+                "model": config.model,
+                "messages": messages,
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+            }
+        ).encode("utf-8")
+        req = urlrequest.Request(
+            url=f"{config.base_url}/chat/completions",
+            data=payload,
+            method="POST",
+            headers={
+                "Authorization": f"Bearer {config.api_key}",
+                "Content-Type": "application/json",
+            },
+        )
+    
     try:
         with urlrequest.urlopen(req, timeout=timeout_seconds) as response:
             raw = response.read().decode("utf-8")
@@ -228,11 +302,18 @@ def request_chat_completion(
         raise RuntimeError(f"Request failed: {exc.reason}") from exc
 
     data = json.loads(raw)
-    choices = data.get("choices") or []
-    if not choices:
-        raise RuntimeError("No choices returned from provider")
-    message = (choices[0] or {}).get("message")
-    text = _extract_message_text(message).strip()
+    
+    # Handle Ollama native API response format
+    if config.provider == "ollama":
+        message = data.get("message", {})
+        text = message.get("content", "").strip()
+    else:
+        choices = data.get("choices") or []
+        if not choices:
+            raise RuntimeError("No choices returned from provider")
+        message = (choices[0] or {}).get("message")
+        text = _extract_message_text(message).strip()
+    
     if not text:
         raise RuntimeError("Provider returned empty content")
     return text
