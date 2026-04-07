@@ -2,7 +2,7 @@
 
 import { AnimatePresence } from "framer-motion";
 import { Header } from "@/components/layout/Header";
-import { OperatorMicrographics } from "@/components/layout/OperatorMicrographics";
+import OperatorMicrographics from "@/components/layout/OperatorMicrographics";
 import { ChatPanel } from "@/components/chat/ChatPanel";
 import { BackendStatus } from "@/components/ui/ErrorBanner";
 import { KeyboardNav } from "@/components/ui/KeyboardNav";

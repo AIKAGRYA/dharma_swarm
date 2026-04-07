@@ -1,910 +1,712 @@
 "use client";
 
-import {
-  useEffect,
-  useId,
-  useMemo,
-  useState,
-  type CSSProperties,
-} from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, useReducedMotion, AnimatePresence } from "framer-motion";
-import { ChevronDown, ChevronUp } from "lucide-react";
-import { usePathname } from "next/navigation";
+import { ChevronDown, ChevronUp, HelpCircle } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { colors } from "@/lib/theme";
 import { useOverview } from "@/hooks/useOverview";
 import { useHealth } from "@/hooks/useHealth";
 import { useAgents } from "@/hooks/useAgents";
 import { apiFetch } from "@/lib/api";
-import type { FitnessTrendPoint, AgentOut, HealthOut, SwarmOverview } from "@/lib/types";
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-type LensId = "pulse" | "vsm" | "telos";
-
-interface LensDef {
-  id: LensId;
-  label: string;
-  accent: string;
-  summary: string;
-}
-
-const LENSES: LensDef[] = [
-  {
-    id: "pulse",
-    label: "System Pulse",
-    accent: colors.aozora,
-    summary: "Fitness trend, loop closure events, and module health across the living system.",
-  },
-  {
-    id: "vsm",
-    label: "VSM Health",
-    accent: colors.botan,
-    summary: "Beer's Viable System Model: 5 regulatory levels × 7 system domains.",
-  },
-  {
-    id: "telos",
-    label: "Telos Vector",
-    accent: colors.kinpaku,
-    summary: "Ontological priority orbits and telos coherence score across the swarm.",
-  },
-];
+import type { FitnessTrendPoint } from "@/lib/types";
 
 const COLLAPSED_KEY = "dharma-micrographics-collapsed";
 
-const VSM_ROWS = ["S5 Identity", "S4 Intel", "S3 Control", "S2 Coord", "S1 Ops", "Variety"];
-const VSM_COLS = ["CTL", "LIV", "EVO", "STG", "AGT", "TEL", "ECO"];
+/* ─── Tooltip ────────────────────────────────────────────── */
 
-const MODULE_LABELS = ["CTL", "CRN", "LIV", "JGK", "MYC", "TRI", "EVO"];
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function routeLens(pathname: string): LensId {
-  if (pathname.includes("/agents") || pathname.includes("/tasks")) return "vsm";
-  if (pathname.includes("/evolution") || pathname.includes("/telos")) return "telos";
-  return "pulse";
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min), max);
-}
-
-function sparkle(value: number, accent: string): CSSProperties {
-  const alpha = clamp(10 + value * 70, 10, 78);
-  return {
-    background: `color-mix(in srgb, ${accent} ${alpha}%, ${colors.sumi[900]})`,
-    boxShadow: `0 0 14px color-mix(in srgb, ${accent} ${Math.round(alpha * 0.55)}%, transparent)`,
-  };
-}
-
-function hoursAgo(iso: string): number {
-  const ts = new Date(iso).getTime();
-  return (Date.now() - ts) / 3_600_000;
-}
-
-function buildVSMMatrix(
-  overview: SwarmOverview | null,
-  health: HealthOut | null,
-  agents: AgentOut[],
-  fitnessTrend: FitnessTrendPoint[] | undefined,
-): number[][] {
-  const agentCount = agents.length;
-  const agentHealth = health?.agent_health ?? [];
-  const meanSuccess =
-    agentHealth.length > 0
-      ? agentHealth.reduce((s, h) => s + h.success_rate, 0) / agentHealth.length
-      : 0;
-
-  const stigmergyDensity = clamp((overview?.stigmergy_density ?? 0) / 100, 0, 1);
-  const evolutionEntries = overview?.evolution_entries ?? 0;
-  const isHealthy = overview?.health_status === "healthy";
-  const meanFitness = overview?.mean_fitness ?? 0;
-  const taskCompletionRate =
-    (overview?.tasks_completed ?? 0) /
-    Math.max(1, (overview?.task_count ?? 1));
-
-  // Distinct providers, models, roles
-  const providers = new Set(agents.map((a) => a.provider).filter(Boolean));
-  const models = new Set(agents.map((a) => a.model).filter(Boolean));
-  const roles = new Set(agents.map((a) => a.role).filter(Boolean));
-  const varietyScore = clamp(
-    (providers.size / 4 + models.size / 6 + roles.size / 8) / 3,
-    0,
-    1,
+function Tip({ text }: { text: string }) {
+  const [show, setShow] = useState(false);
+  return (
+    <span className="relative inline-block">
+      <HelpCircle
+        size={10}
+        className="cursor-help text-sumi-600 transition-colors hover:text-aozora"
+        onMouseEnter={() => setShow(true)}
+        onMouseLeave={() => setShow(false)}
+      />
+      {show && (
+        <span className="absolute bottom-full left-1/2 z-50 mb-2 w-48 -translate-x-1/2 rounded-lg border border-sumi-700/40 bg-sumi-900 px-3 py-2 text-[10px] leading-tight text-torinoko shadow-lg">
+          {text}
+        </span>
+      )}
+    </span>
   );
-
-  // Latest fitness point
-  const latestFitness =
-    fitnessTrend && fitnessTrend.length > 0
-      ? fitnessTrend[fitnessTrend.length - 1].fitness
-      : 0;
-
-  // 6 rows × 7 cols: CTL, LIV, EVO, STG, AGT, TEL, ECO
-  //                   0    1    2    3    4    5    6
-  const matrix: number[][] = [
-    // S5 Identity — mostly dim (telos gates not actively running)
-    [0.28, 0.12, clamp(latestFitness * 0.9, 0, 1), 0.18, 0.35, 0.22, 0.08],
-    // S4 Intelligence — evolution, ontology
-    [0.2, 0.3, clamp(evolutionEntries > 0 ? 0.7 + latestFitness * 0.25 : 0.15, 0, 1), 0.45, 0.35, 0.55, 0.1],
-    // S3 Control — orchestration, health status
-    [clamp(isHealthy ? 0.75 : 0.35, 0, 1), 0.22, 0.48, 0.3, clamp(meanSuccess, 0, 1), 0.4, 0.18],
-    // S2 Coordination — stigmergy
-    [0.12, clamp(stigmergyDensity * 1.2, 0, 1), 0.3, clamp(stigmergyDensity * 1.5, 0, 1), 0.38, 0.28, 0.1],
-    // S1 Operations — task throughput, agents
-    [clamp(taskCompletionRate, 0, 1), 0.55, clamp(latestFitness, 0, 1), 0.62, clamp(meanSuccess, 0, 1), 0.35, 0.28],
-    // Variety — diversity across providers/models/roles
-    [varietyScore * 0.8, varietyScore * 0.6, varietyScore, varietyScore * 0.5, clamp(agentCount / 20, 0, 1), varietyScore * 0.7, varietyScore * 0.4],
-  ];
-
-  return matrix;
 }
 
-function cellColor(value: number): string {
-  if (value > 0.6) return colors.aozora;
-  if (value > 0.3) return colors.kinpaku;
-  return colors.bengara;
-}
+/* ─── Stat Pill ──────────────────────────────────────────── */
 
-// ---------------------------------------------------------------------------
-// Sub-components
-// ---------------------------------------------------------------------------
-
-function MiniReadout({
+function Pill({
   label,
   value,
-  accent,
+  sub,
+  color,
+  tip,
 }: {
   label: string;
-  value: string;
-  accent: string;
+  value: string | number;
+  sub?: string;
+  color: string;
+  tip?: string;
 }) {
   return (
-    <div className="rounded-xl border border-sumi-700/35 bg-sumi-900/70 px-3 py-2">
-      <p className="font-mono uppercase tracking-[0.12em] text-sumi-600">{label}</p>
-      <p className="mt-1 font-heading text-sm" style={{ color: accent }}>
+    <div className="flex flex-col items-center gap-0.5">
+      <div className="flex items-center gap-1">
+        <span className="text-[8px] font-semibold uppercase tracking-widest text-sumi-600">
+          {label}
+        </span>
+        {tip && <Tip text={tip} />}
+      </div>
+      <span className="font-mono text-sm font-bold" style={{ color }}>
         {value}
-      </p>
+      </span>
+      {sub && <span className="text-[8px] text-sumi-600">{sub}</span>}
     </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Main component
-// ---------------------------------------------------------------------------
+/* ─── Heartbeat Waveform ─────────────────────────────────── */
 
-export function OperatorMicrographics() {
-  const pathname = usePathname();
-  const prefersReducedMotion = useReducedMotion();
-  const sparkGradientId = useId();
-  const coreGradientId = useId();
+function Heartbeat({
+  data,
+  tick,
+  noMotion,
+}: {
+  data: number[];
+  tick: number;
+  noMotion: boolean;
+}) {
+  const points = useMemo(() => {
+    const w = 400;
+    const h = 80;
+    const step = w / (data.length - 1 || 1);
+    return data
+      .map((v, i) => {
+        const jitter = noMotion ? 0 : Math.sin(tick * 0.4 + i * 0.7) * 1.5;
+        const y = h - v * h * 0.85 - 6 + jitter;
+        return `${i * step},${y.toFixed(1)}`;
+      })
+      .join(" ");
+  }, [data, tick, noMotion]);
 
-  const defaultLens = useMemo(() => routeLens(pathname), [pathname]);
-  const [activeLens, setActiveLens] = useState<LensId>(defaultLens);
-  const [tick, setTick] = useState(0);
-  const [focusBar, setFocusBar] = useState(24);
-  const [focusCell, setFocusCell] = useState<number | null>(null);
+  const gradientId = "hb-grad";
 
-  const [collapsed, setCollapsed] = useState<boolean>(() => {
-    if (typeof window === "undefined") return true;
-    const stored = window.localStorage.getItem(COLLAPSED_KEY);
-    return stored === null ? true : stored === "true";
-  });
+  return (
+    <svg viewBox="0 0 400 80" className="h-20 w-full" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={colors.aozora} stopOpacity={0.4} />
+          <stop offset="100%" stopColor={colors.aozora} stopOpacity={0} />
+        </linearGradient>
+        <filter id="hb-glow">
+          <feGaussianBlur stdDeviation="2" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
+      {/* Fill area */}
+      <polygon
+        points={`0,80 ${points} 400,80`}
+        fill={`url(#${gradientId})`}
+      />
+      {/* Line */}
+      <polyline
+        points={points}
+        fill="none"
+        stroke={colors.aozora}
+        strokeWidth="2"
+        strokeLinejoin="round"
+        filter="url(#hb-glow)"
+      />
+      {/* Current value dot */}
+      {data.length > 0 && (
+        <circle
+          cx="400"
+          cy={80 - data[data.length - 1] * 80 * 0.85 - 6}
+          r="3"
+          fill={colors.aozora}
+          opacity={noMotion ? 1 : 0.5 + Math.sin(tick * 0.5) * 0.5}
+        >
+          {!noMotion && (
+            <animate
+              attributeName="r"
+              values="3;5;3"
+              dur="2s"
+              repeatCount="indefinite"
+            />
+          )}
+        </circle>
+      )}
+    </svg>
+  );
+}
 
-  // Data hooks
+/* ─── Health Ring ─────────────────────────────────────────── */
+
+function HealthRing({
+  layers,
+  tick,
+  noMotion,
+}: {
+  layers: { name: string; value: number; color: string; tip: string }[];
+  tick: number;
+  noMotion: boolean;
+}) {
+  const size = 180;
+  const cx = size / 2;
+  const cy = size / 2;
+
+  return (
+    <div className="relative" style={{ width: size, height: size }}>
+      <svg viewBox={`0 0 ${size} ${size}`} className="h-full w-full">
+        {layers.map((layer, i) => {
+          const r = 28 + i * 14;
+          const circumference = 2 * Math.PI * r;
+          const filled = layer.value * circumference;
+          const pulse = noMotion ? 0 : Math.sin(tick * 0.3 + i * 1.2) * 2;
+
+          return (
+            <g key={layer.name}>
+              {/* Background ring */}
+              <circle
+                cx={cx}
+                cy={cy}
+                r={r}
+                fill="none"
+                stroke="rgba(56,58,68,0.25)"
+                strokeWidth="6"
+              />
+              {/* Filled arc */}
+              <circle
+                cx={cx}
+                cy={cy}
+                r={r}
+                fill="none"
+                stroke={layer.color}
+                strokeWidth="6"
+                strokeDasharray={`${filled + pulse} ${circumference}`}
+                strokeDashoffset={circumference * 0.25}
+                strokeLinecap="round"
+                opacity={0.6 + layer.value * 0.4}
+                style={{
+                  filter:
+                    layer.value > 0.6
+                      ? `drop-shadow(0 0 4px ${layer.color})`
+                      : "none",
+                  transition: "stroke-dasharray 1s ease",
+                }}
+              />
+            </g>
+          );
+        })}
+        {/* Center label */}
+        <text
+          x={cx}
+          y={cx - 6}
+          textAnchor="middle"
+          fill={colors.sumi[600]}
+          fontSize="8"
+          fontWeight="600"
+        >
+          SYSTEM
+        </text>
+        <text
+          x={cx}
+          y={cx + 6}
+          textAnchor="middle"
+          fill={colors.sumi[600]}
+          fontSize="8"
+          fontWeight="600"
+        >
+          HEALTH
+        </text>
+      </svg>
+      {/* Ring labels */}
+      {layers.map((layer, i) => {
+        const r = 28 + i * 14;
+        const angle = -Math.PI / 2 + layer.value * Math.PI * 2 * 0.95;
+        const lx = cx + Math.cos(angle) * r;
+        const ly = cy + Math.sin(angle) * r;
+        return (
+          <div
+            key={layer.name}
+            className="group absolute"
+            style={{ left: lx - 4, top: ly - 4, width: 8, height: 8 }}
+          >
+            <div
+              className="h-full w-full rounded-full"
+              style={{
+                background: layer.color,
+                boxShadow: `0 0 6px ${layer.color}`,
+              }}
+            />
+            <div className="pointer-events-none absolute bottom-full left-1/2 mb-2 hidden -translate-x-1/2 whitespace-nowrap rounded bg-sumi-900 px-2 py-1 text-[9px] text-torinoko shadow group-hover:block">
+              {layer.name}: {Math.round(layer.value * 100)}%
+              <br />
+              <span className="text-sumi-600">{layer.tip}</span>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ─── Priority Radar ─────────────────────────────────────── */
+
+function PriorityRadar({
+  priorities,
+  tick,
+  noMotion,
+}: {
+  priorities: { name: string; value: number; color: string; count: number }[];
+  tick: number;
+  noMotion: boolean;
+}) {
+  const size = 180;
+  const cx = size / 2;
+  const cy = size / 2;
+  const maxR = 75;
+  const n = priorities.length;
+
+  const points = useMemo(() => {
+    return priorities.map((p, i) => {
+      const angle = (Math.PI * 2 * i) / n - Math.PI / 2;
+      const jitter = noMotion ? 0 : Math.sin(tick * 0.25 + i * 2) * 3;
+      const r = p.value * maxR + jitter;
+      return {
+        x: cx + Math.cos(angle) * r,
+        y: cy + Math.sin(angle) * r,
+        labelX: cx + Math.cos(angle) * (maxR + 16),
+        labelY: cy + Math.sin(angle) * (maxR + 16),
+        axisX: cx + Math.cos(angle) * maxR,
+        axisY: cy + Math.sin(angle) * maxR,
+        ...p,
+      };
+    });
+  }, [priorities, tick, noMotion, n]);
+
+  const polygon = points.map((p) => `${p.x},${p.y}`).join(" ");
+
+  return (
+    <svg viewBox={`0 0 ${size} ${size}`} className="h-full w-full">
+      {/* Grid rings */}
+      {[0.25, 0.5, 0.75, 1].map((pct) => (
+        <circle
+          key={pct}
+          cx={cx}
+          cy={cy}
+          r={maxR * pct}
+          fill="none"
+          stroke="rgba(56,58,68,0.2)"
+          strokeWidth="0.5"
+        />
+      ))}
+      {/* Axis lines */}
+      {points.map((p, i) => (
+        <line
+          key={i}
+          x1={cx}
+          y1={cy}
+          x2={p.axisX}
+          y2={p.axisY}
+          stroke="rgba(56,58,68,0.2)"
+          strokeWidth="0.5"
+        />
+      ))}
+      {/* Filled polygon */}
+      <polygon
+        points={polygon}
+        fill={`${colors.aozora}15`}
+        stroke={colors.aozora}
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+        style={{ filter: "drop-shadow(0 0 6px rgba(79,209,217,0.3))" }}
+      />
+      {/* Dots + labels */}
+      {points.map((p, i) => (
+        <g key={i}>
+          <circle
+            cx={p.x}
+            cy={p.y}
+            r={3}
+            fill={p.color}
+            style={{ filter: `drop-shadow(0 0 4px ${p.color})` }}
+          />
+          <text
+            x={p.labelX}
+            y={p.labelY}
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fill={colors.kitsurubami}
+            fontSize="7"
+            fontWeight="600"
+          >
+            {p.name}
+          </text>
+          <text
+            x={p.labelX}
+            y={p.labelY + 10}
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fill={p.color}
+            fontSize="8"
+            fontWeight="700"
+            fontFamily="monospace"
+          >
+            {p.count}
+          </text>
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+/* ─── Main Component ─────────────────────────────────────── */
+
+export default function OperatorMicrographics() {
+  const prefersReducedMotion = useReducedMotion() ?? false;
   const { overview } = useOverview();
   const { health } = useHealth();
   const { agents } = useAgents();
 
   const { data: fitnessTrend } = useQuery<FitnessTrendPoint[]>({
     queryKey: ["fitness-trend-micro"],
-    queryFn: () => apiFetch<FitnessTrendPoint[]>("/api/evolution/fitness-trend"),
+    queryFn: () => apiFetch("/api/evolution/fitness-trend"),
     refetchInterval: 15_000,
   });
 
-  const { data: modulesRaw } = useQuery<unknown[]>({
-    queryKey: ["modules-micro"],
-    queryFn: () => apiFetch<unknown[]>("/api/modules"),
-    refetchInterval: 30_000,
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    return localStorage.getItem(COLLAPSED_KEY) !== "false";
   });
 
-  // Sync lens with route
-  useEffect(() => {
-    setActiveLens(defaultLens);
-  }, [defaultLens]);
+  const [tick, setTick] = useState(0);
 
-  // Tick timer — only when expanded
   useEffect(() => {
-    if (prefersReducedMotion) return;
-    if (collapsed) return;
-    const handle = window.setInterval(() => {
-      setTick((v) => v + 1);
-    }, 1400);
-    return () => window.clearInterval(handle);
-  }, [prefersReducedMotion, collapsed]);
+    if (collapsed || prefersReducedMotion) return;
+    const id = setInterval(() => setTick((t) => t + 1), 1400);
+    return () => clearInterval(id);
+  }, [collapsed, prefersReducedMotion]);
 
-  function toggleCollapsed() {
+  function toggle() {
     setCollapsed((prev) => {
       const next = !prev;
-      window.localStorage.setItem(COLLAPSED_KEY, String(next));
+      localStorage.setItem(COLLAPSED_KEY, String(next));
       return next;
     });
   }
 
-  const lens = LENSES.find((l) => l.id === activeLens) ?? LENSES[0];
+  /* ── Derived metrics ─────────────────────────────────── */
 
-  // ---------------------------------------------------------------------------
-  // PANEL 1: System Pulse — sparkline
-  // ---------------------------------------------------------------------------
+  const agentCount = overview?.agent_count ?? agents.length;
+  const tasksDone = overview?.tasks_completed ?? 0;
+  const tasksFailed = overview?.tasks_failed ?? 0;
+  const taskCount = overview?.task_count ?? 0;
+  const tracesHr = health?.traces_last_hour ?? 0;
+  const fitness = overview?.mean_fitness ?? 0;
+  const evoEntries = overview?.evolution_entries ?? 0;
+  const stigDensity = overview?.stigmergy_density ?? 0;
+  const anomalyCount = health?.anomalies?.length ?? 0;
+  const healthStatus = overview?.health_status ?? "unknown";
 
-  const sparklineValues = useMemo<number[]>(() => {
-    const raw = fitnessTrend ?? [];
-    // Take up to 28 points; pad with ~0.45 baseline if fewer
-    const pts = raw.slice(-28).map((p) => p.fitness);
-    while (pts.length < 28) pts.unshift(0.45);
-    // Add subtle jitter per tick
-    return pts.map((v, i) =>
-      clamp(v + (prefersReducedMotion ? 0 : Math.sin(tick * 0.3 + i * 0.5) * 0.015), 0.05, 0.98),
-    );
-  }, [fitnessTrend, tick, prefersReducedMotion]);
-
-  const sparklinePath = useMemo(() => {
-    return sparklineValues
-      .map((v, i) => {
-        const x = 8 + i * 14.2;
-        const y = 92 - v * 60;
-        return `${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`;
-      })
-      .join(" ");
-  }, [sparklineValues]);
-
-  // Loop closure indicators
-  const evolutionStaleHours = useMemo(() => {
-    const raw = fitnessTrend ?? [];
-    if (raw.length === 0) return Infinity;
-    return hoursAgo(raw[raw.length - 1].timestamp);
+  // Heartbeat data: fitness trend padded to 28 points
+  const heartbeatData = useMemo(() => {
+    const raw = (fitnessTrend ?? []).slice(-28).map((f) => f.fitness);
+    while (raw.length < 28) raw.unshift(raw[0] ?? 0.45);
+    return raw;
   }, [fitnessTrend]);
 
-  const stigmergyActive = (overview?.stigmergy_density ?? 0) > 0;
+  // Completion rate
+  const completionRate = taskCount > 0 ? tasksDone / taskCount : 0;
 
-  // Module pips — derive from modulesRaw if present, else from overview health
-  const modulePips = useMemo(() => {
-    if (modulesRaw && modulesRaw.length >= 7) {
-      return (modulesRaw as Array<{ status?: string; live?: boolean }>)
-        .slice(0, 7)
-        .map((m) => {
-          if (m.live === true || m.status === "alive") return "alive" as const;
-          if (m.status === "stale") return "stale" as const;
-          return "dead" as const;
-        });
-    }
-    // Fallback: derive from overview health
-    const isHealthy = overview?.health_status === "healthy";
-    return MODULE_LABELS.map((_, i) => {
-      if (!isHealthy) return i < 3 ? ("stale" as const) : ("dead" as const);
-      return i < 4 ? ("alive" as const) : ("stale" as const);
-    });
-  }, [modulesRaw, overview]);
+  // Agent diversity
+  const providers = new Set(agents.map((a) => a.provider)).size;
+  const models = new Set(agents.map((a) => a.model)).size;
+  const roles = new Set(agents.map((a) => a.role)).size;
+  const busyAgents = agents.filter((a) => a.status === "busy").length;
 
-  const aliveModules = modulePips.filter((s) => s === "alive").length;
+  // Health layers for ring
+  const agentHealth = health?.agent_health ?? [];
+  const meanSuccess =
+    agentHealth.length > 0
+      ? agentHealth.reduce((s, h) => s + h.success_rate, 0) / agentHealth.length
+      : 0;
 
-  // Readout values
-  const tracesPerHour = health?.traces_last_hour ?? overview?.task_count ?? 0;
-  const nonStaleLoops = [
-    evolutionStaleHours < 24,
-    stigmergyActive,
-    false, // Metabolic always stale for now
-  ].filter(Boolean).length;
+  const healthLayers = [
+    {
+      name: "Operations",
+      value: completionRate,
+      color: completionRate > 0.5 ? colors.rokusho : completionRate > 0.2 ? colors.kinpaku : colors.bengara,
+      tip: `${tasksDone} of ${taskCount} tasks completed`,
+    },
+    {
+      name: "Coordination",
+      value: Math.min(1, stigDensity / 1500),
+      color: stigDensity > 500 ? colors.rokusho : stigDensity > 100 ? colors.kinpaku : colors.bengara,
+      tip: `${stigDensity} stigmergy marks (pheromone trails)`,
+    },
+    {
+      name: "Agent Health",
+      value: meanSuccess,
+      color: meanSuccess > 0.8 ? colors.rokusho : meanSuccess > 0.5 ? colors.kinpaku : colors.bengara,
+      tip: `${Math.round(meanSuccess * 100)}% mean success across ${agentHealth.length} agents`,
+    },
+    {
+      name: "Evolution",
+      value: Math.min(1, evoEntries / 150),
+      color: evoEntries > 50 ? colors.rokusho : evoEntries > 10 ? colors.kinpaku : colors.bengara,
+      tip: `${evoEntries} self-improvement cycles completed`,
+    },
+    {
+      name: "Fitness",
+      value: fitness,
+      color: fitness > 0.6 ? colors.rokusho : fitness > 0.4 ? colors.kinpaku : colors.bengara,
+      tip: `System quality score: ${(fitness * 100).toFixed(0)}%`,
+    },
+  ];
 
-  // ---------------------------------------------------------------------------
-  // PANEL 2: VSM Matrix
-  // ---------------------------------------------------------------------------
+  // Priority radar
+  const priorities = [
+    { name: "Agents", value: Math.min(1, agentCount / 30), color: colors.aozora, count: agentCount },
+    { name: "Tasks", value: Math.min(1, taskCount / 100), color: colors.botan, count: taskCount },
+    { name: "Evolution", value: Math.min(1, evoEntries / 150), color: colors.kinpaku, count: evoEntries },
+    { name: "Traces", value: Math.min(1, (health?.total_traces ?? 0) / 1500), color: colors.rokusho, count: health?.total_traces ?? 0 },
+    { name: "Stigmergy", value: Math.min(1, stigDensity / 1500), color: colors.fuji, count: stigDensity },
+  ];
 
-  const vsmMatrix = useMemo(
-    () => buildVSMMatrix(overview, health, agents, fitnessTrend),
-    [overview, health, agents, fitnessTrend],
-  );
+  // Status color
+  const statusColor =
+    healthStatus === "healthy" ? colors.rokusho
+    : healthStatus === "degraded" ? colors.kinpaku
+    : colors.bengara;
 
-  const vsmActiveRows = useMemo(
-    () =>
-      vsmMatrix.filter(
-        (row) => row.reduce((s, v) => s + v, 0) / row.length > 0.3,
-      ).length,
-    [vsmMatrix],
-  );
-
-  const distinctProviders = useMemo(
-    () => new Set(agents.map((a) => a.provider).filter(Boolean)).size,
-    [agents],
-  );
-  const distinctModels = useMemo(
-    () => new Set(agents.map((a) => a.model).filter(Boolean)).size,
-    [agents],
-  );
-  const distinctRoles = useMemo(
-    () => new Set(agents.map((a) => a.role).filter(Boolean)).size,
-    [agents],
-  );
-  const varietyLabel = `${distinctProviders}p·${distinctModels}m·${distinctRoles}r`;
-
-  // ---------------------------------------------------------------------------
-  // PANEL 3: Telos Vector — orbital diagram
-  // ---------------------------------------------------------------------------
-
-  const TCS = 0.39;
-  const tcsState = TCS >= 0.7 ? "COHERENT" : TCS >= 0.5 ? "STABILIZING" : "DRIFTING";
-  const tcsStateColor = TCS >= 0.7 ? colors.rokusho : TCS >= 0.5 ? colors.kinpaku : colors.bengara;
-
-  const orbits = useMemo(
-    () => [
-      { name: "witness", telos: 1.0, color: colors.aozora, instances: 0, r: 20 },
-      { name: "experiment", telos: 0.95, color: colors.rokusho, instances: 0, r: 38 },
-      { name: "venture", telos: 0.95, color: colors.kinpaku, instances: 0, r: 56 },
-      { name: "agent", telos: 0.9, color: colors.botan, instances: agents.length, r: 74 },
-      { name: "task", telos: 0.7, color: colors.fuji, instances: overview?.task_count ?? 0, r: 92 },
-    ],
-    [agents.length, overview?.task_count],
-  );
-
-  // Animated particle positions per orbit (CSS animation via inline keyframes is not feasible here;
-  // we drive positions via tick so the particles move without CSS @keyframes)
-  const particlePositions = useMemo(() => {
-    return orbits.map((orbit, oi) => {
-      const speed = (8 - Math.min(5, orbit.instances / 20)) * 0.1; // radians/tick
-      const angle1 = tick * speed * (0.08 + oi * 0.012);
-      const angle2 = angle1 + Math.PI;
-      return {
-        p1: {
-          x: 110 + Math.cos(angle1) * orbit.r,
-          y: 110 + Math.sin(angle1) * orbit.r,
-        },
-        p2: {
-          x: 110 + Math.cos(angle2) * orbit.r,
-          y: 110 + Math.sin(angle2) * orbit.r,
-        },
-        opacity: Math.min(1, 0.2 + orbit.instances / 50),
-      };
-    });
-  }, [orbits, tick]);
-
-  // ---------------------------------------------------------------------------
-  // Collapsed strip values
-  // ---------------------------------------------------------------------------
-
-  const focusValue = sparklineValues[focusBar] ?? sparklineValues[sparklineValues.length - 1];
-
-  // ---------------------------------------------------------------------------
-  // Render
-  // ---------------------------------------------------------------------------
+  /* ── Render ──────────────────────────────────────────── */
 
   return (
-    <section className="glass-panel relative overflow-hidden px-5 py-4">
-      {/* Background gradient */}
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background:
-            `radial-gradient(circle at 12% 20%, color-mix(in srgb, ${lens.accent} 18%, transparent), transparent 28%), ` +
-            `radial-gradient(circle at 88% 15%, color-mix(in srgb, ${colors.fuji} 12%, transparent), transparent 22%), ` +
-            `linear-gradient(135deg, rgba(255,255,255,0.015), transparent 65%)`,
-        }}
-      />
-
-      <div className="relative flex flex-col gap-4">
-        {/* Header row */}
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-          <div className="flex-1">
-            <div className="mb-1 flex items-center gap-2">
-              <span
-                className="rounded-full px-2 py-1 font-mono text-[10px] uppercase tracking-[0.18em]"
-                style={{
-                  color: lens.accent,
-                  background: `color-mix(in srgb, ${lens.accent} 12%, transparent)`,
-                }}
-              >
-                Operator Micrographics
-              </span>
-              <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-sumi-600">
-                {pathname.replace("/dashboard", "dashboard") || "dashboard"}
-              </span>
-              <button
-                type="button"
-                aria-label={collapsed ? "Expand micrographics" : "Collapse micrographics"}
-                onClick={toggleCollapsed}
-                className="ml-auto flex items-center gap-1 rounded-full border px-2 py-1 font-mono text-[10px] uppercase tracking-[0.14em] transition-all"
-                style={{
-                  color: colors.sumi[600],
-                  borderColor: `${colors.sumi[700]}66`,
-                  background: `${colors.sumi[900]}99`,
-                }}
-              >
-                {collapsed ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
-              </button>
-            </div>
-            <h2
-              className="font-heading text-lg font-semibold tracking-tight"
-              style={{ color: lens.accent }}
-            >
-              Cybernetic system state — live swarm telemetry
-            </h2>
-            {!collapsed && (
-              <p className="mt-1 max-w-3xl text-sm text-sumi-600">{lens.summary}</p>
-            )}
-          </div>
-
-          {/* Lens buttons — shown when expanded */}
-          {!collapsed && (
-            <div className="flex flex-wrap gap-2">
-              {LENSES.map((item) => {
-                const active = item.id === activeLens;
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => setActiveLens(item.id)}
-                    className="rounded-full border px-3 py-1.5 font-mono text-[11px] tracking-[0.12em] transition-all"
-                    style={{
-                      color: active ? item.accent : colors.sumi[600],
-                      borderColor: active
-                        ? `color-mix(in srgb, ${item.accent} 38%, transparent)`
-                        : `${colors.sumi[700]}66`,
-                      background: active
-                        ? `color-mix(in srgb, ${item.accent} 12%, transparent)`
-                        : `${colors.sumi[900]}99`,
-                      boxShadow: active
-                        ? `0 0 18px color-mix(in srgb, ${item.accent} 18%, transparent)`
-                        : "none",
-                    }}
-                  >
-                    {item.label}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Collapsed strip */}
-          {collapsed && (
-            <div className="flex flex-wrap items-center gap-4 font-mono text-[11px]">
-              <span className="text-sumi-600">
-                Pulse <span style={{ color: colors.aozora }}>{tracesPerHour}/hr</span>
-              </span>
-              <span className="text-sumi-600">
-                Loops <span style={{ color: colors.kinpaku }}>{nonStaleLoops}/3</span>
-              </span>
-              <span className="text-sumi-600">
-                Modules <span style={{ color: colors.rokusho }}>{aliveModules}/7</span>
-              </span>
-              <span className="text-sumi-600">
-                VSM <span style={{ color: colors.botan }}>{vsmActiveRows}/5</span>
-              </span>
-              <span className="text-sumi-600">
-                Variety <span style={{ color: colors.fuji }}>{varietyLabel}</span>
-              </span>
-              <span className="text-sumi-600">
-                TCS <span style={{ color: colors.kinpaku }}>{TCS.toFixed(2)}</span>
-              </span>
-              <span style={{ color: tcsStateColor }}>{tcsState}</span>
-            </div>
-          )}
+    <section className="glass-panel relative overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-3">
+        <div className="flex items-center gap-3">
+          <div
+            className="h-2 w-2 rounded-full"
+            style={{
+              background: statusColor,
+              boxShadow: `0 0 8px ${statusColor}`,
+            }}
+          />
+          <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-kitsurubami">
+            System Status
+          </span>
+          <span
+            className="rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider"
+            style={{
+              color: statusColor,
+              background: `color-mix(in srgb, ${statusColor} 12%, transparent)`,
+            }}
+          >
+            {healthStatus}
+          </span>
         </div>
 
-        {/* Expanded body */}
-        <AnimatePresence initial={false}>
-          {!collapsed && (
-            <motion.div
-              key="micrographics-body"
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={
-                prefersReducedMotion
-                  ? { duration: 0 }
-                  : { duration: 0.28, ease: "easeInOut" }
-              }
-              style={{ overflow: "hidden" }}
-            >
-              <div className="grid gap-4 xl:grid-cols-[1.15fr_1fr_0.92fr]">
-
-                {/* ============================================================
-                    PANEL 1: SYSTEM PULSE
-                ============================================================ */}
-                <motion.div
-                  layout
-                  className="glass-panel-subtle overflow-hidden p-4"
-                  onMouseMove={(event) => {
-                    const rect = event.currentTarget.getBoundingClientRect();
-                    const ratio = clamp((event.clientX - rect.left) / rect.width, 0, 0.999);
-                    setFocusBar(Math.floor(ratio * sparklineValues.length));
-                  }}
-                >
-                  <div className="mb-3 flex items-center justify-between">
-                    <div>
-                      <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-sumi-600">
-                        System Pulse
-                      </p>
-                      <p className="font-heading text-sm text-torinoko">
-                        Fitness trend + loop closure events
-                      </p>
-                    </div>
-                    <span
-                      className="rounded-full px-2 py-1 font-mono text-[10px]"
-                      style={{
-                        color: colors.aozora,
-                        background: `color-mix(in srgb, ${colors.aozora} 10%, transparent)`,
-                      }}
-                    >
-                      {(focusValue * 100).toFixed(0)}%
-                    </span>
-                  </div>
-
-                  {/* Sparkline SVG */}
-                  <svg viewBox="0 0 400 110" className="h-28 w-full">
-                    <defs>
-                      <linearGradient id={sparkGradientId} x1="0" x2="1">
-                        <stop offset="0%" stopColor={colors.aozora} stopOpacity="0.15" />
-                        <stop offset="100%" stopColor={colors.fuji} stopOpacity="0.28" />
-                      </linearGradient>
-                    </defs>
-                    {sparklineValues.map((v, i) => {
-                      const x = 8 + i * 14.2;
-                      const h = v * 62;
-                      const isFocus = i === focusBar;
-                      return (
-                        <rect
-                          key={i}
-                          x={x - 3}
-                          y={102 - h}
-                          width="6"
-                          height={h}
-                          rx="3"
-                          fill={isFocus ? colors.aozora : `${colors.sumi[700]}77`}
-                          opacity={isFocus ? 0.95 : 0.34}
-                        />
-                      );
-                    })}
-                    <path
-                      d={`${sparklinePath} L 392 104 L 8 104 Z`}
-                      fill={`url(#${sparkGradientId})`}
-                      opacity="0.28"
-                    />
-                    <path
-                      d={sparklinePath}
-                      fill="none"
-                      stroke={colors.aozora}
-                      strokeWidth="2.4"
-                      strokeLinecap="round"
-                    />
-                    <circle
-                      cx={8 + focusBar * 14.2}
-                      cy={92 - focusValue * 60}
-                      r="5.5"
-                      fill={colors.aozora}
-                      style={{ filter: `drop-shadow(0 0 8px ${colors.aozora})` }}
-                    />
-                  </svg>
-
-                  {/* Loop closure indicators */}
-                  <div className="mt-3 flex flex-wrap gap-3">
-                    {/* Evolution */}
-                    <div className="flex items-center gap-1.5">
-                      <div
-                        className="h-[5px] w-[5px] rounded-full"
-                        style={{
-                          background: evolutionStaleHours < 24 ? colors.rokusho : colors.bengara,
-                          boxShadow:
-                            evolutionStaleHours < 24
-                              ? `0 0 4px ${colors.rokusho}`
-                              : "none",
-                        }}
-                      />
-                      <span
-                        className="font-mono text-[8px]"
-                        style={{
-                          color: evolutionStaleHours < 24 ? colors.rokusho : colors.bengara,
-                        }}
-                      >
-                        Evolution{" "}
-                        {evolutionStaleHours < 24
-                          ? `${evolutionStaleHours.toFixed(0)}h ago`
-                          : "stale"}
-                      </span>
-                    </div>
-                    {/* Stigmergy */}
-                    <div className="flex items-center gap-1.5">
-                      <div
-                        className="h-[5px] w-[5px] rounded-full"
-                        style={{
-                          background: stigmergyActive ? colors.aozora : colors.kinpaku,
-                          boxShadow: stigmergyActive ? `0 0 4px ${colors.aozora}` : "none",
-                        }}
-                      />
-                      <span
-                        className="font-mono text-[8px]"
-                        style={{ color: stigmergyActive ? colors.aozora : colors.kinpaku }}
-                      >
-                        Stigmergy {stigmergyActive ? "active" : "sparse"}
-                      </span>
-                    </div>
-                    {/* Metabolic */}
-                    <div className="flex items-center gap-1.5">
-                      <div
-                        className="h-[5px] w-[5px] rounded-full"
-                        style={{ background: colors.bengara }}
-                      />
-                      <span className="font-mono text-[8px]" style={{ color: colors.bengara }}>
-                        Metabolic stale
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Module pips */}
-                  <div className="mt-3">
-                    <span className="font-mono text-[7px] uppercase tracking-[0.08em] text-sumi-600">
-                      Modules
-                    </span>
-                    <div className="mt-1.5 flex gap-1.5">
-                      {MODULE_LABELS.map((label, i) => {
-                        const status = modulePips[i] ?? "dead";
-                        const pipColor =
-                          status === "alive"
-                            ? colors.rokusho
-                            : status === "stale"
-                              ? colors.kinpaku
-                              : colors.bengara;
-                        return (
-                          <div key={label} className="flex flex-col items-center gap-[3px]">
-                            <div
-                              className="h-2 w-2 rounded-full"
-                              style={{
-                                background: pipColor,
-                                boxShadow:
-                                  status === "alive" ? `0 0 5px ${pipColor}88` : "none",
-                              }}
-                            />
-                            <span
-                              className="font-mono text-[6px]"
-                              style={{ color: colors.sumi[600] }}
-                            >
-                              {label}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Readout */}
-                  <div className="mt-3 grid grid-cols-3 gap-2">
-                    <MiniReadout label="Pulse" value={`${tracesPerHour}/hr`} accent={colors.aozora} />
-                    <MiniReadout label="Loops" value={`${nonStaleLoops}/3`} accent={colors.kinpaku} />
-                    <MiniReadout label="Modules" value={`${aliveModules}/7`} accent={colors.rokusho} />
-                  </div>
-                </motion.div>
-
-                {/* ============================================================
-                    PANEL 2: VIABLE SYSTEM MATRIX
-                ============================================================ */}
-                <motion.div layout className="glass-panel-subtle p-4">
-                  <div className="mb-3 flex items-center justify-between">
-                    <div>
-                      <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-sumi-600">
-                        Viable System Matrix
-                      </p>
-                      <p className="font-heading text-sm text-torinoko">
-                        Beer VSM levels × system domains
-                      </p>
-                    </div>
-                    <span className="font-mono text-[11px]" style={{ color: colors.botan }}>
-                      {vsmActiveRows}/5
-                    </span>
-                  </div>
-
-                  {/* Grid: header row + 6 data rows */}
-                  <div className="overflow-x-auto">
-                    <div
-                      className="grid gap-[3px]"
-                      style={{
-                        gridTemplateColumns: "60px repeat(7, 1fr)",
-                        minWidth: 280,
-                      }}
-                    >
-                      {/* Column headers */}
-                      <div />
-                      {VSM_COLS.map((col) => (
-                        <div
-                          key={col}
-                          className="py-[2px] text-center font-mono"
-                          style={{ fontSize: 7, color: colors.sumi[600], letterSpacing: "0.05em" }}
-                        >
-                          {col}
-                        </div>
-                      ))}
-
-                      {/* Data rows */}
-                      {VSM_ROWS.map((rowName, ri) => (
-                        <>
-                          <div
-                            key={`row-${ri}`}
-                            className="flex items-center font-mono"
-                            style={{
-                              fontSize: 7,
-                              color: colors.kitsurubami,
-                              letterSpacing: "0.05em",
-                              fontWeight: 600,
-                            }}
-                          >
-                            {rowName}
-                          </div>
-                          {vsmMatrix[ri]?.map((value, ci) => {
-                            const cellIdx = ri * 7 + ci;
-                            const isFocus = focusCell === cellIdx;
-                            const col = cellColor(value);
-                            const alpha = clamp(10 + value * 70, 10, 78);
-                            return (
-                              <button
-                                key={`cell-${ri}-${ci}`}
-                                type="button"
-                                aria-label={`VSM ${rowName} × ${VSM_COLS[ci]}`}
-                                onMouseEnter={() => setFocusCell(cellIdx)}
-                                onMouseLeave={() => setFocusCell(null)}
-                                className="h-[18px] rounded-[3px] transition-transform duration-150 hover:scale-110"
-                                style={{
-                                  background: `color-mix(in srgb, ${col} ${alpha}%, ${colors.sumi[900]})`,
-                                  boxShadow:
-                                    value > 0.7
-                                      ? `0 0 6px color-mix(in srgb, ${col} 35%, transparent)`
-                                      : "none",
-                                  outline: isFocus ? `1px solid ${col}` : "none",
-                                }}
-                              />
-                            );
-                          })}
-                        </>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="mt-3 h-px bg-sumi-700/40" />
-
-                  {/* Readout */}
-                  <div className="mt-3 grid grid-cols-3 gap-2">
-                    <MiniReadout label="VSM Active" value={`${vsmActiveRows}/5`} accent={colors.aozora} />
-                    <MiniReadout label="Variety" value={varietyLabel} accent={colors.botan} />
-                    <MiniReadout label="Fleet" value={`${agents.length}`} accent={colors.kinpaku} />
-                  </div>
-                </motion.div>
-
-                {/* ============================================================
-                    PANEL 3: TELOS VECTOR
-                ============================================================ */}
-                <motion.div layout className="glass-panel-subtle p-4">
-                  <div className="mb-3 flex items-center justify-between">
-                    <div>
-                      <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-sumi-600">
-                        Telos Vector
-                      </p>
-                      <p className="font-heading text-sm text-torinoko">
-                        Ontological priority orbits + coherence
-                      </p>
-                    </div>
-                    <span className="font-mono text-[11px]" style={{ color: colors.kinpaku }}>
-                      TCS {TCS.toFixed(2)}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-center">
-                    <svg viewBox="0 0 220 220" className="h-52 w-52 max-w-full">
-                      <defs>
-                        <radialGradient id={coreGradientId}>
-                          <stop offset="0%" stopColor={colors.aozora} stopOpacity="0.38" />
-                          <stop offset="100%" stopColor={colors.aozora} stopOpacity="0" />
-                        </radialGradient>
-                      </defs>
-
-                      {/* Orbit rings */}
-                      {orbits.map((orbit) => (
-                        <circle
-                          key={`ring-${orbit.name}`}
-                          cx="110"
-                          cy="110"
-                          r={orbit.r}
-                          fill="none"
-                          stroke={`color-mix(in srgb, ${orbit.color} 12%, transparent)`}
-                          strokeWidth="1"
-                        />
-                      ))}
-
-                      {/* Core glow */}
-                      <circle cx="110" cy="110" r="16" fill={`url(#${coreGradientId})`} />
-                      <circle cx="110" cy="110" r="6" fill={colors.aozora} opacity="0.4" />
-
-                      {/* TCS label */}
-                      <text
-                        x="110"
-                        y="107"
-                        textAnchor="middle"
-                        fill={colors.sumi[600]}
-                        fontSize="6"
-                        fontWeight="600"
-                      >
-                        TCS
-                      </text>
-                      <text
-                        x="110"
-                        y="117"
-                        textAnchor="middle"
-                        fill={colors.kinpaku}
-                        fontSize="8"
-                        fontWeight="700"
-                        fontFamily="monospace"
-                      >
-                        {TCS.toFixed(2)}
-                      </text>
-
-                      {/* Orbit particles */}
-                      {orbits.map((orbit, oi) => {
-                        const pos = particlePositions[oi];
-                        if (!pos) return null;
-                        const show = orbit.instances > 0 || oi < 2; // always show witness/experiment
-                        return (
-                          <g key={`particles-${orbit.name}`}>
-                            <circle
-                              cx={pos.p1.x}
-                              cy={pos.p1.y}
-                              r={3.5 - oi * 0.2}
-                              fill={orbit.color}
-                              opacity={show ? pos.opacity : 0.15}
-                              style={
-                                show
-                                  ? { filter: `drop-shadow(0 0 4px ${orbit.color})` }
-                                  : undefined
-                              }
-                            />
-                            {(orbit.instances > 10 || oi === 3) && (
-                              <circle
-                                cx={pos.p2.x}
-                                cy={pos.p2.y}
-                                r={2.5 - oi * 0.1}
-                                fill={orbit.color}
-                                opacity={pos.opacity * 0.55}
-                              />
-                            )}
-                          </g>
-                        );
-                      })}
-
-                      {/* Orbit labels */}
-                      {orbits.map((orbit, oi) => (
-                        <text
-                          key={`label-${orbit.name}`}
-                          x={120 + orbit.r * 0.22}
-                          y={96 - oi * 14}
-                          fill={orbit.color}
-                          fontSize="6"
-                          opacity="0.6"
-                        >
-                          {orbit.name}
-                        </text>
-                      ))}
-                    </svg>
-                  </div>
-
-                  {/* Readout */}
-                  <div className="mt-2 grid grid-cols-3 gap-2">
-                    <MiniReadout label="TCS" value={TCS.toFixed(2)} accent={colors.kinpaku} />
-                    <MiniReadout label="State" value={tcsState} accent={tcsStateColor} />
-                    <MiniReadout label="Focus" value="alignment" accent={colors.fuji} />
-                  </div>
-                </motion.div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <button
+          onClick={toggle}
+          className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-[10px] text-sumi-600 transition-colors hover:text-aozora"
+          aria-label={collapsed ? "Expand diagnostics" : "Collapse diagnostics"}
+        >
+          {collapsed ? "expand" : "collapse"}
+          {collapsed ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
+        </button>
       </div>
+
+      {/* Collapsed strip */}
+      {collapsed && (
+        <div className="flex items-center gap-6 border-t border-sumi-700/20 px-5 py-2">
+          <Pill
+            label="Activity"
+            value={tracesHr > 0 ? `${tracesHr}/hr` : "quiet"}
+            color={tracesHr > 10 ? colors.aozora : tracesHr > 0 ? colors.kinpaku : colors.bengara}
+            tip="Actions performed by agents in the last hour"
+          />
+          <Pill
+            label="Fitness"
+            value={`${(fitness * 100).toFixed(0)}%`}
+            color={fitness > 0.6 ? colors.rokusho : fitness > 0.4 ? colors.kinpaku : colors.bengara}
+            tip="Overall system quality score from self-improvement cycles"
+          />
+          <Pill
+            label="Fleet"
+            value={`${busyAgents}/${agentCount}`}
+            sub="active"
+            color={busyAgents > 0 ? colors.aozora : colors.sumi[600]}
+            tip={`${busyAgents} agents working, ${agentCount} total in swarm`}
+          />
+          <Pill
+            label="Tasks"
+            value={`${tasksDone}/${taskCount}`}
+            sub={`${tasksFailed} failed`}
+            color={tasksFailed > tasksDone ? colors.bengara : colors.rokusho}
+            tip="Tasks completed vs total dispatched"
+          />
+          <Pill
+            label="Diversity"
+            value={`${providers}p ${models}m ${roles}r`}
+            color={providers > 3 ? colors.rokusho : colors.kinpaku}
+            tip={`${providers} providers, ${models} models, ${roles} roles — more diversity = stronger swarm`}
+          />
+          <Pill
+            label="Evolution"
+            value={evoEntries}
+            sub="cycles"
+            color={evoEntries > 50 ? colors.rokusho : colors.kinpaku}
+            tip="Times the system has improved its own code"
+          />
+          {anomalyCount > 0 && (
+            <Pill
+              label="Anomalies"
+              value={anomalyCount}
+              color={colors.bengara}
+              tip="Detected issues requiring attention"
+            />
+          )}
+        </div>
+      )}
+
+      {/* Expanded panels */}
+      <AnimatePresence initial={false}>
+        {!collapsed && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{
+              duration: prefersReducedMotion ? 0 : 0.35,
+              ease: [0.22, 1, 0.36, 1],
+            }}
+            className="overflow-hidden"
+          >
+            <div className="grid grid-cols-1 gap-4 border-t border-sumi-700/20 px-5 py-4 xl:grid-cols-3">
+              {/* ── Panel 1: System Pulse ────────────────── */}
+              <div className="glass-panel-subtle p-4">
+                <div className="mb-1 flex items-center gap-2">
+                  <h3 className="text-[10px] font-semibold uppercase tracking-[0.12em] text-kitsurubami">
+                    System Pulse
+                  </h3>
+                  <Tip text="The system's heartbeat — each peak is a period of high activity. Flat line means the swarm is idle." />
+                </div>
+                <p className="mb-3 text-[9px] text-sumi-600">
+                  How active and alive the swarm is right now
+                </p>
+
+                <Heartbeat data={heartbeatData} tick={tick} noMotion={prefersReducedMotion} />
+
+                {/* Key stats below waveform */}
+                <div className="mt-3 grid grid-cols-3 gap-3">
+                  <div>
+                    <p className="text-[8px] font-semibold uppercase tracking-widest text-sumi-600">
+                      Activity
+                    </p>
+                    <p className="font-mono text-sm font-bold" style={{ color: tracesHr > 0 ? colors.aozora : colors.bengara }}>
+                      {tracesHr > 0 ? `${tracesHr}/hr` : "idle"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[8px] font-semibold uppercase tracking-widest text-sumi-600">
+                      Fitness
+                    </p>
+                    <p className="font-mono text-sm font-bold" style={{ color: fitness > 0.5 ? colors.rokusho : colors.kinpaku }}>
+                      {(fitness * 100).toFixed(0)}%
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[8px] font-semibold uppercase tracking-widest text-sumi-600">
+                      Anomalies
+                    </p>
+                    <p className="font-mono text-sm font-bold" style={{ color: anomalyCount > 0 ? colors.bengara : colors.rokusho }}>
+                      {anomalyCount}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Panel 2: System Health Ring ──────────── */}
+              <div className="glass-panel-subtle flex flex-col items-center p-4">
+                <div className="mb-1 flex w-full items-center gap-2">
+                  <h3 className="text-[10px] font-semibold uppercase tracking-[0.12em] text-kitsurubami">
+                    System Health
+                  </h3>
+                  <Tip text="Five concentric rings — each represents a layer of the system. Fuller rings = healthier layers. Hover the dots for details." />
+                </div>
+                <p className="mb-2 w-full text-[9px] text-sumi-600">
+                  Each ring is a system layer — hover dots for detail
+                </p>
+
+                <HealthRing layers={healthLayers} tick={tick} noMotion={prefersReducedMotion} />
+
+                {/* Legend */}
+                <div className="mt-2 flex flex-wrap justify-center gap-x-4 gap-y-1">
+                  {healthLayers.map((l) => (
+                    <div key={l.name} className="flex items-center gap-1.5">
+                      <div
+                        className="h-1.5 w-1.5 rounded-full"
+                        style={{ background: l.color, boxShadow: `0 0 4px ${l.color}60` }}
+                      />
+                      <span className="text-[8px] text-sumi-600">{l.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* ── Panel 3: Swarm Shape ─────────────────── */}
+              <div className="glass-panel-subtle p-4">
+                <div className="mb-1 flex items-center gap-2">
+                  <h3 className="text-[10px] font-semibold uppercase tracking-[0.12em] text-kitsurubami">
+                    Swarm Shape
+                  </h3>
+                  <Tip text="A radar showing the swarm's capabilities. Each axis is a dimension — a balanced shape means a healthy system. Lopsided = gaps." />
+                </div>
+                <p className="mb-2 text-[9px] text-sumi-600">
+                  Capability profile — balanced shape is healthy
+                </p>
+
+                <div style={{ width: 180, height: 180, margin: "0 auto" }}>
+                  <PriorityRadar priorities={priorities} tick={tick} noMotion={prefersReducedMotion} />
+                </div>
+
+                {/* Fleet summary */}
+                <div className="mt-2 grid grid-cols-3 gap-2 text-center">
+                  <div>
+                    <p className="text-[8px] font-semibold uppercase tracking-widest text-sumi-600">
+                      Fleet
+                    </p>
+                    <p className="font-mono text-xs font-bold text-aozora">
+                      {agentCount}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[8px] font-semibold uppercase tracking-widest text-sumi-600">
+                      Diversity
+                    </p>
+                    <p className="font-mono text-xs font-bold text-botan">
+                      {providers}p·{models}m·{roles}r
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[8px] font-semibold uppercase tracking-widest text-sumi-600">
+                      Active
+                    </p>
+                    <p className="font-mono text-xs font-bold" style={{ color: busyAgents > 0 ? colors.rokusho : colors.sumi[600] }}>
+                      {busyAgents}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </section>
   );
 }
