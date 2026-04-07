@@ -25,6 +25,7 @@ OLLAMA_CAPABILITIES = (
     Capability.SYSTEM_PROMPT
     | Capability.COST_TRACKING
     | Capability.CANCEL
+    | Capability.STREAMING
 )
 
 _CLOUD_MODELS: dict[str, str] = {
@@ -74,7 +75,7 @@ class OllamaAdapter(ProviderAdapter):
 
     async def stream(
         self, request: CompletionRequest, session_id: str
-    ) -> AsyncIterator[SessionStart | TextComplete | UsageReport | ErrorEvent | SessionEnd]:
+    ) -> AsyncIterator[SessionStart | TextDelta | TextComplete | UsageReport | ErrorEvent | SessionEnd]:
         profile = self.get_profile(request.model)
         model = request.model or profile.model_id
         wire_model = _wire_model(model)

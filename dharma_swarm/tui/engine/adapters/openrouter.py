@@ -20,6 +20,7 @@ OPENROUTER_CAPABILITIES = (
     Capability.SYSTEM_PROMPT
     | Capability.COST_TRACKING
     | Capability.CANCEL
+    | Capability.STREAMING
 )
 
 
@@ -90,7 +91,7 @@ class OpenRouterAdapter(ProviderAdapter):
         self,
         request: CompletionRequest,
         session_id: str,
-    ) -> AsyncIterator[SessionStart | TextComplete | UsageReport | ErrorEvent | SessionEnd]:
+    ) -> AsyncIterator[SessionStart | TextDelta | TextComplete | UsageReport | ErrorEvent | SessionEnd]:
         profile = self.get_profile(request.model)
         model = request.model or profile.model_id
         self._cancelled = False
