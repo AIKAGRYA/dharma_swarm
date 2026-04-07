@@ -1,12 +1,28 @@
 "use client";
 
-import { useEffect, useId, useMemo, useState, type CSSProperties } from "react";
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useState,
+  type CSSProperties,
+} from "react";
 import { motion, useReducedMotion, AnimatePresence } from "framer-motion";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { usePathname } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { colors } from "@/lib/theme";
+import { useOverview } from "@/hooks/useOverview";
+import { useHealth } from "@/hooks/useHealth";
+import { useAgents } from "@/hooks/useAgents";
+import { apiFetch } from "@/lib/api";
+import type { FitnessTrendPoint, AgentOut, HealthOut, SwarmOverview } from "@/lib/types";
 
-type LensId = "routing" | "fleet" | "contracts";
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+type LensId = "pulse" | "vsm" | "telos";
 
 interface LensDef {
   id: LensId;
@@ -17,31 +33,40 @@ interface LensDef {
 
 const LENSES: LensDef[] = [
   {
-    id: "routing",
-    label: "Routing Flux",
+    id: "pulse",
+    label: "System Pulse",
     accent: colors.aozora,
-    summary: "Live route pressure, adaptive drift, and handoff bias.",
+    summary: "Fitness trend, loop closure events, and module health across the living system.",
   },
   {
-    id: "fleet",
-    label: "Fleet Pulse",
+    id: "vsm",
+    label: "VSM Health",
     accent: colors.botan,
-    summary: "Operator-visible rhythm across agents, tasks, and active lanes.",
+    summary: "Beer's Viable System Model: 5 regulatory levels × 7 system domains.",
   },
   {
-    id: "contracts",
-    label: "Contract Tension",
+    id: "telos",
+    label: "Telos Vector",
     accent: colors.kinpaku,
-    summary: "Surface contract drift before it turns into silent state rot.",
+    summary: "Ontological priority orbits and telos coherence score across the swarm.",
   },
 ];
 
 const COLLAPSED_KEY = "dharma-micrographics-collapsed";
 
+const VSM_ROWS = ["S5 Identity", "S4 Intel", "S3 Control", "S2 Coord", "S1 Ops", "Variety"];
+const VSM_COLS = ["CTL", "LIV", "EVO", "STG", "AGT", "TEL", "ECO"];
+
+const MODULE_LABELS = ["CTL", "CRN", "LIV", "JGK", "MYC", "TRI", "EVO"];
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
 function routeLens(pathname: string): LensId {
-  if (pathname.includes("/agents") || pathname.includes("/tasks")) return "fleet";
-  if (pathname.includes("/doctor") || pathname.includes("/modules")) return "contracts";
-  return "routing";
+  if (pathname.includes("/agents") || pathname.includes("/tasks")) return "vsm";
+  if (pathname.includes("/evolution") || pathname.includes("/telos")) return "telos";
+  return "pulse";
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -56,32 +81,147 @@ function sparkle(value: number, accent: string): CSSProperties {
   };
 }
 
+function hoursAgo(iso: string): number {
+  const ts = new Date(iso).getTime();
+  return (Date.now() - ts) / 3_600_000;
+}
+
+function buildVSMMatrix(
+  overview: SwarmOverview | null,
+  health: HealthOut | null,
+  agents: AgentOut[],
+  fitnessTrend: FitnessTrendPoint[] | undefined,
+): number[][] {
+  const agentCount = agents.length;
+  const agentHealth = health?.agent_health ?? [];
+  const meanSuccess =
+    agentHealth.length > 0
+      ? agentHealth.reduce((s, h) => s + h.success_rate, 0) / agentHealth.length
+      : 0;
+
+  const stigmergyDensity = clamp((overview?.stigmergy_density ?? 0) / 100, 0, 1);
+  const evolutionEntries = overview?.evolution_entries ?? 0;
+  const isHealthy = overview?.health_status === "healthy";
+  const meanFitness = overview?.mean_fitness ?? 0;
+  const taskCompletionRate =
+    (overview?.tasks_completed ?? 0) /
+    Math.max(1, (overview?.task_count ?? 1));
+
+  // Distinct providers, models, roles
+  const providers = new Set(agents.map((a) => a.provider).filter(Boolean));
+  const models = new Set(agents.map((a) => a.model).filter(Boolean));
+  const roles = new Set(agents.map((a) => a.role).filter(Boolean));
+  const varietyScore = clamp(
+    (providers.size / 4 + models.size / 6 + roles.size / 8) / 3,
+    0,
+    1,
+  );
+
+  // Latest fitness point
+  const latestFitness =
+    fitnessTrend && fitnessTrend.length > 0
+      ? fitnessTrend[fitnessTrend.length - 1].fitness
+      : 0;
+
+  // 6 rows × 7 cols: CTL, LIV, EVO, STG, AGT, TEL, ECO
+  //                   0    1    2    3    4    5    6
+  const matrix: number[][] = [
+    // S5 Identity — mostly dim (telos gates not actively running)
+    [0.28, 0.12, clamp(latestFitness * 0.9, 0, 1), 0.18, 0.35, 0.22, 0.08],
+    // S4 Intelligence — evolution, ontology
+    [0.2, 0.3, clamp(evolutionEntries > 0 ? 0.7 + latestFitness * 0.25 : 0.15, 0, 1), 0.45, 0.35, 0.55, 0.1],
+    // S3 Control — orchestration, health status
+    [clamp(isHealthy ? 0.75 : 0.35, 0, 1), 0.22, 0.48, 0.3, clamp(meanSuccess, 0, 1), 0.4, 0.18],
+    // S2 Coordination — stigmergy
+    [0.12, clamp(stigmergyDensity * 1.2, 0, 1), 0.3, clamp(stigmergyDensity * 1.5, 0, 1), 0.38, 0.28, 0.1],
+    // S1 Operations — task throughput, agents
+    [clamp(taskCompletionRate, 0, 1), 0.55, clamp(latestFitness, 0, 1), 0.62, clamp(meanSuccess, 0, 1), 0.35, 0.28],
+    // Variety — diversity across providers/models/roles
+    [varietyScore * 0.8, varietyScore * 0.6, varietyScore, varietyScore * 0.5, clamp(agentCount / 20, 0, 1), varietyScore * 0.7, varietyScore * 0.4],
+  ];
+
+  return matrix;
+}
+
+function cellColor(value: number): string {
+  if (value > 0.6) return colors.aozora;
+  if (value > 0.3) return colors.kinpaku;
+  return colors.bengara;
+}
+
+// ---------------------------------------------------------------------------
+// Sub-components
+// ---------------------------------------------------------------------------
+
+function MiniReadout({
+  label,
+  value,
+  accent,
+}: {
+  label: string;
+  value: string;
+  accent: string;
+}) {
+  return (
+    <div className="rounded-xl border border-sumi-700/35 bg-sumi-900/70 px-3 py-2">
+      <p className="font-mono uppercase tracking-[0.12em] text-sumi-600">{label}</p>
+      <p className="mt-1 font-heading text-sm" style={{ color: accent }}>
+        {value}
+      </p>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
+
 export function OperatorMicrographics() {
   const pathname = usePathname();
   const prefersReducedMotion = useReducedMotion();
-  const fluxGradientId = useId();
+  const sparkGradientId = useId();
   const coreGradientId = useId();
+
   const defaultLens = useMemo(() => routeLens(pathname), [pathname]);
   const [activeLens, setActiveLens] = useState<LensId>(defaultLens);
   const [tick, setTick] = useState(0);
-  const [focusIndex, setFocusIndex] = useState(8);
-  const [focusCell, setFocusCell] = useState(19);
-  const [orbitalBias, setOrbitalBias] = useState(0.36);
+  const [focusBar, setFocusBar] = useState(24);
+  const [focusCell, setFocusCell] = useState<number | null>(null);
+
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     if (typeof window === "undefined") return true;
     const stored = window.localStorage.getItem(COLLAPSED_KEY);
     return stored === null ? true : stored === "true";
   });
 
+  // Data hooks
+  const { overview } = useOverview();
+  const { health } = useHealth();
+  const { agents } = useAgents();
+
+  const { data: fitnessTrend } = useQuery<FitnessTrendPoint[]>({
+    queryKey: ["fitness-trend-micro"],
+    queryFn: () => apiFetch<FitnessTrendPoint[]>("/api/evolution/fitness-trend"),
+    refetchInterval: 15_000,
+  });
+
+  const { data: modulesRaw } = useQuery<unknown[]>({
+    queryKey: ["modules-micro"],
+    queryFn: () => apiFetch<unknown[]>("/api/modules"),
+    refetchInterval: 30_000,
+  });
+
+  // Sync lens with route
   useEffect(() => {
     setActiveLens(defaultLens);
   }, [defaultLens]);
 
+  // Tick timer — only when expanded
   useEffect(() => {
     if (prefersReducedMotion) return;
     if (collapsed) return;
     const handle = window.setInterval(() => {
-      setTick((value) => value + 1);
+      setTick((v) => v + 1);
     }, 1400);
     return () => window.clearInterval(handle);
   }, [prefersReducedMotion, collapsed]);
@@ -94,59 +234,155 @@ export function OperatorMicrographics() {
     });
   }
 
-  const lens = LENSES.find((item) => item.id === activeLens) ?? LENSES[0];
+  const lens = LENSES.find((l) => l.id === activeLens) ?? LENSES[0];
 
-  const sparkline = useMemo(() => {
-    const phaseShift = activeLens === "routing" ? 0.2 : activeLens === "fleet" ? 1.1 : 2.4;
-    return Array.from({ length: 28 }, (_, index) => {
-      const base =
-        0.52
-        + Math.sin(index * 0.38 + tick * 0.22 + phaseShift) * 0.18
-        + Math.cos(index * 0.16 + tick * 0.11) * 0.11;
-      return clamp(base, 0.1, 0.92);
-    });
-  }, [activeLens, tick]);
+  // ---------------------------------------------------------------------------
+  // PANEL 1: System Pulse — sparkline
+  // ---------------------------------------------------------------------------
+
+  const sparklineValues = useMemo<number[]>(() => {
+    const raw = fitnessTrend ?? [];
+    // Take up to 28 points; pad with ~0.45 baseline if fewer
+    const pts = raw.slice(-28).map((p) => p.fitness);
+    while (pts.length < 28) pts.unshift(0.45);
+    // Add subtle jitter per tick
+    return pts.map((v, i) =>
+      clamp(v + (prefersReducedMotion ? 0 : Math.sin(tick * 0.3 + i * 0.5) * 0.015), 0.05, 0.98),
+    );
+  }, [fitnessTrend, tick, prefersReducedMotion]);
 
   const sparklinePath = useMemo(() => {
-    return sparkline
-      .map((value, index) => {
-        const x = 8 + index * 14.2;
-        const y = 92 - value * 60;
-        return `${index === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`;
+    return sparklineValues
+      .map((v, i) => {
+        const x = 8 + i * 14.2;
+        const y = 92 - v * 60;
+        return `${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`;
       })
       .join(" ");
-  }, [sparkline]);
+  }, [sparklineValues]);
 
-  const lattice = useMemo(() => {
-    const lensShift = activeLens === "routing" ? 0 : activeLens === "fleet" ? 0.55 : 1.05;
-    return Array.from({ length: 48 }, (_, index) => {
-      const row = Math.floor(index / 8);
-      const col = index % 8;
-      const value =
-        0.44
-        + Math.sin(col * 0.9 + tick * 0.18 + lensShift) * 0.24
-        + Math.cos(row * 0.8 + tick * 0.12 + lensShift) * 0.16;
-      return clamp(value, 0.04, 0.98);
+  // Loop closure indicators
+  const evolutionStaleHours = useMemo(() => {
+    const raw = fitnessTrend ?? [];
+    if (raw.length === 0) return Infinity;
+    return hoursAgo(raw[raw.length - 1].timestamp);
+  }, [fitnessTrend]);
+
+  const stigmergyActive = (overview?.stigmergy_density ?? 0) > 0;
+
+  // Module pips — derive from modulesRaw if present, else from overview health
+  const modulePips = useMemo(() => {
+    if (modulesRaw && modulesRaw.length >= 7) {
+      return (modulesRaw as Array<{ status?: string; live?: boolean }>)
+        .slice(0, 7)
+        .map((m) => {
+          if (m.live === true || m.status === "alive") return "alive" as const;
+          if (m.status === "stale") return "stale" as const;
+          return "dead" as const;
+        });
+    }
+    // Fallback: derive from overview health
+    const isHealthy = overview?.health_status === "healthy";
+    return MODULE_LABELS.map((_, i) => {
+      if (!isHealthy) return i < 3 ? ("stale" as const) : ("dead" as const);
+      return i < 4 ? ("alive" as const) : ("stale" as const);
     });
-  }, [activeLens, tick]);
+  }, [modulesRaw, overview]);
 
-  const orbitals = useMemo(() => {
-    return Array.from({ length: 5 }, (_, index) => {
-      const speed = 0.12 + index * 0.035;
-      const radius = 30 + index * 18;
-      const angle = tick * speed + orbitalBias * (index + 1) * 3.8;
-      const x = 104 + Math.cos(angle) * radius;
-      const y = 104 + Math.sin(angle) * radius * 0.62;
-      const intensity = 0.4 + ((index + tick) % 4) * 0.12;
-      return { radius, x, y, intensity };
+  const aliveModules = modulePips.filter((s) => s === "alive").length;
+
+  // Readout values
+  const tracesPerHour = health?.traces_last_hour ?? overview?.task_count ?? 0;
+  const nonStaleLoops = [
+    evolutionStaleHours < 24,
+    stigmergyActive,
+    false, // Metabolic always stale for now
+  ].filter(Boolean).length;
+
+  // ---------------------------------------------------------------------------
+  // PANEL 2: VSM Matrix
+  // ---------------------------------------------------------------------------
+
+  const vsmMatrix = useMemo(
+    () => buildVSMMatrix(overview, health, agents, fitnessTrend),
+    [overview, health, agents, fitnessTrend],
+  );
+
+  const vsmActiveRows = useMemo(
+    () =>
+      vsmMatrix.filter(
+        (row) => row.reduce((s, v) => s + v, 0) / row.length > 0.3,
+      ).length,
+    [vsmMatrix],
+  );
+
+  const distinctProviders = useMemo(
+    () => new Set(agents.map((a) => a.provider).filter(Boolean)).size,
+    [agents],
+  );
+  const distinctModels = useMemo(
+    () => new Set(agents.map((a) => a.model).filter(Boolean)).size,
+    [agents],
+  );
+  const distinctRoles = useMemo(
+    () => new Set(agents.map((a) => a.role).filter(Boolean)).size,
+    [agents],
+  );
+  const varietyLabel = `${distinctProviders}p·${distinctModels}m·${distinctRoles}r`;
+
+  // ---------------------------------------------------------------------------
+  // PANEL 3: Telos Vector — orbital diagram
+  // ---------------------------------------------------------------------------
+
+  const TCS = 0.39;
+  const tcsState = TCS >= 0.7 ? "COHERENT" : TCS >= 0.5 ? "STABILIZING" : "DRIFTING";
+  const tcsStateColor = TCS >= 0.7 ? colors.rokusho : TCS >= 0.5 ? colors.kinpaku : colors.bengara;
+
+  const orbits = useMemo(
+    () => [
+      { name: "witness", telos: 1.0, color: colors.aozora, instances: 0, r: 20 },
+      { name: "experiment", telos: 0.95, color: colors.rokusho, instances: 0, r: 38 },
+      { name: "venture", telos: 0.95, color: colors.kinpaku, instances: 0, r: 56 },
+      { name: "agent", telos: 0.9, color: colors.botan, instances: agents.length, r: 74 },
+      { name: "task", telos: 0.7, color: colors.fuji, instances: overview?.task_count ?? 0, r: 92 },
+    ],
+    [agents.length, overview?.task_count],
+  );
+
+  // Animated particle positions per orbit (CSS animation via inline keyframes is not feasible here;
+  // we drive positions via tick so the particles move without CSS @keyframes)
+  const particlePositions = useMemo(() => {
+    return orbits.map((orbit, oi) => {
+      const speed = (8 - Math.min(5, orbit.instances / 20)) * 0.1; // radians/tick
+      const angle1 = tick * speed * (0.08 + oi * 0.012);
+      const angle2 = angle1 + Math.PI;
+      return {
+        p1: {
+          x: 110 + Math.cos(angle1) * orbit.r,
+          y: 110 + Math.sin(angle1) * orbit.r,
+        },
+        p2: {
+          x: 110 + Math.cos(angle2) * orbit.r,
+          y: 110 + Math.sin(angle2) * orbit.r,
+        },
+        opacity: Math.min(1, 0.2 + orbit.instances / 50),
+      };
     });
-  }, [orbitalBias, tick]);
+  }, [orbits, tick]);
 
-  const focusValue = sparkline[focusIndex] ?? sparkline[0];
-  const focusLattice = lattice[focusCell] ?? lattice[0];
+  // ---------------------------------------------------------------------------
+  // Collapsed strip values
+  // ---------------------------------------------------------------------------
+
+  const focusValue = sparklineValues[focusBar] ?? sparklineValues[sparklineValues.length - 1];
+
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
 
   return (
     <section className="glass-panel relative overflow-hidden px-5 py-4">
+      {/* Background gradient */}
       <div
         className="pointer-events-none absolute inset-0"
         style={{
@@ -158,6 +394,7 @@ export function OperatorMicrographics() {
       />
 
       <div className="relative flex flex-col gap-4">
+        {/* Header row */}
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div className="flex-1">
             <div className="mb-1 flex items-center gap-2">
@@ -184,24 +421,21 @@ export function OperatorMicrographics() {
                   background: `${colors.sumi[900]}99`,
                 }}
               >
-                {collapsed
-                  ? <ChevronDown size={12} />
-                  : <ChevronUp size={12} />}
+                {collapsed ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
               </button>
             </div>
             <h2
               className="font-heading text-lg font-semibold tracking-tight"
               style={{ color: lens.accent }}
             >
-              Thin diagnostics, dense texture, no fake dashboards
+              Cybernetic system state — live swarm telemetry
             </h2>
             {!collapsed && (
-              <p className="mt-1 max-w-3xl text-sm text-sumi-600">
-                {lens.summary}
-              </p>
+              <p className="mt-1 max-w-3xl text-sm text-sumi-600">{lens.summary}</p>
             )}
           </div>
 
+          {/* Lens buttons — shown when expanded */}
           {!collapsed && (
             <div className="flex flex-wrap gap-2">
               {LENSES.map((item) => {
@@ -232,27 +466,33 @@ export function OperatorMicrographics() {
             </div>
           )}
 
+          {/* Collapsed strip */}
           {collapsed && (
-            <div className="flex flex-wrap items-center gap-3 font-mono text-[11px]">
+            <div className="flex flex-wrap items-center gap-4 font-mono text-[11px]">
               <span className="text-sumi-600">
-                Flux <span style={{ color: lens.accent }}>{Math.round(focusValue * 100)}%</span>
+                Pulse <span style={{ color: colors.aozora }}>{tracesPerHour}/hr</span>
               </span>
               <span className="text-sumi-600">
-                Bias <span style={{ color: lens.accent }}>{(focusValue * 1.34).toFixed(2)}x</span>
+                Loops <span style={{ color: colors.kinpaku }}>{nonStaleLoops}/3</span>
               </span>
               <span className="text-sumi-600">
-                Drift <span style={{ color: colors.fuji }}>{(sparkline[focusIndex + 1] ?? focusValue - 0.1).toFixed(2)}</span>
+                Modules <span style={{ color: colors.rokusho }}>{aliveModules}/7</span>
               </span>
               <span className="text-sumi-600">
-                Pulse <span style={{ color: colors.rokusho }}>{42 + focusIndex}</span>
+                VSM <span style={{ color: colors.botan }}>{vsmActiveRows}/5</span>
               </span>
               <span className="text-sumi-600">
-                Mesh <span style={{ color: lens.accent }}>{Math.round(focusLattice * 100)}/100</span>
+                Variety <span style={{ color: colors.fuji }}>{varietyLabel}</span>
               </span>
+              <span className="text-sumi-600">
+                TCS <span style={{ color: colors.kinpaku }}>{TCS.toFixed(2)}</span>
+              </span>
+              <span style={{ color: tcsStateColor }}>{tcsState}</span>
             </div>
           )}
         </div>
 
+        {/* Expanded body */}
         <AnimatePresence initial={false}>
           {!collapsed && (
             <motion.div
@@ -268,223 +508,396 @@ export function OperatorMicrographics() {
               style={{ overflow: "hidden" }}
             >
               <div className="grid gap-4 xl:grid-cols-[1.15fr_1fr_0.92fr]">
+
+                {/* ============================================================
+                    PANEL 1: SYSTEM PULSE
+                ============================================================ */}
                 <motion.div
                   layout
                   className="glass-panel-subtle overflow-hidden p-4"
                   onMouseMove={(event) => {
                     const rect = event.currentTarget.getBoundingClientRect();
                     const ratio = clamp((event.clientX - rect.left) / rect.width, 0, 0.999);
-                    setFocusIndex(Math.floor(ratio * sparkline.length));
+                    setFocusBar(Math.floor(ratio * sparklineValues.length));
                   }}
                 >
                   <div className="mb-3 flex items-center justify-between">
                     <div>
                       <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-sumi-600">
-                        Flux Ribbon
+                        System Pulse
                       </p>
-                      <p className="font-heading text-sm text-torinoko">Adaptive route pressure</p>
+                      <p className="font-heading text-sm text-torinoko">
+                        Fitness trend + loop closure events
+                      </p>
                     </div>
                     <span
                       className="rounded-full px-2 py-1 font-mono text-[10px]"
                       style={{
-                        color: lens.accent,
-                        background: `color-mix(in srgb, ${lens.accent} 10%, transparent)`,
+                        color: colors.aozora,
+                        background: `color-mix(in srgb, ${colors.aozora} 10%, transparent)`,
                       }}
                     >
-                      {Math.round(focusValue * 100)}%
+                      {(focusValue * 100).toFixed(0)}%
                     </span>
                   </div>
 
-                  <svg viewBox="0 0 400 120" className="h-32 w-full">
+                  {/* Sparkline SVG */}
+                  <svg viewBox="0 0 400 110" className="h-28 w-full">
                     <defs>
-                      <linearGradient id={fluxGradientId} x1="0" x2="1">
-                        <stop offset="0%" stopColor={lens.accent} stopOpacity="0.15" />
+                      <linearGradient id={sparkGradientId} x1="0" x2="1">
+                        <stop offset="0%" stopColor={colors.aozora} stopOpacity="0.15" />
                         <stop offset="100%" stopColor={colors.fuji} stopOpacity="0.28" />
                       </linearGradient>
                     </defs>
-                    {sparkline.map((value, index) => {
-                      const x = 8 + index * 14.2;
-                      const h = value * 62;
+                    {sparklineValues.map((v, i) => {
+                      const x = 8 + i * 14.2;
+                      const h = v * 62;
+                      const isFocus = i === focusBar;
                       return (
                         <rect
-                          key={index}
+                          key={i}
                           x={x - 3}
                           y={102 - h}
                           width="6"
                           height={h}
                           rx="3"
-                          fill={index === focusIndex ? lens.accent : `${colors.sumi[700]}77`}
-                          opacity={index === focusIndex ? 0.95 : 0.34}
+                          fill={isFocus ? colors.aozora : `${colors.sumi[700]}77`}
+                          opacity={isFocus ? 0.95 : 0.34}
                         />
                       );
                     })}
                     <path
                       d={`${sparklinePath} L 392 104 L 8 104 Z`}
-                      fill={`url(#${fluxGradientId})`}
+                      fill={`url(#${sparkGradientId})`}
                       opacity="0.28"
                     />
                     <path
                       d={sparklinePath}
                       fill="none"
-                      stroke={lens.accent}
+                      stroke={colors.aozora}
                       strokeWidth="2.4"
                       strokeLinecap="round"
                     />
                     <circle
-                      cx={8 + focusIndex * 14.2}
+                      cx={8 + focusBar * 14.2}
                       cy={92 - focusValue * 60}
                       r="5.5"
-                      fill={lens.accent}
-                      style={{ filter: `drop-shadow(0 0 8px ${lens.accent})` }}
+                      fill={colors.aozora}
+                      style={{ filter: `drop-shadow(0 0 8px ${colors.aozora})` }}
                     />
                   </svg>
 
-                  <div className="mt-3 grid grid-cols-3 gap-2 text-[11px] text-sumi-600">
-                    <MiniReadout label="Bias" value={`${(focusValue * 1.34).toFixed(2)}x`} accent={lens.accent} />
-                    <MiniReadout label="Drift" value={`${(sparkline[focusIndex + 1] ?? focusValue - 0.1).toFixed(2)}`} accent={colors.fuji} />
-                    <MiniReadout label="Pulse" value={`${42 + focusIndex}`} accent={colors.rokusho} />
+                  {/* Loop closure indicators */}
+                  <div className="mt-3 flex flex-wrap gap-3">
+                    {/* Evolution */}
+                    <div className="flex items-center gap-1.5">
+                      <div
+                        className="h-[5px] w-[5px] rounded-full"
+                        style={{
+                          background: evolutionStaleHours < 24 ? colors.rokusho : colors.bengara,
+                          boxShadow:
+                            evolutionStaleHours < 24
+                              ? `0 0 4px ${colors.rokusho}`
+                              : "none",
+                        }}
+                      />
+                      <span
+                        className="font-mono text-[8px]"
+                        style={{
+                          color: evolutionStaleHours < 24 ? colors.rokusho : colors.bengara,
+                        }}
+                      >
+                        Evolution{" "}
+                        {evolutionStaleHours < 24
+                          ? `${evolutionStaleHours.toFixed(0)}h ago`
+                          : "stale"}
+                      </span>
+                    </div>
+                    {/* Stigmergy */}
+                    <div className="flex items-center gap-1.5">
+                      <div
+                        className="h-[5px] w-[5px] rounded-full"
+                        style={{
+                          background: stigmergyActive ? colors.aozora : colors.kinpaku,
+                          boxShadow: stigmergyActive ? `0 0 4px ${colors.aozora}` : "none",
+                        }}
+                      />
+                      <span
+                        className="font-mono text-[8px]"
+                        style={{ color: stigmergyActive ? colors.aozora : colors.kinpaku }}
+                      >
+                        Stigmergy {stigmergyActive ? "active" : "sparse"}
+                      </span>
+                    </div>
+                    {/* Metabolic */}
+                    <div className="flex items-center gap-1.5">
+                      <div
+                        className="h-[5px] w-[5px] rounded-full"
+                        style={{ background: colors.bengara }}
+                      />
+                      <span className="font-mono text-[8px]" style={{ color: colors.bengara }}>
+                        Metabolic stale
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Module pips */}
+                  <div className="mt-3">
+                    <span className="font-mono text-[7px] uppercase tracking-[0.08em] text-sumi-600">
+                      Modules
+                    </span>
+                    <div className="mt-1.5 flex gap-1.5">
+                      {MODULE_LABELS.map((label, i) => {
+                        const status = modulePips[i] ?? "dead";
+                        const pipColor =
+                          status === "alive"
+                            ? colors.rokusho
+                            : status === "stale"
+                              ? colors.kinpaku
+                              : colors.bengara;
+                        return (
+                          <div key={label} className="flex flex-col items-center gap-[3px]">
+                            <div
+                              className="h-2 w-2 rounded-full"
+                              style={{
+                                background: pipColor,
+                                boxShadow:
+                                  status === "alive" ? `0 0 5px ${pipColor}88` : "none",
+                              }}
+                            />
+                            <span
+                              className="font-mono text-[6px]"
+                              style={{ color: colors.sumi[600] }}
+                            >
+                              {label}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Readout */}
+                  <div className="mt-3 grid grid-cols-3 gap-2">
+                    <MiniReadout label="Pulse" value={`${tracesPerHour}/hr`} accent={colors.aozora} />
+                    <MiniReadout label="Loops" value={`${nonStaleLoops}/3`} accent={colors.kinpaku} />
+                    <MiniReadout label="Modules" value={`${aliveModules}/7`} accent={colors.rokusho} />
                   </div>
                 </motion.div>
 
+                {/* ============================================================
+                    PANEL 2: VIABLE SYSTEM MATRIX
+                ============================================================ */}
                 <motion.div layout className="glass-panel-subtle p-4">
                   <div className="mb-3 flex items-center justify-between">
                     <div>
                       <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-sumi-600">
-                        Lattice Mesh
+                        Viable System Matrix
                       </p>
-                      <p className="font-heading text-sm text-torinoko">Hover any cell to isolate tension</p>
+                      <p className="font-heading text-sm text-torinoko">
+                        Beer VSM levels × system domains
+                      </p>
                     </div>
-                    <span className="font-mono text-[11px]" style={{ color: lens.accent }}>
-                      C{focusCell.toString().padStart(2, "0")}
+                    <span className="font-mono text-[11px]" style={{ color: colors.botan }}>
+                      {vsmActiveRows}/5
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-8 gap-1.5">
-                    {lattice.map((value, index) => (
-                      <button
-                        key={index}
-                        type="button"
-                        aria-label={`mesh cell ${index}`}
-                        onMouseEnter={() => setFocusCell(index)}
-                        onFocus={() => setFocusCell(index)}
-                        className="aspect-square rounded-[7px] border border-transparent transition-transform duration-150 hover:scale-[1.08]"
-                        style={{
-                          ...sparkle(value, index === focusCell ? lens.accent : colors.fuji),
-                          opacity: index === focusCell ? 1 : 0.52 + value * 0.36,
-                        }}
-                      />
-                    ))}
+                  {/* Grid: header row + 6 data rows */}
+                  <div className="overflow-x-auto">
+                    <div
+                      className="grid gap-[3px]"
+                      style={{
+                        gridTemplateColumns: "60px repeat(7, 1fr)",
+                        minWidth: 280,
+                      }}
+                    >
+                      {/* Column headers */}
+                      <div />
+                      {VSM_COLS.map((col) => (
+                        <div
+                          key={col}
+                          className="py-[2px] text-center font-mono"
+                          style={{ fontSize: 7, color: colors.sumi[600], letterSpacing: "0.05em" }}
+                        >
+                          {col}
+                        </div>
+                      ))}
+
+                      {/* Data rows */}
+                      {VSM_ROWS.map((rowName, ri) => (
+                        <>
+                          <div
+                            key={`row-${ri}`}
+                            className="flex items-center font-mono"
+                            style={{
+                              fontSize: 7,
+                              color: colors.kitsurubami,
+                              letterSpacing: "0.05em",
+                              fontWeight: 600,
+                            }}
+                          >
+                            {rowName}
+                          </div>
+                          {vsmMatrix[ri]?.map((value, ci) => {
+                            const cellIdx = ri * 7 + ci;
+                            const isFocus = focusCell === cellIdx;
+                            const col = cellColor(value);
+                            const alpha = clamp(10 + value * 70, 10, 78);
+                            return (
+                              <button
+                                key={`cell-${ri}-${ci}`}
+                                type="button"
+                                aria-label={`VSM ${rowName} × ${VSM_COLS[ci]}`}
+                                onMouseEnter={() => setFocusCell(cellIdx)}
+                                onMouseLeave={() => setFocusCell(null)}
+                                className="h-[18px] rounded-[3px] transition-transform duration-150 hover:scale-110"
+                                style={{
+                                  background: `color-mix(in srgb, ${col} ${alpha}%, ${colors.sumi[900]})`,
+                                  boxShadow:
+                                    value > 0.7
+                                      ? `0 0 6px color-mix(in srgb, ${col} 35%, transparent)`
+                                      : "none",
+                                  outline: isFocus ? `1px solid ${col}` : "none",
+                                }}
+                              />
+                            );
+                          })}
+                        </>
+                      ))}
+                    </div>
                   </div>
 
-                  <div className="mt-4 rounded-2xl border border-sumi-700/40 bg-sumi-900/70 p-3">
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span className="font-mono uppercase tracking-[0.14em] text-sumi-600">Mesh Readout</span>
-                      <span style={{ color: lens.accent }}>{Math.round(focusLattice * 100)} / 100</span>
-                    </div>
-                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-sumi-800">
-                      <motion.div
-                        className="h-full rounded-full"
-                        animate={{ width: `${Math.round(focusLattice * 100)}%` }}
-                        transition={
-                          prefersReducedMotion
-                            ? { duration: 0 }
-                            : { type: "spring", stiffness: 120, damping: 20 }
-                        }
-                        style={{
-                          background: `linear-gradient(90deg, ${lens.accent}, ${colors.fuji})`,
-                        }}
-                      />
-                    </div>
-                    <p className="mt-3 text-[11px] leading-5 text-sumi-600">
-                      {activeLens === "contracts"
-                        ? "Contract seams are shimmering at the edges. This is where route/API/schema truth tends to drift first."
-                        : activeLens === "fleet"
-                          ? "The mesh is reading operator-visible pressure bands across active cells, handoffs, and stalled queues."
-                          : "The routing field is showing uneven lift across lanes; hover reveals local pressure rather than page-level averages."}
-                    </p>
+                  <div className="mt-3 h-px bg-sumi-700/40" />
+
+                  {/* Readout */}
+                  <div className="mt-3 grid grid-cols-3 gap-2">
+                    <MiniReadout label="VSM Active" value={`${vsmActiveRows}/5`} accent={colors.aozora} />
+                    <MiniReadout label="Variety" value={varietyLabel} accent={colors.botan} />
+                    <MiniReadout label="Fleet" value={`${agents.length}`} accent={colors.kinpaku} />
                   </div>
                 </motion.div>
 
-                <motion.div
-                  layout
-                  className="glass-panel-subtle p-4"
-                  onMouseMove={(event) => {
-                    const rect = event.currentTarget.getBoundingClientRect();
-                    setOrbitalBias(clamp((event.clientX - rect.left) / rect.width, 0.1, 0.9));
-                  }}
-                >
+                {/* ============================================================
+                    PANEL 3: TELOS VECTOR
+                ============================================================ */}
+                <motion.div layout className="glass-panel-subtle p-4">
                   <div className="mb-3 flex items-center justify-between">
                     <div>
                       <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-sumi-600">
-                        Orbital Sweep
+                        Telos Vector
                       </p>
-                      <p className="font-heading text-sm text-torinoko">Pointer-reactive diagnostics halo</p>
+                      <p className="font-heading text-sm text-torinoko">
+                        Ontological priority orbits + coherence
+                      </p>
                     </div>
-                    <span className="font-mono text-[11px]" style={{ color: lens.accent }}>
-                      {(orbitalBias * 10).toFixed(1)}
+                    <span className="font-mono text-[11px]" style={{ color: colors.kinpaku }}>
+                      TCS {TCS.toFixed(2)}
                     </span>
                   </div>
 
                   <div className="flex items-center justify-center">
-                    <svg viewBox="0 0 208 208" className="h-52 w-52 max-w-full">
+                    <svg viewBox="0 0 220 220" className="h-52 w-52 max-w-full">
                       <defs>
                         <radialGradient id={coreGradientId}>
-                          <stop offset="0%" stopColor={lens.accent} stopOpacity="0.42" />
-                          <stop offset="100%" stopColor={lens.accent} stopOpacity="0" />
+                          <stop offset="0%" stopColor={colors.aozora} stopOpacity="0.38" />
+                          <stop offset="100%" stopColor={colors.aozora} stopOpacity="0" />
                         </radialGradient>
                       </defs>
 
-                      {[34, 52, 70, 88].map((radius, index) => (
+                      {/* Orbit rings */}
+                      {orbits.map((orbit) => (
                         <circle
-                          key={radius}
-                          cx="104"
-                          cy="104"
-                          r={radius}
+                          key={`ring-${orbit.name}`}
+                          cx="110"
+                          cy="110"
+                          r={orbit.r}
                           fill="none"
-                          stroke={index % 2 === 0 ? `${colors.sumi[700]}bb` : `${colors.sumi[600]}88`}
-                          strokeDasharray={index % 2 === 0 ? "3 8" : "12 9"}
-                          strokeWidth="1.2"
+                          stroke={`color-mix(in srgb, ${orbit.color} 12%, transparent)`}
+                          strokeWidth="1"
                         />
                       ))}
 
-                      <circle cx="104" cy="104" r="20" fill={`url(#${coreGradientId})`} />
-                      <circle cx="104" cy="104" r="8" fill={lens.accent} opacity="0.9" />
+                      {/* Core glow */}
+                      <circle cx="110" cy="110" r="16" fill={`url(#${coreGradientId})`} />
+                      <circle cx="110" cy="110" r="6" fill={colors.aozora} opacity="0.4" />
 
-                      {orbitals.map((orbital, index) => (
-                        <g key={index}>
-                          <circle
-                            cx="104"
-                            cy="104"
-                            r={orbital.radius}
-                            fill="none"
-                            stroke={`color-mix(in srgb, ${index % 2 === 0 ? lens.accent : colors.fuji} 18%, transparent)`}
-                          />
-                          <circle
-                            cx={orbital.x}
-                            cy={orbital.y}
-                            r={4 + index * 0.8}
-                            fill={index % 2 === 0 ? lens.accent : colors.fuji}
-                            opacity={orbital.intensity}
-                          />
-                        </g>
+                      {/* TCS label */}
+                      <text
+                        x="110"
+                        y="107"
+                        textAnchor="middle"
+                        fill={colors.sumi[600]}
+                        fontSize="6"
+                        fontWeight="600"
+                      >
+                        TCS
+                      </text>
+                      <text
+                        x="110"
+                        y="117"
+                        textAnchor="middle"
+                        fill={colors.kinpaku}
+                        fontSize="8"
+                        fontWeight="700"
+                        fontFamily="monospace"
+                      >
+                        {TCS.toFixed(2)}
+                      </text>
+
+                      {/* Orbit particles */}
+                      {orbits.map((orbit, oi) => {
+                        const pos = particlePositions[oi];
+                        if (!pos) return null;
+                        const show = orbit.instances > 0 || oi < 2; // always show witness/experiment
+                        return (
+                          <g key={`particles-${orbit.name}`}>
+                            <circle
+                              cx={pos.p1.x}
+                              cy={pos.p1.y}
+                              r={3.5 - oi * 0.2}
+                              fill={orbit.color}
+                              opacity={show ? pos.opacity : 0.15}
+                              style={
+                                show
+                                  ? { filter: `drop-shadow(0 0 4px ${orbit.color})` }
+                                  : undefined
+                              }
+                            />
+                            {(orbit.instances > 10 || oi === 3) && (
+                              <circle
+                                cx={pos.p2.x}
+                                cy={pos.p2.y}
+                                r={2.5 - oi * 0.1}
+                                fill={orbit.color}
+                                opacity={pos.opacity * 0.55}
+                              />
+                            )}
+                          </g>
+                        );
+                      })}
+
+                      {/* Orbit labels */}
+                      {orbits.map((orbit, oi) => (
+                        <text
+                          key={`label-${orbit.name}`}
+                          x={120 + orbit.r * 0.22}
+                          y={96 - oi * 14}
+                          fill={orbit.color}
+                          fontSize="6"
+                          opacity="0.6"
+                        >
+                          {orbit.name}
+                        </text>
                       ))}
                     </svg>
                   </div>
 
-                  <div className="mt-2 space-y-2">
-                    {[
-                      ["Sweep", `${Math.round(orbitalBias * 100)}%`, lens.accent],
-                      ["Lock", `${76 + tick % 12} ms`, colors.kinpaku],
-                      ["Focus", activeLens.toUpperCase(), colors.fuji],
-                    ].map(([label, value, accent]) => (
-                      <div
-                        key={label}
-                        className="flex items-center justify-between rounded-xl border border-sumi-700/30 bg-sumi-900/60 px-3 py-2 text-[11px]"
-                      >
-                        <span className="font-mono uppercase tracking-[0.14em] text-sumi-600">{label}</span>
-                        <span style={{ color: accent }}>{value}</span>
-                      </div>
-                    ))}
+                  {/* Readout */}
+                  <div className="mt-2 grid grid-cols-3 gap-2">
+                    <MiniReadout label="TCS" value={TCS.toFixed(2)} accent={colors.kinpaku} />
+                    <MiniReadout label="State" value={tcsState} accent={tcsStateColor} />
+                    <MiniReadout label="Focus" value="alignment" accent={colors.fuji} />
                   </div>
                 </motion.div>
               </div>
@@ -493,24 +906,5 @@ export function OperatorMicrographics() {
         </AnimatePresence>
       </div>
     </section>
-  );
-}
-
-function MiniReadout({
-  label,
-  value,
-  accent,
-}: {
-  label: string;
-  value: string;
-  accent: string;
-}) {
-  return (
-    <div className="rounded-xl border border-sumi-700/35 bg-sumi-900/70 px-3 py-2">
-      <p className="font-mono uppercase tracking-[0.12em] text-sumi-600">{label}</p>
-      <p className="mt-1 font-heading text-sm" style={{ color: accent }}>
-        {value}
-      </p>
-    </div>
   );
 }
