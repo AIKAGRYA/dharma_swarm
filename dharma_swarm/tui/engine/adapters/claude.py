@@ -232,6 +232,7 @@ class ClaudeAdapter(ProviderAdapter):
     def _build_env(self, request: CompletionRequest) -> dict[str, str]:
         env = dict(os.environ)
         env.pop("CLAUDECODE", None)
+        env.pop("ANTHROPIC_API_KEY", None)  # Force MAX subscription, not API credits
         internet_enabled = bool(request.provider_options.get("internet_enabled", True))
         if internet_enabled:
             env.pop("CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC", None)
