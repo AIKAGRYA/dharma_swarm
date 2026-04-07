@@ -10,6 +10,13 @@ import { useHealth } from "@/hooks/useHealth";
 import { useAgents } from "@/hooks/useAgents";
 import { apiFetch } from "@/lib/api";
 import type { FitnessTrendPoint } from "@/lib/types";
+import dynamic from "next/dynamic";
+
+// R3F must be loaded client-side only (no SSR)
+const MicrographicsScene = dynamic(
+  () => import("./MicrographicsScene").then((m) => m.MicrographicsScene),
+  { ssr: false },
+);
 
 const COLLAPSED_KEY = "dharma-micrographics-collapsed";
 
@@ -574,7 +581,7 @@ export default function OperatorMicrographics() {
         </div>
       )}
 
-      {/* Expanded panels */}
+      {/* Expanded: R3F 3D Scene */}
       <AnimatePresence initial={false}>
         {!collapsed && (
           <motion.div
@@ -587,122 +594,21 @@ export default function OperatorMicrographics() {
             }}
             className="overflow-hidden"
           >
-            <div className="grid grid-cols-1 gap-4 border-t border-sumi-700/20 px-5 py-4 xl:grid-cols-3">
-              {/* ── Panel 1: System Pulse ────────────────── */}
-              <div className="glass-panel-subtle p-4">
-                <div className="mb-1 flex items-center gap-2">
-                  <h3 className="text-[10px] font-semibold uppercase tracking-[0.12em] text-kitsurubami">
-                    System Pulse
-                  </h3>
-                  <Tip text="The system's heartbeat — each peak is a period of high activity. Flat line means the swarm is idle." />
-                </div>
-                <p className="mb-3 text-[9px] text-sumi-600">
-                  How active and alive the swarm is right now
-                </p>
-
-                <Heartbeat data={heartbeatData} tick={tick} noMotion={prefersReducedMotion} />
-
-                {/* Key stats below waveform */}
-                <div className="mt-3 grid grid-cols-3 gap-3">
-                  <div>
-                    <p className="text-[8px] font-semibold uppercase tracking-widest text-sumi-600">
-                      Activity
-                    </p>
-                    <p className="font-mono text-sm font-bold" style={{ color: tracesHr > 0 ? colors.aozora : colors.bengara }}>
-                      {tracesHr > 0 ? `${tracesHr}/hr` : "idle"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[8px] font-semibold uppercase tracking-widest text-sumi-600">
-                      Fitness
-                    </p>
-                    <p className="font-mono text-sm font-bold" style={{ color: fitness > 0.5 ? colors.rokusho : colors.kinpaku }}>
-                      {(fitness * 100).toFixed(0)}%
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[8px] font-semibold uppercase tracking-widest text-sumi-600">
-                      Anomalies
-                    </p>
-                    <p className="font-mono text-sm font-bold" style={{ color: anomalyCount > 0 ? colors.bengara : colors.rokusho }}>
-                      {anomalyCount}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* ── Panel 2: System Health Ring ──────────── */}
-              <div className="glass-panel-subtle flex flex-col items-center p-4">
-                <div className="mb-1 flex w-full items-center gap-2">
-                  <h3 className="text-[10px] font-semibold uppercase tracking-[0.12em] text-kitsurubami">
-                    System Health
-                  </h3>
-                  <Tip text="Five concentric rings — each represents a layer of the system. Fuller rings = healthier layers. Hover the dots for details." />
-                </div>
-                <p className="mb-2 w-full text-[9px] text-sumi-600">
-                  Each ring is a system layer — hover dots for detail
-                </p>
-
-                <HealthRing layers={healthLayers} tick={tick} noMotion={prefersReducedMotion} />
-
-                {/* Legend */}
-                <div className="mt-2 flex flex-wrap justify-center gap-x-4 gap-y-1">
-                  {healthLayers.map((l) => (
-                    <div key={l.name} className="flex items-center gap-1.5">
-                      <div
-                        className="h-1.5 w-1.5 rounded-full"
-                        style={{ background: l.color, boxShadow: `0 0 4px ${l.color}60` }}
-                      />
-                      <span className="text-[8px] text-sumi-600">{l.name}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* ── Panel 3: Swarm Shape ─────────────────── */}
-              <div className="glass-panel-subtle p-4">
-                <div className="mb-1 flex items-center gap-2">
-                  <h3 className="text-[10px] font-semibold uppercase tracking-[0.12em] text-kitsurubami">
-                    Swarm Shape
-                  </h3>
-                  <Tip text="A radar showing the swarm's capabilities. Each axis is a dimension — a balanced shape means a healthy system. Lopsided = gaps." />
-                </div>
-                <p className="mb-2 text-[9px] text-sumi-600">
-                  Capability profile — balanced shape is healthy
-                </p>
-
-                <div style={{ width: 180, height: 180, margin: "0 auto" }}>
-                  <PriorityRadar priorities={priorities} tick={tick} noMotion={prefersReducedMotion} />
-                </div>
-
-                {/* Fleet summary */}
-                <div className="mt-2 grid grid-cols-3 gap-2 text-center">
-                  <div>
-                    <p className="text-[8px] font-semibold uppercase tracking-widest text-sumi-600">
-                      Fleet
-                    </p>
-                    <p className="font-mono text-xs font-bold text-aozora">
-                      {agentCount}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[8px] font-semibold uppercase tracking-widest text-sumi-600">
-                      Diversity
-                    </p>
-                    <p className="font-mono text-xs font-bold text-botan">
-                      {providers}p·{models}m·{roles}r
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[8px] font-semibold uppercase tracking-widest text-sumi-600">
-                      Active
-                    </p>
-                    <p className="font-mono text-xs font-bold" style={{ color: busyAgents > 0 ? colors.rokusho : colors.sumi[600] }}>
-                      {busyAgents}
-                    </p>
-                  </div>
-                </div>
-              </div>
+            <div className="border-t border-sumi-700/20">
+              <MicrographicsScene
+                fitness={fitness}
+                agentCount={agentCount}
+                taskCompletion={completionRate}
+                stigmergyDensity={stigDensity}
+                healthScore={meanSuccess}
+                evolutionEntries={evoEntries}
+                fitnessTrend={heartbeatData}
+                agentBlips={agents.slice(0, 12).map((a, i) => ({
+                  angle: (i / Math.max(agents.length, 1)) * Math.PI * 2,
+                  dist: 0.3 + Math.random() * 0.6,
+                  intensity: a.status === "busy" ? 1.0 : a.status === "idle" ? 0.4 : 0.1,
+                }))}
+              />
             </div>
           </motion.div>
         )}
