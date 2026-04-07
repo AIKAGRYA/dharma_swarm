@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import json
 import os
 from typing import Any, AsyncIterator
 
@@ -13,7 +14,7 @@ from dharma_swarm.model_hierarchy import DEFAULT_MODELS
 from dharma_swarm.models import ProviderType
 
 from .base import Capability, CompletionRequest, ModelProfile, ProviderAdapter, ProviderConfig
-from ..events import ErrorEvent, SessionEnd, SessionStart, TextComplete, UsageReport
+from ..events import ErrorEvent, SessionEnd, SessionStart, TextComplete, TextDelta, UsageReport
 
 OPENROUTER_CAPABILITIES = (
     Capability.SYSTEM_PROMPT
@@ -131,7 +132,7 @@ class OpenRouterAdapter(ProviderAdapter):
         payload: dict[str, Any] = {
             "model": model,
             "messages": messages,
-            "stream": False,
+            "stream": True,
         }
         if request.system_prompt:
             payload["messages"] = [
@@ -146,12 +147,72 @@ class OpenRouterAdapter(ProviderAdapter):
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
+            "HTTP-Referer": "https://github.com/dharma-swarm",
+            "X-Title": "dharma_swarm",
         }
+
+        collected: list[str] = []
+        usage_data: dict[str, Any] = {}
 
         try:
             timeout = float(request.provider_options.get("timeout_sec", 120))
             async with httpx.AsyncClient(timeout=timeout) as client:
-                resp = await client.post(url, headers=headers, json=payload)
+                async with client.stream("POST", url, headers=headers, json=payload) as resp:
+                    if resp.status_code >= 400:
+                        error_body = ""
+                        async for chunk in resp.aiter_text():
+                            error_body += chunk
+                            if len(error_body) > 1000:
+                                break
+                        code = "rate_limited" if resp.status_code == 429 else f"http_{resp.status_code}"
+                        msg = error_body.strip()[:1000] or f"HTTP {resp.status_code}"
+                        yield ErrorEvent(
+                            provider_id=self.provider_id,
+                            session_id=session_id,
+                            code=code,
+                            message=msg,
+                            retryable=resp.status_code in {408, 409, 429, 500, 502, 503, 504},
+                        )
+                        yield SessionEnd(
+                            provider_id=self.provider_id,
+                            session_id=session_id,
+                            success=False,
+                            error_code=code,
+                            error_message=msg,
+                        )
+                        return
+
+                    async for line in resp.aiter_lines():
+                        if self._cancelled:
+                            break
+                        line = line.strip()
+                        if not line or line.startswith(":"):
+                            continue
+                        if not line.startswith("data: "):
+                            continue
+                        data_str = line[6:]
+                        if data_str == "[DONE]":
+                            break
+                        try:
+                            data = json.loads(data_str)
+                        except Exception:
+                            continue
+                        if not isinstance(data, dict):
+                            continue
+                        chunk_usage = data.get("usage")
+                        if isinstance(chunk_usage, dict):
+                            usage_data = chunk_usage
+                        piece = _extract_delta_content(data)
+                        if piece:
+                            collected.append(piece)
+                            yield TextDelta(
+                                provider_id=self.provider_id,
+                                session_id=session_id,
+                                content=piece,
+                                content_index=0,
+                                role="assistant",
+                            )
+
             if self._cancelled:
                 yield SessionEnd(
                     provider_id=self.provider_id,
@@ -162,41 +223,20 @@ class OpenRouterAdapter(ProviderAdapter):
                 )
                 return
 
-            if resp.status_code >= 400:
-                msg = resp.text.strip()[:1000]
-                code = "rate_limited" if resp.status_code == 429 else f"http_{resp.status_code}"
-                yield ErrorEvent(
-                    provider_id=self.provider_id,
-                    session_id=session_id,
-                    code=code,
-                    message=msg or f"HTTP {resp.status_code}",
-                    retryable=resp.status_code in {408, 409, 429, 500, 502, 503, 504},
-                )
-                yield SessionEnd(
-                    provider_id=self.provider_id,
-                    session_id=session_id,
-                    success=False,
-                    error_code=code,
-                    error_message=msg or f"HTTP {resp.status_code}",
-                )
-                return
-
-            data = resp.json()
-            content = _extract_content(data)
+            full_text = "".join(collected)
             yield TextComplete(
                 provider_id=self.provider_id,
                 session_id=session_id,
-                content=content,
+                content=full_text,
                 role="assistant",
             )
-            usage = data.get("usage", {}) if isinstance(data, dict) else {}
             yield UsageReport(
                 provider_id=self.provider_id,
                 session_id=session_id,
-                input_tokens=int(usage.get("prompt_tokens", 0) or 0),
-                output_tokens=int(usage.get("completion_tokens", 0) or 0),
-                total_cost_usd=_extract_cost(data),
-                model_breakdown=usage if isinstance(usage, dict) else {},
+                input_tokens=int(usage_data.get("prompt_tokens", 0) or 0),
+                output_tokens=int(usage_data.get("completion_tokens", 0) or 0),
+                total_cost_usd=_extract_cost({"usage": usage_data}),
+                model_breakdown=usage_data if isinstance(usage_data, dict) else {},
             )
             yield SessionEnd(
                 provider_id=self.provider_id,
@@ -242,6 +282,21 @@ class OpenRouterAdapter(ProviderAdapter):
     async def close(self) -> None:
         with contextlib.suppress(Exception):
             await self.cancel()
+
+
+def _extract_delta_content(data: dict[str, Any]) -> str:
+    choices = data.get("choices")
+    if not isinstance(choices, list) or not choices:
+        return ""
+    first = choices[0]
+    if not isinstance(first, dict):
+        return ""
+    delta = first.get("delta", {})
+    if isinstance(delta, dict):
+        content = delta.get("content")
+        if isinstance(content, str):
+            return content
+    return ""
 
 
 def _extract_content(data: Any) -> str:
