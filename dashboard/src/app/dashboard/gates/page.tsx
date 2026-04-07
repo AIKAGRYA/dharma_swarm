@@ -2,7 +2,7 @@
 
 /**
  * DHARMA COMMAND -- Gates page (L3).
- * Dharmic telos gate review with sequential pipeline visualization.
+ * Dharma subsystem health view: kernel, corpus, compiler, canary, stigmergy.
  */
 
 import { motion } from "framer-motion";
@@ -10,44 +10,91 @@ import {
   Shield,
   CheckCircle2,
   XCircle,
-  AlertTriangle,
-  MinusCircle,
+  BookOpen,
+  Cpu,
+  Wind,
+  GitBranch,
+  Hash,
+  Activity,
 } from "lucide-react";
-import { useGates, type GateResult } from "@/hooks/useGates";
+import { useGates, type DharmaHealth } from "@/hooks/useGates";
 import { colors } from "@/lib/theme";
 
-const gateDescriptions: Record<string, string> = {
-  AHIMSA: "Non-harm. Blocks actions that could cause damage to systems or data.",
-  SATYA: "Truth. Prevents credential leaks and ensures honest communication.",
-  CONSENT: "Explicit consent required for irreversible operations.",
-  VYAVASTHIT: "Natural order. Ensures changes follow evolutionary protocol.",
-  REVERSIBILITY: "All mutations must be reversible with lineage tracking.",
-  SVABHAAVA: "True nature. Validates alignment with system identity.",
-  BHED_GNAN: "Discriminative knowledge. Separates signal from noise.",
-  WITNESS: "The act of checking IS witnessing. Observation without interference.",
-};
+interface SubsystemCard {
+  key: keyof DharmaHealth;
+  label: string;
+  description: string;
+  icon: typeof Shield;
+  stats?: Array<{ key: keyof DharmaHealth; label: string; format?: (v: unknown) => string }>;
+}
 
-const statusConfig: Record<
-  string,
-  { icon: typeof CheckCircle2; color: string; label: string }
-> = {
-  pass: { icon: CheckCircle2, color: colors.rokusho, label: "Pass" },
-  fail: { icon: XCircle, color: colors.bengara, label: "Fail" },
-  warn: { icon: AlertTriangle, color: colors.kinpaku, label: "Warn" },
-  skip: { icon: MinusCircle, color: colors.sumi[600], label: "Skip" },
-};
+const subsystems: SubsystemCard[] = [
+  {
+    key: "kernel",
+    label: "Dharma Kernel",
+    description: "25 immutable axioms. SHA-256 signed. The constitution of the swarm.",
+    icon: Shield,
+    stats: [
+      { key: "kernel_axioms", label: "Axioms", format: (v) => String(v ?? 0) },
+      {
+        key: "kernel_integrity",
+        label: "Integrity",
+        format: (v) => (v ? "Verified" : "Compromised"),
+      },
+    ],
+  },
+  {
+    key: "corpus",
+    label: "Dharma Corpus",
+    description: "Versioned claims corpus. Living memory of validated truths.",
+    icon: BookOpen,
+    stats: [
+      { key: "corpus_claims", label: "Claims", format: (v) => String(v ?? 0) },
+    ],
+  },
+  {
+    key: "compiler",
+    label: "Policy Compiler",
+    description: "Compiles telos gates and dharmic rules into executable policy.",
+    icon: Cpu,
+  },
+  {
+    key: "canary",
+    label: "Canary Deployer",
+    description: "Promote / rollback guard. Ensures safe incremental evolution.",
+    icon: Wind,
+  },
+  {
+    key: "stigmergy",
+    label: "Stigmergy Store",
+    description: "Pheromone-trail coordination. Indirect signaling across agents.",
+    icon: GitBranch,
+    stats: [
+      {
+        key: "stigmergy_density",
+        label: "Density",
+        format: (v) =>
+          typeof v === "number" ? v.toFixed(4) : "—",
+      },
+    ],
+  },
+];
 
 export default function GatesPage() {
-  const { gates, isLoading } = useGates();
+  const { health, isLoading } = useGates();
 
-  const overallColor =
-    gates?.overall === "pass"
+  const activeCount = health
+    ? subsystems.filter((s) => health[s.key] === true).length
+    : 0;
+  const totalCount = subsystems.length;
+  const allHealthy = activeCount === totalCount;
+  const overallColor = health
+    ? allHealthy
       ? colors.rokusho
-      : gates?.overall === "fail"
+      : activeCount === 0
         ? colors.bengara
-        : gates?.overall === "warn"
-          ? colors.kinpaku
-          : colors.sumi[600];
+        : colors.kinpaku
+    : colors.sumi[600];
 
   return (
     <div className="space-y-6">
@@ -57,22 +104,22 @@ export default function GatesPage() {
         animate={{ opacity: 1, y: 0 }}
       >
         <div className="flex items-center gap-3">
-          <Shield size={24} className="text-rokusho" />
+          <Activity size={24} className="text-rokusho" />
           <h1 className="glow-rokusho font-heading text-2xl font-bold tracking-tight text-rokusho">
-            Telos Gates
+            Dharma Health
           </h1>
         </div>
         <p className="mt-1 text-sm text-sumi-600">
           {isLoading
-            ? "Checking gate status..."
-            : gates
-              ? `${gates.pass_count} pass, ${gates.fail_count} fail, ${gates.warn_count} warn`
-              : "Awaiting gate data."}
+            ? "Checking subsystem status..."
+            : health
+              ? `${activeCount} of ${totalCount} subsystems active`
+              : "Awaiting dharma status."}
         </p>
       </motion.div>
 
-      {/* Overall status */}
-      {gates && (
+      {/* Overall status banner */}
+      {health && (
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -90,47 +137,47 @@ export default function GatesPage() {
           </div>
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-kitsurubami">
-              Overall Status
+              System Status
             </p>
             <p
               className="font-heading text-xl font-bold uppercase"
               style={{ color: overallColor }}
             >
-              {gates.overall}
+              {allHealthy ? "All Systems Operational" : activeCount === 0 ? "All Systems Down" : "Degraded"}
             </p>
           </div>
           <div className="ml-auto flex gap-6">
-            <CountBadge label="Pass" count={gates.pass_count} color={colors.rokusho} />
-            <CountBadge label="Fail" count={gates.fail_count} color={colors.bengara} />
-            <CountBadge label="Warn" count={gates.warn_count} color={colors.kinpaku} />
+            <StatBadge
+              label="Active"
+              value={String(activeCount)}
+              color={colors.rokusho}
+            />
+            <StatBadge
+              label="Down"
+              value={String(totalCount - activeCount)}
+              color={colors.bengara}
+            />
           </div>
         </motion.div>
       )}
 
-      {/* Gate pipeline */}
+      {/* Subsystem cards */}
       {isLoading ? (
         <div className="glass-panel flex items-center justify-center py-16">
-          <p className="animate-pulse text-sm text-sumi-600">Loading gates...</p>
+          <p className="animate-pulse text-sm text-sumi-600">
+            Loading dharma subsystems...
+          </p>
         </div>
       ) : (
-        <div className="relative space-y-0">
-          {/* Vertical pipeline line */}
-          <div
-            className="absolute left-[31px] top-4 bottom-4 w-px"
-            style={{
-              background: `linear-gradient(to bottom, ${colors.sumi[700]}, color-mix(in srgb, ${colors.sumi[700]} 30%, transparent))`,
-            }}
-          />
-
-          {gates?.gates.map((gate, i) => (
-            <GateRow key={gate.name} gate={gate} index={i} />
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {subsystems.map((sub, i) => (
+            <SubsystemCard
+              key={sub.key}
+              sub={sub}
+              health={health}
+              index={i}
+            />
           ))}
-
-          {(!gates || gates.gates.length === 0) && (
-            <div className="glass-panel flex items-center justify-center py-12">
-              <p className="text-sm text-sumi-600">No gate data available</p>
-            </div>
-          )}
         </div>
       )}
     </div>
@@ -138,85 +185,104 @@ export default function GatesPage() {
 }
 
 // ---------------------------------------------------------------------------
-// Gate row
+// SubsystemCard
 // ---------------------------------------------------------------------------
 
-function GateRow({ gate, index }: { gate: GateResult; index: number }) {
-  const config = statusConfig[gate.status] ?? statusConfig.skip;
-  const Icon = config.icon;
-  const desc = gateDescriptions[gate.name] ?? "";
+function SubsystemCard({
+  sub,
+  health,
+  index,
+}: {
+  sub: SubsystemCard;
+  health: DharmaHealth | null;
+  index: number;
+}) {
+  const active = health ? health[sub.key] === true : false;
+  const color = active ? colors.rokusho : colors.bengara;
+  const Icon = sub.icon;
+  const StatusIcon = active ? CheckCircle2 : XCircle;
 
   return (
     <motion.div
-      initial={{ opacity: 0, x: -12 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.4, delay: index * 0.08 }}
-      className="relative flex items-start gap-5 py-3 pl-3"
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, delay: index * 0.07 }}
+      className="glass-panel p-5 space-y-4"
     >
-      {/* Status icon (on the pipeline line) */}
-      <div
-        className="relative z-10 flex h-[26px] w-[26px] flex-shrink-0 items-center justify-center rounded-full"
-        style={{
-          backgroundColor: `color-mix(in srgb, ${config.color} 15%, ${colors.sumi[900]})`,
-          boxShadow: `0 0 10px color-mix(in srgb, ${config.color} 20%, transparent)`,
-        }}
-      >
-        <Icon size={14} style={{ color: config.color }} />
-      </div>
-
-      {/* Content card */}
-      <div className="glass-panel-subtle flex-1 p-4">
-        <div className="mb-1 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <h3
-              className="font-heading text-sm font-bold uppercase tracking-wider"
-              style={{ color: config.color }}
-            >
-              {gate.name}
-            </h3>
-            <span
-              className="rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider"
-              style={{
-                color: config.color,
-                backgroundColor: `color-mix(in srgb, ${config.color} 10%, transparent)`,
-                border: `1px solid color-mix(in srgb, ${config.color} 20%, transparent)`,
-              }}
-            >
-              {config.label}
-            </span>
+      {/* Card header */}
+      <div className="flex items-start justify-between">
+        <div className="flex items-center gap-3">
+          <div
+            className="flex h-9 w-9 items-center justify-center rounded-lg"
+            style={{
+              backgroundColor: `color-mix(in srgb, ${color} 12%, transparent)`,
+              border: `1px solid color-mix(in srgb, ${color} 25%, transparent)`,
+            }}
+          >
+            <Icon size={16} style={{ color }} />
           </div>
-          {gate.score > 0 && (
-            <span className="font-mono text-xs text-sumi-600">
-              {gate.score.toFixed(2)}
-            </span>
-          )}
+          <h3
+            className="font-heading text-sm font-bold tracking-wide"
+            style={{ color }}
+          >
+            {sub.label}
+          </h3>
         </div>
-
-        <p className="text-xs leading-relaxed text-sumi-600">
-          {gate.message || desc}
-        </p>
-
-        {desc && gate.message && (
-          <p className="mt-1 text-[10px] italic text-sumi-700">{desc}</p>
-        )}
+        <div className="flex items-center gap-1.5">
+          <StatusIcon size={15} style={{ color }} />
+          <span
+            className="text-[10px] font-semibold uppercase tracking-wider"
+            style={{ color }}
+          >
+            {active ? "Active" : "Down"}
+          </span>
+        </div>
       </div>
+
+      {/* Description */}
+      <p className="text-xs leading-relaxed text-sumi-600">{sub.description}</p>
+
+      {/* Stats */}
+      {sub.stats && health && (
+        <div className="flex gap-4 border-t pt-3" style={{ borderColor: `color-mix(in srgb, ${colors.sumi[700]} 40%, transparent)` }}>
+          {sub.stats.map((stat) => {
+            const raw = health[stat.key];
+            const display = stat.format ? stat.format(raw) : String(raw ?? "—");
+            return (
+              <div key={stat.key} className="flex items-center gap-2">
+                <Hash size={10} className="text-sumi-600" />
+                <span className="text-[10px] uppercase tracking-wider text-sumi-600">
+                  {stat.label}
+                </span>
+                <span className="font-mono text-xs font-semibold" style={{ color }}>
+                  {display}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </motion.div>
   );
 }
 
-function CountBadge({
+// ---------------------------------------------------------------------------
+// StatBadge
+// ---------------------------------------------------------------------------
+
+function StatBadge({
   label,
-  count,
+  value,
   color,
 }: {
   label: string;
-  count: number;
+  value: string;
   color: string;
 }) {
   return (
     <div className="flex flex-col items-center">
       <span className="font-mono text-lg font-bold" style={{ color }}>
-        {count}
+        {value}
       </span>
       <span className="text-[9px] uppercase tracking-widest text-sumi-600">
         {label}

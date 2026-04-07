@@ -3,28 +3,24 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 
-export interface GateResult {
-  name: string;
-  status: "pass" | "fail" | "warn" | "skip";
-  message: string;
-  score: number;
-  timestamp: string;
-}
-
-export interface GatesSummary {
-  gates: GateResult[];
-  overall: "pass" | "fail" | "warn";
-  pass_count: number;
-  fail_count: number;
-  warn_count: number;
+export interface DharmaHealth {
+  kernel: boolean;
+  corpus: boolean;
+  compiler: boolean;
+  canary: boolean;
+  stigmergy: boolean;
+  kernel_axioms?: number;
+  kernel_integrity?: boolean;
+  corpus_claims?: number;
+  stigmergy_density?: number;
 }
 
 export function useGates() {
-  const { data, isLoading, error } = useQuery<GatesSummary>({
+  const { data, isLoading, error } = useQuery<DharmaHealth>({
     queryKey: ["gates"],
-    queryFn: () => apiFetch<GatesSummary>("/api/commands/dharma"),
+    queryFn: () => apiFetch<DharmaHealth>("/api/commands/dharma"),
     refetchInterval: 10_000,
   });
 
-  return { gates: data ?? null, isLoading, error };
+  return { health: data ?? null, isLoading, error };
 }
