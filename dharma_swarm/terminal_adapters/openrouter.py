@@ -1,4 +1,4 @@
-"""OpenRouter adapter for TUI model switching and fallback."""
+"""OpenRouter provider adapter (httpx async streaming -> canonical events)."""
 
 from __future__ import annotations
 
@@ -13,7 +13,13 @@ from dharma_swarm.model_hierarchy import DEFAULT_MODELS
 from dharma_swarm.models import ProviderType
 
 from .base import Capability, CompletionRequest, ModelProfile, ProviderAdapter, ProviderConfig
-from ..events import ErrorEvent, SessionEnd, SessionStart, TextComplete, UsageReport
+from dharma_swarm.terminal_engine.events import (
+    ErrorEvent,
+    SessionEnd,
+    SessionStart,
+    TextComplete,
+    UsageReport,
+)
 
 OPENROUTER_CAPABILITIES = (
     Capability.SYSTEM_PROMPT
@@ -21,26 +27,30 @@ OPENROUTER_CAPABILITIES = (
     | Capability.CANCEL
 )
 
+_DEFAULT_BASE_URL = "https://openrouter.ai/api/v1"
+
 
 class OpenRouterAdapter(ProviderAdapter):
-    """Provider adapter for OpenRouter chat completions."""
+    """ProviderAdapter implementation for OpenRouter (OpenAI-compatible chat completions)."""
 
     provider_id = "openrouter"
 
     def __init__(self, config: ProviderConfig | None = None) -> None:
         self._config = config or ProviderConfig(
             provider_id=self.provider_id,
-            base_url="https://openrouter.ai/api/v1",
-            default_model=DEFAULT_MODELS[ProviderType.OPENROUTER],
+            base_url=_DEFAULT_BASE_URL,
+            default_model=DEFAULT_MODELS.get(ProviderType.OPENROUTER, "xiaomi/mimo-v2-pro"),
         )
         self._cancelled = False
+        self._response: httpx.Response | None = None
+
         # All OpenRouter models the swarm knows about. The adapter handles any
         # model ID — this list controls what appears in the terminal handshake.
         # Sources: agent_registry.MODEL_PRICING, free_fleet._TIER_RULES,
         # cross_pollination.py, provider_smoke.py, ginko_agents.py
         _OR_MODELS: dict[str, str] = {
             # Paid
-            DEFAULT_MODELS[ProviderType.OPENROUTER]: "MiMo V2 Pro",
+            "xiaomi/mimo-v2-pro": "MiMo V2 Pro",
             "openai/gpt-5-codex": "GPT-5 Codex",
             "google/gemini-2.5-pro": "Gemini 2.5 Pro",
             "moonshotai/kimi-k2.5": "Kimi K2.5",
@@ -51,7 +61,7 @@ class OpenRouterAdapter(ProviderAdapter):
             "nvidia/llama-3.1-nemotron-70b-instruct:free": "Nemotron 70B [FREE]",
             "nvidia/nemotron-nano-9b-v2:free": "Nemotron Nano 9B [FREE]",
             # Free — GLM
-            "z-ai/glm-5": "GLM-5 (OpenRouter)",
+            "z-ai/glm-5": "GLM-5",
             "z-ai/glm-4.5-air:free": "GLM-4.5 Air [FREE]",
             "zhipuai/glm-5-plus": "GLM-5 Plus",
             # Free — Meta / Qwen / other
@@ -75,7 +85,9 @@ class OpenRouterAdapter(ProviderAdapter):
         return list(self._profiles.values())
 
     def get_profile(self, model_id: str | None = None) -> ModelProfile:
-        model = model_id or self._config.default_model or DEFAULT_MODELS[ProviderType.OPENROUTER]
+        model = model_id or self._config.default_model or DEFAULT_MODELS.get(
+            ProviderType.OPENROUTER, "xiaomi/mimo-v2-pro"
+        )
         if model in self._profiles:
             return self._profiles[model]
         return ModelProfile(
@@ -100,7 +112,7 @@ class OpenRouterAdapter(ProviderAdapter):
             model=model,
             capabilities=[c.name.lower() for c in Capability if profile.capabilities & c],
             tools_available=[],
-            system_info={"base_url": self._config.base_url or "https://openrouter.ai/api/v1"},
+            system_info={"base_url": self._config.base_url or _DEFAULT_BASE_URL},
         )
 
         api_key = (
@@ -125,19 +137,18 @@ class OpenRouterAdapter(ProviderAdapter):
             )
             return
 
-        base_url = (self._config.base_url or "https://openrouter.ai/api/v1").rstrip("/")
+        base_url = (self._config.base_url or _DEFAULT_BASE_URL).rstrip("/")
         url = f"{base_url}/chat/completions"
-        messages = request.messages or []
+
+        messages = list(request.messages or [])
+        if request.system_prompt:
+            messages = [{"role": "system", "content": request.system_prompt}, *messages]
+
         payload: dict[str, Any] = {
             "model": model,
             "messages": messages,
-            "stream": False,
+            "stream": True,
         }
-        if request.system_prompt:
-            payload["messages"] = [
-                {"role": "system", "content": request.system_prompt},
-                *messages,
-            ]
         if request.max_tokens is not None:
             payload["max_tokens"] = int(request.max_tokens)
         if request.temperature is not None:
@@ -146,12 +157,83 @@ class OpenRouterAdapter(ProviderAdapter):
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
+            "HTTP-Referer": "https://github.com/dharma-swarm",
+            "X-Title": "dharma_swarm",
         }
 
+        timeout_sec = float(request.provider_options.get("timeout_sec", 120))
+        collected_text: list[str] = []
+        usage_data: dict[str, Any] = {}
+        cost: float | None = None
+
         try:
-            timeout = float(request.provider_options.get("timeout_sec", 120))
-            async with httpx.AsyncClient(timeout=timeout) as client:
-                resp = await client.post(url, headers=headers, json=payload)
+            async with httpx.AsyncClient(timeout=timeout_sec) as client:
+                async with client.stream(
+                    "POST", url, headers=headers, json=payload
+                ) as resp:
+                    self._response = resp
+                    if resp.status_code >= 400:
+                        error_body = ""
+                        async for chunk in resp.aiter_text():
+                            error_body += chunk
+                            if len(error_body) > 1000:
+                                break
+                        code = "rate_limited" if resp.status_code == 429 else f"http_{resp.status_code}"
+                        msg = error_body.strip()[:1000] or f"HTTP {resp.status_code}"
+                        yield ErrorEvent(
+                            provider_id=self.provider_id,
+                            session_id=session_id,
+                            code=code,
+                            message=msg,
+                            retryable=resp.status_code in {408, 409, 429, 500, 502, 503, 504},
+                        )
+                        yield SessionEnd(
+                            provider_id=self.provider_id,
+                            session_id=session_id,
+                            success=False,
+                            error_code=code,
+                            error_message=msg,
+                        )
+                        return
+
+                    async for line in resp.aiter_lines():
+                        if self._cancelled:
+                            break
+
+                        line = line.strip()
+                        if not line:
+                            continue
+                        if line.startswith(":"):
+                            continue
+                        if not line.startswith("data: "):
+                            continue
+
+                        data_str = line[6:]
+                        if data_str == "[DONE]":
+                            break
+
+                        try:
+                            data = _parse_json(data_str)
+                        except Exception:
+                            continue
+
+                        if not isinstance(data, dict):
+                            continue
+
+                        chunk_usage = data.get("usage")
+                        if isinstance(chunk_usage, dict):
+                            usage_data = chunk_usage
+
+                        chunk_cost = _extract_cost(data)
+                        if chunk_cost is not None:
+                            cost = chunk_cost
+
+                        content_piece = _extract_delta_content(data)
+                        if content_piece:
+                            collected_text.append(content_piece)
+
+                    self._response = None
+
             if self._cancelled:
                 yield SessionEnd(
                     provider_id=self.provider_id,
@@ -162,47 +244,27 @@ class OpenRouterAdapter(ProviderAdapter):
                 )
                 return
 
-            if resp.status_code >= 400:
-                msg = resp.text.strip()[:1000]
-                code = "rate_limited" if resp.status_code == 429 else f"http_{resp.status_code}"
-                yield ErrorEvent(
-                    provider_id=self.provider_id,
-                    session_id=session_id,
-                    code=code,
-                    message=msg or f"HTTP {resp.status_code}",
-                    retryable=resp.status_code in {408, 409, 429, 500, 502, 503, 504},
-                )
-                yield SessionEnd(
-                    provider_id=self.provider_id,
-                    session_id=session_id,
-                    success=False,
-                    error_code=code,
-                    error_message=msg or f"HTTP {resp.status_code}",
-                )
-                return
-
-            data = resp.json()
-            content = _extract_content(data)
+            full_text = "".join(collected_text)
             yield TextComplete(
                 provider_id=self.provider_id,
                 session_id=session_id,
-                content=content,
+                content=full_text,
                 role="assistant",
             )
-            usage = data.get("usage", {}) if isinstance(data, dict) else {}
             yield UsageReport(
                 provider_id=self.provider_id,
                 session_id=session_id,
-                input_tokens=int(usage.get("prompt_tokens", 0) or 0),
-                output_tokens=int(usage.get("completion_tokens", 0) or 0),
-                total_cost_usd=_extract_cost(data),
-                model_breakdown=usage if isinstance(usage, dict) else {},
+                input_tokens=int(usage_data.get("prompt_tokens", 0) or 0),
+                output_tokens=int(usage_data.get("completion_tokens", 0) or 0),
+                total_cost_usd=cost or 0.0,
+                model_breakdown=usage_data if isinstance(usage_data, dict) else {},
             )
             yield SessionEnd(
                 provider_id=self.provider_id,
                 session_id=session_id,
                 success=True,
             )
+
         except httpx.TimeoutException:
             yield ErrorEvent(
                 provider_id=self.provider_id,
@@ -236,12 +298,35 @@ class OpenRouterAdapter(ProviderAdapter):
 
     async def cancel(self) -> None:
         self._cancelled = True
-        # keep API parity with other adapters
+        resp = self._response
+        if resp is not None:
+            with contextlib.suppress(Exception):
+                await resp.aclose()
         await asyncio.sleep(0)
 
     async def close(self) -> None:
         with contextlib.suppress(Exception):
             await self.cancel()
+
+
+def _parse_json(s: str) -> Any:
+    import json
+    return json.loads(s)
+
+
+def _extract_delta_content(data: dict[str, Any]) -> str:
+    choices = data.get("choices")
+    if not isinstance(choices, list) or not choices:
+        return ""
+    first = choices[0]
+    if not isinstance(first, dict):
+        return ""
+    delta = first.get("delta", {})
+    if isinstance(delta, dict):
+        content = delta.get("content")
+        if isinstance(content, str):
+            return content
+    return ""
 
 
 def _extract_content(data: Any) -> str:
@@ -256,9 +341,8 @@ def _extract_content(data: Any) -> str:
     msg = first.get("message", {})
     if isinstance(msg, dict):
         content = msg.get("content", "")
-        if isinstance(content, str):
-            if content.strip():
-                return content
+        if isinstance(content, str) and content.strip():
+            return content
         if isinstance(content, list):
             chunks: list[str] = []
             for item in content:
@@ -289,7 +373,6 @@ def _extract_cost(data: Any) -> float | None:
         return None
     usage = data.get("usage", {})
     if isinstance(usage, dict):
-        # OpenRouter can include either total_cost or cost
         for key in ("total_cost", "cost"):
             if key in usage:
                 try:
