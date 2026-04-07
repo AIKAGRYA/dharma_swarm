@@ -6,11 +6,32 @@ from dataclasses import dataclass, field
 import re
 import time
 
+from dharma_swarm.model_hierarchy import (
+    CANONICAL_SEED_ORDER,
+    DEFAULT_MODELS,
+    get_tier,
+    provider_lane_role,
+)
+from dharma_swarm.models import ProviderType
+
 INDIGO = "#9C7444"
 VERDIGRIS = "#62725D"
 OCHRE = "#A17A47"
 BENGARA = "#8C5448"
 WISTERIA = "#74677D"
+
+
+# ─── Adapter Map ─────────────────────────────────────────────────────────────
+# Maps ProviderType → terminal adapter_id.
+# Only providers listed here are reachable from the terminal.
+ADAPTER_MAP: dict[ProviderType, str] = {
+    ProviderType.CLAUDE_CODE: "claude",
+    ProviderType.ANTHROPIC: "claude",
+    ProviderType.CODEX: "codex",
+    ProviderType.OPENROUTER: "openrouter",
+    ProviderType.OPENROUTER_FREE: "openrouter",
+    ProviderType.OLLAMA: "ollama",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -22,15 +43,96 @@ class ModelTarget:
     aliases: tuple[str, ...] = field(default_factory=tuple)
 
 
-MODEL_TARGETS: tuple[ModelTarget, ...] = (
-    # Free frontier (Ollama Cloud)
-    ModelTarget(
-        alias="glm-5",
-        provider_id="ollama",
-        model_id="glm-5:cloud",
-        label="GLM-5 744B [FREE]",
-        aliases=("glm5", "glm 5", "zhipu"),
+# ─── Alias overrides ─────────────────────────────────────────────────────────
+# Maps (ProviderType, model_id) → (alias, extra_aliases, label).
+# Providers not listed here get auto-generated aliases.
+_ALIAS_OVERRIDES: dict[tuple[ProviderType, str], tuple[str, tuple[str, ...], str]] = {
+    (ProviderType.OLLAMA, "glm-5:cloud"): (
+        "glm-5",
+        ("glm5", "glm 5", "zhipu"),
+        "GLM-5 744B [FREE]",
     ),
+    (ProviderType.CLAUDE_CODE, "claude-code"): (
+        "sonnet-4.6",
+        ("sonnet", "sonnet 4.6", "claude sonnet 4.6"),
+        "Claude Sonnet 4.6",
+    ),
+    (ProviderType.CODEX, "gpt-5.4"): (
+        "codex-5.4",
+        ("codex", "codex 5.4", "gpt 5 codex"),
+        "Codex 5.4",
+    ),
+    (ProviderType.ANTHROPIC, "claude-opus-4-6"): (
+        "opus-4.6",
+        ("opus", "opus 4.6", "claude opus 4.6"),
+        "Claude Opus 4.6",
+    ),
+    (ProviderType.OPENROUTER_FREE, "meta-llama/llama-3.3-70b-instruct:free"): (
+        "llama-free",
+        ("llama", "llama 3.3", "llama free"),
+        "Llama 3.3 70B [FREE via OpenRouter]",
+    ),
+    (ProviderType.OPENROUTER, "xiaomi/mimo-v2-pro"): (
+        "mimo-pro",
+        ("mimo", "mimo v2", "xiaomi mimo"),
+        "MiMo V2 Pro (via OpenRouter)",
+    ),
+}
+
+
+def _auto_alias(provider: ProviderType, model_id: str) -> str:
+    """Derive a short alias from provider + model_id."""
+    short = model_id.split("/")[-1].split(":")[0].lower()
+    short = re.sub(r"[^a-z0-9.\-]", "-", short)
+    return short[:24]
+
+
+def _generate_targets() -> tuple[ModelTarget, ...]:
+    """Walk CANONICAL_SEED_ORDER and build one ModelTarget per reachable provider.
+
+    Filters to providers listed in ADAPTER_MAP, looks up DEFAULT_MODELS for
+    the model_id, applies alias overrides, and deduplicates by (adapter_id, model_id).
+    """
+    seen: set[tuple[str, str]] = set()
+    targets: list[ModelTarget] = []
+    for provider in CANONICAL_SEED_ORDER:
+        adapter_id = ADAPTER_MAP.get(provider)
+        if adapter_id is None:
+            continue
+        model_id = DEFAULT_MODELS.get(provider, "")
+        if not model_id:
+            continue
+        key = (adapter_id, model_id)
+        if key in seen:
+            continue
+        seen.add(key)
+        override = _ALIAS_OVERRIDES.get((provider, model_id))
+        if override is not None:
+            alias, extra_aliases, label = override
+        else:
+            alias = _auto_alias(provider, model_id)
+            extra_aliases = ()
+            tier = get_tier(provider)
+            label = f"{model_id} [{tier.upper()}]"
+        targets.append(
+            ModelTarget(
+                alias=alias,
+                provider_id=adapter_id,
+                model_id=model_id,
+                label=label,
+                aliases=extra_aliases,
+            )
+        )
+    return tuple(targets)
+
+
+MODEL_TARGETS: tuple[ModelTarget, ...] = _generate_targets()
+
+
+# ─── Soft targets ────────────────────────────────────────────────────────────
+# Extra targets resolvable by alias (backward compat, legacy models) but NOT
+# shown in /model list or counted in target_by_index.
+_SOFT_TARGETS: tuple[ModelTarget, ...] = (
     ModelTarget(
         alias="deepseek-v3.2",
         provider_id="ollama",
@@ -52,27 +154,12 @@ MODEL_TARGETS: tuple[ModelTarget, ...] = (
         label="MiniMax M2.7 [FREE]",
         aliases=("minimax", "m2.7", "minimax m2.7"),
     ),
-    # Paid models
     ModelTarget(
         alias="sonnet-4.5",
         provider_id="claude",
         model_id="claude-sonnet-4-5",
         label="Claude Sonnet 4.5",
-        aliases=("sonnet", "sonnet 4.5", "claude sonnet 4.5"),
-    ),
-    ModelTarget(
-        alias="sonnet-4.6",
-        provider_id="claude",
-        model_id="claude-sonnet-4-6",
-        label="Claude Sonnet 4.6",
-        aliases=("sonnet 4.6", "claude sonnet 4.6"),
-    ),
-    ModelTarget(
-        alias="opus-4.6",
-        provider_id="claude",
-        model_id="claude-opus-4-6",
-        label="Claude Opus 4.6",
-        aliases=("opus", "opus 4.6", "claude opus 4.6"),
+        aliases=("sonnet 4.5", "claude sonnet 4.5"),
     ),
     ModelTarget(
         alias="haiku-4.5",
@@ -80,13 +167,6 @@ MODEL_TARGETS: tuple[ModelTarget, ...] = (
         model_id="claude-haiku-4-5",
         label="Claude Haiku 4.5",
         aliases=("haiku", "haiku 4.5", "claude haiku 4.5"),
-    ),
-    ModelTarget(
-        alias="codex-5.4",
-        provider_id="codex",
-        model_id="gpt-5.4",
-        label="Codex 5.4",
-        aliases=("codex", "codex 5.4", "gpt 5 codex"),
     ),
     ModelTarget(
         alias="gemini-3",
@@ -171,7 +251,8 @@ def resolve_model_target(text: str) -> ModelTarget | None:
     q = _norm(text)
     if not q:
         return None
-    for t in MODEL_TARGETS:
+    _all = MODEL_TARGETS + _SOFT_TARGETS
+    for t in _all:
         if q == _norm(t.alias):
             return t
         if q == _norm(t.model_id):
@@ -180,7 +261,7 @@ def resolve_model_target(text: str) -> ModelTarget | None:
             if q == _norm(a):
                 return t
     # relaxed match: "switch to opus 4.6"
-    for t in MODEL_TARGETS:
+    for t in _all:
         keys = (_norm(t.alias), _norm(t.model_id), *(_norm(a) for a in t.aliases))
         if any(k and k in q for k in keys):
             return t

@@ -10,6 +10,13 @@ from dharma_swarm.tui.model_routing import (
     resolve_model_target,
     target_by_index,
 )
+from dharma_swarm.model_hierarchy import DEFAULT_MODELS
+from dharma_swarm.models import ProviderType
+from dharma_swarm.tui.model_routing import (
+    ADAPTER_MAP,
+    MODEL_TARGETS,
+    all_targets,
+)
 
 
 def test_default_target_is_claude_sonnet() -> None:
@@ -60,3 +67,40 @@ def test_target_by_index_maps_in_model_list_order() -> None:
     # First target is now GLM-5 (free frontier) per model_hierarchy.py
     assert first.alias == "glm-5"
     assert target_by_index(999) is None
+
+
+def test_adapter_map_covers_all_terminal_adapters() -> None:
+    adapter_ids = set(ADAPTER_MAP.values())
+    assert adapter_ids == {"claude", "codex", "openrouter", "ollama"}
+
+
+def test_targets_derived_from_hierarchy() -> None:
+    targets = all_targets()
+    assert len(targets) > 0
+    for t in targets:
+        matching_providers = [
+            pt for pt, adapter in ADAPTER_MAP.items() if adapter == t.provider_id
+        ]
+        assert matching_providers, f"No ProviderType maps to adapter '{t.provider_id}'"
+        hierarchy_models = {DEFAULT_MODELS.get(pt, "") for pt in matching_providers}
+        assert t.model_id in hierarchy_models, (
+            f"Target {t.alias} ({t.provider_id}:{t.model_id}) not found in "
+            f"DEFAULT_MODELS for providers {matching_providers}. "
+            f"Hierarchy has: {hierarchy_models}"
+        )
+
+
+def test_no_unreachable_targets() -> None:
+    for t in all_targets():
+        assert t.provider_id in {"claude", "codex", "openrouter", "ollama"}, (
+            f"Target {t.alias} has provider_id '{t.provider_id}' "
+            f"which has no terminal adapter"
+        )
+
+
+def test_ollama_targets_present() -> None:
+    targets = all_targets()
+    ollama_targets = [t for t in targets if t.provider_id == "ollama"]
+    assert len(ollama_targets) >= 1, "No Ollama Cloud targets found"
+    aliases = {t.alias for t in ollama_targets}
+    assert "glm-5" in aliases, "GLM-5 missing from targets"

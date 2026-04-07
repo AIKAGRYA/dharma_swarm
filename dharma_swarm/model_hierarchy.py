@@ -264,7 +264,7 @@ DEFAULT_MODELS: dict[ProviderType, str] = {
     ProviderType.OPENAI: "gpt-5",
     ProviderType.ANTHROPIC: "claude-opus-4-6",
     ProviderType.CLAUDE_CODE: "claude-code",
-    ProviderType.CODEX: "codex",
+    ProviderType.CODEX: "gpt-5.4",
 }
 
 
