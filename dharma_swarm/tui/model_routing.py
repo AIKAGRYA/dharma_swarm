@@ -10,7 +10,6 @@ from dharma_swarm.model_hierarchy import (
     CANONICAL_SEED_ORDER,
     DEFAULT_MODELS,
     get_tier,
-    provider_lane_role,
 )
 from dharma_swarm.models import ProviderType
 
@@ -127,6 +126,11 @@ def _generate_targets() -> tuple[ModelTarget, ...]:
 
 
 MODEL_TARGETS: tuple[ModelTarget, ...] = _generate_targets()
+if not MODEL_TARGETS:
+    raise RuntimeError(
+        "MODEL_TARGETS is empty — check CANONICAL_SEED_ORDER, ADAPTER_MAP, "
+        "and DEFAULT_MODELS for missing or mismatched entries"
+    )
 
 
 # ─── Soft targets ────────────────────────────────────────────────────────────
@@ -269,7 +273,7 @@ def resolve_model_target(text: str) -> ModelTarget | None:
 
 
 def target_for_route(provider_id: str, model_id: str) -> ModelTarget | None:
-    for target in MODEL_TARGETS:
+    for target in (*MODEL_TARGETS, *_SOFT_TARGETS):
         if target.provider_id == provider_id and target.model_id == model_id:
             return target
     return None
@@ -400,7 +404,7 @@ def fallback_chain(
         _FALLBACK_ORDER_BY_STRATEGY["responsive"],
     )
     ordered: list[ModelTarget] = []
-    by_alias = {t.alias: t for t in MODEL_TARGETS}
+    by_alias = {t.alias: t for t in (*MODEL_TARGETS, *_SOFT_TARGETS)}
     now = now_ts if now_ts is not None else time.time()
     for alias in order:
         t = by_alias.get(alias)
