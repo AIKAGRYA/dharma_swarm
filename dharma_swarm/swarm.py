@@ -2005,10 +2005,9 @@ class SwarmManager:
     async def _director_pulse(self) -> list[Task]:
         """Run one ThinkodynamicDirector vision pulse.
 
-        Uses the lightweight ``sense()`` path (ecosystem signal ranking and
-        opportunity detection) to avoid shelling out to an LLM on every tick.
-        Tasks are enqueued via the director's own ``enqueue_workflow`` which
-        writes to the shared task-board database.
+        Uses the full vision() path with LLM call to read telos gradient,
+        ecosystem signals, and PSMV seeds — then proposes real work.
+        Falls back to sense()-only if the LLM call fails.
 
         Returns:
             List of tasks created by the director, possibly empty.
@@ -2026,28 +2025,42 @@ class SwarmManager:
                 )
                 return []
 
-            # STRATOSPHERE: lightweight ecosystem sensing (no LLM call)
+            import time as _time
+            cycle_id = f"swarm-{int(_time.time())}"
+
+            # PRIMARY PATH: full vision() with LLM — reads telos gradient,
+            # ecosystem, PSMV seeds, OverseeingI assessment. This is the brain.
+            vision_result: dict[str, Any] | None = None
+            try:
+                vision_result = await asyncio.wait_for(
+                    self._director.vision(), timeout=90,
+                )
+                logger.info(
+                    "Director vision: success=%s, %d proposed tasks",
+                    vision_result.get("vision_success"),
+                    len(vision_result.get("proposed_tasks", [])),
+                )
+            except (asyncio.TimeoutError, Exception) as ve:
+                logger.info("Director vision failed (%s), falling back to sense()", ve)
+
+            # FALLBACK: sense()-only if vision didn't work
             sense_result = self._director.sense()
             opportunities = sense_result.get("opportunities", [])
-            if not opportunities:
-                logger.debug("Director pulse: no opportunities detected")
-                return []
 
-            # GROUND: compile a workflow from the top opportunity
-            import time as _time
+            if vision_result is None or not vision_result.get("vision_success"):
+                if not opportunities:
+                    logger.debug("Director pulse: no opportunities detected")
+                    return []
+                vision_result = {
+                    "proposed_tasks": [],
+                    "vision_text": "",
+                    "vision_success": False,
+                    "seeds": [],
+                    "ecosystem": sense_result.get("signals", {}),
+                }
 
-            cycle_id = f"swarm-{int(_time.time())}"
-            # Build a minimal vision stub so compile_workflow_from_vision
-            # falls through to the opportunity-based planner.
-            vision_stub: dict[str, Any] = {
-                "proposed_tasks": [],
-                "vision_text": "",
-                "vision_success": False,
-                "seeds": [],
-                "ecosystem": sense_result.get("signals", {}),
-            }
             workflow = self._director.compile_workflow_from_vision(
-                vision_stub, sense_result, cycle_id=cycle_id,
+                vision_result, sense_result, cycle_id=cycle_id,
             )
 
             # DELEGATE: enqueue into the shared task board

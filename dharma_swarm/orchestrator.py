@@ -2091,20 +2091,30 @@ class Orchestrator:
                 from dharma_swarm.models import LLMRequest
 
                 class _MinimalLLMClient:
-                    """Thin adapter so SleepTimeAgent can call the runtime provider."""
-                    async def complete(self, prompt: str, max_tokens: int = 512) -> str:
-                        req = LLMRequest(
-                            model="",
-                            messages=[{"role": "user", "content": prompt}],
-                            system="Extract factual propositions and recommendations.",
-                            max_tokens=max_tokens,
-                            temperature=0.1,
-                        )
+                    """Adapter matching KnowledgeExtractor's LLMProvider interface.
+
+                    KnowledgeExtractor._call_llm() passes an LLMRequest object
+                    to .complete(), not a plain string.
+                    """
+                    model = ""
+
+                    async def complete(self, request):
+                        if isinstance(request, str):
+                            req = LLMRequest(
+                                model="",
+                                messages=[{"role": "user", "content": request}],
+                                system="Extract factual propositions and recommendations.",
+                                max_tokens=512,
+                                temperature=0.1,
+                            )
+                        else:
+                            req = request
                         try:
                             response = await complete_via_preferred_runtime_providers(req)
-                            return response.content or ""
+                            return response
                         except Exception:
-                            return ""
+                            from types import SimpleNamespace
+                            return SimpleNamespace(content="[]")
 
                 _sta = SleepTimeAgent()
                 _t4 = asyncio.create_task(
