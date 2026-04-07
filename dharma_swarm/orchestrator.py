@@ -2091,30 +2091,34 @@ class Orchestrator:
                 from dharma_swarm.models import LLMRequest
 
                 class _MinimalLLMClient:
-                    """Adapter matching KnowledgeExtractor's LLMProvider interface.
+                    """Thin adapter matching KnowledgeExtractor._call_llm interface.
 
-                    KnowledgeExtractor._call_llm() passes an LLMRequest object
-                    to .complete(), not a plain string.
+                    KnowledgeExtractor calls: await self._llm_client.complete(LLMRequest)
+                    and expects: response.content (str) or response.text (str).
                     """
-                    model = ""
-
-                    async def complete(self, request):
-                        if isinstance(request, str):
+                    async def complete(self, request_or_prompt, **kwargs):
+                        # Accept both LLMRequest objects and raw prompt strings
+                        if isinstance(request_or_prompt, str):
                             req = LLMRequest(
                                 model="",
-                                messages=[{"role": "user", "content": request}],
-                                system="Extract factual propositions and recommendations.",
-                                max_tokens=512,
-                                temperature=0.1,
+                                messages=[{"role": "user", "content": request_or_prompt}],
+                                system="Extract factual propositions and recommendations. Return valid JSON.",
+                                max_tokens=kwargs.get("max_tokens", 1024),
+                                temperature=0.2,
                             )
                         else:
-                            req = request
+                            # Already an LLMRequest — use as-is but clear model for auto-routing
+                            req = request_or_prompt
+                            req.model = req.model or ""
                         try:
-                            response = await complete_via_preferred_runtime_providers(req)
-                            return response
-                        except Exception:
-                            from types import SimpleNamespace
-                            return SimpleNamespace(content="[]")
+                            return await complete_via_preferred_runtime_providers(req)
+                        except Exception as exc:
+                            logger.debug("_MinimalLLMClient failed: %s", exc)
+                            # Return object with .content attr that KnowledgeExtractor expects
+                            class _EmptyResponse:
+                                content = "[]"
+                                text = "[]"
+                            return _EmptyResponse()
 
                 _sta = SleepTimeAgent()
                 _t4 = asyncio.create_task(
