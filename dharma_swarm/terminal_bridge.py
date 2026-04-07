@@ -257,34 +257,39 @@ class TerminalBridge:
             }
         )
 
-        while True:
-            raw_line = await asyncio.to_thread(sys.stdin.readline)
-            if raw_line == "":
-                break
-            line = raw_line.strip()
-            if not line:
-                continue
-            try:
-                request = json.loads(line)
-            except json.JSONDecodeError as exc:
-                self._emit(
-                    {
-                        "type": "bridge.error",
-                        "code": "invalid_json",
-                        "message": exc.msg,
-                    }
-                )
-                continue
-            if not isinstance(request, dict):
-                self._emit(
-                    {
-                        "type": "bridge.error",
-                        "code": "invalid_request",
-                        "message": "request must be a JSON object",
-                    }
-                )
-                continue
-            await self._handle_request(request)
+        queue: asyncio.Queue[dict[str, Any] | None] = asyncio.Queue()
+
+        async def _reader() -> None:
+            """Read stdin lines into queue without blocking on request processing."""
+            while True:
+                raw_line = await asyncio.to_thread(sys.stdin.readline)
+                if raw_line == "":
+                    await queue.put(None)
+                    break
+                line = raw_line.strip()
+                if not line:
+                    continue
+                try:
+                    request = json.loads(line)
+                except json.JSONDecodeError as exc:
+                    self._emit({"type": "bridge.error", "code": "invalid_json", "message": exc.msg})
+                    continue
+                if not isinstance(request, dict):
+                    self._emit({"type": "bridge.error", "code": "invalid_request", "message": "request must be a JSON object"})
+                    continue
+                await queue.put(request)
+
+        async def _processor() -> None:
+            """Process requests from queue sequentially."""
+            while True:
+                request = await queue.get()
+                if request is None:
+                    break
+                await self._handle_request(request)
+
+        reader_task = asyncio.create_task(_reader())
+        processor_task = asyncio.create_task(_processor())
+        await asyncio.gather(reader_task, processor_task)
         return 0
 
     async def _handle_request(self, request: dict[str, Any]) -> None:
