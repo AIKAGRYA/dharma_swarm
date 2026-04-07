@@ -9,6 +9,10 @@ import time
 from dharma_swarm.model_hierarchy import (
     CANONICAL_SEED_ORDER,
     DEFAULT_MODELS,
+    TIER_FREE,
+    TIER_CHEAP,
+    TIER_SUBSCRIPTION,
+    TIER_PAID_API,
     get_tier,
 )
 from dharma_swarm.models import ProviderType
@@ -184,31 +188,36 @@ _SOFT_TARGETS: tuple[ModelTarget, ...] = (
 
 _DEFAULT_TARGET = MODEL_TARGETS[0]
 ROUTING_STRATEGIES: tuple[str, ...] = ("responsive", "cost", "genius")
+
+_TIER_ORDER_BY_STRATEGY: dict[str, tuple[tuple[ProviderType, ...], ...]] = {
+    "responsive": (TIER_SUBSCRIPTION, TIER_FREE, TIER_CHEAP, TIER_PAID_API),
+    "cost":       (TIER_FREE, TIER_CHEAP, TIER_SUBSCRIPTION, TIER_PAID_API),
+    "genius":     (TIER_SUBSCRIPTION, TIER_PAID_API, TIER_FREE, TIER_CHEAP),
+}
+
+
+def _build_fallback_order(strategy: str) -> tuple[str, ...]:
+    """Build alias ordering for a strategy from tier priority."""
+    tier_order = _TIER_ORDER_BY_STRATEGY.get(strategy, _TIER_ORDER_BY_STRATEGY["responsive"])
+    ordered: list[str] = []
+    seen: set[str] = set()
+    for tier in tier_order:
+        for pt in tier:
+            adapter = ADAPTER_MAP.get(pt)
+            if adapter is None:
+                continue
+            model = DEFAULT_MODELS.get(pt, "")
+            if not model:
+                continue
+            for t in (*MODEL_TARGETS, *_SOFT_TARGETS):
+                if t.provider_id == adapter and t.model_id == model and t.alias not in seen:
+                    ordered.append(t.alias)
+                    seen.add(t.alias)
+    return tuple(ordered)
+
+
 _FALLBACK_ORDER_BY_STRATEGY: dict[str, tuple[str, ...]] = {
-    "responsive": (
-        "sonnet-4.5",
-        "haiku-4.5",
-        "sonnet-4.6",
-        "codex-5.4",
-        "opus-4.6",
-        "gemini-3",
-    ),
-    "cost": (
-        "haiku-4.5",
-        "gemini-3",
-        "sonnet-4.5",
-        "codex-5.4",
-        "sonnet-4.6",
-        "opus-4.6",
-    ),
-    "genius": (
-        "opus-4.6",
-        "sonnet-4.6",
-        "codex-5.4",
-        "gemini-3",
-        "sonnet-4.5",
-        "haiku-4.5",
-    ),
+    s: _build_fallback_order(s) for s in ROUTING_STRATEGIES
 }
 
 

@@ -104,3 +104,40 @@ def test_ollama_targets_present() -> None:
     assert len(ollama_targets) >= 1, "No Ollama Cloud targets found"
     aliases = {t.alias for t in ollama_targets}
     assert "glm-5" in aliases, "GLM-5 missing from targets"
+
+
+def test_cost_strategy_prefers_free_tier() -> None:
+    """Cost strategy should put free-tier models before paid ones."""
+    chain = fallback_chain("claude", "claude-sonnet-4-5", strategy="cost")
+    if not chain:
+        return
+    first = chain[0]
+    assert first.provider_id in {"ollama", "openrouter"}, (
+        f"Cost strategy first fallback is {first.provider_id}:{first.model_id}, "
+        f"expected a free/cheap provider"
+    )
+
+
+def test_genius_strategy_prefers_frontier() -> None:
+    """Genius strategy should put frontier models first."""
+    chain = fallback_chain("ollama", "glm-5:cloud", strategy="genius")
+    if not chain:
+        return
+    first = chain[0]
+    assert first.provider_id in {"claude", "codex"}, (
+        f"Genius strategy first fallback is {first.provider_id}:{first.model_id}, "
+        f"expected a frontier provider"
+    )
+
+
+def test_fallback_chain_all_entries_have_adapters() -> None:
+    """Every entry in the fallback chain must have a working adapter."""
+    for provider_id in ("claude", "codex", "openrouter", "ollama"):
+        targets = [t for t in all_targets() if t.provider_id == provider_id]
+        if not targets:
+            continue
+        chain = fallback_chain(provider_id, targets[0].model_id)
+        for entry in chain:
+            assert entry.provider_id in {"claude", "codex", "openrouter", "ollama"}, (
+                f"Fallback entry {entry.alias} has unreachable provider {entry.provider_id}"
+            )
