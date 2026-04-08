@@ -2307,6 +2307,7 @@ class SwarmManager:
         reopened: list[Any] = []
         # Suppress synthetic task generation when operator-created tasks are pending
         _has_real_tasks = False
+        _has_seed_history = False
         if self._task_board is not None:
             try:
                 _pending = await self._task_board.list_tasks(
@@ -2317,6 +2318,15 @@ class SwarmManager:
                     and t.metadata.get("created_via") in ("manual_seed", "swarm.create_task")
                     or t.created_by == "operator"
                     for t in _pending
+                )
+                # C1/C2: Check if seed tasks have EVER been created (any status).
+                # Uses a targeted query — only need to know if at least one exists.
+                _all_tasks = await self._task_board.list_tasks(limit=50)
+                _has_seed_history = any(
+                    (isinstance(t.metadata, dict)
+                     and t.metadata.get("created_via") in ("operator", "manual_seed", "swarm.create_task"))
+                    or getattr(t, "created_by", None) == "operator"
+                    for t in _all_tasks
                 )
             except Exception:
                 pass
@@ -2359,14 +2369,15 @@ class SwarmManager:
             coordination = await asyncio.wait_for(
                 self.coordination_status(refresh=False), timeout=10.0
             )
-            # Skip coordination busywork when real tasks exist
-            if _has_real_tasks:
-                synthesized = []
-            else:
+            # C2 fix: Only synthesize coordination when seed/operator tasks exist.
+            # Without real tasks, coordination spawns recursive busywork loops.
+            if _has_real_tasks or _has_seed_history:
                 synthesized = await asyncio.wait_for(
                     self.spawn_coordination_tasks(coordination=coordination),
                     timeout=15.0,
                 )
+            else:
+                synthesized = []
         except asyncio.TimeoutError:
             coordination = SwarmCoordinationState()
             synthesized = []
@@ -2377,7 +2388,10 @@ class SwarmManager:
             logger.warning("coordination took %.1fs", _coord_dur)
 
         director_proposals: list[Task] = []
+        # C1 fix: Only auto-generate director tasks when seed tasks exist
+        # (indicates a mission was set). Without seeds, director generates busywork.
         if (allow_autonomous_generation and not _has_real_tasks
+            and _has_seed_history
             and self._director is not None
             and self._tick_count % self._director_interval_ticks == 0):
             _dir_t0 = _time.monotonic()

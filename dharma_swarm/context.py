@@ -667,7 +667,40 @@ def read_memory_context(
                 except Exception:
                     logger.debug("Memory plane recall failed", exc_info=True)
             return "No memories stored yet."
-        return "\n".join(f"  [{r['layer']}] {r['content'][:100]}" for r in rows)
+        sections = ["\n".join(f"  [{r['layer']}] {r['content'][:100]}" for r in rows)]
+
+        # B3/B4 fix: Also query KnowledgeStore and MemoryPalace if available
+        if query:
+            try:
+                from dharma_swarm.knowledge_units import KnowledgeStore
+                ks_path = base_dir / "state" / "knowledge.db"
+                if ks_path.exists():
+                    ks = KnowledgeStore(ks_path)
+                    concepts = [w.lower() for w in query.split() if len(w) > 3][:5]
+                    if concepts:
+                        props = ks.get_propositions_for_context(concepts, max_tokens=300)
+                        if props:
+                            sections.append("\n## Knowledge Store\n" + "\n".join(
+                                f"  [proposition] {p.content[:120]}" for p in props
+                            ))
+            except Exception:
+                logger.debug("KnowledgeStore query failed in read_memory_context", exc_info=True)
+
+            try:
+                from dharma_swarm.memory_palace import MemoryPalace
+                palace = MemoryPalace(state_dir=base_dir)
+                # MemoryPalace.search() detects async context and returns early.
+                # VectorStore path (sync) still works in async; lattice fallback skipped.
+                palace_hits = palace.search(query, top_k=min(3, limit))
+                if palace_hits:
+                    sections.append("\n## Memory Palace\n" + "\n".join(
+                        f"  [palace] {h.get('text', '')[:120]}"
+                        for h in palace_hits
+                    ))
+            except Exception:
+                logger.debug("MemoryPalace query failed in read_memory_context", exc_info=True)
+
+        return "\n".join(sections)
     except Exception as e:
         return f"Memory unavailable: {e}"
 

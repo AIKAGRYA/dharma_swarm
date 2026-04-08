@@ -2138,9 +2138,15 @@ class Orchestrator:
 
                         # Final fallback via full router
                         try:
-                            return await complete_via_preferred_runtime_providers(req)
+                            response, _cfg = await complete_via_preferred_runtime_providers(
+                                messages=req.messages,
+                                system=req.system or "",
+                                max_tokens=min(req.max_tokens or 2048, 2048),
+                                temperature=req.temperature if req.temperature is not None else 0.2,
+                            )
+                            return response
                         except Exception as exc:
-                            logger.debug("_MinimalLLMClient: all providers failed: %s", exc)
+                            logger.warning("_MinimalLLMClient: all providers failed: %s", exc)
                             class _EmptyResponse:
                                 content = "[]"
                                 text = "[]"

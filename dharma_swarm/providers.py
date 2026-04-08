@@ -609,8 +609,12 @@ class _SubprocessProvider(LLMProvider):
         if request.system:
             parts.append(request.system)
         for msg in request.messages:
-            if msg.get("role") == "user":
-                parts.append(msg["content"])
+            role = msg.get("role", "")
+            content = msg.get("content", "")
+            if role == "user":
+                parts.append(f"[User]\n{content}")
+            elif role == "assistant":
+                parts.append(f"[Assistant]\n{content}")
         prompt = "\n\n".join(parts)
         prompt += "\n\n## Communication\n"
         prompt += "- Write findings to ~/.dharma/shared/ (APPEND)\n"
@@ -619,9 +623,20 @@ class _SubprocessProvider(LLMProvider):
         prompt += MEMORY_SURVIVAL_DIRECTIVE
         return prompt
 
-    def _build_cli_args(self, prompt: str, model: str | None = None) -> list[str]:
+    def _build_cli_args(
+        self, model: str | None = None, output_format: str = "text",
+    ) -> list[str]:
         resolved = model or "sonnet"
-        return [self._resolved_command, "-p", prompt, "--output-format", "text", "--model", resolved]
+        args = [
+            self._resolved_command, "-p",
+            "--output-format", output_format,
+            "--model", resolved,
+            "--no-session-persistence",
+            "--dangerously-skip-permissions",
+        ]
+        if output_format == "stream-json":
+            args.extend(["--verbose", "--include-partial-messages"])
+        return args
 
     def _build_env(self) -> dict[str, str]:
         env = {**os.environ, "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"}
@@ -634,7 +649,115 @@ class _SubprocessProvider(LLMProvider):
         shared.mkdir(parents=True, exist_ok=True)
 
         prompt = self._build_prompt(request)
-        args = self._build_cli_args(prompt, model=request.model)
+        args = self._build_cli_args(model=request.model)
+        env = self._build_env()
+
+        proc = await asyncio.create_subprocess_exec(
+            *args,
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=self._working_dir,
+            env=env,
+        )
+
+        try:
+            stdout, stderr = await asyncio.wait_for(
+                proc.communicate(input=prompt.encode()), timeout=self._timeout
+            )
+        except asyncio.TimeoutError:
+            terminate_result = proc.terminate()
+            if inspect.isawaitable(terminate_result):
+                await terminate_result
+            await proc.wait()
+            return LLMResponse(content="TIMEOUT: exceeded limit", model=self._cli_label)
+
+        content = stdout.decode()[:50_000] if stdout else ""
+        if proc.returncode != 0 and not content:
+            content = (
+                f"ERROR (rc={proc.returncode}): "
+                f"{stderr.decode()[:500] if stderr else 'unknown'}"
+            )
+
+        return LLMResponse(content=content, model=self._cli_label)
+
+    async def stream(self, request: LLMRequest) -> AsyncIterator[str]:
+        response = await self.complete(request)
+        yield response.content
+
+    async def stream_lines(self, request: LLMRequest) -> AsyncIterator[str]:
+        """Yield JSONL lines from ``claude -p --output-format stream-json``."""
+        shared = Path.home() / ".dharma" / "shared"
+        shared.mkdir(parents=True, exist_ok=True)
+
+        prompt = self._build_prompt(request)
+        args = self._build_cli_args(model=request.model, output_format="stream-json")
+        env = self._build_env()
+
+        proc = await asyncio.create_subprocess_exec(
+            *args,
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=self._working_dir,
+            env=env,
+        )
+
+        assert proc.stdin is not None
+        proc.stdin.write(prompt.encode())
+        await proc.stdin.drain()
+        proc.stdin.close()
+
+        assert proc.stdout is not None
+        try:
+            async for raw_line in proc.stdout:
+                decoded = raw_line.decode().strip()
+                if decoded:
+                    yield decoded
+        except asyncio.CancelledError:
+            proc.terminate()
+            await proc.wait()
+            raise
+
+        await proc.wait()
+
+
+class ClaudeCodeProvider(_SubprocessProvider):
+    """Spawns real Claude Code instances via ``claude -p``.
+
+    Each complete() call spawns a subprocess with full tool access.
+    This is the REAL agent — file access, bash, everything.
+    """
+
+    _cli_command = "claude"
+    _cli_label = "claude-code"
+
+
+class CodexProvider(_SubprocessProvider):
+    """Spawns OpenAI Codex CLI instances via ``codex``.
+
+    Uses ``codex exec`` for non-interactive operation.
+    Codex CLI requires prompt as a positional argument (no stdin support),
+    so we override complete() to preserve the old behavior.
+    """
+
+    _cli_command = "codex"
+    _cli_label = "codex"
+
+    def _build_codex_cli_args(self, prompt: str, model: str | None = None) -> list[str]:
+        args = dgc_codex_exec_prefix(cli_path=self._resolved_command)
+        if model:
+            args.extend(["-m", model])
+        args.append(prompt)
+        return args
+
+    @jikoku_traced_provider
+    async def complete(self, request: LLMRequest) -> LLMResponse:
+        shared = Path.home() / ".dharma" / "shared"
+        shared.mkdir(parents=True, exist_ok=True)
+
+        prompt = self._build_prompt(request)
+        args = self._build_codex_cli_args(prompt, model=request.model)
         env = self._build_env()
 
         proc = await asyncio.create_subprocess_exec(
@@ -664,38 +787,6 @@ class _SubprocessProvider(LLMProvider):
             )
 
         return LLMResponse(content=content, model=self._cli_label)
-
-    async def stream(self, request: LLMRequest) -> AsyncIterator[str]:
-        response = await self.complete(request)
-        yield response.content
-
-
-class ClaudeCodeProvider(_SubprocessProvider):
-    """Spawns real Claude Code instances via ``claude -p``.
-
-    Each complete() call spawns a subprocess with full tool access.
-    This is the REAL agent — file access, bash, everything.
-    """
-
-    _cli_command = "claude"
-    _cli_label = "claude-code"
-
-
-class CodexProvider(_SubprocessProvider):
-    """Spawns OpenAI Codex CLI instances via ``codex``.
-
-    Uses ``codex exec`` for non-interactive operation.
-    """
-
-    _cli_command = "codex"
-    _cli_label = "codex"
-
-    def _build_cli_args(self, prompt: str, model: str | None = None) -> list[str]:
-        args = dgc_codex_exec_prefix(cli_path=self._resolved_command)
-        if model:
-            args.extend(["-m", model])
-        args.append(prompt)
-        return args
 
     def _build_env(self) -> dict[str, str]:
         env = {**os.environ}
@@ -2768,7 +2859,7 @@ class ModelRouter:
                     )
                     if _is_permanent:
                         # Force circuit open by recording enough failures at once
-                        for _ in range(breaker._config.min_samples):
+                        for _ in range(breaker.config.min_samples):
                             breaker.record_failure()
                         logger.warning(
                             "Fast-tripped circuit breaker for %s: %s",

@@ -146,7 +146,7 @@ class KnowledgeExtractor:
             response = await self._llm_client.complete(request)
             return response.content
         except Exception as exc:
-            logger.debug("KnowledgeExtractor LLM call failed: %s", exc)
+            logger.warning("KnowledgeExtractor LLM call failed: %s", exc)
             return "[]"
 
     # ── Parsing ───────────────────────────────────────────────────────
