@@ -285,7 +285,14 @@ class TerminalBridge:
                 request = await queue.get()
                 if request is None:
                     break
-                await self._handle_request(request)
+                try:
+                    await self._handle_request(request)
+                except Exception as exc:
+                    self._emit({
+                        "type": "bridge.error",
+                        "code": "handler_crash",
+                        "message": f"{type(exc).__name__}: {exc}",
+                    })
 
         reader_task = asyncio.create_task(_reader())
         processor_task = asyncio.create_task(_processor())

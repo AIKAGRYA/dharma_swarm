@@ -222,6 +222,7 @@ class ClaudeAdapter(ProviderAdapter):
         stream_limit = int(self._config.extra.get("stream_reader_limit", 2_000_000))
         return await asyncio.create_subprocess_exec(
             *cmd,
+            stdin=asyncio.subprocess.DEVNULL,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             cwd=str(self._workdir),
