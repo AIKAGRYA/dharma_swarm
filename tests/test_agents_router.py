@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 import pytest
 
 from api.routers import agents as agents_router
+from api.routers import routing as routing_router
 from dharma_swarm.models import AgentRole, AgentState, AgentStatus, ProviderType
 from dharma_swarm.ontology_runtime import get_shared_registry, reset_shared_registry
 
@@ -77,6 +78,12 @@ class _EmptyAgentRegistry:
 def _client() -> TestClient:
     app = FastAPI()
     app.include_router(agents_router.router)
+    return TestClient(app)
+
+
+def _routing_client() -> TestClient:
+    app = FastAPI()
+    app.include_router(routing_router.router)
     return TestClient(app)
 
 
@@ -184,3 +191,22 @@ def test_agent_detail_restores_dashboard_contract(
     assert body["health_stats"]["total_actions"] == 0
     assert body["assigned_tasks"] == []
     assert body["fitness_history"] == []
+
+
+def test_routing_manifest_exposes_shared_model_and_agent_contract(
+    monkeypatch,
+    isolated_shared_ontology,
+) -> None:
+    monkeypatch.setattr(routing_router, "_get_swarm", lambda: _DummySwarm())
+    client = _routing_client()
+
+    resp = client.get("/api/routing/manifest?provider=codex&model=gpt-5.4")
+
+    assert resp.status_code == 200
+    body = resp.json()["data"]
+    assert body["domain"] == "routing_manifest"
+    assert body["counts"]["selectable_routes"] >= 1
+    assert body["counts"]["adapter_catalog"] >= body["counts"]["selectable_routes"]
+    assert any(route["provider"] == "codex" for route in body["selectable_routes"])
+    assert any(entry["model"] == "qwen/qwen3-coder" for entry in body["adapter_catalog"])
+    assert body["agent_assignments"][0]["route_id"] == "ollama:qwen3-coder:480b-cloud"

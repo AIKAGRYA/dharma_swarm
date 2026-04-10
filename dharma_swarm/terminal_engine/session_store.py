@@ -8,6 +8,4 @@ from dharma_swarm.operator_core.session_store import (
     cwd_matches,
 )
 
-_cwd_matches = cwd_matches
-
-__all__ = ["DEFAULT_ROOT", "SessionStore", "cwd_matches", "_cwd_matches"]
+__all__ = ["DEFAULT_ROOT", "SessionStore", "cwd_matches"]

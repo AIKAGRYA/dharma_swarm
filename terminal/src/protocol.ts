@@ -15,6 +15,7 @@ import type {
   AgentRoutesPayload,
   OutlineItem,
   RoutingDecisionPayload,
+  RoutingManifestPayload,
   RuntimeSnapshotPayload,
   SessionCatalogEntry,
   SessionCatalogPayload,
@@ -2713,6 +2714,37 @@ export function agentRoutesPayloadFromEvent(event: Record<string, unknown>): Age
   };
 }
 
+export function routingManifestPayloadFromEvent(event: Record<string, unknown>): RoutingManifestPayload | undefined {
+  const payload = asRecord(event.payload);
+  if (stringField(payload, "domain") !== "routing_manifest" || stringField(payload, "version") !== "v1") {
+    return undefined;
+  }
+  const routingDecision = routingDecisionPayloadFromEvent({payload: payload.routing_decision});
+  const agentRoutes = agentRoutesPayloadFromEvent({payload: payload.agent_routes});
+  if (!routingDecision || !agentRoutes) {
+    return undefined;
+  }
+  return {
+    version: "v1",
+    domain: "routing_manifest",
+    selected_route: stringField(payload, "selected_route"),
+    strategy: stringField(payload, "strategy", "responsive"),
+    model_policy: asRecord(payload.model_policy),
+    routing_decision: routingDecision,
+    agent_routes: agentRoutes,
+    selectable_routes: asRecordList(payload.selectable_routes),
+    adapter_catalog: asRecordList(payload.adapter_catalog),
+    legacy_targets: asRecordList(payload.legacy_targets),
+    agent_assignments: asRecordList(payload.agent_assignments),
+    counts: Object.fromEntries(
+      Object.entries(asRecord(payload.counts))
+        .map(([key, value]) => [key, Number(value)])
+        .filter(([, value]) => Number.isFinite(value)),
+    ),
+    drift: asRecordList(payload.drift),
+  };
+}
+
 function normalizeCanonicalSession(value: unknown): CanonicalSession | undefined {
   const session = asRecord(value);
   const sessionId = stringField(session, "session_id");
@@ -3792,6 +3824,70 @@ export function agentRoutesToPreview(payload: Record<string, unknown>): TabPrevi
     "OpenClaw agents": String(openclaw.agents_count ?? 0),
     Providers: Array.isArray(openclaw.providers) ? openclaw.providers.map(String).join(", ") || "none" : "none",
     "Primary route": routeItems.length > 0 ? String((routeItems[0] as Record<string, unknown>).intent ?? "none") : "none",
+  };
+}
+
+export function routingManifestToLines(payload: Record<string, unknown>): TranscriptLine[] {
+  const manifest = routingManifestPayloadFromEvent(payload);
+  if (!manifest) {
+    return toLines("system", "# Routing Manifest\nunavailable");
+  }
+  const lines = [
+    "# Routing Manifest",
+    `Selected: ${manifest.selected_route || "unknown"}`,
+    `Strategy: ${manifest.strategy}`,
+    "",
+    "## Counts",
+    `Selectable routes: ${String(manifest.counts.selectable_routes ?? manifest.selectable_routes.length)}`,
+    `Adapter catalog: ${String(manifest.counts.adapter_catalog ?? manifest.adapter_catalog.length)}`,
+    `Legacy aliases: ${String(manifest.counts.legacy_targets ?? manifest.legacy_targets.length)}`,
+    `Agent assignments: ${String(manifest.counts.agent_assignments ?? manifest.agent_assignments.length)}`,
+    `Drift warnings: ${String(manifest.counts.drift ?? manifest.drift.length)}`,
+    "",
+    "## Selectable routes",
+  ];
+  for (const route of manifest.selectable_routes.slice(0, 13)) {
+    lines.push(
+      `- ${stringField(route, "provider", "?")}:${stringField(route, "model", "?")} | ${stringField(route, "lane_role", "role").replaceAll("_", " ")} | ${stringField(route, "tier", "tier")}`,
+    );
+  }
+  const catalogOnly = manifest.adapter_catalog.filter((entry) => !boolField(entry, "policy_selectable"));
+  lines.push("", "## Catalog-only models");
+  if (catalogOnly.length === 0) {
+    lines.push("none");
+  } else {
+    for (const entry of catalogOnly.slice(0, 8)) {
+      lines.push(`- ${stringField(entry, "route_id", "?")} | ${stringField(entry, "display_name", "model")}`);
+    }
+  }
+  if (manifest.agent_assignments.length > 0) {
+    lines.push("", "## Agent assignments");
+    for (const entry of manifest.agent_assignments.slice(0, 8)) {
+      lines.push(`- ${stringField(entry, "display_name", stringField(entry, "name", "?"))} -> ${stringField(entry, "route_id", "unassigned")} [${stringField(entry, "status", "unknown")}]`);
+    }
+  }
+  if (manifest.drift.length > 0) {
+    lines.push("", "## Drift");
+    for (const entry of manifest.drift.slice(0, 8)) {
+      lines.push(`- ${stringField(entry, "kind", "drift")} | ${stringField(entry, "route_id", "unknown")}`);
+    }
+  }
+  return toLines("system", lines.join("\n"));
+}
+
+export function routingManifestToPreview(payload: Record<string, unknown>): TabPreview {
+  const manifest = routingManifestPayloadFromEvent(payload);
+  if (!manifest) {
+    return {Manifest: "unavailable"};
+  }
+  return {
+    Selected: manifest.selected_route || "unknown",
+    Strategy: manifest.strategy,
+    "Selectable routes": String(manifest.counts.selectable_routes ?? manifest.selectable_routes.length),
+    "Adapter catalog": String(manifest.counts.adapter_catalog ?? manifest.adapter_catalog.length),
+    "Legacy aliases": String(manifest.counts.legacy_targets ?? manifest.legacy_targets.length),
+    "Agent assignments": String(manifest.counts.agent_assignments ?? manifest.agent_assignments.length),
+    Drift: String(manifest.counts.drift ?? manifest.drift.length),
   };
 }
 

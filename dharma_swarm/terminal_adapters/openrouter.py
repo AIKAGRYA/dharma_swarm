@@ -11,6 +11,7 @@ import httpx
 
 from dharma_swarm.model_hierarchy import DEFAULT_MODELS
 from dharma_swarm.models import ProviderType
+from dharma_swarm.power_model_catalog import OPENROUTER_POWER_MODELS
 
 from .base import Capability, CompletionRequest, ModelProfile, ProviderAdapter, ProviderConfig
 from dharma_swarm.terminal_engine.events import (
@@ -53,7 +54,6 @@ class OpenRouterAdapter(ProviderAdapter):
             "xiaomi/mimo-v2-pro": "MiMo V2 Pro",
             "openai/gpt-5-codex": "GPT-5 Codex",
             "google/gemini-2.5-pro": "Gemini 2.5 Pro",
-            "moonshotai/kimi-k2.5": "Kimi K2.5",
             "deepseek/deepseek-chat-v3-0324": "DeepSeek V3",
             "deepseek/deepseek-r1": "DeepSeek R1",
             # Free — Nemotron
@@ -66,11 +66,13 @@ class OpenRouterAdapter(ProviderAdapter):
             "zhipuai/glm-5-plus": "GLM-5 Plus",
             # Free — Meta / Qwen / other
             "meta-llama/llama-3.3-70b-instruct:free": "Llama 3.3 70B [FREE]",
+            "qwen/qwen3-coder": "Qwen3 Coder",
             "qwen/qwen3-coder:free": "Qwen3 Coder [FREE]",
             "qwen/qwen3-235b-a22b": "Qwen3 235B",
             "google/gemma-3-27b-it:free": "Gemma 3 27B [FREE]",
             "nousresearch/hermes-3-llama-3.1-405b:free": "Hermes 3 405B [FREE]",
         }
+        _OR_MODELS.update(OPENROUTER_POWER_MODELS)
         self._profiles: dict[str, ModelProfile] = {
             model_id: ModelProfile(
                 provider_id=self.provider_id,

@@ -12,6 +12,7 @@ from dharma_swarm.tui.model_routing import (
 )
 from dharma_swarm.model_hierarchy import DEFAULT_MODELS
 from dharma_swarm.models import ProviderType
+from dharma_swarm.power_model_catalog import POWER_MODEL_ROUTES
 from dharma_swarm.tui.model_routing import (
     ADAPTER_MAP,
     MODEL_TARGETS,
@@ -76,6 +77,7 @@ def test_adapter_map_covers_all_terminal_adapters() -> None:
 
 def test_targets_derived_from_hierarchy() -> None:
     targets = all_targets()
+    power_routes = {(route.provider_id, route.model_id) for route in POWER_MODEL_ROUTES}
     assert len(targets) > 0
     for t in targets:
         matching_providers = [
@@ -83,9 +85,9 @@ def test_targets_derived_from_hierarchy() -> None:
         ]
         assert matching_providers, f"No ProviderType maps to adapter '{t.provider_id}'"
         hierarchy_models = {DEFAULT_MODELS.get(pt, "") for pt in matching_providers}
-        assert t.model_id in hierarchy_models, (
+        assert t.model_id in hierarchy_models or (t.provider_id, t.model_id) in power_routes, (
             f"Target {t.alias} ({t.provider_id}:{t.model_id}) not found in "
-            f"DEFAULT_MODELS for providers {matching_providers}. "
+            f"DEFAULT_MODELS or POWER_MODEL_ROUTES for providers {matching_providers}. "
             f"Hierarchy has: {hierarchy_models}"
         )
 
@@ -104,6 +106,20 @@ def test_ollama_targets_present() -> None:
     assert len(ollama_targets) >= 1, "No Ollama Cloud targets found"
     aliases = {t.alias for t in ollama_targets}
     assert "glm-5" in aliases, "GLM-5 missing from targets"
+
+
+def test_power_model_aliases_resolve_to_callable_routes() -> None:
+    expected = {
+        "opus-fast": ("openrouter", "anthropic/claude-opus-4.6-fast"),
+        "glm-5.1": ("openrouter", "z-ai/glm-5.1"),
+        "qwen-3.5": ("openrouter", "qwen/qwen3.5-397b-a17b"),
+        "deepseek-speciale": ("openrouter", "deepseek/deepseek-v3.2-speciale"),
+        "nemotron-ultra": ("openrouter", "nvidia/llama-3.1-nemotron-ultra-253b-v1"),
+    }
+    for alias, route in expected.items():
+        target = resolve_model_target(alias)
+        assert target is not None
+        assert (target.provider_id, target.model_id) == route
 
 
 def test_cost_strategy_prefers_free_tier() -> None:

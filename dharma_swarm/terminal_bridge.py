@@ -10,10 +10,12 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import inspect
 from dataclasses import asdict, is_dataclass
 import importlib.util
 import json
 from datetime import datetime, timezone
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -24,15 +26,23 @@ from typing import Any
 from dharma_swarm.context import build_orientation_packet
 from dharma_swarm.cascade import get_registered_domains
 from dharma_swarm.operator_views import OperatorViews
+from dharma_swarm import terminal_bridge_context
+from dharma_swarm import terminal_bridge_renderers
 from dharma_swarm.operator_core import (
+    build_command_graph_summary,
+    build_command_registry_payload,
     build_permission_history_payload,
     build_permission_decision_payload,
     build_permission_outcome_payload,
     build_permission_resolution_payload,
     build_agent_routes_payload,
+    build_model_policy_summary,
     build_routing_decision_payload,
+    build_routing_manifest_payload,
     build_runtime_snapshot_payload,
     build_workspace_snapshot_payload,
+    normalize_adapter_catalog,
+    normalize_legacy_targets,
 )
 from dharma_swarm.orientation_packet import DirectiveSummary, RuntimeStateSummary
 from dharma_swarm.provider_matrix import build_default_matrix_targets
@@ -46,7 +56,6 @@ from dharma_swarm.workspace_topology import build_workspace_topology
 from dharma_swarm.operator_core import build_session_catalog, build_session_detail
 from dharma_swarm.operator_core.session_store import SessionStore
 from dharma_swarm.terminal_control import load_terminal_control_state
-from dharma_swarm.terminal_engine.events import ToolCallComplete
 from dharma_swarm.terminal_engine.events import PermissionDecisionEvent, PermissionOutcomeEvent, PermissionResolutionEvent
 
 
@@ -68,6 +77,14 @@ def _target_alias(model: str) -> str:
     return normalized.strip("-") or "model"
 
 
+def _is_tool_call_complete_event(event: Any) -> bool:
+    return (
+        getattr(event, "type", "") == "tool_call_complete"
+        and hasattr(event, "tool_call_id")
+        and hasattr(event, "tool_name")
+    )
+
+
 class TerminalBridge:
     """Minimal stdio protocol server for a terminal frontend."""
 
@@ -86,138 +103,46 @@ class TerminalBridge:
         self._ensure_adapters()
 
     def _load_repo_guidance(self, limit_chars: int = 2400) -> str:
-        guidance_path = self._repo_root / "CLAUDE.md"
-        try:
-            text = guidance_path.read_text(encoding="utf-8").strip()
-        except OSError:
-            return ""
-        if not text:
-            return ""
-        sections = self._summarize_repo_guidance(text)
-        text = sections or text
-        if len(text) <= limit_chars:
-            return text
-        return text[: limit_chars - 1].rstrip() + "…"
+        return terminal_bridge_context.load_repo_guidance(self._repo_root, limit_chars=limit_chars)
 
     def _summarize_repo_guidance(self, text: str) -> str:
-        lines = text.splitlines()
-        kept: list[str] = []
-        current_heading = ""
-        allowed_headings = {
-            "## Behavioral Rules (Always Enforced)",
-            "## File Organization",
-            "## Project Architecture",
-            "## CLI Entry Points",
-            "## Security Rules",
-        }
-        for line in lines:
-            stripped = line.rstrip()
-            if stripped.startswith("## "):
-                current_heading = stripped
-                if current_heading in allowed_headings:
-                    kept.append(stripped)
-                continue
-            if current_heading not in allowed_headings:
-                continue
-            if stripped.startswith("- ") or stripped.startswith("```") or stripped.startswith("dgc ") or stripped.startswith("uvicorn ") or stripped.startswith("bash "):
-                kept.append(stripped)
-        return "\n".join(line for line in kept if line)
+        return terminal_bridge_context.summarize_repo_guidance(text)
 
     def _load_session_context_hint(self) -> str:
-        try:
-            from dharma_swarm.claude_hooks import session_context
-
-            return session_context().strip()
-        except Exception:
-            return ""
+        return terminal_bridge_context.load_session_context_hint()
 
     def _memory_path(self) -> Path:
-        return self._state_dir / "working_memory.json"
+        return terminal_bridge_context.memory_path(self._state_dir)
 
     def _load_working_memory(self) -> dict[str, Any]:
-        path = self._memory_path()
-        try:
-            payload = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            return {
-                "recent_turns": [],
-                "recent_actions": [],
-                "active_mission": "",
-                "preferred_route": "",
-                "updated_at": "",
-            }
-        if not isinstance(payload, dict):
-            return {"recent_turns": [], "recent_actions": [], "active_mission": "", "preferred_route": "", "updated_at": ""}
-        payload.setdefault("recent_turns", [])
-        payload.setdefault("recent_actions", [])
-        payload.setdefault("active_mission", "")
-        payload.setdefault("preferred_route", "")
-        payload.setdefault("updated_at", "")
-        return payload
+        return terminal_bridge_context.load_working_memory(self._state_dir)
 
     def _save_working_memory(self, payload: dict[str, Any]) -> None:
-        self._state_dir.mkdir(parents=True, exist_ok=True)
-        payload["updated_at"] = datetime.now(timezone.utc).isoformat()
-        self._memory_path().write_text(json.dumps(payload, ensure_ascii=True, indent=2), encoding="utf-8")
+        terminal_bridge_context.save_working_memory(self._state_dir, payload)
 
     def _remember_turn(self, *, prompt: str, intent: dict[str, Any], route: str, active_tab: str) -> None:
-        memory = self._load_working_memory()
-        self._apply_turn_to_memory(memory, prompt=prompt, intent=intent, route=route, active_tab=active_tab)
-        self._save_working_memory(memory)
+        terminal_bridge_context.remember_turn(
+            self._state_dir,
+            prompt=prompt,
+            intent=intent,
+            route=route,
+            active_tab=active_tab,
+        )
 
     def _apply_turn_to_memory(self, memory: dict[str, Any], *, prompt: str, intent: dict[str, Any], route: str, active_tab: str) -> dict[str, Any]:
-        turns = memory.get("recent_turns", [])
-        if not isinstance(turns, list):
-            turns = []
-        turns.append(
-            {
-                "prompt": prompt,
-                "intent": str(intent.get("kind", "chat")),
-                "route": route,
-                "active_tab": active_tab,
-            }
+        return terminal_bridge_context.apply_turn_to_memory(
+            memory,
+            prompt=prompt,
+            intent=intent,
+            route=route,
+            active_tab=active_tab,
         )
-        memory["recent_turns"] = turns[-8:]
-        if str(intent.get("kind", "")) in {"agent", "evolution", "command"}:
-            memory["active_mission"] = prompt[:200]
-        memory["preferred_route"] = route
-        return memory
 
     def _remember_action(self, summary: str) -> None:
-        memory = self._load_working_memory()
-        actions = memory.get("recent_actions", [])
-        if not isinstance(actions, list):
-            actions = []
-        actions.append(summary)
-        memory["recent_actions"] = [str(item) for item in actions][-8:]
-        self._save_working_memory(memory)
+        terminal_bridge_context.remember_action(self._state_dir, summary)
 
     def _render_working_memory(self, memory: dict[str, Any]) -> str:
-        turns = memory.get("recent_turns", [])
-        actions = memory.get("recent_actions", [])
-        active_mission = str(memory.get("active_mission", "") or "").strip() or "none"
-        preferred_route = str(memory.get("preferred_route", "") or "").strip() or "none"
-        lines = [
-            f"Active mission: {active_mission}",
-            f"Preferred route: {preferred_route}",
-        ]
-        if isinstance(turns, list) and turns:
-            lines.append("Recent turns:")
-            for item in turns[-4:]:
-                if not isinstance(item, dict):
-                    continue
-                lines.append(
-                    "- {intent} | {route} | {prompt}".format(
-                        intent=str(item.get("intent", "chat")),
-                        route=str(item.get("route", "unknown")),
-                        prompt=str(item.get("prompt", ""))[:100],
-                    )
-                )
-        if isinstance(actions, list) and actions:
-            lines.append("Recent actions:")
-            for action in actions[-4:]:
-                lines.append(f"- {str(action)[:120]}")
-        return "\n".join(lines)
+        return terminal_bridge_context.render_working_memory(memory)
 
     def _ensure_adapters(self) -> None:
         if self._adapters or self._adapter_boot_error is not None:
@@ -244,18 +169,33 @@ class TerminalBridge:
     def _available_provider_ids(self) -> set[str]:
         return set(self._adapters)
 
+    async def _resolve_operator_snapshot(self) -> dict[str, Any]:
+        snapshot = self._build_operator_snapshot()
+        if inspect.isawaitable(snapshot):
+            snapshot = await snapshot
+        return dict(snapshot)
+
+    def _resolve_operator_snapshot_sync(self) -> dict[str, Any]:
+        snapshot = self._build_operator_snapshot()
+        if inspect.isawaitable(snapshot):
+            return asyncio.run(snapshot)
+        return dict(snapshot)
+
     async def close(self) -> None:
         for adapter in self._adapters.values():
             await adapter.close()
 
     async def run_stdio(self) -> int:
-        self._emit(
-            {
-                "type": "bridge.ready",
-                "schema_version": 1,
-                "protocol": "dharma-terminal-bridge",
-            }
-        )
+        try:
+            self._emit(
+                {
+                    "type": "bridge.ready",
+                    "schema_version": 1,
+                    "protocol": "dharma-terminal-bridge",
+                }
+            )
+        except BrokenPipeError:
+            return 0
 
         queue: asyncio.Queue[dict[str, Any] | None] = asyncio.Queue()
 
@@ -272,10 +212,18 @@ class TerminalBridge:
                 try:
                     request = json.loads(line)
                 except json.JSONDecodeError as exc:
-                    self._emit({"type": "bridge.error", "code": "invalid_json", "message": exc.msg})
+                    try:
+                        self._emit({"type": "bridge.error", "code": "invalid_json", "message": exc.msg})
+                    except BrokenPipeError:
+                        await queue.put(None)
+                        break
                     continue
                 if not isinstance(request, dict):
-                    self._emit({"type": "bridge.error", "code": "invalid_request", "message": "request must be a JSON object"})
+                    try:
+                        self._emit({"type": "bridge.error", "code": "invalid_request", "message": "request must be a JSON object"})
+                    except BrokenPipeError:
+                        await queue.put(None)
+                        break
                     continue
                 await queue.put(request)
 
@@ -287,16 +235,24 @@ class TerminalBridge:
                     break
                 try:
                     await self._handle_request(request)
+                except BrokenPipeError:
+                    break
                 except Exception as exc:
-                    self._emit({
-                        "type": "bridge.error",
-                        "code": "handler_crash",
-                        "message": f"{type(exc).__name__}: {exc}",
-                    })
+                    try:
+                        self._emit({
+                            "type": "bridge.error",
+                            "code": "handler_crash",
+                            "message": f"{type(exc).__name__}: {exc}",
+                        })
+                    except BrokenPipeError:
+                        break
 
         reader_task = asyncio.create_task(_reader())
         processor_task = asyncio.create_task(_processor())
-        await asyncio.gather(reader_task, processor_task)
+        try:
+            await asyncio.gather(reader_task, processor_task)
+        except BrokenPipeError:
+            return 0
         return 0
 
     async def _handle_request(self, request: dict[str, Any]) -> None:
@@ -323,6 +279,9 @@ class TerminalBridge:
             return
         if request_type == "model.policy":
             await self._handle_model_policy(request_id, request)
+            return
+        if request_type == "routing.manifest":
+            await self._handle_routing_manifest(request_id, request)
             return
         if request_type == "operator.snapshot":
             await self._handle_operator_snapshot(request_id)
@@ -382,26 +341,8 @@ class TerminalBridge:
         )
 
     async def _handle_handshake(self, request_id: str) -> None:
-        providers: list[dict[str, Any]] = []
         adapter_error = self._adapter_boot_error
-        if adapter_error is None:
-            for provider_id, adapter in self._adapters.items():
-                models = []
-                for profile in await adapter.list_models():
-                    models.append(
-                        {
-                            "id": profile.model_id,
-                            "display_name": profile.display_name,
-                            "capabilities": sorted(cap.name.lower() for cap in type(profile.capabilities) if profile.supports(cap)),
-                        }
-                    )
-                providers.append(
-                    {
-                        "provider_id": provider_id,
-                        "default_model": adapter.get_profile(None).model_id,
-                        "models": models,
-                    }
-                )
+        providers = await self._build_adapter_catalog_entries() if adapter_error is None else []
         self._emit(
             {
                 "type": "handshake.result",
@@ -415,6 +356,31 @@ class TerminalBridge:
                 "adapter_boot_error": adapter_error,
             }
         )
+
+    async def _build_adapter_catalog_entries(self) -> list[dict[str, Any]]:
+        providers: list[dict[str, Any]] = []
+        for provider_id, adapter in self._adapters.items():
+            models = []
+            for profile in await adapter.list_models():
+                models.append(
+                    {
+                        "id": profile.model_id,
+                        "display_name": profile.display_name,
+                        "capabilities": sorted(
+                            cap.name.lower()
+                            for cap in type(profile.capabilities)
+                            if profile.supports(cap)
+                        ),
+                    }
+                )
+            providers.append(
+                {
+                    "provider_id": provider_id,
+                    "default_model": adapter.get_profile(None).model_id,
+                    "models": models,
+                }
+            )
+        return providers
 
     async def _handle_workspace_snapshot(self, request_id: str) -> None:
         summary = await asyncio.to_thread(self._load_repo_xray)
@@ -449,7 +415,7 @@ class TerminalBridge:
         )
 
     async def _handle_runtime_snapshot(self, request_id: str) -> None:
-        operator_snapshot = await self._build_operator_snapshot()
+        operator_snapshot = await self._resolve_operator_snapshot()
         runtime_payload = build_runtime_snapshot_payload(
             operator_snapshot,
             repo_root=str(self._repo_root),
@@ -661,6 +627,40 @@ class TerminalBridge:
             policy=policy,
         )
 
+    async def _handle_routing_manifest(self, request_id: str, request: dict[str, Any]) -> None:
+        selected_provider = str(request.get("provider", "") or "codex").strip().lower()
+        selected_model = str(request.get("model", "") or "").strip() or model_routing.default_target().model_id
+        strategy = model_routing.resolve_strategy(str(request.get("strategy", "") or "")) or "responsive"
+        policy = await asyncio.to_thread(
+            self._build_model_policy_summary,
+            selected_provider=selected_provider,
+            selected_model=selected_model,
+            strategy=strategy,
+        )
+        agent_routes = await asyncio.to_thread(self._build_agent_routes)
+        adapter_entries = await self._build_adapter_catalog_entries()
+        adapter_catalog = normalize_adapter_catalog(adapter_entries, policy_targets=policy.get("targets", []))
+        legacy_targets = normalize_legacy_targets(
+            hard_targets=model_routing.MODEL_TARGETS,
+            soft_targets=model_routing._SOFT_TARGETS,
+            policy_targets=policy.get("targets", []),
+            adapter_catalog=adapter_catalog,
+        )
+        payload = build_routing_manifest_payload(
+            model_policy=policy,
+            routing_decision_payload=build_routing_decision_payload(policy),
+            agent_routes_payload=build_agent_routes_payload(agent_routes),
+            adapter_catalog=adapter_catalog,
+            legacy_targets=legacy_targets,
+        )
+        self._emit(
+            {
+                "type": "routing.manifest.result",
+                "request_id": request_id,
+                "payload": payload,
+            }
+        )
+
     async def _handle_agent_routes(self, request_id: str) -> None:
         routes = await asyncio.to_thread(self._build_agent_routes)
         self._emit_payload_result(
@@ -824,7 +824,7 @@ class TerminalBridge:
 
         try:
             async for event in adapter.stream(completion, session_id=session_id):
-                if isinstance(event, ToolCallComplete):
+                if _is_tool_call_complete_event(event):
                     self._emit_permission_decision(request_id, event)
                 payload = asdict(event)
                 payload["request_id"] = request_id
@@ -900,8 +900,12 @@ class TerminalBridge:
         )
 
     def _emit(self, payload: dict[str, Any]) -> None:
-        sys.stdout.write(json.dumps(payload, default=_json_default) + "\n")
-        sys.stdout.flush()
+        try:
+            sys.stdout.write(json.dumps(payload, default=_json_default) + "\n")
+            sys.stdout.flush()
+        except BrokenPipeError:
+            sys.stdout = open(os.devnull, "w", encoding="utf-8")
+            raise
 
     def _emit_payload_result(
         self,
@@ -923,7 +927,7 @@ class TerminalBridge:
             event.update(extra)
         self._emit(event)
 
-    def _emit_permission_decision(self, request_id: str, event: ToolCallComplete) -> None:
+    def _emit_permission_decision(self, request_id: str, event: Any) -> None:
         payload = build_permission_decision_payload(event)
         if payload.get("decision") == "allow" and not bool(payload.get("requires_confirmation")):
             return
@@ -1016,7 +1020,7 @@ class TerminalBridge:
         top_imports = summary.most_imported_modules[:5]
         lines = [
             "# Workspace X-Ray",
-            f"Repo root: {summary.repo_root}",
+            f"Repo root: {getattr(summary, 'repo_root', self._repo_root)}",
             *git_summary_lines,
             f"Python modules: {summary.python_modules}",
             f"Python tests: {summary.python_tests}",
@@ -1407,79 +1411,16 @@ class TerminalBridge:
         }
 
     def _build_command_graph_summary(self) -> dict[str, Any]:
-        commands = sorted(system_commands_module._ALL_COMMANDS)
-        async_commands = sorted(system_commands_module._ASYNC_COMMANDS)
-        categories = {
-            "chat": sorted(["chat", "clear", "reset", "cancel", "paste", "copy", "copylast", "thread"]),
-            "repo": sorted(["git"]),
-            "runtime": sorted(["runtime"]),
-            "control": sorted(["status", "health", "pulse", "self"]),
-            "ontology": sorted(["context", "foundations", "telos", "dharma", "corpus", "evidence"]),
-            "memory": sorted(["memory", "notes", "archive", "darwin", "logs", "truth", "stigmergy"]),
-            "swarm": sorted(["swarm", "agni", "gates", "witness", "hum"]),
-        }
-        return {
-            "count": len(commands),
-            "async_count": len(async_commands),
-            "commands": commands,
-            "async_commands": async_commands,
-            "categories": categories,
-        }
+        return build_command_graph_summary(
+            system_commands_module._ALL_COMMANDS,
+            system_commands_module._ASYNC_COMMANDS,
+        )
 
     def _build_command_registry(self) -> dict[str, Any]:
-        descriptions = {
-            "status": "Full system status panel",
-            "health": "Ecosystem health check",
-            "pulse": "Run heartbeat",
-            "self": "System self-map",
-            "context": "Show agent context layers",
-            "memory": "Strange loop memory and latent gold",
-            "notes": "Shared agent notes",
-            "archive": "Evolution archive",
-            "darwin": "Darwin experiment memory and trust ladder",
-            "swarm": "Swarm operations and report lanes",
-            "gates": "Test telos gates",
-            "evolve": "Darwin Engine evolution",
-            "runtime": "Live process and runtime matrix",
-            "git": "Repo branch/head/dirty counts",
-            "foundations": "Foundational pillars",
-            "telos": "Telos Engine research docs",
-            "thread": "Show or set research thread",
-            "plan": "Plan-mode control",
-            "model": "Model routing control",
-            "chat": "Native chat continuation control",
-        }
-        categories = self._build_command_graph_summary()["categories"]
-        records = []
-        for name in sorted(system_commands_module._ALL_COMMANDS):
-            target_pane = "control"
-            for category_name, commands in categories.items():
-                if name in commands:
-                    if category_name == "repo":
-                        target_pane = "repo"
-                    elif category_name == "runtime":
-                        target_pane = "runtime"
-                    elif category_name == "ontology":
-                        target_pane = "ontology"
-                    elif category_name == "memory":
-                        target_pane = "sessions"
-                    elif category_name == "swarm":
-                        target_pane = "agents"
-                    elif category_name == "chat":
-                        target_pane = "chat"
-            records.append(
-                {
-                    "name": name,
-                    "async": name in system_commands_module._ASYNC_COMMANDS,
-                    "category": next((category for category, commands in categories.items() if name in commands), "control"),
-                    "target_pane": target_pane,
-                    "description": descriptions.get(name, "Dharma operator command"),
-                }
-            )
-        return {
-            "count": len(records),
-            "commands": records,
-        }
+        return build_command_registry_payload(
+            system_commands_module._ALL_COMMANDS,
+            system_commands_module._ASYNC_COMMANDS,
+        )
 
     async def _build_operator_snapshot(self) -> dict[str, Any]:
         runtime_state = RuntimeStateStore(db_path=DEFAULT_RUNTIME_DB)
@@ -1528,76 +1469,18 @@ class TerminalBridge:
     def _build_model_policy_summary(self, *, selected_provider: str, selected_model: str, strategy: str) -> dict[str, Any]:
         strategy = model_routing.resolve_strategy(strategy) or "responsive"
         raw_targets = build_default_matrix_targets(profile="live25", include_unavailable=True)
-        seen_routes: set[tuple[str, str]] = set()
-        targets: list[dict[str, Any]] = []
-        for target in raw_targets:
-            provider_id = _bridge_provider_id(target.provider)
-            if provider_id is None:
-                continue
-            route = (provider_id, target.model)
-            if route in seen_routes:
-                continue
-            seen_routes.add(route)
-            alias = _target_alias(target.model)
-            lane_role = str(target.lane_role.value).replace("_", " ")
-            tier = str(target.tier)
-            availability = "ready" if bool(target.available) else "unavailable"
-            targets.append(
-                {
-                    "alias": alias,
-                    "provider": provider_id,
-                    "model": target.model,
-                    "label": f"{target.model} [{provider_id} | {lane_role} | {tier} | {availability}]",
-                    "lane_role": target.lane_role.value,
-                    "tier": tier,
-                    "available": bool(target.available),
-                    "availability_reason": target.availability_reason,
-                    "config_source": target.config_source,
-                }
-            )
-
-        selected_available = any(
-            target["provider"] == selected_provider and target["model"] == selected_model
-            for target in targets
+        default_target = model_routing.default_target()
+        return build_model_policy_summary(
+            selected_provider=selected_provider,
+            selected_model=selected_model,
+            strategy=strategy,
+            raw_targets=raw_targets,
+            strategies=model_routing.ROUTING_STRATEGIES,
+            default_provider_id=default_target.provider_id,
+            default_model_id=default_target.model_id,
+            provider_id_for_target=lambda target: _bridge_provider_id(target.provider),
+            alias_for_model=_target_alias,
         )
-        if not selected_available and targets:
-            fallback_target = next((target for target in targets if target["provider"] == "codex"), targets[0])
-            selected_provider = str(fallback_target["provider"])
-            selected_model = str(fallback_target["model"])
-
-        active_target = next(
-            (
-                target
-                for target in targets
-                if target["provider"] == selected_provider and target["model"] == selected_model
-            ),
-            None,
-        )
-        fallback_chain = [
-            {
-                "alias": str(target["alias"]),
-                "provider": str(target["provider"]),
-                "model": str(target["model"]),
-                "label": str(target["label"]),
-            }
-            for target in targets
-            if not (target["provider"] == selected_provider and target["model"] == selected_model)
-        ][:6]
-        return {
-            "selected_provider": selected_provider,
-            "selected_model": selected_model,
-            "selected_route": f"{selected_provider}:{selected_model}",
-            "strategy": strategy,
-            "strategies": list(model_routing.ROUTING_STRATEGIES),
-            "default_route": (
-                f"{targets[0]['provider']}:{targets[0]['model']}"
-                if targets
-                else f"{model_routing.default_target().provider_id}:{model_routing.default_target().model_id}"
-            ),
-            "active_label": str(active_target["label"]) if active_target else selected_model,
-            "fallback_chain": fallback_chain,
-            "targets": targets,
-        }
 
     def _build_agent_routes(self) -> dict[str, Any]:
         openclaw = self._read_openclaw_summary()
@@ -1682,297 +1565,47 @@ class TerminalBridge:
         session_context_hint: str,
         working_memory: str,
     ) -> str:
-        command_categories = command_graph.get("categories", {})
-        command_lines = []
-        for name, commands in command_categories.items():
-            if isinstance(commands, list) and commands:
-                command_lines.append(f"- {name}: {', '.join(str(item) for item in commands[:8])}")
-
-        lines = [
-            "# Dharma Terminal Bootstrap",
-            "",
-            "Identity:",
-            "- You are not a detached chatbot. You are the Dharma Swarm operator intelligence speaking from inside the repo and control plane.",
-            "- Treat the repo, ontology, runtime state, command graph, model policy, and swarm routes as your own appendages.",
-            "- When the user asks what you can do, answer in terms of Dharma-native commands, panes, agents, models, and repo actions available right now.",
-            "- If a native command, pane refresh, model switch, or operator action is the right move, prefer it over generic prose.",
-            "- Your tone should feel like the system itself: specific, grounded, operational, and aware of local topology.",
-            "",
-            "Turn context:",
-            f"- Prompt: {prompt}",
-            f"- Active tab: {active_tab}",
-            f"- Intent: {intent.get('kind', 'chat')}",
-            f"- Selected route: {selected_provider}:{selected_model}",
-            f"- Routing strategy: {routing_strategy}",
-            "",
-            "Model policy:",
-            f"- Default route: {model_policy.get('default_route', 'unknown')}",
-            f"- Strategies: {', '.join(str(item) for item in model_policy.get('strategies', []))}",
-            f"- Available model targets: {', '.join(str(item.get('alias', '?')) for item in model_policy.get('targets', [])[:10])}",
-            "",
-            "Command graph:",
-            *command_lines,
-            "",
-            "Behavioral rules:",
-            "- If the user asks for a model change, perform the switch and explain the new route briefly.",
-            "- If the user asks for status, topology, runtime, memory, agents, or evolution state, prefer the corresponding Dharma surface over generic explanation.",
-            "- If the user asks who you are, answer as Dharma Swarm's operator intelligence for this repo, not as an abstract assistant.",
-            "- When helpful, restate the available command or pane that matches the request.",
-            "",
-            "Repo guidance (always-loaded doctrine):",
-            repo_guidance or "(no CLAUDE.md guidance found)",
-            "",
-            "Session context hint:",
-            session_context_hint or "(no session context hint available)",
-            "",
-            "Working memory:",
-            working_memory or "(no working memory yet)",
-            "",
-            "Orientation packet:",
-            json.dumps(orientation_packet, indent=2, ensure_ascii=True),
-            "",
-            "Workspace snapshot:",
-            workspace_snapshot,
-            "",
-            "Ontology snapshot:",
-            ontology_snapshot,
-            "",
-            "Runtime snapshot:",
-            runtime_snapshot,
-        ]
-        return "\n".join(lines)
+        return terminal_bridge_context.render_system_prompt(
+            prompt=prompt,
+            active_tab=active_tab,
+            intent=intent,
+            selected_provider=selected_provider,
+            selected_model=selected_model,
+            routing_strategy=routing_strategy,
+            command_graph=command_graph,
+            model_policy=model_policy,
+            orientation_packet=orientation_packet,
+            workspace_snapshot=workspace_snapshot,
+            ontology_snapshot=ontology_snapshot,
+            runtime_snapshot=runtime_snapshot,
+            repo_guidance=repo_guidance,
+            session_context_hint=session_context_hint,
+            working_memory=working_memory,
+        )
 
     def _render_command_graph_text(self, graph: dict[str, Any]) -> str:
-        lines = [
-            "# Command Graph",
-            f"Command count: {graph.get('count', 0)}",
-            f"Async commands: {graph.get('async_count', 0)}",
-            "",
-            "## Categories",
-        ]
-        categories = graph.get("categories", {})
-        if isinstance(categories, dict):
-            for name, commands in categories.items():
-                values = commands if isinstance(commands, list) else []
-                lines.append(f"- {name}: {', '.join(str(item) for item in values) if values else 'none'}")
-        async_commands = graph.get("async_commands", [])
-        if isinstance(async_commands, list):
-            lines.extend(["", "## Async lanes", ", ".join(str(item) for item in async_commands) if async_commands else "none"])
-        return "\n".join(lines)
+        return terminal_bridge_renderers.render_command_graph_text(graph)
 
     def _render_command_registry_text(self, registry: dict[str, Any]) -> str:
-        lines = ["# Command Registry", f"Commands: {registry.get('count', 0)}", "", "## Commands"]
-        commands = registry.get("commands", [])
-        if isinstance(commands, list):
-            for item in commands[:24]:
-                if not isinstance(item, dict):
-                    continue
-                sync_state = "async" if item.get("async") else "sync"
-                lines.append(
-                    "- /{name} [{sync_state}] -> {target_pane} | {description}".format(
-                        name=str(item.get("name", "?")),
-                        sync_state=sync_state,
-                        target_pane=str(item.get("target_pane", "control")),
-                        description=str(item.get("description", "command")),
-                    )
-                )
-        return "\n".join(lines)
+        return terminal_bridge_renderers.render_command_registry_text(registry)
 
     def _render_operator_snapshot_text(self, snapshot: dict[str, Any]) -> str:
-        overview = snapshot.get("overview", {})
-        runs = snapshot.get("runs", [])
-        actions = snapshot.get("actions", [])
-        lines = [
-            "# Operator Snapshot",
-            f"Runtime DB: {snapshot.get('runtime_db', str(DEFAULT_RUNTIME_DB))}",
-        ]
-        error = str(snapshot.get("error", "") or "").strip()
-        if error:
-            lines.append(f"Error: {error}")
-            return "\n".join(lines)
-        if isinstance(overview, dict):
-            lines.extend(
-                [
-                    f"Sessions: {overview.get('sessions', 0)}",
-                    f"Claims: {overview.get('claims', 0)} | active {overview.get('active_claims', 0)} | acked {overview.get('acknowledged_claims', 0)}",
-                    f"Runs: {overview.get('runs', 0)} | active {overview.get('active_runs', 0)}",
-                    f"Artifacts: {overview.get('artifacts', 0)} | promoted facts {overview.get('promoted_facts', 0)}",
-                    f"Context bundles: {overview.get('context_bundles', 0)} | operator actions {overview.get('operator_actions', 0)}",
-                ]
-            )
-        lines.extend(["", "## Active runs"])
-        if isinstance(runs, list) and runs:
-            for run in runs[:8]:
-                if not isinstance(run, dict):
-                    continue
-                lines.append(
-                    "- {assigned_to} | {status} | task {task_id} | run {run_id}".format(
-                        assigned_to=str(run.get("assigned_to", "?")),
-                        status=str(run.get("status", "?")),
-                        task_id=str(run.get("task_id", ""))[:18],
-                        run_id=str(run.get("run_id", ""))[:12],
-                    )
-                )
-        else:
-            lines.append("none")
-        lines.extend(["", "## Recent operator actions"])
-        if isinstance(actions, list) and actions:
-            for action in actions[:8]:
-                if not isinstance(action, dict):
-                    continue
-                lines.append(
-                    "- {action_name} by {actor} | task {task_id} | {reason}".format(
-                        action_name=str(action.get("action_name", "?")),
-                        actor=str(action.get("actor", "?")),
-                        task_id=str(action.get("task_id", ""))[:18] or "-",
-                        reason=str(action.get("reason", "") or "").strip() or "no reason",
-                    )
-                )
-        else:
-            lines.append("none")
-        return "\n".join(lines)
+        return terminal_bridge_renderers.render_operator_snapshot_text(snapshot, default_runtime_db=DEFAULT_RUNTIME_DB)
 
     def _render_model_policy_text(self, policy: dict[str, Any]) -> str:
-        lines = [
-            "# Model Policy",
-            f"Active: {policy.get('active_label', policy.get('selected_model', 'unknown'))}",
-            f"Route: {policy.get('selected_route', 'unknown')}",
-            f"Strategy: {policy.get('strategy', 'responsive')}",
-            f"Default route: {policy.get('default_route', 'unknown')}",
-            "",
-            "## Fallback chain",
-        ]
-        chain = policy.get("fallback_chain", [])
-        if isinstance(chain, list) and chain:
-            for item in chain[:6]:
-                if not isinstance(item, dict):
-                    continue
-                lines.append(f"- {item.get('label', item.get('alias', '?'))} [{item.get('provider', '?')}]")
-        else:
-            lines.append("none")
-        lines.extend(["", "## Targets"])
-        targets = policy.get("targets", [])
-        if isinstance(targets, list):
-            for item in targets:
-                if not isinstance(item, dict):
-                    continue
-                lines.append(f"- {item.get('alias', '?')} -> {item.get('label', '?')}")
-        return "\n".join(lines)
+        return terminal_bridge_renderers.render_model_policy_text(policy)
 
     def _render_agent_routes_text(self, routes: dict[str, Any]) -> str:
-        lines = ["# Agent Routes", "", "## Route profiles"]
-        route_items = routes.get("routes", [])
-        if isinstance(route_items, list):
-            for item in route_items:
-                if not isinstance(item, dict):
-                    continue
-                lines.append(
-                    "- {intent} -> {provider}:{model_alias} | effort {reasoning} | role {role}".format(
-                        intent=str(item.get("intent", "?")),
-                        provider=str(item.get("provider", "?")),
-                        model_alias=str(item.get("model_alias", "?")),
-                        reasoning=str(item.get("reasoning", "?")),
-                        role=str(item.get("role", "?")),
-                    )
-                )
-        openclaw = routes.get("openclaw", {})
-        if isinstance(openclaw, dict):
-            lines.extend(
-                [
-                    "",
-                    "## OpenClaw",
-                    f"Present: {openclaw.get('present', False)}",
-                    f"Readable: {openclaw.get('readable', False)}",
-                    f"Agents: {openclaw.get('agents_count', 0)}",
-                    f"Providers: {', '.join(str(item) for item in openclaw.get('providers', [])) if openclaw.get('providers') else 'none'}",
-                ]
-            )
-        return "\n".join(lines)
+        return terminal_bridge_renderers.render_agent_routes_text(routes)
 
     def _render_evolution_surface_text(self, surface: dict[str, Any]) -> str:
-        lines = ["# Evolution Surface", "", "## Cascade domains"]
-        domains = surface.get("domains", [])
-        if isinstance(domains, list):
-            for item in domains:
-                if not isinstance(item, dict):
-                    continue
-                lines.append(
-                    "- {name} | threshold {fitness_threshold} | max_iter {max_iterations} | max_duration {max_duration_seconds}s".format(
-                        name=str(item.get("name", "?")),
-                        fitness_threshold=str(item.get("fitness_threshold", "?")),
-                        max_iterations=str(item.get("max_iterations", "?")),
-                        max_duration_seconds=str(item.get("max_duration_seconds", "?")),
-                    )
-                )
-        lines.extend(["", "## Entry commands"])
-        entries = surface.get("entry_commands", [])
-        if isinstance(entries, list):
-            for entry in entries:
-                lines.append(f"- {entry}")
-        lines.extend(["", "## Principles"])
-        principles = surface.get("principles", [])
-        if isinstance(principles, list):
-            for principle in principles:
-                lines.append(f"- {principle}")
-        return "\n".join(lines)
+        return terminal_bridge_renderers.render_evolution_surface_text(surface)
 
     def _render_session_catalog_text(self, catalog: dict[str, Any]) -> str:
-        lines = ["# Session Catalog", f"Sessions: {catalog.get('count', 0)}", "", "## Recent sessions"]
-        sessions = catalog.get("sessions", [])
-        if isinstance(sessions, list) and sessions:
-            for item in sessions[:12]:
-                if not isinstance(item, dict):
-                    continue
-                session = item.get("session")
-                if session is None:
-                    continue
-                metadata = session.get("metadata", {}) if isinstance(session, dict) else {}
-                lines.append(
-                    "- {session_id} | {provider_id}:{model_id} | {status} | turns {turns} | replay {replay}".format(
-                        session_id=session.get("session_id", "?") if isinstance(session, dict) else getattr(session, "session_id", "?"),
-                        provider_id=session.get("provider_id", "?") if isinstance(session, dict) else getattr(session, "provider_id", "?"),
-                        model_id=session.get("model_id", "?") if isinstance(session, dict) else getattr(session, "model_id", "?"),
-                        status=session.get("status", "?") if isinstance(session, dict) else getattr(session, "status", "?"),
-                        turns=str(metadata.get("total_turns", item.get("total_turns", 0))),
-                        replay="ok" if bool(item.get("replay_ok")) else "issues",
-                    )
-                )
-        else:
-            lines.append("none")
-        return "\n".join(lines)
+        return terminal_bridge_renderers.render_session_catalog_text(catalog)
 
     def _render_session_detail_text(self, detail: dict[str, Any]) -> str:
-        session = detail.get("session")
-        compact = detail.get("compaction_preview", {})
-        session_id = session.get("session_id", "?") if isinstance(session, dict) else getattr(session, "session_id", "?")
-        provider_id = session.get("provider_id", "?") if isinstance(session, dict) else getattr(session, "provider_id", "?")
-        model_id = session.get("model_id", "?") if isinstance(session, dict) else getattr(session, "model_id", "?")
-        status = session.get("status", "?") if isinstance(session, dict) else getattr(session, "status", "?")
-        cwd = session.get("cwd", "?") if isinstance(session, dict) else getattr(session, "cwd", "?")
-        lines = [
-            "# Session Detail",
-            f"Session: {session_id}",
-            f"Route: {provider_id}:{model_id}",
-            f"Status: {status}",
-            f"CWD: {cwd}",
-            f"Replay: {'ok' if detail.get('replay_ok') else 'issues'}",
-            "",
-            "## Compaction preview",
-            f"Events: {compact.get('event_count', 0)}",
-            f"Compactable ratio: {compact.get('compactable_ratio', 0.0)}",
-            f"Protected: {', '.join(str(item) for item in compact.get('protected_event_types', [])) or 'none'}",
-            "",
-            "## Recent event types",
-            ", ".join(str(item) for item in compact.get("recent_event_types", [])) or "none",
-        ]
-        issues = detail.get("replay_issues", [])
-        lines.extend(["", "## Replay issues"])
-        if isinstance(issues, list) and issues:
-            for issue in issues[:8]:
-                lines.append(f"- {issue}")
-        else:
-            lines.append("none")
-        return "\n".join(lines)
+        return terminal_bridge_renderers.render_session_detail_text(detail)
 
     def _build_workspace_preview(self, content: str) -> dict[str, str]:
         return {
@@ -2293,7 +1926,7 @@ class TerminalBridge:
                 result["payload"] = build_routing_decision_payload(policy)
                 result["policy"] = policy
             elif surface in {"control", "runtime"}:
-                operator_snapshot = asyncio.run(self._build_operator_snapshot())
+                operator_snapshot = self._resolve_operator_snapshot_sync()
                 result["payload"] = build_runtime_snapshot_payload(
                     operator_snapshot,
                     repo_root=str(self._repo_root),

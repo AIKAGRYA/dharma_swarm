@@ -545,9 +545,9 @@ def test_model_set_action_accepts_index(monkeypatch) -> None:
 
     app._handle_action("model:set 3", "model set 3")
 
-    # Index 3 is now kimi-k2.5 (free frontier) per model_hierarchy.py
-    assert app._active_provider == "ollama"
-    assert app._active_model == "kimi-k2.5:cloud"
+    # Index 3 follows the canonical model hierarchy order.
+    assert app._active_provider == "claude"
+    assert app._active_model == "claude-code"
 
 
 def test_model_auto_strategy_sets_profile(monkeypatch) -> None:

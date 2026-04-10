@@ -6,8 +6,18 @@ import json
 from pathlib import Path
 
 from dharma_swarm.runtime_contract import validate_envelope
+from dharma_swarm.operator_core.session_store import (
+    SessionStore as OperatorCoreSessionStore,
+    cwd_matches as operator_core_cwd_matches,
+)
 from dharma_swarm.tui.engine.events import PermissionDecisionEvent, PermissionResolutionEvent, TextComplete
+from dharma_swarm.tui.engine import session_store as tui_session_store_module
 from dharma_swarm.tui.engine.session_store import SessionStore
+
+
+def test_tui_session_store_is_operator_core_shim():
+    assert SessionStore is OperatorCoreSessionStore
+    assert tui_session_store_module._cwd_matches is operator_core_cwd_matches
 
 
 def test_session_store_list_and_latest_filters(tmp_path):

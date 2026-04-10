@@ -24,6 +24,7 @@ from dharma_swarm.provider_matrix import (
 
 def test_build_default_matrix_targets_keeps_sovereign_lanes_first() -> None:
     targets = build_default_matrix_targets(profile="live25", env={})
+    target_models = {target.model for target in targets}
 
     assert targets[0].provider == ProviderType.CODEX
     assert targets[0].lane_role == LaneRole.PRIMARY_DRIVER
@@ -38,6 +39,10 @@ def test_build_default_matrix_targets_keeps_sovereign_lanes_first() -> None:
     assert any(target.model == "kimi-k2.5:cloud" for target in targets)
     assert any(target.model == "qwen3-coder:480b-cloud" for target in targets)
     assert any(target.model == "minimax-m2.7:cloud" for target in targets)
+    assert "z-ai/glm-5.1" in target_models
+    assert "qwen/qwen3.5-397b-a17b" in target_models
+    assert "deepseek/deepseek-v3.2-speciale" in target_models
+    assert "nvidia/llama-3.1-nemotron-ultra-253b-v1" in target_models
     assert len(targets) >= 20
 
 

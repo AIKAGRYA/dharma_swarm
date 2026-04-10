@@ -130,7 +130,7 @@ export const initialState: AppState = {
   },
   outline: buildInitialOutline(),
   statusLine: "bridge booting",
-  footerHint: "Keys: Tab/Shift-Tab tabs | \u2190/\u2192 tabs | ^K switch panes | ^B sidebar | 1/2/3 sidebar | ^G ^R ^O ^M ^A ^P ^E ^T ^Y panes | ^H ^J ^N transparency",
+  footerHint: "Keys: Tab/Shift-Tab tabs | \u2190/\u2192 tabs | ^K switch panes | ^B sidebar | 1/2/3 sidebar | ^G chat | ^R repo | ^O ontology | ^A agents | ^P models | ^E evolution | ^T control | ^Y runtime | ^N timeline",
 };
 
 export function reduceApp(state: AppState, action: AppAction): AppState {

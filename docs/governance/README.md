@@ -2,21 +2,21 @@
 
 Last updated: 2026-04-04 Asia/Tokyo
 
-This directory is the easiest single place to orient any human or agent before working in `dharma_swarm`, with [DHARMA_SWARM_ALL_AGENTS.md](/Users/dhyana/dharma_swarm/DHARMA_SWARM_ALL_AGENTS.md) as the neutral root entry.
+This directory is the easiest single place to orient any human or agent before working in `dharma_swarm`.
 
 ## Read Order
 
-1. [DHARMA_SWARM_ALL_AGENTS.md](/Users/dhyana/dharma_swarm/DHARMA_SWARM_ALL_AGENTS.md)  
-   Neutral root entrypoint for all agents.
-
-2. [CLAUDE.md](/Users/dhyana/dharma_swarm/CLAUDE.md)  
+1. [CLAUDE.md](/Users/dhyana/dharma_swarm/CLAUDE.md)
    Repo-wide working contract and behavioral rules.
 
-3. [SOVEREIGN_MANIFEST.md](/Users/dhyana/dharma_swarm/docs/governance/SOVEREIGN_MANIFEST.md)  
+2. [SOVEREIGN_MANIFEST.md](/Users/dhyana/dharma_swarm/docs/governance/SOVEREIGN_MANIFEST.md)
    High-level architecture, domains, invariants, and agent boot sequence.
 
-4. [CANONICAL_DOC_STACK.md](/Users/dhyana/dharma_swarm/docs/governance/CANONICAL_DOC_STACK.md)  
+3. [CANONICAL_DOC_STACK.md](/Users/dhyana/dharma_swarm/docs/governance/CANONICAL_DOC_STACK.md)
    Which docs own which kind of truth.
+
+4. [TERMINAL_OPERATING_MODEL.md](/Users/dhyana/dharma_swarm/docs/governance/TERMINAL_OPERATING_MODEL.md)
+   Canonical terminal surface, bridge boundary, and migration rules.
 
 5. [REPO_GOVERNANCE_AUDIT.md](/Users/dhyana/dharma_swarm/docs/governance/REPO_GOVERNANCE_AUDIT.md)  
    Contradictions, stale claims, and audit evidence.

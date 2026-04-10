@@ -376,6 +376,53 @@
         "hiding severity",
         "treating incidents as normal feature work"
       ]
+    },
+    {
+      "slug": "terminal-autonomous-build",
+      "title": "Terminal Autonomous Build",
+      "summary": "Run a bounded autonomous terminal cleanup lane focused on the canonical Bun shell, bridge boundary, and tranche-by-tranche validation.",
+      "runtime_aliases": {
+        "claude_skill": "dharma-terminal-autonomous-build",
+        "codex_mode": "terminal-autonomous-build",
+        "dgc_lane": "terminal_autonomous_build",
+        "openclaw_profile": "terminal_autonomous_build"
+      },
+      "allowed_tools": [
+        "Read",
+        "Grep",
+        "Glob",
+        "Bash",
+        "Edit",
+        "Write"
+      ],
+      "required_outputs": [
+        "current_lane",
+        "tranche_completed",
+        "files_changed",
+        "validation_performed",
+        "residual_risks",
+        "next_bounded_seam"
+      ],
+      "required_artifacts": [
+        "lane_control_note",
+        "issue_log"
+      ],
+      "escalation_triggers": [
+        "bridge ownership ambiguity",
+        "dual-shell drift",
+        "promotion decision required",
+        "hot-path collision outside terminal lane"
+      ],
+      "handoff_to": [
+        "preflight-review",
+        "retro"
+      ],
+      "non_goals": [
+        "building a third shell in parallel",
+        "dashboard or API cleanup",
+        "treating terminal-v2 as a peer product by default",
+        "claiming a tranche is safe without focused shell or bridge validation"
+      ]
     }
   ]
 }

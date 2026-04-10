@@ -136,6 +136,7 @@ Do not treat it as `foundations/`-style canon or `lodestones/`-style orienting p
 |------|---------|
 | `ceo-review` | Reframe the problem and find the strongest product wedge |
 | `autonomous-build` | Run a bounded overnight cleanup or build lane with explicit boundaries and stop rules |
+| `terminal-autonomous-build` | Run a bounded terminal cleanup lane on the canonical shell and bridge boundary |
 | `eng-review` | Lock architecture, interfaces, failure modes, and tests |
 | `preflight-review` | Review a diff or plan for production-grade risks |
 | `ship` | Execute the release workflow for a ready branch |
@@ -235,8 +236,20 @@ For long-running bounded execution, use:
 autonomous-build -> preflight-review / retro
 ```
 
+For long-running terminal cleanup, use:
+
+```text
+terminal-autonomous-build -> preflight-review / retro
+```
+
 Repo-local launcher:
 
 ```bash
 bash scripts/start_autonomous_cleanup_tmux.sh
+```
+
+Terminal-specific launcher:
+
+```bash
+bash scripts/start_terminal_autonomous_build_tmux.sh
 ```

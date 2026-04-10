@@ -181,6 +181,22 @@ export type AgentRoutesPayload = {
   subagent_capabilities: string[];
 };
 
+export type RoutingManifestPayload = {
+  version: "v1";
+  domain: "routing_manifest";
+  selected_route: string;
+  strategy: string;
+  model_policy: Record<string, unknown>;
+  routing_decision: RoutingDecisionPayload;
+  agent_routes: AgentRoutesPayload;
+  selectable_routes: Array<Record<string, unknown>>;
+  adapter_catalog: Array<Record<string, unknown>>;
+  legacy_targets: Array<Record<string, unknown>>;
+  agent_assignments: Array<Record<string, unknown>>;
+  counts: Record<string, number>;
+  drift: Array<Record<string, unknown>>;
+};
+
 export type WorkspaceChangedHotspot = {
   name: string;
   count: number;

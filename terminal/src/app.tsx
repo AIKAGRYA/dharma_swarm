@@ -65,6 +65,8 @@ import {
   resolveEventCommand,
   resolveEventOutput,
   routingDecisionPayloadFromEvent,
+  routingManifestToLines,
+  routingManifestToPreview,
   outlineFromTabs,
   runtimePreviewToLines,
   runtimePayloadHasAuthoritativeControlSignal,
@@ -83,8 +85,19 @@ import {
   workspaceSnapshotPayloadFromEvent,
   workspaceSnapshotToPreview,
 } from "./protocol.ts";
+import {
+  authoritativeResyncStatus,
+  requestAuthoritativeResync,
+  requestLiveSnapshots,
+  requestMissingAuthoritativeSurfaces,
+  requestPermissionHistory,
+  requestSessionCatalog,
+  requestSessionDetail,
+} from "./bridgeRequests.ts";
 import {initialState, reduceApp} from "./state.ts";
 import type {AppAction, AppState, ApprovalQueueEntry, ApprovalQueueState, CanonicalPermissionDecision, CanonicalPermissionOutcome, CanonicalPermissionResolution, RouteTarget, RuntimeSnapshotPayload, SessionCatalogPayload, SessionDetailPayload, SessionPaneState, SurfaceAuthorityState, TabPreview, TabSpec, TranscriptLine, WorkspaceSnapshotPayload} from "./types.ts";
+
+export {authoritativeResyncStatus, requestMissingAuthoritativeSurfaces} from "./bridgeRequests.ts";
 
 const SNAPSHOT_REFRESH_INTERVAL_MS = 15000;
 const SESSION_CATALOG_LIMIT = 12;
@@ -116,14 +129,6 @@ function ensureRuntimeTabs(stateTabs: TabSpec[]): TabSpec[] {
   const existingIds = new Set(stateTabs.map((tab) => tab.id));
   const missing = buildBridgeTabs().filter((tab) => !existingIds.has(tab.id));
   return [...stateTabs, ...missing];
-}
-
-function requestLiveSnapshots(bridge: DharmaBridge, provider: string, model: string, strategy: string): void {
-  bridge.send("workspace.snapshot");
-  bridge.send("runtime.snapshot");
-  bridge.send("model.policy", {provider, model, strategy});
-  bridge.send("agent.routes");
-  bridge.send("evolution.surface");
 }
 
 function queueAppActions(dispatch: React.Dispatch<AppAction>, actions: AppAction[]): void {
@@ -800,73 +805,6 @@ export function markAuthoritativeSurface(
     ...authoritative,
     [surface]: true,
   };
-}
-
-export function authoritativeResyncStatus(authoritative: SurfaceAuthorityState): string {
-  const remaining = missingAuthoritativeSurfaces(authoritative).length;
-  if (remaining === 0) {
-    return "operator state live";
-  }
-  return `resyncing ${remaining} surface${remaining === 1 ? "" : "s"}`;
-}
-
-function requestAuthoritativeResync(bridge: DharmaBridge, provider: string, model: string, strategy: string): void {
-  bridge.send("status");
-  bridge.send("command.graph");
-  bridge.send("command.registry");
-  bridge.send("ontology.snapshot");
-  requestSessionCatalog(bridge);
-  requestPermissionHistory(bridge);
-  requestLiveSnapshots(bridge, provider, model, strategy);
-}
-
-export function requestMissingAuthoritativeSurfaces(
-  bridge: DharmaBridge,
-  provider: string,
-  model: string,
-  strategy: string,
-  authoritative: SurfaceAuthorityState,
-): void {
-  for (const surface of missingAuthoritativeSurfaces(authoritative)) {
-    if (surface === "repo") {
-      bridge.send("workspace.snapshot");
-      continue;
-    }
-    if (surface === "control") {
-      bridge.send("runtime.snapshot");
-      continue;
-    }
-    if (surface === "sessions") {
-      requestSessionCatalog(bridge);
-      continue;
-    }
-    if (surface === "approvals") {
-      requestPermissionHistory(bridge);
-      continue;
-    }
-    if (surface === "models") {
-      bridge.send("model.policy", {provider, model, strategy});
-      continue;
-    }
-    if (surface === "agents") {
-      bridge.send("agent.routes");
-    }
-  }
-}
-
-function requestSessionCatalog(bridge: DharmaBridge): void {
-  bridge.send("session.catalog", {limit: SESSION_CATALOG_LIMIT});
-}
-
-function requestPermissionHistory(bridge: DharmaBridge): void {
-  bridge.send("permission.history", {limit: 50});
-}
-
-function requestSessionDetail(bridge: DharmaBridge, sessionId: string | undefined): void {
-  if (!sessionId) {
-    return;
-  }
-  bridge.send("session.detail", {session_id: sessionId, transcript_limit: SESSION_TRANSCRIPT_LIMIT});
 }
 
 function nextSessionPaneAfterCatalog(current: SessionPaneState, catalog: SessionCatalogPayload): SessionPaneState {
@@ -2010,6 +1948,14 @@ export function createBridgeEventHandler({
         tabId: "agents",
         lines: agentRoutesToLines(routesPayload ? {payload: routesPayload} : typed),
         preview: agentRoutesToPreview(routesPayload ? {payload: routesPayload} : typed),
+      }]);
+    }
+    if (eventType === "routing.manifest.result") {
+      apply([{
+        type: "tab.replace",
+        tabId: "models",
+        lines: routingManifestToLines(typed),
+        preview: routingManifestToPreview(typed),
       }]);
     }
     if (eventType === "evolution.surface.result") {

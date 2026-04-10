@@ -27,6 +27,7 @@ mkdir -p "$TARGET_DIR"
 
 MODES=(
   "ceo-review:dharma-ceo-review"
+  "terminal-autonomous-build:dharma-terminal-autonomous-build"
   "eng-review:dharma-eng-review"
   "preflight-review:dharma-preflight-review"
   "ship:dharma-ship"

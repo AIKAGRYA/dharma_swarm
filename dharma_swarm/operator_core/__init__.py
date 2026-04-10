@@ -23,7 +23,14 @@ from .permission_payloads import (
     permission_outcome_payload_from_outcome,
     permission_resolution_payload_from_resolution,
 )
-from .routing_payloads import build_agent_routes_payload, build_routing_decision_payload
+from .command_payloads import build_command_graph_summary, build_command_registry_payload
+from .routing_payloads import build_agent_routes_payload, build_model_policy_summary, build_routing_decision_payload
+from .routing_manifest_payloads import (
+    build_routing_manifest_payload,
+    normalize_adapter_catalog,
+    normalize_agent_assignments,
+    normalize_legacy_targets,
+)
 from .runtime_payloads import build_runtime_snapshot_payload
 from .workspace_payloads import build_workspace_snapshot_payload
 from .session_payloads import build_session_catalog_payload, build_session_detail_payload
@@ -72,8 +79,12 @@ __all__ = [
     "build_permission_history_payload",
     "build_permission_outcome_payload",
     "build_permission_resolution_payload",
+    "build_command_graph_summary",
+    "build_command_registry_payload",
     "build_agent_routes_payload",
+    "build_model_policy_summary",
     "build_routing_decision_payload",
+    "build_routing_manifest_payload",
     "build_runtime_snapshot_payload",
     "build_workspace_snapshot_payload",
     "PermissionDecisionKind",
@@ -93,6 +104,9 @@ __all__ = [
     "permission_outcome_payload_from_outcome",
     "permission_resolution_payload_from_resolution",
     "routing_decision_from_policy",
+    "normalize_adapter_catalog",
+    "normalize_agent_assignments",
+    "normalize_legacy_targets",
     "runtime_snapshot_from_operator_snapshot",
     "session_from_meta",
 ]

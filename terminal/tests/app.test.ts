@@ -251,6 +251,7 @@ test("authoritative recovery helpers identify missing surfaces and target only t
     {type: "session.catalog", payload: {limit: 12}},
     {type: "model.policy", payload: {provider: "codex", model: "gpt-5.4", strategy: "responsive"}},
     {type: "agent.routes", payload: {}},
+    {type: "routing.manifest", payload: {provider: "codex", model: "gpt-5.4", strategy: "responsive"}},
   ]);
 });
 
@@ -851,11 +852,13 @@ describe("snapshotActionsForBridgeEvent", () => {
         "Snapshot",
         "Git main@95210b1 | high (552 local changes) | sync tracking origin/main in sync",
         "Snapshot branch main@95210b1 | tracking origin/main in sync",
-        "Snapshot dirty high (552 local changes) | staged 0 | unstaged 510 | untracked 42",
+        "Dirty staged 0 | unstaged 510 | untracked 42",
         "Snapshot topology degraded (1 warning, 2 peers) | warnings 1 (sab_canonical_repo_missing)",
         "Snapshot hotspots change terminal (274)",
         "Snapshot hotspot pressure change terminal (274)",
-        "Task terminal-repo-pane | complete/fail | tsc=ok",
+        "Task terminal-repo-pane | 3 done, 1 pending of 4",
+        "Outcome complete | accept fail",
+        "Verify tsc=ok",
       ];
       const expectedSidebarLines = buildVisibleContextSidebarLines(
         bootState.tabs,
@@ -2352,6 +2355,7 @@ test("operator summary prefers non-placeholder control tab preview values over g
       "runtime.snapshot",
       "model.policy",
       "agent.routes",
+      "routing.manifest",
       "evolution.surface",
     ]);
   });
@@ -2414,6 +2418,7 @@ test("operator summary prefers non-placeholder control tab preview values over g
       "runtime.snapshot",
       "model.policy",
       "agent.routes",
+      "routing.manifest",
       "evolution.surface",
     ]);
   });
@@ -2467,6 +2472,7 @@ test("operator summary prefers non-placeholder control tab preview values over g
       "runtime.snapshot",
       "model.policy",
       "agent.routes",
+      "routing.manifest",
       "evolution.surface",
     ]);
   });
@@ -4756,6 +4762,7 @@ Workflows: 1
         "runtime.snapshot",
         "model.policy",
         "agent.routes",
+        "routing.manifest",
         "evolution.surface",
     ]);
 
@@ -4916,6 +4923,7 @@ Workflows: 1
       "runtime.snapshot",
       "model.policy",
       "agent.routes",
+      "routing.manifest",
       "evolution.surface",
     ]);
 
@@ -5336,6 +5344,7 @@ Toolchain
       "runtime.snapshot",
       "model.policy",
       "agent.routes",
+      "routing.manifest",
       "evolution.surface",
     ]);
 
@@ -5443,6 +5452,7 @@ Toolchain
       "runtime.snapshot",
       "model.policy",
       "agent.routes",
+      "routing.manifest",
       "evolution.surface",
     ]);
 
@@ -5543,6 +5553,7 @@ Toolchain
       "runtime.snapshot",
       "model.policy",
       "agent.routes",
+      "routing.manifest",
       "evolution.surface",
     ]);
 
@@ -6842,6 +6853,7 @@ Workflows: 1`;
         payload: {provider: "codex", model: "gpt-5.4", strategy: "responsive"},
       },
       {type: "agent.routes", payload: undefined},
+      {type: "routing.manifest", payload: {provider: "codex", model: "gpt-5.4", strategy: "responsive"}},
       {type: "evolution.surface", payload: undefined},
     ]);
   });
@@ -7438,6 +7450,7 @@ Workflows: 1`;
         payload: {provider: "claude", model: "claude-opus-4-6", strategy: "genius"},
       },
       {type: "agent.routes", payload: {}},
+      {type: "routing.manifest", payload: {provider: "claude", model: "claude-opus-4-6", strategy: "genius"}},
       {type: "evolution.surface", payload: {}},
     ]);
   });
@@ -7668,6 +7681,7 @@ Toolchain
       "runtime.snapshot",
       "model.policy",
       "agent.routes",
+      "routing.manifest",
       "evolution.surface",
     ]);
   });
@@ -9200,6 +9214,7 @@ describe("typed session bridge handling", () => {
       "runtime.snapshot",
       "model.policy",
       "agent.routes",
+      "routing.manifest",
       "evolution.surface",
     ]);
 
@@ -9242,6 +9257,7 @@ describe("typed session bridge handling", () => {
       "runtime.snapshot",
       "model.policy",
       "agent.routes",
+      "routing.manifest",
       "evolution.surface",
     ]);
   });
@@ -9305,6 +9321,7 @@ describe("typed session bridge handling", () => {
       "runtime.snapshot",
       "model.policy",
       "agent.routes",
+      "routing.manifest",
       "evolution.surface",
     ]);
   });
@@ -9367,6 +9384,7 @@ describe("typed session bridge handling", () => {
       "runtime.snapshot",
       "model.policy",
       "agent.routes",
+      "routing.manifest",
       "evolution.surface",
     ]);
 
@@ -9403,6 +9421,7 @@ describe("typed session bridge handling", () => {
       "runtime.snapshot",
       "model.policy",
       "agent.routes",
+      "routing.manifest",
       "evolution.surface",
     ]);
   });
@@ -9444,6 +9463,7 @@ describe("typed session bridge handling", () => {
       "runtime.snapshot",
       "model.policy",
       "agent.routes",
+      "routing.manifest",
       "evolution.surface",
     ]);
 
@@ -10313,6 +10333,7 @@ Workflows: 1
         "runtime.snapshot",
         "model.policy",
         "agent.routes",
+        "routing.manifest",
         "evolution.surface",
       ]),
     );
@@ -10500,6 +10521,7 @@ Workflows: 1
         "runtime.snapshot",
         "model.policy",
         "agent.routes",
+        "routing.manifest",
         "evolution.surface",
       ]),
     );

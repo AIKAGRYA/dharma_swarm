@@ -115,7 +115,8 @@ It combines a Python orchestration core, a FastAPI backend, a Next.js dashboard,
 ## Entry Points
 
 - Python package: `dharma-swarm`
-- CLI: `dgc`
+- CLI: `dgc` (no-args launches TUI)
+- TUI terminal: **`dgc tui`** (canonical)
 - API server: `uvicorn api.main:app --host 127.0.0.1 --port 8420 --reload`
 - Canonical backend launcher: `bash run_operator.sh`
 - Dashboard dev server: `npm --prefix dashboard run dev`
@@ -152,11 +153,34 @@ That report is the fastest way to answer:
 - The most coupled runtime surfaces currently sit in the Python core, especially `dharma_swarm/dgc_cli.py`, `dharma_swarm/swarm.py`, `dharma_swarm/agent_runner.py`, and `dharma_swarm/evolution.py`.
 - Dashboard and API development are active; expect local changes in `dashboard/`, `api/`, and resident-operator code during ongoing work.
 
+## Current Operator Surface Status
+
+- `terminal/` is the active Bun operator shell.
+- `dharma_swarm/tui/` is the legacy Textual operator surface and still matters for some runtime/session flows.
+- `terminal-v2/` exists as an experimental newer Bun surface, but it is not yet the canonical operator shell. Treat it as migration work, not the default place to land new features, unless a task explicitly targets it.
+- `dharma_swarm/terminal_bridge.py` is the transport seam between the Python runtime and Bun terminal surfaces. It should move structured state and events, not invent shell-local policy.
+
+## Agent Orientation Shortcut
+
+If you want a human or agent to orient quickly, do not rely on the phrase `REPO RULES` by itself.
+Use this instead:
+
+```text
+Read docs/governance/README.md, then CLAUDE.md, before touching code.
+```
+
+That sends the reader to:
+
+- `docs/governance/README.md` for the active governance hub and read order
+- `CLAUDE.md` for behavioral rules and repo-wide engineering constraints
+- the touched code files after that, rather than broad doc wandering
+
 ## Before Writing Any Code
 
 - **Read [`CLAUDE.md`](CLAUDE.md)** — system genome, key abstractions, behavioral rules, the Transcendence Principle.
+- **Read [`docs/governance/README.md`](docs/governance/README.md)** — the active governance hub and recommended orientation order for humans and agents.
 - **Read [`INTERFACE_MISMATCH_MAP.md`](INTERFACE_MISMATCH_MAP.md)** — every known interface mismatch between modules, with exact line numbers, root causes, and fixes. This is the primary source of runtime failures. Follow the Bootstrap Sequence to unblock the system.
-- **Read [`NAVIGATION.md`](NAVIGATION.md)** — full module map across 12 architectural layers with line counts and "When to Touch" guidance.
+- **Run `make xray`** — generates a live module map across all architectural layers with line counts (replaces the former static NAVIGATION.md).
 - **Read [`MODEL_ROUTING_MAP.md`](MODEL_ROUTING_MAP.md)** — how every LLM call flows through the system. 18 providers, 3 calling surfaces, 5 inconsistencies, the HuggingFace fix, and the minimum viable path to first LLM call.
 
 ## First Places To Look

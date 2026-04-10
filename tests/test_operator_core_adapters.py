@@ -18,7 +18,14 @@ from dharma_swarm.operator_core.permission_payloads import (
     build_permission_outcome_payload,
     build_permission_resolution_payload,
 )
-from dharma_swarm.operator_core.routing_payloads import build_agent_routes_payload, build_routing_decision_payload
+from dharma_swarm.operator_core.command_payloads import build_command_graph_summary, build_command_registry_payload
+from dharma_swarm.operator_core.routing_payloads import build_agent_routes_payload, build_model_policy_summary, build_routing_decision_payload
+from dharma_swarm.operator_core.routing_manifest_payloads import (
+    build_routing_manifest_payload,
+    normalize_adapter_catalog,
+    normalize_agent_assignments,
+    normalize_legacy_targets,
+)
 from dharma_swarm.operator_core.runtime_payloads import build_runtime_snapshot_payload
 from dharma_swarm.operator_core.workspace_payloads import build_workspace_snapshot_payload
 from dharma_swarm.operator_core.contracts import (
@@ -134,6 +141,98 @@ class OperatorCoreAdapterTests(unittest.TestCase):
         self.assertEqual(payload["domain"], "agent_routes")
         self.assertEqual(payload["routes"][0]["intent"], "deep_code_work")
         self.assertEqual(payload["openclaw"]["agents_count"], 3)
+
+    def test_build_command_payloads_are_json_ready(self) -> None:
+        graph = build_command_graph_summary({"runtime", "git", "memory"}, {"runtime"})
+        registry = build_command_registry_payload({"runtime", "git", "memory"}, {"runtime"})
+
+        self.assertEqual(graph["categories"]["runtime"], ["runtime"])
+        self.assertEqual(graph["async_commands"], ["runtime"])
+        self.assertEqual(registry["count"], 3)
+        self.assertEqual(
+            {item["name"]: item["target_pane"] for item in registry["commands"]},
+            {"git": "repo", "memory": "sessions", "runtime": "runtime"},
+        )
+
+    def test_build_model_policy_summary_is_json_ready(self) -> None:
+        class Lane:
+            value = "general_support"
+
+        class Target:
+            provider = "CODEX"
+            model = "gpt-5.4"
+            lane_role = Lane()
+            tier = "primary"
+            available = True
+            availability_reason = "configured"
+            config_source = "test"
+
+        payload = build_model_policy_summary(
+            raw_targets=[Target()],
+            selected_provider="codex",
+            selected_model="gpt-5.4",
+            strategy="responsive",
+            strategies=["responsive"],
+            default_provider_id="codex",
+            default_model_id="gpt-5.4",
+            provider_id_for_target=lambda target: str(target.provider).lower(),
+            alias_for_model=lambda model: model.replace(".", "-"),
+        )
+
+        self.assertEqual(payload["selected_route"], "codex:gpt-5.4")
+        self.assertEqual(payload["targets"][0]["alias"], "gpt-5-4")
+        self.assertEqual(payload["targets"][0]["lane_role"], "general_support")
+
+    def test_build_routing_manifest_payload_reconciles_catalog_and_agents(self) -> None:
+        policy = {
+            "selected_route": "codex:gpt-5.4",
+            "selected_provider": "codex",
+            "selected_model": "gpt-5.4",
+            "strategy": "responsive",
+            "targets": [{"provider": "codex", "model": "gpt-5.4", "alias": "codex", "label": "Codex"}],
+        }
+        catalog = normalize_adapter_catalog(
+            [
+                {
+                    "provider_id": "codex",
+                    "default_model": "gpt-5.4",
+                    "models": [{"id": "gpt-5.4", "display_name": "Codex 5.4", "capabilities": ["streaming"]}],
+                }
+            ],
+            policy_targets=policy["targets"],
+        )
+
+        class Target:
+            provider_id = "codex"
+            model_id = "gpt-5.4"
+            alias = "codex"
+            label = "Codex"
+            aliases = ("gpt",)
+
+        legacy = normalize_legacy_targets(
+            hard_targets=[Target()],
+            soft_targets=[],
+            policy_targets=policy["targets"],
+            adapter_catalog=catalog,
+        )
+        agents = normalize_agent_assignments(
+            [{"id": "agent-1", "name": "builder", "provider": "codex", "model": "gpt-5.4"}]
+        )
+        manifest = build_routing_manifest_payload(
+            model_policy=policy,
+            routing_decision_payload=build_routing_decision_payload(policy),
+            agent_routes_payload=build_agent_routes_payload({"routes": [], "openclaw": {}, "subagent_capabilities": []}),
+            adapter_catalog=catalog,
+            legacy_targets=legacy,
+            agent_assignments=agents,
+        )
+
+        self.assertEqual(manifest["domain"], "routing_manifest")
+        self.assertEqual(manifest["counts"]["selectable_routes"], 1)
+        self.assertEqual(manifest["adapter_catalog"][0]["policy_selectable"], True)
+        self.assertEqual(manifest["legacy_targets"][0]["adapter_catalog"], True)
+        self.assertEqual(manifest["agent_assignments"][0]["route_id"], "codex:gpt-5.4")
+        self.assertEqual(manifest["drift"], [])
 
     def test_runtime_snapshot_from_operator_snapshot(self) -> None:
         snapshot = runtime_snapshot_from_operator_snapshot(

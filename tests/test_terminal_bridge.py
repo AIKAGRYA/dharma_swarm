@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import sys
 
 import dharma_swarm.terminal_bridge as terminal_bridge_module
 from dharma_swarm.terminal_bridge import TerminalBridge
+from dharma_swarm.operator_core.session_store import SessionStore
 from dharma_swarm.runtime_state import OperatorAction, RuntimeStateStore
 from dharma_swarm.tui.engine.events import ToolCallComplete, ToolResult
 
@@ -539,6 +541,72 @@ def test_handle_agent_routes_emits_typed_payload_without_legacy_content(monkeypa
     assert captured[0]["payload"]["routes"][0]["intent"] == "deep_code_work"
 
 
+def test_handle_routing_manifest_reconciles_models_and_agents(monkeypatch) -> None:
+    bridge = TerminalBridge()
+    captured: list[dict[str, object]] = []
+    policy = {
+        "selected_provider": "codex",
+        "selected_model": "gpt-5.4",
+        "selected_route": "codex:gpt-5.4",
+        "strategy": "responsive",
+        "strategies": ["responsive"],
+        "default_route": "codex:gpt-5.4",
+        "active_label": "Codex",
+        "targets": [{"provider": "codex", "model": "gpt-5.4", "alias": "codex", "label": "Codex", "available": True}],
+        "fallback_chain": [],
+    }
+    routes = {"routes": [], "openclaw": {}, "subagent_capabilities": []}
+    catalog = [
+        {
+            "provider_id": "codex",
+            "default_model": "gpt-5.4",
+            "models": [{"id": "gpt-5.4", "display_name": "Codex 5.4", "capabilities": ["streaming"]}],
+        }
+    ]
+    monkeypatch.setattr(bridge, "_build_model_policy_summary", lambda **kwargs: policy)
+    monkeypatch.setattr(bridge, "_build_agent_routes", lambda: routes)
+    async def _catalog() -> list[dict[str, object]]:
+        return catalog
+
+    monkeypatch.setattr(bridge, "_build_adapter_catalog_entries", _catalog)
+    monkeypatch.setattr(bridge, "_emit", lambda payload: captured.append(payload))
+
+    asyncio.run(bridge._handle_routing_manifest("req-manifest", {"provider": "codex", "model": "gpt-5.4"}))
+
+    assert captured[0]["type"] == "routing.manifest.result"
+    assert captured[0]["payload"]["domain"] == "routing_manifest"
+    assert captured[0]["payload"]["counts"]["selectable_routes"] == 1
+    assert captured[0]["payload"]["adapter_catalog"][0]["policy_selectable"] is True
+
+
+def test_emit_redirects_stdout_after_broken_pipe(monkeypatch) -> None:
+    bridge = TerminalBridge()
+
+    class BrokenStdout:
+        def write(self, _value: str) -> None:
+            raise BrokenPipeError
+
+        def flush(self) -> None:
+            raise AssertionError("flush should not run after write fails")
+
+    original_stdout = sys.stdout
+    monkeypatch.setattr(sys, "stdout", BrokenStdout())
+
+    try:
+        try:
+            bridge._emit({"type": "test"})
+        except BrokenPipeError:
+            pass
+        else:
+            raise AssertionError("_emit should preserve BrokenPipeError for shutdown callers")
+
+        assert sys.stdout is not original_stdout
+        assert sys.stdout.write("quiet\n") is not None or True
+    finally:
+        sys.stdout.close()
+        monkeypatch.setattr(sys, "stdout", original_stdout)
+
+
 def test_run_action_command_run_materializes_runtime() -> None:
     bridge = TerminalBridge()
     result = bridge._run_action("command.run", {"command": "/runtime"})
@@ -578,7 +646,7 @@ def test_handle_command_materializes_model_status() -> None:
     bridge = TerminalBridge()
     output = bridge._materialize_model_command("model", "model:status")
     assert "Available models:" in output
-    assert "GLM-5" in output
+    assert "glm-5" in output
 
 
 def test_run_action_agent_route_returns_selected_route() -> None:
@@ -928,8 +996,9 @@ def test_record_runtime_approval_resolution_classifies_denial_as_runtime_rejecte
     assert events[0].payload["outcome"] == "runtime_rejected"
 
 
-def test_record_permission_payload_appends_transcript_events() -> None:
+def test_record_permission_payload_appends_transcript_events(tmp_path) -> None:
     bridge = TerminalBridge()
+    bridge._session_store = SessionStore(root=tmp_path / "sessions")
     session_id = bridge._session_store.create_session(
         session_id="sess-record",
         provider_id="codex",

@@ -11,6 +11,7 @@ from typing import Any, AsyncIterator
 import httpx
 
 from dharma_swarm.ollama_config import OLLAMA_CLOUD_BASE_URL, resolve_ollama_base_url
+from dharma_swarm.power_model_catalog import OLLAMA_CLOUD_POWER_MODELS
 from .base import Capability, CompletionRequest, ModelProfile, ProviderAdapter, ProviderConfig
 from dharma_swarm.terminal_engine.events import (
     ErrorEvent,
@@ -28,13 +29,7 @@ OLLAMA_CAPABILITIES = (
     | Capability.STREAMING
 )
 
-_CLOUD_MODELS: dict[str, str] = {
-    "glm-5:cloud": "GLM-5 (Ollama Cloud)",
-    "deepseek-v3.2:cloud": "DeepSeek v3.2 (Ollama Cloud)",
-    "kimi-k2.5:cloud": "Kimi K2.5 (Ollama Cloud)",
-    "qwen3-coder:480b-cloud": "Qwen3 Coder 480B (Ollama Cloud)",
-    "minimax-m2.7:cloud": "MiniMax M2.7 (Ollama Cloud)",
-}
+_CLOUD_MODELS: dict[str, str] = dict(OLLAMA_CLOUD_POWER_MODELS)
 
 
 def _wire_model(model: str) -> str:

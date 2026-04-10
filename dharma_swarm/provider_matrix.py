@@ -23,6 +23,7 @@ from dharma_swarm.model_hierarchy import (
     provider_lane_role,
 )
 from dharma_swarm.models import LLMRequest, ProviderType
+from dharma_swarm.power_model_catalog import POWER_MODEL_ROUTES
 from dharma_swarm.runtime_provider import (
     create_runtime_provider,
     resolve_runtime_provider_config,
@@ -57,6 +58,7 @@ _SMOKE_PROVIDER_KEYS = {
     ProviderType.NVIDIA_NIM: "nvidia_nim",
     ProviderType.OPENROUTER: "openrouter",
 }
+_LANE_ROLE_VALUES = {role.value: role for role in LaneRole}
 _MATRIX_REPAIR_MAX_CHARS = 8_000
 _MODEL_FAMILY_SUFFIX_RE = re.compile(r"[-_:]20\d{6,8}$")
 
@@ -608,6 +610,16 @@ def _live25_blueprints(env: Mapping[str, str] | None) -> list[tuple[ProviderType
         or DEFAULT_MODELS[ProviderType.ANTHROPIC]
     )
 
+    power_openrouter_routes = [
+        (
+            ProviderType.OPENROUTER,
+            route.model_id,
+            _LANE_ROLE_VALUES.get(route.lane_role, LaneRole.RESEARCH_DELEGATE),
+        )
+        for route in POWER_MODEL_ROUTES
+        if route.provider_id == "openrouter"
+    ]
+
     return [
         (ProviderType.CODEX, codex_model, LaneRole.PRIMARY_DRIVER),
         (ProviderType.CLAUDE_CODE, claude_cli_model, LaneRole.PRIMARY_DRIVER),
@@ -626,6 +638,7 @@ def _live25_blueprints(env: Mapping[str, str] | None) -> list[tuple[ProviderType
         (ProviderType.OPENROUTER, qwen_builder_model, LaneRole.BULK_BUILDER),
         (ProviderType.OPENROUTER, "openai/gpt-5-codex", LaneRole.BULK_BUILDER),
         (ProviderType.OPENROUTER, "deepseek/deepseek-r1", LaneRole.CHALLENGER),
+        *power_openrouter_routes,
         (ProviderType.OPENROUTER_FREE, DEFAULT_MODELS[ProviderType.OPENROUTER_FREE], LaneRole.GENERAL_SUPPORT),
         (ProviderType.GROQ, DEFAULT_MODELS[ProviderType.GROQ], LaneRole.VALIDATOR),
         (ProviderType.CEREBRAS, DEFAULT_MODELS[ProviderType.CEREBRAS], LaneRole.BULK_BUILDER),

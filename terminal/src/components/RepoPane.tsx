@@ -89,12 +89,16 @@ export function sectionCardSummaries(section: RepoSection): string[] {
   const snapshotTopologyStable = !snapshotHasTopologyWarnings && !snapshotHasDetachedPeers;
   const priorityPrefixesBySection: Record<string, string[]> = {
     "Operator Snapshot": [
+      "Repo Preview",
+      ...(operatorSnapshotHasControlPreview || operatorSnapshotHasRuntime || operatorSnapshotHasVerification ? ["Control Preview"] : []),
       "Snapshot branch ",
       "Snapshot dirty ",
       "Snapshot topology ",
       ...(includeWarningMembers ? ["Snapshot warning members "] : []),
       ...(operatorSnapshotHasDetachedPeers || operatorSnapshotHasBranchDivergence ? ["Snapshot branch divergence "] : []),
       ...(operatorSnapshotHasTopologyPressure ? ["Snapshot topology pressure "] : []),
+      "Snapshot hotspots ",
+      "Snapshot hotspot pressure ",
       ...(operatorSnapshotHasRuntime || operatorSnapshotHasVerification
         ? [
             ...(operatorSnapshotHasControlPreview ? ["Snapshot control preview "] : []),
@@ -154,7 +158,7 @@ export function sectionCardSummaries(section: RepoSection): string[] {
       ...(includeWarningMembers ? [] : ["Warnings "]),
     ],
     Git: ["Branch ", "Counts ", "Pressure ", "Risk "],
-    Topology: ["Status ", "Signal ", "Lead peer ", "Branch divergence ", "Detached peers ", "Warnings "],
+    Topology: ["Status ", "Signal ", "Lead peer ", "Pressure ", "Pressure preview ", "Branch divergence ", "Detached peers ", "Warnings "],
     Hotspots: [
       "Summary ",
       ...(sectionHasControl || sectionHasRuntime || sectionHasVerification
@@ -169,16 +173,18 @@ export function sectionCardSummaries(section: RepoSection): string[] {
       "Lead path ",
       "Lead file ",
     ],
-    Control: ["Task ", "Outcome ", "Health ", "Verify ", "Next "],
+    Control: ["Task ", "Outcome ", "Health ", "Loop ", "Verify ", "Next "],
     Inventory: ["Inventory ", "Mix "],
   };
   const guaranteedPrefixesBySection: Record<string, string[]> = {
     "Operator Snapshot": [
+      "Repo Preview",
       "Snapshot branch ",
       "Snapshot dirty ",
       "Snapshot topology ",
       ...(includeWarningMembers ? ["Snapshot warning members "] : []),
-      "Snapshot hotspot summary ",
+      "Snapshot hotspots ",
+      "Snapshot hotspot pressure ",
     ],
     Snapshot: ["Branch ", "Dirty ", ...(includeWarningMembers ? ["Warning members "] : []), "Snapshot hotspot summary "],
   };
@@ -196,15 +202,15 @@ export function sectionCardSummaries(section: RepoSection): string[] {
             ? includeWarningMembers
               ? 10
               : 9
-            : includeWarningMembers
-              ? 7
-              : 6,
+          : includeWarningMembers
+            ? 9
+            : 8,
     Snapshot: snapshotHasRuntime || snapshotHasVerification ? (includeWarningMembers ? 9 : 8) : includeWarningMembers ? 7 : 6,
     "Repo Risk": sectionHasRuntime || sectionHasVerification ? (includeWarningMembers ? 7 : 6) : includeWarningMembers ? 5 : 4,
     Git: 4,
-    Topology: 4,
+    Topology: 6,
     Hotspots: sectionHasRuntime || sectionHasVerification ? 6 : 4,
-    Control: 4,
+    Control: 6,
     Inventory: 2,
   };
   const priorityPrefixes = priorityPrefixesBySection[section.title] ?? [];
@@ -2026,6 +2032,9 @@ function buildOperatorSnapshotRows(
     ? buildFallbackRepoControlRuntimeSummaryLabel(preview, lines, controlPreview, controlLines)
     : null;
   const rows = [
+    "Repo Preview",
+    ...(hasControlSignal || hasRepoControlPreview ? ["Control Preview"] : []),
+    ...(controlPreview?.Authority ? [`Authority ${controlPreview.Authority}`] : []),
     buildRepoOverviewLabel(preview, lines),
     buildRepoPulseLabel(preview, lines),
     `Snapshot branch ${buildBranchLabel(preview, lines)} | ${previewValue(preview, lines, "Branch status")}`,

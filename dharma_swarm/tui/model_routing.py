@@ -16,6 +16,7 @@ from dharma_swarm.model_hierarchy import (
     get_tier,
 )
 from dharma_swarm.models import ProviderType
+from dharma_swarm.power_model_catalog import POWER_MODEL_ROUTES
 
 INDIGO = "#9C7444"
 VERDIGRIS = "#62725D"
@@ -124,6 +125,24 @@ def _generate_targets() -> tuple[ModelTarget, ...]:
                 model_id=model_id,
                 label=label,
                 aliases=extra_aliases,
+            )
+        )
+    for route in POWER_MODEL_ROUTES:
+        if route.provider_id not in {"claude", "codex", "openrouter", "ollama"}:
+            continue
+        key = (route.provider_id, route.model_id)
+        if key in seen:
+            continue
+        seen.add(key)
+        aliases = route.aliases
+        alias = aliases[0] if aliases else _auto_alias(ProviderType.OPENROUTER, route.model_id)
+        targets.append(
+            ModelTarget(
+                alias=alias,
+                provider_id=route.provider_id,
+                model_id=route.model_id,
+                label=f"{route.display_name} [power | {route.lane_role}]",
+                aliases=aliases[1:],
             )
         )
     return tuple(targets)
