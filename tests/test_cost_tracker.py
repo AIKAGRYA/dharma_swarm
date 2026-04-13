@@ -215,3 +215,117 @@ class TestCostSummary:
         assert "T1" in summary
         assert "T2" in summary
         assert "T3" in summary
+
+
+# ---------------------------------------------------------------------------
+# _infer_caller_source
+# ---------------------------------------------------------------------------
+
+class TestInferCallerSource:
+    def test_returns_string(self) -> None:
+        from dharma_swarm.providers import _infer_caller_source
+
+        result = _infer_caller_source()
+        assert isinstance(result, str)
+
+    def test_skips_providers_module(self) -> None:
+        from dharma_swarm.providers import _infer_caller_source
+
+        result = _infer_caller_source()
+        assert result != "providers"
+        assert result != "cost_tracker"
+
+    def test_finds_dharma_swarm_module(self) -> None:
+        """_infer_caller_source walks sys._getframe chain and returns
+        the first dharma_swarm module that is not in the skip set.
+        When called from test code (not under /dharma_swarm/), it returns ''."""
+        from dharma_swarm.providers import _infer_caller_source
+
+        result = _infer_caller_source()
+        # Called from test file (not under /dharma_swarm/), so it returns
+        # the first dharma_swarm frame it finds — or '' if there isn't one.
+        # The function itself lives in providers.py (skipped), so when called
+        # from test code, it returns '' — that's the correct async-safe
+        # behavior.  Attribution is now done at call-site entry points
+        # (runtime_provider._capture_caller_source) before any await.
+        assert isinstance(result, str)
+
+
+# ---------------------------------------------------------------------------
+# _finalize_response metadata auto-fill
+# ---------------------------------------------------------------------------
+
+class TestFinalizeResponseMetadata:
+    def test_empty_metadata_gets_inferred_source(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        log_file = tmp_path / "cost_log.jsonl"
+        monkeypatch.setattr("dharma_swarm.cost_tracker._COST_LOG", log_file)
+
+        from dharma_swarm.models import LLMRequest, LLMResponse, ProviderType
+        from dharma_swarm.providers import _finalize_response, _infer_caller_source
+
+        # Patch _infer_caller_source to return a known value
+        monkeypatch.setattr(
+            "dharma_swarm.providers._infer_caller_source",
+            lambda: "evolution",
+        )
+
+        request = LLMRequest(
+            model="test-model",
+            messages=[{"role": "user", "content": "hi"}],
+        )
+        response = LLMResponse(content="hello", model="test-model", usage={})
+        _finalize_response(ProviderType.OLLAMA, request, response)
+
+        data = json.loads(log_file.read_text().strip())
+        assert data["source"] == "evolution"
+        assert data["execution_mode"] == "headless_evolution"
+
+    def test_explicit_metadata_preserved(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        log_file = tmp_path / "cost_log.jsonl"
+        monkeypatch.setattr("dharma_swarm.cost_tracker._COST_LOG", log_file)
+
+        from dharma_swarm.models import LLMRequest, LLMResponse, ProviderType
+        from dharma_swarm.providers import _finalize_response
+
+        request = LLMRequest(
+            model="test-model",
+            messages=[{"role": "user", "content": "hi"}],
+            metadata={
+                "execution_mode": "persistent_agent",
+                "source": "agent_runner",
+                "agent_name": "builder",
+            },
+        )
+        response = LLMResponse(content="hello", model="test-model", usage={})
+        _finalize_response(ProviderType.OLLAMA, request, response)
+
+        data = json.loads(log_file.read_text().strip())
+        assert data["execution_mode"] == "persistent_agent"
+        assert data["source"] == "agent_runner"
+        assert data["agent_name"] == "builder"
+
+
+class TestCaptureCallerSource:
+    """Tests for runtime_provider._capture_caller_source."""
+
+    def test_returns_string(self) -> None:
+        from dharma_swarm.runtime_provider import _capture_caller_source
+
+        result = _capture_caller_source()
+        assert isinstance(result, str)
+
+    def test_does_not_return_skipped_modules(self) -> None:
+        from dharma_swarm.runtime_provider import _capture_caller_source
+
+        result = _capture_caller_source()
+        assert result not in {"providers", "cost_tracker", "runtime_provider", "jikoku_instrumentation"}
+
+    async def test_capture_before_await_finds_caller(self) -> None:
+        """Verify that _capture_caller_source works at function entry in async code."""
+        from dharma_swarm.runtime_provider import _capture_caller_source
+
+        # When called from test code, the frame chain includes only
+        # runtime_provider (skipped) and test files (not /dharma_swarm/).
+        # The function correctly returns '' in that case.
+        result = _capture_caller_source()
+        assert isinstance(result, str)

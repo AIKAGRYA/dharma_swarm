@@ -6,6 +6,7 @@ Wraps dharma_swarm.web_search.SearchRouter into the AutoResearch protocol.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 from typing import Any
 
 from .models import ResearchBrief, ResearchQuery, SourceDocument
@@ -66,13 +67,26 @@ class WebSearchBackend:
                 if r.url in seen_urls:
                     continue
                 seen_urls.add(r.url)
+                sid = f"src-{hashlib.md5(r.url.encode()).hexdigest()[:8]}"
+                freshness = 0.8  # default for web results
+                pub = r.published_date or ""
+                if pub:
+                    try:
+                        from datetime import datetime, timezone
+                        pub_dt = datetime.fromisoformat(pub.replace("Z", "+00:00"))
+                        age_days = (datetime.now(timezone.utc) - pub_dt).days
+                        freshness = max(0.1, min(1.0, 1.0 - (age_days / 730)))
+                    except (ValueError, TypeError):
+                        pass
                 all_results.append({
+                    "source_id": sid,
                     "url": r.url,
                     "title": r.title,
-                    "snippet": r.snippet,
-                    "published_date": r.published_date,
-                    "source": r.source,
-                    "query": query_str,
+                    "content": r.snippet or "",
+                    "published_at": pub,
+                    "freshness_score": freshness,
+                    "source_type": "web",
+                    "metadata": {"query": query_str, "search_backend": r.source},
                 })
 
         return all_results
