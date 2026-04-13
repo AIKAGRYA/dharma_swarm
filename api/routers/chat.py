@@ -320,11 +320,13 @@ CHAT_PROFILE_SPECS: dict[str, ChatProfileSpec] = {
         summary="Strategic operator with broad system awareness and full swarm tooling.",
         system_prompt=COMMAND_SYSTEM_PROMPT,
         provider_order_env="DASHBOARD_CHAT_PROVIDER_ORDER",
-        default_provider_order=(ProviderType.OPENROUTER,),
+        default_provider_order=(ProviderType.CLAUDE_CODE, ProviderType.OPENROUTER),
         default_models={
+            ProviderType.CLAUDE_CODE: "claude-opus-4-6",
             ProviderType.OPENROUTER: DEFAULT_MODEL,
         },
         model_envs={
+            ProviderType.CLAUDE_CODE: "DASHBOARD_CHAT_CLAUDE_CODE_MODEL",
             ProviderType.OPENROUTER: "DASHBOARD_CHAT_MODEL",
         },
     ),
@@ -335,12 +337,14 @@ CHAT_PROFILE_SPECS: dict[str, ChatProfileSpec] = {
         summary="Implementation-focused control agent for edits, diagnostics, and fast wiring.",
         system_prompt=CODEX_SYSTEM_PROMPT,
         provider_order_env="DASHBOARD_CODEX_PROVIDER_ORDER",
-        default_provider_order=(ProviderType.OPENAI, ProviderType.OPENROUTER),
+        default_provider_order=(ProviderType.CODEX, ProviderType.OPENAI, ProviderType.OPENROUTER),
         default_models={
+            ProviderType.CODEX: "gpt-5.4",
             ProviderType.OPENAI: "gpt-5-codex",
             ProviderType.OPENROUTER: "openai/gpt-5-codex",
         },
         model_envs={
+            ProviderType.CODEX: "DASHBOARD_CODEX_CLI_MODEL",
             ProviderType.OPENAI: "DASHBOARD_CODEX_MODEL",
             ProviderType.OPENROUTER: "DASHBOARD_CODEX_OPENROUTER_MODEL",
         },

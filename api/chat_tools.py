@@ -17,13 +17,15 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# Safety: scope filesystem operations to these roots
+REPO_ROOT = Path(__file__).resolve().parents[1]
+
+# Safety: scope filesystem operations to the active repo and shared runtime state.
 ALLOWED_ROOTS = [
-    Path.home() / "dharma_swarm",
+    REPO_ROOT,
     Path.home() / ".dharma",
 ]
 
-PROJECT_ROOT = Path.home() / "dharma_swarm"
+PROJECT_ROOT = REPO_ROOT
 
 
 def _path_allowed(path_str: str) -> bool:
