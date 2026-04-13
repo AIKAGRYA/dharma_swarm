@@ -52,6 +52,8 @@ export function buildDashboardNavSections(): DashboardNavSection[] {
       items: [
         { label: "Overview", href: "/dashboard", icon: "LayoutDashboard", level: 1 },
         ...canonicalOperatorDeckItems(),
+        { label: "Codex", href: "/dashboard/codex", icon: "Bot", level: 1 },
+        { label: "Claude Code", href: "/dashboard/claude-code", icon: "MessageSquare", level: 1 },
         { label: "Conv. Log", href: "/dashboard/log", icon: "MessageSquare", level: 1 },
         { label: "Truth Map", href: "/dashboard/modules", icon: "Activity", level: 1 },
         { label: "Semantic Graph", href: "/dashboard/claude", icon: "Globe", level: 1 },

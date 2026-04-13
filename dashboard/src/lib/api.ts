@@ -15,6 +15,7 @@ import type {
   ModuleTruthOut,
   OntologyTypeOut,
   ProvenanceOut,
+  RoutingManifestOut,
   StigmergyMarkOut,
   SwarmOverview,
   TaskOut,
@@ -282,6 +283,21 @@ export function fetchImpact(
 
 export function fetchChatStatus(): Promise<ApiResponse<ChatStatusOut>> {
   return apiGet<ChatStatusOut>("/api/chat/status");
+}
+
+// -- Routing ---------------------------------------------------------------
+
+export function fetchRoutingManifest(params?: {
+  provider?: string;
+  model?: string;
+  strategy?: string;
+}): Promise<ApiResponse<RoutingManifestOut>> {
+  const sp = new URLSearchParams();
+  if (params?.provider) sp.set("provider", params.provider);
+  if (params?.model) sp.set("model", params.model);
+  if (params?.strategy) sp.set("strategy", params.strategy);
+  const qs = sp.toString();
+  return apiGet<RoutingManifestOut>(`/api/routing/manifest${qs ? `?${qs}` : ""}`);
 }
 
 // -- Truth modules ----------------------------------------------------------

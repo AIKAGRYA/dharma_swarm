@@ -6,18 +6,18 @@
  * Click row to open detail drawer. Spawn / Stop controls.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bot, Plus, X, StopCircle, Clock, Zap } from "lucide-react";
 import { useAgents } from "@/hooks/useAgents";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiFetch } from "@/lib/api";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { apiFetch, fetchRoutingManifest } from "@/lib/api";
 import { HPBar } from "@/components/game/HPBar";
 import { HealthBadge } from "@/components/dashboard/HealthBadge";
 import { timeAgo } from "@/lib/utils";
 import { colors, accentAt } from "@/lib/theme";
-import type { AgentOut } from "@/lib/types";
+import type { AgentOut, RoutingManifestOut } from "@/lib/types";
 
 function agentHealthStatus(agent: AgentOut): "healthy" | "degraded" | "critical" | "unknown" {
   const s = agent.status?.toLowerCase();
@@ -38,8 +38,25 @@ function agentHPPercent(agent: AgentOut): number {
 export default function AgentsPage() {
   const router = useRouter();
   const { agents, isLoading } = useAgents();
+  const { data: manifest } = useQuery<RoutingManifestOut>({
+    queryKey: ["routing-manifest", "agents-page"],
+    queryFn: async () => {
+      const response = await fetchRoutingManifest({
+        provider: "codex",
+        model: "gpt-5.4",
+        strategy: "responsive",
+      });
+      if (response.status === "error") {
+        throw new Error(response.error || "Failed to load routing manifest");
+      }
+      return response.data;
+    },
+    refetchInterval: 30_000,
+  });
   const [selectedAgent, setSelectedAgent] = useState<AgentOut | null>(null);
   const [showSpawnDialog, setShowSpawnDialog] = useState(false);
+  const selectableRouteIds = new Set((manifest?.selectable_routes ?? []).map((route) => `${route.provider}:${route.model}`));
+  const assignedRouteIds = new Set((manifest?.agent_assignments ?? []).map((agent) => agent.route_id).filter(Boolean));
 
   return (
     <div className="space-y-6">
@@ -51,6 +68,11 @@ export default function AgentsPage() {
           <p className="mt-1 text-sm text-sumi-600">
             {agents.length} agents registered, {agents.filter((a) => a.status === "busy").length} active
           </p>
+          {manifest && (
+            <p className="mt-1 text-xs text-sumi-600">
+              {manifest.counts.selectable_routes} selectable routes · {assignedRouteIds.size} assigned model lanes · {manifest.counts.drift} drift warnings
+            </p>
+          )}
         </div>
         <button
           onClick={() => setShowSpawnDialog(true)}
@@ -81,6 +103,7 @@ export default function AgentsPage() {
                 >
                   <th className="px-5 py-3">Name</th>
                   <th className="px-5 py-3">Role</th>
+                  <th className="px-5 py-3">Model Route</th>
                   <th className="px-5 py-3">Status</th>
                   <th className="px-5 py-3">Tasks</th>
                   <th className="px-5 py-3 w-[140px]">HP</th>
@@ -124,6 +147,13 @@ export default function AgentsPage() {
                       </span>
                     </td>
                     <td className="px-5 py-3">
+                      <RouteBadge
+                        provider={agent.provider}
+                        model={agent.model}
+                        selectable={selectableRouteIds.has(`${agent.provider}:${agent.model}`)}
+                      />
+                    </td>
+                    <td className="px-5 py-3">
                       <div className="flex items-center gap-2">
                         <HealthBadge status={agentHealthStatus(agent)} size="sm" />
                         <span className="text-xs capitalize text-kitsurubami">{agent.status}</span>
@@ -144,7 +174,7 @@ export default function AgentsPage() {
                 ))}
                 {agents.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="py-12 text-center text-sm text-sumi-600">
+                    <td colSpan={7} className="py-12 text-center text-sm text-sumi-600">
                       No agents registered. Spawn one to begin.
                     </td>
                   </tr>
@@ -162,7 +192,7 @@ export default function AgentsPage() {
       </AnimatePresence>
 
       <AnimatePresence>
-        {showSpawnDialog && <SpawnDialog onClose={() => setShowSpawnDialog(false)} />}
+        {showSpawnDialog && <SpawnDialog manifest={manifest} onClose={() => setShowSpawnDialog(false)} />}
       </AnimatePresence>
     </div>
   );
@@ -275,16 +305,57 @@ function StatBox({ icon, label, value }: { icon: React.ReactNode; label: string;
   );
 }
 
-function SpawnDialog({ onClose }: { onClose: () => void }) {
+function RouteBadge({
+  provider,
+  model,
+  selectable,
+}: {
+  provider: string;
+  model: string;
+  selectable: boolean;
+}) {
+  const route = provider && model ? `${provider}:${model}` : "unassigned";
+  return (
+    <div className="max-w-[260px]">
+      <div className="truncate font-mono text-[11px] text-torinoko">{route}</div>
+      <div
+        className="mt-1 inline-flex rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em]"
+        style={{
+          color: selectable ? colors.rokusho : colors.kinpaku,
+          borderColor: `color-mix(in srgb, ${selectable ? colors.rokusho : colors.kinpaku} 35%, transparent)`,
+          backgroundColor: `color-mix(in srgb, ${selectable ? colors.rokusho : colors.kinpaku} 8%, transparent)`,
+        }}
+      >
+        {selectable ? "policy route" : "outside policy"}
+      </div>
+    </div>
+  );
+}
+
+function SpawnDialog({ manifest, onClose }: { manifest?: RoutingManifestOut; onClose: () => void }) {
   const [name, setName] = useState("");
   const [role, setRole] = useState("researcher");
+  const routeOptions = manifest?.selectable_routes ?? [];
+  const defaultRoute = routeOptions[0];
+  const [routeId, setRouteId] = useState(defaultRoute ? `${defaultRoute.provider}:${defaultRoute.model}` : "");
+  useEffect(() => {
+    if (!routeId && defaultRoute) {
+      setRouteId(`${defaultRoute.provider}:${defaultRoute.model}`);
+    }
+  }, [defaultRoute, routeId]);
   const qc = useQueryClient();
+  const selectedRoute = routeOptions.find((route) => `${route.provider}:${route.model}` === routeId) ?? defaultRoute;
 
   const spawnMutation = useMutation({
     mutationFn: () =>
       apiFetch("/api/agents/spawn", {
         method: "POST",
-        body: JSON.stringify({ name, role }),
+        body: JSON.stringify({
+          name,
+          role,
+          provider: selectedRoute?.provider,
+          model: selectedRoute?.model,
+        }),
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["agents"] });
@@ -340,6 +411,27 @@ function SpawnDialog({ onClose }: { onClose: () => void }) {
               <option value="tester">Tester</option>
               <option value="general">General</option>
             </select>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.12em] text-kitsurubami">
+              Model Route
+            </label>
+            <select
+              value={routeId || (defaultRoute ? `${defaultRoute.provider}:${defaultRoute.model}` : "")}
+              onChange={(e) => setRouteId(e.target.value)}
+              className="w-full rounded-lg border border-sumi-700/40 bg-sumi-850 px-3 py-2 text-sm text-torinoko outline-none transition-colors focus:border-aozora/50"
+            >
+              {routeOptions.map((route) => (
+                <option key={`${route.provider}:${route.model}`} value={`${route.provider}:${route.model}`}>
+                  {route.provider}:{route.model}
+                </option>
+              ))}
+              {routeOptions.length === 0 && <option value="">Manifest unavailable</option>}
+            </select>
+            <p className="mt-1 text-[10px] text-sumi-600">
+              Spawn now uses the same selectable route manifest as the TUI.
+            </p>
           </div>
         </div>
 

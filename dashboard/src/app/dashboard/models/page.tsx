@@ -16,9 +16,9 @@ import {
   Sparkles,
   XCircle,
 } from "lucide-react";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, fetchRoutingManifest } from "@/lib/api";
 import { colors } from "@/lib/theme";
-import type { ModelProfileOut, TopModelOut, VerifyTop10Out } from "@/lib/types";
+import type { ModelProfileOut, RoutingManifestOut, TopModelOut, VerifyTop10Out } from "@/lib/types";
 
 type DraftMap = Record<string, { custom_label: string; short_name: string }>;
 
@@ -72,6 +72,22 @@ export default function ModelsPage() {
     refetchInterval: 30_000,
   });
 
+  const { data: manifest } = useQuery<RoutingManifestOut>({
+    queryKey: ["routing-manifest", "models-page"],
+    queryFn: async () => {
+      const response = await fetchRoutingManifest({
+        provider: "codex",
+        model: "gpt-5.4",
+        strategy: "responsive",
+      });
+      if (response.status === "error") {
+        throw new Error(response.error || "Failed to load routing manifest");
+      }
+      return response.data;
+    },
+    refetchInterval: 30_000,
+  });
+
   const verifyMutation = useMutation({
     mutationFn: () => apiFetch<VerifyTop10Out>("/api/pool/top10/verify", { method: "POST" }),
     onSuccess: () => {
@@ -105,6 +121,10 @@ export default function ModelsPage() {
 
   const verifiedCount = models.filter((model) => model.verification?.status === "ok").length;
   const availableCount = models.filter((model) => model.available).length;
+  const selectableRoutes = manifest?.selectable_routes ?? [];
+  const catalogEntries = manifest?.adapter_catalog ?? [];
+  const policyCatalogEntries = catalogEntries.filter((entry) => entry.policy_selectable);
+  const catalogOnlyEntries = catalogEntries.filter((entry) => !entry.policy_selectable);
 
   return (
     <div className="space-y-6">
@@ -132,9 +152,9 @@ export default function ModelsPage() {
               </div>
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
-              <MetricPill label="Curated Top 10" value={String(models.length)} accent={colors.aozora} />
-              <MetricPill label="Callable Right Now" value={`${availableCount}/10`} accent={colors.rokusho} />
-              <MetricPill label="Verified Live" value={`${verifiedCount}/10`} accent={colors.kinpaku} />
+              <MetricPill label="Selectable Routes" value={String(selectableRoutes.length || models.length)} accent={colors.aozora} />
+              <MetricPill label="Adapter Catalog" value={String(catalogEntries.length || availableCount)} accent={colors.rokusho} />
+              <MetricPill label="Drift Warnings" value={String(manifest?.counts.drift ?? 0)} accent={manifest?.counts.drift ? colors.bengara : colors.kinpaku} />
             </div>
           </div>
 
@@ -170,6 +190,79 @@ export default function ModelsPage() {
           Verification finished at {new Date(verifyMutation.data.verified_at).toLocaleString()} with{" "}
           {verifyMutation.data.ok_count}/10 success.
         </div>
+      )}
+
+      {manifest && (
+        <motion.section
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35 }}
+          className="grid gap-4 lg:grid-cols-[1.4fr_1fr]"
+        >
+          <div className="glass-panel p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-sumi-600">
+                  Canonical routing manifest
+                </p>
+                <h2 className="mt-1 font-heading text-xl font-semibold text-torinoko">
+                  {manifest.selected_route || "unknown route"}
+                </h2>
+                <p className="mt-1 text-sm text-sumi-600">
+                  Dashboard and TUI now share this route-policy contract. The picker should use selectable routes; the catalog is metadata.
+                </p>
+              </div>
+              <span
+                className="rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em]"
+                style={{
+                  color: manifest.counts.drift ? colors.bengara : colors.rokusho,
+                  borderColor: `color-mix(in srgb, ${manifest.counts.drift ? colors.bengara : colors.rokusho} 35%, transparent)`,
+                  backgroundColor: `color-mix(in srgb, ${manifest.counts.drift ? colors.bengara : colors.rokusho} 8%, transparent)`,
+                }}
+              >
+                {manifest.counts.drift ? `${manifest.counts.drift} drift` : "aligned"}
+              </span>
+            </div>
+
+            <div className="mt-5 grid gap-3 md:grid-cols-3">
+              <ManifestStat label="Selectable" value={String(manifest.counts.selectable_routes)} />
+              <ManifestStat label="Catalog" value={String(manifest.counts.adapter_catalog)} />
+              <ManifestStat label="Legacy aliases" value={String(manifest.counts.legacy_targets)} />
+            </div>
+
+            <div className="mt-5 grid gap-2 sm:grid-cols-2">
+              {selectableRoutes.slice(0, 8).map((route) => (
+                <div key={`${route.provider}:${route.model}`} className="rounded-xl border border-sumi-700/35 bg-sumi-900/45 px-3 py-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="truncate font-mono text-xs text-torinoko">{route.provider}:{route.model}</span>
+                    <span className="shrink-0 text-[10px] uppercase tracking-[0.12em] text-sumi-600">{route.tier ?? "tier"}</span>
+                  </div>
+                  <p className="mt-1 truncate text-[11px] text-sumi-600">{route.lane_role?.replaceAll("_", " ") ?? route.alias}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="glass-panel p-5">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-sumi-600">
+              Catalog split
+            </p>
+            <h3 className="mt-1 font-heading text-lg font-semibold text-torinoko">
+              {policyCatalogEntries.length} route-backed, {catalogOnlyEntries.length} catalog-only
+            </h3>
+            <p className="mt-2 text-sm text-sumi-600">
+              Catalog-only models are callable metadata, not first-class operating lanes unless promoted through policy.
+            </p>
+            <div className="mt-4 space-y-2">
+              {catalogOnlyEntries.slice(0, 6).map((entry) => (
+                <div key={entry.route_id} className="flex items-center justify-between gap-3 rounded-xl border border-sumi-700/30 bg-sumi-900/35 px-3 py-2">
+                  <span className="min-w-0 truncate font-mono text-[11px] text-kitsurubami">{entry.route_id}</span>
+                  <span className="shrink-0 text-[10px] text-sumi-600">catalog</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </motion.section>
       )}
 
       <div className="grid gap-4 xl:grid-cols-2">
@@ -378,6 +471,15 @@ function MetricPill({
         <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-sumi-600">{label}</span>
       </div>
       <p className="mt-2 text-lg font-semibold text-torinoko">{value}</p>
+    </div>
+  );
+}
+
+function ManifestStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-sumi-700/35 bg-sumi-900/40 px-4 py-3">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-sumi-600">{label}</p>
+      <p className="mt-1 font-mono text-lg font-semibold text-torinoko">{value}</p>
     </div>
   );
 }

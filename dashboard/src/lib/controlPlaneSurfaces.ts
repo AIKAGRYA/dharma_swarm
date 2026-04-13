@@ -284,8 +284,10 @@ function surfaceState(
         snapshot.totalProfileCount > 0
           ? `${snapshot.availableProfileCount}/${snapshot.totalProfileCount} lanes ready`
           : "Awaiting lanes",
-      detail: snapshot.defaultProfile
-        ? `Default lane ${snapshot.defaultProfile.label} anchors the command relay and shared operator path.`
+      detail: peerProfile
+        ? `${peerProfile.label} anchors the command relay and shared operator path.`
+        : snapshot.defaultProfile
+          ? `Default lane ${snapshot.defaultProfile.label} anchors the command relay and shared operator path.`
         : "Waiting for /api/chat/status to advertise the command lanes.",
       tone: commandPostTone(snapshot, chatStatus),
     };

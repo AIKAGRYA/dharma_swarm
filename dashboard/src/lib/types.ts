@@ -241,6 +241,78 @@ export interface ModelProfileOut {
   short_name?: string | null;
 }
 
+// ---------------------------------------------------------------------------
+// Routing manifest (GET /api/routing/manifest)
+// ---------------------------------------------------------------------------
+
+export interface RoutingManifestRoute {
+  alias: string;
+  provider: string;
+  model: string;
+  label: string;
+  lane_role?: string;
+  tier?: string;
+  available?: boolean;
+  availability_reason?: string;
+  config_source?: string;
+}
+
+export interface RoutingManifestCatalogEntry {
+  route_id: string;
+  provider: string;
+  model: string;
+  display_name: string;
+  capabilities: string[];
+  default_for_provider: boolean;
+  policy_selectable: boolean;
+}
+
+export interface RoutingManifestLegacyTarget {
+  source: string;
+  route_id: string;
+  provider: string;
+  model: string;
+  alias: string;
+  label: string;
+  aliases: string[];
+  policy_selectable: boolean;
+  adapter_catalog: boolean;
+}
+
+export interface RoutingManifestAgentAssignment {
+  agent_id: string;
+  name: string;
+  display_name: string;
+  role: string;
+  status: string;
+  provider: string;
+  model: string;
+  route_id: string;
+  model_key: string;
+}
+
+export interface RoutingManifestOut {
+  version: "v1";
+  domain: "routing_manifest";
+  selected_route: string;
+  strategy: string;
+  model_policy: Record<string, unknown>;
+  routing_decision: Record<string, unknown>;
+  agent_routes: Record<string, unknown>;
+  selectable_routes: RoutingManifestRoute[];
+  adapter_catalog: RoutingManifestCatalogEntry[];
+  legacy_targets: RoutingManifestLegacyTarget[];
+  agent_assignments: RoutingManifestAgentAssignment[];
+  counts: {
+    selectable_routes: number;
+    adapter_catalog: number;
+    legacy_targets: number;
+    agent_assignments: number;
+    drift: number;
+  };
+  drift: { kind: string; route_id: string }[];
+}
+
 export interface VerifyTop10Out {
   verified_at: string;
   ok_count: number;
@@ -292,6 +364,73 @@ export interface HealthOut {
   traces_last_hour: number;
   failure_rate: number;
   mean_fitness: number | null;
+}
+
+export interface DaemonCostBucket {
+  window_hours: number;
+  calls: number;
+  total_cost_usd: number;
+  input_tokens: number;
+  output_tokens: number;
+  by_provider?: Record<string, unknown>;
+  by_lane?: Record<string, unknown>;
+  by_model?: Record<string, unknown>;
+  by_execution_mode?: Record<string, {
+    calls: number;
+    cost_usd: number;
+    input_tokens: number;
+    output_tokens: number;
+  }>;
+  by_source?: Record<string, {
+    calls: number;
+    cost_usd: number;
+    input_tokens: number;
+    output_tokens: number;
+  }>;
+  top_agents?: Array<{
+    agent_id: string;
+    agent_name: string;
+    agent_role: string;
+    execution_mode: string;
+    calls: number;
+    cost_usd: number;
+    input_tokens: number;
+    output_tokens: number;
+  }>;
+  recent?: DaemonRecentCall[];
+}
+
+export interface DaemonRecentCall {
+  timestamp: number;
+  provider: string;
+  model: string;
+  input_tokens: number;
+  output_tokens: number;
+  estimated_cost_usd: number;
+  lane?: string;
+  execution_mode?: string;
+  source?: string;
+  agent_id?: string;
+  task_id?: string;
+  agent_name?: string;
+  agent_role?: string;
+  task_title?: string;
+  tier?: string;
+}
+
+export interface DaemonHealthOut {
+  status: string;
+  uptime: string;
+  timestamp: string;
+  version: string;
+  resources?: {
+    open_fds: number;
+    maxfiles_soft: number;
+    maxfiles_hard: number;
+    fd_pressure: number;
+    fd_status: string;
+  };
+  costs?: Record<string, DaemonCostBucket>;
 }
 
 // ---------------------------------------------------------------------------

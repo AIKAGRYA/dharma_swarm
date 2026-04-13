@@ -4,7 +4,7 @@ import { use, createContext, useContext } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Bot,
   RefreshCw,
@@ -20,10 +20,12 @@ import {
 } from "lucide-react";
 import { useAgent } from "@/hooks/useAgent";
 import type { AgentDetailData } from "@/hooks/useAgent";
+import { fetchRoutingManifest } from "@/lib/api";
 import { HPBar } from "@/components/game/HPBar";
 import { HealthBadge } from "@/components/dashboard/HealthBadge";
 import { BackButton, agentHealthStatus, agentHPPercent, tierColor, stagger } from "@/components/agent-workspace/shared";
 import { colors, glowBox } from "@/lib/theme";
+import type { RoutingManifestOut } from "@/lib/types";
 
 /* ─── Context ─────────────────────────────────────────────── */
 
@@ -63,6 +65,21 @@ export default function AgentWorkspaceLayout({
   const qc = useQueryClient();
   const agentData = useAgent(id);
   const { agent, config, isLoading, error, stopAgent, respawnAgent } = agentData;
+  const { data: manifest } = useQuery<RoutingManifestOut>({
+    queryKey: ["routing-manifest", "agent-layout"],
+    queryFn: async () => {
+      const response = await fetchRoutingManifest({
+        provider: "codex",
+        model: "gpt-5.4",
+        strategy: "responsive",
+      });
+      if (response.status === "error") {
+        throw new Error(response.error || "Failed to load routing manifest");
+      }
+      return response.data;
+    },
+    refetchInterval: 30_000,
+  });
 
   const basePath = `/dashboard/agents/${id}`;
 
@@ -109,10 +126,15 @@ export default function AgentWorkspaceLayout({
   const agentTier = config?.tier ?? "unknown";
   const providerStatus = agentData.providerStatus;
   const currentProvider = agent.provider ?? config?.provider;
+  const currentModel = agent.model ?? config?.model;
+  const currentRouteId = currentProvider && currentModel ? `${currentProvider}:${currentModel}` : "";
   const providerEntry = Array.isArray(providerStatus)
     ? providerStatus.find((ps) => ps.provider === currentProvider) ?? providerStatus[0]
     : null;
   const providerAvailable = providerEntry?.available ?? false;
+  const selectableRouteIds = new Set((manifest?.selectable_routes ?? []).map((route) => `${route.provider}:${route.model}`));
+  const routeSelectable = currentRouteId ? selectableRouteIds.has(currentRouteId) : false;
+  const assignedLane = (manifest?.agent_assignments ?? []).find((entry) => entry.agent_id === agent.id);
 
   return (
     <AgentWorkspaceContext.Provider value={agentData}>
@@ -212,6 +234,25 @@ export default function AgentWorkspaceLayout({
                       {agentTier}
                     </span>
                   </div>
+                </div>
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] text-sumi-600">
+                  <span className="font-mono text-kitsurubami">
+                    {currentRouteId || "unassigned"}
+                  </span>
+                  <span
+                    className="rounded px-1.5 py-px font-semibold uppercase tracking-[0.12em]"
+                    style={{
+                      color: routeSelectable ? colors.rokusho : colors.kinpaku,
+                      backgroundColor: `color-mix(in srgb, ${routeSelectable ? colors.rokusho : colors.kinpaku} 12%, transparent)`,
+                    }}
+                  >
+                    {routeSelectable ? "policy route" : "outside policy"}
+                  </span>
+                  {assignedLane?.model_key && (
+                    <span className="font-mono text-kitsurubami">
+                      key:{assignedLane.model_key}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>

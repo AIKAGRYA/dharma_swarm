@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
+import { useQuery } from "@tanstack/react-query";
 import { ControlPlanePageSummary } from "@/components/dashboard/ControlPlanePageSummary";
 import { ControlPlaneSurfaceGrid } from "@/components/dashboard/ControlPlaneSurfaceGrid";
 import { ControlPlaneStrip } from "@/components/dashboard/ControlPlaneStrip";
-import { API_TRANSPORT_MODE, BASE_URL } from "@/lib/api";
+import { API_TRANSPORT_MODE, BASE_URL, fetchRoutingManifest } from "@/lib/api";
 import { buildControlPlanePageMeta } from "@/lib/controlPlanePageMeta";
 import {
   buildControlPlaneSyncState,
@@ -15,7 +16,7 @@ import { buildRuntimeOperatorHandbook } from "@/lib/runtimeOperatorHandbook";
 import { buildControlPlaneSurfaces } from "@/lib/controlPlaneSurfaces";
 import { colors, glowText } from "@/lib/theme";
 import { useRuntimeControlPlane } from "@/hooks/useRuntimeControlPlane";
-import type { ChatProfileOut } from "@/lib/types";
+import type { ChatProfileOut, RoutingManifestOut } from "@/lib/types";
 
 const PAGE_META = buildControlPlanePageMeta("runtime");
 const PAGE_ACCENT = colors[PAGE_META.accent];
@@ -77,6 +78,21 @@ export default function RuntimePage() {
     isFetching,
     refresh,
   } = useRuntimeControlPlane();
+  const { data: manifest } = useQuery<RoutingManifestOut>({
+    queryKey: ["routing-manifest", "runtime-page"],
+    queryFn: async () => {
+      const response = await fetchRoutingManifest({
+        provider: "codex",
+        model: "gpt-5.4",
+        strategy: "responsive",
+      });
+      if (response.status === "error") {
+        throw new Error(response.error || "Failed to load routing manifest");
+      }
+      return response.data;
+    },
+    refetchInterval: 30_000,
+  });
   const syncState = buildControlPlaneSyncState({ isLoading, isFetching });
 
   useEffect(() => {
@@ -87,6 +103,14 @@ export default function RuntimePage() {
   }, []);
 
   const profiles = useMemo(() => chatStatus?.profiles ?? [], [chatStatus]);
+  const defaultProfile = chatStatus?.profiles?.find((profile) => profile.id === chatStatus?.default_profile_id) ?? chatStatus?.profiles?.[0];
+  const selectedRouteId = manifest?.selected_route ?? "";
+  const selectableRouteIds = new Set((manifest?.selectable_routes ?? []).map((route) => `${route.provider}:${route.model}`));
+  const defaultProfileRoute = defaultProfile ? `${defaultProfile.provider}:${defaultProfile.model}` : "";
+  const defaultProfileOnPolicy = defaultProfileRoute ? selectableRouteIds.has(defaultProfileRoute) : false;
+  const offPolicyAssignments = (manifest?.agent_assignments ?? []).filter(
+    (assignment) => assignment.route_id && !selectableRouteIds.has(assignment.route_id),
+  );
   const runtimeHandbook = useMemo(() => buildRuntimeOperatorHandbook(), []);
   const surfaces = useMemo(
     () =>
@@ -168,6 +192,105 @@ export default function RuntimePage() {
           badge={badgeClasses(chatStatus?.chat_contract_version ? "ok" : "muted")}
         />
       </div>
+
+      {manifest && (
+        <section className="rounded-2xl border border-sumi-700/50 bg-sumi-900/60 p-5 shadow-[0_0_0_1px_rgba(80,90,110,0.08)]">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="font-heading text-lg text-sumi-100">Runtime Route Policy</h2>
+              <p className="text-sm text-sumi-400">
+                This is the operator-facing route contract shared with the models and agents pages.
+              </p>
+            </div>
+            <span
+              className={`rounded-full border px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.12em] ${badgeClasses(
+                manifest.counts.drift ? "warn" : "ok",
+              )}`}
+            >
+              {manifest.counts.drift ? `${manifest.counts.drift} drift` : "aligned"}
+            </span>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <RuntimeCard
+              label="Selected Route"
+              value={selectedRouteId || "unknown"}
+              detail={`Strategy: ${manifest.strategy}`}
+              badge={badgeClasses("ok")}
+            />
+            <RuntimeCard
+              label="Selectable Routes"
+              value={String(manifest.counts.selectable_routes)}
+              detail={`${manifest.counts.adapter_catalog} catalog entries`}
+              badge={badgeClasses("muted")}
+            />
+            <RuntimeCard
+              label="Default Chat Lane"
+              value={defaultProfileRoute || "unknown"}
+              detail={defaultProfile ? `${defaultProfile.label} · ${defaultProfileOnPolicy ? "on policy" : "outside policy"}` : "No default profile advertised"}
+              badge={badgeClasses(defaultProfile ? (defaultProfileOnPolicy ? "ok" : "warn") : "muted")}
+            />
+            <RuntimeCard
+              label="Assigned Agent Lanes"
+              value={String(manifest.counts.agent_assignments)}
+              detail={`${manifest.counts.legacy_targets} legacy aliases still visible`}
+              badge={badgeClasses("muted")}
+            />
+          </div>
+
+          <div className="mt-4 grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+            <div className="rounded-xl border border-sumi-700/40 bg-sumi-800/30 p-4">
+              <div className="mb-2 text-xs uppercase tracking-[0.16em] text-sumi-500">
+                Policy drift
+              </div>
+              {offPolicyAssignments.length === 0 ? (
+                <p className="text-sm text-sumi-300">
+                  No agent lanes currently sit outside the selectable route policy.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {offPolicyAssignments.slice(0, 6).map((assignment) => (
+                    <div
+                      key={`${assignment.agent_id}:${assignment.route_id}`}
+                      className="flex items-center justify-between gap-3 rounded-lg border border-sumi-700/30 bg-sumi-900/35 px-3 py-2"
+                    >
+                      <div className="min-w-0">
+                        <div className="truncate text-sm text-sumi-100">{assignment.display_name}</div>
+                        <div className="truncate font-mono text-[11px] text-sumi-500">{assignment.route_id}</div>
+                      </div>
+                      <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.12em] ${badgeClasses("warn")}`}>
+                        outside policy
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-xl border border-sumi-700/40 bg-sumi-800/30 p-4">
+              <div className="mb-2 text-xs uppercase tracking-[0.16em] text-sumi-500">
+                Default lane check
+              </div>
+              <div className="space-y-2 text-sm text-sumi-300">
+                <div className="flex items-center justify-between gap-3">
+                  <span>Selected runtime route</span>
+                  <span className="font-mono text-xs text-sumi-100">{selectedRouteId || "unknown"}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span>Default chat profile</span>
+                  <span className="font-mono text-xs text-sumi-100">{defaultProfileRoute || "unknown"}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span>Policy alignment</span>
+                  <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.12em] ${badgeClasses(defaultProfile ? (defaultProfileOnPolicy ? "ok" : "warn") : "muted")}`}>
+                    {defaultProfile ? (defaultProfileOnPolicy ? "on policy" : "outside policy") : "unknown"}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {isLoading && !chatStatus && !health ? (
         <div className="py-12 text-center text-sumi-500">Loading runtime status...</div>
