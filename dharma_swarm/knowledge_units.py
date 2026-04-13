@@ -669,9 +669,10 @@ def get_default_knowledge_db_path() -> str:
     explicit = os.getenv("KNOWLEDGE_DB_PATH")
     if explicit:
         return explicit
-    state_dir = os.getenv("DHARMA_STATE_DIR", os.path.expanduser("~/.dharma/state"))
-    os.makedirs(state_dir, exist_ok=True)
-    return os.path.join(state_dir, "knowledge.db")
+    dharma_home = os.getenv("DHARMA_HOME", os.path.expanduser("~/.dharma"))
+    db_dir = os.path.join(dharma_home, "db")
+    os.makedirs(db_dir, exist_ok=True)
+    return os.path.join(db_dir, "knowledge_store.db")
 
 
 __all__ = [

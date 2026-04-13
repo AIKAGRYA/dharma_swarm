@@ -20,6 +20,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import re
 import time
 from dataclasses import dataclass, field
 from typing import Any
@@ -72,6 +73,13 @@ class SearchBackend:
     async def fetch_content(self, url: str) -> str:
         """Fetch and return clean text from a URL."""
         raise NotImplementedError("This backend does not support content fetching")
+
+
+def _strip_html(text: str) -> str:
+    cleaned = re.sub(r"(?is)<(script|style).*?>.*?</\1>", " ", text)
+    cleaned = re.sub(r"(?s)<[^>]+>", " ", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    return cleaned.strip()
 
 
 def _curated_research_fallback(query: str, max_results: int = 5) -> list[SearchResult]:
@@ -566,6 +574,14 @@ class SearchRouter:
             JinaSearchBackend(),
             DuckDuckGoSearchBackend(),
         ]
+        self._research: list[SearchBackend] = [
+            ArxivSearchBackend(),
+            PerplexitySearchBackend(),
+            ExaSearchBackend(),
+            BraveSearchBackend(),
+            DuckDuckGoSearchBackend(),
+            JinaSearchBackend(),
+        ]
         self.arxiv = ArxivSearchBackend()
         self.finnhub = FinnhubSearchBackend()
         self._jina = JinaSearchBackend()
@@ -589,7 +605,21 @@ class SearchRouter:
             domain: Hint for domain-specific routing ("research" → arxiv, "finance" → finnhub)
         """
         # Domain-specific routing
-        if domain == "research" or backend == "arxiv":
+        if domain == "research":
+            for b in self._research:
+                if backend and backend != "arxiv" and b.name != backend:
+                    continue
+                if not b.available:
+                    continue
+                try:
+                    results = await b.search(query, max_results)
+                    if results:
+                        logger.info("web_search research via %s: %d results", b.name, len(results))
+                        return results
+                except Exception as exc:
+                    logger.warning("Research backend %s failed, trying next: %s", b.name, exc)
+                    continue
+        if backend == "arxiv":
             results = await self.arxiv.search(query, max_results)
             if results:
                 return results
@@ -625,8 +655,22 @@ class SearchRouter:
         return _curated_research_fallback(query, max_results=max_results)
 
     async def fetch_content(self, url: str) -> str:
-        """Fetch clean text content from a URL using Jina Reader."""
-        return await self._jina.fetch_content(url)
+        """Fetch clean text content with Jina first, then direct HTTP fallback."""
+        content = await self._jina.fetch_content(url)
+        if content and not content.startswith("Error fetching "):
+            return content
+        try:
+            import httpx
+
+            async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+                resp = await client.get(
+                    url,
+                    headers={"User-Agent": "Mozilla/5.0 (compatible; DharmaSwarm/1.0)"},
+                )
+                resp.raise_for_status()
+                return _strip_html(resp.text)[:20000]
+        except Exception as exc:
+            return f"Error fetching {url}: {exc}"
 
     def format_results(self, results: list[SearchResult], include_urls: bool = True) -> str:
         """Format results as clean text for agent consumption."""

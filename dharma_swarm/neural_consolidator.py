@@ -666,6 +666,11 @@ class NeuralConsolidator:
             system=system,
             max_tokens=1500,
             temperature=0.7,
+            metadata={
+                "execution_mode": "headless_neural_consolidation",
+                "source": "neural_consolidator",
+                "task_title": "neural_consolidation",
+            },
         )
         assert self._provider is not None
         response = await self._provider.complete(request)

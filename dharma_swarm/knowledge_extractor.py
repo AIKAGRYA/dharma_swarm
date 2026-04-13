@@ -142,6 +142,12 @@ class KnowledgeExtractor:
                 system="You are a knowledge extraction assistant. Return only valid JSON.",
                 max_tokens=2048,
                 temperature=0.2,
+                metadata={
+                    "execution_mode": "headless_knowledge_extraction",
+                    "source": "knowledge_extractor",
+                    "task_title": "knowledge_extraction",
+                    "tier": "knowledge",
+                },
             )
             response = await self._llm_client.complete(request)
             return response.content

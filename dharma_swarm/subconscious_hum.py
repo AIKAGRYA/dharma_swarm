@@ -178,6 +178,11 @@ End with ~ when the vibration stops, not when you've concluded.
                 model="claude-sonnet-4-20250514",
                 temperature=self.temperature,
                 max_tokens=2048,  # Longer for liquid transmission
+                metadata={
+                    "execution_mode": "headless_subconscious_hum",
+                    "source": "subconscious_hum",
+                    "task_title": "subconscious_dreaming",
+                },
             )
             
             response = await provider.complete(request)

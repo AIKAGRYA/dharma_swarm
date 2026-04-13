@@ -60,9 +60,12 @@ Reference: Sakana AI Darwin Gödel Machine (ICLR 2026)
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import random
+import re
 import time
+from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -242,6 +245,142 @@ DGM_TARGET_FILES = [
     "thinkodynamic_director.py",  # mission seeding
 ]
 
+_GAUNTLET_TARGET_RE = re.compile(r"^- `([^`]+)`", re.MULTILINE)
+
+
+def _tail_lines(path: Path, max_lines: int = 200) -> list[str]:
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except Exception:
+        return []
+    return lines[-max_lines:]
+
+
+def _normalize_component_to_file(component: str | None, src_root: Path) -> str | None:
+    if not component:
+        return None
+    raw = str(component).strip()
+    if not raw:
+        return None
+    candidate = raw.replace("\\", "/")
+    if candidate.startswith("dharma_swarm/"):
+        candidate = candidate.split("/", 1)[1]
+    if candidate.endswith(".py"):
+        filename = Path(candidate).name
+        return filename if (src_root / filename).exists() else None
+    module_file = Path(candidate.replace(".", "/")).name + ".py"
+    if (src_root / module_file).exists():
+        return module_file
+    bare_file = f"{Path(candidate).name}.py"
+    if (src_root / bare_file).exists():
+        return bare_file
+    return None
+
+
+def _latest_gauntlet_targets(state_dir: Path, src_root: Path) -> list[str]:
+    latest = state_dir / "gauntlet" / "LATEST_DELTA.md"
+    if not latest.exists():
+        return []
+    try:
+        text = latest.read_text(encoding="utf-8")
+    except Exception:
+        return []
+    targets: list[str] = []
+    for match in _GAUNTLET_TARGET_RE.finditer(text):
+        normalized = _normalize_component_to_file(match.group(1), src_root)
+        if normalized:
+            targets.append(normalized)
+    return list(dict.fromkeys(targets))
+
+
+def _recent_archive_component_stats(state_dir: Path, src_root: Path, max_lines: int = 160) -> dict[str, Counter]:
+    archive_path = state_dir / "evolution" / "archive.jsonl"
+    counters = {
+        "failure_hotspots": Counter(),
+        "recent_pressure": Counter(),
+        "applied_success": Counter(),
+    }
+    for line in _tail_lines(archive_path, max_lines=max_lines):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            entry = json.loads(line)
+        except Exception:
+            continue
+        component = _normalize_component_to_file(entry.get("component"), src_root)
+        if not component:
+            continue
+        counters["recent_pressure"][component] += 1
+        status = str(entry.get("status", "") or "").strip().lower()
+        description = str(entry.get("description", "") or "")
+        test_results = entry.get("test_results", {}) or {}
+        correctness = float(((entry.get("fitness") or {}).get("correctness")) or 0.0)
+        if status == "applied" and correctness > 0:
+            counters["applied_success"][component] += 1
+        systematic_issue = "systematic test issue" in description.lower()
+        test_failed = bool(test_results) and int(test_results.get("exit_code", 0) or 0) != 0
+        if systematic_issue or test_failed or correctness <= 0:
+            counters["failure_hotspots"][component] += 1
+    return counters
+
+
+def _build_target_scores(state_dir: Path, src_root: Path) -> dict[str, float]:
+    available_targets = [t for t in DGM_TARGET_FILES if (src_root / t).exists()]
+    scores: dict[str, float] = {
+        target: float(len(available_targets) - idx)
+        for idx, target in enumerate(available_targets)
+    }
+    stats = _recent_archive_component_stats(state_dir, src_root)
+    for target in _latest_gauntlet_targets(state_dir, src_root):
+        scores[target] = scores.get(target, 0.0) + 12.0
+    for target, count in stats["failure_hotspots"].items():
+        scores[target] = scores.get(target, 0.0) + min(12.0, count * 2.5)
+    for target, count in stats["applied_success"].items():
+        scores[target] = scores.get(target, 0.0) + min(3.0, count * 0.5)
+    gauntlet_targets = set(_latest_gauntlet_targets(state_dir, src_root))
+    total_recent = sum(stats["recent_pressure"].values())
+    for target, count in stats["recent_pressure"].items():
+        if count > 2:
+            scores[target] = max(0.5, scores.get(target, 0.0) - min(6.0, (count - 2) * 1.5))
+        if total_recent > 0:
+            share = count / total_recent
+            if share >= 0.25 and target not in gauntlet_targets:
+                scores[target] = max(0.25, scores.get(target, 0.0) * 0.25)
+            elif share >= 0.18 and target not in gauntlet_targets:
+                scores[target] = max(0.5, scores.get(target, 0.0) * 0.45)
+    return scores
+
+
+def _compose_live_fitness_context(
+    state_dir: Path,
+    src_root: Path,
+    source_file: str,
+    fitness_context: str,
+) -> str:
+    parts: list[str] = []
+    if fitness_context:
+        parts.append(fitness_context)
+    gauntlet_targets = [t for t in _latest_gauntlet_targets(state_dir, src_root) if t != source_file]
+    if gauntlet_targets:
+        parts.append(
+            "Latest gauntlet pressure signals: "
+            + ", ".join(gauntlet_targets[:3])
+            + " are currently the top failing or targeted seams."
+        )
+    stats = _recent_archive_component_stats(state_dir, src_root)
+    hotspot_count = stats["failure_hotspots"].get(source_file, 0)
+    if hotspot_count > 0:
+        parts.append(
+            f"Recent archive evidence: {source_file} appears in {hotspot_count} recent failing or systematic issue entries."
+        )
+    recent_pressure = stats["recent_pressure"].get(source_file, 0)
+    if recent_pressure > 3:
+        parts.append(
+            f"Exploration note: {source_file} has already been touched {recent_pressure} times recently, so any change should be high-signal rather than cosmetic."
+        )
+    return " | ".join(part for part in parts if part)
+
 
 class DGMLoop:
     """Open-ended DGM evolution loop with telos-gated self-modification.
@@ -279,7 +418,8 @@ class DGMLoop:
         else:
             self._shadow_mode = shadow_mode
 
-        self._src_root = Path.home() / "dharma_swarm" / "dharma_swarm"
+        self._src_root = Path(__file__).resolve().parent
+        self._target_scores = _build_target_scores(self._state_dir, self._src_root)
 
     async def run_one_generation(
         self,
@@ -323,13 +463,19 @@ class DGMLoop:
 
         # Step 2: Determine source file to evolve
         # Priority: explicit arg > parent's component > quality-diversity selection
+        self._target_scores = _build_target_scores(self._state_dir, self._src_root)
         if source_file is None and parent_entry is not None:
             source_file = _get_source_file_from_entry(parent_entry, self._src_root)
 
         if source_file is None:
-            # Fall back to weighted random from target list
-            weights = [len(DGM_TARGET_FILES) - i for i in range(len(DGM_TARGET_FILES))]
-            source_file = random.choices(DGM_TARGET_FILES, weights=weights, k=1)[0]
+            available_targets = [
+                target for target in DGM_TARGET_FILES
+                if (self._src_root / target).exists()
+            ]
+            weighted_targets = available_targets or DGM_TARGET_FILES
+            weights = [max(0.5, self._target_scores.get(target, 1.0)) for target in weighted_targets]
+            source_file = random.choices(weighted_targets, weights=weights, k=1)[0]
+            result.selection_strategy = "evidence_weighted"
 
         source_path = Path(source_file) if not isinstance(source_file, Path) else source_file
         if not source_path.is_absolute():
@@ -346,30 +492,75 @@ class DGMLoop:
         full_context = self._build_fitness_context(
             parent_entry=parent_entry,
             lineage_depth=lineage_depth,
-            fitness_context=fitness_context,
+            fitness_context=_compose_live_fitness_context(
+                self._state_dir,
+                self._src_root,
+                source_path.name,
+                fitness_context,
+            ),
         )
 
         # Step 4: Run auto_evolve with the selected source file and parent context
         try:
-            from dharma_swarm.providers import OpenRouterProvider
+            from dharma_swarm.providers import OpenRouterProvider, create_default_router
             import os as _os
 
             provider = None
             if _os.environ.get("OPENROUTER_API_KEY"):
                 provider = OpenRouterProvider()
 
+            router = create_default_router()
+
             if provider is None:
                 result.error = "No LLM provider available (set OPENROUTER_API_KEY)"
                 result.duration_seconds = time.monotonic() - start
                 return result
 
-            evo_result = await self._engine.auto_evolve(
-                provider=provider,
-                source_files=[source_path],
-                shadow=self._shadow_mode,
-                timeout=timeout,
-                context=full_context,
-            )
+            async def _run_auto_evolve(run_context: str, run_timeout: float) -> Any:
+                return await self._engine.auto_evolve(
+                    provider=provider,
+                    source_files=[source_path],
+                    model="",
+                    shadow=self._shadow_mode,
+                    timeout=max(10.0, run_timeout),
+                    context=run_context,
+                    router=router,
+                )
+
+            evo_result = await _run_auto_evolve(full_context, timeout)
+
+            if (
+                not self._shadow_mode
+                and evo_result.proposals_submitted == 0
+                and (time.monotonic() - start) < timeout
+            ):
+                retry_context = (
+                    full_context
+                    + " | Mutation required: do not return no-op. "
+                    + "Propose one minimal, safe, reversible code change that improves correctness "
+                    + "under the stated stigmergy failure mode. Prefer the smallest diff that can be tested."
+                )
+                remaining = timeout - (time.monotonic() - start)
+                if remaining > 10.0:
+                    logger.info(
+                        "DGM received no-op for %s — retrying direct proposal with mutation-required context",
+                        source_path.name,
+                    )
+                    direct_model = (
+                        _os.environ.get("DGM_FORCE_MODEL", "").strip()
+                        or "qwen/qwen3-coder:free"
+                    )
+                    proposal = await self._engine.generate_proposal(
+                        provider=provider,
+                        source_file=source_path,
+                        context=retry_context,
+                        model=direct_model,
+                    )
+                    if proposal is not None:
+                        evo_result = await self._engine.run_cycle_with_sandbox(
+                            [proposal],
+                            timeout=max(10.0, remaining),
+                        )
 
             result.proposals_submitted = evo_result.proposals_submitted
             result.proposals_gated = evo_result.proposals_gated

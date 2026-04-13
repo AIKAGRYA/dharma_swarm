@@ -1617,6 +1617,11 @@ async def _vision_via_provider(
     budget = max(float(timeout_seconds), 1.0)
     deadline = time.monotonic() + budget
     tiny_budget = budget < 2.0
+    _vision_metadata = {
+        "execution_mode": "headless_director_vision",
+        "source": "thinkodynamic_director",
+        "task_title": "director_vision",
+    }
 
     async def _attempt(
         label: str,
@@ -1673,6 +1678,7 @@ async def _vision_via_provider(
                         system=sys_msg,
                         model=model,
                         max_tokens=4096,
+                        metadata=_vision_metadata,
                     ),
                     per_attempt_max=max_t,
                 )
@@ -1705,6 +1711,7 @@ async def _vision_via_provider(
                     system=sys_msg,
                     model=model,
                     max_tokens=4096,
+                    metadata=_vision_metadata,
                 ),
                 per_attempt_max=max_t,
             )
@@ -1724,6 +1731,7 @@ async def _vision_via_provider(
                 messages=[{"role": "user", "content": prompt}],
                 system=sys_msg,
                 max_tokens=4096,
+                metadata=_vision_metadata,
             ),
             per_attempt_max=30.0,
         )
@@ -1747,6 +1755,7 @@ async def _vision_via_provider(
                 system=sys_msg,
                 model="claude-sonnet-4-20250514",
                 max_tokens=4096,
+                metadata=_vision_metadata,
             ),
             per_attempt_max=45.0,
         )

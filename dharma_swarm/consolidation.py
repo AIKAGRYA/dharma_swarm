@@ -503,6 +503,11 @@ class ContrarianDialogue:
             messages=[{"role": "user", "content": user_msg}],
             max_tokens=1500,
             temperature=0.7,
+            metadata={
+                "execution_mode": "headless_consolidation",
+                "source": "consolidation",
+                "task_title": "memory_consolidation",
+            },
         )
         response = await provider.complete(request)
         return response.content

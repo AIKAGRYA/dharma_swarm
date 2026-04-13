@@ -9,8 +9,7 @@ Jobs are stored in ~/.dharma/cron/jobs.json. Each job has:
   - delivery: where to send results ("local", "telegram:<chat_id>", etc.)
 
 ``tick()`` checks for due jobs, acquires a file lock, and executes them.
-Integrates with YogaScheduler quiet hours — jobs are deferred during
-quiet hours unless marked urgent.
+Runs jobs whenever due. Time-of-day quiet-hour deferral is disabled.
 """
 
 from __future__ import annotations
@@ -36,8 +35,8 @@ JOBS_FILE = CRON_DIR / "jobs.json"
 OUTPUT_DIR = CRON_DIR / "output"
 LOCK_FILE = CRON_DIR / ".tick.lock"
 
-# Default quiet hours (2-4 AM local)
-DEFAULT_QUIET_HOURS: set[int] = {2, 3, 4}
+# Quiet-hour deferral disabled.
+DEFAULT_QUIET_HOURS: set[int] = set()
 
 
 def _utc_now() -> datetime:

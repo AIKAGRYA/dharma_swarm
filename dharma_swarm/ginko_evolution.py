@@ -348,6 +348,13 @@ class PromptTournament:
                 max_tokens=1024,
                 temperature=0.8,
                 timeout_seconds=60.0,
+                metadata={
+                    "execution_mode": "ginko_prompt_mutation",
+                    "source": "ginko_evolution",
+                    "agent_name": agent_name,
+                    "task_title": f"mutate_prompt:{agent_name}",
+                    "tier": "evolution",
+                },
             )
             latency_ms = (time.monotonic() - t0) * 1000.0
             content = response.content

@@ -568,6 +568,12 @@ async def generate_evolved_prompt(
         temperature=0.7,
         provider_order=PREFERRED_LOW_COST_WITH_ANTHROPIC_RUNTIME_PROVIDERS,
         timeout_seconds=llm_timeout_sec,
+        metadata={
+            "execution_mode": "master_prompt_engineering",
+            "source": "master_prompt_engineer",
+            "task_title": "evolve_master_prompt",
+            "tier": "prompting",
+        },
     )
     evolved_prompt = response.content
 

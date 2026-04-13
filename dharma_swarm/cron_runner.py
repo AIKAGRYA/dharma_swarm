@@ -273,6 +273,13 @@ def _run_hosted_portable_prompt(
                 provider_order=profile.provider_order,
                 working_dir=str(job.get("working_dir", "")).strip() or None,
                 timeout_seconds=timeout_seconds,
+                metadata={
+                    "execution_mode": "headless_cron",
+                    "source": "cron_runner",
+                    "task_id": str(job.get("id", "") or ""),
+                    "task_title": str(job.get("name", job.get("id", "unnamed"))),
+                    "tier": "cron",
+                },
             )
         )
     except Exception as exc:

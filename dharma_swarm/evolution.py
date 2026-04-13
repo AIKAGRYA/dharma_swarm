@@ -15,6 +15,7 @@ from dataclasses import dataclass
 import hashlib
 import inspect
 import logging
+import os
 import re
 import shlex
 import shutil
@@ -285,8 +286,10 @@ class DarwinEngine:
         self._adaptive_strategy = "explore"
         self._max_cycle_tokens = max(0, int(max_cycle_tokens))
         self._session_tokens_used = 0
-        # Mutation budget: max mutations per day (prevents runaway self-modification)
-        self._daily_mutation_budget = 5
+        # Mutation budget: env-configurable. Set to 0 to disable the cap.
+        self._daily_mutation_budget = max(
+            0, int(os.environ.get("DHARMA_DAILY_MUTATION_BUDGET", "0") or "0")
+        )
         self._mutations_today = 0
         self._budget_reset_date = ""
         self.last_landscape_probe: LandscapeProbe | None = None
@@ -1968,7 +1971,7 @@ class DarwinEngine:
             self._mutations_today = 0
             self._budget_reset_date = today
 
-        if self._mutations_today >= self._daily_mutation_budget:
+        if self._daily_mutation_budget > 0 and self._mutations_today >= self._daily_mutation_budget:
             logger.warning(
                 "Daily mutation budget exhausted (%d/%d). "
                 "Skipping mutations, eval-only mode.",
@@ -2753,6 +2756,11 @@ class DarwinEngine:
                 ),
                 max_tokens=800,
                 temperature=0.2,
+                metadata={
+                    "execution_mode": "headless_evolution",
+                    "source": "evolution",
+                    "task_title": "code_improvement_diff",
+                },
             )
 
             response = await provider.complete(request)
@@ -2890,6 +2898,11 @@ class DarwinEngine:
             ),
             max_tokens=2048,
             temperature=min(1.0, max(0.3, 0.4 + mutation_rate)),
+            metadata={
+                "execution_mode": "headless_evolution",
+                "source": "evolution",
+                "task_title": f"propose_mutation:{component_key}",
+            },
         )
 
         # Token budget check

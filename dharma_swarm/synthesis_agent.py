@@ -234,6 +234,12 @@ async def run_synthesis(model: str = "claude-opus-4-6") -> Path | None:
             ),
             max_tokens=4000,
             temperature=0.4,
+            metadata={
+                "execution_mode": "synthesis_agent",
+                "source": "synthesis_agent",
+                "task_title": "synthesize_scout_reports",
+                "tier": "synthesis",
+            },
         )
         raw = response.content
         provider_used = config.provider.value
