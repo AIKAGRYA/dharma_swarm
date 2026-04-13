@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import logging
+import os
 
+import httpx
 from fastapi import APIRouter
 
 from api.models import (
@@ -19,6 +21,22 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["health"])
 
 
+def _daemon_base_url() -> str:
+    return os.environ.get("DHARMA_DAEMON_URL", "http://127.0.0.1:7433").rstrip("/")
+
+
+async def _fetch_daemon_health() -> dict | None:
+    try:
+        async with httpx.AsyncClient(timeout=2.0) as client:
+            response = await client.get(f"{_daemon_base_url()}/health")
+            response.raise_for_status()
+        payload = response.json()
+        return payload if isinstance(payload, dict) else None
+    except Exception:
+        logger.debug("Failed to fetch daemon health for API blending", exc_info=True)
+        return None
+
+
 def _get_deps():
     """Lazy-load dharma_swarm dependencies."""
     from api.main import get_swarm, get_trace_store, get_monitor
@@ -30,8 +48,39 @@ async def health_check() -> ApiResponse:
     _, trace_store, monitor = _get_deps()
     try:
         report = await monitor.check_health()
+        daemon = await _fetch_daemon_health()
+
+        daemon_status = str(daemon.get("status", "")).lower() if daemon else ""
+        daemon_costs_1h = daemon.get("costs", {}).get("1h", {}) if daemon else {}
+        daemon_calls_1h = int(daemon_costs_1h.get("calls", 0) or 0) if daemon else 0
+        daemon_live = daemon_status == "ok" and daemon_calls_1h > 0
+
+        anomalies = []
+        for a in report.anomalies:
+            if (
+                daemon_live
+                and a.anomaly_type == "agent_silent"
+                and any(
+                    token in a.description
+                    for token in ("darwin_engine", "darwin_planner", "organism")
+                )
+            ):
+                continue
+            anomalies.append(a)
+
+        overall_status = report.overall_status.value if hasattr(report.overall_status, 'value') else str(report.overall_status)
+        if daemon_live and report.failure_rate == 0.0:
+            has_high = any(a.severity == "high" for a in anomalies)
+            has_medium = any(a.severity == "medium" for a in anomalies)
+            if has_high:
+                overall_status = "critical"
+            elif has_medium:
+                overall_status = "degraded"
+            else:
+                overall_status = "healthy"
+
         return ApiResponse(data=HealthOut(
-            overall_status=report.overall_status.value if hasattr(report.overall_status, 'value') else str(report.overall_status),
+            overall_status=overall_status,
             agent_health=[
                 AgentHealthOut(
                     agent_name=ah.agent_name,
@@ -52,10 +101,10 @@ async def health_check() -> ApiResponse:
                     description=a.description,
                     related_traces=a.related_traces,
                 )
-                for a in report.anomalies
+                for a in anomalies
             ],
             total_traces=report.total_traces,
-            traces_last_hour=report.traces_last_hour,
+            traces_last_hour=max(report.traces_last_hour, daemon_calls_1h),
             failure_rate=report.failure_rate,
             mean_fitness=report.mean_fitness,
         ).model_dump())

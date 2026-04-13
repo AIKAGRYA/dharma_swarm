@@ -374,7 +374,14 @@ export interface DaemonCostBucket {
   output_tokens: number;
   by_provider?: Record<string, unknown>;
   by_lane?: Record<string, unknown>;
-  by_model?: Record<string, unknown>;
+  by_model?: Record<string, {
+    provider: string;
+    lane: string;
+    calls: number;
+    cost_usd: number;
+    input_tokens: number;
+    output_tokens: number;
+  }>;
   by_execution_mode?: Record<string, {
     calls: number;
     cost_usd: number;

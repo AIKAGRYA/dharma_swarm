@@ -140,67 +140,17 @@ async def run_swarm_loop(
 
     swarm = SwarmManager(state_dir=str(STATE_DIR), daemon_config=cfg)
     await swarm.init()
-    try:
-        from dharma_swarm.startup_crew import spawn_cybernetics_crew
-
-        cyber_crew = await spawn_cybernetics_crew(swarm)
-        if cyber_crew:
-            _log("swarm", f"Cybernetics crew asserted: {len(cyber_crew)} seats")
-    except Exception as exc:
-        _log("swarm", f"Cybernetics crew assertion failed: {exc}")
 
     # MessageBus for instinct signal consumption
     from dharma_swarm.message_bus import MessageBus as _MBus
     _instinct_bus = _MBus(STATE_DIR / "db" / "messages.db")
     await _instinct_bus.init_db()
 
-    agents = await swarm.list_agents()
-    swarm_state = await swarm.status()
     _update_runtime_health_state(
-        agent_count=len(swarm_state.agents),
-        task_count=(
-            swarm_state.tasks_pending
-            + swarm_state.tasks_running
-            + swarm_state.tasks_completed
-            + swarm_state.tasks_failed
-        ),
+        agent_count=0,
+        task_count=0,
     )
-    _log("swarm", f"Ready: {len(agents)} agents, thread={swarm.current_thread}")
-
-    # Auto-seed missions from ThinkodynamicDirector if task board is empty.
-    # The director derives missions from TelosGraph + recognition_seed + ecosystem.
-    # This replaces static SEED_TASKS with telos-derived, philosophically grounded work.
-    try:
-        _board = swarm._orchestrator._board
-        _board_stats = await _board.stats()
-        _pending = _board_stats.get("pending", 0) + _board_stats.get("running", 0)
-        if _pending == 0:
-            from dharma_swarm.mission_contract import load_latest_mission
-            from pathlib import Path
-            _handoff = STATE_DIR / "shared" / "thinkodynamic_director_handoff.md"
-            _contract_path = STATE_DIR / "logs" / "thinkodynamic_director" / "latest.json"
-            if _contract_path.exists():
-                try:
-                    mission = load_latest_mission(_contract_path)
-                    if mission and hasattr(mission, 'task_titles') and mission.task_titles:
-                        _log("swarm", f"Seeding {len(mission.task_titles)} tasks from director: '{mission.mission_title}'")
-                        for title in mission.task_titles[:10]:  # cap at 10 per mission
-                            await _board.create(
-                                title=title,
-                                description=(
-                                    f"Mission: {mission.mission_title}.\n"
-                                    f"Use web_search, fetch_url, read_file, and write_file "
-                                    f"to complete this task. Write results to "
-                                    f"~/.dharma/shared/ with a descriptive filename."
-                                ),
-                                priority="high",
-                            )
-                except Exception as e:
-                    _log("swarm", f"Director mission seeding failed (non-fatal): {e}")
-            else:
-                _log("swarm", "No director mission found — using default SEED_TASKS")
-    except Exception as e:
-        _log("swarm", f"Mission auto-seed check failed (non-fatal): {e}")
+    _log("swarm", f"Ready: boot complete, thread={swarm.current_thread}")
 
     try:
         while not shutdown_event.is_set():

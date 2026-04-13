@@ -202,6 +202,7 @@ export default function DashboardOverview() {
   const hoursUp = overview ? Math.floor(overview.uptime_seconds / 3600) : null;
   const telemetryCost = telemetryOverview?.total_cost_usd ?? 0;
   const daemonCost1h = daemonHealth?.costs?.["1h"];
+  const daemonCost24h = daemonHealth?.costs?.["24h"];
   const daemonRecent = daemonCost1h?.recent?.slice(0, 6) ?? [];
   const daemonRecentCount = daemonRecent.length;
   const daemonUptime = daemonHealth?.uptime;
@@ -210,6 +211,26 @@ export default function DashboardOverview() {
   const dominantExecutionMode = daemonExecutionModes[0];
   const dominantSource = daemonSources[0];
   const daemonProviders = Object.keys(daemonCost1h?.by_provider ?? {}).length;
+  const topModels24h = Object.entries(daemonCost24h?.by_model ?? {}).sort((a, b) => b[1].calls - a[1].calls);
+  const topModel24h = topModels24h[0];
+  const secondModel24h = topModels24h[1];
+  const topModelShare24h = topModel24h && daemonCost24h?.calls
+    ? Math.round((topModel24h[1].calls / daemonCost24h.calls) * 100)
+    : null;
+  const internalHeavyCalls24h = (daemonCost24h?.by_source?.sleep_time_agent?.calls ?? 0)
+    + (daemonCost24h?.by_source?.["swarm.coordination_synthesis"]?.calls ?? 0)
+    + (daemonCost24h?.by_source?.unknown?.calls ?? 0);
+  const internalHeavyShare24h = daemonCost24h?.calls
+    ? Math.round((internalHeavyCalls24h / daemonCost24h.calls) * 100)
+    : null;
+  const inwardnessLabel =
+    internalHeavyShare24h == null
+      ? "orientation pending"
+      : internalHeavyShare24h >= 70
+        ? "inward-heavy"
+        : internalHeavyShare24h >= 50
+          ? "mixed"
+          : "outward-leaning";
   const liveOutcomeCount = outcomeCount;
   const liveInterventions = interventionCount;
   const attentionDetail =
@@ -363,6 +384,34 @@ export default function DashboardOverview() {
                   Daemon recorded <span className="text-torinoko">{daemonCost1h.calls}</span> model calls in the last hour across
                   {" "}
                   <span className="text-torinoko">{daemonProviders}</span> provider{daemonProviders === 1 ? "" : "s"}.
+                </p>
+              ) : null}
+              {topModel24h ? (
+                <p>
+                  Model concentration is <span className="text-torinoko">{topModel24h[0]}</span>
+                  {" "}
+                  at <span className="text-torinoko">{topModelShare24h}%</span> of 24h calls
+                  {secondModel24h ? (
+                    <>
+                      , with <span className="text-torinoko">{secondModel24h[0]}</span> next at
+                      {" "}
+                      <span className="text-torinoko">
+                        {daemonCost24h?.calls
+                          ? Math.round((secondModel24h[1].calls / daemonCost24h.calls) * 100)
+                          : 0}
+                        %
+                      </span>
+                    </>
+                  ) : null}
+                  .
+                </p>
+              ) : null}
+              {internalHeavyShare24h != null ? (
+                <p>
+                  Orientation is currently <span className="text-torinoko">{inwardnessLabel}</span>:
+                  {" "}
+                  <span className="text-torinoko">{internalHeavyShare24h}%</span> of 24h calls came from
+                  sleep-time extraction, coordination synthesis, or still-unlabeled work.
                 </p>
               ) : null}
             </div>

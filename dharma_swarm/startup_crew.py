@@ -386,7 +386,7 @@ async def spawn_default_crew(swarm) -> list:
         logger.info("All agents already exist, skipping spawn")
         return []
 
-    spawn_ops = []
+    spawn_specs: list[tuple[dict, asyncio.Future]] = []
     for spec in specs_to_spawn:
         provider = spec.get("provider", ProviderType.CLAUDE_CODE)
         model = spec.get("model", "claude-code")
@@ -396,7 +396,8 @@ async def spawn_default_crew(swarm) -> list:
             if base_prompt
             else MEMORY_SURVIVAL_INSTINCT
         )
-        spawn_ops.append(
+        spawn_specs.append((
+            spec,
             swarm.spawn_agent(
                 name=spec["name"],
                 role=spec["role"],
@@ -405,16 +406,36 @@ async def spawn_default_crew(swarm) -> list:
                 model=model,
                 system_prompt=merged_prompt,
             )
-        )
+        ))
 
-    agents = await asyncio.gather(*spawn_ops)
+    agents = []
+    for spec, spawn_op in spawn_specs:
+        try:
+            agent = await asyncio.wait_for(spawn_op, timeout=20.0)
+            agents.append(agent)
+            logger.info(
+                "Spawned %s (%s) on %s [%s]",
+                spec["name"],
+                spec["role"].value,
+                spec.get("provider", ProviderType.CLAUDE_CODE).value,
+                spec["thread"],
+            )
+        except TimeoutError:
+            logger.warning(
+                "Timed out spawning %s on %s [%s]; continuing startup",
+                spec["name"],
+                spec.get("provider", ProviderType.CLAUDE_CODE).value,
+                spec["thread"],
+            )
+        except Exception as exc:
+            logger.warning(
+                "Failed to spawn %s on %s [%s]: %s",
+                spec["name"],
+                spec.get("provider", ProviderType.CLAUDE_CODE).value,
+                spec["thread"],
+                exc,
+            )
 
-    # Log results
-    for spec in specs_to_spawn:
-        logger.info("Spawned %s (%s) on %s [%s]",
-                     spec["name"], spec["role"].value,
-                     spec.get("provider", ProviderType.CLAUDE_CODE).value,
-                     spec["thread"])
     return list(agents)
 
 
@@ -432,7 +453,7 @@ async def spawn_cybernetics_crew(swarm) -> list:
         logger.info("Cybernetics crew already exists, skipping spawn")
         return []
 
-    spawn_ops = []
+    spawn_specs: list[tuple[dict, asyncio.Future]] = []
     for spec in specs_to_spawn:
         base_prompt = str(spec.get("system_prompt", "") or "").strip()
         merged_prompt = (
@@ -440,7 +461,8 @@ async def spawn_cybernetics_crew(swarm) -> list:
             if base_prompt
             else MEMORY_SURVIVAL_INSTINCT
         )
-        spawn_ops.append(
+        spawn_specs.append((
+            spec,
             swarm.spawn_agent(
                 name=spec["name"],
                 role=spec["role"],
@@ -449,18 +471,35 @@ async def spawn_cybernetics_crew(swarm) -> list:
                 model=spec["model"],
                 system_prompt=merged_prompt,
             )
-        )
+        ))
 
-    agents = await asyncio.gather(*spawn_ops)
-
-    for spec in specs_to_spawn:
-        logger.info(
-            "Spawned cybernetics seat %s (%s) on %s [%s]",
-            spec["name"],
-            spec["role"].value,
-            spec["provider"].value,
-            spec["thread"],
-        )
+    agents = []
+    for spec, spawn_op in spawn_specs:
+        try:
+            agent = await asyncio.wait_for(spawn_op, timeout=20.0)
+            agents.append(agent)
+            logger.info(
+                "Spawned cybernetics seat %s (%s) on %s [%s]",
+                spec["name"],
+                spec["role"].value,
+                spec["provider"].value,
+                spec["thread"],
+            )
+        except TimeoutError:
+            logger.warning(
+                "Timed out spawning cybernetics seat %s on %s [%s]; continuing startup",
+                spec["name"],
+                spec["provider"].value,
+                spec["thread"],
+            )
+        except Exception as exc:
+            logger.warning(
+                "Failed to spawn cybernetics seat %s on %s [%s]: %s",
+                spec["name"],
+                spec["provider"].value,
+                spec["thread"],
+                exc,
+            )
 
     return list(agents)
 

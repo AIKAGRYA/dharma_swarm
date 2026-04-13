@@ -212,6 +212,12 @@ class SwarmManager:
             "yes",
             "on",
         }
+        self._sync_startup = str(os.environ.get("DHARMA_SYNC_STARTUP", "")).strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
         self._read_only_boot = str(
             os.environ.get("DHARMA_READ_ONLY_BOOT", "")
         ).strip().lower() in {
@@ -570,17 +576,69 @@ class SwarmManager:
         self._refresh_initialized_registry()
 
     async def _complete_deferred_startup(self) -> None:
-        """Backfill the default crew and optional subsystems after fast boot."""
+        """Backfill noncritical startup work after core runtime is live."""
         try:
-            from dharma_swarm.startup_crew import spawn_default_crew
+            from dharma_swarm.startup_crew import (
+                create_seed_tasks,
+                spawn_cybernetics_crew,
+                spawn_default_crew,
+            )
 
-            crew = await spawn_default_crew(self)
+            cyber_crew = []
+            seeds = []
+            crew = []
+            try:
+                cyber_crew = await asyncio.wait_for(
+                    spawn_cybernetics_crew(self), timeout=30.0,
+                )
+                if cyber_crew:
+                    logger.info(
+                        "Deferred startup spawned %d agents for cybernetics crew",
+                        len(cyber_crew),
+                    )
+            except (asyncio.TimeoutError, Exception) as exc:
+                logger.warning(
+                    "Deferred cybernetics crew spawn timed out or failed (non-fatal): %s",
+                    exc,
+                )
+
+            try:
+                seeds = await asyncio.wait_for(
+                    create_seed_tasks(self), timeout=30.0,
+                )
+                if seeds:
+                    logger.info("Deferred startup created %d seed tasks", len(seeds))
+            except (asyncio.TimeoutError, Exception) as exc:
+                logger.warning(
+                    "Deferred seed task creation timed out or failed (non-fatal): %s",
+                    exc,
+                )
+
+            try:
+                crew = await asyncio.wait_for(
+                    spawn_default_crew(self), timeout=30.0,
+                )
+            except (asyncio.TimeoutError, Exception) as exc:
+                logger.warning(
+                    "Deferred default crew spawn timed out or failed (non-fatal): %s",
+                    exc,
+                )
             if crew:
                 logger.info("Deferred startup spawned %d agents from default crew", len(crew))
-            await self._init_optional_subsystems()
+            try:
+                await asyncio.wait_for(
+                    self._init_optional_subsystems(), timeout=120.0,
+                )
+            except asyncio.TimeoutError:
+                logger.warning(
+                    "Deferred optional subsystem init timed out after 120s — continuing"
+                )
+                self._refresh_initialized_registry()
             if self._memory is not None:
                 await self._memory.remember(
-                    f"Swarm fast-boot backfill complete — {len(crew)} default agents added",
+                    "Swarm deferred startup complete — "
+                    f"{len(crew)} default agents, "
+                    f"{len(cyber_crew)} cybernetics agents, {len(seeds)} seed tasks",
                     layer=MemoryLayer.SESSION,
                     source="swarm",
                 )
@@ -742,38 +800,9 @@ class SwarmManager:
         except Exception as exc:
             logger.warning("Stale task reaper failed (non-fatal): %s", exc)
 
-        # Spawn default crew and seed tasks if this is a fresh start
-        from dharma_swarm.startup_crew import (
-            spawn_cybernetics_crew,
-            spawn_default_crew,
-            create_seed_tasks,
-        )
-        crew: list[AgentState] | list = []
-        _CREW_TIMEOUT = 30.0  # seconds — crew spawning should not block init
-        try:
-            cyber_crew = await asyncio.wait_for(
-                spawn_cybernetics_crew(self), timeout=_CREW_TIMEOUT,
-            )
-        except (asyncio.TimeoutError, Exception) as exc:
-            logger.warning("Cybernetics crew spawn timed out or failed (non-fatal): %s", exc)
-            cyber_crew = []
-        try:
-            seeds = await asyncio.wait_for(
-                create_seed_tasks(self), timeout=_CREW_TIMEOUT,
-            )
-        except (asyncio.TimeoutError, Exception) as exc:
-            logger.warning("Seed tasks creation timed out or failed (non-fatal): %s", exc)
-            seeds = []
-
-        if cyber_crew:
-            logger.info("Spawned %d agents for cybernetics crew", len(cyber_crew))
-        if seeds:
-            logger.info("Created %d seed tasks", len(seeds))
-
-        if self._fast_boot:
+        if self._fast_boot or not self._sync_startup:
             await self._memory.remember(
-                f"Swarm fast-boot initialized — 0 default agents, "
-                f"{len(cyber_crew)} cybernetics agents, {len(seeds)} seed tasks",
+                "Swarm live boot initialized — noncritical startup deferred",
                 layer=MemoryLayer.SESSION,
                 source="swarm",
             )
@@ -783,37 +812,20 @@ class SwarmManager:
                 self._complete_deferred_startup()
             )
             logger.info(
-                "Fast boot enabled — deferred default crew and noncritical subsystems"
+                "Deferred startup enabled — crews, seeds, and noncritical subsystems "
+                "continue in background while main loop starts"
             )
             return
 
-        try:
-            crew = await asyncio.wait_for(
-                spawn_default_crew(self), timeout=_CREW_TIMEOUT,
-            )
-        except (asyncio.TimeoutError, Exception) as exc:
-            logger.warning("Default crew spawn timed out or failed (non-fatal): %s", exc)
-            crew = []
-        if crew:
-            logger.info("Spawned %d agents from default crew", len(crew))
-
+        self._startup_background_task = asyncio.create_task(
+            self._complete_deferred_startup()
+        )
         await self._memory.remember(
-            f"Swarm initialized — {len(crew)} default agents, "
-            f"{len(cyber_crew)} cybernetics agents, {len(seeds)} seed tasks",
+            "Swarm sync startup requested — background startup task also scheduled",
             layer=MemoryLayer.SESSION,
             source="swarm",
         )
-
-        try:
-            await asyncio.wait_for(
-                self._init_optional_subsystems(), timeout=120.0,
-            )
-        except asyncio.TimeoutError:
-            logger.warning(
-                "Optional subsystem init timed out after 120s — "
-                "continuing with critical subsystems only"
-            )
-            self._refresh_initialized_registry()
+        logger.info("Synchronous startup requested via DHARMA_SYNC_STARTUP")
 
     # --- Agent Operations ---
 
