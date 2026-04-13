@@ -1198,6 +1198,22 @@ def _build_prompt(
         messages=[{"role": "user", "content": "\n".join(user_parts)}],
         system=system,
         max_tokens=8192,
+        metadata={
+            "task_id": task.id,
+            "task_title": task.title,
+            "agent_id": config.id,
+            "agent_name": config.name,
+            "agent_role": config.role.value,
+            "execution_mode": "persistent_agent",
+            "source": str(task.metadata.get("source", "agent_runner") or "agent_runner"),
+            "tier": str(task.metadata.get("tier", "") or ""),
+            "session_id": str(
+                task.metadata.get("session_id")
+                or task.metadata.get("trace_id")
+                or config.metadata.get("session_id")
+                or f"task:{task.id}"
+            ),
+        },
     )
 
 
@@ -2012,6 +2028,7 @@ class AgentRunner:
         async with self._lock:
             self._state.status = AgentStatus.BUSY
             self._state.current_task = task.id
+            self._state.error = None
 
         # ── Lifecycle event: task started ──
         try:
@@ -2323,6 +2340,7 @@ class AgentRunner:
                 self._state.tasks_completed += 1
                 self._state.current_task = None
                 self._state.status = AgentStatus.IDLE
+                self._state.error = None
                 self._state.last_heartbeat = _utc_now()
 
             await _leave_task_mark(

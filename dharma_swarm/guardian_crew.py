@@ -554,7 +554,7 @@ async def run_guardian_cycle(
     Returns:
         Dict with finding counts, report path, and issue creation results.
     """
-    src_root = src_root or Path.home() / "dharma_swarm" / "dharma_swarm"
+    src_root = src_root or Path(__file__).resolve().parent
     state_dir = state_dir or Path.home() / ".dharma"
     generated_at = datetime.now(timezone.utc).isoformat()
 

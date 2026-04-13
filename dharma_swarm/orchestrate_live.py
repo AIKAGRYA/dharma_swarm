@@ -865,6 +865,8 @@ REPLICATION_INTERVAL = 3600  # 1 hour between replication checks
 
 RECOGNITION_INTERVAL = 7200  # 2 hours between recognition synthesis
 
+EXECUTIVE_INTERVAL = 2700  # 45 minutes between strategic executive cycles
+
 
 async def _run_recognition_loop(shutdown_event: asyncio.Event) -> None:
     """Periodic recognition synthesis — the strange loop's self-model.
@@ -1050,16 +1052,18 @@ _GRIND_INTERVAL_FAST = 60      # seconds — when hungry
 _GRIND_INTERVAL_SLOW = 300     # seconds — when satisfied
 _GRIND_STAGNATION_WINDOW = 10  # meta-archive entries to check for plateau
 
-# Free-tier providers only — zero cost, can run 24/7
-_FREE_PROVIDER_TYPES = ("ollama", "nvidia_nim", "openrouter_free", "groq", "siliconflow")
-
-# Free coding-capable models on OpenRouter for evolution proposals
-_FREE_CODING_MODELS = (
-    "qwen/qwen3-coder:free",
-    "qwen/qwen3-next-80b-a3b-instruct:free",
-    "qwen/qwen3-4b:free",
-    "meta-llama/llama-3.3-70b-instruct:free",
-    "deepseek/deepseek-chat-v3-0324:free",
+# Low-cost and free providers preferred for the continuous grind.
+_FREE_PROVIDER_TYPES = (
+    "ollama",
+    "nvidia_nim",
+    "siliconflow",
+    "together",
+    "fireworks",
+    "cerebras",
+    "sambanova",
+    "openrouter_free",
+    "groq",
+    "openrouter",
 )
 
 # Core Python modules to target for evolution — actual testable source
@@ -1141,11 +1145,11 @@ async def run_free_evolution_grind(shutdown_event: asyncio.Event) -> None:
 
     This is loop #13 in the orchestrator — the system's metabolic drive.
     """
-    await asyncio.sleep(90)  # Let swarm + evolution init first
-
     _log("grind", "Free Evolution Grind starting (loop #13)")
-    _log("grind", f"  Free providers: {_FREE_PROVIDER_TYPES}")
+    _log("grind", f"  Preferred providers: {_FREE_PROVIDER_TYPES}")
     _log("grind", f"  Interval range: {_GRIND_INTERVAL_FAST}s (hungry) → {_GRIND_INTERVAL_SLOW}s (satisfied)")
+    _log("grind", "  Warm-up delay: 90s before first cycle")
+    await asyncio.sleep(90)  # Let swarm + evolution init first
 
     # Init DarwinEngine (separate instance, reads same archive)
     from dharma_swarm.evolution import DarwinEngine, Proposal
@@ -1172,6 +1176,7 @@ async def run_free_evolution_grind(shutdown_event: asyncio.Event) -> None:
     cycle_count = 0
     last_improvement_time = __import__("time").time()
     last_best_fitness = 0.0
+    recent_targets: list[str] = []
 
     while not shutdown_event.is_set():
         cycle_count += 1
@@ -1222,44 +1227,50 @@ async def run_free_evolution_grind(shutdown_event: asyncio.Event) -> None:
                 except Exception as exc:
                     _log("grind", f"Observation read error: {exc}")
 
-            # Phase 3: Always include a random core Python module target
-            # This ensures every cycle has at least one testable proposal
+            # Phase 3: Always include a rotating core Python module target.
             available_targets = [
                 t for t in _GRIND_EVOLUTION_TARGETS
                 if (_src_root / t).exists()
             ]
             if available_targets:
-                target = _grng.choice(available_targets)
+                novel_targets = [t for t in available_targets if t not in recent_targets]
+                target_pool = novel_targets or available_targets
+                target = _grng.choice(target_pool)
                 proposals.append(Proposal(
                     component=target,
                     change_type="mutation",
                     description=f"Grind probe: evolve {target} (hunger={hunger:.2f})",
                     spec_ref="grind_probe",
                 ))
+                recent_targets.append(target)
+                recent_targets = recent_targets[-6:]
 
             # Phase 4: Run evolution cycle via DarwinEngine.run_cycle
             # (takes proposals directly — no LLM needed for proposal gen)
             result = await engine.run_cycle(proposals)
 
-            # Phase 4b: LLM-powered evolution via Qwen3-coder:free (every 5th cycle)
-            # This uses auto_evolve with free coding models for deeper mutations
+            # Phase 4b: LLM-powered evolution with the multi-provider roster.
             if cycle_count % 5 == 0 and hunger > 0.4:
                 try:
-                    import os as _gos
-                    if _gos.environ.get("OPENROUTER_API_KEY"):
-                        from dharma_swarm.providers import OpenRouterProvider
-                        _free_provider = OpenRouterProvider()
-                        _llm_targets = _grng.sample(available_targets, min(2, len(available_targets)))
+                    if available_targets:
+                        from dharma_swarm.providers import OpenRouterProvider, create_default_router
+
+                        router = create_default_router()
+                        fallback_provider = OpenRouterProvider()
+                        llm_target_pool = [t for t in available_targets if t not in recent_targets]
+                        if len(llm_target_pool) < 2:
+                            llm_target_pool = available_targets
+                        _llm_targets = _grng.sample(llm_target_pool, min(3, len(llm_target_pool)))
                         _llm_files = [_src_root / t for t in _llm_targets]
-                        _model = _grng.choice(_FREE_CODING_MODELS)
-                        _log("grind", f"LLM evolve via {_model}: {_llm_targets}")
+                        _log("grind", f"LLM evolve via roster: {_llm_targets}")
                         llm_result = await engine.auto_evolve(
-                            provider=_free_provider,
+                            provider=fallback_provider,
                             source_files=_llm_files,
-                            model=_model,
+                            model="",
                             shadow=False,  # Real mode — apply diffs, run tests, roll back on failure
                             timeout=30.0,
                             context=f"Grind cycle {cycle_count}, hunger={hunger:.2f}",
+                            router=router,
                         )
                         if llm_result.best_fitness > result.best_fitness:
                             result = llm_result  # Use the better result
@@ -1627,6 +1638,91 @@ async def _run_archaeology_loop(shutdown_event: asyncio.Event) -> None:
         _log("archaeology", f"Archaeology loop crashed: {exc}")
 
 
+RESEARCH_RTN_INTERVAL = 1800  # 30 minutes
+
+
+async def _run_research_rtn_loop(shutdown_event: asyncio.Event) -> None:
+    _log("research-rtn", f"Starting research RTN loop (interval={RESEARCH_RTN_INTERVAL}s)")
+    try:
+        await asyncio.sleep(5)  # let other systems boot first
+        from dharma_swarm.research_rtn import ResearchRTN
+        from dharma_swarm.research_tracks import ALL_TRACKS
+
+        # Try to use WebSearchBackend; fall back to NullSearchBackend
+        try:
+            from dharma_swarm.auto_research.backends import WebSearchBackend
+            backend = WebSearchBackend()
+        except Exception:
+            from dharma_swarm.auto_research.search import NullSearchBackend
+            backend = NullSearchBackend()
+
+        rtn = ResearchRTN(search_backend=backend)
+        track_cycle = 0
+
+        while not shutdown_event.is_set():
+            track = ALL_TRACKS[track_cycle % len(ALL_TRACKS)]
+            brief_idx = track_cycle // len(ALL_TRACKS)
+            brief = track.next_brief(index=brief_idx)
+            _log("research-rtn", f"Executing: track={track.slug}, topic={brief.topic}")
+
+            try:
+                result = rtn.execute_brief(brief)
+                status = "PASSED" if result.passed_gates else "FAILED"
+                score = result.reward.grade_card.final_score if result.reward else 0.0
+                _log(
+                    "research-rtn",
+                    f"Result: {status} (score={score:.2f}, subs={len(result.sub_results)})",
+                )
+                if result.artifact:
+                    _log("research-rtn", f"Artifact published: {result.artifact.ref.artifact_id}")
+            except Exception as exc:
+                _log("research-rtn", f"RTN execution error: {exc}")
+
+            track_cycle += 1
+            try:
+                await asyncio.wait_for(
+                    shutdown_event.wait(), timeout=RESEARCH_RTN_INTERVAL
+                )
+                break
+            except asyncio.TimeoutError:
+                pass
+
+    except Exception as exc:
+        _log("research-rtn", f"Research RTN loop crashed: {exc}")
+
+
+async def _run_executive_loop(shutdown_event: asyncio.Event) -> None:
+    """ShaktiZeitgeistExecutive — strategic sensing + opportunity scoring.
+
+    Phase 1: read-only.  Ingests signals from zeitgeist, mission, organism,
+    and algedonic sources.  Scores opportunities with a 12-factor model.
+    Emits executive artifacts under ``~/.dharma/meta/``.
+    """
+    await asyncio.sleep(120)  # let zeitgeist + organism boot first
+
+    from dharma_swarm.shakti_zeitgeist_executive import ShaktiZeitgeistExecutive
+    executive = ShaktiZeitgeistExecutive(state_dir=STATE_DIR)
+
+    while not shutdown_event.is_set():
+        try:
+            result = await executive.cycle()
+            n_opps = len(result.opportunities)
+            n_starved = len(result.starvation_alerts)
+            _log("executive", f"Cycle {result.cycle_id}: {result.signals_ingested} signals, "
+                 f"{n_opps} opportunities, {n_starved} starvation alerts "
+                 f"({result.duration_ms:.0f}ms)")
+        except Exception as e:
+            _log("executive", f"Executive cycle failed: {e}")
+
+        try:
+            await asyncio.wait_for(
+                shutdown_event.wait(), timeout=EXECUTIVE_INTERVAL
+            )
+            break
+        except asyncio.TimeoutError:
+            pass
+
+
 async def orchestrate(background: bool = False) -> None:
     """Main entry point — run all systems concurrently."""
     # Ensure Python logging is configured so module-level logger.info() calls
@@ -1718,6 +1814,8 @@ async def orchestrate(background: bool = False) -> None:
         "consolidation": CONSOLIDATION_INTERVAL, "recognition": 7200,
         "replication": 3600, "self-improve": 3600, "free-grind": 600,
         "flywheel": 300, "conductors": 120, "context-agent": 60,
+        "research-rtn": RESEARCH_RTN_INTERVAL,
+        "executive": EXECUTIVE_INTERVAL,
     }
     for loop_name, interval in _loop_intervals.items():
         _supervisor.register_loop(loop_name, expected_interval=float(interval))
@@ -1749,6 +1847,14 @@ async def orchestrate(background: bool = False) -> None:
         "guardian": lambda: _run_guardian_loop(shutdown_event),
         # ── Gauntlet: adversarial eval pressure + DGM feedback loop ──
         "gauntlet": lambda: _run_gauntlet_loop(shutdown_event),
+        # ── Research RTN: artifact-producing research pipeline ──
+        # Cycles through 3 tracks (swarm/NeurIPS/market) every 30 minutes.
+        # Produces graded research artifacts at ~/.dharma/artifacts/research/
+        "research-rtn": lambda: _run_research_rtn_loop(shutdown_event),
+        # ── ShaktiZeitgeistExecutive: strategic sensing + opportunity scoring ──
+        # Phase 1: read-only. Ingests signals, scores opportunities, emits
+        # executive artifacts at ~/.dharma/meta/ every 45 minutes.
+        "executive": lambda: _run_executive_loop(shutdown_event),
     }
     optional_clean_exit = {"pulse"}
     tasks = {

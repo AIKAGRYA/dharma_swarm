@@ -416,6 +416,12 @@ class SystemMonitor:
             system=f"You are agent '{agent_name}'. Answer the question briefly and accurately.",
             max_tokens=200,
             temperature=0.0,
+            metadata={
+                "execution_mode": "headless_monitor",
+                "source": "monitor",
+                "task_title": f"agent_audit:{agent_name}",
+                "agent_name": agent_name,
+            },
         )
 
         try:

@@ -554,11 +554,15 @@ class SwarmManager:
         # Closes Loops 9 (Memory→Metabolism) and 2 (Evolution→Agent Improvement).
         # These setters already exist but were never called.
         try:
-            from dharma_swarm.engine.knowledge_store import create_knowledge_store
-            _ks = create_knowledge_store(prefer_qdrant=False)
+            from dharma_swarm.knowledge_units import KnowledgeStore
+            knowledge_db = self.state_dir / "db" / "knowledge_store.db"
+            knowledge_db.parent.mkdir(parents=True, exist_ok=True)
+            _ks = KnowledgeStore(str(knowledge_db))
             if self._engine is not None:
                 self._engine.set_knowledge_store(_ks)
-            logger.info("KnowledgeStore wired to DarwinEngine")
+            if self._orchestrator is not None:
+                self._orchestrator.set_knowledge_store(_ks)
+            logger.info("KnowledgeStore wired to runtime: %s", knowledge_db)
         except Exception as e:
             logger.debug("KnowledgeStore wiring failed (non-fatal): %s", e)
 
@@ -688,8 +692,9 @@ class SwarmManager:
         self._thread_mgr = ThreadManager(self._daemon, self.state_dir)
 
         self._yoga = YogaScheduler(
-            quiet_hours=self._daemon.quiet_hours,
-            max_daily_tasks=self._daemon.max_daily_contributions * 5,
+            quiet_hours=[],
+            max_daily_tasks=0,
+            global_token_budget=0,
         )
         self._orchestrator = Orchestrator(
             task_board=self._task_board,
@@ -1601,7 +1606,7 @@ class SwarmManager:
 
     def _in_quiet_hours(self) -> bool:
         """Check if current hour is in quiet hours."""
-        return datetime.now().hour in self._daemon.quiet_hours
+        return False
 
     def _contribution_allowed(self) -> bool:
         """Check rate limits: daily max, min interval between contributions."""

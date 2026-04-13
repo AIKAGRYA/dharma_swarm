@@ -45,6 +45,10 @@ from dharma_swarm.claude_cli import (
     run_claude_headless as _run_claude_headless_impl,
 )
 from dharma_swarm.runtime_artifacts import append_pulse_log, freshest_pulse_log_path
+from dharma_swarm.runtime_provider import (
+    PREFERRED_LOW_COST_RUNTIME_PROVIDERS,
+    complete_via_preferred_runtime_providers,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +60,16 @@ _DREAM_THRESHOLD = 50
 _DREAM_HYSTERESIS = 10
 _SHAKTI_INTERVAL_SECONDS = 900
 _SHAKTI_SALIENCE_THRESHOLD = 0.7
+_PULSE_FALLBACK_ERROR_MARKERS = (
+    "credit balance is too low",
+    "credit balance",
+    "insufficient_quota",
+    "billing hard limit",
+    "not logged in",
+    "please run /login",
+    "unattended claude bare mode requires anthropic_api_key",
+    "error (rc=",
+)
 
 
 def build_prompt(
@@ -115,6 +129,57 @@ Active thread: {thread}
 def _resolve_claude_binary() -> str:
     """Compatibility wrapper for shared Claude CLI resolution."""
     return resolve_claude_binary()
+
+
+def _pulse_result_failed(result: str) -> bool:
+    lowered = result.strip().lower()
+    return lowered.startswith("error") or lowered.startswith("timeout")
+
+
+def _pulse_failure_supports_runtime_fallback(result: str) -> bool:
+    lowered = result.lower()
+    return any(marker in lowered for marker in _PULSE_FALLBACK_ERROR_MARKERS)
+
+
+async def _run_runtime_pulse_fallback(prompt: str, thread: str, remote_error: str) -> str:
+    """Preserve pulse progress when the Claude lane is unavailable."""
+    try:
+        response, config = await complete_via_preferred_runtime_providers(
+            messages=[{"role": "user", "content": prompt}],
+            system=(
+                "You are DGC Pulse fallback. Produce a brief, concrete heartbeat result. "
+                "Summarize one next action or one witness observation. No theater."
+            ),
+            provider_order=tuple(
+                provider
+                for provider in PREFERRED_LOW_COST_RUNTIME_PROVIDERS
+                if provider.value not in {"claude_code", "anthropic"}
+            ),
+            working_dir=str(Path.home() / "dharma_swarm_lf5"),
+            timeout_seconds=45,
+            temperature=0.3,
+            max_tokens=1200,
+            metadata={
+                "execution_mode": "headless_pulse_fallback",
+                "source": "pulse",
+                "task_title": f"pulse:{thread}",
+                "tier": "pulse",
+            },
+        )
+        content = response.content.strip() or "Witness: fallback pulse completed without a detailed response."
+        return (
+            f"Mode: runtime-fallback\n"
+            f"Claude unavailable: {remote_error[:180]}\n"
+            f"Route: provider={config.provider.value} model={config.default_model or response.model}\n\n"
+            f"{content}"
+        )
+    except Exception as exc:
+        return (
+            "Mode: runtime-fallback-failed\n"
+            f"Claude unavailable: {remote_error[:180]}\n"
+            f"Fallback error: {type(exc).__name__}: {exc}\n\n"
+            "Witness: pulse degraded gracefully but no backup provider completed."
+        )
 
 
 def run_claude_headless(
@@ -299,42 +364,7 @@ def pulse(config: DaemonConfig | None = None) -> str:
 
     inject = tm.check_inject_override(STATE_DIR)
 
-    # Check quiet hours — run sleep cycle instead of skipping
-    if datetime.now().hour in cfg.quiet_hours:
-        try:
-            from dharma_swarm.sleep_cycle import SleepCycle
-            store = StigmergyStore()
-            stream = SubconsciousStream(stigmergy=store)
-            cycle = SleepCycle(
-                stigmergy_store=store,
-                subconscious_stream=stream,
-            )
-            report = asyncio.run(cycle.run_full_cycle())
-            summary = (
-                f"SLEEP: phases={','.join(report.phases_completed)} "
-                f"decayed={report.marks_decayed} "
-                f"consolidated={report.memories_consolidated} "
-                f"dreams={report.dreams_generated}"
-            )
-            if report.colony_rv is not None:
-                summary += f" colony_rv={report.colony_rv:.3f}"
-                # Feed colony R_V into evolution bridge
-                try:
-                    from dharma_swarm.ouroboros import colony_rv_reading
-                    reading = colony_rv_reading(
-                        report.density_before, report.density_after,
-                    )
-                    if reading.is_contracted:
-                        summary += " [CONTRACTED]"
-                except Exception:
-                    logger.debug("Colony R_V reading failed", exc_info=True)
-            if report.errors:
-                summary += f" errors={len(report.errors)}"
-            print(f"[pulse] {summary}")
-            return summary
-        except Exception as e:
-            logger.warning("Sleep cycle failed: %s", e)
-            return f"QUIET: Hour {datetime.now().hour} (sleep cycle error: {e})"
+    # Quiet-hour suppression removed. Pulse runs continuously.
 
     # Check circuit breaker
     if cfg.circuit_breaker.is_broken:
@@ -377,15 +407,17 @@ def pulse(config: DaemonConfig | None = None) -> str:
     if gate.attempts:
         print(f"[pulse] witness reroute applied ({gate.attempts} attempts)")
 
-    # Execute via Claude Code headless.
-    # Use "sonnet" (not opus) for pulse — heartbeat checks don't need
-    # the most expensive model, and opus drains credits fast.
+    # Execute via Claude Code headless, then degrade gracefully to the cheap/free
+    # runtime provider stack when the Claude lane is unavailable.
     print(f"[pulse] Thread: {thread} | Executing...")
-    result = run_claude_headless(prompt, model="sonnet")
+    pulse_model = os.environ.get("DGC_PULSE_CLAUDE_MODEL", "haiku").strip() or "haiku"
+    result = run_claude_headless(prompt, model=pulse_model)
+    if _pulse_result_failed(result) and _pulse_failure_supports_runtime_fallback(result):
+        result = asyncio.run(_run_runtime_pulse_fallback(prompt, thread, result))
 
     # Record
     tm.record_contribution()
-    if result.startswith("ERROR") or result.startswith("TIMEOUT"):
+    if _pulse_result_failed(result):
         tripped = cfg.circuit_breaker.record_failure()
         if tripped:
             print("[pulse] Circuit breaker tripped! Rotating thread.")

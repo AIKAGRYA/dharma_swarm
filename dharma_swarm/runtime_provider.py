@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import os
 import shutil
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
@@ -88,13 +89,13 @@ DEFAULT_RUNTIME_PROVIDERS: tuple[ProviderType, ...] = CANONICAL_SEED_ORDER
 # capability, then cheap, then paid.
 PREFERRED_LOW_COST_RUNTIME_PROVIDERS: tuple[ProviderType, ...] = (
     ProviderType.OLLAMA,          # FREE frontier: GLM-5 744B, DeepSeek-v3.2, Kimi-K2.5
-    ProviderType.NVIDIA_NIM,      # FREE: Llama 3.3 70B (50 req/day)
-    ProviderType.GROQ,            # FREE: Qwen3-32B (3000 tok/s)
+    ProviderType.NVIDIA_NIM,      # FREE: Nemotron / frontier support
     ProviderType.CEREBRAS,        # FREE: Qwen3 235B (3000 tok/s)
     ProviderType.SILICONFLOW,     # FREE: Qwen3-Coder 480B
-    ProviderType.SAMBANOVA,       # FREE: Llama 3.3 70B
     ProviderType.TOGETHER,        # FREE: Qwen3-Coder 480B
     ProviderType.FIREWORKS,       # FREE: Qwen3-Coder 480B
+    ProviderType.GROQ,            # FREE: Qwen3-32B (3000 tok/s)
+    ProviderType.SAMBANOVA,       # FREE: Llama 3.3 70B
     ProviderType.OPENROUTER_FREE, # FREE: auto-discovered
     ProviderType.MISTRAL,         # CHEAP
     ProviderType.GOOGLE_AI,       # CHEAP
@@ -106,11 +107,12 @@ PREFERRED_LOW_COST_RUNTIME_PROVIDERS: tuple[ProviderType, ...] = (
 PREFERRED_LOW_COST_WITH_ANTHROPIC_RUNTIME_PROVIDERS: tuple[ProviderType, ...] = (
     ProviderType.OLLAMA,          # FREE frontier first
     ProviderType.NVIDIA_NIM,
-    ProviderType.GROQ,
     ProviderType.CEREBRAS,
-    ProviderType.OPENROUTER_FREE,
+    ProviderType.SILICONFLOW,
     ProviderType.TOGETHER,
     ProviderType.FIREWORKS,
+    ProviderType.OPENROUTER_FREE,
+    ProviderType.GROQ,
     ProviderType.OPENROUTER,      # PAID (xiaomi/mimo-v2-pro)
     ProviderType.ANTHROPIC,
     ProviderType.CLAUDE_CODE,     # FALLBACK: always available if claude binary installed
@@ -585,6 +587,27 @@ def preferred_runtime_provider_configs(
     return configs
 
 
+def _capture_caller_source() -> str:
+    """Walk the frame chain to find the nearest dharma_swarm caller module.
+
+    Must be called at function entry — before any ``await`` — because
+    asyncio drops the caller's frame once the coroutine suspends.
+    """
+    _SKIP = frozenset({
+        "providers", "cost_tracker", "runtime_provider",
+        "jikoku_instrumentation", "base_provider",
+    })
+    frame = sys._getframe(1)  # start from our caller
+    while frame is not None:
+        filename = frame.f_code.co_filename
+        if "/dharma_swarm/" in filename:
+            basename = filename.rsplit("/", 1)[-1].removesuffix(".py")
+            if basename not in _SKIP:
+                return basename
+        frame = frame.f_back
+    return ""
+
+
 async def complete_via_preferred_runtime_providers(
     *,
     messages: list[dict[str, str]],
@@ -597,8 +620,19 @@ async def complete_via_preferred_runtime_providers(
     working_dir: str | None = None,
     timeout_seconds: float | None = None,
     env: Mapping[str, str] | None = None,
+    metadata: Mapping[str, Any] | None = None,
 ) -> tuple[LLMResponse, RuntimeProviderConfig]:
     """Complete an LLM request via the canonical cheap-first runtime stack."""
+
+    # Capture caller identity BEFORE any await — asyncio drops the caller's
+    # frame once this coroutine suspends, making stack-walk attribution
+    # impossible deeper in the provider chain.
+    caller_source = _capture_caller_source()
+    merged_metadata: dict[str, Any] = dict(metadata or {})
+    if not merged_metadata.get("source") and caller_source:
+        merged_metadata["source"] = caller_source
+    if not merged_metadata.get("execution_mode") and caller_source:
+        merged_metadata["execution_mode"] = f"headless_{caller_source}"
 
     overrides: dict[ProviderType, str | None] = {
         ProviderType.OPENROUTER_FREE: openrouter_model,
@@ -629,6 +663,7 @@ async def complete_via_preferred_runtime_providers(
                 system=system,
                 max_tokens=max_tokens,
                 temperature=temperature,
+                metadata=merged_metadata,
             )
             if timeout_seconds is not None:
                 response = await asyncio.wait_for(
@@ -643,7 +678,12 @@ async def complete_via_preferred_runtime_providers(
         finally:
             close = getattr(provider, "close", None)
             if callable(close):
-                await close()
+                try:
+                    await close()
+                except RuntimeError:
+                    pass
+                except Exception:
+                    pass
 
     if last_exc is not None:
         raise last_exc

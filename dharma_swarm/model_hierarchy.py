@@ -123,19 +123,19 @@ PRIMARY_DRIVER_LANES: tuple[ProviderType, ...] = (
 )
 
 DELEGATED_RESEARCH_PRIORITY: tuple[ProviderType, ...] = (
-    ProviderType.OPENROUTER,     # Kimi / GLM / Qwen router
     ProviderType.OLLAMA,         # GLM-5 / Kimi cloud
-    ProviderType.NVIDIA_NIM,     # MiniMax / Nemotron frontier support
-    ProviderType.OPENROUTER_FREE,
+    ProviderType.NVIDIA_NIM,     # Nemotron / frontier support
+    ProviderType.CEREBRAS,       # Qwen3 235B high-throughput
     ProviderType.SILICONFLOW,
     ProviderType.TOGETHER,
     ProviderType.FIREWORKS,
+    ProviderType.OPENROUTER_FREE,
     ProviderType.GROQ,
-    ProviderType.CEREBRAS,
     ProviderType.GOOGLE_AI,
     ProviderType.MISTRAL,
     ProviderType.CHUTES,
     ProviderType.SAMBANOVA,
+    ProviderType.OPENROUTER,     # paid router only after strong free/cheap lanes
 )
 
 CHALLENGER_PRIORITY: tuple[ProviderType, ...] = (
@@ -147,25 +147,28 @@ CHALLENGER_PRIORITY: tuple[ProviderType, ...] = (
 )
 
 DELEGATED_BUILDER_PRIORITY: tuple[ProviderType, ...] = (
-    ProviderType.OPENROUTER,
-    ProviderType.OPENROUTER_FREE,
     ProviderType.OLLAMA,
+    ProviderType.NVIDIA_NIM,
     ProviderType.SILICONFLOW,
+    ProviderType.CEREBRAS,
     ProviderType.TOGETHER,
     ProviderType.FIREWORKS,
+    ProviderType.OPENROUTER_FREE,
     ProviderType.GROQ,
     ProviderType.GOOGLE_AI,
     ProviderType.MISTRAL,
     ProviderType.CHUTES,
-    ProviderType.CEREBRAS,
     ProviderType.SAMBANOVA,
+    ProviderType.OPENROUTER,
 )
 
 VALIDATOR_PRIORITY: tuple[ProviderType, ...] = (
     ProviderType.NVIDIA_NIM,
-    ProviderType.OPENROUTER,
     ProviderType.GROQ,
     ProviderType.OLLAMA,
+    ProviderType.CEREBRAS,
+    ProviderType.OPENROUTER_FREE,
+    ProviderType.OPENROUTER,
     ProviderType.OPENAI,
     ProviderType.ANTHROPIC,
     ProviderType.CODEX,
@@ -175,7 +178,10 @@ PRIMARY_TOOLING_PRIORITY: tuple[ProviderType, ...] = (
     ProviderType.CLAUDE_CODE,    # Subscription (unlimited)
     ProviderType.CODEX,          # Subscription (unlimited)
     ProviderType.OLLAMA,         # Free frontier
+    ProviderType.NVIDIA_NIM,     # Free frontier validator/reasoner
     ProviderType.CEREBRAS,       # Free (Qwen3 235B)
+    ProviderType.SILICONFLOW,    # Free coder lane
+    ProviderType.OPENROUTER_FREE,
     ProviderType.ANTHROPIC,      # API credits (last resort)
     ProviderType.OPENAI,         # API credits (last resort)
     ProviderType.OPENROUTER,     # API credits (last resort)
@@ -184,8 +190,11 @@ PRIMARY_TOOLING_PRIORITY: tuple[ProviderType, ...] = (
 PRIMARY_REASONING_PRIORITY: tuple[ProviderType, ...] = (
     ProviderType.CLAUDE_CODE,    # Subscription (unlimited, Opus-class)
     ProviderType.OLLAMA,         # Free frontier (GLM-5 744B, DeepSeek-v3.2)
+    ProviderType.NVIDIA_NIM,     # Free Nemotron Ultra
+    ProviderType.CEREBRAS,       # Free Qwen3 235B
     ProviderType.CODEX,          # Subscription (unlimited)
-    ProviderType.CEREBRAS,       # Free (Qwen3 235B)
+    ProviderType.SILICONFLOW,    # Free Qwen3-Coder 480B
+    ProviderType.OPENROUTER_FREE,
     ProviderType.ANTHROPIC,      # API credits (last resort)
     ProviderType.OPENAI,         # API credits (last resort)
     ProviderType.OPENROUTER,     # API credits (last resort)
@@ -247,7 +256,7 @@ def provider_lane_role(provider: ProviderType) -> LaneRole:
 DEFAULT_MODELS: dict[ProviderType, str] = {
     # Free tier — frontier
     ProviderType.OLLAMA: "glm-5:cloud",
-    ProviderType.NVIDIA_NIM: "meta/llama-3.3-70b-instruct",
+    ProviderType.NVIDIA_NIM: "nvidia/llama-3.1-nemotron-ultra-253b-v1",
     ProviderType.GROQ: "qwen/qwen3-32b",
     ProviderType.CEREBRAS: "qwen-3-235b-a22b-instruct-2507",
     ProviderType.SILICONFLOW: "Qwen/Qwen3-Coder-480B-A35B-Instruct",
@@ -258,9 +267,9 @@ DEFAULT_MODELS: dict[ProviderType, str] = {
     ProviderType.MISTRAL: "mistral-small-latest",
     ProviderType.GOOGLE_AI: "gemini-2.5-flash",
     ProviderType.CHUTES: "deepseek-ai/DeepSeek-R1",
-    ProviderType.OPENROUTER_FREE: "meta-llama/llama-3.3-70b-instruct:free",
+    ProviderType.OPENROUTER_FREE: "qwen/qwen3-next-80b-a3b-instruct:free",
     # Paid tier
-    ProviderType.OPENROUTER: "xiaomi/mimo-v2-pro",
+    ProviderType.OPENROUTER: "moonshotai/kimi-k2.5",
     ProviderType.OPENAI: "gpt-5",
     ProviderType.ANTHROPIC: "claude-opus-4-6",
     ProviderType.CLAUDE_CODE: "claude-code",

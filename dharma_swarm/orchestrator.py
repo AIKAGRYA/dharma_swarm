@@ -2152,31 +2152,31 @@ class Orchestrator:
                             req = request_or_prompt
                             req.model = req.model or ""
                             req.max_tokens = min(getattr(req, 'max_tokens', 512) or 512, 512)
-
-                        # Try cheap providers in order, skip dead ones
-                        cheap_providers = [
-                            ProviderType.OLLAMA,
-                            ProviderType.GROQ,
-                            ProviderType.NVIDIA_NIM,
-                            ProviderType.CEREBRAS,
-                            ProviderType.OPENROUTER,   # fallback: always available if key set
-                            ProviderType.OPENROUTER_FREE,  # final free tier fallback
-                        ]
-                        for ptype in cheap_providers:
-                            try:
-                                from dharma_swarm.runtime_provider import create_default_provider_map
-                                provider_map = create_default_provider_map()
-                                provider = provider_map.get(ptype)
-                                if provider and getattr(provider, 'available', False):
-                                    response = await provider.complete(req)
-                                    if response and getattr(response, 'content', None):
-                                        return response
-                            except Exception:
-                                continue  # Try next provider
-
-                        # Final fallback via full router
                         try:
-                            return await complete_via_preferred_runtime_providers(req)
+                            response, _config = await complete_via_preferred_runtime_providers(
+                                system=req.system,
+                                messages=req.messages,
+                                max_tokens=req.max_tokens,
+                                temperature=req.temperature,
+                                provider_order=(
+                                    ProviderType.OLLAMA,
+                                    ProviderType.NVIDIA_NIM,
+                                    ProviderType.CEREBRAS,
+                                    ProviderType.SILICONFLOW,
+                                    ProviderType.TOGETHER,
+                                    ProviderType.FIREWORKS,
+                                    ProviderType.OPENROUTER_FREE,
+                                    ProviderType.GROQ,
+                                    ProviderType.OPENROUTER,
+                                ),
+                                metadata={
+                                    "execution_mode": "headless_knowledge_extraction",
+                                    "source": "sleep_time_agent",
+                                    "task_title": "knowledge_extraction",
+                                    "tier": "knowledge",
+                                },
+                            )
+                            return response
                         except Exception as exc:
                             logger.debug("_MinimalLLMClient: all providers failed: %s", exc)
                             class _EmptyResponse:

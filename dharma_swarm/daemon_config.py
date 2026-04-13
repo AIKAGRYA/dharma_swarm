@@ -67,7 +67,7 @@ class DaemonConfig:
     heartbeat_interval: float = 21600.0  # 6 hours in seconds
     max_daily_contributions: int = 40
     min_between_contributions: float = 1800.0  # 30 minutes
-    quiet_hours: list[int] = field(default_factory=lambda: [2, 3, 4, 5])
+    quiet_hours: list[int] = field(default_factory=list)
 
     # LLM defaults
     model: str = "anthropic/claude-sonnet-4"
@@ -182,7 +182,7 @@ Quality bar: Every contribution must connect to prior work, propose sources, sta
 
 
 # ---------------------------------------------------------------------------
-# Adaptive quiet hours — learn from actual activity patterns
+# Adaptive active hours — retained for observability, not enforcement
 # ---------------------------------------------------------------------------
 
 _ACTIVITY_WINDOW_DAYS = 14
@@ -190,18 +190,14 @@ _QUIET_HOUR_ACTIVITY_THRESHOLD = 3  # >= 3 active events in an hour → not quie
 
 
 class AdaptiveQuietHours:
-    """Learn which hours the user is actually active and avoid interrupting them.
+    """Learn which hours the user is actually active.
 
     Records pulse activity timestamps in a rolling 14-day window.  Derives
     adaptive quiet hours by finding hours that are consistently active
     (above threshold) and treating *those* as protected work time.
 
-    The logic is inverted from naive quiet-hours: instead of silencing the
-    daemon during low-activity hours, we silence it during hours that show
-    *high user activity*, because that's when interruption is most costly.
-
-    Default static quiet hours ([2, 3, 4, 5]) remain as a floor — they are
-    always included, regardless of observed patterns.
+    This is now an observability aid rather than a runtime throttle.
+    The swarm no longer blocks or defers work based on hour-of-day.
 
     Args:
         state_dir: Path to ``~/.dharma/`` or equivalent state directory.

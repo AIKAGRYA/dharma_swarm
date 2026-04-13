@@ -4,7 +4,7 @@ Born from a synchronicity: Facebook's Yoga layout engine (constraint-based node
 arrangement) crashed in Dhyana's terminal. Yoga arranges nodes through recursive
 constraint resolution — flexbox for UI. This module does the same for agents:
 constraint-aware scheduling that respects capacity, deadlines, token budgets,
-quiet hours, and provider rate limits.
+and provider rate limits.
 
 The layout engine computes how nodes contract/expand within constraints.
 R_V measures how Value space contracts under self-reference.
@@ -14,7 +14,7 @@ Maps:
     flex-grow    → agent capacity to absorb more work
     flex-shrink  → graceful degradation under pressure
     min/max      → hard limits (concurrent tasks, tokens/day)
-    constraints  → quiet hours, deadlines, provider rate limits
+    constraints  → deadlines, provider rate limits
     measure()    → task cost estimation (duration, tokens, complexity)
 
 Integration point: sits between orchestrator.route_next() and agent_pool.assign().
@@ -150,13 +150,13 @@ ROLE_CAPACITIES: dict[AgentRole, AgentCapacity] = {
 PROVIDER_LIMITS: dict[ProviderType, dict[str, int]] = {
     ProviderType.ANTHROPIC: {"rpm": 10, "tpd": 1_000_000},
     ProviderType.OPENAI: {"rpm": 20, "tpd": 2_000_000},
-    ProviderType.OPENROUTER: {"rpm": 10, "tpd": 500_000},
-    ProviderType.OPENROUTER_FREE: {"rpm": 2, "tpd": 100_000},
+    ProviderType.OPENROUTER: {"rpm": 120, "tpd": 20_000_000},
+    ProviderType.OPENROUTER_FREE: {"rpm": 30, "tpd": 2_000_000},
     ProviderType.CLAUDE_CODE: {"rpm": 5, "tpd": 500_000},
     ProviderType.CODEX: {"rpm": 5, "tpd": 500_000},
-    ProviderType.NVIDIA_NIM: {"rpm": 10, "tpd": 500_000},
+    ProviderType.NVIDIA_NIM: {"rpm": 120, "tpd": 20_000_000},
     ProviderType.LOCAL: {"rpm": 100, "tpd": 10_000_000},  # no real limit
-    ProviderType.OLLAMA: {"rpm": 100, "tpd": 10_000_000},
+    ProviderType.OLLAMA: {"rpm": 1000, "tpd": 100_000_000},
 }
 
 
@@ -173,6 +173,7 @@ class UsageTracker:
     tasks_dispatched_today: int = 0
     provider_calls: dict[str, list[float]] = field(default_factory=dict)
     agent_active_tasks: dict[str, int] = field(default_factory=dict)
+    daily_token_budget: int = 500_000
     _day_start: float = field(default_factory=lambda: _day_start_ts())
 
     def record_dispatch(
@@ -222,17 +223,19 @@ class UsageTracker:
     @property
     def tokens_remaining_today(self) -> int:
         self._maybe_reset_daily()
-        # Global daily budget (sum of all provider limits is too generous;
-        # use a conservative aggregate)
-        daily_budget = 500_000
+        daily_budget = max(0, int(self.daily_token_budget or 0))
+        if daily_budget <= 0:
+            return 10**12
         return max(0, daily_budget - self.tokens_used_today)
 
     @property
     def contraction_level(self) -> ContractionLevel:
         """The R_V of scheduling — how constrained are we?"""
+        if self.daily_token_budget <= 0:
+            return ContractionLevel.RELAXED
         if self.tokens_remaining_today <= 0:
             return ContractionLevel.CRITICAL
-        utilization = 1.0 - (self.tokens_remaining_today / 500_000)
+        utilization = 1.0 - (self.tokens_remaining_today / max(self.daily_token_budget, 1))
         if utilization < 0.3:
             return ContractionLevel.RELAXED
         if utilization < 0.6:
@@ -283,10 +286,10 @@ class YogaScheduler:
         max_daily_tasks: int = 20,
         global_token_budget: int = 500_000,
     ):
-        self.quiet_hours = quiet_hours if quiet_hours is not None else []
+        self.quiet_hours = []
         self.max_daily_tasks = max_daily_tasks
         self.global_token_budget = global_token_budget
-        self.usage = UsageTracker()
+        self.usage = UsageTracker(daily_token_budget=global_token_budget)
         self._capacities: dict[str, AgentCapacity] = {}
 
     def set_agent_capacity(
@@ -361,24 +364,8 @@ class YogaScheduler:
         capacity = self.get_capacity(agent)
         checks: list[ConstraintCheck] = []
 
-        # 1. Quiet hours
-        now_hour = datetime.now(timezone.utc).hour
-        if now_hour in self.quiet_hours:
-            metadata = task.metadata if isinstance(task.metadata, dict) else {}
-            explicit_operator_task = (
-                task.created_by == "operator"
-                or metadata.get("created_via") in {"operator", "manual_seed", "swarm.create_task"}
-            )
-            if task.priority != TaskPriority.URGENT and not explicit_operator_task:
-                checks.append(ConstraintCheck(
-                    verdict=ConstraintVerdict.HOLD,
-                    reason=f"Quiet hour ({now_hour}:00 UTC). "
-                           f"Task priority={task.priority.value}, needs URGENT or operator origin to override.",
-                    constraint_name="quiet_hours",
-                ))
-
-        # 2. Daily token budget
-        if cost.estimated_tokens > self.usage.tokens_remaining_today:
+        # 1. Daily token budget
+        if self.global_token_budget > 0 and cost.estimated_tokens > self.usage.tokens_remaining_today:
             checks.append(ConstraintCheck(
                 verdict=ConstraintVerdict.DEFER,
                 reason=f"Daily token budget exhausted. "
@@ -387,8 +374,8 @@ class YogaScheduler:
                 constraint_name="token_budget",
             ))
 
-        # 3. Daily task limit
-        if self.usage.tasks_dispatched_today >= self.max_daily_tasks:
+        # 2. Daily task limit
+        if self.max_daily_tasks > 0 and self.usage.tasks_dispatched_today >= self.max_daily_tasks:
             if task.priority not in (TaskPriority.HIGH, TaskPriority.URGENT):
                 checks.append(ConstraintCheck(
                     verdict=ConstraintVerdict.DEFER,
@@ -397,7 +384,7 @@ class YogaScheduler:
                     constraint_name="daily_task_limit",
                 ))
 
-        # 4. Agent concurrent task limit (the max-width constraint)
+        # 3. Agent concurrent task limit (the max-width constraint)
         current_load = self.usage.agent_load(agent.id)
         if current_load >= capacity.max_concurrent:
             checks.append(ConstraintCheck(
@@ -407,7 +394,7 @@ class YogaScheduler:
                 constraint_name="agent_capacity",
             ))
 
-        # 5. Complexity match (don't waste deep thinkers on trivial tasks)
+        # 4. Complexity match (don't waste deep thinkers on trivial tasks)
         if cost.complexity < capacity.min_complexity:
             checks.append(ConstraintCheck(
                 verdict=ConstraintVerdict.HOLD,
@@ -423,7 +410,7 @@ class YogaScheduler:
                 constraint_name="complexity_ceiling",
             ))
 
-        # 6. Provider rate limit
+        # 5. Provider rate limit
         if provider:
             limits = PROVIDER_LIMITS.get(provider, {})
             rpm_limit = limits.get("rpm", 100)
@@ -436,7 +423,7 @@ class YogaScheduler:
                     constraint_name="provider_rate_limit",
                 ))
 
-        # 7. Provider compatibility
+        # 6. Provider compatibility
         if cost.required_providers and provider:
             if provider not in cost.required_providers:
                 checks.append(ConstraintCheck(
@@ -446,7 +433,7 @@ class YogaScheduler:
                     constraint_name="provider_compatibility",
                 ))
 
-        # 8. Deadline pressure — escalate if critical
+        # 7. Deadline pressure — escalate if critical
         if cost.is_deadline_critical:
             slack = cost.deadline_slack_sec
             checks.append(ConstraintCheck(
@@ -541,8 +528,10 @@ class YogaScheduler:
             "contraction_level": self.usage.contraction_level.value,
             "tokens_used_today": self.usage.tokens_used_today,
             "tokens_remaining": self.usage.tokens_remaining_today,
+            "token_budget_unlimited": self.global_token_budget <= 0,
             "tasks_dispatched_today": self.usage.tasks_dispatched_today,
             "max_daily_tasks": self.max_daily_tasks,
+            "task_budget_unlimited": self.max_daily_tasks <= 0,
             "agent_loads": dict(self.usage.agent_active_tasks),
             "quiet_hours": self.quiet_hours,
             "is_quiet_hour": datetime.now(timezone.utc).hour in self.quiet_hours,
@@ -560,9 +549,17 @@ class YogaScheduler:
         }.get(level, "?")
         lines = [
             f"YogaNode Contraction: {level} {emoji}",
-            f"  Tokens: {s['tokens_used_today']:,}/{s['tokens_used_today'] + s['tokens_remaining']:,} "
-            f"({s['tokens_remaining']:,} remaining)",
-            f"  Tasks: {s['tasks_dispatched_today']}/{s['max_daily_tasks']} dispatched today",
+            (
+                f"  Tokens: {s['tokens_used_today']:,} used today (uncapped)"
+                if s.get("token_budget_unlimited")
+                else f"  Tokens: {s['tokens_used_today']:,}/{s['tokens_used_today'] + s['tokens_remaining']:,} "
+                f"({s['tokens_remaining']:,} remaining)"
+            ),
+            (
+                f"  Tasks: {s['tasks_dispatched_today']} dispatched today (uncapped)"
+                if s.get("task_budget_unlimited")
+                else f"  Tasks: {s['tasks_dispatched_today']}/{s['max_daily_tasks']} dispatched today"
+            ),
             f"  Quiet: {'YES' if s['is_quiet_hour'] else 'no'}",
         ]
         loads = s.get("agent_loads", {})

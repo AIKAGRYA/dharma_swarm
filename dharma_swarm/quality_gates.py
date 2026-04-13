@@ -519,6 +519,11 @@ async def _llm_evaluate(
         system="You are a quality evaluation judge. Respond only with valid JSON.",
         max_tokens=1024,
         temperature=0.1,
+        metadata={
+            "execution_mode": "headless_quality_gate",
+            "source": "quality_gates",
+            "task_title": f"quality_eval:{domain.value}",
+        },
     )
 
     start = time.monotonic()

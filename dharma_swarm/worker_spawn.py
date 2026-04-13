@@ -332,6 +332,13 @@ class WorkerSpawner:
             model=model,
             messages=[{"role": "user", "content": f"## Task: {spec.task_title}\n\n{spec.task_description}"}],
             system="\n\n".join(system_parts),
+            metadata={
+                "execution_mode": "worker_spawn",
+                "source": f"worker_spawn.{spec.worker_type}",
+                "agent_name": spec.parent_agent,
+                "task_title": spec.task_title,
+                "tier": str(metadata.get("tier", "") or ""),
+            },
         )
 
         complete_for_task = getattr(provider, "complete_for_task", None)

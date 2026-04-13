@@ -709,6 +709,12 @@ class AutonomousAgent:
                     "messages": messages,
                     "max_tokens": 4096,
                     "temperature": 0.0,
+                    "metadata": {
+                        "execution_mode": "autonomous_agent",
+                        "source": "autonomous_agent",
+                        "agent_name": self.identity.name,
+                        "agent_role": self.identity.role,
+                    },
                 }
                 if tools:
                     request_kwargs["tools"] = [
@@ -805,6 +811,12 @@ class AutonomousAgent:
                         messages=messages,
                         max_tokens=4096,
                         temperature=0.0,
+                        metadata={
+                            "execution_mode": "autonomous_agent_codex",
+                            "source": "autonomous_agent",
+                            "agent_name": self.identity.name,
+                            "agent_role": self.identity.role,
+                        },
                     )
                 )
                 usage = response.usage or {}

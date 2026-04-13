@@ -73,6 +73,26 @@ def _has_ollama_key() -> bool:
     return bool(os.environ.get("OLLAMA_API_KEY", "").strip())
 
 
+def _has_nim_key() -> bool:
+    import os
+    return bool(os.environ.get("NVIDIA_NIM_API_KEY", "").strip())
+
+
+def _cyber_provider_model(
+    *,
+    ollama_model: str,
+    openrouter_free_model: str,
+    nim_model: str | None = None,
+) -> tuple[ProviderType, str]:
+    if nim_model and _has_nim_key():
+        return ProviderType.NVIDIA_NIM, nim_model
+    if _has_ollama_key():
+        return ProviderType.OLLAMA, ollama_model
+    if _has_openrouter_key():
+        return ProviderType.OPENROUTER_FREE, openrouter_free_model
+    return ProviderType.CLAUDE_CODE, "sonnet"
+
+
 def _resolve_default_crew() -> list[dict]:
     """Build crew preferring free providers.  Ollama Cloud > OpenRouter > Claude Code.
 
@@ -84,16 +104,26 @@ def _resolve_default_crew() -> list[dict]:
         # Ollama Cloud — diverse frontier models for error decorrelation
         from dharma_swarm.ollama_config import OLLAMA_CLOUD_FRONTIER_MODELS
         _models = OLLAMA_CLOUD_FRONTIER_MODELS  # glm-5, deepseek-v3.2, kimi-k2.5, minimax-m2.7, qwen3-coder
-        return [
+        crew = [
             {"name": "cartographer", "role": AgentRole.CARTOGRAPHER,
              "thread": "mechanistic", "provider": ProviderType.OLLAMA, "model": _models[0]},  # glm-5
             {"name": "surgeon", "role": AgentRole.SURGEON,
              "thread": "alignment", "provider": ProviderType.OLLAMA, "model": _models[2]},    # kimi-k2.5
             {"name": "architect", "role": AgentRole.ARCHITECT,
              "thread": "architectural", "provider": ProviderType.OLLAMA, "model": _models[1]}, # deepseek-v3.2
-            {"name": "validator", "role": AgentRole.VALIDATOR,
-             "thread": "scaling", "provider": ProviderType.OLLAMA, "model": _models[4]},       # qwen3-coder
         ]
+        if _has_nim_key():
+            crew.append(
+                {"name": "validator", "role": AgentRole.VALIDATOR,
+                 "thread": "scaling", "provider": ProviderType.NVIDIA_NIM,
+                 "model": DEFAULT_MODELS[ProviderType.NVIDIA_NIM]}
+            )
+        else:
+            crew.append(
+                {"name": "validator", "role": AgentRole.VALIDATOR,
+                 "thread": "scaling", "provider": ProviderType.OLLAMA, "model": _models[4]}
+            )
+        return crew
 
     if _has_openrouter_key():
         # OpenRouter Free — diverse free models for error decorrelation
@@ -132,8 +162,14 @@ CYBERNETICS_CREW = [
         "name": "cyber-glm5",
         "role": AgentRole.RESEARCHER,
         "thread": "cybernetics",
-        "provider": ProviderType.OLLAMA,
-        "model": "glm-5:cloud",
+        "provider": _cyber_provider_model(
+            ollama_model="glm-5:cloud",
+            openrouter_free_model="meta-llama/llama-3.3-70b-instruct:free",
+        )[0],
+        "model": _cyber_provider_model(
+            ollama_model="glm-5:cloud",
+            openrouter_free_model="meta-llama/llama-3.3-70b-instruct:free",
+        )[1],
         "system_prompt": (
             "You are CYBER-GLM5, the Variety Cartographer of the Cybernetics Directive. "
             "Map S2/S3/S4/S5 wiring, identify where governance variety is attenuated, "
@@ -144,8 +180,14 @@ CYBERNETICS_CREW = [
         "name": "cyber-kimi25",
         "role": AgentRole.CARTOGRAPHER,
         "thread": "cybernetics",
-        "provider": ProviderType.OLLAMA,
-        "model": "kimi-k2.5:cloud",
+        "provider": _cyber_provider_model(
+            ollama_model="kimi-k2.5:cloud",
+            openrouter_free_model="qwen/qwen3-32b:free",
+        )[0],
+        "model": _cyber_provider_model(
+            ollama_model="kimi-k2.5:cloud",
+            openrouter_free_model="qwen/qwen3-32b:free",
+        )[1],
         "system_prompt": (
             "You are CYBER-KIMI25, the ecosystem mapper of the Cybernetics Directive. "
             "Trace cross-file, cross-module, and cross-ledger connections; make the "
@@ -156,8 +198,14 @@ CYBERNETICS_CREW = [
         "name": "cyber-codex",
         "role": AgentRole.SURGEON,
         "thread": "cybernetics",
-        "provider": ProviderType.OLLAMA,
-        "model": "qwen3-coder:480b-cloud",
+        "provider": _cyber_provider_model(
+            ollama_model="qwen3-coder:480b-cloud",
+            openrouter_free_model="google/gemma-4-27b-it:free",
+        )[0],
+        "model": _cyber_provider_model(
+            ollama_model="qwen3-coder:480b-cloud",
+            openrouter_free_model="google/gemma-4-27b-it:free",
+        )[1],
         "system_prompt": (
             "You are CYBER-CODEX, the execution and wiring seat of the Cybernetics Directive. "
             "Prefer the smallest hot-path control improvement over broad subsystem invention. "
@@ -168,8 +216,16 @@ CYBERNETICS_CREW = [
         "name": "cyber-opus",
         "role": AgentRole.ARCHITECT,
         "thread": "cybernetics",
-        "provider": ProviderType.OLLAMA,
-        "model": "deepseek-v3.2:cloud",
+        "provider": _cyber_provider_model(
+            ollama_model="deepseek-v3.2:cloud",
+            openrouter_free_model="deepseek/deepseek-chat-v3-0324:free",
+            nim_model=DEFAULT_MODELS[ProviderType.NVIDIA_NIM],
+        )[0],
+        "model": _cyber_provider_model(
+            ollama_model="deepseek-v3.2:cloud",
+            openrouter_free_model="deepseek/deepseek-chat-v3-0324:free",
+            nim_model=DEFAULT_MODELS[ProviderType.NVIDIA_NIM],
+        )[1],
         "system_prompt": (
             "You are CYBER-OPUS, the identity and architecture seat of the Cybernetics Directive. "
             "Hold telos, constitutional coherence, and the bounded mission shape. "

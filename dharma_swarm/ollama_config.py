@@ -14,9 +14,9 @@ OLLAMA_DEFAULT_LOCAL_MODEL = "llama3.2"
 OLLAMA_DEFAULT_CLOUD_MODEL = DEFAULT_MODELS[ProviderType.OLLAMA]
 OLLAMA_CLOUD_FRONTIER_MODELS = (
     "glm-5:cloud",
-    "deepseek-v3.2:cloud",
     "kimi-k2.5:cloud",
     "minimax-m2.7:cloud",
+    "deepseek-v3.2:cloud",
     "qwen3-coder:480b-cloud",
 )
 
@@ -69,6 +69,8 @@ def resolve_ollama_base_url(
 ) -> str:
     explicit = _normalize_base_url(base_url)
     if explicit:
+        if explicit in _LOCAL_BASE_URLS and ollama_prefers_cloud(base_url=explicit, api_key=api_key):
+            return OLLAMA_CLOUD_BASE_URL
         return explicit
 
     configured = _normalize_base_url(os.environ.get("OLLAMA_BASE_URL"))

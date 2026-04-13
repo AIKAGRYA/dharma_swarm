@@ -319,6 +319,7 @@ class LLMRequest(BaseModel):
     max_tokens: int = 4096
     temperature: float = 0.7
     tools: list[dict[str, Any]] = Field(default_factory=list)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class LLMResponse(BaseModel):
