@@ -995,6 +995,28 @@ async def test_route_next_skips_retry_backoff_tasks(agents):
 
 
 @pytest.mark.asyncio
+async def test_route_next_diversity_overlay_demotes_internal_task(agents, monkeypatch):
+    board = MockTaskBoard()
+    board.tasks = [
+        Task(id="t-internal", title="knowledge extraction follow-up", metadata={"source": "sleep_time_agent"}),
+        Task(id="t-outward", title="Publish artifact report", metadata={"artifact_contract": True}),
+    ]
+    pool = MockAgentPool(agents[:1])
+    orch = Orchestrator(task_board=board, agent_pool=pool)
+
+    monkeypatch.setattr(
+        orch._diversity_governor,
+        "reorder_ready_tasks",
+        lambda tasks: ([tasks[1], tasks[0]], ["diversity_demote_internal_tasks"]),
+    )
+
+    dispatches = await orch.route_next()
+
+    assert len(dispatches) == 1
+    assert dispatches[0].task_id == "t-outward"
+
+
+@pytest.mark.asyncio
 async def test_dispatch_dropoff_requeues_once_when_runner_missing(tmp_path):
     board = MockTaskBoard()
     board.tasks = [

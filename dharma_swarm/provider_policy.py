@@ -11,6 +11,7 @@ import time
 from typing import Any, Iterable
 
 from dharma_swarm.decision_router import DecisionInput, DecisionRouter, RoutePath
+from dharma_swarm.diversity_governor import DiversityGovernor
 from dharma_swarm.model_hierarchy import (
     CANONICAL_SEED_ORDER,
     DELIBERATIVE_EXECUTION_PRIORITY,
@@ -149,6 +150,7 @@ class ProviderPolicyRouter:
                 else TelemetryPlaneStore()
             )
             self._telemetry_optimizer = TelemetryOptimizer(telemetry)
+        self._diversity_governor = DiversityGovernor()
 
     @staticmethod
     def _build_smart_router() -> SmartRouter:
@@ -226,6 +228,13 @@ class ProviderPolicyRouter:
             request=request,
         )
         reasons.extend(telemetry_reasons)
+        filtered, diversity_reasons = self._apply_diversity_overlay(
+            candidates=filtered,
+            path=path,
+            request=request,
+        )
+        reasons.extend(diversity_reasons)
+        filtered = self._apply_frontier_precision_bias(filtered, request)
 
         selected = filtered[0] if filtered else ProviderType.CLAUDE_CODE
         fallbacks = [item for item in filtered[1:] if item != selected]
@@ -366,6 +375,47 @@ class ProviderPolicyRouter:
                 f"telemetry_score:{selected.value}:{recommendation.optimization_score:.3f}",
             ],
         )
+
+    def _apply_diversity_overlay(
+        self,
+        *,
+        candidates: list[ProviderType],
+        path: RoutePath,
+        request: ProviderRouteRequest,
+    ) -> tuple[list[ProviderType], list[str]]:
+        if not candidates:
+            return (candidates, [])
+        if path == RoutePath.ESCALATE:
+            return (candidates, [])
+        if request.requires_frontier_precision or request.privileged_action or request.requires_human_consent:
+            return (candidates, [])
+        if bool(request.context.get("requires_tooling")):
+            return (candidates, [])
+        if str(request.context.get("session_id", "")).strip():
+            return (candidates, [])
+        return self._diversity_governor.reorder_providers(
+            candidates,
+            default_model_hints=self.config.default_model_hints,
+        )
+
+    @staticmethod
+    def _apply_frontier_precision_bias(
+        candidates: list[ProviderType],
+        request: ProviderRouteRequest,
+    ) -> list[ProviderType]:
+        if not request.requires_frontier_precision:
+            return candidates
+        frontier_priority = [
+            ProviderType.ANTHROPIC,
+            ProviderType.OPENAI,
+            ProviderType.OPENROUTER,
+            ProviderType.CLAUDE_CODE,
+            ProviderType.CODEX,
+        ]
+        preferred = [provider for provider in frontier_priority if provider in candidates]
+        if not preferred:
+            return candidates
+        return preferred + [provider for provider in candidates if provider not in preferred]
 
     @property
     def smart_router(self) -> SmartRouter:

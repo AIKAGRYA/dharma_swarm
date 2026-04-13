@@ -179,6 +179,38 @@ def test_provider_policy_prefers_japanese_quality_lanes() -> None:
     assert decision.selected_provider == ProviderType.OPENROUTER
 
 
+def test_provider_policy_diversity_overlay_demotes_ollama_when_recent_mix_is_monoculture(monkeypatch) -> None:
+    router = ProviderPolicyRouter()
+
+    monkeypatch.setattr(
+        router._diversity_governor,
+        "reorder_providers",
+        lambda candidates, default_model_hints=None: (
+            [ProviderType.OPENROUTER, ProviderType.NVIDIA_NIM, ProviderType.OLLAMA],
+            ["diversity_demote_provider:ollama"],
+        ),
+    )
+
+    decision = router.route(
+        ProviderRouteRequest(
+            action_name="compare_alternatives",
+            risk_score=0.2,
+            uncertainty=0.35,
+            novelty=0.3,
+            urgency=0.4,
+            expected_impact=0.5,
+        ),
+        available_providers=[
+            ProviderType.OLLAMA,
+            ProviderType.OPENROUTER,
+            ProviderType.NVIDIA_NIM,
+        ],
+    )
+
+    assert decision.selected_provider == ProviderType.OPENROUTER
+    assert "diversity_demote_provider:ollama" in decision.reasons
+
+
 def test_provider_policy_can_promote_provider_from_telemetry_signal(tmp_path) -> None:
     telemetry_db = tmp_path / "telemetry.db"
 

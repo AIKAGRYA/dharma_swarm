@@ -35,6 +35,7 @@ from dharma_swarm.models import (
     TopologyType,
     _new_id,
 )
+from dharma_swarm.diversity_governor import DiversityGovernor
 from dharma_swarm.runtime_contract import RuntimeEnvelope, RuntimeEventType
 from dharma_swarm.session_ledger import SessionLedger
 from dharma_swarm.sheaf import (
@@ -137,6 +138,7 @@ class Orchestrator:
         self._last_coordination_signature = ""
         self._last_coordination_refresh_at: float = 0.0  # monotonic timestamp
         self._coordination_refresh_interval_s: float = 120.0  # skip if refreshed within this window
+        self._diversity_governor = DiversityGovernor()
 
     def _get_sleep_time_agent(self) -> Any | None:
         direct = getattr(self, "_sleep_time_agent", None)
@@ -339,6 +341,9 @@ class Orchestrator:
         # Skip tasks already being executed or waiting for retry backoff.
         ready = [t for t in ready if t.id not in self._running_tasks]
         ready = [t for t in ready if self._is_retry_window_open(t)]
+        ready, diversity_reasons = self._diversity_governor.reorder_ready_tasks(ready)
+        if diversity_reasons:
+            logger.info("route_next: diversity overlay applied: %s", ", ".join(diversity_reasons))
 
         dispatches: list[TaskDispatch] = []
         available = list(idle)
