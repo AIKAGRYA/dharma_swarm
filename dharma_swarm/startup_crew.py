@@ -103,14 +103,14 @@ def _resolve_default_crew() -> list[dict]:
     if _has_ollama_key():
         # Ollama Cloud — diverse frontier models for error decorrelation
         from dharma_swarm.ollama_config import OLLAMA_CLOUD_FRONTIER_MODELS
-        _models = OLLAMA_CLOUD_FRONTIER_MODELS  # glm-5, deepseek-v3.2, kimi-k2.5, minimax-m2.7, qwen3-coder
+        _models = OLLAMA_CLOUD_FRONTIER_MODELS  # glm-5, kimi-k2.5, minimax-m2.7, deepseek-v3.2, qwen3-coder
         crew = [
             {"name": "cartographer", "role": AgentRole.CARTOGRAPHER,
              "thread": "mechanistic", "provider": ProviderType.OLLAMA, "model": _models[0]},  # glm-5
             {"name": "surgeon", "role": AgentRole.SURGEON,
-             "thread": "alignment", "provider": ProviderType.OLLAMA, "model": _models[2]},    # kimi-k2.5
+             "thread": "alignment", "provider": ProviderType.OLLAMA, "model": _models[1]},    # kimi-k2.5
             {"name": "architect", "role": AgentRole.ARCHITECT,
-             "thread": "architectural", "provider": ProviderType.OLLAMA, "model": _models[1]}, # deepseek-v3.2
+             "thread": "architectural", "provider": ProviderType.OLLAMA, "model": _models[2]}, # minimax-m2.7
         ]
         if _has_nim_key():
             crew.append(
@@ -121,7 +121,7 @@ def _resolve_default_crew() -> list[dict]:
         else:
             crew.append(
                 {"name": "validator", "role": AgentRole.VALIDATOR,
-                 "thread": "scaling", "provider": ProviderType.OLLAMA, "model": _models[4]}
+                 "thread": "scaling", "provider": ProviderType.OLLAMA, "model": _models[3]}
             )
         return crew
 
@@ -217,12 +217,12 @@ CYBERNETICS_CREW = [
         "role": AgentRole.ARCHITECT,
         "thread": "cybernetics",
         "provider": _cyber_provider_model(
-            ollama_model="deepseek-v3.2:cloud",
+            ollama_model="minimax-m2.7:cloud",
             openrouter_free_model="deepseek/deepseek-chat-v3-0324:free",
             nim_model=DEFAULT_MODELS[ProviderType.NVIDIA_NIM],
         )[0],
         "model": _cyber_provider_model(
-            ollama_model="deepseek-v3.2:cloud",
+            ollama_model="minimax-m2.7:cloud",
             openrouter_free_model="deepseek/deepseek-chat-v3-0324:free",
             nim_model=DEFAULT_MODELS[ProviderType.NVIDIA_NIM],
         )[1],

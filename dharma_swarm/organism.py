@@ -162,7 +162,8 @@ class Organism:
         try:
             from dharma_swarm.sleep_time_agent import SleepTimeAgent
 
-            self.sleep_time_agent = SleepTimeAgent(tick_interval=5)
+            interval = int(os.getenv("DGC_SLEEP_TIME_TICK_INTERVAL", "12") or "12")
+            self.sleep_time_agent = SleepTimeAgent(tick_interval=max(3, interval))
         except Exception:
             self.sleep_time_agent = None
             logger.debug("SleepTimeAgent init failed (non-fatal)")

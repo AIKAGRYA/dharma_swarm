@@ -2022,8 +2022,8 @@ class ThinkodynamicDirector:
             DirectorMindSpec(
                 name="minimax-challenger",
                 role="researcher",
-                provider=ProviderType.NVIDIA_NIM.value,
-                model=os.getenv("DGC_DIRECTOR_MINIMAX_MODEL", "").strip() or "minimaxai/minimax-m2.5",
+                provider=ProviderType.OLLAMA.value,
+                model=os.getenv("DGC_DIRECTOR_MINIMAX_MODEL", "").strip() or "minimax-m2.7:cloud",
                 backend="provider-fallback",
                 purpose="Counterargument mining, failure-mode pressure, and long-context challenge generation with a cheap frontier lane.",
                 focus=("researcher", "validator", "architect"),

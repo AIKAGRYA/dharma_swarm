@@ -593,7 +593,7 @@ def _should_load_probe_snapshot(env: Mapping[str, str] | None) -> bool:
 def _live25_blueprints(env: Mapping[str, str] | None) -> list[tuple[ProviderType, str, LaneRole]]:
     kimi_model = _env_value(env, "DGC_DIRECTOR_KIMI_MODEL", "moonshotai/kimi-k2.5")
     glm_model = _env_value(env, "DGC_DIRECTOR_GLM_MODEL", "z-ai/glm-5")
-    minimax_model = _env_value(env, "DGC_DIRECTOR_MINIMAX_MODEL", "minimaxai/minimax-m2.5")
+    minimax_model = _env_value(env, "DGC_DIRECTOR_MINIMAX_MODEL", "minimax-m2.7:cloud")
     qwen_builder_model = _env_value(env, "DGC_DIRECTOR_QWEN_MODEL", "qwen/qwen3-coder")
     codex_model = (
         resolve_runtime_provider_config(ProviderType.CODEX, env=env).default_model
@@ -620,7 +620,7 @@ def _live25_blueprints(env: Mapping[str, str] | None) -> list[tuple[ProviderType
         (ProviderType.NVIDIA_NIM, DEFAULT_MODELS[ProviderType.NVIDIA_NIM], LaneRole.VALIDATOR),
         (ProviderType.NVIDIA_NIM, kimi_model, LaneRole.RESEARCH_DELEGATE),
         (ProviderType.NVIDIA_NIM, glm_model, LaneRole.RESEARCH_DELEGATE),
-        (ProviderType.NVIDIA_NIM, minimax_model, LaneRole.CHALLENGER),
+        (ProviderType.OLLAMA, minimax_model, LaneRole.CHALLENGER),
         (ProviderType.OPENROUTER, kimi_model, LaneRole.RESEARCH_DELEGATE),
         (ProviderType.OPENROUTER, glm_model, LaneRole.RESEARCH_DELEGATE),
         (ProviderType.OPENROUTER, qwen_builder_model, LaneRole.BULK_BUILDER),

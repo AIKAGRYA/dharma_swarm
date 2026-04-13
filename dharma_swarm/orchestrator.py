@@ -2122,6 +2122,18 @@ class Orchestrator:
             # REQUIRES llm_client — without it, KnowledgeExtractor returns []
             # and nothing is stored. Pass a lightweight provider wrapper.
             try:
+                enabled = os.getenv("ENABLE_TASK_KNOWLEDGE_CONSOLIDATION", "true").strip().lower()
+                if enabled not in {"1", "true", "yes", "on"}:
+                    raise RuntimeError("task_knowledge_consolidation_disabled")
+                min_chars = int(os.getenv("DGC_TASK_KNOWLEDGE_MIN_CHARS", "800") or "800")
+                cooldown_seconds = float(os.getenv("DGC_TASK_KNOWLEDGE_COOLDOWN_SECONDS", "180") or "180")
+                result_text = result or ""
+                if len(result_text.strip()) < min_chars:
+                    raise RuntimeError("task_knowledge_consolidation_too_small")
+                now = time.time()
+                last_consolidation_at = float(getattr(self, "_last_knowledge_consolidation_at", 0.0) or 0.0)
+                if last_consolidation_at and (now - last_consolidation_at) < cooldown_seconds:
+                    raise RuntimeError("task_knowledge_consolidation_cooldown")
                 from dharma_swarm.sleep_time_agent import SleepTimeAgent
                 from dharma_swarm.runtime_provider import complete_via_preferred_runtime_providers
                 from dharma_swarm.models import LLMRequest
@@ -2185,9 +2197,10 @@ class Orchestrator:
                             return _EmptyResponse()
 
                 _sta = SleepTimeAgent()
+                self._last_knowledge_consolidation_at = now
                 _t4 = asyncio.create_task(
                     _sta.consolidate_knowledge(
-                        task_context=result or "",
+                        task_context=result_text,
                         task_outcome={
                             "success": True,
                             "task_title": getattr(task, 'title', ''),
@@ -2202,6 +2215,8 @@ class Orchestrator:
                         if not t.cancelled() and t.exception() else None
                     )
                 )
+            except RuntimeError as exc:
+                logger.debug("Skipping task knowledge consolidation: %s", exc)
             except Exception:
                 pass  # Never block task completion
 
