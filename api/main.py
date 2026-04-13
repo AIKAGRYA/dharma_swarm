@@ -9,10 +9,10 @@ Usage:
 
 from __future__ import annotations
 
+import asyncio
 import hmac
 import logging
 import os
-import asyncio
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from typing import Any
@@ -71,6 +71,7 @@ def get_swarm():
     """Get or create SwarmManager singleton."""
     if "swarm" not in _state:
         from dharma_swarm.swarm import SwarmManager
+
         _state["swarm"] = SwarmManager()
     return _state["swarm"]
 
@@ -79,6 +80,7 @@ def get_trace_store():
     """Get or create TraceStore singleton."""
     if "traces" not in _state:
         from dharma_swarm.traces import TraceStore
+
         _state["traces"] = TraceStore()
     return _state["traces"]
 
@@ -87,11 +89,13 @@ def get_monitor():
     """Get or create SystemMonitor singleton."""
     if "monitor" not in _state:
         from dharma_swarm.monitor import SystemMonitor
+
         _state["monitor"] = SystemMonitor(trace_store=get_trace_store())
     return _state["monitor"]
 
 
 # ── Lifespan ──────────────────────────────────────────────────────
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -245,18 +249,21 @@ app.add_middleware(
 
 # ── Register Routers ─────────────────────────────────────────────
 
+
 def _register_routers(api_app: FastAPI) -> None:
-    from api.routers.health import router as health_router
     from api.routers.agents import router as agents_router
-    from api.routers.evolution import router as evolution_router
-    from api.routers.ontology import router as ontology_router
-    from api.routers.lineage import router as lineage_router
-    from api.routers.stigmergy import router as stigmergy_router
     from api.routers.commands import router as commands_router
-    from api.routers.modules import router as modules_router
+    from api.routers.daemon import router as daemon_router
     from api.routers.dashboard_new import router as dashboard_new_router
-    from api.routers.telemetry import router as telemetry_router
+    from api.routers.evolution import router as evolution_router
     from api.routers.graphql_router import router as graphql_router
+    from api.routers.health import router as health_router
+    from api.routers.lineage import router as lineage_router
+    from api.routers.modules import router as modules_router
+    from api.routers.ontology import router as ontology_router
+    from api.routers.routing import router as routing_router
+    from api.routers.stigmergy import router as stigmergy_router
+    from api.routers.telemetry import router as telemetry_router
     from api.routers.verify import router as verify_router
 
     api_app.include_router(health_router)
@@ -269,10 +276,13 @@ def _register_routers(api_app: FastAPI) -> None:
     api_app.include_router(modules_router)
     api_app.include_router(dashboard_new_router)
     api_app.include_router(telemetry_router)
+    api_app.include_router(daemon_router)
+    api_app.include_router(routing_router)
     api_app.include_router(graphql_router)
     api_app.include_router(verify_router)
 
-    from api.routers.chat import router as chat_router, ws_router as chat_ws_router
+    from api.routers.chat import router as chat_router
+    from api.routers.chat import ws_router as chat_ws_router
 
     api_app.include_router(chat_router)
     api_app.include_router(chat_ws_router)
@@ -282,6 +292,7 @@ _register_routers(app)
 
 
 # ── Root ──────────────────────────────────────────────────────────
+
 
 @app.get("/")
 async def root():
