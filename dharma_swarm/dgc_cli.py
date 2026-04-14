@@ -2262,6 +2262,298 @@ def cmd_full_power_probe(
 # Commands from dharma_swarm Typer CLI
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Governance CLI — directed agents, campaigns, promises, status snapshots
+# ---------------------------------------------------------------------------
+
+
+def _governance_meta_dir() -> Path:
+    return Path.home() / ".dharma" / "meta"
+
+
+def _witness_dir() -> Path:
+    return Path.home() / ".dharma" / "witness"
+
+
+def _conductor_last_seen_s(name: str) -> float | None:
+    """Seconds since conductor last wrote to its witness log, or None."""
+    import time as _time
+    path = _witness_dir() / f"conductor_{name}.jsonl"
+    if not path.exists():
+        return None
+    try:
+        mtime = path.stat().st_mtime
+    except Exception:
+        return None
+    return max(0.0, _time.time() - mtime)
+
+
+def cmd_agent_direct(name: str, task: str, campaign_id: str | None = None) -> None:
+    """Enqueue a directive for a registered conductor via file drop."""
+    from dharma_swarm.agent_direct import write_directive
+    try:
+        path = write_directive(name, task, campaign_id=campaign_id)
+    except ValueError as exc:
+        print(f"error: {exc}")
+        sys.exit(2)
+    print(f"Directive queued: {path}")
+    print(f"  target: {name}")
+    if campaign_id:
+        print(f"  campaign: {campaign_id}")
+    print("  The daemon watcher will pick this up within ~5s.")
+
+
+def cmd_agent_active() -> None:
+    """Show seeded conductors, last-seen freshness, and pinned campaigns."""
+    from dharma_swarm.conductors import CONDUCTOR_CONFIGS
+    from dharma_swarm.campaigns import find_by_agent
+
+    meta = _governance_meta_dir()
+    print(f"{'conductor':<22} {'model':<28} {'last_seen':<14} {'pins':<30}")
+    print("-" * 96)
+    for cfg in CONDUCTOR_CONFIGS:
+        name = cfg["name"]
+        model = str(cfg.get("model", ""))[:28]
+        ls = _conductor_last_seen_s(name)
+        if ls is None:
+            seen = "never"
+        elif ls < 120:
+            seen = f"{int(ls)}s ago"
+        elif ls < 3600:
+            seen = f"{int(ls/60)}m ago"
+        elif ls < 86400:
+            seen = f"{int(ls/3600)}h ago"
+        else:
+            seen = f"{int(ls/86400)}d ago"
+        pins = find_by_agent(name, meta_dir=meta)
+        pin_str = ", ".join(c.get("campaign_id", "?") for c in pins) or "-"
+        print(f"{name:<22} {model:<28} {seen:<14} {pin_str[:30]:<30}")
+
+
+def cmd_campaign_new(
+    campaign_id: str,
+    agents: list[str],
+    domain: str,
+    *,
+    title: str | None = None,
+    deadline: str | None = None,
+    criteria: str = "",
+) -> None:
+    from dharma_swarm.campaigns import create_campaign
+    from dharma_swarm.shakti_zeitgeist_executive import DOMAINS
+    if domain not in DOMAINS:
+        print(f"error: invalid domain {domain!r}. choose one of: {', '.join(DOMAINS)}")
+        sys.exit(2)
+    record = create_campaign(
+        campaign_id, domain, agents,
+        title=title, deadline=deadline, success_criteria=criteria,
+        meta_dir=_governance_meta_dir(),
+    )
+    print(f"Campaign created: {record['campaign_id']}")
+    print(f"  domain: {record['domain']}")
+    print(f"  pinned_agents: {', '.join(record['pinned_agents'])}")
+    if record.get("deadline"):
+        print(f"  deadline: {record['deadline']}")
+    if record.get("success_criteria"):
+        print(f"  criteria: {record['success_criteria']}")
+
+
+def cmd_campaign_pin(campaign_id: str, agent: str) -> None:
+    from dharma_swarm.campaigns import find_campaign, save_active, load_active
+    meta = _governance_meta_dir()
+    existing = load_active(meta)
+    for c in existing:
+        if c.get("campaign_id") != campaign_id:
+            continue
+        pins = list(c.get("pinned_agents") or [])
+        if agent in pins:
+            print(f"agent {agent!r} already pinned to {campaign_id}")
+            return
+        pins.append(agent)
+        c["pinned_agents"] = pins
+        save_active(existing, meta)
+        print(f"Pinned {agent} to {campaign_id}. Pins: {', '.join(pins)}")
+        return
+    print(f"error: no active campaign with id {campaign_id!r}")
+    sys.exit(2)
+
+
+def cmd_campaign_release(campaign_id: str, agent: str | None = None) -> None:
+    from dharma_swarm.campaigns import release_campaign
+    out = release_campaign(campaign_id, agent, meta_dir=_governance_meta_dir())
+    if out is None:
+        print(f"error: no active campaign with id {campaign_id!r}")
+        sys.exit(2)
+    if out.get("status") == "abandoned":
+        print(f"Campaign {campaign_id} closed (status=abandoned).")
+    else:
+        print(f"Released {agent} from {campaign_id}. Remaining pins: {', '.join(out['pinned_agents'])}")
+
+
+def cmd_campaign_list(stale_only: bool = False) -> None:
+    from dharma_swarm.campaigns import list_stale, load_active
+    meta = _governance_meta_dir()
+    if stale_only:
+        rows = list_stale(meta_dir=meta)
+        if not rows:
+            print("(no stale campaigns)")
+            return
+    else:
+        rows = load_active(meta)
+        if not rows:
+            print("(no active campaigns)")
+            return
+    print(f"{'campaign_id':<24} {'domain':<24} {'agents':<30} {'check-ins':<10} {'status':<10}")
+    print("-" * 100)
+    for c in rows:
+        cid = str(c.get("campaign_id", "?"))[:24]
+        domain = str(c.get("domain", "?"))[:24]
+        agents = ", ".join(c.get("pinned_agents") or [])[:30]
+        cnt = str(c.get("check_in_count", 0))
+        status = str(c.get("status", "active"))
+        print(f"{cid:<24} {domain:<24} {agents:<30} {cnt:<10} {status:<10}")
+        if stale_only and "elapsed_seconds" in c:
+            print(f"  elapsed: {c['elapsed_seconds']}s since last check-in")
+
+
+def cmd_campaign_complete(campaign_id: str, outcome: str = "") -> None:
+    from dharma_swarm.campaigns import complete_campaign
+    out = complete_campaign(campaign_id, outcome=outcome, meta_dir=_governance_meta_dir())
+    if out is None:
+        print(f"error: no active campaign with id {campaign_id!r}")
+        sys.exit(2)
+    print(f"Campaign {campaign_id} completed. Migrated to campaign_history.jsonl.")
+    if outcome:
+        print(f"  outcome: {outcome}")
+
+
+def cmd_promise_pin(promise_id: str, agent: str) -> None:
+    """Pin a heartbeat promise to an agent, auto-creating a linked campaign."""
+    from dharma_swarm.campaigns import campaign_from_promise, find_campaign
+    meta = _governance_meta_dir()
+    promise_file = meta / "promise_pressure.json"
+    if not promise_file.exists():
+        print("error: promise_pressure.json not found. Has the executive run?")
+        sys.exit(2)
+    try:
+        data = json.loads(promise_file.read_text())
+    except Exception as exc:
+        print(f"error: could not parse promise_pressure.json ({exc})")
+        sys.exit(2)
+    promises = data.get("promises") or []
+    match = next((p for p in promises if p.get("id") == promise_id), None)
+    if match is None:
+        print(f"error: no promise with id {promise_id!r} in current snapshot")
+        print("available ids:")
+        for p in promises[:8]:
+            print(f"  {p.get('id')}  ({(p.get('text') or '')[:60]})")
+        sys.exit(2)
+    domain = match.get("domain_hint") or "internal_maintenance"
+    c = campaign_from_promise(
+        str(match.get("text") or promise_id), agent, domain, meta_dir=meta,
+    )
+    # Short-circuit if campaign already existed
+    existing = find_campaign(c["campaign_id"], meta)
+    print(f"Promise pinned: {promise_id} → {agent}")
+    print(f"  campaign_id: {c['campaign_id']}")
+    print(f"  domain: {c['domain']}")
+    if existing and agent not in (existing.get("pinned_agents") or []):
+        # Ensure agent is actually pinned
+        cmd_campaign_pin(c["campaign_id"], agent)
+
+
+def cmd_governance_status() -> None:
+    """Show current governance snapshot: overlay status + artifact summary."""
+    import os as _os
+    meta = _governance_meta_dir()
+    overlay_on = _os.environ.get("DGC_GOVERNANCE_OVERLAY", "0").strip() not in ("", "0", "false", "False", "no")
+    print(f"DGC_GOVERNANCE_OVERLAY = {'ON' if overlay_on else 'OFF'}")
+    print()
+
+    gs_path = meta / "governance_signal.json"
+    if not gs_path.exists():
+        print("governance_signal.json not found — the executive has not yet emitted a Phase 2 bundle.")
+        return
+    try:
+        gs = json.loads(gs_path.read_text())
+    except Exception as exc:
+        print(f"could not parse governance_signal.json: {exc}")
+        return
+    print(f"Cycle: {gs.get('cycle_id', '?')}")
+    print(f"Generated: {gs.get('generated_at', '?')}")
+    print(f"Active campaigns: {gs.get('active_campaign_count', 0)}")
+    print(f"Promises in pressure list: {gs.get('promise_count', 0)}")
+    print(f"Quarantined topics: {gs.get('quarantine_count', 0)}")
+    print(f"Underexpressed roles: {gs.get('underexpressed_role_count', 0)}")
+    print(f"Nominal-only agents: {gs.get('nominal_only_agent_count', 0)}")
+
+    if gs.get("stale_campaign_ids"):
+        print()
+        print("Stale campaigns (no check-in in 2× interval):")
+        for cid in gs["stale_campaign_ids"]:
+            print(f"  - {cid}")
+
+    if gs.get("starvation_alerts"):
+        print()
+        print("Starvation alerts (first 8):")
+        for alert in gs["starvation_alerts"][:8]:
+            print(f"  - {alert}")
+
+    shares = gs.get("domain_shares") or {}
+    if shares:
+        print()
+        print("Domain signal shares:")
+        for dom, share in sorted(shares.items(), key=lambda kv: -float(kv[1])):
+            bar = "█" * int(float(share) * 40)
+            print(f"  {dom:<28} {float(share):.3f}  {bar}")
+
+
+def cmd_governance_promises() -> None:
+    path = _governance_meta_dir() / "promise_pressure.json"
+    if not path.exists():
+        print("promise_pressure.json not found — executive hasn't emitted Phase 2 bundle yet.")
+        return
+    try:
+        data = json.loads(path.read_text())
+    except Exception as exc:
+        print(f"parse error: {exc}")
+        return
+    promises = data.get("promises") or []
+    if not promises:
+        print("(no unresolved promises)")
+        return
+    print(f"{'id':<22} {'urgency':<8} {'domain':<26} text")
+    print("-" * 100)
+    for p in promises:
+        pid = str(p.get("id", ""))[:22]
+        urg = f"{float(p.get('urgency', 0)):.2f}"
+        dom = str(p.get("domain_hint", "?"))[:26]
+        text = (p.get("text") or "")[:50]
+        print(f"{pid:<22} {urg:<8} {dom:<26} {text}")
+
+
+def cmd_governance_domain_mix() -> None:
+    path = _governance_meta_dir() / "allocation_weights.json"
+    if not path.exists():
+        print("allocation_weights.json not found.")
+        return
+    try:
+        data = json.loads(path.read_text())
+    except Exception as exc:
+        print(f"parse error: {exc}")
+        return
+    per = data.get("per_domain") or {}
+    boosts = data.get("starvation_boosts") or {}
+    pens = data.get("churn_penalties") or {}
+    print(f"{'domain':<28} {'weight':<10} {'×neutral':<12} {'boost':<10} {'penalty':<10}")
+    print("-" * 80)
+    for dom, w in sorted(per.items(), key=lambda kv: -float(kv[1])):
+        x_neutral = float(w) * 8
+        boost = boosts.get(dom, 0.0)
+        pen = pens.get(dom, 0.0)
+        print(f"{dom:<28} {float(w):<10.4f} {x_neutral:<12.2f} {float(boost):<10.3f} {float(pen):<10.3f}")
+
+
 def cmd_spawn(name: str, role: str, model: str) -> None:
     """Spawn a new agent."""
     async def _spawn():
@@ -5441,6 +5733,71 @@ def _build_parser() -> argparse.ArgumentParser:
     p_dev.add_argument("what", help="What was developed")
     p_dev.add_argument("evidence", nargs="+", help="Evidence")
 
+    # -- campaign (durable campaign memory) --
+    p_campaign = sub.add_parser(
+        "campaign",
+        help="Manage durable campaign memory (~/.dharma/meta/active_campaigns.json)",
+    )
+    campaign_sub = p_campaign.add_subparsers(dest="campaign_cmd")
+
+    p_camp_new = campaign_sub.add_parser("new", help="Create a new active campaign")
+    p_camp_new.add_argument("campaign_id")
+    p_camp_new.add_argument("--agents", nargs="+", required=True,
+                            help="One or more agent names to pin to the campaign")
+    p_camp_new.add_argument("--domain", required=True,
+                            help="One of the 8 operational domains")
+    p_camp_new.add_argument("--title", default=None)
+    p_camp_new.add_argument("--deadline", default=None, help="ISO timestamp")
+    p_camp_new.add_argument("--criteria", default="",
+                            help="Success criteria (free text)")
+
+    p_camp_pin = campaign_sub.add_parser("pin", help="Add an agent to an existing campaign")
+    p_camp_pin.add_argument("campaign_id")
+    p_camp_pin.add_argument("agent")
+
+    p_camp_release = campaign_sub.add_parser(
+        "release",
+        help="Remove an agent from a campaign, or close the campaign entirely",
+    )
+    p_camp_release.add_argument("campaign_id")
+    p_camp_release.add_argument("--agent", default=None,
+                                help="Release only this agent; omit to close campaign")
+
+    p_camp_list = campaign_sub.add_parser("list", help="List active campaigns")
+    p_camp_list.add_argument("--stale", action="store_true",
+                             help="Only campaigns with no check-in in 2× executive interval")
+
+    p_camp_done = campaign_sub.add_parser(
+        "complete", help="Mark campaign done and migrate to campaign_history.jsonl",
+    )
+    p_camp_done.add_argument("campaign_id")
+    p_camp_done.add_argument("--outcome", default="")
+
+    # -- promise (heartbeat promise → campaign shortcut) --
+    p_promise = sub.add_parser(
+        "promise",
+        help="Operate on heartbeat-derived promises (promise_pressure.json)",
+    )
+    promise_sub = p_promise.add_subparsers(dest="promise_cmd")
+
+    p_prom_pin = promise_sub.add_parser(
+        "pin",
+        help="Pin a heartbeat promise to an agent, auto-creating a linked campaign",
+    )
+    p_prom_pin.add_argument("promise_id",
+                            help="ID from `dgc governance promises` (promise_...)")
+    p_prom_pin.add_argument("agent")
+
+    # -- governance (status + inspection) --
+    p_gov = sub.add_parser(
+        "governance",
+        help="Inspect the executive governance bundle under ~/.dharma/meta/",
+    )
+    gov_sub = p_gov.add_subparsers(dest="governance_cmd")
+    gov_sub.add_parser("status", help="Show governance_signal summary")
+    gov_sub.add_parser("promises", help="Show promise_pressure list")
+    gov_sub.add_parser("domain-mix", help="Show allocation_weights per domain")
+
     # -- gates --
     p_gates = sub.add_parser("gates", help="Run telos gates on an action")
     p_gates.add_argument("action", nargs="+")
@@ -5518,6 +5875,23 @@ def _build_parser() -> argparse.ArgumentParser:
     p_agent_list = agent_sub.add_parser("list", help="List available preset agents")
 
     p_agent_runs = agent_sub.add_parser("runs", help="Show recent agent run reports")
+
+    # Governance additions: directed injection + registry inspection.
+    p_agent_direct = agent_sub.add_parser(
+        "direct",
+        help="Inject a task into a registered conductor via file-drop",
+    )
+    p_agent_direct.add_argument("name", help="Conductor name (e.g. conductor_claude)")
+    p_agent_direct.add_argument("task", help="The task to inject")
+    p_agent_direct.add_argument(
+        "--campaign", default=None,
+        help="Optional campaign_id. Watcher will prefix the task with CAMPAIGN:",
+    )
+
+    p_agent_active = agent_sub.add_parser(
+        "active",
+        help="Show seeded conductors, last-seen witness freshness, and pinned campaigns",
+    )
 
     # -- task --
     p_task = sub.add_parser("task", help="Task management")
@@ -6454,8 +6828,46 @@ def main() -> None:
                     _cmd_agent_list()
                 case "runs":
                     _cmd_agent_runs()
+                case "direct":
+                    cmd_agent_direct(args.name, args.task, args.campaign)
+                case "active":
+                    cmd_agent_active()
                 case _:
                     parser.parse_args(["agent", "--help"])
+        case "campaign":
+            match args.campaign_cmd:
+                case "new":
+                    cmd_campaign_new(
+                        args.campaign_id, args.agents, args.domain,
+                        title=args.title, deadline=args.deadline,
+                        criteria=args.criteria,
+                    )
+                case "pin":
+                    cmd_campaign_pin(args.campaign_id, args.agent)
+                case "release":
+                    cmd_campaign_release(args.campaign_id, args.agent)
+                case "list":
+                    cmd_campaign_list(stale_only=args.stale)
+                case "complete":
+                    cmd_campaign_complete(args.campaign_id, outcome=args.outcome)
+                case _:
+                    parser.parse_args(["campaign", "--help"])
+        case "promise":
+            match args.promise_cmd:
+                case "pin":
+                    cmd_promise_pin(args.promise_id, args.agent)
+                case _:
+                    parser.parse_args(["promise", "--help"])
+        case "governance":
+            match args.governance_cmd:
+                case "status" | None:
+                    cmd_governance_status()
+                case "promises":
+                    cmd_governance_promises()
+                case "domain-mix":
+                    cmd_governance_domain_mix()
+                case _:
+                    parser.parse_args(["governance", "--help"])
         case "task":
             match args.task_cmd:
                 case "create":
