@@ -48,7 +48,12 @@ class DiversitySnapshot:
 
     @property
     def model_monoculture(self) -> bool:
-        return self.top_model_share >= _env_float("DGC_DIVERSITY_MAX_MODEL_SHARE", 0.55)
+        # Calibrated against observed 24h model mix (2026-04-14): GLM-5
+        # natural share is 46-53%. Previous default 0.55 sat just above
+        # that, so the OLLAMA model-swap in runtime_provider never fired.
+        # 0.40 triggers diversification while still leaving healthy cases
+        # (one model at 35-40%) untouched. Override with DGC_DIVERSITY_MAX_MODEL_SHARE.
+        return self.top_model_share >= _env_float("DGC_DIVERSITY_MAX_MODEL_SHARE", 0.40)
 
     @property
     def inward_heavy(self) -> bool:
@@ -92,11 +97,53 @@ class DiversityGovernor:
         "ship",
     )
 
-    def __init__(self, *, window_hours: float = 1.0) -> None:
+    # Cascading window fallback — recent data is preferred, but on bursty
+    # traffic the last 1h may be empty. Walk out to 6h then 24h so the
+    # governor never goes silent while the swarm is actively running.
+    # Override the chain with DGC_DIVERSITY_WINDOW_CASCADE="1,6,24".
+    _DEFAULT_WINDOW_CASCADE: tuple[float, ...] = (1.0, 6.0, 24.0)
+
+    def __init__(
+        self,
+        *,
+        window_hours: float = 1.0,
+        window_cascade: tuple[float, ...] | None = None,
+    ) -> None:
         self.window_hours = window_hours
+        if window_cascade is not None:
+            self._window_cascade = tuple(window_cascade)
+        else:
+            env_raw = os.environ.get("DGC_DIVERSITY_WINDOW_CASCADE", "").strip()
+            if env_raw:
+                try:
+                    self._window_cascade = tuple(
+                        float(x) for x in env_raw.split(",") if x.strip()
+                    )
+                except Exception:
+                    self._window_cascade = self._DEFAULT_WINDOW_CASCADE
+            else:
+                self._window_cascade = self._DEFAULT_WINDOW_CASCADE
+
+    def _resolve_window(self) -> tuple[float, dict[str, Any]]:
+        """Return (effective_window_hours, rollup).
+
+        Start from the configured window; if it produced zero calls, walk
+        through the fallback cascade until we find non-empty data or exhaust
+        the cascade. This prevents silent governor no-ops on bursty traffic.
+        """
+        primary = summarize_costs(self.window_hours)
+        if int(primary.get("calls", 0) or 0) > 0:
+            return self.window_hours, primary
+        for candidate in self._window_cascade:
+            if candidate <= self.window_hours:
+                continue
+            rollup = summarize_costs(candidate)
+            if int(rollup.get("calls", 0) or 0) > 0:
+                return candidate, rollup
+        return self.window_hours, primary
 
     def snapshot(self) -> DiversitySnapshot:
-        rollup = summarize_costs(self.window_hours)
+        effective_window, rollup = self._resolve_window()
         total_calls = int(rollup.get("calls", 0) or 0)
         by_model = rollup.get("by_model", {}) or {}
         by_provider = rollup.get("by_provider", {}) or {}
@@ -133,7 +180,7 @@ class DiversityGovernor:
                 unknown_calls += calls
 
         return DiversitySnapshot(
-            window_hours=self.window_hours,
+            window_hours=effective_window,
             total_calls=total_calls,
             top_model=top_model,
             top_model_share=round(_safe_ratio(top_model_calls, total_calls), 6),
