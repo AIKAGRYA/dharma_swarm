@@ -151,6 +151,52 @@ class TestScoring:
         assert rel_opp
         assert rel_opp[0].factor_scores["algedonic_urgency"] > 0
 
+    def test_memory_pressure_penalizes_internal_churn(self, tmp_path: Path):
+        exe = self._make_exec(tmp_path)
+        sig = ExecutiveSignal(
+            source="zeitgeist", category="methodology",
+            title="Refactor local coordination path", relevance=0.7,
+            domain="internal_maintenance",
+        )
+        balances = exe._compute_domain_balance([sig])
+
+        class _RoleEcology:
+            underexpressed_roles: list[str] = []
+
+        class _MemoryPressure:
+            repeated_loop_signatures = ["eval_probe_loop:7", "latent_followup_loop:4"]
+            unresolved_promises: list[str] = []
+
+        opps = exe._rank_opportunities(
+            [sig], balances, "general", {}, _RoleEcology(), _MemoryPressure(),
+        )
+        internal_opp = [o for o in opps if o.domain == "internal_maintenance"]
+        assert internal_opp
+        assert internal_opp[0].factor_scores["internal_churn_penalty"] > 0
+
+    def test_underexpressed_roles_boost_strategic_infrastructure(self, tmp_path: Path):
+        exe = self._make_exec(tmp_path)
+        sig = ExecutiveSignal(
+            source="zeitgeist", category="opportunity",
+            title="Wire executive role ecology into mission loop", relevance=0.7,
+            domain="strategic_infrastructure",
+        )
+        balances = exe._compute_domain_balance([sig])
+
+        class _RoleEcology:
+            underexpressed_roles = ["architect", "validator"]
+
+        class _MemoryPressure:
+            repeated_loop_signatures: list[str] = []
+            unresolved_promises: list[str] = []
+
+        opps = exe._rank_opportunities(
+            [sig], balances, "general", {}, _RoleEcology(), _MemoryPressure(),
+        )
+        strat_opp = [o for o in opps if o.domain == "strategic_infrastructure"]
+        assert strat_opp
+        assert strat_opp[0].factor_scores["domain_balance_bonus"] > 0
+
 
 # ---------------------------------------------------------------------------
 # Domain balance
@@ -211,6 +257,8 @@ class TestFullCycle:
         assert result.signals_ingested == 0
         assert result.opportunities == []
         assert result.duration_ms >= 0
+        assert "role_ecology" in result.model_dump()
+        assert "memory_pressure" in result.model_dump()
 
         # All 5 artifacts should exist.
         meta = state_dir / "meta"
@@ -218,6 +266,7 @@ class TestFullCycle:
         assert (meta / "opportunity_board.json").exists()
         assert (meta / "allocation_weights.json").exists()
         assert (meta / "active_campaigns.json").exists()
+        assert (meta / "executive_operator_summary.json").exists()
         assert (meta / "executive_briefs").is_dir()
         briefs = list((meta / "executive_briefs").glob("*.md"))
         assert len(briefs) == 1
@@ -249,6 +298,44 @@ class TestFullCycle:
 
         assert result.signals_ingested >= 2
         assert "zeitgeist" in result.signals_by_source
+
+    @pytest.mark.asyncio
+    async def test_cycle_surfaces_memory_pressure_and_role_ecology(self, tmp_path: Path):
+        state_dir = tmp_path / ".dharma"
+        state_dir.mkdir()
+        meta = state_dir / "meta"
+        meta.mkdir()
+        (state_dir / "context" / "distilled").mkdir(parents=True)
+        (state_dir / "shared").mkdir(parents=True)
+        (state_dir / "cron_logs").mkdir(parents=True)
+        (state_dir / "stigmergy").mkdir(parents=True)
+        (state_dir / "vectors.db").write_bytes(b"x" * 1024)
+        (state_dir / "context" / "distilled" / "builder_distilled.md").write_text("builder")
+        (state_dir / "shared" / "aaa_synthesize_disagreement_eval_probe_task.md").write_text("a")
+        (state_dir / "shared" / "bbb_synthesize_disagreement_eval_probe_task.md").write_text("b")
+        (state_dir / "shared" / "ccc_synthesize_disagreement_eval_probe_task.md").write_text("c")
+        (state_dir / "cron_logs" / "2026-04-14_00-30_heartbeat.md").write_text(
+            "- { promise: \"Run R_V experiment\", status: \"not started\" }\n"
+        )
+        with open(state_dir / "stigmergy" / "marks.jsonl", "w") as fh:
+            fh.write(json.dumps({
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "agent": "builder",
+                "file_path": "gauntlet.py",
+            }) + "\n")
+
+        exe = ShaktiZeitgeistExecutive(state_dir=state_dir)
+        result = await exe.cycle()
+
+        assert "underexpressed_roles" in result.role_ecology
+        assert "unresolved_promises" in result.memory_pressure
+        assert "top_priority_domain" in result.operator_summary
+        assert any(alert.startswith("promise:") for alert in result.starvation_alerts)
+
+        summary_path = state_dir / "meta" / "executive_operator_summary.json"
+        payload = json.loads(summary_path.read_text())
+        assert "loop_attention" in payload
+        assert "promise_attention" in payload
 
     @pytest.mark.asyncio
     async def test_artifacts_are_valid_json(self, tmp_path: Path):

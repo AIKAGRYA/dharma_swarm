@@ -1,18 +1,41 @@
-"""ShaktiZeitgeistExecutive — thin strategic executive layer (Phase 1: read-only).
+"""ShaktiZeitgeistExecutive — strategic executive layer.
 
-Ingests signals from zeitgeist, mission state, organism/algedonic, and
-capability sources.  Scores opportunities with a 12-factor model.  Tracks
-domain balance across 8 operational domains.  Emits durable artifacts under
-``~/.dharma/meta/``.
+Phase 1 (landed 2026-04-13): ingests signals from zeitgeist, mission state,
+organism/algedonic, and capability sources. Scores opportunities with a
+12-factor model. Tracks domain balance across 8 operational domains. Emits
+durable artifacts under ``~/.dharma/meta/``.
 
-Phase 1 does NOT control dispatch, mint campaigns, or influence DGM.  It
-writes ``allocation_weights.json`` but nothing reads it yet (Phase 2).
+Phase 2 governance emission (landed 2026-04-14): in addition to the Phase 1
+artifacts, the executive now emits a governance bundle consumed by the
+orchestrator's governance overlay and the operator CLI:
+
+    * ``promise_pressure.json``       heartbeat-derived promises with stable
+                                      ids and urgency scores
+    * ``disagreement_quarantine.json`` repeated loop signatures that
+                                      coordination_synthesis should skip
+    * ``role_underuse_report.json``    nominal-only agents and
+                                      underexpressed roles
+    * ``challenge_pressure.json``     deadline-driven per-domain multipliers
+                                      sourced from ``deadlines.json``
+    * ``governance_signal.json``      combined summary for
+                                      ``dgc status --governance``
+
+The executive still does NOT control dispatch directly — the governance
+overlay in ``orchestrator.route_next`` reads these files and reorders the
+ready queue behind ``DGC_GOVERNANCE_OVERLAY``.
+
+IMPORTANT INVARIANT: the executive does NOT write to
+``active_campaigns.json`` once it exists. Write authority over campaign
+memory belongs to ``dharma_swarm.campaigns`` (and by extension the CLI).
+The executive only creates the file on first cycle if absent, and reads it
+every cycle to compute stale_campaign alerts.
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import re
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -20,6 +43,10 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from dharma_swarm.executive_substrates import (
+    build_memory_pressure_snapshot,
+    build_role_ecology_snapshot,
+)
 from dharma_swarm.models import _new_id, _utc_now
 
 logger = logging.getLogger(__name__)
@@ -134,6 +161,9 @@ class ExecutiveCycleState(BaseModel):
     domain_balances: list[DomainBalance] = Field(default_factory=list)
     starvation_alerts: list[str] = Field(default_factory=list)
     organism_health: dict[str, float] = Field(default_factory=dict)
+    role_ecology: dict[str, Any] = Field(default_factory=dict)
+    memory_pressure: dict[str, Any] = Field(default_factory=dict)
+    operator_summary: dict[str, Any] = Field(default_factory=dict)
     allocation_weights: AllocationWeights = Field(default_factory=AllocationWeights)
     mission_title: str = ""
     mission_status: str = ""
@@ -167,12 +197,21 @@ class ShaktiZeitgeistExecutive:
         signals = self._ingest_signals()
         mission_state, mission_title, mission_status, mission_theme = self._read_mission()
         pulse_health = self._read_organism()
+        role_ecology = build_role_ecology_snapshot(state_dir=self._state_dir)
+        memory_pressure = build_memory_pressure_snapshot(state_dir=self._state_dir)
         balances = self._compute_domain_balance(signals)
         opportunities = self._rank_opportunities(
-            signals, balances, mission_theme, pulse_health,
+            signals, balances, mission_theme, pulse_health, role_ecology, memory_pressure,
         )
         weights = self._build_allocation_weights(balances)
         starvation_alerts = [b.domain for b in balances if b.starvation]
+        starvation_alerts.extend(f"role:{role}" for role in role_ecology.underexpressed_roles[:5])
+        starvation_alerts.extend(
+            f"promise:{promise[:80]}" for promise in memory_pressure.unresolved_promises[:5]
+        )
+        starvation_alerts.extend(
+            f"loop:{loop}" for loop in memory_pressure.repeated_loop_signatures[:5]
+        )
 
         # Track recent domains for repetition penalty.
         if opportunities:
@@ -187,6 +226,26 @@ class ShaktiZeitgeistExecutive:
             domain_balances=balances,
             starvation_alerts=starvation_alerts,
             organism_health=pulse_health,
+            role_ecology={
+                "seeded_agents": role_ecology.seeded_agents,
+                "active_agents_72h": role_ecology.active_agents_72h,
+                "nominal_only_agents": role_ecology.nominal_only_agents,
+                "overloaded_agents": role_ecology.overloaded_agents,
+                "underexpressed_roles": role_ecology.underexpressed_roles,
+            },
+            memory_pressure={
+                "distilled_roles": memory_pressure.distilled_roles,
+                "unresolved_promises": memory_pressure.unresolved_promises,
+                "repeated_loop_signatures": memory_pressure.repeated_loop_signatures,
+                "top_stigmergy_hotspots": memory_pressure.top_stigmergy_hotspots,
+                "memory_health": memory_pressure.memory_health,
+            },
+            operator_summary=self._build_operator_summary(
+                role_ecology=role_ecology,
+                memory_pressure=memory_pressure,
+                opportunities=opportunities,
+                mission_title=mission_title,
+            ),
             allocation_weights=weights,
             mission_title=mission_title,
             mission_status=mission_status,
@@ -400,6 +459,8 @@ class ShaktiZeitgeistExecutive:
         balances: list[DomainBalance],
         mission_theme: str,
         pulse_health: dict[str, float],
+        role_ecology: Any | None = None,
+        memory_pressure: Any | None = None,
     ) -> list[ScoredOpportunity]:
         balance_map = {b.domain: b for b in balances}
 
@@ -414,7 +475,13 @@ class ShaktiZeitgeistExecutive:
             if not sigs:
                 continue
             factors = self._score_factors(
-                domain, sigs, balance_map.get(domain), mission_theme, pulse_health,
+                domain,
+                sigs,
+                balance_map.get(domain),
+                mission_theme,
+                pulse_health,
+                role_ecology,
+                memory_pressure,
             )
             raw = sum(factors[k] * SCORING_FACTORS[k] for k in SCORING_FACTORS)
             final = round(max(0.0, min(100.0, (raw / MAX_SCORE) * 100)), 1)
@@ -440,6 +507,8 @@ class ShaktiZeitgeistExecutive:
         balance: DomainBalance | None,
         mission_theme: str,
         pulse_health: dict[str, float],
+        role_ecology: Any | None = None,
+        memory_pressure: Any | None = None,
     ) -> dict[str, float]:
         avg_relevance = sum(s.relevance for s in signals) / max(1, len(signals))
         threat_count = sum(1 for s in signals if s.category == "threat")
@@ -472,6 +541,33 @@ class ShaktiZeitgeistExecutive:
         recent_3 = self._recent_domains[-3:]
         if domain in recent_3:
             factors["repetition_penalty"] = min(1.0, recent_3.count(domain) / 3.0)
+
+        underexpressed_roles = set(getattr(role_ecology, "underexpressed_roles", []))
+        repeated_loops = list(getattr(memory_pressure, "repeated_loop_signatures", []))
+        unresolved_promises = list(getattr(memory_pressure, "unresolved_promises", []))
+
+        if domain == "strategic_infrastructure" and underexpressed_roles:
+            factors["domain_balance_bonus"] = min(
+                1.0,
+                factors["domain_balance_bonus"] + 0.35,
+            )
+            factors["strategic_compounding"] = min(
+                1.0,
+                factors["strategic_compounding"] + 0.25,
+            )
+
+        if domain == "reliability" and unresolved_promises:
+            factors["urgency"] = min(1.0, factors["urgency"] + 0.35)
+            factors["artifact_potential"] = min(1.0, factors["artifact_potential"] + 0.1)
+
+        if domain == "internal_maintenance" and repeated_loops:
+            loop_pressure = min(1.0, len(repeated_loops) / 4.0)
+            factors["internal_churn_penalty"] = max(
+                factors["internal_churn_penalty"], loop_pressure
+            )
+            factors["repetition_penalty"] = max(
+                factors["repetition_penalty"], min(1.0, loop_pressure * 0.8)
+            )
 
         return {k: round(v, 4) for k, v in factors.items()}
 
@@ -512,7 +608,31 @@ class ShaktiZeitgeistExecutive:
             self._meta_dir / "allocation_weights.json",
             state.allocation_weights.model_dump(mode="json"),
         )
-        _write_json(self._meta_dir / "active_campaigns.json", [])
+
+        # active_campaigns.json: create if absent, preserve if present.
+        # Write authority belongs to dharma_swarm.campaigns — the executive
+        # must never clobber operator-pinned work here.
+        self._ensure_active_campaigns_file()
+        active_campaigns = self._read_active_campaigns()
+
+        _write_json(
+            self._meta_dir / "executive_operator_summary.json",
+            state.operator_summary,
+        )
+
+        # Phase 2 governance emission bundle.
+        promises = self._emit_promise_pressure(state)
+        quarantine = self._emit_disagreement_quarantine(state)
+        role_report = self._emit_role_underuse(state)
+        challenge = self._emit_challenge_pressure(state)
+        self._emit_governance_signal(
+            state,
+            promises=promises,
+            quarantine=quarantine,
+            role_report=role_report,
+            challenge=challenge,
+            active_campaigns=active_campaigns,
+        )
 
         # Executive brief.
         brief = self._render_brief(state)
@@ -525,6 +645,204 @@ class ShaktiZeitgeistExecutive:
 
         # Prune old briefs.
         self._prune_briefs()
+
+    # -- active_campaigns: read-only after first cycle ---------------------
+
+    def _ensure_active_campaigns_file(self) -> None:
+        """Create an empty active_campaigns.json only if it doesn't exist.
+
+        Once created, the executive never rewrites this file — operator and
+        CLI via ``dharma_swarm.campaigns`` own its contents.
+        """
+        path = self._meta_dir / "active_campaigns.json"
+        if not path.exists():
+            _write_json(path, [])
+
+    def _read_active_campaigns(self) -> list[dict[str, Any]]:
+        path = self._meta_dir / "active_campaigns.json"
+        if not path.exists():
+            return []
+        try:
+            data = json.loads(path.read_text())
+        except Exception:
+            logger.warning("executive: active_campaigns.json unreadable; treating as empty")
+            return []
+        if not isinstance(data, list):
+            return []
+        return [c for c in data if isinstance(c, dict) and c.get("campaign_id")]
+
+    # -- phase 2 governance emission ----------------------------------------
+
+    def _emit_promise_pressure(self, state: ExecutiveCycleState) -> list[dict[str, Any]]:
+        """Turn heartbeat-derived promises into structured, stable-id records."""
+        raw_promises = state.memory_pressure.get("unresolved_promises") or []
+        records: list[dict[str, Any]] = []
+        for i, line in enumerate(raw_promises):
+            if not isinstance(line, str) or not line.strip():
+                continue
+            pid = _promise_id_from_text(line)
+            domain = _classify_domain(line)
+            # Urgency: age-agnostic bootstrap — inverse rank within the list.
+            rank = i + 1
+            urgency = round(max(0.2, 1.0 - (rank - 1) * 0.15), 3)
+            records.append({
+                "id": pid,
+                "text": line.strip()[:400],
+                "urgency": urgency,
+                "domain_hint": domain,
+                "rank": rank,
+            })
+        payload = {
+            "generated_at": _now_iso(),
+            "cycle_id": state.cycle_id,
+            "count": len(records),
+            "promises": records,
+        }
+        _write_json(self._meta_dir / "promise_pressure.json", payload)
+        return records
+
+    def _emit_disagreement_quarantine(self, state: ExecutiveCycleState) -> list[dict[str, Any]]:
+        """Extract repeated loop signatures that synthesis should skip."""
+        raw = state.memory_pressure.get("repeated_loop_signatures") or []
+        topics: list[dict[str, Any]] = []
+        for item in raw:
+            if not isinstance(item, str):
+                continue
+            # Format from executive_substrates: "label:count".
+            m = re.match(r"^([\w\-]+):(\d+)$", item.strip())
+            if m:
+                topics.append({"topic": m.group(1), "count": int(m.group(2))})
+            else:
+                topics.append({"topic": item.strip().lower(), "count": 0})
+        payload = {
+            "generated_at": _now_iso(),
+            "cycle_id": state.cycle_id,
+            "cooling_off_seconds": 21600,  # 6h default
+            "topics": [t["topic"] for t in topics],
+            "active": topics,
+        }
+        _write_json(self._meta_dir / "disagreement_quarantine.json", payload)
+        return topics
+
+    def _emit_role_underuse(self, state: ExecutiveCycleState) -> dict[str, Any]:
+        ecology = state.role_ecology or {}
+        payload = {
+            "generated_at": _now_iso(),
+            "cycle_id": state.cycle_id,
+            "seeded_agents": ecology.get("seeded_agents", 0),
+            "active_agents_72h": ecology.get("active_agents_72h", 0),
+            "nominal_only_agents": list(ecology.get("nominal_only_agents") or []),
+            "underexpressed_roles": list(ecology.get("underexpressed_roles") or []),
+            "overloaded_agents": list(ecology.get("overloaded_agents") or []),
+        }
+        _write_json(self._meta_dir / "role_underuse_report.json", payload)
+        return payload
+
+    def _emit_challenge_pressure(self, state: ExecutiveCycleState) -> dict[str, Any]:
+        """Read ~/.dharma/meta/deadlines.json and derive per-domain pressure."""
+        deadlines = self._load_deadlines()
+        active: list[dict[str, Any]] = []
+        per_domain: dict[str, float] = {}
+        now = _utc_now()
+        for d in deadlines:
+            try:
+                dt = datetime.fromisoformat(str(d.get("date", "")).replace("Z", "+00:00"))
+            except Exception:
+                continue
+            days_remaining = (dt - now).total_seconds() / 86400.0
+            if days_remaining < -1.0:  # more than one day past
+                continue
+            domain = str(d.get("domain") or "")
+            if domain not in DOMAINS:
+                continue
+            # Pressure ramps as deadline approaches. 60+ days → 0.0, 7 days → 0.5, 0 days → 1.0.
+            if days_remaining >= 60:
+                pressure = 0.0
+            elif days_remaining >= 14:
+                pressure = round(0.2 * (60 - days_remaining) / 46.0, 3)
+            elif days_remaining >= 0:
+                pressure = round(0.4 + 0.6 * (14 - days_remaining) / 14.0, 3)
+            else:
+                pressure = 1.0
+            record = {
+                "name": str(d.get("name", "")),
+                "date": d.get("date"),
+                "days_remaining": round(days_remaining, 2),
+                "domain": domain,
+                "pressure": pressure,
+            }
+            active.append(record)
+            per_domain[domain] = max(per_domain.get(domain, 0.0), pressure)
+        payload = {
+            "generated_at": _now_iso(),
+            "cycle_id": state.cycle_id,
+            "active_deadlines": active,
+            "per_domain": per_domain,
+        }
+        _write_json(self._meta_dir / "challenge_pressure.json", payload)
+        return payload
+
+    def _load_deadlines(self) -> list[dict[str, Any]]:
+        path = self._meta_dir / "deadlines.json"
+        if not path.exists():
+            return []
+        try:
+            raw = json.loads(path.read_text())
+        except Exception:
+            logger.warning("executive: deadlines.json unreadable; skipping challenge pressure")
+            return []
+        if isinstance(raw, dict):
+            items = raw.get("deadlines") or []
+        elif isinstance(raw, list):
+            items = raw
+        else:
+            items = []
+        return [d for d in items if isinstance(d, dict)]
+
+    def _emit_governance_signal(
+        self,
+        state: ExecutiveCycleState,
+        *,
+        promises: list[dict[str, Any]],
+        quarantine: list[dict[str, Any]],
+        role_report: dict[str, Any],
+        challenge: dict[str, Any],
+        active_campaigns: list[dict[str, Any]],
+    ) -> None:
+        """Combined summary for dgc status --governance."""
+        # Stale campaigns: last_check_in older than 2 * executive interval.
+        executive_interval_s = 2700.0  # 45 min — matches orchestrate_live
+        stale_ids: list[str] = []
+        now = _utc_now()
+        for c in active_campaigns:
+            ts_raw = c.get("last_check_in") or c.get("created")
+            if not ts_raw:
+                continue
+            try:
+                ts = datetime.fromisoformat(str(ts_raw).replace("Z", "+00:00"))
+            except Exception:
+                continue
+            if (now - ts).total_seconds() >= executive_interval_s * 2:
+                stale_ids.append(str(c.get("campaign_id", "?")))
+
+        domain_shares = {
+            b.domain: b.signal_share for b in state.domain_balances
+        }
+        payload = {
+            "generated_at": _now_iso(),
+            "cycle_id": state.cycle_id,
+            "executive_interval_s": executive_interval_s,
+            "domain_shares": domain_shares,
+            "starvation_alerts": list(state.starvation_alerts),
+            "promise_count": len(promises),
+            "quarantine_count": len(quarantine),
+            "active_campaign_count": len(active_campaigns),
+            "stale_campaign_ids": stale_ids,
+            "per_domain_challenge": challenge.get("per_domain", {}),
+            "underexpressed_role_count": len(role_report.get("underexpressed_roles", [])),
+            "nominal_only_agent_count": len(role_report.get("nominal_only_agents", [])),
+        }
+        _write_json(self._meta_dir / "governance_signal.json", payload)
 
     def _render_brief(self, state: ExecutiveCycleState) -> str:
         ts = state.timestamp.strftime("%Y-%m-%d %H:%M UTC")
@@ -544,6 +862,56 @@ class ShaktiZeitgeistExecutive:
         lines.append(f"**Signals**: {state.signals_ingested} ingested")
         lines.append(f"**Duration**: {state.duration_ms:.0f}ms")
         lines.append("")
+
+        ecology = state.role_ecology
+        if ecology:
+            lines.append("## Role Ecology")
+            lines.append(
+                f"Seeded agents: {ecology.get('seeded_agents', 0)} | "
+                f"active in 72h: {ecology.get('active_agents_72h', 0)}"
+            )
+            if ecology.get("underexpressed_roles"):
+                lines.append(
+                    "Underexpressed roles: "
+                    + ", ".join(ecology.get("underexpressed_roles", [])[:6])
+                )
+            if ecology.get("nominal_only_agents"):
+                lines.append(
+                    "Nominal-only agents: "
+                    + ", ".join(ecology.get("nominal_only_agents", [])[:6])
+                )
+            lines.append("")
+
+        pressure = state.memory_pressure
+        if pressure:
+            lines.append("## Memory Pressure")
+            if pressure.get("unresolved_promises"):
+                lines.append("Unresolved promises:")
+                for promise in pressure.get("unresolved_promises", [])[:5]:
+                    lines.append(f"- {promise}")
+            if pressure.get("repeated_loop_signatures"):
+                lines.append("Repeated loops:")
+                for loop in pressure.get("repeated_loop_signatures", [])[:5]:
+                    lines.append(f"- {loop}")
+            lines.append("")
+
+        summary = state.operator_summary
+        if summary:
+            lines.append("## Operator Summary")
+            for key in (
+                "mission",
+                "top_priority_domain",
+                "top_priority_title",
+                "role_attention",
+                "promise_attention",
+                "loop_attention",
+                "nominal_agent_attention",
+            ):
+                value = summary.get(key)
+                if value:
+                    label = key.replace("_", " ").title()
+                    lines.append(f"- **{label}**: {value}")
+            lines.append("")
 
         lines.append("## Top Opportunities")
         for i, opp in enumerate(state.opportunities[:5], 1):
@@ -573,6 +941,37 @@ class ShaktiZeitgeistExecutive:
 
         return "\n".join(lines) + "\n"
 
+    def _build_operator_summary(
+        self,
+        *,
+        role_ecology: Any,
+        memory_pressure: Any,
+        opportunities: list[ScoredOpportunity],
+        mission_title: str,
+    ) -> dict[str, Any]:
+        top_opp = opportunities[0] if opportunities else None
+        role_attention = ""
+        if getattr(role_ecology, "underexpressed_roles", None):
+            role_attention = ", ".join(role_ecology.underexpressed_roles[:4])
+        promise_attention = ""
+        if getattr(memory_pressure, "unresolved_promises", None):
+            promise_attention = " | ".join(memory_pressure.unresolved_promises[:2])
+        loop_attention = ""
+        if getattr(memory_pressure, "repeated_loop_signatures", None):
+            loop_attention = ", ".join(memory_pressure.repeated_loop_signatures[:3])
+        nominal_attention = ""
+        if getattr(role_ecology, "nominal_only_agents", None):
+            nominal_attention = ", ".join(role_ecology.nominal_only_agents[:4])
+        return {
+            "mission": mission_title or "(none)",
+            "top_priority_domain": top_opp.domain if top_opp else "",
+            "top_priority_title": top_opp.title if top_opp else "",
+            "role_attention": role_attention,
+            "promise_attention": promise_attention,
+            "loop_attention": loop_attention,
+            "nominal_agent_attention": nominal_attention,
+        }
+
     def _prune_briefs(self) -> None:
         try:
             briefs = sorted(self._briefs_dir.glob("*.md"), reverse=True)
@@ -597,3 +996,21 @@ def _count_by(signals: list[ExecutiveSignal], attr: str) -> dict[str, int]:
         key = getattr(sig, attr, "unknown")
         counts[key] = counts.get(key, 0) + 1
     return counts
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _promise_id_from_text(text: str) -> str:
+    """Match campaigns.promise_id_from_text. Kept local to avoid import cycle."""
+    # Lazy import: campaigns.py does not import this module, so this is safe,
+    # but routing through the canonical implementation keeps IDs identical.
+    from dharma_swarm.campaigns import promise_id_from_text
+    return promise_id_from_text(text)
+
+
+def _classify_domain(text: str) -> str:
+    """Match domain_classify.classify_text. Kept local to avoid import cycle."""
+    from dharma_swarm.domain_classify import classify_text
+    return classify_text(text)
