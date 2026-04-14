@@ -324,6 +324,7 @@ class PersistentAgent:
             messages = await bus.receive(agent_id=self.name, limit=5)
 
             # 5. Determine task
+            active_campaign: dict[str, Any] | None = None
             if injected_task:
                 task_text = injected_task
                 task_source = "injected"
@@ -332,8 +333,17 @@ class PersistentAgent:
                 task_text = f"Respond to message from {top_msg.from_agent}: {top_msg.subject} — {top_msg.body[:300]}"
                 task_source = "message"
             else:
-                task_text = self._generate_self_task(hot_paths, salient_marks)
-                task_source = "self"
+                # Before falling through to self-generated work, check whether
+                # this agent is pinned to an active campaign. Campaign pins
+                # are first-class memory and keep the agent on a declared
+                # track across wake cycles.
+                active_campaign = self._check_pinned_campaign()
+                if active_campaign is not None:
+                    task_text = self._render_campaign_task(active_campaign)
+                    task_source = "campaign"
+                else:
+                    task_text = self._generate_self_task(hot_paths, salient_marks)
+                    task_source = "self"
 
             # 6. Gate check
             gate_outcome = self._check_gate(task_text)
@@ -392,6 +402,26 @@ class PersistentAgent:
                 "summary": agent_result.summary[:500],
             })
 
+            # Campaign check-in — update durable campaign memory so the
+            # executive's next cycle sees recent activity. Non-fatal on
+            # failure; the task already completed.
+            campaign_id_for_checkin = self._extract_campaign_for_checkin(
+                task_source, task_text, active_campaign,
+            )
+            if campaign_id_for_checkin:
+                try:
+                    from dharma_swarm.campaigns import mark_check_in
+                    mark_check_in(
+                        campaign_id_for_checkin,
+                        self.name,
+                        note=self._summarize_for_checkin(agent_result, duration),
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "[%s] campaign check-in failed (%s): %s",
+                        self.name, campaign_id_for_checkin, exc,
+                    )
+
         except Exception as e:
             logger.error("[%s] wake error: %s", self.name, e)
             result_info["error"] = str(e)[:500]
@@ -417,6 +447,70 @@ class PersistentAgent:
             return f"Follow up on observation: {mark.observation}"
 
         return "Review system state, check agent notes in ~/.dharma/shared/, report observations"
+
+    # -- Campaign pin integration ----------------------------------------
+
+    def _check_pinned_campaign(self) -> dict[str, Any] | None:
+        """Return the first active campaign this agent is pinned to, or None.
+
+        Read-only — write authority lives in ``dharma_swarm.campaigns``.
+        Defensive: swallow any error and fall through to self-generation.
+        """
+        try:
+            from dharma_swarm.campaigns import find_by_agent
+            pins = find_by_agent(self.name, meta_dir=self.state_dir / "meta")
+        except Exception as exc:
+            logger.debug("[%s] campaign pin check failed: %s", self.name, exc)
+            return None
+        active = [c for c in pins if c.get("status", "active") == "active"]
+        if not active:
+            return None
+        # Earliest-created first, so the agent stays on the original pin.
+        active.sort(key=lambda c: str(c.get("created", "")))
+        return active[0]
+
+    def _render_campaign_task(self, campaign: dict[str, Any]) -> str:
+        campaign_id = campaign.get("campaign_id", "?")
+        criteria = campaign.get("success_criteria") or campaign.get("title", "")
+        markers = campaign.get("progress_markers") or []
+        last_note = ""
+        if markers:
+            last = markers[-1]
+            last_note = (last.get("note") or "")[:200]
+        deadline = campaign.get("deadline")
+        deadline_suffix = f" Deadline: {deadline}." if deadline else ""
+        progress_suffix = f" Last progress: {last_note}" if last_note else ""
+        return (
+            f"CAMPAIGN: {campaign_id} — Make measurable progress on: "
+            f"{criteria}.{deadline_suffix}{progress_suffix}"
+        )
+
+    @staticmethod
+    def _extract_campaign_for_checkin(
+        task_source: str,
+        task_text: str,
+        active_campaign: dict[str, Any] | None,
+    ) -> str | None:
+        if task_source == "campaign" and active_campaign:
+            cid = active_campaign.get("campaign_id")
+            return str(cid) if cid else None
+        if task_source == "injected":
+            # Inspect CAMPAIGN: <id> — prefix that the directive watcher
+            # applies when a directive carries a campaign_id.
+            import re as _re
+            m = _re.match(r"CAMPAIGN:\s*([\w_\-]+)\s*—", task_text)
+            if m:
+                return m.group(1)
+        return None
+
+    @staticmethod
+    def _summarize_for_checkin(agent_result: Any, duration_s: float) -> str:
+        try:
+            summary = (getattr(agent_result, "summary", "") or "")[:180]
+            turns = getattr(agent_result, "turns", 0)
+            return f"wake:{turns}t/{duration_s:.0f}s — {summary}"
+        except Exception:
+            return f"wake complete in {duration_s:.0f}s"
 
     # -- Gate check ------------------------------------------------------
 

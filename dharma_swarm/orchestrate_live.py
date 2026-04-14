@@ -1421,9 +1421,13 @@ async def run_conductor_loop(shutdown_event: asyncio.Event) -> None:
 
     Each conductor has its own wake interval and restart logic.
     If one crashes, the other keeps running.
+
+    Conductors are also registered into the module-level ACTIVE_CONDUCTORS
+    registry in ``dharma_swarm.conductors`` so the directive watcher and
+    CLI (``dgc agent:direct``, ``dgc campaign:*``) can reach them by name.
     """
     from dharma_swarm.persistent_agent import PersistentAgent
-    from dharma_swarm.conductors import CONDUCTOR_CONFIGS
+    from dharma_swarm.conductors import CONDUCTOR_CONFIGS, register, unregister
 
     _log("conductors", f"Initializing {len(CONDUCTOR_CONFIGS)} conductors...")
 
@@ -1440,7 +1444,11 @@ async def run_conductor_loop(shutdown_event: asyncio.Event) -> None:
             max_turns=cfg.get("max_turns", 25),
         )
         conductors.append(agent)
-        _log("conductors", f"  {cfg['name']}: {cfg['model']} every {cfg['wake_interval_seconds']}s")
+        await register(cfg["name"], agent)
+        _log(
+            "conductors",
+            f"  {cfg['name']}: {cfg['model']} every {cfg['wake_interval_seconds']}s (registered)",
+        )
 
     async def _run_with_restart(conductor: PersistentAgent, delay: float) -> None:
         await asyncio.sleep(delay)
@@ -1455,10 +1463,17 @@ async def run_conductor_loop(shutdown_event: asyncio.Event) -> None:
                 except asyncio.TimeoutError:
                     pass
 
-    await asyncio.gather(
-        _run_with_restart(conductors[0], 10),   # Claude starts +10s
-        _run_with_restart(conductors[1], 30),   # Codex starts +30s
-    )
+    try:
+        await asyncio.gather(
+            _run_with_restart(conductors[0], 10),   # Claude starts +10s
+            _run_with_restart(conductors[1], 30),   # Codex starts +30s
+        )
+    finally:
+        for c in conductors:
+            try:
+                await unregister(c.name)
+            except Exception:
+                pass
 
 
 async def _run_gauntlet_loop(shutdown_event: asyncio.Event) -> None:
@@ -1641,6 +1656,23 @@ async def _run_research_rtn_loop(shutdown_event: asyncio.Event) -> None:
         _log("research-rtn", f"Research RTN loop crashed: {exc}")
 
 
+async def _run_directives_loop(shutdown_event: asyncio.Event) -> None:
+    """Operator-facing directive watcher.
+
+    Boots 20s after daemon start so conductors have time to register
+    themselves into ACTIVE_CONDUCTORS. Thin wrapper around
+    ``agent_direct.watcher_loop`` for orchestrator supervision.
+    """
+    await asyncio.sleep(20)
+    from dharma_swarm.agent_direct import watcher_loop
+
+    _log("directives", "Directive watcher starting (poll=5s)")
+    try:
+        await watcher_loop(shutdown_event, poll_interval=5.0)
+    except Exception as exc:
+        _log("directives", f"Directive watcher crashed: {exc}")
+
+
 async def _run_executive_loop(shutdown_event: asyncio.Event) -> None:
     """ShaktiZeitgeistExecutive — strategic sensing + opportunity scoring.
 
@@ -1805,6 +1837,12 @@ async def orchestrate(background: bool = False) -> None:
         # Phase 1: read-only. Ingests signals, scores opportunities, emits
         # executive artifacts at ~/.dharma/meta/ every 45 minutes.
         "executive": lambda: _run_executive_loop(shutdown_event),
+        # ── Directive watcher: operator-facing injection socket ──
+        # Polls ~/.dharma/directives/ every 5s. For each JSON directive file,
+        # looks up the target conductor in ACTIVE_CONDUCTORS and calls
+        # accept_task(). Unmatched/malformed directives move to
+        # ~/.dharma/directives/_unmatched/ with a reason.
+        "directives": lambda: _run_directives_loop(shutdown_event),
     }
     optional_clean_exit = {"pulse"}
     tasks = {
