@@ -36,6 +36,7 @@ from dharma_swarm.models import (
     _new_id,
 )
 from dharma_swarm.diversity_governor import DiversityGovernor
+from dharma_swarm.governance_signal import reorder_by_governance
 from dharma_swarm.runtime_contract import RuntimeEnvelope, RuntimeEventType
 from dharma_swarm.session_ledger import SessionLedger
 from dharma_swarm.sheaf import (
@@ -344,6 +345,17 @@ class Orchestrator:
         ready, diversity_reasons = self._diversity_governor.reorder_ready_tasks(ready)
         if diversity_reasons:
             logger.info("route_next: diversity overlay applied: %s", ", ".join(diversity_reasons))
+
+        # Governance overlay — Shakti executive → dispatch binding.
+        # No-op unless DGC_GOVERNANCE_OVERLAY is truthy. Demotes only, never
+        # drops; directed tasks bypass; preserves every-task-eventually-runs
+        # invariant.
+        ready, gov_reasons = reorder_by_governance(ready)
+        if gov_reasons:
+            logger.info(
+                "route_next: governance overlay applied: %s",
+                ", ".join(gov_reasons[:5]),
+            )
 
         dispatches: list[TaskDispatch] = []
         available = list(idle)

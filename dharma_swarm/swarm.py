@@ -42,6 +42,7 @@ from dharma_swarm.models import (
     TaskStatus,
     TopologyType,
 )
+from dharma_swarm.governance_signal import is_overlay_enabled, load_governance
 from dharma_swarm.providers import create_default_router
 
 if TYPE_CHECKING:
@@ -1454,11 +1455,35 @@ class SwarmManager:
         task_specs: list[dict[str, Any]] = []
         capacity = max(0, max_pending - active)
         planned_limit = max(0, min(limit, capacity))
+
+        # Governance quarantine skip — avoid re-spawning synthesis on topics
+        # the executive has flagged as stuck in repeated loops. No-op unless
+        # DGC_GOVERNANCE_OVERLAY is on.
+        quarantine_topics: set[str] = set()
+        if is_overlay_enabled():
+            try:
+                snap = load_governance()
+                quarantine_topics = snap.quarantine_topics
+            except Exception as exc:
+                logger.debug("coordination: governance load failed (%s)", exc)
+
         for claim_key in state.productive_disagreement_claim_keys:
             if len(task_specs) >= planned_limit:
                 break
             if claim_key in active_claims:
                 continue
+            if quarantine_topics:
+                claim_lower = str(claim_key).lower()
+                hit = next(
+                    (t for t in quarantine_topics if t and t in claim_lower),
+                    None,
+                )
+                if hit:
+                    logger.info(
+                        "coordination: quarantine_skip topic=%s claim=%s",
+                        hit, claim_key[:60],
+                    )
+                    continue
             task_specs.append(
                 {
                     "title": self._coordination_synthesis_title(claim_key),
