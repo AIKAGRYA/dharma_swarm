@@ -71,16 +71,23 @@ class TestPersistentAgentInit:
 
 
 class TestSelfTaskGeneration:
-    def setup_method(self):
-        self.agent = PersistentAgent(
-            name="gen_test",
+    """Phase 1 priority order: primary_campaign → promises → hot_paths → salient → fallback."""
+
+    def _make_agent(self, tmp_path, name="gen_test"):
+        state_dir = tmp_path / ".dharma"
+        (state_dir / "meta").mkdir(parents=True)
+        (state_dir / "witness").mkdir(parents=True)
+        return PersistentAgent(
+            name=name,
             role=AgentRole.CONDUCTOR,
             provider_type=ProviderType.ANTHROPIC,
             model="test-model",
+            state_dir=state_dir,
         )
 
-    def test_hot_paths_priority(self):
-        task = self.agent._generate_self_task(
+    def test_hot_paths_when_no_campaign_no_promises(self, tmp_path):
+        agent = self._make_agent(tmp_path)
+        task = agent._generate_self_task(
             hot_paths=[("dharma_swarm/swarm.py", 5)],
             salient_marks=[],
         )
@@ -88,22 +95,92 @@ class TestSelfTaskGeneration:
         assert "swarm.py" in task
         assert "5 marks" in task
 
-    def test_salient_marks_fallback(self):
+    def test_salient_marks_fallback(self, tmp_path):
+        agent = self._make_agent(tmp_path)
         mark = MagicMock()
         mark.observation = "R_V contraction detected in layer 27"
-        task = self.agent._generate_self_task(
+        task = agent._generate_self_task(
             hot_paths=[],
             salient_marks=[mark],
         )
         assert "Follow up" in task
         assert "R_V contraction" in task
 
-    def test_default_fallback(self):
-        task = self.agent._generate_self_task(
+    def test_default_fallback(self, tmp_path):
+        agent = self._make_agent(tmp_path)
+        task = agent._generate_self_task(
             hot_paths=[],
             salient_marks=[],
         )
         assert "Review system state" in task
+
+    def test_primary_campaign_wins_over_hot_paths(self, tmp_path):
+        agent = self._make_agent(tmp_path, name="conductor_test")
+        # Seed a primary campaign
+        from dharma_swarm.campaigns import create_campaign
+        create_campaign(
+            "neurips_abstract", "artifact_publication", ["conductor_test"],
+            title="NeurIPS abstract", success_criteria="abstract_on_openreview",
+            meta_dir=agent.state_dir / "meta",
+        )
+        task = agent._generate_self_task(
+            hot_paths=[("gauntlet.py", 100)],  # strong hot_path, should still lose
+            salient_marks=[],
+        )
+        assert "PRIMARY CAMPAIGN" in task
+        assert "neurips_abstract" in task
+        # Sole pin → (lead)
+        assert "(lead)" in task
+        assert "gauntlet.py" not in task
+
+    def test_primary_campaign_support_role_when_not_lead(self, tmp_path):
+        agent = self._make_agent(tmp_path, name="outsider")
+        from dharma_swarm.campaigns import create_campaign
+        create_campaign(
+            "neurips_abstract", "artifact_publication",
+            ["conductor_claude", "researcher"],  # outsider not on list
+            meta_dir=agent.state_dir / "meta",
+        )
+        task = agent._generate_self_task(hot_paths=[], salient_marks=[])
+        assert "PRIMARY CAMPAIGN" in task
+        assert "(support)" in task
+
+    def test_promise_wins_over_hot_paths_when_no_campaign(self, tmp_path):
+        import json as _json
+        agent = self._make_agent(tmp_path)
+        (agent.state_dir / "meta" / "promise_pressure.json").write_text(_json.dumps({
+            "promises": [
+                {"id": "promise_rv", "text": "Run R_V experiment (Mistral-7B)"},
+            ]
+        }))
+        task = agent._generate_self_task(
+            hot_paths=[("gauntlet.py", 100)],
+            salient_marks=[],
+        )
+        assert "UNFULFILLED PROMISE" in task
+        assert "R_V experiment" in task
+
+    def test_malformed_promise_file_does_not_crash(self, tmp_path):
+        agent = self._make_agent(tmp_path)
+        (agent.state_dir / "meta" / "promise_pressure.json").write_text("{not json")
+        # Should not raise; falls through to hot_paths
+        task = agent._generate_self_task(
+            hot_paths=[("x.py", 3)],
+            salient_marks=[],
+        )
+        assert "x.py" in task
+
+    def test_empty_promises_list_falls_through(self, tmp_path):
+        import json as _json
+        agent = self._make_agent(tmp_path)
+        (agent.state_dir / "meta" / "promise_pressure.json").write_text(
+            _json.dumps({"promises": []})
+        )
+        task = agent._generate_self_task(
+            hot_paths=[("fallback.py", 7)],
+            salient_marks=[],
+        )
+        assert "fallback.py" in task
 
 
 class TestExtractKeyInsight:
@@ -134,6 +211,18 @@ class TestAcceptTask:
         assert not agent._task_queue.empty()
         task = agent._task_queue.get_nowait()
         assert task == "Check daemon health"
+
+    @pytest.mark.asyncio
+    async def test_accept_task_sets_wake_event(self):
+        agent = PersistentAgent(
+            name="wake_test",
+            role=AgentRole.CONDUCTOR,
+            provider_type=ProviderType.ANTHROPIC,
+            model="test-model",
+        )
+        assert not agent._task_event.is_set()
+        await agent.accept_task("Wake now")
+        assert agent._task_event.is_set()
 
 
 class TestGateCheck:

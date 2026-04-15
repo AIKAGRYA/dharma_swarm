@@ -161,6 +161,7 @@ class PersistentAgent:
 
         # Orchestrator task injection
         self._task_queue: asyncio.Queue[str] = asyncio.Queue()
+        self._task_event = asyncio.Event()
 
         # Witness log
         witness_dir = self.state_dir / "witness"
@@ -437,15 +438,67 @@ class PersistentAgent:
         hot_paths: list[tuple[str, int]],
         salient_marks: list[Any],
     ) -> str:
-        """Generate a task from environmental signals. No LLM call."""
+        """Generate a task from environmental signals. No LLM call.
+
+        Priority order (compression spec §185-206):
+          1. Active primary campaign support — even if not personally pinned,
+             non-lead agents bias toward the declared artifact.
+          2. Unfulfilled heartbeat promises — from ``promise_pressure.json``.
+          3. Stigmergy hot paths (demoted from #1).
+          4. Salient marks (demoted).
+          5. Generic system review.
+
+        Silence-is-valid (V7 rule 4) still applies — but cannot justify chronic
+        non-production when a primary campaign exists.
+        """
+        # 1. Primary campaign support (soft-primary today; Phase 4 tightens)
+        try:
+            from dharma_swarm.campaigns import active_primary
+            primary = active_primary(meta_dir=self.state_dir / "meta")
+        except Exception:
+            primary = None
+        if primary is not None:
+            artifact = (
+                primary.get("artifact_path")
+                or primary.get("success_criteria")
+                or primary.get("title", "?")
+            )
+            pinned = list(primary.get("pinned_agents") or [])
+            role_hint = (
+                "lead" if self.name in pinned and pinned[:1] == [self.name]
+                else "support"
+            )
+            return (
+                f"PRIMARY CAMPAIGN ({role_hint}): {primary.get('campaign_id', '?')} "
+                f"— make measurable progress toward: {artifact}"
+            )
+
+        # 2. Unfulfilled heartbeat promises
+        try:
+            pp_path = self.state_dir / "meta" / "promise_pressure.json"
+            if pp_path.exists():
+                import json as _json
+                pp = _json.loads(pp_path.read_text())
+                promises = pp.get("promises") or []
+                if promises:
+                    top = promises[0]
+                    text = str(top.get("text") or "").strip()
+                    if text:
+                        return f"UNFULFILLED PROMISE: {text[:280]}"
+        except Exception as exc:
+            logger.debug("[%s] promise_pressure read failed: %s", self.name, exc)
+
+        # 3. Stigmergy hot paths (original behaviour, demoted)
         if hot_paths:
             top_path, count = hot_paths[0]
             return f"Investigate high-activity path: {top_path} ({count} marks in 6h)"
 
+        # 4. Salient marks
         if salient_marks:
             mark = salient_marks[0]
             return f"Follow up on observation: {mark.observation}"
 
+        # 5. Fallback
         return "Review system state, check agent notes in ~/.dharma/shared/, report observations"
 
     # -- Campaign pin integration ----------------------------------------
@@ -574,6 +627,7 @@ class PersistentAgent:
     async def run_loop(self, shutdown_event: asyncio.Event) -> None:
         """Run the persistent wake loop until shutdown."""
         logger.info("[%s] Starting persistent loop (interval=%ds)", self.name, self.wake_interval)
+        await self._write_witness("LOOP_START", f"interval={self.wake_interval}", "")
 
         while not shutdown_event.is_set():
             try:
@@ -584,6 +638,9 @@ class PersistentAgent:
                         injected = self._task_queue.get_nowait()
                     except asyncio.QueueEmpty:
                         pass
+                    else:
+                        if self._task_queue.empty():
+                            self._task_event.clear()
 
                 await self.wake(injected_task=injected)
 
@@ -605,18 +662,31 @@ class PersistentAgent:
 
             # Sleep until next wake or shutdown
             try:
-                await asyncio.wait_for(
-                    shutdown_event.wait(), timeout=self.wake_interval,
+                shutdown_task = asyncio.create_task(shutdown_event.wait())
+                injected_task = asyncio.create_task(self._task_event.wait())
+                done, pending = await asyncio.wait(
+                    {shutdown_task, injected_task},
+                    timeout=self.wake_interval,
+                    return_when=asyncio.FIRST_COMPLETED,
                 )
-                break  # shutdown signaled
+                for task in pending:
+                    task.cancel()
+                if shutdown_task in done and shutdown_event.is_set():
+                    break  # shutdown signaled
+                if injected_task in done and self._task_event.is_set():
+                    continue  # wake immediately for injected work
             except asyncio.TimeoutError:
                 pass  # time to wake again
 
         logger.info("[%s] Persistent loop stopped", self.name)
+        await self._write_witness("LOOP_STOP", "", "")
 
     async def accept_task(self, task: str) -> None:
         """Inject a task from the orchestrator."""
         await self._task_queue.put(task)
+        self._task_event.set()
+        logger.info("[%s] Accepted injected task: %s", self.name, task[:160])
+        await self._write_witness("TASK_ACCEPTED", task, "injected")
 
     @property
     def cron(self) -> AgentCronScheduler:

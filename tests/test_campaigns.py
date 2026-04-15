@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from dharma_swarm.campaigns import (
+    active_primary,
     campaign_from_promise,
     complete_campaign,
     create_campaign,
@@ -168,3 +169,56 @@ def test_load_active_ignores_malformed_file(meta_dir: Path) -> None:
 def test_save_active_is_atomic(meta_dir: Path) -> None:
     create_campaign("c", "research", ["a"], meta_dir=meta_dir)
     assert not list((meta_dir).glob("*.tmp"))  # atomic write cleans up
+
+
+# ---------------------------------------------------------------------------
+# active_primary — Phase 1 helper (soft-primary today, hard primary Phase 4)
+# ---------------------------------------------------------------------------
+
+
+def test_active_primary_none_when_no_campaigns(meta_dir: Path) -> None:
+    assert active_primary(meta_dir) is None
+
+
+def test_active_primary_returns_sole_active_as_soft_primary(meta_dir: Path) -> None:
+    create_campaign("lone", "research", ["a"], meta_dir=meta_dir)
+    p = active_primary(meta_dir)
+    assert p is not None
+    assert p["campaign_id"] == "lone"
+
+
+def test_active_primary_prefers_earliest_created_as_soft(meta_dir: Path) -> None:
+    create_campaign("first", "research", ["a"], meta_dir=meta_dir)
+    create_campaign("second", "reliability", ["b"], meta_dir=meta_dir)
+    # Force second to have an earlier created ts to prove sort is by timestamp.
+    active = load_active(meta_dir)
+    for c in active:
+        if c["campaign_id"] == "first":
+            c["created"] = "2026-04-14T09:00:00+00:00"
+        if c["campaign_id"] == "second":
+            c["created"] = "2026-04-13T09:00:00+00:00"
+    save_active(active, meta_dir)
+    p = active_primary(meta_dir)
+    assert p["campaign_id"] == "second"
+
+
+def test_active_primary_explicit_primary_beats_soft(meta_dir: Path) -> None:
+    create_campaign("first", "research", ["a"], meta_dir=meta_dir)
+    create_campaign("marked", "reliability", ["b"], meta_dir=meta_dir)
+    # Mark "marked" as primary=True.
+    active = load_active(meta_dir)
+    for c in active:
+        if c["campaign_id"] == "marked":
+            c["primary"] = True
+    save_active(active, meta_dir)
+    p = active_primary(meta_dir)
+    assert p["campaign_id"] == "marked"
+
+
+def test_active_primary_skips_non_active_status(meta_dir: Path) -> None:
+    create_campaign("alpha", "research", ["a"], meta_dir=meta_dir)
+    # Manually mark as abandoned
+    active = load_active(meta_dir)
+    active[0]["status"] = "abandoned"
+    save_active(active, meta_dir)
+    assert active_primary(meta_dir) is None

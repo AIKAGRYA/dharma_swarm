@@ -106,6 +106,29 @@ def find_by_agent(agent_name: str, meta_dir: Path | None = None) -> list[dict[st
     ]
 
 
+def active_primary(meta_dir: Path | None = None) -> dict[str, Any] | None:
+    """Return the active primary campaign, or the earliest-created active campaign
+    as a soft-primary proxy.
+
+    Phase 1 implementation: if any active campaign has ``primary: true``, return it.
+    Otherwise return the earliest-created active campaign (soft-primary). Phase 4
+    will introduce the ``primary`` field as authoritative with a slot cap of 1.
+
+    This helper is what non-pinned agents check when deciding how to self-task.
+    """
+    active = [c for c in load_active(meta_dir) if c.get("status", "active") == "active"]
+    if not active:
+        return None
+    # Explicit primary wins (Phase 4 field)
+    explicit = [c for c in active if c.get("primary") is True]
+    if explicit:
+        explicit.sort(key=lambda c: str(c.get("created", "")))
+        return explicit[0]
+    # Soft-primary: earliest-created active
+    active.sort(key=lambda c: str(c.get("created", "")))
+    return active[0]
+
+
 def create_campaign(
     campaign_id: str,
     domain: str,
@@ -266,6 +289,7 @@ __all__ = [
     "find_campaign",
     "find_campaign_domain",
     "find_by_agent",
+    "active_primary",
     "create_campaign",
     "mark_check_in",
     "complete_campaign",
