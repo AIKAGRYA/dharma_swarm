@@ -2554,6 +2554,31 @@ def cmd_governance_domain_mix() -> None:
         print(f"{dom:<28} {float(w):<10.4f} {x_neutral:<12.2f} {float(boost):<10.3f} {float(pen):<10.3f}")
 
 
+def cmd_directives_show() -> None:
+    from dharma_swarm.operator_directives import load_directives, seed_if_absent
+    seed_if_absent()
+    d = load_directives(force=True)
+    if not d.has_content:
+        print("(no directives — file exists but empty)")
+        return
+    print(d.raw_text)
+
+
+def cmd_directives_edit() -> None:
+    from dharma_swarm.operator_directives import seed_if_absent, _directives_path
+    path = seed_if_absent()
+    editor = os.environ.get("EDITOR", "vim")
+    os.execvp(editor, [editor, str(path)])
+
+
+def cmd_directives_seed() -> None:
+    from dharma_swarm.operator_directives import seed_if_absent, _directives_path
+    path = seed_if_absent()
+    print(f"Directives file: {path}")
+    if path.exists():
+        print(f"  ({path.stat().st_size} bytes)")
+
+
 def cmd_spawn(name: str, role: str, model: str) -> None:
     """Spawn a new agent."""
     async def _spawn():
@@ -5789,6 +5814,16 @@ def _build_parser() -> argparse.ArgumentParser:
     p_prom_pin.add_argument("agent")
 
     # -- governance (status + inspection) --
+    # -- directives (operator air traffic controller) --
+    p_dir = sub.add_parser(
+        "directives",
+        help="Manage operator directives (~/.dharma/meta/OPERATOR_DIRECTIVES.md)",
+    )
+    dir_sub = p_dir.add_subparsers(dest="directives_cmd")
+    dir_sub.add_parser("show", help="Print current directives")
+    dir_sub.add_parser("edit", help="Open directives in $EDITOR")
+    dir_sub.add_parser("seed", help="Create seed directives file if absent")
+
     p_gov = sub.add_parser(
         "governance",
         help="Inspect the executive governance bundle under ~/.dharma/meta/",
@@ -6858,6 +6893,16 @@ def main() -> None:
                     cmd_promise_pin(args.promise_id, args.agent)
                 case _:
                     parser.parse_args(["promise", "--help"])
+        case "directives":
+            match args.directives_cmd:
+                case "show" | None:
+                    cmd_directives_show()
+                case "edit":
+                    cmd_directives_edit()
+                case "seed":
+                    cmd_directives_seed()
+                case _:
+                    parser.parse_args(["directives", "--help"])
         case "governance":
             match args.governance_cmd:
                 case "status" | None:

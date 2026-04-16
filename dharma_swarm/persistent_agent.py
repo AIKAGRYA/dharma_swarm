@@ -11,6 +11,7 @@ or independently via launchd.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
 import time
@@ -19,7 +20,8 @@ from pathlib import Path
 from typing import Any, Callable, Awaitable
 
 from dharma_swarm.autonomous_agent import AgentIdentity, AgentResult, AutonomousAgent
-from dharma_swarm.models import AgentRole, ProviderType
+from dharma_swarm.models import AgentRole, ProviderType, TaskPriority, TaskStatus
+from dharma_swarm.task_board_mirror import CanonicalTaskMirror, MirroredTaskSpec
 
 logger = logging.getLogger(__name__)
 
@@ -179,6 +181,7 @@ class PersistentAgent:
             model=model,
             provider=provider_type.value,
         )
+        self._task_mirror = CanonicalTaskMirror(self.state_dir)
 
     # -- Per-agent cron defaults ------------------------------------------
 
@@ -303,9 +306,19 @@ class PersistentAgent:
             "timestamp": time.time(),
             "success": False,
         }
+        mirror_spec: MirroredTaskSpec | None = None
 
         try:
-            # 0. Run per-agent mini-crons (housekeeping tasks)
+            # 0a. Load operator directives — the air traffic controller.
+            # Read before everything else; directives override self-task gen.
+            directives = None
+            try:
+                from dharma_swarm.operator_directives import load_directives
+                directives = load_directives(self.state_dir)
+            except Exception:
+                pass
+
+            # 0b. Run per-agent mini-crons (housekeeping tasks)
             cron_results = await self._cron.tick()
             if cron_results:
                 fired = [r["job"] for r in cron_results if r["success"]]
@@ -346,12 +359,46 @@ class PersistentAgent:
                     task_text = self._generate_self_task(hot_paths, salient_marks)
                     task_source = "self"
 
+            # 5b. Directive forbidden check + mission context injection.
+            if directives is not None:
+                from dharma_swarm.operator_directives import is_forbidden, mission_context_block
+                if task_source in ("self", "campaign") and is_forbidden(task_text, directives):
+                    logger.info(
+                        "[%s] directive_redirect: forbidden task suppressed, "
+                        "redirecting to DO item",
+                        self.name,
+                    )
+                    if directives.do_items:
+                        task_text = f"OPERATOR DIRECTIVE: {directives.do_items[0]}"
+                    task_source = "directive"
+                # Prepend mission context so the agent sees directives.
+                ctx = mission_context_block(directives)
+                if ctx:
+                    task_text = f"{ctx}\n\n---\nTASK: {task_text}"
+
+            mirror_spec = self._build_task_mirror_spec(
+                task_source=task_source,
+                task_text=task_text,
+                active_campaign=active_campaign,
+            )
+            if mirror_spec is not None:
+                await self._sync_task_mirror(mirror_spec)
+
             # 6. Gate check
             gate_outcome = self._check_gate(task_text)
             if gate_outcome and gate_outcome.get("blocked"):
                 self._profile.record_gate(passed=False)
                 result_info["blocked"] = True
                 result_info["gate_reason"] = gate_outcome.get("reason", "")
+                if mirror_spec is not None:
+                    await self._sync_task_mirror(
+                        self._replace_mirror_spec(
+                            mirror_spec,
+                            status=TaskStatus.FAILED,
+                            result=gate_outcome.get("reason", ""),
+                            metadata={"gate_blocked": True},
+                        )
+                    )
                 await self._write_witness("BLOCKED", task_text, gate_outcome.get("reason", ""))
                 return result_info
             if gate_outcome:
@@ -402,6 +449,20 @@ class PersistentAgent:
                 "duration_s": round(duration, 1),
                 "summary": agent_result.summary[:500],
             })
+            if mirror_spec is not None:
+                await self._sync_task_mirror(
+                    self._replace_mirror_spec(
+                        mirror_spec,
+                        status=TaskStatus.COMPLETED,
+                        result=self._mirror_result_summary(agent_result, duration),
+                        metadata={
+                            "turns": agent_result.turns,
+                            "tokens": agent_result.total_tokens,
+                            "duration_s": round(duration, 1),
+                            "summary": agent_result.summary[:500],
+                        },
+                    )
+                )
 
             # Campaign check-in — update durable campaign memory so the
             # executive's next cycle sees recent activity. Non-fatal on
@@ -427,6 +488,15 @@ class PersistentAgent:
             logger.error("[%s] wake error: %s", self.name, e)
             result_info["error"] = str(e)[:500]
             self._profile.record_task(success=False)
+            if mirror_spec is not None:
+                await self._sync_task_mirror(
+                    self._replace_mirror_spec(
+                        mirror_spec,
+                        status=TaskStatus.FAILED,
+                        result=str(e)[:500],
+                        metadata={"error": str(e)[:500]},
+                    )
+                )
             await self._write_witness("ERROR", str(e)[:200], "")
 
         return result_info
@@ -564,6 +634,79 @@ class PersistentAgent:
             return f"wake:{turns}t/{duration_s:.0f}s — {summary}"
         except Exception:
             return f"wake complete in {duration_s:.0f}s"
+
+    def _build_task_mirror_spec(
+        self,
+        *,
+        task_source: str,
+        task_text: str,
+        active_campaign: dict[str, Any] | None,
+    ) -> MirroredTaskSpec | None:
+        if task_source not in {"self", "campaign", "injected"}:
+            return None
+
+        digest = hashlib.sha1(f"{task_source}:{task_text}".encode("utf-8")).hexdigest()[:16]
+        campaign_id = self._extract_campaign_for_checkin(task_source, task_text, active_campaign)
+        metadata: dict[str, Any] = {
+            "source": f"persistent_agent.{task_source}",
+            "execution_substrate": "persistent_agent",
+            "task_source": task_source,
+            "agent_name": self.name,
+            "agent_role": self.role.value,
+            "provider": self.provider_type.value,
+            "model": self.model,
+            "task_text": task_text,
+        }
+        if campaign_id:
+            metadata["campaign_id"] = campaign_id
+
+        return MirroredTaskSpec(
+            mirror_key=f"persistent_agent:{self.name}:{task_source}:{digest}",
+            title=task_text[:240],
+            description=(
+                f"PersistentAgent {self.name} executing {task_source}-sourced work."
+            ),
+            priority=TaskPriority.HIGH if task_source in {"campaign", "injected"} else TaskPriority.NORMAL,
+            created_by=self.name,
+            assigned_to=self.name,
+            status=TaskStatus.RUNNING,
+            metadata=metadata,
+        )
+
+    @staticmethod
+    def _replace_mirror_spec(
+        spec: MirroredTaskSpec,
+        *,
+        status: TaskStatus,
+        result: str = "",
+        metadata: dict[str, Any] | None = None,
+    ) -> MirroredTaskSpec:
+        merged = dict(spec.metadata or {})
+        if metadata:
+            merged.update(metadata)
+        return MirroredTaskSpec(
+            mirror_key=spec.mirror_key,
+            title=spec.title,
+            description=spec.description,
+            priority=spec.priority,
+            created_by=spec.created_by,
+            assigned_to=spec.assigned_to,
+            status=status,
+            result=result,
+            metadata=merged,
+        )
+
+    @staticmethod
+    def _mirror_result_summary(agent_result: Any, duration_s: float) -> str:
+        summary = str(getattr(agent_result, "summary", "") or "").strip()
+        compact = summary[:280] if summary else "wake complete"
+        return f"{compact} (duration={duration_s:.1f}s)"
+
+    async def _sync_task_mirror(self, spec: MirroredTaskSpec) -> None:
+        try:
+            await self._task_mirror.sync(spec)
+        except Exception:
+            logger.debug("[%s] task mirror failure", self.name, exc_info=True)
 
     # -- Gate check ------------------------------------------------------
 

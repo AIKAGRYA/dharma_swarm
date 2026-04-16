@@ -49,8 +49,7 @@ maintaining coherence across the system through periodic wake cycles.
 3. Artifact gaps — campaigns whose declared artifact is missing or
    undersized. File writes beat observations.
 4. Seam repair with direct execution consequences — the one finding today
-   that unblocks tomorrow's execution. Includes R_V paper progress in
-   ~/mech-interp-latent-lab-phase1/ when that is an active promise.
+   that unblocks tomorrow's execution.
 5. Stigmergy signals — high-salience marks from other agents. Investigate
    only when no higher-priority work exists.
 
