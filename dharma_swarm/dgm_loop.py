@@ -62,11 +62,13 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import random
 import re
 import time
 from collections import Counter
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -202,6 +204,105 @@ async def _sample_parent_qd(
     except Exception as exc:
         logger.warning("QD parent sampling failed, falling back to None: %s", exc)
         return None, 0
+
+
+async def _sample_parent_diversity_archive(
+    archive: Any,
+    dimensions: list[str] | None = None,
+) -> tuple[Any | None, int]:
+    """Sample a parent via MAP-Elites DiversityArchive (farthest-point sampling).
+
+    Populates DiversityArchive from feature_coords on each ArchiveEntry, then
+    picks candidates with max behavioral spread. Canonical source for
+    diversity-aware selection. Sprint 1 Fix 6 — shadow/live flag gated.
+    """
+    try:
+        from dharma_swarm.diversity_archive import BehaviorDescriptor, DiversityArchive
+
+        entries = list(archive._entries.values()) if hasattr(archive, "_entries") else []
+        if not entries:
+            return None, 0
+
+        dims = dimensions or ["dharmic_alignment", "elegance", "complexity"]
+        div = DiversityArchive(dimensions=dims, bins_per_dimension=5)
+
+        populated = 0
+        for entry in entries:
+            coords = getattr(entry, "feature_coords", None) or {}
+            if not coords:
+                continue
+            descriptor = BehaviorDescriptor(
+                dimensions={d: float(coords.get(d, 0.0)) for d in dims}
+            )
+            fitness_obj = getattr(entry, "fitness", None)
+            f = (
+                fitness_obj.weighted()
+                if fitness_obj and hasattr(fitness_obj, "weighted")
+                else 0.0
+            )
+            div.add(
+                candidate_id=getattr(entry, "id", ""),
+                candidate_payload={"entry_id": getattr(entry, "id", "")},
+                fitness=f,
+                behavior=descriptor,
+            )
+            populated += 1
+
+        if populated == 0:
+            return None, 0
+
+        cells = div.sample_diverse(n=1)
+        if not cells:
+            return None, 0
+
+        selected_id = cells[0].candidate_id
+        selected = archive._entries.get(selected_id)
+        if selected is None:
+            return None, 0
+
+        depth = 0
+        current = selected
+        while hasattr(current, "parent_id") and current.parent_id:
+            parent = archive._entries.get(current.parent_id)
+            if parent is None:
+                break
+            current = parent
+            depth += 1
+            if depth > 100:
+                break
+
+        return selected, depth
+    except Exception as exc:
+        logger.warning("DiversityArchive sampling failed: %s", exc)
+        return None, 0
+
+
+def _log_divarchive_shadow_comparison(
+    archive_parent: Any,
+    archive_depth: int,
+    handcoded_parent: Any,
+    handcoded_depth: int,
+    state_dir: Path,
+) -> None:
+    """Append one shadow-comparison line; used to evaluate 48h before live flip."""
+    log_path = state_dir / "meta" / "divarchive_shadow_comparison.jsonl"
+    try:
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        entry = {
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "archive_parent_id": getattr(archive_parent, "id", None),
+            "archive_depth": archive_depth,
+            "handcoded_parent_id": getattr(handcoded_parent, "id", None),
+            "handcoded_depth": handcoded_depth,
+            "same_choice": (
+                getattr(archive_parent, "id", None)
+                == getattr(handcoded_parent, "id", None)
+            ),
+        }
+        with log_path.open("a") as f:
+            f.write(json.dumps(entry) + "\n")
+    except Exception:
+        logger.debug("shadow comparison write failed", exc_info=True)
 
 
 def _get_source_file_from_entry(entry: Any, src_root: Path) -> Path | None:
@@ -445,15 +546,42 @@ class DGMLoop:
         archive_size_before = len(archive._entries) if archive and hasattr(archive, '_entries') else 0
         result.archive_size_before = archive_size_before
 
-        # Step 1: Sample a parent from the archive using quality-diversity
+        # Step 1: Sample a parent. Fix 6 — shadow/live flag selects strategy.
+        # DHARMA_DIVERSITY_ARCHIVE_SAMPLING: off (default, hand-coded),
+        # shadow (log both, use hand-coded), live (archive-canonical w/ fallback).
         parent_entry = None
         lineage_depth = 0
+        sampling_mode = os.getenv("DHARMA_DIVERSITY_ARCHIVE_SAMPLING", "off").lower()
         if archive and archive_size_before > 0:
-            parent_entry, lineage_depth = await _sample_parent_qd(
-                archive,
-                fitness_weights=getattr(self._engine, '_fitness_weights', None),
-                novelty_pressure=self._novelty_pressure,
-            )
+            if sampling_mode == "live":
+                parent_entry, lineage_depth = await _sample_parent_diversity_archive(archive)
+                if parent_entry is None:
+                    parent_entry, lineage_depth = await _sample_parent_qd(
+                        archive,
+                        fitness_weights=getattr(self._engine, '_fitness_weights', None),
+                        novelty_pressure=self._novelty_pressure,
+                    )
+                    result.selection_strategy = "qd_fallback_from_live"
+                else:
+                    result.selection_strategy = "diversity_archive_live"
+            elif sampling_mode == "shadow":
+                archive_parent, archive_depth = await _sample_parent_diversity_archive(archive)
+                parent_entry, lineage_depth = await _sample_parent_qd(
+                    archive,
+                    fitness_weights=getattr(self._engine, '_fitness_weights', None),
+                    novelty_pressure=self._novelty_pressure,
+                )
+                _log_divarchive_shadow_comparison(
+                    archive_parent, archive_depth, parent_entry, lineage_depth,
+                    state_dir=self._state_dir,
+                )
+                result.selection_strategy = "qd_with_divarchive_shadow"
+            else:  # "off" — default hand-coded QD
+                parent_entry, lineage_depth = await _sample_parent_qd(
+                    archive,
+                    fitness_weights=getattr(self._engine, '_fitness_weights', None),
+                    novelty_pressure=self._novelty_pressure,
+                )
         result.parent_id = getattr(parent_entry, 'id', None)
         result.lineage_depth = lineage_depth
         result.fitness_before = (
