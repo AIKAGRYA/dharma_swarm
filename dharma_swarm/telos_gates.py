@@ -491,20 +491,34 @@ class TelosGatekeeper:
         else:
             results["SATYA"] = (GateResult.PASS, "")
 
-        # --- CONSENT (Tier B) — block sensitive data exfiltration attempts ---
+        # --- CONSENT (Tier B) — tri-state: sensitive+exfil FAIL, lone hits WARN ---
         sensitive_hit = next(
             (p for p in self.SENSITIVE_PATH_PATTERNS if p in combined), None,
         )
         exfil_hit = next(
             (p for p in self.EXFIL_PATTERNS if p in combined), None,
         )
+        tristate_enabled = os.getenv("DHARMA_CONSENT_TRISTATE", "1") != "0"
         if sensitive_hit and exfil_hit:
             results["CONSENT"] = (
                 GateResult.FAIL,
                 f"Sensitive data exfiltration attempt: {sensitive_hit} -> {exfil_hit}",
             )
+        elif tristate_enabled and sensitive_hit:
+            results["CONSENT"] = (
+                GateResult.WARN,
+                f"Sensitive path access ({sensitive_hit}) without declared exfil intent; justify or skip",
+            )
+        elif tristate_enabled and exfil_hit:
+            results["CONSENT"] = (
+                GateResult.WARN,
+                f"Exfil pattern ({exfil_hit}) detected without sensitive path; verify target",
+            )
         else:
-            results["CONSENT"] = (GateResult.PASS, "Permission system active")
+            results["CONSENT"] = (
+                GateResult.PASS,
+                "No sensitive+exfil pair detected",
+            )
 
         # --- VYAVASTHIT (Tier C) — force detection ---
         force_hit = next(
