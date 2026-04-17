@@ -206,6 +206,26 @@ async def run_auditor(src_root: Path) -> list[GuardianFinding]:
                 isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name == method_name
                 for n in ast.walk(class_node)
             )
+            # Dataclasses auto-generate __init__, __repr__, __eq__ at runtime.
+            # AST-only check mis-reports these as missing. If the class has a
+            # @dataclass decorator (or @dataclasses.dataclass), the dunder
+            # methods listed here are provided by the decorator unless
+            # explicitly disabled via decorator args (init=False etc.).
+            if not method_exists and method_name in {"__init__", "__repr__", "__eq__"}:
+                for deco in class_node.decorator_list:
+                    deco_name = ""
+                    if isinstance(deco, ast.Name):
+                        deco_name = deco.id
+                    elif isinstance(deco, ast.Attribute):
+                        deco_name = deco.attr
+                    elif isinstance(deco, ast.Call):
+                        if isinstance(deco.func, ast.Name):
+                            deco_name = deco.func.id
+                        elif isinstance(deco.func, ast.Attribute):
+                            deco_name = deco.func.attr
+                    if deco_name == "dataclass":
+                        method_exists = True
+                        break
             if not method_exists:
                 findings.append(GuardianFinding(
                     severity=severity,
