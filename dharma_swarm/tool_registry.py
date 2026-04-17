@@ -23,6 +23,8 @@ import json
 import logging
 from typing import Any, Callable, Optional
 
+from dharma_swarm.async_bridge import run_coroutine_in_new_loop
+
 logger = logging.getLogger(__name__)
 
 
@@ -145,9 +147,12 @@ class ToolRegistry:
                 if loop and loop.is_running():
                     import concurrent.futures
                     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                        future = pool.submit(asyncio.run, entry.handler(args, **kwargs))
+                        future = pool.submit(
+                            run_coroutine_in_new_loop,
+                            entry.handler(args, **kwargs),
+                        )
                         return future.result(timeout=120)
-                return asyncio.run(entry.handler(args, **kwargs))
+                return run_coroutine_in_new_loop(entry.handler(args, **kwargs))
             return entry.handler(args, **kwargs)
         except Exception as e:
             logger.exception("Tool %s dispatch error: %s", name, e)

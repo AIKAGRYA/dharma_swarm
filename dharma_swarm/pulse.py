@@ -28,6 +28,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from dharma_swarm.async_bridge import run_coroutine_in_new_loop
+
 from dharma_swarm.context import (
     read_agni_state,
     read_manifest,
@@ -413,7 +415,7 @@ def pulse(config: DaemonConfig | None = None) -> str:
     pulse_model = os.environ.get("DGC_PULSE_CLAUDE_MODEL", "haiku").strip() or "haiku"
     result = run_claude_headless(prompt, model=pulse_model)
     if _pulse_result_failed(result) and _pulse_failure_supports_runtime_fallback(result):
-        result = asyncio.run(_run_runtime_pulse_fallback(prompt, thread, result))
+        result = run_coroutine_in_new_loop(_run_runtime_pulse_fallback(prompt, thread, result))
 
     # Record
     tm.record_contribution()
@@ -426,10 +428,10 @@ def pulse(config: DaemonConfig | None = None) -> str:
         cfg.circuit_breaker.record_success()
 
     # Store in memory (async)
-    asyncio.run(_store_pulse_result(result, thread))
+    run_coroutine_in_new_loop(_store_pulse_result(result, thread))
 
     # Living-layer heartbeat (subconscious + shakti)
-    living_summary = asyncio.run(_run_living_layers(thread, result))
+    living_summary = run_coroutine_in_new_loop(_run_living_layers(thread, result))
     if living_summary:
         print(
             "[pulse] Living: density={density} dream={dream} assoc={assoc} "

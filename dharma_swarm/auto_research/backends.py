@@ -7,10 +7,12 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import threading
 from typing import Any
 
 from .models import ResearchBrief, ResearchQuery, SourceDocument
 from .search import SearchBackend, RawSourceDocument
+from dharma_swarm.async_bridge import run_coroutine_in_new_loop
 
 
 class WebSearchBackend:
@@ -34,9 +36,27 @@ class WebSearchBackend:
         queries: list[ResearchQuery],
     ) -> list[RawSourceDocument]:
         """Synchronous wrapper — AutoResearch engine calls this synchronously."""
-        return asyncio.get_event_loop().run_until_complete(
-            self._async_search(brief, queries)
-        )
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return run_coroutine_in_new_loop(self._async_search(brief, queries))
+
+        result: list[RawSourceDocument] = []
+        error: BaseException | None = None
+
+        def _runner() -> None:
+            nonlocal result, error
+            try:
+                result = run_coroutine_in_new_loop(self._async_search(brief, queries))
+            except BaseException as exc:  # pragma: no cover - surfaced to caller
+                error = exc
+
+        thread = threading.Thread(target=_runner, daemon=True)
+        thread.start()
+        thread.join()
+        if error is not None:
+            raise error
+        return result
 
     async def _async_search(
         self,
