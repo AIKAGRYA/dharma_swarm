@@ -51,6 +51,22 @@ from dharma_swarm.runtime_fields import (
     build_runtime_field_registry_from_agent_config,
     runtime_field_manifest_for_agent_config,
 )
+from dharma_swarm.deep_agent_backend import (
+    BackendToolResult,
+    EditResult,
+    ExecuteResult,
+    FetchUrlResult,
+    GlobResult,
+    GrepResult,
+    ReadResult,
+    WebSearchResult,
+    WriteResult,
+    stable_side_effect_id,
+)
+from dharma_swarm.deep_agent_harness import (
+    DeepAgentHarnessConfig,
+    deep_agent_harness_config_from_agent_config,
+)
 from dharma_swarm.telos_gates import check_with_reflective_reroute
 
 logger = logging.getLogger(__name__)
@@ -1560,6 +1576,8 @@ class AgentRunner:
         self._lock = asyncio.Lock()
         self._background_tasks: set[asyncio.Task[Any]] = set()
         self._runtime_fields = build_runtime_field_registry_from_agent_config(config)
+        self._deep_agent_harness_config = deep_agent_harness_config_from_agent_config(config)
+        self._backend_tool_results: list[BackendToolResult] = []
         # Letta-inspired self-managing memory (SQLite-backed)
         self._advanced_memory = advanced_memory
 
@@ -1592,6 +1610,16 @@ class AgentRunner:
         return self._runtime_fields
 
     @property
+    def deep_agent_harness_config(self) -> DeepAgentHarnessConfig:
+        """Expose the typed harness manifest without changing legacy loop behavior."""
+        return self._deep_agent_harness_config
+
+    @property
+    def backend_tool_results(self) -> list[BackendToolResult]:
+        """Expose the structured backend tool results recorded during execution."""
+        return list(self._backend_tool_results)
+
+    @property
     def advanced_memory(self) -> AgentMemoryManager | None:
         """Access the SQLite-backed self-managing memory, if configured."""
         return self._advanced_memory
@@ -1621,6 +1649,87 @@ class AgentRunner:
             grade_kwargs=grade_kwargs,
             runtime_field_names=self._runtime_fields.names(),
         )
+
+    async def _run_deep_research_task(self, task: Task) -> tuple[str, float]:
+        """PR4: handle a frontier-task with task_type=="deep_research".
+
+        Rehydrates the FrontierTask from ``task.metadata["frontier_row"]``
+        (PR1 guarantees this metadata is present), converts to a ResearchBrief
+        via ``frontier_task_to_research_brief``, runs the AutoResearch +
+        AutoGrade workflow, and returns ``(result_json_str, latency_ms)``.
+
+        ``result_json_str`` is the canonical task.result for downstream
+        consumers (the PR2 observer reads it). Shape:
+
+        ::
+
+            {"report": {...}, "grade": {...}, "quarantined": bool}
+
+        ``quarantined`` is True when the grade gates fail (gate_multiplier==0
+        or promotion_state=="rollback_or_revise"). The PR2 observer writes
+        ``deep_research.json`` for passing reports and
+        ``deep_research.quarantined.json`` for failed ones — both via
+        ``ArtifactManifestStore`` for proper sidecar manifest semantics.
+
+        Default engines are used if none are registered. With the default
+        NullSearchBackend the report will be near-empty and quarantine is the
+        expected outcome — this is correct safe behavior until a real backend
+        is wired in.
+        """
+        import time as _time
+        from dharma_swarm.curriculum_engine import (
+            FrontierTask,
+            frontier_task_to_research_brief,
+        )
+        from dharma_swarm.auto_research.engine import AutoResearchEngine
+        from dharma_swarm.auto_grade.engine import AutoGradeEngine
+
+        meta = task.metadata if isinstance(task.metadata, dict) else {}
+        row = meta.get("frontier_row")
+        if not isinstance(row, dict):
+            raise RuntimeError(
+                "deep_research task missing metadata.frontier_row "
+                "(PR1 dispatcher must store the full row)"
+            )
+        # Pydantic rehydration — fails loudly if the row is malformed.
+        frontier_task = FrontierTask.model_validate(row)
+        brief = frontier_task_to_research_brief(frontier_task)
+
+        research_engine = AutoResearchEngine()
+        grade_engine = AutoGradeEngine()
+
+        t0 = _time.monotonic()
+        outcome = await self.run_auto_research_workflow(
+            brief=brief,
+            research_engine=research_engine,
+            grade_engine=grade_engine,
+            trace_store=getattr(self, "_trace_store", None),
+            lineage_graph=getattr(self, "_lineage_graph", None),
+        )
+        latency_ms = (_time.monotonic() - t0) * 1000.0
+
+        report = getattr(outcome, "report", None)
+        reward = getattr(outcome, "reward_signal", None)
+        grade_card = getattr(reward, "grade_card", None) if reward else None
+        gate_multiplier = float(getattr(reward, "gate_multiplier", 1.0) or 0.0)
+        promotion_state = (
+            str(getattr(grade_card, "promotion_state", "candidate") or "candidate")
+            if grade_card is not None
+            else "candidate"
+        )
+        quarantined = (
+            gate_multiplier == 0.0
+            or promotion_state == "rollback_or_revise"
+        )
+
+        payload = {
+            "report": (report.model_dump(mode="json") if report is not None and hasattr(report, "model_dump") else None),
+            "grade": (grade_card.model_dump(mode="json") if grade_card is not None and hasattr(grade_card, "model_dump") else None),
+            "reward_signal": (reward.model_dump(mode="json") if reward is not None and hasattr(reward, "model_dump") else None),
+            "quarantined": quarantined,
+            "lineage_edge_id": getattr(outcome, "lineage_edge_id", None),
+        }
+        return json.dumps(payload, ensure_ascii=False), latency_ms
 
     def get_memory_tools(self) -> dict[str, Any]:
         """Return callable memory tools for agent sandbox injection.
@@ -1710,10 +1819,32 @@ class AgentRunner:
         *,
         task: Task,
     ) -> str:
+        result = await self._execute_local_tool_backend_result(
+            tool_name,
+            parameters,
+            task=task,
+        )
+        return result.rendered_text
+
+    async def _execute_local_tool_backend_result(
+        self,
+        tool_name: str,
+        parameters: dict[str, Any],
+        *,
+        task: Task,
+    ) -> BackendToolResult:
         try:
-            return await self._execute_local_tool_impl(tool_name, parameters, task=task)
+            result = await self._execute_local_tool_impl(tool_name, parameters, task=task)
         except Exception as exc:
-            return f"ERROR: {tool_name} failed: {exc}"
+            result = BackendToolResult(
+                ok=False,
+                error=f"{tool_name} failed: {exc}",
+                metadata={"tool_name": tool_name},
+                rendered_text=f"ERROR: {tool_name} failed: {exc}",
+            )
+        if self._deep_agent_harness_config.feature_flags.backend_protocol_v2_enabled:
+            self._backend_tool_results.append(result)
+        return result
 
     async def _execute_local_tool_impl(
         self,
@@ -1721,7 +1852,7 @@ class AgentRunner:
         parameters: dict[str, Any],
         *,
         task: Task,
-    ) -> str:
+    ) -> BackendToolResult:
         workdir = _local_tool_workdir(task, self._config)
 
         if tool_name == "read_file":
@@ -1734,41 +1865,105 @@ class AgentRunner:
                         if path.exists():
                             break
                 if not path.exists():
-                    return f"ERROR: File not found: {path}"
+                    return ReadResult(
+                        ok=False,
+                        error=f"File not found: {path}",
+                        path=str(path),
+                        offset=1,
+                        limit=0,
+                        rendered_text=f"ERROR: File not found: {path}",
+                    )
             if not path.is_file():
-                return f"ERROR: Not a file: {path}"
+                return ReadResult(
+                    ok=False,
+                    error=f"Not a file: {path}",
+                    path=str(path),
+                    offset=1,
+                    limit=0,
+                    rendered_text=f"ERROR: Not a file: {path}",
+                )
             try:
                 offset = max(1, int(parameters.get("offset", 1) or 1))
                 limit = max(1, min(500, int(parameters.get("limit", 200) or 200)))
             except (TypeError, ValueError):
                 offset = 1
                 limit = 200
-            lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+            raw_text = path.read_text(encoding="utf-8", errors="replace")
+            lines = raw_text.splitlines()
             selected = lines[offset - 1 : offset - 1 + limit]
             numbered = [f"{offset + idx:>5} | {line}" for idx, line in enumerate(selected)]
-            return "\n".join(numbered) if numbered else ""
+            rendered_text = "\n".join(numbered) if numbered else ""
+            return ReadResult(
+                ok=True,
+                content=rendered_text,
+                path=str(path),
+                metadata={"line_count": len(lines)},
+                bytes_read=len(raw_text.encode("utf-8")),
+                offset=offset,
+                limit=limit,
+                rendered_text=rendered_text,
+            )
 
         if tool_name == "write_file":
             path = _resolve_local_tool_path(str(parameters.get("path", "")), workdir=workdir)
             content = str(parameters.get("content", ""))
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(content, encoding="utf-8")
-            return f"OK: wrote {len(content)} chars to {path}"
+            rendered_text = f"OK: wrote {len(content)} chars to {path}"
+            return WriteResult(
+                ok=True,
+                result=rendered_text,
+                path=str(path),
+                metadata={"tool_name": tool_name},
+                bytes_written=len(content.encode("utf-8")),
+                side_effect_id=stable_side_effect_id(
+                    tool_name,
+                    {"path": str(path), "content": content},
+                ),
+                rendered_text=rendered_text,
+            )
 
         if tool_name == "edit_file":
             path = _resolve_local_tool_path(str(parameters.get("path", "")), workdir=workdir)
             if not path.exists():
-                return f"ERROR: File not found: {path}"
+                return EditResult(
+                    ok=False,
+                    error=f"File not found: {path}",
+                    path=str(path),
+                    rendered_text=f"ERROR: File not found: {path}",
+                )
             old = str(parameters.get("old_string", ""))
             new = str(parameters.get("new_string", ""))
             content = path.read_text(encoding="utf-8", errors="replace")
             count = content.count(old)
             if count == 0:
-                return f"ERROR: old_string not found in {path}"
+                return EditResult(
+                    ok=False,
+                    error=f"old_string not found in {path}",
+                    path=str(path),
+                    rendered_text=f"ERROR: old_string not found in {path}",
+                )
             if count > 1:
-                return f"ERROR: old_string found {count} times in {path}"
+                return EditResult(
+                    ok=False,
+                    error=f"old_string found {count} times in {path}",
+                    path=str(path),
+                    metadata={"match_count": count},
+                    rendered_text=f"ERROR: old_string found {count} times in {path}",
+                )
             path.write_text(content.replace(old, new, 1), encoding="utf-8")
-            return f"OK: edited {path}"
+            rendered_text = f"OK: edited {path}"
+            return EditResult(
+                ok=True,
+                result=rendered_text,
+                path=str(path),
+                replacements=1,
+                side_effect_id=stable_side_effect_id(
+                    tool_name,
+                    {"path": str(path), "old_string": old, "new_string": new},
+                ),
+                rendered_text=rendered_text,
+            )
 
         if tool_name in {"shell_exec", "bash"}:
             if self._sandbox is None:
@@ -1779,26 +1974,65 @@ class AgentRunner:
             except (TypeError, ValueError):
                 timeout = 30.0
             result = await self._sandbox.execute(command, timeout=max(1.0, min(timeout, 300.0)))
-            return _tool_result_text(result)
+            rendered_text = _tool_result_text(result)
+            return ExecuteResult(
+                ok=getattr(result, "exit_code", 1) == 0 and not getattr(result, "timed_out", False),
+                result=rendered_text,
+                metadata={"command": command},
+                exit_code=getattr(result, "exit_code", None),
+                stdout=str(getattr(result, "stdout", "") or ""),
+                stderr=str(getattr(result, "stderr", "") or ""),
+                duration_seconds=getattr(result, "duration_seconds", None),
+                timed_out=bool(getattr(result, "timed_out", False)),
+                side_effect_id=stable_side_effect_id(
+                    tool_name,
+                    {"command": command, "timeout": max(1.0, min(timeout, 300.0))},
+                ),
+                rendered_text=rendered_text,
+            )
 
         if tool_name in {"glob_files", "search_files"}:
             pattern = str(parameters.get("pattern", "")).strip()
             base = _resolve_local_tool_path(str(parameters.get("path", "") or parameters.get("directory", "") or "."), workdir=workdir)
-            matches = sorted(base.glob(pattern))[:50]
+            matches = [str(match) for match in sorted(base.glob(pattern))[:50]]
             if not matches:
-                return f"No files matching {pattern!r}"
-            return "\n".join(str(match) for match in matches)
+                return GlobResult(
+                    ok=True,
+                    result=[],
+                    path=str(base),
+                    matches=[],
+                    metadata={"pattern": pattern},
+                    rendered_text=f"No files matching {pattern!r}",
+                )
+            return GlobResult(
+                ok=True,
+                result=matches,
+                path=str(base),
+                matches=matches,
+                metadata={"pattern": pattern},
+                rendered_text="\n".join(matches),
+            )
 
         if tool_name in {"grep_search", "search_content"}:
             pattern = str(parameters.get("pattern", "")).strip()
             if not pattern:
-                return "ERROR: pattern required"
+                return GrepResult(
+                    ok=False,
+                    error="pattern required",
+                    rendered_text="ERROR: pattern required",
+                )
             base = _resolve_local_tool_path(str(parameters.get("path", "") or parameters.get("directory", "") or "."), workdir=workdir)
             file_glob = str(parameters.get("glob", "") or parameters.get("file_glob", "") or "**/*")
             try:
                 compiled = re.compile(pattern)
             except re.error as exc:
-                return f"ERROR: invalid regex: {exc}"
+                return GrepResult(
+                    ok=False,
+                    error=f"invalid regex: {exc}",
+                    path=str(base),
+                    metadata={"pattern": pattern},
+                    rendered_text=f"ERROR: invalid regex: {exc}",
+                )
             try:
                 max_results = max(1, min(50, int(parameters.get("max_results", 30) or 30)))
             except (TypeError, ValueError):
@@ -1815,36 +2049,92 @@ class AgentRunner:
                         if compiled.search(line):
                             results.append(f"{candidate}:{line_no}:{line}")
                             if len(results) >= max_results:
-                                return "\n".join(results)
+                                return GrepResult(
+                                    ok=True,
+                                    result=results,
+                                    path=str(base),
+                                    matches=results,
+                                    metadata={"pattern": pattern, "glob": file_glob},
+                                    truncated=True,
+                                    rendered_text="\n".join(results),
+                                )
                 except Exception:
                     continue
-            return "\n".join(results) if results else f"No matches for {pattern!r}"
+            return GrepResult(
+                ok=True,
+                result=results,
+                path=str(base),
+                matches=results,
+                metadata={"pattern": pattern, "glob": file_glob},
+                rendered_text="\n".join(results) if results else f"No matches for {pattern!r}",
+            )
 
         if tool_name == "web_search":
             query = str(parameters.get("query", "")).strip()
             if not query:
-                return "ERROR: query required"
+                return WebSearchResult(
+                    ok=False,
+                    error="query required",
+                    rendered_text="ERROR: query required",
+                )
             max_results = int(parameters.get("max_results", 5) or 5)
             backend = str(parameters.get("backend", "") or "").strip() or None
             try:
                 from dharma_swarm.web_search import search_web
                 results = await search_web(query, max_results=max_results, backend=backend)
-                return results
+                return WebSearchResult(
+                    ok=True,
+                    result=results,
+                    metadata={"max_results": max_results},
+                    query=query,
+                    backend=backend,
+                    rendered_text=str(results),
+                )
             except Exception as exc:
-                return f"ERROR: web_search failed: {exc}"
+                return WebSearchResult(
+                    ok=False,
+                    error=f"web_search failed: {exc}",
+                    metadata={"max_results": max_results},
+                    query=query,
+                    backend=backend,
+                    rendered_text=f"ERROR: web_search failed: {exc}",
+                )
 
         if tool_name == "fetch_url":
             url = str(parameters.get("url", "")).strip()
             if not url:
-                return "ERROR: url required"
+                return FetchUrlResult(
+                    ok=False,
+                    error="url required",
+                    rendered_text="ERROR: url required",
+                )
             try:
                 from dharma_swarm.web_search import fetch_url
                 content = await fetch_url(url)
-                return content[:16000]
+                rendered_text = content[:16000]
+                return FetchUrlResult(
+                    ok=True,
+                    content=rendered_text,
+                    metadata={"original_length": len(content)},
+                    truncated=len(content) > len(rendered_text),
+                    bytes_read=len(content.encode("utf-8")),
+                    url=url,
+                    rendered_text=rendered_text,
+                )
             except Exception as exc:
-                return f"ERROR: fetch_url failed: {exc}"
+                return FetchUrlResult(
+                    ok=False,
+                    error=f"fetch_url failed: {exc}",
+                    url=url,
+                    rendered_text=f"ERROR: fetch_url failed: {exc}",
+                )
 
-        return f"ERROR: unknown tool {tool_name}"
+        return BackendToolResult(
+            ok=False,
+            error=f"unknown tool {tool_name}",
+            metadata={"tool_name": tool_name},
+            rendered_text=f"ERROR: unknown tool {tool_name}",
+        )
 
     async def _complete_with_tool_loop(
         self,
@@ -1928,17 +2218,21 @@ class AgentRunner:
                 tool_name = str(tool_call.get("name") or "")
                 # MUST match the ID in _normalized_tool_call_payload (ordinal=index)
                 tool_id = str(tool_call.get("id") or f"tool-call-{index}")
-                tool_result = await self._execute_local_tool(
+                backend_result = await self._execute_local_tool_backend_result(
                     tool_name,
                     params,
                     task=task,
                 )
+                tool_result = backend_result.rendered_text
+                tool_message = {
+                    "role": "tool",
+                    "tool_call_id": tool_id,
+                    "content": tool_result[:16000],
+                }
+                if self._deep_agent_harness_config.feature_flags.backend_protocol_v2_enabled:
+                    tool_message["backend_result"] = backend_result.model_dump(mode="json")
                 updated_messages.append(
-                    {
-                        "role": "tool",
-                        "tool_call_id": tool_id,
-                        "content": tool_result[:16000],
-                    }
+                    tool_message
                 )
 
             current_request = current_request.model_copy(update={"messages": updated_messages})
@@ -2172,7 +2466,14 @@ class AgentRunner:
                 self._start_active_inference(task)
             )
 
-            if self._provider is not None:
+            if telic_task_type == "deep_research":
+                # PR4: route through AutoResearch + AutoGrade. Returns a
+                # JSON-serialized result with {report, grade, quarantined}.
+                # The Telic Seam at line ~2680 records Outcome/ValueEvent
+                # exactly once — DO NOT duplicate here.
+                result, completion_latency_ms = await self._run_deep_research_task(task)
+                observed_quality_score = 1.0
+            elif self._provider is not None:
                 current_request = request
                 attempts_remaining = _semantic_repair_attempts(task, self._config)
                 attempt_index = 1

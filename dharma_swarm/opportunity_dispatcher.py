@@ -115,12 +115,17 @@ WITNESS_DIR = DHARMA_HOME / "witness"
 # Canonical task_board location matches swarm.py:608 (state_dir/db/tasks.db).
 TASK_BOARD_DB = DHARMA_HOME / "db" / "tasks.db"
 
-# Stages this PR is allowed to promote. Extended through PR4/PR5.
+# Stages this PR is allowed to promote. Extended through PR5.
 # PR1 had only ``scope``; PR2 adds ``validate``; PR4 adds ``deep_research``;
 # PR5 adds ``capability`` and ``mvp``; ``first_artifact`` is deferred to PR7
 # because it expects a built artifact (per template at curriculum_engine.py:153),
 # not a memo, and so needs a different result contract.
-PROMOTABLE_STAGES: tuple[str, ...] = ("scope", "validate")
+PROMOTABLE_STAGES: tuple[str, ...] = ("scope", "validate", "deep_research")
+
+# Throttle: deep_research stages are expensive (LLM-driven AutoResearch).
+# Cap at N promotions in a rolling 24h window. PR4 enforces this gate.
+DEEP_RESEARCH_THROTTLE_PER_DAY = 6
+DEEP_RESEARCH_WINDOW_SECONDS = 24 * 3600
 
 # Filenames per stage for the artifact_target metadata field. The completion
 # observer writes to these paths.
@@ -311,6 +316,35 @@ def _summarize_chain_status(statuses: dict[str, Any]) -> str:
     if any(v == "failed" for v in vals):
         return "failed_retry_pending"
     return "no_eligible_stage"
+
+
+def _count_recent_deep_research_promotions(
+    window_seconds: int = DEEP_RESEARCH_WINDOW_SECONDS,
+) -> int:
+    """Scan all campaign manifests and count deep_research stages that were
+    promoted (or completed) within the last ``window_seconds``.
+
+    This is the throttle counter: cap is ``DEEP_RESEARCH_THROTTLE_PER_DAY``.
+    Counts promotions even if the stage later completed or was quarantined,
+    because the cost was already incurred at promotion time.
+    """
+    threshold = datetime.now(timezone.utc).timestamp() - window_seconds
+    count = 0
+    for opp_id in list_campaign_ids():
+        m = read_manifest(opp_id)
+        if m is None:
+            continue
+        s = (m.get("stages") or {}).get("deep_research") or {}
+        promoted_at = s.get("promoted_at") or s.get("completed_at")
+        if not promoted_at:
+            continue
+        try:
+            ts = datetime.fromisoformat(str(promoted_at)).timestamp()
+        except ValueError:
+            continue
+        if ts >= threshold:
+            count += 1
+    return count
 
 
 def _depends_on_for_stage(manifest: dict[str, Any], stage: str) -> list[str]:
@@ -657,7 +691,22 @@ async def _promote_one_opportunity(
         if not dry_run:
             _write_review_warn(opp_id, stage, action, gate.reason)
 
-    # 4. Budget gate
+    # 4a. Throttle gate (PR4): cap deep_research promotions per 24h window.
+    if stage == "deep_research":
+        recent = _count_recent_deep_research_promotions()
+        if recent >= DEEP_RESEARCH_THROTTLE_PER_DAY:
+            manifest["throttled"] = True
+            if not dry_run:
+                write_manifest(opp_id, manifest)
+            result.skipped.append(
+                {"opportunity_id": opp_id, "stage": stage,
+                 "reason": "deep_research_throttled",
+                 "recent_count": recent,
+                 "limit": DEEP_RESEARCH_THROTTLE_PER_DAY}
+            )
+            return
+
+    # 4b. Budget gate
     if _budget_exceeded():
         manifest["budget_blocked"] = True
         if not dry_run:
@@ -825,9 +874,70 @@ async def _process_completed_task(
 ) -> None:
     """Handle a task that came back COMPLETED. Writes the artifact for
     stage_doc stages, updates manifest, leaves a stigmergy mark."""
-    # PR4-shaped quarantine: keep the manifest accurate but don't write
-    # a passing artifact. PR4 will own the .quarantined.json artifact.
-    if _is_quarantine_result(task):
+    quarantined = _is_quarantine_result(task)
+
+    # PR4: deep_research stage uses ArtifactManifestStore so its sidecar
+    # manifest is properly recorded — this is what ArtifactManifestStore is
+    # actually for (per artifact_manifest.py:117). Quarantined results land
+    # in deep_research.quarantined.json instead of deep_research.json so the
+    # chain doesn't accidentally promote slop downstream.
+    if stage == "deep_research":
+        filename = "deep_research.quarantined.json" if quarantined else "deep_research.json"
+        target = CAMPAIGN_ROOT / opp_id / filename
+        target.parent.mkdir(parents=True, exist_ok=True)
+        body = str(getattr(task, "result", "") or "")
+        target.write_text(body, encoding="utf-8")
+        # Best-effort sidecar manifest via the canonical artifact store.
+        try:
+            from uuid import uuid4
+            from dharma_swarm.engine.artifacts import ArtifactRef
+            from dharma_swarm.artifact_manifest import ArtifactManifestStore
+            ref = ArtifactRef(
+                artifact_id=uuid4().hex[:16],
+                artifact_type="deep_research_report",
+                path=str(target),
+                created_by="opportunity_dispatcher.observer",
+                session_id=opp_id,
+                version=1,
+                confidence=0.0,
+                citations=[],
+                depends_on=[],
+                metadata={
+                    "opportunity_id": opp_id,
+                    "stage": stage,
+                    "quarantined": quarantined,
+                },
+            )
+            ArtifactManifestStore().record_manifest(
+                ref,
+                artifact_kind="research_report",
+                task_id=task.id,
+                promotion_state="rollback_or_revise" if quarantined else "candidate",
+                provenance={
+                    "opportunity_id": opp_id,
+                    "frontier_id": (manifest.get("stages") or {}).get(stage, {}).get("frontier_id", ""),
+                },
+            )
+        except Exception:
+            logger.debug("ArtifactManifestStore.record_manifest failed", exc_info=True)
+        new_status = "quarantined" if quarantined else "completed"
+        update_stage(
+            manifest, stage,
+            status=new_status,
+            task_id=task.id,
+            completed_at=datetime.now(timezone.utc).isoformat(),
+            artifact_path=filename,
+            quarantine_cleared_by=None if quarantined else None,
+        )
+        write_manifest(opp_id, manifest)
+        if quarantined:
+            result.quarantined.append({"opportunity_id": opp_id, "stage": stage, "task_id": task.id})
+        else:
+            result.completed.append({"opportunity_id": opp_id, "stage": stage, "task_id": task.id})
+        return
+
+    # Non-deep_research path: stage_doc or quarantined-non-research.
+    if quarantined:
         update_stage(
             manifest, stage,
             status="quarantined",
