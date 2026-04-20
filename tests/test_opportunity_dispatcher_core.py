@@ -54,6 +54,8 @@ def tmp_dharma(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setattr(opportunity_dispatcher, "HEALTH_PATH", meta_dir / "opportunity_dispatcher.health.json")
     monkeypatch.setattr(opportunity_dispatcher, "WITNESS_DIR", witness_dir)
     monkeypatch.setattr(_campaign_manifest, "CAMPAIGN_ROOT", campaigns)
+    # Dispatcher imported CAMPAIGN_ROOT at module load — patch its local copy too.
+    monkeypatch.setattr(opportunity_dispatcher, "CAMPAIGN_ROOT", campaigns)
     return dharma_home
 
 
@@ -109,6 +111,22 @@ class _FakeTaskBoard:
     async def create(self, **kwargs):
         type(self).last_call = kwargs
         return FakeTask(id=type(self).next_task_id)
+
+    async def get(self, task_id: str):
+        # PR2 observer calls this. Default: return a still-running task so
+        # the observer treats it as in-flight. Tests that need a different
+        # status can monkey-patch this attribute.
+        from dharma_swarm.models import TaskStatus
+        return _FakePendingTask(id=task_id, status=TaskStatus.RUNNING)
+
+
+@dataclass
+class _FakePendingTask:
+    id: str = "task_fake_running"
+    status: Any = None
+    result: str | None = None
+    metadata: dict[str, Any] = None  # type: ignore[assignment]
+    created_by: str = "opportunity_dispatcher"
 
 
 @pytest.fixture
@@ -398,9 +416,13 @@ def test_health_written_with_required_fields_after_main(
         "run_count", "success_count", "last_run_dispatched",
         "last_run_dry_run", "last_run_paused", "last_run_pending_count",
         "last_run_errors", "schema_version",
+        # PR2 — observer fields
+        "last_run_observed_completed", "last_run_observed_failed_retried",
+        "last_run_observed_failed_abandoned", "last_run_observed_quarantined",
+        "last_run_observed_in_flight",
     ):
         assert key in health, f"missing health field: {key}"
-    assert health["schema_version"] == 1
+    assert health["schema_version"] == 2  # bumped in PR2 for observer fields
     assert health["last_run_dispatched"] == 1
     assert health["consecutive_failures"] == 0
     assert health["last_run_paused"] is False

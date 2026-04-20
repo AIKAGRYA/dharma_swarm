@@ -115,11 +115,15 @@ WITNESS_DIR = DHARMA_HOME / "witness"
 # Canonical task_board location matches swarm.py:608 (state_dir/db/tasks.db).
 TASK_BOARD_DB = DHARMA_HOME / "db" / "tasks.db"
 
-# Stages this PR is allowed to promote. Extended in PR2/PR4/PR5.
-PROMOTABLE_STAGES_PR1: tuple[str, ...] = ("scope",)
+# Stages this PR is allowed to promote. Extended through PR4/PR5.
+# PR1 had only ``scope``; PR2 adds ``validate``; PR4 adds ``deep_research``;
+# PR5 adds ``capability`` and ``mvp``; ``first_artifact`` is deferred to PR7
+# because it expects a built artifact (per template at curriculum_engine.py:153),
+# not a memo, and so needs a different result contract.
+PROMOTABLE_STAGES: tuple[str, ...] = ("scope", "validate")
 
-# Filenames per stage for the artifact_target metadata field. PR2's observer
-# writes to these paths.
+# Filenames per stage for the artifact_target metadata field. The completion
+# observer writes to these paths.
 STAGE_FILENAME: dict[str, str] = {
     "scope": "scope.md",
     "validate": "validate.md",
@@ -128,6 +132,16 @@ STAGE_FILENAME: dict[str, str] = {
     "mvp": "mvp.md",
     # ``first_artifact`` deliberately absent — PR7 needs a directory contract.
 }
+
+# Retry backoff for failed stages. Index = retry_count *before* the increment;
+# value = seconds to wait before the next retry. ``None`` = abandon (no more
+# retries). PR2 policy: try once, retry after 1h, retry after 6h, then abandon.
+RETRY_BACKOFF_SECONDS: tuple[int | None, ...] = (3600, 21600, None)
+
+# Stages whose completion the observer treats as a stage_doc (writes a plain
+# .md file from task.result). ``deep_research`` is excluded because PR4 routes
+# it through ArtifactManifestStore for proper sidecar-manifest semantics.
+STAGE_DOC_STAGES: frozenset[str] = frozenset({"scope", "validate", "capability", "mvp"})
 
 
 # --------------------------------------------------------------------------
@@ -242,6 +256,77 @@ def _row_for_stage(rows: list[dict[str, Any]], stage: str) -> dict[str, Any] | N
         if str(meta.get("stage") or "") == stage:
             return row
     return None
+
+
+def _find_eligible_stage(manifest: dict[str, Any]) -> str | None:
+    """Pick the first PROMOTABLE stage that the dispatcher should attempt
+    on this tick, walking the canonical order.
+
+    Stop conditions (return ``None``):
+    - A stage is in flight (``promoted`` or ``dispatched``) — wait for it
+      before promoting any successor.
+    - A stage is ``quarantined`` or ``abandoned`` — operator must clear via
+      ``--retry-quarantined`` or accept the chain death.
+    - A stage is ``failed`` with ``next_retry_at`` in the future — not yet.
+
+    Skip conditions (continue to next stage):
+    - A stage is ``completed`` — move on to its successor.
+
+    Promote conditions (return that stage):
+    - Status is ``pending`` (fresh) or ``blocked`` (gate may have changed
+      its mind) or ``failed`` with retry due now.
+    """
+    now_iso = datetime.now(timezone.utc).isoformat()
+    for stage in PROMOTABLE_STAGES:
+        s = manifest["stages"].get(stage)
+        if s is None:  # schema mismatch — treat as not promotable
+            return None
+        status = str(s.get("status") or "")
+        if status in {"promoted", "dispatched"}:
+            return None
+        if status == "completed":
+            continue
+        if status in {"quarantined", "abandoned"}:
+            return None
+        if status == "failed":
+            next_retry = s.get("next_retry_at")
+            if next_retry is not None and now_iso < str(next_retry):
+                return None
+        # status is pending, blocked, or failed-with-retry-due
+        return stage
+    return None
+
+
+def _summarize_chain_status(statuses: dict[str, Any]) -> str:
+    """One-word summary for the skip reason. Picks the strongest signal."""
+    vals = list(statuses.values())
+    if any(v == "promoted" or v == "dispatched" for v in vals):
+        return "in_flight"
+    if any(v == "quarantined" for v in vals):
+        return "quarantined"
+    if any(v == "abandoned" for v in vals):
+        return "abandoned"
+    if all(v == "completed" or v is None for v in vals):
+        return "all_completed"
+    if any(v == "failed" for v in vals):
+        return "failed_retry_pending"
+    return "no_eligible_stage"
+
+
+def _depends_on_for_stage(manifest: dict[str, Any], stage: str) -> list[str]:
+    """Return the task_id of the immediately-prior PROMOTABLE stage if it
+    exists and was promoted (so its task_id is on task_board). Empty list
+    for the first stage."""
+    try:
+        idx = PROMOTABLE_STAGES.index(stage)
+    except ValueError:
+        return []
+    if idx == 0:
+        return []
+    prev = PROMOTABLE_STAGES[idx - 1]
+    prev_state = manifest["stages"].get(prev) or {}
+    prev_task_id = prev_state.get("task_id")
+    return [prev_task_id] if prev_task_id else []
 
 
 # --------------------------------------------------------------------------
@@ -420,6 +505,12 @@ class HealthState:
     last_run_paused: bool = False
     last_run_pending_count: int = 0
     last_run_errors: list[str] = field(default_factory=list)
+    # Observer (PR2) — counts from the most recent reconciliation pass.
+    last_run_observed_completed: int = 0
+    last_run_observed_failed_retried: int = 0
+    last_run_observed_failed_abandoned: int = 0
+    last_run_observed_quarantined: int = 0
+    last_run_observed_in_flight: int = 0
 
 
 def _read_health() -> HealthState:
@@ -440,6 +531,11 @@ def _read_health() -> HealthState:
         last_run_paused=bool(raw.get("last_run_paused") or False),
         last_run_pending_count=int(raw.get("last_run_pending_count") or 0),
         last_run_errors=list(raw.get("last_run_errors") or []),
+        last_run_observed_completed=int(raw.get("last_run_observed_completed") or 0),
+        last_run_observed_failed_retried=int(raw.get("last_run_observed_failed_retried") or 0),
+        last_run_observed_failed_abandoned=int(raw.get("last_run_observed_failed_abandoned") or 0),
+        last_run_observed_quarantined=int(raw.get("last_run_observed_quarantined") or 0),
+        last_run_observed_in_flight=int(raw.get("last_run_observed_in_flight") or 0),
     )
 
 
@@ -456,7 +552,12 @@ def _write_health(state: HealthState) -> None:
         "last_run_paused": state.last_run_paused,
         "last_run_pending_count": state.last_run_pending_count,
         "last_run_errors": state.last_run_errors[-5:],  # cap retained errors
-        "schema_version": 1,
+        "last_run_observed_completed": state.last_run_observed_completed,
+        "last_run_observed_failed_retried": state.last_run_observed_failed_retried,
+        "last_run_observed_failed_abandoned": state.last_run_observed_failed_abandoned,
+        "last_run_observed_quarantined": state.last_run_observed_quarantined,
+        "last_run_observed_in_flight": state.last_run_observed_in_flight,
+        "schema_version": 2,
     }
     tmp = HEALTH_PATH.with_suffix(".json.tmp")
     tmp.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -503,16 +604,27 @@ async def _promote_one_opportunity(
         if not dry_run:
             write_manifest(opp_id, manifest)
 
-    # 2. Find the first PR1-eligible stage. PR1 = scope only.
-    stage = "scope"
-    if stage not in PROMOTABLE_STAGES_PR1:
-        return
-    stage_state = manifest["stages"][stage]
-    if stage_state["status"] in {"promoted", "dispatched", "completed", "quarantined", "abandoned"}:
+    # 2. Find the first eligible stage in canonical order.
+    #    A stage is eligible when:
+    #      - it is in PROMOTABLE_STAGES (PR-gated)
+    #      - its current status is "pending" (or "failed" with retry due, or
+    #        "blocked" — gate may now allow)
+    #      - the immediately prior stage is completed (or there is no prior)
+    #    The first such stage wins; we promote one stage per opportunity per
+    #    tick. Subsequent ticks pick up the next stage as predecessors complete.
+    stage = _find_eligible_stage(manifest)
+    if stage is None:
+        # Silent skip is fine for the dispatcher's own logic, but emit a
+        # reason for operator visibility (which stages already in flight,
+        # which were completed, which are quarantined).
+        statuses = {st: m.get("status") for st, m in (manifest.get("stages") or {}).items()}
         result.skipped.append(
-            {"opportunity_id": opp_id, "stage": stage, "reason": f"already_{stage_state['status']}"}
+            {"opportunity_id": opp_id, "stage": "<chain>",
+             "reason": f"already_{_summarize_chain_status(statuses)}",
+             "stages": statuses}
         )
         return
+    stage_state = manifest["stages"][stage]
 
     row = _row_for_stage(rows, stage)
     if row is None:
@@ -560,25 +672,28 @@ async def _promote_one_opportunity(
         )
         return
 
+    depends_on = _depends_on_for_stage(manifest, stage)
     try:
         task_id = await _create_task_for_stage(
-            opp_id=opp_id, stage=stage, row=row, depends_on=[],
+            opp_id=opp_id, stage=stage, row=row, depends_on=depends_on,
         )
     except Exception as exc:
         logger.exception("task_board.create failed for %s/%s", opp_id, stage)
         result.errors.append(f"{opp_id}/{stage}: {exc}")
         return
 
-    # 6. Update manifest
+    # 6. Update manifest. Preserve retry_count across re-promotions so the
+    #    failure handler can keep counting toward the abandon threshold.
     manifest["budget_blocked"] = False  # cleared if we got past it
+    prior_retry_count = int(stage_state.get("retry_count") or 0)
     update_stage(
         manifest, stage,
         status="promoted",
         task_id=task_id,
         promoted_at=datetime.now(timezone.utc).isoformat(),
-        retry_count=0,
-        last_retry_at=None,
-        next_retry_at=None,
+        retry_count=prior_retry_count,
+        # last_retry_at and next_retry_at intentionally preserved — they
+        # describe the most recent failure, not this re-promotion.
     )
     write_manifest(opp_id, manifest)
 
@@ -647,6 +762,254 @@ def _update_health_from_result(state: HealthState, result: RunResult, ok: bool) 
     return state
 
 
+# --------------------------------------------------------------------------
+# Completion observer (PR2)
+#
+# Polls task_board for tasks created by the dispatcher. When a task completes
+# successfully, write the artifact (plain {stage}.md from task.result for
+# stage_doc stages) and mark manifest.stages[stage].status="completed".
+# When a task fails, apply RETRY_BACKOFF_SECONDS — up to 2 retries, then
+# abandon. Quarantined results stay quarantined and require manual
+# ``--retry-quarantined`` to clear.
+#
+# CRITICAL: this observer DOES NOT record Outcome / ValueEvent / Contribution.
+# Those are already recorded at the existing Telic Seam in
+# ``agent_runner.py:2680`` (success) and ``agent_runner.py:2810`` (failure).
+# Duplicating them here would double-count economic events.
+# --------------------------------------------------------------------------
+
+
+@dataclass
+class ObserveResult:
+    completed: list[dict[str, Any]] = field(default_factory=list)
+    failed_retried: list[dict[str, Any]] = field(default_factory=list)
+    failed_abandoned: list[dict[str, Any]] = field(default_factory=list)
+    quarantined: list[dict[str, Any]] = field(default_factory=list)
+    in_flight: list[dict[str, Any]] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
+
+
+def _scan_in_flight() -> list[tuple[str, str, dict[str, Any]]]:
+    """Return ``(opportunity_id, stage, manifest)`` triples for stages whose
+    status is ``promoted`` or ``dispatched`` — i.e. tasks the observer
+    should check on."""
+    out: list[tuple[str, str, dict[str, Any]]] = []
+    for opp_id in list_campaign_ids():
+        manifest = read_manifest(opp_id)
+        if manifest is None:
+            continue
+        for stage, s in (manifest.get("stages") or {}).items():
+            status = str(s.get("status") or "")
+            if status in {"promoted", "dispatched"}:
+                out.append((opp_id, stage, manifest))
+    return out
+
+
+def _is_quarantine_result(task: Any) -> bool:
+    """Detect the PR4 quarantine flag in task.result. PR2 just recognizes
+    the shape so quarantined deep_research tasks stay quarantined; the
+    actual quarantine writer is PR4."""
+    raw = getattr(task, "result", None)
+    if not raw:
+        return False
+    try:
+        parsed = json.loads(raw) if isinstance(raw, str) else raw
+    except Exception:
+        return False
+    return bool(isinstance(parsed, dict) and parsed.get("quarantined") is True)
+
+
+async def _process_completed_task(
+    opp_id: str, stage: str, manifest: dict[str, Any], task: Any,
+    result: ObserveResult,
+) -> None:
+    """Handle a task that came back COMPLETED. Writes the artifact for
+    stage_doc stages, updates manifest, leaves a stigmergy mark."""
+    # PR4-shaped quarantine: keep the manifest accurate but don't write
+    # a passing artifact. PR4 will own the .quarantined.json artifact.
+    if _is_quarantine_result(task):
+        update_stage(
+            manifest, stage,
+            status="quarantined",
+            task_id=task.id,
+            completed_at=datetime.now(timezone.utc).isoformat(),
+            quarantine_cleared_by=None,
+        )
+        write_manifest(opp_id, manifest)
+        result.quarantined.append({"opportunity_id": opp_id, "stage": stage, "task_id": task.id})
+        return
+
+    artifact_path: str | None = None
+    if stage in STAGE_DOC_STAGES:
+        body = str(getattr(task, "result", "") or "")
+        target = CAMPAIGN_ROOT / opp_id / STAGE_FILENAME[stage]
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(body, encoding="utf-8")
+        artifact_path = STAGE_FILENAME[stage]
+
+    update_stage(
+        manifest, stage,
+        status="completed",
+        task_id=task.id,
+        completed_at=datetime.now(timezone.utc).isoformat(),
+        artifact_path=artifact_path,
+    )
+    write_manifest(opp_id, manifest)
+
+    try:
+        from dharma_swarm.stigmergy import leave_stigmergic_mark
+        await leave_stigmergic_mark(
+            agent="opportunity_dispatcher.observer",
+            file_path=str(CAMPAIGN_ROOT / opp_id / (artifact_path or "manifest.json")),
+            observation=f"completed {stage} for {opp_id} → task {task.id}",
+            salience=0.8,
+            connections=[opp_id, task.id],
+            channel="strategy",
+            action="write",
+        )
+    except Exception:
+        logger.debug("observer stigmergy mark failed", exc_info=True)
+
+    result.completed.append({"opportunity_id": opp_id, "stage": stage, "task_id": task.id})
+
+
+def _process_failed_task(
+    opp_id: str, stage: str, manifest: dict[str, Any], task: Any,
+    result: ObserveResult,
+) -> None:
+    """Handle a task that came back FAILED. Apply retry backoff, or abandon."""
+    s = manifest["stages"][stage]
+    retry_count = int(s.get("retry_count") or 0)
+    next_backoff = (
+        RETRY_BACKOFF_SECONDS[retry_count]
+        if retry_count < len(RETRY_BACKOFF_SECONDS)
+        else None
+    )
+    now = datetime.now(timezone.utc)
+    if next_backoff is None:
+        # Out of retries — abandon.
+        update_stage(
+            manifest, stage,
+            status="abandoned",
+            retry_count=retry_count + 1,
+            last_retry_at=now.isoformat(),
+            next_retry_at=None,
+            failure_reason=str(getattr(task, "result", "") or "")[:500],
+        )
+        write_manifest(opp_id, manifest)
+        result.failed_abandoned.append(
+            {"opportunity_id": opp_id, "stage": stage, "task_id": task.id, "retry_count": retry_count + 1}
+        )
+        return
+
+    next_retry = now.timestamp() + next_backoff
+    next_retry_iso = datetime.fromtimestamp(next_retry, tz=timezone.utc).isoformat()
+    update_stage(
+        manifest, stage,
+        status="failed",
+        task_id=task.id,
+        retry_count=retry_count + 1,
+        last_retry_at=now.isoformat(),
+        next_retry_at=next_retry_iso,
+        failure_reason=str(getattr(task, "result", "") or "")[:500],
+    )
+    write_manifest(opp_id, manifest)
+    result.failed_retried.append(
+        {"opportunity_id": opp_id, "stage": stage, "task_id": task.id,
+         "next_retry_at": next_retry_iso, "retry_count": retry_count + 1}
+    )
+
+
+async def observe_completions() -> ObserveResult:
+    """Poll task_board for in-flight dispatcher tasks and reconcile their
+    state into the campaign manifests. Returns an ObserveResult."""
+    from dharma_swarm.models import TaskStatus
+    from dharma_swarm.task_board import TaskBoard
+
+    result = ObserveResult()
+    triples = _scan_in_flight()
+    if not triples:
+        return result
+
+    TASK_BOARD_DB.parent.mkdir(parents=True, exist_ok=True)
+    board = TaskBoard(TASK_BOARD_DB)
+    await board.init_db()
+
+    for opp_id, stage, manifest in triples:
+        task_id = manifest["stages"][stage].get("task_id")
+        if not task_id:
+            continue
+        try:
+            task = await board.get(task_id)
+        except Exception as exc:
+            logger.exception("board.get failed for %s", task_id)
+            result.errors.append(f"{opp_id}/{stage}: {exc}")
+            continue
+        if task is None:
+            # Task vanished — maybe purged externally. Mark as failed-abandoned
+            # so the chain can move on without infinite waiting.
+            update_stage(
+                manifest, stage,
+                status="abandoned",
+                failure_reason="task missing from task_board",
+            )
+            write_manifest(opp_id, manifest)
+            result.failed_abandoned.append(
+                {"opportunity_id": opp_id, "stage": stage, "task_id": task_id, "reason": "missing"}
+            )
+            continue
+        status = task.status if hasattr(task.status, "value") else str(task.status)
+        status_val = status.value if hasattr(status, "value") else str(status)
+        if status_val == TaskStatus.COMPLETED.value:
+            try:
+                await _process_completed_task(opp_id, stage, manifest, task, result)
+            except Exception as exc:
+                logger.exception("process_completed failed for %s/%s", opp_id, stage)
+                result.errors.append(f"{opp_id}/{stage}: {exc}")
+        elif status_val == TaskStatus.FAILED.value:
+            try:
+                _process_failed_task(opp_id, stage, manifest, task, result)
+            except Exception as exc:
+                logger.exception("process_failed failed for %s/%s", opp_id, stage)
+                result.errors.append(f"{opp_id}/{stage}: {exc}")
+        else:
+            # Still in flight (pending/assigned/running/cancelled).
+            result.in_flight.append({"opportunity_id": opp_id, "stage": stage, "task_id": task_id, "task_status": status_val})
+    return result
+
+
+def retry_quarantined(spec: str) -> tuple[bool, str]:
+    """Clear a quarantined stage so the dispatcher will re-attempt it.
+
+    Spec format: ``OPP_ID:STAGE``. Returns (ok, message).
+    """
+    if ":" not in spec:
+        return False, f"expected OPP_ID:STAGE, got {spec!r}"
+    opp_id, stage = spec.split(":", 1)
+    if stage not in PROMOTABLE_STAGES and stage not in STAGE_FILENAME:
+        return False, f"unknown stage: {stage!r}"
+    manifest = read_manifest(opp_id)
+    if manifest is None:
+        return False, f"no manifest for opportunity {opp_id!r}"
+    s = manifest["stages"].get(stage)
+    if s is None:
+        return False, f"stage {stage!r} not present in manifest"
+    if s.get("status") != "quarantined":
+        return False, f"stage {stage!r} is {s.get('status')!r}, not quarantined"
+    update_stage(
+        manifest, stage,
+        status="pending",
+        task_id=None,
+        retry_count=int(s.get("retry_count") or 0),  # preserve history
+        last_retry_at=datetime.now(timezone.utc).isoformat(),
+        next_retry_at=None,
+        quarantine_cleared_by="cli",
+        quarantine_cleared_at=datetime.now(timezone.utc).isoformat(),
+    )
+    write_manifest(opp_id, manifest)
+    return True, f"cleared quarantine on {opp_id}/{stage}"
+
+
 def _build_arg_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="opportunity_dispatcher",
@@ -660,7 +1023,32 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--verbose", "-v", action="store_true", help="Log INFO instead of WARNING.",
     )
+    p.add_argument(
+        "--no-observe", action="store_true",
+        help="Skip the completion observer (promotion-only mode).",
+    )
+    p.add_argument(
+        "--retry-quarantined", metavar="OPP_ID:STAGE", default=None,
+        help="Clear a quarantined stage so the dispatcher will re-attempt it.",
+    )
     return p
+
+
+async def _run_full_tick(
+    *, dry_run: bool, max_promotions: int | None, observe: bool,
+) -> tuple[RunResult, ObserveResult]:
+    """Promotion phase + observer phase, in that order. Each phase isolates
+    its own try/except so a failing observer cannot prevent promotion (and
+    vice versa)."""
+    promote = await run_once(dry_run=dry_run, max_promotions=max_promotions)
+    obs = ObserveResult()
+    if observe and not dry_run and not promote.paused:
+        try:
+            obs = await observe_completions()
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("observe_completions raised")
+            obs.errors.append(str(exc))
+    return promote, obs
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -671,8 +1059,16 @@ def main(argv: list[str] | None = None) -> int:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
 
+    # --retry-quarantined is a one-shot CLI op; doesn't take the lock or
+    # touch health.json (it's a manual operator action).
+    if args.retry_quarantined:
+        ok, msg = retry_quarantined(args.retry_quarantined)
+        print(json.dumps({"action": "retry_quarantined", "ok": ok, "message": msg}))
+        return 0 if ok else 1
+
     state = _read_health()
     result: RunResult = RunResult(dry_run=args.dry_run)
+    obs: ObserveResult = ObserveResult()
     ok = True
 
     try:
@@ -685,11 +1081,15 @@ def main(argv: list[str] | None = None) -> int:
                 _write_health(state)
                 return 0
             try:
-                result = asyncio.run(
-                    run_once(dry_run=args.dry_run, max_promotions=args.max_promotions)
+                result, obs = asyncio.run(
+                    _run_full_tick(
+                        dry_run=args.dry_run,
+                        max_promotions=args.max_promotions,
+                        observe=not args.no_observe,
+                    )
                 )
             except Exception as exc:  # noqa: BLE001
-                logger.exception("run_once raised")
+                logger.exception("run_full_tick raised")
                 result.errors.append(str(exc))
                 ok = False
     except Exception as exc:  # noqa: BLE001 — catch-all for ops health
@@ -697,7 +1097,14 @@ def main(argv: list[str] | None = None) -> int:
         result.errors.append(str(exc))
         ok = False
 
-    state = _update_health_from_result(state, result, ok=ok and not result.errors)
+    state = _update_health_from_result(state, result, ok=ok and not result.errors and not obs.errors)
+    state.last_run_observed_completed = len(obs.completed)
+    state.last_run_observed_failed_retried = len(obs.failed_retried)
+    state.last_run_observed_failed_abandoned = len(obs.failed_abandoned)
+    state.last_run_observed_quarantined = len(obs.quarantined)
+    state.last_run_observed_in_flight = len(obs.in_flight)
+    if obs.errors:
+        state.last_run_errors = (state.last_run_errors + obs.errors)[-5:]
     try:
         _write_health(state)
     except Exception:
@@ -710,7 +1117,12 @@ def main(argv: list[str] | None = None) -> int:
         "pending_count": result.pending_count,
         "promoted": len(result.promoted),
         "skipped": len(result.skipped),
-        "errors": len(result.errors),
+        "errors": len(result.errors) + len(obs.errors),
+        "observed_completed": len(obs.completed),
+        "observed_failed_retried": len(obs.failed_retried),
+        "observed_failed_abandoned": len(obs.failed_abandoned),
+        "observed_quarantined": len(obs.quarantined),
+        "observed_in_flight": len(obs.in_flight),
     }
     print(json.dumps(summary, ensure_ascii=False))
     return 0 if ok else 1
