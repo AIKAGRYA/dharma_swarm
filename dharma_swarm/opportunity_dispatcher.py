@@ -1034,6 +1034,142 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     return p
 
 
+# --------------------------------------------------------------------------
+# Stalled-frontier invariant (PR3)
+#
+# WARNING fires when the frontier has work to do (pending rows OR in-flight
+# manifests) AND the dispatcher has not made progress for ``stall_window``
+# seconds. CRITICAL fires after ``critical_failure_threshold`` consecutive
+# failures (from health.json).
+#
+# The invariant ALWAYS goes through algedonic_bridge — even if the live
+# organism singleton is unreachable, the on-disk jsonl + witness still record
+# it. PR3's bridge handles EMERGENCY_HOLD escalation independently.
+# --------------------------------------------------------------------------
+
+
+# Default cron interval if the operator has not set DISPATCHER_INTERVAL_SECONDS.
+DEFAULT_INTERVAL_SECONDS = 1800  # 30 min — matches PR6 cron suggestion.
+
+# Critical fires after N consecutive dispatcher failures (run wrapper crash,
+# task_board write error, etc.). 3 matches the spirit of swarm.py:1467 (which
+# escalates after 3 critical signals).
+CRITICAL_FAILURE_THRESHOLD = 3
+
+
+def _is_frontier_active(pending_count: int, observed_in_flight: int) -> bool:
+    """The invariant only fires when there is real work to do. If there is
+    no pending work AND no in-flight tasks, silence is correct."""
+    return pending_count > 0 or observed_in_flight > 0
+
+
+def _stall_window_seconds(interval_seconds: int = DEFAULT_INTERVAL_SECONDS) -> int:
+    """The stall window is 2× the cron interval — one missed run is normal,
+    two means something is wrong."""
+    return 2 * int(interval_seconds)
+
+
+def detect_stalled_frontier(
+    *,
+    state: HealthState,
+    pending_count: int,
+    observed_in_flight: int,
+    interval_seconds: int = DEFAULT_INTERVAL_SECONDS,
+) -> dict[str, Any] | None:
+    """Inspect the freshly-written health state and decide whether to fire.
+
+    Returns ``None`` if all is well, or a dict ``{severity, kind, action,
+    description, context}`` describing the signal to emit.
+
+    The function is pure: it does not call the bridge itself. Callers
+    invoke ``algedonic_bridge.fire_signal(**signal_dict)`` separately.
+    """
+    if not _is_frontier_active(pending_count, observed_in_flight):
+        return None
+
+    # CRITICAL: too many consecutive failures.
+    if state.consecutive_failures >= CRITICAL_FAILURE_THRESHOLD:
+        return {
+            "severity": "critical",
+            "kind": "dispatcher_consecutive_failures",
+            "action": f"opportunity_dispatcher failed {state.consecutive_failures}x in a row",
+            "value": state.consecutive_failures,
+            "description": (
+                f"opportunity_dispatcher has failed {state.consecutive_failures} "
+                f"consecutive times while pending={pending_count} and "
+                f"in_flight={observed_in_flight}. The frontier is stalled — "
+                f"investigate logs and last_run_errors before clearing."
+            ),
+            "context": {
+                "consecutive_failures": state.consecutive_failures,
+                "pending_count": pending_count,
+                "in_flight": observed_in_flight,
+                "last_run_errors": state.last_run_errors,
+                "last_success_at": state.last_success_at,
+            },
+        }
+
+    # WARNING: stale last_success_at while work exists.
+    if state.last_success_at:
+        try:
+            last_success = datetime.fromisoformat(state.last_success_at)
+        except ValueError:
+            last_success = None
+    else:
+        last_success = None
+    if last_success is not None:
+        elapsed = (datetime.now(timezone.utc) - last_success).total_seconds()
+        if elapsed > _stall_window_seconds(interval_seconds):
+            return {
+                "severity": "warning",
+                "kind": "dispatcher_stale_success",
+                "action": f"opportunity_dispatcher stale by {int(elapsed)}s",
+                "value": int(elapsed),
+                "description": (
+                    f"opportunity_dispatcher last reported success "
+                    f"{int(elapsed)}s ago (window={_stall_window_seconds(interval_seconds)}s) "
+                    f"while pending={pending_count} and in_flight={observed_in_flight}."
+                ),
+                "context": {
+                    "elapsed_seconds": int(elapsed),
+                    "stall_window_seconds": _stall_window_seconds(interval_seconds),
+                    "pending_count": pending_count,
+                    "in_flight": observed_in_flight,
+                    "last_success_at": state.last_success_at,
+                },
+            }
+
+    return None
+
+
+def _maybe_fire_invariant(
+    state: HealthState, pending_count: int, observed_in_flight: int,
+) -> None:
+    """Convenience wrapper: detect, then fire via bridge if a signal is
+    indicated. Best-effort — bridge errors don't escape this function."""
+    sig = detect_stalled_frontier(
+        state=state,
+        pending_count=pending_count,
+        observed_in_flight=observed_in_flight,
+        interval_seconds=int(os.environ.get("DISPATCHER_INTERVAL_SECONDS", DEFAULT_INTERVAL_SECONDS)),
+    )
+    if sig is None:
+        return
+    try:
+        from dharma_swarm.algedonic_bridge import fire_signal
+        fire_signal(
+            kind=sig["kind"],
+            severity=sig["severity"],
+            action=sig["action"],
+            value=sig["value"],
+            description=sig["description"],
+            source="opportunity_dispatcher",
+            context=sig["context"],
+        )
+    except Exception:
+        logger.exception("algedonic_bridge.fire_signal raised")
+
+
 async def _run_full_tick(
     *, dry_run: bool, max_promotions: int | None, observe: bool,
 ) -> tuple[RunResult, ObserveResult]:
@@ -1109,6 +1245,12 @@ def main(argv: list[str] | None = None) -> int:
         _write_health(state)
     except Exception:
         logger.exception("failed to write health.json")
+
+    # Stalled-frontier invariant — fire AFTER health is written so the
+    # bridge sees the most recent state. Best-effort; bridge errors do not
+    # affect exit code.
+    if not args.dry_run and not result.paused:
+        _maybe_fire_invariant(state, result.pending_count, len(obs.in_flight))
 
     # Print a short human summary on stdout for operator visibility.
     summary = {
