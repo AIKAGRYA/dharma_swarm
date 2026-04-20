@@ -120,7 +120,9 @@ TASK_BOARD_DB = DHARMA_HOME / "db" / "tasks.db"
 # PR5 adds ``capability`` and ``mvp``; ``first_artifact`` is deferred to PR7
 # because it expects a built artifact (per template at curriculum_engine.py:153),
 # not a memo, and so needs a different result contract.
-PROMOTABLE_STAGES: tuple[str, ...] = ("scope", "validate", "deep_research")
+PROMOTABLE_STAGES: tuple[str, ...] = (
+    "scope", "validate", "deep_research", "capability", "mvp",
+)
 
 # Throttle: deep_research stages are expensive (LLM-driven AutoResearch).
 # Cap at N promotions in a rolling 24h window. PR4 enforces this gate.
