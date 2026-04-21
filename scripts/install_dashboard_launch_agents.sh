@@ -18,6 +18,33 @@ WEB_TEMPLATE="${SCRIPT_DIR}/${WEB_LABEL}.plist"
 API_DEST="${LAUNCH_AGENTS_DIR}/${API_LABEL}.plist"
 WEB_DEST="${LAUNCH_AGENTS_DIR}/${WEB_LABEL}.plist"
 
+plist_is_current() {
+    local plist="$1"
+
+    [[ -f "$plist" ]] || return 1
+    ! grep -Fq "__REPO_ROOT__" "$plist" || return 1
+    ! grep -Fq "__HOME__" "$plist" || return 1
+    grep -Fq "${REPO_ROOT}" "$plist" || return 1
+    grep -Fq "${HOME_DIR}" "$plist" || return 1
+}
+
+launchctl_job_field() {
+    local label="$1"
+    local field="$2"
+
+    launchctl print "${LAUNCH_DOMAIN}/${label}" 2>/dev/null \
+        | awk -F' = ' -v wanted="$field" '
+            {
+                key = $1
+                gsub(/^[[:space:]]+|[[:space:]]+$/, "", key)
+                if (key == wanted) {
+                    print $2
+                    exit
+                }
+            }
+        '
+}
+
 render_template() {
     local src="$1"
     local dest="$2"
@@ -29,7 +56,9 @@ render_template() {
 }
 
 unload_if_present() {
-    local plist="$1"
+    local label="$1"
+    local plist="$2"
+    launchctl bootout "${LAUNCH_DOMAIN}/${label}" >/dev/null 2>&1 || true
     launchctl bootout "${LAUNCH_DOMAIN}" "$plist" >/dev/null 2>&1 || true
 }
 
@@ -57,6 +86,36 @@ status() {
     echo "Launch agents:"
     launchctl list | grep -E "${API_LABEL}|${WEB_LABEL}" || true
     echo
+    echo "Configured plists:"
+    for spec in \
+        "${API_LABEL}:${API_DEST}" \
+        "${WEB_LABEL}:${WEB_DEST}"
+    do
+        IFS=":" read -r label plist <<< "${spec}"
+        if plist_is_current "${plist}"; then
+            echo "- ${label}: current (${plist})"
+        elif [[ -f "${plist}" ]]; then
+            echo "- ${label}: drifted (${plist})"
+        else
+            echo "- ${label}: missing (${plist})"
+        fi
+        local path=""
+        local state=""
+        local exit_code=""
+        path="$(launchctl_job_field "${label}" "path" || true)"
+        state="$(launchctl_job_field "${label}" "state" || true)"
+        exit_code="$(launchctl_job_field "${label}" "last exit code" || true)"
+        if [[ -n "${path}" ]]; then
+            echo "  launchctl path: ${path}"
+        fi
+        if [[ -n "${state}" ]]; then
+            echo "  state: ${state}"
+        fi
+        if [[ -n "${exit_code}" ]]; then
+            echo "  last exit: ${exit_code}"
+        fi
+    done
+    echo
     echo "Listening ports:"
     lsof -n -P -iTCP:3420 -sTCP:LISTEN || true
     lsof -n -P -iTCP:8420 -sTCP:LISTEN || true
@@ -67,8 +126,8 @@ install() {
     ensure_dashboard_build
     render_template "${API_TEMPLATE}" "${API_DEST}"
     render_template "${WEB_TEMPLATE}" "${WEB_DEST}"
-    unload_if_present "${API_DEST}"
-    unload_if_present "${WEB_DEST}"
+    unload_if_present "${API_LABEL}" "${API_DEST}"
+    unload_if_present "${WEB_LABEL}" "${WEB_DEST}"
     load_plist "${API_DEST}"
     load_plist "${WEB_DEST}"
     kickstart_label "${API_LABEL}"
@@ -79,8 +138,8 @@ install() {
 }
 
 uninstall() {
-    unload_if_present "${API_DEST}"
-    unload_if_present "${WEB_DEST}"
+    unload_if_present "${API_LABEL}" "${API_DEST}"
+    unload_if_present "${WEB_LABEL}" "${WEB_DEST}"
     rm -f "${API_DEST}" "${WEB_DEST}"
     echo "Removed launch agents."
 }

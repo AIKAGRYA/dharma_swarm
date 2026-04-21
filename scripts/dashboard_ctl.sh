@@ -17,6 +17,41 @@ API_PLIST="${LAUNCH_AGENTS_DIR}/${API_LABEL}.plist"
 WEB_PLIST="${LAUNCH_AGENTS_DIR}/${WEB_LABEL}.plist"
 INSTALL_SCRIPT="${SCRIPT_DIR}/install_dashboard_launch_agents.sh"
 
+plist_is_current() {
+    local plist="$1"
+
+    [[ -f "$plist" ]] || return 1
+    ! grep -Fq "__REPO_ROOT__" "$plist" || return 1
+    ! grep -Fq "__HOME__" "$plist" || return 1
+    grep -Fq "${REPO_ROOT}" "$plist" || return 1
+    grep -Fq "${HOME_DIR}" "$plist" || return 1
+}
+
+launchctl_job_path() {
+    local label="$1"
+
+    launchctl print "${LAUNCH_DOMAIN}/${label}" 2>/dev/null \
+        | awk -F' = ' '
+            {
+                key = $1
+                gsub(/^[[:space:]]+|[[:space:]]+$/, "", key)
+                if (key == "path") {
+                    print $2
+                    exit
+                }
+            }
+        '
+}
+
+loaded_service_matches_current_plist() {
+    local label="$1"
+    local plist="$2"
+    local loaded_path=""
+
+    loaded_path="$(launchctl_job_path "$label" || true)"
+    [[ -n "$loaded_path" && "$loaded_path" == "$plist" ]]
+}
+
 service_port() {
     local label="$1"
 
@@ -161,7 +196,14 @@ ensure_loaded() {
 }
 
 ensure_installed() {
-    if [[ ! -f "$API_PLIST" || ! -f "$WEB_PLIST" ]]; then
+    if ! plist_is_current "$API_PLIST" || ! plist_is_current "$WEB_PLIST"; then
+        bash "$INSTALL_SCRIPT" install
+        return
+    fi
+
+    if ! loaded_service_matches_current_plist "$API_LABEL" "$API_PLIST" \
+        || ! loaded_service_matches_current_plist "$WEB_LABEL" "$WEB_PLIST"
+    then
         bash "$INSTALL_SCRIPT" install
         return
     fi

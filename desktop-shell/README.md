@@ -25,7 +25,7 @@ This scaffold is intentionally repo-local for now:
 
 - it starts the dashboard runtime through `scripts/dashboard_ctl.sh`
 - it opens `http://127.0.0.1:3420/dashboard/command-post`
-- it is a thin operator shell, not yet a self-contained distributable bundle
+- it builds into a native macOS `.app` bundle, but still leans on the same repo-local runtime rather than embedding sidecars
 
 Optional overrides:
 
@@ -48,6 +48,12 @@ Build the shell binary:
 ```bash
 cd /Users/dhyana/dharma_swarm/desktop-shell
 npm run build
+```
+
+That produces the native app bundle at:
+
+```bash
+desktop-shell/src-tauri/target/release/bundle/macos/DHARMA COMMAND.app
 ```
 
 Runtime helper commands from the shell package:
