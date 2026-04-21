@@ -7,7 +7,10 @@
     "build": "tauri build",
     "tauri": "tauri",
     "runtime:start": "bash ../scripts/dashboard_ctl.sh start",
-    "runtime:status": "bash ../scripts/dashboard_ctl.sh status"
+    "runtime:status": "bash ../scripts/dashboard_ctl.sh status",
+    "runtime:stop": "bash ../scripts/dashboard_ctl.sh stop",
+    "runtime:restart": "bash ../scripts/dashboard_ctl.sh restart",
+    "runtime:logs": "bash ../scripts/dashboard_ctl.sh logs"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.1.1"

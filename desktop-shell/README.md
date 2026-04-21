@@ -50,6 +50,16 @@ cd /Users/dhyana/dharma_swarm/desktop-shell
 npm run build
 ```
 
+Runtime helper commands from the shell package:
+
+```bash
+cd /Users/dhyana/dharma_swarm/desktop-shell
+npm run runtime:start
+npm run runtime:status
+npm run runtime:restart
+npm run runtime:logs
+```
+
 ## Long-term path
 
 The product path is:
