@@ -56,9 +56,15 @@ Runtime helper commands from the shell package:
 cd /Users/dhyana/dharma_swarm/desktop-shell
 npm run runtime:start
 npm run runtime:status
+npm run runtime:smoke
 npm run runtime:restart
 npm run runtime:logs
 ```
+
+`npm run runtime:smoke` is the quickest repo-local check that the shell can
+reach the live stack: it starts the supervised runtime if needed, verifies
+`/api/health`, then verifies the current dashboard route
+(`DHARMA_DESKTOP_ROUTE`, default `/dashboard/command-post`).
 
 ## Long-term path
 
