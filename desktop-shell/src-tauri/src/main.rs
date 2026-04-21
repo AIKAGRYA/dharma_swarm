@@ -59,16 +59,28 @@ fn start_runtime() -> bool {
         .unwrap_or(false)
 }
 
-fn dashboard_webview_url() -> WebviewUrl {
-    if !start_runtime() {
+fn resolve_dashboard_webview_url(
+    runtime_started: bool,
+    route_override: Option<&str>,
+    api_key: Option<&str>,
+) -> WebviewUrl {
+    if !runtime_started {
         return WebviewUrl::App("index.html".into());
     }
-    let route_override = env::var(DASHBOARD_ROUTE_ENV).ok();
-    let api_key = env::var(DASHBOARD_API_KEY_ENV).ok();
-    let route = resolve_dashboard_route(route_override.as_deref());
-    let target = build_dashboard_url(route, api_key.as_deref());
+    let route = resolve_dashboard_route(route_override);
+    let target = build_dashboard_url(route, api_key);
     let url = target.parse().expect("dashboard URL should be a valid URL");
     WebviewUrl::External(url)
+}
+
+fn dashboard_webview_url() -> WebviewUrl {
+    let route_override = env::var(DASHBOARD_ROUTE_ENV).ok();
+    let api_key = env::var(DASHBOARD_API_KEY_ENV).ok();
+    resolve_dashboard_webview_url(
+        start_runtime(),
+        route_override.as_deref(),
+        api_key.as_deref(),
+    )
 }
 
 fn main() {
@@ -89,7 +101,11 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::{build_dashboard_url, resolve_dashboard_route, DEFAULT_DASHBOARD_ROUTE};
+    use super::{
+        build_dashboard_url, resolve_dashboard_route, resolve_dashboard_webview_url,
+        DEFAULT_DASHBOARD_ROUTE,
+    };
+    use tauri::WebviewUrl;
 
     #[test]
     fn dashboard_url_stays_plain_without_api_key() {
@@ -116,5 +132,24 @@ mod tests {
     fn dashboard_route_override_rejects_non_dashboard_paths() {
         assert_eq!(resolve_dashboard_route(Some("/api/health")), DEFAULT_DASHBOARD_ROUTE);
         assert_eq!(resolve_dashboard_route(Some("https://example.com")), DEFAULT_DASHBOARD_ROUTE);
+    }
+
+    #[test]
+    fn dashboard_webview_falls_back_to_local_asset_when_runtime_fails() {
+        match resolve_dashboard_webview_url(false, Some("/dashboard/fleet"), Some("secret")) {
+            WebviewUrl::App(path) => assert_eq!(path.to_string_lossy(), "index.html"),
+            other => panic!("expected App fallback, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn dashboard_webview_uses_override_and_bootstraps_api_key_when_runtime_is_ready() {
+        match resolve_dashboard_webview_url(true, Some("/dashboard/fleet"), Some("alpha beta")) {
+            WebviewUrl::External(url) => assert_eq!(
+                url.as_str(),
+                "http://127.0.0.1:3420/dashboard/fleet#desktop_api_key=alpha%20beta"
+            ),
+            other => panic!("expected External dashboard URL, got {other:?}"),
+        }
     }
 }
