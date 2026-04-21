@@ -65,11 +65,15 @@
       <h1>DHARMA COMMAND</h1>
       <p>
         The native shell opens the same dashboard routes you already use in the browser.
-        If you are seeing this page directly, the shell fallback assets loaded before the
-        local runtime window was created.
+        If you are seeing this page directly, the local dashboard runtime did not become
+        ready before the shell window fell back to these bundled assets.
       </p>
       <p style="margin-top: 16px;">
-        Canonical dashboard URL: <code>http://127.0.0.1:3420/dashboard</code>
+        Canonical operator URL: <code>http://127.0.0.1:3420/dashboard/command-post</code>
+      </p>
+      <p style="margin-top: 16px;">
+        Try <code>bash scripts/dashboard_ctl.sh start</code> to start the runtime, or
+        <code>bash scripts/dashboard_ctl.sh logs</code> to inspect failures.
       </p>
     </main>
   </body>

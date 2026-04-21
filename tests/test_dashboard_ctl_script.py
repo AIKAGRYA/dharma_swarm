@@ -52,6 +52,19 @@ def test_dashboard_ctl_reconciles_split_port_owners_before_kickstart() -> None:
     assert "process_descends_from()" in text
 
 
+def test_dashboard_ctl_waits_for_api_and_web_readiness() -> None:
+    script = (
+        Path(__file__).resolve().parents[1]
+        / "scripts"
+        / "dashboard_ctl.sh"
+    )
+    text = script.read_text(encoding="utf-8")
+
+    assert "wait_for_service_ready()" in text
+    assert 'wait_for_service_ready "$API_LABEL" 20 1' in text
+    assert 'wait_for_service_ready "$WEB_LABEL" 20 1' in text
+
+
 def test_run_dashboard_ui_rebuilds_when_sources_are_newer_than_build_id() -> None:
     script = (
         Path(__file__).resolve().parents[1]

@@ -53,7 +53,7 @@ import { timeAgo } from "@/lib/utils";
 import { useAgent } from "@/hooks/useAgent";
 import { useTelemetry } from "@/hooks/useTelemetry";
 import { useRuntimeControlPlane } from "@/hooks/useRuntimeControlPlane";
-import { apiPath, API_TRANSPORT_MODE } from "@/lib/api";
+import { authorizedFetch, API_TRANSPORT_MODE } from "@/lib/api";
 import {
   findAdvertisedChatProfile,
   isAdvertisedChatProfileAvailable,
@@ -525,7 +525,7 @@ export default function Qwen35Page() {
           .slice(-120)
           .map((m) => ({ role: m.role, content: m.content }));
 
-        const res = await fetch(apiPath("/api/chat"), {
+        const res = await authorizedFetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -2044,7 +2044,7 @@ function Qwen35TasksTab() {
     setIsDispatching(true);
 
     try {
-      const res = await fetch(apiPath(`/api/agents/${AGENT_ID}/dispatch`), {
+      const res = await authorizedFetch(`/api/agents/${AGENT_ID}/dispatch`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title, description: taskDesc.trim() }),

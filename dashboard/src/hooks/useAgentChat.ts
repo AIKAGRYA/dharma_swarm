@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import { create } from "zustand";
-import { apiPath } from "@/lib/api";
+import { authorizedFetch } from "@/lib/api";
 
 /* ─── Types ───────────────────────────────────────────────── */
 
@@ -105,7 +105,7 @@ export function useAgentChat(agentId: string) {
     }
     hydratedRef.current.add(agentId);
 
-    fetch(apiPath(`/api/agents/${encodeURIComponent(agentId)}/chat/history`))
+    authorizedFetch(`/api/agents/${encodeURIComponent(agentId)}/chat/history`)
       .then((r) => r.json())
       .then((json) => {
         const data = json?.data ?? json;
@@ -192,8 +192,8 @@ export function useAgentChat(agentId: string) {
         // Keep only last 20 messages to avoid context overflow
         const trimmedMessages = apiMessages.slice(-20);
 
-        const res = await fetch(
-          apiPath(`/api/agents/${encodeURIComponent(agentId)}/chat`),
+        const res = await authorizedFetch(
+          `/api/agents/${encodeURIComponent(agentId)}/chat`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },

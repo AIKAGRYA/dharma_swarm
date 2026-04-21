@@ -3,23 +3,40 @@
  */
 
 import type {
+  AgentDetailPayload,
+  AgentMemoryOut,
+  AgentNoteOut,
   AgentOut,
   AnomalyOut,
   ApiResponse,
   ArchiveEntryOut,
+  ChatHistoryPayload,
   ChatStatusOut,
+  ConversationEntry,
+  DagData,
+  EvolutionStats,
   HeatmapCell,
   HealthOut,
+  HotPath,
   ImpactOut,
   LineageEdgeOut,
   ModuleTruthOut,
+  OntologyDetailOut,
+  OntologyGraphData,
   OntologyTypeOut,
+  PromiseEntry,
   ProvenanceOut,
+  RoutingManifestOut,
+  StigmergyGraphData,
   StigmergyMarkOut,
+  SupervisorStatus,
   SwarmOverview,
   TaskOut,
   TraceOut,
+  VizEvent,
+  VizSnapshot,
 } from "./types";
+import { authorizedHeaders } from "./auth";
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -65,11 +82,11 @@ async function _fetchWrapped<T>(
   try {
     const res = await fetch(url, {
       ...init,
-      headers: {
+      headers: authorizedHeaders({
         "Content-Type": "application/json",
         Accept: "application/json",
         ...init?.headers,
-      },
+      }),
     });
 
     if (!res.ok) {
@@ -284,6 +301,21 @@ export function fetchChatStatus(): Promise<ApiResponse<ChatStatusOut>> {
   return apiGet<ChatStatusOut>("/api/chat/status");
 }
 
+// -- Routing ---------------------------------------------------------------
+
+export function fetchRoutingManifest(params?: {
+  provider?: string;
+  model?: string;
+  strategy?: string;
+}): Promise<ApiResponse<RoutingManifestOut>> {
+  const sp = new URLSearchParams();
+  if (params?.provider) sp.set("provider", params.provider);
+  if (params?.model) sp.set("model", params.model);
+  if (params?.strategy) sp.set("strategy", params.strategy);
+  const qs = sp.toString();
+  return apiGet<RoutingManifestOut>(`/api/routing/manifest${qs ? `?${qs}` : ""}`);
+}
+
 // -- Truth modules ----------------------------------------------------------
 
 export function fetchModules(): Promise<ApiResponse<ModuleTruthOut[]>> {
@@ -315,6 +347,486 @@ export function wsBaseUrl(): string {
 export { BASE_URL };
 
 // ---------------------------------------------------------------------------
+// Agent detail & scoped endpoints
+// ---------------------------------------------------------------------------
+
+export function fetchAgentDetail(
+  id: string,
+): Promise<ApiResponse<AgentDetailPayload>> {
+  return apiGet<AgentDetailPayload>(
+    `/api/agents/${encodeURIComponent(id)}/detail`,
+  );
+}
+
+export function fetchAgentMemory(
+  id: string,
+): Promise<ApiResponse<AgentMemoryOut>> {
+  return apiGet<AgentMemoryOut>(
+    `/api/agents/${encodeURIComponent(id)}/memory`,
+  );
+}
+
+export function fetchAgentChatHistory(
+  id: string,
+  limit = 50,
+): Promise<ApiResponse<ChatHistoryPayload>> {
+  return apiGet<ChatHistoryPayload>(
+    `/api/agents/${encodeURIComponent(id)}/chat/history?limit=${limit}`,
+  );
+}
+
+export function fetchAgentNotes(
+  id: string,
+): Promise<ApiResponse<{ notes: AgentNoteOut[] }>> {
+  return apiGet<{ notes: AgentNoteOut[] }>(
+    `/api/agents/${encodeURIComponent(id)}/notes`,
+  );
+}
+
+export function fetchAgentProfile(
+  id: string,
+): Promise<ApiResponse<Record<string, unknown>>> {
+  return apiGet<Record<string, unknown>>(
+    `/api/agents/${encodeURIComponent(id)}/profile`,
+  );
+}
+
+export function spawnAgent(body: {
+  name: string;
+  role?: string;
+  model?: string;
+  provider?: string;
+}): Promise<ApiResponse<AgentOut>> {
+  return apiPost<AgentOut>("/api/agents/spawn", body);
+}
+
+export function stopAgent(id: string): Promise<ApiResponse<{ stopped: string }>> {
+  return apiPost<{ stopped: string }>(
+    `/api/agents/${encodeURIComponent(id)}/stop`,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Evolution (additional)
+// ---------------------------------------------------------------------------
+
+export function fetchEvolutionDag(): Promise<ApiResponse<DagData>> {
+  return apiGet<DagData>("/api/evolution/dag");
+}
+
+export function fetchEvolutionStats(): Promise<ApiResponse<EvolutionStats>> {
+  return apiGet<EvolutionStats>("/api/evolution/stats");
+}
+
+export function triggerEvolution(body?: {
+  component?: string;
+}): Promise<ApiResponse<Record<string, unknown>>> {
+  return apiPost<Record<string, unknown>>("/api/commands/evolve", body);
+}
+
+// ---------------------------------------------------------------------------
+// Stigmergy (additional)
+// ---------------------------------------------------------------------------
+
+export function fetchStigmergyGraph(): Promise<ApiResponse<StigmergyGraphData>> {
+  return apiGet<StigmergyGraphData>("/api/stigmergy/graph");
+}
+
+export function fetchStigmergyHotPaths(params?: {
+  window_hours?: number;
+  min_marks?: number;
+}): Promise<ApiResponse<HotPath[]>> {
+  const sp = new URLSearchParams();
+  if (params?.window_hours != null) sp.set("window_hours", String(params.window_hours));
+  if (params?.min_marks != null) sp.set("min_marks", String(params.min_marks));
+  const qs = sp.toString();
+  return apiGet<HotPath[]>(`/api/stigmergy/hot-paths${qs ? `?${qs}` : ""}`);
+}
+
+export function fetchStigmergyHighSalience(params?: {
+  threshold?: number;
+  limit?: number;
+}): Promise<ApiResponse<StigmergyMarkOut[]>> {
+  const sp = new URLSearchParams();
+  if (params?.threshold != null) sp.set("threshold", String(params.threshold));
+  if (params?.limit != null) sp.set("limit", String(params.limit));
+  const qs = sp.toString();
+  return apiGet<StigmergyMarkOut[]>(`/api/stigmergy/high-salience${qs ? `?${qs}` : ""}`);
+}
+
+export function fetchStigmergyDensity(): Promise<ApiResponse<{ density: number }>> {
+  return apiGet<{ density: number }>("/api/stigmergy/density");
+}
+
+export function promoteStigmergyMark(
+  markId: string,
+  body: { salience: number; promoted_by: string },
+): Promise<ApiResponse<Record<string, unknown>>> {
+  return apiPost<Record<string, unknown>>(
+    `/api/stigmergy/marks/${encodeURIComponent(markId)}/promote`,
+    body,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Ontology (additional)
+// ---------------------------------------------------------------------------
+
+export function fetchOntologyGraph(): Promise<ApiResponse<OntologyGraphData>> {
+  return apiGet<OntologyGraphData>("/api/ontology/graph");
+}
+
+export function fetchOntologyDetail(
+  typeName: string,
+): Promise<ApiResponse<OntologyDetailOut>> {
+  return apiGet<OntologyDetailOut>(
+    `/api/ontology/types/${encodeURIComponent(typeName)}`,
+  );
+}
+
+export function fetchOntologyStats(): Promise<
+  ApiResponse<Record<string, unknown>>
+> {
+  return apiGet<Record<string, unknown>>("/api/ontology/stats");
+}
+
+// ---------------------------------------------------------------------------
+// Lineage (additional)
+// ---------------------------------------------------------------------------
+
+export function fetchLineageDag(
+  artifactId: string,
+  maxDepth = 20,
+): Promise<ApiResponse<DagData>> {
+  return apiGet<DagData>(
+    `/api/lineage/${encodeURIComponent(artifactId)}/dag?max_depth=${maxDepth}`,
+  );
+}
+
+export function fetchLineageStats(): Promise<
+  ApiResponse<Record<string, unknown>>
+> {
+  return apiGet<Record<string, unknown>>("/api/lineage/stats");
+}
+
+// ---------------------------------------------------------------------------
+// Viz (unified data plane)
+// ---------------------------------------------------------------------------
+
+export function fetchVizSnapshot(
+  maxNodes = 200,
+): Promise<ApiResponse<VizSnapshot>> {
+  return apiGet<VizSnapshot>(`/api/viz/snapshot?max_nodes=${maxNodes}`);
+}
+
+export function fetchVizEvents(params?: {
+  since?: number;
+  limit?: number;
+}): Promise<ApiResponse<VizEvent[]>> {
+  const sp = new URLSearchParams();
+  if (params?.since != null) sp.set("since", String(params.since));
+  if (params?.limit != null) sp.set("limit", String(params.limit));
+  const qs = sp.toString();
+  return apiGet<VizEvent[]>(`/api/viz/events${qs ? `?${qs}` : ""}`);
+}
+
+// ---------------------------------------------------------------------------
+// Audit & Eval
+// ---------------------------------------------------------------------------
+
+export function fetchAuditLatest(): Promise<
+  ApiResponse<Record<string, unknown> | null>
+> {
+  return apiGet<Record<string, unknown> | null>("/api/audit/latest");
+}
+
+export function fetchAuditTrend(
+  lastN = 20,
+): Promise<ApiResponse<Record<string, unknown>[]>> {
+  return apiGet<Record<string, unknown>[]>(`/api/audit/trend?last_n=${lastN}`);
+}
+
+export function fetchEvalLatest(): Promise<
+  ApiResponse<Record<string, unknown> | null>
+> {
+  return apiGet<Record<string, unknown> | null>("/api/eval/latest");
+}
+
+export function fetchEvalTrend(
+  lastN = 20,
+): Promise<ApiResponse<Record<string, unknown>[]>> {
+  return apiGet<Record<string, unknown>[]>(`/api/eval/trend?last_n=${lastN}`);
+}
+
+// ---------------------------------------------------------------------------
+// Supervisor
+// ---------------------------------------------------------------------------
+
+export function fetchSupervisorStatus(): Promise<
+  ApiResponse<SupervisorStatus>
+> {
+  return apiGet<SupervisorStatus>("/api/supervisor/status");
+}
+
+// ---------------------------------------------------------------------------
+// Conversation log
+// ---------------------------------------------------------------------------
+
+export function fetchConversationRecent(params?: {
+  hours?: number;
+  role?: string;
+}): Promise<ApiResponse<ConversationEntry[]>> {
+  const sp = new URLSearchParams();
+  if (params?.hours != null) sp.set("hours", String(params.hours));
+  if (params?.role != null) sp.set("role", params.role);
+  const qs = sp.toString();
+  return apiGet<ConversationEntry[]>(
+    `/api/conversation-log/recent${qs ? `?${qs}` : ""}`,
+  );
+}
+
+export function fetchConversationPromises(
+  hours = 24,
+): Promise<ApiResponse<PromiseEntry[]>> {
+  return apiGet<PromiseEntry[]>(
+    `/api/conversation-log/promises?hours=${hours}`,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Telemetry
+// ---------------------------------------------------------------------------
+
+export function fetchTelemetryOverview(): Promise<
+  ApiResponse<Record<string, unknown>>
+> {
+  return apiGet<Record<string, unknown>>("/api/telemetry/overview");
+}
+
+export function fetchTelemetryEconomics(): Promise<
+  ApiResponse<Record<string, unknown>>
+> {
+  return apiGet<Record<string, unknown>>("/api/telemetry/economics");
+}
+
+export function fetchTelemetryRouting(): Promise<
+  ApiResponse<Record<string, unknown>>
+> {
+  return apiGet<Record<string, unknown>>("/api/telemetry/routing");
+}
+
+// ---------------------------------------------------------------------------
+// Commands
+// ---------------------------------------------------------------------------
+
+export function dispatchTasks(body?: {
+  count?: number;
+}): Promise<ApiResponse<{ dispatched: number }>> {
+  return apiPost<{ dispatched: number }>("/api/commands/dispatch", body);
+}
+
+export function fetchDharmaStatus(): Promise<
+  ApiResponse<Record<string, unknown>>
+> {
+  return apiGet<Record<string, unknown>>("/api/commands/dharma");
+}
+
+// ---------------------------------------------------------------------------
+// VSM (cybernetic health)
+// ---------------------------------------------------------------------------
+
+export function fetchVsmStatus(): Promise<
+  ApiResponse<Record<string, unknown>>
+> {
+  return apiGet<Record<string, unknown>>("/api/vsm/status");
+}
+
+export function fetchAlgedonicSignals(): Promise<
+  ApiResponse<import("./types").AlgedonicSignal[]>
+> {
+  return apiGet<import("./types").AlgedonicSignal[]>("/api/vsm/algedonic");
+}
+
+export function acknowledgeAlgedonic(
+  signalId: string,
+): Promise<ApiResponse<{ acknowledged: boolean }>> {
+  return apiPost<{ acknowledged: boolean }>(
+    `/api/vsm/algedonic/${encodeURIComponent(signalId)}/ack`,
+  );
+}
+
+export function fetchGatePatterns(): Promise<
+  ApiResponse<import("./types").GatePattern[]>
+> {
+  return apiGet<import("./types").GatePattern[]>("/api/vsm/gate-patterns");
+}
+
+export function fetchAgentViability(): Promise<
+  ApiResponse<Record<string, import("./types").AgentViabilityEntry>>
+> {
+  return apiGet<Record<string, import("./types").AgentViabilityEntry>>(
+    "/api/vsm/viability",
+  );
+}
+
+export function fetchFleetHealth(): Promise<
+  ApiResponse<{ fleet_health: number }>
+> {
+  return apiGet<{ fleet_health: number }>("/api/vsm/viability/fleet");
+}
+
+export function fetchRecentAudits(): Promise<
+  ApiResponse<import("./types").AuditResultOut[]>
+> {
+  return apiGet<import("./types").AuditResultOut[]>("/api/vsm/audit/recent");
+}
+
+export function fetchVarietyPending(): Promise<
+  ApiResponse<import("./types").GateExpansionProposal[]>
+> {
+  return apiGet<import("./types").GateExpansionProposal[]>(
+    "/api/vsm/variety/pending",
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Catalytic graph
+// ---------------------------------------------------------------------------
+
+export function fetchCatalyticSummary(): Promise<
+  ApiResponse<import("./types").CatalyticSummary>
+> {
+  return apiGet<import("./types").CatalyticSummary>("/api/catalytic/summary");
+}
+
+export function fetchCatalyticGraph(): Promise<
+  ApiResponse<{
+    nodes: import("./types").CatalyticNode[];
+    edges: import("./types").CatalyticEdge[];
+  }>
+> {
+  return apiGet<{
+    nodes: import("./types").CatalyticNode[];
+    edges: import("./types").CatalyticEdge[];
+  }>("/api/catalytic/graph");
+}
+
+export function fetchAutocatalyticSets(): Promise<
+  ApiResponse<{ sets: string[][]; count: number; largest: string[] }>
+> {
+  return apiGet<{ sets: string[][]; count: number; largest: string[] }>(
+    "/api/catalytic/autocatalytic",
+  );
+}
+
+export function fetchLoopClosurePriorities(): Promise<
+  ApiResponse<import("./types").LoopClosurePriority[]>
+> {
+  return apiGet<import("./types").LoopClosurePriority[]>(
+    "/api/catalytic/priorities",
+  );
+}
+
+export function fetchRevenueReady(): Promise<
+  ApiResponse<{ sets: string[][]; count: number }>
+> {
+  return apiGet<{ sets: string[][]; count: number }>(
+    "/api/catalytic/revenue-ready",
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Strange loop
+// ---------------------------------------------------------------------------
+
+export function fetchStrangeLoopStats(): Promise<
+  ApiResponse<import("./types").StrangeLoopStats>
+> {
+  return apiGet<import("./types").StrangeLoopStats>(
+    "/api/strange-loop/stats",
+  );
+}
+
+export function fetchMutationHistory(
+  limit = 50,
+): Promise<ApiResponse<import("./types").MutationEntry[]>> {
+  return apiGet<import("./types").MutationEntry[]>(
+    `/api/strange-loop/mutations?limit=${limit}`,
+  );
+}
+
+export function fetchOrganismConfig(): Promise<
+  ApiResponse<Record<string, unknown>>
+> {
+  return apiGet<Record<string, unknown>>("/api/strange-loop/config");
+}
+
+// ---------------------------------------------------------------------------
+// Telos gates
+// ---------------------------------------------------------------------------
+
+export function fetchGateDefinitions(): Promise<
+  ApiResponse<import("./types").GateDefinition[]>
+> {
+  return apiGet<import("./types").GateDefinition[]>("/api/gates/definitions");
+}
+
+export function runGateCheck(body: {
+  action: string;
+  content?: string;
+}): Promise<ApiResponse<import("./types").GateCheckResult>> {
+  return apiPost<import("./types").GateCheckResult>(
+    "/api/gates/check",
+    body,
+  );
+}
+
+export function fetchGateProposals(
+  status?: string,
+): Promise<ApiResponse<import("./types").GateProposalOut[]>> {
+  const qs = status ? `?status=${encodeURIComponent(status)}` : "";
+  return apiGet<import("./types").GateProposalOut[]>(
+    `/api/gates/proposals${qs}`,
+  );
+}
+
+export function fetchWitnessLogs(
+  limit = 50,
+): Promise<ApiResponse<Record<string, unknown>[]>> {
+  return apiGet<Record<string, unknown>[]>(
+    `/api/gates/witness/recent?limit=${limit}`,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Cascade
+// ---------------------------------------------------------------------------
+
+export function fetchCascadeDomains(): Promise<
+  ApiResponse<Record<string, import("./types").CascadeDomainConfig>>
+> {
+  return apiGet<Record<string, import("./types").CascadeDomainConfig>>(
+    "/api/cascade/domains",
+  );
+}
+
+export function fetchCascadeHistory(
+  limit = 50,
+): Promise<ApiResponse<Record<string, unknown>[]>> {
+  return apiGet<Record<string, unknown>[]>(
+    `/api/cascade/history?limit=${limit}`,
+  );
+}
+
+export function fetchCascadeCheckpoints(): Promise<
+  ApiResponse<import("./types").CascadeCheckpoint[]>
+> {
+  return apiGet<import("./types").CascadeCheckpoint[]>(
+    "/api/cascade/checkpoints",
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Legacy apiFetch -- backward-compatible with existing hooks.
 // Returns T directly (unwrapped) and throws on failure.
 // ---------------------------------------------------------------------------
@@ -331,16 +843,22 @@ export class ApiError extends Error {
   }
 }
 
-export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const url = apiPath(path);
-  const res = await fetch(url, {
+export async function authorizedFetch(
+  path: string,
+  init?: RequestInit,
+): Promise<Response> {
+  return fetch(apiPath(path), {
     ...init,
-    headers: {
+    headers: authorizedHeaders({
       "Content-Type": "application/json",
       Accept: "application/json",
       ...init?.headers,
-    },
+    }),
   });
+}
+
+export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await authorizedFetch(path, init);
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");

@@ -7,8 +7,10 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
+import { consumeDesktopShellBootstrapHash } from "@/lib/auth";
 
 export function Providers({ children }: { children: ReactNode }) {
+  consumeDesktopShellBootstrapHash();
   const [queryClient] = useState(
     () =>
       new QueryClient({

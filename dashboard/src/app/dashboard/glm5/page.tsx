@@ -42,7 +42,7 @@ import { buildGLMTransparencySummary } from "@/lib/glmTransparency";
 import { colors, glowText, glowBox } from "@/lib/theme";
 import { timeAgo } from "@/lib/utils";
 import { useAgent } from "@/hooks/useAgent";
-import { apiPath } from "@/lib/api";
+import { authorizedFetch } from "@/lib/api";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -432,7 +432,7 @@ export default function GLM5Page() {
           .slice(-120)
           .map((m) => ({ role: m.role, content: m.content }));
 
-        const res = await fetch(apiPath("/api/chat"), {
+        const res = await authorizedFetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -1606,7 +1606,7 @@ function GLM5TasksTab() {
     setIsDispatching(true);
 
     try {
-      const res = await fetch(apiPath(`/api/agents/${AGENT_ID}/dispatch`), {
+      const res = await authorizedFetch(`/api/agents/${AGENT_ID}/dispatch`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title, description: taskDesc.trim() }),

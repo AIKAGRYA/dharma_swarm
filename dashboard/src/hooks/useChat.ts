@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import { apiPath, fetchChatStatus } from "@/lib/api";
+import { authorizedFetch, fetchChatStatus } from "@/lib/api";
 import {
   CHAT_CONTRACT_VERSION_STORAGE_KEY,
   DEFAULT_CHAT_PROFILE_ID,
@@ -300,7 +300,7 @@ export function useChat(
 
       while (true) {
         try {
-          const res = await fetch(apiPath("/api/chat"), {
+          const res = await authorizedFetch("/api/chat", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body,
