@@ -72,9 +72,10 @@ http_ready() {
     local url="$1"
     local attempts="${2:-3}"
     local sleep_seconds="${3:-1}"
+    local curl_timeout="${4:-2}"
 
     for ((i = 1; i <= attempts; i++)); do
-        if curl -fsS "$url" >/dev/null 2>&1; then
+        if curl -fsS --max-time "$curl_timeout" "$url" >/dev/null 2>&1; then
             return 0
         fi
         sleep "$sleep_seconds"
@@ -223,8 +224,12 @@ start() {
     ensure_installed
     reconcile_service_owner "$API_LABEL"
     reconcile_service_owner "$WEB_LABEL"
-    kickstart_label "$API_LABEL"
-    kickstart_label "$WEB_LABEL"
+    if ! kickstart_label "$API_LABEL"; then
+        echo "Dashboard API kickstart missed; falling through to readiness wait." >&2
+    fi
+    if ! kickstart_label "$WEB_LABEL"; then
+        echo "Dashboard web kickstart missed; falling through to readiness wait." >&2
+    fi
     if ! wait_for_service_ready "$API_LABEL" 20 1; then
         echo "Dashboard API failed to become ready on port 8420." >&2
         return 1

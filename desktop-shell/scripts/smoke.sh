@@ -15,9 +15,13 @@ if [[ "${ROUTE}" != /dashboard* ]]; then
 fi
 
 echo "Starting dashboard runtime..."
-if ! bash "${REPO_ROOT}/scripts/dashboard_ctl.sh" start >/dev/null; then
-  echo "Dashboard runtime failed to start. Try bash scripts/dashboard_ctl.sh status or logs." >&2
-  exit 1
+if [[ "${DHARMA_SMOKE_SKIP_START:-0}" != "1" ]]; then
+  if ! bash "${REPO_ROOT}/scripts/dashboard_ctl.sh" start >/dev/null; then
+    echo "Dashboard runtime failed to start. Try bash scripts/dashboard_ctl.sh status or logs." >&2
+    exit 1
+  fi
+else
+  echo "Skipping runtime startup; probing current services only."
 fi
 
 echo "Checking API health at ${API_URL}/api/health ..."

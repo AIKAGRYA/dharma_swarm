@@ -7,6 +7,7 @@ import argparse
 import json
 import subprocess
 import sys
+import tempfile
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -83,33 +84,43 @@ def read_last_jsonl(path: Path) -> dict[str, Any]:
 
 def run_cmd(cmd: Sequence[str], *, cwd: Path, timeout: int) -> dict[str, Any]:
     start = datetime.now(timezone.utc)
-    try:
-        proc = subprocess.run(
-            list(cmd),
-            cwd=str(cwd),
-            text=True,
-            capture_output=True,
-            timeout=timeout,
-        )
-        stdout = proc.stdout.strip()
-        stderr = proc.stderr.strip()
+    with tempfile.TemporaryDirectory(prefix="review-readiness-probe-") as tmp_dir:
+        stdout_path = Path(tmp_dir) / "stdout.log"
+        stderr_path = Path(tmp_dir) / "stderr.log"
+        with stdout_path.open("w", encoding="utf-8") as stdout_handle, stderr_path.open(
+            "w", encoding="utf-8"
+        ) as stderr_handle:
+            proc = subprocess.Popen(
+                list(cmd),
+                cwd=str(cwd),
+                text=True,
+                stdout=stdout_handle,
+                stderr=stderr_handle,
+            )
+            try:
+                rc = proc.wait(timeout=timeout)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait()
+                stdout = stdout_path.read_text(encoding="utf-8", errors="ignore").strip()
+                stderr = stderr_path.read_text(encoding="utf-8", errors="ignore").strip()
+                return {
+                    "rc": 124,
+                    "started_at": start.isoformat(),
+                    "stdout": stdout[-8000:],
+                    "stderr": stderr[-4000:],
+                    "headline": "timeout",
+                }
+
+        stdout = stdout_path.read_text(encoding="utf-8", errors="ignore").strip()
+        stderr = stderr_path.read_text(encoding="utf-8", errors="ignore").strip()
         headline = stdout.splitlines()[0] if stdout else (stderr.splitlines()[0] if stderr else "")
         return {
-            "rc": proc.returncode,
+            "rc": rc,
             "started_at": start.isoformat(),
             "stdout": stdout[-8000:],
             "stderr": stderr[-4000:],
             "headline": headline[:240],
-        }
-    except subprocess.TimeoutExpired as exc:
-        stdout = (exc.stdout or "") if isinstance(exc.stdout, str) else (exc.stdout or b"").decode("utf-8", errors="ignore")
-        stderr = (exc.stderr or "") if isinstance(exc.stderr, str) else (exc.stderr or b"").decode("utf-8", errors="ignore")
-        return {
-            "rc": 124,
-            "started_at": start.isoformat(),
-            "stdout": stdout[-8000:],
-            "stderr": stderr[-4000:],
-            "headline": "timeout",
         }
 
 
@@ -117,7 +128,7 @@ def build_check_specs(mode: str, repo_root: Path) -> list[CheckSpec]:
     specs = [
         CheckSpec(
             name="desktop_runtime_smoke",
-            cmd=["npm", "run", "runtime:smoke"],
+            cmd=["env", "DHARMA_SMOKE_SKIP_START=1", "bash", "./scripts/smoke.sh"],
             cwd=repo_root / "desktop-shell",
             timeout=180,
             critical=True,

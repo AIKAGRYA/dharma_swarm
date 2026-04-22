@@ -4,7 +4,7 @@ from pathlib import Path
 
 from dharma_swarm.codex_overnight import GitSnapshot
 
-from scripts.review_readiness_probe import build_check_specs, derive_overall_status
+from scripts.review_readiness_probe import build_check_specs, derive_overall_status, run_cmd
 
 
 def _snapshot(*, dirty: bool) -> GitSnapshot:
@@ -23,6 +23,7 @@ def test_build_check_specs_quick_keeps_runtime_smoke_only() -> None:
     specs = build_check_specs("quick", Path("/tmp/repo"))
 
     assert [spec.name for spec in specs] == ["desktop_runtime_smoke"]
+    assert specs[0].cmd == ["env", "DHARMA_SMOKE_SKIP_START=1", "bash", "./scripts/smoke.sh"]
 
 
 def test_build_check_specs_full_includes_review_surface_builds_and_tests() -> None:
@@ -67,3 +68,15 @@ def test_derive_overall_status_blocks_on_failed_check_and_dirty_tree() -> None:
     assert ready is False
     assert any("failing checks" in blocker for blocker in blockers)
     assert any("dirty worktree" in blocker for blocker in blockers)
+
+
+def test_run_cmd_captures_output_without_pipe_mode() -> None:
+    result = run_cmd(
+        ["python3", "-c", "print('probe-ok')"],
+        cwd=Path("/tmp"),
+        timeout=5,
+    )
+
+    assert result["rc"] == 0
+    assert result["headline"] == "probe-ok"
+    assert "probe-ok" in result["stdout"]

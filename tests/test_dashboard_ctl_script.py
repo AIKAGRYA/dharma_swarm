@@ -36,6 +36,7 @@ def test_dashboard_ctl_uses_http_health_probes_for_live_services() -> None:
 
     assert "/api/health" in text
     assert "http://127.0.0.1:3420/" in text
+    assert 'curl -fsS --max-time "$curl_timeout" "$url"' in text
 
 
 def test_dashboard_ctl_reconciles_split_port_owners_before_kickstart() -> None:
@@ -63,6 +64,19 @@ def test_dashboard_ctl_waits_for_api_and_web_readiness() -> None:
     assert "wait_for_service_ready()" in text
     assert 'wait_for_service_ready "$API_LABEL" 20 1' in text
     assert 'wait_for_service_ready "$WEB_LABEL" 20 1' in text
+
+
+def test_dashboard_ctl_does_not_treat_kickstart_as_hard_success_gate() -> None:
+    script = (
+        Path(__file__).resolve().parents[1]
+        / "scripts"
+        / "dashboard_ctl.sh"
+    )
+    text = script.read_text(encoding="utf-8")
+
+    assert 'if ! kickstart_label "$API_LABEL"; then' in text
+    assert 'if ! kickstart_label "$WEB_LABEL"; then' in text
+    assert "falling through to readiness wait" in text
 
 
 def test_dashboard_ctl_reinstalls_when_plists_are_drifted_or_loaded_from_other_repo() -> None:
