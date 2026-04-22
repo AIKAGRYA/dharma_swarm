@@ -64,6 +64,10 @@ def test_dashboard_ctl_waits_for_api_and_web_readiness() -> None:
     assert "wait_for_service_ready()" in text
     assert 'wait_for_service_ready "$API_LABEL" 20 1' in text
     assert 'wait_for_service_ready "$WEB_LABEL" 20 1' in text
+    assert 'echo "- API health: ok"' in text
+    assert 'echo "- API health: failing"' in text
+    assert 'echo "- Web health: ok"' in text
+    assert 'echo "- Web health: failing"' in text
 
 
 def test_dashboard_ctl_does_not_treat_kickstart_as_hard_success_gate() -> None:

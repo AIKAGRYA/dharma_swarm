@@ -216,6 +216,18 @@ ensure_installed() {
 status() {
     bash "$INSTALL_SCRIPT" status
     echo
+    echo "HTTP health:"
+    if service_is_ready "$API_LABEL"; then
+        echo "- API health: ok"
+    else
+        echo "- API health: failing"
+    fi
+    if service_is_ready "$WEB_LABEL"; then
+        echo "- Web health: ok"
+    else
+        echo "- Web health: failing"
+    fi
+    echo
     echo "PID files:"
     ls -l "${STATE_DIR}/operator.pid" "${STATE_DIR}/dashboard-ui.pid" 2>/dev/null || true
 }
