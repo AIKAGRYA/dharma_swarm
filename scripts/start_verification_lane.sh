@@ -22,11 +22,19 @@ fi
 
 HOURS="${1:-8}"
 INTERVAL="${VERIFY_INTERVAL:-300}"
+DEFAULT_REPO_PYTHON="${ROOT}/.venv/bin/python"
+if [[ -z "${PYTHON_BIN:-}" ]]; then
+  if [[ -x "${DEFAULT_REPO_PYTHON}" ]]; then
+    PYTHON_BIN="${DEFAULT_REPO_PYTHON}"
+  else
+    PYTHON_BIN="python3"
+  fi
+fi
 
 cd "$ROOT"
 
 NEW_PID="$(
-  python3 - "$ROOT" "$LOG_DIR/verification_lane_stdout.log" "$HOURS" "$INTERVAL" <<'PY'
+  "${PYTHON_BIN}" - "$ROOT" "$LOG_DIR/verification_lane_stdout.log" "$HOURS" "$INTERVAL" <<'PY'
 import os
 import subprocess
 import sys
@@ -65,4 +73,3 @@ if [[ -f "$RUN_FILE" ]]; then
   echo "Run dir: $(cat "$RUN_FILE")"
 fi
 echo "Stdout: $LOG_DIR/verification_lane_stdout.log"
-

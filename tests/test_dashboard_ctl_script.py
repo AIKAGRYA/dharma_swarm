@@ -105,3 +105,11 @@ def test_run_dashboard_ui_rebuilds_when_sources_are_newer_than_build_id() -> Non
     assert "dashboard_build_stale()" in text
     assert '.next/BUILD_ID' in text
     assert '-newer "$build_id"' in text
+
+
+def test_run_operator_prefers_repo_venv_python() -> None:
+    script = Path(__file__).resolve().parents[1] / "run_operator.sh"
+    text = script.read_text(encoding="utf-8")
+
+    assert 'DEFAULT_REPO_PYTHON="${SCRIPT_DIR}/.venv/bin/python"' in text
+    assert 'PYTHON_BIN="${DEFAULT_REPO_PYTHON}"' in text

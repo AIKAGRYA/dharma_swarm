@@ -13,6 +13,14 @@ MISSION_FILE="${DGC_CODEX_NIGHT_MISSION_FILE:-}"
 LABEL="${DGC_CODEX_NIGHT_LABEL:-}"
 YOLO="${DGC_CODEX_NIGHT_YOLO:-0}"
 USE_CAFFEINATE="${USE_CAFFEINATE:-1}"
+DEFAULT_REPO_PYTHON="${ROOT}/.venv/bin/python"
+if [[ -z "${PYTHON_BIN:-}" ]]; then
+  if [[ -x "${DEFAULT_REPO_PYTHON}" ]]; then
+    PYTHON_BIN="${DEFAULT_REPO_PYTHON}"
+  else
+    PYTHON_BIN="python3"
+  fi
+fi
 
 if tmux has-session -t "${SESSION}" 2>/dev/null; then
   echo "Session '${SESSION}' already running."
@@ -40,7 +48,7 @@ fi
 
 mkdir -p "${STATE_DIR}"
 
-runner="python3 scripts/codex_overnight_autopilot.py --hours '${HOURS}' --poll-seconds '${POLL_SECONDS}' --cycle-timeout '${CYCLE_TIMEOUT}' --state-dir '${STATE_DIR}'"
+runner="'${PYTHON_BIN}' scripts/codex_overnight_autopilot.py --hours '${HOURS}' --poll-seconds '${POLL_SECONDS}' --cycle-timeout '${CYCLE_TIMEOUT}' --state-dir '${STATE_DIR}'"
 if [[ "${MAX_CYCLES}" != "0" ]]; then
   runner="${runner} --max-cycles '${MAX_CYCLES}'"
 fi
