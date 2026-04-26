@@ -80,3 +80,19 @@ governance-baseline:
 		--report-format json \
 		--report-path reports/governance/gitleaks-baseline.json
 	@printf "Baselines written to reports/governance/\n"
+
+# ============================================================================
+# Phase 4 + 5 governance gates
+# ============================================================================
+
+mismatch-check:
+	$(PYTHON) scripts/governance/check_mismatch_map.py
+
+test-hygiene:
+	$(PYTHON) scripts/governance/check_test_hygiene.py
+
+module-budget:
+	$(PYTHON) scripts/governance/check_module_budget.py \
+		--base-ref origin/main --head-ref HEAD
+
+governance-all: semgrep gitleaks mismatch-check test-hygiene module-budget
