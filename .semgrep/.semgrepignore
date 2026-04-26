@@ -1,0 +1,70 @@
+# Semgrep scan exclusions.
+# Same syntax as .gitignore. Patterns are evaluated against the repo root.
+
+# Virtual envs and dependency caches
+.venv/
+venv/
+env/
+node_modules/
+.npm/
+.yarn/
+.bun/
+.pnpm-store/
+
+# Python build / cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+build/
+dist/
+*.egg-info/
+
+# Repo-internal generated/historical data, not first-party code
+migration_delta/
+dharma_swarm_old/
+.mcp_data/
+.dharma/
+.claude/
+.cody/
+.devfleet/
+.gitnexus/
+
+# Dashboard build artifacts
+dashboard/.next/
+dashboard/out/
+dashboard/.turbo/
+dashboard/coverage/
+
+# Reports / outputs (not source code)
+reports/
+analysis/
+results/
+experiments/raw_outputs/
+transcripts/
+logs/
+artifacts/
+
+# Audit screenshots (binary)
+**/.audit-screens/
+
+# Spec-forge generated docs
+spec-forge/**/research/
+spec-forge/**/generated/
+
+# Foundations are pillar reference texts, not first-party code
+foundations/
+
+# Generated SQLite snapshots / SQL dumps
+*.db
+*.db-journal
+*.sqlite
+*.sqlite-journal
+*.sql.gz
+
+# Large embeddings caches
+*embeddings-cache*.json
