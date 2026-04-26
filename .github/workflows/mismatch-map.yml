@@ -1,0 +1,40 @@
+name: mismatch-map
+
+on:
+  pull_request:
+    branches: [main, "promote/**", "governance/**"]
+    paths:
+      # Run when the map itself changes, when any module cited in the
+      # map changes, or when the checker script itself changes. The
+      # paths filter is wide because we'd rather over-run than miss
+      # a drift case.
+      - "INTERFACE_MISMATCH_MAP.md"
+      - "dharma_swarm/**.py"
+      - "api/**.py"
+      - "scripts/governance/check_mismatch_map.py"
+
+concurrency:
+  group: mismatch-map-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  drift-check:
+    name: mismatch-map drift
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run drift checker
+        run: |
+          python3 scripts/governance/check_mismatch_map.py
