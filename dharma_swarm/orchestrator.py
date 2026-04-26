@@ -35,6 +35,7 @@ from dharma_swarm.models import (
     TopologyType,
     _new_id,
 )
+from dharma_swarm.runtime_state import DelegationRun, TaskClaim
 from dharma_swarm.runtime_contract import RuntimeEnvelope, RuntimeEventType
 from dharma_swarm.session_ledger import SessionLedger
 from dharma_swarm.sheaf import (
@@ -654,6 +655,162 @@ class Orchestrator:
         if task is None or not isinstance(task.metadata, dict):
             return {}
         return dict(task.metadata)
+
+    @staticmethod
+    def _utc_datetime_from(value: Any, fallback: datetime | None = None) -> datetime:
+        if isinstance(value, datetime):
+            return value if value.tzinfo is not None else value.replace(tzinfo=timezone.utc)
+        if isinstance(value, (int, float)):
+            try:
+                return datetime.fromtimestamp(float(value), timezone.utc)
+            except Exception:
+                pass
+        if isinstance(value, str) and value.strip():
+            try:
+                parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+                return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=timezone.utc)
+            except Exception:
+                pass
+        return fallback or datetime.now(timezone.utc)
+
+    @staticmethod
+    def _runtime_status_time(status: str) -> datetime | None:
+        if status in {"running", "completed", "failed"}:
+            return datetime.now(timezone.utc)
+        return None
+
+    def _runtime_state_store(self) -> Any | None:
+        return getattr(self._ledger, "_runtime_state", None)
+
+    def _ensure_runtime_run_id(self, td: TaskDispatch) -> str:
+        existing = str(td.metadata.get("runtime_run_id", "") or "").strip()
+        if existing:
+            return existing
+        run_id = f"run_{_new_id()}"
+        td.metadata["runtime_run_id"] = run_id
+        return run_id
+
+    def _runtime_metadata(
+        self,
+        td: TaskDispatch,
+        *,
+        status: str,
+        failure_code: str = "",
+        error: str = "",
+        result: str | None = None,
+    ) -> dict[str, Any]:
+        metadata = {
+            "source": "orchestrator",
+            "status": status,
+            "topology": td.topology.value if td.topology else "dispatch",
+            "timeout_seconds": td.timeout_seconds,
+            "retry_count": td.metadata.get("retry_count", 0),
+            "max_retries": td.metadata.get("max_retries", 0),
+            "claim_timeout_seconds": td.metadata.get("claim_timeout_seconds", 0),
+        }
+        if failure_code:
+            metadata["failure_code"] = failure_code
+        if error:
+            metadata["error"] = error[:500]
+        if result is not None:
+            metadata["result_chars"] = len(result or "")
+        return metadata
+
+    async def _record_runtime_task_claim(
+        self,
+        td: TaskDispatch,
+        *,
+        task: Task | None,
+        status: str,
+        failure_code: str = "",
+        error: str = "",
+    ) -> None:
+        store = self._runtime_state_store()
+        claim_id = str(td.metadata.get("claim_id", "") or "").strip()
+        if store is None or not claim_id:
+            return
+        task_meta = self._task_meta(task)
+        active_claim = task_meta.get("active_claim")
+        if not isinstance(active_claim, dict):
+            active_claim = {}
+        now = datetime.now(timezone.utc)
+        acked_at = self._runtime_status_time(status)
+        heartbeat_at = now if status in {"running", "completed", "failed"} else None
+        stale_after = None
+        if active_claim.get("claim_expires_at_epoch") is not None:
+            stale_after = self._utc_datetime_from(active_claim.get("claim_expires_at_epoch"))
+        claim = TaskClaim(
+            claim_id=claim_id,
+            task_id=td.task_id,
+            agent_id=td.agent_id,
+            status=status,
+            session_id=self._ledger.session_id,
+            claimed_at=self._utc_datetime_from(active_claim.get("claimed_at"), now),
+            acked_at=acked_at,
+            heartbeat_at=heartbeat_at,
+            stale_after=stale_after,
+            retry_count=max(0, self._coerce_int(td.metadata.get("retry_count"), 0)),
+            metadata=self._runtime_metadata(
+                td,
+                status=status,
+                failure_code=failure_code,
+                error=error,
+            ),
+        )
+        try:
+            await store.record_task_claim(claim)
+        except Exception:
+            logger.debug("Runtime task claim recording failed", exc_info=True)
+
+    async def _record_runtime_delegation_run(
+        self,
+        td: TaskDispatch,
+        *,
+        task: Task | None,
+        status: str,
+        failure_code: str = "",
+        error: str = "",
+        result: str | None = None,
+    ) -> None:
+        store = self._runtime_state_store()
+        if store is None:
+            return
+        run_id = self._ensure_runtime_run_id(td)
+        started_raw = td.metadata.get("runtime_run_started_at")
+        started_at = self._utc_datetime_from(started_raw)
+        if not started_raw:
+            td.metadata["runtime_run_started_at"] = started_at.isoformat()
+        task_meta = self._task_meta(task)
+        requested_output = task_meta.get("requested_output", [])
+        if not isinstance(requested_output, list):
+            requested_output = []
+        completed_at = datetime.now(timezone.utc) if status in {"completed", "failed"} else None
+        run = DelegationRun(
+            run_id=run_id,
+            task_id=td.task_id,
+            assigned_to=td.agent_id,
+            status=status,
+            session_id=self._ledger.session_id,
+            claim_id=str(td.metadata.get("claim_id", "") or ""),
+            parent_run_id=str(task_meta.get("parent_run_id", "") or ""),
+            assigned_by="orchestrator",
+            requested_output=[str(item) for item in requested_output],
+            current_artifact_id=str(task_meta.get("current_artifact_id", "") or ""),
+            started_at=started_at,
+            completed_at=completed_at,
+            failure_code=failure_code,
+            metadata=self._runtime_metadata(
+                td,
+                status=status,
+                failure_code=failure_code,
+                error=error,
+                result=result,
+            ),
+        )
+        try:
+            await store.record_delegation_run(run)
+        except Exception:
+            logger.debug("Runtime delegation run recording failed", exc_info=True)
 
     def _resolve_timeout_seconds(self, task: Task | None, fallback: float) -> float:
         meta = self._task_meta(task)
@@ -1583,6 +1740,20 @@ class Orchestrator:
             max_retries=max_retries,
             backoff=backoff,
         )
+        await self._record_runtime_task_claim(
+            td,
+            task=task,
+            status="failed",
+            failure_code=failure_class,
+            error=error,
+        )
+        await self._record_runtime_delegation_run(
+            td,
+            task=task,
+            status="failed",
+            failure_code=failure_class,
+            error=error,
+        )
         meta.pop("active_claim", None)
         meta["last_error"] = error
         meta["last_failure_class"] = failure_class
@@ -1832,6 +2003,11 @@ class Orchestrator:
         )
         logger.info("_assign_dispatch(%s): update_task=%.2fs", td.task_id[:8], _adt.monotonic() - _pe_t1)
         self._active_dispatches[td.task_id] = td
+        await self._record_runtime_task_claim(
+            td,
+            task=task_for_gate,
+            status="claimed",
+        )
         _pe_t2 = _adt.monotonic()
         if self._bus is not None:
             await self._bus.send(Message(
@@ -1890,10 +2066,21 @@ class Orchestrator:
         pool_get = getattr(self._pool, "get", None)
         runner = await pool_get(td.agent_id) if pool_get else None
         task = task_for_gate or await self._safe_get_task(td.task_id)
+        pool_agents_sample: list[Any] = []
+        list_agents = getattr(self._pool, "list_agents", None) if self._pool else None
+        if list_agents:
+            try:
+                agents_result = list_agents()
+                if inspect.isawaitable(agents_result):
+                    agents_result = await agents_result
+                if isinstance(agents_result, list):
+                    pool_agents_sample = list(agents_result[:3])
+            except Exception:
+                logger.debug("Pool agent sample failed", exc_info=True)
         logger.info(
             "_assign_dispatch(%s): runner=%s task=%s pool_agents=%s",
             td.task_id[:8], bool(runner), bool(task),
-            list((await self._pool.list_agents()) if self._pool else [])[:3],
+            pool_agents_sample,
         )
         if runner and task:
             run_meta = self._task_meta(task)
@@ -1903,6 +2090,11 @@ class Orchestrator:
                 td.task_id,
                 status=TaskStatus.RUNNING,
                 metadata=run_meta,
+            )
+            await self._record_runtime_task_claim(
+                td,
+                task=task,
+                status="running",
             )
             td.metadata["run_started_monotonic"] = time.monotonic()
             self._record_progress_event(
@@ -1954,6 +2146,11 @@ class Orchestrator:
             self._coerce_float(td.timeout_seconds, self._default_timeout_seconds),
         )
         try:
+            await self._record_runtime_delegation_run(
+                td,
+                task=task,
+                status="running",
+            )
             result = await asyncio.wait_for(
                 runner.run_task(task),
                 timeout=timeout_seconds,
@@ -2022,6 +2219,17 @@ class Orchestrator:
                 self._yoga.record_completion(td.agent_id)
             logger.info("Task %s completed by agent %s", td.task_id, td.agent_id)
             duration_sec = max(0.0, time.monotonic() - run_started)
+            await self._record_runtime_task_claim(
+                td,
+                task=task,
+                status="completed",
+            )
+            await self._record_runtime_delegation_run(
+                td,
+                task=task,
+                status="completed",
+                result=result,
+            )
 
             # Emit to signal_bus so organism heartbeat, evolution loop,
             # and consolidation loop can sense completed work.
