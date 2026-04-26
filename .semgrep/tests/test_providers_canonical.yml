@@ -1,0 +1,15 @@
+rules:
+  - id: dharma.providers-canonical
+    message: test fixture (mirror of real rule)
+    severity: WARNING
+    languages: [python]
+    pattern-either:
+      - pattern: from anthropic import $X
+      - pattern: import anthropic
+      - pattern: import anthropic as $X
+      - pattern: from openai import $X
+      - pattern: import openai
+      - pattern: import openai as $X
+      - pattern: import ollama
+      - pattern: import ollama as $X
+      - pattern: from ollama import $X

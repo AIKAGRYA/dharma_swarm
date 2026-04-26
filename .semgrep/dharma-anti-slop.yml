@@ -1,22 +1,144 @@
 rules:
-  # =============================================================================
-  # Phase 1 proof-of-life rule.
-  # Phase 4 will replace this file with the full 10-rule anti-slop suite.
-  # =============================================================================
-  - id: dharma.proof-of-life-no-print-in-runtime
+  # ===========================================================================
+  # Rule 1: dharma.no-unauthorized-dharma-write
+  # Reference to ~/.dharma outside the canonical owner allowlist.
+  # Matches reads AND writes by design — non-owners shouldn't even
+  # know about ~/.dharma; they should go through RuntimeStateStore.
+  # WARNING because the canonical-owner allowlist is incomplete and
+  # tightening the pattern (writes-only) is a separate refinement.
+  # ===========================================================================
+  - id: dharma.no-unauthorized-dharma-write
     message: |
-      `print()` in dharma_swarm runtime modules is a slop signal.
-      Use the structured logger instead (`logging.getLogger(__name__).info(...)`).
-      This rule is intentionally narrow; Phase 4 introduces the full anti-slop suite.
+      Reference to ~/.dharma detected outside the canonical owner allowlist.
+      Even reads should go through RuntimeStateStore (dharma_swarm/runtime_state.py)
+      so state ownership stays centralized. If this module legitimately owns
+      a slice of ~/.dharma, add the file to the allowlist below AFTER
+      documenting in docs/governance/STATE_DIR_OWNERS.md.
     severity: WARNING
     languages: [python]
     paths:
-      include:
-        - "dharma_swarm/"
       exclude:
-        - "dharma_swarm/**/__main__.py"
-        - "dharma_swarm/dgc_cli.py"
-        - "dharma_swarm/cli.py"
-        - "tests/"
-        - "scripts/"
-    pattern: print(...)
+        # Canonical owners (verified via 2026-04-26 audit)
+        - "dharma_swarm/runtime_state.py"
+        - "dharma_swarm/system_rv.py"
+        - "dharma_swarm/daemon_config.py"
+        - "dharma_swarm/experiment_log.py"
+        - "dharma_swarm/pulse.py"
+        - "dharma_swarm/custodians.py"
+        - "dharma_swarm/kaizen_ops_local.py"
+        - "dharma_swarm/scout_report.py"
+        - "dharma_swarm/review_cycle.py"
+        - "dharma_swarm/ginko_backtest.py"
+        - "dharma_swarm/ginko_evolution.py"
+    pattern: Path.home() / ".dharma"
+
+  # ===========================================================================
+  # Rule 2: dharma.no-new-substrate
+  # New persistent stores (Store/Ledger/Registry classes that open
+  # their own SQLite or append their own JSONL) should be wrapped by
+  # RuntimeStateStore, not created as new substrates.
+  # ===========================================================================
+  - id: dharma.no-new-substrate
+    message: |
+      New persistence-substrate class detected. dharma_swarm should have
+      ONE canonical state store (RuntimeStateStore). Adding a new Store /
+      Ledger / Registry that opens its own SQLite or appends its own
+      JSONL creates substrate drift. Either:
+        (a) wrap the data in RuntimeStateStore tables, or
+        (b) document the new substrate in docs/governance/ and add the
+            class name to this rule's allowlist with justification.
+    severity: WARNING
+    languages: [python]
+    paths:
+      exclude:
+        - "dharma_swarm/runtime_state.py"
+    patterns:
+      - pattern-either:
+          - pattern: |
+              class $NAME:
+                  ...
+                  $X = sqlite3.connect(...)
+                  ...
+          - pattern: |
+              class $NAME:
+                  ...
+                  $X = aiosqlite.connect(...)
+                  ...
+      - metavariable-regex:
+          metavariable: $NAME
+          regex: '.*(Store|Ledger|Registry|Substrate)$'
+
+  # ===========================================================================
+  # Rule 4: dharma.scripts-no-git-add-all
+  # Scripts must not blanket-stage with `git add -A` or `git add .`.
+  # ===========================================================================
+  - id: dharma.scripts-no-git-add-all
+    message: |
+      `git add -A` / `git add .` blanket-stages everything. This can
+      pick up .env files, generated reports, secrets, or another author's
+      in-flight work. Always pass explicit paths.
+    severity: ERROR
+    languages: [python, bash]
+    paths:
+      exclude:
+        - "scripts/uplift_guards/"
+    pattern-either:
+      - pattern: |
+          $RUN([..., "git", "add", "-A", ...], ...)
+      - pattern: |
+          $RUN([..., "git", "add", ".", ...], ...)
+      - pattern: |
+          $RUN("git add -A", ...)
+      - pattern: |
+          $RUN("git add .", ...)
+
+  # ===========================================================================
+  # Rule 6: dharma.providers-canonical
+  # All anthropic/openai/ollama SDK imports must live inside the canonical
+  # provider factory module (dharma_swarm/providers.py or providers_extended.py).
+  # ===========================================================================
+  - id: dharma.providers-canonical
+    message: |
+      LLM provider SDK import outside the canonical providers.py /
+      providers_extended.py factory. This duplicates connection handling,
+      bypasses retry/budget controls, and confuses provider-routing.
+      Move the SDK import into providers.py and call through the factory.
+      Known offender at the time this rule was added:
+        dharma_swarm/autonomous_agent.py:468 (fix in a separate PR
+        before this rule is promoted to ERROR).
+    # WARNING until autonomous_agent.py:468 is refactored.
+    # TODO(governance): promote to ERROR once that fix lands.
+    severity: WARNING
+    languages: [python]
+    paths:
+      exclude:
+        - "dharma_swarm/providers.py"
+        - "dharma_swarm/providers_extended.py"
+        - "dharma_swarm/runtime_provider/"
+    pattern-either:
+      - pattern: from anthropic import $X
+      - pattern: import anthropic
+      - pattern: import anthropic as $X
+      - pattern: from openai import $X
+      - pattern: import openai
+      - pattern: import openai as $X
+      - pattern: import ollama
+      - pattern: import ollama as $X
+      - pattern: from ollama import $X
+
+  # ===========================================================================
+  # Rules implemented OUTSIDE Semgrep
+  # ===========================================================================
+  # Rule 3 (test-no-default-state): scripts/governance/check_test_hygiene.py
+  #   (Semgrep auto-excludes tests/ and we couldn't override.)
+  # Rule 5 (tests-no-dgc-subprocess): scripts/governance/check_test_hygiene.py
+  #   (Same auto-exclusion issue.)
+  # Rule 7 (no-lf5-whole-file-restore): .github/workflows/commit-lint.yml
+  #   (Semgrep can't read commit messages.)
+  # Rule 8 (no-root-markdown): .github/workflows/structure.yml
+  #   (Semgrep can't see new-file placement at PR-level granularity.)
+  # Rule 9 (no-committed-guardian-report): .github/workflows/structure.yml
+  #   (A path-glob is the natural expression.)
+  # Rule 10 (module-line-budget): .github/workflows/module-budget.yml
+  #   + scripts/governance/check_module_budget.py
+  #   (Needs file-size diff between commits.)

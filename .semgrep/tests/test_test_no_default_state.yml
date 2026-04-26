@@ -1,0 +1,6 @@
+rules:
+  - id: dharma.test-no-default-state
+    message: test fixture (mirror of real rule)
+    severity: WARNING
+    languages: [python]
+    pattern: RuntimeStateStore()

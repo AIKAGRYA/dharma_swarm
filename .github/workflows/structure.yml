@@ -1,0 +1,103 @@
+name: structure
+
+on:
+  pull_request:
+    branches: [main, "promote/**", "governance/**"]
+
+concurrency:
+  group: structure-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  no-root-markdown:
+    name: Rule 8 — no new root markdown
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Block new repo-root .md files
+        run: |
+          set -euo pipefail
+          base="${{ github.event.pull_request.base.sha }}"
+          head="${{ github.event.pull_request.head.sha }}"
+
+          # Allowlist of root-level .md files that are canonical and may exist.
+          allow=(
+            "README.md"
+            "CLAUDE.md"
+            "CHANGELOG.md"
+            "LICENSE.md"
+            "INTERFACE_MISMATCH_MAP.md"
+            "SWARM_HOT_ITEMS.md"
+            "MODEL_ROUTING_MAP.md"
+            "CYBERNETIC_LOOP_MAP.md"
+            "AGENT_IDENTITY_UNIFICATION.md"
+          )
+
+          new_root_md=$(git diff --name-only --diff-filter=A "${base}" "${head}" \
+            | grep -E '^[^/]+\.md$' || true)
+
+          if [ -z "$new_root_md" ]; then
+            echo "No new repo-root markdown files. OK."
+            exit 0
+          fi
+
+          violations=""
+          while IFS= read -r f; do
+            ok=0
+            for a in "${allow[@]}"; do
+              if [ "$f" = "$a" ]; then ok=1; break; fi
+            done
+            if [ "$ok" -eq 0 ]; then
+              violations="$violations $f"
+            fi
+          done <<< "$new_root_md"
+
+          if [ -n "$violations" ]; then
+            echo "::error::Rule 8 violation — new repo-root markdown file(s) outside allowlist:"
+            for f in $violations; do echo "  - $f"; done
+            echo ""
+            echo "Move these into docs/, reports/, or another subdir."
+            echo "If a new root-level .md is genuinely needed, edit"
+            echo ".github/workflows/structure.yml and add to the allowlist."
+            exit 1
+          fi
+          echo "All new root markdown files are in the allowlist. OK."
+
+  no-committed-guardian-report:
+    name: Rule 9 — no GUARDIAN_REPORT.md outside reports/
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Block GUARDIAN_REPORT.md outside reports/
+        run: |
+          set -euo pipefail
+          base="${{ github.event.pull_request.base.sha }}"
+          head="${{ github.event.pull_request.head.sha }}"
+
+          violations=$(git diff --name-only --diff-filter=AM "${base}" "${head}" \
+            | grep -E '(^|/)GUARDIAN_REPORT\.md$' \
+            | grep -vE '^reports/' || true)
+
+          if [ -n "$violations" ]; then
+            echo "::error::Rule 9 violation — GUARDIAN_REPORT.md outside reports/:"
+            echo "$violations"
+            echo ""
+            echo "GUARDIAN_REPORT.md is a generated artifact. Either delete it,"
+            echo "move it under reports/, or regenerate via the canonical script."
+            exit 1
+          fi
+          echo "No GUARDIAN_REPORT.md leaks outside reports/. OK."
