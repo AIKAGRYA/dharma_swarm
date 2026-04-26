@@ -1,0 +1,14 @@
+rules:
+  - id: dharma.scripts-no-git-add-all
+    message: test fixture (mirror of real rule)
+    severity: ERROR
+    languages: [python]
+    pattern-either:
+      - pattern: |
+          $RUN([..., "git", "add", "-A", ...], ...)
+      - pattern: |
+          $RUN([..., "git", "add", ".", ...], ...)
+      - pattern: |
+          $RUN("git add -A", ...)
+      - pattern: |
+          $RUN("git add .", ...)

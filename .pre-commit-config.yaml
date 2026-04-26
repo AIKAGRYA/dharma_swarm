@@ -42,6 +42,21 @@ repos:
         stages: [pre-commit]
 
   # ---------------------------------------------------------------------------
+  # Test hygiene gate (Rules 3 + 5) — Semgrep can't scan tests/ so we
+  # use a small Python script instead. Currently warn-only because the
+  # known offender tests/test_full_loop.py:343 has not been fixed yet.
+  # ---------------------------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: dharma-test-hygiene
+        name: dharma test hygiene (rule 3 + 5)
+        entry: python3 scripts/governance/check_test_hygiene.py --warn-only
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+
+  # ---------------------------------------------------------------------------
   # Gitleaks — secret scanning on staged content.
   # ---------------------------------------------------------------------------
   - repo: https://github.com/gitleaks/gitleaks

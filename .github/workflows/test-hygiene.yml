@@ -1,0 +1,35 @@
+name: test-hygiene
+
+on:
+  pull_request:
+    branches: [main, "promote/**", "governance/**"]
+
+concurrency:
+  group: test-hygiene-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  test-hygiene:
+    name: Rules 3 + 5 — test hygiene
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run test-hygiene gate
+        # --warn-only currently because tests/test_full_loop.py:343 is a
+        # known offender that fixes in a separate micro-PR. Drop the flag
+        # once that PR lands. NEW offenders will still fail the build
+        # because known_offender_3() only whitelists the one known path.
+        run: |
+          python3 scripts/governance/check_test_hygiene.py
