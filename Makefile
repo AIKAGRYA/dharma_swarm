@@ -1,7 +1,7 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth
+.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline
 
 SWARM_PLIST := $(HOME)/Library/LaunchAgents/com.dharma.swarm.plist
 STATE_DIR    := $(HOME)/.dharma
@@ -25,6 +25,10 @@ help:
 	@echo "  make docker-down  Stop docker-compose stack"
 	@echo "  make gh-auth      Authenticate gh CLI (needed for Guardian Crew issues)"
 	@echo "  make live         Run dgc orchestrate-live in foreground (dev mode)"
+	@echo "  make semgrep      Run governance Semgrep rules"
+	@echo "  make gitleaks     Scan for secrets"
+	@echo "  make precommit-run Run pre-commit on all files"
+	@echo "  make governance-baseline Capture scanner baselines"
 	@echo ""
 
 install:
@@ -114,3 +118,34 @@ docker-down:
 
 docker-logs:
 	docker-compose logs -f swarm
+
+# ============================================================================
+# Governance targets (Phase 1)
+# ============================================================================
+
+semgrep:
+	# Phase 1 is warn-only locally so the install does not block on the
+	# 4 pre-existing real findings (3 shell=True + 1 eval). CI (Phase 2)
+	# uses the stricter mode below; Phase 4 promotes anti-slop rules to ERROR.
+	semgrep --config .semgrep --metrics=off
+
+semgrep-strict:
+	semgrep --config .semgrep --error --metrics=off
+
+gitleaks:
+	gitleaks detect --source . --redact --no-banner --exit-code 1
+
+precommit-install:
+	pre-commit install --install-hooks
+
+precommit-run:
+	pre-commit run --all-files
+
+governance-baseline:
+	@mkdir -p reports/governance
+	semgrep --config .semgrep --json --metrics=off \
+		--output reports/governance/semgrep-baseline.json || true
+	gitleaks detect --source . --redact --no-banner --exit-code 0 \
+		--report-format json \
+		--report-path reports/governance/gitleaks-baseline.json
+	@printf "Baselines written to reports/governance/\n"

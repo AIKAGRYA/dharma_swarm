@@ -1,0 +1,90 @@
+# Gitleaks configuration for dharma_swarm.
+# Extends the bundled default ruleset with allowlists tuned to the repo's
+# real false-positive surface (committed env templates, audit reports,
+# experiment outputs, agent transcripts).
+#
+# Update strategy: when a new false positive is hit, add the SHORTEST
+# possible allowlist entry (path or regex), and link it to the gitleaks
+# rule ID it satisfies. Never broaden an allowlist beyond what's needed.
+
+title = "dharma_swarm gitleaks config"
+
+[extend]
+# Inherit all rules from the gitleaks default config.
+useDefault = true
+
+# =============================================================================
+# Repo-wide allowlist
+# =============================================================================
+[allowlist]
+description = "dharma_swarm false-positive surface"
+paths = [
+    # Committed env templates (no secrets, just keys + placeholders)
+    '''(^|/)\.env\.example$''',
+    '''(^|/)\.env\.template$''',
+
+    # Tests by definition contain intentional fake tokens for fixture data.
+    # Real secrets in tests would still be visible at code review.
+    '''(^|/)tests/''',
+
+    # Seed scripts use long underscore-separated identifier strings
+    # (e.g., CYCLE_KEY = "cybernetics_population_v1") that match the
+    # generic-api-key entropy heuristic.
+    '''(^|/)scripts/seed_''',
+
+    # Documentation often references token shapes / examples
+    '''(^|/)docs/''',
+    '''(^|/)README\.md$''',
+    '''(^|/)CLAUDE\.md$''',
+    '''(^|/)foundations/''',
+
+    # Reports, analyses, audit logs — text dumps, not credentials
+    '''(^|/)reports/''',
+    '''(^|/)analysis/''',
+    '''(^|/)results/''',
+    '''(^|/)experiments/''',
+    '''(^|/)transcripts/''',
+    '''(^|/)artifacts/''',
+
+    # Agent skill descriptions sometimes show example API payloads
+    '''(^|/)\.agents/skills/''',
+    '''(^|/)\.claude/skills/''',
+
+    # Old hyperfile-branch log artifacts. These should be deleted from
+    # the repo in a separate cleanup PR (tracked as governance issue);
+    # allowlisting prevents them from blocking the governance install.
+    '''(^|/)\.dharma_psmv_hyperfile_branch''',
+
+    # Lockfiles and dependency manifests
+    '''(^|/)package-lock\.json$''',
+    '''(^|/)yarn\.lock$''',
+    '''(^|/)pnpm-lock\.yaml$''',
+    '''(^|/)bun\.lockb$''',
+    '''(^|/)Cargo\.lock$''',
+    '''(^|/)poetry\.lock$''',
+
+    # Migration delta / legacy snapshots — out of governance scope
+    '''(^|/)migration_delta/''',
+    '''(^|/)dharma_swarm_old/''',
+]
+
+regexes = [
+    # Common test/example token shapes that match generic-api-key heuristics
+    '''(?i)(example|test|placeholder|your[-_]?api[-_]?key|xxxxx+|todo|fake[-_]?token)''',
+    # Anthropic / OpenAI documented placeholder shapes
+    '''sk-ant-api03-AAAAA[A-Za-z0-9_-]{20,}''',
+    '''sk-proj-XXXXX''',
+]
+
+# =============================================================================
+# Per-rule overrides
+# =============================================================================
+# The bundled `finnhub-access-token` rule is tuned for finnhub.io tokens.
+# dharma_swarm does not use Finnhub. The rule false-positives on identifiers
+# like `FinnhubBackend = ...` (a class assignment in web_search.py).
+# Disable this single rule rather than allowlisting the file.
+[[rules]]
+id = "finnhub-access-token"
+[rules.allowlist]
+description = "dharma_swarm does not integrate with Finnhub"
+regexes = [".*"]

@@ -1,0 +1,22 @@
+rules:
+  # =============================================================================
+  # Phase 1 proof-of-life rule.
+  # Phase 4 will replace this file with the full 10-rule anti-slop suite.
+  # =============================================================================
+  - id: dharma.proof-of-life-no-print-in-runtime
+    message: |
+      `print()` in dharma_swarm runtime modules is a slop signal.
+      Use the structured logger instead (`logging.getLogger(__name__).info(...)`).
+      This rule is intentionally narrow; Phase 4 introduces the full anti-slop suite.
+    severity: WARNING
+    languages: [python]
+    paths:
+      include:
+        - "dharma_swarm/"
+      exclude:
+        - "dharma_swarm/**/__main__.py"
+        - "dharma_swarm/dgc_cli.py"
+        - "dharma_swarm/cli.py"
+        - "tests/"
+        - "scripts/"
+    pattern: print(...)
