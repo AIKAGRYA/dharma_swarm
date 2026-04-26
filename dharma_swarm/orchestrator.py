@@ -35,7 +35,7 @@ from dharma_swarm.models import (
     TopologyType,
     _new_id,
 )
-from dharma_swarm.runtime_state import DelegationRun, TaskClaim
+from dharma_swarm.runtime_state import ArtifactRecord, DelegationRun, TaskClaim
 from dharma_swarm.runtime_contract import RuntimeEnvelope, RuntimeEventType
 from dharma_swarm.session_ledger import SessionLedger
 from dharma_swarm.sheaf import (
@@ -811,6 +811,42 @@ class Orchestrator:
             await store.record_delegation_run(run)
         except Exception:
             logger.debug("Runtime delegation run recording failed", exc_info=True)
+
+    async def _record_runtime_artifact(
+        self,
+        *,
+        task: Task,
+        artifact_id: str,
+        artifact_kind: str,
+        payload_path: Path,
+        checksum: str,
+        manifest_path: Path | None = None,
+        run_id: str = "",
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        store = self._runtime_state_store()
+        if store is None:
+            return
+        artifact = ArtifactRecord(
+            artifact_id=artifact_id,
+            artifact_kind=artifact_kind,
+            session_id=self._ledger.session_id,
+            task_id=task.id,
+            run_id=run_id,
+            manifest_path=str(manifest_path or ""),
+            payload_path=str(payload_path),
+            checksum=checksum,
+            promotion_state="ephemeral",
+            metadata={
+                "source": "orchestrator._persist_result",
+                "task_title": task.title,
+                **(metadata or {}),
+            },
+        )
+        try:
+            await store.record_artifact(artifact)
+        except Exception:
+            logger.debug("Runtime artifact recording failed", exc_info=True)
 
     def _resolve_timeout_seconds(self, task: Task | None, fallback: float) -> float:
         meta = self._task_meta(task)
@@ -2432,6 +2468,7 @@ class Orchestrator:
                 provider_name=str(provider_name),
                 task=task,
                 result=result,
+                run_id=str(td.metadata.get("runtime_run_id", "") or ""),
             )
 
         except asyncio.TimeoutError:
@@ -2472,6 +2509,7 @@ class Orchestrator:
         provider_name: str,
         task: Task,
         result: str | None,
+        run_id: str = "",
     ) -> None:
         """Write agent result to shared notes and stigmergy marks.
 
@@ -2513,6 +2551,7 @@ class Orchestrator:
             "source": "orchestrator._persist_result",
         }
         provenance_path = provenance_dir / f"{task.id}.json"
+        shared_artifact: Path | None = None
         entry = (
             f"\n---\n## {task.title}\n"
             f"*{timestamp} | task: {task.id[:8]} | trace: {trace_id}*\n\n"
@@ -2561,6 +2600,25 @@ class Orchestrator:
             logger.debug("Shared artifact written: %s", shared_artifact.name)
         except Exception as exc:
             logger.debug("Shared artifact write failed (non-fatal): %s", exc)
+
+        if shared_artifact is not None:
+            await self._record_runtime_artifact(
+                task=task,
+                artifact_id=f"artifact_task_result_{task.id}",
+                artifact_kind="task_result",
+                payload_path=shared_artifact,
+                manifest_path=provenance_path,
+                checksum=result_hash,
+                run_id=run_id,
+                metadata={
+                    "agent": agent_name,
+                    "model": model_name,
+                    "provider": provider_name,
+                    "trace_id": trace_id,
+                    "notes_file": str(notes_file),
+                    "result_chars": len(result or ""),
+                },
+            )
 
         # Fix 2: Feed result into MemoryPalace for cross-session semantic recall.
         # Even with TF-IDF only (sqlite-vec not installed), this builds the corpus

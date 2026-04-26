@@ -41,7 +41,12 @@ def _utcnow() -> datetime:
 
 
 def _runtime_table_count(db_path: Path, table: str) -> int:
-    assert table in {"session_events", "task_claims", "delegation_runs"}
+    assert table in {
+        "session_events",
+        "task_claims",
+        "delegation_runs",
+        "artifact_records",
+    }
     if not db_path.exists():
         return 0
     with sqlite3.connect(db_path) as db:
@@ -372,6 +377,7 @@ async def test_task_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     assert _runtime_table_count(runtime_db_path, "session_events") == 0
     assert _runtime_table_count(runtime_db_path, "task_claims") == 0
     assert _runtime_table_count(runtime_db_path, "delegation_runs") == 0
+    assert _runtime_table_count(runtime_db_path, "artifact_records") == 0
 
     # Tick 1: should dispatch the task
     result = await orch.tick()
@@ -394,12 +400,24 @@ async def test_task_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     assert _runtime_table_count(runtime_db_path, "task_claims") == 1
     assert _runtime_table_count(runtime_db_path, "delegation_runs") == 1
     assert _runtime_delegation_statuses(runtime_db_path) == ["completed"]
+    artifact_count = _runtime_table_count(runtime_db_path, "artifact_records")
+    assert artifact_count >= 1
+    with sqlite3.connect(runtime_db_path) as db:
+        artifact_kind, artifact_task_id, payload_path, checksum = db.execute(
+            "SELECT artifact_kind, task_id, payload_path, checksum"
+            " FROM artifact_records ORDER BY created_at DESC LIMIT 1"
+        ).fetchone()
+    assert artifact_kind == "task_result"
+    assert artifact_task_id == task.id
+    assert Path(payload_path).exists()
+    assert checksum
 
     # A settle-only follow-up tick must not duplicate structured runtime rows.
     result2 = await orch.tick()
     assert result2["dispatched"] == 0
     assert _runtime_table_count(runtime_db_path, "task_claims") == 1
     assert _runtime_table_count(runtime_db_path, "delegation_runs") == 1
+    assert _runtime_table_count(runtime_db_path, "artifact_records") == artifact_count
 
 
 async def test_task_failure_records_runtime_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
