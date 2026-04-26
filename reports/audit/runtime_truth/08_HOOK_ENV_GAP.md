@@ -12,4 +12,3 @@
 This is a local hook/tooling environment gap, not a Slice 2 runtime-spine issue.
 
 Fix it later in a dedicated CI/tooling branch. Do not spend Slice 2 budget repairing hook configuration or local Python environment drift.
-

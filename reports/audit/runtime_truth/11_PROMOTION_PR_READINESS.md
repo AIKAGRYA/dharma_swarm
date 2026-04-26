@@ -86,7 +86,7 @@ A  tests/test_guardian_crew.py
 M  tests/test_session_ledger.py
 ```
 
-After this readiness artifact is staged later, `reports/audit/runtime_truth/11_PROMOTION_PR_READINESS.md` should be included as a docs-only PR readiness commit.
+This readiness artifact is included as the final docs-only proof commit on the branch.
 
 ## 6. Files Intentionally Not Promoted
 
