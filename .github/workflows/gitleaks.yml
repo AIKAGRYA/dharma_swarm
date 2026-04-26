@@ -1,0 +1,40 @@
+name: gitleaks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main, "promote/**", "governance/**"]
+
+concurrency:
+  group: gitleaks-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  gitleaks:
+    name: gitleaks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          # gitleaks scans history; need depth 0 for full coverage
+          fetch-depth: 0
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          # GITLEAKS_LICENSE only required for org-owned repos. Personal
+          # repos run without it. Set as a secret if/when the repo moves
+          # under an org.
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+          # Default-ignore commits already in the baseline; the
+          # .gitleaks.toml allowlist is the canonical config.
+          GITLEAKS_NOTIFY_USER_LIST: '@AmitabhainArunachala'
+        with:
+          # Inputs reference the bundled .gitleaks.toml at repo root.
+          config-path: .gitleaks.toml

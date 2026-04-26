@@ -1,0 +1,59 @@
+name: semgrep
+
+on:
+  pull_request:
+    branches: [main, "promote/**", "governance/**"]
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 10 * * 1'  # Mon 10:00 UTC weekly drift scan
+
+concurrency:
+  group: semgrep-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  semgrep:
+    name: semgrep
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep:latest
+    timeout-minutes: 15
+
+    # Skip on Dependabot PRs — Dependabot doesn't have access to our config.
+    if: (github.actor != 'dependabot[bot]')
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Semgrep CI
+        # In CI we run BOTH the local .semgrep/ rules and the registry
+        # security pack. Phase 4 will hard-fail on dharma-anti-slop rules;
+        # for now CI is fail-on-ERROR and warn-on-WARNING.
+        run: |
+          semgrep ci \
+            --config .semgrep \
+            --config p/python \
+            --config p/owasp-top-ten \
+            --config p/security-audit \
+            --metrics=off \
+            --sarif \
+            --output=semgrep-results.sarif || true
+
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep-results.sarif
+          category: semgrep
+
+      - name: Strict gate (local rules only)
+        # Local .semgrep/ rules are our owned signal. Fail the build on
+        # any ERROR in our own rules — registry packs are advisory only.
+        run: |
+          semgrep --config .semgrep --error --metrics=off

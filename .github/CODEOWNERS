@@ -1,0 +1,28 @@
+# dharma_swarm code owners.
+#
+# When PRs touch matching paths, listed owners are auto-requested for review.
+# Currently single-owner; this file is in place so future collaborators
+# inherit the path-based routing structure.
+#
+# Reference: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owner for everything in the repo
+*                                       @AmitabhainArunachala
+
+# Hot-path / kernel files — extra scrutiny
+/dharma_swarm/dharma_kernel.py          @AmitabhainArunachala
+/dharma_swarm/telos_gates.py            @AmitabhainArunachala
+/dharma_swarm/swarm.py                  @AmitabhainArunachala
+/dharma_swarm/orchestrator.py           @AmitabhainArunachala
+/dharma_swarm/runtime_state.py          @AmitabhainArunachala
+/dharma_swarm/providers.py              @AmitabhainArunachala
+
+# Governance config — touch carefully
+/.github/                               @AmitabhainArunachala
+/.semgrep/                              @AmitabhainArunachala
+/.gitleaks.toml                         @AmitabhainArunachala
+/.pre-commit-config.yaml                @AmitabhainArunachala
+/scripts/uplift_guards/                 @AmitabhainArunachala
+/scripts/governance/                    @AmitabhainArunachala
+/INTERFACE_MISMATCH_MAP.md              @AmitabhainArunachala
+/SWARM_HOT_ITEMS.md                     @AmitabhainArunachala
