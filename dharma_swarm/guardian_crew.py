@@ -63,6 +63,7 @@ import inspect
 import json
 import logging
 import os
+import sqlite3
 import subprocess
 import time
 from dataclasses import dataclass, field
@@ -337,6 +338,91 @@ async def run_loop_watcher(state_dir: Path) -> list[GuardianFinding]:
 
 
 # ---------------------------------------------------------------------------
+# LEDGER_WATCHER: Structured runtime row-count monitor
+# ---------------------------------------------------------------------------
+
+_STRUCTURED_RUNTIME_TABLES = ("task_claims", "delegation_runs", "artifact_records")
+
+
+def _runtime_db_candidates(state_dir: Path) -> list[Path]:
+    """Return state-local runtime DB candidates without consulting Path.home()."""
+    return [
+        state_dir / "state" / "runtime.db",
+        state_dir / "runtime.db",
+    ]
+
+
+def _runtime_table_count(db: sqlite3.Connection, table: str) -> int:
+    exists = db.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+        (table,),
+    ).fetchone()
+    if exists is None:
+        return 0
+    row = db.execute(f"SELECT COUNT(*) FROM {table}").fetchone()
+    return int(row[0] if row else 0)
+
+
+async def run_ledger_watcher(state_dir: Path) -> list[GuardianFinding]:
+    """LEDGER_WATCHER: detect event growth with empty structured runtime tables."""
+    findings: list[GuardianFinding] = []
+    runtime_db = next((path for path in _runtime_db_candidates(state_dir) if path.exists()), None)
+    if runtime_db is None:
+        return findings
+
+    try:
+        with sqlite3.connect(f"file:{runtime_db}?mode=ro", uri=True) as db:
+            counts = {
+                "session_events": _runtime_table_count(db, "session_events"),
+                **{
+                    table: _runtime_table_count(db, table)
+                    for table in _STRUCTURED_RUNTIME_TABLES
+                },
+            }
+    except sqlite3.Error as exc:
+        return [
+            GuardianFinding(
+                severity="WARNING",
+                check="LEDGER_WATCHER:runtime_db",
+                title="Runtime DB could not be read",
+                detail=f"Failed to read structured runtime counts from {runtime_db}: {exc}",
+                file=str(runtime_db),
+                fix_hint="Verify runtime.db is a readable RuntimeStateStore SQLite database.",
+            )
+        ]
+
+    session_events = counts["session_events"]
+    structured_zero = all(counts[table] == 0 for table in _STRUCTURED_RUNTIME_TABLES)
+    if not structured_zero or session_events <= 100:
+        return findings
+
+    severity = "BLOCKER" if session_events > 1000 else "DEGRADED"
+    threshold = "> 1000" if severity == "BLOCKER" else "> 100"
+    findings.append(
+        GuardianFinding(
+            severity=severity,
+            check="LEDGER_WATCHER:structured_runtime_counts",
+            title="Session events are growing while structured runtime tables are empty",
+            detail=(
+                f"{runtime_db} has session_events={session_events}, "
+                f"task_claims={counts['task_claims']}, "
+                f"delegation_runs={counts['delegation_runs']}, "
+                f"artifact_records={counts['artifact_records']}. "
+                f"Threshold {threshold} was crossed with all structured producer "
+                "tables empty, so lifecycle state is not inspectable from the "
+                "canonical RuntimeStateStore tables."
+            ),
+            file=str(runtime_db),
+            fix_hint=(
+                "Wire existing RuntimeStateStore producers for task claims, "
+                "delegation runs, and artifacts; do not create a new ledger."
+            ),
+        )
+    )
+    return findings
+
+
+# ---------------------------------------------------------------------------
 # ROUTER_PROBE: Model routing health checker
 # ---------------------------------------------------------------------------
 
@@ -436,8 +522,10 @@ def synthesize_report(
     router_findings: list[GuardianFinding],
     generated_at: str,
     src_root: Path,
+    ledger_findings: list[GuardianFinding] | None = None,
 ) -> str:
-    all_findings = auditor_findings + loop_findings + router_findings
+    ledger_findings = ledger_findings or []
+    all_findings = auditor_findings + loop_findings + router_findings + ledger_findings
     all_findings.sort(key=lambda f: _severity_rank(f.severity))
 
     blockers = [f for f in all_findings if f.severity == "BLOCKER"]
@@ -484,6 +572,7 @@ def synthesize_report(
         "## Checked By",
         "- **AUDITOR**: Import chains, method existence, syntax errors across all modules",
         "- **LOOP_WATCHER**: Cybernetic loop artifact existence + freshness + evolution quality",
+        "- **LEDGER_WATCHER**: RuntimeStateStore row counts for session events and structured producers",
         "- **ROUTER_PROBE**: Circuit breaker state, log error patterns, missing API keys",
         "",
         "---",
@@ -560,11 +649,12 @@ async def run_guardian_cycle(
 
     logger.info("Guardian Crew: starting cycle (src=%s)", src_root)
 
-    # Run all three agents in parallel
-    auditor_findings, loop_findings, router_findings = await asyncio.gather(
+    # Run all Guardian checks in parallel.
+    auditor_findings, loop_findings, router_findings, ledger_findings = await asyncio.gather(
         run_auditor(src_root),
         run_loop_watcher(state_dir),
         run_router_probe(state_dir),
+        run_ledger_watcher(state_dir),
         return_exceptions=False,
     )
 
@@ -575,6 +665,7 @@ async def run_guardian_cycle(
         router_findings=router_findings,
         generated_at=generated_at,
         src_root=src_root,
+        ledger_findings=ledger_findings,
     )
 
     # Write report to disk
@@ -592,7 +683,7 @@ async def run_guardian_cycle(
 
     # Create GitHub issues for BLOCKERs
     issues_created = 0
-    all_findings = auditor_findings + loop_findings + router_findings
+    all_findings = auditor_findings + loop_findings + router_findings + ledger_findings
     blockers = [f for f in all_findings if f.severity == "BLOCKER"]
 
     if create_issues and blockers:
