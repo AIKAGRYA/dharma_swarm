@@ -1,0 +1,151 @@
+# CodeRabbit configuration for dharma_swarm.
+#
+# Reference: https://docs.coderabbit.ai/guides/configure-coderabbit
+#
+# CodeRabbit reviews PRs, summarizes changes, and posts inline comments.
+# This config tunes it for solo work on a complex multi-worktree research
+# repo: chill profile, path-specific instructions, and high-signal output.
+
+language: en-US
+early_access: false
+
+reviews:
+  # 'chill' = less verbose summaries; appropriate for solo work where
+  # the author is the primary reader. Switch to 'assertive' once
+  # collaborators are added.
+  profile: chill
+
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  review_status: true
+  collapse_walkthrough: true
+
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - main
+      - "promote/**"
+      - "governance/**"
+
+  # ---------------------------------------------------------------------
+  # Path-level instructions: tell CodeRabbit what to look for in each area
+  # ---------------------------------------------------------------------
+  path_instructions:
+    - path: "tests/**"
+      instructions: |
+        Test code review focus:
+        - Flag any RuntimeStateStore() instantiated with no arguments.
+          Tests must pass an explicit tmp_path / tmp DB to avoid writing
+          to the canonical ~/.dharma/state/runtime.db.
+        - Flag dgc CLI invoked as subprocess without state_dir override.
+        - Flag direct ~/.dharma/ writes from test fixtures.
+
+    - path: "dharma_swarm/swarm.py"
+      instructions: |
+        swarm.py is mirrored across 5 worktrees. Any change here must:
+        - Be replicated to lf5/operator/dashboard worktrees, or explicitly
+          documented as worktree-divergent in INTERFACE_MISMATCH_MAP.md.
+        - Preserve _complete_deferred_startup signature.
+        - Not introduce new direct writes to ~/.dharma — go through
+          RuntimeStateStore.
+
+    - path: "dharma_swarm/orchestrator.py"
+      instructions: |
+        Hot-path orchestrator. Flag:
+        - New duck-typed agent-pool calls (e.g., self._pool.list_agents)
+          without a hasattr guard or explicit pool-protocol mapping.
+        - New synchronous I/O on the request path (this codebase is
+          async-first via aiosqlite/aiofiles).
+
+    - path: "dharma_swarm/providers.py"
+      instructions: |
+        Canonical provider factory. All anthropic / openai / ollama
+        client instantiation must live here. Flag any new caller that
+        bypasses providers.py and imports SDK clients directly.
+
+    - path: "dharma_swarm/runtime_state.py"
+      instructions: |
+        Canonical RuntimeStateStore. Flag:
+        - New schema columns / tables added without a migration helper.
+        - Reads or writes to ~/.dharma paths defined elsewhere.
+
+    - path: "scripts/**"
+      instructions: |
+        Scripts review focus:
+        - Flag any 'git add -A' or 'git add .' invocation.
+        - Flag subprocess calls with shell=True.
+        - Flag scripts that install or modify launchd / cron without a
+          guarded uninstall path.
+
+    - path: ".github/workflows/**"
+      instructions: |
+        CI workflow review focus:
+        - Flag actions pinned by tag (e.g., @v3) without a comment
+          recording the resolved SHA. Major version drift can change
+          behavior silently.
+        - Flag workflows that run on pull_request_target (privilege
+          escalation surface).
+        - Flag workflows that grant 'contents: write' or 'id-token: write'
+          unless explicitly justified.
+
+    - path: ".semgrep/**"
+      instructions: |
+        Semgrep rule review focus:
+        - Each new rule should include positive + negative test cases
+          in .semgrep/tests/.
+        - Each rule message should explain WHY (not just what), and
+          suggest a concrete fix.
+
+  # ---------------------------------------------------------------------
+  # Path filters: ignore noise
+  # ---------------------------------------------------------------------
+  path_filters:
+    - "!migration_delta/**"
+    - "!dharma_swarm_old/**"
+    - "!foundations/**"
+    - "!reports/**"
+    - "!analysis/**"
+    - "!results/**"
+    - "!experiments/**"
+    - "!transcripts/**"
+    - "!**/.audit-screens/**"
+    - "!**/__pycache__/**"
+    - "!*.min.js"
+    - "!dashboard/.next/**"
+    - "!dashboard/node_modules/**"
+    - "!.dharma_psmv_hyperfile_branch*/**"
+
+  # ---------------------------------------------------------------------
+  # Tools: enable CodeRabbit's bundled static analyzers
+  # ---------------------------------------------------------------------
+  tools:
+    ruff:
+      enabled: true
+    semgrep:
+      enabled: true
+      config_file: ".semgrep"
+    gitleaks:
+      enabled: true
+    actionlint:
+      enabled: true
+    markdownlint:
+      enabled: true
+    yamllint:
+      enabled: true
+
+chat:
+  # Don't auto-reply on every comment; let the author drive @coderabbit
+  # explicitly when they want a response.
+  auto_reply: false
+
+knowledge_base:
+  # Prime CodeRabbit with the canonical reference docs so reviews use
+  # this codebase's conventions, not generic best practices.
+  learnings:
+    scope: "auto"
+  issues:
+    scope: "auto"
+  pull_requests:
+    scope: "auto"
