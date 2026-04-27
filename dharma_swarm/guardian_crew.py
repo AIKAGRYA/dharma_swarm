@@ -67,9 +67,11 @@ import sqlite3
 import subprocess
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+
+from dharma_swarm.guardian_runtime_checks import run_guardian_warning_checks
 
 logger = logging.getLogger(__name__)
 
@@ -342,6 +344,11 @@ async def run_loop_watcher(state_dir: Path) -> list[GuardianFinding]:
 # ---------------------------------------------------------------------------
 
 _STRUCTURED_RUNTIME_TABLES = ("task_claims", "delegation_runs", "artifact_records")
+_STRUCTURED_RUNTIME_TABLE_TIMESTAMPS = {
+    "task_claims": "claimed_at",
+    "delegation_runs": "started_at",
+    "artifact_records": "created_at",
+}
 
 
 def _runtime_db_candidates(state_dir: Path) -> list[Path]:
@@ -363,19 +370,67 @@ def _runtime_table_count(db: sqlite3.Connection, table: str) -> int:
     return int(row[0] if row else 0)
 
 
-async def run_ledger_watcher(state_dir: Path) -> list[GuardianFinding]:
+def _runtime_table_count_since(
+    db: sqlite3.Connection,
+    table: str,
+    timestamp_column: str,
+    since_iso: str,
+) -> int:
+    exists = db.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+        (table,),
+    ).fetchone()
+    if exists is None:
+        return 0
+    columns = {
+        str(row[1])
+        for row in db.execute(f"PRAGMA table_info({table})").fetchall()
+    }
+    if timestamp_column not in columns:
+        return 0
+    row = db.execute(
+        f"SELECT COUNT(*) FROM {table} WHERE {timestamp_column} >= ?",
+        (since_iso,),
+    ).fetchone()
+    return int(row[0] if row else 0)
+
+
+async def run_ledger_watcher(
+    state_dir: Path,
+    *,
+    now: datetime | None = None,
+) -> list[GuardianFinding]:
     """LEDGER_WATCHER: detect event growth with empty structured runtime tables."""
     findings: list[GuardianFinding] = []
     runtime_db = next((path for path in _runtime_db_candidates(state_dir) if path.exists()), None)
     if runtime_db is None:
         return findings
 
+    resolved_now = now or datetime.now(timezone.utc)
+    since_iso = (resolved_now - timedelta(hours=24)).isoformat()
     try:
         with sqlite3.connect(f"file:{runtime_db}?mode=ro", uri=True) as db:
             counts = {
                 "session_events": _runtime_table_count(db, "session_events"),
                 **{
                     table: _runtime_table_count(db, table)
+                    for table in _STRUCTURED_RUNTIME_TABLES
+                },
+            }
+            recent_counts = {
+                "session_events": _runtime_table_count_since(
+                    db,
+                    "session_events",
+                    "created_at",
+                    since_iso,
+                ),
+                **{
+                    table: _runtime_table_count_since(
+                        db,
+                        table,
+                        _STRUCTURED_RUNTIME_TABLE_TIMESTAMPS[table],
+                        since_iso,
+                    )
                     for table in _STRUCTURED_RUNTIME_TABLES
                 },
             }
@@ -393,32 +448,58 @@ async def run_ledger_watcher(state_dir: Path) -> list[GuardianFinding]:
 
     session_events = counts["session_events"]
     structured_zero = all(counts[table] == 0 for table in _STRUCTURED_RUNTIME_TABLES)
-    if not structured_zero or session_events <= 100:
+    if structured_zero and session_events > 100:
+        severity = "BLOCKER" if session_events > 1000 else "DEGRADED"
+        threshold = "> 1000" if severity == "BLOCKER" else "> 100"
+        findings.append(
+            GuardianFinding(
+                severity=severity,
+                check="LEDGER_WATCHER:structured_runtime_counts",
+                title="Session events are growing while structured runtime tables are empty",
+                detail=(
+                    f"{runtime_db} has session_events={session_events}, "
+                    f"task_claims={counts['task_claims']}, "
+                    f"delegation_runs={counts['delegation_runs']}, "
+                    f"artifact_records={counts['artifact_records']}. "
+                    f"Threshold {threshold} was crossed with all structured producer "
+                    "tables empty, so lifecycle state is not inspectable from the "
+                    "canonical RuntimeStateStore tables."
+                ),
+                file=str(runtime_db),
+                fix_hint=(
+                    "Wire existing RuntimeStateStore producers for task claims, "
+                    "delegation runs, and artifacts; do not create a new ledger."
+                ),
+            )
+        )
         return findings
 
-    severity = "BLOCKER" if session_events > 1000 else "DEGRADED"
-    threshold = "> 1000" if severity == "BLOCKER" else "> 100"
-    findings.append(
-        GuardianFinding(
-            severity=severity,
-            check="LEDGER_WATCHER:structured_runtime_counts",
-            title="Session events are growing while structured runtime tables are empty",
-            detail=(
-                f"{runtime_db} has session_events={session_events}, "
-                f"task_claims={counts['task_claims']}, "
-                f"delegation_runs={counts['delegation_runs']}, "
-                f"artifact_records={counts['artifact_records']}. "
-                f"Threshold {threshold} was crossed with all structured producer "
-                "tables empty, so lifecycle state is not inspectable from the "
-                "canonical RuntimeStateStore tables."
-            ),
-            file=str(runtime_db),
-            fix_hint=(
-                "Wire existing RuntimeStateStore producers for task claims, "
-                "delegation runs, and artifacts; do not create a new ledger."
-            ),
-        )
+    recent_session_events = recent_counts["session_events"]
+    recent_structured_zero = all(
+        recent_counts[table] == 0 for table in _STRUCTURED_RUNTIME_TABLES
     )
+    if recent_session_events > 0 and recent_structured_zero:
+        findings.append(
+            GuardianFinding(
+                severity="WARNING",
+                check="LEDGER_WATCHER:delta_window",
+                title="Session events grew in 24h while structured runtime rows did not",
+                detail=(
+                    f"{runtime_db} has 24h deltas: "
+                    f"session_events={recent_session_events}, "
+                    f"task_claims={recent_counts['task_claims']}, "
+                    f"delegation_runs={recent_counts['delegation_runs']}, "
+                    f"artifact_records={recent_counts['artifact_records']}. "
+                    "Recent runtime activity is not producing structured "
+                    "RuntimeStateStore rows."
+                ),
+                file=str(runtime_db),
+                fix_hint=(
+                    "Check existing RuntimeStateStore producers for recent task "
+                    "claims, delegation runs, and artifacts."
+                ),
+            )
+        )
     return findings
 
 
@@ -523,9 +604,17 @@ def synthesize_report(
     generated_at: str,
     src_root: Path,
     ledger_findings: list[GuardianFinding] | None = None,
+    warning_findings: list[GuardianFinding] | None = None,
 ) -> str:
     ledger_findings = ledger_findings or []
-    all_findings = auditor_findings + loop_findings + router_findings + ledger_findings
+    warning_findings = warning_findings or []
+    all_findings = (
+        auditor_findings
+        + loop_findings
+        + router_findings
+        + ledger_findings
+        + warning_findings
+    )
     all_findings.sort(key=lambda f: _severity_rank(f.severity))
 
     blockers = [f for f in all_findings if f.severity == "BLOCKER"]
@@ -573,6 +662,7 @@ def synthesize_report(
         "- **AUDITOR**: Import chains, method existence, syntax errors across all modules",
         "- **LOOP_WATCHER**: Cybernetic loop artifact existence + freshness + evolution quality",
         "- **LEDGER_WATCHER**: RuntimeStateStore row counts for session events and structured producers",
+        "- **GUARDIAN_WARNINGS**: Repo report freshness and registered .dharma top-level directories",
         "- **ROUTER_PROBE**: Circuit breaker state, log error patterns, missing API keys",
         "",
         "---",
@@ -650,11 +740,18 @@ async def run_guardian_cycle(
     logger.info("Guardian Crew: starting cycle (src=%s)", src_root)
 
     # Run all Guardian checks in parallel.
-    auditor_findings, loop_findings, router_findings, ledger_findings = await asyncio.gather(
+    (
+        auditor_findings,
+        loop_findings,
+        router_findings,
+        ledger_findings,
+        warning_findings,
+    ) = await asyncio.gather(
         run_auditor(src_root),
         run_loop_watcher(state_dir),
         run_router_probe(state_dir),
         run_ledger_watcher(state_dir),
+        run_guardian_warning_checks(src_root, state_dir),
         return_exceptions=False,
     )
 
@@ -666,6 +763,7 @@ async def run_guardian_cycle(
         generated_at=generated_at,
         src_root=src_root,
         ledger_findings=ledger_findings,
+        warning_findings=warning_findings,
     )
 
     # Write report to disk
@@ -683,7 +781,13 @@ async def run_guardian_cycle(
 
     # Create GitHub issues for BLOCKERs
     issues_created = 0
-    all_findings = auditor_findings + loop_findings + router_findings + ledger_findings
+    all_findings = (
+        auditor_findings
+        + loop_findings
+        + router_findings
+        + ledger_findings
+        + warning_findings
+    )
     blockers = [f for f in all_findings if f.severity == "BLOCKER"]
 
     if create_issues and blockers:
