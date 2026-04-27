@@ -1,0 +1,6 @@
+rules:
+  - id: dharma.no-unauthorized-dharma-write
+    message: test fixture (mirror of real rule)
+    severity: ERROR
+    languages: [python]
+    pattern: Path.home() / ".dharma"

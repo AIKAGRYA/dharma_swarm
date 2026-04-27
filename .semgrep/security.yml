@@ -1,0 +1,79 @@
+rules:
+  # Lightweight security pack curated to dharma_swarm's surface.
+  # Phase 2 CI extends with Semgrep registry packs (p/python, p/owasp-top-ten).
+  # We pin custom rules here so registry changes don't silently shift our gates.
+
+  - id: dharma.security.subprocess-shell-true
+    message: |
+      `subprocess.*(shell=True)` allows command injection if any argument
+      comes from an untrusted source. Pass a list of args (shell=False).
+    severity: ERROR
+    languages: [python]
+    paths:
+      exclude:
+        - "tests/"
+        - "scripts/uplift_guards/"
+    patterns:
+      - pattern-either:
+          - pattern: subprocess.run(..., shell=True, ...)
+          - pattern: subprocess.Popen(..., shell=True, ...)
+          - pattern: subprocess.call(..., shell=True, ...)
+          - pattern: subprocess.check_call(..., shell=True, ...)
+          - pattern: subprocess.check_output(..., shell=True, ...)
+
+  - id: dharma.security.yaml-load-untrusted
+    message: |
+      `yaml.load()` without a Loader executes arbitrary code on untrusted YAML.
+      Use `yaml.safe_load()` instead.
+    severity: ERROR
+    languages: [python]
+    pattern: yaml.load($X)
+
+  - id: dharma.security.eval-or-exec
+    message: |
+      `eval()` / `exec()` on dynamic input is a code-injection sink.
+      Refactor to a typed dispatch table.
+    severity: ERROR
+    languages: [python]
+    paths:
+      exclude:
+        - "tests/"
+        - "scripts/repo_xray.py"
+    pattern-either:
+      - pattern: eval(...)
+      - pattern: exec(...)
+
+  - id: dharma.security.pickle-load-untrusted
+    message: |
+      `pickle.load()` / `pickle.loads()` deserializes arbitrary objects.
+      Only use on data you produced and trust. Prefer JSON or msgpack for IPC.
+    severity: WARNING
+    languages: [python]
+    paths:
+      exclude:
+        - "tests/"
+    pattern-either:
+      - pattern: pickle.load(...)
+      - pattern: pickle.loads(...)
+
+  - id: dharma.security.tempfile-mktemp
+    message: |
+      `tempfile.mktemp()` is race-prone. Use `tempfile.NamedTemporaryFile`
+      or `tempfile.mkstemp` instead.
+    severity: WARNING
+    languages: [python]
+    pattern: tempfile.mktemp(...)
+
+  - id: dharma.security.requests-no-verify
+    message: |
+      `verify=False` disables TLS certificate verification.
+      Only acceptable for explicit local-test fixtures.
+    severity: ERROR
+    languages: [python]
+    paths:
+      exclude:
+        - "tests/"
+    patterns:
+      - pattern-either:
+          - pattern: requests.$METHOD(..., verify=False, ...)
+          - pattern: httpx.$METHOD(..., verify=False, ...)

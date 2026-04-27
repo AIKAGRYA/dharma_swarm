@@ -1,0 +1,101 @@
+# Pre-commit hook orchestration for dharma_swarm.
+#
+# Wraps the existing `scripts/uplift_guards/run_pre_commit.py` (kernel
+# integrity, secrets, autonomous-destruction, hotpath, mismatch registry)
+# alongside new gitleaks and semgrep gates.
+#
+# Install:   pre-commit install
+# Run all:   pre-commit run --all-files
+# Bypass:    SKIP=<id> git commit ...   (only with justification in message)
+
+minimum_pre_commit_version: "3.6.0"
+fail_fast: false
+
+repos:
+  # ---------------------------------------------------------------------------
+  # Contract tests — verify the interface mismatch registry stays green.
+  # Was previously the first step of the legacy bash pre-commit; pulled into
+  # the framework so we don't run it twice via migration mode.
+  # ---------------------------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: dharma-contract-tests
+        name: dharma contract + private-access tests
+        entry: python3 -m pytest tests/test_contracts.py tests/test_private_access.py -q --tb=line
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+
+  # ---------------------------------------------------------------------------
+  # Existing dharma_swarm uplift guards — single Python entrypoint covers
+  # kernel SHA, secrets scan, autonomous tripwires, hotpath ack, mismatch reg.
+  # ---------------------------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: dharma-uplift-guards
+        name: dharma uplift guards (kernel, secrets, hotpath, mismatch)
+        entry: python3 scripts/uplift_guards/run_pre_commit.py
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+
+  # ---------------------------------------------------------------------------
+  # Test hygiene gate (Rules 3 + 5) — Semgrep can't scan tests/ so we
+  # use a small Python script instead. Currently warn-only because the
+  # known offender tests/test_full_loop.py:343 has not been fixed yet.
+  # ---------------------------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: dharma-test-hygiene
+        name: dharma test hygiene (rule 3 + 5)
+        entry: python3 scripts/governance/check_test_hygiene.py --warn-only
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+
+  # ---------------------------------------------------------------------------
+  # Gitleaks — secret scanning on staged content.
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks
+        name: gitleaks (secret scan)
+
+  # ---------------------------------------------------------------------------
+  # Semgrep — local config only (no registry fetch on commit; CI does that).
+  # Phase 1 enforces only proof-of-life + the curated security pack.
+  # Phase 4 expands `.semgrep/dharma-anti-slop.yml` with 10 rules.
+  # ---------------------------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: semgrep-local
+        name: semgrep (.semgrep/ local rules, warn-only in Phase 1)
+        # Phase 1 is warn-only so the install does not block on the 4
+        # pre-existing real findings. CI (Phase 2) runs in strict mode;
+        # Phase 4 promotes anti-slop rules to ERROR locally as well.
+        entry: semgrep --config .semgrep --quiet --metrics=off
+        language: system
+        pass_filenames: false
+        types: [python]
+        stages: [pre-commit]
+
+  # ---------------------------------------------------------------------------
+  # Whitespace / EOF / large-file hygiene.
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: '\.md$'
+      - id: end-of-file-fixer
+        exclude: '\.(md|svg|json)$'
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: ['--maxkb=2048']
+      - id: check-yaml
+        exclude: '^\.semgrep/tests/'
+      - id: check-toml

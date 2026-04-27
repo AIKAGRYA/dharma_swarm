@@ -1,0 +1,70 @@
+name: codeql
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main, "promote/**", "governance/**"]
+  schedule:
+    # Sunday 09:00 UTC (Mon 17:00 GMT+8) — weekly variant analysis
+    - cron: '0 9 * * 0'
+
+# Run no more than one CodeQL analysis per ref at a time.
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+
+jobs:
+  analyze:
+    name: codeql / ${{ matrix.language }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [python]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          # `security-extended` adds higher-precision queries; `security-and-quality`
+          # adds maintainability queries. Stick with extended for now.
+          queries: security-extended
+          # Phase 1 install: do NOT fail the build on findings yet.
+          # Findings stream into the Security tab; ratchet to fail-on-high
+          # in a follow-up PR after a 2-week observation window.
+          config: |
+            paths-ignore:
+              - migration_delta
+              - dharma_swarm_old
+              - foundations
+              - reports
+              - results
+              - experiments
+              - transcripts
+              - "**/.audit-screens"
+              - "**/__pycache__"
+              - "**/*.min.js"
+              - dashboard/.next
+              - dashboard/node_modules
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
+          # Findings flow into the Security tab even when this step exits 0.
+          upload: always
