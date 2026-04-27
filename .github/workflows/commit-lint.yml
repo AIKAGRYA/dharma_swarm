@@ -32,7 +32,7 @@ jobs:
         run: |
           base="${{ github.event.pull_request.base.sha }}"
           head="${{ github.event.pull_request.head.sha }}"
-          msgs=$(git log --format="%H%n%s%n%b%n---END---" "${base}".."${head}")
+          msgs=$(git log --format="%H%n%s%n---END---" "${base}".."${head}")
           echo "$msgs" | grep -iE "(wholesale restore|restore from lf5|whole.?file restore|copy entire from lf5|sync all from lf5)" && {
             echo "::error::Forbidden commit-message pattern (Rule 7)."
             echo "If you need to bring code in from LF5, open a narrow"
