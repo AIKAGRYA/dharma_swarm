@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import os
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
 
-from dharma_swarm.guardian_crew import run_ledger_watcher
+from dharma_swarm.guardian_crew import run_guardian_warning_checks, run_ledger_watcher
 from dharma_swarm.runtime_state import RuntimeStateStore
 
 
@@ -17,8 +18,13 @@ def _runtime_db(tmp_path: Path) -> tuple[Path, Path]:
     return state_dir, db_path
 
 
-def _seed_session_events(db_path: Path, count: int) -> None:
-    now = datetime.now(timezone.utc).isoformat()
+def _seed_session_events(
+    db_path: Path,
+    count: int,
+    *,
+    created_at: datetime | None = None,
+) -> None:
+    now = (created_at or datetime.now(timezone.utc)).isoformat()
     rows = [
         (
             f"sevt_guardian_{idx}",
@@ -88,6 +94,14 @@ def _seed_structured_rows(db_path: Path) -> None:
         db.commit()
 
 
+def _repo_src_root(tmp_path: Path) -> Path:
+    repo_root = tmp_path / "repo"
+    src_root = repo_root / "dharma_swarm"
+    src_root.mkdir(parents=True)
+    (src_root / "__init__.py").write_text("", encoding="utf-8")
+    return src_root
+
+
 @pytest.mark.asyncio
 async def test_ledger_watcher_degraded_threshold(tmp_path: Path) -> None:
     state_dir, db_path = _runtime_db(tmp_path)
@@ -127,6 +141,84 @@ async def test_ledger_watcher_ok_when_structured_rows_exist(tmp_path: Path) -> N
     _seed_structured_rows(db_path)
 
     findings = await run_ledger_watcher(state_dir)
+
+    assert findings == []
+
+
+@pytest.mark.asyncio
+async def test_ledger_watcher_warning_on_24h_delta_without_structured_rows(tmp_path: Path) -> None:
+    state_dir, db_path = _runtime_db(tmp_path)
+    _seed_session_events(db_path, 3)
+
+    findings = await run_ledger_watcher(state_dir)
+
+    assert len(findings) == 1
+    finding = findings[0]
+    assert finding.severity == "WARNING"
+    assert finding.check == "LEDGER_WATCHER:delta_window"
+    assert "24h deltas" in finding.detail
+    assert "session_events=3" in finding.detail
+    assert "task_claims=0" in finding.detail
+    assert "delegation_runs=0" in finding.detail
+    assert "artifact_records=0" in finding.detail
+
+
+@pytest.mark.asyncio
+async def test_guardian_warning_stale_repo_root_report(tmp_path: Path) -> None:
+    src_root = _repo_src_root(tmp_path)
+    state_dir = tmp_path / ".dharma"
+    state_dir.mkdir()
+    report_path = src_root.parent / "GUARDIAN_REPORT.md"
+    report_path.write_text("# old report\n", encoding="utf-8")
+    old = (datetime.now(timezone.utc) - timedelta(hours=25)).timestamp()
+    os.utime(report_path, (old, old))
+
+    findings = await run_guardian_warning_checks(src_root, state_dir)
+
+    assert len(findings) == 1
+    finding = findings[0]
+    assert finding.severity == "WARNING"
+    assert finding.check == "GUARDIAN_WARNINGS:stale_repo_report"
+    assert "GUARDIAN_REPORT.md is stale" in finding.title
+    assert "threshold: 24h" in finding.detail
+
+
+@pytest.mark.asyncio
+async def test_guardian_warning_unregistered_state_dir(tmp_path: Path) -> None:
+    src_root = _repo_src_root(tmp_path)
+    (src_root.parent / "GUARDIAN_REPORT.md").write_text("# fresh\n", encoding="utf-8")
+    state_dir = tmp_path / ".dharma"
+    (state_dir / "state").mkdir(parents=True)
+    (state_dir / "guardian").mkdir()
+    (state_dir / "novel_feature").mkdir()
+
+    findings = await run_guardian_warning_checks(src_root, state_dir)
+
+    assert len(findings) == 1
+    finding = findings[0]
+    assert finding.severity == "WARNING"
+    assert finding.check == "GUARDIAN_WARNINGS:unregistered_state_dir"
+    assert "novel_feature" in finding.detail
+    assert "directories: novel_feature" in finding.detail
+
+
+@pytest.mark.asyncio
+async def test_guardian_warning_checks_ok_on_healthy_temp_state(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    src_root = _repo_src_root(tmp_path)
+    (src_root.parent / "GUARDIAN_REPORT.md").write_text("# fresh\n", encoding="utf-8")
+    state_dir = tmp_path / ".dharma"
+    for name in ("state", "guardian", "logs"):
+        (state_dir / name).mkdir(parents=True)
+
+    def _fail_home(cls: type[Path]) -> Path:
+        raise AssertionError("warning checks must not read live ~/.dharma")
+
+    monkeypatch.setattr(Path, "home", classmethod(_fail_home))
+
+    findings = await run_guardian_warning_checks(src_root, state_dir)
 
     assert findings == []
 
