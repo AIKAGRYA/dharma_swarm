@@ -72,11 +72,10 @@ function NoteBlock({ note }: { note: NoteEntry }) {
 
 export default function AgentConfigPage() {
   const { agent, config, availableModels, availableRoles, providerStatus, updateConfig } = useAgentWorkspace();
-  if (!agent) return null;
 
-  const agentId = agent.agent_slug;
+  const agentId = agent?.agent_slug ?? "";
 
-  const currentProvider = agent.provider ?? config?.provider;
+  const currentProvider = agent?.provider ?? config?.provider;
   const providerEntry = Array.isArray(providerStatus)
     ? providerStatus.find((ps) => ps.provider === currentProvider) ?? providerStatus[0]
     : null;
@@ -108,6 +107,8 @@ export default function AgentConfigPage() {
 
   const profile = profileQuery.data;
   const notes = notesQuery.data?.notes ?? [];
+
+  if (!agent) return null;
 
   return (
     <motion.div className="space-y-6" variants={stagger.container} initial="hidden" animate="show">
