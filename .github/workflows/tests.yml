@@ -167,24 +167,24 @@ jobs:
         run: |
           # Only run deterministic telos gate + internal correctness checks
           python3 -c "
-import asyncio, json, sys
-sys.path.insert(0, '.')
-sys.path.insert(0, 'benchmarks')
+          import asyncio, json, sys
+          sys.path.insert(0, '.')
+          sys.path.insert(0, 'benchmarks')
 
-async def main():
-    from gauntlet import _t1_telos_gate_enforced, _t1_stigmergy_roundtrip
-    results = await asyncio.gather(_t1_telos_gate_enforced(), _t1_stigmergy_roundtrip())
-    failed = [r for r in results if not r.passed]
-    for r in results:
-        status = 'PASS' if r.passed else 'FAIL'
-        print(f'  [{status}] {r.name}: {r.composite:.2f}')
-        if r.failure_mode:
-            print(f'    Failure: {r.failure_mode}')
-    if failed:
-        print(f'GAUNTLET TIER 1 FAILED: {len(failed)}/{len(results)} tasks')
-        sys.exit(1)
-    else:
-        print(f'GAUNTLET TIER 1 PASSED: {len(results)}/{len(results)} tasks')
+          async def main():
+              from gauntlet import _t1_telos_gate_enforced, _t1_stigmergy_roundtrip
+              results = await asyncio.gather(_t1_telos_gate_enforced(), _t1_stigmergy_roundtrip())
+              failed = [r for r in results if not r.passed]
+              for r in results:
+                  status = 'PASS' if r.passed else 'FAIL'
+                  print(f'  [{status}] {r.name}: {r.composite:.2f}')
+                  if r.failure_mode:
+                      print(f'    Failure: {r.failure_mode}')
+              if failed:
+                  print(f'GAUNTLET TIER 1 FAILED: {len(failed)}/{len(results)} tasks')
+                  sys.exit(1)
+              else:
+                  print(f'GAUNTLET TIER 1 PASSED: {len(results)}/{len(results)} tasks')
 
-asyncio.run(main())
-"
+          asyncio.run(main())
+          "
