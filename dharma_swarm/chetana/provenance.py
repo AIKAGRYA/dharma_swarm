@@ -81,6 +81,11 @@ class AtomProvenance(BaseModel):
     axiom_signature: str
     review_status: ReviewStatus
     reviewer: str | None = None
+    # revival_chain: append-only audit trail of every revival event.
+    # Each entry is a free-form dict (revival_id, revived_at, reviewed_by,
+    # prior_signature, neighbors_added, questions_resolved, etc.) — kept
+    # untyped at this layer so revival v0.x can iterate without schema PRs.
+    revival_chain: list[dict[str, Any]] = Field(default_factory=list)
 
     @field_validator("axiom_signature")
     @classmethod

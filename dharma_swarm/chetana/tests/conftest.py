@@ -18,6 +18,7 @@ def chetana_sandbox(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     from dharma_swarm.chetana import decay as decay_mod
     from dharma_swarm.chetana import gap_scan as gap_mod
     from dharma_swarm.chetana import palace as palace_mod
+    from dharma_swarm.chetana import revival as revival_mod
 
     staging_root = tmp_path / "staging"
     quarantine_root = tmp_path / "quarantine"
@@ -39,5 +40,6 @@ def chetana_sandbox(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setattr(
         palace_mod, "DEFAULT_PALACE_PATH", tmp_path / "memory_palace.canvas", raising=True
     )
+    monkeypatch.setattr(revival_mod, "TRUSTED_DEFAULT", trusted_root, raising=True)
 
     return tmp_path

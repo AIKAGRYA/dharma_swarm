@@ -38,12 +38,42 @@ gate decision, axiom signature, review status, stale_after.
 | L3 memory palace | 10 Pillars rooms + 25 Axioms loci | JSON Canvas spec | `chetana palace` renders to `memory_palace.canvas` |
 | L4 governance overlay | TelosGatekeeper + KernelGuard + provenance | `dharma_swarm/telos_gates.py`, `dharma_swarm/dharma_kernel.py` | every promote routes through gate_check_atom() |
 
+## Philosophy: stale → revive, not exile
+
+When an atom passes `stale_after`, the **default** chetana response is REVIVE,
+not quarantine. Stale is the trigger for re-integration, not termination:
+
+  - scan the corpus for atoms captured *after* this one with overlapping tags/related
+  - find new backlinks (atoms now pointing at this one)
+  - check whether the original body's open questions have been answered elsewhere
+  - propose a patch (new `related:` links, refreshed `confidence`, extended `stale_after`)
+  - on apply, append a `revival_chain` entry to the atom's provenance
+    (audit trail of every revival event with prior signature, neighbors added,
+    questions resolved, reviewer)
+
+Quarantine is reserved for atoms that are genuinely contradicted by evidence,
+no longer relevant, or have failed multiple revival passes. It is opt-in
+(`chetana decay --quarantine`), not the default.
+
+This is the active-inference / Friston layer made concrete: the wiki adapts
+to what the world has learned since the atom was last verified, instead of
+freezing claims at their original confidence.
+
 ## CLI
 
 ```bash
 python -m dharma_swarm.chetana.cli ingest --kind session ~/.claude/projects/.../<id>.jsonl
 python -m dharma_swarm.chetana.cli promote ~/.dharma/knowledge/staging/2026-04-27/<atom_id>.md
+
+# Stale atoms — default = surface only; suggest revive
+python -m dharma_swarm.chetana.cli decay
+# Re-integrate every due atom
+python -m dharma_swarm.chetana.cli revive --all
+# Apply (write the refreshed atom + revival_chain entry)
+python -m dharma_swarm.chetana.cli revive --all --apply
+# Last resort: actually quarantine atoms that resist revival
 python -m dharma_swarm.chetana.cli decay --quarantine
+
 python -m dharma_swarm.chetana.cli gap-scan --queue ~/.dharma/campaign_chetana/gap_queue.jsonl
 python -m dharma_swarm.chetana.cli palace
 python -m dharma_swarm.chetana.cli query "strange loop"
