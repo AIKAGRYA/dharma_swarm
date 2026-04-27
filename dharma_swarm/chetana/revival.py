@@ -100,7 +100,7 @@ def propose_revival(
     if not atom_path.exists():
         raise FileNotFoundError(atom_path)
     text = atom_path.read_text(encoding="utf-8")
-    schema, body = parse_frontmatter(text)
+    schema, body = parse_frontmatter(text, lenient=True, source_path=str(atom_path))
     if schema is None:
         raise ValueError(f"atom has no chetana frontmatter: {atom_path}")
 
@@ -133,7 +133,9 @@ def propose_revival(
                 continue
             try:
                 other_text = path.read_text(encoding="utf-8")
-                other_schema, other_body = parse_frontmatter(other_text)
+                other_schema, other_body = parse_frontmatter(
+                    other_text, lenient=True, source_path=str(path)
+                )
             except Exception:
                 continue
             if other_schema is None:
@@ -308,7 +310,11 @@ def find_due_atoms(
             if not path.is_file():
                 continue
             try:
-                schema, _ = parse_frontmatter(path.read_text(encoding="utf-8"))
+                schema, _ = parse_frontmatter(
+                    path.read_text(encoding="utf-8"),
+                    lenient=True,
+                    source_path=str(path),
+                )
             except Exception:
                 continue
             if schema is None:

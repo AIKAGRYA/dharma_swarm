@@ -105,7 +105,7 @@ def render_palace(
                 continue
             try:
                 text = path.read_text(encoding="utf-8")
-                schema, _body = parse_frontmatter(text)
+                schema, _body = parse_frontmatter(text, lenient=True, source_path=str(path))
             except Exception:
                 continue
             if schema is None:

@@ -79,7 +79,7 @@ def gap_scan(
                 continue
             try:
                 text = path.read_text(encoding="utf-8")
-                schema, body = parse_frontmatter(text)
+                schema, body = parse_frontmatter(text, lenient=True, source_path=str(path))
             except Exception:
                 continue
             report.scanned += 1

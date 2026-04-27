@@ -80,7 +80,7 @@ def scan_decay(
             report.scanned += 1
             try:
                 text = path.read_text(encoding="utf-8")
-                schema, _body = parse_frontmatter(text)
+                schema, _body = parse_frontmatter(text, lenient=True, source_path=str(path))
             except Exception as e:
                 report.skipped.append((path, f"parse error: {e}"))
                 continue
