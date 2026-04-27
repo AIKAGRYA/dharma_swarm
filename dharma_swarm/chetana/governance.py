@@ -110,22 +110,24 @@ def gate_check_atom(
         logger.warning("KernelGuard.load() failed (%s); using zero-signature.", e)
 
     gatekeeper = TelosGatekeeper()
-    full_action_text = f"{requested_action}: {atom_title}\n\n{atom_content}"
+    action_line = f"{requested_action}: {atom_title}"
     try:
-        gate_result = gatekeeper.check_action(full_action_text)
+        gate_result = gatekeeper.check(action=action_line, content=atom_content)
     except Exception as e:
-        logger.warning("TelosGatekeeper.check_action() failed (%s); permissive fallback.", e)
+        logger.warning("TelosGatekeeper.check() failed (%s); permissive fallback.", e)
         return _permissive_check(atom_content, requested_action, kernel_sig=kernel_sig)
 
     # Translate dharma_swarm GateCheckResult → chetana GateCheckRecord.
-    # The dharma_swarm result has fields like .decision (ALLOW/WARN/BLOCK),
-    # .triggered_gates, .reasons. Be defensive.
+    # Real shape (verified 2026-04-27 against installed dharma_swarm):
+    #   decision: GateDecision enum (ALLOW | BLOCK | REVIEW)
+    #   gate: str — the single gate that fired (or "" on ALLOW)
+    #   gate_results: list of per-gate detail records
+    #   reason: str — human-readable rationale
+    #   timestamp: str
     decision = _coerce_decision(getattr(gate_result, "decision", None))
-    triggered = list(getattr(gate_result, "triggered_gates", []) or [])
-    reasons = getattr(gate_result, "reasons", None)
-    rationale = (
-        "; ".join(reasons) if isinstance(reasons, (list, tuple)) else (reasons or None)
-    )
+    primary_gate = getattr(gate_result, "gate", "") or ""
+    triggered = [primary_gate] if primary_gate else []
+    rationale = getattr(gate_result, "reason", None) or None
 
     if decision == "BLOCK":
         gates_blocked = triggered
@@ -191,10 +193,19 @@ def _permissive_check(
 
 
 def _coerce_decision(raw: Any) -> GateResult:
+    """Map any of {Enum, str, value} to chetana's GateResult literal.
+
+    Handles GateDecision.ALLOW / .BLOCK / .REVIEW (the dharma_swarm enum), plus
+    string variants. REVIEW maps to WARN (chetana's middle tier).
+    """
     if raw is None:
         return "ALLOW"
-    s = str(raw).upper()
-    s = s.split(".")[-1]  # GateDecision.BLOCK -> BLOCK
+    # Try the enum's .value first ('allow' | 'block' | 'review')
+    val = getattr(raw, "value", None)
+    if isinstance(val, str):
+        s = val.upper()
+    else:
+        s = str(raw).split(".")[-1].upper()
     if s in ("ALLOW", "PASS", "OK"):
         return "ALLOW"
     if s in ("WARN", "WARNING", "REVIEW", "ADVISORY"):

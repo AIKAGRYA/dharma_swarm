@@ -170,11 +170,15 @@ def render_frontmatter_yaml(schema: FrontmatterSchema) -> str:
     return f"---\n{body}---\n"
 
 
-def parse_frontmatter(text: str) -> tuple[FrontmatterSchema | None, str]:
+def parse_frontmatter(
+    text: str, *, lenient: bool = False, source_path: str | None = None
+) -> tuple[FrontmatterSchema | None, str]:
     """Parse an atom's full text into (frontmatter, body).
 
     Returns (None, full_text) if no frontmatter is present.
-    Raises pydantic ValidationError if frontmatter is present but invalid.
+    Raises pydantic ValidationError if frontmatter is present but invalid
+    (unless ``lenient=True``, in which case missing/loose fields get
+    sensible defaults so chetana can read older Karpathy-style atoms).
 
     YAML auto-coerces ISO-shaped strings to ``date`` objects; we coerce them
     back to ISO strings before validation so the schema stays string-only.
@@ -188,7 +192,103 @@ def parse_frontmatter(text: str) -> tuple[FrontmatterSchema | None, str]:
     if fm_raw is None or not isinstance(fm_raw, dict):
         return None, m.group("body")
     fm_raw = _coerce_temporal_strings(fm_raw)
+    if lenient:
+        fm_raw = _legacy_normalize(fm_raw, source_path=source_path)
     return validate_frontmatter(fm_raw), m.group("body")
+
+
+def _legacy_normalize(fm: dict[str, Any], *, source_path: str | None) -> dict[str, Any]:
+    """Coerce legacy / Karpathy-style frontmatter into the chetana schema.
+
+    Makes chetana able to read 100+ existing wiki atoms that predate it:
+      - missing ``atom_id`` → deterministic uuid5 from the source_path
+      - missing ``type``    → "atomic"
+      - missing ``confidence`` → 0.5
+      - missing ``stale_after`` → today + 90d
+      - ``source: [str, str, ...]`` → list[AtomSource(kind="external", path=str)]
+      - ``sources:`` (alt key) → ``source:``
+      - ``cross_links:`` (alt key) → ``related:``
+    """
+    fm = dict(fm)  # copy
+
+    # alt-key normalizations
+    if "sources" in fm and "source" not in fm:
+        fm["source"] = fm.pop("sources")
+    if "cross_links" in fm and "related" not in fm:
+        fm["related"] = fm.pop("cross_links")
+
+    # atom_id default — deterministic from source_path so re-reads stay stable
+    if not fm.get("atom_id"):
+        if source_path:
+            fm["atom_id"] = str(uuid.uuid5(uuid.NAMESPACE_URL, source_path))
+        else:
+            fm["atom_id"] = str(uuid.uuid4())
+
+    fm.setdefault("type", "atomic")
+    if "confidence" not in fm:
+        fm["confidence"] = 0.5
+    fm.setdefault("stale_after", default_stale_after())
+    fm.setdefault("title", "Untitled")
+
+    # source: [str, ...] → list[dict{kind,path,captured,captured_by}]
+    src = fm.get("source")
+    if not src:
+        fm["source"] = [
+            {
+                "kind": "external",
+                "path": source_path or "<unknown>",
+                "captured": date.today().isoformat(),
+                "captured_by": "legacy_normalize",
+            }
+        ]
+    elif isinstance(src, str):
+        fm["source"] = [
+            {
+                "kind": "external",
+                "path": src,
+                "captured": date.today().isoformat(),
+                "captured_by": "legacy_normalize",
+            }
+        ]
+    elif isinstance(src, list):
+        normalized = []
+        for item in src:
+            if isinstance(item, dict):
+                item.setdefault("kind", "external")
+                item.setdefault("path", "<unknown>")
+                item.setdefault("captured", date.today().isoformat())
+                item.setdefault("captured_by", "legacy_normalize")
+                normalized.append(item)
+            else:
+                normalized.append(
+                    {
+                        "kind": "external",
+                        "path": str(item),
+                        "captured": date.today().isoformat(),
+                        "captured_by": "legacy_normalize",
+                    }
+                )
+        fm["source"] = normalized
+
+    # confidence float coercion
+    try:
+        fm["confidence"] = float(fm["confidence"])
+    except (TypeError, ValueError):
+        fm["confidence"] = 0.5
+
+    # related must be list[str] of [[wikilinks]]
+    related = fm.get("related") or []
+    if isinstance(related, str):
+        related = [related]
+    fm["related"] = [str(r) for r in related]
+
+    # tags must be list[str]
+    tags = fm.get("tags") or []
+    if isinstance(tags, str):
+        tags = [tags]
+    fm["tags"] = [str(t) for t in tags]
+
+    return fm
 
 
 def _coerce_temporal_strings(value: Any) -> Any:
