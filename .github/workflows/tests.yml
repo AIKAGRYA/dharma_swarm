@@ -137,7 +137,7 @@ jobs:
           cache-dependency-path: dashboard/package-lock.json
 
       - name: Install dashboard deps
-        run: npm ci
+        run: npm ci --legacy-peer-deps
 
       - name: Lint dashboard
         run: npm run lint -- --quiet
