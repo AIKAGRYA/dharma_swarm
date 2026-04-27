@@ -27,6 +27,12 @@ from .graph_unifier import coverage_summary, query as unified_query
 from .ingest import ingest
 from .palace import palace_summary, render_palace
 from .promote import promote
+from .revival import (
+    apply_revival,
+    find_due_atoms,
+    propose_revival,
+    revival_summary,
+)
 from .staging import (
     QUARANTINE_ROOT,
     STAGING_ROOT,
@@ -85,9 +91,36 @@ def _cmd_promote(args: argparse.Namespace) -> int:
     return 0 if result.decision != "BLOCK" else 2
 
 
+def _cmd_revive(args: argparse.Namespace) -> int:
+    """Propose (or apply) revival for stale atoms."""
+    targets: list = []
+    if args.all:
+        targets = find_due_atoms(grace_days=args.grace_days)
+    else:
+        targets = [Path(args.path).expanduser().resolve()]
+    proposals = []
+    for t in targets:
+        try:
+            p = propose_revival(atom_path=t, extend_days=args.extend_days)
+        except Exception as e:
+            print(f"  · skipped {t}: {e}")
+            continue
+        proposals.append(p)
+        if args.apply:
+            new_path = apply_revival(p, reviewer=args.reviewer)
+            print(f"  ✓ revived {new_path}")
+    print(revival_summary(proposals))
+    return 0
+
+
 def _cmd_decay(args: argparse.Namespace) -> int:
     report = scan_decay(quarantine=args.quarantine, grace_days=args.grace_days)
     print(decay_summary(report))
+    if not args.quarantine and report.stale_count > 0:
+        print(
+            "\n→ Default chetana response to stale is REVIVE, not quarantine. "
+            "Run `chetana revive --all` to re-research and re-integrate."
+        )
     if args.json:
         payload = {
             "scanned": report.scanned,
@@ -167,11 +200,49 @@ def build_parser() -> argparse.ArgumentParser:
     sp_pr.add_argument("--confidence", type=float, default=None)
     sp_pr.set_defaults(func=_cmd_promote)
 
-    sp_dec = sub.add_parser("decay", help="scan stale_after, quarantine on demand")
-    sp_dec.add_argument("--quarantine", action="store_true")
+    sp_dec = sub.add_parser(
+        "decay",
+        help="surface stale_after atoms; quarantine is opt-in last resort",
+    )
+    sp_dec.add_argument(
+        "--quarantine",
+        action="store_true",
+        help="actually move stale atoms to quarantine/ (default: just surface)",
+    )
     sp_dec.add_argument("--grace-days", dest="grace_days", type=int, default=0)
     sp_dec.add_argument("--json", default=None, help="write JSON report to this path")
     sp_dec.set_defaults(func=_cmd_decay)
+
+    sp_rev = sub.add_parser(
+        "revive",
+        help="re-research stale atoms; find new neighbors / backlinks / answered questions",
+    )
+    sp_rev.add_argument(
+        "path",
+        nargs="?",
+        default=".",
+        help="atom path (omit when using --all)",
+    )
+    sp_rev.add_argument("--all", action="store_true", help="propose revival for every due atom")
+    sp_rev.add_argument(
+        "--apply",
+        action="store_true",
+        help="actually rewrite the atom with refreshed metadata + revival_chain",
+    )
+    sp_rev.add_argument(
+        "--extend-days",
+        dest="extend_days",
+        type=int,
+        default=90,
+        help="how many days to extend stale_after on apply (default 90)",
+    )
+    sp_rev.add_argument(
+        "--reviewer",
+        default="chetana.cli",
+        help="recorded as reviewed_by in the revival_chain entry",
+    )
+    sp_rev.add_argument("--grace-days", dest="grace_days", type=int, default=0)
+    sp_rev.set_defaults(func=_cmd_revive)
 
     sp_gs = sub.add_parser("gap-scan", help="recurring topics + open questions")
     sp_gs.add_argument("--focus", default=None)
