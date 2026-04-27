@@ -1,0 +1,22 @@
+{
+  "name": "chetana",
+  "description": "chetana (चेतना) — connective tissue for the grand memory system. Captures every Claude Code session, ingests as staged atoms, gate-checks via dharma_swarm.telos_gates, surfaces decay/revival/gap queues at SessionStart, and weaves continuous evolution across all sessions.",
+  "version": "0.3.0",
+  "author": {
+    "name": "dhyana"
+  },
+  "homepage": "file:///Users/dhyana/dharma_chetana/dharma_swarm/chetana/README.md",
+  "license": "MIT",
+  "keywords": [
+    "memory",
+    "pkm",
+    "session-capture",
+    "continuous-evolution",
+    "karpathy-llm-wiki",
+    "telos-gates",
+    "dharma-swarm"
+  ],
+  "hooks": "./hooks/hooks.json",
+  "skills": "./skills/",
+  "commands": "./commands/"
+}
