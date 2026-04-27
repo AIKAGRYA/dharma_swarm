@@ -30,6 +30,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Run Semgrep CI
         # In CI we run BOTH the local .semgrep/ rules and the registry
@@ -56,4 +58,16 @@ jobs:
         # Local .semgrep/ rules are our owned signal. Fail the build on
         # any ERROR in our own rules — registry packs are advisory only.
         run: |
-          semgrep --config .semgrep --error --metrics=off
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            base="${{ github.event.before }}"
+          else
+            base=""
+          fi
+
+          if [ -n "$base" ] && git cat-file -e "$base^{commit}" 2>/dev/null; then
+            semgrep --config .semgrep --error --metrics=off --baseline-commit "$base"
+          else
+            semgrep --config .semgrep --error --metrics=off
+          fi
