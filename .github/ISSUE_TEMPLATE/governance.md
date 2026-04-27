@@ -11,9 +11,7 @@ assignees: ''
 - [ ] CI / GitHub Actions
 - [ ] Lint / Semgrep rule
 - [ ] Pre-commit hook
-- [ ] Dependency / Renovate
 - [ ] Secrets / gitleaks
-- [ ] Code-search / Sourcegraph
 - [ ] Cleanup (dead files, drift, allowlist hygiene)
 - [ ] Documentation (governance/*.md)
 

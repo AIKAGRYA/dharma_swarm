@@ -31,18 +31,11 @@ Two modes:
 Scans full git history (`fetch-depth: 0`). Any finding fails the build.
 Allowlists live in `.gitleaks.toml` (committed at repo root).
 
-## Branch protection (manual setup)
+## Branch protection
 
-These workflows only enforce gates if branch protection requires them.
-**The repo owner must do this once, in the GitHub web UI**:
-
-1. Repo → Settings → Branches → Add rule.
-2. Branch name pattern: `main`. Repeat for `promote/**`.
-3. Enable: "Require status checks to pass before merging".
-4. Required checks: `tests`, `codeql`, `semgrep`, `gitleaks`.
-5. Enable: "Do not allow bypassing the above settings" (off for solo
-   to allow emergency override; on once collaborators exist).
-6. Forbid force-push to `main`.
+Branch-protection changes are intentionally deferred from this Wave A
+branch because they require repo-owner web UI action. This branch only
+adds the workflow files and review metadata needed for later activation.
 
 ## Adding a workflow status badge
 
@@ -56,7 +49,7 @@ add status badges to `README.md`:
 [![gitleaks](https://github.com/AmitabhainArunachala/dharma_swarm/actions/workflows/gitleaks.yml/badge.svg)](https://github.com/AmitabhainArunachala/dharma_swarm/actions/workflows/gitleaks.yml)
 ```
 
-Defer until after Phase 3 (CodeRabbit + Renovate land their own surfaces).
+Defer badge additions until the workflows have run cleanly on `main`.
 
 ## Troubleshooting
 
