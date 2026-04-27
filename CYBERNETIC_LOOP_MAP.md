@@ -3,19 +3,31 @@
 **Generated:** 2026-04-04 | **Purpose:** Document every feedback loop's sense→act→evaluate→adapt path.
 Each loop is traced from data source to data sink. A loop is "closed" only when its output feeds back as input to a future cycle.
 
+**Drift status:** Updated 2026-04-27 for post-PR #28 / PR #35 /
+PR #41 repo state. Read `docs/governance/CANONICAL_DOC_STACK.md`
+first, then `reports/ops/REPO_STATE_NOW.md` for current operational
+truth. This map is a loop topology reference; it must not be used to
+claim live daemon closure without tests or runtime evidence.
+
+**Important correction:** the old Loop 1 `huggingface_hub` blocker
+(`MM-01`) is resolved. PR #28 proves the task lifecycle can write
+`task_claims`, `delegation_runs`, `artifact_records`, and indexed
+`session_events` in tests. Live daemon closure and downstream loop
+closure are still not claimed here.
+
 ---
 
 ## Loop Status Summary
 
 | # | Loop | Interval | Closed? | Blocker |
 |---|------|----------|---------|---------|
-| 1 | Swarm Task Loop | 60s | **NO** | Agent execution crashes (MISMATCH-01 in INTERFACE_MISMATCH_MAP.md) |
+| 1 | Swarm Task Loop | 60s | **PARTIAL** | Core runtime-spine test path is closed after PR #28; live daemon / full AgentRunner-provider closure still needs runtime proof |
 | 2 | Organism Heartbeat | 300s | **PARTIAL** | Sense works (computes invariants). Act/adapt require running agents to produce data. |
-| 3 | Evolution Loop | every 3rd tick | **NO** | Requires completed tasks to score fitness. No tasks complete. |
-| 4 | Consolidation Loop | configurable | **NO** | Requires memories to consolidate. No memories exist. |
+| 3 | Evolution Loop | every 3rd tick | **NO** | Requires completed runtime outcomes and fitness evidence beyond the PR #28 task-spine tests. |
+| 4 | Consolidation Loop | configurable | **NO** | Requires memory/material production and consolidation tests beyond the core task-spine proof. |
 | 5 | Zeitgeist Scanner | configurable | **PARTIAL** | Local file scanning works. Claude-assisted scanning requires API key. |
-| 6 | Witness Auditor | 3600s | **NO** | Provider type mismatch (MISMATCH-11). Also needs running agents to audit. |
-| 7 | Training Flywheel | 300s | **NO** | Requires trajectory data from completed tasks. None exists. |
+| 6 | Witness Auditor | 3600s | **PARTIAL** | Prior provider mismatch is marked resolved in `INTERFACE_MISMATCH_MAP.md`; still needs running agent outputs and tests. |
+| 7 | Training Flywheel | 300s | **NO** | Requires trajectory data from completed runtime tasks, not just synthetic lifecycle tests. |
 | 8 | Recognition Loop | 7200s | **NO** | Recognition seed never generated. Depends on cascade history. |
 | 9 | Conductors | 120s | **NO** | Hardcoded to Anthropic, no fallback (INCONSISTENCY-03 in MODEL_ROUTING_MAP.md). |
 | 10 | Context Agent | 60s | **NO** | Requires working agent_runner which crashes. |
@@ -32,7 +44,7 @@ Each loop is traced from data source to data sink. A loop is "closed" only when 
 ```
 SENSE:   orchestrator.tick() → route_next() → find ready tasks + idle agents
 ACT:     orchestrator._execute_task() → agent_runner.run_task() → provider.complete_for_task()
-         → router_v1.build_routing_signals() [CRASHES HERE: huggingface_hub import]
+         → router_v1.build_routing_signals() [old huggingface_hub crash resolved]
          → ModelRouter selects provider → LLM call → response
 EVALUATE: orchestrator._execute_task() → on_task_complete():
          - Writes result to shared notes (~/.dharma/shared/)
@@ -66,7 +78,11 @@ Task queue → Orchestrator → AgentRunner → ModelRouter → LLM Provider
 - `_fitness_biased_pick()` uses agent fitness scores to prefer better agents
 - `DynamicCorrectionEngine` signals cause task reassignment or agent retirement
 
-**Current state:** Broken at the LLM call. No task has ever returned a result. The entire downstream feedback path is untested against real data.
+**Current state:** The old `huggingface_hub` crash is no longer the
+known blocker. PR #28 proves the orchestrator-centric lifecycle can
+complete a task in tests and write structured runtime rows. This does
+not prove that the live daemon, full `AgentRunner` tool/provider path,
+or downstream adaptive loops close under real runtime load.
 
 ---
 
@@ -211,16 +227,24 @@ ADAPT:   Write recognition_seed.md to ~/.dharma/meta/
 
 ### Loops 9-13: Dependent Loops
 
-These loops (Conductors, Context Agent, Replication Monitor, Self-Improvement, Free Evolution Grind) all depend on Loop 1 (Swarm Task Loop) working first. They cannot close independently.
+These loops (Conductors, Context Agent, Replication Monitor,
+Self-Improvement, Free Evolution Grind) all depend on Loop 1 moving
+from test-proven partial closure to live-runtime closure. They cannot
+be promoted as closed from the PR #28 test proof alone.
 
 ---
 
 ## Which Loops Close First After Bootstrap
 
-Once Claude Code applies the 9 fixes from INTERFACE_MISMATCH_MAP.md:
+After the post-PR #28 repo state is verified in a live runtime:
 
-**Immediately closeable (Fix 1 alone):**
-- Loop 1 (Swarm Task) — agents can reach LLMs, complete tasks, store results
+**Already partially proven by PR #28 tests:**
+- Loop 1 (Swarm Task) — orchestrator-centric task lifecycle can
+  complete/fail tasks and persist runtime structured rows
+
+**Still requires live runtime proof:**
+- Loop 1 (Swarm Task) — full live daemon path with real provider,
+  full `AgentRunner`, artifact side effects, and next-tick adaptation
 - Loop 2 (Organism Heartbeat) — invariants will have real data to compute
 
 **Closeable after first task completes:**

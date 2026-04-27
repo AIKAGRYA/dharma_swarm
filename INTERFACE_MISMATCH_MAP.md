@@ -2,8 +2,16 @@
 
 **Last X-Ray:** 2026-04-08 (fresh audit against current HEAD `c73db94`+)
 **Previous version:** 2026-04-04 (55 module pairs, 13 mismatches, 9 prioritized)
-**Maintainer:** Guardian Crew (`guardian_crew.py`) — auto-updates every 4 hours
+**Maintainer:** Manual drift register. Guardian Crew writes
+`~/.dharma/guardian/GUARDIAN_REPORT.md`; it does not auto-update this
+file on `origin/main`.
 **How to read this:** Severity = BLOCKER (crashes at runtime), DEGRADED (silent failure / wrong behavior), WARNING (structural smell).
+
+**Current-state pointers:** read
+`docs/governance/CANONICAL_DOC_STACK.md` first and
+`reports/ops/REPO_STATE_NOW.md` for the current post-PR #28 / PR #35 /
+PR #41 operational summary. This map is a drift register, not proof
+that a fix is implemented unless it names code and tests.
 
 ---
 
@@ -23,6 +31,16 @@
 | NEW-02: dgm_loop _provider attr | DEGRADED | ✅ FIXED THIS SESSION | Removed nonexistent `hasattr(engine, '_provider')` check |
 
 **Net change:** 7 resolved, 2 new fixed, 1 still live BLOCKER, 4 structural degraded remain.
+
+## Docs Drift Register Update — 2026-04-27
+
+| Drift | Status | Cleanup action |
+|---|---|---|
+| Loop 1 still described as dying on `MM-01` / `huggingface_hub` | Stale | `CYBERNETIC_LOOP_MAP.md` now marks Loop 1 as PR #28 test-proven partial closure, with live runtime proof still required |
+| Root `MODEL_ROUTING_MAP.md` presenting the HuggingFace fix as active work | Stale | Map now labels the blocker historical/resolved and defers routing canon to `docs/architecture/MODEL_ROUTING_CANON.md` |
+| Guardian auto-update claim for this file | Stale | Maintainer line now says manual drift register; Guardian writes `GUARDIAN_REPORT.md` |
+| `LIVING_LAYERS.md` competing as active root architecture | Stale | Moved to `docs/archive/LIVING_LAYERS.md` with a historical banner |
+| Agent identity unification described as current fix direction | Ambiguous | Routing map now states current code truth is `AgentConfig` / `AgentState`; `AgentIdentity` unification is aspirational until tests land |
 
 ---
 
@@ -166,4 +184,7 @@ ROUTER_PROBE   — Reads circuit_breakers.json for open providers
 
 ---
 
-*This document is maintained by the Guardian Crew. Do not edit the "Current Live Mismatches" section manually — it will be overwritten on the next guardian cycle. Add new contracts to `guardian_crew.py:_METHOD_EXISTENCE_CHECKS` to ensure they are continuously monitored.*
+*This document is a manual drift register. Do not claim a mismatch is
+resolved from prose alone; name the code path and the test or runtime
+evidence. Guardian Crew findings live in `GUARDIAN_REPORT.md` until a
+separate docs-drift updater is implemented.*

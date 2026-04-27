@@ -1,5 +1,20 @@
 # Living Layers Architecture
 
+**Archive status:** Historical reference, demoted from repo root on
+2026-04-27 by docs drift cleanup. Do not treat this file as current
+architecture truth.
+
+Read these first instead:
+
+- `docs/governance/CANONICAL_DOC_STACK.md` for canonical read order.
+- `reports/ops/REPO_STATE_NOW.md` for current post-PR #28 runtime
+  state.
+- `docs/architecture/NAVIGATION.md` for active module navigation.
+
+The line numbers and wiring-status claims below were written against
+older code. They may still explain design intent, but implementation
+claims require current source inspection and tests.
+
 **Source files:**
 - `~/dharma_swarm/dharma_swarm/stigmergy.py` (220 lines)
 - `~/dharma_swarm/dharma_swarm/shakti.py` (201 lines)

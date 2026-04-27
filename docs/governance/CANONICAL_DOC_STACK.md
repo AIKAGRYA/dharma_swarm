@@ -1,6 +1,7 @@
 # CANONICAL DOC STACK
 
 **Date**: 2026-04-04
+**Drift cleanup update**: 2026-04-27
 **Purpose**: Define the minimal root-adjacent file stack for repo integrity.
 
 ---
@@ -24,11 +25,12 @@ TIER 3 — FOUNDATIONAL (read for deep context, rarely changes)
 │
 TIER 4 — OPERATIONAL REFERENCE (read when operating the system)
 ├── README.md                          → Repo overview, quick-start
+├── reports/ops/REPO_STATE_NOW.md      → Current post-PR #28 / #35 / #41 operating state
 ├── docs/governance/REPO_GOVERNANCE_AUDIT.md → Audit findings, contradictions, stale doc log
 │
 TIER 5 — ARCHIVE (do not read unless investigating history)
 ├── docs/archive/*                     → Correctly quarantined old docs
-├── LIVING_LAYERS.md                   → Demote to archive (stale, overlaps NAVIGATION.md)
+├── docs/archive/LIVING_LAYERS.md      → Historical living-layers design reference
 ├── program.md                         → Demote to archive (overlaps README)
 ├── PRODUCT_SURFACE.md                 → Demote to archive or merge into SOVEREIGN_MANIFEST
 ```
@@ -46,6 +48,7 @@ TIER 5 — ARCHIVE (do not read unless investigating history)
 | Terminal protocol | `specs/DGC_TERMINAL_ARCHITECTURE_v1.1.md` | v1.0 is deprecated |
 | Constitutional axioms | `specs/Dharma_Constitution_v0.md` | — |
 | Kernel spec | `specs/KERNEL_CORE_SPEC.md` | — |
+| Current operating state | `reports/ops/REPO_STATE_NOW.md` | older status maps and stale root docs |
 | Contradictions & staleness | `REPO_GOVERNANCE_AUDIT.md` | — |
 
 ---
@@ -55,7 +58,7 @@ TIER 5 — ARCHIVE (do not read unless investigating history)
 ### DEPRECATE (move to docs/archive/)
 | File | Reason |
 |------|--------|
-| `LIVING_LAYERS.md` | Overlaps NAVIGATION.md, stale line counts, bloated frontmatter |
+| `LIVING_LAYERS.md` | Archived to `docs/archive/LIVING_LAYERS.md` by 2026-04-27 docs drift cleanup |
 | `program.md` | Overlaps README.md |
 | `PRODUCT_SURFACE.md` | Content belongs in SOVEREIGN_MANIFEST or README |
 | `specs/DGC_TERMINAL_ARCHITECTURE.md` (v1.0) | Superseded by v1.1 |

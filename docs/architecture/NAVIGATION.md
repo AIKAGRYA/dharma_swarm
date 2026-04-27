@@ -1,93 +1,17 @@
----
-title: dharma_swarm Navigation Map
-path: docs/architecture/NAVIGATION.md
-slug: dharma-swarm-navigation-map
-doc_type: note
-status: active
-summary: dharma swarm Navigation Map
-source:
-  provenance: repo_local
-  kind: note
-  origin_signals:
-  - CLAUDE.md
-  - dharma_swarm/models.py
-  - dharma_swarm/config.py
-  - dharma_swarm/telos_gates.py
-  - dharma_swarm/providers.py
-  cited_urls: []
-  generated_hint: human_or_agent_authored_repo_doc
-disciplines:
-- swarm_intelligence
-- multi_agent_systems
-- software_architecture
-- knowledge_management
-- cybernetics
-- research_methodology
-inspiration:
-- stigmergy
-- verification
-- operator_runtime
-- product_surface
-- research_synthesis
-connected_python_files:
-- dharma_swarm/models.py
-- dharma_swarm/config.py
-- dharma_swarm/telos_gates.py
-- dharma_swarm/providers.py
-- garden_daemon.py
-connected_python_modules:
-- dharma_swarm.models
-- dharma_swarm.config
-- dharma_swarm.telos_gates
-- dharma_swarm.providers
-- garden_daemon
-connected_relevant_files:
-- CLAUDE.md
-- dharma_swarm/models.py
-- dharma_swarm/config.py
-- dharma_swarm/telos_gates.py
-- dharma_swarm/providers.py
-improvement:
-  room_for_improvement:
-  - Strengthen cross-links to adjacent docs and implementing modules.
-  - Separate durable knowledge from transient session context.
-  - Add a tighter summary for first-pass retrieval.
-  - Review whether this file should stay in `.` or be consolidated elsewhere.
-  next_review_at: '2026-04-01T00:43:19+09:00'
-pkm:
-  note_class: note
-  vault_path: docs/architecture/NAVIGATION.md
-  retrieval_terms:
-  - navigation
-  - map
-  evergreen_potential: medium
-stigmergy:
-  meaning: This file is a shared environmental trace in the DHARMA corpus. Its path, recency, and linked surfaces guide future agent attention; its frontmatter now adds machine-readable coordination cues.
-  state: active
-  semantic_weight: 0.6
-  coordination_comment: dharma swarm Navigation Map
-  levels:
-    sematectonic:
-      what_it_is: The document itself is the mark. Its existence, filename, location, and revision history attract or repel future work.
-      access_mark: Opening, linking, and revising docs/architecture/NAVIGATION.md reinforces its salience without needing a separate message.
-    marker_based:
-      what_it_is: The frontmatter is an explicit annotation layer on top of the document.
-      semantic_mark: Semantic weight, improvement prompts, related files, and provenance comments tell later agents how to use this document.
-  trace_role: coordination_trace
-curation:
-  last_frontmatter_refresh: '2026-04-01T00:43:19+09:00'
-  curated_by_model: Codex (GPT-5)
-  source_model_in_file: 
-  future_model_handoffs:
-  - GPT-5 Codex
-  - Claude
-  - Gemini
-  - Local evaluator
-  schema_version: pkm-phd-stigmergy-v1
----
 # dharma_swarm Navigation Map
 
-Generated: 2026-03-29 | 500 Python modules | 494 test files | 8,848 tests
+Status: active navigation aid, drift-cleaned 2026-04-27.
+
+Read order:
+
+1. `docs/governance/CANONICAL_DOC_STACK.md`
+2. `reports/ops/REPO_STATE_NOW.md`
+3. This navigation map when you need module orientation
+
+Counts and line numbers in this file are approximate navigation aids,
+not acceptance criteria. For current runtime truth, use
+`reports/ops/REPO_STATE_NOW.md` and the cartography/audit reports it
+references.
 
 ---
 
@@ -95,9 +19,10 @@ Generated: 2026-03-29 | 500 Python modules | 494 test files | 8,848 tests
 
 | Need to... | Go to... |
 |------------|----------|
-| Understand the system | `CLAUDE.md` (this repo root) |
-| Find all interface bugs | [`INTERFACE_MISMATCH_MAP.md`](INTERFACE_MISMATCH_MAP.md) — 55 module pairs verified, 13 with issues, 9 prioritized fixes |
-| Understand model routing | [`MODEL_ROUTING_MAP.md`](MODEL_ROUTING_MAP.md) — 18 providers, 3 calling surfaces, 5 inconsistencies, HuggingFace fix |
+| Understand the system | `CLAUDE.md`, then `docs/governance/CANONICAL_DOC_STACK.md` |
+| Find current repo state | `reports/ops/REPO_STATE_NOW.md` |
+| Find interface drift | [`INTERFACE_MISMATCH_MAP.md`](../../INTERFACE_MISMATCH_MAP.md) — manual drift register, not an auto-updated Guardian artifact |
+| Understand model routing | `docs/architecture/MODEL_ROUTING_CANON.md` for canon; root [`MODEL_ROUTING_MAP.md`](../../MODEL_ROUTING_MAP.md) is a historical drift register |
 | Run the live orchestrator | `dgc orchestrate-live` (or `--background`) |
 | Check system health | `dgc status` / `dgc health` |
 | Run all tests | `python3 -m pytest tests/ -q` (~6 min) |
@@ -150,10 +75,10 @@ Generated: 2026-03-29 | 500 Python modules | 494 test files | 8,848 tests
 
 | File | Lines | What It Does | When to Touch |
 |------|-------|-------------|---------------|
-| `swarm.py` | 2,359 | **SwarmManager** -- the facade. Integrates agent pool, task board, message bus, orchestrator, evolution, monitoring. Uses `TYPE_CHECKING` for lazy imports of 20+ subsystems. | Adding new subsystem integrations |
-| `orchestrator.py` | 2,078 | Task routing, dispatching, priority management, retry logic | Modifying task dispatch strategy |
+| `swarm.py` | large | **SwarmManager** -- the facade. Integrates agent pool, task board, message bus, orchestrator, evolution, monitoring. Uses `TYPE_CHECKING` for lazy imports of many subsystems. | Adding new subsystem integrations |
+| `orchestrator.py` | large | Task routing, dispatching, priority management, retry logic, and PR #28 runtime-state producer calls | Modifying task dispatch strategy |
 | `agent_runner.py` | 2,094 | **AgentRunner** (single agent lifecycle) + **AgentPool** (fleet management). Heartbeats, task execution, fitness signal emission. | Modifying agent execution behavior |
-| `providers.py` | 2,098 | 9 LLM providers: Anthropic, OpenAI, OpenRouter, NVIDIA NIM, Local, ClaudeCode, Codex, OpenRouter Free, Ollama. `create_default_router()`. | Adding providers or changing routing |
+| `providers.py` | large | Provider implementations plus `ModelRouter`, routing policy integration, and circuit-breaker path. See `MODEL_ROUTING_CANON.md` and the routing drift register before changing. | Adding providers or changing routing |
 | `providers_extended.py` | 214 | Extended provider configurations | Provider-specific extensions |
 | `base_provider.py` | 198 | Abstract base class for all providers | Only if changing provider contract |
 | `free_fleet.py` | 408 | Free model fleet (Ollama Cloud, NVIDIA NIM, OpenRouter Free) | Adding free model sources |
@@ -489,7 +414,7 @@ Notable standalone docs:
 models.py (schema contract)
     |
     v
-providers.py (9 LLM providers) ---> agent_runner.py (agent lifecycle)
+providers.py (provider/router spine) ---> agent_runner.py (agent lifecycle)
     |                                      |
     v                                      v
 orchestrator.py (task routing) <--- swarm.py (facade, 2359 lines)

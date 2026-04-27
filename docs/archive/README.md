@@ -71,6 +71,7 @@ Current examples:
 - [DHARMA_SWARM_1000X_MASTERPLAN_2026-03-16.md](/Users/dhyana/dharma_swarm/docs/archive/DHARMA_SWARM_1000X_MASTERPLAN_2026-03-16.md)
 - [FIRST_LIVE_RUN_REPORT.md](/Users/dhyana/dharma_swarm/docs/archive/FIRST_LIVE_RUN_REPORT.md)
 - [KAIZEN_IMPLEMENTATION_SUMMARY.md](/Users/dhyana/dharma_swarm/docs/archive/KAIZEN_IMPLEMENTATION_SUMMARY.md)
+- [LIVING_LAYERS.md](/Users/dhyana/dharma_swarm/docs/archive/LIVING_LAYERS.md) — historical design reference demoted from repo root on 2026-04-27
 - [OVERNIGHT_AUTOPILOT.md](/Users/dhyana/dharma_swarm/docs/archive/OVERNIGHT_AUTOPILOT.md)
 - [PUBLISH_TOMORROW.md](/Users/dhyana/dharma_swarm/docs/archive/PUBLISH_TOMORROW.md)
 - [OVERNIGHT_BUILD_PLAN.md](/Users/dhyana/dharma_swarm/docs/archive/OVERNIGHT_BUILD_PLAN.md)

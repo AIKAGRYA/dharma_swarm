@@ -1,7 +1,20 @@
 # Model Routing Map — dharma_swarm
 
 **Generated:** 2026-04-04 | **Purpose:** Complete map of how every LLM call flows through the system.
-Three calling surfaces exist. This document maps each one, identifies inconsistencies between them, and documents the exact fix for the HuggingFace blocker.
+Three calling surfaces exist. This document maps each one, identifies
+inconsistencies between them, and preserves historical context for the
+now-resolved HuggingFace blocker.
+
+**Drift status:** Updated 2026-04-27 as a historical routing-drift
+register. The canonical routing reference is
+`docs/architecture/MODEL_ROUTING_CANON.md`; the canonical doc read
+order is `docs/governance/CANONICAL_DOC_STACK.md`; current
+operational state is summarized in `reports/ops/REPO_STATE_NOW.md`.
+
+**Important correction:** the old `huggingface_hub` import crash is
+resolved and must not be treated as the current Loop 1 blocker. This
+map still documents real routing fragmentation, but it does not claim
+repo-wide routing coherence or implementation fixes without tests.
 
 ---
 
@@ -9,7 +22,7 @@ Three calling surfaces exist. This document maps each one, identifies inconsiste
 
 ### Surface 1: Swarm Agents (orchestrate_live → swarm → orchestrator → agent_runner → providers)
 **How it works:** SwarmManager.init() creates a ModelRouter via create_default_router(). The ModelRouter holds 18 provider instances. When an agent needs to call an LLM, agent_runner._invoke_provider() calls ModelRouter.complete_for_task() which:
-1. Calls router_v1.build_routing_signals() to classify the request (this is where HuggingFace crashes)
+1. Calls router_v1.build_routing_signals() to classify the request (the old HuggingFace import crash is resolved)
 2. Calls ProviderPolicyRouter.route() to pick a provider chain
 3. Tries each provider in the chain with fallback
 4. Records telemetry, EWMA scores, and audit logs
@@ -82,20 +95,38 @@ After ~100 routing events, EWMA scores from real performance data override this 
 
 **Fix:** All three surfaces should route through a shared ModelRouter instance (or at minimum, share the same RoutingMemoryStore SQLite DB so EWMA scores transfer).
 
-### INCONSISTENCY-02: Agent identity is defined in 4 different places with different schemas
+### INCONSISTENCY-02: Agent identity/config is defined in multiple places with different schemas
 - startup_crew.py: dict with name/role/thread/provider/model
 - persistent_agent.py: PersistentAgent(name, role: AgentRole, provider_type: ProviderType, model)
 - autonomous_agent.py: AgentIdentity(name, role: str, system_prompt, model: str, provider: str)
 - profiles.py: AgentProfile(name, skill_name, model: str, provider: str, autonomy, permissions)
 
-**Impact:** No single source of truth for "who is this agent." The startup crew uses AgentRole enums + ProviderType enums. AutonomousAgent uses bare strings. AgentProfile uses bare strings. PersistentAgent uses enums. Converting between them is error-prone (see INTERFACE_MISMATCH_MAP.md MISMATCH-02).
+**Impact:** Agent identity/config is not fully unified across all
+calling surfaces. The startup crew uses AgentRole enums + ProviderType
+enums. AutonomousAgent uses bare strings. AgentProfile uses bare
+strings. PersistentAgent uses enums. Converting between them is
+error-prone (see INTERFACE_MISMATCH_MAP.md MISMATCH-02).
 
-**Fix:** Unify to one AgentIdentity model (Pydantic) that all surfaces consume. Keep it in models.py.
+**Current code truth:** `AgentConfig` / `AgentState` and the shared
+enums in `dharma_swarm/models.py` are the current cross-runtime code
+truth. `AutonomousAgent.AgentIdentity` remains a separate surface.
 
-### INCONSISTENCY-03: Conductors bypass the model hierarchy
-Conductors in conductors.py are hardcoded to ProviderType.ANTHROPIC with specific models ("claude-opus-4-6", "claude-sonnet-4-20250514"). They don't go through the free → cheap → paid hierarchy. If ANTHROPIC_API_KEY is not set, conductors crash — there's no fallback to free providers.
+**Aspirational migration:** unifying all surfaces into one Pydantic
+`AgentIdentity` model may still be desirable, but it is not implemented
+by this cleanup and must not be described as current behavior until
+code and tests prove it.
 
-**Fix:** Conductors should use the same provider resolution as startup_crew.py: check what's available, fallback through tiers.
+### INCONSISTENCY-03: Conductors and persistent agents still bypass the routed policy path
+Earlier versions of this map described conductors as simply hardcoded
+to Anthropic. Current code is more nuanced, but the risk remains:
+conductor / persistent-agent paths do not yet prove the same routed
+policy, routing-memory, and circuit-breaker behavior as
+`ModelRouter.complete_for_task()`.
+
+**Fix direction:** conductors and persistent agents should either use
+the same routed provider path as swarm agents or record equivalent
+routing outcomes into the shared routing memory. Do not claim this is
+implemented until provider-path tests cover it.
 
 ### INCONSISTENCY-04: pulse.py uses subprocess, not API
 pulse.py calls `claude -p` as a subprocess. This means:
@@ -114,18 +145,22 @@ Dashboard defines profiles like "qwen35_surgeon" with Groq as first provider. Th
 
 ---
 
-## The HuggingFace Blocker: Exact Fix
+## Historical HuggingFace Blocker: Resolved
 
 ### What happens
 Every swarm agent call goes through:
 agent_runner._invoke_provider() → ModelRouter.complete_for_task() → router_v1.build_routing_signals() → tiny_router_shadow.infer_tiny_router_shadow_from_messages() → ... → _load_tiny_router_artifacts() → `from huggingface_hub import snapshot_download` → ImportError
 
+**Post-PR #28 status:** this is no longer the current blocker. The
+interface mismatch map marks `MM-01` resolved. Keep the details below
+as historical context only.
+
 ### Why it exists
 tiny_router_shadow.py is an ML-based message transition classifier. It tries to load a HuggingFace checkpoint model for better accuracy. If the checkpoint isn't available, it falls back to a pure-Python heuristic (line 647-651). The fallback WORKS — but the ImportError crashes before the fallback can trigger.
 
-### The fix (choose ONE)
+### Historical fix options
 
-**Option A — 3-line code fix (recommended):**
+**Option A — code fix that landed before this cleanup:**
 In dharma_swarm/tiny_router_shadow.py, line 494-495, change:
 ```python
 # BEFORE:
@@ -146,13 +181,21 @@ Set `TINY_ROUTER_BACKEND=heuristic` in your environment. The _requested_backend(
 **Option C — install the dependency:**
 `pip install huggingface-hub` — this makes the import succeed, but the model download will likely fail on first run without internet access to HuggingFace. On subsequent runs with `local_files_only=True`, it would use cached artifacts.
 
-**Recommendation:** Apply Option A AND set the env var as a belt-and-suspenders approach. The heuristic fallback is good enough for routing — the checkpoint model is a marginal accuracy improvement.
+**Current recommendation:** do not re-open this as an active blocker.
+If a future routing failure appears, reproduce it with a current test
+or runtime log and add a new drift entry instead of reviving the old
+`MM-01` claim.
 
 ---
 
-## Minimum Viable Model Path (Getting One LLM Call Working)
+## Historical Minimum Viable Model Path
 
-1. Apply the HuggingFace fix (Option A above)
+This section is retained as 2026-04-04 bootstrap context. Do not use
+it as a current blocker list without re-verifying against
+`reports/ops/REPO_STATE_NOW.md` and current tests.
+
+1. Confirm the HuggingFace fix remains present; do not re-apply it as
+   if it were still missing.
 2. Get ONE free API key. Easiest options:
    - GROQ_API_KEY from console.groq.com (free, instant, Qwen3-32B at 3000 tok/s)
    - NVIDIA_NIM_API_KEY from build.nvidia.com (free, 50 req/day)
@@ -180,7 +223,7 @@ Set `TINY_ROUTER_BACKEND=heuristic` in your environment. The _requested_backend(
 | persistent_agent.py | ~320 | PersistentAgent: long-lived agent with wake loop |
 | autonomous_agent.py | ~750 | AutonomousAgent: ReAct loop with direct provider calls (bypasses ModelRouter) |
 | profiles.py | ~160 | AgentProfile: runtime config per agent instance |
-| conductors.py | ~80 | Conductor configs: hardcoded to Anthropic |
+| conductors.py | ~80 | Conductor / persistent-agent provider configs; still outside the fully routed policy path |
 | certified_lanes.py | ~80 | Dashboard chat lane definitions |
 | api/routers/chat.py | ~900 | Dashboard chat endpoint: profiles, provider resolution, tool execution |
 | free_fleet.py | ~410 | Free model discovery and tier management |
