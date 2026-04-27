@@ -5,6 +5,7 @@
 - `.github/workflows/tests.yml`
 - `benchmarks/gauntlet.py`
 - `dashboard/src/app/dashboard/agents/[id]/config/page.tsx`
+- `reports/ops/CI_UNBLOCK_PR28.md`
 
 ## Failure Reasons
 
@@ -24,6 +25,7 @@ After the install was repaired locally, the next hard dashboard gate failed in `
 
 - Changed the workflow dashboard install step to `npm ci --legacy-peer-deps`.
 - Fixed the exposed dashboard hook-order violation by computing a nullable `agentId`, keeping both `useQuery` calls unconditional, then returning `null` after hooks when `agent` is absent.
+- No dependency versions or lockfiles were changed.
 
 ### gauntlet-tier1
 
@@ -39,6 +41,14 @@ After the install was repaired locally, the next hard dashboard gate failed in `
 - `npm ci --legacy-peer-deps` in `dashboard/` - passed
 - `npm run lint -- --quiet` in `dashboard/` - passed
 - `npm run build` in `dashboard/` - passed
+- `python -m pytest tests/test_session_ledger.py tests/test_runtime_state.py tests/test_bootstrap_loops.py tests/test_guardian_crew.py -q --tb=short` - not runnable on this clean `origin/main` branch because `tests/test_guardian_crew.py` is only present on PR #28.
+- `python -m pytest tests/test_session_ledger.py tests/test_runtime_state.py tests/test_bootstrap_loops.py -q --tb=short` - 19 passed, 2 failed on the pre-PR #28 `agent_pool.list_agents()` issue in `orchestrator.py`; not patched here because runtime-spine files are out of scope for this CI-unblock branch.
+
+## Remaining Risk
+
+- This branch intentionally does not fix the `orchestrator.py` dispatch-path failures already addressed by PR #28.
+- The dashboard component change is included only because `npm ci --legacy-peer-deps` exposed the next CI blocker, a hook-order lint failure. No dashboard dependency surgery was performed.
+- Local `gh` authentication is still broken, so GitHub job metadata could not be inspected through `gh`; validation used local reproduction of the failing workflow steps.
 
 ## PR #28 Follow-Up
 
