@@ -9,10 +9,13 @@ Detects:
   - Secret exfiltration commands (curl $API_KEY, cat .env)
   - Hidden unicode (zero-width characters, bidi overrides)
   - HTML-based concealment (hidden divs, comment injection)
+  - Typoglycemia obfuscation (scrambled-word injection evasion)
+  - Base64-encoded prompt injection payloads (OWASP evasion class)
 """
 
 from __future__ import annotations
 
+import base64
 import logging
 import re
 from dataclasses import dataclass, field
@@ -44,7 +47,23 @@ _THREAT_PATTERNS: list[tuple[str, str]] = [
     # Code injection
     (r"translate\s+.*\s+into\s+.*\s+and\s+(execute|run|eval)", "translate_execute"),
     (r"eval\s*\(\s*['\"]", "eval_injection"),
+    # Typoglycemia obfuscation: scrambled keyword variants (first/last letter fixed,
+    # interior shuffled).  Covers OWASP evasion class: token-level scrambling.
+    (r"i[a-z]*e\s+p[a-z]*s\s+i[a-z]*s", "typoglycemia_injection"),
+    (r"d[a-z]*d\s+y[a-z]*r\s+i[a-z]*s", "typoglycemia_injection"),
 ]
+
+# Base64 token patterns that decode to known injection payloads
+_BASE64_INJECTION_DECODED_PATTERNS: list[tuple[str, str]] = [
+    (r"ignore\s+(previous|all|above|prior)\s+instructions", "b64_prompt_injection"),
+    (r"disregard\s+(your|all|any)\s+(instructions|rules|guidelines)", "b64_disregard_rules"),
+    (r"system\s+prompt\s+override", "b64_sys_prompt_override"),
+    (r"you\s+are\s+now\s+(a|an)\s+(?!agent)", "b64_identity_override"),
+    (r"new\s+instructions?\s*:", "b64_new_instructions"),
+]
+
+# Matches standalone base64 tokens of suspicious length (≥20 chars, padded)
+_B64_TOKEN_RE = re.compile(r"(?<![A-Za-z0-9+/])([A-Za-z0-9+/]{20,}={0,2})(?![A-Za-z0-9+/=])")
 
 # Zero-width and bidirectional override characters
 _INVISIBLE_CHARS: set[str] = {
@@ -68,6 +87,28 @@ class ScanResult:
     findings: list[str] = field(default_factory=list)
     sanitized_content: str = ""
     source_file: str = ""
+
+
+def _check_base64_payloads(content: str) -> list[str]:
+    """Decode candidate base64 tokens and scan decoded text for injection patterns.
+
+    Returns a list of threat IDs for any decoded tokens that match known injection
+    payload patterns (OWASP evasion class: base64 obfuscation).
+    """
+    findings: list[str] = []
+    for match in _B64_TOKEN_RE.finditer(content):
+        token = match.group(1)
+        # Pad to a valid base64 length
+        padded = token + "=" * (-len(token) % 4)
+        try:
+            decoded = base64.b64decode(padded).decode("utf-8", errors="replace")
+        except Exception:
+            continue
+        for pattern, threat_id in _BASE64_INJECTION_DECODED_PATTERNS:
+            if re.search(pattern, decoded, re.IGNORECASE):
+                if threat_id not in findings:
+                    findings.append(threat_id)
+    return findings
 
 
 def scan_content(content: str, filename: str = "<unknown>") -> ScanResult:
@@ -94,6 +135,9 @@ def scan_content(content: str, filename: str = "<unknown>") -> ScanResult:
     for pattern, threat_id in _THREAT_PATTERNS:
         if re.search(pattern, content, re.IGNORECASE):
             findings.append(threat_id)
+
+    # Check base64-encoded payloads
+    findings.extend(_check_base64_payloads(content))
 
     if findings:
         logger.warning(

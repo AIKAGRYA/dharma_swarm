@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import sqlite3
 from datetime import datetime, timedelta, timezone
@@ -122,6 +123,89 @@ def _seed_structured_rows(db_path: Path, *, with_context: bool = True) -> None:
             ),
         )
         db.commit()
+
+
+def _seed_context_bundle(
+    db_path: Path,
+    *,
+    bundle_id: str = "bundle_test",
+    context_scan: str = "clean",
+    context_bundle_status: str | None = None,
+) -> None:
+    now = datetime.now(timezone.utc).isoformat()
+    meta: dict = {"context_scan": context_scan}
+    if context_bundle_status is not None:
+        meta["context_bundle_status"] = context_bundle_status
+    with sqlite3.connect(db_path) as db:
+        db.execute(
+            "INSERT INTO context_bundles (bundle_id, session_id, task_id,"
+            " run_id, token_budget, rendered_text, sections_json,"
+            " source_refs_json, checksum, created_at, metadata_json)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                bundle_id,
+                "sess_test",
+                "task_test",
+                "run_test",
+                200,
+                "context text",
+                "[]",
+                "[]",
+                "checksum",
+                now,
+                json.dumps(meta),
+            ),
+        )
+        db.commit()
+
+
+@pytest.mark.asyncio
+async def test_ledger_watcher_warns_on_injected_context_bundle(tmp_path: Path) -> None:
+    state_dir, db_path = _runtime_db(tmp_path)
+    _seed_context_bundle(db_path, bundle_id="bundle_flagged", context_scan="flagged")
+
+    findings = await run_ledger_watcher(state_dir)
+
+    injection_findings = [f for f in findings if f.check == "LEDGER_WATCHER:injected_context_bundle"]
+    assert len(injection_findings) == 1
+    finding = injection_findings[0]
+    assert finding.severity == "WARNING"
+    assert "flagged" in finding.detail
+    assert "injection" in finding.detail.lower() or "injection" in finding.title.lower()
+
+
+@pytest.mark.asyncio
+async def test_ledger_watcher_warns_on_unhealthy_context_bundle_status(tmp_path: Path) -> None:
+    state_dir, db_path = _runtime_db(tmp_path)
+    _seed_context_bundle(
+        db_path,
+        bundle_id="bundle_failed",
+        context_scan="clean",
+        context_bundle_status="failed",
+    )
+
+    findings = await run_ledger_watcher(state_dir)
+
+    unhealthy_findings = [
+        f for f in findings if f.check == "LEDGER_WATCHER:unhealthy_context_bundle_status"
+    ]
+    assert len(unhealthy_findings) == 1
+    finding = unhealthy_findings[0]
+    assert finding.severity == "WARNING"
+    assert "failed" in finding.detail or "unhealthy" in finding.detail.lower()
+
+
+@pytest.mark.asyncio
+async def test_ledger_watcher_no_injection_finding_for_clean_bundle(tmp_path: Path) -> None:
+    state_dir, db_path = _runtime_db(tmp_path)
+    _seed_context_bundle(db_path, bundle_id="bundle_clean", context_scan="clean")
+
+    findings = await run_ledger_watcher(state_dir)
+
+    injection_findings = [f for f in findings if f.check == "LEDGER_WATCHER:injected_context_bundle"]
+    unhealthy_findings = [f for f in findings if f.check == "LEDGER_WATCHER:unhealthy_context_bundle_status"]
+    assert injection_findings == []
+    assert unhealthy_findings == []
 
 
 def _repo_src_root(tmp_path: Path) -> Path:

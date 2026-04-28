@@ -128,5 +128,7 @@ async def test_context_compiler_builds_and_persists_budgeted_bundle(tmp_path) ->
     assert "runtime_state.py" in bundle.rendered_text
     assert len(bundle.rendered_text) <= 240 * 4
     assert saved[0].bundle_id == bundle.bundle_id
+    # context_scan metadata must be recorded without adding columns
+    assert bundle.metadata.get("context_scan") in ("clean", "flagged")
 
     await memory_lattice.close()

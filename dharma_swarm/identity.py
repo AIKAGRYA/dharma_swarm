@@ -322,6 +322,17 @@ class IdentityMonitor:
             count = len(list(shared_dir.glob("*.md")))
             signals.append(min(1.0, count / 50.0))
 
+        # Chetana atom health: presence of knowledge atoms under .dharma/knowledge
+        # (filesystem-only signal; does not import or vendor the chetana package)
+        knowledge_dir = self._state_dir / "knowledge"
+        if knowledge_dir.exists():
+            try:
+                atom_count = len(list(knowledge_dir.rglob("*.md")))
+                if atom_count > 0:
+                    signals.append(min(1.0, atom_count / 20.0))
+            except Exception:
+                logger.debug("Chetana knowledge atom count failed", exc_info=True)
+
         return sum(signals) / len(signals) if signals else 0.5
 
     # -- correction ---------------------------------------------------------

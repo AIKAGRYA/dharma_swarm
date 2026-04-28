@@ -448,6 +448,53 @@ def _runtime_rows_missing_context(
     return int(row[0] if row else 0)
 
 
+def _context_bundles_with_injection(
+    db: sqlite3.Connection,
+    since_iso: str,
+) -> int:
+    """Count recent context bundles whose metadata records a flagged context_scan."""
+    existing = {
+        str(row[0])
+        for row in db.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table'"
+        ).fetchall()
+    }
+    if "context_bundles" not in existing:
+        return 0
+    row = db.execute(
+        "SELECT COUNT(*) FROM context_bundles "
+        "WHERE created_at >= ? "
+        "AND json_valid(metadata_json) "
+        "AND json_extract(metadata_json, '$.context_scan') = 'flagged'",
+        (since_iso,),
+    ).fetchone()
+    return int(row[0] if row else 0)
+
+
+def _context_bundles_unhealthy_status(
+    db: sqlite3.Connection,
+    since_iso: str,
+) -> int:
+    """Count recent context bundles with unhealthy context_bundle_status metadata values."""
+    existing = {
+        str(row[0])
+        for row in db.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table'"
+        ).fetchall()
+    }
+    if "context_bundles" not in existing:
+        return 0
+    row = db.execute(
+        "SELECT COUNT(*) FROM context_bundles "
+        "WHERE created_at >= ? "
+        "AND json_valid(metadata_json) "
+        "AND json_extract(metadata_json, '$.context_bundle_status') "
+        "    IN ('failed', 'missing_runtime_state')",
+        (since_iso,),
+    ).fetchone()
+    return int(row[0] if row else 0)
+
+
 async def run_ledger_watcher(
     state_dir: Path,
     *,
@@ -501,6 +548,8 @@ async def run_ledger_watcher(
                     since_iso,
                 ),
             }
+            injected_bundle_count = _context_bundles_with_injection(db, since_iso)
+            unhealthy_bundle_count = _context_bundles_unhealthy_status(db, since_iso)
     except sqlite3.Error as exc:
         return [
             GuardianFinding(
@@ -585,6 +634,45 @@ async def run_ledger_watcher(
                 fix_hint=(
                     "Attach context_bundle_id during Orchestrator dispatch and ensure "
                     "AgentRunner consumes the persisted bundle before action."
+                ),
+            )
+        )
+    if injected_bundle_count > 0:
+        findings.append(
+            GuardianFinding(
+                severity="WARNING",
+                check="LEDGER_WATCHER:injected_context_bundle",
+                title="Recent context bundles contain flagged injection signatures",
+                detail=(
+                    f"{runtime_db} has {injected_bundle_count} recent context_bundle(s) "
+                    "whose metadata records context_scan=flagged. "
+                    "The injection scanner detected suspicious content in the compiled "
+                    "context text before it reached the agent prompt boundary."
+                ),
+                file=str(runtime_db),
+                fix_hint=(
+                    "Investigate the flagged bundles. The AgentRunner replaced "
+                    "suspicious bundle text with a BLOCKED marker — review the source "
+                    "data feeding into ContextCompiler to remove the injection vector."
+                ),
+            )
+        )
+    if unhealthy_bundle_count > 0:
+        findings.append(
+            GuardianFinding(
+                severity="WARNING",
+                check="LEDGER_WATCHER:unhealthy_context_bundle_status",
+                title="Recent context bundles have unhealthy context_bundle_status",
+                detail=(
+                    f"{runtime_db} has {unhealthy_bundle_count} recent context_bundle(s) "
+                    "with context_bundle_status in ('failed', 'missing_runtime_state'). "
+                    "Context bundles in these states indicate the compiler could not "
+                    "assemble a valid pre-action context snapshot."
+                ),
+                file=str(runtime_db),
+                fix_hint=(
+                    "Check RuntimeStateStore availability and ContextCompiler error logs. "
+                    "Ensure session, run, and task records exist before bundle compilation."
                 ),
             )
         )

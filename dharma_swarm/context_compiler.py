@@ -317,6 +317,23 @@ class ContextCompiler:
             for ref in section.source_refs
         )
         created_at = _utc_now()
+
+        # Scan rendered text for injection threats and record compile-time metadata
+        context_scan_meta: dict = {"context_scan": "clean"}
+        try:
+            from dharma_swarm.injection_scanner import scan_content
+
+            scan_result = scan_content(rendered_text, "context_compiler:rendered_text")
+            if not scan_result.is_clean:
+                context_scan_meta = {
+                    "context_scan": "flagged",
+                    "context_scan_findings": scan_result.findings,
+                }
+            else:
+                context_scan_meta = {"context_scan": "clean"}
+        except Exception:
+            logger.debug("Context scan of rendered_text failed", exc_info=True)
+
         checksum = _sha256(
             _canonical_json(
                 {
@@ -339,7 +356,7 @@ class ContextCompiler:
             source_refs=source_refs,
             checksum=checksum,
             created_at=created_at,
-            metadata=dict(metadata or {}),
+            metadata={**(metadata or {}), **context_scan_meta},
         )
         saved = await self.runtime_state.record_context_bundle(bundle)
         if session is not None:
