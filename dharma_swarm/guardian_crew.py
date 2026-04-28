@@ -448,6 +448,49 @@ def _runtime_rows_missing_context(
     return int(row[0] if row else 0)
 
 
+def _runtime_context_bundle_injection_findings(
+    db: sqlite3.Connection,
+    since_iso: str,
+    *,
+    limit: int = 20,
+) -> list[tuple[str, list[str]]]:
+    existing = {
+        str(row[0])
+        for row in db.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table'"
+        ).fetchall()
+    }
+    if "context_bundles" not in existing:
+        return []
+    columns = {
+        str(row[1])
+        for row in db.execute("PRAGMA table_info(context_bundles)").fetchall()
+    }
+    if not {"bundle_id", "rendered_text", "created_at"} <= columns:
+        return []
+
+    try:
+        from dharma_swarm.injection_scanner import scan_content
+    except Exception:
+        logger.debug("Injection scanner unavailable for context bundle audit", exc_info=True)
+        return []
+
+    rows = db.execute(
+        "SELECT bundle_id, rendered_text FROM context_bundles "
+        "WHERE created_at >= ? ORDER BY created_at DESC LIMIT ?",
+        (since_iso, int(limit)),
+    ).fetchall()
+    findings: list[tuple[str, list[str]]] = []
+    for bundle_id, rendered_text in rows:
+        result = scan_content(
+            str(rendered_text or ""),
+            f"context_bundle:{bundle_id}",
+        )
+        if not result.is_clean:
+            findings.append((str(bundle_id), list(result.findings)))
+    return findings
+
+
 async def run_ledger_watcher(
     state_dir: Path,
     *,
@@ -501,6 +544,10 @@ async def run_ledger_watcher(
                     since_iso,
                 ),
             }
+            context_injection_findings = _runtime_context_bundle_injection_findings(
+                db,
+                since_iso,
+            )
     except sqlite3.Error as exc:
         return [
             GuardianFinding(
@@ -585,6 +632,30 @@ async def run_ledger_watcher(
                 fix_hint=(
                     "Attach context_bundle_id during Orchestrator dispatch and ensure "
                     "AgentRunner consumes the persisted bundle before action."
+                ),
+            )
+        )
+    if context_injection_findings:
+        examples = ", ".join(
+            f"{bundle_id}:{'|'.join(items)}"
+            for bundle_id, items in context_injection_findings[:5]
+        )
+        findings.append(
+            GuardianFinding(
+                severity="DEGRADED",
+                check="LEDGER_WATCHER:context_bundle_injection",
+                title="Recent context bundles contain prompt-injection signatures",
+                detail=(
+                    f"{runtime_db} has {len(context_injection_findings)} recent "
+                    "context_bundles whose rendered_text matches injection scanner "
+                    f"rules. Examples: {examples}. Persisted pre-action context is "
+                    "load-bearing and must be treated as untrusted evidence before "
+                    "AgentRunner prompt injection."
+                ),
+                file=str(runtime_db),
+                fix_hint=(
+                    "Sanitize or block suspicious persisted context before prompt "
+                    "construction; keep Runtime Context Bundle text fenced as evidence."
                 ),
             )
         )

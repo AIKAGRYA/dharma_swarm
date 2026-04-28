@@ -1089,7 +1089,14 @@ def _read_persisted_context_bundle(task: Task, config: AgentConfig) -> str:
         return ""
     if bundle is None or not bundle.rendered_text.strip():
         return ""
-    return bundle.rendered_text.strip()
+    rendered_text = bundle.rendered_text.strip()
+    try:
+        from dharma_swarm.injection_scanner import scan_and_sanitize
+
+        return scan_and_sanitize(rendered_text, f"context_bundle:{bundle_id}")
+    except Exception:
+        logger.debug("Context bundle %s injection scan failed", bundle_id, exc_info=True)
+        return rendered_text
 
 
 def _resolve_agent_registry_dir(task: Task, config: AgentConfig) -> Path | None:
