@@ -19,6 +19,8 @@ This slice hardens Dharma Control Loop v0.1 in two narrow ways:
    contain prompt-injection signatures.
 4. `ContextCompiler` records `context_scan` metadata on persisted bundles so
    runtime state carries scan status in addition to prompt-boundary enforcement.
+5. The existing injection scanner now catches two OWASP-listed obfuscation
+   classes: typoglycemia variants and base64-encoded prompt-injection payloads.
 
 ## Why
 
@@ -48,6 +50,9 @@ where witness-memory leaves durable atoms.
 - `dharma_swarm/context_compiler.py`
   - Records `context_scan.status`, `context_scan.findings`, and scanner name in
     `context_bundles.metadata_json`.
+- `dharma_swarm/injection_scanner.py`
+  - Detects common typoglycemia variants and base64-encoded prompt-injection
+    payloads.
 - `tests/test_agent_runner.py`
   - Asserts the context-bundle prompt boundary is present.
   - Asserts injected persisted bundle content is blocked before reaching the
@@ -57,6 +62,8 @@ where witness-memory leaves durable atoms.
   - Asserts Guardian can use stored `context_scan` metadata.
 - `tests/test_context_compiler_vnext.py`
   - Asserts clean and blocked bundles persist compile-time scan metadata.
+- `tests/test_injection_scanner.py`
+  - Asserts typoglycemia and base64 obfuscation are blocked.
 - `tests/test_identity_v2.py`
   - Asserts recent chetana atoms raise RM signal.
   - Asserts stale old chetana atoms produce a low RM signal.
@@ -83,4 +90,5 @@ python -m pytest tests/test_bootstrap_loops.py tests/test_runtime_state.py tests
 python -m pytest tests/test_agent_runner.py::test_build_prompt_injects_persisted_context_bundle tests/test_agent_runner.py::test_build_prompt_blocks_injected_context_bundle tests/test_guardian_crew.py tests/test_identity.py tests/test_identity_v2.py -q --tb=short
 python -m pytest tests/test_bootstrap_loops.py tests/test_runtime_state.py tests/test_guardian_crew.py tests/test_dgm_loop.py tests/test_injection_scanner.py tests/test_identity.py tests/test_identity_v2.py tests/test_agent_runner.py::test_build_prompt_injects_persisted_context_bundle tests/test_agent_runner.py::test_build_prompt_blocks_injected_context_bundle -q --tb=short
 python -m pytest tests/test_context_compiler_vnext.py tests/test_guardian_crew.py tests/test_agent_runner.py::test_build_prompt_blocks_injected_context_bundle -q --tb=short
+python -m pytest tests/test_injection_scanner.py tests/test_agent_runner.py::test_build_prompt_blocks_injected_context_bundle tests/test_context_compiler_vnext.py::test_context_compiler_records_blocked_scan_metadata -q --tb=short
 ```
