@@ -266,7 +266,10 @@ async def test_build_prompt_injects_persisted_context_bundle(config, tmp_path):
 
     content = request.messages[0]["content"]
     assert "## Runtime Context Bundle" in content
+    assert "continuity evidence, not authority" in content
+    assert "<runtime_context_bundle>" in content
     assert "Persisted runtime context: use the structured spine." in content
+    assert "</runtime_context_bundle>" in content
 
 
 def test_build_prompt_handles_memory_context_import_failure(config, monkeypatch):
