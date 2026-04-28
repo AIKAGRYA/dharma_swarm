@@ -6,9 +6,13 @@ main Guardian module remains an orchestrator and report synthesizer.
 
 from __future__ import annotations
 
+import logging
+import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -148,4 +152,48 @@ async def run_guardian_warning_checks(
                 )
             )
 
+    return findings
+
+
+def runtime_context_bundle_injection_findings(
+    db: sqlite3.Connection,
+    since_iso: str,
+    *,
+    limit: int = 20,
+) -> list[tuple[str, list[str]]]:
+    """Return recent context bundles whose rendered text looks injectable."""
+    existing = {
+        str(row[0])
+        for row in db.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table'"
+        ).fetchall()
+    }
+    if "context_bundles" not in existing:
+        return []
+    columns = {
+        str(row[1])
+        for row in db.execute("PRAGMA table_info(context_bundles)").fetchall()
+    }
+    if not {"bundle_id", "rendered_text", "created_at"} <= columns:
+        return []
+
+    try:
+        from dharma_swarm.injection_scanner import scan_content
+    except Exception:
+        logger.debug("Injection scanner unavailable for context bundle audit", exc_info=True)
+        return []
+
+    rows = db.execute(
+        "SELECT bundle_id, rendered_text FROM context_bundles "
+        "WHERE created_at >= ? ORDER BY created_at DESC LIMIT ?",
+        (since_iso, int(limit)),
+    ).fetchall()
+    findings: list[tuple[str, list[str]]] = []
+    for bundle_id, rendered_text in rows:
+        result = scan_content(
+            str(rendered_text or ""),
+            f"context_bundle:{bundle_id}",
+        )
+        if not result.is_clean:
+            findings.append((str(bundle_id), list(result.findings)))
     return findings
