@@ -210,6 +210,14 @@ Tests:
 - five failed rows produce DEGRADED.
 - attached bundles suppress the warning.
 
+Status:
+
+- Implemented in PR #48 after this spec was drafted.
+- Guardian reads `context_bundle_status` from recent `task_claims` and
+  `delegation_runs` metadata.
+- Severity is graduated by recent unhealthy status count:
+  `>= 1` WARNING, `>= 5` DEGRADED, `>= 20` BLOCKER.
+
 ### Slice D - hard gate readiness metric, not hard gate
 
 Do not hard-block dispatch yet. v0.2 should compute readiness for a future hard

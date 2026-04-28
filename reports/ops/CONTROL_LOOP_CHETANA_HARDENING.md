@@ -21,6 +21,8 @@ This slice hardens Dharma Control Loop v0.1 in two narrow ways:
    runtime state carries scan status in addition to prompt-boundary enforcement.
 5. The existing injection scanner now catches two OWASP-listed obfuscation
    classes: typoglycemia variants and base64-encoded prompt-injection payloads.
+6. Guardian now warns when recent lifecycle rows record unhealthy
+   `context_bundle_status` values such as `failed` or `missing_runtime_state`.
 
 ## Why
 
@@ -47,6 +49,7 @@ where witness-memory leaves durable atoms.
 - `dharma_swarm/guardian_runtime_checks.py`
   - Holds the context-bundle scan query so `guardian_crew.py` stays under the
     module line budget.
+  - Holds context missing/status query helpers used by LEDGER_WATCHER.
 - `dharma_swarm/context_compiler.py`
   - Records `context_scan.status`, `context_scan.findings`, and scanner name in
     `context_bundles.metadata_json`.
@@ -60,6 +63,7 @@ where witness-memory leaves durable atoms.
 - `tests/test_guardian_crew.py`
   - Asserts Guardian detects injected persisted context bundles.
   - Asserts Guardian can use stored `context_scan` metadata.
+  - Asserts Guardian detects failed context bundle status metadata.
 - `tests/test_context_compiler_vnext.py`
   - Asserts clean and blocked bundles persist compile-time scan metadata.
 - `tests/test_injection_scanner.py`
