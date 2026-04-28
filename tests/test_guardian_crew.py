@@ -239,6 +239,28 @@ async def test_ledger_watcher_uses_context_scan_metadata(tmp_path: Path) -> None
 
 
 @pytest.mark.asyncio
+async def test_ledger_watcher_warns_on_scanner_unavailable_metadata(tmp_path: Path) -> None:
+    state_dir, db_path = _runtime_db(tmp_path)
+    _seed_session_events(db_path, 3)
+    _seed_structured_rows(
+        db_path,
+        context_text="clean rendered context",
+        context_metadata_json=(
+            '{"context_scan": {"status": "scanner_unavailable", '
+            '"findings": [], '
+            '"scanner": "dharma_swarm.injection_scanner.scan_content"}}'
+        ),
+    )
+
+    findings = await run_ledger_watcher(state_dir)
+
+    assert len(findings) == 1
+    finding = findings[0]
+    assert finding.check == "LEDGER_WATCHER:context_bundle_injection"
+    assert "bundle_guardian:scanner_unavailable" in finding.detail
+
+
+@pytest.mark.asyncio
 async def test_ledger_watcher_warns_on_context_bundle_status_failure(tmp_path: Path) -> None:
     state_dir, db_path = _runtime_db(tmp_path)
     _seed_session_events(db_path, 3)

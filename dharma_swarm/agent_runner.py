@@ -1095,8 +1095,15 @@ def _read_persisted_context_bundle(task: Task, config: AgentConfig) -> str:
 
         return scan_and_sanitize(rendered_text, f"context_bundle:{bundle_id}")
     except Exception:
-        logger.debug("Context bundle %s injection scan failed", bundle_id, exc_info=True)
-        return rendered_text
+        logger.warning(
+            "Context bundle %s injection scan failed; blocking bundle",
+            bundle_id,
+            exc_info=True,
+        )
+        return (
+            f"[BLOCKED: context_bundle:{bundle_id} could not be scanned for "
+            "prompt injection. Content not loaded.]"
+        )
 
 
 def _resolve_agent_registry_dir(task: Task, config: AgentConfig) -> Path | None:

@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
-import pytest
-
-from dharma_swarm.injection_scanner import ScanResult, scan_and_sanitize, scan_content
+from dharma_swarm.injection_scanner import (
+    _MAX_BASE64_TOKEN_CHARS,
+    _MAX_BASE64_TOKENS,
+    _MAX_TYPOGLYCEMIA_WORDS,
+    scan_and_sanitize,
+    scan_content,
+)
 
 
 class TestCleanContent:
@@ -65,6 +69,30 @@ class TestPromptInjection:
         result = scan_content(f"harmless wrapper {encoded}", "encoded.md")
         assert result.is_clean is False
         assert "base64_prompt_injection" in result.findings
+
+    def test_benign_base64_is_not_blocked(self):
+        encoded = "VGVsZW1ldHJ5IHN1bW1hcnkgbm90IGFuIGluc3RydWN0aW9u"
+        result = scan_content(f"encoded attachment note {encoded}", "encoded.md")
+        assert result.is_clean is True
+
+    def test_base64_token_count_is_bounded(self):
+        benign_token = "QUFBQUFBQUFBQUFB"
+        content = " ".join([benign_token] * (_MAX_BASE64_TOKENS + 1))
+        result = scan_content(content, "many-encoded.md")
+        assert result.is_clean is False
+        assert "base64_scan_token_limit" in result.findings
+
+    def test_base64_token_length_is_bounded(self):
+        content = "A" * (_MAX_BASE64_TOKEN_CHARS + 4)
+        result = scan_content(content, "oversized-encoded.md")
+        assert result.is_clean is False
+        assert "base64_token_too_large" in result.findings
+
+    def test_typoglycemia_word_count_is_bounded(self):
+        content = " ".join(["context"] * (_MAX_TYPOGLYCEMIA_WORDS + 1))
+        result = scan_content(content, "oversized.md")
+        assert result.is_clean is False
+        assert "typoglycemia_scan_word_limit" in result.findings
 
 
 class TestSecretExfiltration:

@@ -178,31 +178,40 @@ def runtime_context_bundle_injection_findings(
     if not {"bundle_id", "rendered_text", "created_at"} <= columns:
         return []
 
-    try:
-        from dharma_swarm.injection_scanner import scan_content
-    except Exception:
-        logger.debug("Injection scanner unavailable for context bundle audit", exc_info=True)
-        return []
-
     rows = db.execute(
         "SELECT bundle_id, rendered_text, metadata_json FROM context_bundles "
         "WHERE created_at >= ? ORDER BY created_at DESC LIMIT ?",
         (since_iso, int(limit)),
     ).fetchall()
+    try:
+        from dharma_swarm.injection_scanner import scan_content
+    except Exception:
+        logger.debug("Injection scanner unavailable for context bundle audit", exc_info=True)
+        scan_content = None
+
     findings: list[tuple[str, list[str]]] = []
     for bundle_id, rendered_text, metadata_json in rows:
         metadata = _json_load(metadata_json, {})
         context_scan = metadata.get("context_scan")
-        if isinstance(context_scan, dict) and context_scan.get("status") == "blocked":
+        if isinstance(context_scan, dict) and context_scan.get("status") in {
+            "blocked",
+            "scanner_unavailable",
+        }:
             scan_findings = context_scan.get("findings")
+            finding_items = (
+                [str(item) for item in scan_findings if str(item)]
+                if isinstance(scan_findings, list)
+                else []
+            )
             findings.append(
                 (
                     str(bundle_id),
-                    [str(item) for item in scan_findings]
-                    if isinstance(scan_findings, list)
-                    else ["blocked"],
+                    finding_items or [str(context_scan.get("status") or "blocked")],
                 )
             )
+            continue
+        if scan_content is None:
+            findings.append((str(bundle_id), ["scanner_unavailable"]))
             continue
         result = scan_content(
             str(rendered_text or ""),

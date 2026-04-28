@@ -2,7 +2,7 @@
 
 Date: 2026-04-28
 Branch: feature/control-loop-hardening-chetana
-Base: origin/main@1e5f35d
+Base: origin/main@f3f1900
 
 ## Summary
 
@@ -23,6 +23,8 @@ This slice hardens Dharma Control Loop v0.1 in two narrow ways:
    classes: typoglycemia variants and base64-encoded prompt-injection payloads.
 6. Guardian now warns when recent lifecycle rows record unhealthy
    `context_bundle_status` values such as `failed` or `missing_runtime_state`.
+7. Prompt-boundary context loading now fails closed if the scanner is unavailable,
+   and scanner work is bounded for typoglycemia and base64 checks.
 
 ## Why
 

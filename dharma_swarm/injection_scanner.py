@@ -77,6 +77,9 @@ _FUZZY_TARGETS = (
 _BASE64_TOKEN_RE = re.compile(
     r"(?<![A-Za-z0-9+/])([A-Za-z0-9+/]{16,}={0,2})(?![A-Za-z0-9+/=])"
 )
+_MAX_TYPOGLYCEMIA_WORDS = 20_000
+_MAX_BASE64_TOKENS = 64
+_MAX_BASE64_TOKEN_CHARS = 4_096
 
 
 @dataclass
@@ -153,7 +156,9 @@ def scan_and_sanitize(content: str, filename: str = "<unknown>") -> str:
 def _typoglycemia_findings(content: str) -> list[str]:
     words = re.findall(r"\b[a-zA-Z]{4,}\b", content.lower())
     findings: list[str] = []
-    for word in words:
+    if len(words) > _MAX_TYPOGLYCEMIA_WORDS:
+        findings.append("typoglycemia_scan_word_limit")
+    for word in words[:_MAX_TYPOGLYCEMIA_WORDS]:
         for target in _FUZZY_TARGETS:
             if _is_typoglycemia_variant(word, target):
                 finding = f"typoglycemia_{target}"
@@ -176,7 +181,15 @@ def _is_typoglycemia_variant(word: str, target: str) -> bool:
 
 def _encoded_payload_findings(content: str) -> list[str]:
     findings: list[str] = []
-    for token in _BASE64_TOKEN_RE.findall(content):
+    for index, token in enumerate(_BASE64_TOKEN_RE.findall(content)):
+        if index >= _MAX_BASE64_TOKENS:
+            findings.append("base64_scan_token_limit")
+            break
+        if len(token) > _MAX_BASE64_TOKEN_CHARS:
+            finding = "base64_token_too_large"
+            if finding not in findings:
+                findings.append(finding)
+            continue
         try:
             decoded = base64.b64decode(token, validate=True)
         except (binascii.Error, ValueError):
