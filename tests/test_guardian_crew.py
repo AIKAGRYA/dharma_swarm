@@ -239,6 +239,35 @@ async def test_ledger_watcher_uses_context_scan_metadata(tmp_path: Path) -> None
 
 
 @pytest.mark.asyncio
+async def test_ledger_watcher_warns_on_context_bundle_status_failure(tmp_path: Path) -> None:
+    state_dir, db_path = _runtime_db(tmp_path)
+    _seed_session_events(db_path, 3)
+    _seed_structured_rows(
+        db_path,
+        context_metadata_json='{"context_scan": {"status": "clean", "findings": []}}',
+    )
+    with sqlite3.connect(db_path) as db:
+        metadata = '{"context_bundle_id": "bundle_guardian", "context_bundle_status": "failed"}'
+        db.execute(
+            "UPDATE task_claims SET metadata_json = ? WHERE claim_id = ?",
+            (metadata, "claim_guardian"),
+        )
+        db.execute(
+            "UPDATE delegation_runs SET metadata_json = ? WHERE run_id = ?",
+            (metadata, "run_guardian"),
+        )
+        db.commit()
+
+    findings = await run_ledger_watcher(state_dir)
+
+    assert len(findings) == 1
+    finding = findings[0]
+    assert finding.severity == "WARNING"
+    assert finding.check == "LEDGER_WATCHER:context_bundle_status"
+    assert "failed=2" in finding.detail
+
+
+@pytest.mark.asyncio
 async def test_ledger_watcher_warning_on_24h_delta_without_structured_rows(tmp_path: Path) -> None:
     state_dir, db_path = _runtime_db(tmp_path)
     _seed_session_events(db_path, 3)

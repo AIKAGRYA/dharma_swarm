@@ -6,8 +6,8 @@ main Guardian module remains an orchestrator and report synthesizer.
 
 from __future__ import annotations
 
-import logging
 import json
+import logging
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -211,6 +211,94 @@ def runtime_context_bundle_injection_findings(
         if not result.is_clean:
             findings.append((str(bundle_id), list(result.findings)))
     return findings
+
+
+def runtime_rows_missing_context(
+    db: sqlite3.Connection,
+    table: str,
+    timestamp_column: str,
+    since_iso: str,
+) -> int:
+    """Count recent task/run rows with no matching context bundle."""
+    existing = _runtime_table_names(db)
+    if table not in existing or "context_bundles" not in existing:
+        return 0
+    if timestamp_column not in _runtime_table_columns(db, table):
+        return 0
+
+    metadata_bundle = (
+        "CASE WHEN json_valid(t.metadata_json) "
+        "THEN COALESCE(json_extract(t.metadata_json, '$.context_bundle_id'), '') "
+        "ELSE '' END"
+    )
+    if table == "delegation_runs":
+        join_clause = (
+            f"cb.bundle_id = {metadata_bundle} "
+            "OR (t.run_id != '' AND cb.run_id = t.run_id) "
+            "OR (t.session_id != '' AND t.task_id != '' "
+            "AND cb.session_id = t.session_id AND cb.task_id = t.task_id)"
+        )
+    elif table == "task_claims":
+        join_clause = (
+            f"cb.bundle_id = {metadata_bundle} "
+            "OR (t.session_id != '' AND t.task_id != '' "
+            "AND cb.session_id = t.session_id AND cb.task_id = t.task_id)"
+        )
+    else:
+        return 0
+
+    row = db.execute(
+        f"SELECT COUNT(*) FROM {table} t "
+        f"LEFT JOIN context_bundles cb ON {join_clause} "
+        f"WHERE t.{timestamp_column} >= ? "
+        "AND t.status IN ('claimed', 'running', 'completed', 'failed') "
+        "AND cb.bundle_id IS NULL",
+        (since_iso,),
+    ).fetchone()
+    return int(row[0] if row else 0)
+
+
+def runtime_context_status_counts(
+    db: sqlite3.Connection,
+    since_iso: str,
+) -> dict[str, int]:
+    """Count recent lifecycle rows whose context bundle status is unhealthy."""
+    unhealthy = {"failed", "missing_runtime_state", "missing_task"}
+    counts: dict[str, int] = {}
+    for table, timestamp_column in (
+        ("task_claims", "claimed_at"),
+        ("delegation_runs", "started_at"),
+    ):
+        if table not in _runtime_table_names(db):
+            continue
+        columns = _runtime_table_columns(db, table)
+        if timestamp_column not in columns or "metadata_json" not in columns:
+            continue
+        rows = db.execute(
+            f"SELECT metadata_json FROM {table} WHERE {timestamp_column} >= ?",
+            (since_iso,),
+        ).fetchall()
+        for (metadata_json,) in rows:
+            metadata = _json_load(metadata_json, {})
+            if not isinstance(metadata, dict):
+                continue
+            status = str(metadata.get("context_bundle_status") or "")
+            if status in unhealthy:
+                counts[status] = counts.get(status, 0) + 1
+    return counts
+
+
+def _runtime_table_names(db: sqlite3.Connection) -> set[str]:
+    return {
+        str(row[0])
+        for row in db.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table'"
+        ).fetchall()
+    }
+
+
+def _runtime_table_columns(db: sqlite3.Connection, table: str) -> set[str]:
+    return {str(row[1]) for row in db.execute(f"PRAGMA table_info({table})").fetchall()}
 
 
 def _json_load(raw: object, default: object) -> object:
