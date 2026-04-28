@@ -172,6 +172,14 @@ Tests:
 - Guardian reads metadata and does not need to rescan when metadata exists.
 - AgentRunner still blocks even if metadata lies or is absent.
 
+Status:
+
+- Implemented in PR #48 after this spec was drafted.
+- `ContextCompiler` records `context_scan` metadata without adding columns.
+- Guardian prefers stored blocked metadata and falls back to scanning
+  `rendered_text` for older bundles.
+- AgentRunner remains the prompt-boundary enforcement point.
+
 ### Slice C - context compile failure threshold
 
 Goal:
@@ -284,4 +292,3 @@ Before merging v0.2 slices:
 
 Dharma Control Loop v0.2 should make inherited context useful without letting
 inherited context become sovereign.
-

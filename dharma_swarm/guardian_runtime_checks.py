@@ -7,6 +7,7 @@ main Guardian module remains an orchestrator and report synthesizer.
 from __future__ import annotations
 
 import logging
+import json
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -184,12 +185,25 @@ def runtime_context_bundle_injection_findings(
         return []
 
     rows = db.execute(
-        "SELECT bundle_id, rendered_text FROM context_bundles "
+        "SELECT bundle_id, rendered_text, metadata_json FROM context_bundles "
         "WHERE created_at >= ? ORDER BY created_at DESC LIMIT ?",
         (since_iso, int(limit)),
     ).fetchall()
     findings: list[tuple[str, list[str]]] = []
-    for bundle_id, rendered_text in rows:
+    for bundle_id, rendered_text, metadata_json in rows:
+        metadata = _json_load(metadata_json, {})
+        context_scan = metadata.get("context_scan")
+        if isinstance(context_scan, dict) and context_scan.get("status") == "blocked":
+            scan_findings = context_scan.get("findings")
+            findings.append(
+                (
+                    str(bundle_id),
+                    [str(item) for item in scan_findings]
+                    if isinstance(scan_findings, list)
+                    else ["blocked"],
+                )
+            )
+            continue
         result = scan_content(
             str(rendered_text or ""),
             f"context_bundle:{bundle_id}",
@@ -197,3 +211,12 @@ def runtime_context_bundle_injection_findings(
         if not result.is_clean:
             findings.append((str(bundle_id), list(result.findings)))
     return findings
+
+
+def _json_load(raw: object, default: object) -> object:
+    if isinstance(raw, str) and raw.strip():
+        try:
+            return json.loads(raw)
+        except Exception:
+            return default
+    return default
