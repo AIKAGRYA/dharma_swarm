@@ -34,7 +34,6 @@ import re
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 from pathlib import Path
-from typing import Any
 
 from .governance import gate_check_atom
 from .provenance import (
@@ -45,6 +44,7 @@ from .provenance import (
     parse_frontmatter,
 )
 from .staging import TRUSTED_DEFAULT
+from .stigmergy_emit import emit_mark
 
 
 logger = logging.getLogger(__name__)
@@ -290,6 +290,15 @@ def apply_revival(
         }
     )
     proposal.atom_path.write_text(assemble_atom(refreshed, new_body), encoding="utf-8")
+
+    # Best-effort stigmergy emit — never blocks revival on failure.
+    emit_mark(
+        action="chetana.revive.apply",
+        content=f"{schema.title} | revived",
+        connections=["chetana", "revive", schema.atom_id],
+        salience=0.7,
+    )
+
     return proposal.atom_path
 
 

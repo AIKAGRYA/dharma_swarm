@@ -5344,6 +5344,10 @@ def _build_parser() -> argparse.ArgumentParser:
     p_swarm = sub.add_parser("swarm", help="Swarm orchestrator + overnight/live")
     p_swarm.add_argument("swarm_args", nargs="*", default=[])
 
+    # -- chetana (proxies to python -m dharma_swarm.chetana.cli) --
+    p_chetana = sub.add_parser("chetana", help="chetana PKM CLI (proxied passthrough)")
+    p_chetana.add_argument("chetana_args", nargs=argparse.REMAINDER, default=[])
+
     # -- stress --
     p_stress = sub.add_parser("stress", help="Run max-capacity DGC stress harness")
     p_stress.add_argument("--profile", choices=["quick", "full", "max"], default="full")
@@ -6327,6 +6331,12 @@ def main() -> None:
             print(json.dumps(_result, indent=2))
         case "swarm":
             cmd_swarm(args.swarm_args)
+        case "chetana":
+            rc = subprocess.call(
+                [sys.executable, "-m", "dharma_swarm.chetana.cli", *args.chetana_args]
+            )
+            if rc != 0:
+                raise SystemExit(rc)
         case "stress":
             cmd_stress(
                 profile=args.profile,
