@@ -356,6 +356,9 @@ class ContextCompiler:
             source_refs=source_refs,
             checksum=checksum,
             created_at=created_at,
+            # context_scan_meta is always written last: it is a compiler-owned
+            # reserved key and must reflect the actual scan outcome, not a
+            # caller-supplied value.
             metadata={**(metadata or {}), **context_scan_meta},
         )
         saved = await self.runtime_state.record_context_bundle(bundle)

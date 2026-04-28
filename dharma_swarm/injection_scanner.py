@@ -49,8 +49,11 @@ _THREAT_PATTERNS: list[tuple[str, str]] = [
     (r"eval\s*\(\s*['\"]", "eval_injection"),
     # Typoglycemia obfuscation: scrambled keyword variants (first/last letter fixed,
     # interior shuffled).  Covers OWASP evasion class: token-level scrambling.
-    (r"i[a-z]*e\s+p[a-z]*s\s+i[a-z]*s", "typoglycemia_injection"),
-    (r"d[a-z]*d\s+y[a-z]*r\s+i[a-z]*s", "typoglycemia_injection"),
+    # Patterns require exact word lengths to minimise false positives:
+    #   "ignore" (6) + "previous" (8) + "instructions" (12)
+    (r"\bi[a-z]{4}e\s+p[a-z]{6}s\s+i[a-z]{10}s\b", "typoglycemia_injection"),
+    #   "disregard" (9) + "your" (4) + "instructions" (12)
+    (r"\bd[a-z]{7}d\s+y[a-z]{2}r\s+i[a-z]{10}s\b", "typoglycemia_injection"),
 ]
 
 # Base64 token patterns that decode to known injection payloads
@@ -62,8 +65,9 @@ _BASE64_INJECTION_DECODED_PATTERNS: list[tuple[str, str]] = [
     (r"new\s+instructions?\s*:", "b64_new_instructions"),
 ]
 
-# Matches standalone base64 tokens of suspicious length (≥20 chars, padded)
-_B64_TOKEN_RE = re.compile(r"(?<![A-Za-z0-9+/])([A-Za-z0-9+/]{20,}={0,2})(?![A-Za-z0-9+/=])")
+# Matches standalone base64 tokens of suspicious length (20–200 chars).
+# Upper bound prevents attempting to decode large binary blobs or embedded files.
+_B64_TOKEN_RE = re.compile(r"(?<![A-Za-z0-9+/])([A-Za-z0-9+/]{20,200}={0,2})(?![A-Za-z0-9+/=])")
 
 # Zero-width and bidirectional override characters
 _INVISIBLE_CHARS: set[str] = {

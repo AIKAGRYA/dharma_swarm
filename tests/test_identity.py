@@ -318,11 +318,10 @@ class TestChetanaAtomRMSignal:
         monitor = IdentityMonitor(state_dir=state_dir)
         rm = await monitor._measure_rm()
 
-        # With 10 atoms (10/20 = 0.5 normalized), RM > default 0.5 is not
-        # guaranteed alone but the chetana signal must have been included.
-        # We confirm RM is not at exactly 0.5 (the no-data default) meaning a
-        # signal was actually read.
-        assert rm != 0.5 or True  # guard: at least it did not crash
+        # With 10 knowledge atoms the chetana signal contributes to RM.
+        # Verify the value is in valid range; the boost test in
+        # test_rm_knowledge_atoms_boost_rm confirms the signal direction.
+        assert 0.0 <= rm <= 1.0
 
     @pytest.mark.asyncio
     async def test_rm_no_knowledge_dir_is_neutral(self, tmp_path: Path) -> None:
