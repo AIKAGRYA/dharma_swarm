@@ -6,6 +6,7 @@ import asyncio
 import json
 import os
 import time
+from datetime import date, timedelta
 from pathlib import Path
 
 import pytest
@@ -173,6 +174,51 @@ class TestRMFiltered:
         rm = asyncio.run(monitor._measure_rm())
         # stigmergy: 500/1000=0.5, shared notes: 0/50=0.0 → avg = 0.25
         assert abs(rm - 0.25) < 0.01
+
+    def test_chetana_recent_atoms_raise_rm_signal(self, tmp_path: Path):
+        state_dir = tmp_path / ".dharma"
+        concepts = state_dir / "knowledge" / "wiki" / "concepts"
+        staging = state_dir / "knowledge" / "staging" / date.today().isoformat()
+        concepts.mkdir(parents=True)
+        staging.mkdir(parents=True)
+
+        future = (date.today() + timedelta(days=90)).isoformat()
+        (concepts / "trusted.md").write_text(
+            f"---\ntitle: Trusted\natom_id: atom-1\nstale_after: {future}\n---\nbody\n",
+            encoding="utf-8",
+        )
+        (staging / "staged.md").write_text(
+            f"---\ntitle: Staged\natom_id: atom-2\nstale_after: {future}\n---\nbody\n",
+            encoding="utf-8",
+        )
+
+        monitor = IdentityMonitor(state_dir)
+        signal = monitor._measure_chetana_rm_signal()
+        rm = asyncio.run(monitor._measure_rm())
+
+        assert signal is not None
+        assert signal > 0.55
+        assert rm == pytest.approx(signal, abs=0.01)
+
+    def test_chetana_stale_old_atoms_reduce_rm_signal(self, tmp_path: Path):
+        state_dir = tmp_path / ".dharma"
+        concepts = state_dir / "knowledge" / "wiki" / "concepts"
+        concepts.mkdir(parents=True)
+
+        stale = (date.today() - timedelta(days=1)).isoformat()
+        atom_path = concepts / "stale.md"
+        atom_path.write_text(
+            f"---\ntitle: Stale\natom_id: atom-1\nstale_after: {stale}\n---\nbody\n",
+            encoding="utf-8",
+        )
+        old_time = time.time() - (45 * 86400)
+        os.utime(atom_path, (old_time, old_time))
+
+        monitor = IdentityMonitor(state_dir)
+        signal = monitor._measure_chetana_rm_signal()
+
+        assert signal is not None
+        assert signal < 0.1
 
 
 # ---------------------------------------------------------------------------

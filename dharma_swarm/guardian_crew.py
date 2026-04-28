@@ -71,7 +71,12 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from dharma_swarm.guardian_runtime_checks import run_guardian_warning_checks
+from dharma_swarm.guardian_runtime_checks import (
+    run_guardian_warning_checks,
+    runtime_context_bundle_injection_findings,
+    runtime_context_status_counts,
+    runtime_rows_missing_context,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -395,59 +400,6 @@ def _runtime_table_count_since(
     return int(row[0] if row else 0)
 
 
-def _runtime_rows_missing_context(
-    db: sqlite3.Connection,
-    table: str,
-    timestamp_column: str,
-    since_iso: str,
-) -> int:
-    existing = {
-        str(row[0])
-        for row in db.execute(
-            "SELECT name FROM sqlite_master WHERE type = 'table'"
-        ).fetchall()
-    }
-    if table not in existing or "context_bundles" not in existing:
-        return 0
-    columns = {
-        str(row[1])
-        for row in db.execute(f"PRAGMA table_info({table})").fetchall()
-    }
-    if timestamp_column not in columns:
-        return 0
-
-    metadata_bundle = (
-        "CASE WHEN json_valid(t.metadata_json) "
-        "THEN COALESCE(json_extract(t.metadata_json, '$.context_bundle_id'), '') "
-        "ELSE '' END"
-    )
-    if table == "delegation_runs":
-        join_clause = (
-            f"cb.bundle_id = {metadata_bundle} "
-            "OR (t.run_id != '' AND cb.run_id = t.run_id) "
-            "OR (t.session_id != '' AND t.task_id != '' "
-            "AND cb.session_id = t.session_id AND cb.task_id = t.task_id)"
-        )
-    elif table == "task_claims":
-        join_clause = (
-            f"cb.bundle_id = {metadata_bundle} "
-            "OR (t.session_id != '' AND t.task_id != '' "
-            "AND cb.session_id = t.session_id AND cb.task_id = t.task_id)"
-        )
-    else:
-        return 0
-
-    row = db.execute(
-        f"SELECT COUNT(*) FROM {table} t "
-        f"LEFT JOIN context_bundles cb ON {join_clause} "
-        f"WHERE t.{timestamp_column} >= ? "
-        "AND t.status IN ('claimed', 'running', 'completed', 'failed') "
-        "AND cb.bundle_id IS NULL",
-        (since_iso,),
-    ).fetchone()
-    return int(row[0] if row else 0)
-
-
 async def run_ledger_watcher(
     state_dir: Path,
     *,
@@ -488,19 +440,24 @@ async def run_ledger_watcher(
                 },
             }
             missing_context_counts = {
-                "task_claims": _runtime_rows_missing_context(
+                "task_claims": runtime_rows_missing_context(
                     db,
                     "task_claims",
                     "claimed_at",
                     since_iso,
                 ),
-                "delegation_runs": _runtime_rows_missing_context(
+                "delegation_runs": runtime_rows_missing_context(
                     db,
                     "delegation_runs",
                     "started_at",
                     since_iso,
                 ),
             }
+            context_injection_findings = runtime_context_bundle_injection_findings(
+                db,
+                since_iso,
+            )
+            context_status_counts = runtime_context_status_counts(db, since_iso)
     except sqlite3.Error as exc:
         return [
             GuardianFinding(
@@ -585,6 +542,59 @@ async def run_ledger_watcher(
                 fix_hint=(
                     "Attach context_bundle_id during Orchestrator dispatch and ensure "
                     "AgentRunner consumes the persisted bundle before action."
+                ),
+            )
+        )
+    if context_injection_findings:
+        examples = ", ".join(
+            f"{bundle_id}:{'|'.join(items)}"
+            for bundle_id, items in context_injection_findings[:5]
+        )
+        findings.append(
+            GuardianFinding(
+                severity="DEGRADED",
+                check="LEDGER_WATCHER:context_bundle_injection",
+                title="Recent context bundles contain prompt-injection signatures",
+                detail=(
+                    f"{runtime_db} has {len(context_injection_findings)} recent "
+                    "context_bundles whose rendered_text matches injection scanner "
+                    f"rules. Examples: {examples}. Persisted pre-action context is "
+                    "load-bearing and must be treated as untrusted evidence before "
+                    "AgentRunner prompt injection."
+                ),
+                file=str(runtime_db),
+                fix_hint=(
+                    "Sanitize or block suspicious persisted context before prompt "
+                    "construction; keep Runtime Context Bundle text fenced as evidence."
+                ),
+            )
+        )
+    context_status_total = sum(context_status_counts.values())
+    if context_status_total > 0:
+        severity = (
+            "BLOCKER"
+            if context_status_total >= 20
+            else "DEGRADED"
+            if context_status_total >= 5
+            else "WARNING"
+        )
+        breakdown = ", ".join(
+            f"{status}={count}" for status, count in sorted(context_status_counts.items())
+        )
+        findings.append(
+            GuardianFinding(
+                severity=severity,
+                check="LEDGER_WATCHER:context_bundle_status",
+                title="Recent runtime rows record context bundle compile failures",
+                detail=(
+                    f"{runtime_db} has recent task/run rows with unhealthy "
+                    f"context_bundle_status values: {breakdown}. Canonical action "
+                    "is falling back from pre-action context compilation."
+                ),
+                file=str(runtime_db),
+                fix_hint=(
+                    "Inspect Orchestrator context_bundle_failed session events and "
+                    "RuntimeStateStore availability before hard-gating dispatch."
                 ),
             )
         )
