@@ -816,6 +816,108 @@ class Orchestrator:
         meta["latent_gold_refreshed_at"] = datetime.now(timezone.utc).isoformat()
         return meta
 
+    def _operator_intent_for_task(self, task: Task, meta: dict[str, Any]) -> str:
+        for key in (
+            "operator_intent",
+            "user_intent",
+            "mission_intent",
+            "intent",
+            "operator_directive",
+        ):
+            raw = meta.get(key)
+            if isinstance(raw, str) and raw.strip():
+                return raw.strip()
+        return str(task.title or "").strip()
+
+    async def _attach_context_bundle(
+        self,
+        task: Task | None,
+        td: TaskDispatch,
+        meta: dict[str, Any],
+    ) -> dict[str, Any]:
+        if task is None:
+            meta["context_bundle_status"] = "missing_task"
+            td.metadata["context_bundle_status"] = "missing_task"
+            return meta
+
+        store = self._runtime_lifecycle._runtime_state_store()
+        if store is None:
+            meta["context_bundle_status"] = "missing_runtime_state"
+            td.metadata["context_bundle_status"] = "missing_runtime_state"
+            return meta
+
+        run_id = self._runtime_lifecycle.ensure_runtime_run_id(td)
+        runtime_root = self._runtime_root()
+        operator_intent = self._operator_intent_for_task(task, meta)
+        task_description = "\n\n".join(
+            part.strip()
+            for part in (task.title, task.description)
+            if isinstance(part, str) and part.strip()
+        )
+        token_budget = max(200, self._coerce_int(meta.get("context_token_budget"), 1200))
+        lattice = None
+        try:
+            from dharma_swarm.context_compiler import ContextCompiler
+            from dharma_swarm.memory_lattice import MemoryLattice
+
+            lattice = MemoryLattice(
+                db_path=store.db_path,
+                event_log_dir=runtime_root / "events",
+            )
+            compiler = ContextCompiler(
+                runtime_state=store,
+                memory_lattice=lattice,
+            )
+            bundle = await compiler.compile_bundle(
+                session_id=self._ledger.session_id,
+                task_id=td.task_id,
+                run_id=run_id,
+                operator_intent=operator_intent,
+                task_description=task_description,
+                query=str(meta.get("context_query") or task.description or task.title or ""),
+                token_budget=token_budget,
+                metadata={
+                    "source": "orchestrator._assign_dispatch",
+                    "agent_id": td.agent_id,
+                    "topology": td.topology.value if td.topology else "dispatch",
+                },
+                workspace_root=runtime_root,
+            )
+        except Exception as exc:
+            error = str(exc)[:300]
+            meta["context_bundle_status"] = "failed"
+            meta["context_bundle_error"] = error
+            td.metadata["context_bundle_status"] = "failed"
+            td.metadata["context_bundle_error"] = error
+            self._record_progress_event(
+                "context_bundle_failed",
+                task_id=td.task_id,
+                agent_id=td.agent_id,
+                error=error,
+            )
+            logger.debug("Context bundle compilation failed", exc_info=True)
+            return meta
+        finally:
+            if lattice is not None:
+                try:
+                    await lattice.close()
+                except Exception:
+                    logger.debug("Memory lattice close failed", exc_info=True)
+
+        bundle_id = bundle.bundle_id
+        runtime_db_path = str(store.db_path)
+        state_dir = str(runtime_root)
+        meta["context_bundle_id"] = bundle_id
+        meta["context_bundle_status"] = "attached"
+        meta["runtime_run_id"] = run_id
+        meta["runtime_db_path"] = runtime_db_path
+        meta.setdefault("state_dir", state_dir)
+        td.metadata["context_bundle_id"] = bundle_id
+        td.metadata["context_bundle_status"] = "attached"
+        td.metadata["runtime_db_path"] = runtime_db_path
+        td.metadata.setdefault("state_dir", state_dir)
+        return meta
+
     @staticmethod
     def _dedupe_strings(values: list[str]) -> list[str]:
         ordered: list[str] = []
@@ -1822,6 +1924,8 @@ class Orchestrator:
             td.metadata["witness_reroutes"] = gate.attempts
 
         claim_meta = self._prepare_claim(task_for_gate, td)
+        self._runtime_lifecycle.ensure_runtime_run_id(td)
+        claim_meta = await self._attach_context_bundle(task_for_gate, td, claim_meta)
         claim_meta = self._attach_latent_gold(task_for_gate, claim_meta)
         if task_for_gate is not None:
             task_for_gate.metadata = dict(claim_meta)

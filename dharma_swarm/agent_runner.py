@@ -1044,6 +1044,54 @@ def _resolve_prompt_state_dir(task: Task, config: AgentConfig) -> Path | None:
     return _resolve_config_state_dir(config)
 
 
+def _resolve_context_bundle_db_path(task: Task, config: AgentConfig) -> Path | None:
+    metadata = task.metadata if isinstance(task.metadata, dict) else {}
+    config_meta = config.metadata if isinstance(config.metadata, dict) else {}
+    for candidate in (
+        metadata.get("runtime_db_path"),
+        config_meta.get("runtime_db_path"),
+    ):
+        if isinstance(candidate, str) and candidate.strip():
+            return Path(candidate).expanduser()
+        if isinstance(candidate, Path):
+            return candidate
+
+    state_dir = _resolve_prompt_state_dir(task, config)
+    if state_dir is None:
+        return None
+    for candidate in (
+        state_dir / "state" / "runtime.db",
+        state_dir / "runtime.db",
+    ):
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def _read_persisted_context_bundle(task: Task, config: AgentConfig) -> str:
+    metadata = task.metadata if isinstance(task.metadata, dict) else {}
+    bundle_id = str(metadata.get("context_bundle_id", "") or "").strip()
+    if not bundle_id:
+        return ""
+    db_path = _resolve_context_bundle_db_path(task, config)
+    if db_path is None:
+        logger.debug("Context bundle %s has no resolvable runtime DB", bundle_id)
+        return ""
+    if not db_path.exists():
+        logger.debug("Context bundle %s runtime DB does not exist: %s", bundle_id, db_path)
+        return ""
+    try:
+        from dharma_swarm.runtime_state import RuntimeStateStore
+
+        bundle = RuntimeStateStore(db_path).get_context_bundle_sync(bundle_id)
+    except Exception:
+        logger.debug("Context bundle %s could not be loaded", bundle_id, exc_info=True)
+        return ""
+    if bundle is None or not bundle.rendered_text.strip():
+        return ""
+    return bundle.rendered_text.strip()
+
+
 def _resolve_agent_registry_dir(task: Task, config: AgentConfig) -> Path | None:
     """Resolve the per-run AgentRegistry directory, if one is configured."""
     state_dir = _resolve_prompt_state_dir(task, config)
@@ -1114,6 +1162,9 @@ def _build_prompt(
             user_parts.append("\n\n" + render_completion_contract_brief(completion_contract))
     except Exception:
         logger.debug("Completion contract prompt injection failed", exc_info=True)
+    runtime_context_bundle = _read_persisted_context_bundle(task, config)
+    if runtime_context_bundle:
+        user_parts.append(f"\n\n## Runtime Context Bundle\n{runtime_context_bundle}")
     prompt_state_dir = _resolve_prompt_state_dir(task, config)
     memory_query = "\n".join(
         part.strip()

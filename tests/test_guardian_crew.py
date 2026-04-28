@@ -51,14 +51,24 @@ def _seed_session_events(
         db.commit()
 
 
-def _seed_structured_rows(db_path: Path) -> None:
+def _seed_structured_rows(db_path: Path, *, with_context: bool = True) -> None:
     now = datetime.now(timezone.utc).isoformat()
+    metadata_json = '{"context_bundle_id": "bundle_guardian"}' if with_context else "{}"
     with sqlite3.connect(db_path) as db:
         db.execute(
             "INSERT INTO task_claims (claim_id, task_id, session_id, agent_id,"
             " status, claimed_at, retry_count, metadata_json)"
             " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            ("claim_guardian", "task_guardian", "sess_guardian", "agent_guardian", "completed", now, 0, "{}"),
+            (
+                "claim_guardian",
+                "task_guardian",
+                "sess_guardian",
+                "agent_guardian",
+                "completed",
+                now,
+                0,
+                metadata_json,
+            ),
         )
         db.execute(
             "INSERT INTO delegation_runs (run_id, session_id, task_id, claim_id,"
@@ -72,9 +82,29 @@ def _seed_structured_rows(db_path: Path) -> None:
                 "agent_guardian",
                 "completed",
                 now,
-                "{}",
+                metadata_json,
             ),
         )
+        if with_context:
+            db.execute(
+                "INSERT INTO context_bundles (bundle_id, session_id, task_id,"
+                " run_id, token_budget, rendered_text, sections_json,"
+                " source_refs_json, checksum, created_at, metadata_json)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    "bundle_guardian",
+                    "sess_guardian",
+                    "task_guardian",
+                    "run_guardian",
+                    200,
+                    "guardian context",
+                    "[]",
+                    "[]",
+                    "checksum",
+                    now,
+                    "{}",
+                ),
+            )
         db.execute(
             "INSERT INTO artifact_records (artifact_id, session_id, task_id,"
             " run_id, artifact_kind, payload_path, checksum, created_at, metadata_json)"
@@ -143,6 +173,22 @@ async def test_ledger_watcher_ok_when_structured_rows_exist(tmp_path: Path) -> N
     findings = await run_ledger_watcher(state_dir)
 
     assert findings == []
+
+
+@pytest.mark.asyncio
+async def test_ledger_watcher_warns_on_recent_rows_without_context_bundle(tmp_path: Path) -> None:
+    state_dir, db_path = _runtime_db(tmp_path)
+    _seed_session_events(db_path, 3)
+    _seed_structured_rows(db_path, with_context=False)
+
+    findings = await run_ledger_watcher(state_dir)
+
+    assert len(findings) == 1
+    finding = findings[0]
+    assert finding.severity == "WARNING"
+    assert finding.check == "LEDGER_WATCHER:missing_context_bundle"
+    assert "task_claims=1" in finding.detail
+    assert "delegation_runs=1" in finding.detail
 
 
 @pytest.mark.asyncio
