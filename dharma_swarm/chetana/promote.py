@@ -24,12 +24,12 @@ from pathlib import Path
 
 from .governance import gate_check_atom
 from .provenance import (
-    FrontmatterSchema,
     GateResult,
     ReviewStatus,
     parse_frontmatter,
 )
 from .staging import quarantine_atom, write_trusted
+from .stigmergy_emit import emit_mark
 
 logger = logging.getLogger(__name__)
 
@@ -119,13 +119,7 @@ def promote(
     trusted_path = write_trusted(promoted_schema, body)
     notes.append(f"promoted ({gov.result}, review={review_status}) → {trusted_path}")
 
-    # Successful promote → remove the staged file.
-    try:
-        staged_path.unlink()
-    except OSError as e:
-        logger.warning("failed to unlink staged atom %s: %s", staged_path, e)
-
-    return PromoteResult(
+    result = PromoteResult(
         staged_path=staged_path,
         trusted_path=trusted_path,
         decision=gov.result,
@@ -133,3 +127,19 @@ def promote(
         rationale=gov.record.rationale,
         notes=notes,
     )
+
+    # Best-effort stigmergy emit — never blocks promotion on failure.
+    emit_mark(
+        action="chetana.promote",
+        content=f"{schema.title} | {result.decision}",
+        connections=["chetana", "promote", schema.type, result.review_status or "staged"],
+        salience=schema.confidence,
+    )
+
+    # Successful promote → remove the staged file.
+    try:
+        staged_path.unlink()
+    except OSError as e:
+        logger.warning("failed to unlink staged atom %s: %s", staged_path, e)
+
+    return result

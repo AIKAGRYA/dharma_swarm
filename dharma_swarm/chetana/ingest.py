@@ -18,7 +18,6 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass
-from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -33,6 +32,7 @@ from .provenance import (
     now_iso,
 )
 from .staging import write_staged
+from .stigmergy_emit import emit_mark
 
 logger = logging.getLogger(__name__)
 
@@ -90,12 +90,22 @@ def ingest(
         )
         atoms = [atom]
 
-    return IngestResult(
+    result = IngestResult(
         atoms=atoms,
         staged_count=len(atoms),
         skipped_count=0,
         notes=notes,
     )
+
+    # Best-effort stigmergy emit — once per ingest, not per atom.
+    emit_mark(
+        action="chetana.ingest",
+        content=f"{source_kind} | {len(result.atoms)} atoms staged",
+        connections=["chetana", "ingest", source_kind],
+        salience=0.4,
+    )
+
+    return result
 
 
 def _ingest_simple(
