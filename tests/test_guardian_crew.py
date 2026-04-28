@@ -56,6 +56,7 @@ def _seed_structured_rows(
     *,
     with_context: bool = True,
     context_text: str = "guardian context",
+    context_metadata_json: str = "{}",
 ) -> None:
     now = datetime.now(timezone.utc).isoformat()
     metadata_json = '{"context_bundle_id": "bundle_guardian"}' if with_context else "{}"
@@ -107,7 +108,7 @@ def _seed_structured_rows(
                     "[]",
                     "checksum",
                     now,
-                    "{}",
+                    context_metadata_json,
                 ),
             )
         db.execute(
@@ -213,6 +214,28 @@ async def test_ledger_watcher_warns_on_injected_context_bundle(tmp_path: Path) -
     assert finding.check == "LEDGER_WATCHER:context_bundle_injection"
     assert "bundle_guardian:prompt_injection" in finding.detail
     assert "AgentRunner prompt injection" in finding.detail
+
+
+@pytest.mark.asyncio
+async def test_ledger_watcher_uses_context_scan_metadata(tmp_path: Path) -> None:
+    state_dir, db_path = _runtime_db(tmp_path)
+    _seed_session_events(db_path, 3)
+    _seed_structured_rows(
+        db_path,
+        context_text="clean rendered context",
+        context_metadata_json=(
+            '{"context_scan": {"status": "blocked", '
+            '"findings": ["prompt_injection"], '
+            '"scanner": "dharma_swarm.injection_scanner.scan_content"}}'
+        ),
+    )
+
+    findings = await run_ledger_watcher(state_dir)
+
+    assert len(findings) == 1
+    finding = findings[0]
+    assert finding.check == "LEDGER_WATCHER:context_bundle_injection"
+    assert "bundle_guardian:prompt_injection" in finding.detail
 
 
 @pytest.mark.asyncio

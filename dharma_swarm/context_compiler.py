@@ -63,6 +63,25 @@ def _truncate(text: str, max_chars: int) -> str:
     return text[: max_chars - 15].rstrip() + "\n... [truncated]"
 
 
+def _context_scan_metadata(rendered_text: str) -> dict[str, Any]:
+    try:
+        from dharma_swarm.injection_scanner import scan_content
+
+        result = scan_content(rendered_text, "context_bundle")
+    except Exception:
+        logger.debug("Context bundle scan failed", exc_info=True)
+        return {
+            "status": "scanner_unavailable",
+            "findings": [],
+            "scanner": "dharma_swarm.injection_scanner.scan_content",
+        }
+    return {
+        "status": "clean" if result.is_clean else "blocked",
+        "findings": list(result.findings),
+        "scanner": "dharma_swarm.injection_scanner.scan_content",
+    }
+
+
 @dataclass(frozen=True)
 class ContextSection:
     name: str
@@ -208,7 +227,11 @@ class ContextCompiler:
                     source_refs=[],
                     checksum=checksum,
                     created_at=created_at,
-                    metadata={**(metadata or {}), "mem_truncated": True},
+                    metadata={
+                        **(metadata or {}),
+                        "mem_truncated": True,
+                        "context_scan": _context_scan_metadata(truncated),
+                    },
                 )
                 await self.runtime_state.init_db()
                 saved = await self.runtime_state.record_context_bundle(bundle)
@@ -339,7 +362,10 @@ class ContextCompiler:
             source_refs=source_refs,
             checksum=checksum,
             created_at=created_at,
-            metadata=dict(metadata or {}),
+            metadata={
+                **(metadata or {}),
+                "context_scan": _context_scan_metadata(rendered_text),
+            },
         )
         saved = await self.runtime_state.record_context_bundle(bundle)
         if session is not None:
