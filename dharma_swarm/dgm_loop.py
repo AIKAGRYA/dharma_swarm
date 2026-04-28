@@ -227,16 +227,28 @@ def _get_source_file_from_entry(entry: Any, src_root: Path) -> Path | None:
 # DGM Loop class
 # ---------------------------------------------------------------------------
 
-# Source files that are valid evolution targets (in priority order)
-# These are the files where improvement has the highest leverage on swarm performance
+# Source files that DGM may not mutate directly.  This mirrors the
+# identity-layer precedent in self_improve.py and verify/scorer.py.
+DGM_PROTECTED_FILES = frozenset({
+    "telos_gates.py",
+    "dharma_kernel.py",
+    "evolution.py",
+    "config.py",
+})
+
+
+def _is_protected_dgm_target(path: Path | str) -> bool:
+    return Path(path).name in DGM_PROTECTED_FILES
+
+
+# Source files that are valid evolution targets (in priority order).
+# These are the files where improvement has the highest leverage on swarm performance.
 DGM_TARGET_FILES = [
     "agent_runner.py",         # task execution — most direct impact on completion rate
     "autonomous_agent.py",     # tool use, LLM calls — quality of agent cognition
     "orchestrator.py",         # task routing and lifecycle — affects all agents
     "swarm.py",                # boot, coordination — foundational
-    "telos_gates.py",          # constraint enforcement — safety-critical
     "providers.py",            # LLM provider routing — reliability
-    "evolution.py",            # self-improvement loop — recursive
     "task_board.py",           # task management — throughput
     "stigmergy.py",            # agent coordination memory
     "thinkodynamic_director.py",  # mission seeding
@@ -334,6 +346,14 @@ class DGMLoop:
         source_path = Path(source_file) if not isinstance(source_file, Path) else source_file
         if not source_path.is_absolute():
             source_path = self._src_root / source_path
+
+        if _is_protected_dgm_target(source_path):
+            result.error = (
+                f"Protected DGM target rejected: {source_path.name}. "
+                "Telos/Dharma/Governance boundary files require explicit human review."
+            )
+            result.duration_seconds = time.monotonic() - start
+            return result
 
         if not source_path.exists():
             result.error = f"Source file not found: {source_path}"
