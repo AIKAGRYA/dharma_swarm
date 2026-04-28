@@ -91,6 +91,15 @@ class RuntimeLifecycle:
             metadata["error"] = error[:500]
         if result is not None:
             metadata["result_chars"] = len(result or "")
+        for key in (
+            "context_bundle_id",
+            "context_bundle_status",
+            "context_bundle_error",
+            "runtime_db_path",
+        ):
+            value = td.metadata.get(key)
+            if value:
+                metadata[key] = value
         return metadata
 
     async def record_task_claim(

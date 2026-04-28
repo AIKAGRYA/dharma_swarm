@@ -46,6 +46,7 @@ def _runtime_table_count(db_path: Path, table: str) -> int:
         "task_claims",
         "delegation_runs",
         "artifact_records",
+        "context_bundles",
     }
     if not db_path.exists():
         return 0
@@ -378,10 +379,12 @@ async def test_task_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     assert _runtime_table_count(runtime_db_path, "task_claims") == 0
     assert _runtime_table_count(runtime_db_path, "delegation_runs") == 0
     assert _runtime_table_count(runtime_db_path, "artifact_records") == 0
+    assert _runtime_table_count(runtime_db_path, "context_bundles") == 0
 
     # Tick 1: should dispatch the task
     result = await orch.tick()
     assert result["dispatched"] >= 1, "Tick must dispatch the pending task"
+    assert _runtime_table_count(runtime_db_path, "context_bundles") == 1
     assert _runtime_table_count(runtime_db_path, "task_claims") == 1
 
     # The background _execute_task coroutine runs async — yield to let it complete.
@@ -396,6 +399,8 @@ async def test_task_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
         f"result={completed.result!r}"
     )
     assert completed.result == MOCK_RESULT
+    context_bundle_id = str(completed.metadata.get("context_bundle_id", "") or "")
+    assert context_bundle_id
     assert _runtime_table_count(runtime_db_path, "session_events") >= 3
     assert _runtime_table_count(runtime_db_path, "task_claims") == 1
     assert _runtime_table_count(runtime_db_path, "delegation_runs") == 1
@@ -411,6 +416,15 @@ async def test_task_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     assert artifact_task_id == task.id
     assert Path(payload_path).exists()
     assert checksum
+    with sqlite3.connect(runtime_db_path) as db:
+        claim_meta_json, run_meta_json = db.execute(
+            "SELECT c.metadata_json, r.metadata_json"
+            " FROM task_claims c JOIN delegation_runs r ON r.claim_id = c.claim_id"
+            " WHERE c.task_id = ?",
+            (task.id,),
+        ).fetchone()
+    assert context_bundle_id in claim_meta_json
+    assert context_bundle_id in run_meta_json
 
     # A settle-only follow-up tick must not duplicate structured runtime rows.
     result2 = await orch.tick()
@@ -418,6 +432,7 @@ async def test_task_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     assert _runtime_table_count(runtime_db_path, "task_claims") == 1
     assert _runtime_table_count(runtime_db_path, "delegation_runs") == 1
     assert _runtime_table_count(runtime_db_path, "artifact_records") == artifact_count
+    assert _runtime_table_count(runtime_db_path, "context_bundles") == 1
 
 
 async def test_task_failure_records_runtime_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

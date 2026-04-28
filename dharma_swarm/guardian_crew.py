@@ -395,6 +395,59 @@ def _runtime_table_count_since(
     return int(row[0] if row else 0)
 
 
+def _runtime_rows_missing_context(
+    db: sqlite3.Connection,
+    table: str,
+    timestamp_column: str,
+    since_iso: str,
+) -> int:
+    existing = {
+        str(row[0])
+        for row in db.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table'"
+        ).fetchall()
+    }
+    if table not in existing or "context_bundles" not in existing:
+        return 0
+    columns = {
+        str(row[1])
+        for row in db.execute(f"PRAGMA table_info({table})").fetchall()
+    }
+    if timestamp_column not in columns:
+        return 0
+
+    metadata_bundle = (
+        "CASE WHEN json_valid(t.metadata_json) "
+        "THEN COALESCE(json_extract(t.metadata_json, '$.context_bundle_id'), '') "
+        "ELSE '' END"
+    )
+    if table == "delegation_runs":
+        join_clause = (
+            f"cb.bundle_id = {metadata_bundle} "
+            "OR (t.run_id != '' AND cb.run_id = t.run_id) "
+            "OR (t.session_id != '' AND t.task_id != '' "
+            "AND cb.session_id = t.session_id AND cb.task_id = t.task_id)"
+        )
+    elif table == "task_claims":
+        join_clause = (
+            f"cb.bundle_id = {metadata_bundle} "
+            "OR (t.session_id != '' AND t.task_id != '' "
+            "AND cb.session_id = t.session_id AND cb.task_id = t.task_id)"
+        )
+    else:
+        return 0
+
+    row = db.execute(
+        f"SELECT COUNT(*) FROM {table} t "
+        f"LEFT JOIN context_bundles cb ON {join_clause} "
+        f"WHERE t.{timestamp_column} >= ? "
+        "AND t.status IN ('claimed', 'running', 'completed', 'failed') "
+        "AND cb.bundle_id IS NULL",
+        (since_iso,),
+    ).fetchone()
+    return int(row[0] if row else 0)
+
+
 async def run_ledger_watcher(
     state_dir: Path,
     *,
@@ -433,6 +486,20 @@ async def run_ledger_watcher(
                     )
                     for table in _STRUCTURED_RUNTIME_TABLES
                 },
+            }
+            missing_context_counts = {
+                "task_claims": _runtime_rows_missing_context(
+                    db,
+                    "task_claims",
+                    "claimed_at",
+                    since_iso,
+                ),
+                "delegation_runs": _runtime_rows_missing_context(
+                    db,
+                    "delegation_runs",
+                    "started_at",
+                    since_iso,
+                ),
             }
     except sqlite3.Error as exc:
         return [
@@ -497,6 +564,27 @@ async def run_ledger_watcher(
                 fix_hint=(
                     "Check existing RuntimeStateStore producers for recent task "
                     "claims, delegation runs, and artifacts."
+                ),
+            )
+        )
+    missing_context_total = sum(missing_context_counts.values())
+    if missing_context_total > 0:
+        findings.append(
+            GuardianFinding(
+                severity="WARNING",
+                check="LEDGER_WATCHER:missing_context_bundle",
+                title="Recent runtime claims or runs have no persisted context bundle",
+                detail=(
+                    f"{runtime_db} has recent rows without matching context_bundles: "
+                    f"task_claims={missing_context_counts['task_claims']}, "
+                    f"delegation_runs={missing_context_counts['delegation_runs']}. "
+                    "Canonical action is occurring without a persisted pre-action "
+                    "context bundle linked by metadata, run_id, or task/session."
+                ),
+                file=str(runtime_db),
+                fix_hint=(
+                    "Attach context_bundle_id during Orchestrator dispatch and ensure "
+                    "AgentRunner consumes the persisted bundle before action."
                 ),
             )
         )

@@ -234,6 +234,41 @@ def test_build_prompt_prefers_local_state_dir_when_available(config, monkeypatch
     assert recorded["state_dir"] == tmp_path / ".dharma"
 
 
+@pytest.mark.asyncio
+async def test_build_prompt_injects_persisted_context_bundle(config, tmp_path):
+    from dharma_swarm.runtime_state import ContextBundleRecord, RuntimeStateStore
+
+    runtime_db_path = tmp_path / "runtime.db"
+    runtime_state = RuntimeStateStore(runtime_db_path)
+    await runtime_state.init_db()
+    await runtime_state.record_context_bundle(
+        ContextBundleRecord(
+            bundle_id="bundle_prompt_test",
+            session_id="sess-prompt",
+            task_id="task-prompt",
+            run_id="run-prompt",
+            token_budget=200,
+            rendered_text="Persisted runtime context: use the structured spine.",
+            checksum="checksum",
+        )
+    )
+    task = Task(
+        id="task-prompt",
+        title="Build prompt",
+        description="Consume persisted context",
+        metadata={
+            "context_bundle_id": "bundle_prompt_test",
+            "runtime_db_path": str(runtime_db_path),
+        },
+    )
+
+    request = _build_prompt(task, config)
+
+    content = request.messages[0]["content"]
+    assert "## Runtime Context Bundle" in content
+    assert "Persisted runtime context: use the structured spine." in content
+
+
 def test_build_prompt_handles_memory_context_import_failure(config, monkeypatch):
     original_import = builtins.__import__
 

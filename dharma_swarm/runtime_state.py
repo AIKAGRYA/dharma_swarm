@@ -1710,6 +1710,18 @@ class RuntimeStateStore:
             ).fetchone()
         return _row_to_context_bundle(row) if row is not None else None
 
+    def get_context_bundle_sync(self, bundle_id: str) -> ContextBundleRecord | None:
+        self.init_db_sync()
+        with sqlite3.connect(self.db_path) as db:
+            db.row_factory = sqlite3.Row
+            row = db.execute(
+                "SELECT bundle_id, session_id, task_id, run_id, token_budget,"
+                " rendered_text, sections_json, source_refs_json, checksum,"
+                " created_at, metadata_json FROM context_bundles WHERE bundle_id = ?",
+                (bundle_id,),
+            ).fetchone()
+        return _row_to_context_bundle(row) if row is not None else None
+
     async def list_context_bundles(
         self,
         *,
