@@ -33,7 +33,6 @@ are rejected by :func:`validate_sandbox_path`.
 
 from __future__ import annotations
 
-import os
 import re
 from datetime import datetime, timezone
 from enum import Enum
@@ -46,6 +45,7 @@ from dharma_swarm.dgm_loop import DGM_PROTECTED_FILES
 from dharma_swarm.roaming_onboarding import (
     OnboardingReceipt,
     RoamingAgentRegistration,
+    _dharma_home as _roaming_dharma_home,
     onboard_roaming_agent,
 )
 
@@ -116,14 +116,16 @@ def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def _dharma_home() -> Path:
-    return Path(os.getenv("DHARMA_HOME", Path.home() / ".dharma"))
-
-
 def external_agent_sandbox_root(dharma_home: Path | None = None) -> Path:
-    """Sandbox root under which external-worker artifacts may be written."""
+    """Sandbox root under which external-worker artifacts may be written.
 
-    return (dharma_home or _dharma_home()) / "external_agents"
+    Defers ``$DHARMA_HOME`` resolution to ``roaming_onboarding`` so this
+    module does not own a separate slice of ``~/.dharma`` — external-agent
+    artifacts live under the same canonical state root that the roaming
+    onboarding pipeline already governs.
+    """
+
+    return (dharma_home or _roaming_dharma_home()) / "external_agents"
 
 
 # ---------------------------------------------------------------------------
