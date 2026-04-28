@@ -9,6 +9,7 @@ import sqlite3
 import pytest
 from unittest.mock import AsyncMock
 
+from dharma_swarm.base_provider import ProviderCapabilities
 from dharma_swarm.models import AgentConfig, AgentRole, AgentStatus, LLMResponse, ProviderType, Task
 from dharma_swarm.agent_runner import AgentPool, AgentRunner, _build_prompt
 from dharma_swarm.lineage import LineageGraph
@@ -439,6 +440,7 @@ async def test_runner_auto_executes_tool_loop_for_api_provider_shell_task(
     )
     target = tmp_path / "report.md"
     provider = AsyncMock()
+    provider.capabilities = ProviderCapabilities(supports_tools=True)
 
     async def _complete(request):
         call_index = provider.complete.await_count
