@@ -179,6 +179,9 @@ Status:
 - Guardian prefers stored blocked metadata and falls back to scanning
   `rendered_text` for older bundles.
 - AgentRunner remains the prompt-boundary enforcement point.
+- The scanner now covers common direct patterns, hidden unicode, HTML hiding,
+  base64-encoded injection payloads, and typoglycemia variants called out by
+  OWASP.
 
 ### Slice C - context compile failure threshold
 
