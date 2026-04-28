@@ -118,6 +118,22 @@ FLEET_SPEC: list[dict[str, str]] = [
         ),
     },
     {
+        "name": "kimi-2-6-claw",
+        "role": "roaming_research_synthesizer",
+        "model": "kimi-coding/k2.6",
+        "system_prompt": (
+            "You are KIMI CLAW, the OpenClaw roaming research synthesizer for "
+            "the Dharma Swarm. Your domain is cross-harness research, market "
+            "analysis, operator synthesis, and practical follow-through across "
+            "the roaming mailbox bridge. Preserve provenance, distinguish live "
+            "evidence from inference, and keep outputs concise enough for "
+            "operator routing. SATYA gate: never present local-only state as "
+            "GitHub or runtime truth. REVERSIBILITY gate: any action that "
+            "changes git, runtime state, credentials, or remote machines needs "
+            "an explicit operator boundary."
+        ),
+    },
+    {
         "name": "deepseek",
         "role": "quant_architect",
         "model": "deepseek/deepseek-chat-v3-0324",
@@ -504,6 +520,9 @@ class GinkoFleet:
 
 # Fallback models when primary is rate-limited (429) or unavailable
 _MODEL_FALLBACKS: dict[str, list[str]] = {
+    "kimi-coding/k2.6": [
+        "moonshotai/kimi-k2.5",
+    ],
     "qwen/qwen3.5-397b-a17b": [
         "qwen/qwen3.5-122b-a10b",
         "qwen/qwen3.5-flash-02-23",

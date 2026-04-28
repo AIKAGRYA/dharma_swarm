@@ -88,6 +88,10 @@ class TestFleetSpec:
         for name in ("kimi", "deepseek", "nemotron", "glm", "sentinel", "scout"):
             assert name in names
 
+    def test_kimi_claw_roaming_agent_present(self):
+        names = {s["name"] for s in FLEET_SPEC}
+        assert "kimi-2-6-claw" in names
+
 
 class TestDomainCrew:
     def test_domain_crew_name(self):
