@@ -1414,6 +1414,8 @@ def _provider_supports_local_tool_loop(
     supports_tools = getattr(capabilities, "supports_tools", None)
     if isinstance(supports_tools, bool):
         return supports_tools
+    if provider is not None and not _is_routed_provider(provider):
+        return False
     # Routed provider (ModelRouter): check the agent's config provider type
     # The ModelRouter wraps all providers and doesn't have capabilities itself
     if _is_routed_provider(provider):

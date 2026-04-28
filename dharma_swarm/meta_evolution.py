@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import math
 import random
 from pathlib import Path
@@ -13,6 +14,13 @@ from pydantic import BaseModel, Field, field_validator
 from dharma_swarm.archive import FITNESS_DIMENSIONS, normalize_fitness_weights
 from dharma_swarm.evolution import CycleResult, DarwinEngine, Proposal
 from dharma_swarm.models import _new_id, _utc_now
+
+
+_LEGACY_FITNESS_DIMENSION_ALIASES: dict[str, str] = {
+    "economic_savings": "economic_value",
+    "paper_profit": "economic_value",
+    "verified_revenue": "economic_value",
+}
 
 
 class MetaParameters(BaseModel):
@@ -236,7 +244,48 @@ class MetaEvolutionEngine:
                 stripped = line.strip()
                 if not stripped:
                     continue
-                self.meta_archive.append(MetaArchiveEntry.model_validate_json(stripped))
+                payload = json.loads(stripped)
+                self.meta_archive.append(
+                    MetaArchiveEntry.model_validate(
+                        self._normalize_meta_archive_payload(payload)
+                    )
+                )
+
+    @classmethod
+    def _normalize_meta_archive_payload(cls, payload: Any) -> Any:
+        """Map legacy archive-only fitness dimensions onto canonical weights."""
+        if not isinstance(payload, dict):
+            return payload
+        normalized_payload = dict(payload)
+        meta_parameters = normalized_payload.get("meta_parameters")
+        if not isinstance(meta_parameters, dict):
+            return normalized_payload
+
+        normalized_meta = dict(meta_parameters)
+        weights = normalized_meta.get("fitness_weights")
+        if not isinstance(weights, dict):
+            normalized_payload["meta_parameters"] = normalized_meta
+            return normalized_payload
+
+        normalized_weights: dict[str, Any] = {}
+        for raw_key, raw_value in weights.items():
+            key = cls._legacy_fitness_dimension(str(raw_key))
+            try:
+                value = float(raw_value)
+            except (TypeError, ValueError):
+                value = raw_value
+            if isinstance(value, float):
+                normalized_weights[key] = normalized_weights.get(key, 0.0) + value
+            else:
+                normalized_weights[key] = value
+
+        normalized_meta["fitness_weights"] = normalized_weights
+        normalized_payload["meta_parameters"] = normalized_meta
+        return normalized_payload
+
+    @staticmethod
+    def _legacy_fitness_dimension(key: str) -> str:
+        return _LEGACY_FITNESS_DIMENSION_ALIASES.get(key, key)
 
     def _archive_meta_entry(self, entry: MetaArchiveEntry) -> None:
         """Append a meta result to the JSONL archive."""
