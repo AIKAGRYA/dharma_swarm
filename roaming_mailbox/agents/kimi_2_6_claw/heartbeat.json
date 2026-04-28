@@ -1,0 +1,18 @@
+{
+  "agent_id": "kimi_2_6_claw",
+  "timestamp": "2026-04-28T06:25:00+00:00",
+  "status": "registered_handshake",
+  "model": "kimi-coding/k2.6",
+  "runtime_surface": "OpenClaw gateway on Linux server (kimi-claw channel)",
+  "repo_path": "/root/.openclaw/workspace/repos/dharma_swarm",
+  "current_branch": "roaming-fixall-20260326",
+  "current_head": "f02bed4",
+  "session_active": true,
+  "authority_level": "external_worker_evidence_only",
+  "historical_registrations_acknowledged": [
+    "kimi-claw (K2.5, 2026-03-26, .dharma/ginko/agents/kimi-claw)",
+    "kimi-claw-v2 (K2.5, 2026-03-26, .dharma/ginko/agents/kimi-claw-v2)"
+  ],
+  "auto_inheritance": false,
+  "heartbeat_sequence": 1
+}

@@ -1,0 +1,72 @@
+{
+  "agent_id": "kimi_2_6_claw",
+  "display_name": "Kimi 2.6 via Kimi Claw",
+  "runtime_surface": "OpenClaw gateway on Linux server (kimi-claw channel)",
+  "model": "kimi-coding/k2.6",
+  "operator": "Amitabha in Arunachala",
+  "continuous": true,
+  "filesystem_access": true,
+  "shell_access": true,
+  "git_access": true,
+  "github_access": false,
+  "web_access": true,
+  "repo_path": "/root/.openclaw/workspace/repos/dharma_swarm",
+  "current_branch": "roaming-fixall-20260326",
+  "current_head": "f02bed4",
+  "historical_registrations_found": [
+    {
+      "source": ".dharma/ginko/agents/kimi-claw/identity.json",
+      "classification": "ignored_runtime_state",
+      "model": "kimi-coding/k2p5",
+      "status": "idle_unactivated",
+      "tasks_completed": 0,
+      "claim": "NO_AUTO_INHERITANCE"
+    },
+    {
+      "source": ".dharma/ginko/agents/kimi-claw-v2/identity.json",
+      "classification": "ignored_runtime_state",
+      "model": "kimi-coding/k2p5",
+      "status": "idle_unactivated",
+      "tasks_completed": 0,
+      "claim": "NO_AUTO_INHERITANCE"
+    },
+    {
+      "source": "git_history_commits",
+      "classification": "git_history_only",
+      "commits": ["93a0dd7", "3330dc8", "221ba6a", "27b29f6", "b57a5f3", "0510f4c"],
+      "author": "Kimi Claw <kimi-claw@openclaw.ai>",
+      "in_current_ancestry": ["b57a5f3", "0510f4c"],
+      "on_parallel_branches_only": ["93a0dd7", "3330dc8", "221ba6a", "27b29f6"],
+      "claim": "HISTORICAL_EVIDENCE_ONLY"
+    },
+    {
+      "source": "roaming_mailbox/tasks/",
+      "classification": "mailbox_transport_state",
+      "tasks": ["mbx_81f02f117c024f76", "mbx_b35ccc08c7a744aa"],
+      "claimed_by": "kimi-claw-phone",
+      "status": "claimed_but_never_responded_at_HEAD",
+      "claim": "NO_AUTO_INHERITANCE"
+    }
+  ],
+  "authority_level": "external_worker_evidence_only",
+  "allowed_without_explicit_approval": [
+    "read repository",
+    "summarize files",
+    "write heartbeat if assigned",
+    "write artifact reports if assigned"
+  ],
+  "forbidden_without_explicit_approval": [
+    "modify source files",
+    "modify constitutional/meta files",
+    "commit",
+    "push",
+    "open pull request",
+    "run destructive commands",
+    "touch PR 48 branch",
+    "claim prior kimi-claw or kimi-claw-v2 task assignments",
+    "auto-continue any task in roaming_mailbox without new operator assignment"
+  ],
+  "status": "registered",
+  "rebind_acknowledgment": "I acknowledge prior kimi-claw and kimi-claw-v2 registrations exist in this repo's history and runtime state. I do NOT claim continuity of authority from those prior sessions. I am a new runtime binding (K2.6) and require explicit task assignment before any write operations.",
+  "registration_timestamp": "2026-04-28T06:25:00+00:00"
+}
