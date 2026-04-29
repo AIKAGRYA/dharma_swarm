@@ -1,6 +1,6 @@
 """chetana.mcp_server — MCP server skeleton (stdio transport).
 
-Exposes 6 tools to agents:
+Exposes 9 tools to agents:
 
     chetana_ingest(source_text, source_kind, para_class) -> {atom_id, staging_path}
     chetana_promote(atom_id, confidence, requester) -> {gate_result, wiki_path, ...}
@@ -8,6 +8,9 @@ Exposes 6 tools to agents:
     chetana_gap_scan(focus_topic) -> {gaps, open_questions}
     chetana_decay_check() -> {stale_count, stale_atoms}
     chetana_palace_state() -> {pillar_rooms, total_atoms, coverage_gaps}
+    chetana_verify(path) -> {verified, zero_sig, kernel_drift, ...}      [Slice 7]
+    chetana_revive(path|all, apply, reviewer) -> {proposals, applied}    [Slice 7]
+    chetana_approve(path, reviewer) -> {decision, trusted_path}          [Slice 7]
 
 This is a thin wrapper over the chetana package functions. The server is
 launched via `python -m dharma_swarm.chetana.mcp_server` from an .mcp.json
@@ -31,7 +34,11 @@ from .graph_unifier import query as unified_query
 from .ingest import ingest as ingest_fn
 from .palace import render_palace
 from .promote import promote as promote_fn
-from .provenance import SourceKind
+from .revival import (
+    apply_revival as apply_revival_fn,
+    find_due_atoms,
+    propose_revival as propose_revival_fn,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -136,6 +143,247 @@ def tool_palace_state() -> dict:
     }
 
 
+# ---------------------------------------------------------------------------
+# Slice 7 of Plan v3 — verify, revive, approve
+# ---------------------------------------------------------------------------
+# These tools were exposed as CLI but missing from MCP. They route through the
+# same underlying functions the CLI uses. No auto-approve without explicit
+# reviewer (per v3 acceptance criteria).
+
+
+def _current_kernel_signature() -> str:
+    """Load the current kernel signature without nesting an event loop."""
+    placeholder = "0" * 64
+    try:
+        from dharma_swarm.dharma_kernel import DharmaKernel, KernelGuard  # type: ignore
+
+        kernel_path = KernelGuard().path
+        text = kernel_path.read_text(encoding="utf-8")
+        kernel = DharmaKernel.model_validate_json(text)
+        if kernel.verify_integrity() and kernel.signature:
+            return kernel.signature
+    except Exception:
+        pass
+    return placeholder
+
+
+def tool_verify(path: str | None = None) -> dict:
+    """Round-trip axiom signatures against the current kernel.
+
+    Args:
+        path: Optional atom path. If None or ".", verifies all trusted atoms.
+
+    Returns four buckets: verified, zero-sig, kernel-drift, no-provenance,
+    schema-error.
+    """
+    from .provenance import compute_axiom_signature, parse_frontmatter
+    from .staging import list_trusted
+
+    placeholder = "0" * 64
+    current_kernel_sig = _current_kernel_signature()
+
+    if path and path != ".":
+        targets = [Path(path).expanduser().resolve()]
+    else:
+        targets = list_trusted()
+
+    buckets: dict[str, list[str]] = {
+        "verified": [],
+        "zero-sig": [],
+        "kernel-drift": [],
+        "no-provenance": [],
+        "schema-error": [],
+    }
+    for p in targets:
+        try:
+            text = p.read_text(encoding="utf-8")
+            try:
+                schema, body = parse_frontmatter(text, source_path=str(p))
+            except Exception:
+                if text.lstrip().startswith("---"):
+                    buckets["no-provenance"].append(str(p))
+                else:
+                    buckets["schema-error"].append(str(p))
+                continue
+
+            if schema.provenance is None:
+                buckets["no-provenance"].append(str(p))
+                continue
+
+            stored = schema.provenance.axiom_signature or ""
+            if stored == placeholder:
+                buckets["zero-sig"].append(str(p))
+                continue
+
+            if compute_axiom_signature(body, current_kernel_sig) == stored:
+                buckets["verified"].append(str(p))
+            elif compute_axiom_signature(body, placeholder) == stored:
+                buckets["zero-sig"].append(str(p))
+            else:
+                buckets["kernel-drift"].append(str(p))
+        except Exception:
+            buckets["schema-error"].append(str(p))
+
+    return {
+        "kernel_signature": current_kernel_sig,
+        "verified_count": len(buckets["verified"]),
+        "zero_sig_count": len(buckets["zero-sig"]),
+        "kernel_drift_count": len(buckets["kernel-drift"]),
+        "no_provenance_count": len(buckets["no-provenance"]),
+        "schema_error_count": len(buckets["schema-error"]),
+        "buckets": buckets,
+    }
+
+
+def tool_revive(
+    path: str | None = None,
+    all_due: bool = False,
+    apply: bool = False,
+    reviewer: str = "mcp_caller",
+    extend_days: int = 90,
+    grace_days: int = 0,
+) -> dict:
+    """Propose (or apply) revival for stale atoms.
+
+    Args:
+        path: A specific atom path to revive (ignored when all_due=True).
+        all_due: If True, revive all due-for-revival atoms across the corpus.
+        apply: If True, write the revived atom; otherwise return proposals only.
+        reviewer: Who is performing the revival (recorded in revival_chain).
+        extend_days: How far to push the new stale_after.
+        grace_days: Grace window when collecting due atoms.
+    """
+    if all_due:
+        targets = find_due_atoms(grace_days=grace_days)
+    else:
+        if not path:
+            return {"error": "either path or all_due=True required"}
+        targets = [Path(path).expanduser().resolve()]
+
+    proposals: list[dict] = []
+    applied: list[str] = []
+    skipped: list[dict] = []
+    for t in targets:
+        try:
+            p = propose_revival_fn(atom_path=t, extend_days=extend_days)
+        except Exception as e:
+            skipped.append({"path": str(t), "reason": str(e)})
+            continue
+        proposals.append({
+            "atom_path": str(p.atom_path),
+            "title": getattr(p, "title", ""),
+            "extend_to": getattr(p, "extend_to", ""),
+        })
+        if apply:
+            try:
+                new_path = apply_revival_fn(p, reviewer=reviewer)
+                applied.append(str(new_path))
+            except Exception as e:
+                skipped.append({"path": str(t), "reason": f"apply failed: {e}"})
+
+    return {
+        "proposed_count": len(proposals),
+        "applied_count": len(applied),
+        "skipped_count": len(skipped),
+        "proposals": proposals,
+        "applied": applied,
+        "skipped": skipped,
+    }
+
+
+def tool_approve(path: str, reviewer: str) -> dict:
+    """Human-explicit approval transitioning staged → approved.
+
+    Slice 7 of Plan v3: NO auto-approve. ``reviewer`` is required and must be
+    a non-empty string identifying the human (or named agent) accepting
+    responsibility for the approval.
+    """
+    if not reviewer or not reviewer.strip():
+        return {
+            "error": "reviewer required for approve (no auto-approve)",
+            "decision": "REJECTED",
+        }
+    from .provenance import assemble_atom, now_iso, parse_frontmatter
+    from .staging import STAGING_ROOT, write_trusted
+
+    target = Path(path).expanduser().resolve()
+    if not target.exists():
+        candidates = (
+            list(STAGING_ROOT.rglob(f"{path}.md")) if STAGING_ROOT.exists() else []
+        )
+        if candidates:
+            target = candidates[0]
+    if not target.exists():
+        return {"error": f"{path} not found", "decision": "NOT_FOUND"}
+
+    text = target.read_text(encoding="utf-8")
+    try:
+        schema, body = parse_frontmatter(text, source_path=str(target))
+    except Exception as e:
+        return {"error": f"parse failed: {e}", "decision": "PARSE_ERROR"}
+
+    if schema.provenance is None:
+        return {
+            "error": "atom has no provenance — promote first",
+            "decision": "NEEDS_PROMOTE",
+        }
+
+    current_status = schema.provenance.review_status
+    if current_status == "approved":
+        return {
+            "decision": "ALREADY_APPROVED",
+            "reviewer": schema.provenance.reviewer,
+            "trusted_path": str(target),
+        }
+    if current_status == "rejected":
+        return {"decision": "REJECTED_PRIOR", "trusted_path": str(target)}
+    if current_status not in ("staged", "auto_promoted"):
+        return {
+            "decision": "BAD_STATE",
+            "current_status": current_status,
+        }
+
+    approval_entry = {
+        "event": "approve",
+        "ts": now_iso(),
+        "reviewer": reviewer,
+        "prior_status": current_status,
+    }
+    new_revival_chain = list(schema.provenance.revival_chain) + [approval_entry]
+    new_provenance = schema.provenance.model_copy(update={
+        "review_status": "approved",
+        "reviewer": reviewer,
+        "revival_chain": new_revival_chain,
+    })
+    new_schema = schema.model_copy(update={"provenance": new_provenance})
+
+    try:
+        target.relative_to(STAGING_ROOT.resolve())
+        is_staged = True
+    except ValueError:
+        is_staged = False
+
+    if is_staged:
+        trusted_path = write_trusted(new_schema, body=body)
+        try:
+            target.unlink()
+        except OSError:
+            pass
+        return {
+            "decision": "APPROVED",
+            "prior_status": current_status,
+            "reviewer": reviewer,
+            "trusted_path": str(trusted_path),
+        }
+    target.write_text(assemble_atom(new_schema, body), encoding="utf-8")
+    return {
+        "decision": "APPROVED",
+        "prior_status": current_status,
+        "reviewer": reviewer,
+        "trusted_path": str(target),
+    }
+
+
 TOOL_REGISTRY = {
     "chetana_ingest": tool_ingest,
     "chetana_promote": tool_promote,
@@ -143,6 +391,120 @@ TOOL_REGISTRY = {
     "chetana_gap_scan": tool_gap_scan,
     "chetana_decay_check": tool_decay_check,
     "chetana_palace_state": tool_palace_state,
+    "chetana_verify": tool_verify,
+    "chetana_revive": tool_revive,
+    "chetana_approve": tool_approve,
+}
+
+TOOL_SCHEMAS: dict[str, dict] = {
+    "chetana_ingest": {
+        "type": "object",
+        "properties": {
+            "source_text": {"type": "string"},
+            "source_kind": {
+                "type": "string",
+                "enum": [
+                    "session",
+                    "webclip",
+                    "pdf",
+                    "note",
+                    "wiki_extract",
+                    "voice",
+                    "external",
+                    "synthesis",
+                ],
+                "default": "note",
+            },
+            "title": {"type": "string"},
+            "para_class": {"type": "string"},
+            "confidence": {"type": "number", "minimum": 0, "maximum": 1, "default": 0.5},
+            "requester": {"type": "string", "default": "mcp_caller"},
+        },
+        "required": ["source_text"],
+        "additionalProperties": False,
+    },
+    "chetana_promote": {
+        "type": "object",
+        "properties": {
+            "staged_path": {
+                "type": "string",
+                "description": "Path to a staged atom under ~/.dharma/knowledge/staging.",
+            },
+            "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+            "requester": {"type": "string", "default": "mcp_caller"},
+            "auto_promote": {"type": "boolean", "default": False},
+        },
+        "required": ["staged_path"],
+        "additionalProperties": False,
+    },
+    "chetana_query": {
+        "type": "object",
+        "properties": {
+            "text": {"type": "string"},
+            "sources": {"type": "array", "items": {"type": "string"}},
+            "limit": {"type": "integer", "minimum": 1, "maximum": 100, "default": 20},
+        },
+        "required": ["text"],
+        "additionalProperties": False,
+    },
+    "chetana_gap_scan": {
+        "type": "object",
+        "properties": {
+            "focus_topic": {"type": "string"},
+            "min_occurrences": {"type": "integer", "minimum": 1, "default": 2},
+        },
+        "additionalProperties": False,
+    },
+    "chetana_decay_check": {
+        "type": "object",
+        "properties": {
+            "quarantine": {"type": "boolean", "default": False},
+            "grace_days": {"type": "integer", "minimum": 0, "default": 0},
+        },
+        "additionalProperties": False,
+    },
+    "chetana_palace_state": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": False,
+    },
+    "chetana_verify": {
+        "type": "object",
+        "properties": {
+            "path": {
+                "type": "string",
+                "description": "Specific atom path; omit or '.' to verify all trusted atoms.",
+            },
+        },
+        "additionalProperties": False,
+    },
+    "chetana_revive": {
+        "type": "object",
+        "properties": {
+            "path": {"type": "string", "description": "Atom path to revive (ignored if all_due=true)."},
+            "all_due": {"type": "boolean", "default": False, "description": "Revive all due atoms."},
+            "apply": {"type": "boolean", "default": False, "description": "Write revived atoms (vs propose-only)."},
+            "reviewer": {"type": "string", "default": "mcp_caller"},
+            "extend_days": {"type": "integer", "minimum": 1, "default": 90},
+            "grace_days": {"type": "integer", "minimum": 0, "default": 0},
+        },
+        "additionalProperties": False,
+    },
+    "chetana_approve": {
+        "type": "object",
+        "properties": {
+            "path": {
+                "type": "string",
+                "description": "Path to staged or trusted atom needing human approval.",
+            },
+            "reviewer": {
+                "type": "string",
+                "description": "REQUIRED: identifier for the human (or named agent) accepting responsibility. No auto-approve.",
+            },
+        },
+        "required": ["path", "reviewer"],
+        "additionalProperties": False,
+    },
 }
 
 
@@ -174,7 +536,7 @@ def main() -> int:
         from mcp.types import Tool  # type: ignore
 
         return [
-            Tool(name=name, description=f"chetana — {name}", inputSchema={"type": "object"})
+            Tool(name=name, description=f"chetana - {name}", inputSchema=TOOL_SCHEMAS[name])
             for name in TOOL_REGISTRY
         ]
 

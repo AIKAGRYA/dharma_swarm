@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import asyncio
 
 from dharma_swarm.chetana.ingest import ingest
 from dharma_swarm.chetana.palace import (
@@ -56,7 +57,7 @@ def test_palace_summary_lists_all_rooms(chetana_sandbox: Path):
 
 def test_mcp_tool_registry_completeness():
     """Every documented MCP tool must be registered in the TOOL_REGISTRY."""
-    from dharma_swarm.chetana.mcp_server import TOOL_REGISTRY
+    from dharma_swarm.chetana.mcp_server import TOOL_REGISTRY, TOOL_SCHEMAS
 
     expected = {
         "chetana_ingest",
@@ -65,8 +66,16 @@ def test_mcp_tool_registry_completeness():
         "chetana_gap_scan",
         "chetana_decay_check",
         "chetana_palace_state",
+        "chetana_verify",
+        "chetana_revive",
+        "chetana_approve",
     }
     assert set(TOOL_REGISTRY.keys()) == expected
+    assert set(TOOL_SCHEMAS.keys()) == expected
+    assert TOOL_SCHEMAS["chetana_ingest"]["required"] == ["source_text"]
+    assert TOOL_SCHEMAS["chetana_promote"]["required"] == ["staged_path"]
+    assert TOOL_SCHEMAS["chetana_approve"]["required"] == ["path", "reviewer"]
+    assert TOOL_SCHEMAS["chetana_palace_state"]["additionalProperties"] is False
 
 
 def test_mcp_tool_ingest_actually_calls_ingest(chetana_sandbox: Path):
@@ -95,3 +104,31 @@ def test_mcp_tool_palace_state_renders(chetana_sandbox: Path):
     assert "canvas_path" in result
     assert "coverage" in result
     assert Path(result["canvas_path"]).exists()
+
+
+def test_mcp_tool_verify_works_inside_event_loop(chetana_sandbox: Path):
+    from dharma_swarm.chetana.mcp_server import tool_ingest, tool_promote, tool_verify
+
+    staged = tool_ingest(
+        source_text="Verified MCP atom body.",
+        source_kind="note",
+        title="Verified MCP atom",
+    )["atoms"][0]
+    trusted = tool_promote(staged_path=staged, requester="mcp-test")["trusted_path"]
+
+    async def _call_verify() -> dict:
+        return tool_verify(trusted)
+
+    result = asyncio.run(_call_verify())
+    assert result["kernel_signature"] != "0" * 64
+    assert result["verified_count"] == 1
+    assert result["zero_sig_count"] == 0
+    assert result["kernel_drift_count"] == 0
+
+
+def test_mcp_tool_approve_requires_reviewer():
+    from dharma_swarm.chetana.mcp_server import tool_approve
+
+    result = tool_approve(path="missing", reviewer="")
+    assert result["decision"] == "REJECTED"
+    assert "reviewer required" in result["error"]
