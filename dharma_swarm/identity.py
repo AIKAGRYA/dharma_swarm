@@ -322,6 +322,44 @@ class IdentityMonitor:
             count = len(list(shared_dir.glob("*.md")))
             signals.append(min(1.0, count / 50.0))
 
+        # Chetana atom health — bounded to [0, 0.5] so chetana cannot
+        # dominate RM. Combines trusted+staged atom count (saturated at 200)
+        # with recency (saturated at 20 atoms touched in last 14 days).
+        # Slice 1 of Plan v3 — makes chetana visible to identity self-measurement.
+        knowledge_dir = self._state_dir / "knowledge"
+        if knowledge_dir.exists():
+            try:
+                trusted_dir = knowledge_dir / "wiki" / "concepts"
+                staging_dir = knowledge_dir / "staging"
+
+                trusted_count = (
+                    len(list(trusted_dir.glob("*.md")))
+                    if trusted_dir.exists() else 0
+                )
+                staged_count = 0
+                if staging_dir.exists():
+                    for d in staging_dir.iterdir():
+                        if d.is_dir():
+                            staged_count += len(list(d.glob("*.md")))
+                total = trusted_count + staged_count
+
+                recent_count = 0
+                if trusted_dir.exists():
+                    cutoff = time.time() - (14 * 86400)
+                    for atom in trusted_dir.glob("*.md"):
+                        try:
+                            if atom.stat().st_mtime > cutoff:
+                                recent_count += 1
+                        except Exception:
+                            continue
+
+                count_factor = min(1.0, total / 200.0)
+                recency_factor = min(1.0, recent_count / 20.0)
+                chetana_signal = 0.5 * ((count_factor + recency_factor) / 2.0)
+                signals.append(chetana_signal)
+            except Exception:
+                logger.debug("Chetana atom signal read failed", exc_info=True)
+
         return sum(signals) / len(signals) if signals else 0.5
 
     # -- correction ---------------------------------------------------------

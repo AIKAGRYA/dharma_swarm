@@ -176,6 +176,110 @@ class TestRMFiltered:
 
 
 # ---------------------------------------------------------------------------
+# RM — Chetana atom awareness (Slice 1 of Plan v3)
+# ---------------------------------------------------------------------------
+
+
+class TestRMChetanaAwareness:
+    def _make_atoms(self, state_dir: Path, trusted: int = 0, staged: int = 0,
+                    fresh: int = 0) -> None:
+        """Create chetana atom files under state_dir/knowledge/.
+
+        ``fresh`` of the trusted atoms get a recent mtime; the rest get an
+        old mtime (>14 days ago) so recency only counts what we mark fresh.
+        """
+        knowledge = state_dir / "knowledge"
+        trusted_dir = knowledge / "wiki" / "concepts"
+        trusted_dir.mkdir(parents=True, exist_ok=True)
+        old_t = time.time() - (30 * 86400)
+        for i in range(trusted):
+            p = trusted_dir / f"atom_{i:03d}.md"
+            p.write_text(f"# atom {i}\n")
+            if i >= fresh:
+                import os
+                os.utime(p, (old_t, old_t))
+        if staged:
+            staging_root = knowledge / "staging" / "2026-04-29"
+            staging_root.mkdir(parents=True, exist_ok=True)
+            for i in range(staged):
+                (staging_root / f"staged_{i:03d}.md").write_text(f"# s{i}\n")
+
+    def test_no_knowledge_dir_no_change(self, state_dir: Path):
+        """When ~/.dharma/knowledge doesn't exist, RM behaves as before."""
+        # Only seed stigmergy → expect 0.5
+        marks = state_dir / "stigmergy" / "marks.jsonl"
+        marks.write_text("\n".join(json.dumps({"id": f"m{i}"}) for i in range(500)))
+
+        monitor = IdentityMonitor(state_dir)
+        rm = asyncio.run(monitor._measure_rm())
+        # stigmergy 0.5 + shared 0.0 = avg 0.25 (no chetana signal)
+        assert abs(rm - 0.25) < 0.01
+
+    def test_chetana_signal_contributes_when_present(self, state_dir: Path):
+        """With saturated chetana counts, RM gains the bounded signal."""
+        # No stigmergy, no shared → only chetana signal
+        self._make_atoms(state_dir, trusted=200, staged=0, fresh=20)
+        monitor = IdentityMonitor(state_dir)
+        rm = asyncio.run(monitor._measure_rm())
+        # Saturated: count_factor=1.0, recency_factor=1.0
+        # chetana_signal = 0.5 * ((1 + 1) / 2) = 0.5
+        # shared dir exists empty → 0.0; total = (0.5 + 0.0) / 2 = 0.25
+        assert abs(rm - 0.25) < 0.01
+
+    def test_chetana_signal_capped_at_half(self, state_dir: Path):
+        """Even with extreme atom counts, chetana signal never exceeds 0.5."""
+        # 5x saturation
+        self._make_atoms(state_dir, trusted=1000, staged=500, fresh=200)
+        monitor = IdentityMonitor(state_dir)
+        rm = asyncio.run(monitor._measure_rm())
+        # shared empty → 0.0; chetana capped at 0.5 → avg = 0.25
+        assert rm <= 0.25 + 0.001
+        assert rm >= 0.25 - 0.001
+
+    def test_chetana_cannot_dominate_with_other_signals(self, state_dir: Path):
+        """When other signals are at zero and chetana saturates, RM stays bounded."""
+        self._make_atoms(state_dir, trusted=200, staged=0, fresh=20)
+        # Add empty stigmergy file (forces signal of 0.0)
+        marks = state_dir / "stigmergy" / "marks.jsonl"
+        marks.write_text(json.dumps({"id": "x"}) + "\n")  # 1 valid → ~0.001
+
+        monitor = IdentityMonitor(state_dir)
+        rm = asyncio.run(monitor._measure_rm())
+        # signals: stig ~0.001, shared 0.0, chetana 0.5 → avg ~0.167
+        # Critical assertion: RM nowhere near 1.0 despite saturated chetana
+        assert rm < 0.3
+
+    def test_chetana_signal_recency_only(self, state_dir: Path):
+        """Only recency saturated, count low → partial signal."""
+        # 20 trusted atoms, all fresh → count_factor=0.1, recency_factor=1.0
+        self._make_atoms(state_dir, trusted=20, staged=0, fresh=20)
+        monitor = IdentityMonitor(state_dir)
+        rm = asyncio.run(monitor._measure_rm())
+        # chetana_signal = 0.5 * ((0.1 + 1.0) / 2) = 0.275
+        # shared 0.0 → avg = 0.1375
+        assert abs(rm - 0.1375) < 0.01
+
+    def test_chetana_signal_count_only(self, state_dir: Path):
+        """High count, no recency → partial signal."""
+        # 200 trusted but none fresh → count_factor=1.0, recency_factor=0.0
+        self._make_atoms(state_dir, trusted=200, staged=0, fresh=0)
+        monitor = IdentityMonitor(state_dir)
+        rm = asyncio.run(monitor._measure_rm())
+        # chetana_signal = 0.5 * ((1.0 + 0.0) / 2) = 0.25
+        # shared 0.0 → avg = 0.125
+        assert abs(rm - 0.125) < 0.01
+
+    def test_staged_atoms_count_toward_total(self, state_dir: Path):
+        """Staged atoms in dated subdirs count toward the count factor."""
+        self._make_atoms(state_dir, trusted=100, staged=100, fresh=0)
+        monitor = IdentityMonitor(state_dir)
+        rm = asyncio.run(monitor._measure_rm())
+        # total = 200 → count_factor = 1.0; recency 0 → 0.0
+        # chetana_signal = 0.25, shared 0.0 → avg = 0.125
+        assert abs(rm - 0.125) < 0.01
+
+
+# ---------------------------------------------------------------------------
 # Full TCS integration
 # ---------------------------------------------------------------------------
 
