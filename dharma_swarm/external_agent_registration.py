@@ -156,6 +156,7 @@ class AutonomyPolicy(BaseModel):
     def _refuse_escalation(self) -> "AutonomyPolicy":
         forbidden = [
             ("can_approve_prs", self.can_approve_prs),
+            ("can_write_source", self.can_write_source),
             ("can_mutate_meta_dharma", self.can_mutate_meta_dharma),
             ("can_mutate_telos", self.can_mutate_telos),
             ("can_mutate_dharma_kernel", self.can_mutate_dharma_kernel),
@@ -169,10 +170,10 @@ class AutonomyPolicy(BaseModel):
                 + ", ".join(offenders)
                 + " — these require a separate, explicitly-reviewed runtime PR."
             )
-        if not self.requires_approval and self.explicit_task_assignment_required:
-            # Approval can only be waived once explicit-task-assignment is also
-            # turned off (which itself requires a higher authority rung).
-            return self
+        if not self.requires_approval:
+            raise ValueError(
+                "External roaming workers must require approval in Stage 1."
+            )
         return self
 
 
@@ -193,6 +194,24 @@ class WorkspacePolicy(BaseModel):
                 f"got {value!r}"
             )
         return str(path)
+
+    @model_validator(mode="after")
+    def _refuse_non_sandbox_writes(self) -> "WorkspacePolicy":
+        forbidden = [
+            ("repo_writes_allowed", self.repo_writes_allowed),
+            (
+                "canonical_dharma_dir_writes_allowed",
+                self.canonical_dharma_dir_writes_allowed,
+            ),
+        ]
+        offenders = [name for name, val in forbidden if val]
+        if offenders:
+            raise ValueError(
+                "External roaming workers may not be granted workspace writes: "
+                + ", ".join(offenders)
+                + " in Stage 1."
+            )
+        return self
 
 
 # ---------------------------------------------------------------------------

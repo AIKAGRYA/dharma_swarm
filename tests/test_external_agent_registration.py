@@ -121,6 +121,7 @@ def test_stage_1_allowed_authorities_set():
     "field_name",
     [
         "can_approve_prs",
+        "can_write_source",
         "can_mutate_meta_dharma",
         "can_mutate_telos",
         "can_mutate_dharma_kernel",
@@ -131,6 +132,26 @@ def test_stage_1_allowed_authorities_set():
 def test_autonomy_policy_refuses_dangerous_flag(field_name):
     with pytest.raises(Exception):
         AutonomyPolicy(**{field_name: True})
+
+
+def test_autonomy_policy_requires_approval_at_stage_1():
+    with pytest.raises(Exception):
+        AutonomyPolicy(requires_approval=False)
+
+
+@pytest.mark.parametrize(
+    "field_name",
+    [
+        "repo_writes_allowed",
+        "canonical_dharma_dir_writes_allowed",
+    ],
+)
+def test_workspace_policy_refuses_non_sandbox_writes(tmp_path, field_name):
+    with pytest.raises(Exception):
+        WorkspacePolicy(
+            sandbox_root=str(tmp_path / ".dharma" / "external_agents" / "demo"),
+            **{field_name: True},
+        )
 
 
 # ---------------------------------------------------------------------------
