@@ -27,6 +27,16 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+try:
+    from dharma_swarm.register_disciplines import (
+        flag_felt_relief,
+        make_register_mark,
+        write_register_mark,
+    )
+    _REGISTER_AVAILABLE = True
+except Exception:  # pragma: no cover - graceful degrade
+    _REGISTER_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 
@@ -64,6 +74,7 @@ class Mutation:
     post_metrics: dict = field(default_factory=dict)  # Metrics after measurement
     gnani_verdict: bool | None = None                 # Did Gnani approve?
     kept: bool | None = None                          # Final decision
+    relief_flagged: bool = False                      # Slice 3: register conscience caught rescue-relief pattern
 
     def to_dict(self) -> dict:
         """Serialize to a JSON-compatible dict."""
@@ -80,6 +91,7 @@ class Mutation:
             "post_metrics": self.post_metrics,
             "gnani_verdict": self.gnani_verdict,
             "kept": self.kept,
+            "relief_flagged": self.relief_flagged,
         }
 
     @classmethod
@@ -101,6 +113,7 @@ class Mutation:
             post_metrics=d.get("post_metrics", {}),
             gnani_verdict=d.get("gnani_verdict"),
             kept=d.get("kept"),
+            relief_flagged=bool(d.get("relief_flagged", False)),
         )
 
 
@@ -201,6 +214,37 @@ class StrangeLoop:
         if proposal is None:
             return "idle"
 
+        # Slice 3 of Plan v3 — Register conscience.
+        # Before evaluation, check whether the proposed mutation looks like
+        # rescue-relief (a distinction that conveniently saves a claim under
+        # threat). On high-confidence flag: extend measurement window so the
+        # mutation gets twice the runway to prove itself; never block here —
+        # measurement extension is not fear.
+        if _REGISTER_AVAILABLE:
+            try:
+                pulse_summary = (
+                    f"avg_health={avg_health:.2f}, avg_failure={avg_failure:.2f}, "
+                    f"unhealthy_ratio={unhealthy_ratio:.2f}, "
+                    f"avg_coherence={avg_coherence:.2f}"
+                )
+                relief = flag_felt_relief(
+                    decision_context=pulse_summary,
+                    proposed_action=proposal.reason,
+                )
+                if relief.flagged and relief.confidence > 0.7:
+                    proposal.relief_flagged = True
+                    mark = make_register_mark(
+                        relief,
+                        plane="evolution",
+                        subject_type="mutation",
+                        subject_id=proposal.id,
+                        decision_point="strange_loop._observe_diagnose_propose",
+                        actual_action="extended_measurement_window",
+                    )
+                    write_register_mark(mark)
+            except Exception:
+                logger.debug("flag_felt_relief check failed", exc_info=True)
+
         # Evaluate via Gnani checkpoint
         try:
             if hasattr(self._organism, 'attractor') and self._organism.attractor is not None:
@@ -230,7 +274,12 @@ class StrangeLoop:
         proposal.applied_at = datetime.now(timezone.utc)
         proposal.pre_metrics = self._snapshot_metrics(pulse_history)
         self._pending_mutation = proposal
-        self._measurement_countdown = self._measurement_window
+        # Relief-flagged mutations get double measurement window — Slice 3
+        self._measurement_countdown = (
+            self._measurement_window * 2
+            if proposal.relief_flagged
+            else self._measurement_window
+        )
         self._record_to_memory(proposal, "applied")
         self._save()
 
