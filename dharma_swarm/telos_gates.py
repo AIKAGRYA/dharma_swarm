@@ -23,6 +23,16 @@ from typing import Any
 
 from dharma_swarm.anekanta_gate import evaluate_anekanta
 
+try:
+    from dharma_swarm.register_disciplines import (
+        friction_detector,
+        make_register_mark,
+        write_register_mark,
+    )
+    _REGISTER_AVAILABLE = True
+except Exception:  # pragma: no cover
+    _REGISTER_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 from dharma_swarm.models import (
     GateCheckResult,
@@ -607,6 +617,64 @@ class TelosGatekeeper:
             else:
                 results[gate_name] = (GateResult.PASS, "")
 
+        # --- Slice 5: Telos friction advisory ---
+        # When ALL gates have passed and the action touches a register-relevant
+        # category (proposal / public claim / self-modification / philosophy /
+        # consciousness), check whether the apparent consensus is real friction
+        # or substrate-attractor. This NEVER blocks Tier A/B safety; it only
+        # appends an advisory note and writes a register mark.
+        friction_advisory = ""
+        if _REGISTER_AVAILABLE:
+            try:
+                _RELEVANT_KEYWORDS = (
+                    "consciousness", "witness", "phenomenolog", "qualia",
+                    "self-modif", "self_modif", "auto-evolve", "auto_evolve",
+                    "publish", "essay", "paper", "claim ", "thesis",
+                    "promote", "atom", "altitude", "register-",
+                    "alignment", "welfare", "sentience",
+                )
+                relevance_hit = any(k in combined for k in _RELEVANT_KEYWORDS)
+                all_passed = all(
+                    r[0] == GateResult.PASS for r in results.values()
+                )
+                if relevance_hit and all_passed and len(results) >= 3:
+                    # Tier C reasons — what the gates actually said
+                    tier_c_reasons = " | ".join(
+                        f"{g}: {results[g][1]}"
+                        for g in results
+                        if g in self.GATES and self.GATES[g] == GateTier.C
+                        and results[g][1]
+                    ) or "all Tier C gates: PASS (no specific reason)"
+                    party_A = tier_c_reasons
+                    party_B = (
+                        f"Proposed action: {action[:200]}. "
+                        f"Content excerpt: {content[:200]}"
+                    )
+                    convergence = (
+                        "All gates passed; the system is about to ALLOW "
+                        "this register-relevant action."
+                    )
+                    fr = friction_detector(
+                        party_A=party_A,
+                        party_B=party_B,
+                        convergence=convergence,
+                    )
+                    if fr.flagged:
+                        friction_advisory = (
+                            f" [friction-advisory: {fr.explanation[:160]}]"
+                        )
+                    mark = make_register_mark(
+                        fr,
+                        plane="telos",
+                        subject_type="gate_check",
+                        subject_id=action[:80],
+                        decision_point="telos_gates.check:post_results",
+                        actual_action="advisory_only",
+                    )
+                    write_register_mark(mark)
+            except Exception:
+                logger.debug("friction advisory failed", exc_info=True)
+
         # --- Evaluate decision ---
         tier_a_fail = any(
             results[g][0] == GateResult.FAIL
@@ -704,7 +772,7 @@ class TelosGatekeeper:
         return GateCheckResult(
             decision=GateDecision.ALLOW,
             gate="",
-            reason="All gates passed",
+            reason="All gates passed" + friction_advisory,
             gate_results=results,
         )
 
