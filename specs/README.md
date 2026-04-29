@@ -100,10 +100,20 @@ Use these rules when multiple spec-shaped files exist for one surface:
 - Narrow subsystem specifications can live here if they define durable contracts or invariants.
 - Versioned specs must clearly state whether they supersede an earlier version.
 - Broad product strategy, prompts, and implementation plans do not belong here.
+- Serious agent-executed work should use `specs/<work-id>/PRODUCT.md` and `specs/<work-id>/TECH.md` when behavior, implementation, tests, and rollback need to be separated.
+
+## Product/Tech Spec Convention
+
+Use [specs/_template/PRODUCT.md](/Users/dhyana/dharma_swarm/specs/_template/PRODUCT.md) and [specs/_template/TECH.md](/Users/dhyana/dharma_swarm/specs/_template/TECH.md) for new issue-driven or agent-executed work that is larger than a narrow hotfix.
+
+- `PRODUCT.md` defines externally visible behavior, invariants, acceptance criteria, and non-goals.
+- `TECH.md` defines current system context, implementation path, runtime substrate mapping, tests, risks, and rollback.
+- Small hotfixes may skip specs if the PR or report includes a clear no-spec rationale.
 
 ## Relation To The Rest Of The Repo
 
 - `README.md` and `CLAUDE.md` define operator-level orientation.
+- `AGENTS.md` defines canonical cross-agent repo rules.
 - `docs/` defines prose canon, plans, prompts, and archive material.
 - `reports/` stores historical outputs and audits.
 - `specs/` defines precise contracts that should outlive any one planning wave.
