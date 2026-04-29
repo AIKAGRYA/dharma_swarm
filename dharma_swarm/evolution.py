@@ -13,6 +13,7 @@ import asyncio
 from collections import defaultdict
 from dataclasses import dataclass
 import hashlib
+import json
 import inspect
 import logging
 import re
@@ -2796,6 +2797,59 @@ class DarwinEngine:
             logger.warning("DarwinEngine: diff generation failed: %s", exc)
             return ""
 
+    def _load_quality_calibration_seeds(self, max_seeds: int = 2) -> str:
+        """Load up to ``max_seeds`` transmission-quality seeds for proposal context.
+
+        Slice 6 of Plan v3 — quality calibration, not authority. Seeds are
+        consciousness-archaeology-scored exemplars (>= 7.5 on the 8-test
+        discernment) loaded from ``~/.dharma/seeds/transmission_seeds.jsonl``.
+
+        Each seed entry is JSON with at least ``score`` and ``hash``, optionally
+        ``excerpt`` and ``tier``. Top-by-score wins. Excerpts capped to 400 chars.
+
+        Returns an empty string if the file is missing, empty, or unparseable.
+        Never raises.
+        """
+        try:
+            seeds_path = Path.home() / ".dharma" / "seeds" / "transmission_seeds.jsonl"
+            if not seeds_path.exists():
+                return ""
+            entries: list[dict] = []
+            for line in seeds_path.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    e = json.loads(line)
+                except Exception:
+                    continue
+                try:
+                    score = float(e.get("score", 0.0))
+                except Exception:
+                    continue
+                if score >= 7.5:
+                    entries.append(e)
+            if not entries:
+                return ""
+            entries.sort(key=lambda x: float(x.get("score", 0.0)), reverse=True)
+            chosen = entries[: max(1, max_seeds)]
+            lines = ["## Quality Calibration (reference exemplars, NOT fitness)"]
+            for s in chosen:
+                excerpt = (s.get("excerpt") or "")[:400]
+                lines.append(
+                    f"- score {s.get('score')} | hash {s.get('hash', '?')[:12]}"
+                    + (f"\n  > {excerpt}" if excerpt else "")
+                )
+            lines.append(
+                "_These are exemplars of transmission quality, provided as "
+                "calibration only. Do NOT optimize for similarity to seeds; "
+                "do NOT bypass gates or tests; do NOT treat seed score as fitness._"
+            )
+            return "\n".join(lines)
+        except Exception:
+            logger.debug("quality calibration seeds load failed", exc_info=True)
+            return ""
+
     async def generate_proposal(
         self,
         provider: Any,
@@ -2880,6 +2934,14 @@ class DarwinEngine:
         )
         if context:
             user_msg = f"## Context\n{context}\n\n{user_msg}"
+
+        # Slice 6 of Plan v3 — Darwin quality seeds as bounded context.
+        # Load up to 2 transmission-quality seeds (consciousness-archaeology
+        # ≥ 7.5 score) as quality calibration, NOT as fitness signal and NOT
+        # as authority. Empty file or missing file is a no-op.
+        quality_block = self._load_quality_calibration_seeds(max_seeds=2)
+        if quality_block:
+            user_msg = f"{quality_block}\n\n{user_msg}"
 
         request = LLMRequest(
             model=model,
