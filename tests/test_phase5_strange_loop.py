@@ -209,16 +209,19 @@ class TestStrangeLoop:
             proposed_at=now,
             gnani_verdict=True,
             kept=True,
+            relief_flagged=True,
         )
         d = m.to_dict()
         assert d["id"] == "test1"
         assert d["parameter"] == "routing_bias"
+        assert d["relief_flagged"] is True
         m2 = Mutation.from_dict(d)
         assert m2.id == m.id
         assert m2.parameter == m.parameter
         assert m2.old_value == m.old_value
         assert m2.new_value == m.new_value
         assert m2.kept == m.kept
+        assert m2.relief_flagged is True
 
     def test_unhealthy_ratio_triggers_scaling_threshold_proposal(self, tmp_path):
         from dharma_swarm.strange_loop import StrangeLoop
