@@ -64,6 +64,13 @@ def _isolate_stigmergy(tmp_path, monkeypatch):
     monkeypatch.setattr("dharma_swarm.stigmergy._default_store", None)
 
 
+@pytest.fixture(autouse=True)
+def _isolate_register_marks(tmp_path, monkeypatch):
+    """Redirect v3 register marks so tests do not pollute the operator digest."""
+    register_log = tmp_path / "_register_isolated" / "register_marks.jsonl"
+    monkeypatch.setattr("dharma_swarm.register_disciplines.DEFAULT_REGISTER_LOG", register_log)
+
+
 @pytest.fixture
 def fast_gate():
     """Mock telos gate to return ALLOW instantly.
