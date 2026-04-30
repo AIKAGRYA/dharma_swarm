@@ -336,6 +336,7 @@ Use at least these perspectives:
 6. **Commercial Architect** — customer intake, work orders, deliverables, value ledger, billing.
 7. **Dharma Guardian** — telos preservation, authority boundaries, anti-drift, anti-mystification.
 8. **Skeptic/Red Team** — complexity, premature optimization, polyglot risk, security risk.
+9. **Business Endgame Strategist** — reverse-engineering from a clear company outcome vs. building a general value-producing company generator.
 
 ### Required output from each agent
 
@@ -535,6 +536,109 @@ Return:
 7. exact evidence that would change your mind
 ```
 
+### Prompt F — Business endgame strategist
+
+```text
+You are the Business Endgame Strategist for Dharma Swarm.
+
+You are not here to write code. You are here to answer a deeper strategic question before the architecture hardens:
+
+Should Dharma Swarm be reverse-engineered from one clear business endgame, or should it become a general-purpose value-producing autonomous company substrate capable of spawning focused sub-companies, sub-repos, products, audits, research arms, and service lines from itself?
+
+Context:
+- Dharma Swarm is not merely an app. It is evolving toward an autonomous organization substrate with agents, runtime state, governance, memory, routing, evolution, dashboard/control plane, and potential Go/Rust/Python modular layers.
+- There is a live strategic tension:
+  1. Pick a clear first business: e.g. AI Systems X-Ray, LLM/GPU Cost Audit, Agent Work OS Setup, Governance/Verification Audit. Reverse-engineer the repo around that wedge and get revenue fast.
+  2. Build Dharma Swarm as a meta-company engine: a system that can discover, evaluate, launch, and operate many value-producing pipelines/sub-companies/sub-repos over time.
+- We need brutal clarity because premature generality could kill revenue, but overly narrow productization could amputate the original vision.
+
+Your task:
+Think from first principles, complex systems theory, startup strategy, autonomous organization design, platform strategy, and software architecture.
+
+Answer these questions:
+
+1. What is the right strategic frame?
+   - Is Dharma Swarm primarily a single company?
+   - A company factory?
+   - A founder operating system?
+   - A cybernetic value-production engine?
+   - A research lab that must commercialize through wedge products?
+   - Something else?
+
+2. Should we reverse-engineer from one clear business endgame first?
+   - If yes, which wedge should dominate and why?
+   - What parts of the architecture should be shaped around that wedge?
+   - What must remain general so the larger vision is not lost?
+
+3. Should Dharma Swarm instead be built as a general value-producing substrate first?
+   - If yes, what is the minimum viable substrate?
+   - What are the first sub-company/sub-repo patterns it should be able to spawn?
+   - How do we avoid becoming abstract, ornamental, or non-revenue-producing?
+
+4. What is the correct two-layer answer?
+   - Example: a narrow cashflow wedge at the surface, with a general company-factory substrate underneath.
+   - Define exactly what is narrow and exactly what is general.
+
+5. What should be the first commercial flywheel?
+   Map the loop:
+   lead/source signal → opportunity → work order → agent execution → verified deliverable → value event → invoice → case study → improved routing/evolution → next lead.
+
+6. What are the required domain objects?
+   Evaluate whether Dharma Swarm needs:
+   - Customer
+   - Opportunity
+   - WorkOrder
+   - Deliverable
+   - ValueEvent
+   - InvoiceRecord
+   - CaseStudy
+   - ProductLine
+   - SubCompany
+   - RepoSpawn
+   - AgentTeam
+   - Capability
+   - MarketSignal
+
+7. What is the relationship between sub-repos and the main repo?
+   - When should a pipeline remain inside Dharma Swarm?
+   - When should it graduate into its own repo?
+   - What shared kernel/rules/governance does every child repo inherit?
+   - What should never be inherited automatically?
+
+8. How should Go/Rust/Python decisions serve the business strategy?
+   - Go sensorium: does it serve market-signal ingestion, customer telemetry, multi-source research, or product operations first?
+   - Rust core: does it serve commercial ledgers, work-order invariants, artifact verification, permission kernel, or runtime reliability first?
+   - Python: what semantic/cognitive work should remain here?
+
+9. What should we explicitly not build yet?
+   Name the tempting but dangerous abstractions.
+
+10. What is your recommended 30-day strategy?
+   Break it into:
+   - Days 1–3: research and decision
+   - Days 4–7: architecture spec and first data model
+   - Days 8–14: first runnable commercial loop
+   - Days 15–30: first customer-facing deliverable and feedback loop
+
+11. What decision would you force Dhyana to make now?
+   Give one clear strategic fork, the tradeoff, and your recommendation.
+
+Required output format:
+
+A. One-paragraph executive thesis
+B. Strategic identity of Dharma Swarm
+C. Narrow wedge vs general substrate analysis
+D. Recommended first business flywheel
+E. Required architecture objects
+F. Sub-company/sub-repo doctrine
+G. Go/Rust/Python implications
+H. What not to build yet
+I. 30-day plan
+J. Final hard recommendation
+
+Be direct. Preserve the original vision, but do not enable abstraction addiction. The answer must help us decide what to build, what to defer, and how to make Dharma Swarm capable of real large-scale value production.
+```
+
 ---
 
 ## 10. Open decision log
@@ -587,6 +691,22 @@ E. Go event ingestion envelope
 
 Current status: undecided.
 
+### Decision 004 — pending
+
+Question: strategic identity of Dharma Swarm?
+
+Options:
+
+```text
+A. Single focused company with one dominant wedge
+B. Company factory / sub-company generator
+C. Founder operating system
+D. Cybernetic value-production substrate with one narrow cashflow wedge
+E. Research lab that commercializes through selected artifacts
+```
+
+Current status: undecided.
+
 ---
 
 ## 11. Non-goals for now
@@ -602,6 +722,8 @@ Autonomous billing without human approval
 Rust rewrite of existing Python runtime
 Go rewrite of dashboard/API
 Complex message bus before event envelope is stable
+Full company-factory abstraction before one paid work-order loop exists
+Sub-repo spawning before a graduation doctrine exists
 ```
 
 ---
@@ -621,6 +743,7 @@ This strategy is ready to build only when the discussion room produces:
 8. Rollback plan.
 9. 7-day implementation plan.
 10. Human approval from Dhyana.
+11. Clear answer on narrow business endgame vs general value-production substrate.
 ```
 
 Until then, this remains research and architecture only.
