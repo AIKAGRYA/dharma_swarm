@@ -358,6 +358,44 @@ def test_failed_input_no_source(registry, isolated_home):
     assert result["artifact_id"] is None
 
 
+def test_materialise_failure_does_not_leave_artifact_row(
+    registry, isolated_home, good_payload, monkeypatch
+):
+    original_write_text = Path.write_text
+
+    def _raise_for_brief_files(self, *args, **kwargs):
+        if self.suffix == ".md":
+            raise OSError("disk full")
+        return original_write_text(self, *args, **kwargs)
+
+    with monkeypatch.context() as m:
+        m.setattr(Path, "write_text", _raise_for_brief_files)
+        result = run_once(
+            registry=registry,
+            input_payload=good_payload,
+            gatekeeper=_all_pass_keeper(),
+        )
+
+    assert result["outcome"] == "failed_materialise"
+    assert result["artifact_id"] is None
+    artifacts = [
+        o
+        for o in registry.get_objects_by_type("KnowledgeArtifact")
+        if o.properties.get("subtype") == "operator_brief"
+    ]
+    assert artifacts == []
+    artifact_root = isolated_home / ".dharma" / "artifacts" / "operator_brief"
+    assert not artifact_root.exists() or not list(artifact_root.rglob("*.md"))
+
+    retry = run_once(
+        registry=registry,
+        input_payload=good_payload,
+        gatekeeper=_all_pass_keeper(),
+    )
+    assert retry["outcome"] == "success"
+    assert retry["artifact_id"]
+
+
 # ──────────────────────────────────────────────────────────────────────
 # Scheduler / feature-flag integration
 # ──────────────────────────────────────────────────────────────────────
@@ -385,6 +423,24 @@ def test_cron_run_disabled_is_noop(registry, isolated_home, monkeypatch):
     )
     artifact_root = isolated_home / ".dharma" / "artifacts" / "operator_brief"
     assert not artifact_root.exists() or not any(artifact_root.iterdir())
+
+
+def test_cron_dispatch_disabled_is_waiting_external(monkeypatch):
+    monkeypatch.delenv("DHARMA_OPERATOR_BRIEF_ENABLED", raising=False)
+
+    def _should_not_run(*args, **kwargs):
+        raise AssertionError("disabled cron dispatch must not call run_once")
+
+    monkeypatch.setattr(insight_brief, "run_once", _should_not_run)
+
+    from dharma_swarm.cron_job_runtime import CronJobRunStatus
+    from dharma_swarm.cron_runner import execute_cron_job
+
+    result = execute_cron_job({"id": "operator_brief", "handler": "operator_brief"})
+
+    assert result.status == CronJobRunStatus.WAITING_EXTERNAL
+    assert result.metadata["status"] == "disabled"
+    assert result.metadata["outcome"] == "skipped"
 
 
 # ──────────────────────────────────────────────────────────────────────

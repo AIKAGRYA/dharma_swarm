@@ -797,15 +797,15 @@ def _materialise_artifact(
     gate_decision_ids: list[str],
     witness_log_ids: list[str],
 ) -> tuple[str | None, str, str | None]:
-    """Create the KnowledgeArtifact row, then write the file.
+    """Write the file, then publish the KnowledgeArtifact row.
 
     Returns ``(artifact_id, sha256_hex, error_message)``. On
     materialisation failure (filesystem error after gates pass),
     returns ``(None, "", reason)`` so the caller can record a
     ``failed_materialise`` outcome.
     """
-    artifact_obj, errors = reg.create_object(
-        "KnowledgeArtifact",
+    artifact_obj = OntologyObj(
+        type_name="KnowledgeArtifact",
         properties={
             "title": drafted.title,
             "artifact_type": ARTIFACT_TYPE,
@@ -822,8 +822,6 @@ def _materialise_artifact(
         },
         created_by="operator_brief",
     )
-    if artifact_obj is None:
-        return None, "", f"KnowledgeArtifact creation failed: {errors}"
 
     artifact_id = artifact_obj.id
 
@@ -856,6 +854,13 @@ def _materialise_artifact(
     content_hash = hashlib.sha256(full_body.encode("utf-8")).hexdigest()
     artifact_obj.properties["file_path"] = str(file_path)
     artifact_obj.properties["content_sha256"] = content_hash
+    inserted, errors = reg.put_object(artifact_obj, updated_by="operator_brief")
+    if inserted is None:
+        try:
+            file_path.unlink(missing_ok=True)
+        except OSError:
+            logger.debug("failed to clean orphan operator brief file", exc_info=True)
+        return None, "", f"KnowledgeArtifact creation failed: {errors}"
     return artifact_id, content_hash, None
 
 
