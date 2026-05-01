@@ -14,6 +14,7 @@ import asyncio
 import json
 import logging
 import subprocess
+import sys
 import time
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
@@ -31,7 +32,7 @@ STATE_DIR = Path.home() / ".dharma"
 OVERNIGHT_DIR = STATE_DIR / "overnight"
 LOG_FILE = OVERNIGHT_DIR / "gate_coverage.jsonl"
 
-DHARMA_SWARM_ROOT = Path.home() / "dharma_swarm"
+DHARMA_SWARM_ROOT = Path(__file__).resolve().parents[2]
 TESTS_DIR = DHARMA_SWARM_ROOT / "tests"
 
 # The 11 core gates from dharma_swarm.telos_gates.TelosGatekeeper.CORE_GATES
@@ -254,7 +255,7 @@ def run_test_file(test_path: Path, timeout: float = 60.0) -> tuple[bool, str]:
     """
     try:
         result = subprocess.run(
-            ["python3", "-m", "pytest", str(test_path), "-v", "--tb=short", "-q"],
+            [sys.executable, "-m", "pytest", str(test_path), "-v", "--tb=short", "-q"],
             capture_output=True,
             text=True,
             timeout=timeout,
@@ -508,9 +509,8 @@ async def _main() -> None:
     shutdown = asyncio.Event()
 
     import signal as _signal
-    from typing import Any
 
-    def _handle_signal(sig: int, frame: Any) -> None:
+    def _handle_signal(sig: int, frame: object) -> None:
         logger.info("Signal %d received, shutting down gracefully...", sig)
         shutdown.set()
 

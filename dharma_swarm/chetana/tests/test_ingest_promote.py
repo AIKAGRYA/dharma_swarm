@@ -83,3 +83,14 @@ def test_double_promote_raises(chetana_sandbox: Path):
     promote(staged_path=staged, promoted_by="t")
     with pytest.raises(FileNotFoundError):
         promote(staged_path=staged, promoted_by="t")  # already moved/deleted
+
+
+def test_promote_refuses_path_outside_staging_root(chetana_sandbox: Path):
+    ingested = ingest(
+        source="valid staged body", source_kind="note", title="outside copy", confidence=0.5
+    )
+    outside = chetana_sandbox / "outside.md"
+    outside.write_text(ingested.atoms[0].read_text(encoding="utf-8"), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="outside chetana staging root"):
+        promote(staged_path=outside, promoted_by="test")

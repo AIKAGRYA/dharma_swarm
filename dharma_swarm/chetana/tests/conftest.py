@@ -8,6 +8,7 @@ operator's real marks.jsonl during testing.
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 
 import pytest
@@ -29,6 +30,16 @@ def _sandbox_stigmergy(tmp_path_factory: pytest.TempPathFactory, monkeypatch: py
     monkeypatch.setattr(stigmergy_mod, "_DEFAULT_BASE", sandbox, raising=True)
     # Reset the module-level singleton so it re-instantiates with the sandbox
     monkeypatch.setattr(stigmergy_mod, "_default_store", None, raising=True)
+
+
+@pytest.fixture(autouse=True)
+def _sandbox_kernel(tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch):
+    """Provide a real signed kernel for fail-closed chetana governance tests."""
+    from dharma_swarm import dharma_kernel as kernel_mod
+
+    kernel_path = tmp_path_factory.mktemp("kernel") / "kernel.json"
+    asyncio.run(kernel_mod.KernelGuard(kernel_path).save(kernel_mod.DharmaKernel.create_default()))
+    monkeypatch.setattr(kernel_mod, "_DEFAULT_KERNEL_PATH", kernel_path, raising=True)
 
 
 @pytest.fixture

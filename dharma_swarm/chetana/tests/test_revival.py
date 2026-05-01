@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
 
 from dharma_swarm.chetana.ingest import ingest
 from dharma_swarm.chetana.promote import promote
@@ -149,3 +152,34 @@ def test_propose_revival_marks_questions_as_open(chetana_sandbox: Path):
     proposal = propose_revival(atom_path=target)
     assert len(proposal.open_questions) >= 1
     assert proposal.needs_external_research == proposal.open_questions
+
+
+def test_apply_revival_refuses_blocked_gate_without_writing(
+    chetana_sandbox: Path, monkeypatch: pytest.MonkeyPatch
+):
+    past = (date.today() - timedelta(days=8)).isoformat()
+    target = _seed_promoted_atom(
+        title="Blocked revival target",
+        body="Original trusted body.",
+        stale_after=past,
+    )
+    proposal = propose_revival(atom_path=target)
+    before = target.read_text(encoding="utf-8")
+    blocked = SimpleNamespace(
+        result="BLOCK",
+        can_promote=False,
+        axiom_signature="f" * 64,
+        record=SimpleNamespace(
+            rationale="blocked by test gate",
+            gates_blocked=["test_gate"],
+        ),
+    )
+    monkeypatch.setattr(
+        "dharma_swarm.chetana.revival.gate_check_atom",
+        lambda **_kwargs: blocked,
+    )
+
+    with pytest.raises(ValueError, match="revival blocked"):
+        apply_revival(proposal, reviewer="test-reviewer", body_addendum="blocked addendum")
+
+    assert target.read_text(encoding="utf-8") == before

@@ -116,9 +116,8 @@ CANONICAL_SEED_ORDER: tuple[ProviderType, ...] = (
 # delegated search, challenge, and implementation work.
 
 PRIMARY_DRIVER_LANES: tuple[ProviderType, ...] = (
-    ProviderType.CLAUDE_CODE,    # Subscription-backed (unlimited)
     ProviderType.CODEX,          # Subscription-backed (unlimited)
-    ProviderType.OLLAMA,         # Free frontier (GLM-5, DeepSeek-v3.2)
+    ProviderType.CLAUDE_CODE,    # Subscription-backed (unlimited)
     ProviderType.ANTHROPIC,      # API credits (last resort)
 )
 
@@ -172,8 +171,8 @@ VALIDATOR_PRIORITY: tuple[ProviderType, ...] = (
 )
 
 PRIMARY_TOOLING_PRIORITY: tuple[ProviderType, ...] = (
-    ProviderType.CLAUDE_CODE,    # Subscription (unlimited)
     ProviderType.CODEX,          # Subscription (unlimited)
+    ProviderType.CLAUDE_CODE,    # Subscription (unlimited)
     ProviderType.OLLAMA,         # Free frontier
     ProviderType.CEREBRAS,       # Free (Qwen3 235B)
     ProviderType.ANTHROPIC,      # API credits (last resort)
@@ -182,11 +181,11 @@ PRIMARY_TOOLING_PRIORITY: tuple[ProviderType, ...] = (
 )
 
 PRIMARY_REASONING_PRIORITY: tuple[ProviderType, ...] = (
+    ProviderType.ANTHROPIC,      # Opus API for highest-precision reasoning
     ProviderType.CLAUDE_CODE,    # Subscription (unlimited, Opus-class)
     ProviderType.OLLAMA,         # Free frontier (GLM-5 744B, DeepSeek-v3.2)
     ProviderType.CODEX,          # Subscription (unlimited)
     ProviderType.CEREBRAS,       # Free (Qwen3 235B)
-    ProviderType.ANTHROPIC,      # API credits (last resort)
     ProviderType.OPENAI,         # API credits (last resort)
     ProviderType.OPENROUTER,     # API credits (last resort)
 )

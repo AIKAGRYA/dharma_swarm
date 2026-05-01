@@ -6,6 +6,7 @@ build/
 .eggs/
 *.egg
 .pytest_cache/
+.coverage
 .dharma/
 *.db
 .venv/

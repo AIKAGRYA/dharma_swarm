@@ -171,7 +171,7 @@ async def test_run_task_repairs_semantic_failure_before_success(
     provider = _RecordingProvider(
         responses=[
             LLMResponse(
-                content="</think>\nThere was an issue with the selected model.",
+                content="<think>There was an issue with the selected model.</think>",
                 model="gpt-4.1",
             ),
             LLMResponse(content=_good_operator_brief(), model="gpt-4.1"),

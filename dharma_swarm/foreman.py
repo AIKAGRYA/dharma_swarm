@@ -16,7 +16,6 @@ import logging
 import os
 import shlex
 import subprocess
-import sys
 import tempfile
 import uuid
 from datetime import datetime, timezone
@@ -42,6 +41,8 @@ QUALITY_DIMENSIONS = [
     "documented",
     "edge_cases_covered",
 ]
+
+MAX_FOREMAN_AST_FILES = 200
 
 
 def _utc_now() -> datetime:
@@ -164,12 +165,23 @@ def get_active_projects() -> list[ProjectEntry]:
 # ── Quality Dimension Scoring ────────────────────────────────────────
 
 
+def _discover_python_files(repo_path: Path, exclude: set[str]) -> list[Path]:
+    from dharma_swarm.xray import PYTHON_EXTS, discover_files
+
+    return sorted(f for f in discover_files(repo_path, exclude_patterns=exclude) if f.suffix in PYTHON_EXTS)
+
+
+def _sample_paths(paths: list[Path]) -> list[Path]:
+    return paths[:MAX_FOREMAN_AST_FILES]
+
+
 def _score_has_tests(repo_path: Path, exclude: set[str]) -> float:
     """test_files / source_files, capped at 1.0."""
-    from dharma_swarm.xray import discover_files, PYTHON_EXTS
+    py_files = _discover_python_files(repo_path, exclude)
+    return _score_has_tests_from_files(py_files)
 
-    files = discover_files(repo_path, exclude_patterns=exclude)
-    py_files = [f for f in files if f.suffix in PYTHON_EXTS]
+
+def _score_has_tests_from_files(py_files: list[Path]) -> float:
     if not py_files:
         return 0.0
     test_files = [f for f in py_files if "test" in f.name.lower()]
@@ -201,18 +213,20 @@ def _score_tests_pass(project: ProjectEntry) -> float:
 
 def _score_error_handling(repo_path: Path, exclude: set[str]) -> float:
     """Fraction of source files that have try/except or raise statements."""
-    from dharma_swarm.xray import discover_files, PYTHON_EXTS
+    return _score_error_handling_from_files(_discover_python_files(repo_path, exclude))
 
-    files = discover_files(repo_path, exclude_patterns=exclude)
+
+def _score_error_handling_from_files(py_files: list[Path]) -> float:
     py_src = [
-        f for f in files
-        if f.suffix in PYTHON_EXTS and "test" not in f.name.lower()
+        f for f in py_files
+        if "test" not in f.name.lower()
     ]
     if not py_src:
         return 1.0
 
     has_handling = 0
-    for path in py_src:
+    sampled = _sample_paths(py_src)
+    for path in sampled:
         try:
             content = path.read_text(encoding="utf-8", errors="replace")
             tree = ast.parse(content)
@@ -223,23 +237,24 @@ def _score_error_handling(repo_path: Path, exclude: set[str]) -> float:
         except (OSError, SyntaxError):
             pass
 
-    return round(has_handling / len(py_src), 3)
+    return round(has_handling / len(sampled), 3) if sampled else 1.0
 
 
 def _score_documented(repo_path: Path, exclude: set[str]) -> float:
     """Average docstring coverage across source files."""
-    from dharma_swarm.xray import discover_files, PYTHON_EXTS
+    return _score_documented_from_files(_discover_python_files(repo_path, exclude))
 
-    files = discover_files(repo_path, exclude_patterns=exclude)
+
+def _score_documented_from_files(py_files: list[Path]) -> float:
     py_src = [
-        f for f in files
-        if f.suffix in PYTHON_EXTS and "test" not in f.name.lower()
+        f for f in py_files
+        if "test" not in f.name.lower()
     ]
     if not py_src:
         return 1.0
 
     ratios: list[float] = []
-    for path in py_src:
+    for path in _sample_paths(py_src):
         try:
             content = path.read_text(encoding="utf-8", errors="replace")
             tree = ast.parse(content)
@@ -260,16 +275,14 @@ def _score_documented(repo_path: Path, exclude: set[str]) -> float:
 
 def _score_edge_cases(repo_path: Path, exclude: set[str]) -> float:
     """Estimate: how many public functions have matching test functions?"""
-    from dharma_swarm.xray import discover_files, PYTHON_EXTS
+    return _score_edge_cases_from_files(_discover_python_files(repo_path, exclude))
 
-    files = discover_files(repo_path, exclude_patterns=exclude)
-    py_files = [f for f in files if f.suffix in PYTHON_EXTS]
 
+def _score_edge_cases_from_files(py_files: list[Path]) -> float:
     # Collect public function names from source files
     public_fns: set[str] = set()
-    for path in py_files:
-        if "test" in path.name.lower():
-            continue
+    src_files = [path for path in py_files if "test" not in path.name.lower()]
+    for path in _sample_paths(src_files):
         try:
             content = path.read_text(encoding="utf-8", errors="replace")
             tree = ast.parse(content)
@@ -285,9 +298,8 @@ def _score_edge_cases(repo_path: Path, exclude: set[str]) -> float:
 
     # Collect test function names
     test_targets: set[str] = set()
-    for path in py_files:
-        if "test" not in path.name.lower():
-            continue
+    test_files = [path for path in py_files if "test" in path.name.lower()]
+    for path in _sample_paths(test_files):
         try:
             content = path.read_text(encoding="utf-8", errors="replace")
             tree = ast.parse(content)
@@ -314,13 +326,14 @@ def score_all_dimensions(
     repo = Path(project.path)
     exclude = set(project.exclude) if project.exclude else set()
     cached_tests_pass = project.dimensions.get("tests_pass", 0.0) if project.dimensions else 0.0
+    py_files = _discover_python_files(repo, exclude)
 
     return {
-        "has_tests": _score_has_tests(repo, exclude),
+        "has_tests": _score_has_tests_from_files(py_files),
         "tests_pass": float(cached_tests_pass or 0.0) if skip_tests else _score_tests_pass(project),
-        "error_handling": _score_error_handling(repo, exclude),
-        "documented": _score_documented(repo, exclude),
-        "edge_cases_covered": _score_edge_cases(repo, exclude),
+        "error_handling": _score_error_handling_from_files(py_files),
+        "documented": _score_documented_from_files(py_files),
+        "edge_cases_covered": _score_edge_cases_from_files(py_files),
     }
 
 

@@ -5,7 +5,6 @@ from __future__ import annotations
 from datetime import date, timedelta
 from pathlib import Path
 
-from dharma_swarm.chetana import decay as decay_mod
 from dharma_swarm.chetana.decay import scan_decay
 from dharma_swarm.chetana.ingest import ingest
 from dharma_swarm.chetana.promote import promote

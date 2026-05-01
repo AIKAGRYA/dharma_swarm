@@ -81,9 +81,9 @@ async def test_run_task_uses_routed_provider_and_records_feedback(fast_gate) -> 
 
     assert result.startswith("Implemented fix")
     route_request, _, allowlist = provider.calls[0]
-    assert allowlist == [ProviderType.OPENAI]
+    assert allowlist == [ProviderType.OPENAI, ProviderType.CLAUDE_CODE]
     assert route_request.context["preferred_provider"] == "openai"
-    assert route_request.context["preserve_requested_model"] is True
+    assert route_request.context["preserve_requested_model"] is False
     feedback = provider.feedback[0]
     assert feedback["success"] is True
     assert feedback["model"] == "gpt-4.1"
@@ -188,9 +188,9 @@ async def test_global_routed_execution_flag_does_not_override_pinned_agent_lane(
     )
 
     route_request, _, allowlist = provider.calls[0]
-    assert allowlist == [ProviderType.OLLAMA]
+    assert allowlist == [ProviderType.OLLAMA, ProviderType.CLAUDE_CODE]
     assert route_request.context["preferred_provider"] == "ollama"
-    assert route_request.context["preserve_requested_model"] is True
+    assert route_request.context["preserve_requested_model"] is False
 
 
 @pytest.mark.asyncio

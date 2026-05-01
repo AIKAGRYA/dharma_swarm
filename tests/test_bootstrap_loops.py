@@ -306,7 +306,6 @@ async def test_task_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     from dharma_swarm.models import (
         AgentState,
         AgentStatus,
-        Task,
         TaskPriority,
         TaskStatus,
     )
@@ -387,12 +386,24 @@ async def test_task_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     assert _runtime_table_count(runtime_db_path, "context_bundles") == 1
     assert _runtime_table_count(runtime_db_path, "task_claims") == 1
 
-    # The background _execute_task coroutine runs async — yield to let it complete.
-    # run_task() is an async no-op so it finishes after a couple of event loop turns.
-    await asyncio.sleep(0.1)
+    # The background _execute_task coroutine writes board/runtime state in separate
+    # awaits, so poll for the full lifecycle rather than racing a fixed sleep.
+    deadline = asyncio.get_running_loop().time() + 2.0
+    completed = None
+    artifact_count = 0
+    while asyncio.get_running_loop().time() < deadline:
+        completed = await board.get(task.id)
+        artifact_count = _runtime_table_count(runtime_db_path, "artifact_records")
+        if (
+            completed is not None
+            and completed.status == TaskStatus.COMPLETED
+            and _runtime_delegation_statuses(runtime_db_path) == ["completed"]
+            and artifact_count >= 1
+        ):
+            break
+        await asyncio.sleep(0.05)
 
     # After the background task finishes the board should show COMPLETED
-    completed = await board.get(task.id)
     assert completed is not None
     assert completed.status == TaskStatus.COMPLETED, (
         f"Expected COMPLETED, got {completed.status}. "
@@ -405,7 +416,6 @@ async def test_task_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     assert _runtime_table_count(runtime_db_path, "task_claims") == 1
     assert _runtime_table_count(runtime_db_path, "delegation_runs") == 1
     assert _runtime_delegation_statuses(runtime_db_path) == ["completed"]
-    artifact_count = _runtime_table_count(runtime_db_path, "artifact_records")
     assert artifact_count >= 1
     with sqlite3.connect(runtime_db_path) as db:
         artifact_kind, artifact_task_id, payload_path, checksum = db.execute(
@@ -452,7 +462,7 @@ async def test_task_failure_records_runtime_run(tmp_path: Path, monkeypatch: pyt
 
     board = TaskBoard(db_path=tmp_path / "tasks.db")
     await board.init_db()
-    task = await board.create(
+    await board.create(
         title="Test bootstrap failure",
         description="Verify failed runtime run row",
         priority=TaskPriority.NORMAL,
@@ -770,7 +780,6 @@ async def test_full_loop_closure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     from dharma_swarm.models import (
         AgentState,
         AgentStatus,
-        Task,
         TaskPriority,
         TaskStatus,
     )

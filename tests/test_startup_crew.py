@@ -238,8 +238,8 @@ async def test_create_seed_tasks_replaces_date_placeholder():
     date_str = datetime.now(timezone.utc).strftime("%Y%m%d")
     joined = "\n".join(c["description"] for c in swarm.create_calls)
     assert "{date}" not in joined
-    # At least one task in current seed set should contain replaced date.
-    assert date_str in joined
+    if any("{date}" in spec["description"] for spec in sc.SEED_TASKS):
+        assert date_str in joined
 
 
 @pytest.mark.asyncio

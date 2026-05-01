@@ -20,10 +20,8 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import pickle
 import sqlite3
 import struct
-import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
@@ -163,14 +161,6 @@ class TFIDFEmbedder:
         """Embed texts. Fits on first call if not already fitted."""
         if not texts:
             return []
-        try:
-            from sklearn.feature_extraction.text import TfidfVectorizer
-            from sklearn.decomposition import TruncatedSVD
-        except ImportError as exc:
-            logger.debug("scikit-learn not available: %s", exc)
-            # Fallback: zero vectors
-            return [[0.0] * self._dim for _ in texts]
-
         try:
             # Bootstrap: if not fitted, use the texts themselves as initial corpus
             if not self._fitted or self._vectorizer is None:
@@ -374,6 +364,14 @@ class VectorStore:
             conn = sqlite3.connect(str(self._db_path), timeout=10)
             conn.row_factory = sqlite3.Row
             return conn
+
+    def _connect_stats(self) -> sqlite3.Connection:
+        """Open a short-timeout read connection for health/status probes."""
+        conn = sqlite3.connect(str(self._db_path), timeout=0.2)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA busy_timeout=200")
+        conn.execute("PRAGMA query_only=ON")
+        return conn
 
     def _init_db(self) -> None:
         """Create tables if they don't exist."""
@@ -889,7 +887,7 @@ class VectorStore:
 
     def stats(self) -> dict[str, Any]:
         """Return store statistics."""
-        conn = self._connect()
+        conn = self._connect_stats()
         try:
             total = conn.execute(
                 "SELECT COUNT(*) FROM vec_documents"
@@ -918,7 +916,17 @@ class VectorStore:
             }
         except Exception as exc:
             logger.debug("VectorStore.stats failed: %s", exc)
-            return {"total_documents": 0, "error": str(exc)}
+            return {
+                "total_documents": 0,
+                "valid_documents": 0,
+                "invalidated_documents": 0,
+                "avg_confidence": 0.0,
+                "by_layer": {},
+                "db_path": str(self._db_path),
+                "embedder_dim": self._embedder.dim,
+                "embedder_fitted": getattr(self._embedder, "_fitted", False),
+                "error": str(exc),
+            }
         finally:
             conn.close()
 

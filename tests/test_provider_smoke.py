@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 
-from api.routers import chat as chat_router
 from dharma_swarm.models import ProviderType
 from dharma_swarm.provider_smoke import (
     _probe_qwen_dashboard,
@@ -198,6 +197,8 @@ def test_probe_qwen_dashboard_reports_missing_config(monkeypatch) -> None:
 def test_probe_qwen_dashboard_collects_tool_calls_and_content(
     monkeypatch,
 ) -> None:
+    from api.routers import chat as chat_router
+
     settings = chat_router.ChatRuntimeSettings(
         provider=ProviderType.TOGETHER,
         api_key="together-key",

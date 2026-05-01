@@ -42,6 +42,64 @@ chetana_log() {
   echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] [chetana-hook] $*" >> "${CHETANA_LOG}" 2>/dev/null
 }
 
+_CHETANA_HOOK_PAYLOAD_READ=0
+CHETANA_HOOK_PAYLOAD=""
+
+chetana_hook_payload() {
+  if [[ "${_CHETANA_HOOK_PAYLOAD_READ}" == "0" ]]; then
+    _CHETANA_HOOK_PAYLOAD_READ=1
+    if [[ ! -t 0 ]]; then
+      CHETANA_HOOK_PAYLOAD="$(python3 -c 'import sys; sys.stdout.write(sys.stdin.read(1048576))' 2>/dev/null || true)"
+    fi
+  fi
+  [[ -n "${CHETANA_HOOK_PAYLOAD}" ]] || return 1
+  printf '%s' "${CHETANA_HOOK_PAYLOAD}"
+}
+
+chetana_jsonl_from_payload() {
+  local payload
+  payload="$(chetana_hook_payload)" || return 1
+  [[ -n "${payload}" ]] || return 1
+  CHETANA_HOOK_PAYLOAD="${payload}" python3 - <<'PY'
+import json
+import os
+from pathlib import Path
+
+payload = os.environ.get("CHETANA_HOOK_PAYLOAD", "")
+try:
+    data = json.loads(payload)
+except Exception:
+    raise SystemExit(1)
+
+preferred = {
+    "transcript_path",
+    "jsonl_path",
+    "session_jsonl",
+    "session_path",
+    "conversation_path",
+}
+
+def walk(node):
+    if isinstance(node, dict):
+        for key, value in node.items():
+            if isinstance(value, str):
+                if key in preferred or value.endswith(".jsonl"):
+                    p = Path(value).expanduser()
+                    if p.exists() and p.suffix == ".jsonl":
+                        print(p)
+                        return True
+            elif walk(value):
+                return True
+    elif isinstance(node, list):
+        for item in node:
+            if walk(item):
+                return True
+    return False
+
+raise SystemExit(0 if walk(data) else 1)
+PY
+}
+
 # Run a chetana CLI command with a timeout, capturing stdout to a temp file.
 # Args: $1 = timeout seconds, $2... = chetana subcommand args
 # Echoes the temp file path on success, empty on failure.
@@ -76,11 +134,17 @@ chetana_run() {
 
 # Find the most recent session JSONL for the current cwd.
 chetana_current_session_jsonl() {
+  local from_payload
+  from_payload="$(chetana_jsonl_from_payload)" && {
+    echo "${from_payload}"
+    return 0
+  }
   local cwd
   cwd="$(pwd)"
   local slug
-  # Replicate Claude Code's project-dir slug: replace / with -, no leading -
-  slug="$(echo "${cwd}" | sed 's|/|-|g')"
+  # Replicate Claude Code's project-dir slug: replace path separators and
+  # non-alphanumeric characters with hyphens.
+  slug="$(echo "${cwd}" | sed -E 's|/|-|g; s|[^A-Za-z0-9.-]|-|g')"
   local proj_dir="${CHETANA_PROJECTS_ROOT}/${slug}"
   if [[ ! -d "${proj_dir}" ]]; then
     return 1

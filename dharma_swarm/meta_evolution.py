@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import math
+import logging
 import random
 from pathlib import Path
 from statistics import mean, pvariance
@@ -14,6 +15,8 @@ from pydantic import BaseModel, Field, field_validator
 from dharma_swarm.archive import FITNESS_DIMENSIONS, normalize_fitness_weights
 from dharma_swarm.evolution import CycleResult, DarwinEngine, Proposal
 from dharma_swarm.models import _new_id, _utc_now
+
+logger = logging.getLogger(__name__)
 
 
 _LEGACY_FITNESS_DIMENSION_ALIASES: dict[str, str] = {
@@ -236,7 +239,12 @@ class MetaEvolutionEngine:
         return items
 
     def _load_meta_archive(self) -> None:
-        """Load historical meta-configurations from JSONL."""
+        """Load historical meta-configurations from JSONL.
+
+        Legacy rows are normalized via ``_normalize_meta_archive_payload``;
+        rows that remain incompatible after normalization are skipped with a
+        debug log so a single corrupt entry never aborts archive load.
+        """
         if not self.meta_archive_path.exists():
             return
         with self.meta_archive_path.open("r", encoding="utf-8") as handle:
@@ -244,12 +252,19 @@ class MetaEvolutionEngine:
                 stripped = line.strip()
                 if not stripped:
                     continue
-                payload = json.loads(stripped)
-                self.meta_archive.append(
-                    MetaArchiveEntry.model_validate(
-                        self._normalize_meta_archive_payload(payload)
+                try:
+                    payload = json.loads(stripped)
+                    self.meta_archive.append(
+                        MetaArchiveEntry.model_validate(
+                            self._normalize_meta_archive_payload(payload)
+                        )
                     )
-                )
+                except Exception:
+                    logger.debug(
+                        "Skipping incompatible meta-evolution archive row from %s",
+                        self.meta_archive_path,
+                        exc_info=True,
+                    )
 
     @classmethod
     def _normalize_meta_archive_payload(cls, payload: Any) -> Any:

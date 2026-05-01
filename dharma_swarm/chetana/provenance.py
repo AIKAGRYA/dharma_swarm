@@ -31,6 +31,13 @@ SourceKind = Literal[
 ]
 GateResult = Literal["ALLOW", "WARN", "BLOCK"]
 ReviewStatus = Literal["staged", "approved", "rejected", "auto_promoted"]
+# NOTE on `approved`: as of 2026-04-28, the promote/staging code path never sets
+# review_status="approved". Atoms transition staged → auto_promoted (on ALLOW +
+# auto_promote=True), staged → staged (on WARN or ALLOW without auto_promote),
+# or staged → rejected (on BLOCK). The `approved` literal is reserved for a
+# future `chetana approve <atom>` CLI/MCP surface — when human review explicitly
+# accepts a staged atom into the trusted tier (distinct from auto_promoted,
+# which means "no human ever looked at this").
 AtomType = Literal[
     "atomic", "reference", "method", "framework", "spec", "tool", "concept", "decision"
 ]

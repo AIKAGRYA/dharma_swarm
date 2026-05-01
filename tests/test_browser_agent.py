@@ -13,7 +13,6 @@ Tests cover:
 
 from __future__ import annotations
 
-import asyncio
 import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -23,7 +22,6 @@ from dharma_swarm.browser_agent import (
     BrowserAgent,
     PageContent,
     SearchResult,
-    ScreenshotResult,
     _RateLimiter,
     _is_url_blocked,
     _strip_html,
@@ -350,6 +348,10 @@ class TestBrowserAgentHttpxFallback:
 class TestToolRegistryIntegration:
     """Test that browser tools are registered in the tool registry."""
 
+    @pytest.mark.skipif(
+        not _check_browser_available(),
+        reason="Playwright not installed",
+    )
     def test_check_browser_available(self):
         assert _check_browser_available() is True
 
@@ -366,6 +368,10 @@ class TestToolRegistryIntegration:
         assert registry.get_toolset_for_tool("browser_navigate") == "browser"
         assert registry.get_toolset_for_tool("browser_extract") == "browser"
 
+    @pytest.mark.skipif(
+        not _check_browser_available(),
+        reason="Playwright not installed",
+    )
     def test_browser_toolset_available(self):
         from dharma_swarm.tool_registry import registry
         assert registry.is_toolset_available("browser") is True
@@ -474,6 +480,10 @@ class TestContextManager:
     """Test async context manager protocol."""
 
     @pytest.mark.asyncio
+    @pytest.mark.skipif(
+        not _check_browser_available(),
+        reason="Playwright not installed",
+    )
     async def test_context_manager_start_stop(self):
         """BrowserAgent should start/stop cleanly as context manager."""
         # Mock the Playwright import inside start() by patching the module lookup

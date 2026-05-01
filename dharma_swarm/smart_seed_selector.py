@@ -16,7 +16,6 @@ Integration:
 from __future__ import annotations
 
 import logging
-import math
 import random
 from pathlib import Path
 from typing import Any
@@ -96,9 +95,9 @@ class SmartSeedSelector:
 
         # Fallback: random selection from hardcoded dirs
         if not results:
-            return self._fallback_random(count, max_chars)
+            results = self._fallback_random(count, max_chars)
 
-        return results
+        return self._clip_results(results, max_chars)
 
     # ── Context extraction ──────────────────────────────────────
 
@@ -340,6 +339,15 @@ class SmartSeedSelector:
             results.append((text, rel, score))
 
         return results
+
+    @staticmethod
+    def _clip_results(
+        results: list[tuple[str, str, float]],
+        max_chars: int,
+    ) -> list[tuple[str, str, float]]:
+        """Apply the public max_chars contract across all seed sources."""
+        limit = max(max_chars, 0)
+        return [(text[:limit], path, score) for text, path, score in results]
 
     # ── Fallback ────────────────────────────────────────────────
 

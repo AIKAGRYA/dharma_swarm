@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 from dharma_swarm.chetana import graph_unifier as gu_mod
 from dharma_swarm.chetana.graph_unifier import coverage_summary, query

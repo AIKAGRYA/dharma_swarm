@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import subprocess
 import tempfile
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -28,6 +29,22 @@ from dharma_swarm.sandbox_monitor import (
     MonitorEvent,
     SandboxMonitor,
 )
+
+
+def _docker_daemon_available() -> bool:
+    try:
+        proc = subprocess.run(
+            ["docker", "info"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (FileNotFoundError, subprocess.SubprocessError):
+        return False
+    return proc.returncode == 0
+
+
+DOCKER_DAEMON_AVAILABLE = _docker_daemon_available()
 
 
 # ---------------------------------------------------------------------------
@@ -278,6 +295,7 @@ class TestSandboxManagerAutoSelect:
 # ---------------------------------------------------------------------------
 
 @pytest.mark.docker
+@pytest.mark.skipif(not DOCKER_DAEMON_AVAILABLE, reason="Docker daemon unavailable")
 class TestDockerSandboxIntegration:
     """Integration tests — require Docker daemon running."""
 

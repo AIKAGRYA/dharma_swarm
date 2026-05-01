@@ -15,7 +15,7 @@ import shutil
 from datetime import date
 from pathlib import Path
 
-from .provenance import FrontmatterSchema, assemble_atom, render_frontmatter_yaml
+from .provenance import FrontmatterSchema, assemble_atom
 
 
 STAGING_ROOT = Path.home() / ".dharma" / "knowledge" / "staging"
@@ -63,6 +63,23 @@ def write_trusted(
         raise ValueError("trusted atoms MUST carry provenance; promote them first")
     target = trusted_path_for(slug or _derive_slug(schema.title), root=root)
     target.parent.mkdir(parents=True, exist_ok=True)
+    if target.exists():
+        existing_id = None
+        try:
+            existing_text = target.read_text(encoding="utf-8")
+            for line in existing_text.splitlines()[:30]:
+                if line.startswith("atom_id:"):
+                    existing_id = line.split(":", 1)[1].strip()
+                    break
+        except Exception:
+            pass
+        new_id = getattr(schema, "atom_id", None) or "<unknown>"
+        if existing_id and existing_id != str(new_id):
+            raise FileExistsError(
+                f"slug collision: {target} already exists with atom_id={existing_id} "
+                f"(new atom_id={new_id}). Pass an explicit slug= to write_trusted_atom() "
+                f"or rename the title."
+            )
     target.write_text(assemble_atom(schema, body), encoding="utf-8")
     return target
 

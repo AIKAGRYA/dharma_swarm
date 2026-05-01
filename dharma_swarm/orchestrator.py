@@ -116,6 +116,8 @@ class Orchestrator:
         self._telic_seam = self._init_telic_seam()
         self._shared_dir = shared_dir or self._derive_runtime_artifact_dir("shared")
         self._stigmergy_dir = stigmergy_dir or self._derive_runtime_artifact_dir("stigmergy")
+        self._organism: Any | None = None
+        self._knowledge_store: Any | None = None
         self._running = False
         self._active_dispatches: dict[str, TaskDispatch] = {}
         # Track running asyncio tasks for actual LLM execution
@@ -142,6 +144,46 @@ class Orchestrator:
         if base_dir.name == "ledgers":
             return base_dir.parent
         return base_dir
+
+    def _get_sleep_time_agent(self) -> Any | None:
+        direct = getattr(self, "_sleep_time_agent", None)
+        if direct is not None:
+            return direct
+        organism = getattr(self, "_organism", None)
+        if organism is None:
+            return None
+        return getattr(organism, "sleep_time_agent", None)
+
+    def set_organism(self, organism: Any) -> None:
+        self._organism = organism
+
+    def set_knowledge_store(self, knowledge_store: Any) -> None:
+        self._knowledge_store = knowledge_store
+
+    def _build_consolidation_context(
+        self, task: Task, dispatch: TaskDispatch, result: str
+    ) -> str:
+        return (
+            f"Task: {getattr(task, 'title', '')}\n"
+            f"Description: {getattr(task, 'description', '')}\n"
+            f"Agent: {getattr(dispatch, 'agent_id', '')}\n"
+            f"Status: {getattr(dispatch, 'status', '')}\n"
+            f"Result:\n{result or ''}"
+        )
+
+    async def _safe_consolidate(
+        self,
+        sleep_time_agent: Any,
+        task_context: str,
+        task_outcome: dict[str, Any],
+    ) -> None:
+        try:
+            await sleep_time_agent.consolidate_knowledge(
+                task_context=task_context,
+                task_outcome=task_outcome,
+            )
+        except Exception:
+            logger.debug("SleepTimeAgent consolidation failed", exc_info=True)
 
     def _init_telic_seam(self) -> Any | None:
         """Prefer a state-local ontology seam over the global singleton."""
@@ -275,7 +317,8 @@ class Orchestrator:
 
     async def route_next(self) -> list[TaskDispatch]:
         """Match ready tasks to idle agents, one-to-one. Returns dispatches."""
-        import time as _tt; _rn0 = _tt.monotonic()
+        import time as _tt
+        _rn0 = _tt.monotonic()
         if self._board is None or self._pool is None:
             return []
 
@@ -1555,7 +1598,8 @@ class Orchestrator:
         return merged
 
     async def _refresh_coordination_state(self) -> dict[str, Any]:
-        import time as _t; _cs_t0 = _t.monotonic()
+        import time as _t
+        _cs_t0 = _t.monotonic()
         logger.info("_refresh_coordination: entering")
         agents = await self._list_coordination_agents()
         logger.info("_refresh_coordination: agents=%.1fs (n=%d)", _t.monotonic() - _cs_t0, len(agents))
@@ -1831,7 +1875,8 @@ class Orchestrator:
 
     async def _assign_dispatch(self, td: TaskDispatch) -> None:
         """Record dispatch, update board + pool, kick off execution, notify via bus."""
-        import time as _adt; _ad0 = _adt.monotonic()
+        import time as _adt
+        _ad0 = _adt.monotonic()
         td.metadata["dispatch_started_monotonic"] = time.monotonic()
         task_for_gate = await self._safe_get_task(td.task_id)
         logger.info("_assign_dispatch(%s): get_task=%.2fs", td.task_id[:8], _adt.monotonic() - _ad0)
@@ -2180,6 +2225,24 @@ class Orchestrator:
                 result=result,
             )
 
+            # Persist result before optional side effects so completed runs always
+            # have their artifact record before the background task can drift.
+            runner_cfg = getattr(runner, "_config", None)
+            agent_name = runner_cfg.name if runner_cfg else td.agent_id[:8]
+            model_name = getattr(runner_cfg, "model", "unknown")
+            provider_name = (
+                getattr(getattr(runner_cfg, "provider", None), "value", None)
+                or str(getattr(runner_cfg, "provider", "unknown"))
+            )
+            await self._persist_result(
+                agent_name=agent_name,
+                model_name=str(model_name),
+                provider_name=str(provider_name),
+                task=task,
+                result=result,
+                run_id=str(td.metadata.get("runtime_run_id", "") or ""),
+            )
+
             # Emit to signal_bus so organism heartbeat, evolution loop,
             # and consolidation loop can sense completed work.
             try:
@@ -2367,23 +2430,6 @@ class Orchestrator:
             except Exception:
                 logger.debug("Auto-extract failed", exc_info=True)
 
-            # Persist result to shared notes and stigmergy
-            runner_cfg = getattr(runner, "_config", None)
-            agent_name = runner_cfg.name if runner_cfg else td.agent_id[:8]
-            model_name = getattr(runner_cfg, "model", "unknown")
-            provider_name = (
-                getattr(getattr(runner_cfg, "provider", None), "value", None)
-                or str(getattr(runner_cfg, "provider", "unknown"))
-            )
-            await self._persist_result(
-                agent_name=agent_name,
-                model_name=str(model_name),
-                provider_name=str(provider_name),
-                task=task,
-                result=result,
-                run_id=str(td.metadata.get("runtime_run_id", "") or ""),
-            )
-
         except asyncio.TimeoutError:
             error = f"Task execution timed out after {timeout_seconds:.1f}s"
             logger.warning("Task %s timeout on agent %s", td.task_id, td.agent_id)
@@ -2562,7 +2608,7 @@ class Orchestrator:
 
             store = StigmergyStore(self._stigmergy_dir)
             # Extract first meaningful line as observation
-            lines = [l.strip() for l in result.split("\n") if l.strip()]
+            lines = [line.strip() for line in result.split("\n") if line.strip()]
             observation = lines[0][:200] if lines else f"Completed: {task.title}"
             mark = StigmergicMark(
                 agent=agent_name,
