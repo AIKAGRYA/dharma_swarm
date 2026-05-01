@@ -220,7 +220,7 @@ def run_once(
             success=False,
             reason="failed_input",
         )
-        # Even on failure-closed, emit a (zero-value) ValueEvent + Contribution
+        # Even on failure-closed, emit a zero-value ValueEvent
         # so the watchdog (NEXT_10 item 8) can distinguish "ran and failed"
         # from "did not run".
         _emit_value_event(
