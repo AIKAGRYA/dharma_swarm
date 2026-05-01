@@ -631,7 +631,7 @@ def log_to_stigmergy(
 # the digest can show flags fired but cannot prove the loop closed.
 
 # Allowed enums (string literals, validated lightly, never crashes on unknown)
-PLANES = ("register", "telos", "evolution", "memory", "publication", "operator")
+PLANES = ("register", "telos", "evolution", "memory", "publication", "operator", "causal")
 SUBJECT_TYPES = (
     "mutation", "gate_check", "atom", "proposal",
     "essay", "outreach", "session", "decision", "other",
