@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -333,8 +332,14 @@ class TestPromptTournament:
         assert len(history) == 2
 
     @pytest.mark.asyncio
-    async def test_mutate_prompt_no_api_key(self, monkeypatch):
-        monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    async def test_mutate_prompt_provider_failure_falls_back(self, monkeypatch):
+        async def _no_runtime(*args, **kwargs):
+            raise RuntimeError("No preferred providers available")
+
+        monkeypatch.setattr(
+            "dharma_swarm.ginko_evolution.complete_via_preferred_runtime_providers",
+            _no_runtime,
+        )
         t = PromptTournament()
         result = await t.mutate_prompt("original prompt", {"success_rate": 0.5})
         assert result == "original prompt"  # Safe fallback

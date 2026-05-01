@@ -1,7 +1,6 @@
 """Tests for Phase 3 integration: routing activation, palace population,
 crew scaling, fitness routing, stigmergy tasking."""
 import asyncio
-import pytest
 
 
 def _run(coro):
@@ -34,9 +33,9 @@ class TestModelRoutingActivation:
 class TestPalacePopulation:
     """Test that agent outputs get indexed into the palace."""
 
-    def test_organism_on_agent_output_ingests_to_palace(self):
+    def test_organism_on_agent_output_ingests_to_palace(self, tmp_path):
         from dharma_swarm.organism import Organism
-        org = Organism()
+        org = Organism(state_dir=tmp_path)
         _run(org.boot())
         _run(org.on_agent_output(
             agent_id="test_agent",
@@ -57,18 +56,18 @@ class TestPalacePopulation:
 class TestDynamicCrewScaling:
     """Test crew scaling recommendations."""
 
-    def test_no_scaling_when_healthy(self):
+    def test_no_scaling_when_healthy(self, tmp_path):
         from dharma_swarm.organism import Organism
-        org = Organism()
+        org = Organism(state_dir=tmp_path)
         _run(org.boot())
         # Run several healthy heartbeats
         for _ in range(5):
             pulse = _run(org.heartbeat())
         assert org._check_scaling_needs(pulse) is None
 
-    def test_scaling_recommendations_property(self):
+    def test_scaling_recommendations_property(self, tmp_path):
         from dharma_swarm.organism import Organism
-        org = Organism()
+        org = Organism(state_dir=tmp_path)
         _run(org.boot())
         recs = org.scaling_recommendations
         assert isinstance(recs, list)
@@ -86,17 +85,17 @@ class TestFitnessRouting:
 class TestStigmergySelfTasking:
     """Test stigmergy-driven task creation."""
 
-    def test_stigmergy_harvest_no_crash(self):
+    def test_stigmergy_harvest_no_crash(self, tmp_path):
         from dharma_swarm.organism import Organism
-        org = Organism()
+        org = Organism(state_dir=tmp_path)
         _run(org.boot())
         # Should not crash — returns int regardless of stigmergy data presence
         count = _run(org._harvest_stigmergy_tasks())
         assert isinstance(count, int)
         assert count >= 0
 
-    def test_stigmergy_seen_set_initialized(self):
+    def test_stigmergy_seen_set_initialized(self, tmp_path):
         from dharma_swarm.organism import Organism
-        org = Organism()
+        org = Organism(state_dir=tmp_path)
         assert hasattr(org, '_stigmergy_seen')
         assert isinstance(org._stigmergy_seen, set)

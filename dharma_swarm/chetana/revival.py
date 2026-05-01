@@ -269,16 +269,22 @@ def apply_revival(
             new_body += f"- {q}?\n"
     new_body += "\n"
 
-    # Re-sign if requested.
-    if refresh_signature:
-        gov = gate_check_atom(
-            atom_content=new_body,
-            atom_title=schema.title,
-            requested_action="chetana.revive",
-            metadata={"atom_id": schema.atom_id, "revival": True},
+    if not refresh_signature:
+        raise ValueError("chetana revival writes must refresh signature and pass gates")
+
+    gov = gate_check_atom(
+        atom_content=new_body,
+        atom_title=schema.title,
+        requested_action="chetana.revive",
+        metadata={"atom_id": schema.atom_id, "revival": True},
+    )
+    if gov.result == "BLOCK" or not gov.can_promote:
+        raise ValueError(
+            "chetana revival blocked by governance gates: "
+            f"{gov.record.rationale or gov.record.gates_blocked}"
         )
-        prior_provenance["axiom_signature"] = gov.axiom_signature
-        prior_provenance["gate_check"] = gov.record.model_dump()
+    prior_provenance["axiom_signature"] = gov.axiom_signature
+    prior_provenance["gate_check"] = gov.record.model_dump()
 
     new_provenance = type(schema.provenance).model_validate(prior_provenance)
     refreshed = schema.model_copy(

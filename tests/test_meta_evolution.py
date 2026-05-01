@@ -28,6 +28,21 @@ async def test_meta_fitness_correlates_with_trend(engine_paths):
 
 
 @pytest.mark.asyncio
+async def test_load_meta_archive_skips_incompatible_historical_rows(engine_paths, tmp_path):
+    engine = DarwinEngine(**engine_paths)
+    archive_path = tmp_path / "meta_archive_legacy.jsonl"
+    archive_path.write_text(
+        '{"meta_parameters":{"fitness_weights":{"economic_savings":1.0}},'
+        '"meta_fitness":0.4,"n_object_cycles":1,"fitness_trajectory":[0.4]}\n',
+        encoding="utf-8",
+    )
+
+    meta = MetaEvolutionEngine(engine, meta_archive_path=archive_path)
+
+    assert meta.meta_archive == []
+
+
+@pytest.mark.asyncio
 async def test_meta_cycle_archives_and_evolves_when_poor(engine_paths, tmp_path, monkeypatch):
     engine = DarwinEngine(**engine_paths)
     await engine.init()

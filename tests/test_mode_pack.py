@@ -5,7 +5,17 @@ def test_mode_pack_contract_loads() -> None:
     contract = load_mode_pack()
     assert contract.pack_name == "dharma-swarm-mode-pack"
     assert contract.schema_version == "1.0.0"
-    assert len(contract.modes) == 8
+    assert {mode.slug for mode in contract.modes} == {
+        "autonomous-build",
+        "browse",
+        "ceo-review",
+        "eng-review",
+        "incident-commander",
+        "preflight-review",
+        "qa",
+        "retro",
+        "ship",
+    }
 
 
 def test_mode_pack_exposes_expected_runtime_aliases() -> None:

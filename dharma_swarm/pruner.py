@@ -31,7 +31,6 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -236,7 +235,6 @@ class Pruner:
                     if len(name_a) > 10 and len(name_b) > 10:
                         if name_a in name_b or name_b in name_a:
                             shorter = name_a if len(name_a) < len(name_b) else name_b
-                            shorter_id = id_a if len(name_a) < len(name_b) else id_b
                             report.telos_merged += 1
                             report.actions_taken.append(
                                 f"Telos: '{shorter[:40]}' subsumed by larger objective"
@@ -252,19 +250,44 @@ class Pruner:
     async def _prune_concepts(self, report: PruneReport) -> None:
         """Flag concept nodes with no edges and no bridges."""
         try:
-            from dharma_swarm.semantic_gravity import ConceptGraph
-
             cg_path = self._state_dir / "semantic" / "concept_graph.json"
             if not cg_path.exists():
                 return
 
-            cg = await ConceptGraph.load(cg_path)
-            all_nodes = cg.all_nodes()
-            report.concepts_kept = len(all_nodes)
+            data = json.loads(cg_path.read_text(encoding="utf-8"))
+            nodes = data.get("nodes", [])
+            edges = data.get("edges", [])
+            if not isinstance(nodes, list) or not isinstance(edges, list):
+                return
 
-            for node in all_nodes:
-                degree = cg.degree(node.id)
-                if degree == 0 and node.salience < 0.5:
+            report.concepts_kept = len(nodes)
+            if len(nodes) > 5_000 or len(edges) > 20_000:
+                report.actions_taken.append(
+                    "Concepts: skipped isolated-node scan for large graph "
+                    f"({len(nodes)} nodes, {len(edges)} edges)"
+                )
+                return
+
+            degree_by_id: dict[str, int] = {}
+            for raw_edge in edges:
+                if not isinstance(raw_edge, dict):
+                    continue
+                source_id = str(raw_edge.get("source_id", "") or "")
+                target_id = str(raw_edge.get("target_id", "") or "")
+                if source_id:
+                    degree_by_id[source_id] = degree_by_id.get(source_id, 0) + 1
+                if target_id:
+                    degree_by_id[target_id] = degree_by_id.get(target_id, 0) + 1
+
+            for raw_node in nodes:
+                if not isinstance(raw_node, dict):
+                    continue
+                node_id = str(raw_node.get("id", "") or "")
+                try:
+                    salience = float(raw_node.get("salience", 0.5) or 0.0)
+                except (TypeError, ValueError):
+                    salience = 0.5
+                if degree_by_id.get(node_id, 0) == 0 and salience < 0.5:
                     report.concepts_flagged += 1
 
             if report.concepts_flagged > 0:
@@ -316,9 +339,9 @@ class Pruner:
     def print_report(self, report: PruneReport) -> None:
         """Print the zen garden report."""
         mode = " (DRY RUN)" if self._dry_run else ""
-        print(f"\n╔══════════════════════════════════════════════════════════════╗")
+        print("\n╔══════════════════════════════════════════════════════════════╗")
         print(f"║  PRUNER — Sweep the Zen Garden{mode:<29}║")
-        print(f"╚══════════════════════════════════════════════════════════════╝")
+        print("╚══════════════════════════════════════════════════════════════╝")
 
         print(f"\n  {'Subsystem':<20} {'Kept':>8} {'Pruned':>8} {'Action'}")
         print(f"  {'─'*20} {'─'*8} {'─'*8} {'─'*30}")

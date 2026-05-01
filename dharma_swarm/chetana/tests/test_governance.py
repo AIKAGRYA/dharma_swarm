@@ -7,6 +7,8 @@ correctly; the real telos gates have their own tests in dharma_swarm/tests/.
 
 from __future__ import annotations
 
+import builtins
+
 from dharma_swarm.chetana.governance import gate_check_atom
 
 
@@ -32,3 +34,19 @@ def test_to_provenance_round_trips():
     prov = result.to_provenance(promoted_by="tester", review_status="staged")
     assert prov.review_status == "staged"
     assert prov.axiom_signature == result.axiom_signature
+
+
+def test_governance_import_failure_fails_closed(monkeypatch):
+    real_import = builtins.__import__
+
+    def fake_import(name, *args, **kwargs):
+        if name == "dharma_swarm.telos_gates":
+            raise ImportError("simulated missing gates")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+    result = gate_check_atom(atom_content="body", atom_title="t")
+
+    assert result.result == "BLOCK"
+    assert result.can_promote is False
+    assert "chetana_governance_unavailable" in result.record.gates_blocked

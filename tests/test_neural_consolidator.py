@@ -11,18 +11,14 @@ Validates the backpropagation loop for agent behavior:
 
 from __future__ import annotations
 
-import asyncio
 import json
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
 
 from dharma_swarm.neural_consolidator import (
     BehavioralCorrection,
-    CellDivisionProposal,
     ConsolidationReport,
     LossSignal,
     NeuralConsolidator,
@@ -270,7 +266,7 @@ class TestLossComputation:
             {"success": True, "agent": "op"},
         ])
         losses = consolidator.compute_loss(snap)
-        repeated = [l for l in losses if l.category == "repeated_failure"]
+        repeated = [loss for loss in losses if loss.category == "repeated_failure"]
         assert len(repeated) >= 1
         assert repeated[0].severity >= 0.5
 
@@ -283,7 +279,7 @@ class TestLossComputation:
             },
         ])
         losses = consolidator.compute_loss(snap)
-        mimicry = [l for l in losses if l.category == "mimicry"]
+        mimicry = [loss for loss in losses if loss.category == "mimicry"]
         assert len(mimicry) >= 1
 
     def test_no_mimicry_on_genuine_output(self, consolidator: NeuralConsolidator):
@@ -296,7 +292,7 @@ class TestLossComputation:
             },
         ])
         losses = consolidator.compute_loss(snap)
-        mimicry = [l for l in losses if l.category == "mimicry"]
+        mimicry = [loss for loss in losses if loss.category == "mimicry"]
         assert len(mimicry) == 0
 
     def test_detect_coordination_gap(self, consolidator: NeuralConsolidator):
@@ -306,7 +302,7 @@ class TestLossComputation:
             {"agent": "op", "salience": 0.6, "access_count": 0, "observation": "mark3"},
         ])
         losses = consolidator.compute_loss(snap)
-        gaps = [l for l in losses if l.category == "coordination_gap"]
+        gaps = [loss for loss in losses if loss.category == "coordination_gap"]
         assert len(gaps) >= 1
 
     def test_detect_scope_overload(self, consolidator: NeuralConsolidator):
@@ -319,7 +315,7 @@ class TestLossComputation:
             {"agent": "op", "title": "design architecture spec"},
         ])
         losses = consolidator.compute_loss(snap)
-        overload = [l for l in losses if l.category == "scope_overload"]
+        overload = [loss for loss in losses if loss.category == "scope_overload"]
         assert len(overload) >= 1
 
     def test_detect_telos_drift(self, consolidator: NeuralConsolidator):
@@ -330,7 +326,7 @@ class TestLossComputation:
             {"agent": "op", "title": "task4"},
         ])
         losses = consolidator.compute_loss(snap)
-        drift = [l for l in losses if l.category == "telos_drift"]
+        drift = [loss for loss in losses if loss.category == "telos_drift"]
         assert len(drift) >= 1
 
     def test_losses_sorted_by_severity(self, consolidator: NeuralConsolidator):

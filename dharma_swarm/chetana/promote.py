@@ -22,6 +22,7 @@ import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from . import staging as staging_mod
 from .governance import gate_check_atom
 from .provenance import (
     GateResult,
@@ -60,6 +61,7 @@ def promote(
     staged_path = Path(staged_path).resolve()
     if not staged_path.exists():
         raise FileNotFoundError(staged_path)
+    _require_staged_path(staged_path)
 
     raw = staged_path.read_text(encoding="utf-8")
     schema, body = parse_frontmatter(raw)
@@ -143,3 +145,15 @@ def promote(
         logger.warning("failed to unlink staged atom %s: %s", staged_path, e)
 
     return result
+
+
+def _require_staged_path(path: Path) -> None:
+    """Require promote inputs to originate from the configured staging root."""
+    staging_root = staging_mod.STAGING_ROOT.resolve()
+    try:
+        path.relative_to(staging_root)
+    except ValueError as exc:
+        raise ValueError(
+            f"refusing to promote path outside chetana staging root: {path} "
+            f"(staging root: {staging_root})"
+        ) from exc

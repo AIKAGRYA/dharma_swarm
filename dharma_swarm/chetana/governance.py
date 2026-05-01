@@ -22,6 +22,9 @@ land, this module benefits without changes.
 
 from __future__ import annotations
 
+import asyncio
+import inspect
+import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
@@ -78,44 +81,79 @@ def gate_check_atom(
     """
     metadata = metadata or {}
 
-    # Try to use the real gatekeeper. Fall back to PERMISSIVE-WITH-WITNESS
-    # if dharma_swarm internals aren't importable in the current env (e.g.
-    # the package is checked out but not pip install -e .'d, or this is a
-    # standalone import test).
+    # Try to use the real gatekeeper. Chetana is a trust-writing surface, so
+    # governance degradation is fail-closed: no real gates, no trusted write.
     try:
         from dharma_swarm.telos_gates import TelosGatekeeper  # type: ignore
         from dharma_swarm.dharma_kernel import KernelGuard  # type: ignore
     except ImportError as e:
         logger.warning(
-            "chetana.governance: dharma_swarm not importable (%s); running in PERMISSIVE mode. "
+            "chetana.governance: dharma_swarm not importable (%s); blocking trusted write. "
             "Install dharma_swarm (pip install -e .) for real governance.",
             e,
         )
-        return _permissive_check(atom_content, requested_action)
+        return _fail_closed_check(
+            atom_content=atom_content,
+            atom_title=atom_title,
+            requested_action=requested_action,
+            reason=f"dharma_swarm governance imports unavailable: {type(e).__name__}: {e}",
+        )
 
     kernel = KernelGuard()
-    kernel_sig = "0" * 64
+    kernel_sig_placeholder = "0" * 64
+    kernel_sig = kernel_sig_placeholder
+    kernel_sig_degraded_reason: str | None = None
     try:
         loaded = kernel.load()
-        if hasattr(loaded, "__await__"):
-            # KernelGuard.load() in dharma_swarm is async; run it to completion.
-            import asyncio as _aio
-
-            try:
-                _aio.get_event_loop().run_until_complete(loaded)
-            except RuntimeError:
-                _aio.run(loaded)
-        kernel_sig = getattr(getattr(kernel, "kernel", None), "signature", None) or kernel_sig  # type: ignore[arg-type]
+        if inspect.isawaitable(loaded):
+            loaded = _run_sync_awaitable(loaded)
+        resolved = (
+            getattr(loaded, "signature", None)
+            or getattr(getattr(kernel, "_kernel", None), "signature", None)
+        )
+        if resolved:
+            kernel_sig = resolved
+        else:
+            reason = (
+                "KernelGuard.load() returned but neither loaded.signature nor "
+                "kernel._kernel.signature was available; blocking trusted write."
+            )
+            logger.warning("chetana.governance: %s", reason)
+            return _fail_closed_check(
+                atom_content=atom_content,
+                atom_title=atom_title,
+                requested_action=requested_action,
+                reason=reason,
+                kernel_sig=kernel_sig,
+            )
     except Exception as e:
-        logger.warning("KernelGuard.load() failed (%s); using zero-signature.", e)
+        reason = (
+            f"KernelGuard.load() raised {type(e).__name__}: {e}; "
+            "blocking trusted write."
+        )
+        logger.warning("chetana.governance: %s", reason)
+        return _fail_closed_check(
+            atom_content=atom_content,
+            atom_title=atom_title,
+            requested_action=requested_action,
+            reason=reason,
+            kernel_sig=kernel_sig,
+        )
 
     gatekeeper = TelosGatekeeper()
     action_line = f"{requested_action}: {atom_title}"
     try:
         gate_result = gatekeeper.check(action=action_line, content=atom_content)
     except Exception as e:
-        logger.warning("TelosGatekeeper.check() failed (%s); permissive fallback.", e)
-        return _permissive_check(atom_content, requested_action, kernel_sig=kernel_sig)
+        reason = f"TelosGatekeeper.check() raised {type(e).__name__}: {e}; blocking trusted write."
+        logger.warning("chetana.governance: %s", reason)
+        return _fail_closed_check(
+            atom_content=atom_content,
+            atom_title=atom_title,
+            requested_action=requested_action,
+            reason=reason,
+            kernel_sig=kernel_sig,
+        )
 
     # Translate dharma_swarm GateCheckResult → chetana GateCheckRecord.
     # Real shape (verified 2026-04-27 against installed dharma_swarm):
@@ -128,6 +166,11 @@ def gate_check_atom(
     primary_gate = getattr(gate_result, "gate", "") or ""
     triggered = [primary_gate] if primary_gate else []
     rationale = getattr(gate_result, "reason", None) or None
+    if kernel_sig_degraded_reason:
+        prefix = "[zero-signature] "
+        rationale = prefix + (rationale or "no gate rationale") + (
+            f" — degradation: {kernel_sig_degraded_reason}"
+        )
 
     if decision == "BLOCK":
         gates_blocked = triggered
@@ -166,29 +209,32 @@ def gate_check_atom(
     )
 
 
-def _permissive_check(
-    atom_content: str, requested_action: str, kernel_sig: str | None = None
+def _fail_closed_check(
+    *,
+    atom_content: str,
+    atom_title: str,
+    requested_action: str,
+    reason: str,
+    kernel_sig: str | None = None,
 ) -> GovernanceCheck:
-    """Fallback when dharma_swarm internals aren't available."""
+    """Return a BLOCK result when the real governance path is unavailable."""
     kernel_sig = kernel_sig or ("0" * 64)
     record = GateCheckRecord(
-        result="WARN",
+        result="BLOCK",
         gates_passed=[],
-        gates_warned=["chetana_permissive_mode"],
-        gates_blocked=[],
-        rationale=(
-            "dharma_swarm.telos_gates not importable; chetana ran in permissive mode. "
-            "All atoms are written with review_status='staged' for human review."
-        ),
+        gates_warned=[],
+        gates_blocked=["chetana_governance_unavailable"],
+        rationale=f"{requested_action}: {reason}",
         checked_at=now_iso(),
     )
     sig = compute_axiom_signature(atom_content, kernel_sig)
+    _write_witness(record, atom_title, sig, kernel_sig)
     return GovernanceCheck(
-        result="WARN",
+        result="BLOCK",
         record=record,
         axiom_signature=sig,
         kernel_signature=kernel_sig,
-        can_promote=True,
+        can_promote=False,
     )
 
 
@@ -215,18 +261,32 @@ def _coerce_decision(raw: Any) -> GateResult:
     return "WARN"  # conservative default
 
 
+def _run_sync_awaitable(awaitable: Any) -> Any:
+    """Resolve an awaitable from this sync API when no event loop is active."""
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(awaitable)
+    close = getattr(awaitable, "close", None)
+    if callable(close):
+        close()
+    raise RuntimeError("cannot synchronously load kernel while an event loop is running")
+
+
 def _write_witness(
     record: GateCheckRecord, atom_title: str, sig: str, kernel_sig: str
 ) -> None:
     try:
         WITNESS_DIR.mkdir(parents=True, exist_ok=True)
         path = WITNESS_DIR / f"{record.checked_at.replace(':', '-')}.jsonl"
-        line = (
-            f'{{"checked_at": "{record.checked_at}", "atom_title": '
-            f'{atom_title!r}, "result": "{record.result}", "axiom_signature": '
-            f'"{sig}", "kernel_signature": "{kernel_sig}"}}\n'
-        )
+        payload = {
+            "checked_at": record.checked_at,
+            "atom_title": atom_title,
+            "result": record.result,
+            "axiom_signature": sig,
+            "kernel_signature": kernel_sig,
+        }
         with open(path, "a", encoding="utf-8") as f:
-            f.write(line)
+            f.write(json.dumps(payload, sort_keys=True) + "\n")
     except Exception as e:  # pragma: no cover
         logger.warning("chetana witness write failed: %s", e)

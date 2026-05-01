@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/session_start.sh",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/session_start.sh\"",
             "timeout": 8
           }
         ]
@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/session_stop.sh",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/session_stop.sh\"",
             "timeout": 30,
             "async": true
           }
@@ -29,7 +29,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/session_end.sh",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/session_end.sh\"",
             "timeout": 30,
             "async": true
           }
@@ -41,7 +41,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/pre_compact.sh",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/pre_compact.sh\"",
             "timeout": 10
           }
         ]
@@ -52,7 +52,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/subagent_stop.sh",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/subagent_stop.sh\"",
             "timeout": 5,
             "async": true
           }

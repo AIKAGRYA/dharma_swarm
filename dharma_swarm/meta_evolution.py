@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import logging
 import random
 from pathlib import Path
 from statistics import mean, pvariance
@@ -13,6 +14,8 @@ from pydantic import BaseModel, Field, field_validator
 from dharma_swarm.archive import FITNESS_DIMENSIONS, normalize_fitness_weights
 from dharma_swarm.evolution import CycleResult, DarwinEngine, Proposal
 from dharma_swarm.models import _new_id, _utc_now
+
+logger = logging.getLogger(__name__)
 
 
 class MetaParameters(BaseModel):
@@ -236,7 +239,14 @@ class MetaEvolutionEngine:
                 stripped = line.strip()
                 if not stripped:
                     continue
-                self.meta_archive.append(MetaArchiveEntry.model_validate_json(stripped))
+                try:
+                    self.meta_archive.append(MetaArchiveEntry.model_validate_json(stripped))
+                except Exception:
+                    logger.debug(
+                        "Skipping incompatible meta-evolution archive row from %s",
+                        self.meta_archive_path,
+                        exc_info=True,
+                    )
 
     def _archive_meta_entry(self, entry: MetaArchiveEntry) -> None:
         """Append a meta result to the JSONL archive."""

@@ -90,7 +90,7 @@ if [[ -s "${TMP_GAPS}" ]]; then
 fi
 
 # Recent capture
-LATEST_CAP="$(ls -t "${CHETANA_DAILY_DIR}"/*.md 2>/dev/null | head -1)"
+LATEST_CAP="$(find "${CHETANA_DAILY_DIR}" -type f -name '*.md' -exec ls -t {} + 2>/dev/null | head -1)"
 if [[ -n "${LATEST_CAP}" ]]; then
   REL_NAME="$(basename "${LATEST_CAP}")"
   BODY+=$'\n\n'"**Last session captured**: \`${REL_NAME}\`"

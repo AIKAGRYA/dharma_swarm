@@ -5345,7 +5345,11 @@ def _build_parser() -> argparse.ArgumentParser:
     p_swarm.add_argument("swarm_args", nargs="*", default=[])
 
     # -- chetana (proxies to python -m dharma_swarm.chetana.cli) --
-    p_chetana = sub.add_parser("chetana", help="chetana PKM CLI (proxied passthrough)")
+    p_chetana = sub.add_parser(
+        "chetana",
+        help="chetana PKM CLI (proxied passthrough)",
+        add_help=False,
+    )
     p_chetana.add_argument("chetana_args", nargs=argparse.REMAINDER, default=[])
 
     # -- stress --
@@ -6259,6 +6263,17 @@ def main() -> None:
             cmd_status()
         return
 
+    # Pass through before argparse so `dgc chetana --help` reaches the child
+    # parser instead of being interpreted as wrapper help.
+    if sys.argv[1] == "chetana":
+        chetana_args = sys.argv[2:] or ["--help"]
+        rc = subprocess.call(
+            [sys.executable, "-m", "dharma_swarm.chetana.cli", *chetana_args]
+        )
+        if rc != 0:
+            raise SystemExit(rc)
+        return
+
     parser = _build_parser()
     args = parser.parse_args()
 
@@ -6332,8 +6347,9 @@ def main() -> None:
         case "swarm":
             cmd_swarm(args.swarm_args)
         case "chetana":
+            chetana_args = args.chetana_args or ["--help"]
             rc = subprocess.call(
-                [sys.executable, "-m", "dharma_swarm.chetana.cli", *args.chetana_args]
+                [sys.executable, "-m", "dharma_swarm.chetana.cli", *chetana_args]
             )
             if rc != 0:
                 raise SystemExit(rc)

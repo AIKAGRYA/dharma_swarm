@@ -359,7 +359,7 @@ async def test_runner_fails_closed_for_tooling_task_on_api_only_provider(
     tmp_path: Path,
 ):
     isolated_config = _with_state_dir(
-        config.model_copy(update={"provider": ProviderType.OLLAMA}),
+        config.model_copy(update={"provider": ProviderType.ANTHROPIC}),
         tmp_path,
     )
     provider = AsyncMock()

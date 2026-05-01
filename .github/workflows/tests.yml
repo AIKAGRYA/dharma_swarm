@@ -42,7 +42,7 @@ jobs:
           DHARMA_EVOLUTION_SHADOW: "1"
           DGC_AUTONOMY_LEVEL: "0"
         run: |
-          python -m pytest tests/ -q --tb=short \
+          python -m pytest tests/ dharma_swarm/chetana/tests/ -q --tb=short \
             -x \
             --timeout=30 \
             -m "not slow and not docker and not network" \

@@ -7,6 +7,7 @@ touching the operator's real wiki or staging.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import subprocess
@@ -25,6 +26,9 @@ def cli_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     home = tmp_path / "home"
     home.mkdir()
     monkeypatch.setenv("HOME", str(home))
+    from dharma_swarm.dharma_kernel import DharmaKernel, KernelGuard
+
+    asyncio.run(KernelGuard(home / ".dharma" / "kernel.json").save(DharmaKernel.create_default()))
     return home
 
 

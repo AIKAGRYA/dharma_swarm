@@ -7,6 +7,9 @@ production gatekeeper and that BLOCK / ALLOW / REVIEW decisions all fire.
 
 from __future__ import annotations
 
+import asyncio
+import json
+
 import pytest
 
 
@@ -71,17 +74,21 @@ def test_gate_check_allows_or_reviews_harmless_atom():
     assert result.can_promote is True
 
 
-def test_kernel_signature_is_real_64_hex_not_zero():
+def test_kernel_signature_is_real_64_hex_not_zero(tmp_path, monkeypatch):
     """When the real kernel loads, axiom signatures should bind to a non-zero kernel."""
+    from dharma_swarm import dharma_kernel as dk
     from dharma_swarm.chetana.governance import gate_check_atom
+
+    kernel_path = tmp_path / "kernel.json"
+    asyncio.run(dk.KernelGuard(kernel_path).save(dk.DharmaKernel.create_default()))
+    monkeypatch.setattr(dk, "_DEFAULT_KERNEL_PATH", kernel_path, raising=True)
 
     result = gate_check_atom(
         atom_content="bind test", atom_title="kernel signature check"
     )
-    # If the real kernel loaded, kernel_signature should NOT be all zeros.
-    # If it didn't (rare), we accept zero-fallback but at least the format must hold.
     assert len(result.kernel_signature) == 64
     assert all(c in "0123456789abcdef" for c in result.kernel_signature)
+    assert result.kernel_signature != "0" * 64
 
 
 def test_gate_check_witness_log_writes(tmp_path, monkeypatch):
@@ -92,10 +99,12 @@ def test_gate_check_witness_log_writes(tmp_path, monkeypatch):
     witness_dir = tmp_path / "witness_chetana"
     monkeypatch.setattr(gov_mod, "WITNESS_DIR", witness_dir, raising=True)
 
-    gate_check_atom(atom_content="witness log test", atom_title="witness")
+    gate_check_atom(atom_content="witness log test", atom_title="witness 'quoted'")
     assert witness_dir.exists(), "witness dir should be created"
     files = list(witness_dir.glob("*.jsonl"))
     assert len(files) >= 1, f"expected witness file, got {files}"
     body = files[0].read_text()
-    assert '"axiom_signature":' in body
-    assert '"result":' in body
+    record = json.loads(body)
+    assert record["atom_title"] == "witness 'quoted'"
+    assert "axiom_signature" in record
+    assert "result" in record

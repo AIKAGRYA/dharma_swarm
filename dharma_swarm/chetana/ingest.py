@@ -227,8 +227,21 @@ def _ingest_session(
 
 
 def _extract_text(row: dict[str, Any]) -> str:
-    """Pull text content out of a session row, skipping tool blocks."""
-    content = row.get("content") or row.get("message")
+    """Pull text content out of a session row, skipping tool blocks.
+
+    Claude Code JSONL structure: ``row["message"]["content"]`` holds the
+    actual payload (str for user prompts, list of content-blocks for
+    assistant turns).  We try that path first, then fall back to legacy
+    top-level ``content`` / ``message`` keys for non-CC formats.
+    """
+    # --- Primary path: CC JSONL nests content inside row.message ---
+    msg = row.get("message")
+    if isinstance(msg, dict):
+        content = msg.get("content")
+    else:
+        # Legacy / non-CC: top-level content or treat message itself as content
+        content = row.get("content") or msg
+
     if isinstance(content, str):
         return content.strip()
     if isinstance(content, dict) and "text" in content:

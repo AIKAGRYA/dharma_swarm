@@ -33,14 +33,12 @@ from dharma_swarm.models import (
     AgentConfig,
     AgentRole,
     AgentState,
-    AgentStatus,
     MemoryLayer,
     ProviderType,
     SwarmState,
     Task,
     TaskPriority,
     TaskStatus,
-    TopologyType,
 )
 from dharma_swarm.providers import create_default_router
 
@@ -71,7 +69,7 @@ if TYPE_CHECKING:
     from dharma_swarm.thinkodynamic_director import ThinkodynamicDirector
     from dharma_swarm.thread_manager import ThreadManager
     from dharma_swarm.traces import TraceStore
-    from dharma_swarm.organism import OrganismRuntime, HeartbeatResult
+    from dharma_swarm.organism import OrganismRuntime
     from dharma_swarm.witness import WitnessAuditor
 
 logger = logging.getLogger(__name__)
@@ -232,6 +230,14 @@ class SwarmManager:
         self._stagnation_threshold: float = 0.01
         self._stagnation_window: int = 60
         self._auto_evolution_enabled: bool = True
+
+        # Ginko fleet cycle wiring (domain crew, disabled until explicitly wired)
+        self._ginko_enabled: bool = False
+        self._ginko_fleet: Any | None = None
+        self._ginko_interval_ticks: int = 720  # every ~6h at 30s ticks
+        self._ginko_tick_counter: int = 0
+        self._ginko_last_result: dict[str, Any] | None = None
+        self._ginko_running: bool = False
 
     # ── Subsystem access helpers ──
 
@@ -2327,7 +2333,9 @@ class SwarmManager:
             except Exception:
                 pass
         if allow_autonomous_generation and not _has_real_tasks:
-            import time as _t; _t0 = _t.monotonic()
+            import time as _t
+
+            _t0 = _t.monotonic()
             try:
                 reopened = await asyncio.wait_for(
                     self.spawn_latent_gold_tasks(), timeout=20.0
@@ -2600,6 +2608,49 @@ class SwarmManager:
         if self._decision_log is None:
             return []
         return self._decision_log.list_decisions(limit=limit)
+
+    # --- Ginko domain crew ---
+
+    async def _run_ginko_cycle(self) -> dict[str, Any]:
+        """Run one Ginko full-cycle tick if the domain crew is enabled."""
+        if not self._ginko_enabled or self._ginko_fleet is None:
+            return {"skipped": "disabled"}
+        if self._ginko_running:
+            return {"skipped": "already_running"}
+
+        self._ginko_running = True
+        try:
+            from dharma_swarm.ginko_orchestrator import action_full_cycle
+
+            result = await action_full_cycle()
+            self._ginko_last_result = result
+            return result
+        except Exception as exc:
+            logger.warning("Ginko cycle failed (non-fatal): %s", exc)
+            return {"error": str(exc)}
+        finally:
+            self._ginko_running = False
+
+    def get_ginko_status(self) -> dict[str, Any]:
+        """Return a compact status snapshot for the Ginko domain crew."""
+        if not self._ginko_enabled:
+            return {"enabled": False}
+
+        fleet_size = 0
+        if self._ginko_fleet is not None:
+            try:
+                fleet_size = len(self._ginko_fleet.list_agents())
+            except Exception:
+                fleet_size = 0
+
+        return {
+            "enabled": True,
+            "fleet_size": fleet_size,
+            "running": self._ginko_running,
+            "last_result": self._ginko_last_result is not None,
+            "tick_counter": self._ginko_tick_counter,
+            "interval_ticks": self._ginko_interval_ticks,
+        }
 
     # --- Auto-evolution (stagnation detection + triggered evolution) ---
 

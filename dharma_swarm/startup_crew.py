@@ -22,7 +22,6 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import datetime, timezone
-from pathlib import Path
 
 from dharma_swarm.models import AgentRole, ProviderType, TaskPriority
 
@@ -57,11 +56,6 @@ _PROVIDER_MAP = {
     "OPENROUTER_FREE": ProviderType.OPENROUTER_FREE,
     "LOCAL": ProviderType.LOCAL,
 }
-
-
-# Model selection sourced from model_hierarchy.py — the single source of truth.
-from dharma_swarm.model_hierarchy import DEFAULT_MODELS, TIER_FREE
-
 
 def _has_openrouter_key() -> bool:
     from dharma_swarm.api_keys import provider_available
@@ -452,26 +446,21 @@ async def create_seed_tasks(swarm) -> list:
     """
     from dharma_swarm.models import TaskStatus
 
-    # Check if any of the SEED_TASK titles are currently active (PENDING or RUNNING).
-    # We look by title to avoid re-seeding tasks that are mid-flight.
-    # We do NOT check COMPLETED/FAILED — those are done and we should re-seed.
-    seed_titles = {spec["title"] for spec in SEED_TASKS}
-    active_seeds: list = []
+    # Do not inject startup seeds into an already-active board. COMPLETED/FAILED
+    # tasks are terminal and do not block seeding on a later fresh cycle.
+    active_tasks: list = []
     for status in (TaskStatus.PENDING, TaskStatus.RUNNING):
         try:
             active = await swarm.list_tasks(status=status)
-            active_seeds.extend(
-                t for t in active
-                if getattr(t, 'title', '') in seed_titles
-            )
+            active_tasks.extend(active)
         except Exception:
             pass
 
-    if active_seeds:
+    if active_tasks:
         logger.info(
-            "Seed tasks already active (%d in-flight), skipping re-seed: %s",
-            len(active_seeds),
-            [getattr(t, 'title', '')[:40] for t in active_seeds[:3]],
+            "Task board already active (%d pending/running), skipping seed tasks: %s",
+            len(active_tasks),
+            [getattr(t, "title", "")[:40] for t in active_tasks[:3]],
         )
         return []
 

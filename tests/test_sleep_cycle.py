@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -143,7 +143,7 @@ async def test_rem_sleep_dreams_when_threshold(cycle: SleepCycle) -> None:
 
 
 async def test_wake_writes_report(cycle: SleepCycle, tmp_path: Path) -> None:
-    report = await cycle.run_full_cycle()
+    await cycle.run_full_cycle()
     reports_dir = tmp_path / "reports"
     assert reports_dir.exists()
     files = list(reports_dir.glob("*.json"))
@@ -163,7 +163,8 @@ async def test_is_quiet_hours_true() -> None:
     with patch("dharma_swarm.sleep_cycle.datetime") as mock_dt:
         mock_dt.now.return_value = fake_now
         mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
-        assert SleepCycle.is_quiet_hours() is True
+        config = type("Config", (), {"quiet_hours": [3]})()
+        assert SleepCycle.is_quiet_hours(config=config) is True
 
 
 # ---------------------------------------------------------------------------
@@ -176,7 +177,8 @@ async def test_is_quiet_hours_false() -> None:
     with patch("dharma_swarm.sleep_cycle.datetime") as mock_dt:
         mock_dt.now.return_value = fake_now
         mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
-        assert SleepCycle.is_quiet_hours() is False
+        config = type("Config", (), {"quiet_hours": [3]})()
+        assert SleepCycle.is_quiet_hours(config=config) is False
 
 
 # ---------------------------------------------------------------------------

@@ -1,7 +1,5 @@
 """Tests for organism boot integration."""
 import asyncio
-import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
 
 def _run(coro):
     loop = asyncio.new_event_loop()
@@ -14,7 +12,7 @@ def _run(coro):
 class TestOrganismBoot:
     """Test that organism boots correctly and integrates with swarm."""
 
-    def test_organism_singleton(self):
+    def test_organism_singleton(self, tmp_path):
         from dharma_swarm.organism import get_organism, set_organism, Organism
         # Initially None
         import dharma_swarm.organism as mod
@@ -22,30 +20,30 @@ class TestOrganismBoot:
         try:
             mod._global_organism = None
             assert get_organism() is None
-            org = Organism()
+            org = Organism(state_dir=tmp_path)
             set_organism(org)
             assert get_organism() is org
         finally:
             mod._global_organism = old
 
-    def test_organism_boot_diagnostics(self):
+    def test_organism_boot_diagnostics(self, tmp_path):
         from dharma_swarm.organism import Organism
-        org = Organism()
+        org = Organism(state_dir=tmp_path)
         diag = _run(org.boot())
         assert "booted_at" in diag
         assert "amiros" in diag
 
-    def test_organism_heartbeat(self):
+    def test_organism_heartbeat(self, tmp_path):
         from dharma_swarm.organism import Organism
-        org = Organism()
+        org = Organism(state_dir=tmp_path)
         _run(org.boot())
         pulse = _run(org.heartbeat())
         assert pulse.cycle_number == 1
         assert pulse.is_healthy
 
-    def test_organism_status(self):
+    def test_organism_status(self, tmp_path):
         from dharma_swarm.organism import Organism
-        org = Organism()
+        org = Organism(state_dir=tmp_path)
         _run(org.boot())
         status = org.status()
         assert "vsm" in status

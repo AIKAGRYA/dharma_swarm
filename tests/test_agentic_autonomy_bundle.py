@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from dharma_swarm.field_knowledge_base import ALL_FIELD_ENTRIES
 
 
@@ -11,13 +13,19 @@ BUNDLE_DIR = REPO_ROOT / "references" / "research" / "agentic_autonomy_2026-03-2
 MANIFEST_PATH = BUNDLE_DIR / "sources.json"
 
 
+def _load_manifest() -> dict:
+    if not MANIFEST_PATH.exists():
+        pytest.skip(f"optional agentic autonomy source bundle is absent: {MANIFEST_PATH}")
+    return json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+
+
 def test_agentic_autonomy_manifest_has_at_least_20_sources() -> None:
-    data = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+    data = _load_manifest()
     assert len(data["sources"]) >= 20
 
 
 def test_agentic_autonomy_local_paths_exist() -> None:
-    data = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+    data = _load_manifest()
     for source in data["sources"]:
         local_path = source.get("local_path")
         assert local_path, f"missing local_path for {source['id']}"

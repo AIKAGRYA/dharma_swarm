@@ -102,6 +102,18 @@ def test_dgc_cli_status_command():
             mock.assert_called_once()
 
 
+def test_dgc_cli_chetana_help_forwards_to_child_cli():
+    """`dgc chetana --help` should show chetana help, not wrapper help."""
+    from dharma_swarm.dgc_cli import main
+
+    with patch("sys.argv", ["dgc", "chetana", "--help"]):
+        with patch("dharma_swarm.dgc_cli.subprocess.call", return_value=0) as mock:
+            main()
+
+    cmd = mock.call_args.args[0]
+    assert cmd[-2:] == ["dharma_swarm.chetana.cli", "--help"]
+
+
 def test_cmd_status_reports_canonical_pulse_artifacts(monkeypatch, tmp_path, capsys):
     """cmd_status should use canonical ~/.dharma pulse artifacts when legacy state is absent."""
     import subprocess
