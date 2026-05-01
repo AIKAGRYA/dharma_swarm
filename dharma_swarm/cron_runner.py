@@ -394,6 +394,48 @@ def _run_scout_synthesis(job: dict[str, Any]) -> CronJobExecutionResult:
         )
 
 
+def _run_operator_brief(job: dict[str, Any]) -> CronJobExecutionResult:
+    """Cron handler for the ontology-native Operator Brief seam (v0).
+
+    Default-disabled via ``DHARMA_OPERATOR_BRIEF_ENABLED``. When the
+    flag is off, the handler reports ``WAITING_EXTERNAL`` (meaning:
+    "ran but did nothing, awaiting flag flip") and performs no source
+    mutation. See ``docs/plans/ONTOLOGY_NATIVE_OPERATOR_BRIEF_MASTER_SPEC.md``.
+    """
+    try:
+        from dharma_swarm.operator_brief.insight_brief import cron_run
+        result = cron_run(job)
+        status = result.get("status", "unknown")
+        outcome = result.get("outcome", "")
+        if status == "disabled":
+            return CronJobExecutionResult(
+                status=CronJobRunStatus.WAITING_EXTERNAL,
+                output=f"operator_brief disabled: {result.get('reason', '')}",
+                metadata=result,
+            )
+        if outcome == "success":
+            return CronJobExecutionResult(
+                status=CronJobRunStatus.COMPLETED,
+                output=(
+                    f"operator_brief artifact={result.get('artifact_id')} "
+                    f"witnesses={len(result.get('witness_log_ids', []))}"
+                ),
+                metadata=result,
+            )
+        return CronJobExecutionResult(
+            status=CronJobRunStatus.FAILED,
+            output=f"operator_brief outcome={outcome}",
+            error=outcome,
+            metadata=result,
+        )
+    except Exception as e:
+        return CronJobExecutionResult(
+            status=CronJobRunStatus.FAILED,
+            output=str(e),
+            error=str(e),
+        )
+
+
 def execute_cron_job(job: dict[str, Any]) -> CronJobExecutionResult:
     """Dispatch a cron job to the configured runner with structured status.
 
@@ -431,6 +473,8 @@ def execute_cron_job(job: dict[str, Any]) -> CronJobExecutionResult:
         return _run_scout_sweep(job)
     if handler == "scout_synthesis":
         return _run_scout_synthesis(job)
+    if handler == "operator_brief":
+        return _run_operator_brief(job)
 
     error = f"Unsupported cron handler: {handler}"
     return CronJobExecutionResult(
