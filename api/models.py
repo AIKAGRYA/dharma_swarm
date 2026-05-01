@@ -45,6 +45,7 @@ class HealthOut(BaseModel):
     traces_last_hour: int = 0
     failure_rate: float = 0.0
     mean_fitness: float | None = None
+    liveness: dict[str, Any] = Field(default_factory=dict)
 
 
 # ── Agents ────────────────────────────────────────────────────────
@@ -88,6 +89,7 @@ class TaskOut(BaseModel):
     created_at: str = ""
     updated_at: str = ""
     result: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class CreateTaskRequest(BaseModel):
@@ -95,6 +97,7 @@ class CreateTaskRequest(BaseModel):
     description: str = ""
     priority: str = "normal"
     assigned_to: str | None = None
+    created_by: str = "system"
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 

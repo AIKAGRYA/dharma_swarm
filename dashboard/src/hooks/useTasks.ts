@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
-import type { TaskOut } from "@/lib/types";
+import type { CreateTaskBody, TaskOut } from "@/lib/types";
 
 export function useTasks() {
   const { data, isLoading, error } = useQuery<TaskOut[]>({
@@ -22,7 +22,7 @@ export function useCreateTask() {
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: (body: { title: string; description?: string; priority?: string }) =>
+    mutationFn: (body: CreateTaskBody) =>
       apiFetch<TaskOut>("/api/commands/task", {
         method: "POST",
         body: JSON.stringify(body),

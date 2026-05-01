@@ -21,6 +21,7 @@ import type {
   TaskOut,
   TraceOut,
 } from "./types";
+import { authorizedHeaders } from "./auth";
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -66,11 +67,11 @@ async function _fetchWrapped<T>(
   try {
     const res = await fetch(url, {
       ...init,
-      headers: {
+      headers: authorizedHeaders({
         "Content-Type": "application/json",
         Accept: "application/json",
         ...init?.headers,
-      },
+      }),
     });
 
     if (!res.ok) {
@@ -330,6 +331,14 @@ export function wsBaseUrl(): string {
 
 export { BASE_URL };
 
+export async function authorizedFetch(path: string, init?: RequestInit): Promise<Response> {
+  const url = apiPath(path);
+  return fetch(url, {
+    ...init,
+    headers: authorizedHeaders(init?.headers),
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Legacy apiFetch -- backward-compatible with existing hooks.
 // Returns T directly (unwrapped) and throws on failure.
@@ -351,11 +360,11 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   const url = apiPath(path);
   const res = await fetch(url, {
     ...init,
-    headers: {
+    headers: authorizedHeaders({
       "Content-Type": "application/json",
       Accept: "application/json",
       ...init?.headers,
-    },
+    }),
   });
 
   if (!res.ok) {

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
 import pytest
@@ -42,6 +43,41 @@ class TestContextSearchEngine:
         engine = ContextSearchEngine(ecosystem_paths=paths)
         count = engine.build_index()
         assert count == 4
+
+    def test_build_index_returns_path_count_when_already_built(self, search_dir):
+        _, paths = search_dir
+        engine = ContextSearchEngine(ecosystem_paths=paths)
+        assert engine.build_index() == 4
+        assert engine.build_index() == 4
+
+    def test_force_rebuild_reuses_cached_keywords_when_paths_unchanged(
+        self,
+        search_dir,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        _, paths = search_dir
+        engine = ContextSearchEngine(ecosystem_paths=paths)
+        assert engine.build_index() == 4
+
+        def _fail(*_args, **_kwargs):
+            raise AssertionError("unchanged path should reuse cached keywords")
+
+        monkeypatch.setattr(engine, "_extract_keywords", _fail)
+        assert engine.build_index(force=True) == 4
+
+    def test_force_rebuild_refreshes_changed_file_keywords(self, search_dir):
+        root, paths = search_dir
+        engine = ContextSearchEngine(ecosystem_paths=paths)
+        engine.build_index()
+
+        time.sleep(0.05)
+        (root / "rv_paper.md").write_text(
+            "# R_V Paper\nParticipation ratio measurements.\nEntropy gradient."
+        )
+        assert engine.build_index(force=True) == 4
+        results = engine.search("entropy gradient")
+        assert len(results) > 0
+        assert "rv_paper" in results[0].path
 
     def test_search_by_keyword(self, search_dir):
         _, paths = search_dir

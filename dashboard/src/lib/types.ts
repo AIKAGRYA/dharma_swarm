@@ -329,9 +329,20 @@ export interface TaskOut {
   status: string;
   priority: string;
   assigned_to: string | null;
+  created_by: string;
   created_at: string;
   updated_at: string;
   result: string | null;
+  metadata: Record<string, unknown>;
+}
+
+export interface CreateTaskBody {
+  title: string;
+  description?: string;
+  priority?: string;
+  assigned_to?: string;
+  created_by?: string;
+  metadata?: Record<string, unknown>;
 }
 
 // ---------------------------------------------------------------------------
@@ -364,6 +375,19 @@ export interface HealthOut {
   traces_last_hour: number;
   failure_rate: number;
   mean_fitness: number | null;
+  liveness?: {
+    status?: string;
+    bootstrap_phase?: string;
+    bootstrap_complete?: boolean;
+    tick_fresh?: boolean;
+    coordination_fresh?: boolean;
+    stall_state?: string;
+    stall_reason?: string;
+    last_tick_completed_at?: string | null;
+    last_tick_duration_s?: number | null;
+    last_tick_number?: number;
+    last_coordination_completed_at?: string | null;
+  };
 }
 
 export interface DaemonCostBucket {

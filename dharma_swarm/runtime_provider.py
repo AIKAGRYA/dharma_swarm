@@ -40,6 +40,8 @@ from dharma_swarm.api_keys import (
     TOGETHER_API_KEY_ENV,
     TOGETHER_BASE_URL_ENV,
 )
+from dharma_swarm.config import DEFAULT_CONFIG as _SWARM_CFG
+from dharma_swarm.diversity_governor import DiversityGovernor
 from dharma_swarm.models import LLMRequest, LLMResponse, ProviderType
 from dharma_swarm.ollama_config import (
     build_ollama_headers,
@@ -78,7 +80,7 @@ DEFAULT_NIM_MODEL = DEFAULT_MODELS.get(ProviderType.NVIDIA_NIM, "meta/llama-3.3-
 DEFAULT_SAMBANOVA_MODEL = DEFAULT_MODELS.get(ProviderType.SAMBANOVA, "Meta-Llama-3.3-70B-Instruct")
 DEFAULT_MISTRAL_MODEL = DEFAULT_MODELS.get(ProviderType.MISTRAL, "mistral-small-latest")
 DEFAULT_CHUTES_MODEL = DEFAULT_MODELS.get(ProviderType.CHUTES, "deepseek-ai/DeepSeek-R1")
-DEFAULT_PROVIDER_TIMEOUT_SECONDS = 300
+DEFAULT_PROVIDER_TIMEOUT_SECONDS = _SWARM_CFG.agent.subprocess_timeout_seconds
 
 # Provider ordering sourced from model_hierarchy.py — the single source of truth.
 # All free providers first, then cheap, then paid.
@@ -117,6 +119,51 @@ PREFERRED_LOW_COST_WITH_ANTHROPIC_RUNTIME_PROVIDERS: tuple[ProviderType, ...] = 
     ProviderType.ANTHROPIC,
     ProviderType.CLAUDE_CODE,     # FALLBACK: always available if claude binary installed
 )
+
+
+def _select_ollama_diversity_model(metadata: Mapping[str, Any] | None = None) -> str:
+    source = str((metadata or {}).get("source", "") or "").lower()
+    execution_mode = str((metadata or {}).get("execution_mode", "") or "").lower()
+    haystack = f"{source} {execution_mode}"
+    if any(
+        token in haystack
+        for token in ("synthesis", "consolidation", "pulse", "persistent", "evolution")
+    ):
+        return os.environ.get("DGC_DIVERSITY_OLLAMA_SYNTHESIS_MODEL", "minimax-m2.7:cloud").strip() or "minimax-m2.7:cloud"
+    if any(
+        token in haystack
+        for token in ("context", "knowledge", "research", "hypnagogic", "subconscious", "cron")
+    ):
+        return os.environ.get("DGC_DIVERSITY_OLLAMA_RESEARCH_MODEL", "kimi-k2.5:cloud").strip() or "kimi-k2.5:cloud"
+    return os.environ.get("DGC_DIVERSITY_OLLAMA_ALTERNATE_MODEL", "kimi-k2.5:cloud").strip() or "kimi-k2.5:cloud"
+
+
+def _apply_runtime_diversity_overlay(
+    provider_order: tuple[ProviderType, ...],
+    *,
+    model_overrides: Mapping[ProviderType, str | None] | None = None,
+    metadata: Mapping[str, Any] | None = None,
+) -> tuple[tuple[ProviderType, ...], dict[ProviderType, str | None]]:
+    adjusted_overrides: dict[ProviderType, str | None] = dict(model_overrides or {})
+    governor = DiversityGovernor()
+    default_model_hints = {
+        provider: str(adjusted_overrides.get(provider) or DEFAULT_MODELS.get(provider, "") or "")
+        for provider in provider_order
+    }
+    reordered, _reasons = governor.reorder_providers(
+        list(provider_order),
+        default_model_hints=default_model_hints,
+    )
+    snapshot = governor.snapshot()
+    if (
+        ProviderType.OLLAMA in provider_order
+        and not adjusted_overrides.get(ProviderType.OLLAMA)
+        and snapshot.model_monoculture
+        and snapshot.top_provider == ProviderType.OLLAMA.value
+        and "glm-5" in str(snapshot.top_model).lower()
+    ):
+        adjusted_overrides[ProviderType.OLLAMA] = _select_ollama_diversity_model(metadata)
+    return tuple(reordered), adjusted_overrides
 
 
 @dataclass(frozen=True, slots=True)
@@ -641,8 +688,14 @@ async def complete_via_preferred_runtime_providers(
     if anthropic_model is not None:
         overrides[ProviderType.ANTHROPIC] = anthropic_model
 
+    effective_provider_order, overrides = _apply_runtime_diversity_overlay(
+        provider_order or PREFERRED_LOW_COST_RUNTIME_PROVIDERS,
+        model_overrides=overrides,
+        metadata=merged_metadata,
+    )
+
     configs = preferred_runtime_provider_configs(
-        provider_order=provider_order or PREFERRED_LOW_COST_RUNTIME_PROVIDERS,
+        provider_order=effective_provider_order,
         model_overrides=overrides,
         working_dir=working_dir,
         timeout_seconds=int(timeout_seconds) if timeout_seconds is not None else None,

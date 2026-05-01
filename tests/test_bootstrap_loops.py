@@ -23,6 +23,7 @@ Loop mapping:
 from __future__ import annotations
 
 import asyncio
+import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -37,6 +38,17 @@ import pytest
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _runtime_table_count(db_path: Path, table: str) -> int:
+    if not db_path.exists():
+        return 0
+    with sqlite3.connect(db_path) as db:
+        try:
+            row = db.execute(f"SELECT COUNT(*) FROM {table}").fetchone()
+        except sqlite3.OperationalError:
+            return 0
+    return int(row[0]) if row else 0
 
 
 # ---------------------------------------------------------------------------
@@ -331,6 +343,17 @@ async def test_task_lifecycle(tmp_path: Path) -> None:
     pool = MockAgentPool()
 
     # Orchestrator with real board + mock pool, in-memory ledger
+    runtime_db = tmp_path / "state" / "runtime.db"
+    before_runtime_counts = {
+        table: _runtime_table_count(runtime_db, table)
+        for table in ("task_claims", "delegation_runs", "session_events")
+    }
+    assert before_runtime_counts == {
+        "task_claims": 0,
+        "delegation_runs": 0,
+        "session_events": 0,
+    }
+
     orch = Orchestrator(
         task_board=board,
         agent_pool=pool,
@@ -353,6 +376,14 @@ async def test_task_lifecycle(tmp_path: Path) -> None:
         f"result={completed.result!r}"
     )
     assert completed.result == MOCK_RESULT
+
+    after_runtime_counts = {
+        table: _runtime_table_count(runtime_db, table)
+        for table in ("task_claims", "delegation_runs", "session_events")
+    }
+    assert after_runtime_counts["task_claims"] == 1
+    assert after_runtime_counts["delegation_runs"] == 1
+    assert after_runtime_counts["session_events"] >= 3
 
 
 # ---------------------------------------------------------------------------

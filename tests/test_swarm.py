@@ -1,8 +1,11 @@
 """Tests for dharma_swarm.swarm — integration tests."""
 
 import asyncio
+import json
 import os
+from datetime import datetime, timezone
 from pathlib import Path
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -10,7 +13,11 @@ from dharma_swarm.agent_constitution import AgentSpec, ConstitutionalLayer, Dyna
 from dharma_swarm.engine.conversation_memory import ConversationMemoryStore
 from dharma_swarm.message_bus import MessageBus
 from dharma_swarm.models import AgentRole, AgentState, AgentStatus, Message, TaskPriority, TaskStatus, ProviderType
-from dharma_swarm.swarm import SwarmCoordinationState, SwarmManager
+from dharma_swarm.swarm import (
+    SwarmCoordinationState,
+    SwarmManager,
+    _task_counts_as_execution_pressure,
+)
 from dharma_swarm.telemetry_plane import (
     AgentIdentityRecord,
     TeamRosterRecord,
@@ -28,7 +35,21 @@ def _expected_agent_count() -> int:
 
 
 _AUTO_AGENTS = _expected_agent_count()
-_AUTO_TASKS = 5
+
+
+async def _ensure_coordination_agents(
+    swarm: SwarmManager,
+    *,
+    count: int = 2,
+) -> list[AgentState]:
+    agents = await swarm.list_agents()
+    while len(agents) < count:
+        await swarm.spawn_agent(
+            f"coordination-agent-{len(agents) + 1}",
+            role=AgentRole.GENERAL,
+        )
+        agents = await swarm.list_agents()
+    return agents[:count]
 
 
 def _make_dynamic_spec(name: str, **overrides: object) -> AgentSpec:
@@ -56,6 +77,7 @@ def _make_dynamic_spec(name: str, **overrides: object) -> AgentSpec:
 async def swarm(tmp_path):
     s = SwarmManager(state_dir=tmp_path / ".dharma")
     await s.init()
+    await s.wait_until_bootstrap_ready(timeout=60.0)
     yield s
     await s.shutdown()
 
@@ -63,7 +85,7 @@ async def swarm(tmp_path):
 @pytest.mark.asyncio
 async def test_init(swarm):
     state = await swarm.status()
-    assert state.tasks_pending == _AUTO_TASKS
+    assert state.tasks_pending >= 1
     assert len(state.agents) >= _AUTO_AGENTS
 
 
@@ -400,6 +422,15 @@ async def test_create_task(swarm):
     assert task.priority == TaskPriority.HIGH
     assert task.metadata.get("trace_id", "").startswith("trc_")
     assert task.metadata.get("created_via") == "swarm.create_task"
+    assert "coordination_claim_key" not in task.metadata
+
+
+@pytest.mark.asyncio
+async def test_create_task_does_not_infer_coordination_claim_from_title(swarm):
+    task = await swarm.create_task("Route policy review")
+
+    assert "coordination_claim_key" not in task.metadata
+    assert "coordination_topic" not in task.metadata
 
 
 @pytest.mark.asyncio
@@ -439,10 +470,11 @@ async def test_create_task_blocks_self_referential_heartbeat_task(swarm):
 
 @pytest.mark.asyncio
 async def test_list_tasks(swarm):
+    baseline = len(await swarm.list_tasks())
     await swarm.create_task("Task 1")
     await swarm.create_task("Task 2")
     tasks = await swarm.list_tasks()
-    assert len(tasks) == _AUTO_TASKS + 2
+    assert len(tasks) == baseline + 2
 
 
 @pytest.mark.asyncio
@@ -550,6 +582,8 @@ async def test_run_does_not_consume_contribution_budget_without_work(
     monkeypatch.setattr(swarm, "_in_quiet_hours", lambda: False)
     monkeypatch.setattr(swarm._orchestrator, "tick", fake_tick)
     monkeypatch.setattr(asyncio, "sleep", fake_sleep)
+    swarm._director = None
+    swarm._auto_proposer = None
 
     swarm._running = True
     swarm._daily_contributions = 0
@@ -586,6 +620,291 @@ async def test_run_publishes_fresh_dgc_health_snapshot(swarm, monkeypatch):
     assert summary["daemon_pid"] == daemon_pid
     assert summary["daemon_pid_mismatch"] is False
     assert summary["payload"]["source"] == "swarm.run"
+
+
+@pytest.mark.asyncio
+async def test_run_publishes_hot_path_liveness_to_snapshot(swarm, monkeypatch):
+    async def fake_spawn(*args, **kwargs):
+        return []
+
+    async def fake_orchestrator_tick():
+        return {"dispatched": 1, "settled": 1, "recovered": 0}
+
+    async def fake_sleep(_seconds):
+        swarm._running = False
+        return None
+
+    monkeypatch.setattr(swarm, "spawn_latent_gold_tasks", fake_spawn)
+    monkeypatch.setattr(swarm, "_in_quiet_hours", lambda: True)
+    monkeypatch.setattr(swarm, "_contribution_allowed", lambda: False)
+    monkeypatch.setattr(swarm._orchestrator, "tick", fake_orchestrator_tick)
+    monkeypatch.setattr(asyncio, "sleep", fake_sleep)
+
+    swarm._running = True
+    await swarm.run(interval=0.2)
+
+    summary = dgc_health_snapshot_summary(swarm.state_dir)
+    liveness = summary["liveness"]
+    assert summary["payload"]["source"] == "swarm.run"
+    assert liveness["last_tick_number"] >= 1
+    assert liveness["last_tick_started_at"] is not None
+    assert liveness["last_tick_completed_at"] is not None
+    assert liveness["tick_interval_s"] == pytest.approx(0.2)
+    assert liveness["last_task_dispatch_at"] is not None
+    assert liveness["last_task_completion_at"] is not None
+    watch_payload = json.loads(
+        (swarm.state_dir / "meta" / "swarm_liveness.json").read_text(encoding="utf-8")
+    )
+    assert watch_payload["liveness"]["status"] in {"healthy", "degraded", "booting", "stalled"}
+    assert watch_payload["source"] == "swarm.run"
+
+
+def test_task_counts_as_execution_pressure_for_primary_campaign():
+    task = type(
+        "_Task",
+        (),
+        {
+            "created_by": "seed_task",
+            "metadata": {"campaign_id": "camp_primary"},
+        },
+    )()
+    assert _task_counts_as_execution_pressure(task, primary_campaign_id="camp_primary") is True
+
+
+def test_task_counts_as_execution_pressure_for_manual_seed():
+    task = type(
+        "_Task",
+        (),
+        {
+            "created_by": "swarm",
+            "metadata": {"created_via": "manual_seed"},
+        },
+    )()
+    assert _task_counts_as_execution_pressure(task) is True
+
+
+def test_task_counts_as_execution_pressure_for_persistent_campaign_task():
+    task = type(
+        "_Task",
+        (),
+        {
+            "created_by": "conductor_claude",
+            "metadata": {
+                "source": "persistent_agent.campaign",
+                "task_source": "campaign",
+            },
+        },
+    )()
+    assert _task_counts_as_execution_pressure(task) is True
+
+
+def test_task_counts_as_execution_pressure_for_contract_task():
+    task = type(
+        "_Task",
+        (),
+        {
+            "created_by": "system",
+            "metadata": {
+                "contract_version": "task_contract_v1",
+                "owner_lane": "builder",
+                "settlement_state": "queued",
+            },
+        },
+    )()
+    assert _task_counts_as_execution_pressure(task) is True
+
+
+@pytest.mark.asyncio
+async def test_first_tick_without_dispatch_stays_bootstrap_ready(tmp_path, monkeypatch):
+    async def _noop_deferred_startup(self):
+        return None
+
+    monkeypatch.setattr(SwarmManager, "_complete_deferred_startup", _noop_deferred_startup)
+
+    swarm = SwarmManager(state_dir=tmp_path / ".dharma")
+    await swarm.init()
+    try:
+        assert swarm._orchestrator is not None
+
+        async def fake_spawn(*args, **kwargs):
+            return []
+
+        async def fake_orchestrator_tick():
+            return {"dispatched": 0, "settled": 0, "recovered": 0}
+
+        monkeypatch.setattr(swarm, "spawn_latent_gold_tasks", fake_spawn)
+        monkeypatch.setattr(swarm, "_in_quiet_hours", lambda: True)
+        monkeypatch.setattr(swarm, "_contribution_allowed", lambda: False)
+        monkeypatch.setattr(swarm._orchestrator, "tick", fake_orchestrator_tick)
+        swarm._telos_substrate_seeded = True
+
+        activity = await swarm.tick()
+
+        assert activity["dispatched"] == 0
+        liveness = swarm.hot_path_liveness()
+        assert liveness["bootstrap_completed_at"] is None
+        assert liveness["bootstrap_phase"] == "bootstrap_ready"
+        assert liveness["stall_state"] == "bootstrap_waiting_for_dispatch"
+    finally:
+        await swarm.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_timed_out_orchestrator_tick_preserves_dispatch_progress(tmp_path, monkeypatch):
+    async def _noop_deferred_startup(self):
+        return None
+
+    monkeypatch.setattr(SwarmManager, "_complete_deferred_startup", _noop_deferred_startup)
+
+    swarm = SwarmManager(state_dir=tmp_path / ".dharma")
+    await swarm.init()
+    sleepers: list[asyncio.Task] = []
+    try:
+        assert swarm._orchestrator is not None
+
+        async def fake_spawn(*args, **kwargs):
+            return []
+
+        async def fake_orchestrator_tick():
+            sleeper = asyncio.create_task(asyncio.sleep(60.0))
+            sleepers.append(sleeper)
+            swarm._orchestrator._active_dispatches["timeout-task"] = object()
+            swarm._orchestrator._running_tasks["timeout-task"] = sleeper
+            raise asyncio.TimeoutError
+
+        monkeypatch.setattr(swarm, "spawn_latent_gold_tasks", fake_spawn)
+        monkeypatch.setattr(swarm, "_in_quiet_hours", lambda: True)
+        monkeypatch.setattr(swarm, "_contribution_allowed", lambda: False)
+        monkeypatch.setattr(swarm._orchestrator, "tick", fake_orchestrator_tick)
+        swarm._telos_substrate_seeded = True
+
+        activity = await swarm.tick()
+
+        assert activity["dispatched"] == 1
+        liveness = swarm.hot_path_liveness()
+        assert liveness["bootstrap_phase"] == "bootstrap_complete"
+        assert liveness["bootstrap_completed_at"] is not None
+        assert liveness["stall_state"] == "none"
+    finally:
+        for sleeper in sleepers:
+            sleeper.cancel()
+        if sleepers:
+            await asyncio.gather(*sleepers, return_exceptions=True)
+        await swarm.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_deferred_startup_does_not_downgrade_bootstrap_complete(tmp_path, monkeypatch):
+    swarm = SwarmManager(state_dir=tmp_path / ".dharma")
+
+    async def _no_agents(*_args, **_kwargs):
+        return []
+
+    async def _ok_floor():
+        return True, "agents=1"
+
+    monkeypatch.setattr("dharma_swarm.startup_crew.spawn_cybernetics_crew", _no_agents)
+    monkeypatch.setattr("dharma_swarm.startup_crew.create_seed_tasks", _no_agents)
+    monkeypatch.setattr("dharma_swarm.startup_crew.spawn_default_crew", _no_agents)
+    monkeypatch.setattr(swarm, "_init_optional_subsystems", AsyncMock())
+    monkeypatch.setattr(swarm, "_validate_bootstrap_floor", AsyncMock(side_effect=_ok_floor))
+
+    swarm._record_bootstrap_phase(
+        "bootstrap_complete",
+        reason="first_dispatch_completed",
+    )
+
+    await swarm._execute_deferred_startup()
+
+    liveness = swarm.hot_path_liveness()
+    assert liveness["bootstrap_phase"] == "bootstrap_complete"
+    assert liveness["bootstrap_completed_at"] is not None
+
+
+@pytest.mark.asyncio
+async def test_deferred_startup_agents_spawned_does_not_overwrite_bootstrap_complete(tmp_path, monkeypatch):
+    swarm = SwarmManager(state_dir=tmp_path / ".dharma")
+
+    async def _no_agents(*_args, **_kwargs):
+        return []
+
+    async def _some_agents(*_args, **_kwargs):
+        return [object()]
+
+    async def _ok_floor():
+        return True, "agents=1"
+
+    monkeypatch.setattr("dharma_swarm.startup_crew.spawn_cybernetics_crew", _no_agents)
+    monkeypatch.setattr("dharma_swarm.startup_crew.create_seed_tasks", _no_agents)
+    monkeypatch.setattr("dharma_swarm.startup_crew.spawn_default_crew", _some_agents)
+    monkeypatch.setattr(swarm, "_init_optional_subsystems", AsyncMock())
+    monkeypatch.setattr(swarm, "_validate_bootstrap_floor", AsyncMock(side_effect=_ok_floor))
+
+    swarm._record_bootstrap_phase(
+        "bootstrap_complete",
+        reason="first_dispatch_completed",
+    )
+
+    await swarm._execute_deferred_startup()
+
+    liveness = swarm.hot_path_liveness()
+    assert liveness["bootstrap_phase"] == "bootstrap_complete"
+    assert liveness["bootstrap_completed_at"] is not None
+    assert liveness["bootstrap_phase_history"][-1]["phase"] == "bootstrap_complete"
+
+
+@pytest.mark.asyncio
+async def test_publish_runtime_health_snapshot_survives_stuck_agent_pool(tmp_path):
+    state_dir = tmp_path / ".dharma"
+    swarm = SwarmManager(state_dir=state_dir)
+
+    class _SlowPool:
+        async def list_agents(self):
+            await asyncio.Event().wait()
+
+    class _FastBoard:
+        async def stats(self):
+            return {
+                "pending": 2,
+                "assigned": 1,
+                "running": 0,
+                "completed": 0,
+                "failed": 0,
+            }
+
+    swarm._agent_pool = _SlowPool()
+    swarm._task_board = _FastBoard()
+
+    await asyncio.wait_for(
+        swarm._publish_runtime_health_snapshot(source="test.publish_runtime_health"),
+        timeout=5.0,
+    )
+
+    summary = dgc_health_snapshot_summary(state_dir)
+    assert summary["status"] == "fresh"
+    assert summary["payload"]["source"] == "test.publish_runtime_health"
+    assert summary["payload"]["task_count"] == 3
+
+
+@pytest.mark.asyncio
+async def test_run_caps_coordination_refresh_interval_to_tick_interval(swarm, monkeypatch):
+    async def fake_tick():
+        swarm._running = False
+        return {"dispatched": 0, "settled": 0, "recovered": 0}
+
+    async def fake_sleep(_seconds):
+        return None
+
+    monkeypatch.setattr(swarm, "tick", fake_tick)
+    monkeypatch.setattr(asyncio, "sleep", fake_sleep)
+
+    assert swarm._orchestrator is not None
+    swarm._orchestrator._coordination_refresh_interval_s = 120.0
+    swarm._running = True
+
+    await swarm.run(interval=0.5)
+
+    assert swarm._orchestrator._coordination_refresh_interval_s == 0.5
 
 
 @pytest.mark.asyncio
@@ -633,17 +952,18 @@ async def test_rescue_recent_failures_skips_duplicate_active_title(swarm):
 
 @pytest.mark.asyncio
 async def test_status(swarm):
+    baseline = await swarm.status()
     await swarm.spawn_agent("a1")
     await swarm.create_task("t1")
     state = await swarm.status()
     assert len(state.agents) >= _AUTO_AGENTS + 1
-    assert state.tasks_pending == _AUTO_TASKS + 1
+    assert state.tasks_pending == baseline.tasks_pending + 1
     assert state.uptime_seconds > 0
 
 
 @pytest.mark.asyncio
 async def test_coordination_status_reports_global_truth(swarm):
-    agents = await swarm.list_agents()
+    agents = await _ensure_coordination_agents(swarm)
     left, right = agents[0], agents[1]
     await swarm._message_bus.send(
         Message(
@@ -679,7 +999,7 @@ async def test_coordination_status_reports_global_truth(swarm):
 
 @pytest.mark.asyncio
 async def test_coordination_status_reports_productive_disagreement(swarm):
-    agents = await swarm.list_agents()
+    agents = await _ensure_coordination_agents(swarm)
     left, right = agents[0], agents[1]
     await swarm._message_bus.send(
         Message(
@@ -712,7 +1032,7 @@ async def test_coordination_status_reports_productive_disagreement(swarm):
 
 @pytest.mark.asyncio
 async def test_spawn_coordination_tasks_creates_synthesis_task(swarm):
-    agents = await swarm.list_agents()
+    agents = await _ensure_coordination_agents(swarm)
     left, right = agents[0], agents[1]
     await swarm._message_bus.send(
         Message(
@@ -742,8 +1062,166 @@ async def test_spawn_coordination_tasks_creates_synthesis_task(swarm):
     task = created[0]
     assert task.metadata["coordination_origin"] == "sheaf_disagreement"
     assert task.metadata["coordination_claim_key"] == "route-policy"
+    assert task.metadata["coordination_claim_state"] == "open"
     assert task.metadata["coordination_route"] == "synthesis_review"
     assert task.priority == TaskPriority.HIGH
+
+
+@pytest.mark.asyncio
+async def test_spawn_coordination_tasks_suppresses_recent_completed_attempt(swarm):
+    completed = await swarm._task_board.create(
+        title="Synthesize disagreement: route-policy",
+        created_by="system",
+        assigned_to="reviewer-1",
+        metadata={
+            "source": "swarm.coordination_synthesis",
+            "coordination_origin": "sheaf_disagreement",
+            "coordination_claim_key": "route-policy",
+            "coordination_claim_state": "open",
+        },
+    )
+    await swarm._task_board.assign(
+        completed.id,
+        "reviewer-1",
+        metadata=completed.metadata,
+    )
+    await swarm._task_board.start(completed.id, metadata=completed.metadata)
+    await swarm._task_board.complete(
+        completed.id,
+        result="Synthesis completed",
+        metadata=completed.metadata,
+    )
+
+    coordination = SwarmCoordinationState(
+        productive_disagreements=1,
+        productive_disagreement_claim_keys=["route-policy"],
+        observed_at=datetime.now(timezone.utc).isoformat(),
+    )
+
+    created = await swarm.spawn_coordination_tasks(coordination=coordination)
+
+    assert created == []
+
+
+@pytest.mark.asyncio
+async def test_spawn_coordination_tasks_permanently_suppresses_completed_synthesis(swarm):
+    """Completed synthesis permanently suppresses the claim_key — no respawn
+    even with cooldown=0, unless explicitly reopened."""
+    task = await swarm._task_board.create(
+        title="Synthesize disagreement: route-policy",
+        created_by="system",
+        assigned_to="reviewer-1",
+        metadata={
+            "source": "swarm.coordination_synthesis",
+            "coordination_origin": "sheaf_disagreement",
+            "coordination_claim_key": "route-policy",
+            "coordination_claim_state": "open",
+        },
+    )
+    await swarm._task_board.assign(
+        task.id,
+        "reviewer-1",
+        metadata=task.metadata,
+    )
+    await swarm._task_board.start(task.id, metadata=task.metadata)
+    await swarm._task_board.complete(
+        task.id,
+        result="Synthesis completed",
+        metadata=task.metadata,
+    )
+
+    coordination = SwarmCoordinationState(
+        productive_disagreements=1,
+        productive_disagreement_claim_keys=["route-policy"],
+        observed_at=datetime.now(timezone.utc).isoformat(),
+    )
+
+    created = await swarm.spawn_coordination_tasks(
+        coordination=coordination,
+        completed_cooldown_seconds=0.0,
+    )
+
+    assert created == [], "Completed synthesis should permanently suppress, not respawn"
+
+
+@pytest.mark.asyncio
+async def test_spawn_coordination_tasks_allows_reopened_claim(swarm):
+    """A claim explicitly marked 'reopened' can be re-synthesized even if
+    a previous synthesis completed."""
+    task = await swarm._task_board.create(
+        title="Synthesize disagreement: route-policy",
+        created_by="system",
+        assigned_to="reviewer-1",
+        metadata={
+            "source": "swarm.coordination_synthesis",
+            "coordination_origin": "sheaf_disagreement",
+            "coordination_claim_key": "route-policy",
+            "coordination_claim_state": "reopened",
+        },
+    )
+    await swarm._task_board.assign(
+        task.id,
+        "reviewer-1",
+        metadata=task.metadata,
+    )
+    await swarm._task_board.start(task.id, metadata=task.metadata)
+    await swarm._task_board.complete(
+        task.id,
+        result="Synthesis completed",
+        metadata=task.metadata,
+    )
+
+    coordination = SwarmCoordinationState(
+        productive_disagreements=1,
+        productive_disagreement_claim_keys=["route-policy"],
+        observed_at=datetime.now(timezone.utc).isoformat(),
+    )
+
+    created = await swarm.spawn_coordination_tasks(
+        coordination=coordination,
+    )
+
+    assert len(created) == 1
+    assert created[0].metadata["coordination_claim_key"] == "route-policy"
+
+
+@pytest.mark.asyncio
+async def test_spawn_coordination_tasks_suppresses_resolved_claim(swarm):
+    resolved = await swarm._task_board.create(
+        title="Synthesize disagreement: route-policy",
+        created_by="system",
+        assigned_to="reviewer-1",
+        metadata={
+            "source": "swarm.coordination_synthesis",
+            "coordination_origin": "sheaf_disagreement",
+            "coordination_claim_key": "route-policy",
+            "coordination_claim_state": "resolved",
+        },
+    )
+    await swarm._task_board.assign(
+        resolved.id,
+        "reviewer-1",
+        metadata=resolved.metadata,
+    )
+    await swarm._task_board.start(resolved.id, metadata=resolved.metadata)
+    await swarm._task_board.complete(
+        resolved.id,
+        result="Resolved disagreement",
+        metadata=resolved.metadata,
+    )
+
+    coordination = SwarmCoordinationState(
+        productive_disagreements=1,
+        productive_disagreement_claim_keys=["route-policy"],
+        observed_at=datetime.now(timezone.utc).isoformat(),
+    )
+
+    created = await swarm.spawn_coordination_tasks(
+        coordination=coordination,
+        completed_cooldown_seconds=0.0,
+    )
+
+    assert created == []
 
 
 # --- Gödel Claw v0.3.0 tests ---

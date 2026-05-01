@@ -12,6 +12,7 @@ from dharma_swarm.governance_signal import (
     GovernanceSnapshot,
     governance_multiplier,
     invalidate_cache,
+    is_overlay_enabled,
     load_governance,
     reorder_by_governance,
 )
@@ -177,6 +178,144 @@ def test_promise_linked_boost(meta_dir: Path) -> None:
     ml = governance_multiplier(linked, snap)[0]
     mu = governance_multiplier(unlinked, snap)[0]
     assert ml > mu
+
+
+def test_primary_campaign_id_gets_explicit_boost(meta_dir: Path) -> None:
+    _write_alloc(meta_dir, {d: 0.125 for d in [
+        "internal_maintenance", "reliability", "research",
+        "artifact_publication", "productization", "ecosystem_scan",
+        "revenue_exploration", "strategic_infrastructure",
+    ]})
+    (meta_dir / "active_campaigns.json").write_text(
+        json.dumps(
+            [
+                {"campaign_id": "camp_primary", "domain": "research", "primary": True, "status": "active"},
+                {"campaign_id": "camp_other", "domain": "reliability", "primary": False, "status": "active"},
+            ]
+        ),
+    )
+    snap = load_governance(meta_dir=meta_dir, force=True)
+    primary = StubTask("p", domain="research")
+    primary.metadata["campaign_id"] = "camp_primary"
+    other = StubTask("o", domain="research")
+    other.metadata["campaign_id"] = "camp_other"
+    mp, reasons = governance_multiplier(primary, snap)
+    mo = governance_multiplier(other, snap)[0]
+    assert mp > mo
+    assert "primary_campaign(+0.75)" in reasons
+
+
+def test_campaign_pressure_favors_underworked_campaign(meta_dir: Path) -> None:
+    _write_alloc(meta_dir, {d: 0.125 for d in [
+        "internal_maintenance", "reliability", "research",
+        "artifact_publication", "productization", "ecosystem_scan",
+        "revenue_exploration", "strategic_infrastructure",
+    ]})
+    (meta_dir / "active_campaigns.json").write_text(
+        json.dumps(
+            [
+                {
+                    "campaign_id": "camp_old_busy",
+                    "domain": "research",
+                    "status": "active",
+                    "primary": True,
+                    "created": "2026-04-18T00:00:00+00:00",
+                    "last_check_in": "2026-04-20T00:00:00+00:00",
+                    "check_in_count": 20,
+                },
+                {
+                    "campaign_id": "camp_starved",
+                    "domain": "research",
+                    "status": "active",
+                    "primary": False,
+                    "created": "2026-04-20T00:00:00+00:00",
+                    "last_check_in": "2026-04-18T00:00:00+00:00",
+                    "check_in_count": 0,
+                },
+            ]
+        ),
+    )
+    snap = load_governance(meta_dir=meta_dir, force=True)
+    busy = StubTask("busy", domain="research")
+    busy.metadata["campaign_id"] = "camp_old_busy"
+    starved = StubTask("starved", domain="research")
+    starved.metadata["campaign_id"] = "camp_starved"
+    _, reasons = governance_multiplier(starved, snap)
+    assert snap.campaign_pressure["camp_starved"] > snap.campaign_pressure["camp_old_busy"]
+    assert any(r.startswith("campaign_pressure(") for r in reasons)
+
+
+def test_load_governance_without_alloc_still_tracks_campaign_pressure(meta_dir: Path) -> None:
+    (meta_dir / "active_campaigns.json").write_text(
+        json.dumps(
+            [
+                {
+                    "campaign_id": "camp_primary",
+                    "domain": "productization",
+                    "status": "active",
+                    "primary": True,
+                    "created": "2026-04-20T00:00:00+00:00",
+                    "last_check_in": "2026-04-19T00:00:00+00:00",
+                    "check_in_count": 0,
+                }
+            ]
+        ),
+    )
+    snap = load_governance(meta_dir=meta_dir, force=True)
+    assert snap.is_stale is True
+    assert snap.primary_campaign_id == "camp_primary"
+    assert snap.campaign_pressure["camp_primary"] > 0
+
+
+def test_load_governance_accepts_legacy_campaign_envelope(meta_dir: Path) -> None:
+    _write_alloc(meta_dir, {d: 0.125 for d in [
+        "internal_maintenance", "reliability", "research",
+        "artifact_publication", "productization", "ecosystem_scan",
+        "revenue_exploration", "strategic_infrastructure",
+    ]})
+    (meta_dir / "active_campaigns.json").write_text(
+        json.dumps(
+            {
+                "primary_campaign": "camp_primary",
+                "campaigns": [
+                    {
+                        "name": "camp_primary",
+                        "domain": "research",
+                        "priority": "primary",
+                        "status": "active",
+                        "created": "2026-04-20T00:00:00+00:00",
+                        "last_updated": "2026-04-18T00:00:00+00:00",
+                        "check_in_count": 0,
+                    }
+                ],
+            }
+        ),
+    )
+    snap = load_governance(meta_dir=meta_dir, force=True)
+    assert snap.primary_campaign_id == "camp_primary"
+    assert "research" in snap.active_campaign_domains
+    assert snap.campaign_pressure["camp_primary"] > 0
+
+
+def test_overlay_auto_enables_when_campaign_pressure_present(meta_dir: Path, monkeypatch) -> None:
+    monkeypatch.delenv("DGC_GOVERNANCE_OVERLAY", raising=False)
+    (meta_dir / "active_campaigns.json").write_text(
+        json.dumps(
+            [
+                {
+                    "campaign_id": "camp_primary",
+                    "domain": "research",
+                    "status": "active",
+                    "primary": True,
+                    "created": "2026-04-20T00:00:00+00:00",
+                    "last_check_in": "2026-04-18T00:00:00+00:00",
+                    "check_in_count": 0,
+                }
+            ]
+        ),
+    )
+    monkeypatch.setattr("dharma_swarm.governance_signal._DEFAULT_META_DIR", meta_dir)
+    assert is_overlay_enabled() is True
 
 
 def test_reorder_disabled_when_flag_off(meta_dir: Path, monkeypatch) -> None:

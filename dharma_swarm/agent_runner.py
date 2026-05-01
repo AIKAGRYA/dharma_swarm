@@ -50,6 +50,13 @@ from dharma_swarm.runtime_fields import (
     build_runtime_field_registry_from_agent_config,
     runtime_field_manifest_for_agent_config,
 )
+from dharma_swarm.task_contract import (
+    allows_text_result_completion,
+    carries_execution_contract,
+    no_artifact_justification,
+    required_artifact_targets,
+    requires_tooling_lane,
+)
 from dharma_swarm.telos_gates import check_with_reflective_reroute
 
 logger = logging.getLogger(__name__)
@@ -1207,27 +1214,40 @@ def _build_prompt(
 
     if plan_context:
         user_parts.append(f"\n\n{plan_context}")
+    request_metadata = {
+        "task_id": task.id,
+        "task_title": task.title,
+        "agent_id": config.id,
+        "agent_name": config.name,
+        "agent_role": config.role.value,
+        "execution_mode": "persistent_agent",
+        "source": str(metadata.get("source", "agent_runner") or "agent_runner"),
+        "tier": str(metadata.get("tier", "") or ""),
+        "session_id": str(
+            metadata.get("session_id")
+            or metadata.get("trace_id")
+            or config.metadata.get("session_id")
+            or f"task:{task.id}"
+        ),
+    }
+    for key in (
+        "provider_timeout_seconds",
+        "subprocess_timeout_seconds",
+        "timeout_seconds",
+        "run_timeout_seconds",
+        "task_timeout_seconds",
+    ):
+        if metadata.get(key) is not None:
+            request_metadata[key] = metadata[key]
+    active_claim = metadata.get("active_claim")
+    if isinstance(active_claim, dict) and active_claim.get("dispatch_timeout_seconds") is not None:
+        request_metadata["dispatch_timeout_seconds"] = active_claim["dispatch_timeout_seconds"]
     return LLMRequest(
         model=config.model,
         messages=[{"role": "user", "content": "\n".join(user_parts)}],
         system=system,
         max_tokens=8192,
-        metadata={
-            "task_id": task.id,
-            "task_title": task.title,
-            "agent_id": config.id,
-            "agent_name": config.name,
-            "agent_role": config.role.value,
-            "execution_mode": "persistent_agent",
-            "source": str(task.metadata.get("source", "agent_runner") or "agent_runner"),
-            "tier": str(task.metadata.get("tier", "") or ""),
-            "session_id": str(
-                task.metadata.get("session_id")
-                or task.metadata.get("trace_id")
-                or config.metadata.get("session_id")
-                or f"task:{task.id}"
-            ),
-        },
+        metadata=request_metadata,
     )
 
 
@@ -1285,6 +1305,92 @@ async def _inject_stigmergy_context(
     )
 
 
+def _task_context_keywords(task: Task) -> list[str]:
+    raw_parts = [
+        part.strip()
+        for part in (task.title, task.description, _task_file_path(task))
+        if isinstance(part, str) and part.strip()
+    ]
+    task_keywords: list[str] = []
+    seen: set[str] = set()
+    for part in raw_parts:
+        for candidate in [part, *re.findall(r"[A-Za-z0-9_./-]{4,}", part.lower())]:
+            if candidate not in seen:
+                seen.add(candidate)
+                task_keywords.append(candidate)
+    return task_keywords
+
+
+async def _inject_ontology_context(
+    request: LLMRequest,
+    task: Task,
+    config: AgentConfig,
+    explicit_ontology_path: Path | str | None,
+) -> None:
+    """Add typed ontology/knowledge context to the agent prompt."""
+    prompt_state_dir = _resolve_prompt_state_dir(task, config)
+    if prompt_state_dir is None or not request.messages:
+        return
+    task_keywords = _task_context_keywords(task)
+    if not task_keywords:
+        return
+    metadata = _task_metadata(task)
+    try:
+        from dharma_swarm.ontology_context import ontology_context_for_task
+
+        context = await ontology_context_for_task(
+            task_keywords,
+            task_type=str(metadata.get("task_type", "general") or "general"),
+            agent_name=config.name,
+            token_budget=1200,
+            timeout_seconds=3.0,
+            state_dir=prompt_state_dir,
+            ontology_path=_resolve_ontology_path(task, config, explicit_ontology_path),
+            include_stigmergy=False,
+        )
+    except Exception:
+        logger.debug("Ontology context prompt injection failed", exc_info=True)
+        return
+    if not context.strip():
+        return
+    request.messages[0]["content"] = (
+        str(request.messages[0]["content"]).rstrip()
+        + "\n\n"
+        + context.strip()
+    )
+
+
+async def _record_task_ontology_context(
+    task: Task,
+    config: AgentConfig,
+    explicit_ontology_path: Path | str | None,
+    *,
+    task_type: str,
+    output_text: str,
+    success: bool,
+) -> None:
+    """Persist task outcome to the typed ontology loop, best-effort."""
+    prompt_state_dir = _resolve_prompt_state_dir(task, config)
+    if prompt_state_dir is None:
+        return
+    try:
+        from dharma_swarm.ontology_context import record_task_to_ontology
+
+        await record_task_to_ontology(
+            task.id,
+            config.name,
+            task_type or "general",
+            "success" if success else "failure",
+            output_text,
+            component=_task_file_path(task),
+            success=success,
+            state_dir=prompt_state_dir,
+            ontology_path=_resolve_ontology_path(task, config, explicit_ontology_path),
+        )
+    except Exception:
+        logger.debug("Ontology task writeback failed", exc_info=True)
+
+
 def _looks_like_provider_failure(content: str) -> bool:
     """Heuristic guard against error strings being marked as completed work."""
     normalized = (content or "").strip().lower()
@@ -1328,27 +1434,12 @@ def _task_file_path(task: Task) -> str:
 def _required_artifact_paths(task: Task) -> list[Path]:
     """Return required artifact paths declared in task metadata."""
     metadata = _task_metadata(task)
-    raw_values: list[Any] = []
-    for key in ("target_file", "target_path", "artifact_path", "required_artifact"):
-        value = metadata.get(key)
-        if value:
-            raw_values.append(value)
-    for key in ("required_artifacts", "artifact_paths", "target_files"):
-        value = metadata.get(key)
-        if isinstance(value, list):
-            raw_values.extend(value)
-        elif value:
-            raw_values.append(value)
+    raw_values = required_artifact_targets(metadata)
 
     out: list[Path] = []
     seen: set[str] = set()
     for raw in raw_values:
-        if not isinstance(raw, str):
-            continue
-        text = raw.strip()
-        if not text:
-            continue
-        path = Path(text).expanduser()
+        path = Path(raw).expanduser()
         norm = str(path)
         if norm in seen:
             continue
@@ -1373,6 +1464,35 @@ def _task_requires_local_side_effects(task: Task) -> bool:
         if isinstance(value, str) and value.strip():
             return True
     return False
+
+
+def _validate_completion_contract(task: Task, result: str) -> None:
+    metadata = _task_metadata(task)
+    required_artifacts = _required_artifact_paths(task)
+    missing_artifacts = [path for path in required_artifacts if not path.exists()]
+    if missing_artifacts:
+        if no_artifact_justification(metadata):
+            return
+        missing_str = ", ".join(str(path) for path in missing_artifacts[:5])
+        raise RuntimeError(
+            f"Completion contract failed: required artifact missing ({missing_str})"
+        )
+    if required_artifacts:
+        return
+
+    if carries_execution_contract(metadata):
+        if allows_text_result_completion(metadata):
+            return
+        if requires_tooling_lane(metadata) or _task_requires_local_side_effects(task):
+            raise RuntimeError(
+                "Completion contract failed: tooling-bearing task requires artifact "
+                "or explicit no_artifact_justification"
+            )
+
+    if not (result or "").strip() and not no_artifact_justification(metadata):
+        raise RuntimeError(
+            "Completion contract failed: empty result without explicit no_artifact_justification"
+        )
 
 
 def _provider_supports_local_tool_loop(
@@ -2113,9 +2233,10 @@ class AgentRunner:
                     f"- Gate reason: {gate.result.reason}\n"
                     "- Apply these lenses before execution:\n"
                     + "\n".join(f"  - {s}" for s in gate.suggestions)
-                )
+            )
             request = _build_prompt(task, self._config, plan_context=plan_context)
             await _inject_stigmergy_context(request, task, self._config)
+            await _inject_ontology_context(request, task, self._config, self._ontology_path)
             self._record_conversation_turn(
                 task,
                 role="user",
@@ -2263,13 +2384,7 @@ class AgentRunner:
                 )
                 observed_quality_score = 1.0
 
-            required_artifacts = _required_artifact_paths(task)
-            missing_artifacts = [path for path in required_artifacts if not path.exists()]
-            if missing_artifacts:
-                missing_str = ", ".join(str(path) for path in missing_artifacts[:5])
-                raise RuntimeError(
-                    f"Completion contract failed: required artifact missing ({missing_str})"
-                )
+            _validate_completion_contract(task, result)
             self._record_conversation_turn(
                 task,
                 role="assistant",
@@ -2423,6 +2538,14 @@ class AgentRunner:
 
             # Record task result in agent memory
             await self._record_task_memory(task, result)
+            await _record_task_ontology_context(
+                task,
+                self._config,
+                self._ontology_path,
+                task_type=telic_task_type,
+                output_text=result,
+                success=True,
+            )
             self._record_idea_uptake(task, result)
             self._record_follow_up_shard_outcome(task, outcome="success", evidence_text=result)
             self._record_retrieval_citation_uptake(task, result)
@@ -2558,6 +2681,14 @@ class AgentRunner:
 
             # Record failure as a learned lesson
             await self._record_failure_memory(task, exc)
+            await _record_task_ontology_context(
+                task,
+                self._config,
+                self._ontology_path,
+                task_type=telic_task_type,
+                output_text=str(exc),
+                success=False,
+            )
             self._record_follow_up_shard_outcome(task, outcome="failure", evidence_text=str(exc))
             self._mark_idea_outcome(task, outcome="failure")
             self._record_retrieval_outcome(task, outcome="failure")

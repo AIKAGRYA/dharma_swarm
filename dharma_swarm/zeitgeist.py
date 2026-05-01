@@ -173,6 +173,68 @@ class ZeitgeistScanner:
         """Return signals classified as ``threat``."""
         return [s for s in self._signals if s.category == "threat"]
 
+    @staticmethod
+    def _witness_entry_key(entry: dict[str, Any]) -> tuple[str, str]:
+        return (
+            str(entry.get("phase", "")).strip(),
+            str(entry.get("action", "")).strip(),
+        )
+
+    @staticmethod
+    def _is_recent_witness_entry(
+        entry: dict[str, Any],
+        *,
+        now: datetime,
+        max_age_seconds: float = 600.0,
+    ) -> bool:
+        """Keep witness pressure tied to the current scan window."""
+        raw_ts = entry.get("ts") or entry.get("timestamp")
+        if not raw_ts:
+            return True
+        try:
+            ts = datetime.fromisoformat(str(raw_ts))
+        except ValueError:
+            return True
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        age_seconds = (now - ts.astimezone(timezone.utc)).total_seconds()
+        return 0.0 <= age_seconds <= max_age_seconds
+
+    @classmethod
+    def _count_witness_outcomes(
+        cls,
+        entries: list[dict[str, Any]],
+    ) -> dict[str, int]:
+        """Collapse reflective reroute BLOCKED->PASS pairs into one PASS."""
+        outcomes = {"BLOCKED": 0, "WARN": 0, "PASS": 0}
+        idx = 0
+        total = len(entries)
+
+        while idx < total:
+            entry = entries[idx]
+            outcome = str(entry.get("outcome", "")).strip().upper()
+            if outcome not in outcomes:
+                idx += 1
+                continue
+
+            if outcome == "BLOCKED" and idx + 1 < total:
+                next_entry = entries[idx + 1]
+                next_outcome = str(next_entry.get("outcome", "")).strip().upper()
+                next_reflection = str(next_entry.get("reflection", ""))
+                if (
+                    next_outcome == "PASS"
+                    and cls._witness_entry_key(next_entry) == cls._witness_entry_key(entry)
+                    and "Reflective reroute attempt" in next_reflection
+                ):
+                    outcomes["PASS"] += 1
+                    idx += 2
+                    continue
+
+            outcomes[outcome] += 1
+            idx += 1
+
+        return outcomes
+
     # -- scan sources -------------------------------------------------------
 
     async def _scan_local(self) -> list[ZeitgeistSignal]:
@@ -225,19 +287,22 @@ class ZeitgeistScanner:
         witness_dir = self._state_dir / "witness"
         if witness_dir.exists():
             try:
+                scan_now = datetime.now(timezone.utc)
                 today = datetime.now(timezone.utc).strftime("%Y%m%d")
                 log_file = witness_dir / f"witness_{today}.jsonl"
                 if log_file.exists():
-                    lines = log_file.read_text().strip().split("\n")
-                    outcomes = {"BLOCKED": 0, "WARN": 0, "PASS": 0}
-                    for line in lines[-200:]:
+                    entries: list[dict[str, Any]] = []
+                    for line in log_file.read_text().strip().split("\n")[-200:]:
                         try:
-                            entry = json.loads(line)
-                            outcome = entry.get("outcome", "")
-                            if outcome in outcomes:
-                                outcomes[outcome] += 1
-                        except (json.JSONDecodeError, KeyError):
+                            parsed = json.loads(line)
+                        except json.JSONDecodeError:
                             continue
+                        if (
+                            isinstance(parsed, dict)
+                            and self._is_recent_witness_entry(parsed, now=scan_now)
+                        ):
+                            entries.append(parsed)
+                    outcomes = self._count_witness_outcomes(entries)
                     total = sum(outcomes.values())
                     block_count = outcomes["BLOCKED"]
                     if total > 0 and block_count >= 3:
@@ -287,12 +352,9 @@ class ZeitgeistScanner:
                     }), encoding="utf-8")
                     logger.info("S4→S3 gate pressure: external_strict (high block rate)")
                 elif pressure_path.exists():
-                    # Clear stale pressure if no gate threat
+                    # Clear pressure eagerly once the witness channel is clean.
                     try:
-                        data = json.loads(pressure_path.read_text())
-                        import time as _time
-                        if data.get("expires", 0) < _time.time():
-                            pressure_path.unlink(missing_ok=True)
+                        pressure_path.unlink(missing_ok=True)
                     except Exception:
                         logger.debug("Gate pressure cleanup failed", exc_info=True)
             except Exception:

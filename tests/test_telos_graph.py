@@ -92,6 +92,17 @@ class TestCRUD:
         assert found.name == "dharma"
 
     @pytest.mark.asyncio
+    async def test_get_by_name_returns_highest_priority_exact_match(self, tmp_path):
+        tg = _make_graph(tmp_path)
+        await tg.add_objective(_obj("viveka", priority=3))
+        top = await tg.add_objective(_obj("viveka", priority=9))
+
+        found = await tg.get_by_name("viveka")
+
+        assert found is not None
+        assert found.id == top.id
+
+    @pytest.mark.asyncio
     async def test_get_objective_not_found(self, tmp_path):
         tg = _make_graph(tmp_path)
         assert await tg.get_objective("nonexistent") is None

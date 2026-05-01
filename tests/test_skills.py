@@ -203,6 +203,38 @@ class TestSkillRegistry:
         assert "alpha" in reloaded
         assert "updated" in registry.get("alpha").tags
 
+    def test_discover_reuses_cached_parse_for_unchanged_files(
+        self,
+        skill_dir: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        registry = SkillRegistry(skill_dirs=[skill_dir])
+        first = registry.discover()
+        assert len(first) == 2
+
+        def _fail(_path: Path):
+            raise AssertionError("unchanged skill should not be reparsed")
+
+        monkeypatch.setattr("dharma_swarm.skills.parse_skill_file", _fail)
+        second = registry.discover()
+        assert len(second) == 2
+        assert set(second) == {"alpha", "beta"}
+
+    def test_hot_reload_tracks_new_and_deleted_files(self, skill_dir: Path):
+        registry = SkillRegistry(skill_dirs=[skill_dir])
+        registry.discover()
+
+        gamma = skill_dir / "gamma.skill.md"
+        gamma.write_text("---\nname: gamma\n---\n# Gamma\n")
+        reloaded = registry.hot_reload()
+        assert "gamma" in reloaded
+        assert registry.get("gamma") is not None
+
+        (skill_dir / "beta.skill.md").unlink()
+        reloaded = registry.hot_reload()
+        assert "beta" in reloaded
+        assert registry.get("beta") is None
+
     def test_empty_directory(self, tmp_path: Path):
         empty = tmp_path / "empty_skills"
         empty.mkdir()

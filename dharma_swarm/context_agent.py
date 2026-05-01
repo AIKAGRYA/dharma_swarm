@@ -972,6 +972,21 @@ class ContextAgent:
 CONTEXT_AGENT_INTERVAL = int(os.environ.get("DGC_CONTEXT_AGENT_INTERVAL", "180"))
 
 
+def _context_agent_boot_delay_seconds() -> float:
+    raw = os.environ.get("DGC_CONTEXT_AGENT_BOOT_DELAY", "").strip()
+    if not raw:
+        return float(CONTEXT_AGENT_INTERVAL)
+    try:
+        return max(0.0, float(raw))
+    except ValueError:
+        logger.warning(
+            "Invalid DGC_CONTEXT_AGENT_BOOT_DELAY=%r; using %ss",
+            raw,
+            CONTEXT_AGENT_INTERVAL,
+        )
+        return float(CONTEXT_AGENT_INTERVAL)
+
+
 async def run_context_agent_loop(
     shutdown_event: asyncio.Event,
     signal_bus: SignalBus | None = None,
@@ -981,7 +996,23 @@ async def run_context_agent_loop(
     Designed to be added as 6th task in orchestrate_live.orchestrate().
     """
     agent = ContextAgent(signal_bus=signal_bus)
-    logger.info("Context agent started (interval=%ds)", CONTEXT_AGENT_INTERVAL)
+    boot_delay_seconds = _context_agent_boot_delay_seconds()
+    logger.info(
+        "Context agent started (interval=%ds boot_delay=%.1fs)",
+        CONTEXT_AGENT_INTERVAL,
+        boot_delay_seconds,
+    )
+
+    if boot_delay_seconds > 0:
+        try:
+            await asyncio.wait_for(
+                shutdown_event.wait(),
+                timeout=boot_delay_seconds,
+            )
+            logger.info("Context agent stopped before first cycle")
+            return
+        except asyncio.TimeoutError:
+            pass
 
     while not shutdown_event.is_set():
         try:

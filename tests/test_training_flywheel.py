@@ -3,15 +3,18 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from unittest.mock import patch, MagicMock
 
 import pytest
 
+import dharma_swarm.training_flywheel as training_flywheel
 from dharma_swarm.training_flywheel import (
     FlywheelState,
     _run_reinforcement,
     _run_dataset_build,
     _run_readiness_check,
+    get_flywheel_state,
     run_training_flywheel_loop,
     MIN_TRAJECTORIES_FOR_REINFORCE,
 )
@@ -40,6 +43,44 @@ def test_state_snapshot() -> None:
     assert snap["total_patterns_extracted"] == 12
     assert snap["training_ready"] is True
     assert snap["recommended_gpu"] == "A100"
+
+
+def test_get_flywheel_state_reads_persisted_snapshot(
+    tmp_path: pytest.TempPathFactory,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    state_dir = tmp_path / ".dharma"
+    state_path = state_dir / "meta" / "training_flywheel_state.json"
+    state_path.parent.mkdir(parents=True)
+    state_path.write_text(
+        json.dumps(
+            {
+                "reinforce_cycles": 2,
+                "dataset_builds": 1,
+                "readiness_checks": 3,
+                "total_trajectories_scored": 42,
+                "total_patterns_extracted": 7,
+                "last_reinforce": 1.0,
+                "last_dataset_build": 2.0,
+                "last_readiness_check": 3.0,
+                "last_dataset_path": "/tmp/flywheel.jsonl",
+                "training_ready": True,
+                "recommended_gpu": "A100_40GB",
+                "recommended_budget": 9.5,
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(training_flywheel, "STATE_DIR", state_dir)
+    monkeypatch.setattr(training_flywheel, "FLYWHEEL_STATE_PATH", state_path)
+    monkeypatch.setattr(training_flywheel, "_STATE_CACHE", None)
+
+    state = get_flywheel_state()
+
+    assert state.reinforce_cycles == 2
+    assert state.last_dataset_path == "/tmp/flywheel.jsonl"
+    assert state.training_ready is True
+    assert state.recommended_gpu == "A100_40GB"
 
 
 # --- Reinforcement sub-cycle ---

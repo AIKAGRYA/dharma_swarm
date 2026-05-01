@@ -300,6 +300,20 @@ class TelosGraph:
         """Return an objective by id, or ``None``."""
         return self._objectives.get(obj_id)
 
+    async def get_by_name(self, name: str) -> TelosObjective | None:
+        """Return the highest-priority objective with an exact name match."""
+        normalized = name.strip().lower()
+        if not normalized:
+            return None
+        matches = [
+            obj for obj in self._objectives.values()
+            if obj.name.strip().lower() == normalized
+        ]
+        if not matches:
+            return None
+        matches.sort(key=lambda obj: (obj.priority, obj.updated_at), reverse=True)
+        return matches[0]
+
     def list_objectives(
         self,
         perspective: TelosPerspective | None = None,

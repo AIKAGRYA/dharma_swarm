@@ -1,37 +1,20 @@
 # GUARDIAN CREW REPORT
-*Generated: 2026-04-13T10:33:22.274633+00:00*
+*Generated: 2026-05-01T13:10:34.306034+00:00*
 *Src root: /Users/dhyana/dharma_swarm_lf5/dharma_swarm*
 
 ## Summary
 | Severity | Count |
 |----------|-------|
-| BLOCKER  | 1 |
-| DEGRADED | 2 |
+| BLOCKER  | 0 |
+| DEGRADED | 0 |
 | WARNING  | 1 |
-| TOTAL    | 4 |
+| TOTAL    | 1 |
 
 ## BLOCKERs
-### 1. PalaceQuery.__init__() missing in memory_palace.py
-**Check:** `AUDITOR:method_exists` | **File:** `memory_palace.py`
-
-Class PalaceQuery exists but method __init__ is not defined
-
-**Fix:** Add `def __init__(self, ...)` to PalaceQuery
+*None.*
 
 ## DEGRADED
-### 1. TaskBoard.get_by_title() missing in task_board.py
-**Check:** `AUDITOR:method_exists` | **File:** `task_board.py`
-
-Class TaskBoard exists but method get_by_title is not defined
-
-**Fix:** Add `def get_by_title(self, ...)` to TaskBoard
-
-### 2. TelosGraph.get_by_name() missing in telos_graph.py
-**Check:** `AUDITOR:method_exists` | **File:** `telos_graph.py`
-
-Class TelosGraph exists but method get_by_name is not defined
-
-**Fix:** Add `def get_by_name(self, ...)` to TelosGraph
+*None.*
 
 ## WARNINGs
 ### 1. Loop artifact missing: memory (memory palace db)

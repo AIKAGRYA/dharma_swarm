@@ -33,6 +33,53 @@ export interface RuntimeControlPlaneSnapshot {
   meanFitnessLabel: string;
 }
 
+function livenessStatus(data: RuntimeControlPlaneData): string | null {
+  const status = data.health?.liveness?.status?.trim().toLowerCase();
+  return status || null;
+}
+
+function livenessPhase(data: RuntimeControlPlaneData): string | null {
+  const phase = data.health?.liveness?.bootstrap_phase?.trim();
+  return phase || null;
+}
+
+function humanizeLivenessToken(value: string | null | undefined): string {
+  if (!value) return "unknown";
+  return value.replace(/_/g, " ");
+}
+
+function livenessDetail(data: RuntimeControlPlaneData): string | null {
+  const status = livenessStatus(data);
+  if (!status) return null;
+
+  const phase = humanizeLivenessToken(livenessPhase(data));
+  const stallReason = data.health?.liveness?.stall_reason?.trim();
+  const stallState = humanizeLivenessToken(data.health?.liveness?.stall_state);
+  const lastTickNumber = data.health?.liveness?.last_tick_number;
+
+  if (status === "stalled") {
+    const reason = stallReason || `hot path entered ${stallState}`;
+    return `Swarm hot path stalled during ${phase}: ${reason}.`;
+  }
+
+  if (status === "booting") {
+    return `Swarm bootstrap is still in progress at phase ${phase}.`;
+  }
+
+  if (status === "degraded") {
+    if (stallReason) {
+      return `Swarm hot path is degraded during ${phase}: ${stallReason}.`;
+    }
+    return `Swarm hot path is degraded during ${phase}.`;
+  }
+
+  if (status === "healthy" && typeof lastTickNumber === "number" && lastTickNumber > 0) {
+    return `Swarm hot path is healthy at ${phase}; last completed tick ${lastTickNumber}.`;
+  }
+
+  return null;
+}
+
 function firstNonEmpty(values: Array<string | null | undefined>): string | null {
   const normalized = values
     .map((value) => value?.trim())
@@ -214,9 +261,12 @@ function appendSessionFeedDetail(
 function runtimeStatusKind(data: RuntimeControlPlaneData): RuntimeControlPlaneStatusKind {
   if (!hasRuntimeSignal(data)) return "muted";
   if (hasRuntimeTransportFailure(data)) return "error";
+  if (livenessStatus(data) === "stalled") return "error";
+  if (livenessStatus(data) === "booting") return "warn";
   if (!data.chatStatus?.ready) return "error";
   if (hasAdvertisedLaneFailure(data)) return "error";
   if (!data.health) return "warn";
+  if (livenessStatus(data) === "degraded") return "warn";
   if (data.health?.overall_status === "degraded") return "warn";
   if (hasUnavailableDefaultProfile(data)) return "warn";
   if (!sessionFeedAdvertised(data)) return "warn";
@@ -226,13 +276,16 @@ function runtimeStatusKind(data: RuntimeControlPlaneData): RuntimeControlPlaneSt
 function runtimeStatusLabel(data: RuntimeControlPlaneData): string {
   if (!hasRuntimeSignal(data)) return "syncing";
   if (hasRuntimeTransportFailure(data)) return "runtime unreachable";
+  if (livenessStatus(data) === "stalled") return "stalled";
+  if (livenessStatus(data) === "booting") return "booting";
   if (!data.chatStatus?.ready) return "chat unavailable";
   if (hasAdvertisedLaneFailure(data)) return "lanes unavailable";
   if (!data.health) return "health unavailable";
+  if (livenessStatus(data) === "degraded") return "degraded";
   if (data.health?.overall_status === "degraded") return "degraded";
   if (hasUnavailableDefaultProfile(data)) return "default lane unavailable";
   if (!sessionFeedAdvertised(data)) return "session feed unavailable";
-  return data.health?.overall_status ?? "ok";
+  return livenessStatus(data) ?? data.health?.overall_status ?? "ok";
 }
 
 function runtimeDetail(data: RuntimeControlPlaneData): string {
@@ -241,6 +294,13 @@ function runtimeDetail(data: RuntimeControlPlaneData): string {
   }
   if (hasRuntimeTransportFailure(data)) {
     return `Canonical runtime query failed: ${runtimeTransportFailureSummary(data)}`;
+  }
+  const liveDetail = livenessDetail(data);
+  if (liveDetail && livenessStatus(data) === "stalled") {
+    return liveDetail;
+  }
+  if (liveDetail && livenessStatus(data) === "booting") {
+    return liveDetail;
   }
   if (!data.chatStatus?.ready) {
     if (data.chatError) {
@@ -253,7 +313,7 @@ function runtimeDetail(data: RuntimeControlPlaneData): string {
   }
   if (!data.health) {
     if (data.healthError) {
-      return appendSessionFeedDetail(
+        return appendSessionFeedDetail(
         `Chat lanes are live, but /api/health is unavailable: ${data.healthError}`,
         data,
       );
@@ -262,6 +322,9 @@ function runtimeDetail(data: RuntimeControlPlaneData): string {
       "Chat lanes are live, but /api/health has not reported yet.",
       data,
     );
+  }
+  if (liveDetail && livenessStatus(data) === "degraded") {
+    return appendSessionFeedDetail(liveDetail, data);
   }
   if (data.health?.overall_status === "degraded") {
     return appendSessionFeedDetail(
@@ -294,6 +357,16 @@ function healthStatusLabel(data: RuntimeControlPlaneData): string {
   }
   if (!data.health) {
     return data.healthError ? "health unavailable" : "awaiting health";
+  }
+  const liveStatus = livenessStatus(data);
+  if (liveStatus === "stalled") {
+    return `stalled · ${humanizeLivenessToken(data.health?.liveness?.stall_state)}`;
+  }
+  if (liveStatus === "booting") {
+    return `booting · ${humanizeLivenessToken(livenessPhase(data))}`;
+  }
+  if (liveStatus === "degraded") {
+    return `degraded · ${humanizeLivenessToken(data.health?.liveness?.stall_state ?? livenessPhase(data))}`;
   }
   return `${data.health.anomalies.length} anomalies · ${formatMeanFitness(data.health)} fit`;
 }

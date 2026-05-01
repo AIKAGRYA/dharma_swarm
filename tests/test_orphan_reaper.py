@@ -213,6 +213,67 @@ class TestReapOrphanedTasks:
         assert refreshed.status == TaskStatus.RUNNING
 
     @pytest.mark.asyncio
+    async def test_expired_claim_is_reaped_even_before_stale_window(
+        self, tmp_path: Path,
+    ) -> None:
+        board = await _make_board(tmp_path)
+        task = await board.create("recent running task with expired claim")
+        recent_time = datetime.now(timezone.utc) - timedelta(minutes=2)
+        await _force_task_state(
+            board,
+            task.id,
+            status=TaskStatus.RUNNING.value,
+            assigned_to="dead-agent-expired-claim",
+            updated_at=recent_time,
+            metadata={
+                "active_claim": {
+                    "claim_expires_at_epoch": recent_time.timestamp() - 30.0,
+                }
+            },
+        )
+
+        pool = _FakeAgentPool([])
+        sm = await _make_swarm(tmp_path, board, pool)
+
+        reaped = await sm.reap_orphaned_tasks(stale_minutes=30)
+
+        assert len(reaped) == 1
+        assert reaped[0].id == task.id
+        assert reaped[0].status == TaskStatus.PENDING
+        assert reaped[0].metadata["orphan_reap_reason"] == "expired_claim"
+        assert "expired claim" in (reaped[0].result or "").lower()
+
+    @pytest.mark.asyncio
+    async def test_unexpired_claim_still_respects_stale_window(
+        self, tmp_path: Path,
+    ) -> None:
+        board = await _make_board(tmp_path)
+        task = await board.create("recent running task with live claim")
+        recent_time = datetime.now(timezone.utc) - timedelta(minutes=2)
+        await _force_task_state(
+            board,
+            task.id,
+            status=TaskStatus.RUNNING.value,
+            assigned_to="dead-agent-live-claim",
+            updated_at=recent_time,
+            metadata={
+                "active_claim": {
+                    "claim_expires_at_epoch": recent_time.timestamp() + 600.0,
+                }
+            },
+        )
+
+        pool = _FakeAgentPool([])
+        sm = await _make_swarm(tmp_path, board, pool)
+
+        reaped = await sm.reap_orphaned_tasks(stale_minutes=30)
+
+        assert reaped == []
+        refreshed = await board.get(task.id)
+        assert refreshed is not None
+        assert refreshed.status == TaskStatus.RUNNING
+
+    @pytest.mark.asyncio
     async def test_metadata_enriched_on_reap(self, tmp_path: Path) -> None:
         board = await _make_board(tmp_path)
         task = await board.create("metadata enrichment task")
@@ -235,6 +296,7 @@ class TestReapOrphanedTasks:
         assert "orphan_reaped_at" in meta
         assert meta["orphan_original_agent"] == "dead-agent-meta"
         assert meta["orphan_original_status"] == "assigned"
+        assert meta["orphan_reap_reason"] == "stale_assignment"
 
     @pytest.mark.asyncio
     async def test_custom_stale_minutes_threshold(self, tmp_path: Path) -> None:

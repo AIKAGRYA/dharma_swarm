@@ -9,6 +9,7 @@
  */
 
 import { wsBaseUrl } from "./api";
+import { readDashboardApiToken } from "./auth";
 import type { WsEvent } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -52,7 +53,11 @@ export class DharmaSocket {
   constructor(channel: string, options: DharmaSocketOptions = {}) {
     const base = wsBaseUrl();
     const ch = channel.startsWith("/") ? channel : `/${channel}`;
-    this.url = `${base}/ws${ch}`;
+    const token = readDashboardApiToken();
+    const query = token
+      ? `${ch.includes("?") ? "&" : "?"}token=${encodeURIComponent(token)}`
+      : "";
+    this.url = `${base}/ws${ch}${query}`;
     this.opts = {
       maxRetries: 10,
       baseDelay: 1000,

@@ -11,6 +11,7 @@ Usage:
   dgc dashboard                 Launch interactive DGC dashboard (TUI)
   dgc status                    System status overview
   dgc runtime-status            Canonical runtime control-plane summary
+  dgc repo-rules                Show canonical repo rule entrypoints
   dgc mission-status            Mission-level readiness across core/accelerators
   dgc mission-brief             Show the active mission continuity state
   dgc campaign-brief            Show the active dual-engine campaign state
@@ -43,6 +44,7 @@ Usage:
   dgc ouroboros connections|record  Inspect or canonically bind behavioral observations
   dgc health-check              Monitor-based system health (v0.2.0)
   dgc doctor                    Deep runtime diagnostics + fix guidance
+  dgc overnight-readiness       Fresh preflight for multi-hour builds
   dgc spawn --name X --role Y   Spawn a new agent
   dgc task create "title"       Create a task
   dgc task list [--status S]    List tasks
@@ -79,6 +81,7 @@ HOME = Path.home()
 DHARMA_STATE = HOME / ".dharma"
 DHARMA_SWARM = HOME / "dharma_swarm"
 DGC_CORE = HOME / "dgc-core"
+REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SPRINT_LLM_TIMEOUT_SEC = 12.0
 
 # Keep mission-status aligned with the lanes the overnight cycle depends on:
@@ -326,8 +329,20 @@ def _list_daemon_like_processes() -> list[tuple[int, str]]:
 
     current_pid = os.getpid()
     matches: list[tuple[int, str]] = []
-    needles = ("dharma_swarm.orchestrate_live", "orchestrate_live.py", "run_daemon.sh")
-    skip_markers = ("dgc doctor", "ps -axo", "rg ", "pytest")
+    needles = (
+        "dharma_swarm.orchestrate_live",
+        "orchestrate_live.py",
+        "run_daemon.sh",
+        "dgc orchestrate-live",
+    )
+    skip_markers = (
+        "dgc doctor",
+        "ps -axo",
+        "rg ",
+        "pytest",
+        "codex exec",
+        "claude --bare -p",
+    )
 
     for raw in proc.stdout.splitlines():
         line = raw.strip()
@@ -640,6 +655,50 @@ def cmd_runtime_status(
             runtime_db_path=Path(db_path) if db_path else None,
         )
     )
+
+
+def cmd_repo_rules(*, as_json: bool = False) -> int:
+    """Print the canonical repo-rules entrypoints."""
+    payload = {
+        "repo_root": str(REPO_ROOT),
+        "entrypoint": str(REPO_ROOT / "REPO_RULES.md"),
+        "read_order": [
+            "REPO_RULES.md",
+            "README.md",
+            "CLAUDE.md",
+            "AGENTS.md",
+            "INTERFACE_MISMATCH_MAP.md",
+            "MODEL_ROUTING_MAP.md",
+        ],
+        "build_governance": [
+            "dharma_swarm/build_authority.py",
+            "dharma_swarm/build_registry.py",
+            "scripts/build_registry_ctl.py",
+        ],
+        "skill": ".claude/skills/repo-rules/SKILL.md",
+        "usage_hint": (
+            "If told to 'follow the repo rules', start at REPO_RULES.md and then "
+            "follow the listed read order."
+        ),
+    }
+    if as_json:
+        print(json.dumps(payload, ensure_ascii=True, indent=2, sort_keys=True))
+        return 0
+
+    print("Repo rules entrypoint:")
+    print(f"  {payload['entrypoint']}")
+    print()
+    print("Read order:")
+    for item in payload["read_order"]:
+        print(f"  - {item}")
+    print()
+    print("Canonical build governance:")
+    for item in payload["build_governance"]:
+        print(f"  - {item}")
+    print()
+    print(f"Repo-local skill: {payload['skill']}")
+    print(f"Hint: {payload['usage_hint']}")
+    return 0
 
 
 def _read_openclaw_summary() -> dict[str, Any]:
@@ -1536,6 +1595,393 @@ def cmd_doctor(
     else:
         print(render_doctor_report(report))
     return doctor_exit_code(report, strict=strict)
+
+
+def _readiness_fetch_json(url: str, *, timeout: float) -> tuple[bool, dict[str, Any] | str]:
+    from urllib import request
+
+    try:
+        with request.urlopen(url, timeout=max(0.5, timeout)) as response:
+            raw = response.read().decode("utf-8", errors="replace")
+    except Exception as exc:
+        return False, str(exc)
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        return False, f"invalid JSON: {exc}"
+    if not isinstance(payload, dict):
+        return False, "response was not a JSON object"
+    return True, payload
+
+
+def _readiness_doctor_report(*, run_doctor: bool, timeout: float) -> dict[str, Any] | None:
+    from dharma_swarm.doctor import (
+        load_latest_doctor_report,
+        run_doctor,
+        write_doctor_artifacts,
+    )
+
+    if not run_doctor:
+        return load_latest_doctor_report()
+    report = run_doctor(timeout_seconds=timeout, quick=True)
+    write_doctor_artifacts(report)
+    return report
+
+
+def _readiness_permission_blocked(detail: Any) -> bool:
+    return "Operation not permitted" in str(detail)
+
+
+def _readiness_swarm_snapshot() -> dict[str, Any]:
+    try:
+        from dharma_swarm.runtime_artifacts import dgc_health_snapshot_summary
+
+        return dgc_health_snapshot_summary(DHARMA_STATE, stale_after_seconds=300.0)
+    except Exception as exc:
+        return {"status": "unavailable", "error": str(exc), "liveness": {}}
+
+
+def _task_is_builder_claim(task: Any) -> bool:
+    from dharma_swarm.build_authority import BuildLane
+    from dharma_swarm.task_contract import allowed_claim_lanes
+
+    lanes = set(allowed_claim_lanes(getattr(task, "metadata", {}) or {}))
+    return bool(lanes.intersection({BuildLane.BUILDER, BuildLane.GATEWAY}))
+
+
+def _readiness_task_snapshot(*, limit: int = 20) -> dict[str, Any]:
+    async def _collect() -> dict[str, Any]:
+        from dharma_swarm.models import TaskStatus
+
+        tb = await _get_task_board(state_dir=str(DHARMA_STATE))
+        stats = await tb.stats()
+        pending = await tb.list_tasks(status=TaskStatus.PENDING, limit=limit)
+        running = await tb.list_tasks(status=TaskStatus.RUNNING, limit=limit)
+        builder_pending = [task for task in pending if _task_is_builder_claim(task)]
+        builder_running = [task for task in running if _task_is_builder_claim(task)]
+        return {
+            "stats": stats,
+            "pending": [
+                {
+                    "id": task.id,
+                    "title": task.title,
+                    "priority": task.priority.value,
+                    "assigned_to": task.assigned_to,
+                }
+                for task in pending
+            ],
+            "builder_pending": [
+                {
+                    "id": task.id,
+                    "title": task.title,
+                    "priority": task.priority.value,
+                    "assigned_to": task.assigned_to,
+                }
+                for task in builder_pending
+            ],
+            "builder_running": [
+                {
+                    "id": task.id,
+                    "title": task.title,
+                    "priority": task.priority.value,
+                    "assigned_to": task.assigned_to,
+                }
+                for task in builder_running
+            ],
+        }
+
+    try:
+        return _run(_collect())
+    except Exception as exc:
+        return {
+            "error": str(exc),
+            "stats": {},
+            "pending": [],
+            "builder_pending": [],
+            "builder_running": [],
+        }
+
+
+def _readiness_recent_route_blocks(*, lines: int = 600) -> list[str]:
+    log_text = _tail(DHARMA_STATE / "logs" / "swarm.log", lines=lines)
+    blocks = []
+    for raw_line in log_text.splitlines():
+        if "no_tooling_capable_idle_agent" not in raw_line:
+            continue
+        blocks.append(raw_line.strip())
+    return blocks[-10:]
+
+
+def _readiness_add(
+    checks: list[dict[str, Any]],
+    *,
+    name: str,
+    status: str,
+    summary: str,
+    detail: Any = None,
+    fix: str = "",
+) -> None:
+    checks.append(
+        {
+            "name": name,
+            "status": status,
+            "summary": summary,
+            "detail": detail,
+            "fix": fix,
+        }
+    )
+
+
+def _readiness_exit_code(checks: list[dict[str, Any]]) -> int:
+    statuses = {str(check.get("status", "")).upper() for check in checks}
+    if "FAIL" in statuses:
+        return 2
+    if "WARN" in statuses:
+        return 1
+    return 0
+
+
+def _readiness_overall(checks: list[dict[str, Any]]) -> str:
+    code = _readiness_exit_code(checks)
+    if code == 2:
+        return "FAIL"
+    if code == 1:
+        return "WARN"
+    return "PASS"
+
+
+def cmd_overnight_readiness(
+    *,
+    as_json: bool = False,
+    run_doctor: bool = True,
+    timeout: float = 1.5,
+) -> int:
+    """Fresh preflight for multi-hour autonomous builds."""
+    checks: list[dict[str, Any]] = []
+
+    ok, swarm_payload = _readiness_fetch_json(
+        "http://127.0.0.1:7433/health",
+        timeout=timeout,
+    )
+    if not ok:
+        snapshot = _readiness_swarm_snapshot() if _readiness_permission_blocked(swarm_payload) else {}
+        liveness = snapshot.get("liveness", {}) if isinstance(snapshot, dict) else {}
+        snapshot_fresh = snapshot.get("status") == "fresh" if isinstance(snapshot, dict) else False
+        snapshot_healthy = (
+            isinstance(liveness, dict)
+            and liveness.get("status") == "healthy"
+            and bool(liveness.get("tick_fresh", True))
+        )
+        if snapshot_fresh and snapshot_healthy:
+            _readiness_add(
+                checks,
+                name="swarm_health",
+                status="PASS",
+                summary="swarm endpoint blocked here, but fresh runtime snapshot is healthy",
+                detail={
+                    "endpoint_error": swarm_payload,
+                    "snapshot_status": snapshot.get("status"),
+                    "snapshot_age_seconds": snapshot.get("age_seconds"),
+                    "liveness": liveness,
+                },
+            )
+        else:
+            _readiness_add(
+                checks,
+                name="swarm_health",
+                status="FAIL",
+                summary="swarm health endpoint is unavailable",
+                detail=swarm_payload,
+                fix="Start or restart the live daemon before leaving an overnight build running.",
+            )
+    else:
+        health = str(swarm_payload.get("status", "unknown")).lower()
+        liveness = swarm_payload.get("liveness", {})
+        stalled = bool(isinstance(liveness, dict) and liveness.get("orchestrator_stalled"))
+        booted = bool(isinstance(liveness, dict) and liveness.get("bootstrap_complete", True))
+        live_status = str(liveness.get("status", "") if isinstance(liveness, dict) else "").lower()
+        if health in {"healthy", "ok"} and live_status in {"", "healthy"} and booted and not stalled:
+            _readiness_add(
+                checks,
+                name="swarm_health",
+                status="PASS",
+                summary="swarm daemon is healthy",
+                detail=swarm_payload.get("liveness", {}),
+            )
+        else:
+            _readiness_add(
+                checks,
+                name="swarm_health",
+                status="FAIL" if stalled or not booted else "WARN",
+                summary=f"swarm daemon reports {health}",
+                detail=swarm_payload.get("liveness", swarm_payload),
+                fix="Inspect daemon logs and restart if liveness is stale or bootstrap is incomplete.",
+            )
+
+    ok, dashboard_payload = _readiness_fetch_json(
+        "http://127.0.0.1:8420/api/health",
+        timeout=timeout,
+    )
+    if ok:
+        dashboard_status = str(dashboard_payload.get("status", "unknown")).lower()
+        _readiness_add(
+            checks,
+            name="dashboard_api",
+            status="PASS" if dashboard_status in {"healthy", "ok"} else "WARN",
+            summary=f"dashboard API reports {dashboard_status}",
+            detail=dashboard_payload,
+        )
+    else:
+        _readiness_add(
+            checks,
+            name="dashboard_api",
+            status="WARN",
+            summary="dashboard API endpoint is unavailable",
+            detail=dashboard_payload,
+            fix="Start the dashboard API if operator visibility is needed overnight.",
+        )
+
+    ok, chat_payload = _readiness_fetch_json(
+        "http://127.0.0.1:8420/api/chat/status",
+        timeout=timeout,
+    )
+    if ok:
+        ready = bool(chat_payload.get("ready", False))
+        _readiness_add(
+            checks,
+            name="chat_bridge",
+            status="PASS" if ready else "WARN",
+            summary="chat bridge is ready" if ready else "chat bridge is not ready",
+            detail=chat_payload,
+        )
+    else:
+        _readiness_add(
+            checks,
+            name="chat_bridge",
+            status="WARN",
+            summary="chat bridge status endpoint is unavailable",
+            detail=chat_payload,
+        )
+
+    task_snapshot = _readiness_task_snapshot()
+    builder_pending = task_snapshot.get("builder_pending", [])
+    builder_running = task_snapshot.get("builder_running", [])
+    route_blocks = _readiness_recent_route_blocks()
+    if task_snapshot.get("error"):
+        _readiness_add(
+            checks,
+            name="task_board",
+            status="WARN",
+            summary="task board snapshot failed",
+            detail=task_snapshot.get("error"),
+        )
+    elif builder_pending and route_blocks and builder_running:
+        _readiness_add(
+            checks,
+            name="builder_routing",
+            status="WARN",
+            summary=(
+                f"{len(builder_pending)} builder task(s) pending while "
+                f"{len(builder_running)} builder task(s) already run on local tooling"
+            ),
+            detail={
+                "builder_pending": builder_pending[:10],
+                "builder_running": builder_running[:10],
+                "recent_blocks": route_blocks,
+            },
+            fix="Capacity-limited builder backlog: leave Codex running or add another local tooling seat.",
+        )
+    elif builder_pending and route_blocks:
+        _readiness_add(
+            checks,
+            name="builder_routing",
+            status="FAIL",
+            summary=(
+                f"{len(builder_pending)} builder task(s) pending with recent "
+                "no-tooling-capable routing blocks"
+            ),
+            detail={"builder_pending": builder_pending[:10], "recent_blocks": route_blocks},
+            fix="Restart the daemon on the builder-routing fix, then confirm pending build tasks dispatch.",
+        )
+    elif builder_pending:
+        _readiness_add(
+            checks,
+            name="builder_routing",
+            status="WARN",
+            summary=f"{len(builder_pending)} builder task(s) pending; no recent routing block seen",
+            detail={"builder_pending": builder_pending[:10]},
+        )
+    else:
+        _readiness_add(
+            checks,
+            name="builder_routing",
+            status="PASS",
+            summary="no blocked builder backlog detected",
+            detail={"stats": task_snapshot.get("stats", {})},
+        )
+
+    doctor_report = _readiness_doctor_report(run_doctor=run_doctor, timeout=timeout)
+    if doctor_report is None:
+        _readiness_add(
+            checks,
+            name="doctor",
+            status="WARN",
+            summary="no Doctor report available",
+            fix="Run `dgc doctor --quick` to populate a fresh readiness baseline.",
+        )
+    else:
+        summary = doctor_report.get("summary", {})
+        fail_count = int(summary.get("fail", 0) or summary.get("failed", 0) or 0)
+        warn_count = int(summary.get("warn", 0) or summary.get("warnings", 0) or 0)
+        if fail_count:
+            status = "FAIL"
+        elif warn_count:
+            status = "WARN"
+        else:
+            status = "PASS"
+        _readiness_add(
+            checks,
+            name="doctor",
+            status=status,
+            summary=f"Doctor: {fail_count} fail, {warn_count} warn",
+            detail={"summary": summary, "generated_at": doctor_report.get("generated_at")},
+            fix=(
+                "Resolve Doctor hard failures before trusting multi-hour autonomous execution."
+                if fail_count
+                else "Review Doctor warnings before leaving a long unattended run."
+            ),
+        )
+
+    payload = {
+        "overall": _readiness_overall(checks),
+        "exit_code": _readiness_exit_code(checks),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "checks": checks,
+    }
+
+    if as_json:
+        print(json.dumps(payload, ensure_ascii=True, indent=2, sort_keys=True))
+        return payload["exit_code"]
+
+    print(f"Overnight readiness: {payload['overall']}")
+    print()
+    for check in checks:
+        print(f"{check['status']:>4}  {check['name']}: {check['summary']}")
+    fixes = [
+        str(check.get("fix", "")).strip()
+        for check in checks
+        if check.get("status") in {"FAIL", "WARN"} and str(check.get("fix", "")).strip()
+    ]
+    if fixes:
+        print()
+        print("Next actions:")
+        seen: set[str] = set()
+        for fix in fixes:
+            if fix in seen:
+                continue
+            seen.add(fix)
+            print(f"  - {fix}")
+    return payload["exit_code"]
 
 
 def cmd_pulse() -> None:
@@ -2465,9 +2911,18 @@ def cmd_promise_pin(promise_id: str, agent: str) -> None:
 def cmd_governance_status() -> None:
     """Show current governance snapshot: overlay status + artifact summary."""
     import os as _os
+    from dharma_swarm.governance_signal import is_overlay_enabled
+
     meta = _governance_meta_dir()
-    overlay_on = _os.environ.get("DGC_GOVERNANCE_OVERLAY", "0").strip() not in ("", "0", "false", "False", "no")
-    print(f"DGC_GOVERNANCE_OVERLAY = {'ON' if overlay_on else 'OFF'}")
+    raw = _os.environ.get("DGC_GOVERNANCE_OVERLAY", "").strip().lower()
+    if raw in {"1", "true", "yes", "on"}:
+        overlay_mode = "FORCED_ON"
+    elif raw in {"0", "false", "no", "off"}:
+        overlay_mode = "FORCED_OFF"
+    else:
+        overlay_mode = "AUTO"
+    overlay_on = is_overlay_enabled()
+    print(f"DGC_GOVERNANCE_OVERLAY = {'ON' if overlay_on else 'OFF'} ({overlay_mode})")
     print()
 
     gs_path = meta / "governance_signal.json"
@@ -5582,6 +6037,8 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p_canonical = sub.add_parser("canonical-status", help="Show canonical DGC/SAB repo topology")
     p_canonical.add_argument("--json", action="store_true", help="Emit JSON report")
+    p_repo_rules = sub.add_parser("repo-rules", help="Show canonical repo rules entrypoints")
+    p_repo_rules.add_argument("--json", action="store_true", help="Emit machine-readable JSON")
 
     # -- chat --
     p_chat = sub.add_parser("chat", help="Launch native Claude Code interactive UI")
@@ -5876,6 +6333,18 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Optional max iterations for `dgc doctor watch`",
     )
+
+    p_ready = sub.add_parser(
+        "overnight-readiness",
+        help="Fresh preflight for multi-hour autonomous builds",
+    )
+    p_ready.add_argument("--json", action="store_true", help="Emit machine-readable JSON")
+    p_ready.add_argument(
+        "--cached-doctor",
+        action="store_true",
+        help="Use the latest cached Doctor report instead of running a fresh quick Doctor pass",
+    )
+    p_ready.add_argument("--timeout", type=float, default=1.5, help="Probe timeout seconds")
 
     # -- setup --
     sub.add_parser("setup", help="Install dependencies")
@@ -6713,6 +7182,10 @@ def main() -> None:
             rc = cmd_canonical_status(as_json=args.json)
             if rc != 0:
                 raise SystemExit(rc)
+        case "repo-rules":
+            rc = cmd_repo_rules(as_json=args.json)
+            if rc != 0:
+                raise SystemExit(rc)
         case "up":
             cmd_up(background=args.background)
         case "down":
@@ -6842,6 +7315,14 @@ def main() -> None:
                 schedule=args.schedule,
                 interval_sec=args.interval_sec,
                 max_runs=args.max_runs,
+            )
+            if rc != 0:
+                raise SystemExit(rc)
+        case "overnight-readiness":
+            rc = cmd_overnight_readiness(
+                as_json=args.json,
+                run_doctor=not args.cached_doctor,
+                timeout=args.timeout,
             )
             if rc != 0:
                 raise SystemExit(rc)

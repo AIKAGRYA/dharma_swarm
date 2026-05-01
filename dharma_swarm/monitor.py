@@ -108,8 +108,15 @@ class SystemMonitor:
     The monitor is pure analysis -- it never mutates the trace store.
     """
 
-    def __init__(self, trace_store: TraceStore) -> None:
+    def __init__(
+        self,
+        trace_store: TraceStore,
+        *,
+        agent_silent_reemit_hours: float = 4.0,
+    ) -> None:
         self._store = trace_store
+        self._agent_silent_reemit_hours = max(0.0, float(agent_silent_reemit_hours))
+        self._silent_anomaly_fired_at: dict[str, datetime] = {}
 
     # -- public API ----------------------------------------------------------
 
@@ -318,8 +325,16 @@ class SystemMonitor:
         window_agents = {e.agent for e in window}
         window_ids = {e.id for e in window}
         pre_window_agents = {e.agent for e in all_entries if e.id not in window_ids}
+        for agent_name in window_agents:
+            self._silent_anomaly_fired_at.pop(agent_name, None)
         silent_agents = pre_window_agents - window_agents
         for agent_name in sorted(silent_agents):
+            last_fired = self._silent_anomaly_fired_at.get(agent_name)
+            if last_fired is not None:
+                cooldown_s = self._agent_silent_reemit_hours * 3600.0
+                if (now - last_fired).total_seconds() < cooldown_s:
+                    continue
+            self._silent_anomaly_fired_at[agent_name] = now
             anomalies.append(
                 Anomaly(
                     anomaly_type="agent_silent",

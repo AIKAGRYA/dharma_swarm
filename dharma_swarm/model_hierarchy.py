@@ -214,7 +214,14 @@ DELIBERATIVE_EXECUTION_PRIORITY: tuple[ProviderType, ...] = _ordered_unique(
 )
 
 ESCALATION_PRIORITY: tuple[ProviderType, ...] = _ordered_unique(
-    PRIMARY_REASONING_PRIORITY
+    (
+        ProviderType.CLAUDE_CODE,
+        ProviderType.CODEX,
+        ProviderType.ANTHROPIC,
+        ProviderType.OPENAI,
+        ProviderType.OPENROUTER,
+    )
+    + PRIMARY_REASONING_PRIORITY
     + CHALLENGER_PRIORITY
     + DELEGATED_RESEARCH_PRIORITY
     + TIER_PAID

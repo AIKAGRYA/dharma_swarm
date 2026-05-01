@@ -194,7 +194,8 @@ class ShaktiZeitgeistExecutive:
         """Run one executive cycle: ingest, score, balance, emit."""
         t0 = time.monotonic()
 
-        signals = self._ingest_signals()
+        active_campaigns = self._read_active_campaigns()
+        signals = self._ingest_signals(active_campaigns=active_campaigns)
         mission_state, mission_title, mission_status, mission_theme = self._read_mission()
         pulse_health = self._read_organism()
         role_ecology = build_role_ecology_snapshot(state_dir=self._state_dir)
@@ -245,6 +246,7 @@ class ShaktiZeitgeistExecutive:
                 memory_pressure=memory_pressure,
                 opportunities=opportunities,
                 mission_title=mission_title,
+                active_campaigns=active_campaigns,
             ),
             allocation_weights=weights,
             mission_title=mission_title,
@@ -257,13 +259,71 @@ class ShaktiZeitgeistExecutive:
 
     # -- signal ingestion ---------------------------------------------------
 
-    def _ingest_signals(self) -> list[ExecutiveSignal]:
+    def _ingest_signals(
+        self,
+        *,
+        active_campaigns: list[dict[str, Any]] | None = None,
+    ) -> list[ExecutiveSignal]:
         signals: list[ExecutiveSignal] = []
+        signals.extend(self._ingest_campaigns(active_campaigns=active_campaigns))
         signals.extend(self._ingest_zeitgeist())
         signals.extend(self._ingest_mission())
         signals.extend(self._ingest_organism())
         signals.extend(self._ingest_algedonic())
         return signals
+
+    def _ingest_campaigns(
+        self,
+        *,
+        active_campaigns: list[dict[str, Any]] | None = None,
+    ) -> list[ExecutiveSignal]:
+        campaigns = active_campaigns if active_campaigns is not None else self._read_active_campaigns()
+        out: list[ExecutiveSignal] = []
+        now = _utc_now()
+        for campaign in campaigns:
+            if campaign.get("status", "active") != "active":
+                continue
+            campaign_id = str(campaign.get("campaign_id") or "").strip()
+            title = str(campaign.get("title") or campaign_id).strip()
+            if not title:
+                continue
+            domain = str(campaign.get("domain") or "").strip()
+            if domain not in DOMAINS:
+                domain = self._classify_domain(
+                    f"{title}\n{campaign.get('success_criteria', '')}"
+                )
+            is_primary = bool(campaign.get("primary"))
+            urgency = 0.95 if is_primary else 0.55
+            ts_raw = campaign.get("last_check_in") or campaign.get("created")
+            if ts_raw:
+                try:
+                    ts = datetime.fromisoformat(str(ts_raw).replace("Z", "+00:00"))
+                    if (now - ts).total_seconds() > 7200:
+                        urgency = min(1.0, urgency + 0.05)
+                except Exception:
+                    pass
+            keywords = [campaign_id]
+            artifact_path = str(campaign.get("artifact_path") or "").strip()
+            if artifact_path:
+                keywords.append(artifact_path)
+            out.append(
+                ExecutiveSignal(
+                    source="campaign",
+                    category="primary_campaign" if is_primary else "campaign_state",
+                    title=title,
+                    relevance=1.0 if is_primary else 0.7,
+                    urgency=urgency,
+                    domain=domain,
+                    keywords=keywords[:5],
+                    raw_data={
+                        "campaign_id": campaign_id,
+                        "primary": is_primary,
+                        "artifact_path": artifact_path,
+                        "success_criteria": str(campaign.get("success_criteria") or ""),
+                    },
+                )
+            )
+        return out
 
     def _ingest_zeitgeist(self) -> list[ExecutiveSignal]:
         try:
@@ -486,7 +546,15 @@ class ShaktiZeitgeistExecutive:
             raw = sum(factors[k] * SCORING_FACTORS[k] for k in SCORING_FACTORS)
             final = round(max(0.0, min(100.0, (raw / MAX_SCORE) * 100)), 1)
 
-            best_sig = max(sigs, key=lambda s: s.relevance)
+            best_sig = max(
+                sigs,
+                key=lambda s: (
+                    self._signal_priority(s),
+                    s.relevance,
+                    s.urgency,
+                    s.timestamp,
+                ),
+            )
             opportunities.append(ScoredOpportunity(
                 title=best_sig.title,
                 domain=domain,
@@ -499,6 +567,20 @@ class ShaktiZeitgeistExecutive:
 
         opportunities.sort(key=lambda o: o.final_score, reverse=True)
         return opportunities
+
+    def _signal_priority(self, signal: ExecutiveSignal) -> int:
+        raw_data = signal.raw_data if isinstance(signal.raw_data, dict) else {}
+        if signal.source == "campaign":
+            return 50 if raw_data.get("primary") else 40
+        if signal.source == "mission":
+            return 35
+        if signal.source == "algedonic":
+            return 30
+        if signal.source == "organism":
+            return 25
+        if signal.source == "zeitgeist" and signal.title.startswith("Keywords in "):
+            return 5
+        return 10
 
     def _score_factors(
         self,
@@ -948,8 +1030,20 @@ class ShaktiZeitgeistExecutive:
         memory_pressure: Any,
         opportunities: list[ScoredOpportunity],
         mission_title: str,
+        active_campaigns: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
+        primary_campaign = None
+        for campaign in active_campaigns or []:
+            if campaign.get("status", "active") == "active" and campaign.get("primary") is True:
+                primary_campaign = campaign
+                break
         top_opp = opportunities[0] if opportunities else None
+        mission_label = mission_title or str((primary_campaign or {}).get("title") or "").strip() or "(none)"
+        top_priority_domain = top_opp.domain if top_opp else ""
+        top_priority_title = top_opp.title if top_opp else ""
+        if primary_campaign and not mission_title:
+            top_priority_domain = str(primary_campaign.get("domain") or top_priority_domain or "")
+            top_priority_title = str(primary_campaign.get("title") or top_priority_title or "")
         role_attention = ""
         if getattr(role_ecology, "underexpressed_roles", None):
             role_attention = ", ".join(role_ecology.underexpressed_roles[:4])
@@ -963,9 +1057,9 @@ class ShaktiZeitgeistExecutive:
         if getattr(role_ecology, "nominal_only_agents", None):
             nominal_attention = ", ".join(role_ecology.nominal_only_agents[:4])
         return {
-            "mission": mission_title or "(none)",
-            "top_priority_domain": top_opp.domain if top_opp else "",
-            "top_priority_title": top_opp.title if top_opp else "",
+            "mission": mission_label,
+            "top_priority_domain": top_priority_domain,
+            "top_priority_title": top_priority_title,
             "role_attention": role_attention,
             "promise_attention": promise_attention,
             "loop_attention": loop_attention,

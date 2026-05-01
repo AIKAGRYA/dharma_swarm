@@ -19,9 +19,11 @@ from dharma_swarm.campaigns import (
     list_stale,
     load_active,
     mark_check_in,
+    mark_task_check_in,
     promise_id_from_text,
     release_campaign,
     save_active,
+    set_primary,
 )
 
 
@@ -66,6 +68,25 @@ def test_mark_check_in_appends_marker(meta_dir: Path) -> None:
 
 def test_mark_check_in_missing_returns_none(meta_dir: Path) -> None:
     assert mark_check_in("nope", "agent", meta_dir=meta_dir) is None
+
+
+def test_mark_task_check_in_records_task_context(meta_dir: Path) -> None:
+    create_campaign("c", "research", ["agent_a"], meta_dir=meta_dir)
+    updated = mark_task_check_in(
+        "c",
+        task_id="task-123",
+        task_title="Campaign nurture: Alpha",
+        task_status="completed",
+        agent="agent_a",
+        note="wrote durable next-step artifact",
+        meta_dir=meta_dir,
+    )
+    assert updated is not None
+    marker = updated["progress_markers"][-1]
+    assert marker["source"] == "task_board"
+    assert marker["task_id"] == "task-123"
+    assert marker["task_status"] == "completed"
+    assert "wrote durable next-step artifact" in marker["note"]
 
 
 def test_complete_migrates_to_history(meta_dir: Path) -> None:
@@ -166,6 +187,32 @@ def test_load_active_ignores_malformed_file(meta_dir: Path) -> None:
     assert load_active(meta_dir) == []
 
 
+def test_load_active_normalizes_legacy_campaign_envelope(meta_dir: Path) -> None:
+    (meta_dir / "active_campaigns.json").write_text(
+        json.dumps(
+            {
+                "primary_campaign": "startup_world_facing",
+                "campaigns": [
+                    {
+                        "name": "startup_world_facing",
+                        "priority": "primary",
+                        "status": "active",
+                        "artifact_path": "/tmp/startup_world_facing.md",
+                        "last_updated": "2026-04-30T00:30:00Z",
+                    }
+                ],
+            }
+        ),
+    )
+    active = load_active(meta_dir)
+    assert len(active) == 1
+    assert active[0]["campaign_id"] == "startup_world_facing"
+    assert active[0]["primary"] is True
+    assert active[0]["last_check_in"] == "2026-04-30T00:30:00Z"
+    assert active[0]["artifact_path"] == "/tmp/startup_world_facing.md"
+    assert active[0]["pinned_agents"] == []
+
+
 def test_save_active_is_atomic(meta_dir: Path) -> None:
     create_campaign("c", "research", ["a"], meta_dir=meta_dir)
     assert not list((meta_dir).glob("*.tmp"))  # atomic write cleans up
@@ -190,9 +237,10 @@ def test_active_primary_returns_sole_active_as_soft_primary(meta_dir: Path) -> N
 def test_active_primary_prefers_earliest_created_as_soft(meta_dir: Path) -> None:
     create_campaign("first", "research", ["a"], meta_dir=meta_dir)
     create_campaign("second", "reliability", ["b"], meta_dir=meta_dir)
-    # Force second to have an earlier created ts to prove sort is by timestamp.
+    # Clear explicit primaries, then force second to have an earlier created ts.
     active = load_active(meta_dir)
     for c in active:
+        c["primary"] = False
         if c["campaign_id"] == "first":
             c["created"] = "2026-04-14T09:00:00+00:00"
         if c["campaign_id"] == "second":
@@ -205,9 +253,11 @@ def test_active_primary_prefers_earliest_created_as_soft(meta_dir: Path) -> None
 def test_active_primary_explicit_primary_beats_soft(meta_dir: Path) -> None:
     create_campaign("first", "research", ["a"], meta_dir=meta_dir)
     create_campaign("marked", "reliability", ["b"], meta_dir=meta_dir)
-    # Mark "marked" as primary=True.
+    # Demote the default primary and mark "marked" as primary=True.
     active = load_active(meta_dir)
     for c in active:
+        if c["campaign_id"] == "first":
+            c["primary"] = False
         if c["campaign_id"] == "marked":
             c["primary"] = True
     save_active(active, meta_dir)
@@ -222,3 +272,28 @@ def test_active_primary_skips_non_active_status(meta_dir: Path) -> None:
     active[0]["status"] = "abandoned"
     save_active(active, meta_dir)
     assert active_primary(meta_dir) is None
+
+
+def test_create_campaign_marks_first_campaign_primary(meta_dir: Path) -> None:
+    first = create_campaign("first", "research", ["a"], meta_dir=meta_dir)
+    second = create_campaign("second", "reliability", ["b"], meta_dir=meta_dir)
+    assert first["primary"] is True
+    assert second["primary"] is False
+    primary = active_primary(meta_dir)
+    assert primary is not None
+    assert primary["campaign_id"] == "first"
+
+
+def test_set_primary_enforces_single_winner(meta_dir: Path) -> None:
+    create_campaign("first", "research", ["a"], meta_dir=meta_dir)
+    create_campaign("second", "reliability", ["b"], meta_dir=meta_dir)
+    updated = set_primary("second", meta_dir=meta_dir)
+    assert updated is not None
+    active = load_active(meta_dir)
+    assert sum(1 for c in active if c.get("primary") is True) == 1
+    assert active_primary(meta_dir)["campaign_id"] == "second"
+
+
+def test_create_campaign_assigns_default_artifact_path(meta_dir: Path) -> None:
+    created = create_campaign("artifactful", "research", ["a"], meta_dir=meta_dir)
+    assert created["artifact_path"] == "~/.dharma/shared/campaigns/artifactful.md"

@@ -49,6 +49,103 @@ def test_provider_scan_ignores_comments_and_assurance_sources(tmp_path: Path) ->
     assert "dharma_swarm/assurance/scanner_providers.py" not in files
 
 
+def test_provider_scan_pairs_models_with_their_own_config_blocks(tmp_path: Path) -> None:
+    repo_root = tmp_path
+    _write(
+        repo_root / "dharma_swarm" / "models.py",
+        "\n".join(
+            [
+                "from enum import Enum",
+                "class ProviderType(str, Enum):",
+                "    OPENROUTER_FREE = 'openrouter_free'",
+                "    OPENAI = 'openai'",
+            ]
+        ),
+    )
+    _write(
+        repo_root / "dharma_swarm" / "startup_crew.py",
+        "\n".join(
+            [
+                "from dharma_swarm.models import ProviderType",
+                "CREW = [",
+                "    {",
+                '        "provider": ProviderType.OPENROUTER_FREE,',
+                '        "model": "qwen/qwen3-32b:free",',
+                "    },",
+                "    {",
+                '        "provider": ProviderType.OPENAI,',
+                '        "model": "gpt-4o",',
+                "    },",
+                "]",
+            ]
+        ),
+    )
+
+    report = scanner_providers.scan(repo_root=repo_root)
+
+    assert not any(f.category == "provider_model_mismatch" for f in report.findings)
+
+
+def test_provider_scan_ignores_model_suffix_keyword_arguments(tmp_path: Path) -> None:
+    repo_root = tmp_path
+    _write(
+        repo_root / "dharma_swarm" / "models.py",
+        "\n".join(
+            [
+                "from enum import Enum",
+                "class ProviderType(str, Enum):",
+                "    NVIDIA_NIM = 'nvidia_nim'",
+                "    OPENROUTER_FREE = 'openrouter_free'",
+            ]
+        ),
+    )
+    _write(
+        repo_root / "dharma_swarm" / "startup_crew.py",
+        "\n".join(
+            [
+                "from dharma_swarm.models import ProviderType",
+                "def choose(openrouter_free_model, nim_model):",
+                "    return ProviderType.NVIDIA_NIM, nim_model",
+                "SPEC = choose(",
+                '    openrouter_free_model="qwen/qwen3-32b:free",',
+                '    nim_model="nvidia/nemotron-nano-9b-v2",',
+                ")",
+            ]
+        ),
+    )
+
+    report = scanner_providers.scan(repo_root=repo_root)
+
+    assert not any(f.category == "provider_model_mismatch" for f in report.findings)
+
+
+def test_provider_scan_accepts_codex_openai_model_alias(tmp_path: Path) -> None:
+    repo_root = tmp_path
+    _write(
+        repo_root / "dharma_swarm" / "models.py",
+        "\n".join(
+            [
+                "from enum import Enum",
+                "class ProviderType(str, Enum):",
+                "    CODEX = 'codex'",
+            ]
+        ),
+    )
+    _write(
+        repo_root / "dharma_swarm" / "startup_crew.py",
+        "\n".join(
+            [
+                "from dharma_swarm.models import ProviderType",
+                'CYBER_CODEX = {"provider": ProviderType.CODEX, "model": "gpt-5.4"}',
+            ]
+        ),
+    )
+
+    report = scanner_providers.scan(repo_root=repo_root)
+
+    assert not any(f.category == "provider_model_mismatch" for f in report.findings)
+
+
 def test_storage_scan_ignores_assurance_paths_for_message_bus_detection(tmp_path: Path) -> None:
     repo_root = tmp_path
     _write(
@@ -163,6 +260,30 @@ def test_api_envelope_scanner_accepts_unwrapped_typed_wrapper(tmp_path: Path) ->
     )
 
     report = scanner_api_envelope.scan(repo_root=repo_root)
+
+    assert report.findings == []
+
+
+def test_route_scan_handles_type_import_generics(tmp_path: Path) -> None:
+    repo_root = tmp_path
+    _write(
+        repo_root / "api" / "routers" / "items.py",
+        "\n".join(
+            [
+                "from fastapi import APIRouter",
+                'router = APIRouter(prefix="/api")',
+                '@router.get("/items")',
+                "def list_items():",
+                "    return []",
+            ]
+        ),
+    )
+    _write(
+        repo_root / "dashboard" / "src" / "lib" / "api.ts",
+        'export const listItems = () => apiGet<import("./types").Item[]>("/api/items");\n',
+    )
+
+    report = scanner_routes.scan(repo_root=repo_root)
 
     assert report.findings == []
 

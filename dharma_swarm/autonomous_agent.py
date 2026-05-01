@@ -703,10 +703,11 @@ class AutonomousAgent:
         for config in configs:
             provider = create_runtime_provider(config)
             try:
+                normalized_messages = self._to_openai_messages(messages)
                 request_kwargs: dict[str, Any] = {
                     "model": config.default_model or self.identity.model,
                     "system": system,
-                    "messages": messages,
+                    "messages": normalized_messages,
                     "max_tokens": 4096,
                     "temperature": 0.0,
                     "metadata": {
@@ -736,16 +737,28 @@ class AutonomousAgent:
                 text_parts = [response.content] if response.content else []
                 tool_uses: list[dict[str, Any]] = []
                 for tc in response.tool_calls or []:
-                    parsed_input = tc.get("input")
-                    if parsed_input is None and "arguments" in tc:
-                        try:
-                            parsed_input = json.loads(tc["arguments"])
-                        except Exception:
+                    parsed_input = None
+                    if isinstance(tc, dict):
+                        parsed_input = tc.get("parameters")
+                        if parsed_input is None:
+                            parsed_input = tc.get("input")
+                        if parsed_input is None and "arguments" in tc:
                             parsed_input = tc.get("arguments")
+                        if parsed_input is None and isinstance(tc.get("function"), dict):
+                            parsed_input = tc["function"].get("arguments")
+                    else:
+                        parsed_input = getattr(tc, "parameters", None)
+                        if parsed_input is None:
+                            parsed_input = getattr(tc, "input", None)
+                        if parsed_input is None:
+                            parsed_input = getattr(tc, "arguments", None)
+                    tool_name = tc.get("name") if isinstance(tc, dict) else getattr(tc, "name", None)
+                    if not tool_name and isinstance(tc, dict) and isinstance(tc.get("function"), dict):
+                        tool_name = tc["function"].get("name")
                     tool_uses.append({
-                        "id": tc.get("id"),
-                        "name": tc.get("name"),
-                        "input": parsed_input,
+                        "id": tc.get("id") if isinstance(tc, dict) else getattr(tc, "id", None),
+                        "name": tool_name,
+                        "input": self._normalize_tool_inputs(parsed_input),
                     })
 
                 raw_content: list[dict[str, Any]] = []
@@ -899,17 +912,66 @@ class AutonomousAgent:
                                     "arguments": json.dumps(block["input"]),
                                 },
                             })
-                result: dict[str, Any] = {"role": "assistant", "content": text or None}
+                result: dict[str, Any] = {"role": "assistant", "content": text or ""}
                 if tool_calls:
                     result["tool_calls"] = tool_calls
                 return result
 
         return {"role": role, "content": str(content)}
 
+    @classmethod
+    def _to_openai_messages(cls, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Convert internal Anthropic-style transcript into OpenAI-compatible messages."""
+        converted: list[dict[str, Any]] = []
+        for msg in messages:
+            content = msg.get("content")
+            if (
+                isinstance(content, list)
+                and content
+                and all(
+                    isinstance(block, dict) and block.get("type") == "tool_result"
+                    for block in content
+                )
+            ):
+                for block in content:
+                    converted.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": block["tool_use_id"],
+                            "content": str(block.get("content", "")),
+                        }
+                    )
+                continue
+            converted.append(cls._to_openai_message(msg))
+        return converted
+
     # -- Tool execution ------------------------------------------------------
+
+    @staticmethod
+    def _normalize_tool_inputs(raw_inputs: Any) -> dict[str, Any]:
+        """Coerce provider/tool-call payloads into a dict for tool handlers."""
+        if raw_inputs is None:
+            return {}
+        if isinstance(raw_inputs, dict):
+            return raw_inputs
+        if hasattr(raw_inputs, "model_dump"):
+            dumped = raw_inputs.model_dump()
+            if isinstance(dumped, dict):
+                return dumped
+            return {"raw": dumped}
+        if isinstance(raw_inputs, str):
+            try:
+                parsed = json.loads(raw_inputs)
+            except Exception:
+                return {"raw": raw_inputs}
+            if isinstance(parsed, dict):
+                return parsed
+            return {"raw": parsed}
+        return {"raw": raw_inputs}
 
     async def _execute_tool(self, name: str, inputs: dict) -> str:
         """Execute a tool call. Returns result string."""
+        inputs = self._normalize_tool_inputs(inputs)
         if name not in self.identity.allowed_tools:
             return f"Error: tool '{name}' not allowed for agent '{self.identity.name}'"
 

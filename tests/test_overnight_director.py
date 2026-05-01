@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from dharma_swarm.task_board import TaskBoard
 from dharma_swarm.overnight_director import (
     CycleOutcome,
     DurableState,
@@ -217,6 +218,16 @@ class TestOvernightDirector:
             # Verdict file should be written
             assert (director.run_dir / "verdict.json").exists()
             assert (state_dir / "shared" / "overnight_morning_brief.md").exists()
+            board = TaskBoard(state_dir / "db" / "tasks.db")
+            awaitable = board.init_db()
+            asyncio.run(awaitable)
+            mirrored = asyncio.run(board.list_tasks(limit=20))
+            assert mirrored
+            assert any(
+                t.created_by == "overnight_director"
+                and t.metadata.get("source") == "overnight_director"
+                for t in mirrored
+            )
         finally:
             director_mod.STATE_DIR = orig_state
             director_mod.DHARMA_SWARM_ROOT = orig_root

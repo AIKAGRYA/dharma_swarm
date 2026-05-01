@@ -1716,6 +1716,7 @@ class DarwinEngine:
                 test_results,
                 weighted_fitness,
             )
+            applied_status = self._archive_status_for_proposal(proposal, test_results)
 
             entry = ArchiveEntry(
                 component=proposal.component,
@@ -1731,7 +1732,7 @@ class DarwinEngine:
                 execution_profile=proposal.execution_profile,
                 evidence_tier=proposal.evidence_tier,
                 promotion_state=proposal.promotion_state,
-                status="applied",
+                status=applied_status,
                 gates_passed=(
                     ["ALL"]
                     if proposal.gate_decision != GateDecision.BLOCK.value
@@ -1838,6 +1839,19 @@ class DarwinEngine:
             weighted_fitness,
         )
         return entry_id
+
+    @staticmethod
+    def _archive_status_for_proposal(
+        proposal: Proposal,
+        test_results: dict[str, Any],
+    ) -> str:
+        diff_text = str(proposal.diff or "").strip()
+        has_diff = bool(diff_text)
+        pass_rate = float(test_results.get("pass_rate", 0.0) or 0.0)
+        rolled_back = bool(test_results.get("rolled_back", False))
+        if has_diff and pass_rate >= 1.0 and not rolled_back:
+            return "applied"
+        return "candidate"
 
     async def run_runtime_field_trial(
         self,
@@ -2474,7 +2488,7 @@ class DarwinEngine:
             change_type="observation",
             description=f"Task fitness: {fitness_score:.3f}",
             fitness=FitnessScore(correctness=fitness_score),
-            status="applied",
+            status="observed",
             test_results={"task_id": task_id} if task_id else {},
         )
         return await self.archive.add_entry(entry)

@@ -12,8 +12,9 @@ It is intentionally thin:
 
 The route surface stays the same:
 
-- browser: `http://127.0.0.1:3420/dashboard`
-- app shell: same dashboard surface, wrapped in a native window
+- browser overview: `http://127.0.0.1:3420/dashboard`
+- browser primary operator route: `http://127.0.0.1:3420/dashboard/command-post`
+- app shell: native wrapper around the primary operator route, using the same dashboard surface
 
 That is the long-term product direction too. The UI can become a packaged app
 without creating a second control plane.
@@ -23,7 +24,7 @@ without creating a second control plane.
 This scaffold is intentionally repo-local for now:
 
 - it starts the dashboard runtime through `scripts/dashboard_ctl.sh`
-- it opens `http://127.0.0.1:3420/dashboard`
+- it opens `http://127.0.0.1:3420/dashboard/command-post`
 - it is a thin operator shell, not yet a self-contained distributable bundle
 
 That is enough to validate the product architecture before sidecars, embedded

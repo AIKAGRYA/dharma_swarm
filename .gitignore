@@ -63,3 +63,5 @@ dashboard/test-results/
 desktop-shell/src-tauri/target/
 spec-forge/
 .superpowers/
+.trunk/
+.gitnexus

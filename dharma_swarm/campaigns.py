@@ -59,6 +59,83 @@ def promise_id_from_text(text: str) -> str:
     return "promise_" + hashlib.sha1(norm.encode("utf-8")).hexdigest()[:10]
 
 
+def _normalize_campaign_record(
+    record: dict[str, Any],
+    *,
+    envelope_primary: str = "",
+) -> dict[str, Any] | None:
+    campaign_id = str(
+        record.get("campaign_id")
+        or record.get("id")
+        or record.get("name")
+        or "",
+    ).strip()
+    if not campaign_id:
+        return None
+
+    normalized = dict(record)
+    normalized["campaign_id"] = campaign_id
+    normalized["status"] = str(normalized.get("status") or "active").strip() or "active"
+
+    if not str(normalized.get("title") or "").strip():
+        normalized["title"] = (
+            str(normalized.get("goal") or "").strip()
+            or str(normalized.get("name") or "").strip()
+            or campaign_id
+        )
+
+    if not str(normalized.get("success_criteria") or "").strip():
+        normalized["success_criteria"] = (
+            str(normalized.get("goal") or "").strip()
+            or str(normalized.get("why_now") or "").strip()
+            or str(normalized.get("artifact_path") or "").strip()
+            or str(normalized.get("title") or "").strip()
+        )
+
+    if not str(normalized.get("artifact_path") or "").strip():
+        artifact_contract = str(normalized.get("artifact_contract") or "").strip()
+        if artifact_contract:
+            normalized["artifact_path"] = artifact_contract
+
+    pinned_agents = normalized.get("pinned_agents")
+    if isinstance(pinned_agents, list):
+        normalized["pinned_agents"] = [str(agent) for agent in pinned_agents if str(agent).strip()]
+    else:
+        preferred_agents = normalized.get("preferred_agents")
+        if isinstance(preferred_agents, list):
+            normalized["pinned_agents"] = [str(agent) for agent in preferred_agents if str(agent).strip()]
+        else:
+            normalized["pinned_agents"] = []
+
+    created = str(normalized.get("created") or "").strip()
+    last_updated = str(
+        normalized.get("last_check_in")
+        or normalized.get("last_updated")
+        or "",
+    ).strip()
+    if not created:
+        normalized["created"] = last_updated or ""
+    if not str(normalized.get("last_check_in") or "").strip():
+        normalized["last_check_in"] = last_updated or str(normalized.get("created") or "").strip()
+
+    if normalized.get("check_in_count") is None:
+        normalized["check_in_count"] = 0
+
+    if not isinstance(normalized.get("progress_markers"), list):
+        normalized["progress_markers"] = []
+
+    if normalized.get("primary") is None:
+        priority = str(normalized.get("priority") or "").strip().lower()
+        normalized["primary"] = bool(
+            priority == "primary"
+            or (envelope_primary and campaign_id == envelope_primary)
+        )
+    else:
+        normalized["primary"] = bool(normalized.get("primary"))
+
+    return normalized
+
+
 def load_active(meta_dir: Path | None = None) -> list[dict[str, Any]]:
     path = _active_path(meta_dir)
     if not path.exists():
@@ -67,12 +144,36 @@ def load_active(meta_dir: Path | None = None) -> list[dict[str, Any]]:
         data = json.loads(path.read_text())
     except Exception:
         return []
-    if not isinstance(data, list):
+
+    envelope_primary = ""
+    if isinstance(data, list):
+        candidates = data
+    elif isinstance(data, dict):
+        candidates = data.get("campaigns")
+        envelope_primary = str(data.get("primary_campaign") or "").strip()
+    else:
         return []
-    return [c for c in data if isinstance(c, dict) and c.get("campaign_id")]
+
+    if not isinstance(candidates, list):
+        return []
+
+    active: list[dict[str, Any]] = []
+    for candidate in candidates:
+        if not isinstance(candidate, dict):
+            continue
+        normalized = _normalize_campaign_record(
+            candidate,
+            envelope_primary=envelope_primary,
+        )
+        if normalized is not None:
+            active.append(normalized)
+
+    _normalize_primary_flags(active)
+    return active
 
 
 def save_active(campaigns: list[dict[str, Any]], meta_dir: Path | None = None) -> None:
+    _normalize_primary_flags(campaigns)
     path = _active_path(meta_dir)
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".json.tmp")
@@ -129,6 +230,49 @@ def active_primary(meta_dir: Path | None = None) -> dict[str, Any] | None:
     return active[0]
 
 
+def _normalize_primary_flags(campaigns: list[dict[str, Any]]) -> None:
+    """Ensure at most one active campaign is marked primary.
+
+    If none is explicitly primary, elect the earliest-created active campaign.
+    """
+    active_indexes = [
+        i for i, c in enumerate(campaigns)
+        if isinstance(c, dict) and c.get("status", "active") == "active"
+    ]
+    if not active_indexes:
+        for c in campaigns:
+            if isinstance(c, dict):
+                c["primary"] = False
+        return
+
+    explicit_indexes = [i for i in active_indexes if campaigns[i].get("primary") is True]
+    if explicit_indexes:
+        winner = min(explicit_indexes, key=lambda i: str(campaigns[i].get("created", "")))
+    else:
+        winner = min(active_indexes, key=lambda i: str(campaigns[i].get("created", "")))
+
+    for i, c in enumerate(campaigns):
+        if not isinstance(c, dict):
+            continue
+        c["primary"] = bool(i == winner and c.get("status", "active") == "active")
+
+
+def set_primary(campaign_id: str, meta_dir: Path | None = None) -> dict[str, Any] | None:
+    """Mark exactly one active campaign as primary."""
+    campaigns = load_active(meta_dir)
+    target: dict[str, Any] | None = None
+    for c in campaigns:
+        if c.get("campaign_id") == campaign_id and c.get("status", "active") == "active":
+            c["primary"] = True
+            target = c
+        else:
+            c["primary"] = False
+    if target is None:
+        return None
+    save_active(campaigns, meta_dir)
+    return target
+
+
 def create_campaign(
     campaign_id: str,
     domain: str,
@@ -139,14 +283,37 @@ def create_campaign(
     success_criteria: str = "",
     source: str = "operator",
     linked_promise: str | None = None,
+    primary: bool | None = None,
+    artifact_path: str | None = None,
     meta_dir: Path | None = None,
 ) -> dict[str, Any]:
     """Create (or no-op if exists) an active campaign."""
     existing = load_active(meta_dir)
     if any(c.get("campaign_id") == campaign_id for c in existing):
-        return next(c for c in existing if c.get("campaign_id") == campaign_id)
+        existing_record = next(c for c in existing if c.get("campaign_id") == campaign_id)
+        updated = False
+        if title and not str(existing_record.get("title") or "").strip():
+            existing_record["title"] = title
+            updated = True
+        if success_criteria and not str(existing_record.get("success_criteria") or "").strip():
+            existing_record["success_criteria"] = success_criteria
+            updated = True
+        resolved_artifact_path = artifact_path or f"~/.dharma/shared/campaigns/{campaign_id}.md"
+        if resolved_artifact_path and not str(existing_record.get("artifact_path") or "").strip():
+            existing_record["artifact_path"] = resolved_artifact_path
+            updated = True
+        if updated:
+            save_active(existing, meta_dir)
+        if primary is True:
+            set_primary(campaign_id, meta_dir)
+            return find_campaign(campaign_id, meta_dir)
+        return existing_record
 
     now = _utc_now_iso()
+    has_active_primary = any(
+        c.get("status", "active") == "active" and c.get("primary") is True
+        for c in existing
+    )
     record: dict[str, Any] = {
         "campaign_id": campaign_id,
         "title": title or campaign_id,
@@ -154,12 +321,14 @@ def create_campaign(
         "pinned_agents": list(pinned_agents or []),
         "source": source,
         "linked_promise": linked_promise,
+        "artifact_path": artifact_path or f"~/.dharma/shared/campaigns/{campaign_id}.md",
         "success_criteria": success_criteria,
         "deadline": deadline,
         "created": now,
         "last_check_in": now,
         "check_in_count": 0,
         "status": "active",
+        "primary": bool(primary) if primary is not None else (not has_active_primary),
         "progress_markers": [],
     }
     existing.append(record)
@@ -167,10 +336,22 @@ def create_campaign(
     return record
 
 
+def _append_progress_marker(
+    campaign: dict[str, Any],
+    *,
+    marker: dict[str, Any],
+) -> None:
+    markers = list(campaign.get("progress_markers") or [])
+    markers.append(marker)
+    campaign["progress_markers"] = markers[-50:]
+
+
 def mark_check_in(
     campaign_id: str,
     agent: str,
     note: str = "",
+    *,
+    extra: dict[str, Any] | None = None,
     meta_dir: Path | None = None,
 ) -> dict[str, Any] | None:
     campaigns = load_active(meta_dir)
@@ -180,12 +361,47 @@ def mark_check_in(
         now = _utc_now_iso()
         c["last_check_in"] = now
         c["check_in_count"] = int(c.get("check_in_count", 0)) + 1
-        markers = list(c.get("progress_markers") or [])
-        markers.append({"timestamp": now, "agent": agent, "note": note[:400]})
-        c["progress_markers"] = markers[-50:]  # keep last 50
+        marker = {
+            "timestamp": now,
+            "agent": agent,
+            "note": note[:400],
+        }
+        if isinstance(extra, dict):
+            marker.update(extra)
+        _append_progress_marker(c, marker=marker)
         save_active(campaigns, meta_dir)
         return c
     return None
+
+
+def mark_task_check_in(
+    campaign_id: str,
+    *,
+    task_id: str,
+    task_title: str,
+    task_status: str,
+    agent: str,
+    note: str = "",
+    meta_dir: Path | None = None,
+) -> dict[str, Any] | None:
+    status = str(task_status or "").strip().lower() or "unknown"
+    task_label = str(task_title or task_id or "task").strip()[:200]
+    detail = str(note or "").strip().replace("\n", " ")
+    summary = f"{status}: {task_label}"
+    if detail:
+        summary = f"{summary} — {detail[:280]}"
+    return mark_check_in(
+        campaign_id,
+        agent,
+        note=summary,
+        extra={
+            "source": "task_board",
+            "task_id": str(task_id or "").strip(),
+            "task_title": task_label,
+            "task_status": status,
+        },
+        meta_dir=meta_dir,
+    )
 
 
 def complete_campaign(
@@ -290,8 +506,10 @@ __all__ = [
     "find_campaign_domain",
     "find_by_agent",
     "active_primary",
+    "set_primary",
     "create_campaign",
     "mark_check_in",
+    "mark_task_check_in",
     "complete_campaign",
     "release_campaign",
     "list_stale",

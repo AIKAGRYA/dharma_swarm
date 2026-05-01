@@ -1,7 +1,7 @@
 ---
 name: jagat_kalyan
-model: claude-code
-provider: CLAUDE_CODE
+model: meta-llama/llama-3.3-70b-instruct:free
+provider: OPENROUTER_FREE
 autonomy: aggressive
 thread: alignment
 tags: [ecology, sustainability, restoration, carbon, livelihood, jagat-kalyan, gaia]

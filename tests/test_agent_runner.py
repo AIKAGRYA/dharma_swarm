@@ -11,6 +11,7 @@ from unittest.mock import AsyncMock
 
 from dharma_swarm.models import AgentConfig, AgentRole, AgentStatus, LLMResponse, ProviderType, Task
 from dharma_swarm.agent_runner import AgentPool, AgentRunner, _build_prompt
+from dharma_swarm.knowledge_units import KnowledgeStore, Proposition
 from dharma_swarm.lineage import LineageGraph
 from dharma_swarm.message_bus import MessageBus
 from dharma_swarm.ontology import OntologyRegistry
@@ -41,6 +42,23 @@ def _ontology_path(tmp_path: Path) -> Path:
     state_dir = tmp_path / ".dharma"
     state_dir.mkdir(exist_ok=True)
     return state_dir / "ontology.db"
+
+
+def test_build_prompt_carries_task_timeout_metadata(config):
+    task = Task(
+        title="Long builder task",
+        metadata={
+            "timeout_seconds": 1800,
+            "provider_timeout_seconds": 1500,
+            "active_claim": {"dispatch_timeout_seconds": 1800},
+        },
+    )
+
+    request = _build_prompt(task, config)
+
+    assert request.metadata["timeout_seconds"] == 1800
+    assert request.metadata["provider_timeout_seconds"] == 1500
+    assert request.metadata["dispatch_timeout_seconds"] == 1800
 
 
 @pytest.mark.asyncio
@@ -133,6 +151,57 @@ async def test_runner_injects_stigmergy_recall_into_prompt(
 
     mark_payload = json.loads((state_dir / "stigmergy" / "marks.jsonl").read_text().splitlines()[0])
     assert mark_payload["access_count"] >= 1
+
+
+@pytest.mark.asyncio
+async def test_runner_injects_ontology_context_from_knowledge_store(
+    config,
+    fast_gate,
+    tmp_path: Path,
+):
+    isolated_config = _with_state_dir(config, tmp_path)
+    state_dir = Path(str(isolated_config.metadata["state_dir"]))
+    db_dir = state_dir / "db"
+    db_dir.mkdir(parents=True)
+    store = KnowledgeStore(str(db_dir / "knowledge_store.db"))
+    try:
+        store.store_proposition(
+            Proposition(
+                id="prop-agent-ontology",
+                content="Ontology context should reach LF5 provider prompts.",
+                concepts=["ontology context", "provider prompt"],
+            )
+        )
+    finally:
+        store.close()
+
+    provider = AsyncMock()
+    provider.complete = AsyncMock(
+        return_value=LLMResponse(
+            content="Ontology context loop closed with implementation evidence.",
+            model="test",
+        )
+    )
+    runner = AgentRunner(
+        isolated_config,
+        provider=provider,
+        ontology_path=_ontology_path(tmp_path),
+    )
+    await runner.start()
+
+    await runner.run_task(
+        Task(
+            title="Use ontology context",
+            description="Ensure provider prompt receives ontology context.",
+            metadata={"state_dir": str(state_dir), "task_type": "implementation"},
+        )
+    )
+
+    request = provider.complete.await_args.args[0]
+    content = request.messages[0]["content"]
+    assert "## Ontology Context" in content
+    assert "## Knowledge Store" in content
+    assert "Ontology context should reach LF5 provider prompts." in content
 
 
 @pytest.mark.asyncio
@@ -518,6 +587,73 @@ async def test_runner_accepts_completion_when_declared_artifact_exists(
 
     assert result == "artifact ready"
     assert runner.state.tasks_completed == 1
+
+
+@pytest.mark.asyncio
+async def test_runner_accepts_target_artifact_alias(
+    config,
+    fast_gate,
+    tmp_path: Path,
+):
+    isolated_config = _with_state_dir(
+        config.model_copy(update={"provider": ProviderType.CLAUDE_CODE}),
+        tmp_path,
+    )
+    target = tmp_path / "campaign.md"
+    target.write_text("ready", encoding="utf-8")
+    provider = AsyncMock()
+    provider.complete = AsyncMock(return_value=LLMResponse(content="artifact ready", model="test"))
+    runner = AgentRunner(
+        isolated_config,
+        provider=provider,
+        ontology_path=_ontology_path(tmp_path),
+    )
+    await runner.start()
+
+    result = await runner.run_task(
+        Task(
+            title="Use target_artifact alias",
+            description="Artifact alias should satisfy completion contract",
+            metadata={"target_artifact": str(target)},
+        )
+    )
+
+    assert result == "artifact ready"
+    assert runner.state.tasks_completed == 1
+
+
+@pytest.mark.asyncio
+async def test_runner_rejects_builder_completion_without_artifact_or_justification(
+    config,
+    fast_gate,
+    tmp_path: Path,
+):
+    isolated_config = _with_state_dir(
+        config.model_copy(update={"provider": ProviderType.CLAUDE_CODE}),
+        tmp_path,
+    )
+    provider = AsyncMock()
+    provider.complete = AsyncMock(return_value=LLMResponse(content="done", model="test"))
+    runner = AgentRunner(
+        isolated_config,
+        provider=provider,
+        ontology_path=_ontology_path(tmp_path),
+    )
+    await runner.start()
+
+    with pytest.raises(
+        RuntimeError,
+        match="tooling-bearing task requires artifact or explicit no_artifact_justification",
+    ):
+        await runner.run_task(
+            Task(
+                title="Build without proof",
+                description="This should not self-certify as complete.",
+                metadata={"owner_lane": "builder"},
+            )
+        )
+
+    assert runner.state.tasks_completed == 0
 
 
 @pytest.mark.asyncio

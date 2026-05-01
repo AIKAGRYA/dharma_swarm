@@ -131,6 +131,18 @@ make dashboard-lint
 make dashboard-build
 ```
 
+## Build Governance
+
+Use the canonical build-governance surfaces for any overnight, multi-hour, or repo-wide automation lane:
+
+- `dharma_swarm/build_authority.py` — lane/action authority matrix
+- `dharma_swarm/build_registry.py` — append-only build lineage, evaluation, incident, and rollback registry
+- `scripts/build_registry_ctl.py` — agent-agnostic CLI for recording and inspecting registry state
+
+These pair with the repo-wide rule surfaces in `README.md`, `CLAUDE.md`, and `AGENTS.md`. If a build change cannot be traced through those files plus the build registry, it is not yet disciplined enough for this repo.
+
+Fast entrypoint for any agent: [REPO_RULES.md](REPO_RULES.md). Terminal shortcut: `python3 scripts/repo_rules.py`.
+
 ## What The Inventory Says
 
 Use the built-in static inventory pass to get a current snapshot:
@@ -155,6 +167,7 @@ That report is the fastest way to answer:
 ## Before Writing Any Code
 
 - **Read [`CLAUDE.md`](CLAUDE.md)** — system genome, key abstractions, behavioral rules, the Transcendence Principle.
+- **Read [`dharma_swarm/build_authority.py`](dharma_swarm/build_authority.py)** and **[`dharma_swarm/build_registry.py`](dharma_swarm/build_registry.py)** before changing autonomous build, overnight harness, or repo-wide execution rules.
 - **Read [`INTERFACE_MISMATCH_MAP.md`](INTERFACE_MISMATCH_MAP.md)** — every known interface mismatch between modules, with exact line numbers, root causes, and fixes. This is the primary source of runtime failures. Follow the Bootstrap Sequence to unblock the system.
 - **Read [`NAVIGATION.md`](NAVIGATION.md)** — full module map across 12 architectural layers with line counts and "When to Touch" guidance.
 - **Read [`MODEL_ROUTING_MAP.md`](MODEL_ROUTING_MAP.md)** — how every LLM call flows through the system. 18 providers, 3 calling surfaces, 5 inconsistencies, the HuggingFace fix, and the minimum viable path to first LLM call.

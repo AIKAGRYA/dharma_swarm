@@ -112,6 +112,12 @@ export default function RuntimePage() {
     (assignment) => assignment.route_id && !selectableRouteIds.has(assignment.route_id),
   );
   const runtimeHandbook = useMemo(() => buildRuntimeOperatorHandbook(), []);
+  const livenessStatus = health?.liveness?.status ?? health?.overall_status ?? "unknown";
+  const bootstrapPhase = health?.liveness?.bootstrap_phase?.replace(/_/g, " ") ?? "unknown";
+  const lastTickLabel =
+    typeof health?.liveness?.last_tick_number === "number" && health.liveness.last_tick_number > 0
+      ? `tick ${health.liveness.last_tick_number}`
+      : "none";
   const surfaces = useMemo(
     () =>
       buildControlPlaneSurfaces({
@@ -356,11 +362,15 @@ export default function RuntimePage() {
               <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <MiniStat
                   label="Overall"
-                  value={health?.overall_status ?? "unknown"}
+                  value={livenessStatus}
                 />
                 <MiniStat
-                  label="Agents"
-                  value={String(health?.agent_health.length ?? 0)}
+                  label="Bootstrap"
+                  value={bootstrapPhase}
+                />
+                <MiniStat
+                  label="Last Tick"
+                  value={lastTickLabel}
                 />
                 <MiniStat
                   label="Anomalies"

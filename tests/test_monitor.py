@@ -334,6 +334,27 @@ async def test_no_silent_when_agent_active(store: TraceStore, monitor: SystemMon
     assert len(silent) == 0
 
 
+@pytest.mark.asyncio
+async def test_agent_silent_is_debounced_between_polls(
+    store: TraceStore, monitor: SystemMonitor
+):
+    now = _utc_now()
+    await store.log_entry(
+        _make_entry(agent="old-bot", action="pulse", timestamp=now - timedelta(hours=2))
+    )
+    await store.log_entry(
+        _make_entry(agent="active-bot", action="pulse", timestamp=now)
+    )
+
+    first = await monitor.detect_anomalies(window_hours=1)
+    second = await monitor.detect_anomalies(window_hours=1)
+
+    first_silent = [a for a in first if a.anomaly_type == "agent_silent"]
+    second_silent = [a for a in second if a.anomaly_type == "agent_silent"]
+    assert len(first_silent) == 1
+    assert len(second_silent) == 0
+
+
 # ---------------------------------------------------------------------------
 # detect_anomalies -- throughput_drop
 # ---------------------------------------------------------------------------

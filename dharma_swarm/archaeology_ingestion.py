@@ -65,6 +65,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -74,6 +75,7 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 _DEFAULT_INGESTION_INTERVAL = 1800  # 30 minutes
+_DEFAULT_BOOT_DELAY_SECONDS = 300.0
 
 
 @dataclass
@@ -92,6 +94,29 @@ class MemoryHit:
 
 def _utc_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _create_memory_palace(state_dir: Path) -> Any:
+    """Construct MemoryPalace off the event loop."""
+    from dharma_swarm.memory_palace import MemoryPalace
+
+    return MemoryPalace(state_dir=state_dir)
+
+
+def _archaeology_boot_delay_seconds(interval_seconds: int) -> float:
+    raw = os.environ.get("DGC_ARCHAEOLOGY_BOOT_DELAY", "").strip()
+    default_delay = float(min(interval_seconds, int(_DEFAULT_BOOT_DELAY_SECONDS)))
+    if not raw:
+        return default_delay
+    try:
+        return max(0.0, float(raw))
+    except ValueError:
+        logger.warning(
+            "Invalid DGC_ARCHAEOLOGY_BOOT_DELAY=%r; using %.1fs",
+            raw,
+            default_delay,
+        )
+        return default_delay
 
 
 def _truncate(text: str, max_chars: int = 2000) -> str:
@@ -687,8 +712,7 @@ class ArchaeologyIngestionDaemon:
     async def run_once(self) -> dict[str, int]:
         """Run one full ingestion cycle. Returns counts per stream."""
         try:
-            from dharma_swarm.memory_palace import MemoryPalace, PalaceQuery
-            palace = MemoryPalace(state_dir=self._state_dir)
+            palace = await asyncio.to_thread(_create_memory_palace, self._state_dir)
         except Exception as exc:
             logger.error("ArchaeologyIngestionDaemon: MemoryPalace unavailable: %s", exc)
             return {}
@@ -707,11 +731,15 @@ class ArchaeologyIngestionDaemon:
         logger.info("Archaeology ingestion complete: %d documents total | %s", total, counts)
         return counts
 
-    async def run_forever(self) -> None:
+    async def run_forever(self, *, initial_delay_seconds: float = 0.0) -> None:
         """Run ingestion continuously on a fixed interval."""
         logger.info(
-            "ArchaeologyIngestionDaemon starting (interval=%ds)", self._interval
+            "ArchaeologyIngestionDaemon starting (interval=%ds initial_delay=%.1fs)",
+            self._interval,
+            initial_delay_seconds,
         )
+        if initial_delay_seconds > 0:
+            await asyncio.sleep(initial_delay_seconds)
         while True:
             try:
                 await self.run_once()
@@ -736,17 +764,13 @@ async def start_archaeology_loop(
     Returns the asyncio Task so it can be tracked and cancelled on shutdown.
     """
     daemon = ArchaeologyIngestionDaemon(state_dir=state_dir, interval_seconds=interval_seconds)
-
-    # Run once immediately at boot (before the interval timer)
-    try:
-        await asyncio.wait_for(daemon.run_once(), timeout=120.0)
-    except asyncio.TimeoutError:
-        logger.warning("Boot-time archaeology ingestion timed out (120s) — continuing")
-    except Exception as exc:
-        logger.warning("Boot-time archaeology ingestion failed (non-fatal): %s", exc)
+    boot_delay_seconds = _archaeology_boot_delay_seconds(interval_seconds)
 
     # Then schedule the recurring loop
-    task = asyncio.create_task(daemon.run_forever(), name="archaeology_ingestion")
+    task = asyncio.create_task(
+        daemon.run_forever(initial_delay_seconds=boot_delay_seconds),
+        name="archaeology_ingestion",
+    )
     return task
 
 

@@ -44,7 +44,7 @@ class TestAgentConfig:
     def test_defaults(self) -> None:
         cfg = AgentConfig_()
         assert cfg.heartbeat_threshold_seconds == 60.0
-        assert cfg.subprocess_timeout_seconds == 300
+        assert cfg.subprocess_timeout_seconds == 900
         assert cfg.max_output_chars == 50_000
 
     def test_bounds(self) -> None:

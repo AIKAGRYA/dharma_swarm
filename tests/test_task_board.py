@@ -24,6 +24,16 @@ async def test_create_task(board):
 
 
 @pytest.mark.asyncio
+async def test_init_db_creates_parent_directory(tmp_path):
+    nested_db = tmp_path / "nested" / "board" / "tasks.db"
+    board = TaskBoard(nested_db)
+
+    await board.init_db()
+
+    assert nested_db.exists()
+
+
+@pytest.mark.asyncio
 async def test_create_task_persists_metadata(board):
     trace_id = "trc_test_123"
     task = await board.create(
@@ -37,6 +47,27 @@ async def test_create_task_persists_metadata(board):
 
 
 @pytest.mark.asyncio
+async def test_create_task_injects_contract_defaults(board):
+    task = await board.create(
+        "Contract task",
+        metadata={
+            "campaign_id": " camp_primary ",
+            "target_artifact": "/tmp/packet.md",
+        },
+    )
+
+    assert task.metadata["contract_version"] == "task_contract_v1"
+    assert task.metadata["campaign_id"] == "camp_primary"
+    assert task.metadata["target_artifact"] == "/tmp/packet.md"
+    assert task.metadata["artifact_path"] == "/tmp/packet.md"
+    assert task.metadata["owner_lane"] == "builder"
+    assert task.metadata["task_class"] == "build"
+    assert task.metadata["settlement_state"] == "queued"
+    assert task.metadata["requires_verifier"] is True
+    assert task.metadata["done_condition"] == "artifact_written_or_explicit_no_artifact_reason"
+
+
+@pytest.mark.asyncio
 async def test_get_task(board):
     task = await board.create("Test task")
     found = await board.get(task.id)
@@ -47,6 +78,19 @@ async def test_get_task(board):
 @pytest.mark.asyncio
 async def test_get_nonexistent(board):
     assert await board.get("nonexistent") is None
+
+
+@pytest.mark.asyncio
+async def test_get_by_title_returns_newest_exact_match(board):
+    older = await board.create("Repeated title", description="older")
+    newer = await board.create("Repeated title", description="newer")
+
+    found = await board.get_by_title("Repeated title")
+
+    assert found is not None
+    assert found.id == newer.id
+    assert found.id != older.id
+    assert found.description == "newer"
 
 
 @pytest.mark.asyncio
@@ -82,6 +126,27 @@ async def test_full_lifecycle(board):
     task = await board.complete(task.id, result="done!")
     assert task.status == TaskStatus.COMPLETED
     assert task.result == "done!"
+
+
+@pytest.mark.asyncio
+async def test_status_transitions_update_contract_settlement(board):
+    task = await board.create(
+        "Lifecycle contract",
+        metadata={"campaign_id": "camp_alpha", "artifact_path": "/tmp/alpha.md"},
+    )
+    assert task.metadata["settlement_state"] == "queued"
+
+    task = await board.assign(task.id, "agent-1")
+    assert task.metadata["settlement_state"] == "claimed"
+    assert task.metadata["campaign_id"] == "camp_alpha"
+
+    task = await board.start(task.id)
+    assert task.metadata["settlement_state"] == "in_progress"
+
+    task = await board.complete(task.id, result="done!", metadata={"outcome_id": "outcome-1"})
+    assert task.metadata["settlement_state"] == "submitted"
+    assert task.metadata["outcome_id"] == "outcome-1"
+    assert task.metadata["artifact_path"] == "/tmp/alpha.md"
 
 
 @pytest.mark.asyncio
@@ -168,6 +233,24 @@ async def test_update_task_serializes_metadata(board):
     assert loaded is not None
     assert loaded.metadata["foo"] == "bar"
     assert loaded.metadata["n"] == 1
+
+
+@pytest.mark.asyncio
+async def test_update_task_metadata_merges_existing_contract(board):
+    task = await board.create(
+        "Preserve contract",
+        metadata={"target_artifact": "/tmp/proof.md", "campaign_id": "camp_alpha"},
+    )
+
+    await board.update_task(task.id, metadata={"outcome_id": "outcome-1"})
+
+    loaded = await board.get(task.id)
+    assert loaded is not None
+    assert loaded.metadata["target_artifact"] == "/tmp/proof.md"
+    assert loaded.metadata["campaign_id"] == "camp_alpha"
+    assert loaded.metadata["owner_lane"] == "builder"
+    assert loaded.metadata["task_class"] == "build"
+    assert loaded.metadata["outcome_id"] == "outcome-1"
 
 
 @pytest.mark.asyncio

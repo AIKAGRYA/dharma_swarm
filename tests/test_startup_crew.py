@@ -70,6 +70,10 @@ def _effective_crew() -> list[dict]:
     return sc._crew_from_skills() or sc.DEFAULT_CREW
 
 
+def test_builder_skill_maps_to_builder_lane_role():
+    assert sc._SKILL_ROLE_MAP["builder"] == AgentRole.CODER
+
+
 @pytest.mark.asyncio
 async def test_spawn_default_crew_spawns_all_when_none_exist():
     swarm = _FakeSwarm(existing_names=[])
@@ -194,21 +198,25 @@ async def test_spawn_cybernetics_crew_passes_provider_model_and_prompt():
     codex_call = next(call for call in swarm.spawn_calls if call["name"] == "cyber-codex")
     opus_call = next(call for call in swarm.spawn_calls if call["name"] == "cyber-opus")
 
-    assert glm_call["provider_type"] == ProviderType.OLLAMA
-    assert glm_call["model"] == "glm-5:cloud"
+    glm_spec = next(agent for agent in sc.CYBERNETICS_CREW if agent["name"] == "cyber-glm5")
+    kimi_spec = next(agent for agent in sc.CYBERNETICS_CREW if agent["name"] == "cyber-kimi25")
+    opus_spec = next(agent for agent in sc.CYBERNETICS_CREW if agent["name"] == "cyber-opus")
+
+    assert glm_call["provider_type"] == glm_spec["provider"]
+    assert glm_call["model"] == glm_spec["model"]
     assert glm_call["thread"] == "cybernetics"
     assert "Variety Cartographer" in glm_call["system_prompt"]
     assert "MEMORY SURVIVAL INSTINCT" in glm_call["system_prompt"]
 
-    assert kimi_call["provider_type"] == ProviderType.OLLAMA
-    assert kimi_call["model"] == "kimi-k2.5:cloud"
+    assert kimi_call["provider_type"] == kimi_spec["provider"]
+    assert kimi_call["model"] == kimi_spec["model"]
 
-    assert codex_call["provider_type"] == ProviderType.OLLAMA
-    assert codex_call["model"] == "qwen3-coder:480b-cloud"
+    assert codex_call["provider_type"] == ProviderType.CODEX
+    assert codex_call["model"] == "gpt-5.4"
     assert "hot-path control improvement" in codex_call["system_prompt"]
 
-    assert opus_call["provider_type"] == ProviderType.OLLAMA
-    assert opus_call["model"] == "deepseek-v3.2:cloud"
+    assert opus_call["provider_type"] == opus_spec["provider"]
+    assert opus_call["model"] == opus_spec["model"]
     assert "identity and architecture seat" in opus_call["system_prompt"]
 
 

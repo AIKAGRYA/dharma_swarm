@@ -374,6 +374,19 @@ class TestProfileManagerExtended:
         loaded = mgr.load_all()
         assert loaded == {}
 
+    def test_load_all_prunes_deleted_profile_files(self, tmp_path: Path):
+        mgr = ProfileManager(profile_dir=tmp_path)
+        mgr.save(AgentProfile(name="alpha"))
+        mgr.save(AgentProfile(name="beta"))
+
+        loaded = mgr.load_all()
+        assert set(loaded) == {"alpha", "beta"}
+
+        (tmp_path / "beta.json").unlink()
+        reloaded = mgr.load_all()
+        assert set(reloaded) == {"alpha"}
+        assert mgr.get("beta") is None
+
     def test_save_returns_correct_path(self, tmp_path: Path):
         mgr = ProfileManager(profile_dir=tmp_path)
         path = mgr.save(AgentProfile(name="pathcheck"))

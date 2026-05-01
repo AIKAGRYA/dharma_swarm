@@ -376,6 +376,24 @@ def test_run_cron_job_rejects_unknown_handler():
     assert error == output
 
 
+def test_execute_cron_job_dispatches_opportunity_refill():
+    with patch(
+        "dharma_swarm.opportunity_refill.run_once",
+        return_value={"opportunities_seeded": 2, "rows_appended": 10},
+    ) as mock:
+        result = execute_cron_job(
+            {
+                "handler": "opportunity_refill",
+                "top_k": 2,
+                "min_telos_alignment": 0.9,
+            }
+        )
+
+    assert result.status is CronJobRunStatus.COMPLETED
+    assert "\"rows_appended\": 10" in result.output
+    mock.assert_called_once_with(top_k=2, min_telos_alignment=0.9)
+
+
 def test_execute_cron_job_maps_overnight_waiting_summary_to_waiting_external():
     async def _fake_run_overnight(**kwargs):
         assert kwargs["external_wait_handoff"] is True

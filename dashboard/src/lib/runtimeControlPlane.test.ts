@@ -105,6 +105,120 @@ test("buildRuntimeControlPlaneSnapshot reflects degraded runtime using the adver
   assert.equal(snapshot.meanFitnessLabel, "0.77");
 });
 
+test("buildRuntimeControlPlaneSnapshot surfaces stalled hot-path liveness ahead of generic health", () => {
+  const normalized = normalizeRuntimeControlPlaneResponses(
+    chatOk({
+      ready: true,
+      model: "openai/gpt-5.4",
+      provider: "openrouter",
+      tools: 9,
+      max_tool_rounds: 2,
+      max_tokens: 4096,
+      timeout_seconds: 120,
+      tool_result_max_chars: 4000,
+      history_message_limit: 120,
+      temperature: 0,
+      persistent_sessions: true,
+      chat_contract_version: "2026-04-16-liveness",
+      chat_ws_path_template: "/ws/chat/session/{session_id}",
+      default_profile_id: "codex_operator",
+      profiles: [
+        {
+          id: "codex_operator",
+          label: "Codex Operator",
+          provider: "openai",
+          model: "gpt-5.4",
+          accent: "aozora",
+          summary: "Canonical operator lane.",
+          available: true,
+        },
+      ],
+    }),
+    healthOk({
+      overall_status: "critical",
+      agent_health: [],
+      anomalies: [],
+      total_traces: 12,
+      traces_last_hour: 0,
+      failure_rate: 0,
+      mean_fitness: 0.91,
+      liveness: {
+        status: "stalled",
+        bootstrap_phase: "bootstrap_complete",
+        bootstrap_complete: true,
+        tick_fresh: false,
+        coordination_fresh: false,
+        stall_state: "tick_stalled",
+        stall_reason: "last swarm tick is stale",
+        last_tick_completed_at: "2026-04-16T13:31:00.000Z",
+        last_tick_number: 16,
+      },
+    }),
+  );
+
+  const snapshot = buildRuntimeControlPlaneSnapshot(normalized);
+
+  assert.equal(snapshot.statusKind, "error");
+  assert.equal(snapshot.statusLabel, "stalled");
+  assert.equal(snapshot.healthStatusLabel, "stalled · tick stalled");
+  assert.match(snapshot.detail, /last swarm tick is stale/);
+});
+
+test("buildRuntimeControlPlaneSnapshot surfaces booting hot-path liveness while routes warm up", () => {
+  const normalized = normalizeRuntimeControlPlaneResponses(
+    chatOk({
+      ready: true,
+      model: "openai/gpt-5.4",
+      provider: "openrouter",
+      tools: 9,
+      max_tool_rounds: 2,
+      max_tokens: 4096,
+      timeout_seconds: 120,
+      tool_result_max_chars: 4000,
+      history_message_limit: 120,
+      temperature: 0,
+      persistent_sessions: true,
+      chat_contract_version: "2026-04-16-liveness",
+      chat_ws_path_template: "/ws/chat/session/{session_id}",
+      default_profile_id: "codex_operator",
+      profiles: [
+        {
+          id: "codex_operator",
+          label: "Codex Operator",
+          provider: "openai",
+          model: "gpt-5.4",
+          accent: "aozora",
+          summary: "Canonical operator lane.",
+          available: true,
+        },
+      ],
+    }),
+    healthOk({
+      overall_status: "degraded",
+      agent_health: [],
+      anomalies: [],
+      total_traces: 2,
+      traces_last_hour: 0,
+      failure_rate: 0,
+      mean_fitness: null,
+      liveness: {
+        status: "booting",
+        bootstrap_phase: "bootstrap_deferred",
+        bootstrap_complete: false,
+        tick_fresh: false,
+        coordination_fresh: false,
+      },
+    }),
+  );
+
+  const snapshot = buildRuntimeControlPlaneSnapshot(normalized);
+
+  assert.equal(snapshot.statusKind, "warn");
+  assert.equal(snapshot.statusLabel, "booting");
+  assert.equal(snapshot.healthStatusLabel, "booting · bootstrap deferred");
+  assert.match(snapshot.detail, /bootstrap is still in progress/i);
+});
+
 test("buildRuntimeControlPlaneSnapshot keeps the cold-start session rail muted before runtime data arrives", () => {
   const snapshot = buildRuntimeControlPlaneSnapshot({
     chatStatus: null,

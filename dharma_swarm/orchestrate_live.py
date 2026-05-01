@@ -27,8 +27,11 @@ import hashlib
 import json
 import logging
 import os
+import re
 import signal
+import subprocess
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from collections.abc import Awaitable, Callable
@@ -37,7 +40,7 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 from dharma_swarm.config import DEFAULT_CONFIG
-from dharma_swarm.models import TaskPriority
+from dharma_swarm.models import TaskPriority, TaskStatus
 from dharma_swarm.pending_proposals import append_pending_proposals
 from dharma_swarm.runtime_artifacts import (
     dgc_health_snapshot_summary,
@@ -64,6 +67,10 @@ _RUNTIME_HEALTH_STATE: dict[str, int] = {
 }
 SWARM_LIVENESS_PATH = STATE_DIR / "meta" / "swarm_liveness.json"
 STARTUP_SEED_TIMEOUT_S = max(5.0, min(float(SWARM_TICK), 30.0))
+CAMPAIGN_NURTURE_INTERVAL_S = max(300.0, min(1800.0, float(SWARM_TICK) * 5.0))
+CAMPAIGN_NURTURE_STALE_HOURS = 2.0
+CAMPAIGN_NURTURE_RECENT_HOURS = 12.0
+CAMPAIGN_NURTURE_MAX_SPECS = 3
 
 
 def _update_runtime_health_state(*, agent_count: int | None = None, task_count: int | None = None) -> None:
@@ -78,6 +85,27 @@ def _log(system: str, msg: str) -> None:
     line = f"[{ts}] [{system}] {msg}"
     print(line, flush=True)
     logger.info("[%s] %s", system, msg)
+
+
+async def _consume_event_backlog(
+    bus: Any,
+    event_type: str,
+    *,
+    batch_size: int = 500,
+    max_events: int = 1000,
+) -> list[Any]:
+    """Drain a bounded event backlog without starving the loop."""
+    events: list[Any] = []
+    while len(events) < max_events:
+        remaining = max_events - len(events)
+        limit = max(1, min(batch_size, remaining))
+        batch = await bus.consume_events(event_type, limit=limit)
+        if not batch:
+            break
+        events.extend(batch)
+        if len(batch) < limit:
+            break
+    return events
 
 
 def _swarm_liveness_watch_payload(snapshot: dict[str, Any]) -> dict[str, Any]:
@@ -361,6 +389,19 @@ def _mission_campaign_id(mission_title: str) -> str:
     return f"mission_{digest}"
 
 
+def _artifact_slug(text: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "_", (text or "").strip().lower()).strip("_")
+    return slug[:48] or "artifact"
+
+
+def _campaign_artifact_path(campaign_id: str) -> str:
+    return f"~/.dharma/shared/campaigns/{campaign_id}.md"
+
+
+def _campaign_task_artifact_path(campaign_id: str, title: str) -> str:
+    return f"~/.dharma/shared/campaigns/{campaign_id}_{_artifact_slug(title)}.md"
+
+
 def _recent_worker_call_count() -> int:
     try:
         from dharma_swarm.cost_tracker import summarize_costs
@@ -412,6 +453,100 @@ def _campaign_has_board_presence(campaign: dict[str, Any] | None, tasks: list[An
     return False
 
 
+def _campaign_has_open_human_blocker(campaign: dict[str, Any] | None) -> bool:
+    if not campaign:
+        return False
+    blockers = campaign.get("human_blocking")
+    if not isinstance(blockers, list):
+        return False
+    terminal_statuses = {
+        "abandoned",
+        "canceled",
+        "cancelled",
+        "completed",
+        "done",
+        "resolved",
+    }
+    for blocker in blockers:
+        if isinstance(blocker, str):
+            if blocker.strip():
+                return True
+            continue
+        if not isinstance(blocker, dict):
+            continue
+        status = str(blocker.get("status") or "").strip().lower()
+        if status in terminal_statuses:
+            continue
+        if blocker:
+            return True
+    return False
+
+
+def _task_matches_campaign(task: Any, campaign_id: str) -> bool:
+    metadata = getattr(task, "metadata", None)
+    if not isinstance(metadata, dict):
+        return False
+    return str(metadata.get("campaign_id") or "").strip() == campaign_id
+
+
+def _campaign_has_live_board_presence(campaign: dict[str, Any] | None, tasks: list[Any]) -> bool:
+    if not campaign:
+        return False
+    campaign_id = str(campaign.get("campaign_id") or "").strip()
+    if not campaign_id:
+        return False
+    live_statuses = {
+        TaskStatus.PENDING,
+        TaskStatus.ASSIGNED,
+        TaskStatus.RUNNING,
+    }
+    for task in tasks:
+        if not _task_matches_campaign(task, campaign_id):
+            continue
+        if getattr(task, "status", None) in live_statuses:
+            return True
+    return False
+
+
+def _task_is_recent(
+    task: Any,
+    *,
+    hours: float,
+    now: datetime | None = None,
+) -> bool:
+    ts = getattr(task, "updated_at", None) or getattr(task, "created_at", None)
+    if not isinstance(ts, datetime):
+        return False
+    current = now or datetime.now(timezone.utc)
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=timezone.utc)
+    return (current - ts).total_seconds() <= max(0.0, hours) * 3600.0
+
+
+def _campaign_has_recent_nurture_task(
+    campaign: dict[str, Any] | None,
+    tasks: list[Any],
+    *,
+    recent_hours: float = CAMPAIGN_NURTURE_RECENT_HOURS,
+) -> bool:
+    if not campaign:
+        return False
+    campaign_id = str(campaign.get("campaign_id") or "").strip()
+    if not campaign_id:
+        return False
+    for task in tasks:
+        if not _task_matches_campaign(task, campaign_id):
+            continue
+        metadata = getattr(task, "metadata", None)
+        if not isinstance(metadata, dict):
+            continue
+        if str(metadata.get("created_via") or "") != "campaign_nurture":
+            continue
+        if _task_is_recent(task, hours=recent_hours):
+            return True
+    return False
+
+
 def _task_has_mission_pressure(task: Any) -> bool:
     metadata = getattr(task, "metadata", None)
     if not isinstance(metadata, dict):
@@ -439,6 +574,124 @@ def _campaign_is_stale(campaign: dict[str, Any] | None, *, max_age_hours: float 
     return age_hours > max_age_hours
 
 
+def _campaign_nurture_reason(
+    campaign: dict[str, Any],
+    tasks: list[Any],
+    *,
+    stale_hours: float = CAMPAIGN_NURTURE_STALE_HOURS,
+) -> str:
+    is_primary = bool(campaign.get("primary"))
+    stale = _campaign_is_stale(campaign, max_age_hours=stale_hours)
+    live_presence = _campaign_has_live_board_presence(campaign, tasks)
+    if not live_presence and _campaign_has_open_human_blocker(campaign):
+        return ""
+    if not live_presence and stale:
+        return "stale_no_live_work"
+    if not live_presence and is_primary:
+        return "primary_no_live_work"
+    return ""
+
+
+def _build_campaign_nurture_specs(
+    *,
+    campaigns: list[dict[str, Any]],
+    tasks: list[Any],
+    stale_hours: float = CAMPAIGN_NURTURE_STALE_HOURS,
+    recent_hours: float = CAMPAIGN_NURTURE_RECENT_HOURS,
+    limit: int = CAMPAIGN_NURTURE_MAX_SPECS,
+) -> list[dict[str, Any]]:
+    specs: list[dict[str, Any]] = []
+    active_campaigns = [
+        campaign for campaign in campaigns
+        if isinstance(campaign, dict) and campaign.get("status", "active") == "active"
+    ]
+    primary_campaigns = [campaign for campaign in active_campaigns if campaign.get("primary")]
+    candidate_campaigns = primary_campaigns[:1] if primary_campaigns else active_campaigns
+    for campaign in candidate_campaigns:
+        if not isinstance(campaign, dict):
+            continue
+        campaign_id = str(campaign.get("campaign_id") or "").strip()
+        if not campaign_id:
+            continue
+        if _campaign_has_recent_nurture_task(
+            campaign,
+            tasks,
+            recent_hours=recent_hours,
+        ):
+            continue
+        reason = _campaign_nurture_reason(
+            campaign,
+            tasks,
+            stale_hours=stale_hours,
+        )
+        if not reason:
+            continue
+        title = f"Campaign nurture: {campaign.get('title') or campaign_id}"
+        artifact_path = str(campaign.get("artifact_path") or _campaign_artifact_path(campaign_id))
+        markers = list(campaign.get("progress_markers") or [])
+        last_marker = markers[-1] if markers else {}
+        last_note = str(last_marker.get("note") or "").strip()
+        description_lines = [
+            f"Campaign: {campaign_id}",
+            f"Title: {campaign.get('title') or campaign_id}",
+            f"Domain: {campaign.get('domain') or 'unknown'}",
+            f"Reason: {reason}.",
+            "",
+            "This active campaign has gone cold or lost live board pressure.",
+            f"Write or refresh the binding campaign artifact at {artifact_path}.",
+            "Include:",
+            "1. current state and strongest real evidence",
+            "2. blocking gap or decision that is preventing progress",
+            "3. one concrete next external action or deliverable",
+            "4. up to three bounded follow-on tasks if real branches emerge",
+        ]
+        if last_note:
+            description_lines.extend(["", f"Last marker: {last_note[:280]}"])
+        specs.append(
+            {
+                "title": title,
+                "description": "\n".join(description_lines),
+                "priority": TaskPriority.HIGH if campaign.get("primary") else TaskPriority.NORMAL,
+                "created_by": "campaign_garden",
+                "metadata": {
+                    "campaign_id": campaign_id,
+                    "campaign_support": True,
+                    "artifact_required": True,
+                    "seed_class": "campaign_nurture",
+                    "created_via": "campaign_nurture",
+                    "nurture_reason": reason,
+                    "domain": campaign.get("domain") or "",
+                    "target_artifact": artifact_path,
+                },
+            }
+        )
+        if len(specs) >= max(1, int(limit)):
+            break
+    return specs
+
+
+async def _refresh_campaign_pressure(swarm: Any) -> int:
+    """Keep durable campaigns warm by reseeding bounded board work when they cool off."""
+    try:
+        from dharma_swarm.campaigns import load_active
+
+        campaigns = load_active(STATE_DIR / "meta")
+        if not campaigns:
+            return 0
+        board = swarm._orchestrator._board
+        tasks = await board.list_tasks(limit=400)
+        specs = _build_campaign_nurture_specs(campaigns=campaigns, tasks=tasks)
+        if not specs:
+            return 0
+        created = await _enqueue_startup_specs(swarm, specs)
+        if created:
+            _log("swarm", f"Campaign nurture: queued {created} task(s)")
+        return created
+    except Exception as exc:
+        _log("swarm", f"Campaign nurture failed (non-fatal): {exc}")
+        return 0
+
+
 def _build_mission_seed_specs(
     *,
     mission_title: str,
@@ -453,12 +706,14 @@ def _build_mission_seed_specs(
         norm = (title or "").strip().lower()
         if not norm or norm in existing_titles:
             continue
+        artifact_path = _campaign_task_artifact_path(campaign_id, title)
         specs.append(
             {
                 "title": title,
                 "description": (
                     f"Mission: {mission_title}.\n"
                     f"Campaign: {campaign_id}.\n"
+                    f"Write the deliverable to {artifact_path}.\n"
                     "Produce a durable artifact in ~/.dharma/shared/ or the repo. "
                     "Prefer evidence-backed output over coordination churn."
                 ),
@@ -471,6 +726,7 @@ def _build_mission_seed_specs(
                     "artifact_required": True,
                     "mission_title": mission_title,
                     "seed_class": "director_mission",
+                    "target_artifact": artifact_path,
                 },
             }
         )
@@ -513,8 +769,13 @@ async def _seed_startup_pressure(swarm: Any) -> None:
         has_mission_pressure = any(_task_has_mission_pressure(task) for task in existing_tasks)
         primary_campaign_viable = (
             primary_campaign is not None
-            and not _campaign_is_stale(primary_campaign)
-            and _campaign_has_board_presence(primary_campaign, existing_tasks)
+            and (
+                _campaign_has_open_human_blocker(primary_campaign)
+                or (
+                    not _campaign_is_stale(primary_campaign)
+                    and _campaign_has_board_presence(primary_campaign, existing_tasks)
+                )
+            )
         )
         _log(
             "swarm",
@@ -559,6 +820,7 @@ async def _seed_startup_pressure(swarm: Any) -> None:
                 success_criteria=mission.mission_thesis,
                 source="director",
                 primary=True,
+                artifact_path=_campaign_artifact_path(campaign_id),
                 meta_dir=STATE_DIR / "meta",
             )
             specs = _build_mission_seed_specs(
@@ -590,6 +852,7 @@ async def _seed_startup_pressure(swarm: Any) -> None:
             success_criteria="Convert daemon boot into durable world-facing artifacts.",
             source="startup_seed",
             primary=True,
+            artifact_path=_campaign_artifact_path(fallback_campaign_id),
             meta_dir=STATE_DIR / "meta",
         )
 
@@ -598,10 +861,15 @@ async def _seed_startup_pressure(swarm: Any) -> None:
             title = str(spec.get("title", "") or "").strip()
             if not title or title.lower() in existing_titles:
                 continue
+            artifact_path = _campaign_task_artifact_path(fallback_campaign_id, title)
+            description = str(spec.get("description", "") or "").strip()
             seed_specs.append(
                 {
                     "title": title,
-                    "description": str(spec.get("description", "") or ""),
+                    "description": (
+                        f"{description}\n\n"
+                        f"Write the deliverable to {artifact_path} before marking the task complete."
+                    ).strip(),
                     "priority": spec.get("priority", TaskPriority.HIGH),
                     "created_by": "seed_task",
                     "metadata": {
@@ -610,6 +878,7 @@ async def _seed_startup_pressure(swarm: Any) -> None:
                         "artifact_required": True,
                         "seed_class": "startup_seed",
                         "domain": "artifact_publication",
+                        "target_artifact": artifact_path,
                     },
                 }
             )
@@ -848,6 +1117,7 @@ async def run_swarm_loop(
 
     await _safe_seed_startup_pressure(swarm)
     asyncio.create_task(_delayed_startup_reseed(swarm, shutdown_event))
+    last_campaign_nurture_at = 0.0
 
     try:
         while not shutdown_event.is_set():
@@ -897,20 +1167,24 @@ async def run_swarm_loop(
                         _log("watchdog", f"{alert.severity.upper()} [{alert.loop_name}]: "
                              f"{alert.message} → {alert.intervention}")
 
-                swarm_state = await swarm.status()
-                _update_runtime_health_state(
-                    agent_count=len(swarm_state.agents),
-                    task_count=(
-                        swarm_state.tasks_pending
-                        + swarm_state.tasks_running
-                        + swarm_state.tasks_completed
-                        + swarm_state.tasks_failed
-                    ),
-                )
-                await _publish_swarm_runtime_snapshot(
-                    swarm,
-                    source="swarm.tick_complete",
-                )
+                await _post_tick_runtime_bookkeeping(swarm)
+
+                phase = str(
+                    swarm.hot_path_liveness().get("bootstrap_phase", "") or ""
+                ).strip()
+                now_monotonic = time.monotonic()
+                if (
+                    phase == "bootstrap_complete"
+                    and (now_monotonic - last_campaign_nurture_at) >= CAMPAIGN_NURTURE_INTERVAL_S
+                ):
+                    last_campaign_nurture_at = now_monotonic
+                    try:
+                        await asyncio.wait_for(
+                            _refresh_campaign_pressure(swarm),
+                            timeout=10.0,
+                        )
+                    except asyncio.TimeoutError:
+                        _log("swarm", "Campaign nurture exceeded 10.0s; continuing")
 
                 if activity.get("paused"):
                     _log("swarm", "Paused (.PAUSE file)")
@@ -1060,8 +1334,11 @@ async def run_evolution_loop(shutdown_event: asyncio.Event) -> None:
             # Drain lifecycle events — task completion throughput for fitness context
             completions = 0
             try:
-                lifecycle_events = await _bus.consume_events(
-                    "AGENT_LIFECYCLE_COMPLETED", limit=20,
+                lifecycle_events = await _consume_event_backlog(
+                    _bus,
+                    "AGENT_LIFECYCLE_COMPLETED",
+                    batch_size=500,
+                    max_events=5000,
                 )
                 completions = len(lifecycle_events)
                 if completions:
@@ -1081,6 +1358,7 @@ async def run_evolution_loop(shutdown_event: asyncio.Event) -> None:
 
             # ── ACTIVE EVOLUTION: run cycle + meta-adaptation ──
             cycle_count += 1
+            meta_observation: CycleResult | None = None
 
             # Extract live fitness from AGENT_FITNESS event payloads and persist
             live_fitness_scores: list[float] = []
@@ -1109,33 +1387,18 @@ async def run_evolution_loop(shutdown_event: asyncio.Event) -> None:
                      f"avg={sum(live_fitness_scores)/len(live_fitness_scores):.3f} "
                      f"max={max(live_fitness_scores):.3f}")
 
-            # Feed meta-evolution with observed fitness
-            # Prefer live agent fitness; fall back to historical archive average
+            # Stage one meta-evolution observation per loop cycle. Live fitness
+            # is useful context, but a real Darwin cycle result supersedes it.
             if avg_fitness > 0 or fitness_events:
                 if live_fitness_scores:
                     best_fitness = max(live_fitness_scores)
                 else:
                     best_fitness = avg_fitness if avg_fitness > 0 else 0.0
-                synthetic_result = CycleResult(
+                meta_observation = CycleResult(
                     cycle_id=f"orch-evo-{cycle_count}",
                     best_fitness=best_fitness,
                     proposals_submitted=len(fitness_events),
                 )
-                meta_result = meta_engine.observe_cycle_result(synthetic_result)
-                if meta_result is not None:
-                    if meta_result.evolved_parameters:
-                        _log(
-                            "evolution",
-                            f"Meta-evolution adapted parameters "
-                            f"(meta_fitness={meta_result.meta_fitness:.3f}, "
-                            f"applied={meta_result.applied_parameters})",
-                        )
-                    else:
-                        _log(
-                            "evolution",
-                            f"Meta-evolution: no adaptation needed "
-                            f"(meta_fitness={meta_result.meta_fitness:.3f})",
-                        )
 
             # Drain active inference prediction errors — bias evolution toward high-error areas
             try:
@@ -1292,12 +1555,28 @@ async def run_evolution_loop(shutdown_event: asyncio.Event) -> None:
                                     )
                                 _log("evolution", f"Live cycle: {_committed} commits on {_branch}")
 
-                            # Feed result to meta-evolution
-                            meta_engine.observe_cycle_result(result)
+                            meta_observation = result
                     else:
                         _log("evolution", "Auto-evolve skipped: OPENROUTER_API_KEY not set")
                 except Exception as exc:
                     _log("evolution", f"Auto-evolve error: {exc}")
+
+            if meta_observation is not None:
+                meta_result = meta_engine.observe_cycle_result(meta_observation)
+                if meta_result is not None:
+                    if meta_result.evolved_parameters:
+                        _log(
+                            "evolution",
+                            f"Meta-evolution adapted parameters "
+                            f"(meta_fitness={meta_result.meta_fitness:.3f}, "
+                            f"applied={meta_result.applied_parameters})",
+                        )
+                    else:
+                        _log(
+                            "evolution",
+                            f"Meta-evolution: no adaptation needed "
+                            f"(meta_fitness={meta_result.meta_fitness:.3f})",
+                        )
 
             # Bus metrics for observability
             try:
@@ -1506,6 +1785,68 @@ async def run_living_layers(
             _log("living", f"Error: {e}")
 
         await asyncio.sleep(LIVING_INTERVAL)
+
+
+def _list_orchestrator_processes() -> list[tuple[int, str]]:
+    """Best-effort process scan for competing live orchestrators."""
+    try:
+        proc = subprocess.run(
+            ["ps", "-axo", "pid=,command="],
+            capture_output=True,
+            text=True,
+            timeout=1.0,
+            check=False,
+        )
+    except Exception:
+        return []
+
+    if proc.returncode != 0:
+        return []
+
+    current_pid = os.getpid()
+    matches: list[tuple[int, str]] = []
+    needles = (
+        "dharma_swarm.orchestrate_live",
+        "orchestrate_live.py",
+        "run_daemon.sh",
+        "dgc orchestrate-live",
+    )
+    skip_markers = (
+        "ps -axo",
+        "rg ",
+        "pytest",
+        "codex exec",
+        "claude --bare -p",
+    )
+
+    for raw in proc.stdout.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        parts = line.split(maxsplit=1)
+        if len(parts) != 2:
+            continue
+        try:
+            pid = int(parts[0])
+        except ValueError:
+            continue
+        command = parts[1]
+        if pid == current_pid:
+            continue
+        if not any(needle in command for needle in needles):
+            continue
+        if any(marker in command for marker in skip_markers):
+            continue
+        matches.append((pid, command))
+
+    return matches
+
+
+def _find_competing_orchestrator() -> tuple[int, str] | None:
+    matches = _list_orchestrator_processes()
+    if not matches:
+        return None
+    return matches[0]
 
 
 def _stop_old_daemon() -> None:
@@ -1860,6 +2201,10 @@ async def run_free_evolution_grind(shutdown_event: asyncio.Event) -> None:
         n_object_cycles_per_meta=2,
         auto_apply=True,
     )
+    from dharma_swarm.message_bus import MessageBus as _MBus
+
+    _bus = _MBus(STATE_DIR / "db" / "messages.db")
+    await _bus.init_db()
 
     cycle_count = 0
     last_improvement_time = __import__("time").time()
@@ -1868,6 +2213,42 @@ async def run_free_evolution_grind(shutdown_event: asyncio.Event) -> None:
 
     while not shutdown_event.is_set():
         cycle_count += 1
+
+        try:
+            fitness_events = await _bus.consume_events("AGENT_FITNESS", limit=100)
+            lifecycle_events = await _consume_event_backlog(
+                _bus,
+                "AGENT_LIFECYCLE_COMPLETED",
+                batch_size=500,
+                max_events=5000,
+            )
+            if fitness_events:
+                scores: list[float] = []
+                for ev in fitness_events:
+                    payload = ev.get("payload") if isinstance(ev, dict) else {}
+                    if not isinstance(payload, dict):
+                        continue
+                    score = (
+                        payload.get("swabhaav_ratio")
+                        or payload.get("fitness_score")
+                        or payload.get("composite")
+                    )
+                    if isinstance(score, (int, float)) and score > 0:
+                        scores.append(float(score))
+                        await engine.record_fitness_observation(
+                            agent_name=payload.get("agent", "unknown"),
+                            fitness_score=float(score),
+                            task_id=payload.get("task_id"),
+                        )
+                if scores:
+                    _log(
+                        "grind",
+                        f"Bus fitness: {len(scores)} score(s), avg={sum(scores) / len(scores):.3f}",
+                    )
+            if lifecycle_events:
+                _log("grind", f"Lifecycle backlog drained: {len(lifecycle_events)} completion event(s)")
+        except Exception:
+            logger.debug("Free-grind bus drain failed", exc_info=True)
 
         # Compute hunger
         hunger = _compute_hunger(meta_archive_path, last_improvement_time)
@@ -2358,13 +2739,24 @@ async def _run_archaeology_loop(shutdown_event: asyncio.Event) -> None:
     """
     _log("archaeology", "Starting archaeology ingestion loop (interval=1800s)")
     try:
-        await asyncio.sleep(2)
-        from dharma_swarm.archaeology_ingestion import ArchaeologyIngestionDaemon
+        from dharma_swarm.archaeology_ingestion import (
+            ArchaeologyIngestionDaemon,
+            _archaeology_boot_delay_seconds,
+        )
+
+        def _run_cycle_sync(daemon: ArchaeologyIngestionDaemon) -> dict[str, int]:
+            return asyncio.run(daemon.run_once())
+
+        boot_delay_seconds = _archaeology_boot_delay_seconds(1800)
+        if boot_delay_seconds > 0:
+            _log("archaeology", f"Deferring boot ingestion for {boot_delay_seconds:.0f}s")
+            if await _wait_or_shutdown(shutdown_event, boot_delay_seconds):
+                return
         daemon = ArchaeologyIngestionDaemon(state_dir=STATE_DIR, interval_seconds=1800)
 
         # Run once immediately at boot
         try:
-            counts = await asyncio.wait_for(daemon.run_once(), timeout=120.0)
+            counts = await asyncio.wait_for(asyncio.to_thread(_run_cycle_sync, daemon), timeout=120.0)
             _log("archaeology", f"Boot ingestion complete: {counts}")
         except asyncio.TimeoutError:
             _log("archaeology", "Boot ingestion timed out (120s) — continuing")
@@ -2381,7 +2773,7 @@ async def _run_archaeology_loop(shutdown_event: asyncio.Event) -> None:
             if shutdown_event.is_set():
                 break
             try:
-                counts = await asyncio.wait_for(daemon.run_once(), timeout=120.0)
+                counts = await asyncio.wait_for(asyncio.to_thread(_run_cycle_sync, daemon), timeout=120.0)
                 _log("archaeology", f"Ingestion cycle complete: {counts}")
             except asyncio.TimeoutError:
                 _log("archaeology", "Ingestion cycle timed out (120s) — continuing")
@@ -2420,7 +2812,7 @@ async def _run_research_rtn_loop(shutdown_event: asyncio.Event) -> None:
             _log("research-rtn", f"Executing: track={track.slug}, topic={brief.topic}")
 
             try:
-                result = rtn.execute_brief(brief)
+                result = await asyncio.to_thread(rtn.execute_brief, brief)
                 status = "PASSED" if result.passed_gates else "FAILED"
                 score = result.reward.grade_card.final_score if result.reward else 0.0
                 _log(
@@ -2514,6 +2906,15 @@ async def orchestrate(background: bool = False) -> None:
         _root.addHandler(_fh)
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+    competing = _find_competing_orchestrator()
+    if competing is not None:
+        pid, command = competing
+        _log(
+            "orchestrator",
+            f"Refusing duplicate startup; existing orchestrator PID {pid}: {command[:160]}",
+        )
+        return
 
     # Stop any existing daemon to avoid DB conflicts
     _stop_old_daemon()

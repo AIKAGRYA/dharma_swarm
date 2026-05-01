@@ -84,6 +84,10 @@ def _rate_for_provider_model(provider: str, model: str) -> float:
     for (provider_key, model_prefix), rate in _MODEL_RATE_OVERRIDES.items():
         if provider_lower == provider_key and model_lower.startswith(model_prefix):
             return rate
+    if not provider_lower:
+        for (_, model_prefix), rate in _MODEL_RATE_OVERRIDES.items():
+            if model_lower.startswith(model_prefix):
+                return rate
     return _PROVIDER_DEFAULT_RATES.get(provider_lower, 0.0)
 
 

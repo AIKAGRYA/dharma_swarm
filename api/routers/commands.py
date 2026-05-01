@@ -14,6 +14,22 @@ def _get_swarm():
     return get_swarm()
 
 
+def _serialize_task(task) -> dict[str, object]:
+    return {
+        "id": task.id,
+        "title": task.title,
+        "description": task.description,
+        "status": task.status.value if hasattr(task.status, "value") else str(task.status),
+        "priority": task.priority.value if hasattr(task.priority, "value") else str(task.priority),
+        "assigned_to": task.assigned_to,
+        "created_by": getattr(task, "created_by", "system"),
+        "created_at": str(task.created_at),
+        "updated_at": str(task.updated_at),
+        "result": task.result,
+        "metadata": dict(getattr(task, "metadata", {}) or {}),
+    }
+
+
 @router.post("/commands/evolve")
 async def trigger_evolve(req: EvolveRequest) -> ApiResponse:
     swarm = _get_swarm()
@@ -35,20 +51,15 @@ async def create_task(req: CreateTaskRequest) -> ApiResponse:
             priority = TaskPriority.NORMAL
 
         meta = dict(req.metadata or {})
-        if req.assigned_to:
-            meta["assigned_to"] = req.assigned_to
         task = await swarm.create_task(
             title=req.title,
             description=req.description,
             priority=priority,
+            created_by=req.created_by,
+            assigned_to=req.assigned_to,
             metadata=meta,
         )
-        return ApiResponse(data={
-            "id": task.id,
-            "title": task.title,
-            "status": task.status.value if hasattr(task.status, 'value') else str(task.status),
-            "priority": task.priority.value if hasattr(task.priority, 'value') else str(task.priority),
-        })
+        return ApiResponse(data=_serialize_task(task))
     except Exception as e:
         return ApiResponse(status="error", error=str(e))
 
@@ -58,20 +69,7 @@ async def list_tasks() -> ApiResponse:
     swarm = _get_swarm()
     try:
         tasks = await swarm.list_tasks()
-        return ApiResponse(data=[
-            {
-                "id": t.id,
-                "title": t.title,
-                "description": t.description,
-                "status": t.status.value if hasattr(t.status, 'value') else str(t.status),
-                "priority": t.priority.value if hasattr(t.priority, 'value') else str(t.priority),
-                "assigned_to": t.assigned_to,
-                "created_at": str(t.created_at),
-                "updated_at": str(t.updated_at),
-                "result": t.result,
-            }
-            for t in tasks
-        ])
+        return ApiResponse(data=[_serialize_task(t) for t in tasks])
     except Exception as e:
         return ApiResponse(data=[], error=str(e))
 

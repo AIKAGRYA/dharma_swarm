@@ -106,13 +106,25 @@ class AgentCronScheduler:
 
 def _provider_string(provider_type: ProviderType) -> str:
     """Map ProviderType enum to the string AutonomousAgent expects."""
-    if provider_type in (ProviderType.ANTHROPIC, ProviderType.CLAUDE_CODE):
+    if provider_type == ProviderType.ANTHROPIC:
         return "anthropic"
+    if provider_type == ProviderType.CLAUDE_CODE:
+        return "openrouter"
     if provider_type == ProviderType.CODEX:
         return "codex"
     if provider_type in (ProviderType.OPENROUTER, ProviderType.OPENROUTER_FREE):
         return "openrouter"
     return "anthropic"
+
+
+@dataclass(order=True)
+class QueuedAttentionTask:
+    """Priority-scored task injection for persistent agents."""
+
+    priority_rank: int
+    created_at: float = field(default_factory=time.monotonic)
+    source: str = field(compare=False, default="injected")
+    text: str = field(compare=False, default="")
 
 
 class PersistentAgent:
@@ -162,7 +174,7 @@ class PersistentAgent:
         self._bus: Any = None
 
         # Orchestrator task injection
-        self._task_queue: asyncio.Queue[str] = asyncio.Queue()
+        self._task_queue: asyncio.PriorityQueue[QueuedAttentionTask] = asyncio.PriorityQueue()
         self._task_event = asyncio.Event()
 
         # Witness log
@@ -235,8 +247,10 @@ class PersistentAgent:
             if salient:
                 # Queue an investigation task if something urgent appeared
                 mark = salient[0]
-                await self._task_queue.put(
-                    f"Urgent stigmergy signal: {mark.observation[:150]}"
+                await self._enqueue_attention_task(
+                    f"Urgent stigmergy signal: {mark.observation[:150]}",
+                    source="stigmergy",
+                    priority_rank=3,
                 )
                 return f"found={len(salient)}, queued_investigation"
             return "no_urgent_signals"
@@ -251,8 +265,10 @@ class PersistentAgent:
             urgent = [m for m in msgs if getattr(m, "priority", 0) >= 8]
             if urgent:
                 top = urgent[0]
-                await self._task_queue.put(
-                    f"Urgent message from {top.from_agent}: {top.subject}"
+                await self._enqueue_attention_task(
+                    f"Urgent message from {top.from_agent}: {top.subject}",
+                    source="message",
+                    priority_rank=1,
                 )
                 return f"urgent={len(urgent)}, queued_response"
             return f"inbox={len(msgs)}, no_urgent"
@@ -351,7 +367,7 @@ class PersistentAgent:
                 # this agent is pinned to an active campaign. Campaign pins
                 # are first-class memory and keep the agent on a declared
                 # track across wake cycles.
-                active_campaign = self._check_pinned_campaign()
+                active_campaign = self._check_pinned_campaign(directives=directives)
                 if active_campaign is not None:
                     task_text = self._render_campaign_task(active_campaign)
                     task_source = "campaign"
@@ -573,8 +589,8 @@ class PersistentAgent:
 
     # -- Campaign pin integration ----------------------------------------
 
-    def _check_pinned_campaign(self) -> dict[str, Any] | None:
-        """Return the first active campaign this agent is pinned to, or None.
+    def _check_pinned_campaign(self, directives: Any | None = None) -> dict[str, Any] | None:
+        """Return the pinned campaign with the highest current attention debt.
 
         Read-only — write authority lives in ``dharma_swarm.campaigns``.
         Defensive: swallow any error and fall through to self-generation.
@@ -588,9 +604,96 @@ class PersistentAgent:
         active = [c for c in pins if c.get("status", "active") == "active"]
         if not active:
             return None
-        # Earliest-created first, so the agent stays on the original pin.
-        active.sort(key=lambda c: str(c.get("created", "")))
-        return active[0]
+        if len(active) == 1:
+            return active[0]
+
+        def _parse_timestamp(raw: Any) -> float:
+            if not raw:
+                return 0.0
+            try:
+                from datetime import datetime
+
+                return datetime.fromisoformat(str(raw).replace("Z", "+00:00")).timestamp()
+            except Exception:
+                return 0.0
+
+        governance = None
+        try:
+            from dharma_swarm.governance_signal import load_governance
+
+            governance = load_governance(meta_dir=self.state_dir / "meta")
+        except Exception:
+            governance = None
+
+        now_ts = time.time()
+        ages_hours: list[float] = []
+        checkins: list[int] = []
+        for campaign in active:
+            anchor_ts = _parse_timestamp(
+                campaign.get("last_check_in") or campaign.get("created"),
+            )
+            age_h = max(0.0, (now_ts - anchor_ts) / 3600.0) if anchor_ts else 0.0
+            ages_hours.append(age_h)
+            checkins.append(max(0, int(campaign.get("check_in_count", 0) or 0)))
+
+        max_age = max(ages_hours) or 1.0
+        max_checkins = max(checkins) if checkins else 0
+
+        directive_text = ""
+        if directives is not None:
+            parts = [
+                str(getattr(directives, "active_mission", "") or ""),
+                *[str(x) for x in (getattr(directives, "do_items", []) or [])],
+                *[str(x) for x in (getattr(directives, "context_lines", []) or [])],
+            ]
+            directive_text = " ".join(parts).lower()
+
+        def _directive_match_bonus(campaign: dict[str, Any]) -> float:
+            if not directive_text:
+                return 0.0
+            candidates = [
+                str(campaign.get("campaign_id", "") or "").lower(),
+                str(campaign.get("title", "") or "").lower(),
+                str(campaign.get("domain", "") or "").lower(),
+            ]
+            for candidate in candidates:
+                if candidate and len(candidate) >= 4 and candidate in directive_text:
+                    return 0.5
+            return 0.0
+
+        best: dict[str, Any] | None = None
+        best_score = float("-inf")
+        for campaign, age_h, count in zip(active, ages_hours, checkins):
+            campaign_id = str(campaign.get("campaign_id", "") or "")
+            domain = str(campaign.get("domain", "") or "")
+
+            stale_score = age_h / max_age if max_age > 0 else 0.0
+            coverage_debt = 1.0 - (count / max_checkins) if max_checkins > 0 else 1.0
+            score = (stale_score * 1.25) + (coverage_debt * 0.9)
+
+            if campaign.get("primary") is True:
+                score += 0.35
+
+            if governance is not None:
+                score += float(getattr(governance, "campaign_pressure", {}).get(campaign_id, 0.0) or 0.0) * 1.4
+                if domain:
+                    try:
+                        domain_mult = governance.domain_weight(domain) / 0.125
+                    except Exception:
+                        domain_mult = 1.0
+                    score += max(0.0, min(0.75, domain_mult - 1.0))
+                    score += min(
+                        0.6,
+                        float(getattr(governance, "starvation_boosts", {}).get(domain, 0.0) or 0.0) * 2.0,
+                    )
+
+            score += _directive_match_bonus(campaign)
+
+            if score > best_score:
+                best = campaign
+                best_score = score
+
+        return best
 
     def _render_campaign_task(self, campaign: dict[str, Any]) -> str:
         campaign_id = campaign.get("campaign_id", "?")
@@ -708,6 +811,22 @@ class PersistentAgent:
         except Exception:
             logger.debug("[%s] task mirror failure", self.name, exc_info=True)
 
+    async def _enqueue_attention_task(
+        self,
+        task_text: str,
+        *,
+        source: str,
+        priority_rank: int,
+    ) -> None:
+        await self._task_queue.put(
+            QueuedAttentionTask(
+                priority_rank=priority_rank,
+                source=source,
+                text=task_text,
+            )
+        )
+        self._task_event.set()
+
     # -- Gate check ------------------------------------------------------
 
     def _check_gate(self, task_text: str) -> dict[str, Any] | None:
@@ -778,10 +897,11 @@ class PersistentAgent:
                 injected = None
                 if not self._task_queue.empty():
                     try:
-                        injected = self._task_queue.get_nowait()
+                        queued = self._task_queue.get_nowait()
                     except asyncio.QueueEmpty:
                         pass
                     else:
+                        injected = queued.text
                         if self._task_queue.empty():
                             self._task_event.clear()
 
@@ -824,10 +944,13 @@ class PersistentAgent:
         logger.info("[%s] Persistent loop stopped", self.name)
         await self._write_witness("LOOP_STOP", "", "")
 
-    async def accept_task(self, task: str) -> None:
+    async def accept_task(self, task: str, *, priority_rank: int = 0) -> None:
         """Inject a task from the orchestrator."""
-        await self._task_queue.put(task)
-        self._task_event.set()
+        await self._enqueue_attention_task(
+            task,
+            source="injected",
+            priority_rank=priority_rank,
+        )
         logger.info("[%s] Accepted injected task: %s", self.name, task[:160])
         await self._write_witness("TASK_ACCEPTED", task, "injected")
 

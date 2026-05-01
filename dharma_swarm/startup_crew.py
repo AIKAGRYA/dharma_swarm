@@ -45,7 +45,7 @@ _SKILL_ROLE_MAP = {
     "archeologist": AgentRole.ARCHEOLOGIST,
     "validator": AgentRole.VALIDATOR,
     "researcher": AgentRole.RESEARCHER,
-    "builder": AgentRole.GENERAL,
+    "builder": AgentRole.CODER,
 }
 
 _PROVIDER_MAP = {
@@ -198,14 +198,8 @@ CYBERNETICS_CREW = [
         "name": "cyber-codex",
         "role": AgentRole.SURGEON,
         "thread": "cybernetics",
-        "provider": _cyber_provider_model(
-            ollama_model="qwen3-coder:480b-cloud",
-            openrouter_free_model="google/gemma-4-27b-it:free",
-        )[0],
-        "model": _cyber_provider_model(
-            ollama_model="qwen3-coder:480b-cloud",
-            openrouter_free_model="google/gemma-4-27b-it:free",
-        )[1],
+        "provider": ProviderType.CODEX,
+        "model": "gpt-5.4",
         "system_prompt": (
             "You are CYBER-CODEX, the execution and wiring seat of the Cybernetics Directive. "
             "Prefer the smallest hot-path control improvement over broad subsystem invention. "
@@ -398,14 +392,14 @@ async def spawn_default_crew(swarm) -> list:
         )
         spawn_specs.append((
             spec,
-            swarm.spawn_agent(
+            asyncio.create_task(swarm.spawn_agent(
                 name=spec["name"],
                 role=spec["role"],
                 thread=spec["thread"],
                 provider_type=provider,
                 model=model,
                 system_prompt=merged_prompt,
-            )
+            ))
         ))
 
     agents = []
@@ -463,14 +457,14 @@ async def spawn_cybernetics_crew(swarm) -> list:
         )
         spawn_specs.append((
             spec,
-            swarm.spawn_agent(
+            asyncio.create_task(swarm.spawn_agent(
                 name=spec["name"],
                 role=spec["role"],
                 thread=spec["thread"],
                 provider_type=spec["provider"],
                 model=spec["model"],
                 system_prompt=merged_prompt,
-            )
+            ))
         ))
 
     agents = []

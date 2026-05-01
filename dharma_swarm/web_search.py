@@ -320,9 +320,12 @@ class JinaSearchBackend(SearchBackend):
     SEARCH_URL = "https://s.jina.ai/"
     READER_URL = "https://r.jina.ai/"
 
+    def __init__(self) -> None:
+        self._auth_disabled = False
+
     @property
     def available(self) -> bool:
-        return True  # Works without API key (rate-limited but functional)
+        return not self._auth_disabled
 
     def _headers(self) -> dict[str, str]:
         key = os.environ.get(self.API_KEY_ENV, "").strip()
@@ -331,8 +334,22 @@ class JinaSearchBackend(SearchBackend):
             h["Authorization"] = f"Bearer {key}"
         return h
 
+    def _disable_after_auth_failure(self, status_code: int, *, action: str) -> bool:
+        if status_code not in {401, 403}:
+            return False
+        if not self._auth_disabled:
+            logger.warning(
+                "Jina %s auth failed (%s); disabling Jina for this process",
+                action,
+                status_code,
+            )
+        self._auth_disabled = True
+        return True
+
     async def search(self, query: str, max_results: int = 5) -> list[SearchResult]:
         import httpx
+        if self._auth_disabled:
+            return []
         try:
             async with httpx.AsyncClient(timeout=20) as client:
                 resp = await client.get(
@@ -342,6 +359,12 @@ class JinaSearchBackend(SearchBackend):
                 )
                 resp.raise_for_status()
                 data = resp.json()
+        except httpx.HTTPStatusError as exc:
+            status_code = exc.response.status_code if exc.response is not None else 0
+            if self._disable_after_auth_failure(status_code, action="search"):
+                return []
+            logger.warning("Jina search failed: %s", exc)
+            return []
         except Exception as exc:
             logger.warning("Jina search failed: %s", exc)
             return []
@@ -360,6 +383,8 @@ class JinaSearchBackend(SearchBackend):
     async def fetch_content(self, url: str) -> str:
         """Fetch and return clean markdown from any URL."""
         import httpx
+        if self._auth_disabled:
+            return f"Error fetching {url}: Jina disabled after auth failure"
         try:
             async with httpx.AsyncClient(timeout=30) as client:
                 resp = await client.get(
@@ -368,6 +393,11 @@ class JinaSearchBackend(SearchBackend):
                 )
                 resp.raise_for_status()
                 return resp.text[:20000]
+        except httpx.HTTPStatusError as exc:
+            status_code = exc.response.status_code if exc.response is not None else 0
+            if self._disable_after_auth_failure(status_code, action="fetch"):
+                return f"Error fetching {url}: Jina disabled after auth failure"
+            return f"Error fetching {url}: {exc}"
         except Exception as exc:
             return f"Error fetching {url}: {exc}"
 

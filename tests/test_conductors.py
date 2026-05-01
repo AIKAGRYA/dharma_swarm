@@ -46,3 +46,13 @@ class TestConductorConfigs:
     def test_system_prompts_nonempty(self):
         for cfg in CONDUCTOR_CONFIGS:
             assert len(cfg["system_prompt"]) > 100
+
+
+def test_resolve_conductor_provider_defaults_to_claude_code(monkeypatch):
+    monkeypatch.delenv("DGC_CONDUCTOR_PROVIDER", raising=False)
+    assert _resolve_conductor_provider() == ProviderType.CLAUDE_CODE
+
+
+def test_resolve_conductor_provider_allows_explicit_anthropic_override(monkeypatch):
+    monkeypatch.setenv("DGC_CONDUCTOR_PROVIDER", "anthropic")
+    assert _resolve_conductor_provider() == ProviderType.ANTHROPIC

@@ -10,9 +10,11 @@ import pytest
 from dharma_swarm.auto_research.models import (
     ClaimRecord,
     ResearchBrief,
+    ResearchQuery,
     ResearchReport,
     SourceDocument,
 )
+from dharma_swarm.auto_research.backends import WebSearchBackend
 from dharma_swarm.auto_research.search import NullSearchBackend
 from dharma_swarm.auto_grade.models import GradeCard, RewardSignal
 from dharma_swarm.research_rtn import ResearchRTN, RTNRunResult
@@ -283,3 +285,34 @@ class TestResearchRTN:
             result = rtn.execute_brief(brief)
             assert result.report is not None, f"Track {track.slug} failed to produce report"
             assert result.error == "", f"Track {track.slug} had error: {result.error}"
+
+
+@pytest.mark.asyncio
+async def test_web_search_backend_search_works_inside_running_loop(monkeypatch):
+    backend = WebSearchBackend()
+    brief = _make_brief()
+    queries = [ResearchQuery(query_id="q1", text="test query", intent="research")]
+    expected = [
+        {
+            "source_id": "src-test",
+            "url": "https://example.com/test",
+            "title": "Test",
+            "content": "snippet",
+            "published_at": "",
+            "freshness_score": 0.8,
+            "source_type": "web",
+            "metadata": {"query": "test query", "search_backend": "test"},
+        }
+    ]
+
+    async def _fake_async_search(
+        brief_arg: ResearchBrief,
+        queries_arg: list[ResearchQuery],
+    ) -> list[dict[str, object]]:
+        assert brief_arg == brief
+        assert queries_arg == queries
+        return expected
+
+    monkeypatch.setattr(backend, "_async_search", _fake_async_search)
+
+    assert backend.search(brief, queries) == expected

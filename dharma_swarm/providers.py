@@ -11,8 +11,10 @@ from dataclasses import replace
 from datetime import datetime, timezone
 import inspect
 import json
+import logging
 import os
 import random
+import signal
 import shutil
 import time
 from abc import abstractmethod
@@ -41,6 +43,7 @@ from dharma_swarm.api_keys import (
 )
 from dharma_swarm.base_provider import BaseProvider, ProviderCapabilities
 from dharma_swarm.codex_cli import dgc_codex_exec_prefix
+from dharma_swarm.config import DEFAULT_CONFIG as _SWARM_CFG
 from dharma_swarm.cost_tracker import _estimate_cost, log_cost
 from dharma_swarm.model_hierarchy import default_model as canonical_default_model
 from dharma_swarm.models import LLMRequest, LLMResponse, ProviderType
@@ -82,6 +85,27 @@ from dharma_swarm.telemetry_plane import (
     RoutingDecisionRecord,
     TelemetryPlaneStore,
 )
+
+
+logger = logging.getLogger(__name__)
+
+DEFAULT_SUBPROCESS_TIMEOUT_SECONDS = _SWARM_CFG.agent.subprocess_timeout_seconds
+_SUBPROCESS_TIMEOUT_METADATA_KEYS = (
+    "provider_timeout_seconds",
+    "subprocess_timeout_seconds",
+    "timeout_seconds",
+    "run_timeout_seconds",
+    "task_timeout_seconds",
+    "dispatch_timeout_seconds",
+)
+
+
+def _coerce_subprocess_timeout(value: Any, fallback: float) -> float:
+    try:
+        timeout = float(value)
+    except (TypeError, ValueError):
+        timeout = float(fallback)
+    return max(0.01, min(timeout, 7200.0))
 
 
 class LLMProvider(BaseProvider):
@@ -732,11 +756,22 @@ class _SubprocessProvider(LLMProvider):
                 return str(p)
         return name  # last resort — hope PATH has it
 
-    def __init__(self, timeout: int = 300, working_dir: str | None = None) -> None:
+    def __init__(
+        self,
+        timeout: int = DEFAULT_SUBPROCESS_TIMEOUT_SECONDS,
+        working_dir: str | None = None,
+    ) -> None:
         self._timeout = timeout
         self._working_dir = working_dir or str(Path.home() / "dharma_swarm")
         # Resolve once at init so subprocess calls always use an absolute path
         self._resolved_command = self._resolve_binary(self._cli_command)
+
+    def _effective_timeout(self, request: LLMRequest) -> float:
+        metadata = request.metadata if isinstance(request.metadata, dict) else {}
+        for key in _SUBPROCESS_TIMEOUT_METADATA_KEYS:
+            if metadata.get(key) is not None:
+                return _coerce_subprocess_timeout(metadata.get(key), self._timeout)
+        return _coerce_subprocess_timeout(None, self._timeout)
 
     def _build_prompt(self, request: LLMRequest) -> str:
         parts: list[str] = []
@@ -762,6 +797,43 @@ class _SubprocessProvider(LLMProvider):
         env.pop("CLAUDECODE", None)  # Allow nesting
         return env
 
+    async def _terminate_process_tree(self, proc: Any) -> None:
+        pid = getattr(proc, "pid", None)
+        if isinstance(pid, int) and hasattr(os, "killpg"):
+            try:
+                os.killpg(pid, signal.SIGTERM)
+            except ProcessLookupError:
+                return
+            except Exception:
+                terminate_result = proc.terminate()
+                if inspect.isawaitable(terminate_result):
+                    await terminate_result
+        else:
+            terminate_result = proc.terminate()
+            if inspect.isawaitable(terminate_result):
+                await terminate_result
+
+        try:
+            await asyncio.wait_for(proc.wait(), timeout=5.0)
+            return
+        except asyncio.TimeoutError:
+            pass
+
+        if isinstance(pid, int) and hasattr(os, "killpg"):
+            try:
+                os.killpg(pid, signal.SIGKILL)
+            except ProcessLookupError:
+                return
+            except Exception:
+                kill_result = proc.kill()
+                if inspect.isawaitable(kill_result):
+                    await kill_result
+        else:
+            kill_result = proc.kill()
+            if inspect.isawaitable(kill_result):
+                await kill_result
+        await proc.wait()
+
     @jikoku_traced_provider
     async def complete(self, request: LLMRequest) -> LLMResponse:
         shared = Path.home() / ".dharma" / "shared"
@@ -777,18 +849,23 @@ class _SubprocessProvider(LLMProvider):
             stderr=asyncio.subprocess.PIPE,
             cwd=self._working_dir,
             env=env,
+            start_new_session=True,
         )
 
         try:
             stdout, stderr = await asyncio.wait_for(
-                proc.communicate(), timeout=self._timeout
+                proc.communicate(), timeout=self._effective_timeout(request)
             )
         except asyncio.TimeoutError:
-            terminate_result = proc.terminate()
-            if inspect.isawaitable(terminate_result):
-                await terminate_result
-            await proc.wait()
+            await self._terminate_process_tree(proc)
             return LLMResponse(content="TIMEOUT: exceeded limit", model=self._cli_label)
+        except asyncio.CancelledError:
+            cleanup = asyncio.create_task(self._terminate_process_tree(proc))
+            try:
+                await asyncio.shield(cleanup)
+            except asyncio.CancelledError:
+                pass
+            raise
 
         content = stdout.decode()[:50_000] if stdout else ""
         if proc.returncode != 0 and not content:
@@ -2218,6 +2295,7 @@ class ModelRouter:
         _BILLING_MARKERS = (
             "credit balance is too low",
             "credit balance",
+            "requires more credits",
             "insufficient_quota",
             "you exceeded your current quota",
             "billing hard limit",
@@ -2965,7 +3043,7 @@ class ModelRouter:
                     )
                     if _is_permanent:
                         # Force circuit open by recording enough failures at once
-                        for _ in range(breaker._config.min_samples):
+                        for _ in range(breaker.config.min_samples):
                             breaker.record_failure()
                         logger.warning(
                             "Fast-tripped circuit breaker for %s: %s",

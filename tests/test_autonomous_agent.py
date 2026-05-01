@@ -337,6 +337,51 @@ class TestOpenAIMessageConversion:
         assert len(result["tool_calls"]) == 1
         assert result["tool_calls"][0]["id"] == "tu1"
 
+    def test_assistant_tool_only_blocks_keep_empty_string_content(self):
+        msg = {
+            "role": "assistant",
+            "content": [
+                {
+                    "type": "tool_use", "id": "tu1",
+                    "name": "read_file", "input": {"path": "/tmp/x"},
+                },
+            ],
+        }
+        result = AutonomousAgent._to_openai_message(msg)
+        assert result["role"] == "assistant"
+        assert result["content"] == ""
+        assert len(result["tool_calls"]) == 1
+        assert result["tool_calls"][0]["id"] == "tu1"
+
+    def test_tool_result_list_expands_to_multiple_tool_messages(self):
+        msgs = [
+            {"role": "user", "content": "task"},
+            {
+                "role": "assistant",
+                "content": [
+                    {"type": "text", "text": "analysis"},
+                    {
+                        "type": "tool_use", "id": "tu1",
+                        "name": "read_file", "input": {"path": "/tmp/x"},
+                    },
+                ],
+            },
+            {
+                "role": "user",
+                "content": [
+                    {"type": "tool_result", "tool_use_id": "tu1", "content": "file one"},
+                    {"type": "tool_result", "tool_use_id": "tu2", "content": "file two"},
+                ],
+            },
+        ]
+        result = AutonomousAgent._to_openai_messages(msgs)
+        assert result[0] == {"role": "user", "content": "task"}
+        assert result[1]["role"] == "assistant"
+        assert result[1]["content"] == "analysis"
+        assert result[1]["tool_calls"][0]["id"] == "tu1"
+        assert result[2] == {"role": "tool", "tool_call_id": "tu1", "content": "file one"}
+        assert result[3] == {"role": "tool", "tool_call_id": "tu2", "content": "file two"}
+
     def test_fallback_stringifies(self):
         msg = {"role": "user", "content": [42, 43]}
         result = AutonomousAgent._to_openai_message(msg)
@@ -607,6 +652,69 @@ class TestCallLLM:
         agent._call_codex = AsyncMock(return_value={"text": [], "tool_uses": []})
         await agent._call_llm("sys", [], [])
         agent._call_codex.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_openrouter_normalizes_tool_transcript(self):
+        ident = AgentIdentity(
+            name="t", role="r", system_prompt="s", provider="openrouter", model="test-model",
+        )
+        agent = AutonomousAgent(ident)
+
+        config = SimpleNamespace(
+            provider=SimpleNamespace(value="ollama"),
+            default_model="runtime-model",
+        )
+        provider = MagicMock()
+        provider.complete = AsyncMock(
+            return_value=SimpleNamespace(
+                content="done",
+                tool_calls=[],
+                stop_reason="end_turn",
+                usage={"prompt_tokens": 11, "completion_tokens": 7},
+            )
+        )
+        provider.close = AsyncMock()
+
+        messages = [
+            {"role": "user", "content": "task"},
+            {
+                "role": "assistant",
+                "content": [
+                    {"type": "text", "text": "analysis"},
+                    {
+                        "type": "tool_use",
+                        "id": "tu1",
+                        "name": "read_file",
+                        "input": {"path": "/tmp/x"},
+                    },
+                ],
+            },
+            {
+                "role": "user",
+                "content": [
+                    {"type": "tool_result", "tool_use_id": "tu1", "content": "file body"},
+                ],
+            },
+        ]
+
+        with (
+            patch("dharma_swarm.autonomous_agent.preferred_runtime_provider_configs", return_value=[config]),
+            patch("dharma_swarm.autonomous_agent.create_runtime_provider", return_value=provider),
+        ):
+            result = await agent._call_openrouter("sys", messages, [])
+
+        request = provider.complete.await_args.args[0]
+        assert request.messages[0] == {"role": "user", "content": "task"}
+        assert request.messages[1]["role"] == "assistant"
+        assert request.messages[1]["content"] == "analysis"
+        assert request.messages[1]["tool_calls"][0]["id"] == "tu1"
+        assert request.messages[2] == {
+            "role": "tool",
+            "tool_call_id": "tu1",
+            "content": "file body",
+        }
+        assert result["text"] == ["done"]
+        provider.close.assert_awaited_once()
 
 
 # ---------------------------------------------------------------------------

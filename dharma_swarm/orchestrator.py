@@ -27,17 +27,27 @@ from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
 from dharma_swarm.models import (
+    AgentRole,
     AgentState,
     Message,
+    ProviderType,
     Task,
     TaskDispatch,
     TaskStatus,
     TopologyType,
     _new_id,
 )
+from dharma_swarm.build_authority import BuildLane
+from dharma_swarm.task_contract import (
+    allowed_claim_lanes,
+    carries_execution_contract,
+    required_artifact_targets,
+    requires_tooling_lane,
+)
 from dharma_swarm.diversity_governor import DiversityGovernor
 from dharma_swarm.governance_signal import reorder_by_governance
 from dharma_swarm.runtime_contract import RuntimeEnvelope, RuntimeEventType
+from dharma_swarm.runtime_state import DelegationRun, RuntimeStateStore, TaskClaim
 from dharma_swarm.session_ledger import SessionLedger
 from dharma_swarm.sheaf import (
     CoordinationProtocol,
@@ -50,6 +60,65 @@ from dharma_swarm.telos_gates import check_with_reflective_reroute
 from dharma_swarm.yoga_node import ConstraintVerdict, YogaScheduler
 
 logger = logging.getLogger(__name__)
+
+_ROLE_TO_BUILD_LANES: dict[str, tuple[BuildLane, ...]] = {
+    AgentRole.CONDUCTOR.value: (BuildLane.CONDUCTOR,),
+    AgentRole.ORCHESTRATOR.value: (BuildLane.CONDUCTOR,),
+    AgentRole.OPERATOR.value: (BuildLane.CONDUCTOR,),
+    AgentRole.STRATEGIST.value: (BuildLane.CONDUCTOR, BuildLane.RESEARCHER),
+    AgentRole.CODER.value: (BuildLane.BUILDER,),
+    AgentRole.SURGEON.value: (BuildLane.BUILDER,),
+    AgentRole.ARCHITECT.value: (BuildLane.BUILDER, BuildLane.RESEARCHER),
+    AgentRole.SYSTEMS_ARCHITECT.value: (BuildLane.BUILDER,),
+    AgentRole.WORKER.value: (BuildLane.BUILDER,),
+    AgentRole.RESEARCHER.value: (BuildLane.RESEARCHER,),
+    AgentRole.CARTOGRAPHER.value: (BuildLane.RESEARCHER,),
+    AgentRole.ARCHEOLOGIST.value: (BuildLane.RESEARCHER,),
+    AgentRole.RESEARCH_DIRECTOR.value: (BuildLane.RESEARCHER,),
+    AgentRole.REVIEWER.value: (BuildLane.VERIFIER,),
+    AgentRole.VALIDATOR.value: (BuildLane.VERIFIER,),
+    AgentRole.TESTER.value: (BuildLane.VERIFIER,),
+    AgentRole.WITNESS.value: (BuildLane.VERIFIER,),
+    AgentRole.ARCHIVIST.value: (BuildLane.VERIFIER,),
+}
+_TOOLING_CAPABLE_PROVIDER_TYPES = frozenset(
+    {
+        ProviderType.CLAUDE_CODE,
+        ProviderType.CODEX,
+        ProviderType.OPENAI,
+        ProviderType.OPENROUTER,
+        ProviderType.OPENROUTER_FREE,
+        ProviderType.NVIDIA_NIM,
+        ProviderType.GROQ,
+        ProviderType.CEREBRAS,
+        ProviderType.SILICONFLOW,
+        ProviderType.TOGETHER,
+        ProviderType.FIREWORKS,
+        ProviderType.GOOGLE_AI,
+        ProviderType.SAMBANOVA,
+        ProviderType.MISTRAL,
+        ProviderType.CHUTES,
+    }
+)
+_GENERAL_BUILDER_IDENTITY_TOKENS = frozenset(
+    {
+        "builder",
+        "coder",
+        "codex",
+        "surgeon",
+    }
+)
+_LOCAL_TOOLING_PROVIDER_VALUES = frozenset(
+    {ProviderType.CLAUDE_CODE.value, ProviderType.CODEX.value}
+)
+_UNUSABLE_TOOLING_ERROR_MARKERS = frozenset(
+    {
+        "access_denied",
+        "billing_exhausted",
+        "circuit_open",
+        "quota_exceeded",
+    }
+)
 
 
 @runtime_checkable
@@ -116,6 +185,11 @@ class Orchestrator:
             session_id=session_id,
             runtime_db_path=resolved_runtime_db_path,
         )
+        self._runtime_state: RuntimeStateStore | None = getattr(
+            self._ledger,
+            "_runtime_state",
+            None,
+        )
         self._telic_seam = self._init_telic_seam()
         self._shared_dir = shared_dir or self._derive_runtime_artifact_dir("shared")
         self._stigmergy_dir = stigmergy_dir or self._derive_runtime_artifact_dir("stigmergy")
@@ -140,6 +214,19 @@ class Orchestrator:
         self._last_coordination_refresh_at: float = 0.0  # monotonic timestamp
         self._coordination_refresh_interval_s: float = 120.0  # skip if refreshed within this window
         self._diversity_governor = DiversityGovernor()
+
+    def set_coordination_refresh_interval(self, seconds: float) -> None:
+        """Bound coordination refresh cadence for the live daemon.
+
+        The sheaf snapshot should not remain stale for longer than the
+        daemon's own heartbeat. This keeps coordination synthesis responsive
+        in the live loop without forcing a refresh on every helper call.
+        """
+        try:
+            normalized = max(0.0, float(seconds))
+        except (TypeError, ValueError):
+            return
+        self._coordination_refresh_interval_s = normalized
 
     def _get_sleep_time_agent(self) -> Any | None:
         direct = getattr(self, "_sleep_time_agent", None)
@@ -195,6 +282,9 @@ class Orchestrator:
         if base_dir.name == "ledgers":
             return base_dir.parent
         return base_dir
+
+    def _campaign_meta_dir(self) -> Path:
+        return self._runtime_root() / "meta"
 
     def _init_telic_seam(self) -> Any | None:
         """Prefer a state-local ontology seam over the global singleton."""
@@ -337,6 +427,7 @@ class Orchestrator:
         idle = await self._pool.get_idle_agents()
         logger.info("route_next: idle=%d (%.1fs)", len(idle), _tt.monotonic() - _rn0)
         if not ready or not idle:
+            logger.info("route_next: skip ready=%d idle=%d", len(ready), len(idle))
             return []
 
         # Skip tasks already being executed or waiting for retry backoff.
@@ -362,7 +453,27 @@ class Orchestrator:
         for task in ready:
             agent = self._select_idle_agent(task, available)
             if agent is None:
-                break
+                if not available:
+                    break
+                contract_snapshot = self._task_contract_snapshot(task)
+                reason = "no_eligible_idle_agent"
+                if self._task_requires_tooling_lane(task):
+                    reason = "no_tooling_capable_idle_agent"
+                if carries_execution_contract(self._task_meta(task)) or self._task_requires_strict_worker_lane(task):
+                    logger.info(
+                        "route_next: blocked %s reason=%s lanes=%s",
+                        task.id,
+                        reason,
+                        ",".join(lane.value for lane in self._task_required_build_lanes(task)) or "any",
+                    )
+                if contract_snapshot:
+                    self._record_task_event(
+                        "dispatch_skipped",
+                        task_id=task.id,
+                        reason=reason,
+                        **contract_snapshot,
+                    )
+                continue
 
             # YogaNode constraint check — if wired, filter before dispatch
             if self._yoga is not None:
@@ -726,6 +837,82 @@ class Orchestrator:
             return {}
         return dict(task.metadata)
 
+    @staticmethod
+    def _task_campaign_id(task: Task | None) -> str | None:
+        meta = Orchestrator._task_meta(task)
+        campaign_id = str(meta.get("campaign_id") or "").strip()
+        return campaign_id or None
+
+    @staticmethod
+    def _task_contract_snapshot(task: Task | None) -> dict[str, Any]:
+        meta = Orchestrator._task_meta(task)
+        snapshot: dict[str, Any] = {}
+        for key in (
+            "contract_version",
+            "task_class",
+            "owner_lane",
+            "campaign_id",
+            "artifact_id",
+            "outcome_id",
+            "done_condition",
+            "settlement_state",
+            "source_task_id",
+        ):
+            value = meta.get(key)
+            if value is None:
+                continue
+            text = str(value).strip()
+            if text:
+                snapshot[key] = text
+        if "requires_verifier" in meta:
+            snapshot["requires_verifier"] = bool(meta.get("requires_verifier"))
+        if meta.get("depends_on"):
+            snapshot["depends_on"] = list(meta.get("depends_on") or [])
+        artifact_targets = required_artifact_targets(meta)
+        if artifact_targets:
+            snapshot["target_artifacts"] = artifact_targets
+        return snapshot
+
+    @staticmethod
+    def _campaign_lifecycle_note(task: Task | None, detail: str) -> str:
+        summary = str(detail or "").strip().replace("\n", " ")
+        if summary:
+            return summary[:280]
+        if task is None:
+            return ""
+        return str(getattr(task, "title", "") or "").strip()[:280]
+
+    def _record_campaign_task_check_in(
+        self,
+        *,
+        task: Task | None,
+        agent_id: str,
+        task_status: str,
+        detail: str,
+    ) -> None:
+        campaign_id = self._task_campaign_id(task)
+        if not campaign_id:
+            return
+        try:
+            from dharma_swarm.campaigns import mark_task_check_in
+
+            mark_task_check_in(
+                campaign_id,
+                task_id=str(getattr(task, "id", "") or ""),
+                task_title=str(getattr(task, "title", "") or ""),
+                task_status=task_status,
+                agent=agent_id,
+                note=self._campaign_lifecycle_note(task, detail),
+                meta_dir=self._campaign_meta_dir(),
+            )
+        except Exception as exc:
+            logger.warning(
+                "Campaign task check-in failed (%s %s): %s",
+                campaign_id,
+                task_status,
+                exc,
+            )
+
     def _resolve_timeout_seconds(self, task: Task | None, fallback: float) -> float:
         meta = self._task_meta(task)
         raw = (
@@ -909,6 +1096,10 @@ class Orchestrator:
 
     def _task_preferred_roles(self, task: Task | None) -> list[str]:
         meta = self._task_meta(task)
+        owner_lane = str(meta.get("owner_lane", "")).strip().lower()
+        task_class = str(meta.get("task_class", "")).strip().lower()
+        requires_verifier = bool(meta.get("requires_verifier"))
+        artifact_targets = required_artifact_targets(meta)
         raw = meta.get("coordination_preferred_roles")
         if raw is None:
             raw = meta.get("preferred_roles")
@@ -917,6 +1108,16 @@ class Orchestrator:
         )
         if roles:
             return roles
+        if requires_verifier or owner_lane == "verifier" or task_class == "verify":
+            return ["validator", "reviewer", "tester", "witness"]
+        if (
+            artifact_targets
+            or owner_lane in {"builder", "gateway"}
+            or task_class in {"build", "integrate", "operate"}
+        ):
+            return ["surgeon", "coder", "architect", "systems_architect", "worker"]
+        if owner_lane == "researcher" or task_class == "research":
+            return ["researcher", "cartographer", "archeologist", "architect"]
         if (
             str(meta.get("coordination_route", "")).strip().lower()
             == "synthesis_review"
@@ -927,12 +1128,74 @@ class Orchestrator:
 
     def _task_preferred_agent_names(self, task: Task | None) -> list[str]:
         meta = self._task_meta(task)
+        owner_lane = str(meta.get("owner_lane", "")).strip().lower()
+        task_class = str(meta.get("task_class", "")).strip().lower()
+        requires_verifier = bool(meta.get("requires_verifier"))
+        artifact_targets = required_artifact_targets(meta)
         raw = meta.get("director_preferred_agents")
         if raw is None:
             raw = meta.get("preferred_agents")
-        return self._dedupe_strings(self._coerce_string_list(raw))
+        names = self._dedupe_strings(self._coerce_string_list(raw))
+        if names:
+            return names
+        if requires_verifier or owner_lane == "verifier" or task_class == "verify":
+            return ["validator", "cyber-validator"]
+        if artifact_targets or owner_lane == "builder" or task_class in {"build", "integrate"}:
+            return ["cyber-codex", "qwen-builder", "builder", "coder", "surgeon"]
+        if owner_lane == "researcher" or task_class == "research":
+            return ["researcher", "cyber-glm5"]
+        return []
 
     _EXPLORATION_RATE = 0.1  # 10% random exploration
+
+    @staticmethod
+    def _agent_role_value(agent: AgentState) -> str:
+        return str(getattr(getattr(agent, "role", None), "value", getattr(agent, "role", ""))).lower()
+
+    def _task_required_build_lanes(self, task: Task | None) -> tuple[BuildLane, ...]:
+        return allowed_claim_lanes(self._task_meta(task))
+
+    def _task_requires_tooling_lane(self, task: Task | None) -> bool:
+        return requires_tooling_lane(self._task_meta(task))
+
+    @classmethod
+    def _agent_build_lanes(cls, agent: AgentState) -> set[BuildLane]:
+        role_value = cls._agent_role_value(agent)
+        lanes = set(_ROLE_TO_BUILD_LANES.get(role_value, ()))
+        provider_value = str(getattr(agent, "provider", "") or "").strip().lower()
+        name = str(getattr(agent, "name", "") or "").strip().lower()
+        identity = " ".join(
+            str(getattr(agent, attr, "") or "").strip().lower()
+            for attr in ("name", "model", "provider")
+        )
+
+        # Older persisted skill agents used AgentRole.GENERAL even when their
+        # identity clearly advertised a builder/tooling seat. Keep generic
+        # generalists blocked, but let explicit builder identities claim
+        # builder-lane work after the strict task-contract filter.
+        if role_value == AgentRole.GENERAL.value and any(
+            token in identity for token in _GENERAL_BUILDER_IDENTITY_TOKENS
+        ):
+            lanes.add(BuildLane.BUILDER)
+
+        # Director minds such as codex-primus are orchestrators, but they are
+        # also explicit Codex subprocess execution seats. They can absorb
+        # builder backlog; persistent conductors remain conductor-only.
+        if (
+            provider_value == ProviderType.CODEX.value
+            and not name.startswith("conductor_")
+            and "codex" in identity
+        ):
+            lanes.add(BuildLane.BUILDER)
+        return lanes
+
+    @classmethod
+    def _agent_is_tooling_capable(cls, agent: AgentState) -> bool:
+        provider_value = str(getattr(agent, "provider", "") or "").strip().lower()
+        if provider_value not in _LOCAL_TOOLING_PROVIDER_VALUES:
+            return False
+        last_error = str(getattr(agent, "error", "") or "").lower()
+        return not any(marker in last_error for marker in _UNUSABLE_TOOLING_ERROR_MARKERS)
 
     def _select_idle_agent(
         self,
@@ -941,6 +1204,23 @@ class Orchestrator:
     ) -> AgentState | None:
         if not idle_agents:
             return None
+
+        candidate_pool = list(idle_agents)
+        strict_lanes = set(self._task_required_build_lanes(task))
+        if strict_lanes:
+            candidate_pool = [
+                agent
+                for agent in candidate_pool
+                if self._agent_build_lanes(agent).intersection(strict_lanes)
+            ]
+            if not candidate_pool:
+                return None
+        if self._task_requires_tooling_lane(task):
+            candidate_pool = [
+                agent for agent in candidate_pool if self._agent_is_tooling_capable(agent)
+            ]
+            if not candidate_pool:
+                return None
 
         preferred_names = self._task_preferred_agent_names(task)
         preferred_roles = self._task_preferred_roles(task)
@@ -953,7 +1233,7 @@ class Orchestrator:
                 wanted = preferred_name.strip()
                 if not wanted:
                     continue
-                for agent in idle_agents:
+                for agent in candidate_pool:
                     if agent.name != wanted or agent.id in seen:
                         continue
                     name_matched.append(agent)
@@ -962,36 +1242,46 @@ class Orchestrator:
 
         # Collect ALL role-matched candidates (not just first match)
         role_matched: list[AgentState] = []
-        for agent in idle_agents:
-            role_value = str(getattr(agent.role, "value", agent.role)).lower()
+        for agent in candidate_pool:
+            role_value = self._agent_role_value(agent)
             if any(role_value == p for p in preferred_roles):
                 role_matched.append(agent)
 
-        # Pick from name-matched subset first, then role-matched subset, else all candidates.
-        candidates = name_matched or role_matched or list(idle_agents)
+        strict_contract = bool(strict_lanes)
+        if strict_contract:
+            candidates = name_matched or role_matched or list(candidate_pool)
+            if not candidates:
+                return None
+        else:
+            # Pick from name-matched subset first, then role-matched subset, else all candidates.
+            candidates = name_matched or role_matched or list(candidate_pool)
 
         # Active inference EFE-based selection (Friston P10)
         best = self._efe_biased_pick(candidates, task)
         if best is not None:
-            idle_agents.remove(best)
+            idle_agents[:] = [agent for agent in idle_agents if agent.id != best.id]
             return best
 
         # Fitness-biased selection (feature-flagged, best-effort)
         best = self._fitness_biased_pick(candidates, task)
         if best is not None:
-            idle_agents.remove(best)
+            idle_agents[:] = [agent for agent in idle_agents if agent.id != best.id]
             return best
 
         # FIFO fallback (original behavior)
         if name_matched:
             pick = name_matched[0]
-            idle_agents.remove(pick)
+            idle_agents[:] = [agent for agent in idle_agents if agent.id != pick.id]
             return pick
         if role_matched:
             pick = role_matched[0]
-            idle_agents.remove(pick)
+            idle_agents[:] = [agent for agent in idle_agents if agent.id != pick.id]
             return pick
-        return idle_agents.pop(0)
+        if not candidates:
+            return None
+        pick = candidates[0]
+        idle_agents[:] = [agent for agent in idle_agents if agent.id != pick.id]
+        return pick
 
     def _efe_biased_pick(
         self,
@@ -1219,14 +1509,11 @@ class Orchestrator:
             "claim_key",
             "coordination_topic",
             "topic",
-            "parent_task",
-            "task_group",
         ):
             value = str(metadata.get(key, "")).strip()
             if value:
                 return value
-        title = (task.title or "").strip()
-        return title or task.id
+        return ""
 
     @classmethod
     def _coordination_task_agent_id(cls, task: Task) -> str:
@@ -1366,6 +1653,40 @@ class Orchestrator:
             )
         return updated_tasks
 
+    # Coordination origins that are outputs of the sheaf itself — never
+    # republish as fresh discoveries (breaks the feedback loop).
+    _COORDINATION_OUTPUT_ORIGINS: frozenset[str] = frozenset({
+        "sheaf_disagreement",
+        "coordination_synthesis",
+    })
+
+    @classmethod
+    def _is_actionable_coordination_task(
+        cls,
+        task: Task,
+    ) -> bool:
+        """Return True only if *task* should participate in sheaf coordination.
+
+        Rejects:
+        - Tasks whose coordination_origin marks them as sheaf outputs
+          (synthesis tasks feeding back in was the root cause of the
+          461-task runaway loop).
+        - Tasks that lack an explicit coordination_claim_key in metadata
+          (prevents title-only or generic tasks from entering the sheaf).
+        - Tasks created by internal instrumentation (eval_harness, probes).
+        """
+        metadata = cls._task_meta(task)
+        origin = str(metadata.get("coordination_origin", "")).strip()
+        if origin in cls._COORDINATION_OUTPUT_ORIGINS:
+            return False
+        claim_key = str(metadata.get("coordination_claim_key", "")).strip()
+        if not claim_key:
+            return False
+        created_by = str(getattr(task, "created_by", "") or "").strip().lower()
+        if created_by in {"eval_harness", "tool_test", "master_test"}:
+            return False
+        return True
+
     @classmethod
     def _task_discovery(
         cls,
@@ -1375,6 +1696,11 @@ class Orchestrator:
     ) -> Discovery | None:
         agent_id = cls._coordination_task_agent_id(task)
         if not agent_id or agent_id not in agent_ids:
+            return None
+        if not cls._is_actionable_coordination_task(task):
+            return None
+        claim_key = cls._coordination_claim_key_from_task(task)
+        if not claim_key:
             return None
         metadata = cls._task_meta(task)
         content = str(
@@ -1395,7 +1721,7 @@ class Orchestrator:
         }
         return Discovery(
             agent_id=agent_id,
-            claim_key=cls._coordination_claim_key_from_task(task),
+            claim_key=claim_key,
             content=content,
             confidence=cls._coordination_confidence(
                 metadata.get("coordination_confidence"),
@@ -1454,6 +1780,8 @@ class Orchestrator:
             if not agent_id or agent_id not in agent_ids:
                 continue
             claim_key = cls._coordination_claim_key_from_task(task)
+            if not claim_key:
+                continue
             claim_participants.setdefault(claim_key, set()).add(agent_id)
 
         channels: dict[tuple[str, str], InformationChannel] = {}
@@ -1632,6 +1960,142 @@ class Orchestrator:
         except Exception as exc:
             logger.warning("Task board update failed for %s: %s", task_id, exc)
 
+    @staticmethod
+    def _utc_datetime_from(value: Any, default: datetime | None = None) -> datetime | None:
+        if isinstance(value, datetime):
+            parsed = value
+        elif isinstance(value, (int, float)):
+            try:
+                return datetime.fromtimestamp(float(value), timezone.utc)
+            except Exception:
+                return default
+        elif isinstance(value, str) and value.strip():
+            raw = value.strip()
+            try:
+                parsed = datetime.fromisoformat(
+                    raw[:-1] + "+00:00" if raw.endswith("Z") else raw
+                )
+            except ValueError:
+                try:
+                    return datetime.fromtimestamp(float(raw), timezone.utc)
+                except Exception:
+                    return default
+        else:
+            return default
+        if parsed.tzinfo is None:
+            return parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
+
+    def _ensure_runtime_run_id(self, td: TaskDispatch) -> str:
+        run_id = str(td.metadata.get("runtime_run_id", "") or "")
+        if not run_id and self._runtime_state is not None:
+            run_id = self._runtime_state.new_run_id()
+            td.metadata["runtime_run_id"] = run_id
+        return run_id
+
+    async def _record_runtime_task_claim(
+        self,
+        *,
+        td: TaskDispatch,
+        task: Task | None,
+        claim_meta: dict[str, Any],
+    ) -> None:
+        store = self._runtime_state
+        if store is None:
+            return
+        active_claim = claim_meta.get("active_claim")
+        if not isinstance(active_claim, dict):
+            return
+        claim_id = str(active_claim.get("claim_id", "") or td.metadata.get("claim_id", "") or "")
+        if not claim_id:
+            return
+        now = datetime.now(timezone.utc)
+        claimed_at = (
+            self._utc_datetime_from(active_claim.get("claimed_at"), None)
+            or self._utc_datetime_from(active_claim.get("claimed_at_epoch"), now)
+            or now
+        )
+        stale_after = self._utc_datetime_from(active_claim.get("claim_expires_at_epoch"))
+        task_meta = self._task_meta(task)
+        try:
+            await store.record_task_claim(
+                TaskClaim(
+                    claim_id=claim_id,
+                    task_id=td.task_id,
+                    session_id=self._ledger.session_id,
+                    agent_id=td.agent_id,
+                    status="assigned",
+                    claimed_at=claimed_at,
+                    stale_after=stale_after,
+                    retry_count=self._coerce_int(td.metadata.get("retry_count"), 0),
+                    metadata={
+                        "topology": td.topology.value,
+                        "dispatch_timeout_seconds": td.timeout_seconds,
+                        "claim_timeout_seconds": active_claim.get("claim_timeout_seconds"),
+                        "task_title": getattr(task, "title", "") if task else "",
+                        "task_status": getattr(getattr(task, "status", None), "value", ""),
+                        "required_artifacts": required_artifact_targets(task_meta),
+                    },
+                )
+            )
+        except Exception:
+            logger.debug("Runtime task_claim write failed for %s", td.task_id, exc_info=True)
+
+    async def _record_runtime_delegation_run(
+        self,
+        *,
+        td: TaskDispatch,
+        task: Task | None,
+        status: str,
+        completed_at: datetime | None = None,
+        failure_code: str = "",
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        store = self._runtime_state
+        if store is None:
+            return
+        run_id = self._ensure_runtime_run_id(td)
+        if not run_id:
+            return
+        task_meta = self._task_meta(task)
+        active_claim = task_meta.get("active_claim") or task_meta.get("last_claim") or {}
+        claim_id = str(
+            td.metadata.get("claim_id", "")
+            or (active_claim.get("claim_id", "") if isinstance(active_claim, dict) else "")
+        )
+        try:
+            existing = await store.get_delegation_run(run_id)
+            existing_metadata = dict(existing.metadata) if existing is not None else {}
+            existing_metadata.update(metadata or {})
+            await store.record_delegation_run(
+                DelegationRun(
+                    run_id=run_id,
+                    session_id=self._ledger.session_id,
+                    task_id=td.task_id,
+                    claim_id=claim_id,
+                    parent_run_id=existing.parent_run_id if existing else "",
+                    assigned_by=existing.assigned_by if existing else "orchestrator",
+                    assigned_to=td.agent_id,
+                    requested_output=(
+                        existing.requested_output
+                        if existing is not None
+                        else required_artifact_targets(task_meta)
+                    ),
+                    current_artifact_id=existing.current_artifact_id if existing else "",
+                    status=status,
+                    started_at=existing.started_at if existing is not None else datetime.now(timezone.utc),
+                    completed_at=completed_at,
+                    failure_code=failure_code,
+                    metadata={
+                        **existing_metadata,
+                        "topology": td.topology.value,
+                        "task_title": getattr(task, "title", "") if task else "",
+                    },
+                )
+            )
+        except Exception:
+            logger.debug("Runtime delegation_run write failed for %s", td.task_id, exc_info=True)
+
     async def _handle_task_failure(
         self,
         *,
@@ -1661,6 +2125,18 @@ class Orchestrator:
         meta["last_failure_source"] = source
         meta["last_failed_agent"] = td.agent_id
         meta["last_failed_at"] = datetime.now(timezone.utc).isoformat()
+        await self._record_runtime_delegation_run(
+            td=td,
+            task=task,
+            status="failed",
+            completed_at=datetime.now(timezone.utc),
+            failure_code=source,
+            metadata={
+                "failure_class": failure_class,
+                "failure_signature": failure_signature,
+                "error": error,
+            },
+        )
 
         retry_scheduled = retry_count < max_retries
         if retry_scheduled:
@@ -1725,6 +2201,14 @@ class Orchestrator:
             result=error,
             metadata=meta,
         )
+        failed_task = await self._safe_get_task(td.task_id)
+        contract_snapshot = self._task_contract_snapshot(failed_task or task)
+        self._record_campaign_task_check_in(
+            task=task,
+            agent_id=td.agent_id,
+            task_status="failed",
+            detail=error,
+        )
         self._record_progress_event(
             "task_failed",
             task_id=td.task_id,
@@ -1735,6 +2219,7 @@ class Orchestrator:
             failure_class=failure_class,
             retry_count=retry_count,
             max_retries=max_retries,
+            **contract_snapshot,
         )
         await self._emit_lifecycle_event(
             "task_failed",
@@ -1746,6 +2231,7 @@ class Orchestrator:
                 "failure_class": failure_class,
                 "retry_count": retry_count,
                 "max_retries": max_retries,
+                **contract_snapshot,
             },
         )
         # ── Algedonic signal: task exhausted all retries → pain to S5 ──
@@ -1845,6 +2331,12 @@ class Orchestrator:
                 status=TaskStatus.FAILED,
                 result=f"TELOS BLOCK (dispatch): {gate.result.reason}",
             )
+            self._record_campaign_task_check_in(
+                task=task_for_gate,
+                agent_id=td.agent_id,
+                task_status="failed",
+                detail=f"dispatch blocked by telos gate: {gate.result.reason}",
+            )
             self._record_task_event(
                 "dispatch_blocked",
                 task_id=td.task_id,
@@ -1901,6 +2393,11 @@ class Orchestrator:
             assigned_to=td.agent_id,
             metadata=claim_meta,
         )
+        await self._record_runtime_task_claim(
+            td=td,
+            task=task_for_gate,
+            claim_meta=claim_meta,
+        )
         logger.info("_assign_dispatch(%s): update_task=%.2fs", td.task_id[:8], _adt.monotonic() - _pe_t1)
         self._active_dispatches[td.task_id] = td
         _pe_t2 = _adt.monotonic()
@@ -1912,12 +2409,14 @@ class Orchestrator:
                 body=f"You have been assigned task {td.task_id}.",
             ))
         logger.info("_assign_dispatch(%s): bus_send=%.2fs", td.task_id[:8], _adt.monotonic() - _pe_t2)
+        contract_snapshot = self._task_contract_snapshot(task_for_gate)
         self._record_task_event(
             "dispatch_assigned",
             task_id=td.task_id,
             agent_id=td.agent_id,
             topology=td.topology.value,
             witness_reroutes=td.metadata.get("witness_reroutes", 0),
+            **contract_snapshot,
         )
         latent_gold_count = int(claim_meta.get("latent_gold_count", 0) or 0)
         if latent_gold_count > 0:
@@ -1952,7 +2451,10 @@ class Orchestrator:
             "dispatch_assigned",
             task_id=td.task_id,
             agent_id=td.agent_id,
-            extra={"topology": td.topology.value},
+            extra={
+                "topology": td.topology.value,
+                **contract_snapshot,
+            },
         )
         logger.info("_assign_dispatch(%s): lifecycle_event=%.2fs", td.task_id[:8], _adt.monotonic() - _pe_t3)
 
@@ -1976,24 +2478,40 @@ class Orchestrator:
             run_meta = self._task_meta(task)
             run_meta.pop("retry_not_before_epoch", None)
             run_meta["active_claim"] = claim_meta.get("active_claim")
+            runtime_run_id = self._ensure_runtime_run_id(td)
+            if runtime_run_id:
+                run_meta["runtime_run_id"] = runtime_run_id
             await self._safe_update_task(
                 td.task_id,
                 status=TaskStatus.RUNNING,
                 metadata=run_meta,
             )
             td.metadata["run_started_monotonic"] = time.monotonic()
+            await self._record_runtime_delegation_run(
+                td=td,
+                task=task,
+                status="running",
+                metadata={
+                    "event": "task_started",
+                    "timeout_seconds": td.timeout_seconds,
+                },
+            )
             self._record_progress_event(
                 "task_started",
                 task_id=td.task_id,
                 agent_id=td.agent_id,
                 topology=td.topology.value,
                 timeout_seconds=td.timeout_seconds,
+                **self._task_contract_snapshot(task),
             )
             await self._emit_lifecycle_event(
                 "task_started",
                 task_id=td.task_id,
                 agent_id=td.agent_id,
-                extra={"timeout_seconds": td.timeout_seconds},
+                extra={
+                    "timeout_seconds": td.timeout_seconds,
+                    **self._task_contract_snapshot(task),
+                },
             )
             bg = asyncio.create_task(
                 self._execute_task(runner, task, td),
@@ -2098,7 +2616,24 @@ class Orchestrator:
             if self._yoga is not None:
                 self._yoga.record_completion(td.agent_id)
             logger.info("Task %s completed by agent %s", td.task_id, td.agent_id)
+            self._record_campaign_task_check_in(
+                task=task,
+                agent_id=td.agent_id,
+                task_status="completed",
+                detail=result or "",
+            )
             duration_sec = max(0.0, time.monotonic() - run_started)
+            await self._record_runtime_delegation_run(
+                td=td,
+                task=task,
+                status="completed",
+                completed_at=datetime.now(timezone.utc),
+                metadata={
+                    "event": "task_completed",
+                    "duration_sec": round(duration_sec, 4),
+                    "result_chars": len(result or ""),
+                },
+            )
 
             # Emit to signal_bus so organism heartbeat, evolution loop,
             # and consolidation loop can sense completed work.
@@ -2254,19 +2789,25 @@ class Orchestrator:
             except Exception:
                 pass
 
+            completed_task = await self._safe_get_task(td.task_id)
+            contract_snapshot = self._task_contract_snapshot(completed_task or task)
             self._record_progress_event(
                 "task_completed",
-                    task_id=td.task_id,
-                    agent_id=td.agent_id,
-                    duration_sec=round(duration_sec, 4),
-                    result_chars=len(result or ""),
-                    timeout_seconds=timeout_seconds,
-                )
+                task_id=td.task_id,
+                agent_id=td.agent_id,
+                duration_sec=round(duration_sec, 4),
+                result_chars=len(result or ""),
+                timeout_seconds=timeout_seconds,
+                **contract_snapshot,
+            )
             await self._emit_lifecycle_event(
                 "task_completed",
                 task_id=td.task_id,
                 agent_id=td.agent_id,
-                extra={"duration_sec": round(duration_sec, 4)},
+                extra={
+                    "duration_sec": round(duration_sec, 4),
+                    **contract_snapshot,
+                },
             )
             # Emit durable event for evolution loop consumption
             if self._bus is not None:
@@ -2371,6 +2912,10 @@ class Orchestrator:
         shared_dir = self._shared_dir
         shared_dir.mkdir(parents=True, exist_ok=True)
 
+        meta = task.metadata if isinstance(task.metadata, dict) else {}
+        artifact_targets = required_artifact_targets(meta)
+        artifact_primary = bool(artifact_targets)
+
         # Write shared notes (append, not overwrite)
         notes_file = shared_dir / f"{agent_name}_notes.md"
         provenance_dir = shared_dir / "provenance"
@@ -2380,8 +2925,10 @@ class Orchestrator:
         ) or f"task:{task.id}"
         result_hash = hashlib.sha256((result or "").encode("utf-8")).hexdigest()
         timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-        # Truncate very long results for notes (full result is in task board)
-        summary = result[:2000] if len(result) > 2000 else result
+        # Contract-bearing tasks should leave an audit trail, but their
+        # bound artifact path remains the primary closeout surface.
+        summary_limit = 500 if artifact_primary else 2000
+        summary = result[:summary_limit] if len(result) > summary_limit else result
         provenance_record = {
             "trace_id": trace_id,
             "task_id": task.id,
@@ -2394,15 +2941,32 @@ class Orchestrator:
             "result_chars": len(result or ""),
             "result_sha256": result_hash,
             "notes_file": str(notes_file),
+            "target_artifacts": artifact_targets,
+            "primary_closeout_surface": (
+                "artifact_contract" if artifact_primary else "shared_notes"
+            ),
+            "notes_mode": "pointer" if artifact_primary else "summary",
             "source": "orchestrator._persist_result",
         }
         provenance_path = provenance_dir / f"{task.id}.json"
-        entry = (
-            f"\n---\n## {task.title}\n"
-            f"*{timestamp} | task: {task.id[:8]} | trace: {trace_id}*\n\n"
-            f"_provenance_: `{provenance_path}`\n\n"
-            f"{summary}\n"
-        )
+        if artifact_primary:
+            artifact_lines = "\n".join(f"- `{path}`" for path in artifact_targets)
+            entry = (
+                f"\n---\n## {task.title}\n"
+                f"*{timestamp} | task: {task.id[:8]} | trace: {trace_id}*\n\n"
+                f"_provenance_: `{provenance_path}`\n\n"
+                f"_primary_closeout_: artifact contract\n\n"
+                f"_target_artifacts_:\n{artifact_lines}\n\n"
+                f"_result_excerpt_:\n\n"
+                f"{summary}\n"
+            )
+        else:
+            entry = (
+                f"\n---\n## {task.title}\n"
+                f"*{timestamp} | task: {task.id[:8]} | trace: {trace_id}*\n\n"
+                f"_provenance_: `{provenance_path}`\n\n"
+                f"{summary}\n"
+            )
         try:
             with open(notes_file, "a") as f:
                 f.write(entry)
@@ -2417,6 +2981,9 @@ class Orchestrator:
                 provenance_file=str(provenance_path),
                 trace_id=trace_id,
                 result_chars=len(result or ""),
+                notes_mode=provenance_record["notes_mode"],
+                primary_closeout_surface=provenance_record["primary_closeout_surface"],
+                target_artifacts=artifact_targets,
             )
         except Exception as exc:
             logger.warning("Failed to write notes for %s: %s", agent_name, exc)
@@ -2428,30 +2995,39 @@ class Orchestrator:
                 error=str(exc),
             )
 
-        # Write a shared artifact with task-specific path so dependent tasks can find it
-        try:
-            # Create a slug from task title for predictable cross-task path
-            slug = re.sub(r'[^a-z0-9]+', '_', (task.title or 'task').lower()).strip('_')[:40]
-            shared_artifact = shared_dir / f"{task.id[:8]}_{slug}.md"
-            shared_artifact.write_text(
-                f"# {task.title}\n\n"
-                f"**Task ID:** {task.id}\n"
-                f"**Agent:** {agent_name}\n"
-                f"**Completed:** {datetime.now(timezone.utc).isoformat()}\n\n"
-                f"---\n\n"
-                f"{result}",
-                encoding="utf-8",
+        # Legacy shared markdown artifacts remain for non-contract tasks only.
+        if not artifact_primary:
+            try:
+                # Create a slug from task title for predictable cross-task path
+                slug = re.sub(r'[^a-z0-9]+', '_', (task.title or 'task').lower()).strip('_')[:40]
+                shared_artifact = shared_dir / f"{task.id[:8]}_{slug}.md"
+                shared_artifact.write_text(
+                    f"# {task.title}\n\n"
+                    f"**Task ID:** {task.id}\n"
+                    f"**Agent:** {agent_name}\n"
+                    f"**Completed:** {datetime.now(timezone.utc).isoformat()}\n\n"
+                    f"---\n\n"
+                    f"{result}",
+                    encoding="utf-8",
+                )
+                logger.debug("Shared artifact written: %s", shared_artifact.name)
+            except Exception as exc:
+                logger.debug("Shared artifact write failed (non-fatal): %s", exc)
+        else:
+            logger.debug(
+                "Skipping generic shared artifact for contract-bearing task %s",
+                task.id,
             )
-            logger.debug("Shared artifact written: %s", shared_artifact.name)
-        except Exception as exc:
-            logger.debug("Shared artifact write failed (non-fatal): %s", exc)
 
         # Fix 2: Feed result into MemoryPalace for cross-session semantic recall.
         # Even with TF-IDF only (sqlite-vec not installed), this builds the corpus
         # that future vector/hybrid search will query.
         try:
             from dharma_swarm.memory_palace import MemoryPalace
-            palace = MemoryPalace(state_dir=self._runtime_root())
+            palace = await asyncio.to_thread(
+                MemoryPalace,
+                state_dir=self._runtime_root(),
+            )
             _t_palace = asyncio.create_task(
                 palace.ingest(
                     content=result,

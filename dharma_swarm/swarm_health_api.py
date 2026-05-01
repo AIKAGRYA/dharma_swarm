@@ -32,6 +32,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from dharma_swarm.cost_tracker import summarize_costs
+from dharma_swarm.runtime_artifacts import dgc_health_snapshot_summary
 
 logger = logging.getLogger(__name__)
 
@@ -226,7 +227,16 @@ def _model_activity_summary(window_hours: float = 24.0, limit: int = 12) -> dict
 def _route(path: str) -> tuple[str, str]:
     if path == "/health" or path == "/":
         fd = _fd_metrics()
+        snapshot = dgc_health_snapshot_summary(_STATE_DIR)
+        liveness = snapshot.get("liveness", {})
         status = "ok"
+        liveness_status = str(liveness.get("status", "") or "").strip().lower()
+        if liveness_status == "healthy":
+            status = "ok"
+        elif liveness_status in {"booting", "degraded", "stalled"}:
+            status = liveness_status
+        elif snapshot.get("status") in {"missing", "stale", "unreadable"}:
+            status = "degraded"
         if fd["fd_status"] == "high":
             status = "degraded"
         return "200 OK", json.dumps({
@@ -235,16 +245,30 @@ def _route(path: str) -> tuple[str, str]:
             "timestamp": _utc_now(),
             "version": "dharma_swarm",
             "resources": fd,
+            "liveness": liveness,
+            "runtime_snapshot": {
+                "status": snapshot.get("status"),
+                "age_seconds": snapshot.get("age_seconds"),
+                "daemon_pid_mismatch": snapshot.get("daemon_pid_mismatch"),
+                "source": (snapshot.get("payload") or {}).get("source"),
+            },
             "costs": _cost_rollups(),
             "model_activity": _model_activity_summary(),
         })
 
     if path == "/metrics":
+        snapshot = dgc_health_snapshot_summary(_STATE_DIR)
         return "200 OK", json.dumps({
             "uptime": _uptime(),
             "timestamp": _utc_now(),
             "resources": _fd_metrics(),
             "loops": _loop_status(),
+            "runtime_snapshot": {
+                "status": snapshot.get("status"),
+                "age_seconds": snapshot.get("age_seconds"),
+                "daemon_pid_mismatch": snapshot.get("daemon_pid_mismatch"),
+                "liveness": snapshot.get("liveness"),
+            },
             "evolution": _evolution_summary(),
             "providers": _provider_status(),
             "telos": _telos_summary(),

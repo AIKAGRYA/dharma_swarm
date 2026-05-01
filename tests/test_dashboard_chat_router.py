@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from types import SimpleNamespace
 
 from fastapi import FastAPI
@@ -15,7 +16,20 @@ def _chat_client() -> TestClient:
     return TestClient(app)
 
 
+def _disable_subprocess_chat_lanes(monkeypatch: pytest.MonkeyPatch) -> None:
+    resolve_config = chat_router.resolve_runtime_provider_config
+
+    def _wrapped(provider, *args, **kwargs):
+        config = resolve_config(provider, *args, **kwargs)
+        if provider in {chat_router.ProviderType.CLAUDE_CODE, chat_router.ProviderType.CODEX}:
+            return replace(config, available=False, binary_path=None)
+        return config
+
+    monkeypatch.setattr(chat_router, "resolve_runtime_provider_config", _wrapped)
+
+
 def test_chat_status_reports_runtime_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    _disable_subprocess_chat_lanes(monkeypatch)
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
     monkeypatch.delenv("SILICONFLOW_API_KEY", raising=False)
     monkeypatch.delenv("TOGETHER_API_KEY", raising=False)
@@ -72,6 +86,7 @@ def test_chat_status_reports_runtime_settings(monkeypatch: pytest.MonkeyPatch) -
 
 
 def test_chat_status_uses_configured_default_profile(monkeypatch: pytest.MonkeyPatch) -> None:
+    _disable_subprocess_chat_lanes(monkeypatch)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
     monkeypatch.setenv("DASHBOARD_DEFAULT_PROFILE_ID", "codex_operator")
@@ -214,8 +229,10 @@ async def test_agentic_stream_reports_missing_visible_qwen_output() -> None:
 async def test_agentic_stream_stops_after_max_tool_rounds(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    _disable_subprocess_chat_lanes(monkeypatch)
     monkeypatch.setenv("DASHBOARD_CHAT_MAX_TOOL_ROUNDS", "2")
-    settings = chat_router._get_chat_settings()
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    settings = chat_router._get_chat_settings("qwen35_surgeon")
     call_count = 0
 
     async def fake_call_openrouter(messages, runtime_settings):

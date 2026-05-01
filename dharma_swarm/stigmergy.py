@@ -15,6 +15,7 @@ import asyncio
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Literal
+import uuid
 
 import aiofiles
 from pydantic import BaseModel, Field
@@ -112,6 +113,9 @@ class StigmergyStore:
         self._marks_file: Path = self.base_path / "marks.jsonl"
         self._archive_file: Path = self.base_path / "archive.jsonl"
         self._write_lock: asyncio.Lock = asyncio.Lock()
+
+    def _rewrite_tmp_path(self) -> Path:
+        return self.base_path / f"marks.{uuid.uuid4().hex}.tmp"
 
     # -- write ---------------------------------------------------------------
 
@@ -306,7 +310,7 @@ class StigmergyStore:
                 return
 
             self.base_path.mkdir(parents=True, exist_ok=True)
-            tmp = self._marks_file.with_suffix(".tmp")
+            tmp = self._rewrite_tmp_path()
             async with aiofiles.open(tmp, "w") as f:
                 for mark in persisted:
                     await f.write(mark.model_dump_json() + "\n")
@@ -351,7 +355,7 @@ class StigmergyStore:
                     await f.write(m.model_dump_json() + "\n")
 
             # Atomic rewrite: temp file → rename
-            tmp = self._marks_file.with_suffix(".tmp")
+            tmp = self._rewrite_tmp_path()
             async with aiofiles.open(tmp, "w") as f:
                 for m in keep:
                     await f.write(m.model_dump_json() + "\n")
@@ -373,7 +377,7 @@ class StigmergyStore:
                     dead_count += 1
             self.base_path.mkdir(parents=True, exist_ok=True)
             # Atomic rewrite: temp file → rename
-            tmp = self._marks_file.with_suffix(".tmp")
+            tmp = self._rewrite_tmp_path()
             async with aiofiles.open(tmp, "w") as f:
                 for m in marks:
                     await f.write(m.model_dump_json() + "\n")

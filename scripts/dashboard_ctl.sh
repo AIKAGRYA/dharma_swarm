@@ -64,6 +64,21 @@ service_is_ready() {
     esac
 }
 
+wait_for_service_ready() {
+    local label="$1"
+    local attempts="${2:-20}"
+    local sleep_seconds="${3:-1}"
+
+    for ((i = 1; i <= attempts; i++)); do
+        if service_is_ready "$label"; then
+            return 0
+        fi
+        sleep "$sleep_seconds"
+    done
+
+    return 1
+}
+
 listening_pid_for_label() {
     local label="$1"
     local port
@@ -168,7 +183,14 @@ start() {
     reconcile_service_owner "$WEB_LABEL"
     kickstart_label "$API_LABEL"
     kickstart_label "$WEB_LABEL"
-    sleep 2
+    if ! wait_for_service_ready "$API_LABEL" 20 1; then
+        echo "Dashboard API failed to become ready on port 8420." >&2
+        return 1
+    fi
+    if ! wait_for_service_ready "$WEB_LABEL" 20 1; then
+        echo "Dashboard web runtime failed to become ready on port 3420." >&2
+        return 1
+    fi
     status
 }
 

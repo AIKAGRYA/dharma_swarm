@@ -338,6 +338,42 @@ class TestFullCycle:
         assert "promise_attention" in payload
 
     @pytest.mark.asyncio
+    async def test_cycle_prefers_primary_campaign_over_keyword_salience(self, tmp_path: Path):
+        state_dir = tmp_path / ".dharma"
+        state_dir.mkdir()
+        meta = state_dir / "meta"
+        meta.mkdir()
+
+        (meta / "active_campaigns.json").write_text(json.dumps([
+            {
+                "campaign_id": "startup_world_facing",
+                "title": "Startup World-Facing Pressure",
+                "domain": "revenue_exploration",
+                "primary": True,
+                "status": "active",
+                "artifact_path": "~/.dharma/shared/campaigns/startup_world_facing.md",
+            }
+        ]))
+        with open(meta / "zeitgeist.jsonl", "w") as fh:
+            fh.write(json.dumps({
+                "id": "sig-keywords",
+                "source": "local_scan",
+                "category": "opportunity",
+                "title": "Keywords in aligned_revenue_engines_garden.md",
+                "relevance_score": 0.95,
+                "keywords": ["revenue", "engines"],
+                "description": "",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }) + "\n")
+
+        exe = ShaktiZeitgeistExecutive(state_dir=state_dir)
+        result = await exe.cycle()
+
+        assert result.operator_summary["mission"] == "Startup World-Facing Pressure"
+        assert result.operator_summary["top_priority_title"] == "Startup World-Facing Pressure"
+        assert result.operator_summary["top_priority_domain"] == "revenue_exploration"
+
+    @pytest.mark.asyncio
     async def test_artifacts_are_valid_json(self, tmp_path: Path):
         state_dir = tmp_path / ".dharma"
         state_dir.mkdir()

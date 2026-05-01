@@ -12,6 +12,7 @@ Profiles can be:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from enum import Enum
@@ -181,6 +182,8 @@ class ProfileManager:
     def __init__(self, profile_dir: Path | None = None):
         self._dir = profile_dir or (Path.home() / ".dharma" / "profiles")
         self._profiles: dict[str, AgentProfile] = {}
+        self._file_mtimes: dict[str, float] = {}
+        self._file_to_profile: dict[str, str] = {}
         self._loaded = False
 
     def _ensure_dir(self) -> None:
@@ -189,15 +192,40 @@ class ProfileManager:
     def load_all(self) -> dict[str, AgentProfile]:
         """Load all profiles from the profile directory."""
         self._ensure_dir()
+        loaded: dict[str, AgentProfile] = {}
+        seen_files: set[str] = set()
         for path in self._dir.glob("*.json"):
+            path_str = str(path)
+            seen_files.add(path_str)
             try:
+                current_mtime = path.stat().st_mtime
+                prior_name = self._file_to_profile.get(path_str)
+                if prior_name and self._file_mtimes.get(path_str) == current_mtime:
+                    cached = self._profiles.get(prior_name)
+                    if cached is not None:
+                        loaded[cached.name] = cached
+                        continue
+
                 data = json.loads(path.read_text())
                 profile = AgentProfile(**data)
-                self._profiles[profile.name] = profile
+                loaded[profile.name] = profile
+                self._file_mtimes[path_str] = current_mtime
+                self._file_to_profile[path_str] = profile.name
             except Exception as e:
                 logger.warning("Failed to load profile %s: %s", path, e)
+                self._file_mtimes.pop(path_str, None)
+                self._file_to_profile.pop(path_str, None)
+        removed_files = set(self._file_mtimes) - seen_files
+        for path_str in removed_files:
+            self._file_mtimes.pop(path_str, None)
+            self._file_to_profile.pop(path_str, None)
+        self._profiles = loaded
         self._loaded = True
-        return self._profiles
+        return loaded
+
+    async def load_all_async(self) -> dict[str, AgentProfile]:
+        """Load all profiles off the event loop."""
+        return await asyncio.to_thread(self.load_all)
 
     def get(self, name: str) -> AgentProfile | None:
         """Get a profile by name."""
@@ -211,6 +239,9 @@ class ProfileManager:
         path = self._dir / f"{profile.name}.json"
         path.write_text(profile.model_dump_json(indent=2))
         self._profiles[profile.name] = profile
+        self._file_mtimes[str(path)] = path.stat().st_mtime
+        self._file_to_profile[str(path)] = profile.name
+        self._loaded = True
         return path
 
     def create_from_skill(
@@ -254,4 +285,6 @@ class ProfileManager:
         path = self._dir / f"{name}.json"
         if path.exists():
             path.unlink()
+        self._file_mtimes.pop(str(path), None)
+        self._file_to_profile.pop(str(path), None)
         return self._profiles.pop(name, None) is not None

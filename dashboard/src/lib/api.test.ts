@@ -2,11 +2,14 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  apiFetch,
+  authorizedFetch,
   fetchHeatmap,
   fetchImpact,
   fetchProvenance,
   fetchHealth,
 } from "./api.ts";
+import { clearDashboardApiToken } from "./auth.ts";
 
 type FetchCall = {
   input: RequestInfo | URL;
@@ -31,6 +34,45 @@ function installFetchStub(responseBody: unknown, status = 200): {
     restore: () => {
       globalThis.fetch = originalFetch;
     },
+  };
+}
+
+function installWindowStorage(token: string | null): () => void {
+  const originalWindow = globalThis.window;
+  const map = new Map<string, string>();
+  if (token) {
+    map.set("dharma.dashboard.api-token", token);
+  }
+  const localStorage = {
+    getItem(key: string) {
+      return map.has(key) ? map.get(key)! : null;
+    },
+    setItem(key: string, value: string) {
+      map.set(key, value);
+    },
+    removeItem(key: string) {
+      map.delete(key);
+    },
+  };
+  Object.defineProperty(globalThis, "window", {
+    configurable: true,
+    value: {
+      localStorage,
+      location: { hash: "", pathname: "/dashboard/command-post", search: "" },
+      history: { state: null, replaceState() {} },
+    },
+  });
+  return () => {
+    clearDashboardApiToken();
+    if (originalWindow === undefined) {
+      // @ts-expect-error synthetic window cleanup in node tests
+      delete globalThis.window;
+      return;
+    }
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: originalWindow,
+    });
   };
 }
 
@@ -124,5 +166,44 @@ test("fetchHeatmap uses the stigmergy heatmap query route", async () => {
     );
   } finally {
     stub.restore();
+  }
+});
+
+test("authorized dashboard fetch attaches stored bearer token", async () => {
+  const restoreWindow = installWindowStorage("desktop-secret");
+  const stub = installFetchStub({
+    status: "ok",
+    data: { ok: true },
+    error: "",
+    timestamp: "2026-04-21T00:00:00.000Z",
+  });
+
+  try {
+    await authorizedFetch("/api/health");
+    const headers = new Headers(stub.calls[0]?.init?.headers);
+    assert.equal(headers.get("Authorization"), "Bearer desktop-secret");
+  } finally {
+    stub.restore();
+    restoreWindow();
+  }
+});
+
+test("apiFetch unwraps response while preserving stored bearer token", async () => {
+  const restoreWindow = installWindowStorage("desktop-secret");
+  const stub = installFetchStub({
+    status: "ok",
+    data: { ok: true },
+    error: "",
+    timestamp: "2026-04-21T00:00:00.000Z",
+  });
+
+  try {
+    const result = await apiFetch<{ ok: boolean }>("/api/health");
+    assert.equal(result.ok, true);
+    const headers = new Headers(stub.calls[0]?.init?.headers);
+    assert.equal(headers.get("Authorization"), "Bearer desktop-secret");
+  } finally {
+    stub.restore();
+    restoreWindow();
   }
 });

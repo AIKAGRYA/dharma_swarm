@@ -102,6 +102,64 @@ def test_provider_policy_escalates_for_frontier_precision() -> None:
     assert "frontier_precision_requested" in decision.reasons
 
 
+def test_provider_policy_blocks_free_fallback_for_sensitive_requests() -> None:
+    router = ProviderPolicyRouter()
+    decision = router.route(
+        ProviderRouteRequest(
+            action_name="security_hotfix",
+            risk_score=0.30,
+            uncertainty=0.25,
+            novelty=0.20,
+            urgency=0.95,
+            expected_impact=0.92,
+            requires_frontier_precision=True,
+            privileged_action=True,
+            requires_human_consent=True,
+        ),
+        available_providers=[
+            ProviderType.OPENROUTER_FREE,
+            ProviderType.OLLAMA,
+            ProviderType.ANTHROPIC,
+            ProviderType.OPENAI,
+        ],
+    )
+
+    assert decision.path == RoutePath.ESCALATE
+    assert decision.selected_provider == ProviderType.ANTHROPIC
+    assert ProviderType.OPENROUTER_FREE not in decision.fallback_providers
+    assert ProviderType.OLLAMA not in decision.fallback_providers
+    assert "free_fallback_blocked_for_sensitive_request" in decision.reasons
+
+
+def test_provider_policy_allows_free_fallback_for_sensitive_requests_when_enabled() -> None:
+    router = ProviderPolicyRouter()
+    decision = router.route(
+        ProviderRouteRequest(
+            action_name="security_hotfix",
+            risk_score=0.30,
+            uncertainty=0.25,
+            novelty=0.20,
+            urgency=0.95,
+            expected_impact=0.92,
+            requires_frontier_precision=True,
+            privileged_action=True,
+            requires_human_consent=True,
+            allow_free_fallback=True,
+        ),
+        available_providers=[
+            ProviderType.OPENROUTER_FREE,
+            ProviderType.OLLAMA,
+            ProviderType.ANTHROPIC,
+            ProviderType.OPENAI,
+        ],
+    )
+
+    assert decision.path == RoutePath.ESCALATE
+    assert ProviderType.OPENROUTER_FREE in decision.fallback_providers
+    assert ProviderType.OLLAMA in decision.fallback_providers
+    assert "free_fallback_allowed" in decision.reasons
+
+
 def test_provider_policy_deliberative_reasoning_prefers_delegated_research_before_primaries() -> None:
     router = ProviderPolicyRouter()
     decision = router.route(
@@ -523,6 +581,28 @@ class _CountingFailingProvider:
         yield ""
 
 
+class _BillingExhaustedProvider:
+    async def complete(self, request: LLMRequest) -> LLMResponse:
+        return LLMResponse(content="credit balance is too low", model="dummy")
+
+    async def stream(self, request: LLMRequest):
+        yield "credit balance is too low"
+
+
+class _OpenRouterCreditsProvider:
+    async def complete(self, request: LLMRequest) -> LLMResponse:
+        return LLMResponse(
+            content=(
+                "Error code: 402 - This request requires more credits, "
+                "or fewer max_tokens."
+            ),
+            model="dummy",
+        )
+
+    async def stream(self, request: LLMRequest):
+        yield "Error code: 402 - This request requires more credits, or fewer max_tokens."
+
+
 @pytest.mark.asyncio
 async def test_model_router_complete_for_task_uses_policy_selection() -> None:
     router = ModelRouter(
@@ -590,6 +670,111 @@ async def test_model_router_complete_for_task_falls_back_cross_provider() -> Non
     assert decision.selected_provider == ProviderType.ANTHROPIC
     assert "fallback_provider_selected" in decision.reasons
     assert response.content == "frontier"
+
+
+@pytest.mark.asyncio
+async def test_model_router_fast_trips_breaker_on_permanent_provider_failure() -> None:
+    router = ModelRouter(
+        {
+            ProviderType.CLAUDE_CODE: _BillingExhaustedProvider(),
+            ProviderType.CODEX: _DummyProvider("frontier"),
+        },
+        retry_policy=RetryPolicy(
+            max_attempts=1,
+            base_delay_seconds=0.0,
+            jitter_seconds=0.0,
+            max_delay_seconds=0.0,
+        ),
+    )
+
+    decision, response = await router.complete_for_task(
+        ProviderRouteRequest(
+            action_name="frontier_council",
+            risk_score=0.25,
+            uncertainty=0.25,
+            novelty=0.25,
+            urgency=0.8,
+            expected_impact=0.8,
+            requires_frontier_precision=True,
+        ),
+        LLMRequest(
+            model="claude-opus-4-6",
+            messages=[{"role": "user", "content": "diagnose the control plane"}],
+        ),
+        available_provider_types=[ProviderType.CLAUDE_CODE, ProviderType.CODEX],
+    )
+
+    breaker_snapshots = router._breaker_registry.snapshot_all()
+    claude_code_states = [
+        payload["state"]
+        for key, payload in breaker_snapshots.items()
+        if key.startswith("claude_code:")
+    ]
+    assert decision.selected_provider == ProviderType.CODEX
+    assert "fallback_provider_selected" in decision.reasons
+    assert response.content == "frontier"
+    assert "open" in claude_code_states
+
+
+@pytest.mark.asyncio
+async def test_model_router_single_provider_permanent_failure_surfaces_clean_runtime_error() -> None:
+    router = ModelRouter(
+        {ProviderType.CLAUDE_CODE: _BillingExhaustedProvider()},
+        retry_policy=RetryPolicy(
+            max_attempts=1,
+            base_delay_seconds=0.0,
+            jitter_seconds=0.0,
+            max_delay_seconds=0.0,
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="billing_exhausted"):
+        await router.complete_for_task(
+            ProviderRouteRequest(
+                action_name="frontier_council",
+                risk_score=0.25,
+                uncertainty=0.25,
+                novelty=0.25,
+                urgency=0.8,
+                expected_impact=0.8,
+                requires_frontier_precision=True,
+            ),
+            LLMRequest(
+                model="claude-opus-4-6",
+                messages=[{"role": "user", "content": "diagnose the control plane"}],
+            ),
+            available_provider_types=[ProviderType.CLAUDE_CODE],
+        )
+
+
+@pytest.mark.asyncio
+async def test_model_router_openrouter_402_credit_phrase_maps_to_billing_exhausted() -> None:
+    router = ModelRouter(
+        {ProviderType.OPENROUTER: _OpenRouterCreditsProvider()},
+        retry_policy=RetryPolicy(
+            max_attempts=1,
+            base_delay_seconds=0.0,
+            jitter_seconds=0.0,
+            max_delay_seconds=0.0,
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="billing_exhausted"):
+        await router.complete_for_task(
+            ProviderRouteRequest(
+                action_name="triage_notes",
+                risk_score=0.10,
+                uncertainty=0.12,
+                novelty=0.10,
+                urgency=0.3,
+                expected_impact=0.2,
+            ),
+            LLMRequest(
+                model="z-ai/glm-5",
+                messages=[{"role": "user", "content": "summarize the incident"}],
+            ),
+            available_provider_types=[ProviderType.OPENROUTER],
+        )
 
 
 @pytest.mark.asyncio

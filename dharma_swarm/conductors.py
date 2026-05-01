@@ -26,9 +26,18 @@ if TYPE_CHECKING:  # avoid import cycle with persistent_agent
 
 
 def _resolve_conductor_provider() -> ProviderType:
-    """Pick the best available provider for conductors (Anthropic > Claude Code)."""
-    if os.environ.get("ANTHROPIC_API_KEY"):
+    """Pick the safest default provider for conductors.
+
+    Conductors default to the Claude Code/runtime-backed path because the
+    direct Anthropic API route has been the noisiest live failure mode on
+    this machine. Set ``DGC_CONDUCTOR_PROVIDER=anthropic`` to opt back into
+    the direct API explicitly.
+    """
+    override = os.environ.get("DGC_CONDUCTOR_PROVIDER", "").strip().lower()
+    if override in {"anthropic", ProviderType.ANTHROPIC.value}:
         return ProviderType.ANTHROPIC
+    if override in {"claude", "claude-code", ProviderType.CLAUDE_CODE.value}:
+        return ProviderType.CLAUDE_CODE
     return ProviderType.CLAUDE_CODE
 
 

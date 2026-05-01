@@ -234,10 +234,16 @@ async def watcher_loop(
     witness_dir: Path | None = None,
 ) -> None:
     """Run the watcher until shutdown. Registered by orchestrate_live."""
+    from dharma_swarm.conductors import snapshot_names
+
     _ensure_dirs(directives_dir)
     logger.info(
         "agent_direct: watcher running (dir=%s interval=%.1fs)",
         _directives_dir(directives_dir), poll_interval,
+    )
+    logger.info(
+        "agent_direct: initial active conductors=%s",
+        ", ".join(snapshot_names()) or "(none)",
     )
     while not shutdown_event.is_set():
         try:

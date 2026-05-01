@@ -24,6 +24,9 @@ def test_dashboard_ctl_checks_live_services_before_restart() -> None:
 
     assert "service_is_ready()" in text
     assert 'if service_is_ready "$label"; then' in text
+    assert "wait_for_service_ready()" in text
+    assert 'if ! wait_for_service_ready "$API_LABEL" 20 1; then' in text
+    assert 'if ! wait_for_service_ready "$WEB_LABEL" 20 1; then' in text
 
 
 def test_dashboard_ctl_uses_http_health_probes_for_live_services() -> None:

@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import json
 import logging
 import os
@@ -2494,7 +2495,10 @@ class ThinkodynamicDirector:
             template = THEME_TEMPLATES["autonomy"]
             return [
                 DirectorOpportunity(
-                    opportunity_id=f"opp-{int(time.time())}",
+                    opportunity_id=self._stable_opportunity_id(
+                        theme="autonomy",
+                        title=template.title,
+                    ),
                     theme="autonomy",
                     title=template.title,
                     thesis=template.thesis,
@@ -2525,9 +2529,15 @@ class ThinkodynamicDirector:
                     f"{why_now} Latent gold: "
                     + "; ".join(latent_evidence[:2])
                 )
+            opportunity_id = self._stable_opportunity_id(
+                theme=theme,
+                title=template.title,
+                evidence=evidence,
+                latent_evidence=latent_evidence,
+            )
             opportunities.append(
                 DirectorOpportunity(
-                    opportunity_id=f"opp-{_safe_slug(theme)}-{int(time.time())}",
+                    opportunity_id=opportunity_id,
                     theme=theme,
                     title=template.title,
                     thesis=template.thesis,
@@ -2542,6 +2552,33 @@ class ThinkodynamicDirector:
                 )
             )
         return opportunities
+
+    @staticmethod
+    def _stable_opportunity_id(
+        *,
+        theme: str,
+        title: str,
+        evidence: Sequence[str] = (),
+        latent_evidence: Sequence[str] = (),
+    ) -> str:
+        """Return a deterministic id for recurring opportunities.
+
+        Director retries and dedupe logic depend on stable opportunity ids.
+        Time-based ids make the same underlying opportunity look novel every
+        cycle, which prevents clean requeue/retry behavior.
+        """
+        evidence_names = [Path(path).name for path in evidence[:3]]
+        latent_names = [item.strip() for item in latent_evidence[:2] if item.strip()]
+        fingerprint = " | ".join(
+            [
+                str(theme or "").strip().lower(),
+                str(title or "").strip().lower(),
+                *[name.lower() for name in evidence_names],
+                *[name.lower() for name in latent_names],
+            ]
+        )
+        digest = hashlib.sha1(fingerprint.encode("utf-8")).hexdigest()[:12]
+        return f"opp-{_safe_slug(theme or 'general')}-{digest}"
 
     @staticmethod
     def choose_primary(opportunities: Sequence[DirectorOpportunity]) -> DirectorOpportunity:
@@ -4034,7 +4071,7 @@ class ThinkodynamicDirector:
         return sum(1 for task in tasks if task.status in active)
 
     async def enqueue_workflow(self, workflow: WorkflowPlan) -> list[Task]:
-        if workflow.theme == "execution_brief" and workflow.opportunity_id:
+        if workflow.opportunity_id:
             task_plan_by_key = {task_plan.key: task_plan for task_plan in workflow.tasks}
             existing = [
                 task
@@ -4049,54 +4086,60 @@ class ThinkodynamicDirector:
                 }
                 if any(task.status in live_statuses for task in existing):
                     return existing
-                if all(task.status == TaskStatus.COMPLETED for task in existing):
+                if (
+                    workflow.theme == "execution_brief"
+                    and all(task.status == TaskStatus.COMPLETED for task in existing)
+                ):
                     return existing
+                if all(task.status == TaskStatus.COMPLETED for task in existing):
+                    existing = []
 
-                refreshed: list[Task] = []
-                for task in existing:
-                    task_key = str(task.metadata.get("director_task_key", "")).strip()
-                    task_plan = task_plan_by_key.get(task_key)
-                    merged_metadata = dict(task.metadata or {})
-                    merged_metadata.update({
-                        "director_cycle_id": workflow.cycle_id,
-                        "director_workflow_id": workflow.workflow_id,
-                        "director_opportunity_title": workflow.opportunity_title,
-                        "director_theme": workflow.theme,
-                        "director_source_kind": workflow.theme,
-                        "director_expected_duration_min": workflow.expected_duration_min,
-                        "director_evidence_paths": list(workflow.evidence_paths),
-                        "director_thesis": workflow.thesis,
-                        "director_why_now": workflow.why_now,
-                        "director_council_guidance": workflow.council_guidance,
-                        "director_council_members": list(workflow.council_members),
-                        "director_council_dialogue_path": workflow.council_dialogue_path,
-                        "director_council_routing_strategy": dict(workflow.council_routing_strategy),
-                    })
-                    if task_plan is not None:
-                        merged_metadata.update(
-                            {
-                                "director_preferred_agents": list(task_plan.preferred_agents),
-                                "director_preferred_backends": list(task_plan.preferred_backends),
-                                "available_provider_types": list(task_plan.provider_allowlist),
-                            }
-                        )
-                    if task.status in {TaskStatus.FAILED, TaskStatus.CANCELLED}:
-                        refreshed.append(
-                            await self._task_board.requeue(
+                if existing:
+                    refreshed: list[Task] = []
+                    for task in existing:
+                        task_key = str(task.metadata.get("director_task_key", "")).strip()
+                        task_plan = task_plan_by_key.get(task_key)
+                        merged_metadata = dict(task.metadata or {})
+                        merged_metadata.update({
+                            "director_cycle_id": workflow.cycle_id,
+                            "director_workflow_id": workflow.workflow_id,
+                            "director_opportunity_title": workflow.opportunity_title,
+                            "director_theme": workflow.theme,
+                            "director_source_kind": workflow.theme,
+                            "director_expected_duration_min": workflow.expected_duration_min,
+                            "director_evidence_paths": list(workflow.evidence_paths),
+                            "director_thesis": workflow.thesis,
+                            "director_why_now": workflow.why_now,
+                            "director_council_guidance": workflow.council_guidance,
+                            "director_council_members": list(workflow.council_members),
+                            "director_council_dialogue_path": workflow.council_dialogue_path,
+                            "director_council_routing_strategy": dict(workflow.council_routing_strategy),
+                        })
+                        if task_plan is not None:
+                            merged_metadata.update(
+                                {
+                                    "director_preferred_agents": list(task_plan.preferred_agents),
+                                    "director_preferred_backends": list(task_plan.preferred_backends),
+                                    "available_provider_types": list(task_plan.provider_allowlist),
+                                }
+                            )
+                        if task.status in {TaskStatus.FAILED, TaskStatus.CANCELLED}:
+                            refreshed.append(
+                                await self._task_board.requeue(
+                                    task.id,
+                                    reason=f"Director retry for cycle {workflow.cycle_id}",
+                                    metadata=merged_metadata,
+                                )
+                            )
+                        else:
+                            await self._task_board.update_task(
                                 task.id,
-                                reason=f"Director retry for cycle {workflow.cycle_id}",
                                 metadata=merged_metadata,
                             )
-                        )
-                    else:
-                        await self._task_board.update_task(
-                            task.id,
-                            metadata=merged_metadata,
-                        )
-                        current = await self._task_board.get(task.id)
-                        if current is not None:
-                            refreshed.append(current)
-                return refreshed
+                            current = await self._task_board.get(task.id)
+                            if current is not None:
+                                refreshed.append(current)
+                    return refreshed
 
         created: list[Task] = []
         by_key: dict[str, Task] = {}

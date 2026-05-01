@@ -51,6 +51,8 @@ async def health_check() -> ApiResponse:
         daemon = await _fetch_daemon_health()
 
         daemon_status = str(daemon.get("status", "")).lower() if daemon else ""
+        daemon_liveness = daemon.get("liveness", {}) if isinstance(daemon, dict) else {}
+        daemon_liveness_status = str(daemon_liveness.get("status", "")).lower()
         daemon_costs_1h = daemon.get("costs", {}).get("1h", {}) if daemon else {}
         daemon_calls_1h = int(daemon_costs_1h.get("calls", 0) or 0) if daemon else 0
         daemon_live = daemon_status == "ok" and daemon_calls_1h > 0
@@ -69,6 +71,10 @@ async def health_check() -> ApiResponse:
             anomalies.append(a)
 
         overall_status = report.overall_status.value if hasattr(report.overall_status, 'value') else str(report.overall_status)
+        if daemon_liveness_status == "stalled":
+            overall_status = "critical"
+        elif daemon_liveness_status in {"booting", "degraded"} and overall_status not in {"critical", "degraded"}:
+            overall_status = "degraded"
         if daemon_live and report.failure_rate == 0.0:
             has_high = any(a.severity == "high" for a in anomalies)
             has_medium = any(a.severity == "medium" for a in anomalies)
@@ -107,6 +113,7 @@ async def health_check() -> ApiResponse:
             traces_last_hour=max(report.traces_last_hour, daemon_calls_1h),
             failure_rate=report.failure_rate,
             mean_fitness=report.mean_fitness,
+            liveness=daemon_liveness if isinstance(daemon_liveness, dict) else {},
         ).model_dump())
     except Exception as e:
         return ApiResponse(data=HealthOut(overall_status="unknown").model_dump(), error=str(e))
@@ -158,6 +165,16 @@ async def overview() -> ApiResponse:
         health_status = report.overall_status.value if hasattr(report.overall_status, 'value') else str(report.overall_status)
     except Exception:
         logger.debug("Failed to check health for overview", exc_info=True)
+    try:
+        daemon = await _fetch_daemon_health()
+        daemon_liveness = daemon.get("liveness", {}) if isinstance(daemon, dict) else {}
+        daemon_liveness_status = str(daemon_liveness.get("status", "")).lower()
+        if daemon_liveness_status == "stalled":
+            health_status = "critical"
+        elif daemon_liveness_status in {"booting", "degraded"} and health_status not in {"critical", "degraded"}:
+            health_status = "degraded"
+    except Exception:
+        logger.debug("Failed to blend daemon liveness into overview", exc_info=True)
 
     mean_fitness = 0.0
     evolution_entries = 0

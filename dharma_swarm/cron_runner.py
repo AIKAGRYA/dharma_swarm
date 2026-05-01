@@ -206,6 +206,20 @@ def _result_from_legacy(
     )
 
 
+def _run_opportunity_refill(job: dict[str, Any]) -> CronJobExecutionResult:
+    """Seed staged frontier rows from the durable opportunity board."""
+    from dharma_swarm.opportunity_refill import run_once
+
+    summary = run_once(
+        top_k=_as_int(job.get("top_k"), 10),
+        min_telos_alignment=_as_float(job.get("min_telos_alignment"), 0.8),
+    )
+    return CronJobExecutionResult(
+        status=CronJobRunStatus.COMPLETED,
+        output=json.dumps(summary, indent=2, sort_keys=True),
+    )
+
+
 def _portable_model_overrides(
     provider_order: tuple[ProviderType, ...],
     requested_model: str | None,
@@ -411,6 +425,7 @@ def execute_cron_job(job: dict[str, Any]) -> CronJobExecutionResult:
         foreman          — foreman quality forge cycle
         custodians       — custodian maintenance fleet (no quality re-scan)
         custodians_forge — custodian fleet + foreman quality re-scan
+        opportunity_refill — seed staged frontier rows from opportunity board
     """
     handler = str(job.get("handler", "headless_prompt")).strip() or "headless_prompt"
 
@@ -433,6 +448,8 @@ def execute_cron_job(job: dict[str, Any]) -> CronJobExecutionResult:
     if handler == "custodians_forge":
         from dharma_swarm.foreman import custodians_forge_fn
         return _result_from_legacy(*custodians_forge_fn(job))
+    if handler == "opportunity_refill":
+        return _run_opportunity_refill(job)
 
     if handler == "scout_sweep":
         return _run_scout_sweep(job)

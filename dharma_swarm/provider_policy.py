@@ -67,6 +67,7 @@ class ProviderRouteRequest:
     requires_frontier_precision: bool = False
     privileged_action: bool = False
     requires_human_consent: bool = False
+    allow_free_fallback: bool = False
     context: dict[str, Any] = field(default_factory=dict)
 
 
@@ -203,6 +204,13 @@ class ProviderPolicyRouter:
                 filtered = available
         else:
             filtered = candidates
+
+        filtered, safety_reasons = self._apply_sensitive_free_tier_guard(
+            candidates=filtered,
+            path=path,
+            request=request,
+        )
+        reasons.extend(safety_reasons)
 
         # SmartRouter cost-aware re-ranking: promotes cheaper providers for
         # simple tasks without overriding escalation, frontier, or tooling requests.
@@ -416,6 +424,36 @@ class ProviderPolicyRouter:
         if not preferred:
             return candidates
         return preferred + [provider for provider in candidates if provider not in preferred]
+
+    @staticmethod
+    def _is_free_provider(provider: ProviderType) -> bool:
+        return provider in TIER_FREE or provider == ProviderType.OPENROUTER_FREE
+
+    def _apply_sensitive_free_tier_guard(
+        self,
+        *,
+        candidates: list[ProviderType],
+        path: RoutePath,
+        request: ProviderRouteRequest,
+    ) -> tuple[list[ProviderType], list[str]]:
+        if not candidates:
+            return (candidates, [])
+        sensitive = (
+            path == RoutePath.ESCALATE
+            or request.requires_frontier_precision
+            or request.privileged_action
+            or request.requires_human_consent
+        )
+        if not sensitive:
+            return (candidates, [])
+        if request.allow_free_fallback or bool(request.context.get("allow_free_fallback")):
+            return (candidates, ["free_fallback_allowed"])
+        filtered = [item for item in candidates if not self._is_free_provider(item)]
+        if not filtered:
+            return (candidates, [])
+        if len(filtered) == len(candidates):
+            return (candidates, [])
+        return (filtered, ["free_fallback_blocked_for_sensitive_request"])
 
     @property
     def smart_router(self) -> SmartRouter:

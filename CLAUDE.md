@@ -103,6 +103,25 @@ make dashboard-lint
 - ALWAYS run tests after making code changes
 - ALWAYS verify tests pass before committing
 
+## Build Governance
+
+Canonical repo-wide build-governance surfaces:
+
+- `dharma_swarm/build_authority.py` — authority matrix for who may create, assign, submit, verify, quarantine, promote, and roll back
+- `dharma_swarm/build_registry.py` — append-only canonical record of build intent, tranche scope, runs, decisions, evaluations, incidents, and rollbacks
+- `scripts/build_registry_ctl.py` — agent-agnostic CLI for the same registry
+
+These pair with the repo rule surfaces in `README.md`, `CLAUDE.md`, and `AGENTS.md`.
+Fast orientation shortcut: `REPO_RULES.md`. Terminal call: `python3 scripts/repo_rules.py`.
+
+Rules for unattended or multi-hour build work:
+
+- Record build intent before substantive write phases.
+- Record tranche scope and compatibility mode before schema or contract changes.
+- Workers may submit outputs; they do not self-certify.
+- Verifier or higher-authority lanes record evaluations, quarantines, incidents, and rollback outcomes.
+- Prefer the canonical registry over ad hoc markdown notes for build lineage.
+
 ## CLI Entry Points
 
 ```bash
@@ -164,3 +183,159 @@ See [`MODEL_ROUTING_MAP.md`](MODEL_ROUTING_MAP.md) for the complete model routin
 See [`CYBERNETIC_LOOP_MAP.md`](CYBERNETIC_LOOP_MAP.md) for every feedback loop's sense→act→evaluate→adapt path, current closure status, and verification commands.
 
 See [`AGENT_IDENTITY_UNIFICATION.md`](AGENT_IDENTITY_UNIFICATION.md) for the spec to unify the 4 agent identity schemas into one canonical model. **Any change to agent creation or identity must follow this spec.**
+
+## Semantic Investigation Discipline (enforced)
+
+Grep is the last resort. In this repo, structural awareness is ALWAYS more valuable than string matching, because the same symbol may live in 5 worktrees with drifted interfaces.
+
+**Before investigating any symbol:**
+1. `mcp__contextplus__get_blast_radius("<symbol>")` — count worktree copies and callers.
+2. `mcp__contextplus__get_file_skeleton("<path>")` — learn a file's API without reading it end to end.
+3. `wiki show <concept>` or `wiki search <term>` — 115-article Karpathy wiki, check if the concept is already codified.
+4. Only then `Read` / `Grep` / `Glob`.
+
+**Before editing any hot-path symbol (`swarm.py`, `orchestrate_live.py`, `orchestrator.py`, `frontier_council.py`, `task_board.py`):**
+1. Check `get_blast_radius` — decide explicitly whether to patch all worktree copies or note the drift.
+2. Consult `INTERFACE_MISMATCH_MAP.md` — if the symbol is listed, fix the mismatch as part of the change.
+3. After the patch: trigger `dual-audit` (Claude + Codex) before declaring done.
+4. Write the decision and outcome to the memory graph (`mcp__plugin_everything-claude-code_memory__create_entities`).
+
+## Cross-Worktree Ground Truth (verified 2026-04-17)
+
+`_complete_deferred_startup` exists in 5 worktree copies. Likewise most other hot-path symbols. Treat this as the default assumption unless proven otherwise:
+- `/Users/dhyana/dharma_swarm/` (primary)
+- `/Users/dhyana/dharma_swarm_lf5/` (live fire — this repo)
+- `/Users/dhyana/dharma_swarm_lf5_operator/`
+- `/Users/dhyana/dharma_swarm_dashboard_skill_worktree/`
+- `/Users/dhyana/migration_delta/dharma_swarm_old/`
+
+Rule: when shipping a patch to the hot path, state which worktrees it lands in and which it doesn't. Silent per-worktree drift is the exact rot that `TaskBoard(state_dir=...)` / missing `ConceptGraph` / `TelosGraph.get_by_name` came from (see `INTERFACE_MISMATCH_MAP.md`).
+
+## Runtime Floor (shipped 2026-04-17)
+
+The runtime-floor seam is sealed. These invariants must not regress:
+
+- **SwarmManager.init() is non-blocking** — schedules `_complete_deferred_startup` as a background task, returns so `run_swarm_loop` can start ticking immediately. Tests/tooling that need ready state must call `await swarm.wait_until_bootstrap_ready(timeout=60.0)`.
+- **Bootstrap wall-clock budget** at `SwarmManager._read_bootstrap_budget_seconds` — `DHARMA_BOOTSTRAP_BUDGET_S` (default 600s). Exceeded → `bootstrap_failed` + `boot_stall`.
+- **Tick wall-clock budget** at `orchestrate_live._invoke_swarm_tick` — `DHARMA_TICK_BUDGET_S` (default min(180, 3×SWARM_TICK)). Exceeded → circuit-breaker failure, loop continues.
+- **Liveness watchdog** at `orchestrate_live.run_swarm_liveness_watchdog` — self-declares `boot_stall` in-process, publishes `~/.dharma/meta/swarm_liveness.json` every 20s. If process looks alive but watchdog timestamps are stale, the event loop is pinned.
+- `_init_optional_subsystems` sync hotspots at `swarm.py:668,672,677` now use `*_async` wrappers (`discover_async`, `load_all_async`, `build_index_async`). Other sync calls in that function are NOT yet audited — likely culprits for the next wedge include `KernelGuard.load`, `DharmaCorpus.load`, `Organism` init, `Director` init, LanceDB first-connect, `context_agent` builder-notes distillation.
+
+Any work that touches these areas must preserve or strengthen these invariants, never relax them.
+
+## Self-Evolution Trigger for this Repo
+
+Every session that touches dharma_swarm should, on completion:
+
+1. Add/update memory graph entities for any new symbol, incident, or design decision (not per-line details; only reusable signal).
+2. If a pattern has now recurred 3+ times — wrap it in a skill or hook. Examples worth watching:
+   - "sync call pins event loop inside async" → recurrence → write an `async_safety` skill.
+   - "interface drift between worktrees" → recurrence → write a `worktree-drift-check` skill that runs `get_blast_radius` on changed symbols.
+   - "bootstrap phase doesn't progress" → watchdog already catches; recurrence means fix the underlying sync blocker.
+3. If a wiki article is stale (check `stale_after` in its frontmatter) and you're in its domain — refresh it as part of the work. Don't let the wiki rot.
+
+## Reuse Over Rewrite
+
+Before writing any new orchestration, supervisor, watchdog, evaluator, or gate — grep the repo for existing versions, then query `get_blast_radius` on candidate names. The repo has ~30 subsystems that each tend to re-implement their own version of these primitives; adding a fifth version is the failure mode. See the `reuse > rewrite` rule in `GNANI_LODESTONE.md` if it exists, or use `catalytic` / `consciousness-archaeology` skills to find existing implementations.
+
+<!-- gitnexus:start -->
+# GitNexus — Code Intelligence
+
+This project is indexed by GitNexus as **dharma_swarm_lf5** (27173 symbols, 70724 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+
+> If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
+
+## Always Do
+
+- **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `gitnexus_impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user.
+- **MUST run `gitnexus_detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows.
+- **MUST warn the user** if impact analysis returns HIGH or CRITICAL risk before proceeding with edits.
+- When exploring unfamiliar code, use `gitnexus_query({query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
+- When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `gitnexus_context({name: "symbolName"})`.
+
+## When Debugging
+
+1. `gitnexus_query({query: "<error or symptom>"})` — find execution flows related to the issue
+2. `gitnexus_context({name: "<suspect function>"})` — see all callers, callees, and process participation
+3. `READ gitnexus://repo/dharma_swarm_lf5/process/{processName}` — trace the full execution flow step by step
+4. For regressions: `gitnexus_detect_changes({scope: "compare", base_ref: "main"})` — see what your branch changed
+
+## When Refactoring
+
+- **Renaming**: MUST use `gitnexus_rename({symbol_name: "old", new_name: "new", dry_run: true})` first. Review the preview — graph edits are safe, text_search edits need manual review. Then run with `dry_run: false`.
+- **Extracting/Splitting**: MUST run `gitnexus_context({name: "target"})` to see all incoming/outgoing refs, then `gitnexus_impact({target: "target", direction: "upstream"})` to find all external callers before moving code.
+- After any refactor: run `gitnexus_detect_changes({scope: "all"})` to verify only expected files changed.
+
+## Never Do
+
+- NEVER edit a function, class, or method without first running `gitnexus_impact` on it.
+- NEVER ignore HIGH or CRITICAL risk warnings from impact analysis.
+- NEVER rename symbols with find-and-replace — use `gitnexus_rename` which understands the call graph.
+- NEVER commit changes without running `gitnexus_detect_changes()` to check affected scope.
+
+## Tools Quick Reference
+
+| Tool | When to use | Command |
+|------|-------------|---------|
+| `query` | Find code by concept | `gitnexus_query({query: "auth validation"})` |
+| `context` | 360-degree view of one symbol | `gitnexus_context({name: "validateUser"})` |
+| `impact` | Blast radius before editing | `gitnexus_impact({target: "X", direction: "upstream"})` |
+| `detect_changes` | Pre-commit scope check | `gitnexus_detect_changes({scope: "staged"})` |
+| `rename` | Safe multi-file rename | `gitnexus_rename({symbol_name: "old", new_name: "new", dry_run: true})` |
+| `cypher` | Custom graph queries | `gitnexus_cypher({query: "MATCH ..."})` |
+
+## Impact Risk Levels
+
+| Depth | Meaning | Action |
+|-------|---------|--------|
+| d=1 | WILL BREAK — direct callers/importers | MUST update these |
+| d=2 | LIKELY AFFECTED — indirect deps | Should test |
+| d=3 | MAY NEED TESTING — transitive | Test if critical path |
+
+## Resources
+
+| Resource | Use for |
+|----------|---------|
+| `gitnexus://repo/dharma_swarm_lf5/context` | Codebase overview, check index freshness |
+| `gitnexus://repo/dharma_swarm_lf5/clusters` | All functional areas |
+| `gitnexus://repo/dharma_swarm_lf5/processes` | All execution flows |
+| `gitnexus://repo/dharma_swarm_lf5/process/{name}` | Step-by-step execution trace |
+
+## Self-Check Before Finishing
+
+Before completing any code modification task, verify:
+1. `gitnexus_impact` was run for all modified symbols
+2. No HIGH/CRITICAL risk warnings were ignored
+3. `gitnexus_detect_changes()` confirms changes match expected scope
+4. All d=1 (WILL BREAK) dependents were updated
+
+## Keeping the Index Fresh
+
+After committing code changes, the GitNexus index becomes stale. Re-run analyze to update it:
+
+```bash
+npx gitnexus analyze
+```
+
+If the index previously included embeddings, preserve them by adding `--embeddings`:
+
+```bash
+npx gitnexus analyze --embeddings
+```
+
+To check whether embeddings exist, inspect `.gitnexus/meta.json` — the `stats.embeddings` field shows the count (0 means no embeddings). **Running analyze without `--embeddings` will delete any previously generated embeddings.**
+
+> Claude Code users: A PostToolUse hook handles this automatically after `git commit` and `git merge`.
+
+## CLI
+
+| Task | Read this skill file |
+|------|---------------------|
+| Understand architecture / "How does X work?" | `.claude/skills/gitnexus/gitnexus-exploring/SKILL.md` |
+| Blast radius / "What breaks if I change X?" | `.claude/skills/gitnexus/gitnexus-impact-analysis/SKILL.md` |
+| Trace bugs / "Why is X failing?" | `.claude/skills/gitnexus/gitnexus-debugging/SKILL.md` |
+| Rename / extract / split / refactor | `.claude/skills/gitnexus/gitnexus-refactoring/SKILL.md` |
+| Tools, resources, schema reference | `.claude/skills/gitnexus/gitnexus-guide/SKILL.md` |
+| Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md` |
+
+<!-- gitnexus:end -->

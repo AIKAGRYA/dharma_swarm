@@ -28,9 +28,10 @@ DOES NOT:
 * Touch the EFE/fitness selection logic in ``orchestrator._select_idle_agent``.
 * Touch ``dgm_loop.py``.
 
-Activation is guarded by ``DGC_GOVERNANCE_OVERLAY``. When unset or ``"0"``,
-``reorder_by_governance`` returns tasks unchanged with an empty reason list,
-making this module a no-op in production until explicitly enabled.
+Activation is guarded by ``DGC_GOVERNANCE_OVERLAY``. Explicit falsey values
+disable the overlay; explicit truthy values force it on. When unset, the
+overlay auto-enables once real governance state exists (campaign pressure,
+directives, or fresh executive artifacts).
 """
 
 from __future__ import annotations
@@ -45,7 +46,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
-from dharma_swarm.campaigns import load_active as load_active_campaigns
+from dharma_swarm.campaigns import active_primary, load_active as load_active_campaigns
 from dharma_swarm.domain_classify import infer_domain
 from dharma_swarm.shakti_zeitgeist_executive import DOMAINS
 
@@ -80,6 +81,9 @@ class GovernanceSnapshot:
     promise_pressure: dict[str, float] = field(default_factory=dict)
     challenge_multiplier: dict[str, float] = field(default_factory=dict)
     active_campaign_domains: set[str] = field(default_factory=set)
+    campaign_pressure: dict[str, float] = field(default_factory=dict)
+    primary_campaign_id: str = ""
+    primary_campaign_domain: str = ""
     loaded_at: float = 0.0
     source_mtime: float = 0.0
     is_stale: bool = True
@@ -120,6 +124,72 @@ def _neutral_snapshot(loaded_at: float, is_stale: bool = True) -> GovernanceSnap
     )
 
 
+def _parse_iso_timestamp(raw: Any) -> float:
+    if not raw:
+        return 0.0
+    try:
+        return datetime.fromisoformat(str(raw).replace("Z", "+00:00")).timestamp()
+    except Exception:
+        return 0.0
+
+
+def _campaign_context(base: Path) -> tuple[set[str], str, str, dict[str, float]]:
+    active = [
+        c
+        for c in load_active_campaigns(base)
+        if isinstance(c, dict) and c.get("status", "active") == "active"
+    ]
+    active_campaign_domains: set[str] = set()
+    for campaign in active:
+        domain = campaign.get("domain")
+        if isinstance(domain, str) and domain in DOMAINS:
+            active_campaign_domains.add(domain)
+
+    primary_campaign_id = ""
+    primary_campaign_domain = ""
+    try:
+        primary_campaign = active_primary(base)
+        if primary_campaign:
+            primary_campaign_id = str(primary_campaign.get("campaign_id") or "")
+            domain = str(primary_campaign.get("domain") or "")
+            if domain in DOMAINS:
+                primary_campaign_domain = domain
+    except Exception:
+        pass
+
+    campaign_pressure: dict[str, float] = {}
+    if not active:
+        return active_campaign_domains, primary_campaign_id, primary_campaign_domain, campaign_pressure
+
+    now_ts = datetime.now(timezone.utc).timestamp()
+    ages_hours: list[float] = []
+    checkins: list[int] = []
+    for campaign in active:
+        anchor_ts = _parse_iso_timestamp(
+            campaign.get("last_check_in") or campaign.get("created"),
+        )
+        age_h = max(0.0, (now_ts - anchor_ts) / 3600.0) if anchor_ts else 0.0
+        ages_hours.append(age_h)
+        checkins.append(max(0, int(campaign.get("check_in_count", 0) or 0)))
+
+    max_age = max(ages_hours) or 1.0
+    max_checkins = max(checkins) if checkins else 0
+    for campaign, age_h, count in zip(active, ages_hours, checkins):
+        campaign_id = str(campaign.get("campaign_id") or "").strip()
+        if not campaign_id:
+            continue
+        stale_score = age_h / max_age if max_age > 0 else 0.0
+        coverage_debt = 1.0 - (count / max_checkins) if max_checkins > 0 else 1.0
+        pressure = (stale_score * 0.55) + (coverage_debt * 0.35)
+        if stale_score >= 0.75 and coverage_debt >= 0.75:
+            pressure += 0.2
+        if campaign.get("primary") is True:
+            pressure += 0.15
+        campaign_pressure[campaign_id] = min(1.2, max(0.0, pressure))
+
+    return active_campaign_domains, primary_campaign_id, primary_campaign_domain, campaign_pressure
+
+
 def load_governance(meta_dir: Path | None = None, force: bool = False) -> GovernanceSnapshot:
     """Return a current GovernanceSnapshot, using a 30s mtime cache."""
     base = meta_dir or _DEFAULT_META_DIR
@@ -127,6 +197,12 @@ def load_governance(meta_dir: Path | None = None, force: bool = False) -> Govern
     quarantine_path = base / "disagreement_quarantine.json"
     promise_path = base / "promise_pressure.json"
     challenge_path = base / "challenge_pressure.json"
+    (
+        active_campaign_domains,
+        primary_campaign_id,
+        primary_campaign_domain,
+        campaign_pressure,
+    ) = _campaign_context(base)
 
     # Cache key: tuple of (path, mtime) for each governance file.
     key = (
@@ -148,6 +224,10 @@ def load_governance(meta_dir: Path | None = None, force: bool = False) -> Govern
     alloc = _read_json(alloc_path)
     if not isinstance(alloc, dict):
         snap = _neutral_snapshot(loaded_at=now, is_stale=True)
+        snap.active_campaign_domains = active_campaign_domains
+        snap.primary_campaign_id = primary_campaign_id
+        snap.primary_campaign_domain = primary_campaign_domain
+        snap.campaign_pressure = campaign_pressure
         _cache.update(snap=snap, key=key, loaded_at=now)
         return snap
 
@@ -157,6 +237,10 @@ def load_governance(meta_dir: Path | None = None, force: bool = False) -> Govern
     if file_age > _STALE_AFTER_SECONDS:
         snap = _neutral_snapshot(loaded_at=now, is_stale=True)
         snap.source_mtime = mtime
+        snap.active_campaign_domains = active_campaign_domains
+        snap.primary_campaign_id = primary_campaign_id
+        snap.primary_campaign_domain = primary_campaign_domain
+        snap.campaign_pressure = campaign_pressure
         _cache.update(snap=snap, key=key, loaded_at=now)
         return snap
 
@@ -215,16 +299,6 @@ def load_governance(meta_dir: Path | None = None, force: bool = False) -> Govern
             except Exception:
                 pass
 
-    # Active-campaign domain accounting — prevents double-starve.
-    active_campaign_domains: set[str] = set()
-    try:
-        for c in load_active_campaigns(base):
-            d = c.get("domain")
-            if isinstance(d, str) and d in DOMAINS:
-                active_campaign_domains.add(d)
-    except Exception:
-        pass
-
     snap = GovernanceSnapshot(
         per_domain=per_domain,
         starvation_boosts=starvation,
@@ -233,6 +307,9 @@ def load_governance(meta_dir: Path | None = None, force: bool = False) -> Govern
         promise_pressure=promise_pressure,
         challenge_multiplier=challenge_multiplier,
         active_campaign_domains=active_campaign_domains,
+        campaign_pressure=campaign_pressure,
+        primary_campaign_id=primary_campaign_id,
+        primary_campaign_domain=primary_campaign_domain,
         loaded_at=now,
         source_mtime=mtime,
         is_stale=False,
@@ -329,6 +406,24 @@ def governance_multiplier(
             multiplier += pressure
             reasons.append(f"promise(+{pressure:.2f})")
 
+    task_campaign_id = str(_metadata_get(task, "campaign_id", "") or "")
+    campaign_pressure = snap.campaign_pressure.get(task_campaign_id, 0.0)
+    if campaign_pressure > 0:
+        multiplier += campaign_pressure
+        reasons.append(f"campaign_pressure(+{campaign_pressure:.2f})")
+
+    if snap.primary_campaign_id:
+        if task_campaign_id == snap.primary_campaign_id:
+            multiplier += 0.75
+            reasons.append("primary_campaign(+0.75)")
+        elif (
+            snap.primary_campaign_domain
+            and domain == snap.primary_campaign_domain
+            and _metadata_get(task, "campaign_support") is True
+        ):
+            multiplier += 0.35
+            reasons.append("primary_support(+0.35)")
+
     # Clamp for first 48h.
     clamped = max(_CLAMP_MIN, min(_CLAMP_MAX, multiplier))
     if clamped != multiplier:
@@ -337,7 +432,31 @@ def governance_multiplier(
 
 
 def is_overlay_enabled() -> bool:
-    return os.environ.get(_ENV_FLAG, "0").strip() not in ("", "0", "false", "False", "no")
+    raw = os.environ.get(_ENV_FLAG, "").strip().lower()
+    if raw in {"0", "false", "no", "off"}:
+        return False
+    if raw in {"1", "true", "yes", "on"}:
+        return True
+
+    snap = load_governance()
+    if snap.primary_campaign_id or snap.campaign_pressure:
+        return True
+    if not snap.is_stale:
+        if snap.starvation_boosts or snap.churn_penalties or snap.promise_pressure or snap.challenge_multiplier:
+            return True
+        if any(abs(snap.domain_weight(domain) - _NEUTRAL_WEIGHT) > 1e-9 for domain in DOMAINS):
+            return True
+
+    try:
+        from dharma_swarm.operator_directives import load_directives
+
+        directives = load_directives(_DEFAULT_META_DIR.parent)
+        if directives.has_content:
+            return True
+    except Exception:
+        pass
+
+    return False
 
 
 def reorder_by_governance(

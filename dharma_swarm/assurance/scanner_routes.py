@@ -69,24 +69,21 @@ def _scan_frontend_calls(repo_root: Path) -> list[tuple[str, str, int, str]]:
             continue
 
         method = match.group(1).upper()
-        open_paren = line.find("(", match.start())
-        if open_paren < 0:
-            continue
 
         quote_char = ""
         quote_pos = -1
-        for candidate in ('"', "`"):
-            pos = line.find(candidate, open_paren)
+        for candidate in ('"', "'", "`"):
+            pos = line.find(candidate, match.end())
             if pos != -1 and (quote_pos == -1 or pos < quote_pos):
                 quote_char = candidate
                 quote_pos = pos
         if quote_pos == -1:
             continue
 
-        if quote_char == '"':
-            end_pos = line.find('"', quote_pos + 1)
-        else:
+        if quote_char == "`":
             end_pos = line.rfind("`")
+        else:
+            end_pos = line.find(quote_char, quote_pos + 1)
         if end_pos <= quote_pos:
             continue
 

@@ -304,3 +304,10 @@ async def test_access_decay_atomic_rewrite(store: StigmergyStore):
     marks = await store.read_marks(limit=20)
     assert len(marks) == 10
     assert dead == 0  # salience 0.5 * 0.95^2 = 0.45, still above 0.1
+
+
+def test_rewrite_tmp_paths_are_unique_across_store_instances(tmp_path: Path):
+    base_path = tmp_path / "stigmergy"
+    store_a = StigmergyStore(base_path=base_path)
+    store_b = StigmergyStore(base_path=base_path)
+    assert store_a._rewrite_tmp_path() != store_b._rewrite_tmp_path()

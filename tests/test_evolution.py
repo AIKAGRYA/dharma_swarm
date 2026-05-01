@@ -797,7 +797,7 @@ async def test_archive_result_stores_entry(engine):
     stored = await engine.archive.get_entry(entry_id)
     assert stored is not None
     assert stored.component == "module.py"
-    assert stored.status == "applied"
+    assert stored.status == "candidate"
     assert stored.fitness.correctness == pytest.approx(0.8)
     assert stored.promotion_state == "candidate"
     assert stored.evidence_tier == "unvalidated"
@@ -824,6 +824,7 @@ async def test_archive_result_records_experiment_metadata(engine_paths):
     recent = await eng.experiment_log.get_recent(limit=5)
 
     assert stored is not None
+    assert stored.status == "applied"
     assert stored.execution_profile == "pkg-profile"
     assert stored.promotion_state == "component_pass"
     assert stored.test_results["execution_target"]["profile_name"] == "pkg-profile"
