@@ -28,6 +28,7 @@ A REVIEW from any of the four gates is treated as BLOCK for v0.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import logging
 import os
@@ -43,6 +44,7 @@ from dharma_swarm.ontology_runtime import (
     get_shared_registry,
     persist_shared_registry,
 )
+from dharma_swarm.runtime_state import ArtifactRecord, RuntimeStateStore
 from dharma_swarm.telos_gates import DEFAULT_GATEKEEPER, TelosGatekeeper
 
 logger = logging.getLogger(__name__)
@@ -58,6 +60,10 @@ ARTIFACT_SUBTYPE = "operator_brief"
 ARTIFACT_TYPE = "note"
 DEFAULT_AGENT_ID = "operator_brief_agent"
 DEFAULT_AGENT_NAME = "OperatorBriefAgent"
+OPERATOR_BRIEF_CAUSE_ID = "cause:operator_brief_v0"
+OPERATOR_BRIEF_CELL_NAME = "Operator Brief v0"
+OPERATOR_BRIEF_CELL_KIND = "VentureCell"
+RUNTIME_INPUT_LIMIT = 8
 
 ENABLED_ENV = "DHARMA_OPERATOR_BRIEF_ENABLED"
 
@@ -73,6 +79,9 @@ class _BriefInput:
     snapshot_hash: str
     cited_fact_ids: list[str] = field(default_factory=list)
     summary_lines: list[str] = field(default_factory=list)
+    source_event_ids: list[str] = field(default_factory=list)
+    memory_fact_ids: list[str] = field(default_factory=list)
+    source_session_ids: list[str] = field(default_factory=list)
     counterargument: str = ""
     has_source: bool = True
 
@@ -95,6 +104,7 @@ class _RunResult:
     witness_log_ids: list[str]
     gate_decision_ids: list[str]
     proposal_id: str | None
+    runtime_artifact_id: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -103,6 +113,7 @@ class _RunResult:
             "witness_log_ids": list(self.witness_log_ids),
             "gate_decision_ids": list(self.gate_decision_ids),
             "proposal_id": self.proposal_id,
+            "runtime_artifact_id": self.runtime_artifact_id,
         }
 
 
@@ -130,6 +141,7 @@ def run_once(
     *,
     registry: OntologyRegistry | None = None,
     input_payload: dict[str, Any] | None = None,
+    runtime_state: RuntimeStateStore | None = None,
     agent_id: str = DEFAULT_AGENT_ID,
     agent_name: str = DEFAULT_AGENT_NAME,
     gatekeeper: TelosGatekeeper | None = None,
@@ -152,32 +164,47 @@ def run_once(
     keeper = gatekeeper or DEFAULT_GATEKEEPER
     now_dt = now or datetime.now(timezone.utc)
     date_str = now_dt.date().isoformat()
+    runtime = runtime_state
+    if runtime is None and registry is None and input_payload is None:
+        runtime = RuntimeStateStore()
 
     agent_obj = _ensure_agent(reg, agent_id=agent_id, agent_name=agent_name)
     actual_agent_id = agent_obj.id if agent_obj is not None else agent_id
+    cell_obj = _ensure_operator_brief_cell(reg)
+    cell_id = cell_obj.id if cell_obj is not None else ""
 
     # Idempotency: short-circuit if today's brief already exists for this agent.
     existing = _existing_artifact_for(reg, date_str, actual_agent_id)
     if existing is not None:
+        runtime_artifact_id = _backfill_existing_runtime_artifact(
+            runtime,
+            existing=existing,
+            date_str=date_str,
+            cell_id=cell_id,
+        )
         return _RunResult(
             artifact_id=existing.id,
             outcome="success",
             witness_log_ids=[],
             gate_decision_ids=[],
             proposal_id=existing.properties.get("provenance", "") or None,
+            runtime_artifact_id=runtime_artifact_id,
         ).to_dict()
 
     witness_ids: list[str] = []
     gate_ids: list[str] = []
 
-    brief_input = _collect_input(input_payload)
+    brief_input = _collect_input(input_payload, runtime_state=runtime)
 
     proposal_id = _propose(
         reg,
         agent_id=actual_agent_id,
         title=f"Operator Brief — {date_str}",
         snapshot_hash=brief_input.snapshot_hash,
+        cell_id=cell_id,
     )
+    if cell_obj is not None:
+        _safe_create_link(reg, "belongs_to_cell", proposal_id, cell_obj.id)
 
     witness_ids.append(
         _record_witness(
@@ -227,9 +254,11 @@ def run_once(
             reg,
             outcome_id=outcome_id,
             agent_id=actual_agent_id,
+            cell_id=cell_id,
             success=False,
             cited_count=0,
         )
+        _persist_if_shared(reg, registry)
         return _RunResult(
             artifact_id=None,
             outcome="failed_input",
@@ -296,6 +325,7 @@ def run_once(
             reg,
             outcome_id=outcome_id,
             agent_id=actual_agent_id,
+            cell_id=cell_id,
             success=False,
             cited_count=len(brief_input.cited_fact_ids),
         )
@@ -310,9 +340,12 @@ def run_once(
 
     artifact_id, content_hash, materialise_error = _materialise_artifact(
         reg,
+        runtime_state=runtime,
         proposal_id=proposal_id,
         agent_obj=agent_obj,
         agent_id=actual_agent_id,
+        cell_id=cell_id,
+        brief_input=brief_input,
         drafted=drafted,
         date_str=date_str,
         gate_decision_ids=gate_ids,
@@ -332,6 +365,7 @@ def run_once(
             reg,
             outcome_id=outcome_id,
             agent_id=actual_agent_id,
+            cell_id=cell_id,
             success=False,
             cited_count=len(brief_input.cited_fact_ids),
         )
@@ -369,6 +403,7 @@ def run_once(
         reg,
         outcome_id=outcome_id,
         agent_id=actual_agent_id,
+        cell_id=cell_id,
         success=True,
         cited_count=len(brief_input.cited_fact_ids),
     )
@@ -378,10 +413,23 @@ def run_once(
             reg,
             value_event_id=value_event_id,
             agent_id=actual_agent_id,
+            cell_id=cell_id,
         )
 
     if agent_obj is not None:
         _safe_create_link(reg, "authored", agent_obj.id, artifact_id)
+
+    runtime_artifact_id = _backfill_existing_runtime_artifact(
+        runtime,
+        existing=reg.get_object(artifact_id),
+        date_str=date_str,
+        cell_id=cell_id,
+        brief_input=brief_input,
+        gate_decision_ids=gate_ids,
+        witness_log_ids=witness_ids,
+        outcome_id=outcome_id,
+        value_event_id=value_event_id,
+    )
 
     _persist_if_shared(reg, registry)
 
@@ -391,6 +439,7 @@ def run_once(
         witness_log_ids=witness_ids,
         gate_decision_ids=gate_ids,
         proposal_id=proposal_id,
+        runtime_artifact_id=runtime_artifact_id,
     ).to_dict()
 
 
@@ -468,22 +517,33 @@ def _existing_artifact_for(
     return None
 
 
-def _collect_input(payload: dict[str, Any] | None) -> _BriefInput:
+def _collect_input(
+    payload: dict[str, Any] | None,
+    *,
+    runtime_state: RuntimeStateStore | None = None,
+) -> _BriefInput:
     """Collect minimal runtime input for the brief.
 
-    For v0, ``payload`` (when provided) is treated as the snapshot. In
-    cron mode payload is None and we still require the caller (or a
-    later wiring step) to surface something to cite — fail-closed if
-    nothing is available. NEXT_10_SUBSTRATE_TODO item 7 will plumb
-    real ``session_events``/``memory_facts`` here.
+    For tests, ``payload`` can still provide an explicit snapshot. In
+    cron mode, payload is None and this reads the canonical
+    ``RuntimeStateStore`` for recent ``session_events`` and
+    ``memory_facts``. If neither source exists, the seam fails closed.
     """
     if not payload:
-        # No source plumbed yet — surface honestly. The DOGMA_DRIFT path
-        # in run_once will fail-closed.
-        return _BriefInput(snapshot_hash="empty", has_source=False)
+        return _collect_runtime_input(runtime_state)
 
     cited = list(payload.get("cited_fact_ids") or [])
     lines = list(payload.get("summary_lines") or [])
+    source_event_ids = [
+        _strip_source_prefix(fid, "session_events")
+        for fid in cited
+        if _strip_source_prefix(fid, "session_events")
+    ]
+    memory_fact_ids = [
+        _strip_source_prefix(fid, "memory_facts")
+        for fid in cited
+        if _strip_source_prefix(fid, "memory_facts")
+    ]
     counter = str(payload.get("counterargument") or "").strip()
     raw = "|".join(cited) + "::" + "\n".join(lines) + "::" + counter
     snapshot_hash = hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
@@ -491,8 +551,70 @@ def _collect_input(payload: dict[str, Any] | None) -> _BriefInput:
         snapshot_hash=snapshot_hash,
         cited_fact_ids=cited,
         summary_lines=lines,
+        source_event_ids=source_event_ids,
+        memory_fact_ids=memory_fact_ids,
         counterargument=counter,
         has_source=bool(cited or lines),
+    )
+
+
+def _collect_runtime_input(
+    runtime_state: RuntimeStateStore | None,
+) -> _BriefInput:
+    if runtime_state is None:
+        return _BriefInput(snapshot_hash="empty", has_source=False)
+
+    try:
+        events = _run_async_sync(
+            lambda: runtime_state.list_session_events(limit=RUNTIME_INPUT_LIMIT)
+        )
+        facts = _run_async_sync(
+            lambda: runtime_state.list_memory_facts(limit=RUNTIME_INPUT_LIMIT)
+        )
+    except Exception as exc:
+        logger.warning("operator_brief runtime input unavailable: %s", exc)
+        return _BriefInput(snapshot_hash="empty", has_source=False)
+
+    cited: list[str] = []
+    lines: list[str] = []
+    source_event_ids: list[str] = []
+    memory_fact_ids: list[str] = []
+    session_ids: list[str] = []
+
+    for event in events[:4]:
+        cited.append(f"session_events:{event.event_id}")
+        source_event_ids.append(event.event_id)
+        if event.session_id:
+            session_ids.append(event.session_id)
+        summary = event.summary or event.event_text or event.event_name
+        lines.append(f"{event.event_name}: {_truncate(summary, 180)}")
+
+    for fact in facts[:4]:
+        cited.append(f"memory_facts:{fact.fact_id}")
+        memory_fact_ids.append(fact.fact_id)
+        if fact.source_event_id:
+            source_event_ids.append(fact.source_event_id)
+        if fact.session_id:
+            session_ids.append(fact.session_id)
+        lines.append(f"{fact.fact_kind}: {_truncate(fact.text, 180)}")
+
+    if not cited:
+        return _BriefInput(snapshot_hash="empty", has_source=False)
+
+    counter = (
+        "However, recent runtime rows are telemetry, not judgment; "
+        "they may overstate urgency without operator review."
+    )
+    raw = "|".join(cited) + "::" + "\n".join(lines) + "::" + counter
+    return _BriefInput(
+        snapshot_hash=hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16],
+        cited_fact_ids=cited,
+        summary_lines=lines,
+        source_event_ids=_dedupe(source_event_ids),
+        memory_fact_ids=_dedupe(memory_fact_ids),
+        source_session_ids=_dedupe(session_ids),
+        counterargument=counter,
+        has_source=True,
     )
 
 
@@ -502,12 +624,15 @@ def _propose(
     agent_id: str,
     title: str,
     snapshot_hash: str,
+    cell_id: str,
 ) -> str:
     obj, errors = reg.create_object(
         "ActionProposal",
         properties={
             "task_id": f"operator_brief::{snapshot_hash}",
             "agent_id": agent_id,
+            "cell_id": cell_id,
+            "cause_id": OPERATOR_BRIEF_CAUSE_ID,
             "action_type": "manual",
             "title": title,
             "description": "Publish ontology-native operator brief (v0 seam).",
@@ -708,6 +833,7 @@ def _record_outcome(
             "proposal_id": proposal_id,
             "task_id": f"operator_brief::{proposal_id}",
             "agent_id": agent_id,
+            "cause_id": OPERATOR_BRIEF_CAUSE_ID,
             "success": success,
             "result_summary": result_summary or reason,
             "error": error,
@@ -729,6 +855,7 @@ def _emit_value_event(
     *,
     outcome_id: str,
     agent_id: str,
+    cell_id: str,
     success: bool,
     cited_count: int,
 ) -> str | None:
@@ -741,7 +868,8 @@ def _emit_value_event(
         properties={
             "outcome_id": outcome_id,
             "agent_id": agent_id,
-            "cell_id": "",
+            "cell_id": cell_id,
+            "cause_id": OPERATOR_BRIEF_CAUSE_ID,
             "task_id": f"operator_brief::{outcome_id}",
             "task_type": "operator_brief",
             "behavioral_signal": 0.5,
@@ -766,13 +894,15 @@ def _record_contribution(
     *,
     value_event_id: str,
     agent_id: str,
+    cell_id: str,
 ) -> str | None:
     obj, errors = reg.create_object(
         "Contribution",
         properties={
             "value_event_id": value_event_id,
             "agent_id": agent_id,
-            "cell_id": "",
+            "cell_id": cell_id,
+            "cause_id": OPERATOR_BRIEF_CAUSE_ID,
             "task_type": "operator_brief",
             "credit_share": 1.0,
             "attributed_value": 0.5,
@@ -789,9 +919,12 @@ def _record_contribution(
 def _materialise_artifact(
     reg: OntologyRegistry,
     *,
+    runtime_state: RuntimeStateStore | None,
     proposal_id: str,
     agent_obj: OntologyObj | None,
     agent_id: str,
+    cell_id: str,
+    brief_input: _BriefInput,
     drafted: _DraftedBrief,
     date_str: str,
     gate_decision_ids: list[str],
@@ -819,6 +952,10 @@ def _materialise_artifact(
             "subtype": ARTIFACT_SUBTYPE,
             "agent_id": agent_id,
             "brief_date": date_str,
+            "cause_id": OPERATOR_BRIEF_CAUSE_ID,
+            "cell_id": cell_id,
+            "movement_kind": OPERATOR_BRIEF_CELL_KIND,
+            "cited_fact_ids": list(drafted.cited_fact_ids),
         },
         created_by="operator_brief",
     )
@@ -831,7 +968,10 @@ def _materialise_artifact(
         f"artifact_id: {artifact_id}\n"
         f"agent_id: {agent_id}\n"
         f"proposal_id: {proposal_id}\n"
+        f"cause_id: {OPERATOR_BRIEF_CAUSE_ID}\n"
+        f"cell_id: {cell_id}\n"
         f"brief_date: {date_str}\n"
+        f"cited_fact_ids: [{', '.join(drafted.cited_fact_ids)}]\n"
         f"gate_decision_ids: [{', '.join(gate_decision_ids)}]\n"
         f"witness_log_ids: [{', '.join(witness_log_ids)}]\n"
         "value_event_status: estimated_not_verified\n"
@@ -854,6 +994,26 @@ def _materialise_artifact(
     content_hash = hashlib.sha256(full_body.encode("utf-8")).hexdigest()
     artifact_obj.properties["file_path"] = str(file_path)
     artifact_obj.properties["content_sha256"] = content_hash
+
+    runtime_error = _record_runtime_artifact(
+        runtime_state,
+        artifact_id=artifact_id,
+        file_path=file_path,
+        content_hash=content_hash,
+        date_str=date_str,
+        proposal_id=proposal_id,
+        cell_id=cell_id,
+        brief_input=brief_input,
+        gate_decision_ids=gate_decision_ids,
+        witness_log_ids=witness_log_ids,
+    )
+    if runtime_error is not None:
+        try:
+            file_path.unlink(missing_ok=True)
+        except OSError:
+            logger.debug("failed to clean orphan operator brief file", exc_info=True)
+        return None, "", f"Runtime artifact record failed: {runtime_error}"
+
     inserted, errors = reg.put_object(artifact_obj, updated_by="operator_brief")
     if inserted is None:
         try:
@@ -862,6 +1022,168 @@ def _materialise_artifact(
             logger.debug("failed to clean orphan operator brief file", exc_info=True)
         return None, "", f"KnowledgeArtifact creation failed: {errors}"
     return artifact_id, content_hash, None
+
+
+def _ensure_operator_brief_cell(reg: OntologyRegistry) -> OntologyObj | None:
+    for obj in reg.get_objects_by_type("VentureCell"):
+        if (
+            obj.properties.get("cause_id") == OPERATOR_BRIEF_CAUSE_ID
+            or obj.properties.get("name") == OPERATOR_BRIEF_CELL_NAME
+        ):
+            return obj
+
+    obj, errors = reg.create_object(
+        "VentureCell",
+        properties={
+            "name": OPERATOR_BRIEF_CELL_NAME,
+            "description": (
+                "Existing VentureCell container for the first "
+                "ontology-native Operator Brief cause; not a Movement engine."
+            ),
+            "domain": "governance",
+            "autonomy_stage": 1,
+            "status": "active",
+            "budget_tokens": 0,
+            "kpis": {
+                "artifact_subtype": ARTIFACT_SUBTYPE,
+                "phase": "operator_brief_v0",
+            },
+            "cause_id": OPERATOR_BRIEF_CAUSE_ID,
+            "movement_kind": OPERATOR_BRIEF_CELL_KIND,
+        },
+        created_by="operator_brief",
+    )
+    if obj is None:
+        logger.warning("operator brief VentureCell creation failed: %s", errors)
+    return obj
+
+
+def _backfill_existing_runtime_artifact(
+    runtime_state: RuntimeStateStore | None,
+    *,
+    existing: OntologyObj | None,
+    date_str: str,
+    cell_id: str,
+    brief_input: _BriefInput | None = None,
+    gate_decision_ids: list[str] | None = None,
+    witness_log_ids: list[str] | None = None,
+    outcome_id: str = "",
+    value_event_id: str | None = None,
+) -> str | None:
+    if runtime_state is None or existing is None:
+        return None
+    file_path_str = str(existing.properties.get("file_path") or "")
+    content_hash = str(existing.properties.get("content_sha256") or "")
+    if not file_path_str or not content_hash:
+        return None
+    error = _record_runtime_artifact(
+        runtime_state,
+        artifact_id=existing.id,
+        file_path=Path(file_path_str),
+        content_hash=content_hash,
+        date_str=date_str,
+        proposal_id=str(existing.properties.get("provenance") or ""),
+        cell_id=cell_id or str(existing.properties.get("cell_id") or ""),
+        brief_input=brief_input,
+        gate_decision_ids=gate_decision_ids or [],
+        witness_log_ids=witness_log_ids or [],
+        outcome_id=outcome_id,
+        value_event_id=value_event_id or "",
+    )
+    if error is not None:
+        logger.warning("operator_brief runtime artifact backfill failed: %s", error)
+        return None
+    return existing.id
+
+
+def _record_runtime_artifact(
+    runtime_state: RuntimeStateStore | None,
+    *,
+    artifact_id: str,
+    file_path: Path,
+    content_hash: str,
+    date_str: str,
+    proposal_id: str,
+    cell_id: str,
+    brief_input: _BriefInput | None,
+    gate_decision_ids: list[str],
+    witness_log_ids: list[str],
+    outcome_id: str = "",
+    value_event_id: str = "",
+) -> str | None:
+    if runtime_state is None:
+        return None
+    if not file_path.exists():
+        return f"missing artifact payload: {file_path}"
+
+    cited_fact_ids = list(brief_input.cited_fact_ids) if brief_input else []
+    source_event_ids = list(brief_input.source_event_ids) if brief_input else []
+    memory_fact_ids = list(brief_input.memory_fact_ids) if brief_input else []
+    source_session_ids = list(brief_input.source_session_ids) if brief_input else []
+    session_id = source_session_ids[0] if source_session_ids else "operator_brief"
+    record = ArtifactRecord(
+        artifact_id=artifact_id,
+        artifact_kind=ARTIFACT_SUBTYPE,
+        session_id=session_id,
+        task_id=f"operator_brief::{proposal_id or date_str}",
+        payload_path=str(file_path),
+        checksum=content_hash,
+        promotion_state="published",
+        metadata={
+            "subtype": ARTIFACT_SUBTYPE,
+            "cause_id": OPERATOR_BRIEF_CAUSE_ID,
+            "cell_id": cell_id,
+            "movement_kind": OPERATOR_BRIEF_CELL_KIND,
+            "proposal_id": proposal_id,
+            "outcome_id": outcome_id,
+            "value_event_id": value_event_id,
+            "brief_date": date_str,
+            "cited_fact_ids": cited_fact_ids,
+            "source_event_ids": source_event_ids,
+            "memory_fact_ids": memory_fact_ids,
+            "gate_decision_ids": list(gate_decision_ids),
+            "witness_log_ids": list(witness_log_ids),
+            "content_sha256": content_hash,
+        },
+    )
+    try:
+        _run_async_sync(lambda: runtime_state.record_artifact(record))
+    except Exception as exc:
+        return str(exc)
+    return None
+
+
+def _run_async_sync(factory):
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(factory())
+    raise RuntimeError("operator_brief sync entrypoint cannot await inside a running loop")
+
+
+def _strip_source_prefix(value: str, table_name: str) -> str:
+    prefix = f"{table_name}:"
+    if value.startswith(prefix):
+        return value[len(prefix):]
+    return ""
+
+
+def _truncate(text: str, limit: int) -> str:
+    clean = " ".join(str(text).split())
+    if len(clean) <= limit:
+        return clean
+    return clean[: max(0, limit - 3)].rstrip() + "..."
+
+
+def _dedupe(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    out: list[str] = []
+    for value in values:
+        if not value or value in seen:
+            continue
+        seen.add(value)
+        out.append(value)
+    return out
 
 
 def _safe_create_link(

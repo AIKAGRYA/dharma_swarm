@@ -12,6 +12,7 @@ Three test groups:
 from __future__ import annotations
 
 import ast
+import asyncio
 import hashlib
 from pathlib import Path
 
@@ -21,6 +22,7 @@ from dharma_swarm.models import GateCheckResult, GateDecision, GateResult
 from dharma_swarm.ontology import OntologyRegistry
 from dharma_swarm.operator_brief import insight_brief
 from dharma_swarm.operator_brief.insight_brief import REQUIRED_GATES, run_once
+from dharma_swarm.runtime_state import MemoryFact, RuntimeStateStore, SessionEventRecord
 
 
 @pytest.fixture
@@ -169,6 +171,7 @@ def test_happy_path_creates_full_link_set(
     ve = value_events[0]
     assert ve.properties["scoring_method"] == "operator_brief_v0_estimated"
     assert ve.properties.get("estimated") is True
+    assert ve.properties["cause_id"] == insight_brief.OPERATOR_BRIEF_CAUSE_ID
 
     contributions = [
         o
@@ -176,6 +179,22 @@ def test_happy_path_creates_full_link_set(
         if o.properties.get("value_event_id") == ve.id
     ]
     assert len(contributions) == 1
+    assert contributions[0].properties["cell_id"] == ve.properties["cell_id"]
+
+    # Cause awareness is represented narrowly: one existing VentureCell
+    # container, linked from the proposal. No Movement schema is created.
+    cells = [
+        o
+        for o in registry.get_objects_by_type("VentureCell")
+        if o.properties.get("cause_id") == insight_brief.OPERATOR_BRIEF_CAUSE_ID
+    ]
+    assert len(cells) == 1
+    assert artifact.properties["cause_id"] == insight_brief.OPERATOR_BRIEF_CAUSE_ID
+    assert artifact.properties["cell_id"] == cells[0].id
+    assert registry.get_links(
+        source_id=result["proposal_id"],
+        link_name="belongs_to_cell",
+    )
 
     # AgentIdentity exists and authored link is present.
     agents = registry.get_objects_by_type("AgentIdentity")
@@ -356,6 +375,86 @@ def test_failed_input_no_source(registry, isolated_home):
     )
     assert result["outcome"] == "failed_input"
     assert result["artifact_id"] is None
+
+
+def test_runtime_state_sources_drive_brief_and_artifact_record(
+    registry, isolated_home, tmp_path
+):
+    runtime = RuntimeStateStore(tmp_path / "runtime.db")
+    runtime.record_session_event_sync(
+        SessionEventRecord(
+            event_id="sevt-operator-1",
+            session_id="sess-operator",
+            ledger_kind="progress",
+            event_name="operator_tick",
+            task_id="task-operator",
+            agent_id="agent-runtime",
+            summary="Operator saw a real runtime event",
+            event_text="operator_tick task-operator real runtime event",
+            payload={"summary": "Operator saw a real runtime event"},
+        )
+    )
+    asyncio.run(
+        runtime.record_memory_fact(
+            MemoryFact(
+                fact_id="fact-operator-1",
+                fact_kind="operator_memory",
+                truth_state="promoted",
+                text="Runtime memory fact backs the operator brief.",
+                confidence=0.9,
+                session_id="sess-operator",
+                task_id="task-operator",
+                source_event_id="sevt-operator-1",
+            )
+        )
+    )
+
+    result = run_once(
+        registry=registry,
+        input_payload=None,
+        runtime_state=runtime,
+        gatekeeper=_all_pass_keeper(),
+    )
+
+    assert result["outcome"] == "success", result
+    assert result["artifact_id"]
+    assert result["runtime_artifact_id"] == result["artifact_id"]
+
+    artifact = registry.get_object(result["artifact_id"])
+    assert artifact is not None
+    assert "session_events:sevt-operator-1" in artifact.properties["cited_fact_ids"]
+    assert "memory_facts:fact-operator-1" in artifact.properties["cited_fact_ids"]
+
+    persisted = asyncio.run(runtime.get_artifact(result["artifact_id"]))
+    assert persisted is not None
+    assert persisted.artifact_id == result["artifact_id"]
+    assert persisted.artifact_kind == "operator_brief"
+    assert persisted.session_id == "sess-operator"
+    assert persisted.payload_path == artifact.properties["file_path"]
+    assert persisted.checksum == artifact.properties["content_sha256"]
+    assert persisted.promotion_state == "published"
+    assert persisted.metadata["cause_id"] == insight_brief.OPERATOR_BRIEF_CAUSE_ID
+    assert persisted.metadata["cell_id"] == artifact.properties["cell_id"]
+    assert persisted.metadata["source_event_ids"] == ["sevt-operator-1"]
+    assert persisted.metadata["memory_fact_ids"] == ["fact-operator-1"]
+    assert persisted.metadata["value_event_id"]
+
+
+def test_empty_runtime_state_fails_closed_without_artifact_record(
+    registry, isolated_home, tmp_path
+):
+    runtime = RuntimeStateStore(tmp_path / "runtime.db")
+
+    result = run_once(
+        registry=registry,
+        input_payload=None,
+        runtime_state=runtime,
+        gatekeeper=_all_pass_keeper(),
+    )
+
+    assert result["outcome"] == "failed_input"
+    assert result["artifact_id"] is None
+    assert asyncio.run(runtime.list_artifacts(limit=10)) == []
 
 
 def test_materialise_failure_does_not_leave_artifact_row(
