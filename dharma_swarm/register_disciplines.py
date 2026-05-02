@@ -31,6 +31,7 @@ performance — exactly the failure mode the atoms warn against.
 from __future__ import annotations
 
 import json
+import os
 import re
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
@@ -590,6 +591,38 @@ def substrate_test_required(
 DEFAULT_REGISTER_LOG = Path.home() / ".dharma" / "stigmergy" / "register_marks.jsonl"
 
 
+# Runtime kill-switch for default-path register writes. Per Move 0 / Phase 1
+# safety contract: chetana register writes must be gated until the 48-hour
+# canary passes. Explicit log_path callers (tests, ad-hoc tooling) bypass the
+# gate; only writes to the canonical production log are suppressed when the
+# flag is off. Suppressed writes are counted (process-local) so the gate is
+# observable without leaking mark contents.
+
+_SUPPRESSED_REGISTER_MARK_COUNT: int = 0
+
+
+def chetana_register_enabled() -> bool:
+    """Return True iff DHARMA_CHETANA_ENABLED is set to '1'."""
+    return os.environ.get("DHARMA_CHETANA_ENABLED", "").strip() == "1"
+
+
+def _increment_suppressed_register_mark_count() -> None:
+    global _SUPPRESSED_REGISTER_MARK_COUNT
+    _SUPPRESSED_REGISTER_MARK_COUNT += 1
+
+
+def get_suppressed_register_mark_count() -> int:
+    """Return the count of register-mark writes suppressed by the env gate
+    in this process. Diagnostic only; does not include explicit-path writes."""
+    return _SUPPRESSED_REGISTER_MARK_COUNT
+
+
+def reset_suppressed_register_mark_count() -> None:
+    """Reset the suppressed-write counter (test helper)."""
+    global _SUPPRESSED_REGISTER_MARK_COUNT
+    _SUPPRESSED_REGISTER_MARK_COUNT = 0
+
+
 def log_to_stigmergy(
     result: DisciplineResult,
     decision_point: str = "",
@@ -604,13 +637,16 @@ def log_to_stigmergy(
     For the v3 closed-loop shape (with mark_id, plane, severity, corrects, etc.)
     use ``make_register_mark()`` + ``write_register_mark()``.
     """
-    log_path = log_path or DEFAULT_REGISTER_LOG
+    resolved = log_path or DEFAULT_REGISTER_LOG
+    if log_path is None and not chetana_register_enabled():
+        _increment_suppressed_register_mark_count()
+        return False
     try:
-        log_path.parent.mkdir(parents=True, exist_ok=True)
+        resolved.parent.mkdir(parents=True, exist_ok=True)
         entry = result.to_stigmergy_dict()
         entry["decision_point"] = decision_point
         entry["organism_action"] = organism_action
-        with log_path.open("a", encoding="utf-8") as f:
+        with resolved.open("a", encoding="utf-8") as f:
             f.write(json.dumps(entry) + "\n")
         return True
     except Exception:
@@ -766,11 +802,18 @@ def write_register_mark(
     """Append a v3 RegisterMark to the conscience log.
 
     Best-effort: returns True on success, False on any failure. Never raises.
+
+    Default-path writes are gated by DHARMA_CHETANA_ENABLED=1; suppressed writes
+    increment a process-local counter (see ``get_suppressed_register_mark_count``).
+    Explicit ``log_path`` callers (tests, tooling) bypass the gate.
     """
-    log_path = log_path or DEFAULT_REGISTER_LOG
+    resolved = log_path or DEFAULT_REGISTER_LOG
+    if log_path is None and not chetana_register_enabled():
+        _increment_suppressed_register_mark_count()
+        return False
     try:
-        log_path.parent.mkdir(parents=True, exist_ok=True)
-        with log_path.open("a", encoding="utf-8") as f:
+        resolved.parent.mkdir(parents=True, exist_ok=True)
+        with resolved.open("a", encoding="utf-8") as f:
             f.write(json.dumps(mark.to_dict()) + "\n")
         return True
     except Exception:

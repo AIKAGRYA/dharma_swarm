@@ -19,9 +19,13 @@ from dharma_swarm.register_disciplines import (
     RegisterMark,
     SEVERITIES,
     SUBJECT_TYPES,
+    chetana_register_enabled,
     detect_methodological_collapse,
     flag_felt_relief,
+    get_suppressed_register_mark_count,
+    log_to_stigmergy,
     make_register_mark,
+    reset_suppressed_register_mark_count,
     write_register_mark,
 )
 
@@ -240,6 +244,81 @@ class TestWriteRegisterMark:
         # Must NOT raise; returns False
         result = write_register_mark(m, log_path=bad)
         assert result is False
+
+
+# ---------------------------------------------------------------------------
+# DHARMA_CHETANA_ENABLED env-flag gate
+# ---------------------------------------------------------------------------
+
+
+class TestRegisterEnvGate:
+    def test_explicit_log_path_bypasses_gate_when_flag_off(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.delenv("DHARMA_CHETANA_ENABLED", raising=False)
+        assert chetana_register_enabled() is False
+        log = tmp_path / "register_marks.jsonl"
+        m = make_register_mark(
+            DisciplineResult(flagged=True, confidence=0.8, explanation="x", discipline="x")
+        )
+        # Explicit log_path: gate must not apply
+        assert write_register_mark(m, log_path=log) is True
+        assert log.exists() and log.read_text().strip() != ""
+
+    def test_default_path_suppressed_when_flag_off(
+        self, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.delenv("DHARMA_CHETANA_ENABLED", raising=False)
+        reset_suppressed_register_mark_count()
+        m = make_register_mark(
+            DisciplineResult(flagged=True, confidence=0.8, explanation="x", discipline="x")
+        )
+        # Default path: gate must suppress and count
+        assert write_register_mark(m) is False
+        assert get_suppressed_register_mark_count() == 1
+
+    def test_default_path_writes_when_flag_on(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.setenv("DHARMA_CHETANA_ENABLED", "1")
+        assert chetana_register_enabled() is True
+        # Redirect HOME so DEFAULT_REGISTER_LOG points inside tmp_path. Note
+        # DEFAULT_REGISTER_LOG was bound at import time, so we patch the module
+        # constant instead of relying on $HOME.
+        from dharma_swarm import register_disciplines as rd
+
+        log = tmp_path / "stigmergy" / "register_marks.jsonl"
+        monkeypatch.setattr(rd, "DEFAULT_REGISTER_LOG", log)
+        reset_suppressed_register_mark_count()
+        m = make_register_mark(
+            DisciplineResult(flagged=False, confidence=0.0, explanation="", discipline="x")
+        )
+        assert write_register_mark(m) is True
+        assert log.exists()
+        assert get_suppressed_register_mark_count() == 0
+
+    def test_log_to_stigmergy_gated_same_way(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.delenv("DHARMA_CHETANA_ENABLED", raising=False)
+        reset_suppressed_register_mark_count()
+        r = DisciplineResult(flagged=False, confidence=0.0, explanation="", discipline="x")
+        # Default path: suppressed
+        assert log_to_stigmergy(r) is False
+        assert get_suppressed_register_mark_count() == 1
+        # Explicit path: bypassed
+        log = tmp_path / "legacy.jsonl"
+        assert log_to_stigmergy(r, log_path=log) is True
+        assert log.exists()
+
+    def test_only_strict_one_enables(self, monkeypatch: pytest.MonkeyPatch):
+        # Truthy-looking but not '1' must still be off
+        for val in ("0", "true", "TRUE", "yes", "", "  "):
+            monkeypatch.setenv("DHARMA_CHETANA_ENABLED", val)
+            assert chetana_register_enabled() is False, val
+        # Whitespace around '1' is tolerated
+        monkeypatch.setenv("DHARMA_CHETANA_ENABLED", " 1 ")
+        assert chetana_register_enabled() is True
 
 
 # ---------------------------------------------------------------------------
