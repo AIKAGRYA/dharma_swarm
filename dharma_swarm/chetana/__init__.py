@@ -59,13 +59,27 @@ _DEFAULT_PROMOTION_HOOKS_REGISTERED = False
 
 
 def register_default_promotion_hooks() -> bool:
-    """Register production promotion hooks once unless explicitly disabled."""
+    """Register production promotion hooks under the canary flag.
+
+    Runtime emission is gated by the master ``DHARMA_CHETANA_ENABLED`` canary
+    (the same flag that gates register-mark writes). When the master is OFF,
+    no runtime memory emission happens regardless of any per-feature setting.
+
+    When the master is ON, runtime emission is enabled by default but can be
+    explicitly opted out via ``DHARMA_CHETANA_RUNTIME_EMIT=0`` (used by the
+    test suite to keep promote tests from writing the runtime DB).
+    """
     global _DEFAULT_PROMOTION_HOOKS_REGISTERED
     if _DEFAULT_PROMOTION_HOOKS_REGISTERED:
         return True
 
-    enabled = os.getenv("DHARMA_CHETANA_RUNTIME_EMIT", "1").strip().lower()
-    if enabled in {"0", "false", "no", "off"}:
+    from dharma_swarm.register_disciplines import chetana_register_enabled
+
+    if not chetana_register_enabled():
+        return False
+
+    explicit = os.getenv("DHARMA_CHETANA_RUNTIME_EMIT", "").strip().lower()
+    if explicit in {"0", "false", "no", "off"}:
         return False
 
     from .promote import register_promotion_hook
