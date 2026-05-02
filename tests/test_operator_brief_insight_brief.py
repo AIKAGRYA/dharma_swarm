@@ -20,7 +20,7 @@ import pytest
 
 from dharma_swarm.models import GateCheckResult, GateDecision, GateResult
 from dharma_swarm.ontology import OntologyRegistry
-from dharma_swarm.operator_brief import insight_brief
+from dharma_swarm.operator_brief import insight_brief, persistence
 from dharma_swarm.operator_brief.insight_brief import REQUIRED_GATES, run_once
 from dharma_swarm.runtime_state import MemoryFact, RuntimeStateStore, SessionEventRecord
 
@@ -547,8 +547,8 @@ def test_cron_dispatch_disabled_is_waiting_external(monkeypatch):
 # ──────────────────────────────────────────────────────────────────────
 
 
-def _module_path() -> Path:
-    return Path(insight_brief.__file__)
+def _seam_module_paths() -> list[Path]:
+    return [Path(insight_brief.__file__), Path(persistence.__file__)]
 
 
 def test_no_raw_open_writes_outside_artifact_path():
@@ -559,22 +559,25 @@ def test_no_raw_open_writes_outside_artifact_path():
     a regression where the seam writes JSON sidecar files outside the
     ontology.
     """
-    src = _module_path().read_text(encoding="utf-8")
-    tree = ast.parse(src)
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
-            if node.func.id == "open":
-                # Inspect mode argument if present.
-                mode = ""
-                if len(node.args) >= 2 and isinstance(node.args[1], ast.Constant):
-                    mode = str(node.args[1].value)
-                for kw in node.keywords:
-                    if kw.arg == "mode" and isinstance(kw.value, ast.Constant):
-                        mode = str(kw.value.value)
-                assert "w" not in mode and "a" not in mode and "x" not in mode, (
-                    "operator_brief must not write via open(); "
-                    "use Path.write_text under _artifact_dir_for"
-                )
+    for module_path in _seam_module_paths():
+        src = module_path.read_text(encoding="utf-8")
+        tree = ast.parse(src)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+                if node.func.id == "open":
+                    # Inspect mode argument if present.
+                    mode = ""
+                    if len(node.args) >= 2 and isinstance(
+                        node.args[1], ast.Constant
+                    ):
+                        mode = str(node.args[1].value)
+                    for kw in node.keywords:
+                        if kw.arg == "mode" and isinstance(kw.value, ast.Constant):
+                            mode = str(kw.value.value)
+                    assert "w" not in mode and "a" not in mode and "x" not in mode, (
+                        "operator_brief must not write via open(); "
+                        "use Path.write_text under _artifact_dir_for"
+                    )
 
 
 def test_no_jsonl_appends_outside_witness_api():
@@ -584,9 +587,10 @@ def test_no_jsonl_appends_outside_witness_api():
     ``~/.dharma/witness/`` would bypass the ontology rows we just
     created.
     """
-    src = _module_path().read_text(encoding="utf-8")
-    assert ".jsonl" not in src, (
-        "operator_brief must not touch jsonl files directly"
-    )
-    # Belt and suspenders: no raw `with open(... 'a'` anywhere.
-    assert "', 'a'" not in src and "\", 'a'" not in src
+    for module_path in _seam_module_paths():
+        src = module_path.read_text(encoding="utf-8")
+        assert ".jsonl" not in src, (
+            "operator_brief must not touch jsonl files directly"
+        )
+        # Belt and suspenders: no raw `with open(... 'a'` anywhere.
+        assert "', 'a'" not in src and "\", 'a'" not in src
