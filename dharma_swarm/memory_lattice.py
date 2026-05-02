@@ -54,6 +54,43 @@ class AdmissionResult:
     admitted_at: str
 
 
+@dataclass(frozen=True)
+class RetrievalAdmissionPolicy:
+    min_truth_state: str = "candidate"
+    min_confidence: float = 0.0
+    max_age_days: int | None = None
+    allow_contradicting_within_session: bool = False
+    max_tokens: int = 4000
+    source_scope: frozenset[str] = frozenset()
+    require_axiom_signature: bool = False
+    drop_superseded: bool = True
+
+    @classmethod
+    def default(cls) -> "RetrievalAdmissionPolicy":
+        return cls()
+
+    @classmethod
+    def strict(cls) -> "RetrievalAdmissionPolicy":
+        return cls(
+            min_truth_state="promoted",
+            min_confidence=0.6,
+            max_age_days=90,
+            drop_superseded=True,
+        )
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "min_truth_state": self.min_truth_state,
+            "min_confidence": self.min_confidence,
+            "max_age_days": self.max_age_days,
+            "allow_contradicting_within_session": self.allow_contradicting_within_session,
+            "max_tokens": self.max_tokens,
+            "source_scope": sorted(self.source_scope),
+            "require_axiom_signature": self.require_axiom_signature,
+            "drop_superseded": self.drop_superseded,
+        }
+
+
 def _utc_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -178,6 +215,43 @@ class MemoryLattice:
             "policy_decision": _policy_payload(policy_decision),
             "request_metadata_hash": _sha256(normalized_metadata)[:24],
         }
+
+    @staticmethod
+    def _resolve_retrieval_policy(
+        policy: RetrievalAdmissionPolicy | dict[str, Any] | None,
+        membrane_policy: str,
+    ) -> RetrievalAdmissionPolicy:
+        if isinstance(policy, RetrievalAdmissionPolicy):
+            return policy
+        if isinstance(policy, dict):
+            values = dict(policy)
+            if "source_scope" in values and not isinstance(values["source_scope"], frozenset):
+                values["source_scope"] = frozenset(values["source_scope"] or [])
+            return RetrievalAdmissionPolicy(**values)
+        if membrane_policy == "strict":
+            return RetrievalAdmissionPolicy.strict()
+        return RetrievalAdmissionPolicy.default()
+
+    @staticmethod
+    def _fact_ids_from_source_refs(source_refs: list[str]) -> list[str]:
+        fact_ids: list[str] = []
+        for ref in source_refs:
+            if ref.startswith("memory://"):
+                fact_ids.append(ref.removeprefix("memory://"))
+        return fact_ids
+
+    @staticmethod
+    def _fact_records_from_bundle(bundle: ContextBundleRecord) -> list[dict[str, Any]]:
+        records: list[dict[str, Any]] = []
+        for section in bundle.sections:
+            if section.get("name") != "Durable Facts":
+                continue
+            refs = [ref for ref in bundle.source_refs if str(ref).startswith("memory://")]
+            lines = str(section.get("content", "")).splitlines()
+            for idx, line in enumerate(lines):
+                fact_id = refs[idx].removeprefix("memory://") if idx < len(refs) else f"fact-{idx}"
+                records.append({"id": fact_id, "text": line})
+        return records
 
     async def init_db(self) -> None:
         await self.runtime_state.init_db()
@@ -538,23 +612,68 @@ class MemoryLattice:
         **kwargs: Any,
     ) -> ContextBundleRecord:
         from dharma_swarm.context_compiler import ContextCompiler
+        from dharma_swarm.retrieval.contradiction_detector import detect_contradictions
+        from dharma_swarm.retrieval.retrieval_effect_logger import (
+            RetrievalEffect,
+            citation_handle_for_fact_id,
+            log_effect,
+            new_effect_id,
+            now_iso,
+        )
 
+        retrieval_policy = self._resolve_retrieval_policy(
+            kwargs.pop("retrieval_policy", None),
+            membrane_policy,
+        )
+        effect_log_path = kwargs.pop("retrieval_effect_path", None)
+        effective_token_budget = min(int(token_budget), int(retrieval_policy.max_tokens))
         metadata = {
             **dict(kwargs.pop("metadata", {}) or {}),
             "membrane_policy": membrane_policy,
+            "retrieval_policy": retrieval_policy.as_dict(),
             "compiled_by": "MemoryLattice.compile_memory_context",
         }
         compiler = ContextCompiler(
             runtime_state=self.runtime_state,
             memory_lattice=self,
         )
-        return await compiler.compile_bundle(
+        bundle = await compiler.compile_bundle(
             session_id=session_id,
             task_id=task_id,
-            token_budget=token_budget,
+            token_budget=effective_token_budget,
             metadata=metadata,
             **kwargs,
         )
+        fact_ids = self._fact_ids_from_source_refs(bundle.source_refs)
+        contradictions = detect_contradictions(self._fact_records_from_bundle(bundle))
+        contradiction_tuples = [
+            (item.left_id, item.right_id, item.reason)
+            for item in contradictions
+        ]
+        effect = RetrievalEffect(
+            effect_id=new_effect_id(),
+            session_id=session_id,
+            task_id=task_id,
+            injected_fact_ids=fact_ids,
+            citation_handles=[citation_handle_for_fact_id(fact_id) for fact_id in fact_ids],
+            policy_used=retrieval_policy.as_dict(),
+            token_budget=effective_token_budget,
+            actual_tokens=max(1, len(bundle.rendered_text) // 4) if bundle.rendered_text else 0,
+            contradictions_dropped=[],
+            ts=now_iso(),
+        )
+        log_effect(effect, path=effect_log_path)
+        updated = replace(
+            bundle,
+            metadata={
+                **bundle.metadata,
+                "retrieval_effect_id": effect.effect_id,
+                "retrieval_fact_ids": fact_ids,
+                "citation_handles": effect.citation_handles,
+                "contradictions_detected": contradiction_tuples,
+            },
+        )
+        return await self.runtime_state.record_context_bundle(updated)
 
     async def replay_session(self, session_id: str, limit: int = 1000) -> list[dict[str, Any]]:
         return await self.event_store.replay_session(session_id, limit=limit)
