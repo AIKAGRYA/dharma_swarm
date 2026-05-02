@@ -29,6 +29,8 @@ revive (find new neighbors + backlinks + answered questions, propose patch).
 Quarantine is reserved for atoms genuinely contradicted or no longer relevant.
 """
 
+import os
+
 from .governance import GovernanceCheck, gate_check_atom
 from .provenance import (
     AtomProvenance,
@@ -53,6 +55,27 @@ from .revival import (
 )
 
 __version__ = "0.5.0"
+_DEFAULT_PROMOTION_HOOKS_REGISTERED = False
+
+
+def register_default_promotion_hooks() -> bool:
+    """Register production promotion hooks once unless explicitly disabled."""
+    global _DEFAULT_PROMOTION_HOOKS_REGISTERED
+    if _DEFAULT_PROMOTION_HOOKS_REGISTERED:
+        return True
+
+    enabled = os.getenv("DHARMA_CHETANA_RUNTIME_EMIT", "1").strip().lower()
+    if enabled in {"0", "false", "no", "off"}:
+        return False
+
+    from .promote import register_promotion_hook
+    from .runtime_emission import emit_memory_fact_for_atom
+
+    register_promotion_hook(emit_memory_fact_for_atom)
+    _DEFAULT_PROMOTION_HOOKS_REGISTERED = True
+    return True
+
+
 __all__ = [
     "AtomProvenance",
     "AtomSource",
@@ -70,6 +93,7 @@ __all__ = [
     "gate_check_atom",
     "parse_frontmatter",
     "propose_revival",
+    "register_default_promotion_hooks",
     "render_frontmatter_yaml",
     "revival_summary",
     "validate_frontmatter",

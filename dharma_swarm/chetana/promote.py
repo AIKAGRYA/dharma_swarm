@@ -18,13 +18,19 @@ Every promote call:
 
 from __future__ import annotations
 
+import asyncio
+import inspect
 import logging
+from concurrent.futures import Future, ThreadPoolExecutor, wait
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Awaitable, Callable, Iterator
 
 from . import staging as staging_mod
 from .governance import gate_check_atom
 from .provenance import (
+    FrontmatterSchema,
     GateResult,
     ReviewStatus,
     parse_frontmatter,
@@ -33,6 +39,11 @@ from .staging import quarantine_atom, write_trusted
 from .stigmergy_emit import emit_mark
 
 logger = logging.getLogger(__name__)
+
+PromotionHook = Callable[["PromoteResult", FrontmatterSchema, str], Awaitable[None] | None]
+_promotion_hooks: list[PromotionHook] = []
+_hook_executor: ThreadPoolExecutor | None = None
+_pending_hook_futures: set[Future] = set()
 
 
 @dataclass
@@ -43,6 +54,90 @@ class PromoteResult:
     review_status: ReviewStatus | None
     rationale: str | None = None
     notes: list[str] = field(default_factory=list)
+
+
+def register_promotion_hook(hook: PromotionHook) -> None:
+    if hook not in _promotion_hooks:
+        _promotion_hooks.append(hook)
+
+
+def unregister_promotion_hook(hook: PromotionHook) -> None:
+    try:
+        _promotion_hooks.remove(hook)
+    except ValueError:
+        pass
+
+
+@contextmanager
+def promotion_hooks(*hooks: PromotionHook) -> Iterator[None]:
+    for hook in hooks:
+        register_promotion_hook(hook)
+    try:
+        yield
+    finally:
+        for hook in hooks:
+            unregister_promotion_hook(hook)
+
+
+def clear_promotion_hooks() -> None:
+    drain_promotion_hooks()
+    _promotion_hooks.clear()
+
+
+def drain_promotion_hooks(timeout: float = 2.0) -> None:
+    if not _pending_hook_futures:
+        return
+    done, _ = wait(set(_pending_hook_futures), timeout=timeout)
+    _pending_hook_futures.difference_update(done)
+
+
+def _get_hook_executor() -> ThreadPoolExecutor:
+    global _hook_executor
+    if _hook_executor is None:
+        _hook_executor = ThreadPoolExecutor(
+            max_workers=1,
+            thread_name_prefix="chetana-promote-hook",
+        )
+    return _hook_executor
+
+
+def _run_hook_sync(
+    hook: PromotionHook,
+    result: PromoteResult,
+    schema: FrontmatterSchema,
+    body: str,
+) -> None:
+    out = hook(result, schema, body)
+    if inspect.isawaitable(out):
+        asyncio.run(out)
+
+
+def _run_promotion_hooks_safely(
+    result: PromoteResult,
+    schema: FrontmatterSchema,
+    body: str,
+) -> None:
+    if result.decision == "BLOCK" or not _promotion_hooks:
+        return
+
+    for hook in list(_promotion_hooks):
+        future = _get_hook_executor().submit(_run_hook_sync, hook, result, schema, body)
+        _pending_hook_futures.add(future)
+
+        def _log_done(done: Future, hook_name: str = getattr(hook, "__name__", repr(hook))) -> None:
+            _pending_hook_futures.discard(done)
+            try:
+                done.result()
+            except Exception:
+                logger.warning("promotion hook failed: %s", hook_name, exc_info=True)
+
+        future.add_done_callback(_log_done)
+
+
+def _register_default_promotion_hooks_if_enabled() -> None:
+    from dharma_swarm.chetana import register_default_promotion_hooks
+
+    register_default_promotion_hooks()
 
 
 def promote(
@@ -129,6 +224,9 @@ def promote(
         rationale=gov.record.rationale,
         notes=notes,
     )
+
+    _register_default_promotion_hooks_if_enabled()
+    _run_promotion_hooks_safely(result, promoted_schema, body)
 
     # Best-effort stigmergy emit — never blocks promotion on failure.
     emit_mark(

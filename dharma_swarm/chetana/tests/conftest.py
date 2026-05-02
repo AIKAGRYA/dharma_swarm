@@ -33,6 +33,25 @@ def _sandbox_stigmergy(tmp_path_factory: pytest.TempPathFactory, monkeypatch: py
 
 
 @pytest.fixture(autouse=True)
+def _disable_runtime_emission(monkeypatch: pytest.MonkeyPatch):
+    """Keep promote tests from writing runtime memory unless explicitly enabled."""
+    monkeypatch.setenv("DHARMA_CHETANA_RUNTIME_EMIT", "0")
+    try:
+        from dharma_swarm import chetana as chetana_pkg
+        from dharma_swarm.chetana import promote as promote_mod
+    except Exception:
+        yield
+        return
+
+    monkeypatch.setattr(chetana_pkg, "_DEFAULT_PROMOTION_HOOKS_REGISTERED", False)
+    promote_mod.clear_promotion_hooks()
+    try:
+        yield
+    finally:
+        promote_mod.clear_promotion_hooks()
+
+
+@pytest.fixture(autouse=True)
 def _sandbox_kernel(tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch):
     """Provide a real signed kernel for fail-closed chetana governance tests."""
     from dharma_swarm import dharma_kernel as kernel_mod
