@@ -375,6 +375,145 @@ def test_mutation_id_round_trips_through_subject_id(tmp_log: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
+def test_duplicate_resolutions_first_wins(tmp_log: Path) -> None:
+    """Codex cross-check fix: previously last-write-wins, allowing a
+    second resolver to flip a repaired prediction into unrepaired or
+    vice versa. Now first-wins."""
+    pred = causal_ledger.declare_prediction(
+        subject_kind="mutation",
+        subject_id="m-dup",
+        expected={"score": 1.0},
+        window_heartbeats=1,
+        log_path=tmp_log,
+    )
+    assert pred is not None
+
+    # First resolution: in-tolerance (repaired)
+    causal_ledger.resolve_prediction(
+        prediction_mark_id=pred.mark_id,
+        actual={"score": 1.05},  # within 50% tolerance, sign matches
+        expected={"score": 1.0},
+        log_path=tmp_log,
+    )
+    # Second resolution (remeasurement): sign-flipped, NOT repaired
+    causal_ledger.resolve_prediction(
+        prediction_mark_id=pred.mark_id,
+        actual={"score": -1.0},
+        expected={"score": 1.0},
+        log_path=tmp_log,
+    )
+
+    # First-wins: repair scoring uses the FIRST resolution (repaired)
+    rate, n_pred, n_resolved = causal_ledger.compute_repair_rate_for_kind(
+        "mutation", log_path=tmp_log
+    )
+    assert n_pred == 1
+    assert n_resolved == 1
+    assert rate == 1.0  # first wins -> repaired
+
+
+def test_since_filter_excludes_old_predictions(tmp_log: Path) -> None:
+    """Codex cross-check fix: window_days now actually enforced.
+
+    Manually inject an OLD prediction (ts before since), verify it's
+    excluded from the count even though it has a resolution."""
+    from datetime import datetime, timezone
+
+    # Inject one OLD prediction + resolution
+    old_pred_id = "old-mutation-pred-id"
+    old_lines = [
+        json.dumps({
+            "mark_id": old_pred_id,
+            "ts": "2026-01-01T00:00:00+00:00",  # old
+            "plane": "causal",
+            "discipline": "causal_prediction",
+            "subject_id": "m-old",
+            "links": {
+                "kind": "causal_prediction",
+                "subject_kind": "mutation",
+                "expected": {"k": 1.0},
+            },
+        }),
+        json.dumps({
+            "mark_id": "old-res",
+            "ts": "2026-01-02T00:00:00+00:00",
+            "plane": "causal",
+            "discipline": "causal_resolution",
+            "subject_id": old_pred_id,
+            "corrects": old_pred_id,
+            "links": {
+                "kind": "causal_resolution",
+                "actual": {"k": 1.0},
+                "expected": {"k": 1.0},
+            },
+        }),
+    ]
+    tmp_log.parent.mkdir(parents=True, exist_ok=True)
+    tmp_log.write_text("\n".join(old_lines) + "\n", encoding="utf-8")
+
+    # Add one NEW prediction (no resolution yet)
+    causal_ledger.declare_prediction(
+        subject_kind="mutation",
+        subject_id="m-new",
+        expected={"k": 1.0},
+        window_heartbeats=1,
+        log_path=tmp_log,
+    )
+
+    # Without window filter: counts both
+    rate_all, n_all, _ = causal_ledger.compute_repair_rate_for_kind(
+        "mutation", log_path=tmp_log
+    )
+    assert n_all == 2
+
+    # With window: only counts the new one
+    cutoff = datetime(2026, 5, 1, tzinfo=timezone.utc)
+    rate_win, n_win, n_res_win = causal_ledger.compute_repair_rate_for_kind(
+        "mutation", log_path=tmp_log, since=cutoff,
+    )
+    assert n_win == 1
+    assert n_res_win == 0  # the new one has no resolution
+
+
+def test_find_unresolved_with_since_filter(tmp_log: Path) -> None:
+    """find_unresolved_predictions also honors the since filter."""
+    from datetime import datetime, timezone
+
+    # Old unresolved prediction
+    tmp_log.parent.mkdir(parents=True, exist_ok=True)
+    tmp_log.write_text(
+        json.dumps({
+            "mark_id": "old-id",
+            "ts": "2026-01-01T00:00:00+00:00",
+            "plane": "causal",
+            "discipline": "causal_prediction",
+            "subject_id": "m-old",
+            "links": {
+                "kind": "causal_prediction",
+                "subject_kind": "mutation",
+                "expected": {"k": 1.0},
+                "window_heartbeats": 1,
+            },
+        }) + "\n",
+        encoding="utf-8",
+    )
+    # New unresolved
+    causal_ledger.declare_prediction(
+        subject_kind="mutation",
+        subject_id="m-new",
+        expected={"k": 1.0},
+        window_heartbeats=1,
+        log_path=tmp_log,
+    )
+    cutoff = datetime(2026, 5, 1, tzinfo=timezone.utc)
+    unresolved = causal_ledger.find_unresolved_predictions(
+        log_path=tmp_log, since=cutoff,
+    )
+    assert len(unresolved) == 1
+    # Only the NEW one
+    assert unresolved[0]["subject_id"] == "m-new"
+
+
 def test_corrupted_jsonl_lines_are_skipped(tmp_log: Path) -> None:
     pred = causal_ledger.declare_prediction(
         subject_kind="mutation",

@@ -98,9 +98,15 @@ PROVISIONAL_WINDOW_DAYS: int = 90
 # read with caution.
 CONFIDENCE_FULL_AT_N: int = 30
 
+# Codex cross-check fix: aggregate authority requires at least this many
+# kinds to have data. Below this, r_aggregate is NaN with low_coverage note.
+# Prevents "gate-only" data from masquerading as a clean three-kind score.
+MIN_KINDS_FOR_AGGREGATE: int = 2
+
 # Default persistence locations.
 DEFAULT_SCORE_PATH = Path.home() / ".dharma" / "meta" / "r_repair_score.json"
 DEFAULT_HISTORY_PATH = Path.home() / ".dharma" / "meta" / "r_repair_history.jsonl"
+DEFAULT_CONFIG_PATH = Path.home() / ".dharma" / "meta" / "repair_metric_config.json"
 
 # Sentinel for "kind had zero predictions": NaN. Aggregation treats NaN as
 # missing (excluded from geometric mean rather than zeroing the product).
@@ -163,6 +169,8 @@ def compute_repair_score(
     log_path: Path | None = None,
     history_path: Path | None = None,
     launched_at: datetime | None = None,
+    config_path: Path | None = None,
+    min_kinds_for_aggregate: int = MIN_KINDS_FOR_AGGREGATE,
     now: datetime | None = None,
 ) -> RepairScore:
     """Compute the current repair score from causal_ledger marks.
@@ -170,10 +178,9 @@ def compute_repair_score(
     Parameters
     ----------
     window_days:
-        How many days back to consider for the rate computation. The
-        underlying ``compute_repair_rate_for_kind`` reads from the tail
-        of register_marks.jsonl so this is approximate (mark-count
-        bound, not strict day bound) at the v1 implementation.
+        Hard time window for prediction inclusion. Codex cross-check fix:
+        previously documented but not enforced (compute_repair_rate_for_kind
+        used tail-by-line cap). Now properly filters by ts >= now-window_days.
     log_path:
         Override register_marks.jsonl location.
     history_path:
@@ -181,8 +188,17 @@ def compute_repair_score(
         ``near_eigenform`` (sustained-high check).
     launched_at:
         Optional UTC datetime when the metric system "launched". Used
-        for the 90-day Mahakali provisional window. Defaults to None
-        which leaves provisional=True (safer default).
+        for the 90-day Mahakali provisional window. If None, looks up
+        from config_path (default ~/.dharma/meta/repair_metric_config.json).
+        If neither, provisional defaults True (safer default).
+    config_path:
+        Path to repair_metric_config.json with shape {"launched_at": iso}.
+        Override for testing.
+    min_kinds_for_aggregate:
+        Codex cross-check fix: require at least this many kinds (default 2)
+        to have data before computing r_aggregate. Below threshold,
+        aggregate is NaN with a low_coverage note. Prevents "gate-only"
+        data from masquerading as a strong three-kind score.
     now:
         Override "now" for testing. Defaults to UTC now.
 
@@ -193,8 +209,13 @@ def compute_repair_score(
         contract on partial-data paths.
     """
     now = now or datetime.now(timezone.utc)
+    since = now - timedelta(days=window_days)
 
-    # 1. Per-kind rates
+    # If launched_at not passed, try config file
+    if launched_at is None:
+        launched_at = _read_launched_at(config_path or DEFAULT_CONFIG_PATH)
+
+    # 1. Per-kind rates (now ts-windowed)
     rates: dict[str, float] = {}
     counts: dict[str, dict[str, int]] = {}
     n_pred_total = 0
@@ -202,10 +223,11 @@ def compute_repair_score(
     n_rep_total = 0
 
     for kind in AGGREGATE_KINDS:
-        rate, n_pred, n_res = compute_repair_rate_for_kind(kind, log_path=log_path)
+        rate, n_pred, n_res = compute_repair_rate_for_kind(
+            kind, log_path=log_path, since=since,
+        )
 
         # n_repaired isn't directly returned; recompute from rate + n_pred
-        # Use round() because integer derivation: rate = n_repaired / n_pred.
         n_repaired = int(round(rate * n_pred)) if n_pred > 0 else 0
 
         # Use NaN sentinel when zero predictions to distinguish "no data"
@@ -220,9 +242,14 @@ def compute_repair_score(
         n_res_total += n_res
         n_rep_total += n_repaired
 
-    # 2. Aggregate via geometric mean over kinds that have data
+    # 2. Aggregate via geometric mean — coverage-gated
     valid_rates = [v for v in rates.values() if not math.isnan(v)]
-    if not valid_rates:
+    n_kinds_with_data = len(valid_rates)
+    low_coverage = n_kinds_with_data < min_kinds_for_aggregate
+
+    if not valid_rates or low_coverage:
+        # Below coverage threshold -> NaN aggregate. Per-kind rates remain
+        # readable; just refuse to publish a definitive aggregate.
         r_aggregate = _NAN
     elif any(v == 0.0 for v in valid_rates):
         # Geometric mean of zero is zero. Honor that semantically:
@@ -255,7 +282,15 @@ def compute_repair_score(
             f"(want >= {CONFIDENCE_FULL_AT_N})"
         )
     if math.isnan(r_aggregate):
-        notes.append("no causal predictions found in any subject kind")
+        if not valid_rates:
+            notes.append("no causal predictions found in any subject kind")
+        elif low_coverage:
+            notes.append(
+                f"low_coverage: only {n_kinds_with_data} of "
+                f"{len(AGGREGATE_KINDS)} kinds have data (want >= "
+                f"{min_kinds_for_aggregate}); aggregate withheld to "
+                f"prevent single-kind misrepresentation"
+            )
     if near_eigenform:
         notes.append(
             "near_eigenform: aggregate sustained > "
@@ -328,6 +363,34 @@ def persist_repair_score(
 # ---------------------------------------------------------------------------
 
 
+def _read_launched_at(config_path: Path) -> datetime | None:
+    """Read launched_at from repair_metric_config.json.
+
+    Schema: ``{"launched_at": "<iso8601>"}``. Returns None on missing,
+    parse error, or bad value (caller falls back to provisional=True).
+    """
+    if not config_path.exists():
+        return None
+    try:
+        text = config_path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    try:
+        data = json.loads(text)
+    except (json.JSONDecodeError, ValueError):
+        return None
+    ts_str = data.get("launched_at") if isinstance(data, dict) else None
+    if not isinstance(ts_str, str):
+        return None
+    try:
+        ts = datetime.fromisoformat(ts_str)
+    except (TypeError, ValueError):
+        return None
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=timezone.utc)
+    return ts
+
+
 def _check_near_eigenform(
     *,
     history_path: Path,
@@ -398,9 +461,11 @@ def _check_near_eigenform(
 
 __all__ = [
     "AGGREGATE_KINDS",
+    "MIN_KINDS_FOR_AGGREGATE",
     "NEAR_EIGENFORM_THRESHOLD",
     "NEAR_EIGENFORM_SUSTAINED_DAYS",
     "PROVISIONAL_WINDOW_DAYS",
+    "DEFAULT_CONFIG_PATH",
     "RepairScore",
     "compute_repair_score",
     "persist_repair_score",

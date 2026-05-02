@@ -158,8 +158,12 @@ def test_zero_in_one_kind_pulls_aggregate_to_zero(
 # ---------------------------------------------------------------------------
 
 
-def test_nan_kind_excluded_from_aggregate(tmp_log: Path, tmp_history: Path) -> None:
-    # Only gate has data; mutation and welfare have nothing.
+def test_single_kind_below_coverage_threshold_yields_nan_aggregate(
+    tmp_log: Path, tmp_history: Path
+) -> None:
+    """Codex cross-check fix: single-kind data must NOT masquerade as a
+    clean three-kind aggregate. Below MIN_KINDS_FOR_AGGREGATE (default 2),
+    r_aggregate is NaN with a low_coverage note."""
     _seed_predict_resolve(tmp_log, subject_kind="gate", n_total=10, n_repaired=7)
 
     score = r_repair_metric.compute_repair_score(
@@ -168,10 +172,30 @@ def test_nan_kind_excluded_from_aggregate(tmp_log: Path, tmp_history: Path) -> N
     assert score.r_gate == pytest.approx(0.7)
     assert math.isnan(score.r_mutation)
     assert math.isnan(score.r_welfare)
-    # Aggregate is just gate's rate (single valid kind, geo mean of one)
-    assert score.r_aggregate == pytest.approx(0.7)
+    # AGGREGATE IS NaN — single-kind data doesn't qualify as authoritative
+    assert math.isnan(score.r_aggregate)
+    # Note explicitly says low_coverage
+    assert any("low_coverage" in n for n in score.notes)
     # Confidence ~ 10/30 = 0.333 (rounded to 3 decimals by impl)
     assert score.confidence == pytest.approx(1 / 3, abs=0.001)
+
+
+def test_min_kinds_override_allows_single_kind_aggregate(
+    tmp_log: Path, tmp_history: Path
+) -> None:
+    """Caller can override the coverage threshold to compute single-kind
+    aggregates explicitly. Use case: dashboard widget that wants the gate
+    rate displayed as 'aggregate' when other kinds are pre-launch."""
+    _seed_predict_resolve(tmp_log, subject_kind="gate", n_total=10, n_repaired=7)
+
+    score = r_repair_metric.compute_repair_score(
+        log_path=tmp_log,
+        history_path=tmp_history,
+        min_kinds_for_aggregate=1,  # explicit override
+    )
+    assert score.r_aggregate == pytest.approx(0.7)
+    # No low_coverage warning since override allows single-kind
+    assert not any("low_coverage" in n for n in score.notes)
 
 
 # ---------------------------------------------------------------------------
@@ -209,14 +233,65 @@ def test_provisional_false_after_90_days(tmp_log: Path, tmp_history: Path) -> No
 
 
 def test_provisional_default_true_when_launched_at_unknown(
-    tmp_log: Path, tmp_history: Path
+    tmp_log: Path, tmp_history: Path, tmp_path: Path
 ) -> None:
+    """If launched_at is None and no config file exists, default to provisional=True."""
+    nonexistent_config = tmp_path / "nonexistent_config.json"
     score = r_repair_metric.compute_repair_score(
         log_path=tmp_log,
         history_path=tmp_history,
-        launched_at=None,  # unknown launch
+        launched_at=None,
+        config_path=nonexistent_config,
     )
     # Safer default
+    assert score.provisional is True
+
+
+def test_launched_at_read_from_config_file(
+    tmp_log: Path, tmp_history: Path, tmp_path: Path
+) -> None:
+    """Codex cross-check fix: production launched_at source.
+    repair_metric_config.json with shape {"launched_at": iso} is read
+    when launched_at kwarg is None."""
+    config = tmp_path / "repair_metric_config.json"
+    launched = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    config.write_text(json.dumps({"launched_at": launched.isoformat()}))
+
+    # Inside provisional window
+    inside = datetime(2026, 2, 15, tzinfo=timezone.utc)
+    score = r_repair_metric.compute_repair_score(
+        log_path=tmp_log,
+        history_path=tmp_history,
+        launched_at=None,  # falls through to config
+        config_path=config,
+        now=inside,
+    )
+    assert score.provisional is True
+
+    # After window
+    after = datetime(2026, 5, 1, tzinfo=timezone.utc)
+    score2 = r_repair_metric.compute_repair_score(
+        log_path=tmp_log,
+        history_path=tmp_history,
+        launched_at=None,
+        config_path=config,
+        now=after,
+    )
+    assert score2.provisional is False
+
+
+def test_launched_at_config_corrupt_falls_through(
+    tmp_log: Path, tmp_history: Path, tmp_path: Path
+) -> None:
+    config = tmp_path / "bad_config.json"
+    config.write_text("not json at all")
+    score = r_repair_metric.compute_repair_score(
+        log_path=tmp_log,
+        history_path=tmp_history,
+        launched_at=None,
+        config_path=config,
+    )
+    # Bad config -> behaves as no launched_at -> provisional=True
     assert score.provisional is True
 
 
