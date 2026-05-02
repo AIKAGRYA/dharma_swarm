@@ -31,12 +31,15 @@ Usage::
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
+from dharma_swarm.dharma_kernel import DharmaKernel
 from dharma_swarm.lineage import LineageEdge, LineageGraph
 from dharma_swarm.models import GateCheckResult, GateDecision, Task
-from dharma_swarm.ontology import OntologyRegistry
+from dharma_swarm.ontology import OntologyObj, OntologyRegistry
 from dharma_swarm.ontology_runtime import (
     get_shared_registry,
     persist_shared_registry,
@@ -81,6 +84,324 @@ class TelicSeam:
     def _flush_registry(self) -> None:
         if self._persist_registry:
             persist_shared_registry(self._registry, self._path)
+
+    @staticmethod
+    def _utc_now_iso() -> str:
+        return datetime.now(timezone.utc).isoformat()
+
+    @staticmethod
+    def _new_ref(prefix: str) -> str:
+        return f"{prefix}_{uuid4().hex}"
+
+    def _record_inquiry_object(
+        self,
+        type_name: str,
+        properties: dict[str, Any],
+        *,
+        created_by: str,
+        links: list[tuple[str, str, str]] | None = None,
+    ) -> str | None:
+        """Create one inquiry-chain object and best-effort typed links."""
+        obj, errors = self._registry.create_object(
+            type_name,
+            properties=properties,
+            created_by=created_by,
+        )
+        if obj is None:
+            logger.debug("%s creation failed: %s", type_name, errors)
+            return None
+
+        for link_name, source_id, target_id in links or []:
+            link, link_errors = self._registry.create_link(
+                link_name,
+                source_id=source_id,
+                target_id=target_id,
+                created_by="telic_seam",
+            )
+            if link is None:
+                logger.debug(
+                    "%s link failed for %s -> %s: %s",
+                    link_name,
+                    source_id,
+                    target_id,
+                    link_errors,
+                )
+
+        self._flush_registry()
+        return obj.id
+
+    def _resolve_agent_identity(self, ref: str) -> OntologyObj | None:
+        """Resolve an AgentIdentity by object id, agent_id, name, or agent_slug."""
+        if not ref:
+            return None
+
+        obj = self._registry.get_object(ref)
+        if obj is not None and obj.type_name == "AgentIdentity":
+            return obj
+
+        for identity in self._registry.get_objects_by_type("AgentIdentity"):
+            props = identity.properties
+            if ref in {
+                str(props.get("agent_id") or ""),
+                str(props.get("name") or ""),
+                str(props.get("agent_slug") or ""),
+            }:
+                return identity
+        return None
+
+    def _current_kernel_signature(self) -> str:
+        """Return the current kernel signature, falling back to default kernel shape."""
+        kernel_path = Path.home() / ".dharma" / "kernel.json"
+        if kernel_path.exists():
+            try:
+                kernel = DharmaKernel.model_validate_json(
+                    kernel_path.read_text(encoding="utf-8")
+                )
+                return kernel.signature or kernel.compute_signature()
+            except Exception:
+                logger.debug("Kernel signature read failed", exc_info=True)
+        return DharmaKernel.create_default().compute_signature()
+
+    def record_signal(
+        self,
+        source: str,
+        payload: str,
+        observer_ref: str,
+        *,
+        source_kind: str = "manual",
+        sensitivity: str = "internal",
+    ) -> str | None:
+        """Record an observed Signal as the inquiry-chain entry point."""
+        try:
+            observer = self._resolve_agent_identity(observer_ref)
+            created_by = observer.id if observer is not None else observer_ref
+            props = {
+                "signal_id": self._new_ref("signal"),
+                "source": source,
+                "captured_at": self._utc_now_iso(),
+                "payload": payload,
+                "observer_ref": observer_ref,
+                "source_kind": source_kind,
+                "sensitivity": sensitivity,
+            }
+            obj_id = self._record_inquiry_object(
+                "Signal",
+                props,
+                created_by=created_by or "telic_seam",
+            )
+            if obj_id is not None and observer is not None:
+                link, errors = self._registry.create_link(
+                    "observed_by",
+                    source_id=obj_id,
+                    target_id=observer.id,
+                    created_by="telic_seam",
+                )
+                if link is None:
+                    logger.debug("observed_by link failed: %s", errors)
+                self._flush_registry()
+            return obj_id
+        except Exception as exc:
+            logger.debug("TelicSeam.record_signal failed: %s", exc)
+            return None
+
+    def record_question(
+        self,
+        text: str,
+        opener_ref: str,
+        *,
+        domain: str = "",
+        priority: str = "normal",
+    ) -> str | None:
+        """Record an open inquiry Question."""
+        try:
+            opener = self._resolve_agent_identity(opener_ref)
+            props = {
+                "question_id": self._new_ref("question"),
+                "text": text,
+                "opener_ref": opener_ref,
+                "opened_at": self._utc_now_iso(),
+                "lifecycle_state": "open",
+                "domain": domain,
+                "priority": priority,
+            }
+            obj_id = self._record_inquiry_object(
+                "Question",
+                props,
+                created_by=opener.id if opener is not None else opener_ref or "telic_seam",
+            )
+            if obj_id is not None and opener is not None:
+                link, errors = self._registry.create_link(
+                    "opened_by",
+                    source_id=obj_id,
+                    target_id=opener.id,
+                    created_by="telic_seam",
+                )
+                if link is None:
+                    logger.debug("opened_by link failed: %s", errors)
+                self._flush_registry()
+            return obj_id
+        except Exception as exc:
+            logger.debug("TelicSeam.record_question failed: %s", exc)
+            return None
+
+    def record_claim(
+        self,
+        statement: str,
+        proposer_ref: str,
+        *,
+        confidence: float = 0.5,
+        parent_question_id: str | None = None,
+    ) -> str | None:
+        """Record a proposed Claim, optionally answering an open Question."""
+        try:
+            proposer = self._resolve_agent_identity(proposer_ref)
+            props = {
+                "claim_id": self._new_ref("claim"),
+                "statement": statement,
+                "lifecycle_state": "proposed",
+                "confidence": max(0.0, min(1.0, confidence)),
+                "proposer_ref": proposer_ref,
+                "evidence_refs": [],
+            }
+            obj_id = self._record_inquiry_object(
+                "Claim",
+                props,
+                created_by=proposer.id if proposer is not None else proposer_ref or "telic_seam",
+            )
+            if obj_id is None:
+                return None
+
+            if proposer is not None:
+                link, errors = self._registry.create_link(
+                    "claim_proposed_by",
+                    source_id=obj_id,
+                    target_id=proposer.id,
+                    created_by="telic_seam",
+                )
+                if link is None:
+                    logger.debug("claim_proposed_by link failed: %s", errors)
+            if parent_question_id:
+                link, errors = self._registry.create_link(
+                    "answered_by_claim",
+                    source_id=parent_question_id,
+                    target_id=obj_id,
+                    created_by="telic_seam",
+                )
+                if link is None:
+                    logger.debug("answered_by_claim link failed: %s", errors)
+            self._flush_registry()
+            return obj_id
+        except Exception as exc:
+            logger.debug("TelicSeam.record_claim failed: %s", exc)
+            return None
+
+    def record_evidence(
+        self,
+        claim_ref: str,
+        kind: str,
+        direction: str,
+        attached_by_ref: str,
+        *,
+        source_artifact_ref: str = "",
+        strength: float = 0.5,
+    ) -> str | None:
+        """Record Evidence supporting or refuting a Claim."""
+        try:
+            attached_by = self._resolve_agent_identity(attached_by_ref)
+            props = {
+                "evidence_id": self._new_ref("evidence"),
+                "claim_ref": claim_ref,
+                "kind": kind,
+                "direction": direction,
+                "source_artifact_ref": source_artifact_ref,
+                "attached_at": self._utc_now_iso(),
+                "attached_by_ref": attached_by_ref,
+                "strength": max(0.0, min(1.0, strength)),
+            }
+            obj_id = self._record_inquiry_object(
+                "Evidence",
+                props,
+                created_by=(
+                    attached_by.id if attached_by is not None
+                    else attached_by_ref or "telic_seam"
+                ),
+            )
+            if obj_id is None:
+                return None
+
+            if self._registry.get_object(claim_ref) is not None:
+                link, errors = self._registry.create_link(
+                    "claim_has_evidence",
+                    source_id=claim_ref,
+                    target_id=obj_id,
+                    created_by="telic_seam",
+                )
+                if link is None:
+                    logger.debug("claim_has_evidence link failed: %s", errors)
+
+            artifact = self._registry.get_object(source_artifact_ref)
+            if artifact is not None and artifact.type_name == "KnowledgeArtifact":
+                link, errors = self._registry.create_link(
+                    "evidence_from_artifact",
+                    source_id=obj_id,
+                    target_id=artifact.id,
+                    created_by="telic_seam",
+                )
+                if link is None:
+                    logger.debug("evidence_from_artifact link failed: %s", errors)
+            self._flush_registry()
+            return obj_id
+        except Exception as exc:
+            logger.debug("TelicSeam.record_evidence failed: %s", exc)
+            return None
+
+    def record_doctrine(
+        self,
+        text: str,
+        signer_agent_id: str,
+        *,
+        derived_from_claim_id: str | None = None,
+    ) -> str | None:
+        """Record a signed Doctrine only when the signer is the principal."""
+        try:
+            signer = self._resolve_agent_identity(signer_agent_id)
+            if signer is None or signer.properties.get("is_principal") is not True:
+                logger.debug(
+                    "Doctrine signing refused: signer is not principal (%s)",
+                    signer_agent_id,
+                )
+                return None
+
+            props = {
+                "doctrine_id": self._new_ref("doctrine"),
+                "text": text,
+                "lifecycle_state": "signed",
+                "signed_by_human_at": self._utc_now_iso(),
+                "kernel_signature": self._current_kernel_signature(),
+                "version": 1,
+            }
+            obj_id = self._record_inquiry_object(
+                "Doctrine",
+                props,
+                created_by=signer.id,
+            )
+            if obj_id is None:
+                return None
+
+            if derived_from_claim_id:
+                link, errors = self._registry.create_link(
+                    "derived_from_claim",
+                    source_id=obj_id,
+                    target_id=derived_from_claim_id,
+                    created_by="telic_seam",
+                )
+                if link is None:
+                    logger.debug("derived_from_claim link failed: %s", errors)
+            self._flush_registry()
+            return obj_id
+        except Exception as exc:
+            logger.debug("TelicSeam.record_doctrine failed: %s", exc)
+            return None
 
     def record_dispatch(
         self,
