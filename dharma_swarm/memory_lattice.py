@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass, field, replace
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -56,6 +56,36 @@ class AdmissionResult:
 
 @dataclass(frozen=True)
 class RetrievalAdmissionPolicy:
+    """Policy for what enters the compiled memory context.
+
+    Enforcement scope (current):
+      - ``max_tokens`` — capped at compile time via the bundle's token budget.
+      - ``min_confidence`` — facts below threshold are dropped post-fetch from
+        ``injected_fact_ids`` / ``citation_handles`` and tracked under
+        ``policy_dropped_fact_ids`` in bundle metadata.
+      - ``max_age_days`` — same post-fetch drop semantics keyed off the fact's
+        ``valid_from``.
+      - ``source_scope`` — same post-fetch drop semantics keyed off ``fact_kind``
+        prefixes.
+      - ``require_axiom_signature`` — same post-fetch drop semantics requiring
+        ``provenance.admission.axiom_signature`` to be present and non-empty.
+
+    Enforcement scope (NOT yet wired — scaffolding for follow-up slice):
+      - ``min_truth_state`` — ``ContextCompiler.compile_bundle`` currently
+        hardcodes ``truth_state="promoted"``; relaxing this requires extending
+        the compiler signature and is deferred. Tighter-than-promoted (e.g.
+        require ``trusted``) is also not yet enforced.
+      - ``allow_contradicting_within_session`` — populated by Slice 5b
+        contradiction detector but does not yet feed back to drop facts.
+      - ``drop_superseded`` — same.
+
+    The honest contract: this policy filters at the metadata/citation level for
+    every field listed under "Enforcement scope (current)". The bundle's
+    rendered_text may still contain facts the policy would drop, until full
+    compile-bundle integration lands. Metadata-level drops are sufficient for
+    citation-rate telemetry; render-level drops await the next slice.
+    """
+
     min_truth_state: str = "candidate"
     min_confidence: float = 0.0
     max_age_days: int | None = None
@@ -119,10 +149,21 @@ def _make_gate_record(
     rationale: str | None = None,
     gates_warned: list[str] | None = None,
     gates_blocked: list[str] | None = None,
+    policy_checked: bool = False,
 ) -> GateCheckRecord:
+    """Build an audit-honest GateCheckRecord.
+
+    ``policy_checked`` must be True only when a real policy was compiled and
+    evaluated. Otherwise ``gates_passed`` stays empty regardless of result —
+    claiming a gate ran when none did is misleading audit metadata.
+    """
+    if policy_checked and result == "ALLOW":
+        gates_passed = ["memory_lattice.policy"]
+    else:
+        gates_passed = []
     return GateCheckRecord(
         result=result,  # type: ignore[arg-type]
-        gates_passed=[] if result != "ALLOW" else ["memory_lattice.policy"],
+        gates_passed=gates_passed,
         gates_warned=list(gates_warned or []),
         gates_blocked=list(gates_blocked or []),
         rationale=rationale,
@@ -360,7 +401,14 @@ class MemoryLattice:
                 "admission": self._admission_provenance(
                     admitter="MemoryLattice.admit_register_mark",
                     admitted_at=admitted_at,
-                    gate_check=_make_gate_record(rationale="policy allowed register mark"),
+                    gate_check=_make_gate_record(
+                        rationale=(
+                            "policy allowed register mark"
+                            if policy_decision is not None
+                            else "no policy configured; default-allow register mark"
+                        ),
+                        policy_checked=policy_decision is not None,
+                    ),
                     policy_decision=policy_decision,
                     metadata=metadata,
                 )
@@ -371,6 +419,7 @@ class MemoryLattice:
             result="ALLOW" if ok else "BLOCK",
             rationale="register mark written" if ok else "register mark write failed or suppressed",
             gates_blocked=[] if ok else ["register_write"],
+            policy_checked=policy_decision is not None,
         )
         return AdmissionResult(
             accepted=ok,
@@ -468,7 +517,14 @@ class MemoryLattice:
                 admitted_at=admitted_at,
             )
 
-        gate_check = _make_gate_record(rationale="policy allowed memory fact")
+        if policy_decision is not None:
+            allow_rationale = "policy allowed memory fact"
+        else:
+            allow_rationale = "no policy configured; default-allow memory fact"
+        gate_check = _make_gate_record(
+            rationale=allow_rationale,
+            policy_checked=policy_decision is not None,
+        )
         admitted = replace(
             fact,
             provenance={
@@ -530,7 +586,14 @@ class MemoryLattice:
                 admitted_at=admitted_at,
             )
 
-        gate_check = _make_gate_record(rationale="policy allowed memory edge")
+        if policy_decision is not None:
+            allow_rationale = "policy allowed memory edge"
+        else:
+            allow_rationale = "no policy configured; default-allow memory edge"
+        gate_check = _make_gate_record(
+            rationale=allow_rationale,
+            policy_checked=policy_decision is not None,
+        )
         admitted = replace(
             edge,
             metadata={
@@ -645,6 +708,9 @@ class MemoryLattice:
             **kwargs,
         )
         fact_ids = self._fact_ids_from_source_refs(bundle.source_refs)
+        kept_fact_ids, drop_records = await self._apply_retrieval_policy(
+            fact_ids, retrieval_policy
+        )
         contradictions = detect_contradictions(self._fact_records_from_bundle(bundle))
         contradiction_tuples = [
             (item.left_id, item.right_id, item.reason)
@@ -654,8 +720,8 @@ class MemoryLattice:
             effect_id=new_effect_id(),
             session_id=session_id,
             task_id=task_id,
-            injected_fact_ids=fact_ids,
-            citation_handles=[citation_handle_for_fact_id(fact_id) for fact_id in fact_ids],
+            injected_fact_ids=kept_fact_ids,
+            citation_handles=[citation_handle_for_fact_id(fid) for fid in kept_fact_ids],
             policy_used=retrieval_policy.as_dict(),
             token_budget=effective_token_budget,
             actual_tokens=max(1, len(bundle.rendered_text) // 4) if bundle.rendered_text else 0,
@@ -668,12 +734,62 @@ class MemoryLattice:
             metadata={
                 **bundle.metadata,
                 "retrieval_effect_id": effect.effect_id,
-                "retrieval_fact_ids": fact_ids,
+                "retrieval_fact_ids": kept_fact_ids,
                 "citation_handles": effect.citation_handles,
                 "contradictions_detected": contradiction_tuples,
+                "policy_dropped_fact_ids": [r["fact_id"] for r in drop_records],
+                "policy_drop_reasons": drop_records,
+                "policy_enforcement_level": "metadata-only-pending-render-integration",
             },
         )
         return await self.runtime_state.record_context_bundle(updated)
+
+    async def _apply_retrieval_policy(
+        self,
+        fact_ids: list[str],
+        policy: RetrievalAdmissionPolicy,
+    ) -> tuple[list[str], list[dict[str, Any]]]:
+        """Drop fact IDs that fail the policy from the injected list.
+
+        Filters at the metadata level: ``min_confidence``, ``max_age_days``,
+        ``source_scope``, ``require_axiom_signature``. Returns the kept IDs and
+        a parallel list of drop records ``{fact_id, reason}``. The bundle's
+        rendered text is NOT trimmed — that integration is deferred — but
+        downstream telemetry will see the policy-honored injected list.
+        """
+        if not fact_ids:
+            return [], []
+        kept: list[str] = []
+        drops: list[dict[str, Any]] = []
+        cutoff_iso: str | None = None
+        if policy.max_age_days is not None and policy.max_age_days >= 0:
+            cutoff_dt = datetime.now(timezone.utc) - timedelta(days=policy.max_age_days)
+            cutoff_iso = cutoff_dt.isoformat()
+        scopes = tuple(policy.source_scope) if policy.source_scope else ()
+        for fact_id in fact_ids:
+            fact = await self.runtime_state.get_memory_fact(fact_id)
+            if fact is None:
+                drops.append({"fact_id": fact_id, "reason": "not_found"})
+                continue
+            if fact.confidence < policy.min_confidence:
+                drops.append({"fact_id": fact_id, "reason": "min_confidence"})
+                continue
+            if scopes and not any(fact.fact_kind == s or fact.fact_kind.startswith(f"{s}.") for s in scopes):
+                drops.append({"fact_id": fact_id, "reason": "source_scope"})
+                continue
+            if cutoff_iso is not None:
+                valid_from = (fact.valid_from or "").strip()
+                if valid_from and valid_from < cutoff_iso:
+                    drops.append({"fact_id": fact_id, "reason": "max_age_days"})
+                    continue
+            if policy.require_axiom_signature:
+                admission = (fact.provenance or {}).get("admission") if isinstance(fact.provenance, dict) else None
+                axiom_sig = (admission or {}).get("axiom_signature", "") if isinstance(admission, dict) else ""
+                if not axiom_sig:
+                    drops.append({"fact_id": fact_id, "reason": "require_axiom_signature"})
+                    continue
+            kept.append(fact_id)
+        return kept, drops
 
     async def replay_session(self, session_id: str, limit: int = 1000) -> list[dict[str, Any]]:
         return await self.event_store.replay_session(session_id, limit=limit)
