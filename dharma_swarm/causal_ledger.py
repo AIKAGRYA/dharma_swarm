@@ -72,6 +72,19 @@ from .register_disciplines import (
     write_register_mark,
 )
 
+
+def _parse_ts(ts_str: Any) -> datetime | None:
+    """Best-effort iso8601 parse, normalize to UTC. Returns None on bad input."""
+    if not isinstance(ts_str, str) or not ts_str:
+        return None
+    try:
+        ts = datetime.fromisoformat(ts_str)
+    except (TypeError, ValueError):
+        return None
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=timezone.utc)
+    return ts
+
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -281,12 +294,18 @@ def find_unresolved_predictions(
     *,
     log_path: Path | None = None,
     subject_kind: str | None = None,
-    max_lines: int = 50_000,
+    since: "datetime | None" = None,
 ) -> list[dict]:
     """Scan register_marks.jsonl for causal predictions without resolution.
 
     Useful for the daily sweep: many unresolved predictions = open loop =
     R_M pulled toward zero.
+
+    Implementation note (Codex cross-check fix): full-file scan, no
+    tail-cut. Tail-cut could orphan a prediction whose paired resolution
+    sits inside the cutoff while the prediction is outside. Production
+    file size (current ~80 marks / 2 weeks) makes full scan cheap; if
+    the file ever grows >1M marks, indexing is the next move.
 
     Parameters
     ----------
@@ -294,9 +313,8 @@ def find_unresolved_predictions(
         Default ~/.dharma/stigmergy/register_marks.jsonl.
     subject_kind:
         If set, restrict to predictions of that kind.
-    max_lines:
-        Cap on file lines read (tail) for performance. The default 50k
-        is generous; current production rate is ~80 marks/2 weeks.
+    since:
+        If set, only include predictions whose ts >= since.
 
     Returns
     -------
@@ -318,11 +336,7 @@ def find_unresolved_predictions(
     except OSError:
         return []
 
-    lines = text.splitlines()
-    if len(lines) > max_lines:
-        lines = lines[-max_lines:]
-
-    for line in lines:
+    for line in text.splitlines():
         line = line.strip()
         if not line:
             continue
@@ -340,6 +354,10 @@ def find_unresolved_predictions(
         if kind == "causal_prediction":
             if subject_kind and links.get("subject_kind") != subject_kind:
                 continue
+            if since is not None:
+                ts = _parse_ts(mark.get("ts"))
+                if ts is None or ts < since:
+                    continue
             mark_id = mark.get("mark_id")
             if mark_id:
                 predictions[mark_id] = {
@@ -362,7 +380,7 @@ def compute_repair_rate_for_kind(
     subject_kind: str,
     *,
     log_path: Path | None = None,
-    max_lines: int = 50_000,
+    since: "datetime | None" = None,
 ) -> tuple[float, int, int]:
     """Compute per-kind repair rate from causal-plane marks.
 
@@ -376,14 +394,28 @@ def compute_repair_rate_for_kind(
       _REPAIR_MAGNITUDE_TOLERANCE (50%) of expected magnitude AND
       sign agrees (when expected is nonzero).
 
+    Implementation notes (Codex cross-check fixes):
+    - **Full-file scan, no tail-cut**: tail-cutting could orphan
+      prediction-resolution pairs that span the cutoff. File grows
+      slowly (~80 marks/2 weeks); full scan is cheap.
+    - **First-wins on duplicate resolutions**: if a prediction has
+      multiple resolution marks (re-measurement), the FIRST one (by
+      file order, ~= chronological) is used for repair scoring.
+      Subsequent resolutions are remeasurements, not score-flippers.
+      Surface them via a separate API if needed.
+    - **Window filter via `since`**: ts filter on predictions only
+      (resolutions are always considered, since a late resolution of
+      an in-window prediction is what we want to count).
+
     Parameters
     ----------
     subject_kind:
         One of CAUSAL_SUBJECT_KINDS, e.g. "mutation".
     log_path:
         Default register_marks.jsonl.
-    max_lines:
-        Tail cap on file read.
+    since:
+        If set, only count predictions with ts >= since. Resolutions
+        are always considered to allow late-resolved predictions.
 
     Returns
     -------
@@ -409,11 +441,7 @@ def compute_repair_rate_for_kind(
     except OSError:
         return (0.0, 0, 0)
 
-    lines = text.splitlines()
-    if len(lines) > max_lines:
-        lines = lines[-max_lines:]
-
-    for line in lines:
+    for line in text.splitlines():
         line = line.strip()
         if not line:
             continue
@@ -431,13 +459,23 @@ def compute_repair_rate_for_kind(
         if kind == "causal_prediction":
             if links.get("subject_kind") != subject_kind:
                 continue
+            if since is not None:
+                ts = _parse_ts(mark.get("ts"))
+                if ts is None or ts < since:
+                    continue
             mark_id = mark.get("mark_id")
             if mark_id:
                 predictions[mark_id] = mark
         elif kind == "causal_resolution":
             corrects = mark.get("corrects")
-            if corrects:
-                # Last-write-wins on multiple resolutions for same prediction.
+            if not corrects:
+                continue
+            # FIRST-WINS on duplicate resolutions. Subsequent resolutions
+            # of the same prediction are remeasurements; they preserve
+            # the original repair classification rather than overwriting
+            # it. (Codex cross-check fix: was last-write-wins which let
+            # a second resolver flip the score.)
+            if corrects not in resolutions:
                 resolutions[corrects] = mark
 
     n_predictions = len(predictions)
