@@ -1081,6 +1081,14 @@ _KNOWLEDGE_ARTIFACT = ObjectType(
         "provenance": PropertyDef(name="provenance", property_type=PropertyType.STRING),
         "confidence": PropertyDef(name="confidence", property_type=PropertyType.FLOAT),
         "verified": PropertyDef(name="verified", property_type=PropertyType.BOOLEAN),
+        "audience": PropertyDef(name="audience", property_type=PropertyType.STRING,
+                                description="Intended reader or system audience"),
+        "published_path": PropertyDef(name="published_path", property_type=PropertyType.PATH,
+                                      description="Filesystem path of published artifact"),
+        "published_at": PropertyDef(name="published_at", property_type=PropertyType.DATETIME,
+                                    description="Publication timestamp"),
+        "published_channel": PropertyDef(name="published_channel", property_type=PropertyType.STRING,
+                                         description="Publication channel"),
     },
     actions=[
         ActionDef(name="Verify", object_type="KnowledgeArtifact",
@@ -1088,6 +1096,11 @@ _KNOWLEDGE_ARTIFACT = ObjectType(
                  modifies=["verified", "confidence"], telos_gates=["SATYA"]),
         ActionDef(name="Index", object_type="KnowledgeArtifact",
                  description="Add to ecosystem FTS5 index"),
+        ActionDef(name="Publish", object_type="KnowledgeArtifact",
+                 description="Publish the artifact to a declared channel",
+                 input_params={"channel": "string", "path": "path"},
+                 modifies=["published_path", "published_at", "published_channel"],
+                 telos_gates=["BHED_GNAN", "STEELMAN", "DOGMA_DRIFT", "CONSENT"]),
     ],
     telos_alignment=0.8,
     shakti_energy=ShaktiEnergy.MAHALAKSHMI,
@@ -1189,6 +1202,257 @@ _WITNESS_LOG = ObjectType(
     icon="W",
 )
 
+_CLAIM = ObjectType(
+    name="Claim",
+    description="A versioned proposition promoted from corpus into ontology schema",
+    properties={
+        "claim_id": PropertyDef(name="claim_id", property_type=PropertyType.STRING,
+                                required=True, immutable=True),
+        "statement": PropertyDef(name="statement", property_type=PropertyType.TEXT,
+                                 required=True, searchable=True),
+        "lifecycle_state": PropertyDef(
+            name="lifecycle_state",
+            property_type=PropertyType.ENUM,
+            required=True,
+            enum_values=["proposed", "accepted", "deprecated"],
+            description="Mirrors dharma_corpus ClaimStatus core lifecycle",
+        ),
+        "confidence": PropertyDef(name="confidence", property_type=PropertyType.FLOAT),
+        "proposer_ref": PropertyDef(name="proposer_ref", property_type=PropertyType.STRING),
+        "evidence_refs": PropertyDef(name="evidence_refs", property_type=PropertyType.LIST),
+    },
+    security=SecurityPolicy(audit_all=True),
+    telos_alignment=0.9,
+    shakti_energy=ShaktiEnergy.MAHESHWARI,
+    icon="C",
+)
+
+_DOCTRINE = ObjectType(
+    name="Doctrine",
+    description="A signed revisable rule distinct from immutable kernel axioms",
+    properties={
+        "doctrine_id": PropertyDef(name="doctrine_id", property_type=PropertyType.STRING,
+                                   required=True, immutable=True),
+        "text": PropertyDef(name="text", property_type=PropertyType.TEXT,
+                            required=True, searchable=True),
+        "lifecycle_state": PropertyDef(
+            name="lifecycle_state",
+            property_type=PropertyType.ENUM,
+            required=True,
+            enum_values=["draft", "signed", "deprecated"],
+        ),
+        "signed_by_human_at": PropertyDef(
+            name="signed_by_human_at",
+            property_type=PropertyType.DATETIME,
+            description="Human signature timestamp",
+        ),
+        "kernel_signature": PropertyDef(
+            name="kernel_signature",
+            property_type=PropertyType.STRING,
+            description="SHA-256 kernel signature in force when doctrine was signed",
+        ),
+        "version": PropertyDef(name="version", property_type=PropertyType.INTEGER,
+                               required=True, default=1),
+    },
+    links=[
+        LinkDef(name="derived_from_claim", source_type="Doctrine",
+                target_type="Claim", cardinality=LinkCardinality.MANY_TO_ONE,
+                inverse_name="became_doctrine"),
+    ],
+    security=SecurityPolicy(
+        write_roles=["operator", "system"],
+        delete_roles=[],
+        audit_all=True,
+        telos_required=True,
+    ),
+    telos_alignment=1.0,
+    shakti_energy=ShaktiEnergy.MAHESHWARI,
+    icon="D",
+)
+
+_CAPABILITY = ObjectType(
+    name="Capability",
+    description="A time-boxed authority token granting an agent scoped ability",
+    properties={
+        "capability_id": PropertyDef(name="capability_id", property_type=PropertyType.STRING,
+                                     required=True, immutable=True),
+        "name": PropertyDef(name="name", property_type=PropertyType.STRING,
+                            required=True, searchable=True),
+        "description": PropertyDef(name="description", property_type=PropertyType.TEXT),
+        "issued_to_ref": PropertyDef(name="issued_to_ref", property_type=PropertyType.STRING,
+                                     required=True),
+        "scope": PropertyDef(name="scope", property_type=PropertyType.DICT,
+                             required=True),
+        "token_hash": PropertyDef(name="token_hash", property_type=PropertyType.STRING,
+                                  required=True, immutable=True),
+        "issued_at": PropertyDef(name="issued_at", property_type=PropertyType.DATETIME,
+                                 required=True),
+        "expires_at": PropertyDef(name="expires_at", property_type=PropertyType.DATETIME,
+                                  required=True),
+        "revoked_at": PropertyDef(name="revoked_at", property_type=PropertyType.DATETIME),
+    },
+    links=[
+        LinkDef(name="issued_to", source_type="Capability",
+                target_type="AgentIdentity", cardinality=LinkCardinality.MANY_TO_ONE,
+                inverse_name="capability_tokens"),
+    ],
+    security=SecurityPolicy(
+        create_roles=["orchestrator", "operator", "system"],
+        write_roles=["orchestrator", "operator", "system"],
+        delete_roles=[],
+        audit_all=True,
+        telos_required=True,
+    ),
+    telos_alignment=0.9,
+    shakti_energy=ShaktiEnergy.MAHAKALI,
+    icon="L",
+)
+
+_CAUSE = ObjectType(
+    name="Cause",
+    description="Schema-only sensed cause; Phase 2 runtime remains parked",
+    properties={
+        "cause_id": PropertyDef(name="cause_id", property_type=PropertyType.STRING,
+                                required=True, immutable=True),
+        "name": PropertyDef(name="name", property_type=PropertyType.STRING,
+                            required=True, searchable=True),
+        "description_text": PropertyDef(name="description_text",
+                                        property_type=PropertyType.TEXT,
+                                        required=True, searchable=True),
+        "sensed_at": PropertyDef(name="sensed_at", property_type=PropertyType.DATETIME,
+                                 required=True),
+        "sensed_by_ref": PropertyDef(name="sensed_by_ref", property_type=PropertyType.STRING,
+                                     required=True),
+        "lifecycle_state": PropertyDef(
+            name="lifecycle_state",
+            property_type=PropertyType.ENUM,
+            required=True,
+            enum_values=["sensed", "parked", "active", "retired"],
+        ),
+        "source_signals": PropertyDef(name="source_signals", property_type=PropertyType.LIST,
+                                      required=True, ref_type="Signal"),
+        "dharma_alignment_signature": PropertyDef(
+            name="dharma_alignment_signature",
+            property_type=PropertyType.STRING,
+            description="Placeholder for Phase 2 alignment signature",
+        ),
+    },
+    links=[
+        LinkDef(name="sensed_by", source_type="Cause",
+                target_type="AgentIdentity", cardinality=LinkCardinality.MANY_TO_ONE,
+                inverse_name="sensed_causes",
+                description="Agent or human-operator reference that sensed the Cause"),
+        LinkDef(name="source_signals", source_type="Cause",
+                target_type="Signal", cardinality=LinkCardinality.MANY_TO_MANY,
+                inverse_name="source_for_causes"),
+        LinkDef(name="becomes", source_type="Cause",
+                target_type="Movement", cardinality=LinkCardinality.ONE_TO_MANY,
+                inverse_name="origin_cause"),
+    ],
+    security=SecurityPolicy(audit_all=True),
+    telos_alignment=0.95,
+    shakti_energy=ShaktiEnergy.MAHESHWARI,
+    icon="O",
+)
+
+_MOVEMENT = ObjectType(
+    name="Movement",
+    description="Schema-only movement instantiated from a Cause; Phase 2 runtime remains parked",
+    properties={
+        "movement_id": PropertyDef(name="movement_id", property_type=PropertyType.STRING,
+                                   required=True, immutable=True),
+        "parent_cause_ref": PropertyDef(name="parent_cause_ref",
+                                        property_type=PropertyType.STRING,
+                                        required=True),
+        "lifecycle_state": PropertyDef(
+            name="lifecycle_state",
+            property_type=PropertyType.ENUM,
+            required=True,
+            enum_values=["proposed", "active", "published", "retired"],
+        ),
+        "instantiated_at": PropertyDef(name="instantiated_at",
+                                       property_type=PropertyType.DATETIME,
+                                       required=True),
+        "sourcerer_ref": PropertyDef(name="sourcerer_ref", property_type=PropertyType.STRING),
+        "hitl_outbound_required": PropertyDef(
+            name="hitl_outbound_required",
+            property_type=PropertyType.BOOLEAN,
+            default=True,
+        ),
+    },
+    links=[
+        LinkDef(name="parent_cause", source_type="Movement",
+                target_type="Cause", cardinality=LinkCardinality.MANY_TO_ONE,
+                inverse_name="child_movements"),
+        LinkDef(name="contains", source_type="Movement",
+                target_type="KnowledgeArtifact", cardinality=LinkCardinality.ONE_TO_MANY,
+                inverse_name="contained_by_movement"),
+        LinkDef(name="authored_by", source_type="Movement",
+                target_type="AgentIdentity", cardinality=LinkCardinality.MANY_TO_ONE,
+                inverse_name="authored_movements"),
+    ],
+    security=SecurityPolicy(audit_all=True),
+    telos_alignment=0.9,
+    shakti_energy=ShaktiEnergy.MAHALAKSHMI,
+    icon="M",
+)
+
+_R_V_MEASUREMENT = ObjectType(
+    name="R_V_Measurement",
+    description="Schema-only empirical R_V measurement attached to artifacts, actions, or agents",
+    properties={
+        "measurement_id": PropertyDef(name="measurement_id", property_type=PropertyType.STRING,
+                                      required=True, immutable=True),
+        "subject_artifact_or_action_ref": PropertyDef(
+            name="subject_artifact_or_action_ref",
+            property_type=PropertyType.STRING,
+            required=True,
+        ),
+        "r_v_value": PropertyDef(name="r_v_value", property_type=PropertyType.FLOAT,
+                                 required=True),
+        "architecture": PropertyDef(name="architecture", property_type=PropertyType.STRING,
+                                    required=True),
+        "measured_at": PropertyDef(name="measured_at", property_type=PropertyType.DATETIME,
+                                   required=True),
+        "measured_by_ref": PropertyDef(name="measured_by_ref",
+                                       property_type=PropertyType.STRING,
+                                       required=True),
+        "cohens_d": PropertyDef(name="cohens_d", property_type=PropertyType.FLOAT),
+        "baseline_pr": PropertyDef(name="baseline_pr", property_type=PropertyType.FLOAT),
+        "late_pr": PropertyDef(name="late_pr", property_type=PropertyType.FLOAT),
+        "layer": PropertyDef(name="layer", property_type=PropertyType.STRING),
+    },
+    links=[
+        LinkDef(name="measures_artifact", source_type="R_V_Measurement",
+                target_type="KnowledgeArtifact", cardinality=LinkCardinality.MANY_TO_ONE,
+                inverse_name="r_v_measurements"),
+        LinkDef(name="measures_action", source_type="R_V_Measurement",
+                target_type="ActionProposal", cardinality=LinkCardinality.MANY_TO_ONE,
+                inverse_name="r_v_measurements"),
+        LinkDef(name="measures_agent", source_type="R_V_Measurement",
+                target_type="AgentIdentity", cardinality=LinkCardinality.MANY_TO_ONE,
+                inverse_name="r_v_measurements"),
+        LinkDef(name="attached_as_evidence_to", source_type="R_V_Measurement",
+                target_type="Claim", cardinality=LinkCardinality.MANY_TO_ONE,
+                inverse_name="r_v_evidence"),
+    ],
+    actions=[
+        ActionDef(name="RecordRVMeasurement", object_type="R_V_Measurement",
+                  description="Record an R_V measurement without waking Phase 2 runtime",
+                  input_params={
+                      "subject_ref": "id",
+                      "r_v_value": "float",
+                      "architecture": "string",
+                  },
+                  creates=["R_V_Measurement"],
+                  telos_gates=["provenance"]),
+    ],
+    security=SecurityPolicy(audit_all=True, telos_required=True),
+    telos_alignment=0.95,
+    shakti_energy=ShaktiEnergy.MAHASARASWATI,
+    icon="RV",
+)
+
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # DOMAIN LINKS — Relationships between types
@@ -1232,6 +1496,18 @@ _DOMAIN_LINKS: list[LinkDef] = [
     LinkDef(name="informs_experiment", source_type="KnowledgeArtifact",
            target_type="Experiment", cardinality=LinkCardinality.MANY_TO_MANY,
            inverse_name="informed_by"),
+    LinkDef(name="derived_from", source_type="KnowledgeArtifact",
+           target_type="Outcome", cardinality=LinkCardinality.MANY_TO_MANY,
+           inverse_name="source_for_artifact",
+           description="Artifact cites a concrete execution Outcome as source evidence"),
+    LinkDef(name="cites_witness", source_type="KnowledgeArtifact",
+           target_type="WitnessLog", cardinality=LinkCardinality.MANY_TO_MANY,
+           inverse_name="cited_by_artifact",
+           description="Artifact cites a witnessing observation"),
+    LinkDef(name="published_to", source_type="KnowledgeArtifact",
+           target_type="KnowledgeArtifact", cardinality=LinkCardinality.MANY_TO_MANY,
+           inverse_name="published_from",
+           description="Draft artifact was published to another artifact representation"),
 ]
 
 _ACTION_PROPOSAL = ObjectType(
@@ -1529,6 +1805,7 @@ _METABOLIC_LINKS: list[LinkDef] = [
 _DOMAIN_TYPES: list[ObjectType] = [
     _RESEARCH_THREAD, _EXPERIMENT, _PAPER, _AGENT_IDENTITY, _CUSTODIAN_ROLE,
     _KNOWLEDGE_ARTIFACT, _TYPED_TASK, _EVOLUTION_ENTRY, _WITNESS_LOG,
+    _CLAIM, _DOCTRINE, _CAPABILITY, _CAUSE, _MOVEMENT, _R_V_MEASUREMENT,
     _ACTION_PROPOSAL, _GATE_DECISION_TYPE, _EXECUTION_LEASE, _OUTCOME, _VALUE_EVENT,
     _CONTRIBUTION, _VENTURE_CELL,
 ]
@@ -1536,6 +1813,8 @@ _DOMAIN_TYPES: list[ObjectType] = [
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # BACKWARD COMPATIBILITY — Existing Entity/ONTOLOGY API
+# DEPRECATED: legacy hand-coded ontology scheduled for removal on 2026-05-08.
+# The typed ObjectType/OntologyObj registry above is the schema authority.
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 
