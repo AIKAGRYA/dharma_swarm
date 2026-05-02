@@ -132,6 +132,11 @@ def _artifact_dir_for(date_str: str) -> Path:
     return _artifact_root() / date_str
 
 
+def _default_runtime_state() -> RuntimeStateStore:
+    """Use the canonical runtime DB only for real cron/shared-registry ticks."""
+    return RuntimeStateStore(db_path=None)
+
+
 # ──────────────────────────────────────────────────────────────────────
 # Public entrypoint
 # ──────────────────────────────────────────────────────────────────────
@@ -166,7 +171,7 @@ def run_once(
     date_str = now_dt.date().isoformat()
     runtime = runtime_state
     if runtime is None and registry is None and input_payload is None:
-        runtime = RuntimeStateStore()
+        runtime = _default_runtime_state()
 
     agent_obj = _ensure_agent(reg, agent_id=agent_id, agent_name=agent_name)
     actual_agent_id = agent_obj.id if agent_obj is not None else agent_id
