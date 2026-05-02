@@ -60,6 +60,18 @@ synthesizer_memory.json
 dashboard/playwright-report/
 dashboard/playwright/
 dashboard/test-results/
+dashboard/.audit-screens/
 desktop-shell/src-tauri/target/
 spec-forge/
 .superpowers/
+
+# Local agent/tool indexes and runtime traces.
+.agents/
+.codex/
+.gitnexus/
+.mcp_data/
+.playwright-mcp/
+
+# Generated verification screenshots.
+terminal/screenshots/
+terminal-v2/screenshots/

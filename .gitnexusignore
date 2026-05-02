@@ -1,0 +1,48 @@
+# Virtual envs and caches
+.venv/
+node_modules/
+.next/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+__pycache__/
+*.egg-info/
+
+# State directories (not source code)
+.dharma/
+.dharma_psmv_hyperfile_branch/
+.dharma_psmv_hyperfile_branch_v2/
+.claude-flow/
+.claude/
+.mcp_data/
+.playwright-mcp/
+.swarm/
+~/
+
+# Non-Python directories
+dashboard/
+terminal/
+terminal-v2/
+desktop-shell/
+
+# Large non-code dirs
+reports/
+docs/
+lodestones/
+foundations/
+spec-forge/
+roaming_mailbox/
+build_queues/
+mode_pack/
+results/
+experiments/
+benchmarks/
+analysis/
+architecture/
+references/
+research/
+specs/
+spinouts/
+tools/
+codex_skills/
+hooks/
