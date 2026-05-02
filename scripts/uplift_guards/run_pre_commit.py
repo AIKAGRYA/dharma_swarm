@@ -37,27 +37,32 @@ def check_assurance_diff(repo_root: Path) -> tuple[bool, str]:
         repo_root=repo_root,
         changed_files=changed_files,
     )
-    summary = report.get("summary", {})
-    critical = int(summary.get("critical", 0) or 0)
-    high = int(summary.get("high", 0) or 0)
-    medium = int(summary.get("medium", 0) or 0)
-    if critical or high:
-        top = ""
-        for scanner_report in report.get("reports", []):
-            for finding in scanner_report.get("findings", []):
-                if finding.get("severity") in {"critical", "high"}:
-                    top = (
-                        f"{finding.get('category')} at "
-                        f"{finding.get('file')}:{finding.get('line')}"
-                    )
-                    break
-            if top:
-                break
+    changed_set = set(changed_files)
+    blocking: list[dict] = []
+    medium = 0
+    for scanner_report in report.get("reports", []):
+        for finding in scanner_report.get("findings", []):
+            if str(finding.get("file", "")) not in changed_set:
+                continue
+            severity = finding.get("severity")
+            if severity in {"critical", "high"}:
+                blocking.append(finding)
+            elif severity == "medium":
+                medium += 1
+
+    critical = sum(1 for finding in blocking if finding.get("severity") == "critical")
+    high = sum(1 for finding in blocking if finding.get("severity") == "high")
+    if blocking:
+        first = blocking[0]
+        top = (
+            f"{first.get('category')} at "
+            f"{first.get('file')}:{first.get('line')}"
+        )
         return (
             False,
             "ASSURANCE DIFF GUARD: "
             f"critical={critical} high={high} medium={medium}. "
-            f"First blocking finding: {top or 'see assurance report'}",
+            f"First blocking finding: {top}",
         )
     return True, f"assurance diff clear of blocking findings (medium={medium})"
 
