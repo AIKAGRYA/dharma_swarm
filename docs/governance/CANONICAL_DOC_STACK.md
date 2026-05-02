@@ -50,6 +50,48 @@ TIER 5 — ARCHIVE (do not read unless investigating history)
 
 ---
 
+## Memory Authorities
+
+This section is the canonical map for memory-write authority. It does not
+create a new memory system. It tells agents which existing surface owns each
+kind of memory, which API they must use, and which bypasses are forbidden.
+
+| # | Authority | Class | Owner Module | Write API | Callers MUST NOT |
+|---|-----------|-------|--------------|-----------|------------------|
+| 1 | Register/conscience marks | Write | `dharma_swarm/register_disciplines.py` | `make_register_mark()` + `write_register_mark()` | Append directly to `~/.dharma/stigmergy/register_marks.jsonl` |
+| 2 | Runtime facts and edges | Write | `dharma_swarm/runtime_state.py::RuntimeStateStore` | `record_memory_fact()` + `record_memory_edge()` until the membrane facade lands | Execute SQL writes to `memory_facts` or `memory_edges` outside the store |
+| 3 | Episodes/events | Write | `dharma_swarm/engine/event_memory.py::EventMemoryStore` | `ingest_envelope()` | Write runtime event JSONL or event SQL outside the store |
+| 4 | Trusted semantic atoms | Write | `dharma_swarm/chetana/promote.py` | `promote()` with chetana provenance and gate check | Promote without `gate_check_atom()` or mutate trusted atoms in place |
+| 5 | Context admission | Project | `dharma_swarm/memory_lattice.py` + `dharma_swarm/context_compiler.py` | `MemoryLattice.recall()` today; `MemoryLattice.compile_memory_context()` once the membrane slice lands | Hand-query underlying stores for prompt context unless doing an audit |
+| 6 | Vector/graph/palace/dashboard views | Project | Downstream readers | Read-only projections over owner APIs | Claim upstream truth ownership or write canonical memory state |
+| 7 | Distillers: drift, witness, causal, revive, decay, semantic bridge | Distill | Per-module producer | Emit `RegisterMark`s through authority 1 or staged atoms through authority 4 | Mutate trusted state directly |
+
+### Required Patterns
+
+- To record a new operational fact, construct a `MemoryFact` through the
+  runtime memory path. After the admission facade lands, call
+  `MemoryLattice.admit_memory_fact(...)` instead of calling
+  `RuntimeStateStore.record_memory_fact(...)` directly.
+- To record a session decision or runtime episode, use
+  `MemoryLattice.ingest_runtime_envelope(...)` / `EventMemoryStore`, not a
+  promoted semantic atom and not a bare `MemoryFact`.
+- To record a conscience or repair signal, use
+  `make_register_mark(...)` + `write_register_mark(...)`; never raw-append the
+  canonical register log.
+- To promote chetana knowledge, use `chetana.promote.promote(...)` so the
+  frontmatter, gate result, provenance, and trusted-path write stay coupled.
+
+### Membrane Migration Rule
+
+`MemoryLattice` is the planned admission facade, not a parallel store. Existing
+`record_fact()`, `promote_fact()`, `remember()`, and `recall()` calls remain
+valid until the membrane APIs are added. New direct callers of
+`RuntimeStateStore.record_memory_fact()` or `record_memory_edge()` outside
+`memory_lattice.py` must be tagged `TODO(membrane)` with a reason and migrated
+one minor version after the admission facade lands.
+
+---
+
 ## Deprecation / Merge Decisions
 
 ### DEPRECATE (move to docs/archive/)
