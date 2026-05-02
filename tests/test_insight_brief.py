@@ -84,6 +84,77 @@ def _outcome(
     return obj
 
 
+def _claim(
+    registry: OntologyRegistry,
+    statement: str,
+    *,
+    confidence: float = 0.5,
+):
+    obj, errors = registry.create_object(
+        "Claim",
+        {
+            "claim_id": f"claim-{len(registry.get_objects_by_type('Claim'))}",
+            "statement": statement,
+            "lifecycle_state": "proposed",
+            "confidence": confidence,
+            "proposer_ref": "test",
+            "evidence_refs": [],
+        },
+        created_by="test",
+    )
+    assert obj is not None, errors
+    return obj
+
+
+def _question(
+    registry: OntologyRegistry,
+    text: str,
+    *,
+    priority: str = "normal",
+):
+    obj, errors = registry.create_object(
+        "Question",
+        {
+            "question_id": f"question-{len(registry.get_objects_by_type('Question'))}",
+            "text": text,
+            "opener_ref": "test",
+            "opened_at": _now().isoformat(),
+            "lifecycle_state": "open",
+            "domain": "governance",
+            "priority": priority,
+        },
+        created_by="test",
+    )
+    assert obj is not None, errors
+    return obj
+
+
+def _evidence(registry: OntologyRegistry, claim_id: str):
+    obj, errors = registry.create_object(
+        "Evidence",
+        {
+            "evidence_id": f"evidence-{len(registry.get_objects_by_type('Evidence'))}",
+            "claim_ref": claim_id,
+            "kind": "citation",
+            "direction": "supports",
+            "source_artifact_ref": "tests/test_insight_brief.py",
+            "attached_at": _now().isoformat(),
+            "attached_by_ref": "test",
+            "strength": 0.7,
+        },
+        created_by="test",
+    )
+    assert obj is not None, errors
+    link, link_errors = registry.create_link(
+        "claim_has_evidence",
+        claim_id,
+        obj.id,
+        created_by="test",
+    )
+    assert link is not None, link_errors
+    return obj
+
+
 def test_brief_creates_typed_objects(
     registry: OntologyRegistry,
     gateway: OntologyActionGateway,
@@ -149,6 +220,59 @@ def test_failures_render_under_breakages(
     assert "## Breakages" in content
     assert "## Signals" not in content
     assert "Telos block" in content
+
+
+def test_brief_surfaces_open_claims_and_questions(
+    registry: OntologyRegistry,
+    gateway: OntologyActionGateway,
+    tmp_path,
+) -> None:
+    _outcome(registry)
+    claim = _claim(registry, "The inquiry chain is now ontology-native.", confidence=0.73)
+    _evidence(registry, claim.id)
+    _question(registry, "What would prove the chain is actually useful?", priority="urgent")
+    builder = InsightBriefBuilder(gateway, output_dir=tmp_path, now_fn=_now)
+    brief = builder.compose(builder.propose())
+    content = str(brief.properties["content"])
+
+    assert "## Open Claims (n=1)" in content
+    assert "conf=0.73 evidence=1" in content
+    assert "The inquiry chain is now ontology-native." in content
+    assert "## Outstanding Questions (n=1)" in content
+    assert "priority=urgent domain=governance" in content
+
+
+def test_brief_skips_empty_inquiry_sections(
+    registry: OntologyRegistry,
+    gateway: OntologyActionGateway,
+    tmp_path,
+) -> None:
+    _outcome(registry)
+    builder = InsightBriefBuilder(gateway, output_dir=tmp_path, now_fn=_now)
+    brief = builder.compose(builder.propose())
+    content = str(brief.properties["content"])
+
+    assert "## Open Claims" not in content
+    assert "## Outstanding Questions" not in content
+
+
+def test_brief_caps_inquiry_sections_at_five(
+    registry: OntologyRegistry,
+    gateway: OntologyActionGateway,
+    tmp_path,
+) -> None:
+    _outcome(registry)
+    for index in range(6):
+        _claim(registry, f"Open claim {index}", confidence=0.5)
+        _question(registry, f"Open question {index}")
+    builder = InsightBriefBuilder(gateway, output_dir=tmp_path, now_fn=_now)
+    brief = builder.compose(builder.propose())
+    content = str(brief.properties["content"])
+
+    assert "## Open Claims (n=5)" in content
+    assert "## Outstanding Questions (n=5)" in content
+    assert content.count("- `Claim/") == 5
+    assert content.count("- `Question/") == 5
 
 
 def test_brief_citations_resolve(

@@ -30,6 +30,26 @@ class BriefClaim:
     section: str
 
 
+@dataclass(frozen=True)
+class BriefOpenClaim:
+    """A proposed Claim surfaced for follow-up."""
+
+    obj_id: str
+    text: str
+    confidence: float
+    evidence_count: int
+
+
+@dataclass(frozen=True)
+class BriefOpenQuestion:
+    """An open Question surfaced for follow-up."""
+
+    obj_id: str
+    text: str
+    priority: str
+    domain: str
+
+
 class InsightBriefBuilder:
     """Build and publish one fail-closed ontology-cited brief."""
 
@@ -92,7 +112,16 @@ class InsightBriefBuilder:
         )
 
         claims = self._claims_for(artifact.id, outcomes)
-        content = self._render_markdown(today, artifact.id, witness.id, claims)
+        open_claims = self._open_claim_summaries()
+        open_questions = self._open_question_summaries()
+        content = self._render_markdown(
+            today,
+            artifact.id,
+            witness.id,
+            claims,
+            open_claims=open_claims,
+            open_questions=open_questions,
+        )
         artifact = self.gateway.update_object_or_fail(
             artifact.id,
             {"content": content},
@@ -177,13 +206,65 @@ class InsightBriefBuilder:
             )
         return claims
 
+    def _open_claim_summaries(self) -> list[BriefOpenClaim]:
+        claims = [
+            claim for claim in self.gateway.registry.get_objects_by_type("Claim")
+            if claim.properties.get("lifecycle_state") == "proposed"
+            and float(claim.properties.get("confidence") or 0.0) < 1.0
+        ]
+        claims.sort(key=lambda obj: obj.created_at, reverse=True)
+
+        summaries: list[BriefOpenClaim] = []
+        for claim in claims[:5]:
+            props = claim.properties
+            evidence_links = self.gateway.registry.get_links(
+                source_id=claim.id,
+                link_name="claim_has_evidence",
+            )
+            evidence_refs = props.get("evidence_refs")
+            fallback_count = len(evidence_refs) if isinstance(evidence_refs, list) else 0
+            summaries.append(
+                BriefOpenClaim(
+                    obj_id=claim.id,
+                    text=InsightBriefBuilder._clean_summary(str(props.get("statement") or "")),
+                    confidence=float(props.get("confidence") or 0.0),
+                    evidence_count=len(evidence_links) or fallback_count,
+                )
+            )
+        return summaries
+
+    def _open_question_summaries(self) -> list[BriefOpenQuestion]:
+        questions = [
+            question for question in self.gateway.registry.get_objects_by_type("Question")
+            if question.properties.get("lifecycle_state") == "open"
+        ]
+        questions.sort(key=lambda obj: obj.created_at, reverse=True)
+
+        summaries: list[BriefOpenQuestion] = []
+        for question in questions[:5]:
+            props = question.properties
+            summaries.append(
+                BriefOpenQuestion(
+                    obj_id=question.id,
+                    text=InsightBriefBuilder._clean_summary(str(props.get("text") or "")),
+                    priority=str(props.get("priority") or "normal"),
+                    domain=str(props.get("domain") or ""),
+                )
+            )
+        return summaries
+
     @staticmethod
     def _render_markdown(
         today: str,
         artifact_id: str,
         witness_id: str,
         claims: list[BriefClaim],
+        *,
+        open_claims: list[BriefOpenClaim] | None = None,
+        open_questions: list[BriefOpenQuestion] | None = None,
     ) -> str:
+        open_claims = open_claims or []
+        open_questions = open_questions or []
         lines = [
             f"# Daily Insight Brief - {today}",
             "",
@@ -198,6 +279,29 @@ class InsightBriefBuilder:
             lines.extend([f"## {section}", ""])
             for claim in section_claims:
                 lines.append(f"- {claim.text} [{claim.citation}]")
+            lines.append("")
+        if open_claims:
+            lines.extend([f"## Open Claims (n={len(open_claims)})", ""])
+            for claim in open_claims:
+                lines.append(
+                    "- "
+                    f"`Claim/{claim.obj_id}` "
+                    f"conf={claim.confidence:.2f} "
+                    f"evidence={claim.evidence_count}: "
+                    f"{claim.text}"
+                )
+            lines.append("")
+        if open_questions:
+            lines.extend([f"## Outstanding Questions (n={len(open_questions)})", ""])
+            for question in open_questions:
+                domain = f" domain={question.domain}" if question.domain else ""
+                lines.append(
+                    "- "
+                    f"`Question/{question.obj_id}` "
+                    f"priority={question.priority}"
+                    f"{domain}: "
+                    f"{question.text}"
+                )
             lines.append("")
         lines.extend([
             "## Decision Surface",
