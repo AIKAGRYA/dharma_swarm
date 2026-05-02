@@ -1,0 +1,548 @@
+version: 1
+intent: >
+  Runtime authority membrane for dharma_swarm. Files may remain on disk as
+  research, archive, or reference material, but only manifest-approved surfaces
+  should register routes, appear in the operator UI, run on a schedule, or own
+  canonical state writes.
+
+policy:
+  preserve_artifacts: true
+  default_may_register: false
+  default_may_appear_in_nav: false
+  default_may_run: false
+  default_may_write_state: false
+  enforcement_stage: report_only
+
+status_meanings:
+  active: "Part of the current runtime body."
+  projection: "Read-model or view over another authority; not an authority itself."
+  adapter: "Compatibility layer around a canonical owner."
+  research_preserved: "Useful as reference/research; not an active authority."
+  frozen: "Must not gain new runtime authority without manifest change."
+
+api_routers:
+  health:
+    module: api.routers.health
+    status: active
+    may_register: true
+    reason: API health/readiness surface.
+  verify:
+    module: api.routers.verify
+    status: active
+    may_register: true
+    reason: External verification and webhook boundary.
+  chat:
+    module: api.routers.chat
+    status: active
+    may_register: true
+    reason: Canonical dashboard chat/session contract.
+  dashboard_new:
+    module: api.routers.dashboard_new
+    status: active
+    may_register: true
+    reason: Dashboard runtime read contract.
+  commands:
+    module: api.routers.commands
+    status: active
+    may_register: true
+    reason: Operator command ingress.
+  agents:
+    module: api.routers.agents
+    status: projection
+    may_register: true
+    reason: Read/control projection over swarm runtime.
+  fleet:
+    module: api.routers.fleet
+    status: projection
+    may_register: true
+    reason: Projection over existing runtime state, not a new control plane.
+  telemetry:
+    module: api.routers.telemetry
+    status: projection
+    may_register: true
+    reason: Operator telemetry projection.
+  routing:
+    module: api.routers.routing
+    status: projection
+    may_register: true
+    reason: Provider/routing read model.
+  modules:
+    module: api.routers.modules
+    status: projection
+    may_register: true
+    reason: Module truth-map read model.
+  evolution:
+    module: api.routers.evolution
+    status: projection
+    may_register: true
+    reason: Evolution state projection.
+  ontology:
+    module: api.routers.ontology
+    status: projection
+    may_register: true
+    reason: Ontology read/write boundary while ontology remains active.
+  lineage:
+    module: api.routers.lineage
+    status: projection
+    may_register: true
+    reason: Artifact lineage projection.
+  stigmergy:
+    module: api.routers.stigmergy
+    status: projection
+    may_register: true
+    reason: Stigmergy read projection.
+  vsm:
+    module: api.routers.vsm
+    status: projection
+    may_register: true
+    reason: Cybernetic read model.
+  catalytic:
+    module: api.routers.catalytic
+    status: projection
+    may_register: true
+    reason: Catalytic graph read model.
+  gates:
+    module: api.routers.gates
+    status: projection
+    may_register: true
+    reason: Gate-analysis surface.
+  strange_loop:
+    module: api.routers.strange_loop
+    status: projection
+    may_register: true
+    reason: Strange-loop read model.
+  cascade:
+    module: api.routers.cascade_router
+    status: projection
+    may_register: true
+    reason: Cascade read/control projection.
+  graphql:
+    module: api.routers.graphql_router
+    status: adapter
+    may_register: true
+    reason: Compatibility query adapter.
+  viz:
+    module: api.routers.viz
+    status: projection
+    may_register: true
+    reason: Visualization read projection.
+
+dashboard_pages:
+  overview:
+    route: /dashboard
+    file: dashboard/src/app/dashboard/page.tsx
+    status: active
+    may_appear_in_nav: true
+    reason: Top-level operator landing view.
+  command_post:
+    route: /dashboard/command-post
+    file: dashboard/src/app/dashboard/command-post/page.tsx
+    status: active
+    may_appear_in_nav: true
+    reason: Canonical control-plane deck.
+  qwen35:
+    route: /dashboard/qwen35
+    file: dashboard/src/app/dashboard/qwen35/page.tsx
+    status: active
+    may_appear_in_nav: true
+    reason: Canonical control-plane deck.
+  observatory:
+    route: /dashboard/observatory
+    file: dashboard/src/app/dashboard/observatory/page.tsx
+    status: active
+    may_appear_in_nav: true
+    reason: Canonical control-plane deck.
+  runtime:
+    route: /dashboard/runtime
+    file: dashboard/src/app/dashboard/runtime/page.tsx
+    status: active
+    may_appear_in_nav: true
+    reason: Canonical control-plane deck.
+  qwen35_telemetry:
+    route: /dashboard/qwen35/telemetry
+    file: dashboard/src/app/dashboard/qwen35/telemetry/page.tsx
+    status: projection
+    may_appear_in_nav: false
+    reason: Detail page under canonical qwen lane.
+  agents:
+    route: /dashboard/agents
+    file: dashboard/src/app/dashboard/agents/page.tsx
+    status: projection
+    may_appear_in_nav: false
+    reason: Operator detail surface; not part of top deck.
+  agent_detail:
+    route: /dashboard/agents/{id}
+    file: dashboard/src/app/dashboard/agents/[id]/page.tsx
+    status: projection
+    may_appear_in_nav: false
+    reason: Detail route.
+  agent_chat:
+    route: /dashboard/agents/{id}/chat
+    file: dashboard/src/app/dashboard/agents/[id]/chat/page.tsx
+    status: projection
+    may_appear_in_nav: false
+    reason: Detail route.
+  agent_config:
+    route: /dashboard/agents/{id}/config
+    file: dashboard/src/app/dashboard/agents/[id]/config/page.tsx
+    status: projection
+    may_appear_in_nav: false
+    reason: Detail route.
+  agent_connections:
+    route: /dashboard/agents/{id}/connections
+    file: dashboard/src/app/dashboard/agents/[id]/connections/page.tsx
+    status: projection
+    may_appear_in_nav: false
+    reason: Detail route.
+  agent_memory:
+    route: /dashboard/agents/{id}/memory
+    file: dashboard/src/app/dashboard/agents/[id]/memory/page.tsx
+    status: projection
+    may_appear_in_nav: false
+    reason: Detail route.
+  agent_tasks:
+    route: /dashboard/agents/{id}/tasks
+    file: dashboard/src/app/dashboard/agents/[id]/tasks/page.tsx
+    status: projection
+    may_appear_in_nav: false
+    reason: Detail route.
+  artifacts:
+    route: /dashboard/artifacts
+    file: dashboard/src/app/dashboard/artifacts/page.tsx
+    status: projection
+    may_appear_in_nav: false
+    reason: Artifact detail surface; not part of top deck.
+  audit:
+    route: /dashboard/audit
+    file: dashboard/src/app/dashboard/audit/page.tsx
+    status: projection
+    may_appear_in_nav: false
+    reason: Assurance detail surface; not part of top deck.
+  blocks:
+    route: /dashboard/blocks
+    file: dashboard/src/app/dashboard/blocks/page.tsx
+    status: frozen
+    may_appear_in_nav: false
+    reason: Placeholder/dead surface per SWARM_HOT_ITEMS.
+  cascade:
+    route: /dashboard/cascade
+    file: dashboard/src/app/dashboard/cascade/page.tsx
+    status: projection
+    may_appear_in_nav: false
+    reason: Deep projection; not canonical operator deck.
+  catalytic:
+    route: /dashboard/catalytic
+    file: dashboard/src/app/dashboard/catalytic/page.tsx
+    status: projection
+    may_appear_in_nav: false
+    reason: Deep projection; not canonical operator deck.
+  claude:
+    route: /dashboard/claude
+    file: dashboard/src/app/dashboard/claude/page.tsx
+    status: projection
+    may_appear_in_nav: false
+    reason: Semantic graph projection.
+  doctor:
+    route: /dashboard/doctor
+    file: dashboard/src/app/dashboard/doctor/page.tsx
+    status: projection
+    may_appear_in_nav: false
+    reason: Assurance detail surface.
+  ecosystem:
+    route: /dashboard/ecosystem
+    file: dashboard/src/app/dashboard/ecosystem/page.tsx
+    status: projection
+    may_appear_in_nav: false
+    reason: Ecosystem projection.
+  eval:
+    route: /dashboard/eval
+    file: dashboard/src/app/dashboard/eval/page.tsx
+    status: projection
+    may_appear_in_nav: false
+    reason: Evaluation detail surface.
+  evolution:
+    route: /dashboard/evolution
+    file: dashboard/src/app/dashboard/evolution/page.tsx
+    status: projection
+    may_appear_in_nav: false
+    reason: Evolution projection.
+  fleet:
+    route: /dashboard/fleet
+    file: dashboard/src/app/dashboard/fleet/page.tsx
+    status: projection
+    may_appear_in_nav: false
+    reason: Fleet projection, not authority.
+  gates:
+    route: /dashboard/gates
+    file: dashboard/src/app/dashboard/gates/page.tsx
+    status: projection
+    may_appear_in_nav: false
+    reason: Gate detail projection.
+  gates_analysis:
+    route: /dashboard/gates-analysis
+    file: dashboard/src/app/dashboard/gates-analysis/page.tsx
+    status: projection
+    may_appear_in_nav: false
+    reason: Gate detail projection.
+  glm5:
+    route: /dashboard/glm5
+    file: dashboard/src/app/dashboard/glm5/page.tsx
+    status: projection
+    may_appear_in_nav: false
+    reason: Model lane detail.
+  jobs:
+    route: /dashboard/jobs
+    file: dashboard/src/app/dashboard/jobs/page.tsx
+    status: projection
+    may_appear_in_nav: false
+    reason: Worker/job detail surface.
+  lineage:
+    route: /dashboard/lineage
+    file: dashboard/src/app/dashboard/lineage/page.tsx
+    status: projection
+    may_appear_in_nav: false
+    reason: Artifact lineage projection.
+  log:
+    route: /dashboard/log
+    file: dashboard/src/app/dashboard/log/page.tsx
+    status: projection
+    may_appear_in_nav: false
+    reason: Conversation log detail surface.
+  models:
+    route: /dashboard/models
+    file: dashboard/src/app/dashboard/models/page.tsx
+    status: projection
+    may_appear_in_nav: false
+    reason: Model catalog detail surface.
+  modules:
+    route: /dashboard/modules
+    file: dashboard/src/app/dashboard/modules/page.tsx
+    status: projection
+    may_appear_in_nav: false
+    reason: Truth-map detail surface.
+  ontology:
+    route: /dashboard/ontology
+    file: dashboard/src/app/dashboard/ontology/page.tsx
+    status: projection
+    may_appear_in_nav: false
+    reason: Ontology detail surface.
+  stigmergy:
+    route: /dashboard/stigmergy
+    file: dashboard/src/app/dashboard/stigmergy/page.tsx
+    status: projection
+    may_appear_in_nav: false
+    reason: Stigmergy detail surface.
+  strange_loop:
+    route: /dashboard/strange-loop
+    file: dashboard/src/app/dashboard/strange-loop/page.tsx
+    status: projection
+    may_appear_in_nav: false
+    reason: Strange-loop detail surface.
+  synthesizer:
+    route: /dashboard/synthesizer
+    file: dashboard/src/app/dashboard/synthesizer/page.tsx
+    status: projection
+    may_appear_in_nav: false
+    reason: Synthesis detail surface.
+  tasks:
+    route: /dashboard/tasks
+    file: dashboard/src/app/dashboard/tasks/page.tsx
+    status: projection
+    may_appear_in_nav: false
+    reason: Task detail surface.
+  telemetry:
+    route: /dashboard/telemetry
+    file: dashboard/src/app/dashboard/telemetry/page.tsx
+    status: projection
+    may_appear_in_nav: false
+    reason: Telemetry detail surface.
+  timeline:
+    route: /dashboard/timeline
+    file: dashboard/src/app/dashboard/timeline/page.tsx
+    status: projection
+    may_appear_in_nav: false
+    reason: Timeline detail surface.
+  vsm:
+    route: /dashboard/vsm
+    file: dashboard/src/app/dashboard/vsm/page.tsx
+    status: projection
+    may_appear_in_nav: false
+    reason: Cybernetic detail surface.
+  workflows:
+    route: /dashboard/workflows
+    file: dashboard/src/app/dashboard/workflows/page.tsx
+    status: frozen
+    may_appear_in_nav: false
+    reason: Placeholder/dead surface per SWARM_HOT_ITEMS.
+
+cron_jobs:
+  pulse:
+    status: active
+    may_run: true
+    reason: Cheap heartbeat and assurance watch.
+  agni_check:
+    status: active
+    may_run: true
+    reason: AGNI state check.
+  morning_brief:
+    status: active
+    may_run: true
+    reason: Morning operator synthesis.
+  ontology_insight_brief:
+    status: active
+    may_run: true
+    reason: Ontology-grounded daily brief.
+  witness_consolidation:
+    status: active
+    may_run: true
+    reason: Witness consolidation.
+  memory_health:
+    status: active
+    may_run: true
+    reason: Memory health heartbeat.
+  trishula_triage:
+    status: active
+    may_run: true
+    reason: Inbox triage.
+  subconscious_hum:
+    status: research_preserved
+    may_run: true
+    reason: Existing scheduled research metabolism; candidate for utility scoring.
+  hypnagogic_journal:
+    status: research_preserved
+    may_run: true
+    reason: Existing scheduled research metabolism; candidate for utility scoring.
+  sprint_generator:
+    status: active
+    may_run: true
+    reason: Daily sprint synthesis.
+  subconscious_fleet:
+    status: frozen
+    may_run: false
+    reason: Disabled in cron_jobs; do not reactivate without utility case.
+  jk_scout:
+    status: active
+    may_run: true
+    reason: Jagat Kalyan scout loop.
+  jk_evolve:
+    status: active
+    may_run: true
+    reason: Jagat Kalyan codebase evolution.
+  jk_pulse:
+    status: active
+    may_run: true
+    reason: Jagat Kalyan heartbeat.
+  overnight_director:
+    status: active
+    may_run: true
+    reason: Existing overnight director handler.
+  scout_sweep:
+    status: active
+    may_run: true
+    reason: Scout sweep handler.
+  scout_synthesis:
+    status: active
+    may_run: true
+    reason: Scout synthesis handler.
+
+state_writers:
+  api_operator_pid:
+    file: api/main.py
+    status: active
+    may_write_state: true
+    domains: [operator_pid]
+  runtime_state:
+    file: dharma_swarm/runtime_state.py
+    status: active
+    may_write_state: true
+    domains: [runtime]
+  session_store:
+    file: dharma_swarm/operator_core/session_store.py
+    status: active
+    may_write_state: true
+    domains: [sessions, transcripts, audit]
+  event_memory:
+    file: dharma_swarm/engine/event_memory.py
+    status: active
+    may_write_state: true
+    domains: [events, retrieval_log, source_chunks]
+  retrieval_feedback:
+    file: dharma_swarm/engine/retrieval_feedback.py
+    status: active
+    may_write_state: true
+    domains: [retrieval_utility]
+  config:
+    file: dharma_swarm/config.py
+    status: active
+    may_write_state: true
+    domains: [config]
+  doctor:
+    file: dharma_swarm/doctor.py
+    status: active
+    may_write_state: true
+    domains: [health]
+
+overlap_families:
+  memory:
+    target_shape: "one write path, one consolidation path, one retrieval path"
+    canonical_files:
+      - dharma_swarm/engine/event_memory.py
+      - dharma_swarm/operator_core/session_store.py
+      - dharma_swarm/engine/retrieval_feedback.py
+    adapters_or_views:
+      - dharma_swarm/semantic_memory_bridge.py
+      - dharma_swarm/memory_palace.py
+    sublation_candidates:
+      - dharma_swarm/memory.py
+      - dharma_swarm/agent_memory.py
+      - dharma_swarm/agent_memory_manager.py
+      - dharma_swarm/memory_lattice.py
+      - dharma_swarm/persistent_memory.py
+      - dharma_swarm/organism_memory.py
+      - dharma_swarm/experiment_memory.py
+      - dharma_swarm/routing_memory.py
+      - dharma_swarm/engine/conversation_memory.py
+  provider_routing:
+    target_shape: "one public routing facade with provider implementations behind it"
+    canonical_files:
+      - dharma_swarm/provider_policy.py
+      - dharma_swarm/base_provider.py
+      - dharma_swarm/models.py
+    adapters_or_views:
+      - dharma_swarm/providers.py
+      - dharma_swarm/runtime_provider.py
+      - dharma_swarm/model_hierarchy.py
+    sublation_candidates:
+      - dharma_swarm/model_routing.py
+      - dharma_swarm/model_manager.py
+      - dharma_swarm/model_registry.py
+      - dharma_swarm/model_catalog.py
+      - dharma_swarm/power_model_catalog.py
+      - dharma_swarm/smart_router.py
+      - dharma_swarm/tiny_router_shadow.py
+      - dharma_swarm/router_v1.py
+      - dharma_swarm/providers_extended.py
+  telemetry:
+    target_shape: "one metric/event sink, multiple read-only projections"
+    canonical_files:
+      - dharma_swarm/telemetry_plane.py
+      - dharma_swarm/observability.py
+    adapters_or_views:
+      - dharma_swarm/telemetry_views.py
+      - dharma_swarm/runtime_telemetry_projector.py
+      - api/routers/telemetry.py
+    sublation_candidates:
+      - dharma_swarm/telemetry_optimizer.py
+      - dharma_swarm/epistemic_telemetry.py
+  terminal:
+    target_shape: "one Bun terminal, one Python bridge, one session store"
+    canonical_files:
+      - terminal/src/index.tsx
+      - dharma_swarm/terminal_bridge.py
+      - dharma_swarm/operator_core/session_store.py
+    adapters_or_views:
+      - terminal/src/persistence.ts
+      - terminal/src/state.ts
+    sublation_candidates:
+      - terminal-v2/src
+      - dharma_swarm/tui_legacy.py

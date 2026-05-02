@@ -1,0 +1,77 @@
+# INTERFACE_MISMATCH_MAP — machine-readable form.
+#
+# This file is the executable counterpart to INTERFACE_MISMATCH_MAP.md.
+# Each entry is consumed by:
+#   - scripts/uplift_guards/mismatch_registry.py (pre-commit guard)
+#   - tests/mismatches/test_MISMATCH_<nn>.py    (xfail until status: resolved)
+#   - dgc mismatch list                          (CLI surface)
+#
+# Severity:  BLOCKER (prevents task execution) | DEGRADED (silent loss / fragility)
+# Status:    open    (still a problem)        | resolved (fixed in `fixed_in` commit)
+#
+# Adding a new entry: append below, increment id. Removing: never delete; flip
+# status to `resolved` and record `fixed_in`. Keep the historical lineage.
+#
+# This is a partial seed (5 of 25 entries) demonstrating the schema. The
+# remaining 20 entries should be migrated from INTERFACE_MISMATCH_MAP.md by
+# the Mismatch-Resolver agent (one entry per uplift-cron tick).
+
+version: 1
+generated_from: INTERFACE_MISMATCH_MAP.md
+last_synced: "2026-04-19"
+
+entries:
+  - id: MISMATCH-01
+    severity: BLOCKER
+    status: resolved
+    caller: dharma_swarm/tiny_router_shadow.py:494
+    callee: huggingface_hub.snapshot_download
+    summary: >-
+      Unguarded ImportError when huggingface_hub absent crashed
+      _load_tiny_router_artifacts and every infer_tiny_router_shadow() call
+      in default `auto` backend mode. Was the root blocker for Loop 1.
+    fixed_in: working-tree (verified 2026-04-19 — try/except ImportError → return None present at line 494)
+    test_path: tests/mismatches/test_MISMATCH_01.py
+
+  - id: MISMATCH-02
+    severity: BLOCKER
+    status: open
+    caller: dharma_swarm/orchestrate_live.py:1247
+    callee: dharma_swarm/persistent_agent.py:51-52
+    summary: >-
+      `role` and `provider_type` passed as raw strings; PersistentAgent.__init__
+      requires AgentRole and ProviderType enums. Pydantic v2 strict mode rejects.
+      Replication outcome path crashes here.
+    test_path: tests/mismatches/test_MISMATCH_02.py
+
+  - id: MISMATCH-03
+    severity: BLOCKER
+    status: open
+    caller: dharma_swarm/orchestrate_live.py:1248
+    callee: dharma_swarm/persistent_agent.py:52
+    summary: >-
+      provider_type=outcome.child_spec.get("default_provider", "openrouter_free")
+      is a bare string — Pydantic v2 strict-mode validation rejects.
+    test_path: tests/mismatches/test_MISMATCH_03.py
+
+  - id: MISMATCH-05
+    severity: DEGRADED
+    status: open
+    caller: dharma_swarm/orchestrate_live.py:359
+    callee: dharma_swarm/message_bus.py:193
+    summary: >-
+      receive("evolution_loop", limit=20) — `status` defaults to "unread"; after
+      mark_read the messages become invisible to the next receive() call. Silent
+      data loss in the evolution loop's message visibility.
+    test_path: tests/mismatches/test_MISMATCH_05.py
+
+  - id: MISMATCH-07
+    severity: DEGRADED
+    status: open
+    caller: dharma_swarm/swarm.py:363-370
+    callee: dharma_swarm/auto_proposer.py:157
+    summary: >-
+      AutoProposer accepts stigmergy: StigmergyStore | None but several internal
+      methods call await self._stigmergy.read_marks(...) without None-guard.
+      If StigmergyStore init fails, AutoProposer crashes on first cycle.
+    test_path: tests/mismatches/test_MISMATCH_07.py
