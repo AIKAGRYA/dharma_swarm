@@ -513,6 +513,65 @@ def _handle_status(args: argparse.Namespace) -> int:
     return 0
 
 
+def _handle_audit_gates(args: argparse.Namespace) -> int:
+    from dharma_swarm.audit_queries import (
+        proposal_to_outcome_chain,
+        recent_blocks,
+        unrecorded_actions,
+    )
+
+    days = int(args.days)
+    blocks = recent_blocks(days)
+    gaps = unrecorded_actions(days)
+    proposal_ids: list[str] = []
+    for row in gaps:
+        proposal_ids.append(str(row["id"]))
+    for row in blocks:
+        proposal_id = str(row["properties"].get("proposal_id") or "")
+        if proposal_id:
+            proposal_ids.append(proposal_id)
+    sample_proposal_ids = list(dict.fromkeys(proposal_ids))[:5]
+    chains = [
+        proposal_to_outcome_chain(proposal_id)
+        for proposal_id in sample_proposal_ids
+    ]
+
+    print(f"Governance gate audit ({days}d)")
+    print(f"  Recent blocks: {len(blocks)}")
+    print(f"  Ungated proposals: {len(gaps)}")
+
+    if blocks:
+        print("\nRecent blocks:")
+        for row in blocks[:5]:
+            props = row["properties"]
+            proposal_id = str(props.get("proposal_id") or "")[:12]
+            reason = str(props.get("reason") or "").strip()
+            print(f"  - {row['id']} proposal={proposal_id} reason={reason[:96]}")
+
+    if gaps:
+        print("\nUngated proposals:")
+        for row in gaps[:5]:
+            props = row["properties"]
+            title = str(props.get("title") or "").strip()
+            status = str(props.get("status") or "").strip()
+            print(f"  - {row['id']} status={status} title={title[:96]}")
+
+    if chains:
+        print("\nSample chains:")
+        for chain in chains:
+            states = [
+                "P" if chain["proposal"] else "-",
+                "G" if chain["gate_decision"] else "-",
+                "L" if chain["execution_lease"] else "-",
+                "O" if chain["outcome"] else "-",
+                "V" if chain["value_event"] else "-",
+                f"C{len(chain['contributions'])}",
+            ]
+            print(f"  - {chain['proposal_id'][:12]} {'>'.join(states)}")
+
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="dgc", description="DGC command line interface")
     subparsers = parser.add_subparsers(dest="command")
@@ -520,6 +579,12 @@ def main(argv: list[str] | None = None) -> int:
     # status command
     status_parser = subparsers.add_parser("status", help="System status overview")
     status_parser.set_defaults(func=_handle_status)
+
+    audit_parser = subparsers.add_parser("audit", help="Governance audit queries")
+    audit_subparsers = audit_parser.add_subparsers(dest="audit_command")
+    gates_parser = audit_subparsers.add_parser("gates", help="Audit gate decisions")
+    gates_parser.add_argument("--days", type=int, default=7)
+    gates_parser.set_defaults(func=_handle_audit_gates)
 
     # ... other command parsers ...
 
