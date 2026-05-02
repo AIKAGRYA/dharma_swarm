@@ -19,8 +19,10 @@ Every promote call:
 from __future__ import annotations
 
 import asyncio
+import atexit
 import inspect
 import logging
+import threading
 from concurrent.futures import Future, ThreadPoolExecutor, wait
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -41,9 +43,13 @@ from .stigmergy_emit import emit_mark
 logger = logging.getLogger(__name__)
 
 PromotionHook = Callable[["PromoteResult", FrontmatterSchema, str], Awaitable[None] | None]
+_HOOK_EXECUTOR_MAX_WORKERS = 4
+_HOOK_DRAIN_DEFAULT_TIMEOUT_S = 2.0
 _promotion_hooks: list[PromotionHook] = []
 _hook_executor: ThreadPoolExecutor | None = None
 _pending_hook_futures: set[Future] = set()
+_pending_lock = threading.Lock()  # guards _pending_hook_futures mutations
+_executor_shutdown = False
 
 
 @dataclass
@@ -84,21 +90,60 @@ def clear_promotion_hooks() -> None:
     _promotion_hooks.clear()
 
 
-def drain_promotion_hooks(timeout: float = 2.0) -> None:
-    if not _pending_hook_futures:
+def drain_promotion_hooks(timeout: float = _HOOK_DRAIN_DEFAULT_TIMEOUT_S) -> None:
+    """Wait for pending hook futures with a bounded timeout.
+
+    Futures still running after ``timeout`` seconds are logged as overdue and
+    left in flight (the executor keeps the worker thread; subsequent submits
+    queue behind them). Callers needing a hard guarantee must call
+    ``shutdown_hook_executor`` instead.
+    """
+    with _pending_lock:
+        snapshot = set(_pending_hook_futures)
+    if not snapshot:
         return
-    done, _ = wait(set(_pending_hook_futures), timeout=timeout)
-    _pending_hook_futures.difference_update(done)
+    done, not_done = wait(snapshot, timeout=timeout)
+    with _pending_lock:
+        _pending_hook_futures.difference_update(done)
+    if not_done:
+        for future in not_done:
+            logger.warning(
+                "promotion hook still running after %.1fs drain timeout: %r",
+                timeout,
+                future,
+            )
 
 
 def _get_hook_executor() -> ThreadPoolExecutor:
-    global _hook_executor
-    if _hook_executor is None:
+    global _hook_executor, _executor_shutdown
+    if _hook_executor is None or _executor_shutdown:
         _hook_executor = ThreadPoolExecutor(
-            max_workers=1,
+            max_workers=_HOOK_EXECUTOR_MAX_WORKERS,
             thread_name_prefix="chetana-promote-hook",
         )
+        _executor_shutdown = False
     return _hook_executor
+
+
+def shutdown_hook_executor(wait_for_pending: bool = True, timeout: float = 5.0) -> None:
+    """Shut down the hook executor; safe to call multiple times.
+
+    Registered with ``atexit`` so process exit drains pending hooks. Tests can
+    call this explicitly to force cleanup between modules.
+    """
+    global _hook_executor, _executor_shutdown
+    if _hook_executor is None or _executor_shutdown:
+        return
+    if wait_for_pending:
+        drain_promotion_hooks(timeout=timeout)
+    try:
+        _hook_executor.shutdown(wait=False)
+    except Exception:  # pragma: no cover — defensive on shutdown
+        logger.debug("hook executor shutdown raised", exc_info=True)
+    _executor_shutdown = True
+
+
+atexit.register(shutdown_hook_executor)
 
 
 def _run_hook_sync(
@@ -122,10 +167,12 @@ def _run_promotion_hooks_safely(
 
     for hook in list(_promotion_hooks):
         future = _get_hook_executor().submit(_run_hook_sync, hook, result, schema, body)
-        _pending_hook_futures.add(future)
+        with _pending_lock:
+            _pending_hook_futures.add(future)
 
         def _log_done(done: Future, hook_name: str = getattr(hook, "__name__", repr(hook))) -> None:
-            _pending_hook_futures.discard(done)
+            with _pending_lock:
+                _pending_hook_futures.discard(done)
             try:
                 done.result()
             except Exception:

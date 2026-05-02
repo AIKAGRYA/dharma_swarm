@@ -9,9 +9,11 @@ import pytest
 import dharma_swarm.chetana.promote as promote_mod
 from dharma_swarm.chetana.ingest import ingest
 from dharma_swarm.chetana.promote import (
+    _HOOK_EXECUTOR_MAX_WORKERS,
     drain_promotion_hooks,
     promote,
     promotion_hooks,
+    shutdown_hook_executor,
 )
 from dharma_swarm.chetana.provenance import parse_frontmatter
 from dharma_swarm.chetana.runtime_emission import emit_memory_fact_for_atom
@@ -107,3 +109,91 @@ def test_runtime_emission_hook_writes_promoted_atom_fact(
     assert facts[0].source_artifact_id == staged_schema.atom_id
     assert facts[0].provenance["source"] == "chetana.promote"
     assert facts[0].provenance["admission"]["admitter"] == "MemoryLattice.admit_memory_fact"
+
+
+def test_drain_logs_overdue_hooks_without_blocking(
+    chetana_sandbox: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """A hung hook should be logged as overdue, not block drain forever."""
+    warnings: list[str] = []
+    monkeypatch.setattr(
+        promote_mod.logger,
+        "warning",
+        lambda message, *args, **kwargs: warnings.append(message % args if args else message),
+    )
+
+    blocker = Event()
+    started = Event()
+
+    def hung_hook(result, schema, body):
+        started.set()
+        # Wait far longer than the drain timeout so the future is overdue.
+        blocker.wait(timeout=5.0)
+
+    ingested = ingest(
+        source="hung hook body",
+        source_kind="note",
+        title="Hung hook",
+        confidence=0.8,
+    )
+
+    try:
+        with promotion_hooks(hung_hook):
+            promote(staged_path=ingested.atoms[0], promoted_by="tester")
+            assert started.wait(timeout=2.0), "hook never started"
+            drain_promotion_hooks(timeout=0.05)
+    finally:
+        blocker.set()
+        drain_promotion_hooks(timeout=2.0)
+
+    assert any("still running after" in w for w in warnings), warnings
+
+
+def test_shutdown_hook_executor_is_idempotent_and_recreates(chetana_sandbox: Path):
+    """Calling shutdown twice is safe; subsequent submits get a fresh executor."""
+    shutdown_hook_executor(wait_for_pending=False)
+    shutdown_hook_executor(wait_for_pending=False)  # second call is no-op
+    seen: dict[str, bool] = {}
+
+    def hook(result, schema, body):
+        seen["ran"] = True
+
+    ingested = ingest(
+        source="post-shutdown body",
+        source_kind="note",
+        title="Post-shutdown hook",
+        confidence=0.8,
+    )
+
+    with promotion_hooks(hook):
+        promote(staged_path=ingested.atoms[0], promoted_by="tester")
+        drain_promotion_hooks()
+
+    assert seen.get("ran") is True
+
+
+def test_executor_uses_multiple_workers_so_one_hung_hook_does_not_block_all(
+    chetana_sandbox: Path,
+):
+    """With max_workers > 1, a hung hook should not block all subsequent hooks."""
+    assert _HOOK_EXECUTOR_MAX_WORKERS >= 2, "lifecycle hardening requires >1 worker"
+    blocker = Event()
+    other_ran = Event()
+
+    def hang(result, schema, body):
+        blocker.wait(timeout=5.0)
+
+    def quick(result, schema, body):
+        other_ran.set()
+
+    a = ingest(source="A", source_kind="note", title="A", confidence=0.8).atoms[0]
+    b = ingest(source="B", source_kind="note", title="B", confidence=0.8).atoms[0]
+
+    try:
+        with promotion_hooks(hang, quick):
+            promote(staged_path=a, promoted_by="tester")
+            promote(staged_path=b, promoted_by="tester")
+            assert other_ran.wait(timeout=2.0), "non-hung hook never ran"
+    finally:
+        blocker.set()
+        drain_promotion_hooks(timeout=2.0)
