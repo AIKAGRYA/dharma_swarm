@@ -593,10 +593,11 @@ DEFAULT_REGISTER_LOG = Path.home() / ".dharma" / "stigmergy" / "register_marks.j
 
 # Runtime kill-switch for default-path register writes. Per Move 0 / Phase 1
 # safety contract: chetana register writes must be gated until the 48-hour
-# canary passes. Explicit log_path callers (tests, ad-hoc tooling) bypass the
-# gate; only writes to the canonical production log are suppressed when the
-# flag is off. Suppressed writes are counted (process-local) so the gate is
-# observable without leaking mark contents.
+# canary passes. Explicit non-canonical log_path callers (tests, ad-hoc
+# tooling) bypass the gate; writes to the canonical production log are
+# suppressed when the flag is off even if the canonical path was passed
+# explicitly by a defaulted producer. Suppressed writes are counted
+# (process-local) so the gate is observable without leaking mark contents.
 
 _SUPPRESSED_REGISTER_MARK_COUNT: int = 0
 
@@ -611,9 +612,23 @@ def _increment_suppressed_register_mark_count() -> None:
     _SUPPRESSED_REGISTER_MARK_COUNT += 1
 
 
+def _normalized_register_log_path(path: Path) -> Path:
+    try:
+        return Path(path).expanduser().resolve(strict=False)
+    except (OSError, RuntimeError):
+        return Path(path).expanduser().absolute()
+
+
+def _is_canonical_register_log(path: Path) -> bool:
+    return _normalized_register_log_path(path) == _normalized_register_log_path(
+        DEFAULT_REGISTER_LOG
+    )
+
+
 def get_suppressed_register_mark_count() -> int:
     """Return the count of register-mark writes suppressed by the env gate
-    in this process. Diagnostic only; does not include explicit-path writes."""
+    in this process. Diagnostic only; does not include non-canonical
+    explicit-path writes."""
     return _SUPPRESSED_REGISTER_MARK_COUNT
 
 
@@ -638,7 +653,7 @@ def log_to_stigmergy(
     use ``make_register_mark()`` + ``write_register_mark()``.
     """
     resolved = log_path or DEFAULT_REGISTER_LOG
-    if log_path is None and not chetana_register_enabled():
+    if _is_canonical_register_log(resolved) and not chetana_register_enabled():
         _increment_suppressed_register_mark_count()
         return False
     try:
@@ -803,12 +818,13 @@ def write_register_mark(
 
     Best-effort: returns True on success, False on any failure. Never raises.
 
-    Default-path writes are gated by DHARMA_CHETANA_ENABLED=1; suppressed writes
-    increment a process-local counter (see ``get_suppressed_register_mark_count``).
-    Explicit ``log_path`` callers (tests, tooling) bypass the gate.
+    Canonical production-log writes are gated by DHARMA_CHETANA_ENABLED=1;
+    suppressed writes increment a process-local counter (see
+    ``get_suppressed_register_mark_count``). Explicit non-canonical
+    ``log_path`` callers (tests, tooling) bypass the gate.
     """
     resolved = log_path or DEFAULT_REGISTER_LOG
-    if log_path is None and not chetana_register_enabled():
+    if _is_canonical_register_log(resolved) and not chetana_register_enabled():
         _increment_suppressed_register_mark_count()
         return False
     try:

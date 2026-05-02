@@ -177,6 +177,37 @@ def test_tick_real_decay_fires_drift_mark(paths: dict[str, Path]) -> None:
     assert m_disk["plane"] == "evolution"
 
 
+def test_default_register_path_is_gated_when_flag_off(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from dharma_swarm import register_disciplines as rd
+
+    monkeypatch.delenv("DHARMA_CHETANA_ENABLED", raising=False)
+    log = tmp_path / "stigmergy" / "register_marks.jsonl"
+    monkeypatch.setattr(rd, "DEFAULT_REGISTER_LOG", log)
+    monkeypatch.setattr(drift_monitor, "DEFAULT_REGISTER_LOG", log)
+    rd.reset_suppressed_register_mark_count()
+
+    m = drift_monitor.DriftMonitor(
+        watch_path=tmp_path / "drift_watch.jsonl",
+        target_cycles=(25,),
+    )
+    m.add_watch(
+        mutation_id="mut-default-gated",
+        parameter="routing_bias",
+        pre_metrics={"health": 0.60},
+        post_metrics_t5={"health": 0.85},
+        kept_at_cycle=100,
+        original_mark_id="orig-default-gated",
+    )
+
+    produced = m.tick(current_cycle=130, current_metrics={"health": 0.55})
+
+    assert produced == []
+    assert not log.exists()
+    assert rd.get_suppressed_register_mark_count() == 1
+
+
 # ---------------------------------------------------------------------------
 # 5-7. Drift-detection unit cases
 # ---------------------------------------------------------------------------

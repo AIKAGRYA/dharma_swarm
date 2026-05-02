@@ -277,6 +277,23 @@ class TestRegisterEnvGate:
         assert write_register_mark(m) is False
         assert get_suppressed_register_mark_count() == 1
 
+    def test_explicit_canonical_path_suppressed_when_flag_off(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        from dharma_swarm import register_disciplines as rd
+
+        monkeypatch.delenv("DHARMA_CHETANA_ENABLED", raising=False)
+        log = tmp_path / "stigmergy" / "register_marks.jsonl"
+        monkeypatch.setattr(rd, "DEFAULT_REGISTER_LOG", log)
+        reset_suppressed_register_mark_count()
+        m = make_register_mark(
+            DisciplineResult(flagged=True, confidence=0.8, explanation="x", discipline="x")
+        )
+
+        assert write_register_mark(m, log_path=rd.DEFAULT_REGISTER_LOG) is False
+        assert not log.exists()
+        assert get_suppressed_register_mark_count() == 1
+
     def test_default_path_writes_when_flag_on(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):
@@ -310,6 +327,21 @@ class TestRegisterEnvGate:
         log = tmp_path / "legacy.jsonl"
         assert log_to_stigmergy(r, log_path=log) is True
         assert log.exists()
+
+    def test_log_to_stigmergy_explicit_canonical_path_is_gated(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        from dharma_swarm import register_disciplines as rd
+
+        monkeypatch.delenv("DHARMA_CHETANA_ENABLED", raising=False)
+        log = tmp_path / "stigmergy" / "register_marks.jsonl"
+        monkeypatch.setattr(rd, "DEFAULT_REGISTER_LOG", log)
+        reset_suppressed_register_mark_count()
+        r = DisciplineResult(flagged=False, confidence=0.0, explanation="", discipline="x")
+
+        assert log_to_stigmergy(r, log_path=rd.DEFAULT_REGISTER_LOG) is False
+        assert not log.exists()
+        assert get_suppressed_register_mark_count() == 1
 
     def test_only_strict_one_enables(self, monkeypatch: pytest.MonkeyPatch):
         # Truthy-looking but not '1' must still be off
