@@ -206,6 +206,28 @@ def _result_from_legacy(
     )
 
 
+def _run_insight_brief(job: dict[str, Any]) -> CronJobExecutionResult:
+    """Publish the canonical ontology-native Daily Insight Brief."""
+    try:
+        from dharma_swarm.insight_brief import build_and_publish_daily_brief
+
+        path = build_and_publish_daily_brief(
+            ontology_path=job.get("ontology_path") or None,
+            output_dir=job.get("output_dir") or None,
+        )
+        return CronJobExecutionResult(
+            status=CronJobRunStatus.COMPLETED,
+            output=f"Insight brief published: {path}",
+        )
+    except Exception as exc:  # noqa: BLE001
+        error = f"Insight brief failed: {exc}"
+        return CronJobExecutionResult(
+            status=CronJobRunStatus.FAILED,
+            output=error,
+            error=error[:500],
+        )
+
+
 def _portable_model_overrides(
     provider_order: tuple[ProviderType, ...],
     requested_model: str | None,
@@ -487,6 +509,9 @@ def execute_cron_job(job: dict[str, Any]) -> CronJobExecutionResult:
     if handler == "custodians_forge":
         from dharma_swarm.foreman import custodians_forge_fn
         return _result_from_legacy(*custodians_forge_fn(job))
+
+    if handler == "insight_brief":
+        return _run_insight_brief(job)
 
     if handler == "scout_sweep":
         return _run_scout_sweep(job)

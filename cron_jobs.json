@@ -54,8 +54,22 @@
       "openrouter_free",
       "openrouter"
     ],
-    "prompt": "Generate a morning briefing for Dhyana (4:30 AM WITA). Check:\n1. AGNI state (~/agni-workspace/WORKING.md)\n2. Trishula inbox count and any non-ack messages\n3. DGC memory developments from overnight\n4. R_V paper status (~/mech-interp-latent-lab-phase1/R_V_PAPER/)\n5. Any blocked items anywhere in the system\n6. DREAM JOURNAL: read ~/.dharma/subconscious/journal/LATEST_JOURNAL.md — if it exists, include the HOT-temperature ideas from last night's subconscious layer as a section called 'From the Subconscious'. Flag any publishable-relevant or experiment-relevant seeds.\n7. JAGAT KALYAN: Read ~/.dharma/shared/jk_pulse.md for momentum status. Read ~/.dharma/shared/jk_alert.md if it exists — include any HIGH URGENCY items (grant deadlines, partner moves). Check ~/jagat_kalyan/EVOLUTION_LOG.md for overnight codebase changes. Include a 'Jagat Kalyan' section in the brief.\n\nWrite brief, actionable summary to ~/dgc-core/daemon/morning_brief.md",
-    "enabled": true
+    "prompt": "Legacy non-ontology morning briefing. Superseded for Phase 1 by ontology_insight_brief.",
+    "enabled": false
+  },
+  {
+    "id": "ontology_insight_brief",
+    "name": "Ontology-Native Insight Brief",
+    "trigger": "cron",
+    "schedule": {
+      "hour": 4,
+      "minute": 30
+    },
+    "handler": "insight_brief",
+    "ontology_path": "/Users/dhyana/.dharma/ontology.db",
+    "output_dir": "/Users/dhyana/dharma_briefs",
+    "enabled": true,
+    "prompt": "Build the Daily Insight Brief via dharma_swarm.insight_brief. Every claim must cite a persisted Outcome row; ontology failures are fatal."
   },
   {
     "id": "witness_consolidation",
