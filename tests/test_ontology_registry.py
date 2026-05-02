@@ -78,17 +78,25 @@ def populated_registry(registry: OntologyRegistry) -> OntologyRegistry:
 class TestRegistryFactory:
     def test_create_dharma_registry(self, registry: OntologyRegistry) -> None:
         stats = registry.stats()
-        assert stats["registered_types"] == 15  # 8 original + 6 metabolic + 1 custodian type
-        assert stats["registered_links"] >= 40  # 12+8 defs, each with inverse
+        # Net registry shape after Phase 1.1:
+        # 16 base types (original metabolic chain + custodian + ExecutionLease)
+        # + 6 spec-style additions (Claim, Doctrine, Capability, Cause, Movement, R_V_Measurement)
+        # + 3 inquiry-chain (Signal, Question, Evidence)
+        # = 25 ObjectTypes
+        assert stats["registered_types"] == 25
+        assert stats["registered_links"] >= 40  # original ~40 + inquiry-chain pairs
         assert stats["registered_actions"] >= 16
 
     def test_all_type_names(self, registry: OntologyRegistry) -> None:
         names = registry.type_names()
         expected = [
-            "ActionProposal", "AgentIdentity", "Contribution",
-            "CustodianRole", "EvolutionEntry", "Experiment", "GateDecisionRecord",
-            "KnowledgeArtifact", "Outcome", "Paper", "ResearchThread",
-            "TypedTask", "ValueEvent", "VentureCell", "WitnessLog",
+            "ActionProposal", "AgentIdentity", "Capability", "Cause",
+            "Claim", "Contribution", "CustodianRole", "Doctrine",
+            "Evidence", "EvolutionEntry", "ExecutionLease", "Experiment",
+            "GateDecisionRecord", "KnowledgeArtifact", "Movement",
+            "Outcome", "Paper", "Question", "R_V_Measurement",
+            "ResearchThread", "Signal", "TypedTask", "ValueEvent",
+            "VentureCell", "WitnessLog",
         ]
         assert names == expected
 
