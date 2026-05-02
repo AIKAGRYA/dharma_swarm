@@ -30,6 +30,10 @@ rules:
         - "dharma_swarm/review_cycle.py"
         - "dharma_swarm/ginko_backtest.py"
         - "dharma_swarm/ginko_evolution.py"
+        # Membrane owners (added 2026-05-02 for chetana grand memory; gated by
+        # DHARMA_CHETANA_ENABLED canary, see docs/governance/STATE_DIR_OWNERS.md)
+        - "dharma_swarm/register_disciplines.py"
+        - "dharma_swarm/retrieval/retrieval_effect_logger.py"
     pattern: Path.home() / ".dharma"
 
   # ===========================================================================
