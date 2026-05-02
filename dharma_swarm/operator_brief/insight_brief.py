@@ -213,8 +213,12 @@ def run_once(
         cited_fact_ids=brief_input.cited_fact_ids,
     )
 
+    gate_order = list(REQUIRED_GATES) + [
+        gate_name for gate_name in gate_results if gate_name not in REQUIRED_GATES
+    ]
+
     blocked_gate: str | None = None
-    for gate_name in REQUIRED_GATES:
+    for gate_name in gate_order:
         result, reason = gate_results.get(
             gate_name, (GateResult.PASS, "not evaluated")
         )
@@ -636,7 +640,7 @@ def _evaluate_gates(
     drafted: _DraftedBrief,
     cited_fact_ids: list[str],
 ) -> dict[str, tuple[GateResult, str]]:
-    """Run the four required gates against the drafted brief content.
+    """Run the required gates against the drafted brief content.
 
     Strategy:
     1. Call ``keeper.check`` once on the drafted body for CONSENT,
@@ -646,8 +650,13 @@ def _evaluate_gates(
        in the action string, which this seam does not use, so we
        enforce the spirit of the gate ourselves and record it).
     3. Locally enforce DOGMA_DRIFT (must cite ≥1 runtime fact id).
+    4. Preserve any top-level keeper BLOCK from a non-required gate
+       (for example AHIMSA or SATYA) so hard safety decisions cannot
+       be silently discarded by the operator-brief-specific gate list.
 
-    The returned mapping always contains all four required gate names.
+    The returned mapping always contains all four required gate names,
+    plus an extra blocking gate when the upstream keeper blocks outside
+    that narrow set.
     """
     keeper_result: GateCheckResult = keeper.check(
         action="propose operator brief",
@@ -686,6 +695,29 @@ def _evaluate_gates(
             GateResult.FAIL,
             "No runtime fact ids cited; confidence without evidence",
         )
+
+    if keeper_result.decision == GateDecision.BLOCK:
+        blocking_gate = (keeper_result.gate or "").strip()
+        if not blocking_gate:
+            blocking_gate = next(
+                (
+                    name
+                    for name, (result, _reason) in keeper_gates.items()
+                    if result != GateResult.PASS
+                ),
+                "TELOS_GATEKEEPER",
+            )
+        if blocking_gate not in REQUIRED_GATES:
+            result, reason = keeper_gates.get(
+                blocking_gate,
+                (GateResult.FAIL, keeper_result.reason),
+            )
+            if result == GateResult.PASS:
+                result = GateResult.FAIL
+            out[blocking_gate] = (
+                result,
+                reason or keeper_result.reason or "TelosGatekeeper blocked action",
+            )
 
     return out
 
