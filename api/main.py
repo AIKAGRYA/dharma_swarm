@@ -91,6 +91,33 @@ def get_monitor():
     return _state["monitor"]
 
 
+def get_vsm():
+    """Get or create VSMCoordinator singleton for dashboard cybernetics routes."""
+    if "vsm" not in _state:
+        from dharma_swarm.vsm_channels import VSMCoordinator
+        _state["vsm"] = VSMCoordinator()
+    return _state["vsm"]
+
+
+def get_catalytic_graph():
+    """Get or create CatalyticGraph singleton, loading persisted state best-effort."""
+    if "catalytic_graph" not in _state:
+        from dharma_swarm.catalytic_graph import CatalyticGraph
+        graph = CatalyticGraph()
+        with suppress(Exception):
+            graph.load()
+        _state["catalytic_graph"] = graph
+    return _state["catalytic_graph"]
+
+
+def get_gatekeeper():
+    """Get or create TelosGatekeeper singleton for dashboard gate inspection."""
+    if "gatekeeper" not in _state:
+        from dharma_swarm.telos_gates import DEFAULT_GATEKEEPER
+        _state["gatekeeper"] = DEFAULT_GATEKEEPER
+    return _state["gatekeeper"]
+
+
 # ── Lifespan ──────────────────────────────────────────────────────
 
 @asynccontextmanager
@@ -259,6 +286,11 @@ def _register_routers(api_app: FastAPI) -> None:
     from api.routers.routing import router as routing_router
     from api.routers.graphql_router import router as graphql_router
     from api.routers.verify import router as verify_router
+    from api.routers.vsm import router as vsm_router
+    from api.routers.catalytic import router as catalytic_router
+    from api.routers.strange_loop import router as strange_loop_router
+    from api.routers.gates import router as gates_router
+    from api.routers.cascade_router import router as cascade_router
 
     api_app.include_router(health_router)
     api_app.include_router(agents_router)
@@ -273,6 +305,11 @@ def _register_routers(api_app: FastAPI) -> None:
     api_app.include_router(routing_router)
     api_app.include_router(graphql_router)
     api_app.include_router(verify_router)
+    api_app.include_router(vsm_router)
+    api_app.include_router(catalytic_router)
+    api_app.include_router(strange_loop_router)
+    api_app.include_router(gates_router)
+    api_app.include_router(cascade_router)
 
     from api.routers.chat import router as chat_router, ws_router as chat_ws_router
 

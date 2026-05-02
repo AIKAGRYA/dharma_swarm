@@ -29,4 +29,3 @@ if [[ -n "${RUN_DIR}" && -f "${RUN_DIR}/final_probe.pid" ]]; then
 fi
 
 echo "Stopped."
-

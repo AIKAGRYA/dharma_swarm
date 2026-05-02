@@ -56,4 +56,3 @@ if [[ -n "${RUN_DIR}" && -d "${RUN_DIR}/probes" ]]; then
     echo
   done
 fi
-

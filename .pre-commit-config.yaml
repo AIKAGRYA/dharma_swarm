@@ -21,7 +21,7 @@ repos:
     hooks:
       - id: dharma-contract-tests
         name: dharma contract + private-access tests
-        entry: python3 -m pytest tests/test_contracts.py tests/test_private_access.py -q --tb=line
+        entry: bash -c 'PY="${DHARMA_PYTHON:-}"; if [ -z "$PY" ]; then PY=".venv/bin/python"; fi; if [ ! -x "$PY" ]; then PY="python3"; fi; "$PY" -m pytest tests/test_contracts.py tests/test_private_access.py -q --tb=line'
         language: system
         pass_filenames: false
         always_run: true
@@ -35,7 +35,7 @@ repos:
     hooks:
       - id: dharma-uplift-guards
         name: dharma uplift guards (kernel, secrets, hotpath, mismatch)
-        entry: python3 scripts/uplift_guards/run_pre_commit.py
+        entry: bash -c 'PY="${DHARMA_PYTHON:-}"; if [ -z "$PY" ]; then PY=".venv/bin/python"; fi; if [ ! -x "$PY" ]; then PY="python3"; fi; "$PY" scripts/uplift_guards/run_pre_commit.py'
         language: system
         pass_filenames: false
         always_run: true
@@ -50,7 +50,7 @@ repos:
     hooks:
       - id: dharma-test-hygiene
         name: dharma test hygiene (rule 3 + 5)
-        entry: python3 scripts/governance/check_test_hygiene.py --warn-only
+        entry: bash -c 'PY="${DHARMA_PYTHON:-}"; if [ -z "$PY" ]; then PY=".venv/bin/python"; fi; if [ ! -x "$PY" ]; then PY="python3"; fi; "$PY" scripts/governance/check_test_hygiene.py --warn-only'
         language: system
         pass_filenames: false
         always_run: true
@@ -77,7 +77,7 @@ repos:
         # Phase 1 is warn-only so the install does not block on the 4
         # pre-existing real findings. CI (Phase 2) runs in strict mode;
         # Phase 4 promotes anti-slop rules to ERROR locally as well.
-        entry: semgrep --config .semgrep --quiet --metrics=off
+        entry: bash -c 'SSL_CERT_FILE="${SSL_CERT_FILE:-/etc/ssl/cert.pem}" semgrep --config .semgrep --quiet --metrics=off'
         language: system
         pass_filenames: false
         types: [python]

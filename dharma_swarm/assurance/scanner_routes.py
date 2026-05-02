@@ -64,19 +64,24 @@ def _scan_frontend_calls(repo_root: Path) -> list[tuple[str, str, int, str]]:
 
     calls: list[tuple[str, str, int, str]] = []
     for idx, line in enumerate(lines, start=1):
+        stripped = line.lstrip()
+        if stripped.startswith(("function ", "async function ")):
+            continue
         match = FRONTEND_CALL_RE.search(line)
         if not match:
             continue
 
         method = match.group(1).upper()
-        open_paren = line.find("(", match.start())
-        if open_paren < 0:
-            continue
+        # Match ends at the real apiGet<T>( call paren. Do not search from
+        # match.start(); generic type args may contain import("./types").
+        snippet = line[match.end():]
+        for next_line in lines[idx: idx + 5]:
+            snippet += "\n" + next_line
 
         quote_char = ""
         quote_pos = -1
         for candidate in ('"', "`"):
-            pos = line.find(candidate, open_paren)
+            pos = snippet.find(candidate)
             if pos != -1 and (quote_pos == -1 or pos < quote_pos):
                 quote_char = candidate
                 quote_pos = pos
@@ -84,13 +89,13 @@ def _scan_frontend_calls(repo_root: Path) -> list[tuple[str, str, int, str]]:
             continue
 
         if quote_char == '"':
-            end_pos = line.find('"', quote_pos + 1)
+            end_pos = snippet.find('"', quote_pos + 1)
         else:
-            end_pos = line.rfind("`")
+            end_pos = snippet.find("`", quote_pos + 1)
         if end_pos <= quote_pos:
             continue
 
-        raw_path = line[quote_pos + 1:end_pos]
+        raw_path = snippet[quote_pos + 1:end_pos]
         calls.append((method, _normalize_frontend_path(raw_path), idx, line.strip()))
     return calls
 
