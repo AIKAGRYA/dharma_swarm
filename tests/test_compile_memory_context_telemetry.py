@@ -66,3 +66,45 @@ async def test_compile_memory_context_strict_policy_caps_token_budget(tmp_path) 
     assert bundle.metadata["retrieval_policy"]["min_truth_state"] == "promoted"
 
     await lattice.close()
+
+
+@pytest.mark.asyncio
+async def test_log_effect_suppresses_canonical_default_when_flag_off(
+    tmp_path, monkeypatch
+) -> None:
+    """The retrieval-effect JSONL must not write to its canonical default path
+    unless DHARMA_CHETANA_ENABLED=1, mirroring the register-mark gate."""
+    from dharma_swarm.retrieval import retrieval_effect_logger as logger_mod
+
+    monkeypatch.delenv("DHARMA_CHETANA_ENABLED", raising=False)
+    canonical = tmp_path / "retrieval" / "effect.jsonl"
+    monkeypatch.setattr(logger_mod, "DEFAULT_RETRIEVAL_EFFECT_LOG", canonical)
+    logger_mod.reset_suppressed_retrieval_effect_count()
+
+    effect = logger_mod.RetrievalEffect(
+        effect_id=logger_mod.new_effect_id(),
+        session_id="s",
+        task_id="t",
+        injected_fact_ids=[],
+        citation_handles=[],
+        policy_used={},
+        token_budget=0,
+        actual_tokens=0,
+        contradictions_dropped=[],
+        ts=logger_mod.now_iso(),
+    )
+
+    # Default-path call: suppressed
+    assert logger_mod.log_effect(effect) is False
+    assert logger_mod.get_suppressed_retrieval_effect_count() == 1
+    assert not canonical.exists()
+
+    # Explicit non-canonical path: writes through
+    other = tmp_path / "explicit.jsonl"
+    assert logger_mod.log_effect(effect, path=other) is True
+    assert other.exists()
+
+    # Master flag flips → canonical default writes through
+    monkeypatch.setenv("DHARMA_CHETANA_ENABLED", "1")
+    assert logger_mod.log_effect(effect) is True
+    assert canonical.exists()
