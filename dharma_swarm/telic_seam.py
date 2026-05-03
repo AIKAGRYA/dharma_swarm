@@ -568,7 +568,7 @@ class TelicSeam:
         Also records a lineage edge connecting task inputs to outputs.
         Returns the outcome object ID, or None if recording failed.
         """
-        proposal_id = self._proposal_map.get(task.id)
+        proposal_id = self._proposal_id_for_task(task.id)
         try:
             existing = self._existing_outcome_for_proposal(proposal_id)
             if existing is not None:
@@ -805,7 +805,7 @@ class TelicSeam:
 
     def get_proposal_for_task(self, task_id: str) -> str | None:
         """Look up the ActionProposal ID for a task."""
-        return self._proposal_map.get(task_id)
+        return self._proposal_id_for_task(task_id)
 
     def stats(self) -> dict[str, Any]:
         """Summary statistics for the metabolic loop."""
@@ -849,25 +849,27 @@ class TelicSeam:
         outcomes_by_proposal: dict[str, list[str]] = {}
         for outcome in outcomes:
             proposal_id = str(outcome.properties.get("proposal_id") or "")
-            if proposal_id:
-                outcomes_by_proposal.setdefault(proposal_id, []).append(outcome.id)
-                proposal = proposals.get(proposal_id)
-                linked = self._registry.get_links(
-                    source_id=proposal_id,
-                    target_id=outcome.id,
-                    link_name="has_outcome",
+            if not proposal_id:
+                report["orphan_outcomes"].append(outcome.id)
+                continue
+            outcomes_by_proposal.setdefault(proposal_id, []).append(outcome.id)
+            proposal = proposals.get(proposal_id)
+            linked = self._registry.get_links(
+                source_id=proposal_id,
+                target_id=outcome.id,
+                link_name="has_outcome",
+            )
+            if proposal is None or not linked:
+                report["orphan_outcomes"].append(outcome.id)
+            elif proposal.properties.get("agent_id") != outcome.properties.get("agent_id"):
+                report["proposal_outcome_agent_mismatches"].append(
+                    {
+                        "proposal_id": proposal_id,
+                        "outcome_id": outcome.id,
+                        "proposal_agent_id": proposal.properties.get("agent_id"),
+                        "outcome_agent_id": outcome.properties.get("agent_id"),
+                    }
                 )
-                if proposal is None or not linked:
-                    report["orphan_outcomes"].append(outcome.id)
-                elif proposal.properties.get("agent_id") != outcome.properties.get("agent_id"):
-                    report["proposal_outcome_agent_mismatches"].append(
-                        {
-                            "proposal_id": proposal_id,
-                            "outcome_id": outcome.id,
-                            "proposal_agent_id": proposal.properties.get("agent_id"),
-                            "outcome_agent_id": outcome.properties.get("agent_id"),
-                        }
-                    )
 
         for proposal_id, outcome_ids in outcomes_by_proposal.items():
             if len(outcome_ids) > 1:
@@ -936,6 +938,25 @@ class TelicSeam:
         report["is_clean"] = issue_count == 0
         report["issue_count"] = issue_count
         return report
+
+    def _proposal_id_for_task(self, task_id: str) -> str | None:
+        """Find a task's proposal even when the in-memory map was not shared."""
+        proposal_id = self._proposal_map.get(task_id)
+        if proposal_id and self._registry.get_object(proposal_id) is not None:
+            return proposal_id
+
+        matches = [
+            obj
+            for obj in self._registry.get_objects_by_type("ActionProposal")
+            if obj.properties.get("task_id") == task_id
+        ]
+        if not matches:
+            return None
+
+        matches.sort(key=lambda obj: (obj.created_at, obj.id), reverse=True)
+        proposal_id = matches[0].id
+        self._proposal_map[task_id] = proposal_id
+        return proposal_id
 
     def _existing_outcome_for_proposal(self, proposal_id: str | None) -> Any:
         """Return the canonical Outcome for a proposal if one already exists."""
