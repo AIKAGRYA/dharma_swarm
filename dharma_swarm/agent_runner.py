@@ -1082,6 +1082,13 @@ def _resolve_config_ontology_path(
     return state_dir / "ontology.db"
 
 
+def _ensure_telic_proposal(seam: Any, task: Task, agent_id: str) -> None:
+    """Create a fallback proposal for direct AgentRunner execution."""
+    if seam.get_proposal_for_task(task.id) is not None:
+        return
+    seam.record_dispatch(task, agent_id, topology="manual")
+
+
 _ROLE_INSTRUCTIONS: dict[str, str] = {
     "researcher": "Cite sources and evidence for all claims.",
     "cartographer": "Use tables and maps to organize information visually.",
@@ -2602,6 +2609,7 @@ class AgentRunner:
                 ontology_path = _resolve_ontology_path(task, self._config, self._ontology_path)
                 if ontology_path is not None:
                     seam = get_seam(ontology_path)
+                    _ensure_telic_proposal(seam, task, telic_agent_id)
                     outcome_id = seam.record_outcome(
                         task,
                         telic_agent_id,
@@ -2732,6 +2740,7 @@ class AgentRunner:
                 ontology_path = _resolve_ontology_path(task, self._config, self._ontology_path)
                 if ontology_path is not None:
                     seam = get_seam(ontology_path)
+                    _ensure_telic_proposal(seam, task, telic_agent_id)
                     outcome_id = seam.record_outcome(
                         task,
                         telic_agent_id,
