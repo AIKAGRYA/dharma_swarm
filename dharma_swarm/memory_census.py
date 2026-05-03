@@ -1,22 +1,12 @@
-"""Memory Census Engine — reproducible surface inventory.
+"""Memory Census Engine.
 
-Walks the dharma_swarm + Claude Code + ~/.dharma + ~/.smriti substrates,
-emits one structured `MemorySurface` record per durable persistence surface,
-writes JSONL to ``~/.dharma/meta/memory_census/<iso>.jsonl``.
+This module measures memory surfaces across dharma_swarm, ~/.dharma,
+~/.claude, ~/.smriti, MCP/plugin state, and dormant skill promises. It is
+read-only except for the caller-selected report output.
 
-Designed as the ground-truth side of an inventory pipeline: this module
-*measures*, the companion plan *classifies*. Heuristic fields are suffixed
-``_hint`` so callers can distinguish measurement from inference.
-
-Usage:
+Default CLI:
     python -m dharma_swarm.memory_census scan
-    python -m dharma_swarm.memory_census scan --roots dharma_swarm ~/.dharma
-    python -m dharma_swarm.memory_census diff <prior.jsonl> <current.jsonl>
-
-Read-only: this module never deletes, migrates, or rewrites any surface
-it scans. The single write it performs is the JSONL output of its own
-scan, owned and gated like any other ~/.dharma writer (see
-docs/governance/STATE_DIR_OWNERS.md).
+    python scripts/memory_census.py scan --json-only
 """
 
 from __future__ import annotations
@@ -24,166 +14,205 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
 import re
 import subprocess
 import sys
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, Iterator
 
-# ---------------------------------------------------------------------------
-# Schema
-# ---------------------------------------------------------------------------
+CENSUS_VERSION = 2
 
-CENSUS_VERSION = 1
-
-# Reconciliation tags — every prior claim about this surface gets one of:
-RECONCILIATION_TAGS = ("verified", "probable", "stale", "false", "needs_owner")
-
-# Substrate kinds we recognize. ``other`` is the catch-all.
 KNOWN_SUBSTRATES = (
-    "python_module",
+    "python",
     "jsonl",
     "sqlite",
     "markdown",
     "json",
-    "parquet",
+    "json_canvas",
+    "lancedb",
+    "mcp",
+    "plugin",
     "directory",
     "log",
-    "other",
-)
-
-# Heuristic class buckets (Codex's taxonomy, with `_hint` suffix to make
-# clear these are inferred, not measured).
-KNOWN_CLASSES = (
-    "write_authority",
-    "projection",
-    "distiller",
-    "agent_local",
-    "human_curated",
-    "external_mcp",
-    "dormant_promise",
-    "diagnostic",
+    "parquet",
     "unknown",
 )
+
+KNOWN_ROLES = (
+    "write_authority",
+    "projection_index",
+    "distiller_consolidator",
+    "agent_local",
+    "human_curated",
+    "external_mcp_plugin",
+    "dormant_promise",
+    "unknown",
+)
+
+# Backwards-compatible name from the v0 tests/report.
+KNOWN_CLASSES = KNOWN_ROLES
+
+VERIFICATION_STATUSES = ("verified", "probable", "stale", "false", "needs_owner")
+GOVERNANCE_STATUSES = ("governed", "partially_governed", "ungoverned", "unknown")
+POLICY_STATUSES = ("present", "absent", "unknown")
+AUTHORITY_LEVELS = ("human", "system", "agent", "external", "unknown")
+RISK_LEVELS = ("critical", "high", "medium", "low")
+
+
+@dataclass(frozen=True)
+class Evidence:
+    """One factual support item for a census row."""
+
+    kind: str
+    source: str
+    note: str = ""
 
 
 @dataclass(frozen=True)
 class MemorySurface:
-    """One durable memory surface in the ecosystem.
-
-    Fields without ``_hint`` are measured. Fields with ``_hint`` are
-    heuristic and may be wrong — they are inputs to the classification
-    step, not its output.
-    """
+    """One durable memory surface in the ecosystem."""
 
     surface_id: str
-    path: str
+    name: str
+    paths: list[str]
     substrate: str
-    size_bytes: int
-    last_modified: str
-    owner_module_hint: str | None
-    in_state_dir_owners: bool
-    in_semgrep_allowlist: bool
-    write_call_sites: list[str] = field(default_factory=list)
-    read_call_sites: list[str] = field(default_factory=list)
-    class_hint: str = "unknown"
-    risk_hint: str = "low"
-    reconciliation_tag: str = "needs_owner"
+    role: str
+    authority_level: str
+    owner_module: str | None
+    runtime_owner: str | None
+    read_callers: list[str] = field(default_factory=list)
+    write_callers: list[str] = field(default_factory=list)
+    size_bytes: int = 0
+    last_modified: str = ""
+    governance_status: str = "unknown"
+    decay_policy: str = "unknown"
+    provenance_policy: str = "unknown"
+    verification_status: str = "needs_owner"
+    risk: str = "low"
+    evidence: list[Evidence] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
 
+    @property
+    def path(self) -> str:
+        """Compatibility for v0 callers."""
+        return self.paths[0] if self.paths else ""
 
-# ---------------------------------------------------------------------------
-# Stable surface_id
-# ---------------------------------------------------------------------------
+    @property
+    def class_hint(self) -> str:
+        return self.role
+
+    @property
+    def risk_hint(self) -> str:
+        return self.risk
+
+    @property
+    def owner_module_hint(self) -> str | None:
+        return self.owner_module
+
+    @property
+    def in_state_dir_owners(self) -> bool:
+        return self.governance_status in {"governed", "partially_governed"}
+
+    @property
+    def in_semgrep_allowlist(self) -> bool:
+        return any(e.kind == "semgrep_allowlist" for e in self.evidence)
+
+    @property
+    def reconciliation_tag(self) -> str:
+        return self.verification_status
+
+    def to_dict(self) -> dict:
+        return asdict(self)
 
 
 def _surface_id(path: str) -> str:
-    """Deterministic 16-char id derived from the absolute path string."""
     return hashlib.sha256(path.encode("utf-8")).hexdigest()[:16]
 
 
-# ---------------------------------------------------------------------------
-# Substrate detection
-# ---------------------------------------------------------------------------
-
-_SUFFIX_TO_SUBSTRATE = {
-    ".py": "python_module",
-    ".jsonl": "jsonl",
-    ".db": "sqlite",
-    ".sqlite": "sqlite",
-    ".sqlite3": "sqlite",
-    ".md": "markdown",
-    ".json": "json",
-    ".parquet": "parquet",
-    ".log": "log",
-}
+def _display_name(path: Path) -> str:
+    if path.name:
+        return path.name
+    return str(path)
 
 
 def _detect_substrate(path: Path) -> str:
+    if path.is_dir() and path.name.lower() == "lancedb":
+        return "lancedb"
+    if path.name == ".mcp.json":
+        return "mcp"
+    if path.is_dir() and "plugins" in path.parts:
+        return "plugin"
     if path.is_dir():
         return "directory"
     suffix = path.suffix.lower()
-    return _SUFFIX_TO_SUBSTRATE.get(suffix, "other")
-
-
-# ---------------------------------------------------------------------------
-# Size measurement
-# ---------------------------------------------------------------------------
-
-
-def _size_bytes(path: Path) -> int:
-    """File size for files; recursive du for directories."""
-    try:
-        if path.is_file():
-            return path.stat().st_size
-        if path.is_dir():
-            total = 0
-            for sub in path.rglob("*"):
-                try:
-                    if sub.is_file():
-                        total += sub.stat().st_size
-                except (OSError, PermissionError):
-                    continue
-            return total
-    except (OSError, PermissionError):
-        pass
-    return 0
+    return {
+        ".py": "python",
+        ".jsonl": "jsonl",
+        ".db": "sqlite",
+        ".sqlite": "sqlite",
+        ".sqlite3": "sqlite",
+        ".md": "markdown",
+        ".json": "json",
+        ".canvas": "json_canvas",
+        ".parquet": "parquet",
+        ".log": "log",
+    }.get(suffix, "unknown")
 
 
 def _last_modified(path: Path) -> str:
     try:
-        ts = path.stat().st_mtime
-        return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+        return datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc).isoformat()
     except (OSError, PermissionError):
         return ""
 
 
-# ---------------------------------------------------------------------------
-# Governance lookup
-# ---------------------------------------------------------------------------
+def _size_bytes(path: Path) -> int:
+    """Measure size without opening content. Uses du for large directories."""
+    try:
+        if path.is_file():
+            return path.stat().st_size
+        if path.is_dir():
+            result = subprocess.run(
+                ["du", "-sk", str(path)],
+                capture_output=True,
+                check=False,
+                text=True,
+                timeout=20,
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                return int(result.stdout.split()[0]) * 1024
+    except (OSError, PermissionError, subprocess.SubprocessError, ValueError):
+        pass
+    return _fallback_dir_size(path)
+
+
+def _fallback_dir_size(path: Path) -> int:
+    total = 0
+    try:
+        for sub in path.rglob("*"):
+            try:
+                if sub.is_file():
+                    total += sub.stat().st_size
+            except (OSError, PermissionError):
+                continue
+    except (OSError, PermissionError):
+        return 0
+    return total
 
 
 def _load_state_dir_owners(repo_root: Path) -> set[str]:
-    """Return the set of owner-module paths documented in STATE_DIR_OWNERS.md.
-
-    Parses lines that contain a backtick-quoted module path beginning with
-    ``dharma_swarm/``. Tolerates absent file (returns empty set).
-    """
     doc = repo_root / "docs" / "governance" / "STATE_DIR_OWNERS.md"
     if not doc.exists():
         return set()
     owners: set[str] = set()
     for line in doc.read_text(encoding="utf-8").splitlines():
-        for match in re.findall(r"`(dharma_swarm/[\w./_-]+\.py)`", line):
-            owners.add(match)
+        owners.update(re.findall(r"`(dharma_swarm/[\w./_-]+\.py)`", line))
     return owners
 
 
 def _load_semgrep_allowlist(repo_root: Path) -> set[str]:
-    """Return the set of paths in the semgrep dharma-anti-slop allowlist."""
     yml = repo_root / ".semgrep" / "dharma-anti-slop.yml"
     if not yml.exists():
         return set()
@@ -195,107 +224,191 @@ def _load_semgrep_allowlist(repo_root: Path) -> set[str]:
     return paths
 
 
-# ---------------------------------------------------------------------------
-# Owner module hint via grep
-# ---------------------------------------------------------------------------
-
-_DHARMA_PATH_PATTERN = re.compile(r'Path\.home\(\)\s*/\s*"\.dharma"')
+_DHARMA_LITERAL = re.compile(r'Path\.home\(\)\s*/\s*"\.dharma"')
 
 
 def _find_dharma_writers(repo_root: Path) -> dict[str, str]:
-    """Return a map of ``rel/path/under/.dharma`` → ``owner.py`` for every
-    Python file in the repo that references ``Path.home() / ".dharma" / ...``.
-
-    The mapping is best-effort: it picks the first python module that
-    references each ~/.dharma sub-path. Multi-owner cases get whichever
-    file scans first; a follow-up classifier should disambiguate.
-    """
+    """Map literal ~/.dharma path tails to first repo module writer."""
     writers: dict[str, str] = {}
     pkg_root = repo_root / "dharma_swarm"
     if not pkg_root.exists():
         return writers
-    for py in pkg_root.rglob("*.py"):
+    for py in sorted(pkg_root.rglob("*.py")):
         try:
             text = py.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
             continue
-        if not _DHARMA_PATH_PATTERN.search(text):
+        if not _DHARMA_LITERAL.search(text):
             continue
         rel_owner = str(py.relative_to(repo_root))
-        # Extract the literal path tail from each reference: each line is roughly
-        # ``Path.home() / ".dharma" / "stigmergy" / "marks.jsonl"``
         for match in re.finditer(
             r'Path\.home\(\)\s*/\s*"\.dharma"((?:\s*/\s*"[^"]+")+)', text
         ):
             tail = "/".join(re.findall(r'"([^"]+)"', match.group(1)))
             writers.setdefault(tail, rel_owner)
+            if "/" in tail:
+                writers.setdefault(tail.split("/", 1)[0], rel_owner)
     return writers
 
 
-# ---------------------------------------------------------------------------
-# Classifier (heuristic — _hint fields)
-# ---------------------------------------------------------------------------
+def _repo_python_files(repo_root: Path) -> list[Path]:
+    pkg_root = repo_root / "dharma_swarm"
+    if not pkg_root.exists():
+        return []
+    return sorted(pkg_root.rglob("*.py"))
 
-_PYTHON_CLASS_HINTS = (
-    (re.compile(r"class\s+\w*Store\b"), "write_authority"),
-    (re.compile(r"class\s+\w*Ledger\b"), "write_authority"),
-    (re.compile(r"class\s+\w*Registry\b"), "write_authority"),
-    (re.compile(r"class\s+\w*Index\b"), "projection"),
-    (re.compile(r"class\s+\w*Retriever\b"), "projection"),
-    (re.compile(r"class\s+\w*Cache\b"), "projection"),
+
+def _find_call_sites(
+    repo_root: Path,
+    needles: Iterable[str],
+    *,
+    skip: Path | None = None,
+    limit: int = 25,
+) -> list[str]:
+    hits: list[str] = []
+    needle_set = {n for n in needles if n}
+    if not needle_set:
+        return hits
+    for py in _repo_python_files(repo_root):
+        if skip is not None and py == skip:
+            continue
+        try:
+            lines = py.read_text(encoding="utf-8").splitlines()
+        except (OSError, UnicodeDecodeError):
+            continue
+        for idx, line in enumerate(lines, start=1):
+            if any(n in line for n in needle_set):
+                hits.append(f"{py.relative_to(repo_root)}:{idx}")
+                if len(hits) >= limit:
+                    return hits
+                break
+    return hits
+
+
+_PYTHON_ROLE_HINTS = (
+    (re.compile(r"class\s+\w*(Store|Ledger|Registry)\b"), "write_authority"),
+    (re.compile(r"class\s+\w*(Index|Retriever|Cache)\b"), "projection_index"),
+    (re.compile(r"\bdef\s+(decay|revive|prune|consolidate)\b"), "distiller_consolidator"),
     (re.compile(r"class\s+\w*Memory\b"), "agent_local"),
-    (re.compile(r"\bdef\s+decay\b|\bdef\s+revive\b|\bdef\s+prune\b"), "distiller"),
 )
 
 
-def _classify_python(text: str) -> str:
-    for pattern, label in _PYTHON_CLASS_HINTS:
+def _classify_python(text: str, path: Path | None = None) -> str:
+    name = path.name.lower() if path else ""
+    if name.startswith("ginko_"):
+        return "write_authority"
+    for pattern, role in _PYTHON_ROLE_HINTS:
         if pattern.search(text):
-            return label
+            return role
     return "unknown"
 
 
+def _policy_status(text: str, words: Iterable[str]) -> str:
+    lowered = text.lower()
+    return "present" if any(word in lowered for word in words) else "absent"
+
+
+def _governance_status(owner: str | None, owners: set[str], allowlist: set[str]) -> str:
+    if owner and owner in owners and owner in allowlist:
+        return "governed"
+    if owner and (owner in owners or owner in allowlist):
+        return "partially_governed"
+    if owner:
+        return "ungoverned"
+    return "unknown"
+
+
+def _verification_status(
+    *,
+    path_exists: bool,
+    role: str,
+    governance: str,
+    owner: str | None,
+) -> str:
+    if not path_exists:
+        return "false"
+    if role == "dormant_promise":
+        return "stale"
+    if role in {"write_authority", "projection_index"} and not owner:
+        return "needs_owner"
+    if governance == "governed":
+        return "verified"
+    return "probable"
+
+
 def _risk_for(surface: MemorySurface) -> str:
-    """Crude risk: critical if huge+ungoverned, low if governed+small."""
     gb = surface.size_bytes / (1024**3)
-    if gb >= 50 and not surface.in_state_dir_owners:
+    ungoverned = surface.governance_status in {"ungoverned", "unknown"}
+    if gb >= 50 and ungoverned:
         return "critical"
-    if gb >= 10 and not surface.in_state_dir_owners:
+    if gb >= 10 and ungoverned:
         return "high"
-    if surface.size_bytes >= 100 * 1024**2 and not surface.in_state_dir_owners:
+    if surface.role == "write_authority" and ungoverned:
+        return "high"
+    if surface.role == "dormant_promise":
+        return "medium"
+    if surface.role == "human_curated" and surface.governance_status != "governed":
+        return "medium"
+    if surface.size_bytes >= 100 * 1024**2 and ungoverned:
         return "medium"
     return "low"
 
 
-# ---------------------------------------------------------------------------
-# Surface candidate generators
-# ---------------------------------------------------------------------------
-
-# Patterns that suggest a Python file is a memory module.
 _MEMORY_FILENAME_TOKENS = (
-    "memory", "store", "ledger", "archive", "log", "journal", "cache",
-    "buffer", "history", "registry", "recorder", "recall", "remember",
-    "replay", "episode", "stigmergy", "trace", "witness", "digest",
-    "ledger", "vector_store", "graph", "lattice", "palace",
+    "memory",
+    "store",
+    "ledger",
+    "archive",
+    "log",
+    "journal",
+    "cache",
+    "buffer",
+    "history",
+    "registry",
+    "recorder",
+    "recall",
+    "remember",
+    "replay",
+    "episode",
+    "stigmergy",
+    "trace",
+    "witness",
+    "digest",
+    "ginko",
+    "vector_store",
+    "graph",
+    "lattice",
+    "palace",
 )
 
 
 def _is_python_memory_candidate(path: Path) -> bool:
-    name = path.name.lower()
-    if not name.endswith(".py"):
-        return False
-    return any(tok in name for tok in _MEMORY_FILENAME_TOKENS)
+    return path.suffix == ".py" and any(t in path.name.lower() for t in _MEMORY_FILENAME_TOKENS)
 
 
-# Top-level subdirs of ~/.dharma to enumerate as surfaces (each child file
-# or top-level dir becomes its own surface).
-_DHARMA_SURFACE_GLOBS = (
+def _walk_python_memory_modules(
+    pkg_root: Path,
+    *,
+    extra_owners: Iterable[str] = (),
+) -> Iterator[Path]:
+    if not pkg_root.exists():
+        return
+    repo_root = pkg_root.parent
+    extra_set = set(extra_owners)
+    for py in sorted(pkg_root.rglob("*.py")):
+        rel = str(py.relative_to(repo_root))
+        if _is_python_memory_candidate(py) or rel in extra_set:
+            yield py
+
+
+_DHARMA_DEEP_PATTERNS = (
     "*.jsonl",
     "*.json",
     "*.db",
     "*.md",
     "*.canvas",
     "**/marks.jsonl",
+    "**/register_marks.jsonl",
     "**/archive.jsonl",
     "**/experiments.jsonl",
     "**/meta_archive.jsonl",
@@ -306,309 +419,493 @@ _DHARMA_SURFACE_GLOBS = (
 
 
 def _walk_dharma_surfaces(dharma_root: Path) -> Iterator[Path]:
-    """Yield ~/.dharma surfaces: top-level files + per-stream dirs."""
     if not dharma_root.exists():
         return
     seen: set[Path] = set()
-    # Top-level files
-    for entry in dharma_root.iterdir():
-        if entry.is_file() and entry not in seen:
-            seen.add(entry)
-            yield entry
-    # Each top-level subdir is itself a surface (treat directory as one)
-    for entry in dharma_root.iterdir():
-        if entry.is_dir() and not entry.name.startswith("."):
-            seen.add(entry)
-            yield entry
-    # Plus any deep JSONL/SQLite/Parquet/Canvas files we want individual rows for
-    for pattern in _DHARMA_SURFACE_GLOBS:
-        for match in dharma_root.glob(pattern):
+    for entry in sorted(dharma_root.iterdir()):
+        if entry.name.startswith("."):
+            continue
+        seen.add(entry)
+        yield entry
+    for pattern in _DHARMA_DEEP_PATTERNS:
+        for match in sorted(dharma_root.glob(pattern)):
             if match not in seen:
                 seen.add(match)
                 yield match
 
 
-def _walk_python_memory_modules(
-    pkg_root: Path,
-    *,
-    extra_owners: Iterable[str] = (),
-) -> Iterator[Path]:
-    """Walk Python memory modules.
-
-    A file is included if either (a) the filename matches a memory-token
-    heuristic, or (b) the file appears as a known ``~/.dharma/`` writer.
-    The (b) path catches modules whose names don't match memory tokens
-    but whose semantics make them memory authorities (e.g.
-    ``register_disciplines.py``).
-    """
-    if not pkg_root.exists():
-        return
-    extra_set = {str(o) for o in extra_owners}
-    repo_root = pkg_root.parent
-    for py in pkg_root.rglob("*.py"):
-        if _is_python_memory_candidate(py):
-            yield py
-            continue
-        try:
-            rel = str(py.relative_to(repo_root))
-        except ValueError:
-            continue
-        if rel in extra_set:
-            yield py
-
-
-def _walk_human_curated(claude_root: Path) -> Iterator[Path]:
-    """Cabinet, agent-memory, projects/<this>/memory."""
+def _walk_claude_surfaces(claude_root: Path) -> Iterator[Path]:
     candidates = [
+        claude_root / ".mcp.json",
         claude_root / "cabinet",
         claude_root / "agent-memory",
         claude_root / "projects" / "-Users-dhyana" / "memory",
         claude_root / "homunculus",
+        claude_root / "plugins" / "data",
+        claude_root / "plugins" / "marketplaces",
+        claude_root / "rules",
+        claude_root / "sessions",
     ]
-    for c in candidates:
-        if c.exists():
-            yield c
+    for candidate in candidates:
+        if candidate.exists():
+            yield candidate
+    yield from _walk_skill_promises(claude_root / "skills")
+
+
+_DORMANT_SKILL_PATTERNS = (
+    re.compile(r"DharmicMem0Layer", re.IGNORECASE),
+    re.compile(r"\bclass\s+HopRAG\b|\bHopRAG\b", re.IGNORECASE),
+    re.compile(r"capability_registry", re.IGNORECASE),
+)
+
+
+def _walk_skill_promises(skills_root: Path) -> Iterator[Path]:
+    if not skills_root.exists():
+        return
+    for skill in sorted(skills_root.iterdir()):
+        spec = skill / "SKILL.md"
+        if not spec.exists():
+            continue
+        skill_name = skill.name.lower()
+        if any(token in skill_name for token in ("mem0", "agentic-rag", "a2a")):
+            yield skill
+            continue
+        try:
+            text = spec.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        if any(pattern.search(text) for pattern in _DORMANT_SKILL_PATTERNS):
+            yield skill
 
 
 def _walk_smriti(smriti_root: Path) -> Iterator[Path]:
-    if smriti_root.exists():
+    if not smriti_root.exists():
+        return
+    db = smriti_root / "smriti.db"
+    if db.exists():
+        yield db
+    else:
         yield smriti_root
 
 
-# ---------------------------------------------------------------------------
-# Main scan
-# ---------------------------------------------------------------------------
+def _dharma_owner_for(path: Path, *, home: Path, writers: dict[str, str]) -> str | None:
+    dharma_root = home / ".dharma"
+    try:
+        rel = path.relative_to(dharma_root)
+    except ValueError:
+        return None
+    candidates = [str(rel), rel.parts[0] if rel.parts else ""]
+    if len(rel.parts) > 1:
+        candidates.append("/".join(rel.parts[:2]))
+    if path.is_file() and len(rel.parts) > 1:
+        candidates.append(str(rel.parent))
+    for candidate in candidates:
+        if candidate in writers:
+            return writers[candidate]
+    return None
 
 
-def _make_surface(
+def _make_python_surface(
     path: Path,
     *,
     repo_root: Path,
-    state_dir_owners: set[str],
-    semgrep_allowlist: set[str],
-    dharma_writers: dict[str, str],
+    owners: set[str],
+    allowlist: set[str],
 ) -> MemorySurface:
-    """Construct a MemorySurface from a candidate path."""
+    rel = str(path.relative_to(repo_root))
+    evidence = [Evidence("path_exists", str(path), "python memory candidate")]
+    notes: list[str] = []
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        text = ""
+        notes.append("could_not_read_python_source")
+    role = _classify_python(text, path)
+    if rel in owners:
+        evidence.append(Evidence("state_dir_owner", f"docs/governance/STATE_DIR_OWNERS.md", rel))
+    if rel in allowlist:
+        evidence.append(Evidence("semgrep_allowlist", ".semgrep/dharma-anti-slop.yml", rel))
+    dotted = rel.removesuffix(".py").replace("/", ".")
+    callers = _find_call_sites(repo_root, {rel, dotted, path.stem}, skip=path)
+    governance = _governance_status(rel, owners, allowlist)
+    surface = MemorySurface(
+        surface_id=_surface_id(str(path.resolve())),
+        name=_display_name(path),
+        paths=[str(path.resolve())],
+        substrate="python",
+        role=role,
+        authority_level="system",
+        owner_module=rel,
+        runtime_owner=None,
+        read_callers=callers,
+        write_callers=callers,
+        size_bytes=_size_bytes(path),
+        last_modified=_last_modified(path),
+        governance_status=governance,
+        decay_policy=_policy_status(text, {"decay", "prune", "forget", "ttl"}),
+        provenance_policy=_policy_status(text, {"provenance", "source_ref", "signature"}),
+        verification_status=_verification_status(
+            path_exists=True, role=role, governance=governance, owner=rel
+        ),
+        evidence=evidence,
+        notes=notes,
+    )
+    return replace(surface, risk=_risk_for(surface))
+
+
+def _make_runtime_surface(
+    path: Path,
+    *,
+    repo_root: Path,
+    home: Path,
+    owners: set[str],
+    allowlist: set[str],
+    writers: dict[str, str],
+) -> MemorySurface:
     abs_path = str(path.resolve())
     substrate = _detect_substrate(path)
+    evidence = [Evidence("path_exists", abs_path, "runtime memory surface")]
     notes: list[str] = []
-    owner_hint: str | None = None
-    in_owners = False
-    in_allowlist = False
-    class_hint = "unknown"
-    write_calls: list[str] = []
-    read_calls: list[str] = []
+    owner = _dharma_owner_for(path, home=home, writers=writers)
+    if owner is None:
+        notes.append("owner_unresolved")
+    elif owner in owners:
+        evidence.append(Evidence("state_dir_owner", "docs/governance/STATE_DIR_OWNERS.md", owner))
+    if owner in allowlist:
+        evidence.append(Evidence("semgrep_allowlist", ".semgrep/dharma-anti-slop.yml", owner))
 
-    if substrate == "python_module":
-        rel = ""
-        try:
-            rel = str(path.relative_to(repo_root))
-        except ValueError:
-            rel = abs_path
-        owner_hint = rel
-        in_owners = rel in state_dir_owners
-        in_allowlist = rel in semgrep_allowlist
-        try:
-            text = path.read_text(encoding="utf-8")
-            class_hint = _classify_python(text)
-        except (OSError, UnicodeDecodeError):
-            class_hint = "unknown"
-            notes.append("could_not_read_python_source")
+    role = "write_authority" if owner else "unknown"
+    authority = "system" if owner else "unknown"
+    runtime_owner = None
+    if path.name == "lancedb":
+        role = "projection_index"
+        runtime_owner = "unknown_lancedb_writer"
+        notes.append("critical_claim_verified:lancedb_store_present")
+    elif path.name == "conversation_log":
+        role = "write_authority"
+        runtime_owner = "conversation_hooks"
+    elif path.name == "knowledge":
+        role = "write_authority"
+        runtime_owner = "chetana"
+    elif path.name == "ginko":
+        role = "write_authority"
+        runtime_owner = "ginko"
 
-    elif str(path).startswith(str(Path.home() / ".dharma")):
-        # ~/.dharma surface — cross-reference the writer map
-        rel_under = str(path.relative_to(Path.home() / ".dharma"))
-        owner_hint = dharma_writers.get(rel_under)
-        if owner_hint is None:
-            # Try parent (e.g. witness/ matches a writer that produces witness/witness_*.jsonl)
-            parent_rel = str(path.parent.relative_to(Path.home() / ".dharma"))
-            owner_hint = dharma_writers.get(parent_rel)
-            if owner_hint is None:
-                notes.append("owner_unresolved")
-        in_owners = owner_hint in state_dir_owners if owner_hint else False
-        in_allowlist = owner_hint in semgrep_allowlist if owner_hint else False
-        class_hint = "write_authority" if owner_hint else "unknown"
+    callers = _find_call_sites(repo_root, {str(path.relative_to(home)) if home in path.parents else path.name})
+    governance = _governance_status(owner, owners, allowlist)
+    surface = MemorySurface(
+        surface_id=_surface_id(abs_path),
+        name=_display_name(path),
+        paths=[abs_path],
+        substrate=substrate,
+        role=role,
+        authority_level=authority,
+        owner_module=owner,
+        runtime_owner=runtime_owner,
+        read_callers=callers,
+        write_callers=callers if owner else [],
+        size_bytes=_size_bytes(path),
+        last_modified=_last_modified(path),
+        governance_status=governance,
+        decay_policy="unknown",
+        provenance_policy="unknown",
+        verification_status=_verification_status(
+            path_exists=True, role=role, governance=governance, owner=owner
+        ),
+        evidence=evidence,
+        notes=notes,
+    )
+    return replace(surface, risk=_risk_for(surface))
 
-    elif str(path).startswith(str(Path.home() / ".claude")):
-        # Cabinet / agent-memory / projects → human-curated
-        class_hint = "human_curated"
-        owner_hint = None  # by design — human-curated has no Python owner
-        notes.append("human_curated_no_module_owner")
 
-    elif str(path).startswith(str(Path.home() / ".smriti")):
-        class_hint = "agent_local"
-        owner_hint = None
-        notes.append("smriti_managed_via_skill")
+def _make_claude_surface(path: Path, *, home: Path) -> MemorySurface:
+    abs_path = str(path.resolve())
+    evidence = [Evidence("path_exists", abs_path, "Claude Code memory surface")]
+    role = "agent_local"
+    authority = "agent"
+    runtime_owner = "claude_code"
+    substrate = _detect_substrate(path)
+    notes: list[str] = []
+
+    if path.name == "cabinet":
+        role = "human_curated"
+        authority = "human"
+        runtime_owner = "dhyana"
+        md_count = sum(1 for _ in path.rglob("*.md")) if path.exists() else 0
+        evidence.append(Evidence("size_scan", abs_path, f"cabinet_markdown_count={md_count}"))
+        if md_count != 352:
+            notes.append(f"prior_claim_false:cabinet_markdown_count_352 actual={md_count}")
+    elif path.name in {"data", "marketplaces"} and "plugins" in path.parts:
+        role = "external_mcp_plugin"
+        authority = "external"
+        runtime_owner = "claude_plugins"
+    elif path.name == ".mcp.json":
+        role = "external_mcp_plugin"
+        authority = "external"
+        runtime_owner = "mcp_config"
+        evidence.append(Evidence("mcp_config", abs_path, "mounted memory providers may exist"))
+    elif path.parent.name == "skills":
+        role = "dormant_promise"
+        authority = "external"
+        runtime_owner = "skill_spec"
+        evidence.append(Evidence("skill_spec", str(path / "SKILL.md"), "persistent memory promise"))
 
     surface = MemorySurface(
         surface_id=_surface_id(abs_path),
-        path=abs_path,
+        name=_display_name(path),
+        paths=[abs_path],
         substrate=substrate,
+        role=role,
+        authority_level=authority,
+        owner_module=None,
+        runtime_owner=runtime_owner,
         size_bytes=_size_bytes(path),
         last_modified=_last_modified(path),
-        owner_module_hint=owner_hint,
-        in_state_dir_owners=in_owners,
-        in_semgrep_allowlist=in_allowlist,
-        class_hint=class_hint,
-        write_call_sites=write_calls,
-        read_call_sites=read_calls,
+        governance_status="ungoverned",
+        decay_policy="unknown",
+        provenance_policy="unknown",
+        verification_status=_verification_status(
+            path_exists=True, role=role, governance="ungoverned", owner=runtime_owner
+        ),
+        evidence=evidence,
         notes=notes,
-        reconciliation_tag="needs_owner" if class_hint == "unknown" or not in_owners else "probable",
     )
-    # Risk depends on size+governance; recompute now that base fields are set
-    return MemorySurface(**{**asdict(surface), "risk_hint": _risk_for(surface)})
+    return replace(surface, risk=_risk_for(surface))
 
 
-def scan(
-    *,
-    repo_root: Path | None = None,
-    home: Path | None = None,
-) -> list[MemorySurface]:
-    """Walk all candidate substrates and return a list of MemorySurface records.
+def _make_smriti_surface(path: Path) -> MemorySurface:
+    abs_path = str(path.resolve())
+    evidence = [Evidence("path_exists", abs_path, "smriti memory substrate")]
+    if path.suffix == ".db":
+        evidence.append(Evidence("sqlite_schema", abs_path, "schema inspection deferred to DB tools"))
+    surface = MemorySurface(
+        surface_id=_surface_id(abs_path),
+        name=_display_name(path),
+        paths=[abs_path],
+        substrate=_detect_substrate(path),
+        role="write_authority",
+        authority_level="system",
+        owner_module=None,
+        runtime_owner="smriti_skill",
+        size_bytes=_size_bytes(path),
+        last_modified=_last_modified(path),
+        governance_status="ungoverned",
+        decay_policy="unknown",
+        provenance_policy="unknown",
+        verification_status="needs_owner",
+        evidence=evidence,
+        notes=["separate_memory_authority"],
+    )
+    return replace(surface, risk=_risk_for(surface))
 
-    No I/O outside reads. Caller chooses where to persist the result.
-    """
-    repo_root = repo_root or Path(__file__).resolve().parents[1]
-    home = home or Path.home()
 
-    state_dir_owners = _load_state_dir_owners(repo_root)
-    semgrep_allowlist = _load_semgrep_allowlist(repo_root)
-    dharma_writers = _find_dharma_writers(repo_root)
+def scan(*, repo_root: Path | None = None, home: Path | None = None) -> list[MemorySurface]:
+    """Return current memory-surface inventory without mutating scanned stores."""
+    repo_root = (repo_root or Path(__file__).resolve().parents[1]).resolve()
+    home = (home or Path.home()).resolve()
+    owners = _load_state_dir_owners(repo_root)
+    allowlist = _load_semgrep_allowlist(repo_root)
+    writers = _find_dharma_writers(repo_root)
 
     surfaces: list[MemorySurface] = []
     seen: set[str] = set()
 
-    sources: list[Iterable[Path]] = [
-        _walk_python_memory_modules(
-            repo_root / "dharma_swarm",
-            extra_owners=set(dharma_writers.values())
-            | state_dir_owners
-            | semgrep_allowlist,
-        ),
-        _walk_dharma_surfaces(home / ".dharma"),
-        _walk_human_curated(home / ".claude"),
-        _walk_smriti(home / ".smriti"),
-    ]
-
-    for source in sources:
-        for path in source:
-            abs_path = str(path.resolve())
-            if abs_path in seen:
-                continue
-            seen.add(abs_path)
-            try:
-                surfaces.append(
-                    _make_surface(
-                        path,
-                        repo_root=repo_root,
-                        state_dir_owners=state_dir_owners,
-                        semgrep_allowlist=semgrep_allowlist,
-                        dharma_writers=dharma_writers,
-                    )
+    def add(path: Path, maker) -> None:
+        key = str(path.resolve())
+        if key in seen:
+            return
+        seen.add(key)
+        try:
+            surfaces.append(maker(path))
+        except Exception as exc:  # noqa: BLE001 - census should not abort on one bad row
+            surfaces.append(
+                MemorySurface(
+                    surface_id=_surface_id(key),
+                    name=_display_name(path),
+                    paths=[key],
+                    substrate="unknown",
+                    role="unknown",
+                    authority_level="unknown",
+                    owner_module=None,
+                    runtime_owner=None,
+                    verification_status="needs_owner",
+                    risk="medium",
+                    evidence=[Evidence("scan_error", key, repr(exc))],
                 )
-            except Exception as exc:  # noqa: BLE001 — never abort census on a single surface
-                surfaces.append(
-                    MemorySurface(
-                        surface_id=_surface_id(abs_path),
-                        path=abs_path,
-                        substrate="other",
-                        size_bytes=0,
-                        last_modified="",
-                        owner_module_hint=None,
-                        in_state_dir_owners=False,
-                        in_semgrep_allowlist=False,
-                        notes=[f"scan_error: {exc!r}"],
-                        reconciliation_tag="needs_owner",
-                    )
-                )
-    return surfaces
-
-
-# ---------------------------------------------------------------------------
-# Output
-# ---------------------------------------------------------------------------
-
-
-def write_jsonl(surfaces: list[MemorySurface], output_path: Path) -> Path:
-    """Write surfaces as JSONL, one row per surface, sorted by surface_id."""
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    surfaces_sorted = sorted(surfaces, key=lambda s: s.surface_id)
-    with output_path.open("w", encoding="utf-8") as f:
-        f.write(
-            json.dumps(
-                {
-                    "_meta": {
-                        "census_version": CENSUS_VERSION,
-                        "scanned_at": datetime.now(timezone.utc).isoformat(),
-                        "surface_count": len(surfaces_sorted),
-                    }
-                }
             )
-            + "\n"
+
+    extra_owners = set(writers.values()) | owners | allowlist
+    for py in _walk_python_memory_modules(repo_root / "dharma_swarm", extra_owners=extra_owners):
+        add(py, lambda p: _make_python_surface(p, repo_root=repo_root, owners=owners, allowlist=allowlist))
+    for path in _walk_dharma_surfaces(home / ".dharma"):
+        add(
+            path,
+            lambda p: _make_runtime_surface(
+                p,
+                repo_root=repo_root,
+                home=home,
+                owners=owners,
+                allowlist=allowlist,
+                writers=writers,
+            ),
         )
-        for s in surfaces_sorted:
-            f.write(json.dumps(asdict(s), default=str) + "\n")
-    return output_path
+    for path in _walk_claude_surfaces(home / ".claude"):
+        add(path, lambda p: _make_claude_surface(p, home=home))
+    for path in _walk_smriti(home / ".smriti"):
+        add(path, _make_smriti_surface)
+
+    return sorted(surfaces, key=lambda s: (s.risk, s.surface_id))
+
+
+def build_inventory(surfaces: list[MemorySurface], *, scanned_at: str | None = None) -> dict:
+    scanned_at = scanned_at or datetime.now(timezone.utc).isoformat()
+    surfaces_sorted = sorted(surfaces, key=lambda s: s.surface_id)
+    counts: dict[str, dict[str, int]] = {"role": {}, "risk": {}, "verification_status": {}}
+    for surface in surfaces_sorted:
+        counts["role"][surface.role] = counts["role"].get(surface.role, 0) + 1
+        counts["risk"][surface.risk] = counts["risk"].get(surface.risk, 0) + 1
+        status = surface.verification_status
+        counts["verification_status"][status] = counts["verification_status"].get(status, 0) + 1
+    return {
+        "_meta": {
+            "census_version": CENSUS_VERSION,
+            "scanned_at": scanned_at,
+            "surface_count": len(surfaces_sorted),
+            "counts": counts,
+        },
+        "surfaces": [surface.to_dict() for surface in surfaces_sorted],
+    }
+
+
+def write_inventory(
+    surfaces: list[MemorySurface],
+    output_dir: Path,
+    *,
+    json_only: bool = False,
+    scanned_at: str | None = None,
+) -> tuple[Path, Path | None]:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    inventory = build_inventory(surfaces, scanned_at=scanned_at)
+    json_path = output_dir / "memory_surface_inventory.json"
+    json_path.write_text(json.dumps(inventory, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    md_path = None
+    if not json_only:
+        md_path = output_dir / "memory_surface_inventory.md"
+        md_path.write_text(render_markdown(inventory), encoding="utf-8")
+    return json_path, md_path
+
+
+def render_markdown(inventory: dict) -> str:
+    meta = inventory["_meta"]
+    lines = [
+        "# Memory Surface Inventory",
+        "",
+        f"- Census version: {meta['census_version']}",
+        f"- Scanned at: {meta['scanned_at']}",
+        f"- Surface count: {meta['surface_count']}",
+        "",
+        "## Highest Risk",
+        "",
+        "| Risk | Role | Verification | Name | Owner | Size |",
+        "| --- | --- | --- | --- | --- | ---: |",
+    ]
+    risk_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+    rows = sorted(
+        inventory["surfaces"],
+        key=lambda s: (risk_order.get(s["risk"], 9), s["name"], s["surface_id"]),
+    )
+    for row in rows[:80]:
+        owner = row.get("owner_module") or row.get("runtime_owner") or ""
+        lines.append(
+            f"| {row['risk']} | {row['role']} | {row['verification_status']} "
+            f"| {row['name']} | {owner} | {row['size_bytes']} |"
+        )
+    lines.append("")
+    return "\n".join(lines)
+
+
+def default_output_dir(home: Path | None = None) -> Path:
+    return (home or Path.home()) / ".dharma" / "meta"
 
 
 def default_output_path(home: Path | None = None) -> Path:
-    home = home or Path.home()
+    """Compatibility path for v0 JSONL callers."""
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
-    return home / ".dharma" / "meta" / "memory_census" / f"{stamp}.jsonl"
+    return (home or Path.home()) / ".dharma" / "meta" / "memory_census" / f"{stamp}.jsonl"
 
 
-# ---------------------------------------------------------------------------
-# Diff
-# ---------------------------------------------------------------------------
+def write_jsonl(surfaces: list[MemorySurface], output_path: Path) -> Path:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("w", encoding="utf-8") as f:
+        f.write(json.dumps({"_meta": build_inventory(surfaces)["_meta"]}, sort_keys=True) + "\n")
+        for surface in sorted(surfaces, key=lambda s: s.surface_id):
+            f.write(json.dumps(surface.to_dict(), sort_keys=True) + "\n")
+    return output_path
+
+
+def _load_run(path: Path) -> dict[str, dict]:
+    text = path.read_text(encoding="utf-8")
+    if path.suffix == ".json":
+        payload = json.loads(text)
+        return {row["surface_id"]: row for row in payload.get("surfaces", [])}
+    out: dict[str, dict] = {}
+    for line in text.splitlines():
+        if not line.strip():
+            continue
+        row = json.loads(line)
+        if "surface_id" in row:
+            out[row["surface_id"]] = row
+    return out
 
 
 def diff_runs(prior_path: Path, current_path: Path) -> dict[str, list[str]]:
-    """Return added / removed / changed_size surface_ids between two runs."""
-    def _load(path: Path) -> dict[str, dict]:
-        out: dict[str, dict] = {}
-        for line in path.read_text(encoding="utf-8").splitlines():
-            if not line.strip():
-                continue
-            row = json.loads(line)
-            if "surface_id" in row:
-                out[row["surface_id"]] = row
-        return out
-
-    prior = _load(prior_path)
-    current = _load(current_path)
-    added = sorted(set(current) - set(prior))
-    removed = sorted(set(prior) - set(current))
+    prior = _load_run(prior_path)
+    current = _load_run(current_path)
+    common = set(prior) & set(current)
     changed_size = sorted(
-        sid for sid in (set(prior) & set(current))
-        if prior[sid].get("size_bytes") != current[sid].get("size_bytes")
+        sid for sid in common if prior[sid].get("size_bytes") != current[sid].get("size_bytes")
     )
-    return {"added": added, "removed": removed, "changed_size": changed_size}
+    changed_risk = sorted(sid for sid in common if prior[sid].get("risk") != current[sid].get("risk"))
+    return {
+        "added": sorted(set(current) - set(prior)),
+        "removed": sorted(set(prior) - set(current)),
+        "changed_size": changed_size,
+        "changed_risk": changed_risk,
+    }
 
 
-# ---------------------------------------------------------------------------
-# CLI
-# ---------------------------------------------------------------------------
+def _critical_unknown_owner(surfaces: list[MemorySurface]) -> list[MemorySurface]:
+    return [
+        s
+        for s in surfaces
+        if s.risk == "critical" and s.verification_status == "needs_owner"
+    ]
 
 
 def _cmd_scan(args: argparse.Namespace) -> int:
-    repo_root = Path(args.repo_root).resolve() if args.repo_root else None
+    repo_root = Path(args.repo).resolve() if args.repo else None
     home = Path(args.home).resolve() if args.home else None
     surfaces = scan(repo_root=repo_root, home=home)
-    output = Path(args.output).resolve() if args.output else default_output_path(home)
-    write_jsonl(surfaces, output)
-    by_class: dict[str, int] = {}
-    by_risk: dict[str, int] = {}
-    ungoverned = 0
-    for s in surfaces:
-        by_class[s.class_hint] = by_class.get(s.class_hint, 0) + 1
-        by_risk[s.risk_hint] = by_risk.get(s.risk_hint, 0) + 1
-        if not s.in_state_dir_owners and not s.in_semgrep_allowlist:
-            ungoverned += 1
-    print(f"surfaces: {len(surfaces)}")
-    print(f"by class_hint: {dict(sorted(by_class.items()))}")
-    print(f"by risk_hint: {dict(sorted(by_risk.items()))}")
-    print(f"ungoverned: {ungoverned}")
-    print(f"output: {output}")
+    if args.output and str(args.output).endswith(".jsonl"):
+        jsonl = write_jsonl(surfaces, Path(args.output).resolve())
+        print(f"surfaces: {len(surfaces)}")
+        print(f"output: {jsonl}")
+    else:
+        output_dir = Path(args.output_dir).resolve() if args.output_dir else default_output_dir(home)
+        json_path, md_path = write_inventory(surfaces, output_dir, json_only=args.json_only)
+        print(f"surfaces: {len(surfaces)}")
+        print(f"json: {json_path}")
+        if md_path:
+            print(f"markdown: {md_path}")
+    if args.fail_on_critical_unknown_owner:
+        blockers = _critical_unknown_owner(surfaces)
+        if blockers:
+            print(
+                "critical unknown-owner surfaces: "
+                + ", ".join(surface.name for surface in blockers),
+                file=sys.stderr,
+            )
+            return 2
     return 0
 
 
@@ -622,13 +919,16 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="memory_census")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
-    p_scan = sub.add_parser("scan", help="Scan substrates, emit JSONL census.")
-    p_scan.add_argument("--repo-root", default=None)
+    p_scan = sub.add_parser("scan", help="Scan memory surfaces and emit inventory.")
+    p_scan.add_argument("--repo", "--repo-root", dest="repo", default=None)
     p_scan.add_argument("--home", default=None)
-    p_scan.add_argument("--output", default=None)
+    p_scan.add_argument("--output-dir", default=None)
+    p_scan.add_argument("--output", default=None, help="Compatibility JSONL path when suffix is .jsonl.")
+    p_scan.add_argument("--json-only", action="store_true")
+    p_scan.add_argument("--fail-on-critical-unknown-owner", action="store_true")
     p_scan.set_defaults(func=_cmd_scan)
 
-    p_diff = sub.add_parser("diff", help="Compare two prior census runs.")
+    p_diff = sub.add_parser("diff", help="Compare two inventory JSON/JSONL runs.")
     p_diff.add_argument("prior")
     p_diff.add_argument("current")
     p_diff.set_defaults(func=_cmd_diff)
