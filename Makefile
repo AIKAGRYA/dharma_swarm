@@ -1,6 +1,7 @@
 PYTHON ?= python3
 PYTEST ?= pytest
 DASHBOARD_DIR ?= dashboard
+SEMGREP_SSL_CERT_FILE ?= $(shell if [ -r /etc/ssl/cert.pem ]; then printf '%s' /etc/ssl/cert.pem; elif [ -r /opt/homebrew/etc/ca-certificates/cert.pem ]; then printf '%s' /opt/homebrew/etc/ca-certificates/cert.pem; elif [ -r /opt/homebrew/etc/openssl@3/cert.pem ]; then printf '%s' /opt/homebrew/etc/openssl@3/cert.pem; fi)
 
 .PHONY: help xray xray-json compile test-smoke test-all ci-local dashboard-lint dashboard-build \
         semgrep gitleaks precommit-install precommit-run governance-baseline
@@ -58,10 +59,10 @@ semgrep:
 	# Phase 1 is warn-only locally so the install does not block on the
 	# 4 pre-existing real findings (3 shell=True + 1 eval). CI (Phase 2)
 	# uses the stricter mode below; Phase 4 promotes anti-slop rules to ERROR.
-	semgrep --config .semgrep --metrics=off
+	SSL_CERT_FILE="$${SSL_CERT_FILE:-$(SEMGREP_SSL_CERT_FILE)}" semgrep --config .semgrep --metrics=off
 
 semgrep-strict:
-	semgrep --config .semgrep --error --metrics=off
+	SSL_CERT_FILE="$${SSL_CERT_FILE:-$(SEMGREP_SSL_CERT_FILE)}" semgrep --config .semgrep --error --metrics=off
 
 gitleaks:
 	gitleaks detect --source . --redact --no-banner --exit-code 1
@@ -74,7 +75,7 @@ precommit-run:
 
 governance-baseline:
 	@mkdir -p reports/governance
-	semgrep --config .semgrep --json --metrics=off \
+	SSL_CERT_FILE="$${SSL_CERT_FILE:-$(SEMGREP_SSL_CERT_FILE)}" semgrep --config .semgrep --json --metrics=off \
 		--output reports/governance/semgrep-baseline.json || true
 	gitleaks detect --source . --redact --no-banner --exit-code 0 \
 		--report-format json \
