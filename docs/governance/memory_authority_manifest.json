@@ -1,0 +1,143 @@
+{
+  "version": 1,
+  "description": "Executable authority decisions for the first memory control-plane review.",
+  "surfaces": [
+    {
+      "authority_id": "lancedb",
+      "surface_ids": [],
+      "match": {
+        "names": ["lancedb"],
+        "substrates": ["lancedb"]
+      },
+      "owner": "dharma_swarm.memory_palace",
+      "authority_role": "projection_index",
+      "expected_surface_role": "projection_index",
+      "authority_level": "system",
+      "allowed_writers": ["dharma_swarm.memory_palace._LanceDBAdapter"],
+      "allowed_readers": ["dharma_swarm.memory_palace.MemoryPalace"],
+      "retention_class": "rebuildable_projection",
+      "promotion_path": "source_material -> MemoryPalace -> LanceDB projection",
+      "session_start_context": "deny",
+      "truth_authority": false,
+      "status": "active",
+      "notes": "Vector recall accelerator only; not a source of truth."
+    },
+    {
+      "authority_id": "conversation_log",
+      "surface_ids": [],
+      "match": {
+        "names": ["conversation_log"],
+        "substrates": ["directory"]
+      },
+      "owner": "dharma_swarm.conversation_log",
+      "authority_role": "raw_exhaust_audit",
+      "expected_surface_role": "write_authority",
+      "authority_level": "system",
+      "allowed_writers": ["dharma_swarm.conversation_log"],
+      "allowed_readers": ["distillers", "promise_extractors", "audit_tools"],
+      "retention_class": "raw_exhaust_audit",
+      "promotion_path": "conversation_log -> extracted promises/decisions/facts -> governed memory",
+      "session_start_context": "deny",
+      "truth_authority": false,
+      "status": "active",
+      "notes": "Raw conversation text is audit material, not trusted prior context."
+    },
+    {
+      "authority_id": "smriti",
+      "surface_ids": [],
+      "match": {
+        "names": ["smriti.db"],
+        "substrates": ["sqlite"]
+      },
+      "owner": "smriti_skill",
+      "authority_role": "operator_session_memory",
+      "expected_surface_role": "write_authority",
+      "authority_level": "agent",
+      "allowed_writers": ["~/.smriti/engine.py", "smriti skill hooks"],
+      "allowed_readers": ["Claude Code session context", "operator recall tools"],
+      "retention_class": "operator_memory",
+      "promotion_path": "Smriti -> Cabinet/Chetana/ontology only after explicit promotion",
+      "session_start_context": "allow_operator_only",
+      "truth_authority": false,
+      "status": "active",
+      "notes": "Helps Claude/Codex remember the operator; not canonical swarm truth."
+    },
+    {
+      "authority_id": "cabinet",
+      "surface_ids": [],
+      "match": {
+        "names": ["cabinet"],
+        "substrates": ["directory"]
+      },
+      "owner": "Dhyana",
+      "authority_role": "human_curated_high_trust",
+      "expected_surface_role": "human_curated",
+      "authority_level": "human",
+      "allowed_writers": [],
+      "allowed_readers": ["Claude Code", "Codex", "dharma_swarm context compilers"],
+      "retention_class": "human_curated_doctrine",
+      "promotion_path": "human curation -> Cabinet -> governed context",
+      "session_start_context": "allow",
+      "truth_authority": true,
+      "status": "active",
+      "notes": "High-trust human memory. Autonomous writes are forbidden."
+    },
+    {
+      "authority_id": "mem0_integration",
+      "surface_ids": [],
+      "match": {
+        "names": ["mem0-integration"]
+      },
+      "owner": "unassigned_future",
+      "authority_role": "planned_future",
+      "expected_surface_role": "dormant_promise",
+      "authority_level": "external",
+      "allowed_writers": [],
+      "allowed_readers": [],
+      "retention_class": "no_runtime_authority",
+      "promotion_path": "planned spec -> build plan -> runtime wiring -> authority review",
+      "session_start_context": "deny",
+      "truth_authority": false,
+      "status": "planned_future",
+      "notes": "Skill/spec exists; not active runtime memory."
+    },
+    {
+      "authority_id": "agentic_rag",
+      "surface_ids": [],
+      "match": {
+        "names": ["agentic-rag"]
+      },
+      "owner": "unassigned_future",
+      "authority_role": "planned_future",
+      "expected_surface_role": "dormant_promise",
+      "authority_level": "external",
+      "allowed_writers": [],
+      "allowed_readers": [],
+      "retention_class": "no_runtime_authority",
+      "promotion_path": "planned spec -> build plan -> runtime wiring -> authority review",
+      "session_start_context": "deny",
+      "truth_authority": false,
+      "status": "planned_future",
+      "notes": "Skill/spec exists; not active runtime memory."
+    },
+    {
+      "authority_id": "a2a_protocol",
+      "surface_ids": [],
+      "match": {
+        "names": ["a2a-protocol"]
+      },
+      "owner": "unassigned_future",
+      "authority_role": "planned_future",
+      "expected_surface_role": "dormant_promise",
+      "authority_level": "external",
+      "allowed_writers": [],
+      "allowed_readers": [],
+      "retention_class": "no_runtime_authority",
+      "promotion_path": "planned spec -> build plan -> runtime wiring -> authority review",
+      "session_start_context": "deny",
+      "truth_authority": false,
+      "status": "planned_future",
+      "notes": "Skill/spec exists; not active runtime memory."
+    }
+  ]
+}
