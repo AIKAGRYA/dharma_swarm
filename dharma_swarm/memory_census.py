@@ -32,6 +32,7 @@ KNOWN_SUBSTRATES = (
     "json",
     "json_canvas",
     "lancedb",
+    "chroma",
     "mcp",
     "plugin",
     "directory",
@@ -140,6 +141,8 @@ def _display_name(path: Path) -> str:
 def _detect_substrate(path: Path) -> str:
     if path.is_dir() and path.name.lower() == "lancedb":
         return "lancedb"
+    if path.is_dir() and path.name.lower() == "chroma" and ".claude-mem" in path.parts:
+        return "chroma"
     if path.name == ".mcp.json":
         return "mcp"
     if path.is_dir() and "plugins" in path.parts:
@@ -452,6 +455,20 @@ def _walk_claude_surfaces(claude_root: Path) -> Iterator[Path]:
     yield from _walk_skill_promises(claude_root / "skills")
 
 
+def _walk_claude_mem_surfaces(claude_mem_root: Path) -> Iterator[Path]:
+    if not claude_mem_root.exists():
+        return
+    candidates = [
+        claude_mem_root,
+        claude_mem_root / "claude-mem.db",
+        claude_mem_root / "chroma",
+        claude_mem_root / "logs",
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            yield candidate
+
+
 _DORMANT_SKILL_PATTERNS = (
     re.compile(r"DharmicMem0Layer", re.IGNORECASE),
     re.compile(r"\bclass\s+HopRAG\b|\bHopRAG\b", re.IGNORECASE),
@@ -673,6 +690,46 @@ def _make_claude_surface(path: Path, *, home: Path) -> MemorySurface:
     return replace(surface, risk=_risk_for(surface))
 
 
+def _make_claude_mem_surface(path: Path) -> MemorySurface:
+    abs_path = str(path.resolve())
+    evidence = [Evidence("path_exists", abs_path, "claude-mem memory surface")]
+    role = "write_authority"
+    substrate = _detect_substrate(path)
+    runtime_owner = "claude_mem"
+    notes = ["observer_derived_cross_session_memory"]
+
+    if path.name == "chroma":
+        role = "projection_index"
+        notes.append("semantic_projection_not_truth_source")
+    elif path.name == "logs":
+        role = "write_authority"
+        notes.append("raw_claude_mem_operational_log")
+    elif path.name == "claude-mem.db":
+        evidence.append(Evidence("sqlite_schema", abs_path, "observations/session_summaries/pending_messages"))
+    elif path.name == ".claude-mem":
+        notes.append("claude_mem_root_store")
+
+    surface = MemorySurface(
+        surface_id=_surface_id(abs_path),
+        name=_display_name(path),
+        paths=[abs_path],
+        substrate=substrate,
+        role=role,
+        authority_level="system",
+        owner_module=None,
+        runtime_owner=runtime_owner,
+        size_bytes=_size_bytes(path),
+        last_modified=_last_modified(path),
+        governance_status="ungoverned",
+        decay_policy="unknown",
+        provenance_policy="unknown",
+        verification_status="needs_owner",
+        evidence=evidence,
+        notes=notes,
+    )
+    return replace(surface, risk=_risk_for(surface))
+
+
 def _make_smriti_surface(path: Path) -> MemorySurface:
     abs_path = str(path.resolve())
     evidence = [Evidence("path_exists", abs_path, "smriti memory substrate")]
@@ -751,6 +808,8 @@ def scan(*, repo_root: Path | None = None, home: Path | None = None) -> list[Mem
         )
     for path in _walk_claude_surfaces(home / ".claude"):
         add(path, lambda p: _make_claude_surface(p, home=home))
+    for path in _walk_claude_mem_surfaces(home / ".claude-mem"):
+        add(path, _make_claude_mem_surface)
     for path in _walk_smriti(home / ".smriti"):
         add(path, _make_smriti_surface)
 

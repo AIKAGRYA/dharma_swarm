@@ -83,6 +83,86 @@
       "notes": "High-trust human memory. Autonomous writes are forbidden."
     },
     {
+      "authority_id": "claude_mem_root",
+      "surface_ids": [],
+      "match": {
+        "names": [".claude-mem"],
+        "substrates": ["directory"]
+      },
+      "owner": "claude-mem",
+      "authority_role": "observer_derived_cross_session_memory",
+      "expected_surface_role": "write_authority",
+      "authority_level": "system",
+      "allowed_writers": ["claude-mem worker", "claude-mem hooks"],
+      "allowed_readers": ["Claude Code SessionStart context", "audit tools"],
+      "retention_class": "observer_derived_memory_root",
+      "promotion_path": "claude-mem observations -> audited findings -> Cabinet/Chetana/ontology when promoted",
+      "session_start_context": "allow_with_caveat",
+      "truth_authority": false,
+      "status": "active",
+      "notes": "Cross-session observer memory; useful but not canonical truth."
+    },
+    {
+      "authority_id": "claude_mem_db",
+      "surface_ids": [],
+      "match": {
+        "names": ["claude-mem.db"],
+        "substrates": ["sqlite"]
+      },
+      "owner": "claude-mem",
+      "authority_role": "observer_derived_cross_session_memory",
+      "expected_surface_role": "write_authority",
+      "authority_level": "system",
+      "allowed_writers": ["claude-mem worker", "claude-mem hooks"],
+      "allowed_readers": ["Claude Code SessionStart context", "mem-search", "audit tools"],
+      "retention_class": "observer_derived_session_memory",
+      "promotion_path": "claude-mem observations/summaries -> audited findings -> Cabinet/Chetana/ontology when promoted",
+      "session_start_context": "allow_with_caveat",
+      "truth_authority": false,
+      "status": "active",
+      "notes": "Structured observations, summaries, prompts, and pending compression queue."
+    },
+    {
+      "authority_id": "claude_mem_chroma",
+      "surface_ids": [],
+      "match": {
+        "names": ["chroma"],
+        "substrates": ["chroma"]
+      },
+      "owner": "claude-mem",
+      "authority_role": "projection_index",
+      "expected_surface_role": "projection_index",
+      "authority_level": "system",
+      "allowed_writers": ["claude-mem worker"],
+      "allowed_readers": ["mem-search", "semantic retrieval"],
+      "retention_class": "rebuildable_projection",
+      "promotion_path": "claude-mem DB rows -> Chroma projection",
+      "session_start_context": "deny",
+      "truth_authority": false,
+      "status": "active",
+      "notes": "Semantic projection for claude-mem; not a source of truth."
+    },
+    {
+      "authority_id": "claude_mem_logs",
+      "surface_ids": [],
+      "match": {
+        "names": ["logs"],
+        "path_contains": [".claude-mem"]
+      },
+      "owner": "claude-mem",
+      "authority_role": "raw_exhaust_audit",
+      "expected_surface_role": "write_authority",
+      "authority_level": "system",
+      "allowed_writers": ["claude-mem worker"],
+      "allowed_readers": ["audit tools"],
+      "retention_class": "raw_operational_log",
+      "promotion_path": "logs -> audit findings only",
+      "session_start_context": "deny",
+      "truth_authority": false,
+      "status": "active",
+      "notes": "Operational logs are not memory claims."
+    },
+    {
       "authority_id": "mem0_integration",
       "surface_ids": [],
       "match": {

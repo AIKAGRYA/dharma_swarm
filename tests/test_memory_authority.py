@@ -209,10 +209,34 @@ def test_default_manifest_covers_the_five_hot_decisions() -> None:
         "conversation_log",
         "smriti",
         "cabinet",
+        "claude_mem_root",
+        "claude_mem_db",
+        "claude_mem_chroma",
+        "claude_mem_logs",
         "mem0_integration",
         "agentic_rag",
         "a2a_protocol",
     }.issubset(authority_ids)
+
+
+def test_claude_mem_as_truth_authority_fails() -> None:
+    surfaces = [_surface("claude-mem.db", role="write_authority", substrate="sqlite")]
+    review = review_authority(
+        surfaces,
+        _manifest(
+            _entry(
+                "claude_mem_db",
+                "claude-mem.db",
+                authority_role="observer_derived_cross_session_memory",
+                expected_surface_role="write_authority",
+                substrate="sqlite",
+                session_start_context="allow_with_caveat",
+                truth_authority=True,
+            )
+        ),
+    )
+    assert review.failed
+    assert review.dangerous_context_source[0].authority_id == "claude_mem_db"
 
 
 def test_review_renders_one_page_report() -> None:

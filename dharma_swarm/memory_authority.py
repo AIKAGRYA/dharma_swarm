@@ -165,6 +165,10 @@ def review_authority(
                 "conversation_log": "raw_exhaust_audit",
                 "smriti": "operator_session_memory",
                 "cabinet": "human_curated_high_trust",
+                "claude_mem_root": "observer_derived_cross_session_memory",
+                "claude_mem_db": "observer_derived_cross_session_memory",
+                "claude_mem_chroma": "projection_index",
+                "claude_mem_logs": "raw_exhaust_audit",
             }
             required_authority_role = fixed_roles.get(authority_id)
             if required_authority_role and authority_role != required_authority_role:
@@ -258,6 +262,18 @@ def review_authority(
                         entry,
                         surface,
                         "Smriti/operator memory cannot be canonical swarm truth",
+                    )
+                )
+                continue
+
+            if authority_role == "observer_derived_cross_session_memory" and truth_authority:
+                dangerous.append(
+                    _finding(
+                        "dangerous_context_source",
+                        "FAIL",
+                        entry,
+                        surface,
+                        "claude-mem observations can inform sessions but cannot be canonical truth",
                     )
                 )
                 continue

@@ -105,6 +105,14 @@ def _build_home(tmp_path: Path) -> Path:
     (home / ".claude" / ".mcp.json").write_text('{"mcpServers": {}}\n')
     (home / ".claude" / "plugins" / "data").mkdir(parents=True)
 
+    claude_mem = home / ".claude-mem"
+    claude_mem.mkdir()
+    (claude_mem / "claude-mem.db").write_bytes(b"SQLite format 3\x00" + b"\x00" * 100)
+    (claude_mem / "chroma").mkdir()
+    (claude_mem / "chroma" / "index.bin").write_bytes(b"vector")
+    (claude_mem / "logs").mkdir()
+    (claude_mem / "logs" / "claude-mem.log").write_text("ok\n")
+
     smriti = home / ".smriti"
     smriti.mkdir()
     (smriti / "smriti.db").write_bytes(b"SQLite format 3\x00" + b"\x00" * 100)
@@ -175,12 +183,15 @@ def test_scan_detects_required_surface_families(tmp_path: Path) -> None:
     assert "ginko_brier.py" in names
     assert "lancedb" in names
     assert "conversation_log" in names
+    assert ".claude-mem" in names
+    assert "claude-mem.db" in names
+    assert "chroma" in names
     assert "cabinet" in names
     assert "smriti.db" in names
     assert "mem0-integration" in names
     assert "agentic-rag" in names
     assert {"write_authority", "human_curated", "dormant_promise"}.issubset(roles)
-    assert {"python", "lancedb", "sqlite", "mcp", "plugin"}.issubset(substrates)
+    assert {"python", "lancedb", "sqlite", "chroma", "mcp", "plugin"}.issubset(substrates)
     assert all(substrate in KNOWN_SUBSTRATES for substrate in substrates)
 
 
@@ -209,6 +220,21 @@ def test_scan_marks_dormant_skill_specs_as_stale(tmp_path: Path) -> None:
     assert mem0.role == "dormant_promise"
     assert mem0.verification_status == "stale"
     assert any(e.kind == "skill_spec" for e in mem0.evidence)
+
+
+def test_scan_marks_claude_mem_as_observer_derived_memory(tmp_path: Path) -> None:
+    repo = _build_repo(tmp_path)
+    home = _build_home(tmp_path)
+    surfaces = scan(repo_root=repo, home=home)
+    db = next(surface for surface in surfaces if surface.name == "claude-mem.db")
+    chroma = next(surface for surface in surfaces if surface.name == "chroma")
+    root = next(surface for surface in surfaces if surface.name == ".claude-mem")
+    assert db.role == "write_authority"
+    assert db.runtime_owner == "claude_mem"
+    assert "observer_derived_cross_session_memory" in db.notes
+    assert chroma.role == "projection_index"
+    assert chroma.substrate == "chroma"
+    assert root.verification_status == "needs_owner"
 
 
 def _surface(*, size: int, role: str, governance: str) -> MemorySurface:
