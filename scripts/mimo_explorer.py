@@ -26,6 +26,7 @@ import textwrap
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # Config
@@ -100,9 +101,15 @@ PHASES: list[dict] = [
         ),
         "files": [],
         "run_commands": [
-            ("pytest smoke test", "python3 -m pytest tests/ -q --tb=line -x --timeout=10 2>&1 | tail -30"),
-            ("dgc status", "dgc status 2>&1 | head -60"),
-            ("dgc health", "dgc health 2>&1 | head -60"),
+            ("pytest smoke test", {
+                "argv": [
+                    "python3", "-m", "pytest", "tests/", "-q", "--tb=line",
+                    "-x", "--timeout=10",
+                ],
+                "tail": 30,
+            }),
+            ("dgc status", {"argv": ["dgc", "status"], "head": 60}),
+            ("dgc health", {"argv": ["dgc", "health"], "head": 60}),
         ],
     },
     {
@@ -141,9 +148,15 @@ PHASES: list[dict] = [
             "dharma_swarm/agent_registry.py",
         ],
         "run_commands": [
-            ("module count", "find dharma_swarm/dharma_swarm -name '*.py' | wc -l"),
-            ("test count", "find tests -name '*.py' | wc -l"),
-            ("LOC", "wc -l dharma_swarm/dharma_swarm/*.py 2>/dev/null | tail -1"),
+            ("module count", {
+                "argv": ["find", "dharma_swarm/dharma_swarm", "-name", "*.py"],
+                "count_lines": True,
+            }),
+            ("test count", {
+                "argv": ["find", "tests", "-name", "*.py"],
+                "count_lines": True,
+            }),
+            ("LOC", {"wc_total_glob": "dharma_swarm/dharma_swarm/*.py"}),
         ],
     },
 ]
@@ -168,15 +181,43 @@ def _read_file_excerpt(path: Path, max_chars: int = 8000) -> str:
         return f"[ERROR reading {path}: {e}]"
 
 
-def _run_command(label: str, cmd: str) -> str:
-    """Run a shell command and return output."""
+def _trim_command_output(output: str, spec: dict[str, Any]) -> str:
+    lines = output.splitlines()
+    if "head" in spec:
+        return "\n".join(lines[: int(spec["head"])])
+    if "tail" in spec:
+        return "\n".join(lines[-int(spec["tail"]):])
+    return output.strip()
+
+
+def _wc_total(root: Path, pattern: str) -> str:
+    total = 0
+    for path in sorted(root.glob(pattern)):
+        if path.is_file():
+            total += len(path.read_text(encoding="utf-8", errors="replace").splitlines())
+    return f"{total} total"
+
+
+def _run_command(label: str, spec: dict[str, Any]) -> str:
+    """Run an argv-based command spec and return output."""
     try:
+        root = Path.home() / "dharma_swarm"
+        if "wc_total_glob" in spec:
+            return f"$ {label}\n{_wc_total(root, str(spec['wc_total_glob']))}"
+
+        argv = spec.get("argv")
+        if not isinstance(argv, list) or not all(isinstance(part, str) for part in argv):
+            raise ValueError(f"invalid argv command spec: {spec!r}")
         result = subprocess.run(
-            cmd, shell=True, capture_output=True, text=True, timeout=60,
-            cwd=str(Path.home() / "dharma_swarm"),
+            argv, capture_output=True, text=True, timeout=60,
+            cwd=str(root),
         )
         output = result.stdout + result.stderr
-        return f"$ {label}\n{output.strip()}"
+        if spec.get("count_lines"):
+            output = str(len(output.splitlines()))
+        else:
+            output = _trim_command_output(output, spec)
+        return f"$ {label}\n{output}"
     except Exception as e:
         return f"$ {label}\n[ERROR: {e}]"
 

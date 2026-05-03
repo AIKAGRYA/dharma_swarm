@@ -207,6 +207,23 @@ def _git_diff_files(project_path: str) -> list[str]:
         return []
 
 
+def _git_stageable_files(project_path: str) -> list[str]:
+    """Return explicit paths that should be staged for a build commit."""
+    files: set[str] = set(_git_diff_files(project_path))
+    try:
+        result = subprocess.run(
+            ["git", "ls-files", "--others", "--exclude-standard"],
+            capture_output=True, text=True, cwd=project_path, timeout=30,
+        )
+        files.update(result.stdout.strip().splitlines() if result.stdout.strip() else [])
+    except (subprocess.TimeoutExpired, OSError):
+        return []
+    return sorted(
+        path for path in files
+        if path and not path.startswith("../") and not Path(path).is_absolute()
+    )
+
+
 def _git_reset_hard(project_path: str) -> None:
     """Hard reset to discard all changes (rollback)."""
     try:
@@ -225,10 +242,15 @@ def _git_reset_hard(project_path: str) -> None:
 def _git_commit(project_path: str, message: str) -> bool:
     """Stage all changes and commit. Returns True on success."""
     try:
-        subprocess.run(
-            ["git", "add", "-A"],
+        files = _git_stageable_files(project_path)
+        if not files:
+            return False
+        add_result = subprocess.run(
+            ["git", "add", "--", *files],
             capture_output=True, text=True, cwd=project_path, timeout=30,
         )
+        if add_result.returncode != 0:
+            return False
         result = subprocess.run(
             ["git", "commit", "-m", message],
             capture_output=True, text=True, cwd=project_path, timeout=30,
