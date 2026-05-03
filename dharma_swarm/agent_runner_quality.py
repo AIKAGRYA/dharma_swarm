@@ -660,6 +660,12 @@ async def assess_completion_semantics(
         ).strip()
         lowered = normalized.lower()
         quality_score = _clamp01(quality_score * 0.85)  # 15% penalty, not rejection
+        if lowered.startswith(("</think", "</analysis")):
+            return CompletionAssessment(
+                accepted=False,
+                quality_score=min(quality_score, 0.25),
+                reason="Semantic acceptance failed: response contained malformed reasoning tags",
+            )
         if not normalized:
             # Nothing left after stripping — THEN reject
             return CompletionAssessment(

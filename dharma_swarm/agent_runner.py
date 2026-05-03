@@ -24,7 +24,6 @@ from dharma_swarm.models import (
     AgentRole,
     AgentState,
     AgentStatus,
-    GateDecision,
     LLMRequest,
     LLMResponse,
     ProviderType,
@@ -37,13 +36,11 @@ from dharma_swarm.model_catalog import (
     apply_model_pack_metadata,
     selector_from_metadata,
 )
-from dharma_swarm.agent_runner_quality import (
-    CompletionAssessment as _CompletionAssessment,
-    assess_completion_semantics as _assess_completion_semantics,
-    assess_honors_checkpoint as _assess_honors_checkpoint,
-    build_semantic_repair_request as _build_semantic_repair_request,
-    semantic_attempt_timeout_seconds as _semantic_attempt_timeout_seconds,
-    semantic_repair_attempts as _semantic_repair_attempts,
+from dharma_swarm.execution_pipeline import (
+    PipelineError,
+    TaskExecutionPipeline,
+    looks_like_provider_failure as _pipeline_looks_like_provider_failure,
+    required_artifact_paths as _pipeline_required_artifact_paths,
 )
 from dharma_swarm.jikoku_samaya import get_global_tracer as _jikoku_tracer
 from dharma_swarm.runtime_fields import (
@@ -74,20 +71,6 @@ logger = logging.getLogger(__name__)
 from dharma_swarm.config import DEFAULT_CONFIG as _SWARM_CFG
 
 _HEARTBEAT_THRESHOLD = timedelta(seconds=_SWARM_CFG.agent.heartbeat_threshold_seconds)
-_ERROR_PREFIXES = (
-    "error",
-    "api error:",
-    "timeout: exceeded limit",
-    "not logged in · please run /login",
-    "openrouter error:",
-    "no openrouter_api_key set",
-    "credit balance is too low",
-    "credit balance",
-    "insufficient_quota",
-    "rate_limit_exceeded",
-    "you exceeded your current quota",
-    "billing hard limit",
-)
 _PRIORITY_SALIENCE = {
     TaskPriority.LOW: 0.30,
     TaskPriority.NORMAL: 0.50,
@@ -260,7 +243,6 @@ _OPENAI_TOOL_PROVIDER_TYPES = {
     ProviderType.TOGETHER,
     ProviderType.FIREWORKS,
     ProviderType.GOOGLE_AI,
-    ProviderType.OLLAMA,
     ProviderType.SAMBANOVA,
     ProviderType.MISTRAL,
     ProviderType.CHUTES,
@@ -648,13 +630,9 @@ def _available_provider_types(
         return explicit
     if _allow_provider_routing(task, config):
         return None
-    # Pin to agent's configured provider but add CLAUDE_CODE as a last-resort
-    # fallback so tasks degrade gracefully when the primary provider is down.
-    pinned = [config.provider]
-    from dharma_swarm.models import ProviderType as _PT
-    if config.provider != _PT.CLAUDE_CODE:
-        pinned.append(_PT.CLAUDE_CODE)
-    return pinned
+    # Pin to the agent's configured provider. Fallback lanes must be explicit
+    # task/config policy so provider provenance stays auditable.
+    return [config.provider]
 
 
 def _resolved_routing_metadata(task: Task, config: AgentConfig) -> dict[str, Any]:
@@ -1277,15 +1255,7 @@ async def _inject_stigmergy_context(
 
 def _looks_like_provider_failure(content: str) -> bool:
     """Heuristic guard against error strings being marked as completed work."""
-    normalized = (content or "").strip().lower()
-    if not normalized:
-        return True
-    # Short responses that are just error messages
-    if len(normalized) < 200:
-        if any(prefix in normalized for prefix in _ERROR_PREFIXES):
-            return True
-    # Always check startswith for longer content too
-    return any(normalized.startswith(prefix) for prefix in _ERROR_PREFIXES)
+    return _pipeline_looks_like_provider_failure(content)
 
 
 def _task_file_path(task: Task) -> str:
@@ -1317,34 +1287,7 @@ def _task_file_path(task: Task) -> str:
 
 def _required_artifact_paths(task: Task) -> list[Path]:
     """Return required artifact paths declared in task metadata."""
-    metadata = _task_metadata(task)
-    raw_values: list[Any] = []
-    for key in ("target_file", "target_path", "artifact_path", "required_artifact"):
-        value = metadata.get(key)
-        if value:
-            raw_values.append(value)
-    for key in ("required_artifacts", "artifact_paths", "target_files"):
-        value = metadata.get(key)
-        if isinstance(value, list):
-            raw_values.extend(value)
-        elif value:
-            raw_values.append(value)
-
-    out: list[Path] = []
-    seen: set[str] = set()
-    for raw in raw_values:
-        if not isinstance(raw, str):
-            continue
-        text = raw.strip()
-        if not text:
-            continue
-        path = Path(text).expanduser()
-        norm = str(path)
-        if norm in seen:
-            continue
-        seen.add(norm)
-        out.append(path)
-    return out
+    return _pipeline_required_artifact_paths(task)
 
 
 def _task_requires_local_side_effects(task: Task) -> bool:
@@ -1676,14 +1619,6 @@ class AgentRunner:
         expected outcome — this is correct safe behavior until a real backend
         is wired in.
         """
-        import time as _time
-        from dharma_swarm.curriculum_engine import (
-            FrontierTask,
-            frontier_task_to_research_brief,
-        )
-        from dharma_swarm.auto_research.engine import AutoResearchEngine
-        from dharma_swarm.auto_grade.engine import AutoGradeEngine
-
         meta = task.metadata if isinstance(task.metadata, dict) else {}
         row = meta.get("frontier_row")
         if not isinstance(row, dict):
@@ -1691,9 +1626,32 @@ class AgentRunner:
                 "deep_research task missing metadata.frontier_row "
                 "(PR1 dispatcher must store the full row)"
             )
+
+        import time as _time
+        from dharma_swarm.auto_grade.engine import AutoGradeEngine
+        from dharma_swarm.auto_research.engine import AutoResearchEngine
+        from dharma_swarm.auto_research.models import ResearchBrief
+        from dharma_swarm.curriculum_engine import FrontierTask
+
         # Pydantic rehydration — fails loudly if the row is malformed.
         frontier_task = FrontierTask.model_validate(row)
-        brief = frontier_task_to_research_brief(frontier_task)
+        brief_metadata = {
+            **frontier_task.provenance,
+            **frontier_task.metadata,
+            "frontier_id": frontier_task.frontier_id,
+            "source": frontier_task.source,
+            "verifier_type": frontier_task.verifier_type,
+            "difficulty": frontier_task.difficulty,
+        }
+        if meta.get("opportunity_id"):
+            brief_metadata["opportunity_id"] = str(meta["opportunity_id"])
+        brief = ResearchBrief(
+            task_id=frontier_task.frontier_id,
+            topic=frontier_task.title,
+            question=frontier_task.description,
+            requires_recency=frontier_task.source in {"staleness", "freshness"},
+            metadata=brief_metadata,
+        )
 
         research_engine = AutoResearchEngine()
         grade_engine = AutoGradeEngine()
@@ -2326,6 +2284,56 @@ class AgentRunner:
         except Exception:
             logger.debug("Active inference observation failed", exc_info=True)
 
+    async def _record_pipeline_user_request(
+        self,
+        task: Task,
+        request: LLMRequest,
+    ) -> None:
+        self._record_conversation_turn(
+            task,
+            role="user",
+            content=request.messages[0]["content"],
+            turn_index=1,
+        )
+        try:
+            from dharma_swarm.conversation_log import log_agent_turn
+            log_agent_turn(
+                agent_id=self._config.name,
+                task_id=task.id,
+                role="user",
+                content=request.messages[0]["content"][:5000],
+            )
+        except Exception:
+            logger.debug("Conversation turn logging failed", exc_info=True)
+
+    def _build_execution_pipeline(self) -> TaskExecutionPipeline:
+        return TaskExecutionPipeline(
+            config=self._config,
+            has_provider=self._provider is not None,
+            build_prompt=_build_prompt,
+            inject_stigmergy_context=_inject_stigmergy_context,
+            requires_tooling=_requires_tooling,
+            ensure_local_tool_sandbox=self._ensure_local_tool_sandbox,
+            requires_local_side_effects=_task_requires_local_side_effects,
+            can_execute_local_tooling=lambda: _provider_can_execute_local_tooling(
+                self._config,
+                self._sandbox,
+            ),
+            start_active_inference=self._start_active_inference,
+            execute_completion_attempt=lambda task, request, attempt_index: self._execute_completion_attempt(
+                task,
+                request,
+                attempt_index=attempt_index,
+            ),
+            run_deep_research_task=self._run_deep_research_task,
+            record_user_request=self._record_pipeline_user_request,
+            memory_context_provider=(
+                self._memory.get_working_context if self._memory is not None else None
+            ),
+            artifact_path_resolver=_required_artifact_paths,
+            gate_checker=check_with_reflective_reroute,
+        )
+
     # -- lifecycle ----------------------------------------------------------
 
     async def start(self) -> None:
@@ -2388,205 +2396,28 @@ class AgentRunner:
             telic_agent_id = self.agent_id
             telic_cell_id = str(meta.get("cell_id", "") or "")
             telic_task_type = str(meta.get("task_type", "general") or "general")
-            spec_ref = str(meta.get("spec_ref", "")).strip() or None
-            req_refs_raw = meta.get("requirement_refs", [])
-            if isinstance(req_refs_raw, str):
-                req_refs = [req_refs_raw]
-            elif isinstance(req_refs_raw, list):
-                req_refs = [str(r) for r in req_refs_raw if str(r).strip()]
-            else:
-                req_refs = []
-            seed_reflection = str(meta.get("think_notes", "")).strip()
-            if not seed_reflection:
-                seed_reflection = (
-                    f"Task={task.title}. Goal: execute safely with bounded changes."
-                )
-
-            gate = check_with_reflective_reroute(
-                action=task.title,
-                content=task.description,
-                tool_name="agent_runner",
-                think_phase="before_complete",
-                reflection=seed_reflection,
-                max_reroutes=2,
-                spec_ref=spec_ref,
-                requirement_refs=req_refs,
-            )
-            if gate.result.decision == GateDecision.BLOCK:
-                raise RuntimeError(f"Telos block: {gate.result.reason}")
-
-            plan_context = ""
-            if gate.attempts:
-                plan_context = (
-                    "## Reflective Reroute Context\n"
-                    f"- Reroute attempts: {gate.attempts}\n"
-                    f"- Gate reason: {gate.result.reason}\n"
-                    "- Apply these lenses before execution:\n"
-                    + "\n".join(f"  - {s}" for s in gate.suggestions)
-                )
-            request = _build_prompt(task, self._config, plan_context=plan_context)
-            await _inject_stigmergy_context(request, task, self._config)
-            self._record_conversation_turn(
-                task,
-                role="user",
-                content=request.messages[0]["content"],
-                turn_index=1,
-            )
-            # Unified conversation log
             try:
-                from dharma_swarm.conversation_log import log_agent_turn
-                log_agent_turn(
-                    agent_id=self._config.name,
-                    task_id=task.id,
-                    role="user",
-                    content=request.messages[0]["content"][:5000],
-                )
-            except Exception:
-                logger.debug("Conversation turn logging failed", exc_info=True)
+                pipeline_result = await self._build_execution_pipeline().run(task)
+            except PipelineError as pipeline_exc:
+                request = pipeline_exc.request
+                route_request = pipeline_exc.route_request
+                route_decision = pipeline_exc.route_decision
+                response = pipeline_exc.response
+                completion_latency_ms = pipeline_exc.latency_ms
+                observed_quality_score = pipeline_exc.quality_score
+                active_inference_engine = pipeline_exc.active_inference_engine
+                active_inference_prediction = pipeline_exc.active_inference_prediction
+                raise
 
-            # Inject agent self-editing memory into system prompt
-            if self._memory is not None:
-                memory_ctx = await self._memory.get_working_context()
-                if memory_ctx.strip():
-                    request.system = request.system + "\n\n" + memory_ctx
-
-            if _requires_tooling(task, self._config):
-                await self._ensure_local_tool_sandbox(task)
-
-            if (
-                _task_requires_local_side_effects(task)
-                and not _provider_can_execute_local_tooling(self._config, self._sandbox)
-            ):
-                raise RuntimeError(
-                    f"Provider {self._config.provider.value} cannot execute local tooling task "
-                    "without a subprocess agent or attached sandbox"
-                )
-
-            active_inference_engine, active_inference_prediction = (
-                self._start_active_inference(task)
-            )
-
-            if telic_task_type == "deep_research":
-                # PR4: route through AutoResearch + AutoGrade. Returns a
-                # JSON-serialized result with {report, grade, quarantined}.
-                # The Telic Seam at line ~2680 records Outcome/ValueEvent
-                # exactly once — DO NOT duplicate here.
-                result, completion_latency_ms = await self._run_deep_research_task(task)
-                observed_quality_score = 1.0
-            elif self._provider is not None:
-                current_request = request
-                attempts_remaining = _semantic_repair_attempts(task, self._config)
-                attempt_index = 1
-                accepted_checkpoint: Any | None = None
-                while True:
-                    attempt_timeout_seconds = _semantic_attempt_timeout_seconds(
-                        task,
-                        self._config,
-                        attempts_remaining=attempts_remaining,
-                    )
-                    try:
-                        attempt_result = self._execute_completion_attempt(
-                            task,
-                            current_request,
-                            attempt_index=attempt_index,
-                        )
-                        if attempt_timeout_seconds is not None:
-                            (
-                                route_request,
-                                route_decision,
-                                response,
-                                result,
-                                attempt_latency_ms,
-                            ) = await asyncio.wait_for(
-                                attempt_result,
-                                timeout=attempt_timeout_seconds,
-                            )
-                        else:
-                            (
-                                route_request,
-                                route_decision,
-                                response,
-                                result,
-                                attempt_latency_ms,
-                            ) = await attempt_result
-                    except asyncio.TimeoutError:
-                        attempt_label = (
-                            f"{attempt_timeout_seconds:.2f}s"
-                            if attempt_timeout_seconds is not None
-                            else "the attempt budget"
-                        )
-                        completion_latency_ms += (
-                            max(0.0, attempt_timeout_seconds) * 1000.0
-                            if attempt_timeout_seconds is not None
-                            else 0.0
-                        )
-                        assessment = _CompletionAssessment(
-                            accepted=False,
-                            quality_score=0.0,
-                            reason=(
-                                "Semantic acceptance failed: attempt timeout, timed out after "
-                                f"{attempt_label}"
-                            ),
-                        )
-                        observed_quality_score = 0.0
-                        if attempts_remaining <= 0:
-                            raise RuntimeError(assessment.reason)
-                        current_request = _build_semantic_repair_request(
-                            current_request,
-                            failed_result=f"ATTEMPT TIMED OUT after {attempt_label}",
-                            assessment=assessment,
-                            attempt_index=attempt_index,
-                        )
-                        attempts_remaining -= 1
-                        attempt_index += 1
-                        continue
-                    completion_latency_ms += attempt_latency_ms
-                    if _looks_like_provider_failure(result):
-                        raise RuntimeError(result or "Provider returned empty response")
-                    assessment = await _assess_completion_semantics(
-                        task,
-                        self._config,
-                        result,
-                        requires_tooling=_requires_tooling(task, self._config),
-                        requires_local_side_effects=_task_requires_local_side_effects(task),
-                    )
-                    accepted_checkpoint = None
-                    if assessment.accepted:
-                        assessment, accepted_checkpoint = _assess_honors_checkpoint(
-                            task,
-                            result,
-                            semantic_quality_score=assessment.quality_score,
-                        )
-                    observed_quality_score = assessment.quality_score
-                    if assessment.accepted:
-                        if accepted_checkpoint is not None:
-                            updated_meta = _task_metadata(task)
-                            updated_meta["honors_checkpoint"] = accepted_checkpoint.model_dump(mode="json")
-                            task.metadata = updated_meta
-                        break
-                    if attempts_remaining <= 0:
-                        raise RuntimeError(assessment.reason)
-                    current_request = _build_semantic_repair_request(
-                        current_request,
-                        failed_result=result,
-                        assessment=assessment,
-                        attempt_index=attempt_index,
-                    )
-                    attempts_remaining -= 1
-                    attempt_index += 1
-            else:
-                result = (
-                    f"[mock] Agent {self._config.name} completed: {task.title}"
-                )
-                observed_quality_score = 1.0
-
-            required_artifacts = _required_artifact_paths(task)
-            missing_artifacts = [path for path in required_artifacts if not path.exists()]
-            if missing_artifacts:
-                missing_str = ", ".join(str(path) for path in missing_artifacts[:5])
-                raise RuntimeError(
-                    f"Completion contract failed: required artifact missing ({missing_str})"
-                )
+            result = pipeline_result.result
+            request = pipeline_result.request
+            route_request = pipeline_result.route_request
+            route_decision = pipeline_result.route_decision
+            response = pipeline_result.response
+            completion_latency_ms = pipeline_result.latency_ms
+            observed_quality_score = pipeline_result.quality_score
+            active_inference_engine = pipeline_result.active_inference_engine
+            active_inference_prediction = pipeline_result.active_inference_prediction
             self._record_conversation_turn(
                 task,
                 role="assistant",
