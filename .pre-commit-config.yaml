@@ -20,8 +20,8 @@ repos:
   - repo: local
     hooks:
       - id: dharma-contract-tests
-        name: dharma contract + private-access tests
-        entry: python3 -m pytest tests/test_contracts.py tests/test_private_access.py -q --tb=line
+        name: dharma current contract tests
+        entry: scripts/governance/run_pytest_with_repo_env.sh tests/test_contracts_scaffold.py tests/test_operator_core_contracts.py tests/test_runtime_contract.py tests/test_runtime_contract_adapters.py -q --tb=line
         language: system
         pass_filenames: false
         always_run: true
