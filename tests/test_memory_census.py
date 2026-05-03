@@ -330,26 +330,33 @@ def test_cli_scan_writes_default_inventory_shape(tmp_path: Path, capsys: pytest.
     assert (out / "memory_surface_inventory.md").exists()
 
 
-def test_cli_fail_on_critical_unknown_owner(tmp_path: Path) -> None:
-    repo = _build_repo(tmp_path)
-    home = _build_home(tmp_path)
-    big = home / ".dharma" / "lancedb" / "data.bin"
-    big.write_bytes(b"x")
-    from dharma_swarm.memory_census import _cmd_scan, main
+def test_cli_fail_on_critical_unknown_owner(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import dharma_swarm.memory_census as census
 
-    # Avoid creating a huge fixture; assert the flag path is wired by monkeypatching
-    # the private command boundary through the public CLI would duplicate risk tests.
-    assert callable(_cmd_scan)
-    rc = main(
+    blocker = MemorySurface(
+        surface_id="critical",
+        name="lancedb",
+        paths=["/tmp/lancedb"],
+        substrate="lancedb",
+        role="projection_index",
+        authority_level="unknown",
+        owner_module=None,
+        runtime_owner="unknown_lancedb_writer",
+        size_bytes=200 * 1024**3,
+        verification_status="needs_owner",
+        risk="critical",
+    )
+    monkeypatch.setattr(census, "scan", lambda **_: [blocker])
+    rc = census.main(
         [
             "scan",
-            "--repo",
-            str(repo),
-            "--home",
-            str(home),
             "--output-dir",
             str(tmp_path / "out"),
             "--json-only",
+            "--fail-on-critical-unknown-owner",
         ]
     )
-    assert rc == 0
+    assert rc == 2
