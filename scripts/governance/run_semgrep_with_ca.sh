@@ -51,4 +51,31 @@ fi
 
 export SEMGREP_SEND_METRICS=off
 
-exec semgrep "$@"
+args=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --config)
+      if [[ "${2:-}" == ".semgrep" ]]; then
+        args+=(--config .semgrep/dharma-anti-slop.yml --config .semgrep/security.yml)
+        shift 2
+      else
+        args+=("$1")
+        shift
+        if [[ $# -gt 0 ]]; then
+          args+=("$1")
+          shift
+        fi
+      fi
+      ;;
+    --config=.semgrep)
+      args+=(--config .semgrep/dharma-anti-slop.yml --config .semgrep/security.yml)
+      shift
+      ;;
+    *)
+      args+=("$1")
+      shift
+      ;;
+  esac
+done
+
+exec semgrep "${args[@]}"

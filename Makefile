@@ -15,7 +15,7 @@ help:
 	@printf "  make ci-local          # compile + smoke test + xray\n"
 	@printf "  make dashboard-lint    # lint Next dashboard\n"
 	@printf "  make dashboard-build   # build Next dashboard\n"
-	@printf "  make semgrep           # run .semgrep/ rules\n"
+	@printf "  make semgrep           # run production .semgrep rules\n"
 	@printf "  make gitleaks          # scan for secrets\n"
 	@printf "  make precommit-install # install pre-commit git hook\n"
 	@printf "  make precommit-run     # run pre-commit on all files\n"
@@ -58,6 +58,8 @@ semgrep:
 	# Phase 1 is warn-only locally so the install does not block on the
 	# 4 pre-existing real findings (3 shell=True + 1 eval). CI (Phase 2)
 	# uses the stricter mode below; Phase 4 promotes anti-slop rules to ERROR.
+	# The wrapper expands --config .semgrep to production configs only;
+	# .semgrep/tests remains reserved for explicit rule-test runs.
 	scripts/governance/run_semgrep_with_ca.sh --config .semgrep --metrics=off
 
 semgrep-strict:
