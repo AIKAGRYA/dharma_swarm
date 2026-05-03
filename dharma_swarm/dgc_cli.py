@@ -572,7 +572,7 @@ def _handle_audit_gates(args: argparse.Namespace) -> int:
     return 0
 
 
-def main(argv: list[str] | None = None) -> int:
+def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="dgc", description="DGC command line interface")
     subparsers = parser.add_subparsers(dest="command")
 
@@ -586,7 +586,36 @@ def main(argv: list[str] | None = None) -> int:
     gates_parser.add_argument("--days", type=int, default=7)
     gates_parser.set_defaults(func=_handle_audit_gates)
 
-    # ... other command parsers ...
+    # Parse-only compatibility commands used by legacy control-plane tests.
+    dharma_parser = subparsers.add_parser("dharma", help="Dharma corpus controls")
+    dharma_subparsers = dharma_parser.add_subparsers(dest="dharma_cmd")
+    dharma_subparsers.add_parser("status", help="Dharma corpus status")
+    corpus_parser = dharma_subparsers.add_parser("corpus", help="List corpus claims")
+    corpus_parser.add_argument("--status", dest="corpus_status")
+    corpus_parser.add_argument("--category", dest="corpus_category")
+    review_parser = dharma_subparsers.add_parser("review", help="Review corpus claim")
+    review_parser.add_argument("claim_id")
+
+    evolve_parser = subparsers.add_parser("evolve", help="Evolution controls")
+    evolve_subparsers = evolve_parser.add_subparsers(dest="evolve_cmd")
+    apply_parser = evolve_subparsers.add_parser("apply", help="Apply evolution change")
+    apply_parser.add_argument("component")
+    apply_parser.add_argument("description")
+    promote_parser = evolve_subparsers.add_parser("promote", help="Promote evolution entry")
+    promote_parser.add_argument("entry_id")
+    rollback_parser = evolve_subparsers.add_parser("rollback", help="Rollback evolution entry")
+    rollback_parser.add_argument("entry_id")
+    rollback_parser.add_argument("--reason")
+
+    stigmergy_parser = subparsers.add_parser("stigmergy", help="Inspect stigmergy marks")
+    stigmergy_parser.add_argument("--file", dest="stig_file")
+    subparsers.add_parser("hum", help="Show system hum")
+
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = _build_parser()
 
     args = parser.parse_args(argv)
     if not hasattr(args, "func"):
