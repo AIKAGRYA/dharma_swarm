@@ -12,11 +12,13 @@ and ``stigmergy.py``.  All I/O is async via aiofiles.
 
 from __future__ import annotations
 
+import ast
 import asyncio
 import json
+import operator
 from datetime import datetime
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
 import aiofiles
 from pydantic import BaseModel, Field
@@ -31,6 +33,114 @@ TargetType = Literal["code_function", "code_file", "claim", "principle", "gate"]
 Relationship = Literal["grounds", "challenges", "extends", "instantiates", "violates"]
 
 _DEFAULT_CITATIONS_PATH = Path.home() / ".dharma" / "citations" / "citations.jsonl"
+
+_SAFE_VERIFICATION_FUNCTIONS = {
+    "int": int,
+    "float": float,
+    "str": str,
+    "bool": bool,
+    "len": len,
+    "abs": abs,
+    "min": min,
+    "max": max,
+    "Path": Path,
+}
+_SAFE_VERIFICATION_CONSTANTS = {"True": True, "False": False, "None": None}
+_SAFE_BINARY_OPS = {
+    ast.Add: operator.add,
+    ast.Sub: operator.sub,
+    ast.Mult: operator.mul,
+    ast.Div: operator.truediv,
+    ast.FloorDiv: operator.floordiv,
+    ast.Mod: operator.mod,
+}
+_SAFE_UNARY_OPS = {
+    ast.UAdd: operator.pos,
+    ast.USub: operator.neg,
+    ast.Not: operator.not_,
+}
+_SAFE_COMPARISONS = {
+    ast.Eq: operator.eq,
+    ast.NotEq: operator.ne,
+    ast.Lt: operator.lt,
+    ast.LtE: operator.le,
+    ast.Gt: operator.gt,
+    ast.GtE: operator.ge,
+    ast.In: lambda left, right: left in right,
+    ast.NotIn: lambda left, right: left not in right,
+}
+_SAFE_PATH_METHODS = {"exists", "is_file", "is_dir"}
+
+
+def _evaluate_verification_expr(expr: str) -> bool:
+    """Evaluate a tiny, expression-only verification language.
+
+    Citation verification strings are persisted data, so they cannot execute
+    Python directly. This evaluator supports the historical simple cases used
+    by the index: literals, arithmetic/comparison/boolean expressions, safe
+    builtins, and read-only ``Path(...).exists()/is_file()/is_dir()`` checks.
+    """
+    if len(expr) > 1000:
+        return False
+    try:
+        tree = ast.parse(expr, mode="eval")
+        return bool(_eval_verification_node(tree.body))
+    except Exception:
+        return False
+
+
+def _eval_verification_node(node: ast.AST) -> Any:
+    if isinstance(node, ast.Constant):
+        return node.value
+    if isinstance(node, ast.Name):
+        if node.id in _SAFE_VERIFICATION_CONSTANTS:
+            return _SAFE_VERIFICATION_CONSTANTS[node.id]
+        raise ValueError(f"unsafe name: {node.id}")
+    if isinstance(node, ast.List):
+        return [_eval_verification_node(item) for item in node.elts]
+    if isinstance(node, ast.Tuple):
+        return tuple(_eval_verification_node(item) for item in node.elts)
+    if isinstance(node, ast.Set):
+        return {_eval_verification_node(item) for item in node.elts}
+    if isinstance(node, ast.UnaryOp) and type(node.op) in _SAFE_UNARY_OPS:
+        return _SAFE_UNARY_OPS[type(node.op)](_eval_verification_node(node.operand))
+    if isinstance(node, ast.BinOp) and type(node.op) in _SAFE_BINARY_OPS:
+        return _SAFE_BINARY_OPS[type(node.op)](
+            _eval_verification_node(node.left),
+            _eval_verification_node(node.right),
+        )
+    if isinstance(node, ast.BoolOp):
+        values = [_eval_verification_node(value) for value in node.values]
+        if isinstance(node.op, ast.And):
+            return all(values)
+        if isinstance(node.op, ast.Or):
+            return any(values)
+    if isinstance(node, ast.Compare):
+        left = _eval_verification_node(node.left)
+        for op_node, comparator in zip(node.ops, node.comparators):
+            op = _SAFE_COMPARISONS.get(type(op_node))
+            if op is None:
+                raise ValueError(f"unsafe comparison: {type(op_node).__name__}")
+            right = _eval_verification_node(comparator)
+            if not op(left, right):
+                return False
+            left = right
+        return True
+    if isinstance(node, ast.Call):
+        if node.keywords:
+            raise ValueError("keyword calls are not supported")
+        args = [_eval_verification_node(arg) for arg in node.args]
+        if isinstance(node.func, ast.Name):
+            fn = _SAFE_VERIFICATION_FUNCTIONS.get(node.func.id)
+            if fn is None:
+                raise ValueError(f"unsafe call: {node.func.id}")
+            return fn(*args)
+        if isinstance(node.func, ast.Attribute):
+            target = _eval_verification_node(node.func.value)
+            if isinstance(target, Path) and node.func.attr in _SAFE_PATH_METHODS:
+                return getattr(target, node.func.attr)(*args)
+        raise ValueError("unsafe method call")
+    raise ValueError(f"unsupported expression: {type(node).__name__}")
 
 # ---------------------------------------------------------------------------
 # Data model
@@ -165,33 +275,14 @@ class CitationIndex:
     async def verify_all(self) -> dict[str, bool]:
         """Run verification tests for all citations that have them.
 
-        Each ``verification_test`` is a Python expression evaluated in
-        a namespace containing ``Path`` and ``os``.  Returns a mapping
-        of citation id to pass/fail.
+        Each ``verification_test`` is parsed as a small safe expression
+        language. Returns a mapping of citation id to pass/fail.
         """
-        import os
-
         results: dict[str, bool] = {}
         for cid, citation in self._citations.items():
             if not citation.verification_test:
                 continue
-            try:
-                # Safety: use compile+eval with restricted builtins instead of open eval
-                # Allows simple expressions (1+1==2, Path(...).exists()) but blocks
-                # os.system, __import__, exec, open, etc.
-                test_expr = citation.verification_test.strip()
-                _safe_builtins = {"True": True, "False": False, "None": None,
-                                  "int": int, "float": float, "str": str,
-                                  "bool": bool, "len": len, "abs": abs,
-                                  "Path": Path, "min": min, "max": max}
-                try:
-                    code = compile(test_expr, "<verification>", "eval")
-                    # Block any name not in safe_builtins
-                    passed = bool(eval(code, {"__builtins__": {}}, _safe_builtins))  # noqa: S307
-                except Exception:
-                    passed = False
-            except Exception:
-                passed = False
+            passed = _evaluate_verification_expr(citation.verification_test.strip())
             results[cid] = passed
             citation.verified = passed
             citation.last_verified = _utc_now()

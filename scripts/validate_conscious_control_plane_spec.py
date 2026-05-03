@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -102,29 +103,49 @@ def _run_static_checks(data: dict) -> tuple[list[dict], bool]:
     return results, all_ok
 
 
+def _command_to_argv(command: object) -> list[str]:
+    if isinstance(command, list) and all(isinstance(part, str) for part in command):
+        return list(command)
+    if isinstance(command, str):
+        return shlex.split(command)
+    raise ValueError("command must be a string or list[str]")
+
+
 def _run_command_checks(data: dict) -> tuple[list[dict], bool]:
     results: list[dict] = []
     all_ok = True
 
     for check in data["command_checks"]:
-        proc = subprocess.run(
-            check["command"],
-            cwd=REPO_ROOT,
-            shell=True,
-            capture_output=True,
-            text=True,
-        )
-        ok = proc.returncode == 0
+        command = check["command"]
+        try:
+            argv = _command_to_argv(command)
+            if not argv:
+                raise ValueError("command is empty")
+            proc = subprocess.run(
+                argv,
+                cwd=REPO_ROOT,
+                capture_output=True,
+                text=True,
+            )
+            ok = proc.returncode == 0
+            returncode = proc.returncode
+            stdout_tail = proc.stdout[-400:]
+            stderr_tail = proc.stderr[-400:]
+        except (OSError, ValueError) as exc:
+            ok = False
+            returncode = -1
+            stdout_tail = ""
+            stderr_tail = str(exc)
         results.append(
             {
                 "id": check["id"],
                 "type": "command",
-                "command": check["command"],
+                "command": command,
                 "ok": ok,
                 "description": check["description"],
-                "returncode": proc.returncode,
-                "stdout_tail": proc.stdout[-400:],
-                "stderr_tail": proc.stderr[-400:],
+                "returncode": returncode,
+                "stdout_tail": stdout_tail,
+                "stderr_tail": stderr_tail,
             }
         )
         all_ok &= ok
