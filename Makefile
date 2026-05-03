@@ -133,6 +133,8 @@ semgrep:
 	# Phase 1 is warn-only locally so the install does not block on the
 	# 4 pre-existing real findings (3 shell=True + 1 eval). CI (Phase 2)
 	# uses the stricter mode below; Phase 4 promotes anti-slop rules to ERROR.
+	# The wrapper expands --config .semgrep to production configs only;
+	# .semgrep/tests remains reserved for explicit rule-test runs.
 	$(SEMGREP) --config .semgrep --metrics=off
 
 semgrep-strict:
