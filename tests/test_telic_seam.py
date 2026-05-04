@@ -688,7 +688,7 @@ class TestContribution:
 
 
 class TestCoreFourMetrics:
-    def _make_value_event(self, seam, sample_task):
+    def _make_value_event(self, seam, sample_task, *, fitness_score=0.87):
         seam.record_dispatch(sample_task, "agent_alpha")
         outcome_id = seam.record_outcome(
             sample_task,
@@ -696,7 +696,7 @@ class TestCoreFourMetrics:
             success=True,
             result_summary="DX Core Four ontology metric proof.",
             duration_ms=5000.0,
-            fitness_score=0.87,
+            fitness_score=fitness_score,
         )
         ve_id = seam.record_value_event(
             outcome_id,
@@ -728,6 +728,16 @@ class TestCoreFourMetrics:
         assert {m.properties["outcome_id"] for m in metrics} == {outcome_id}
         assert all(0.0 <= m.properties["score"] <= 1.0 for m in metrics)
         assert seam.stats()["core_four_metrics"] == 4
+
+    def test_core_four_quality_preserves_zero_fitness_score(self, seam, sample_task):
+        _, ve_id = self._make_value_event(seam, sample_task, fitness_score=0.0)
+
+        seam.record_core_four_metrics(ve_id)
+
+        metrics = seam.query_core_four_metrics(value_event_id=ve_id)
+        quality = next(m for m in metrics if m.properties["dimension"] == "quality")
+        assert quality.properties["score"] == 0.0
+        assert quality.properties["signal_source"] == "fitness_or_success"
 
     def test_core_four_metrics_link_to_value_event_and_outcome(self, seam, sample_task):
         outcome_id, ve_id = self._make_value_event(seam, sample_task)

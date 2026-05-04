@@ -36,7 +36,7 @@ def core_four_scores(
     outcome: OntologyObj,
 ) -> list[CoreFourMetricSpec]:
     quality_source = outcome.properties.get("fitness_score")
-    if not isinstance(quality_source, (int, float)) or quality_source <= 0:
+    if not isinstance(quality_source, (int, float)):
         quality_source = value_event.properties.get("success_value")
 
     scores = {
