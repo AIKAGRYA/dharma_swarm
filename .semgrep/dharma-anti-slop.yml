@@ -30,6 +30,11 @@ rules:
         - "dharma_swarm/review_cycle.py"
         - "dharma_swarm/ginko_backtest.py"
         - "dharma_swarm/ginko_evolution.py"
+        # PTR shadow metric owner for ~/.dharma/meta artifacts.
+        # See docs/governance/STATE_DIR_OWNERS.md.
+        - "dharma_swarm/ptr_metric.py"
+        - "dharma_swarm/ptr_integrity.py"
+        - "scripts/ptr_integrity_probe.py"
     pattern: Path.home() / ".dharma"
 
   # ===========================================================================
