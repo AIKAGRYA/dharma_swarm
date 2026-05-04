@@ -34,12 +34,18 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from dharma_swarm.correlation_context import get_correlation
 from dharma_swarm.lineage import LineageEdge, LineageGraph
 from dharma_swarm.models import GateCheckResult, GateDecision, Task
 from dharma_swarm.ontology import OntologyRegistry
 from dharma_swarm.ontology_runtime import (
     get_shared_registry,
     persist_shared_registry,
+)
+from dharma_swarm.signal_bus import (
+    SIGNAL_OUTCOME_RECORDED,
+    SIGNAL_VALUE_EVENT_RECORDED,
+    SignalBus,
 )
 
 logger = logging.getLogger(__name__)
@@ -57,11 +63,13 @@ class TelicSeam:
         registry: OntologyRegistry | None = None,
         lineage: LineageGraph | None = None,
         path: str | Path | None = None,
+        signal_bus: SignalBus | None = None,
     ) -> None:
         self._path = path
         self._registry = registry or get_shared_registry(path)
         self._persist_registry = registry is None
         self._lineage = lineage or LineageGraph()
+        self._signal_bus = signal_bus
         self._proposal_map: dict[str, str] = {}  # task_id -> proposal obj_id
         self._duplicate_suppressions: dict[str, int] = {
             "execution_leases": 0,
@@ -309,6 +317,20 @@ class TelicSeam:
                 },
             ))
 
+            # Emit canonical outcome signal for cross-store fanout
+            if self._signal_bus is not None:
+                corr = get_correlation()
+                self._signal_bus.emit({
+                    "type": SIGNAL_OUTCOME_RECORDED,
+                    "outcome_id": obj.id,
+                    "proposal_id": proposal_id or "",
+                    "task_id": task.id,
+                    "agent_id": agent_id,
+                    "success": success,
+                    "trace_id": corr.trace_id,
+                    "session_id": corr.session_id,
+                })
+
             self._flush_registry()
             return obj.id
 
@@ -385,6 +407,19 @@ class TelicSeam:
                 target_id=obj.id,
                 created_by="telic_seam",
             )
+
+            # Emit canonical value event signal for cross-store fanout
+            if self._signal_bus is not None:
+                corr = get_correlation()
+                self._signal_bus.emit({
+                    "type": SIGNAL_VALUE_EVENT_RECORDED,
+                    "value_event_id": obj.id,
+                    "outcome_id": outcome_id,
+                    "agent_id": agent_id,
+                    "composite_value": composite_value,
+                    "trace_id": corr.trace_id,
+                    "session_id": corr.session_id,
+                })
 
             self._flush_registry()
             return obj.id

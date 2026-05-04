@@ -607,6 +607,83 @@ async def run_ledger_watcher(
 # ---------------------------------------------------------------------------
 
 # Providers to probe (in priority order from CANONICAL_SEED_ORDER)
+async def run_task_consistency_guard(
+    state_dir: Path,
+) -> list[GuardianFinding]:
+    """NEW-05: Detect COMPLETED tasks with still-OPEN claims in runtime_state.
+
+    Cross-references task_board.tasks (status) against
+    runtime_state.task_claims (status) to find split-lifecycle mismatches
+    that indicate silent data loss.
+    """
+    findings: list[GuardianFinding] = []
+    db_candidates = _runtime_db_candidates(state_dir)
+    db_path: Path | None = None
+    for c in db_candidates:
+        if c.exists():
+            db_path = c
+            break
+    if db_path is None:
+        return findings
+
+    try:
+        db = sqlite3.connect(str(db_path))
+        db.execute("PRAGMA busy_timeout=5000")
+    except Exception:
+        return findings
+
+    try:
+        # Check both tables exist
+        for tbl in ("tasks", "task_claims"):
+            exists = db.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
+                (tbl,),
+            ).fetchone()
+            if exists is None:
+                db.close()
+                return findings
+
+        # Find COMPLETED tasks with still-open claims
+        mismatched = db.execute(
+            "SELECT t.id, t.title, t.status, c.claim_id, c.status"
+            " FROM tasks t"
+            " JOIN task_claims c ON c.task_id = t.id"
+            " WHERE t.status IN ('completed', 'done', 'failed')"
+            "   AND c.status NOT IN ('released', 'completed', 'failed', 'expired')"
+        ).fetchall()
+
+        for row in mismatched:
+            task_id, title, task_status, claim_id, claim_status = row
+            findings.append(GuardianFinding(
+                severity="BLOCKER",
+                check="CONSISTENCY:task_claim_lifecycle",
+                title=f"Split lifecycle: task {task_id[:8]} is {task_status} but claim {claim_id[:8]} is {claim_status}",
+                detail=(
+                    f"Task '{title}' (id={task_id}) has status={task_status} "
+                    f"in task_board but claim {claim_id} still has "
+                    f"status={claim_status} in runtime_state. "
+                    f"This indicates a split-lifecycle mismatch (NEW-05). "
+                    f"The claim should be released or completed when the task finishes."
+                ),
+                file="dharma_swarm/runtime_state.py",
+                line=0,
+                fix_hint="Close the claim when transitioning the task to completed/failed.",
+            ))
+
+        if not mismatched:
+            findings.append(GuardianFinding(
+                severity="INFO",
+                check="CONSISTENCY:task_claim_lifecycle",
+                title="Task-claim lifecycle consistency: OK",
+                detail="All completed/failed tasks have properly closed claims.",
+                file="dharma_swarm/guardian_crew.py",
+            ))
+    finally:
+        db.close()
+
+    return findings
+
+
 _PROVIDERS_TO_PROBE = [
     ("anthropic", "claude-sonnet-4-20250514", "ANTHROPIC_API_KEY"),
     ("openrouter", "openai/gpt-4o-mini", "OPENROUTER_API_KEY"),
@@ -704,15 +781,18 @@ def synthesize_report(
     src_root: Path,
     ledger_findings: list[GuardianFinding] | None = None,
     warning_findings: list[GuardianFinding] | None = None,
+    consistency_findings: list[GuardianFinding] | None = None,
 ) -> str:
     ledger_findings = ledger_findings or []
     warning_findings = warning_findings or []
+    consistency_findings = consistency_findings or []
     all_findings = (
         auditor_findings
         + loop_findings
         + router_findings
         + ledger_findings
         + warning_findings
+        + consistency_findings
     )
     all_findings.sort(key=lambda f: _severity_rank(f.severity))
 
@@ -762,6 +842,7 @@ def synthesize_report(
         "- **LOOP_WATCHER**: Cybernetic loop artifact existence + freshness + evolution quality",
         "- **LEDGER_WATCHER**: RuntimeStateStore row counts for session events and structured producers",
         "- **GUARDIAN_WARNINGS**: Repo report freshness and registered .dharma top-level directories",
+        "- **CONSISTENCY_GUARD**: Task-claim lifecycle cross-store consistency (NEW-05)",
         "- **ROUTER_PROBE**: Circuit breaker state, log error patterns, missing API keys",
         "",
         "---",
@@ -845,12 +926,14 @@ async def run_guardian_cycle(
         router_findings,
         ledger_findings,
         warning_findings,
+        consistency_findings,
     ) = await asyncio.gather(
         run_auditor(src_root),
         run_loop_watcher(state_dir),
         run_router_probe(state_dir),
         run_ledger_watcher(state_dir),
         run_guardian_warning_checks(src_root, state_dir),
+        run_task_consistency_guard(state_dir),
         return_exceptions=False,
     )
 
@@ -863,6 +946,7 @@ async def run_guardian_cycle(
         src_root=src_root,
         ledger_findings=ledger_findings,
         warning_findings=warning_findings,
+        consistency_findings=consistency_findings,
     )
 
     # Write report to disk
@@ -886,6 +970,7 @@ async def run_guardian_cycle(
         + router_findings
         + ledger_findings
         + warning_findings
+        + consistency_findings
     )
     blockers = [f for f in all_findings if f.severity == "BLOCKER"]
 

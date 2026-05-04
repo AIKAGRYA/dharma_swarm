@@ -25,8 +25,11 @@
 | MM-17: gnani → TaskBoard.get_by_title | DEGRADED | ✅RESOLVED | `TaskBoard.get_by_title()` added — SQL WHERE on title column |
 | MM-18: gnani → TelosGraph.get_by_name | DEGRADED | ✅RESOLVED | `TelosGraph.get_by_name()` added — linear scan on name field |
 | NEW-04: agent_runner → telic_seam dispatch gap | DEGRADED | ✅RESOLVED | `record_dispatch` + `record_gate_decision` added at task start in agent_runner |
+| NEW-05: task_board ↔ runtime_state split lifecycle | — | ⚠️ GUARDED | `run_task_consistency_guard` added to guardian_crew — detects COMPLETED tasks with still-OPEN claims |
+| NEW-07: 54 stores lack common trace_id | — | ⚠️ PARTIAL | `trace_id` column added to task_board, runtime_state (claims+runs), telemetry_plane (routing, policy, economic) |
+| NEW-08: 12 independent record_outcome() | — | ⚠️ PARTIAL | TelicSeam emits `SIGNAL_OUTCOME_RECORDED` / `SIGNAL_VALUE_EVENT_RECORDED` to signal_bus for canonical fanout |
 
-**Net change:** 7 resolved, 5 fixed this session (MM-17, MM-18, NEW-01, NEW-02, NEW-04), 0 open BLOCKERs, 4 structural degraded remain.
+**Net change:** 7 resolved, 5 fixed prior sessions, 3 new entries (NEW-05 guarded, NEW-07/NEW-08 partially resolved), 0 open BLOCKERs, 7 structural degraded remain.
 
 ---
 
@@ -166,6 +169,9 @@ ROUTER_PROBE   — Reads circuit_breakers.json for open providers
 | 17 | `gnani_lodestone` → `task_board.get_by_title()` | ✅ (method added this session) |
 | 18 | `gnani_lodestone` → `telos_graph.get_by_name()` | ✅ (method added this session) |
 | 21 | `agent_runner` → `telic_seam.record_dispatch()` (provenance) | ✅ (dispatch+gate wired this session) |
+| 22 | `task_board` ↔ `runtime_state` (lifecycle consistency) | ⚠️ GUARDED (NEW-05) |
+| 23 | `telic_seam` → `signal_bus` (outcome fanout) | ✅ (NEW-08: SIGNAL_OUTCOME_RECORDED emitted) |
+| 24 | `task_board` / `runtime_state` / `telemetry_plane` (trace_id) | ⚠️ PARTIAL (NEW-07) |
 | 19 | `guardian_crew` → `world_actions.github_create_issue()` | ✅ |
 | 20 | `orchestrate_live` → `guardian_crew.start_guardian_loop()` | ✅ |
 

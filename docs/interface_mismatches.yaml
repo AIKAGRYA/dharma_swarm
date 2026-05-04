@@ -1,0 +1,141 @@
+# Interface Mismatch Registry — machine-readable source of truth
+# Kept in sync with INTERFACE_MISMATCH_MAP.md
+# Updated: 2026-05-04 (correlation-context session)
+
+mismatches:
+  - id: MM-02
+    title: "PersistentAgent enum deserialization"
+    severity: BLOCKER
+    status: STILL_LIVE
+    caller: orchestrate_live.py:1247
+    callee: persistent_agent.PersistentAgent.__init__
+    description: >
+      Bare string passed for AgentRole/ProviderType instead of enum.
+      Pydantic lax mode may coerce but breaks on invalid values.
+
+  - id: MM-05
+    title: "Private Orchestrator method coupling"
+    severity: DEGRADED
+    status: OPEN
+    caller: swarm.py:1883-1895
+    callee: orchestrator._classify_failure, _resolve_retry_policy
+    description: >
+      swarm.py calls single-underscore private methods on orchestrator.
+      Any internal refactor silently breaks retry logic.
+
+  - id: MM-07
+    title: "MetaEvolutionEngine cadence mismatch"
+    severity: DEGRADED
+    status: OPEN
+    caller: orchestrate_live.py:399,407
+    callee: meta_evolution.MetaEvolutionEngine.observe_cycle_result
+    description: >
+      observe_cycle_result called twice per cycle number.
+      n_object_cycles_per_meta=2 fires after 2 calls, not 2 cycles.
+
+  - id: MM-12
+    title: "Same as MM-02/03 second call site"
+    severity: DEGRADED
+    status: RESOLVED
+    caller: orchestrate_live.py:1354-1364
+    callee: persistent_agent.PersistentAgent.__init__
+    description: >
+      This path uses already-constructed enum values. No mismatch.
+
+  - id: MM-13
+    title: "message_bus receive semantics"
+    severity: DEGRADED
+    status: OPEN
+    caller: orchestrate_live.py
+    callee: message_bus.receive
+    description: >
+      Message bus receive semantics may differ from expectations.
+
+  - id: MM-17
+    title: "gnani_lodestone -> TaskBoard.get_by_title"
+    severity: DEGRADED
+    status: RESOLVED
+    caller: gnani_lodestone.py
+    callee: task_board.TaskBoard.get_by_title
+    resolved_commit: cd0f862
+    description: >
+      TaskBoard.get_by_title() method added. SQL WHERE on title column.
+
+  - id: MM-18
+    title: "gnani_lodestone -> TelosGraph.get_by_name"
+    severity: DEGRADED
+    status: RESOLVED
+    caller: gnani_lodestone.py
+    callee: telos_graph.TelosGraph.get_by_name
+    resolved_commit: cd0f862
+    description: >
+      TelosGraph.get_by_name() method added. Linear scan on name field.
+
+  - id: NEW-01
+    title: "archaeology_ingestion palace.query"
+    severity: BLOCKER
+    status: RESOLVED
+    caller: archaeology_ingestion.py
+    callee: memory_palace.MemoryPalace.recall
+    description: >
+      Replaced with palace.recall(PalaceQuery(...)) + correct max_results=.
+
+  - id: NEW-02
+    title: "dgm_loop _provider attr"
+    severity: DEGRADED
+    status: RESOLVED
+    caller: dgm_loop.py
+    callee: evolution.DarwinEngine
+    description: >
+      Removed nonexistent hasattr(engine, '_provider') check.
+
+  - id: NEW-04
+    title: "agent_runner -> telic_seam dispatch gap"
+    severity: DEGRADED
+    status: RESOLVED
+    caller: agent_runner.py
+    callee: telic_seam.TelicSeam.record_dispatch
+    resolved_commit: cd0f862
+    description: >
+      record_dispatch + record_gate_decision added at task start in agent_runner.
+
+  - id: NEW-05
+    title: "task_board <-> runtime_state split lifecycle"
+    severity: DEGRADED
+    status: GUARDED
+    caller: task_board.py
+    callee: runtime_state.py
+    description: >
+      COMPLETED tasks may have still-OPEN claims in runtime_state.
+      run_task_consistency_guard added to guardian_crew to detect mismatches.
+      Not yet auto-fixed; guard raises BLOCKER finding for manual review.
+
+  - id: NEW-07
+    title: "54 stores lack common trace_id"
+    severity: DEGRADED
+    status: PARTIAL
+    caller: "(cross-cutting)"
+    callee: "task_board, runtime_state, telemetry_plane + 51 others"
+    description: >
+      CorrelationContext + trace_id column added to 6 critical tables
+      (tasks, task_claims, delegation_runs, routing_decisions,
+      policy_decisions, economic_events). 48 remaining stores untouched.
+      Enables cross-store queries on trace_id for the primary data path.
+
+  - id: NEW-08
+    title: "12 independent record_outcome() implementations"
+    severity: DEGRADED
+    status: PARTIAL
+    caller: "telic_seam.py, strategy_reinforcer, routing_memory, etc."
+    callee: signal_bus.py
+    description: >
+      TelicSeam now emits SIGNAL_OUTCOME_RECORDED and
+      SIGNAL_VALUE_EVENT_RECORDED to signal_bus for canonical fanout.
+      Other 11 consumers not yet subscribed. Fanout infrastructure ready.
+
+# Summary counts:
+# Total entries: 13
+# RESOLVED: 6 (MM-12, MM-17, MM-18, NEW-01, NEW-02, NEW-04)
+# STILL_LIVE/OPEN: 4 (MM-02, MM-05, MM-07, MM-13)
+# GUARDED: 1 (NEW-05)
+# PARTIAL: 2 (NEW-07, NEW-08)
