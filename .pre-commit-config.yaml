@@ -1,7 +1,8 @@
 # Pre-commit hook orchestration for dharma_swarm.
 #
 # Wraps the existing `scripts/uplift_guards/run_pre_commit.py` (kernel
-# integrity, secrets, autonomous-destruction, hotpath, mismatch registry)
+# integrity, secrets, autonomous-destruction, hotpath, Shakti warrant,
+# mismatch registry)
 # alongside new gitleaks and semgrep gates.
 #
 # Install:   pre-commit install
@@ -20,8 +21,8 @@ repos:
   - repo: local
     hooks:
       - id: dharma-contract-tests
-        name: dharma contract + private-access tests
-        entry: python3 -m pytest tests/test_contracts.py tests/test_private_access.py -q --tb=line
+        name: dharma current contract tests
+        entry: pytest tests/test_contracts_scaffold.py tests/test_operator_core_contracts.py tests/test_runtime_contract.py tests/test_runtime_contract_adapters.py -q --tb=line
         language: system
         pass_filenames: false
         always_run: true
@@ -29,12 +30,13 @@ repos:
 
   # ---------------------------------------------------------------------------
   # Existing dharma_swarm uplift guards — single Python entrypoint covers
-  # kernel SHA, secrets scan, autonomous tripwires, hotpath ack, mismatch reg.
+  # kernel SHA, secrets scan, autonomous tripwires, hotpath ack, staged Shakti
+  # warrant, mismatch reg.
   # ---------------------------------------------------------------------------
   - repo: local
     hooks:
       - id: dharma-uplift-guards
-        name: dharma uplift guards (kernel, secrets, hotpath, mismatch)
+        name: dharma uplift guards (kernel, secrets, hotpath, shakti, mismatch)
         entry: python3 scripts/uplift_guards/run_pre_commit.py
         language: system
         pass_filenames: false

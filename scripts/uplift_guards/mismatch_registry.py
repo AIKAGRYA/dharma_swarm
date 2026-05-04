@@ -1,0 +1,143 @@
+"""INTERFACE_MISMATCH_MAP as an executable registry.
+
+Reads docs/interface_mismatches.yaml and fails when a staged change touches a
+caller/callee pair flagged BLOCKER with status=open.
+"""
+from __future__ import annotations
+
+import subprocess
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Iterable
+
+try:
+    import yaml  # type: ignore
+except ImportError:  # pragma: no cover - PyYAML is a project dep already
+    yaml = None  # type: ignore
+
+REGISTRY_REL_PATH = "docs/interface_mismatches.yaml"
+
+
+@dataclass(frozen=True)
+class Mismatch:
+    id: str
+    severity: str
+    status: str
+    caller: str
+    callee: str
+    summary: str
+    fixed_in: str = ""
+    test_path: str = ""
+
+    @property
+    def is_open(self) -> bool:
+        return self.status.lower() == "open"
+
+    @property
+    def caller_path(self) -> str:
+        return self.caller.split(":", 1)[0] if ":" in self.caller else self.caller
+
+    @property
+    def callee_path(self) -> str:
+        return self.callee.split(":", 1)[0] if ":" in self.callee else self.callee
+
+
+@dataclass
+class MismatchRegistry:
+    entries: list[Mismatch] = field(default_factory=list)
+
+    def open_blockers(self) -> list[Mismatch]:
+        return [
+            m for m in self.entries if m.is_open and m.severity.upper() == "BLOCKER"
+        ]
+
+    def open_degraded(self) -> list[Mismatch]:
+        return [
+            m for m in self.entries if m.is_open and m.severity.upper() == "DEGRADED"
+        ]
+
+    def matching_paths(self, paths: Iterable[str]) -> list[Mismatch]:
+        path_set = set(paths)
+        hits: list[Mismatch] = []
+        for mismatch in self.entries:
+            if mismatch.caller_path in path_set or mismatch.callee_path in path_set:
+                hits.append(mismatch)
+        return hits
+
+
+def load_mismatch_registry(repo_root: Path | None = None) -> MismatchRegistry:
+    repo_root = repo_root or Path.cwd()
+    registry_path = repo_root / REGISTRY_REL_PATH
+    if not registry_path.exists() or yaml is None:
+        return MismatchRegistry(entries=[])
+    raw = yaml.safe_load(registry_path.read_text()) or {}
+    entries_raw = raw.get("entries", []) if isinstance(raw, dict) else []
+    entries: list[Mismatch] = []
+    for item in entries_raw:
+        try:
+            entries.append(
+                Mismatch(
+                    id=str(item["id"]),
+                    severity=str(item.get("severity", "DEGRADED")),
+                    status=str(item.get("status", "open")),
+                    caller=str(item.get("caller", "")),
+                    callee=str(item.get("callee", "")),
+                    summary=str(item.get("summary", "")),
+                    fixed_in=str(item.get("fixed_in", "")),
+                    test_path=str(item.get("test_path", "")),
+                )
+            )
+        except (KeyError, TypeError):
+            continue
+    return MismatchRegistry(entries=entries)
+
+
+def _staged_files(repo_root: Path) -> list[str]:
+    result = subprocess.run(
+        ["git", "diff", "--cached", "--name-only"],
+        capture_output=True,
+        text=True,
+        cwd=str(repo_root),
+        check=False,
+    )
+    if result.returncode != 0:
+        return []
+    return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+
+
+def check_mismatch_adjacency(repo_root: Path | None = None) -> tuple[bool, str]:
+    """Refuse commits that touch a caller/callee in an open BLOCKER mismatch."""
+    repo_root = repo_root or Path.cwd()
+    registry = load_mismatch_registry(repo_root)
+    if not registry.entries:
+        return True, "mismatch registry empty or unreadable - skipping"
+
+    staged = _staged_files(repo_root)
+    if not staged:
+        return True, "no staged files"
+
+    hits = registry.matching_paths(staged)
+    open_hits = [m for m in hits if m.is_open and m.severity.upper() == "BLOCKER"]
+    if not open_hits:
+        if hits:
+            ids = ", ".join(sorted({m.id for m in hits}))
+            return True, f"touches mismatch entries (none open BLOCKER): {ids}"
+        return True, "no mismatch adjacency"
+
+    lines = [
+        "MISMATCH ADJACENCY GUARD blocked the commit.",
+        "  Staged files touch caller/callee of open BLOCKER mismatches:",
+    ]
+    for mismatch in open_hits:
+        lines.append(
+            f"    {mismatch.id} ({mismatch.severity}): "
+            f"{mismatch.caller} -> {mismatch.callee}"
+        )
+        lines.append(f"      {mismatch.summary}")
+        if mismatch.test_path:
+            lines.append(f"      Pinned test: {mismatch.test_path}")
+    lines.append(
+        "  Either resolve the mismatch, or split this commit so the mismatch "
+        "caller/callee are not touched."
+    )
+    return False, "\n".join(lines)
