@@ -9,7 +9,7 @@ from dharma_swarm.assurance.report_schema import Finding, ScanReport, Severity
 
 BACKEND_ROUTE_RE = re.compile(r"""@router\.(get|post|put|patch|delete)\(\s*["']([^"']+)["']""")
 PREFIX_RE = re.compile(r"""APIRouter\([^)]*prefix\s*=\s*["']([^"']+)["']""")
-FRONTEND_CALL_RE = re.compile(r"""api(Get|Post|Put|Patch|Delete)\s*<[^>]+>\(""")
+FRONTEND_CALL_RE = re.compile(r"""api(Get|Post|Put|Patch|Delete)\b""")
 
 
 def _normalize_frontend_path(raw_path: str) -> str:
@@ -64,35 +64,63 @@ def _scan_frontend_calls(repo_root: Path) -> list[tuple[str, str, int, str]]:
 
     calls: list[tuple[str, str, int, str]] = []
     for idx, line in enumerate(lines, start=1):
-        match = FRONTEND_CALL_RE.search(line)
-        if not match:
+        if not FRONTEND_CALL_RE.search(line):
             continue
 
-        method = match.group(1).upper()
-        open_paren = line.find("(", match.start())
-        if open_paren < 0:
+        statement = "\n".join(lines[idx - 1: idx + 8])
+        call = _extract_frontend_call(statement)
+        if call is None:
             continue
-
-        quote_char = ""
-        quote_pos = -1
-        for candidate in ('"', "`"):
-            pos = line.find(candidate, open_paren)
-            if pos != -1 and (quote_pos == -1 or pos < quote_pos):
-                quote_char = candidate
-                quote_pos = pos
-        if quote_pos == -1:
-            continue
-
-        if quote_char == '"':
-            end_pos = line.find('"', quote_pos + 1)
-        else:
-            end_pos = line.rfind("`")
-        if end_pos <= quote_pos:
-            continue
-
-        raw_path = line[quote_pos + 1:end_pos]
+        method, raw_path = call
         calls.append((method, _normalize_frontend_path(raw_path), idx, line.strip()))
     return calls
+
+
+def _extract_frontend_call(statement: str) -> tuple[str, str] | None:
+    match = FRONTEND_CALL_RE.search(statement)
+    if not match:
+        return None
+
+    method = match.group(1).upper()
+    pos = match.end()
+    if pos < len(statement) and statement[pos] == "<":
+        depth = 0
+        quote_char = ""
+        while pos < len(statement):
+            char = statement[pos]
+            if quote_char:
+                if char == quote_char and statement[pos - 1:pos] != "\\":
+                    quote_char = ""
+            elif char in {'"', "'", "`"}:
+                quote_char = char
+            elif char == "<":
+                depth += 1
+            elif char == ">":
+                depth -= 1
+                if depth == 0:
+                    pos += 1
+                    break
+            pos += 1
+
+    while pos < len(statement) and statement[pos].isspace():
+        pos += 1
+    if pos >= len(statement) or statement[pos] != "(":
+        return None
+    pos += 1
+
+    while pos < len(statement) and statement[pos].isspace():
+        pos += 1
+    if pos >= len(statement) or statement[pos] not in {'"', "`"}:
+        return None
+
+    quote_char = statement[pos]
+    start = pos + 1
+    pos = start
+    while pos < len(statement):
+        if statement[pos] == quote_char and statement[pos - 1:pos] != "\\":
+            return method, statement[start:pos]
+        pos += 1
+    return None
 
 
 def _route_exists(route_set: set[tuple[str, str]], method: str, path: str) -> bool:

@@ -1,11 +1,6 @@
 # Pre-commit hook orchestration for dharma_swarm.
 #
 # Keep this file limited to checks whose entrypoints exist on origin/main.
-# Legacy contract/private-access tests and uplift guards are deferred until
-# their referenced files are promoted:
-#   - tests/test_contracts.py
-#   - tests/test_private_access.py
-#   - scripts/uplift_guards/run_pre_commit.py
 #
 # Install:   pre-commit install
 # Run all:   pre-commit run --all-files
@@ -25,6 +20,20 @@ repos:
       - id: dharma-test-hygiene
         name: dharma test hygiene (rule 3 + 5)
         entry: python3 scripts/governance/check_test_hygiene.py --warn-only
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+      - id: dharma-contract-tests
+        name: dharma contract tests
+        entry: scripts/governance/run_pytest_with_repo_env.sh -q tests/test_contracts_scaffold.py tests/test_operator_core_contracts.py tests/test_runtime_contract.py tests/test_runtime_contract_adapters.py --tb=line
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+      - id: dharma-uplift-guards
+        name: dharma uplift guards
+        entry: python3 scripts/uplift_guards/run_pre_commit.py
         language: system
         pass_filenames: false
         always_run: true
@@ -51,7 +60,7 @@ repos:
         # Phase 1 is warn-only so the install does not block on the 4
         # pre-existing real findings. CI (Phase 2) runs in strict mode;
         # Phase 4 promotes anti-slop rules to ERROR locally as well.
-        entry: bash -c 'semgrep --config .semgrep --quiet --metrics=off || true'
+        entry: scripts/governance/run_semgrep_with_ca.sh --config .semgrep --quiet --metrics=off
         language: system
         pass_filenames: false
         types: [python]

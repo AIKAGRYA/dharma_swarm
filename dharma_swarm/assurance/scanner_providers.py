@@ -22,6 +22,9 @@ MODEL_PROVIDER_MAP = {
     "gemma": "openrouter",
     "nemotron": "nvidia_nim",
 }
+PROVIDER_ALIASES = {
+    "openrouter_free": "openrouter",
+}
 
 
 def _infer_provider_from_model(model_str: str) -> str | None:
@@ -30,6 +33,38 @@ def _infer_provider_from_model(model_str: str) -> str | None:
         if lower.startswith(prefix):
             return provider
     return None
+
+
+def _canonical_provider(provider: str) -> str:
+    return PROVIDER_ALIASES.get(provider, provider)
+
+
+def _provider_for_model_line(lines: list[str], model_line: int) -> tuple[int, str] | None:
+    same_line = PROVIDER_PATTERN.search(lines[model_line - 1])
+    if same_line:
+        return model_line, same_line.group(1).lower()
+
+    lower_bound = max(1, model_line - 10)
+    for line_no in range(model_line - 1, lower_bound - 1, -1):
+        stripped = lines[line_no - 1].strip()
+        if not stripped:
+            break
+        match = PROVIDER_PATTERN.search(lines[line_no - 1])
+        if match:
+            return line_no, match.group(1).lower()
+        if stripped.startswith(("]", ")", "}")):
+            break
+    return None
+
+
+def _provider_matches_model(provider: str, expected: str, model_str: str) -> bool:
+    if _canonical_provider(provider) == expected:
+        return True
+    if provider in {"local", "ollama"}:
+        return True
+    if provider == "groq" and model_str.lower().startswith("llama-"):
+        return True
+    return False
 
 
 def _resolve_target_files(
@@ -125,25 +160,28 @@ def scan(
             expected = _infer_provider_from_model(model_str)
             if expected is None:
                 continue
-            nearby = [(ln, p) for ln, p in providers_in_file if abs(ln - line_no) < 20]
-            for provider_line, provider in nearby:
-                if provider != expected and provider not in {"local", "ollama"}:
-                    fid += 1
-                    findings.append(Finding(
-                        id=f"PC-{fid:03d}",
-                        severity=Severity.HIGH,
-                        category="provider_model_mismatch",
-                        file=str(pyfile.relative_to(root)),
-                        line=line_no,
-                        description=(
-                            f"Model '{model_str}' implies provider '{expected}' "
-                            f"but ProviderType.{provider.upper()} declared at line {provider_line}"
-                        ),
-                        evidence=lines[line_no - 1].strip(),
-                        proposed_fix=(
-                            f"Change provider to ProviderType.{expected.upper()} or update the model string"
-                        ),
-                    ))
+            provider_ref = _provider_for_model_line(lines, line_no)
+            if provider_ref is None:
+                continue
+            provider_line, provider = provider_ref
+            if _provider_matches_model(provider, expected, model_str):
+                continue
+            fid += 1
+            findings.append(Finding(
+                id=f"PC-{fid:03d}",
+                severity=Severity.HIGH,
+                category="provider_model_mismatch",
+                file=str(pyfile.relative_to(root)),
+                line=line_no,
+                description=(
+                    f"Model '{model_str}' implies provider '{expected}' "
+                    f"but ProviderType.{provider.upper()} declared at line {provider_line}"
+                ),
+                evidence=lines[line_no - 1].strip(),
+                proposed_fix=(
+                    f"Change provider to ProviderType.{expected.upper()} or update the model string"
+                ),
+            ))
 
         for line_no, provider in providers_in_file:
             if provider not in known_providers:
