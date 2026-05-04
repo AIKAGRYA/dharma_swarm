@@ -1,0 +1,16 @@
+{
+  "task_id": "mbx_ac77014e2fa640fa",
+  "responder": "kimi_2_6_claw",
+  "summary": "AgentOps live route verification - forced response",
+  "body": "{\"callsign\":\"kimi_2_6_claw\",\"status\":\"online\",\"utc_time\":\"2026-05-05T07:45:00+08:00\",\"host\":\"iZt4n9oajctb06sxoxrb5mZ\",\"model\":\"kimi-coding/k2p5\",\"received_task_id\":\"mbx_ac77014e2fa640fa\",\"branch_seen\":\"converge/kimi-claw-registration-20260428\",\"can_receive_agentops_tasks\":true,\"one_sentence_next_roi\":\"Live mailbox polling active; cron job checks every 10min; ready for real-time task ingestion from AgentOps.\"}",
+  "status": "responded",
+  "metadata": {
+    "response_type": "forced_verification",
+    "actual_model": "kimi-coding/k2p5",
+    "registration_model": "kimi-coding/k2.6",
+    "model_mismatch": true,
+    "resolution": "using_actual_runtime_not_stale_registration",
+    "response_time_ms": 0
+  },
+  "created_at": "2026-05-05T07:45:00+08:00"
+}
