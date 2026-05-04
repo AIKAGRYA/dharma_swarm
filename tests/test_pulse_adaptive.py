@@ -28,6 +28,15 @@ def test_adaptive_quiet_hours_returns_static_floor_when_no_activity(
     assert quiet == [2, 3, 4, 5]
 
 
+def test_adaptive_quiet_hours_defaults_to_no_static_floor(
+    tmp_path: Path,
+) -> None:
+    """By default the swarm runs 24/7 with no quiet-hour floor."""
+    state_dir = tmp_path / ".dharma"
+    aqh = AdaptiveQuietHours(state_dir=state_dir)
+    assert aqh.compute_quiet_hours() == []
+
+
 def test_adaptive_quiet_hours_includes_active_work_hours(
     tmp_path: Path,
 ) -> None:
@@ -99,5 +108,4 @@ def test_adaptive_quiet_hours_update_config_mutates_in_place(
     # config.quiet_hours is now adaptive — includes both static floor and hour 9
     assert 9 in config.quiet_hours
     assert all(h in config.quiet_hours for h in [2, 3, 4, 5])
-    # It changed from the original (which only had [2,3,4,5] without hour 9)
-    assert config.quiet_hours != original_quiet or 9 in original_quiet
+    assert config.quiet_hours != original_quiet
