@@ -521,6 +521,74 @@ async def test_runner_accepts_completion_when_declared_artifact_exists(
 
 
 @pytest.mark.asyncio
+async def test_runner_observability_records_response_usage_tokens(
+    config,
+    fast_gate,
+    monkeypatch,
+    tmp_path: Path,
+):
+    import dharma_swarm.observability as observability
+
+    state_dir = tmp_path / ".dharma"
+    trace_dir = state_dir / "traces"
+    observer = observability.SwarmObserver(trace_dir)
+    monkeypatch.setattr(observability, "_observer", observer)
+
+    isolated_config = _with_state_dir(
+        config.model_copy(
+            update={
+                "provider": ProviderType.OPENAI,
+                "model": "gpt-4.1",
+            }
+        ),
+        tmp_path,
+    )
+    provider = AsyncMock()
+    provider.complete = AsyncMock(
+        return_value=LLMResponse(
+            content="usage visible",
+            model="gpt-4.1",
+            usage={"input_tokens": 1000, "output_tokens": 500},
+        )
+    )
+    runner = AgentRunner(
+        isolated_config,
+        provider=provider,
+        ontology_path=_ontology_path(tmp_path),
+    )
+    await runner.start()
+
+    result = await runner.run_task(Task(title="Record burn contract"))
+
+    assert result == "usage visible"
+    spans = observer.local_store.get_real_spans(kind="agent_dispatch", limit=10)
+    assert len(spans) == 1
+    attrs = spans[0].attributes
+    assert attrs["provider"] == "openai"
+    assert attrs["model"] == "gpt-4.1"
+    assert attrs["prompt_tokens"] == 1000
+    assert attrs["completion_tokens"] == 500
+    assert attrs["total_tokens"] == 1500
+
+    cost_rows = [
+        json.loads(line)
+        for line in (trace_dir / "cost_ledger.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    assert cost_rows == [
+        {
+            "agent": "test-agent",
+            "completion_tokens": 500,
+            "cost_usd": 0.007,
+            "model": "gpt-4.1",
+            "prompt_tokens": 1000,
+            "provider": "openai",
+            "task_id": spans[0].attributes["task_id"],
+            "timestamp": cost_rows[0]["timestamp"],
+        }
+    ]
+
+
+@pytest.mark.asyncio
 async def test_runner_heartbeat(config):
     runner = AgentRunner(config)
     await runner.start()

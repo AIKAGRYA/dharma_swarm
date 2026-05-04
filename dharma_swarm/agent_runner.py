@@ -819,13 +819,60 @@ def _build_route_request(
 
 
 def _response_total_tokens(response: LLMResponse | None) -> int:
+    _, _, total_tokens = _response_usage_tokens(response)
+    return total_tokens
+
+
+def _response_usage_tokens(response: LLMResponse | None) -> tuple[int, int, int]:
     if response is None:
-        return 0
+        return (0, 0, 0)
     usage = response.usage or {}
-    return int(
-        usage.get("total_tokens")
-        or (usage.get("prompt_tokens", 0) + usage.get("completion_tokens", 0))
-        or 0
+    prompt_tokens = _usage_int(usage, "prompt_tokens", "input_tokens")
+    completion_tokens = _usage_int(usage, "completion_tokens", "output_tokens")
+    total_tokens = _usage_int(usage, "total_tokens") or (prompt_tokens + completion_tokens)
+    if total_tokens > 0 and prompt_tokens == 0 and completion_tokens == 0:
+        prompt_tokens = total_tokens
+    return (prompt_tokens, completion_tokens, total_tokens)
+
+
+def _usage_int(usage: dict[str, Any], *keys: str) -> int:
+    for key in keys:
+        try:
+            value = int(usage.get(key) or 0)
+        except (TypeError, ValueError):
+            value = 0
+        if value:
+            return value
+    return 0
+
+
+def _provider_value(raw: Any) -> str:
+    if isinstance(raw, ProviderType):
+        return raw.value
+    return str(raw or "").strip()
+
+
+def _response_provider_for_trace(
+    response: LLMResponse | None,
+    route_decision: Any,
+    config: AgentConfig,
+) -> str:
+    return (
+        _provider_value(getattr(response, "provider", "") if response else "")
+        or _provider_value(getattr(route_decision, "selected_provider", ""))
+        or _provider_value(config.provider)
+    )
+
+
+def _response_model_for_trace(
+    response: LLMResponse | None,
+    request: LLMRequest | None,
+    config: AgentConfig,
+) -> str:
+    return (
+        str(getattr(response, "model", "") if response else "").strip()
+        or str(getattr(request, "model", "") if request else "").strip()
+        or config.model
     )
 
 
@@ -2459,15 +2506,19 @@ class AgentRunner:
             # ── Langfuse / local observability trace ──
             try:
                 from dharma_swarm.observability import get_observer
-                _usage = response.usage if response else {}
+                prompt_tokens, completion_tokens, _ = _response_usage_tokens(response)
                 get_observer().trace_agent_dispatch(
                     agent=self._config.name,
                     task_id=task.id,
                     task_title=task.title[:200],
-                    provider=getattr(response, "provider", "") if response else "",
-                    model=getattr(response, "model", "") if response else "",
-                    prompt_tokens=int(_usage.get("prompt_tokens", 0)),
-                    completion_tokens=int(_usage.get("completion_tokens", 0)),
+                    provider=_response_provider_for_trace(
+                        response,
+                        route_decision,
+                        self._config,
+                    ),
+                    model=_response_model_for_trace(response, request, self._config),
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
                     latency_ms=completion_latency_ms,
                     success=True,
                     result_preview=result[:300] if result else "",
@@ -2695,15 +2746,19 @@ class AgentRunner:
             # ── Langfuse / local observability trace (failure) ──
             try:
                 from dharma_swarm.observability import get_observer
-                _usage = response.usage if response else {}
+                prompt_tokens, completion_tokens, _ = _response_usage_tokens(response)
                 get_observer().trace_agent_dispatch(
                     agent=self._config.name,
                     task_id=task.id,
                     task_title=task.title[:200],
-                    provider=getattr(response, "provider", "") if response else "",
-                    model=getattr(response, "model", "") if response else "",
-                    prompt_tokens=int(_usage.get("prompt_tokens", 0)),
-                    completion_tokens=int(_usage.get("completion_tokens", 0)),
+                    provider=_response_provider_for_trace(
+                        response,
+                        route_decision,
+                        self._config,
+                    ),
+                    model=_response_model_for_trace(response, request, self._config),
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
                     latency_ms=completion_latency_ms,
                     success=False,
                     error=str(exc)[:500],
