@@ -404,6 +404,26 @@ class TestSwarmObserver:
 
 
 class TestGetObserver:
+    def test_default_observer_is_redirected_to_test_state(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        obs = get_observer()
+
+        obs.trace_agent_dispatch(
+            agent="isolated-test",
+            task_id="task-1",
+            task_title="test isolation",
+            provider="openai",
+            model="gpt-4.1",
+            prompt_tokens=10,
+            completion_tokens=5,
+        )
+
+        trace_dir = tmp_path / "_observability_isolated" / "traces"
+        assert (trace_dir / "cost_ledger.jsonl").exists()
+        assert list(trace_dir.glob("traces_*.jsonl"))
+
     def test_returns_singleton(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         import dharma_swarm.observability as obs_mod
 

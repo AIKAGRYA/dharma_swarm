@@ -64,6 +64,17 @@ def _isolate_stigmergy(tmp_path, monkeypatch):
     monkeypatch.setattr("dharma_swarm.stigmergy._default_store", None)
 
 
+@pytest.fixture(autouse=True)
+def _isolate_observability(tmp_path, monkeypatch):
+    """Redirect local observability traces so tests never pollute ~/.dharma/traces."""
+    import dharma_swarm.observability as observability
+
+    trace_dir = tmp_path / "_observability_isolated" / "traces"
+    monkeypatch.setattr(observability, "_TRACES_DIR", trace_dir)
+    monkeypatch.setattr(observability, "_COST_DB_PATH", trace_dir / "cost_ledger.jsonl")
+    monkeypatch.setattr(observability, "_observer", observability.SwarmObserver(trace_dir))
+
+
 @pytest.fixture
 def fast_gate():
     """Mock telos gate to return ALLOW instantly.
