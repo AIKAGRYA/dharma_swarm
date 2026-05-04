@@ -5,7 +5,7 @@ closes the loop between experiments, claims, artifacts, and the ontology.
 
 Designed from the AMIROS research spec (March 2026):
   - Experiment Registry: what was tried
-  - Claim Registry: what was concluded  
+  - Claim Registry: what was concluded
   - Artifact Registry: what was produced
   - Config Registry: what parameters were used
   - Harvest Log: what was extracted from agent outputs

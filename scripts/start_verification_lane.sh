@@ -65,4 +65,3 @@ if [[ -f "$RUN_FILE" ]]; then
   echo "Run dir: $(cat "$RUN_FILE")"
 fi
 echo "Stdout: $LOG_DIR/verification_lane_stdout.log"
-

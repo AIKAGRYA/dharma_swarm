@@ -85,10 +85,10 @@ class WorldModelStore:
         """Serializes and saves the world model state."""
         ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         path = self.base / f"snapshot_{ts}_{state.version}.json"
-        
+
         state_dict = asdict(state)
         data = json.dumps(state_dict, indent=2)
-        
+
         path.write_text(data)
         (self.base / "latest.json").write_text(data)
         return path
@@ -98,14 +98,14 @@ class WorldModelStore:
         latest = self.base / "latest.json"
         if not latest.exists():
             return None
-            
+
         data = json.loads(latest.read_text())
-        
+
         # Reconstruct dataclasses
         stocks = {k: WorldStock(**v) for k, v in data.get("stocks", {}).items()}
         flows = {k: WorldFlow(**v) for k, v in data.get("flows", {}).items()}
         loops = {k: FeedbackLoop(**v) for k, v in data.get("feedback_loops", {}).items()}
-        
+
         state = WorldModelState(
             version=data.get("version", "0.0.0"),
             timestamp=data.get("timestamp", ""),
@@ -128,7 +128,7 @@ def _build_initial_state() -> WorldModelState:
     S11: alignment lagging capability severely
     """
     ts = datetime.now(timezone.utc).isoformat()
-    
+
     stocks = {
         "S01": WorldStock("S01", "Atmospheric CO2 Concentration", "biosphere", 0.28, "rising", -0.006, 0.15, "KALYAN", last_updated=ts, evidence_sources=["NOAA 2026 (429.35 ppm)"]),
         "S02": WorldStock("S02", "Ocean pH (Surface)", "biosphere", 0.35, "falling", -0.015, 0.20, "KALYAN", last_updated=ts),
@@ -146,7 +146,7 @@ def _build_initial_state() -> WorldModelState:
         "S14": WorldStock("S14", "Renewable Energy Share", "economic", 0.35, "rising", 0.025, 0.50, "KALYAN", last_updated=ts),
         "S15": WorldStock("S15", "Military AI Autonomy", "power", 0.40, "rising", 0.08, 0.70, "SHAKTI", last_updated=ts)
     }
-    
+
     flows = {
         "F01": WorldFlow("F01", "Fossil Fuel Emissions", "outflow", 0.75, ["S14"], [], 0.05, True, 0.3),
         "F02": WorldFlow("F02", "AI Compute Scaling", "inflow", 0.85, ["S10"], [], 0.40, False, 0.1),
@@ -157,7 +157,7 @@ def _build_initial_state() -> WorldModelState:
         "F07": WorldFlow("F07", "Military AI Investment", "inflow", 0.65, ["S10", "S07"], ["S15"], 0.05, False, 0.1),
         "F08": WorldFlow("F08", "Renewable Deployment", "inflow", 0.45, ["S14"], ["S01"], 0.85, True, 0.3)
     }
-    
+
     loops = {
         "L01": FeedbackLoop("L01", "Capability-Displacement-Instability", "reinforcing", ["S10", "S07", "S12"], 0.75, True, ["F06"], 0.15),
         "L02": FeedbackLoop("L02", "Carbon-Warming-Permafrost", "reinforcing", ["S01", "S04"], 0.80, True, ["F01", "F04"], 0.10),
@@ -166,7 +166,7 @@ def _build_initial_state() -> WorldModelState:
         "L05": FeedbackLoop("L05", "Military AI-Arms Race", "reinforcing", ["S15", "S10", "S07"], 0.80, True, ["F07"], 0.05),
         "L06": FeedbackLoop("L06", "Renewable Scaling", "balancing", ["S14", "S01"], 0.40, False, ["F08"], 0.85)
     }
-    
+
     return WorldModelState(
         version="0.1.0",
         timestamp=ts,
@@ -187,15 +187,15 @@ def query_world_model(question: str) -> list[WorldStock | WorldFlow]:
     """
     question_lower = question.lower()
     results: list[WorldStock | WorldFlow] = []
-    
+
     for stock in INITIAL_WORLD_STATE.stocks.values():
         if question_lower in stock.name.lower() or question_lower in stock.domain.lower():
             results.append(stock)
-            
+
     for flow in INITIAL_WORLD_STATE.flows.values():
         if question_lower in flow.name.lower():
             results.append(flow)
-            
+
     return results
 
 def update_stock(stock_id: str, new_value: float, evidence: list[str], source_url: str) -> dict[str, Any]:
@@ -206,21 +206,21 @@ def update_stock(stock_id: str, new_value: float, evidence: list[str], source_ur
     state = INITIAL_WORLD_STATE  # In real implementation, pass current state
     if stock_id not in state.stocks:
         raise ValueError(f"Stock {stock_id} not found")
-        
+
     stock = state.stocks[stock_id]
     old_value = stock.current_value
-    
+
     stock.current_value = new_value
     stock.last_updated = datetime.now(timezone.utc).isoformat()
     stock.evidence_sources.extend(evidence)
     stock.evidence_sources.append(source_url)
-    
+
     # Simple trajectory inference
     if new_value > old_value + 0.01:
         stock.trajectory = "rising"
     elif new_value < old_value - 0.01:
         stock.trajectory = "falling"
-        
+
     return {
         "stock_id": stock_id,
         "old_value": old_value,
@@ -253,7 +253,7 @@ def get_telos_pressure() -> dict[str, Any]:
             pressures[sid] = {"name": stock.name, "severity": "high"}
         elif stock.trajectory == "rising" and stock.current_value > stock.threshold_critical - 0.1:
             pressures[sid] = {"name": stock.name, "severity": "high"}
-            
+
     return pressures
 
 class WorldModelAgent:
@@ -261,36 +261,35 @@ class WorldModelAgent:
     The 18th asyncio loop. Runs continuously to research stock values,
     detect loop anomalies, and update the Swarm's structural understanding.
     """
-    
+
     def __init__(self, store: WorldModelStore, search_tool: Any, arxiv_tool: Any):
         self.store = store
         self.search = search_tool
         self.arxiv = arxiv_tool
         self._state: WorldModelState | None = None
-        
+
     async def boot(self) -> None:
         """Load state from disk or initialize from seed."""
         self._state = self.store.load_latest() or INITIAL_WORLD_STATE
-        
+
     async def run_loop(self) -> None:
         """Main execution cycle: research stocks, evaluate loops, sleep."""
         await self.boot()
-        
+
         while True:
             # 1. Update stale stocks (simplified logic)
             # Find oldest updated stock
             if self._state:
                 stale_stocks = sorted(
-                    self._state.stocks.values(), 
+                    self._state.stocks.values(),
                     key=lambda s: s.last_updated
                 )
-                
+
                 # Mock update cycle
                 for stock in stale_stocks[:2]:
                     # await self.search.query(f"{stock.name} current status 2026")
                     pass
-                    
+
             # 2. Re-evaluate loops (check predictions vs reality)
             # 3. Sleep
             await asyncio.sleep(3600)  # Check hourly
-

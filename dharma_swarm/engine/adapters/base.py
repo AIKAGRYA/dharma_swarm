@@ -66,4 +66,3 @@ class ProviderAdapter(ABC):
 
     @abstractmethod
     async def stream(self, request: CompletionRequest) -> AsyncIterator[CanonicalEvent]: ...
-
