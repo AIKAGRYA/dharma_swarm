@@ -99,7 +99,8 @@ class TelicSeam:
                     "task_id": task.id,
                     "agent_id": agent_id,
                     "action_type": topology if topology in (
-                        "dispatch", "fan_out", "pipeline", "evolution", "manual"
+                        "dispatch", "fan_out", "pipeline", "evolution", "manual",
+                        "agent_runner",
                     ) else "dispatch",
                     "title": task.title,
                     "description": task.description[:500] if task.description else "",
@@ -616,7 +617,7 @@ class TelicSeam:
         for proposal_id, proposal in proposals.items():
             if proposal_id not in outcomes_by_proposal:
                 status = str(proposal.properties.get("status") or "proposed")
-                if status not in ("completed", "failed", "cancelled"):
+                if status not in ("completed", "failed", "cancelled", "rejected"):
                     report["proposals_without_outcome"].append(
                         {
                             "proposal_id": proposal_id,
