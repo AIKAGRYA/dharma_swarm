@@ -10,9 +10,10 @@ from dharma_swarm.roaming_onboarding import (
     RoamingAgentRegistration,
     onboard_roaming_agent_sync,
 )
+from dharma_swarm.runtime_state import default_dharma_home
 
 
-STATE_DIR = Path.home() / ".dharma"
+STATE_DIR = default_dharma_home()
 TEAM_ID = "cybernetics_directive"
 DIRECTIVE_DOC = str(Path.home() / "dharma_swarm" / "docs" / "missions" / "CYBERNETIC_DIRECTIVE.md")
 

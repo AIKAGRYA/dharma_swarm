@@ -29,9 +29,10 @@ from dharma_swarm.identity import (
     LiveCoherenceSensor,
     _bsi_proxy_score,
 )
+from dharma_swarm.runtime_state import default_dharma_home
 from dharma_swarm.samvara import Power
 
-STATE = Path.home() / ".dharma"
+STATE = default_dharma_home()
 API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 
 # Models to try, in preference order

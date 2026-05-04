@@ -9,7 +9,9 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-STATE = Path.home() / ".dharma"
+from dharma_swarm.runtime_state import default_dharma_home
+
+STATE = default_dharma_home()
 LOG_DIR = STATE / "logs" / "allout"
 SHARED_DIR = STATE / "shared"
 ALL_OUT_HEARTBEAT = STATE / "allout_heartbeat.json"

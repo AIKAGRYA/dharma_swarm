@@ -24,9 +24,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from dharma_swarm.runtime_state import default_dharma_home
 
 ROOT = Path.home() / "dharma_swarm"
-STATE_DIR = Path.home() / ".dharma"
+STATE_DIR = default_dharma_home()
 DB_TASKS = STATE_DIR / "db" / "tasks.db"
 LOG_ROOT = STATE_DIR / "logs" / "overnight"
 STOP_FILE = STATE_DIR / "STOP_OVERNIGHT"

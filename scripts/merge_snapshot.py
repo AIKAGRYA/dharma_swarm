@@ -11,9 +11,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from dharma_swarm.runtime_state import default_dharma_home
+
 ROOT = Path.home() / "dharma_swarm"
 DOCS_MERGE = ROOT / "docs" / "merge"
-STATE_DIR = Path.home() / ".dharma"
+STATE_DIR = default_dharma_home()
 STATE_MERGE = STATE_DIR / "merge"
 HEARTBEAT_FILE = STATE_DIR / "merge_heartbeat.json"
 
@@ -202,8 +204,8 @@ def legacy_source_facts() -> dict[str, Any]:
 
 
 def legacy_import_facts() -> dict[str, Any]:
-    predictor_path = Path.home() / ".dharma" / "evolution" / "predictor_data.jsonl"
-    state_path = Path.home() / ".dharma" / "evolution" / "legacy_import_state.json"
+    predictor_path = STATE_DIR / "evolution" / "predictor_data.jsonl"
+    state_path = STATE_DIR / "evolution" / "legacy_import_state.json"
     report_dir = ROOT / "docs" / "merge" / "imports"
     latest_report_json = report_dir / "LATEST_LEGACY_IMPORT.json"
 

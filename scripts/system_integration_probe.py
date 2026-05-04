@@ -23,9 +23,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from dharma_swarm.runtime_state import default_dharma_home
+
 logging.basicConfig(level=logging.WARNING, format="%(asctime)s [%(name)s] %(message)s", datefmt="%H:%M:%S")
 
-STATE_DIR = Path.home() / ".dharma"
+STATE_DIR = default_dharma_home()
 
 
 @dataclass

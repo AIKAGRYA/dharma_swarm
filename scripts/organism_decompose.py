@@ -20,8 +20,9 @@ from dharma_swarm.identity import (
     LiveCoherenceSensor,
     _bsi_proxy_score,
 )
+from dharma_swarm.runtime_state import default_dharma_home
 
-STATE = Path.home() / ".dharma"
+STATE = default_dharma_home()
 
 
 async def decompose() -> None:

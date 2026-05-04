@@ -28,6 +28,7 @@ from typing import Any
 import sys
 sys.path.insert(0, str(Path.home() / "dharma_swarm"))
 
+from dharma_swarm.runtime_state import default_dharma_home
 from dharma_swarm.master_prompt_engineer import (
     assess_quality,
     generate_local_prompt,
@@ -36,7 +37,7 @@ from dharma_swarm.master_prompt_engineer import (
 )
 
 ROOT = Path.home() / "dharma_swarm"
-STATE = Path.home() / ".dharma"
+STATE = default_dharma_home()
 LOG_DIR = STATE / "logs" / "allout"
 HEARTBEAT_FILE = STATE / "allout_heartbeat.json"
 SHARED_DIR = STATE / "shared"

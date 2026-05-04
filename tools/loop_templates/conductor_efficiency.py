@@ -27,7 +27,9 @@ try:
 except ImportError:  # pragma: no cover - direct script fallback
     from progress_protocol import LoopProgressTracker, ProgressSnapshot
 
-STATE_DIR = Path.home() / ".dharma"
+from dharma_swarm.runtime_state import default_dharma_home
+
+STATE_DIR = default_dharma_home()
 OVERNIGHT_DIR = STATE_DIR / "overnight"
 LOG_FILE = OVERNIGHT_DIR / "conductor_efficiency.jsonl"
 

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import sqlite3
 from dataclasses import dataclass, field
@@ -25,7 +26,12 @@ from dharma_swarm.engine.event_memory import (
     ensure_memory_plane_schema_sync,
 )
 
-DEFAULT_RUNTIME_DB = Path.home() / ".dharma" / "state" / "runtime.db"
+def default_dharma_home() -> Path:
+    """Return the canonical local Dharma state directory."""
+    return Path(os.environ.get("DHARMA_HOME", str(Path.home() / ".dharma")))
+
+
+DEFAULT_RUNTIME_DB = default_dharma_home() / "state" / "runtime.db"
 
 _SESSIONS_DDL = """
 CREATE TABLE IF NOT EXISTS sessions (

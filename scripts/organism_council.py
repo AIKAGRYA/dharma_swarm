@@ -34,7 +34,9 @@ from pathlib import Path
 # Ensure the package is importable
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-STATE_DIR = Path.home() / ".dharma"
+from dharma_swarm.runtime_state import default_dharma_home
+
+STATE_DIR = default_dharma_home()
 
 
 # ═══════════════════════════════════════════════════════════════════════

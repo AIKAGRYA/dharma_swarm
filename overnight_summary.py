@@ -13,8 +13,9 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
+from dharma_swarm.runtime_state import default_dharma_home
 
-STATE_DIR = Path.home() / ".dharma"
+STATE_DIR = default_dharma_home()
 OVERNIGHT_DIR = STATE_DIR / "overnight"
 DATE = datetime.now().strftime("%Y-%m-%d")
 

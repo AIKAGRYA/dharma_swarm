@@ -22,10 +22,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import httpx
 
 from dharma_swarm.organism import OrganismRuntime
+from dharma_swarm.runtime_state import default_dharma_home
 from dharma_swarm.samvara import Power, DiagnosticResult
 from dharma_swarm.organism import HeartbeatResult
 
-STATE_DIR = Path.home() / ".dharma"
+STATE_DIR = default_dharma_home()
 OPENROUTER_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 

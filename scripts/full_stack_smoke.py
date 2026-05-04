@@ -19,6 +19,7 @@ from pathlib import Path
 # dharma_swarm imports
 from dharma_swarm.swarm import SwarmManager
 from dharma_swarm.models import TaskPriority, AgentRole, ProviderType
+from dharma_swarm.runtime_state import default_dharma_home
 from dharma_swarm.telos_gates import check_action
 from dharma_swarm.stigmergy import StigmergyStore
 from dharma_swarm.cost_tracker import cost_summary
@@ -28,7 +29,7 @@ from dharma_swarm.cost_tracker import cost_summary
 # Configuration
 # ═══════════════════════════════════════════════════════════════════
 
-STATE_DIR = Path.home() / ".dharma"
+STATE_DIR = default_dharma_home()
 REPORT_PATH = STATE_DIR / "graphs" / "smoke_test_report.json"
 
 # 5 agents, 5 lenses, different models via OpenRouter

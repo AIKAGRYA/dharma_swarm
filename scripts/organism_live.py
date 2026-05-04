@@ -28,6 +28,7 @@ from dharma_swarm.organism import (
     HeartbeatResult,
     OrganismRuntime,
 )
+from dharma_swarm.runtime_state import default_dharma_home
 from dharma_swarm.samvara import Power
 
 
@@ -232,7 +233,7 @@ async def main() -> None:
     parser.add_argument("--cycles", type=int, default=5, help="Number of heartbeats")
     parser.add_argument("--verbose", action="store_true", help="Show all details")
     parser.add_argument(
-        "--state-dir", type=str, default=str(Path.home() / ".dharma"),
+        "--state-dir", type=str, default=str(default_dharma_home()),
         help="State directory (default: ~/.dharma)",
     )
     args = parser.parse_args()

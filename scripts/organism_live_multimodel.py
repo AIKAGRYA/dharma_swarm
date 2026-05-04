@@ -27,6 +27,7 @@ from dharma_swarm.runtime_provider import (
     resolve_runtime_provider_config,
     create_runtime_provider,
 )
+from dharma_swarm.runtime_state import default_dharma_home
 
 logging.basicConfig(
     level=logging.INFO,
@@ -149,7 +150,7 @@ async def fire_provider(
 
 async def run_experiment(n_cycles: int = 3) -> None:
     """Run the full experiment."""
-    state_dir = Path.home() / ".dharma"
+    state_dir = default_dharma_home()
 
     # Algedonic + Gnani callbacks
     algedonic_log: list[AlgedonicSignal] = []

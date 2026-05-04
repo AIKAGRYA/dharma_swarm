@@ -27,7 +27,9 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any
 
-DHARMA = Path.home() / ".dharma"
+from dharma_swarm.runtime_state import default_dharma_home
+
+DHARMA = default_dharma_home()
 JIKOKU_LOG = DHARMA / "jikoku" / "JIKOKU_LOG.jsonl"
 JIKOKU_PRE = DHARMA / "jikoku" / "JIKOKU_LOG.20260322_pre_rotation.jsonl"
 THINKODYNAMIC_LOG = DHARMA / "jikoku" / "THINKODYNAMIC_DIRECTOR_LOG.jsonl"
