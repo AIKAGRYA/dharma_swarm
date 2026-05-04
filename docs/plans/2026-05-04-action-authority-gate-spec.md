@@ -4,6 +4,7 @@
 **Status:** proposed execution spec
 **Subordinate to:** `CLAUDE.md`, `docs/governance/SOVEREIGN_MANIFEST.md`, `docs/governance/BUILD_SESSION_ENTRYPOINT.md`, and `docs/governance/CANONICAL_DOC_STACK.md`
 **Replaces:** no canonical document
+**Track note:** The current active implementation seam remains the ontology-native Operator Brief until that seam is accepted or canonical track docs explicitly supersede it. AAG work before then is limited to spec correction, tests, pure default-off contracts, and other non-runtime preparation.
 
 This spec defines the smallest load-bearing runtime gate that turns high-authority agent action from an informal judgment into a typed, witnessed, ontology-native decision.
 
@@ -25,8 +26,8 @@ This spec was built from:
   - integration and rollout map
   - failure-mode and acceptance-test map
 - Local `rg` searches across the clean worktree and neighboring worktrees.
-- GitNexus CLI reads against indexed repo snapshots. The fresh worktree itself was not indexed, and `gitnexus analyze` was not run because that writes state. Existing indexed snapshots showed `ActionEnvelope` and `RuntimeBridge` are mostly latent, while `TelicSeam` exposes the proposal/gate/lease/outcome method family.
-- ContextPlus was attempted with semantic search for action authority and runtime enforcement. The query timed out after 120 seconds. This is itself a design signal: external semantic tools are evidence channels, not runtime dependencies.
+- GitNexus CLI reads against indexed repo snapshots. The fresh worktree itself was not indexed, and `gitnexus analyze` was not run because that writes state. Existing indexed snapshots showed `ActionEnvelope` and `RuntimeBridge` are mostly latent, while `TelicSeam` exposes the proposal/gate/lease/outcome method family. A later external audit saw the same fresh-worktree status: not indexed.
+- ContextPlus was attempted with semantic search for action authority and runtime enforcement. Some queries timed out after 120 seconds; a later external audit also found ContextPlus root/index state was not cleanly bound to this worktree. This is itself a design signal: external semantic tools are evidence channels, not runtime dependencies.
 - Memory MCP search for related prior observations returned no direct graph entities for this exact gate name.
 
 Tool status must be recorded in future warrants as evidence, not hidden. A high-authority warrant can say `contextplus_status=timeout` or `gitnexus_status=stale_index`, but it may not pretend the semantic evidence pass happened when it did not.
@@ -131,21 +132,38 @@ Classify every request into one tier:
 | `governance_mutation` | Policy, telos, ontology, hook, CI, budget, release rules | Yes |
 | `release_or_main` | Merge to main, push release, deployment | Yes and enforce |
 
+## Evidence Thresholds
+
+`ActionAuthorityGate` must not blindly apply the 50-file Fourfold default to every action. It passes or requires thresholds by tier:
+
+| Tier | Minimum evidence for warrant construction |
+| --- | --- |
+| `read_only` | no warrant |
+| `local_side_effect` | no warrant unless escalated by metadata |
+| `repo_mutation` | 8 focused files, unless governance/release triggers promote it |
+| `execution` | 8 focused files plus command/workdir metadata |
+| `external_side_effect` | 12 focused files plus network/tool target metadata |
+| `cross_agent_dispatch` | 12 focused files plus authority/delegation metadata |
+| `governance_mutation` | 50 files across required categories |
+| `release_or_main` | 50 files across required categories |
+
+The PR1 classifier does not build warrants. When a later call site constructs a `FourfoldActionWarrant`, it must pass the tier threshold explicitly to `build_fourfold_action_warrant(..., min_evidence_files=<tier_threshold>)` or equivalent refactored policy. Governance, release/main, and self-modifying diff flows keep the 50-file standard.
+
 ## Authority Surfaces
 
 The first implementation must normalize these surfaces even if only a subset is wired in PR 1:
 
 1. `dispatch`: `Orchestrator._assign_dispatch`
 2. `agent_tool`: `AgentRunner._execute_local_tool`
-3. `autonomous_tool`: `AutonomousAgent._execute_tool` and world-action wrappers
+3. `autonomous_tool`: `AutonomousAgent._execute_tool` and `dharma_swarm/world_actions.py`
 4. `tool_registry`: `ToolRegistry.dispatch`
-5. `api_tool`: chat/API tool execution, spawn, workflow, ontology action endpoints
-6. `cron_daemon`: cron runner, launchd runner, pulse, gateway jobs
+5. `api_tool`: `api/chat_tools.py`, `api/routers/chat.py`, `api/routers/commands.py`, `api/routers/agents.py`, spawn, workflow, and ontology endpoints
+6. `cron_daemon`: `cron_runner.py`, `cron_daemon.py`, `launchd_job_runner.py`, `pulse.py`, gateway jobs
 7. `sandbox_runtime`: `LocalSandboxProviderAdapter.execute`, Docker sandbox, subprocess providers
 8. `ontology_action`: `OntologyRegistry.execute_action` and API execute-action path
-9. `diff_self_improve`: `DiffApplier.apply`, evolution, self-improve, DGC auto paths
-10. `external_bridge`: MCP, A2A, roaming daemon, external agent bridge
-11. `operator_ui`: TUI and dashboard commands that trigger actions
+9. `diff_self_improve`: `DiffApplier.apply`, `evolution.py`, `self_improve.py`, DGC auto paths
+10. `external_bridge`: MCP server, A2A server, roaming dispatch daemon, external agent bridge
+11. `operator_ui`: TUI/dashboard commands and native subprocess adapters that trigger actions
 
 The gate should not live separately in all of these files. It should be a small shared facade that each surface calls.
 
@@ -323,6 +341,9 @@ Use existing lifecycle objects:
 - `GateDecisionRecord`
 - `ExecutionLease`
 - `Outcome`
+- `WitnessLog`
+
+The current ontology link from proposal to gate decision is one-to-one, so AAG records one aggregate `GateDecisionRecord`, not one object per component gate. Component results live inside that aggregate record under `gate_results`, `component_results`, or equivalent properties. ALLOW, REVIEW, and BLOCK must all be witnessed.
 
 Add these properties to the authority gate section of `GateDecisionRecord.properties`:
 
@@ -338,6 +359,13 @@ Add these properties to the authority gate section of `GateDecisionRecord.proper
 - `authority_gate_evidence_refs`
 - `authority_gate_evaluated_at`
 - `authority_gate_trace_id`
+- `authority_gate_witness_log_id`
+
+Persistence failure behavior is mode-specific:
+
+- `off`: no persistence requirement.
+- `shadow`: persistence failure emits visible warning metadata and does not block execution.
+- `enforce`: persistence failure blocks high-authority execution because an unwitnessed authority decision is not load-bearing.
 
 Important preflight bug: current `orchestrator.py` calls `TelicSeam(registry=registry, registry_path=ontology_db)`, while `TelicSeam.__init__` accepts `path`, not `registry_path`. Because that exception is swallowed, live orchestrator ontology writeback may be disabled. Fixing that is a prerequisite before claiming AAG persistence is live in orchestrator dispatch.
 
@@ -356,6 +384,7 @@ Deliver:
 - tier/surface classifier
 - trigger binding to `trigger_reasons_for_action`
 - mode handling
+- PTR as negative evidence only
 - no runtime behavior change
 
 Tests:
@@ -367,6 +396,7 @@ Tests:
 - missing high-authority warrant would block in shadow
 - complete high-authority warrant allows
 - invalid/stale/non-allowing warrant blocks in enforce
+- PTR cannot grant allow, raise autonomy, bypass Telos/PolicyCompiler, or infer consent
 
 ### PR 2: Telic Dispatch Shadow
 
@@ -434,30 +464,77 @@ Tests:
 - API ontology action cannot bypass AAG when enforce mode is active
 - dashboard/API does not persist authority decisions outside ontology path
 
-### PR 5: Cron, Sandbox, Diff, And External Bridges
+### PR 5: Cron Shadow
 
 Files:
 
 - cron runner/daemon paths
-- sandbox/runtime contract adapters
-- diff/self-improve/evolution paths
-- MCP/A2A/roaming bridge paths
 
 Deliver:
 
 - pre-execution AAG for scheduled jobs and subprocess execution
 - runtime events carry `decision_id` and `warrant_id`
-- diff apply and self-improvement require warrant in enforce mode
-- external bridge dispatches cannot inherit authority automatically
 
 Tests:
 
 - cron job execution records authority decision
-- sandbox execution classified with command/workdir metadata
-- diff apply missing warrant blocks in enforce
-- external agent remains evidence-only unless explicitly authorized
 
-### PR 6: Enforce Narrowly
+### PR 6: Sandbox And Runtime Adapter Shadow
+
+Files:
+
+- sandbox/runtime contract adapters
+- Docker sandbox and subprocess providers
+
+Deliver:
+
+- sandbox execution classified with command/workdir metadata
+- no runtime adapter can execute without authority metadata in shadow mode
+
+Tests:
+
+- sandbox execution records authority decision
+- command/workdir metadata is present
+
+### PR 7: Diff And Self-Improvement Shadow
+
+Files:
+
+- `diff_applier.py`
+- `evolution.py`
+- `self_improve.py`
+- DGC auto paths
+
+Deliver:
+
+- diff apply and self-improvement require warrant in enforce mode later
+- shadow mode records would-block data first
+
+Tests:
+
+- diff apply missing warrant would block in shadow
+- diff apply missing warrant blocks in enforce
+
+### PR 8: External Bridges And Operator UI Shadow
+
+Files:
+
+- MCP server
+- A2A server
+- roaming dispatch daemon
+- TUI/dashboard command launchers
+
+Deliver:
+
+- external bridge dispatches cannot inherit authority automatically
+- operator UI stays a command/projection surface, not an authority store
+
+Tests:
+
+- external agent remains evidence-only unless explicitly authorized
+- TUI/dashboard do not persist authority outside ontology path
+
+### PR 9: Enforce Narrowly
 
 Do not turn on global enforcement. Start with:
 
@@ -483,7 +560,11 @@ The full spec is accepted only when tests prove:
 - PTR is represented only as negative evidence: it cannot produce allow, cannot raise autonomy, cannot bypass Telos or PolicyCompiler, and cannot infer operator consent.
 - `ShaktiZeitgeistExecutive` remains read-only and `dispatch_authority` remains false.
 - Dispatch writes one `ActionProposal` and one aggregate `GateDecisionRecord`.
+- ALLOW, REVIEW, and BLOCK authority decisions link to `WitnessLog`.
+- Enforce mode blocks high-authority execution when authority persistence fails.
+- Tier-specific Fourfold evidence thresholds are tested.
 - `ExecutionLease` is created only after effective allow.
+- Operator Brief active-seam tests do not regress.
 - `AgentRunner._execute_local_tool` cannot write/edit/shell in enforce mode without authority.
 - API/chat/world action paths cannot bypass the same gate.
 - Cron and sandbox execution carry decision metadata.
@@ -509,8 +590,11 @@ Integration order:
 4. Wire dispatch in shadow.
 5. Wire AgentRunner local tools in shadow.
 6. Wire autonomous/API/tool-registry/world actions in shadow.
-7. Wire cron/sandbox/diff/external bridges in shadow.
-8. Enable narrow enforcement only after would-block data is reviewed.
+7. Wire cron in shadow.
+8. Wire sandbox/runtime adapters in shadow.
+9. Wire diff/self-improvement in shadow.
+10. Wire external bridges and operator UI in shadow.
+11. Enable narrow enforcement only after would-block data is reviewed.
 
 ## Three-Paragraph Warrant Standard
 
