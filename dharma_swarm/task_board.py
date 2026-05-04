@@ -284,6 +284,18 @@ class TaskBoard:
             deps = await self._fetch_deps(db, task_id)
             return self._row_to_task(row, deps)
 
+    async def get_by_title(self, title: str) -> Task | None:
+        """Retrieve the first task matching *title*, or ``None``."""
+        async with self._open() as db:
+            cur = await db.execute(
+                "SELECT * FROM tasks WHERE title = ? LIMIT 1", (title,),
+            )
+            row = await cur.fetchone()
+            if row is None:
+                return None
+            deps = await self._fetch_deps(db, row[0])
+            return self._row_to_task(row, deps)
+
     async def list_tasks(
         self,
         status: TaskStatus | None = None,

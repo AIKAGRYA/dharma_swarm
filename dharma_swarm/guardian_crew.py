@@ -131,8 +131,8 @@ _METHOD_EXISTENCE_CHECKS: list[tuple[str, str, str, str]] = [
     ("dharma_swarm.gnani_lodestone", "GnaniLodestone", "seed_all", "BLOCKER"),
     ("dharma_swarm.telos_gates", "TelosGatekeeper", "check", "BLOCKER"),
     ("dharma_swarm.stigmergy", "StigmergyStore", "leave_mark", "BLOCKER"),
-    ("dharma_swarm.task_board", "TaskBoard", "get_by_title", "DEGRADED"),
-    ("dharma_swarm.telos_graph", "TelosGraph", "get_by_name", "DEGRADED"),
+    ("dharma_swarm.task_board", "TaskBoard", "get_by_title", "BLOCKER"),
+    ("dharma_swarm.telos_graph", "TelosGraph", "get_by_name", "BLOCKER"),
 ]
 
 # Import chains that must succeed

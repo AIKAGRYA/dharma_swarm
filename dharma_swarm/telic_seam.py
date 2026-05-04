@@ -523,6 +523,7 @@ class TelicSeam:
             "orphan_contributions": [],
             "duplicate_outcomes_per_proposal": [],
             "contribution_scope_mismatches": [],
+            "proposals_without_outcome": [],
         }
 
         outcomes_by_proposal: dict[str, list[str]] = {}
@@ -611,7 +612,23 @@ class TelicSeam:
                     }
                 )
 
-        issue_count = sum(len(items) for items in report.values())
+        # Detect proposals that were dispatched but never got an outcome
+        for proposal_id, proposal in proposals.items():
+            if proposal_id not in outcomes_by_proposal:
+                status = str(proposal.properties.get("status") or "proposed")
+                if status not in ("completed", "failed", "cancelled"):
+                    report["proposals_without_outcome"].append(
+                        {
+                            "proposal_id": proposal_id,
+                            "task_id": str(proposal.properties.get("task_id") or ""),
+                            "agent_id": str(proposal.properties.get("agent_id") or ""),
+                            "status": status,
+                        }
+                    )
+
+        issue_count = sum(
+            len(items) for items in report.values() if isinstance(items, list)
+        )
         report["is_clean"] = issue_count == 0
         report["issue_count"] = issue_count
         return report

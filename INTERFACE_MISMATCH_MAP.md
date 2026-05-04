@@ -1,7 +1,7 @@
 # Interface Mismatch Map — dharma_swarm
 
-**Last X-Ray:** 2026-04-08 (fresh audit against current HEAD `c73db94`+)
-**Previous version:** 2026-04-04 (55 module pairs, 13 mismatches, 9 prioritized)
+**Last X-Ray:** 2026-05-04 (provenance-wiring audit against HEAD `2fcd2cf`)
+**Previous version:** 2026-04-08 (55 module pairs, 13 mismatches, 9 prioritized)
 **Maintainer:** Guardian Crew (`guardian_crew.py`) — auto-updates every 4 hours
 **How to read this:** Severity = BLOCKER (crashes at runtime), DEGRADED (silent failure / wrong behavior), WARNING (structural smell).
 
@@ -22,7 +22,11 @@
 | NEW-01: archaeology_ingestion palace.query | BLOCKER | ✅ FIXED THIS SESSION | Replaced with `palace.recall(PalaceQuery(...))` + correct `max_results=` |
 | NEW-02: dgm_loop _provider attr | DEGRADED | ✅ FIXED THIS SESSION | Removed nonexistent `hasattr(engine, '_provider')` check |
 
-**Net change:** 7 resolved, 2 new fixed, 1 still live BLOCKER, 4 structural degraded remain.
+| MM-17: gnani → TaskBoard.get_by_title | DEGRADED | ✅RESOLVED | `TaskBoard.get_by_title()` added — SQL WHERE on title column |
+| MM-18: gnani → TelosGraph.get_by_name | DEGRADED | ✅RESOLVED | `TelosGraph.get_by_name()` added — linear scan on name field |
+| NEW-04: agent_runner → telic_seam dispatch gap | DEGRADED | ✅RESOLVED | `record_dispatch` + `record_gate_decision` added at task start in agent_runner |
+
+**Net change:** 7 resolved, 5 fixed this session (MM-17, MM-18, NEW-01, NEW-02, NEW-04), 0 open BLOCKERs, 4 structural degraded remain.
 
 ---
 
@@ -159,8 +163,9 @@ ROUTER_PROBE   — Reads circuit_breakers.json for open providers
 | 14 | `orchestrate_live` → `living_layers` (dual StigmergyStore) | ✅ |
 | 15 | `archaeology_ingestion` → `memory_palace.recall()` | ✅ (fixed this session) |
 | 16 | `dgm_loop` → `evolution.DarwinEngine.auto_evolve()` | ✅ (fixed this session) |
-| 17 | `gnani_lodestone` → `task_board.get_by_title()` | ⚠️ DEGRADED (method may not exist) |
-| 18 | `gnani_lodestone` → `telos_graph.get_by_name()` | ⚠️ DEGRADED (method may not exist) |
+| 17 | `gnani_lodestone` → `task_board.get_by_title()` | ✅ (method added this session) |
+| 18 | `gnani_lodestone` → `telos_graph.get_by_name()` | ✅ (method added this session) |
+| 21 | `agent_runner` → `telic_seam.record_dispatch()` (provenance) | ✅ (dispatch+gate wired this session) |
 | 19 | `guardian_crew` → `world_actions.github_create_issue()` | ✅ |
 | 20 | `orchestrate_live` → `guardian_crew.start_guardian_loop()` | ✅ |
 
