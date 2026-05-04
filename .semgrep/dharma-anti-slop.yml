@@ -19,17 +19,17 @@ rules:
     paths:
       exclude:
         # Canonical owners (verified via 2026-04-26 audit)
-        - "dharma_swarm/runtime_state.py"
-        - "dharma_swarm/system_rv.py"
-        - "dharma_swarm/daemon_config.py"
-        - "dharma_swarm/experiment_log.py"
-        - "dharma_swarm/pulse.py"
-        - "dharma_swarm/custodians.py"
-        - "dharma_swarm/kaizen_ops_local.py"
-        - "dharma_swarm/scout_report.py"
-        - "dharma_swarm/review_cycle.py"
-        - "dharma_swarm/ginko_backtest.py"
-        - "dharma_swarm/ginko_evolution.py"
+        - "/dharma_swarm/runtime_state.py"
+        - "/dharma_swarm/system_rv.py"
+        - "/dharma_swarm/daemon_config.py"
+        - "/dharma_swarm/experiment_log.py"
+        - "/dharma_swarm/pulse.py"
+        - "/dharma_swarm/custodians.py"
+        - "/dharma_swarm/kaizen_ops_local.py"
+        - "/dharma_swarm/scout_report.py"
+        - "/dharma_swarm/review_cycle.py"
+        - "/dharma_swarm/ginko_backtest.py"
+        - "/dharma_swarm/ginko_evolution.py"
     pattern: Path.home() / ".dharma"
 
   # ===========================================================================
@@ -51,7 +51,7 @@ rules:
     languages: [python]
     paths:
       exclude:
-        - "dharma_swarm/runtime_state.py"
+        - "/dharma_swarm/runtime_state.py"
     patterns:
       - pattern-either:
           - pattern: |
@@ -81,7 +81,7 @@ rules:
     languages: [python, bash]
     paths:
       exclude:
-        - "scripts/uplift_guards/"
+        - "/scripts/uplift_guards/"
     pattern-either:
       - pattern: |
           $RUN([..., "git", "add", "-A", ...], ...)
@@ -112,9 +112,9 @@ rules:
     languages: [python]
     paths:
       exclude:
-        - "dharma_swarm/providers.py"
-        - "dharma_swarm/providers_extended.py"
-        - "dharma_swarm/runtime_provider/"
+        - "/dharma_swarm/providers.py"
+        - "/dharma_swarm/providers_extended.py"
+        - "/dharma_swarm/runtime_provider/"
     pattern-either:
       - pattern: from anthropic import $X
       - pattern: import anthropic
