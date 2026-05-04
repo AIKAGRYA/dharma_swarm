@@ -208,6 +208,12 @@ class TestVerification:
         results = await index.verify_all()
         assert results[c.id] is False
 
+    async def test_verify_blocks_import_calls(self, index: CitationIndex) -> None:
+        c = _make_citation(verification_test="__import__('os').system('true') == 0")
+        await index.add(c)
+        results = await index.verify_all()
+        assert results[c.id] is False
+
     async def test_verify_skips_citations_without_test(self, index: CitationIndex) -> None:
         c = _make_citation(verification_test=None)
         await index.add(c)
