@@ -21,6 +21,7 @@ if _root not in sys.path:
 import argparse
 import asyncio
 import os
+import shlex
 import subprocess
 import textwrap
 import time
@@ -100,9 +101,9 @@ PHASES: list[dict] = [
         ),
         "files": [],
         "run_commands": [
-            ("pytest smoke test", "python3 -m pytest tests/ -q --tb=line -x --timeout=10 2>&1 | tail -30"),
-            ("dgc status", "dgc status 2>&1 | head -60"),
-            ("dgc health", "dgc health 2>&1 | head -60"),
+            ("pytest smoke test", "python3 -m pytest tests/ -q --tb=line -x --timeout=10"),
+            ("dgc status", "dgc status"),
+            ("dgc health", "dgc health"),
         ],
     },
     {
@@ -141,9 +142,9 @@ PHASES: list[dict] = [
             "dharma_swarm/agent_registry.py",
         ],
         "run_commands": [
-            ("module count", "find dharma_swarm/dharma_swarm -name '*.py' | wc -l"),
-            ("test count", "find tests -name '*.py' | wc -l"),
-            ("LOC", "wc -l dharma_swarm/dharma_swarm/*.py 2>/dev/null | tail -1"),
+            ("module count", "repo-module-count"),
+            ("test count", "repo-test-count"),
+            ("LOC", "repo-module-loc"),
         ],
     },
 ]
@@ -168,14 +169,50 @@ def _read_file_excerpt(path: Path, max_chars: int = 8000) -> str:
         return f"[ERROR reading {path}: {e}]"
 
 
+def _trim_lines(text: str, *, first: int | None = None, last: int | None = None) -> str:
+    lines = text.splitlines()
+    if first is not None:
+        lines = lines[:first]
+    if last is not None:
+        lines = lines[-last:]
+    return "\n".join(lines)
+
+
+def _repo_metric(label: str, root: Path) -> str | None:
+    if label == "module count":
+        count = sum(1 for _ in (root / "dharma_swarm").rglob("*.py"))
+        return str(count)
+    if label == "test count":
+        count = sum(1 for _ in (root / "tests").rglob("*.py"))
+        return str(count)
+    if label == "LOC":
+        total = 0
+        for path in (root / "dharma_swarm").rglob("*.py"):
+            total += len(path.read_text(encoding="utf-8", errors="ignore").splitlines())
+        return str(total)
+    return None
+
+
 def _run_command(label: str, cmd: str) -> str:
-    """Run a shell command and return output."""
+    """Run a command without a shell and return output."""
+    root = Path.home() / "dharma_swarm"
+    metric = _repo_metric(label, root)
+    if metric is not None:
+        return f"$ {label}\n{metric}"
+
     try:
+        args = shlex.split(cmd)
+        if not args:
+            return f"$ {label}\n[ERROR: empty command]"
         result = subprocess.run(
-            cmd, shell=True, capture_output=True, text=True, timeout=60,
-            cwd=str(Path.home() / "dharma_swarm"),
+            args, capture_output=True, text=True, timeout=60,
+            cwd=str(root),
         )
         output = result.stdout + result.stderr
+        if label == "pytest smoke test":
+            output = _trim_lines(output, last=30)
+        elif label in {"dgc status", "dgc health"}:
+            output = _trim_lines(output, first=60)
         return f"$ {label}\n{output.strip()}"
     except Exception as e:
         return f"$ {label}\n[ERROR: {e}]"

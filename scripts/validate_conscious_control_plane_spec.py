@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -107,24 +108,41 @@ def _run_command_checks(data: dict) -> tuple[list[dict], bool]:
     all_ok = True
 
     for check in data["command_checks"]:
-        proc = subprocess.run(
-            check["command"],
-            cwd=REPO_ROOT,
-            shell=True,
-            capture_output=True,
-            text=True,
-        )
-        ok = proc.returncode == 0
+        command = str(check["command"])
+        try:
+            args = shlex.split(command)
+        except ValueError as exc:
+            args = []
+            parse_error = str(exc)
+        else:
+            parse_error = ""
+
+        if not args:
+            ok = False
+            returncode = 127
+            stdout = ""
+            stderr = parse_error or "empty command"
+        else:
+            proc = subprocess.run(
+                args,
+                cwd=REPO_ROOT,
+                capture_output=True,
+                text=True,
+            )
+            ok = proc.returncode == 0
+            returncode = proc.returncode
+            stdout = proc.stdout
+            stderr = proc.stderr
         results.append(
             {
                 "id": check["id"],
                 "type": "command",
-                "command": check["command"],
+                "command": command,
                 "ok": ok,
                 "description": check["description"],
-                "returncode": proc.returncode,
-                "stdout_tail": proc.stdout[-400:],
-                "stderr_tail": proc.stderr[-400:],
+                "returncode": returncode,
+                "stdout_tail": stdout[-400:],
+                "stderr_tail": stderr[-400:],
             }
         )
         all_ok &= ok

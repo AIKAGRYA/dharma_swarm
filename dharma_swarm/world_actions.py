@@ -64,6 +64,20 @@ def _run(cmd: list[str], cwd: Path | None = None, timeout: int = 60) -> tuple[in
     return proc.returncode, proc.stdout.strip(), proc.stderr.strip()
 
 
+def _git_changed_paths(repo: Path) -> list[str]:
+    """Return explicit paths that need staging in a git repository."""
+    paths: set[str] = set()
+    for cmd in (
+        ["git", "diff", "--name-only"],
+        ["git", "diff", "--cached", "--name-only"],
+        ["git", "ls-files", "--others", "--exclude-standard"],
+    ):
+        code, out, _ = _run(cmd, cwd=repo, timeout=30)
+        if code == 0 and out:
+            paths.update(line for line in out.splitlines() if line)
+    return sorted(paths)
+
+
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -136,9 +150,11 @@ def github_commit_push(repo_dir: str, commit_message: str, branch: str | None = 
     if branch:
         _run(["git", "checkout", "-B", branch], cwd=repo, timeout=30)
 
-    code, out, err = _run(["git", "add", "-A"], cwd=repo, timeout=60)
-    if code != 0:
-        return WorldActionResult(False, "github_commit_push", err or out, path=str(repo))
+    changed_paths = _git_changed_paths(repo)
+    if changed_paths:
+        code, out, err = _run(["git", "add", "--", *changed_paths], cwd=repo, timeout=60)
+        if code != 0:
+            return WorldActionResult(False, "github_commit_push", err or out, path=str(repo))
 
     code, out, err = _run(["git", "commit", "-m", commit_message], cwd=repo, timeout=60)
     if code != 0 and "nothing to commit" not in (out + err).lower():
