@@ -1869,6 +1869,54 @@ _CONTRIBUTION = ObjectType(
     icon="C",
 )
 
+_CORE_FOUR_METRIC = ObjectType(
+    name="CoreFourMetric",
+    description="DX Core 4 measurement attached to a ValueEvent: speed, effectiveness, quality, impact",
+    properties={
+        "metric_id": PropertyDef(name="metric_id", property_type=PropertyType.STRING,
+                                  required=True, immutable=True,
+                                  description="Deduplicated: one per (value_event_id, dimension)"),
+        "value_event_id": PropertyDef(name="value_event_id", property_type=PropertyType.STRING,
+                                       required=True, immutable=True),
+        "outcome_id": PropertyDef(name="outcome_id", property_type=PropertyType.STRING,
+                                   required=True, immutable=True),
+        "task_id": PropertyDef(name="task_id", property_type=PropertyType.STRING,
+                                required=True),
+        "agent_id": PropertyDef(name="agent_id", property_type=PropertyType.STRING,
+                                 required=True),
+        "dimension": PropertyDef(name="dimension", property_type=PropertyType.ENUM,
+                                  required=True, immutable=True,
+                                  enum_values=["speed", "effectiveness", "quality", "impact"]),
+        "score": PropertyDef(name="score", property_type=PropertyType.FLOAT,
+                              required=True,
+                              description="Normalized 0.0-1.0 Core Four score"),
+        "signal_source": PropertyDef(name="signal_source", property_type=PropertyType.ENUM,
+                                      required=True,
+                                      enum_values=[
+                                          "duration_efficiency",
+                                          "behavioral_signal",
+                                          "fitness_or_success",
+                                          "composite_value",
+                                          "manual",
+                                      ]),
+        "measurement_method": PropertyDef(name="measurement_method",
+                                           property_type=PropertyType.STRING,
+                                           required=True),
+        "evidence_summary": PropertyDef(name="evidence_summary",
+                                         property_type=PropertyType.TEXT),
+        "measured_at": PropertyDef(name="measured_at", property_type=PropertyType.STRING,
+                                    required=True),
+    },
+    actions=[
+        ActionDef(name="Record", object_type="CoreFourMetric",
+                  description="Record one DX Core 4 metric for a value event"),
+    ],
+    security=SecurityPolicy(audit_all=True),
+    telos_alignment=0.9,
+    shakti_energy=ShaktiEnergy.MAHALAKSHMI,
+    icon="4",
+)
+
 _VENTURE_CELL = ObjectType(
     name="VentureCell",
     description="Fractal project container — first-class ontology object with its own agents, budgets, KPIs",
@@ -1952,6 +2000,14 @@ _METABOLIC_LINKS: list[LinkDef] = [
             target_type="Contribution", cardinality=LinkCardinality.ONE_TO_MANY,
             inverse_name="contributes_to_value",
             description="Credit attributions from this value event"),
+    LinkDef(name="has_core_four_metric", source_type="ValueEvent",
+            target_type="CoreFourMetric", cardinality=LinkCardinality.ONE_TO_MANY,
+            inverse_name="metric_of_value_event",
+            description="DX Core 4 metrics derived from this value event"),
+    LinkDef(name="measures_outcome", source_type="CoreFourMetric",
+            target_type="Outcome", cardinality=LinkCardinality.MANY_TO_ONE,
+            inverse_name="core_four_metrics",
+            description="Outcome measured by this Core Four metric"),
 ]
 
 
@@ -1961,7 +2017,7 @@ _DOMAIN_TYPES: list[ObjectType] = [
     _SIGNAL, _QUESTION, _EVIDENCE,
     _CLAIM, _DOCTRINE, _CAPABILITY, _CAUSE, _MOVEMENT, _R_V_MEASUREMENT,
     _ACTION_PROPOSAL, _GATE_DECISION_TYPE, _EXECUTION_LEASE, _OUTCOME, _VALUE_EVENT,
-    _CONTRIBUTION, _VENTURE_CELL,
+    _CONTRIBUTION, _CORE_FOUR_METRIC, _VENTURE_CELL,
 ]
 
 

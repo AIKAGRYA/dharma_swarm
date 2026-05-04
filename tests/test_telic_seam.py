@@ -130,6 +130,17 @@ class TestOntologyTypes:
         assert "credit_share" in t.properties
         assert "attributed_value" in t.properties
 
+    def test_core_four_metric_type_exists(self, registry):
+        t = registry.get_type("CoreFourMetric")
+        assert t is not None
+        assert "value_event_id" in t.properties
+        assert "outcome_id" in t.properties
+        assert "dimension" in t.properties
+        assert "score" in t.properties
+        assert t.properties["dimension"].enum_values == [
+            "speed", "effectiveness", "quality", "impact",
+        ]
+
     def test_venture_cell_type_exists(self, registry):
         t = registry.get_type("VentureCell")
         assert t is not None
@@ -154,6 +165,12 @@ class TestOntologyTypes:
         links = registry.get_links_for("ValueEvent")
         link_names = {ld.name for ld in links}
         assert "has_contribution" in link_names
+        assert "has_core_four_metric" in link_names
+
+    def test_core_four_metric_links_registered(self, registry):
+        links = registry.get_links_for("CoreFourMetric")
+        link_names = {ld.name for ld in links}
+        assert "measures_outcome" in link_names
 
     def test_venture_cell_links(self, registry):
         links = registry.get_links_for("VentureCell")
@@ -666,6 +683,91 @@ class TestContribution:
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Core Four Metrics
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+class TestCoreFourMetrics:
+    def _make_value_event(self, seam, sample_task):
+        seam.record_dispatch(sample_task, "agent_alpha")
+        outcome_id = seam.record_outcome(
+            sample_task,
+            "agent_alpha",
+            success=True,
+            result_summary="DX Core Four ontology metric proof.",
+            duration_ms=5000.0,
+            fitness_score=0.87,
+        )
+        ve_id = seam.record_value_event(
+            outcome_id,
+            sample_task,
+            "agent_alpha",
+            result_text="DX Core Four ontology metric proof.",
+            success=True,
+            duration_ms=5000.0,
+            cell_id="core_four_cell",
+        )
+        assert outcome_id is not None
+        assert ve_id is not None
+        return outcome_id, ve_id
+
+    def test_record_core_four_metrics_creates_four_dimensions(self, seam, sample_task):
+        outcome_id, ve_id = self._make_value_event(seam, sample_task)
+
+        metric_ids = seam.record_core_four_metrics(
+            ve_id,
+            evidence_summary="Derived from ValueEvent and Outcome telemetry.",
+        )
+
+        assert len(metric_ids) == 4
+        metrics = seam.query_core_four_metrics(value_event_id=ve_id)
+        assert [m.properties["dimension"] for m in metrics] == [
+            "speed", "effectiveness", "quality", "impact",
+        ]
+        assert {m.properties["value_event_id"] for m in metrics} == {ve_id}
+        assert {m.properties["outcome_id"] for m in metrics} == {outcome_id}
+        assert all(0.0 <= m.properties["score"] <= 1.0 for m in metrics)
+        assert seam.stats()["core_four_metrics"] == 4
+
+    def test_core_four_metrics_link_to_value_event_and_outcome(self, seam, sample_task):
+        outcome_id, ve_id = self._make_value_event(seam, sample_task)
+        metric_ids = seam.record_core_four_metrics(ve_id)
+
+        for metric_id in metric_ids:
+            assert seam.registry.get_links(
+                source_id=ve_id,
+                target_id=metric_id,
+                link_name="has_core_four_metric",
+            )
+            assert seam.registry.get_links(
+                source_id=metric_id,
+                target_id=outcome_id,
+                link_name="measures_outcome",
+            )
+
+    def test_core_four_metrics_are_idempotent(self, seam, sample_task):
+        _, ve_id = self._make_value_event(seam, sample_task)
+
+        first = seam.record_core_four_metrics(ve_id)
+        second = seam.record_core_four_metrics(ve_id)
+
+        assert first == second
+        assert seam.stats()["core_four_metrics"] == 4
+        assert seam.stats()["duplicate_suppressions"]["core_four_metrics"] == 4
+
+    def test_query_core_four_metrics_filters_by_outcome(self, seam, sample_task):
+        outcome_id, ve_id = self._make_value_event(seam, sample_task)
+        seam.record_core_four_metrics(ve_id)
+
+        metrics = seam.query_core_four_metrics(outcome_id=outcome_id)
+
+        assert len(metrics) == 4
+        assert [m.properties["dimension"] for m in metrics] == [
+            "speed", "effectiveness", "quality", "impact",
+        ]
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # VentureCell
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -851,6 +953,7 @@ class TestLifecycleIntegrityReport:
             cell_id="rv_cell",
             task_type=ve_obj.properties["task_type"],
         )
+        seam.record_core_four_metrics(ve_id)
 
         report = seam.lifecycle_integrity_report()
 
@@ -889,6 +992,40 @@ class TestLifecycleIntegrityReport:
         assert report["is_clean"] is False
         assert len(report["duplicate_outcomes_per_proposal"]) == 1
         assert len(report["orphan_outcomes"]) == 1
+
+    def test_detects_orphan_core_four_metric(self, seam, sample_task):
+        seam.record_dispatch(sample_task, "agent_alpha")
+        outcome_id = seam.record_outcome(sample_task, "agent_alpha", success=True)
+        ve_id = seam.record_value_event(
+            outcome_id,
+            sample_task,
+            "agent_alpha",
+            success=True,
+            duration_ms=1000.0,
+        )
+        metric, errors = seam.registry.create_object(
+            "CoreFourMetric",
+            {
+                "metric_id": f"core4_{ve_id}_speed",
+                "value_event_id": ve_id,
+                "outcome_id": outcome_id,
+                "task_id": sample_task.id,
+                "agent_id": "agent_alpha",
+                "dimension": "speed",
+                "score": 1.0,
+                "signal_source": "duration_efficiency",
+                "measurement_method": "test_corruption",
+                "measured_at": "2026-05-08T04:30:00+08:00",
+            },
+            created_by="test_corruption",
+        )
+        assert metric is not None
+        assert not errors
+
+        report = seam.lifecycle_integrity_report()
+
+        assert report["is_clean"] is False
+        assert metric.id in report["orphan_core_four_metrics"]
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

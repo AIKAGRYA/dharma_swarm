@@ -36,6 +36,11 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from dharma_swarm.core_four_metrics import (
+    core_four_integrity_report,
+    query_core_four_metrics as query_core_four_metrics_from_registry,
+    record_core_four_metrics as record_core_four_metrics_in_registry,
+)
 from dharma_swarm.dharma_kernel import DharmaKernel
 from dharma_swarm.lineage import LineageEdge, LineageGraph
 from dharma_swarm.models import GateCheckResult, GateDecision, Task
@@ -71,6 +76,7 @@ class TelicSeam:
             "outcomes": 0,
             "value_events": 0,
             "contributions": 0,
+            "core_four_metrics": 0,
         }
 
     @property
@@ -769,6 +775,52 @@ class TelicSeam:
             logger.debug("TelicSeam.record_contribution failed: %s", exc)
             return None
 
+    def record_core_four_metrics(
+        self,
+        value_event_id: str,
+        *,
+        evidence_summary: str = "",
+        measurement_method: str = "dx_core4_from_value_event_v1",
+    ) -> list[str]:
+        """Record Speed, Effectiveness, Quality, and Impact for a ValueEvent.
+
+        Idempotent: one CoreFourMetric per (value_event_id, dimension).
+        Returns created or existing metric IDs. Best-effort and non-blocking.
+        """
+        try:
+            metric_ids, duplicate_count, errors, should_flush = (
+                record_core_four_metrics_in_registry(
+                    self._registry,
+                    value_event_id,
+                    measured_at=self._utc_now_iso(),
+                    evidence_summary=evidence_summary,
+                    measurement_method=measurement_method,
+                )
+            )
+            self._duplicate_suppressions["core_four_metrics"] += duplicate_count
+            if errors:
+                logger.debug("CoreFourMetric recording issues: %s", errors)
+            if should_flush:
+                self._flush_registry()
+            return metric_ids
+
+        except Exception as exc:
+            logger.debug("TelicSeam.record_core_four_metrics failed: %s", exc)
+            return []
+
+    def query_core_four_metrics(
+        self,
+        *,
+        value_event_id: str = "",
+        outcome_id: str = "",
+    ) -> list[OntologyObj]:
+        """Read Core Four metrics, optionally scoped to a ValueEvent or Outcome."""
+        return query_core_four_metrics_from_registry(
+            self._registry,
+            value_event_id=value_event_id,
+            outcome_id=outcome_id,
+        )
+
     _PRIOR_WEIGHT = 5  # Bayesian smoothing prior weight
 
     def query_agent_fitness(
@@ -819,6 +871,7 @@ class TelicSeam:
             "outcomes": by_type.get("Outcome", 0),
             "value_events": by_type.get("ValueEvent", 0),
             "contributions": by_type.get("Contribution", 0),
+            "core_four_metrics": by_type.get("CoreFourMetric", 0),
             "venture_cells": by_type.get("VentureCell", 0),
             "lineage_edges": lineage_stats.get("total_edges", 0),
             "total_ontology_objects": ontology_stats.get("total_objects", 0),
@@ -835,15 +888,19 @@ class TelicSeam:
         outcomes = self._registry.get_objects_by_type("Outcome")
         value_events = self._registry.get_objects_by_type("ValueEvent")
         contributions = self._registry.get_objects_by_type("Contribution")
+        core_four_metrics = self._registry.get_objects_by_type("CoreFourMetric")
 
         report = {
             "proposal_outcome_agent_mismatches": [],
             "outcome_value_agent_mismatches": [],
+            "value_core_four_agent_mismatches": [],
             "orphan_outcomes": [],
             "orphan_value_events": [],
             "orphan_contributions": [],
+            "orphan_core_four_metrics": [],
             "duplicate_outcomes_per_proposal": [],
             "contribution_scope_mismatches": [],
+            "core_four_scope_mismatches": [],
         }
 
         outcomes_by_proposal: dict[str, list[str]] = {}
@@ -933,6 +990,14 @@ class TelicSeam:
                         "contribution_task_type": contribution_task_type,
                     }
                 )
+
+        for key, items in core_four_integrity_report(
+            self._registry,
+            core_four_metrics,
+            value_events_by_id,
+            outcomes_by_id,
+        ).items():
+            report[key].extend(items)
 
         issue_count = sum(len(items) for items in report.values())
         report["is_clean"] = issue_count == 0
@@ -1044,6 +1109,7 @@ class TelicSeam:
             {"status": "completed" if success else "failed"},
             updated_by="telic_seam",
         )
+
 
 
 # Module-level singleton — lazy init
