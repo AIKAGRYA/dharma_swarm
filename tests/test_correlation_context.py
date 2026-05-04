@@ -433,7 +433,7 @@ class TestTaskConsistencyGuard:
         db.commit()
         db.close()
 
-        from dharma_swarm.guardian_crew import run_task_consistency_guard
+        from dharma_swarm.consistency_guard import run_task_consistency_guard
         findings = asyncio.get_event_loop().run_until_complete(
             run_task_consistency_guard(tmp_path)
         )
@@ -475,7 +475,7 @@ class TestTaskConsistencyGuard:
         db.commit()
         db.close()
 
-        from dharma_swarm.guardian_crew import run_task_consistency_guard
+        from dharma_swarm.consistency_guard import run_task_consistency_guard
         findings = asyncio.get_event_loop().run_until_complete(
             run_task_consistency_guard(tmp_path)
         )
@@ -485,7 +485,7 @@ class TestTaskConsistencyGuard:
 
     def test_no_db_returns_empty(self, tmp_path: Path):
         """No database file should return empty findings (not crash)."""
-        from dharma_swarm.guardian_crew import run_task_consistency_guard
+        from dharma_swarm.consistency_guard import run_task_consistency_guard
         findings = asyncio.get_event_loop().run_until_complete(
             run_task_consistency_guard(tmp_path)
         )
