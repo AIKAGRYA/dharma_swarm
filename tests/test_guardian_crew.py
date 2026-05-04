@@ -307,6 +307,121 @@ async def test_ledger_watcher_warning_on_24h_delta_without_structured_rows(tmp_p
     assert "artifact_records=0" in finding.detail
 
 
+def _seed_operator_brief_events(
+    db_path: Path,
+    count: int,
+    *,
+    created_at: datetime | None = None,
+) -> None:
+    now = (created_at or datetime.now(timezone.utc)).isoformat()
+    rows = [
+        (
+            f"sevt_ob_{idx}",
+            "sess_ob",
+            "cron",
+            "operator_brief.tick",
+            "",
+            "",
+            "agent_ob",
+            "operator brief tick",
+            "operator_brief tick event",
+            "{}",
+            now,
+        )
+        for idx in range(count)
+    ]
+    with sqlite3.connect(db_path) as db:
+        db.executemany(
+            "INSERT INTO session_events (event_id, session_id, ledger_kind,"
+            " event_name, task_id, run_id, agent_id, summary, event_text,"
+            " payload_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            rows,
+        )
+        db.commit()
+
+
+def _seed_operator_brief_artifacts(
+    db_path: Path,
+    count: int,
+) -> None:
+    now = datetime.now(timezone.utc).isoformat()
+    with sqlite3.connect(db_path) as db:
+        for idx in range(count):
+            db.execute(
+                "INSERT INTO artifact_records (artifact_id, session_id, task_id,"
+                " run_id, artifact_kind, payload_path, checksum, created_at,"
+                " metadata_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    f"artifact_ob_{idx}",
+                    "sess_ob",
+                    "",
+                    "",
+                    "operator_brief",
+                    f"/tmp/ob-{idx}.md",
+                    "sha256",
+                    now,
+                    "{}",
+                ),
+            )
+        db.commit()
+
+
+@pytest.mark.asyncio
+async def test_ledger_watcher_operator_brief_degraded(tmp_path: Path) -> None:
+    state_dir, db_path = _runtime_db(tmp_path)
+    _seed_operator_brief_events(db_path, 10)
+    _seed_structured_rows(db_path)
+
+    findings = await run_ledger_watcher(state_dir)
+
+    ob_findings = [f for f in findings if f.check == "LEDGER_WATCHER:operator_brief_empty"]
+    assert len(ob_findings) == 1
+    finding = ob_findings[0]
+    assert finding.severity == "DEGRADED"
+    assert "10 operator_brief session events" in finding.detail
+    assert "0 artifact_records" in finding.detail
+
+
+@pytest.mark.asyncio
+async def test_ledger_watcher_operator_brief_blocker(tmp_path: Path) -> None:
+    state_dir, db_path = _runtime_db(tmp_path)
+    _seed_operator_brief_events(db_path, 100)
+    _seed_structured_rows(db_path)
+
+    findings = await run_ledger_watcher(state_dir)
+
+    ob_findings = [f for f in findings if f.check == "LEDGER_WATCHER:operator_brief_empty"]
+    assert len(ob_findings) == 1
+    finding = ob_findings[0]
+    assert finding.severity == "BLOCKER"
+    assert "100 operator_brief session events" in finding.detail
+
+
+@pytest.mark.asyncio
+async def test_ledger_watcher_operator_brief_ok_with_artifacts(tmp_path: Path) -> None:
+    state_dir, db_path = _runtime_db(tmp_path)
+    _seed_operator_brief_events(db_path, 50)
+    _seed_operator_brief_artifacts(db_path, 5)
+    _seed_structured_rows(db_path)
+
+    findings = await run_ledger_watcher(state_dir)
+
+    ob_findings = [f for f in findings if f.check == "LEDGER_WATCHER:operator_brief_empty"]
+    assert ob_findings == []
+
+
+@pytest.mark.asyncio
+async def test_ledger_watcher_operator_brief_below_threshold(tmp_path: Path) -> None:
+    state_dir, db_path = _runtime_db(tmp_path)
+    _seed_operator_brief_events(db_path, 9)
+    _seed_structured_rows(db_path)
+
+    findings = await run_ledger_watcher(state_dir)
+
+    ob_findings = [f for f in findings if f.check == "LEDGER_WATCHER:operator_brief_empty"]
+    assert ob_findings == []
+
+
 @pytest.mark.asyncio
 async def test_guardian_warning_stale_repo_root_report(tmp_path: Path) -> None:
     src_root = _repo_src_root(tmp_path)

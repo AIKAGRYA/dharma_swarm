@@ -357,6 +357,10 @@ _STRUCTURED_RUNTIME_TABLE_TIMESTAMPS = {
 }
 
 
+_OPERATOR_BRIEF_DEGRADED_THRESHOLD = 10
+_OPERATOR_BRIEF_BLOCKER_THRESHOLD = 100
+
+
 def _runtime_db_candidates(state_dir: Path) -> list[Path]:
     """Return state-local runtime DB candidates without consulting Path.home()."""
     return [
@@ -397,6 +401,32 @@ def _runtime_table_count_since(
     row = db.execute(
         f"SELECT COUNT(*) FROM {table} WHERE {timestamp_column} >= ?",
         (since_iso,),
+    ).fetchone()
+    return int(row[0] if row else 0)
+
+
+def _operator_brief_tick_count(db: sqlite3.Connection) -> int:
+    """Count session_events that look like operator_brief cron ticks."""
+    exists = db.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'session_events'",
+    ).fetchone()
+    if exists is None:
+        return 0
+    row = db.execute(
+        "SELECT COUNT(*) FROM session_events WHERE event_name LIKE '%operator_brief%'",
+    ).fetchone()
+    return int(row[0] if row else 0)
+
+
+def _operator_brief_artifact_count(db: sqlite3.Connection) -> int:
+    """Count artifact_records with artifact_kind = 'operator_brief'."""
+    exists = db.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'artifact_records'",
+    ).fetchone()
+    if exists is None:
+        return 0
+    row = db.execute(
+        "SELECT COUNT(*) FROM artifact_records WHERE artifact_kind = 'operator_brief'",
     ).fetchone()
     return int(row[0] if row else 0)
 
@@ -459,6 +489,8 @@ async def run_ledger_watcher(
                 since_iso,
             )
             context_status_counts = runtime_context_status_counts(db, since_iso)
+            ob_ticks = _operator_brief_tick_count(db)
+            ob_artifacts = _operator_brief_artifact_count(db)
     except sqlite3.Error as exc:
         return [
             GuardianFinding(
@@ -596,6 +628,31 @@ async def run_ledger_watcher(
                 fix_hint=(
                     "Inspect Orchestrator context_bundle_failed session events and "
                     "RuntimeStateStore availability before hard-gating dispatch."
+                ),
+            )
+        )
+    if ob_ticks >= _OPERATOR_BRIEF_DEGRADED_THRESHOLD and ob_artifacts == 0:
+        severity = (
+            "BLOCKER"
+            if ob_ticks >= _OPERATOR_BRIEF_BLOCKER_THRESHOLD
+            else "DEGRADED"
+        )
+        findings.append(
+            GuardianFinding(
+                severity=severity,
+                check="LEDGER_WATCHER:operator_brief_empty",
+                title="Operator brief cron has fired without producing artifacts",
+                detail=(
+                    f"{runtime_db} has {ob_ticks} operator_brief session events "
+                    f"but {ob_artifacts} artifact_records with "
+                    f"artifact_kind='operator_brief'. The cron is running but "
+                    "not materialising KnowledgeArtifact rows."
+                ),
+                file=str(runtime_db),
+                fix_hint=(
+                    "Check DHARMA_OPERATOR_BRIEF_ENABLED=1, verify gate "
+                    "decisions are not all blocking, and inspect "
+                    "operator_brief persistence in RuntimeStateStore."
                 ),
             )
         )
