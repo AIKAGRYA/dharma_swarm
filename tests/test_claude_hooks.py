@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -95,40 +96,47 @@ class TestVerifyBaseline:
 class TestCLIEntryPoint:
     """The module can be invoked as a CLI tool."""
 
-    def test_stop_verify_cli(self):
+    def _env(self, tmp_path: Path) -> dict[str, str]:
+        return {**os.environ, "HOME": str(tmp_path)}
+
+    def test_stop_verify_cli(self, tmp_path):
         result = subprocess.run(
             [sys.executable, "-m", "dharma_swarm.claude_hooks", "stop_verify"],
             capture_output=True, text=True, timeout=15,
             cwd=str(Path(__file__).parent.parent),
+            env=self._env(tmp_path),
         )
         assert result.returncode == 0
         data = json.loads(result.stdout)
         assert "gate_decision" in data
 
-    def test_session_context_cli(self):
+    def test_session_context_cli(self, tmp_path):
         result = subprocess.run(
             [sys.executable, "-m", "dharma_swarm.claude_hooks", "session_context"],
             capture_output=True, text=True, timeout=15,
             cwd=str(Path(__file__).parent.parent),
+            env=self._env(tmp_path),
         )
         assert result.returncode == 0
         assert "DGC mission-control" in result.stdout
 
-    def test_verify_baseline_cli(self):
+    def test_verify_baseline_cli(self, tmp_path):
         result = subprocess.run(
             [sys.executable, "-m", "dharma_swarm.claude_hooks", "verify_baseline"],
             capture_output=True, text=True, timeout=15,
             cwd=str(Path(__file__).parent.parent),
+            env=self._env(tmp_path),
         )
         # Exit 0 or 1 depending on gate result — both valid
         data = json.loads(result.stdout)
         assert "gates" in data
         assert "health" in data
 
-    def test_unknown_command_exits_nonzero(self):
+    def test_unknown_command_exits_nonzero(self, tmp_path):
         result = subprocess.run(
             [sys.executable, "-m", "dharma_swarm.claude_hooks", "bogus"],
             capture_output=True, text=True, timeout=10,
             cwd=str(Path(__file__).parent.parent),
+            env=self._env(tmp_path),
         )
         assert result.returncode != 0

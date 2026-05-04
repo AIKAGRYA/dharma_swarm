@@ -300,6 +300,9 @@ def _extract_delta_content(data: dict[str, Any]) -> str:
         content = delta.get("content")
         if isinstance(content, str):
             return content
+        reasoning = delta.get("reasoning")
+        if isinstance(reasoning, str):
+            return reasoning
     return ""
 
 

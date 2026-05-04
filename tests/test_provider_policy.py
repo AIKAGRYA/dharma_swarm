@@ -31,15 +31,17 @@ from dharma_swarm.telemetry_plane import (
 
 def test_model_hierarchy_exposes_primary_driver_and_support_lane_contract() -> None:
     assert PRIMARY_DRIVER_LANES == (
-        ProviderType.CODEX,
         ProviderType.CLAUDE_CODE,
+        ProviderType.CODEX,
+        ProviderType.OLLAMA,
         ProviderType.ANTHROPIC,
     )
     assert PRIMARY_TOOLING_PRIORITY[:2] == (
-        ProviderType.CODEX,
         ProviderType.CLAUDE_CODE,
+        ProviderType.CODEX,
     )
-    assert PRIMARY_REASONING_PRIORITY[0] == ProviderType.ANTHROPIC
+    assert PRIMARY_REASONING_PRIORITY[0] == ProviderType.CLAUDE_CODE
+    assert ProviderType.ANTHROPIC in PRIMARY_REASONING_PRIORITY
     assert ProviderType.OPENROUTER in DELEGATED_RESEARCH_PRIORITY
     assert ProviderType.OLLAMA in DELEGATED_RESEARCH_PRIORITY
     assert ProviderType.NVIDIA_NIM in DELEGATED_RESEARCH_PRIORITY
@@ -149,8 +151,8 @@ def test_provider_policy_prefers_tooling_lanes_when_requested() -> None:
         ],
     )
 
-    assert decision.selected_provider == ProviderType.CODEX
-    assert decision.selected_model_hint == "codex"
+    assert decision.selected_provider == ProviderType.CLAUDE_CODE
+    assert decision.selected_model_hint == "claude-code"
 
 
 def test_provider_policy_prefers_japanese_quality_lanes() -> None:
@@ -415,8 +417,8 @@ def test_provider_policy_swarm_role_allocation_is_deterministic() -> None:
         SwarmRole.CODER,
         SwarmRole.CRITIC,
     )
-    assert first.role_routes[1].route.selected_provider == ProviderType.CODEX
-    assert second.role_routes[1].route.selected_provider == ProviderType.CODEX
+    assert first.role_routes[1].route.selected_provider == ProviderType.CLAUDE_CODE
+    assert second.role_routes[1].route.selected_provider == ProviderType.CLAUDE_CODE
 
 
 def test_provider_policy_swarm_plan_exposes_execution_contract() -> None:

@@ -162,11 +162,14 @@ async def test_claude_code_provider_builds_prompt():
 
     async def fake_exec(*args, **kwargs):
         nonlocal captured_prompt
-        # args: "claude", "-p", <prompt>, "--output-format", "text"
-        captured_prompt = args[2]
 
         mock_proc = AsyncMock()
-        mock_proc.communicate = AsyncMock(return_value=(b"done", b""))
+        async def _communicate(input=None):
+            nonlocal captured_prompt
+            captured_prompt = input.decode() if input else ""
+            return b"done", b""
+
+        mock_proc.communicate = AsyncMock(side_effect=_communicate)
         mock_proc.returncode = 0
         mock_proc.terminate = AsyncMock()
         return mock_proc
@@ -179,8 +182,8 @@ async def test_claude_code_provider_builds_prompt():
     assert "You are a test agent." in captured_prompt
     assert "Do the thing" in captured_prompt
     assert "Now check results" in captured_prompt
-    # Assistant messages should NOT be included
-    assert "OK" not in captured_prompt
+    # Assistant turns are retained as conversation context for subprocess agents.
+    assert "OK" in captured_prompt
     assert result.content == "done"
     assert result.model == "claude-code"
 
@@ -281,7 +284,7 @@ def test_codex_provider_init():
 
 def test_codex_provider_cli_args():
     p = CodexProvider()
-    args = p._build_cli_args("test prompt")
+    args = p._build_codex_cli_args("test prompt")
     # The resolved command may be an absolute path (e.g. /usr/local/bin/codex)
     assert args[0].endswith("codex")
     assert args[1] == "exec"

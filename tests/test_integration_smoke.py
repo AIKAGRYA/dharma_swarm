@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -118,19 +119,15 @@ def test_context_assembly_different_roles(tmp_path: Path) -> None:
 # =========================================================================
 
 
-DGC = "/opt/homebrew/bin/dgc"
+DGC_CMD = [sys.executable, "-m", "dharma_swarm.dgc_cli"]
 
 
-@pytest.mark.skipif(
-    not Path(DGC).exists(),
-    reason="dgc CLI not installed",
-)
 class TestCLISmoke:
     """Verify critical CLI commands execute without crashing."""
 
     def _run(self, *args: str, timeout: int = 15) -> subprocess.CompletedProcess:
         return subprocess.run(
-            [DGC, *args],
+            [*DGC_CMD, *args],
             capture_output=True,
             text=True,
             timeout=timeout,

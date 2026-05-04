@@ -55,6 +55,9 @@ exclude = ["hooks*", "scripts*", "tests*"]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 timeout = 300
+markers = [
+    "docker: tests that require a reachable Docker daemon",
+]
 filterwarnings = [
     "ignore:'asyncio.get_event_loop_policy' is deprecated and slated for removal in Python 3.16:DeprecationWarning",
     "ignore:'asyncio.set_event_loop_policy' is deprecated and slated for removal in Python 3.16:DeprecationWarning",

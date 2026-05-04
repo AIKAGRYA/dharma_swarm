@@ -264,7 +264,7 @@ class PaperPortfolio:
                 base_value,
             )
             raise ValueError(
-                f"AHIMSA GATE: position {position_pct:.1%} exceeds limit"
+                f"AHIMSA GATE: position {position_pct:.1%} exceeds {limit:.0%} limit"
             )
 
         cost = position_value
@@ -367,14 +367,7 @@ class PaperPortfolio:
         positions_value = self._compute_positions_value()
         total_value = self.cash + positions_value
 
-        # Record equity snapshot
-        snapshot = {
-            "timestamp": _utc_now().isoformat(),
-            "total_value": total_value,
-            "daily_return": (total_value / self.initial_capital - 1) if self.initial_capital else 0.0,
-        }
-        with open(self._equity_path, "a", encoding="utf-8") as f:
-            f.write(json.dumps(snapshot) + "\n")
+        self.daily_equity_snapshot()
 
         self._save()
         return {
@@ -384,6 +377,33 @@ class PaperPortfolio:
             "unrealized_pnl": round(sum(p.unrealized_pnl for p in self.positions.values()), 2),
             "positions": position_details,
         }
+
+    def daily_equity_snapshot(self) -> dict[str, Any]:
+        """Append a portfolio equity snapshot to ``equity_curve.jsonl``."""
+        positions_value = self._compute_positions_value()
+        total_value = self.cash + positions_value
+        prior_entries = self._load_equity_curve()
+        prior_value = (
+            float(prior_entries[-1].get("total_value", self.initial_capital))
+            if prior_entries
+            else self.initial_capital
+        )
+        daily_return = (
+            (total_value / prior_value) - 1.0
+            if prior_value
+            else 0.0
+        )
+        snapshot = {
+            "timestamp": _utc_now().isoformat(),
+            "total_value": total_value,
+            "cash": self.cash,
+            "positions_value": positions_value,
+            "daily_return": daily_return,
+        }
+        self._equity_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(self._equity_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(snapshot) + "\n")
+        return snapshot
 
     def get_portfolio_stats(self) -> dict[str, Any]:
         """Compute comprehensive portfolio statistics."""
@@ -507,6 +527,7 @@ class PaperPortfolio:
             "execution_errors": [e.to_dict() for e in self.execution_errors],
             "daily_loss_limit": self.daily_loss_limit,
             "position_size_limit": self.position_size_limit,
+            "last_updated": _utc_now().isoformat(),
         }
         GINKO_DIR.mkdir(parents=True, exist_ok=True)
         with open(self._portfolio_path, "w", encoding="utf-8") as f:

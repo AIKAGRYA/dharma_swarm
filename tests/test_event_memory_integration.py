@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
+import asyncio
 import pytest
 
 from dharma_swarm.engine.conversation_memory import ConversationMemoryStore
@@ -32,6 +33,15 @@ class _Board:
         return None
 
 
+class _Runner:
+    async def run_task(self, task):
+        return (
+            "Event-memory integration task completed with enough local "
+            "deterministic detail to satisfy the orchestrator completion "
+            "quality floor while exercising lifecycle ingestion."
+        )
+
+
 class _Pool:
     def __init__(self) -> None:
         self._agents = [
@@ -43,6 +53,7 @@ class _Pool:
             )
         ]
         self._assignments: list[tuple[str, str]] = []
+        self._runners = {"a1": _Runner()}
 
     async def get_idle_agents(self):
         return self._agents
@@ -57,7 +68,7 @@ class _Pool:
         return None
 
     async def get(self, agent_id):
-        return None
+        return self._runners.get(agent_id)
 
 
 @pytest.mark.asyncio
@@ -74,6 +85,7 @@ async def test_orchestrator_lifecycle_ingests_event_memory(tmp_path) -> None:
     )
 
     await orch._assign_dispatch(TaskDispatch(task_id="task-1", agent_id="a1"))
+    await asyncio.sleep(0.05)
 
     rows = await store.search_events("dispatch_assigned", limit=5)
     assigned_rows = [r for r in rows if r["payload"].get("action_name") == "dispatch_assigned"]
@@ -116,6 +128,7 @@ async def test_orchestrator_attaches_latent_gold_metadata_and_event(tmp_path) ->
     )
 
     await orch._assign_dispatch(TaskDispatch(task_id="task-1", agent_id="a1"))
+    await asyncio.sleep(0.05)
 
     updates = [
         fields["metadata"]

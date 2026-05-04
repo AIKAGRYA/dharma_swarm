@@ -83,7 +83,7 @@ def test_codex_provider_build_env_keeps_claudecode_var(monkeypatch):
     assert env.get("CLAUDECODE") == "1"
 
 
-def test_subprocess_provider_prompt_includes_only_user_messages():
+def test_subprocess_provider_prompt_preserves_conversation_context():
     req = LLMRequest(
         model="x",
         system="SYS",
@@ -97,7 +97,8 @@ def test_subprocess_provider_prompt_includes_only_user_messages():
     prompt = p._build_prompt(req)
     assert "SYS" in prompt
     assert "hello" in prompt and "again" in prompt
-    assert "ignored" not in prompt
+    assert "[Assistant]" in prompt
+    assert "ignored" in prompt
 
 
 @pytest.mark.asyncio

@@ -9,6 +9,7 @@ Tests cover:
 """
 
 import asyncio
+import importlib.util
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
@@ -41,6 +42,11 @@ def _run(coro):
     return asyncio.run(coro)
 
 
+def _require_lancedb() -> None:
+    if importlib.util.find_spec("lancedb") is None:
+        pytest.skip("lancedb optional dependency is not installed")
+
+
 # ===========================================================================
 # Phase 4: LanceDB Adapter Tests
 # ===========================================================================
@@ -50,12 +56,14 @@ class TestLanceDBAdapter:
     """Direct tests for the _LanceDBAdapter wrapper."""
 
     def test_connect_creates_db(self):
+        _require_lancedb()
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "lance_test"
             adapter = _LanceDBAdapter(db_path=db_path)
             assert adapter.connected is True
 
     def test_upsert_and_count(self):
+        _require_lancedb()
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "lance_test"
             adapter = _LanceDBAdapter(db_path=db_path)
@@ -75,6 +83,7 @@ class TestLanceDBAdapter:
             assert adapter.count() == 0
 
     def test_search_returns_results(self):
+        _require_lancedb()
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "lance_test"
             adapter = _LanceDBAdapter(db_path=db_path)
@@ -99,6 +108,7 @@ class TestLanceDBAdapter:
     def test_cross_session_persistence(self):
         """Content indexed in one adapter instance can be retrieved by another
         pointing to the same db_path — the key cross-session test."""
+        _require_lancedb()
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "lance_persist"
 
@@ -155,6 +165,11 @@ class TestLanceDBAdapter:
 
 class TestMemoryPalaceLanceDB:
     """Tests for MemoryPalace with LanceDB integration (Phase 4)."""
+
+    pytestmark = pytest.mark.skipif(
+        importlib.util.find_spec("lancedb") is None,
+        reason="lancedb optional dependency is not installed",
+    )
 
     def test_palace_connects_to_lancedb_with_state_dir(self):
         """When state_dir is provided, LanceDB should connect."""

@@ -13,10 +13,10 @@ def test_daemon_config_import():
     assert DaemonConfig is not None
 
 
-def test_daemon_config_quiet_hours_empty_by_default():
+def test_daemon_config_quiet_hours_has_static_floor_by_default():
     from dharma_swarm.swarm import DaemonConfig
     cfg = DaemonConfig()
-    assert cfg.quiet_hours == []
+    assert cfg.quiet_hours == [2, 3, 4, 5]
 
 
 def test_swarm_manager_instantiates_with_temp_dir():

@@ -830,5 +830,5 @@ def bind(
         pr_late=result.pr_late if result.pr_late is not None else observed.pr_late,
         observation_depth=observed.observation_depth + result.observation_depth,
         introspection={**observed.introspection, **result.introspection},
-        timestamp=result.timestamp,
+        timestamp=observed.timestamp if result.is_pure else result.timestamp,
     )

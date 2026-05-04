@@ -300,7 +300,12 @@ async def test_task_lifecycle(tmp_path: Path) -> None:
         role="general",
     )
 
-    MOCK_RESULT = "mock task completed successfully"
+    MOCK_RESULT = (
+        "mock task completed successfully with enough deterministic detail to "
+        "satisfy the orchestrator completion-quality floor for a normal "
+        "priority bootstrap loop task. The result remains synthetic, local, "
+        "and provider-free while proving the task can settle cleanly."
+    )
 
     class MockRunner:
         """Minimal runner — has run_task() which _execute_task() calls."""
@@ -651,7 +656,17 @@ async def test_full_loop_closure(tmp_path: Path) -> None:
         role="general",
     )
 
-    TASK_RESULT = "Integration task completed with mock LLM: " + FIXED_RESPONSE
+    TASK_RESULT = (
+        "Integration task completed with mock LLM: "
+        + FIXED_RESPONSE
+        + " The integration loop stores a deterministic local result, verifies "
+        "the orchestrator can settle a high-priority task, and avoids any real "
+        "provider call while preserving the expected lifecycle evidence. This "
+        "expanded fixture output is intentionally verbose enough for the "
+        "runtime completion-quality floor applied to high-priority tasks. "
+        "It gives the task board, stigmergy path, and signal handling enough "
+        "substantive content to be accepted as a completed bootstrap loop."
+    )
 
     class IntegrationRunner:
         """Runner with run_task() — what _execute_task() calls after pool.get()."""

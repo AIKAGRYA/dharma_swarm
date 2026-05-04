@@ -18,6 +18,8 @@ from dharma_swarm.api_keys import (
     RUNTIME_PROVIDER_API_KEY_ENV_KEYS,
     env_has_value,
     env_value,
+    get_llm_key,
+    has_any_llm,
     provider_api_key_env,
 )
 from dharma_swarm.models import ProviderType
@@ -76,6 +78,16 @@ def test_all_api_key_registry_contains_system_services() -> None:
 def test_chat_provider_registry_matches_dashboard_surface() -> None:
     assert CHAT_PROVIDER_API_KEY_ENV_KEYS[ProviderType.OPENROUTER.value] == OPENROUTER_API_KEY_ENV
     assert CHAT_PROVIDER_API_KEY_ENV_KEYS[ProviderType.NVIDIA_NIM.value] == "NVIDIA_NIM_API_KEY"
+
+
+def test_llm_key_compatibility_helpers_use_package_registry() -> None:
+    env = {OPENROUTER_API_KEY_ENV: " test-openrouter-key "}
+
+    assert get_llm_key("openrouter", env) == "test-openrouter-key"
+    assert get_llm_key(ProviderType.OPENROUTER_FREE, env) == "test-openrouter-key"
+    assert get_llm_key("missing-provider", env) is None
+    assert has_any_llm(env) is True
+    assert has_any_llm({}) is False
 
 
 def test_env_helpers_trim_and_detect_presence() -> None:

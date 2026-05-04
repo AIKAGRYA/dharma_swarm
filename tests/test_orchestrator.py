@@ -390,6 +390,9 @@ class DummyRunner:
         return self._result
 
 
+QUALITY_ACCEPTED_RESULT = "accepted evidence " * 20
+
+
 # ---------------------------------------------------------------------------
 # New tests — coverage expansion
 # ---------------------------------------------------------------------------
@@ -574,7 +577,7 @@ async def test_orchestrator_writes_task_and_progress_ledgers(tmp_path):
     pool = MockAgentPool(
         [AgentState(id="a1", name="agent-1", role=AgentRole.GENERAL, status=AgentStatus.IDLE)]
     )
-    pool.set_runner("a1", DummyRunner(result="ledger ok"))
+    pool.set_runner("a1", DummyRunner(result=QUALITY_ACCEPTED_RESULT))
     bus = MockMessageBus()
 
     orch = Orchestrator(
@@ -628,7 +631,7 @@ async def test_orchestrator_fail_closes_when_honors_checkpoint_missing(tmp_path)
     pool = MockAgentPool(
         [AgentState(id="a1", name="agent-1", role=AgentRole.GENERAL, status=AgentStatus.IDLE)]
     )
-    pool.set_runner("a1", DummyRunner(result="Looks polished but carried no checkpoint packet."))
+    pool.set_runner("a1", DummyRunner(result=QUALITY_ACCEPTED_RESULT))
 
     orch = Orchestrator(
         task_board=board,

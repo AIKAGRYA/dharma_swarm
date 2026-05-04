@@ -13,7 +13,9 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import subprocess
+import sys
 import time
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
@@ -253,8 +255,9 @@ def run_test_file(test_path: Path, timeout: float = 60.0) -> tuple[bool, str]:
         Tuple of (passed: bool, output: str).
     """
     try:
+        python_bin = os.environ.get("DHARMA_PYTHON") or sys.executable
         result = subprocess.run(
-            ["python3", "-m", "pytest", str(test_path), "-v", "--tb=short", "-q"],
+            [python_bin, "-m", "pytest", str(test_path), "-v", "--tb=short", "-q"],
             capture_output=True,
             text=True,
             timeout=timeout,

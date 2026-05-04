@@ -165,7 +165,7 @@ def service_api_key_env(name: str) -> str:
 
 
 def env_value(env_var: str, env: Mapping[str, str] | None = None) -> str | None:
-    source = env or os.environ
+    source = os.environ if env is None else env
     value = str(source.get(env_var, "")).strip()
     return value or None
 
@@ -190,6 +190,19 @@ def provider_available(provider: str, env: Mapping[str, str] | None = None) -> b
     return env_has_value(env_var, env)
 
 
+def get_llm_key(provider: object, env: Mapping[str, str] | None = None) -> str | None:
+    """Return the configured key for a runtime LLM provider, if present."""
+    env_var = provider_api_key_env(provider)
+    if env_var is None:
+        return None
+    return env_value(env_var, env)
+
+
+def has_any_llm(env: Mapping[str, str] | None = None) -> bool:
+    """Return True when any runtime LLM provider key is configured."""
+    return bool(present_api_key_envs(RUNTIME_PROVIDER_API_KEY_ENV_KEYS, env))
+
+
 __all__ = [
     "ALL_API_KEY_ENV_KEYS",
     "ANTHROPIC_API_KEY_ENV",
@@ -211,6 +224,8 @@ __all__ = [
     "GOOGLE_AI_BASE_URL_ENV",
     "GROQ_API_KEY_ENV",
     "GROQ_BASE_URL_ENV",
+    "get_llm_key",
+    "has_any_llm",
     "MISTRAL_API_KEY_ENV",
     "MISTRAL_BASE_URL_ENV",
     "MOONSHOT_API_KEY_ENV",

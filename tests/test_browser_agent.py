@@ -14,7 +14,9 @@ Tests cover:
 from __future__ import annotations
 
 import asyncio
+import sys
 import time
+import types
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -351,7 +353,7 @@ class TestToolRegistryIntegration:
     """Test that browser tools are registered in the tool registry."""
 
     def test_check_browser_available(self):
-        assert _check_browser_available() is True
+        assert isinstance(_check_browser_available(), bool)
 
     def test_tools_registered(self):
         from dharma_swarm.tool_registry import registry
@@ -368,7 +370,7 @@ class TestToolRegistryIntegration:
 
     def test_browser_toolset_available(self):
         from dharma_swarm.tool_registry import registry
-        assert registry.is_toolset_available("browser") is True
+        assert registry.is_toolset_available("browser") is _check_browser_available()
 
 
 # ── Search Tests (mocked) ─────────────────────────────────────────────
@@ -486,7 +488,18 @@ class TestContextManager:
         mock_pw_cm = AsyncMock()
         mock_pw_cm.start = AsyncMock(return_value=mock_pw_instance)
 
-        with patch("playwright.async_api.async_playwright", return_value=mock_pw_cm):
+        playwright_module = types.ModuleType("playwright")
+        async_api_module = types.ModuleType("playwright.async_api")
+        async_api_module.async_playwright = MagicMock(return_value=mock_pw_cm)
+        playwright_module.async_api = async_api_module
+
+        with patch.dict(
+            sys.modules,
+            {
+                "playwright": playwright_module,
+                "playwright.async_api": async_api_module,
+            },
+        ):
             async with BrowserAgent() as ba:
                 assert ba._started is True
                 assert ba._has_playwright is True

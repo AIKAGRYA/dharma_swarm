@@ -14,13 +14,33 @@ from dharma_swarm.tui.engine.events import ErrorEvent, SessionEnd, TextComplete,
 
 
 class _FakeResponse:
-    def __init__(self, status_code: int, payload: dict, text: str = "") -> None:
+    def __init__(
+        self,
+        status_code: int,
+        payload: dict,
+        text: str = "",
+        lines: list[str] | None = None,
+    ) -> None:
         self.status_code = status_code
         self._payload = payload
         self.text = text
+        self._lines = lines or []
 
     def json(self) -> dict:
         return self._payload
+
+    async def __aenter__(self) -> "_FakeResponse":
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb) -> None:
+        return None
+
+    async def aiter_lines(self) -> AsyncIterator[str]:
+        for line in self._lines:
+            yield line
+
+    async def aiter_text(self) -> AsyncIterator[str]:
+        yield self.text
 
 
 class _FakeClient:
@@ -33,7 +53,7 @@ class _FakeClient:
     async def __aexit__(self, exc_type, exc, tb) -> None:
         return None
 
-    async def post(self, url: str, headers: dict, json: dict) -> _FakeResponse:
+    def stream(self, method: str, url: str, headers: dict, json: dict) -> _FakeResponse:
         return self._response
 
 
@@ -80,6 +100,14 @@ async def test_openrouter_success_emits_text_and_usage(monkeypatch: pytest.Monke
             "choices": [{"message": {"content": "hi from model"}}],
             "usage": {"prompt_tokens": 11, "completion_tokens": 7, "total_cost": 0.02},
         },
+        lines=[
+            'data: {"choices":[{"delta":{"content":"hi from model"}}]}',
+            (
+                'data: {"choices":[{"delta":{}}],'
+                '"usage":{"prompt_tokens":11,"completion_tokens":7,"total_cost":0.02}}'
+            ),
+            "data: [DONE]",
+        ],
     )
     monkeypatch.setattr(
         "dharma_swarm.tui.engine.adapters.openrouter.httpx.AsyncClient",
@@ -116,6 +144,14 @@ async def test_openrouter_success_emits_reasoning_when_content_missing(
             }],
             "usage": {"prompt_tokens": 11, "completion_tokens": 7, "total_cost": 0.02},
         },
+        lines=[
+            'data: {"choices":[{"delta":{"reasoning":"hi from reasoning"}}]}',
+            (
+                'data: {"choices":[{"delta":{}}],'
+                '"usage":{"prompt_tokens":11,"completion_tokens":7,"total_cost":0.02}}'
+            ),
+            "data: [DONE]",
+        ],
     )
     monkeypatch.setattr(
         "dharma_swarm.tui.engine.adapters.openrouter.httpx.AsyncClient",

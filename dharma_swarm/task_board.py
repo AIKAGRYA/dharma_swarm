@@ -46,7 +46,7 @@ WHERE t.status = ?
       SELECT 1 FROM task_dependencies d
       JOIN tasks dep ON dep.id = d.depends_on_id
       WHERE d.task_id = t.id
-        AND dep.status NOT IN (?, 'failed', 'dead_letter')
+        AND dep.status != ?
         AND NOT (
             -- Treat RUNNING tasks stuck >15min as satisfied (timed-out dependency)
             dep.status = 'running'

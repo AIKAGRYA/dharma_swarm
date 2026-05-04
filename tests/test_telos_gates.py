@@ -73,8 +73,10 @@ def test_irreversible_review():
     assert result.decision == GateDecision.REVIEW
 
 
-def test_all_gates_present():
-    gk = TelosGatekeeper()
+def test_all_gates_present(tmp_path):
+    gk = TelosGatekeeper(
+        registry=GateRegistry(proposals_file=tmp_path / "gate_proposals.jsonl")
+    )
     result = gk.check("echo test")
     assert len(result.gate_results) == 11
     expected = {"AHIMSA", "SATYA", "CONSENT", "VYAVASTHIT",

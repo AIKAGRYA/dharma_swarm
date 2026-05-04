@@ -17,12 +17,19 @@ class _AgentStateStub:
     name: str
 
 
+@dataclass
+class _TaskStub:
+    id: str
+    title: str
+
+
 class _FakeSwarm:
     def __init__(self, existing_names: list[str] | None = None, pending_tasks: int = 0) -> None:
         self._existing = [_AgentStateStub(name=n) for n in (existing_names or [])]
         self.spawn_calls: list[dict] = []
         self.create_calls: list[dict] = []
         self.create_batch_calls: list[list[dict]] = []
+        self.dependency_calls: list[tuple[str, str]] = []
         self._pending_tasks = pending_tasks
 
     async def list_agents(self):
@@ -34,7 +41,10 @@ class _FakeSwarm:
 
     async def list_tasks(self, status=None):
         if status == TaskStatus.PENDING:
-            return [object()] * self._pending_tasks
+            return [
+                _TaskStub(id=f"pending-{idx}", title=sc.SEED_TASKS[idx]["title"])
+                for idx in range(min(self._pending_tasks, len(sc.SEED_TASKS)))
+            ]
         return []
 
     async def create_task(self, **kwargs):
@@ -43,9 +53,14 @@ class _FakeSwarm:
 
     async def create_task_batch(self, specs):
         self.create_batch_calls.append(list(specs))
-        for spec in specs:
+        tasks: list[_TaskStub] = []
+        for idx, spec in enumerate(specs):
             self.create_calls.append(spec)
-        return list(specs)
+            tasks.append(_TaskStub(id=f"task-{idx}", title=spec["title"]))
+        return tasks
+
+    async def add_dependency(self, task_id: str, depends_on_id: str):
+        self.dependency_calls.append((task_id, depends_on_id))
 
 
 class _ConcurrentSwarm(_FakeSwarm):
@@ -180,7 +195,7 @@ async def test_spawn_cybernetics_crew_skips_existing_names():
     await sc.spawn_cybernetics_crew(swarm)
 
     spawned_names = {call["name"] for call in swarm.spawn_calls}
-    assert spawned_names == {"cyber-kimi25", "cyber-opus"}
+    assert spawned_names == {"cyber-kimi25", "cyber-opus", "cyber-groq"}
 
 
 @pytest.mark.asyncio
@@ -238,8 +253,8 @@ async def test_create_seed_tasks_replaces_date_placeholder():
     date_str = datetime.now(timezone.utc).strftime("%Y%m%d")
     joined = "\n".join(c["description"] for c in swarm.create_calls)
     assert "{date}" not in joined
-    # At least one task in current seed set should contain replaced date.
-    assert date_str in joined
+    if any("{date}" in spec["description"] for spec in sc.SEED_TASKS):
+        assert date_str in joined
 
 
 @pytest.mark.asyncio

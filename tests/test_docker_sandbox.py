@@ -281,6 +281,11 @@ class TestSandboxManagerAutoSelect:
 class TestDockerSandboxIntegration:
     """Integration tests — require Docker daemon running."""
 
+    @pytest.fixture(autouse=True)
+    async def _require_docker(self):
+        if not await DockerSandbox.docker_available():
+            pytest.skip("Docker daemon is not available")
+
     @pytest.mark.asyncio
     async def test_docker_is_available(self):
         assert await DockerSandbox.docker_available()
