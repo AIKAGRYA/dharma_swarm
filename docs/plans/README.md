@@ -82,6 +82,7 @@ Current examples:
 - [SPRINT_GOTCHAS.md](/Users/dhyana/dharma_swarm/docs/plans/SPRINT_GOTCHAS.md)
 - [2026-04-02-cleanup-control-center.md](/Users/dhyana/dharma_swarm/docs/plans/2026-04-02-cleanup-control-center.md)
 - [REPO_HYGIENE_TRIAGE_2026-04-01.md](/Users/dhyana/dharma_swarm/docs/plans/REPO_HYGIENE_TRIAGE_2026-04-01.md)
+- [2026-05-04-action-authority-gate-spec.md](/Users/dhyana/dharma_swarm/docs/plans/2026-05-04-action-authority-gate-spec.md)
 
 Rule:
 
