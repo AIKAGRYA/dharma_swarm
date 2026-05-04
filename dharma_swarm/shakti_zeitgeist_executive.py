@@ -229,7 +229,7 @@ class ShaktiZeitgeistExecutive:
         for sig in pressure_signals:
             reasons.update(trigger_reasons_for_action(sig.title, " ".join(sig.keywords)))
         return WarrantPressure(
-            required_for_next_action=pressure_score >= 0.35,
+            required_for_next_action=bool(pressure_signals),
             pressure_score=round(pressure_score, 3),
             trigger_reasons=sorted(reasons),
             zeitgeist_signal_ids=[sig.signal_id for sig in pressure_signals[:12]],

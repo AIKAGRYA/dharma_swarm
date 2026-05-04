@@ -89,6 +89,29 @@ async def test_cycle_consumes_zeitgeist_and_emits_artifacts(tmp_path: Path) -> N
     assert not (meta / "active_campaigns.json").exists()
 
 
+@pytest.mark.asyncio
+async def test_single_threat_sets_warrant_pressure(tmp_path: Path) -> None:
+    state_dir = _state(tmp_path)
+    _write_zeitgeist(
+        state_dir,
+        [
+            {
+                "id": "zg-threat",
+                "category": "threat",
+                "title": "New governance bypass threat",
+                "relevance_score": 0.9,
+                "keywords": ["governance", "dispatch"],
+            }
+        ],
+    )
+
+    state = await ShaktiZeitgeistExecutive(state_dir=state_dir).cycle()
+
+    assert state.warrant_pressure.required_for_next_action
+    assert state.warrant_pressure.pressure_score > 0
+    assert "active_s4_pressure" in state.warrant_pressure.trigger_reasons
+
+
 def test_assess_action_uses_fourfold_gate_without_dispatch(tmp_path: Path) -> None:
     state_dir = _state(tmp_path)
     _write_zeitgeist(
