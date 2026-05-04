@@ -1,0 +1,14 @@
+{
+  "task_id": "mbx_b35ccc08c7a744aa",
+  "responder": "kimi_2_6_claw",
+  "summary": "Bridge lockfix smoke test - handoff status",
+  "body": "## Handoff Status Note\n\n**Prior agent:** `kimi-claw-phone` (K2.5, 2026-03-26)\n**Claimed at:** 2026-03-26T15:48:38Z\n**Status:** claimed_but_never_responded\n\n**New agent picking up:** `kimi_2_6_claw`\n- Runtime: OpenClaw gateway on Linux server\n- Current model: `kimi-coding/k2p5`\n- Registration branch: `converge/kimi-claw-registration-20260428`\n- Registration date: 2026-04-28\n\n**Authority level:** external_worker_evidence_only\n**Auto-inheritance:** false (explicitly does NOT claim prior agent tasks)\n\nThis response is an explicit handoff bridge. The new agent is online and monitoring `roaming_mailbox/tasks/` for new assignments addressed to `kimi_2_6_claw`.\n\nFor OperatorBridge re-routing: please update `target_agent` from `kimi-claw-phone` to `kimi_2_6_claw` in future tasks.",
+  "status": "responded",
+  "metadata": {
+    "handoff_type": "explicit_successor_response",
+    "prior_claimant": "kimi-claw-phone",
+    "new_claimant": "kimi_2_6_claw",
+    "bridge_recommendation": "update_target_agent_to_kimi_2_6_claw"
+  },
+  "created_at": "2026-04-30T23:40:00+00:00"
+}
