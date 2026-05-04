@@ -13,9 +13,9 @@ import re
 import sqlite3
 import subprocess
 import time
-from collections import Counter, defaultdict
-from dataclasses import dataclass
-from datetime import datetime
+from collections import Counter
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from textwrap import shorten
 from typing import Any, Callable
@@ -53,6 +53,12 @@ class CostSnapshot:
     output_tokens: int
     by_provider: dict[str, int]
     by_tier: dict[str, int]
+    by_source: dict[str, int] = field(default_factory=dict)
+    trace_spans: int = 0
+    trace_errors: int = 0
+    routing_decisions: int = 0
+    routing_failures: int = 0
+    routing_token_estimate: int = 0
     malformed_lines: int = 0
 
 
@@ -116,7 +122,7 @@ def render_daily_operating_brief(
 ) -> str:
     git = load_git_snapshot(repo_root)
     agentops = load_agentops_reports(repo_root / ".dharma" / "agentops" / "runs")
-    cost = load_cost_snapshot(state_dir / "cost_log.jsonl", now=now, since_hours=since_hours)
+    cost = load_burn_snapshot(state_dir, now=now, since_hours=since_hours)
     yds = load_yds_ratings(state_dir / "ysd" / "ledger.jsonl")
     ontology = load_ontology_counts(state_dir / "ontology.db")
     hot_verdict = extract_markdown_section(repo_root / "SWARM_HOT_ITEMS.md", "Current Verdict", limit=5)
@@ -216,6 +222,22 @@ def load_agentops_reports(runs_dir: Path, *, limit: int = 5) -> list[AgentOpsRep
     return reports
 
 
+def load_burn_snapshot(
+    state_dir: Path,
+    *,
+    now: datetime,
+    since_hours: float = DEFAULT_SINCE_HOURS,
+) -> CostSnapshot:
+    """Load cost, trace, and routing evidence into one burn snapshot."""
+    snapshots = [
+        load_cost_snapshot(state_dir / "cost_log.jsonl", now=now, since_hours=since_hours),
+        load_trace_cost_ledger(state_dir / "traces" / "cost_ledger.jsonl", now=now, since_hours=since_hours),
+        load_trace_dispatch_snapshot(state_dir / "traces", now=now, since_hours=since_hours),
+        load_router_decision_snapshot(state_dir, now=now, since_hours=since_hours),
+    ]
+    return merge_cost_snapshots(snapshots)
+
+
 def load_cost_snapshot(
     path: Path,
     *,
@@ -231,7 +253,54 @@ def load_cost_snapshot(
             output_tokens=0,
             by_provider={},
             by_tier={},
+            by_source={},
         )
+
+    calls = 0
+    total_cost = 0.0
+    input_tokens = 0
+    output_tokens = 0
+    by_provider: Counter[str] = Counter()
+    by_tier: Counter[str] = Counter()
+    by_source: Counter[str] = Counter()
+    malformed = 0
+
+    for row in _read_jsonl(path):
+        if row is None:
+            malformed += 1
+            continue
+        timestamp = _timestamp(row, "timestamp")
+        if timestamp is not None and timestamp < cutoff:
+            continue
+        calls += 1
+        total_cost += _float(row.get("estimated_cost_usd")) or 0.0
+        input_tokens += int(_float(row.get("input_tokens")) or 0)
+        output_tokens += int(_float(row.get("output_tokens")) or 0)
+        by_provider[str(row.get("provider") or "unknown")] += 1
+        by_tier[str(row.get("tier") or "unknown")] += 1
+        by_source["cost_log"] += 1
+
+    return CostSnapshot(
+        calls=calls,
+        total_cost_usd=round(total_cost, 6),
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        by_provider=dict(sorted(by_provider.items())),
+        by_tier=dict(sorted(by_tier.items())),
+        by_source=dict(sorted(by_source.items())),
+        malformed_lines=malformed,
+    )
+
+
+def load_trace_cost_ledger(
+    path: Path,
+    *,
+    now: datetime,
+    since_hours: float = DEFAULT_SINCE_HOURS,
+) -> CostSnapshot:
+    cutoff = now.timestamp() - (since_hours * 3600)
+    if not path.exists():
+        return _empty_cost_snapshot()
 
     calls = 0
     total_cost = 0.0
@@ -245,15 +314,15 @@ def load_cost_snapshot(
         if row is None:
             malformed += 1
             continue
-        timestamp = _float(row.get("timestamp"))
+        timestamp = _timestamp(row, "timestamp")
         if timestamp is not None and timestamp < cutoff:
             continue
         calls += 1
-        total_cost += _float(row.get("estimated_cost_usd")) or 0.0
-        input_tokens += int(_float(row.get("input_tokens")) or 0)
-        output_tokens += int(_float(row.get("output_tokens")) or 0)
+        total_cost += _float(row.get("cost_usd")) or _float(row.get("estimated_cost_usd")) or 0.0
+        input_tokens += int(_float(row.get("prompt_tokens")) or _float(row.get("input_tokens")) or 0)
+        output_tokens += int(_float(row.get("completion_tokens")) or _float(row.get("output_tokens")) or 0)
         by_provider[str(row.get("provider") or "unknown")] += 1
-        by_tier[str(row.get("tier") or "unknown")] += 1
+        by_tier[str(row.get("tier") or "trace")] += 1
 
     return CostSnapshot(
         calls=calls,
@@ -262,7 +331,146 @@ def load_cost_snapshot(
         output_tokens=output_tokens,
         by_provider=dict(sorted(by_provider.items())),
         by_tier=dict(sorted(by_tier.items())),
+        by_source={"trace_cost_ledger": calls} if calls else {},
         malformed_lines=malformed,
+    )
+
+
+def load_trace_dispatch_snapshot(
+    traces_dir: Path,
+    *,
+    now: datetime,
+    since_hours: float = DEFAULT_SINCE_HOURS,
+) -> CostSnapshot:
+    if not traces_dir.exists():
+        return _empty_cost_snapshot()
+
+    cutoff = now.timestamp() - (since_hours * 3600)
+    calls = 0
+    total_cost = 0.0
+    input_tokens = 0
+    output_tokens = 0
+    trace_spans = 0
+    trace_errors = 0
+    by_provider: Counter[str] = Counter()
+    by_tier: Counter[str] = Counter()
+    malformed = 0
+
+    for path in _trace_files_for_window(traces_dir, now=now, since_hours=since_hours):
+        for row in _read_jsonl(path):
+            if row is None:
+                malformed += 1
+                continue
+            timestamp = _timestamp(row, "end_time") or _timestamp(row, "start_time")
+            if timestamp is not None and timestamp < cutoff:
+                continue
+            attrs = row.get("attributes") if isinstance(row.get("attributes"), dict) else {}
+            kind = str(row.get("kind") or "")
+            if kind:
+                trace_spans += 1
+            status = str(row.get("status") or "").lower()
+            success = attrs.get("success")
+            if status == "error" or success is False:
+                trace_errors += 1
+
+            prompt_tokens = int(_float(attrs.get("prompt_tokens")) or 0)
+            completion_tokens = int(_float(attrs.get("completion_tokens")) or 0)
+            cost_usd = _float(attrs.get("cost_usd")) or 0.0
+            if prompt_tokens or completion_tokens or cost_usd:
+                calls += 1
+                input_tokens += prompt_tokens
+                output_tokens += completion_tokens
+                total_cost += cost_usd
+                by_provider[str(attrs.get("provider") or "unknown")] += 1
+                by_tier["trace"] += 1
+
+    return CostSnapshot(
+        calls=calls,
+        total_cost_usd=round(total_cost, 6),
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        by_provider=dict(sorted(by_provider.items())),
+        by_tier=dict(sorted(by_tier.items())),
+        by_source={"trace_dispatch": calls} if calls else {},
+        trace_spans=trace_spans,
+        trace_errors=trace_errors,
+        malformed_lines=malformed,
+    )
+
+
+def load_router_decision_snapshot(
+    state_dir: Path,
+    *,
+    now: datetime,
+    since_hours: float = DEFAULT_SINCE_HOURS,
+) -> CostSnapshot:
+    cutoff = now.timestamp() - (since_hours * 3600)
+    paths = [
+        state_dir / "router" / "decisions.jsonl",
+        state_dir / "logs" / "router" / "routing_decisions.jsonl",
+    ]
+    decisions = 0
+    failures = 0
+    token_estimate = 0
+    malformed = 0
+
+    for path in paths:
+        if not path.exists():
+            continue
+        for row in _read_jsonl(path):
+            if row is None:
+                malformed += 1
+                continue
+            timestamp = _timestamp(row, "timestamp")
+            if timestamp is not None and timestamp < cutoff:
+                continue
+            decisions += 1
+            if str(row.get("result") or "").lower() == "failed":
+                failures += 1
+            failures += len(row.get("failures") or []) if isinstance(row.get("failures"), list) else 0
+            signals = row.get("signals") if isinstance(row.get("signals"), dict) else {}
+            token_estimate += int(
+                _float(row.get("token_estimate"))
+                or _float(signals.get("token_estimate"))
+                or 0
+            )
+
+    return CostSnapshot(
+        calls=0,
+        total_cost_usd=0.0,
+        input_tokens=0,
+        output_tokens=0,
+        by_provider={},
+        by_tier={},
+        routing_decisions=decisions,
+        routing_failures=failures,
+        routing_token_estimate=token_estimate,
+        malformed_lines=malformed,
+    )
+
+
+def merge_cost_snapshots(snapshots: list[CostSnapshot]) -> CostSnapshot:
+    by_provider: Counter[str] = Counter()
+    by_tier: Counter[str] = Counter()
+    by_source: Counter[str] = Counter()
+    for snapshot in snapshots:
+        by_provider.update(snapshot.by_provider)
+        by_tier.update(snapshot.by_tier)
+        by_source.update(snapshot.by_source)
+    return CostSnapshot(
+        calls=sum(snapshot.calls for snapshot in snapshots),
+        total_cost_usd=round(sum(snapshot.total_cost_usd for snapshot in snapshots), 6),
+        input_tokens=sum(snapshot.input_tokens for snapshot in snapshots),
+        output_tokens=sum(snapshot.output_tokens for snapshot in snapshots),
+        by_provider=dict(sorted(by_provider.items())),
+        by_tier=dict(sorted(by_tier.items())),
+        by_source=dict(sorted(by_source.items())),
+        trace_spans=sum(snapshot.trace_spans for snapshot in snapshots),
+        trace_errors=sum(snapshot.trace_errors for snapshot in snapshots),
+        routing_decisions=sum(snapshot.routing_decisions for snapshot in snapshots),
+        routing_failures=sum(snapshot.routing_failures for snapshot in snapshots),
+        routing_token_estimate=sum(snapshot.routing_token_estimate for snapshot in snapshots),
+        malformed_lines=sum(snapshot.malformed_lines for snapshot in snapshots),
     )
 
 
@@ -394,6 +602,8 @@ def choose_next_move(
         )
     if not agentops:
         return "Run the next repo task through an AgentOps packet so the brief has gate evidence."
+    if cost.calls == 0 and (cost.trace_spans or cost.routing_decisions):
+        return "Normalize unpriced trace/routing activity into priced spend before scaling long runs."
     if cost.calls == 0:
         return "Wire existing cost/traces into this brief before spending another long agent run."
     if revenue:
@@ -449,21 +659,45 @@ def _render_agentops(reports: list[AgentOpsReport]) -> list[str]:
 
 
 def _render_cost(snapshot: CostSnapshot, *, since_hours: float) -> list[str]:
-    if snapshot.calls == 0:
-        lines = [f"- No cost entries found in the last {since_hours:.0f}h."]
+    if snapshot.calls == 0 and snapshot.trace_spans == 0 and snapshot.routing_decisions == 0:
+        lines = [f"- No burn evidence found in the last {since_hours:.0f}h."]
     else:
-        lines = [
-            (
+        lines = []
+        if snapshot.calls:
+            lines.extend(
+                [
+                    (
+                        "- "
+                        f"Cost entries: {snapshot.calls} call(s), ${snapshot.total_cost_usd:.4f}, "
+                        f"{snapshot.input_tokens:,} input tokens, "
+                        f"{snapshot.output_tokens:,} output tokens."
+                    ),
+                    "- Providers: " + ", ".join(f"{k}={v}" for k, v in snapshot.by_provider.items()),
+                    "- Tiers: " + ", ".join(f"{k}={v}" for k, v in snapshot.by_tier.items()),
+                ]
+            )
+        else:
+            lines.append(f"- No priced cost entries found in the last {since_hours:.0f}h.")
+        if snapshot.by_source:
+            lines.append(
+                "- Sources: "
+                + ", ".join(f"{k}={v}" for k, v in snapshot.by_source.items())
+            )
+        if snapshot.trace_spans:
+            lines.append(
                 "- "
-                f"{snapshot.calls} call(s), ${snapshot.total_cost_usd:.4f}, "
-                f"{snapshot.input_tokens:,} input tokens, "
-                f"{snapshot.output_tokens:,} output tokens."
-            ),
-            "- Providers: " + ", ".join(f"{k}={v}" for k, v in snapshot.by_provider.items()),
-            "- Tiers: " + ", ".join(f"{k}={v}" for k, v in snapshot.by_tier.items()),
-        ]
+                f"Trace spans: {snapshot.trace_spans} dispatch span(s), "
+                f"{snapshot.trace_errors} error(s)."
+            )
+        if snapshot.routing_decisions:
+            lines.append(
+                "- "
+                f"Routing decisions: {snapshot.routing_decisions}, "
+                f"failures={snapshot.routing_failures}, "
+                f"token_estimate={snapshot.routing_token_estimate:,}."
+            )
     if snapshot.malformed_lines:
-        lines.append(f"- Skipped malformed cost lines: {snapshot.malformed_lines}.")
+        lines.append(f"- Skipped malformed burn lines: {snapshot.malformed_lines}.")
     return lines
 
 
@@ -554,6 +788,58 @@ def _read_jsonl(path: Path) -> list[dict[str, Any] | None]:
     return rows
 
 
+def _empty_cost_snapshot() -> CostSnapshot:
+    return CostSnapshot(
+        calls=0,
+        total_cost_usd=0.0,
+        input_tokens=0,
+        output_tokens=0,
+        by_provider={},
+        by_tier={},
+        by_source={},
+    )
+
+
+def _timestamp(row: dict[str, Any], key: str) -> float | None:
+    value = row.get(key)
+    numeric = _float(value)
+    if numeric is not None:
+        return numeric
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.timestamp()
+
+
+def _trace_files_for_window(
+    traces_dir: Path,
+    *,
+    now: datetime,
+    since_hours: float,
+) -> list[Path]:
+    cutoff = datetime.fromtimestamp(now.timestamp() - (since_hours * 3600), tz=now.tzinfo)
+    dates: set[str] = set()
+    cursor = cutoff.date()
+    end = now.date()
+    while cursor <= end:
+        dates.add(cursor.isoformat())
+        cursor += timedelta(days=1)
+
+    utc_cutoff = cutoff.astimezone(timezone.utc).date()
+    utc_end = now.astimezone(timezone.utc).date()
+    cursor = utc_cutoff
+    while cursor <= utc_end:
+        dates.add(cursor.isoformat())
+        cursor += timedelta(days=1)
+
+    return [path for date in sorted(dates) if (path := traces_dir / f"traces_{date}.jsonl").exists()]
+
+
 def _parse_yds_json_line(line: str, *, source: str) -> HumanYDSRating | None:
     try:
         row = json.loads(line)
@@ -634,13 +920,18 @@ __all__ = [
     "choose_next_move",
     "extract_markdown_section",
     "load_agentops_reports",
+    "load_burn_snapshot",
     "load_cost_snapshot",
     "load_git_snapshot",
     "load_manifest_status_counts",
     "load_ontology_counts",
+    "load_router_decision_snapshot",
     "load_revenue_signals",
+    "load_trace_cost_ledger",
+    "load_trace_dispatch_snapshot",
     "load_yds_ratings",
     "main",
+    "merge_cost_snapshots",
     "render_daily_operating_brief",
 ]
 

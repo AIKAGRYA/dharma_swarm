@@ -90,6 +90,56 @@ def test_daily_operating_brief_composes_existing_signals(tmp_path: Path) -> None
         + "\n",
         encoding="utf-8",
     )
+    traces = state / "traces"
+    traces.mkdir()
+    (traces / "cost_ledger.jsonl").write_text(
+        json.dumps(
+            {
+                "timestamp": _now().isoformat(),
+                "provider": "ollama",
+                "model": "glm-5",
+                "prompt_tokens": 200,
+                "completion_tokens": 300,
+                "cost_usd": 0.02,
+                "agent": "tester",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (traces / "traces_2026-05-09.jsonl").write_text(
+        json.dumps(
+            {
+                "kind": "agent_dispatch",
+                "status": "error",
+                "end_time": _now().isoformat(),
+                "attributes": {
+                    "provider": "anthropic",
+                    "model": "claude-sonnet-4-6",
+                    "prompt_tokens": 10,
+                    "completion_tokens": 20,
+                    "cost_usd": 0.003,
+                    "success": False,
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    router = state / "router"
+    router.mkdir()
+    (router / "decisions.jsonl").write_text(
+        json.dumps(
+            {
+                "timestamp": _now().isoformat(),
+                "result": "failed",
+                "signals": {"token_estimate": 123},
+                "failures": [{"provider": "ollama"}, {"provider": "anthropic"}],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     yds_dir = state / "ysd"
     yds_dir.mkdir()
     (yds_dir / "ledger.jsonl").write_text(
@@ -121,7 +171,10 @@ def test_daily_operating_brief_composes_existing_signals(tmp_path: Path) -> None
     assert "Dirty state:" in brief.content
     assert "active=1, frozen=1, projection=1" in brief.content
     assert "`agentops-v0` status=passed" in brief.content
-    assert "1 call(s), $0.0050" in brief.content
+    assert "Cost entries: 3 call(s), $0.0280" in brief.content
+    assert "Sources: cost_log=1, trace_cost_ledger=1, trace_dispatch=1" in brief.content
+    assert "Trace spans: 1 dispatch span(s), 1 error(s)." in brief.content
+    assert "Routing decisions: 1, failures=3, token_estimate=123." in brief.content
     assert "`5.13a` docs/governance/AGENTOPS.md" in brief.content
     assert "Aligned revenue engines garden exists" in brief.content
     assert "Do not expand dashboard/API/autonomy surfaces" in brief.content
@@ -138,7 +191,7 @@ def test_daily_operating_brief_handles_missing_sources(tmp_path: Path) -> None:
     )
 
     assert "No AgentOps run reports found" in brief.content
-    assert "No cost entries found" in brief.content
+    assert "No burn evidence found" in brief.content
     assert "No human YDS ratings found" in brief.content
     assert "no local ontology database found" in brief.content
     assert "Register one human YDS rating" in brief.content
