@@ -46,6 +46,7 @@ The repo already has many parts of the answer:
 - `dharma_swarm/runtime_bridge.py` normalizes actions but is mostly used by tests.
 - `dharma_swarm/telic_seam.py` records `ActionProposal`, `GateDecisionRecord`, `ExecutionLease`, and `Outcome`.
 - `dharma_swarm/guardrails.py` can run input, output, and tool guardrails.
+- PTR v0, when present, is a shadow-only cybernetic readiness metric. It is negative evidence only.
 
 The missing link is a single authority funnel at the moment of action. Without it, the repo can talk about governance while writes, shell commands, cron jobs, API tools, world actions, and self-modification paths bypass the governance substrate.
 
@@ -78,6 +79,7 @@ Dirty worktree prototypes such as `dharma_swarm/shakti_warrant.py` can be mined 
 | `TelicSeam` | Existing ontology writeback path | Best-effort; one-to-one gate link needs aggregate record | Persistence target for proposal, decision, lease, outcome |
 | `OntologyActionGateway` | Fail-closed semantics from off-main work | Not present on current main | Prior art for later ontology mutation execution |
 | `ShaktiZeitgeistExecutive` | Read-only signal seam | Explicitly no dispatch authority | Evidence source only |
+| PTR | Cybernetic readiness signal | Shadow-only; not a permission source | Negative evidence input only |
 | GitNexus | Code graph context | Fresh worktree can be unindexed; index may be stale | Evidence source and status field |
 | ContextPlus | Semantic search | Can timeout under large repo queries | Evidence source and status field |
 
@@ -112,6 +114,7 @@ Fail policy:
 - High-authority side effects in `enforce` fail closed on missing warrant, invalid warrant, stale warrant, missing capability snapshot, or missing trigger binding.
 - Tool evidence providers failing does not automatically block in `shadow`; their failure is recorded.
 - Tool evidence providers failing in `enforce` blocks only when the action class requires that evidence provider.
+- PTR evidence may lower confidence, require review, or contribute a block reason. It must never create an allow decision, raise autonomy, bypass Telos, bypass PolicyCompiler, or imply operator consent.
 
 ## Authority Tiers
 
@@ -223,6 +226,9 @@ For governance mutations, release/main actions, and self-modification, the warra
 - current index/source status for GitNexus
 - current query status for ContextPlus
 - relevant tests or verification commands
+- PTR score status when available: verdict, authoritative flag, confidence, caps, and evidence freshness. Missing PTR remains review pressure only; it is not a hard dependency in PR 1.
+
+PTR is not part of the positive authority path. A healthy PTR score can strengthen the evidence story but cannot grant authority. A stale, low-coverage, missing, or negative PTR score can only lower confidence or push the decision toward `review` or `block`.
 
 ## The 50-File Rule
 
@@ -287,12 +293,13 @@ For every wired surface:
 7. Evaluate Telos through `TelosGatekeeper` or `check_with_reflective_reroute`.
 8. Evaluate Semantic Governance through an `ActionEnvelope`.
 9. Evaluate applicable `GuardrailRunner` tool/input checks.
-10. Aggregate component results into raw decision.
-11. Convert raw decision to effective decision according to mode.
-12. Persist authority result through `TelicSeam.record_gate_decision` when a proposal exists.
-13. Create or permit an `ExecutionLease` only for effective allow.
-14. Execute action.
-15. Record outcome through existing outcome paths.
+10. Read PTR only as optional negative evidence when an artifact is available.
+11. Aggregate component results into raw decision.
+12. Convert raw decision to effective decision according to mode.
+13. Persist authority result through `TelicSeam.record_gate_decision` when a proposal exists.
+14. Create or permit an `ExecutionLease` only for effective allow.
+15. Execute action.
+16. Record outcome through existing outcome paths.
 
 The aggregate result should appear in `gate_results` as:
 
@@ -473,6 +480,7 @@ The full spec is accepted only when tests prove:
 - `trigger_reasons` are bound to the attached warrant.
 - GitNexus and ContextPlus status fields are present on high-authority warrants.
 - Capability snapshot includes skills, MCP connectors, plugins, hooks, branch, and dirty status.
+- PTR is represented only as negative evidence: it cannot produce allow, cannot raise autonomy, cannot bypass Telos or PolicyCompiler, and cannot infer operator consent.
 - `ShaktiZeitgeistExecutive` remains read-only and `dispatch_authority` remains false.
 - Dispatch writes one `ActionProposal` and one aggregate `GateDecisionRecord`.
 - `ExecutionLease` is created only after effective allow.
@@ -517,4 +525,3 @@ Those paragraphs are not decoration. They are the compression step that proves t
 ## Implementation Principle
 
 The repo does not need another impressive governance phrase. It needs a tiny gate at the side-effect point that records why an agent had authority to act, blocks only where the risk justifies it, and writes the answer into the existing ontology lifecycle.
-
