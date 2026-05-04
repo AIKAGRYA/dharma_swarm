@@ -400,7 +400,7 @@ class TestTelemetryPlaneTraceId:
 
 
 class TestTaskConsistencyGuard:
-    def test_detects_split_lifecycle(self, tmp_path: Path):
+    async def test_detects_split_lifecycle(self, tmp_path: Path):
         """COMPLETED task + still-OPEN claim should produce BLOCKER finding."""
         db_path = tmp_path / "state" / "runtime.db"
         db_path.parent.mkdir(parents=True)
@@ -434,15 +434,13 @@ class TestTaskConsistencyGuard:
         db.close()
 
         from dharma_swarm.consistency_guard import run_task_consistency_guard
-        findings = asyncio.get_event_loop().run_until_complete(
-            run_task_consistency_guard(tmp_path)
-        )
+        findings = await run_task_consistency_guard(tmp_path)
         assert len(findings) == 1
         assert findings[0].severity == "BLOCKER"
         assert "Split lifecycle" in findings[0].title
         assert "t1" in findings[0].detail
 
-    def test_ok_when_claim_released(self, tmp_path: Path):
+    async def test_ok_when_claim_released(self, tmp_path: Path):
         """COMPLETED task + released claim should produce INFO finding."""
         db_path = tmp_path / "state" / "runtime.db"
         db_path.parent.mkdir(parents=True)
@@ -476,17 +474,13 @@ class TestTaskConsistencyGuard:
         db.close()
 
         from dharma_swarm.consistency_guard import run_task_consistency_guard
-        findings = asyncio.get_event_loop().run_until_complete(
-            run_task_consistency_guard(tmp_path)
-        )
+        findings = await run_task_consistency_guard(tmp_path)
         assert len(findings) == 1
         assert findings[0].severity == "INFO"
         assert "OK" in findings[0].title
 
-    def test_no_db_returns_empty(self, tmp_path: Path):
+    async def test_no_db_returns_empty(self, tmp_path: Path):
         """No database file should return empty findings (not crash)."""
         from dharma_swarm.consistency_guard import run_task_consistency_guard
-        findings = asyncio.get_event_loop().run_until_complete(
-            run_task_consistency_guard(tmp_path)
-        )
+        findings = await run_task_consistency_guard(tmp_path)
         assert findings == []
