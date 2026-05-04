@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import ast
 import inspect
+import os
+import subprocess
 from pathlib import Path
 
 import yaml
@@ -294,6 +296,38 @@ def test_mismatch_registry_guard_loads() -> None:
     )
 
 
+def test_mismatch_registry_missing_is_fail_closed_with_valid_remediation(
+    tmp_path: Path,
+) -> None:
+    """Missing registry diagnostics must not point at nonexistent Make targets."""
+    from scripts.uplift_guards.mismatch_registry import check_mismatch_adjacency
+
+    ok, message = check_mismatch_adjacency(tmp_path)
+
+    assert not ok
+    assert "MISMATCH REGISTRY MISSING" in message
+    assert "make mismatch-check" in message
+    assert "mismatch-sync" not in message
+
+
+def test_mismatch_registry_empty_is_fail_closed_with_valid_remediation(
+    tmp_path: Path,
+) -> None:
+    """Empty registry diagnostics must not point at nonexistent Make targets."""
+    from scripts.uplift_guards.mismatch_registry import check_mismatch_adjacency
+
+    registry_path = tmp_path / "docs" / "interface_mismatches.yaml"
+    registry_path.parent.mkdir(parents=True)
+    registry_path.write_text("entries: []\n")
+
+    ok, message = check_mismatch_adjacency(tmp_path)
+
+    assert not ok
+    assert "MISMATCH REGISTRY EMPTY" in message
+    assert "make mismatch-check" in message
+    assert "mismatch-sync" not in message
+
+
 def test_mismatch_registry_matches_dotted_callee_paths() -> None:
     """Dotted callee refs should match concrete repo file paths."""
     from scripts.uplift_guards.mismatch_registry import Mismatch, MismatchRegistry
@@ -313,3 +347,24 @@ def test_mismatch_registry_matches_dotted_callee_paths() -> None:
 
     matches = registry.matching_paths(["dharma_swarm/telic_seam.py"])
     assert [m.id for m in matches] == ["NEW-03"]
+
+
+def test_semgrep_skip_env_exits_before_invoking_semgrep() -> None:
+    """DHARMA_SKIP_SEMGREP=1 must skip even when semgrep is installed."""
+    env = {**os.environ, "DHARMA_SKIP_SEMGREP": "1"}
+    result = subprocess.run(
+        [
+            "bash",
+            "scripts/governance/run_semgrep_with_ca.sh",
+            "--version",
+        ],
+        cwd=REPO_ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert "SEMGREP SKIPPED" in result.stderr
+    assert result.stdout == ""
