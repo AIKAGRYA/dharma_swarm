@@ -24,9 +24,11 @@ from typing import Any
 
 import httpx
 
+from dharma_swarm.runtime_state import default_dharma_home
+
 logger = logging.getLogger(__name__)
 
-GINKO_DIR = Path(os.getenv("DHARMA_HOME", Path.home() / ".dharma")) / "ginko"
+GINKO_DIR = default_dharma_home() / "ginko"
 PREDICTIONS_FILE = GINKO_DIR / "predictions.jsonl"
 DASHBOARD_FILE = GINKO_DIR / "brier_dashboard.json"
 NOTIFICATIONS_FILE = GINKO_DIR / "resolved_notifications.jsonl"

@@ -21,7 +21,6 @@ import asyncio
 import html
 import json
 import logging
-import os
 import re
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -30,9 +29,11 @@ from typing import Any, Callable, Awaitable
 
 import httpx
 
+from dharma_swarm.runtime_state import default_dharma_home
+
 logger = logging.getLogger(__name__)
 
-GINKO_DIR = Path(os.getenv("DHARMA_HOME", Path.home() / ".dharma")) / "ginko"
+GINKO_DIR = default_dharma_home() / "ginko"
 SEC_DIR = GINKO_DIR / "sec"
 
 

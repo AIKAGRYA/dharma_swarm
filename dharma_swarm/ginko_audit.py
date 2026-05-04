@@ -41,6 +41,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from dharma_swarm.runtime_state import default_dharma_home
+
 logger = logging.getLogger("ginko_audit")
 
 # ─── Constants ────────────────────────────────────────────────────────
@@ -48,7 +50,7 @@ logger = logging.getLogger("ginko_audit")
 DHARMA_SWARM_ROOT = Path.home() / "dharma_swarm"
 SRC_DIR = DHARMA_SWARM_ROOT / "dharma_swarm"
 TEST_DIR = DHARMA_SWARM_ROOT / "tests"
-DHARMA_HOME = Path.home() / ".dharma"
+DHARMA_HOME = default_dharma_home()
 GINKO_HOME = DHARMA_HOME / "ginko"
 AUDIT_HOME = GINKO_HOME / "audit"
 

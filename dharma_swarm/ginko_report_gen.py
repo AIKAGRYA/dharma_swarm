@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from html import escape as html_escape
@@ -26,10 +25,11 @@ from dharma_swarm.ginko_brier import BrierDashboard, build_dashboard
 from dharma_swarm.ginko_data import load_latest_pull
 from dharma_swarm.ginko_regime import load_regime_history
 from dharma_swarm.ginko_signals import load_latest_report
+from dharma_swarm.runtime_state import default_dharma_home
 
 logger = logging.getLogger(__name__)
 
-GINKO_DIR = Path(os.getenv("DHARMA_HOME", Path.home() / ".dharma")) / "ginko"
+GINKO_DIR = default_dharma_home() / "ginko"
 REPORTS_DIR = GINKO_DIR / "reports"
 
 SATYA_DISCLOSURE = (

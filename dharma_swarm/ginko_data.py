@@ -28,10 +28,11 @@ from dharma_swarm.api_keys import (
     FRED_API_KEY_ENV,
     GINKO_API_KEY_ENV_VARS,
 )
+from dharma_swarm.runtime_state import default_dharma_home
 
 logger = logging.getLogger(__name__)
 
-GINKO_DIR = Path(os.getenv("DHARMA_HOME", Path.home() / ".dharma")) / "ginko"
+GINKO_DIR = default_dharma_home() / "ginko"
 DATA_DIR = GINKO_DIR / "data"
 
 # API key environment variable names mapped to short provider labels

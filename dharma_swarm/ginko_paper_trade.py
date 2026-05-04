@@ -17,16 +17,17 @@ from __future__ import annotations
 import json
 import logging
 import math
-import os
 import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from dharma_swarm.runtime_state import default_dharma_home
+
 logger = logging.getLogger(__name__)
 
-GINKO_DIR = Path(os.getenv("DHARMA_HOME", Path.home() / ".dharma")) / "ginko"
+GINKO_DIR = default_dharma_home() / "ginko"
 CIRCUIT_BREAKER_FLAG = GINKO_DIR / "CIRCUIT_BREAKER"
 
 AHIMSA_MAX_POSITION_PCT = 0.05  # 5% of portfolio value per position

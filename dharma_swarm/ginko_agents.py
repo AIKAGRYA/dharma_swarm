@@ -22,7 +22,6 @@ import asyncio
 import httpx
 import json
 import logging
-import os
 import time
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -34,10 +33,11 @@ from dharma_swarm.runtime_provider import (
     create_runtime_provider,
     preferred_runtime_provider_configs,
 )
+from dharma_swarm.runtime_state import default_dharma_home
 
 logger = logging.getLogger(__name__)
 
-GINKO_DIR = Path(os.getenv("DHARMA_HOME", Path.home() / ".dharma")) / "ginko"
+GINKO_DIR = default_dharma_home() / "ginko"
 AGENTS_DIR = GINKO_DIR / "agents"
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 

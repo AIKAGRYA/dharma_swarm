@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -50,10 +49,11 @@ from dharma_swarm.ginko_signals import (
     format_signal_report,
     generate_signal_report,
 )
+from dharma_swarm.runtime_state import default_dharma_home
 
 logger = logging.getLogger(__name__)
 
-GINKO_DIR = Path(os.getenv("DHARMA_HOME", Path.home() / ".dharma")) / "ginko"
+GINKO_DIR = default_dharma_home() / "ginko"
 STATE_FILE = GINKO_DIR / "ginko_state.json"
 
 
