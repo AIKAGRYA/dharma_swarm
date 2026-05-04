@@ -26,6 +26,7 @@ from dharma_swarm.fourfold_action_warrant import (
     trigger_reasons_for_action,
 )
 from dharma_swarm.models import _new_id, _utc_now
+from dharma_swarm.runtime_state import DEFAULT_RUNTIME_DB
 from dharma_swarm.zeitgeist import ZeitgeistScanner, ZeitgeistSignal
 
 logger = logging.getLogger(__name__)
@@ -114,7 +115,7 @@ class ShaktiZeitgeistExecutive:
     """Read-only strategic consumer of S4 zeitgeist signals."""
 
     def __init__(self, state_dir: Path | None = None) -> None:
-        self._state_dir = state_dir or (Path.home() / ".dharma")
+        self._state_dir = state_dir or DEFAULT_RUNTIME_DB.parent.parent
         self._meta_dir = self._state_dir / "meta"
         self._briefs_dir = self._meta_dir / "executive_briefs"
         self._history_path = self._meta_dir / "shakti_zeitgeist_history.jsonl"
