@@ -108,7 +108,7 @@ entries:
     fixed_in: "Changed registry_path=ontology_db to path=ontology_db (this PR)"
     test_path: tests/test_mismatch_blockers.py::test_new03_telic_seam_constructor
 
-  # ── Open ────────────────────────────────────────────────────────
+  # ── Replication mismatch + open degraded follow-ups ─────────────
 
   - id: MM-02
     severity: BLOCKER

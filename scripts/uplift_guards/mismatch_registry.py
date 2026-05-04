@@ -2,11 +2,11 @@
 
 Reads docs/interface_mismatches.yaml — the machine-readable form of
 INTERFACE_MISMATCH_MAP.md — and exposes a check that fails the commit
-when a staged change touches a caller/callee pair flagged BLOCKER or
-DEGRADED with status=open.
+when a staged change touches a caller/callee pair flagged BLOCKER with
+status=open.
 
 This is the doc→code coupling: an entry can move from `open` to
-`resolved` only when its xfail test in tests/mismatches/ flips to pass.
+`resolved` only when its pinned regression test passes.
 """
 from __future__ import annotations
 
@@ -21,6 +21,17 @@ except ImportError:  # pragma: no cover - PyYAML is a project dep already
     yaml = None  # type: ignore
 
 REGISTRY_REL_PATH = "docs/interface_mismatches.yaml"
+
+
+def _local_path_candidates(ref: str) -> set[str]:
+    """Return repo path candidates for a mismatch caller/callee reference."""
+    base = ref.split(":", 1)[0] if ":" in ref else ref
+    candidates = {base}
+    if "/" not in base and base.startswith("dharma_swarm."):
+        parts = base.split(".")
+        for end in range(len(parts), 1, -1):
+            candidates.add("/".join(parts[:end]) + ".py")
+    return candidates
 
 
 @dataclass(frozen=True)
@@ -46,6 +57,10 @@ class Mismatch:
     def callee_path(self) -> str:
         return self.callee.split(":", 1)[0] if ":" in self.callee else self.callee
 
+    @property
+    def path_candidates(self) -> set[str]:
+        return _local_path_candidates(self.caller) | _local_path_candidates(self.callee)
+
 
 @dataclass
 class MismatchRegistry:
@@ -61,7 +76,7 @@ class MismatchRegistry:
         path_set = set(paths)
         hits: list[Mismatch] = []
         for m in self.entries:
-            if m.caller_path in path_set or m.callee_path in path_set:
+            if m.path_candidates & path_set:
                 hits.append(m)
         return hits
 
@@ -119,8 +134,8 @@ def check_mismatch_adjacency(
         return (
             False,
             f"MISMATCH REGISTRY MISSING: {REGISTRY_REL_PATH} does not exist.\n"
-            "  Create it from INTERFACE_MISMATCH_MAP.md or run:\n"
-            "    make mismatch-sync\n"
+            "  Restore it from git, or recreate it from INTERFACE_MISMATCH_MAP.md, then run:\n"
+            "    make mismatch-check\n"
             "  To skip: DHARMA_SKIP_MISMATCH_GUARD=1",
         )
     if yaml is None:
@@ -134,8 +149,8 @@ def check_mismatch_adjacency(
         return (
             False,
             f"MISMATCH REGISTRY EMPTY: {REGISTRY_REL_PATH} has no entries.\n"
-            "  Populate from INTERFACE_MISMATCH_MAP.md or run:\n"
-            "    make mismatch-sync",
+            "  Populate it from INTERFACE_MISMATCH_MAP.md, then run:\n"
+            "    make mismatch-check",
         )
 
     staged = _staged_files(repo_root)

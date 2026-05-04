@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import ast
 import inspect
-import textwrap
 from pathlib import Path
 
 import yaml
@@ -33,7 +32,7 @@ def test_registry_loads_and_is_nonempty() -> None:
 
 
 def test_registry_yaml_markdown_count_agree() -> None:
-    """Number of entries in YAML must match the summary table in markdown."""
+    """Entry IDs in YAML must match the summary table and sections in markdown."""
     registry_path = REPO_ROOT / "docs" / "interface_mismatches.yaml"
     data = yaml.safe_load(registry_path.read_text())
     yaml_ids = {e["id"] for e in data["entries"]}
@@ -82,6 +81,14 @@ def test_resolved_entries_have_fixed_in() -> None:
 # ── MM-02: PersistentAgent enum wrapping (RESOLVED) ──────────────
 
 
+def _call_name(node: ast.AST) -> str:
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        return node.attr
+    return ""
+
+
 def test_mm02_persistent_agent_enum() -> None:
     """Replication-path PersistentAgent() must wrap role in AgentRole().
 
@@ -96,6 +103,7 @@ def test_mm02_persistent_agent_enum() -> None:
     tree = ast.parse(src)
 
     # Find PersistentAgent(...) calls that use outcome.child_spec (replication path)
+    replication_calls: list[ast.Call] = []
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
@@ -107,12 +115,30 @@ def test_mm02_persistent_agent_enum() -> None:
             )
             if not uses_child_spec:
                 continue  # conductor-configs path — already enum
-            for kw in node.keywords:
-                if kw.arg == "role":
-                    assert isinstance(kw.value, ast.Call), (
-                        f"PersistentAgent(role=...) at line {node.lineno}: "
-                        "role must be wrapped in AgentRole(), not a bare value"
-                    )
+            replication_calls.append(node)
+
+    assert replication_calls, "No PersistentAgent child_spec replication call found"
+    for node in replication_calls:
+        keywords = {kw.arg: kw.value for kw in node.keywords}
+        role = keywords.get("role")
+        assert isinstance(role, ast.Call), (
+            f"PersistentAgent(role=...) at line {node.lineno}: "
+            "role must be wrapped in AgentRole(), not a bare value"
+        )
+        assert _call_name(role.func) == "AgentRole", (
+            f"PersistentAgent(role=...) at line {node.lineno}: "
+            "role must specifically use AgentRole(...)"
+        )
+
+        provider_type = keywords.get("provider_type")
+        assert isinstance(provider_type, ast.Call), (
+            f"PersistentAgent(provider_type=...) at line {node.lineno}: "
+            "provider_type must be wrapped in ProviderType/PT(), not a bare value"
+        )
+        assert _call_name(provider_type.func) in {"PT", "ProviderType"}, (
+            f"PersistentAgent(provider_type=...) at line {node.lineno}: "
+            "provider_type must specifically use ProviderType/PT(...)"
+        )
 
 
 # ── NEW-03: TelicSeam constructor kwarg (RESOLVED) ───────────────
@@ -192,6 +218,15 @@ def test_mm07_meta_evolution_cadence() -> None:
 # ── MM-17: gnani_lodestone → TaskBoard.get_by_title (OPEN/DEGRADED) ──
 
 
+def _registry_entry(entry_id: str) -> dict:
+    registry_path = REPO_ROOT / "docs" / "interface_mismatches.yaml"
+    data = yaml.safe_load(registry_path.read_text())
+    for entry in data["entries"]:
+        if entry["id"] == entry_id:
+            return entry
+    raise AssertionError(f"{entry_id} missing from interface mismatch registry")
+
+
 def test_mm17_gnani_task_board() -> None:
     """TaskBoard has no get_by_title method — gnani_lodestone.py will crash.
 
@@ -200,14 +235,19 @@ def test_mm17_gnani_task_board() -> None:
     """
     from dharma_swarm.task_board import TaskBoard
 
+    entry = _registry_entry("MM-17")
     has_method = hasattr(TaskBoard, "get_by_title")
-    if not has_method:
-        # Expected: method missing. Document the mismatch.
-        src = (REPO_ROOT / "dharma_swarm" / "gnani_lodestone.py").read_text()
-        assert "get_by_title" in src, (
-            "gnani_lodestone.py no longer calls get_by_title — remove MM-17"
+    src = (REPO_ROOT / "dharma_swarm" / "gnani_lodestone.py").read_text()
+    still_calls_missing_method = "get_by_title" in src
+    if entry["status"] == "open":
+        assert not has_method, "TaskBoard.get_by_title exists — mark MM-17 resolved"
+        assert still_calls_missing_method, (
+            "gnani_lodestone.py no longer calls get_by_title — mark MM-17 resolved"
         )
-    # If method exists, the mismatch is resolved — test passes either way
+    else:
+        assert has_method or not still_calls_missing_method, (
+            "MM-17 is resolved, but gnani_lodestone.py still calls missing get_by_title"
+        )
 
 
 # ── MM-18: gnani_lodestone → TelosGraph.get_by_name (OPEN/DEGRADED) ──
@@ -221,14 +261,19 @@ def test_mm18_gnani_telos_graph() -> None:
     """
     from dharma_swarm.telos_graph import TelosGraph
 
+    entry = _registry_entry("MM-18")
     has_method = hasattr(TelosGraph, "get_by_name")
-    if not has_method:
-        # Expected: method missing. Document the mismatch.
-        src = (REPO_ROOT / "dharma_swarm" / "gnani_lodestone.py").read_text()
-        assert "get_by_name" in src, (
-            "gnani_lodestone.py no longer calls get_by_name — remove MM-18"
+    src = (REPO_ROOT / "dharma_swarm" / "gnani_lodestone.py").read_text()
+    still_calls_missing_method = "get_by_name" in src
+    if entry["status"] == "open":
+        assert not has_method, "TelosGraph.get_by_name exists — mark MM-18 resolved"
+        assert still_calls_missing_method, (
+            "gnani_lodestone.py no longer calls get_by_name — mark MM-18 resolved"
         )
-    # If method exists, the mismatch is resolved — test passes either way
+    else:
+        assert has_method or not still_calls_missing_method, (
+            "MM-18 is resolved, but gnani_lodestone.py still calls missing get_by_name"
+        )
 
 
 # ── Mismatch Registry Guard ──────────────────────────────────────
@@ -247,3 +292,24 @@ def test_mismatch_registry_guard_loads() -> None:
         f"Expected 0 open BLOCKERs, found {len(open_blockers)}: "
         f"{[m.id for m in open_blockers]}"
     )
+
+
+def test_mismatch_registry_matches_dotted_callee_paths() -> None:
+    """Dotted callee refs should match concrete repo file paths."""
+    from scripts.uplift_guards.mismatch_registry import Mismatch, MismatchRegistry
+
+    registry = MismatchRegistry(
+        entries=[
+            Mismatch(
+                id="NEW-03",
+                severity="BLOCKER",
+                status="resolved",
+                caller="dharma_swarm/orchestrator.py:154",
+                callee="dharma_swarm.telic_seam.TelicSeam.__init__",
+                summary="constructor kwarg mismatch",
+            )
+        ]
+    )
+
+    matches = registry.matching_paths(["dharma_swarm/telic_seam.py"])
+    assert [m.id for m in matches] == ["NEW-03"]
