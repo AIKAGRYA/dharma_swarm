@@ -224,6 +224,14 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--json", action="store_true", help="Emit JSON instead of text report.")
     parser.add_argument(
+        "--json-output",
+        help="Write JSON warrant payload to this path in addition to stdout output.",
+    )
+    parser.add_argument(
+        "--report-output",
+        help="Write text warrant report to this path in addition to stdout output.",
+    )
+    parser.add_argument(
         "--fail-on",
         choices=[item.value for item in WarrantVerdict],
         action="append",
@@ -275,10 +283,22 @@ def main(argv: list[str] | None = None) -> int:
         provenance=args.provenance,
     )
     warrant = evaluate_fourfold_warrant(request)
+    json_output = json.dumps(warrant.model_dump(mode="json"), indent=2, sort_keys=True)
+    report_output = render_warrant_report(warrant)
+
+    if args.json_output:
+        json_path = Path(args.json_output)
+        json_path.parent.mkdir(parents=True, exist_ok=True)
+        json_path.write_text(json_output + "\n", encoding="utf-8")
+    if args.report_output:
+        report_path = Path(args.report_output)
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(report_output + "\n", encoding="utf-8")
+
     if args.json:
-        print(json.dumps(warrant.model_dump(mode="json"), indent=2, sort_keys=True))
+        print(json_output)
     else:
-        print(render_warrant_report(warrant))
+        print(report_output)
 
     return 1 if warrant.verdict.value in set(args.fail_on) else 0
 

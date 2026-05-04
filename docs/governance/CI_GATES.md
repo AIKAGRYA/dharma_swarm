@@ -4,6 +4,7 @@ Phase 2 of the governance install adds three GitHub Actions workflows:
 
 | Workflow | File | Triggers | Hard-fail? |
 |---|---|---|---|
+| Fourfold Shakti Warrant | `.github/workflows/fourfold-warrant.yml` | PRs to main/promote/governance/codex | Yes on BLOCK/HOLD; WARN is surfaced but non-blocking |
 | CodeQL | `.github/workflows/codeql.yml` | PRs to main/promote/governance, weekly schedule | No (observe-only first 2 weeks) |
 | Semgrep | `.github/workflows/semgrep.yml` | PRs, push to main, weekly schedule | Yes on local `.semgrep/` ERRORs; advisory on registry packs |
 | Gitleaks | `.github/workflows/gitleaks.yml` | Push and PR | Yes on any finding |
@@ -18,6 +19,18 @@ Python. Findings go to the **Security** tab (Code scanning alerts).
 We do **not** fail the build on findings during the first observation
 window; ratchet to fail-on-high in a follow-up PR after triaging the
 baseline.
+
+### Fourfold Shakti Warrant
+Runs `scripts/governance/check_shakti_warrant.py` against the PR diff using
+`--diff-scope base` and the pull request base SHA. The check hard-fails on
+BLOCK or HOLD verdicts and allows WARN so teams can see weak evidence without
+turning every thin dimension into a merge blocker.
+
+The workflow writes both text and JSON warrant artifacts under
+`reports/governance/fourfold-warrant.*` and appends the text report to the
+GitHub Step Summary. Hot-path diffs require explicit impact acknowledgement:
+include `[impact-checked]` in the PR title or body when the blast radius has
+actually been reviewed.
 
 ### Semgrep
 Two modes:
@@ -47,6 +60,7 @@ add status badges to `README.md`:
 [![codeql](https://github.com/AmitabhainArunachala/dharma_swarm/actions/workflows/codeql.yml/badge.svg)](https://github.com/AmitabhainArunachala/dharma_swarm/actions/workflows/codeql.yml)
 [![semgrep](https://github.com/AmitabhainArunachala/dharma_swarm/actions/workflows/semgrep.yml/badge.svg)](https://github.com/AmitabhainArunachala/dharma_swarm/actions/workflows/semgrep.yml)
 [![gitleaks](https://github.com/AmitabhainArunachala/dharma_swarm/actions/workflows/gitleaks.yml/badge.svg)](https://github.com/AmitabhainArunachala/dharma_swarm/actions/workflows/gitleaks.yml)
+[![fourfold-warrant](https://github.com/AmitabhainArunachala/dharma_swarm/actions/workflows/fourfold-warrant.yml/badge.svg)](https://github.com/AmitabhainArunachala/dharma_swarm/actions/workflows/fourfold-warrant.yml)
 ```
 
 Defer badge additions until the workflows have run cleanly on `main`.

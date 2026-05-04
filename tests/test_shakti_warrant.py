@@ -487,3 +487,45 @@ def test_check_shakti_warrant_cli_honors_env_impact_ack_for_hot_paths(tmp_path):
 
     assert payload["verdict"] in {"allow", "warn"}
     assert not any("hot-path changes lack impact_checked" in item for item in payload["warnings"])
+
+
+def test_check_shakti_warrant_cli_writes_report_and_json_outputs(tmp_path):
+    report_path = tmp_path / "warrant.txt"
+    json_path = tmp_path / "warrant.json"
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(REPO_ROOT) + os.pathsep + env.get("PYTHONPATH", "")
+
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(REPO_ROOT / "scripts/governance/check_shakti_warrant.py"),
+            "--intent",
+            "restore canonical governance architecture",
+            "--content",
+            "fix blocker reduce fragmentation deterministic pytest evidence",
+            "--target",
+            "tests/test_shakti_warrant.py",
+            "--tool",
+            "pytest",
+            "--metadata",
+            "allowed_tools=pytest",
+            "--metadata",
+            "tests_planned=true",
+            "--report-output",
+            str(report_path),
+            "--json-output",
+            str(json_path),
+        ],
+        cwd=REPO_ROOT,
+        env=env,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    payload = json.loads(json_path.read_text(encoding="utf-8"))
+
+    assert "Fourfold Shakti Warrant" in proc.stdout
+    assert "Fourfold Shakti Warrant" in report_path.read_text(encoding="utf-8")
+    assert payload["action_type"] == "proposed_action"
+    assert payload["target_paths"] == ["tests/test_shakti_warrant.py"]
