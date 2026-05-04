@@ -235,7 +235,7 @@ def _all_paths(request: FourfoldActionWarrantRequest) -> list[str]:
 
 
 def _has_diff_evidence(request: FourfoldActionWarrantRequest) -> bool:
-    return bool(
+    return (
         request.metadata.get("diff_bound") is True
         or any(e.kind == "git_diff" for e in request.evidence)
     )
