@@ -24,13 +24,14 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 
 from dharma_swarm.api_keys import DASHBOARD_API_KEY_ENV
+from dharma_swarm.runtime_state import default_dharma_home
 
 logger = logging.getLogger(__name__)
 
 # ── Singleton State ───────────────────────────────────────────────
 
 _state: dict[str, Any] = {}
-_OPERATOR_STATE_DIR = Path.home() / ".dharma"
+_OPERATOR_STATE_DIR = default_dharma_home()
 _OPERATOR_PID_FILE = _OPERATOR_STATE_DIR / "operator.pid"
 
 

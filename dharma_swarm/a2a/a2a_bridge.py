@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -31,10 +30,11 @@ from dharma_swarm.a2a.a2a_server import (
     A2ATask,
     A2ATaskStatus,
 )
+from dharma_swarm.runtime_state import default_dharma_home
 
 logger = logging.getLogger(__name__)
 
-_DHARMA_HOME = Path(os.getenv("DHARMA_HOME", Path.home() / ".dharma"))
+_DHARMA_HOME = default_dharma_home()
 
 # Signal types emitted onto the signal bus
 SIGNAL_A2A_TASK_SUBMITTED = "A2A_TASK_SUBMITTED"

@@ -17,15 +17,16 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from dharma_swarm.runtime_state import default_dharma_home
+
 logger = logging.getLogger(__name__)
 
-_DHARMA_HOME = Path(os.getenv("DHARMA_HOME", Path.home() / ".dharma"))
+_DHARMA_HOME = default_dharma_home()
 _DEFAULT_CARDS_DIR = _DHARMA_HOME / "a2a" / "cards"
 
 

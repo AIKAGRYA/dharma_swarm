@@ -15,12 +15,14 @@ import re
 import subprocess
 from pathlib import Path
 
+from dharma_swarm.runtime_state import default_dharma_home
+
 logger = logging.getLogger(__name__)
 
 # Safety: scope filesystem operations to these roots
 ALLOWED_ROOTS = [
     Path.home() / "dharma_swarm",
-    Path.home() / ".dharma",
+    default_dharma_home(),
 ]
 
 PROJECT_ROOT = Path.home() / "dharma_swarm"
@@ -695,7 +697,7 @@ async def exec_stigmergy_query(args: dict) -> str:
             marks = await stig.read_marks(limit=limit) if hasattr(stig, "read_marks") else []
             if not marks:
                 # Fallback: read the JSONL file directly
-                marks_file = Path.home() / ".dharma" / "stigmergy" / "marks.jsonl"
+                marks_file = default_dharma_home() / "stigmergy" / "marks.jsonl"
                 if marks_file.exists():
                     lines = marks_file.read_text().strip().splitlines()[-limit:]
                     parsed = []
@@ -722,7 +724,7 @@ async def exec_stigmergy_query(args: dict) -> str:
 
         elif action == "search":
             query = args.get("query", "")
-            marks_file = Path.home() / ".dharma" / "stigmergy" / "marks.jsonl"
+            marks_file = default_dharma_home() / "stigmergy" / "marks.jsonl"
             if not marks_file.exists():
                 return "Stigmergy marks file not found"
             results = []

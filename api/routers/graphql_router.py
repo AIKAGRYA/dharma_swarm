@@ -4,13 +4,14 @@ GraphQL Router for Palantir-Style Ontology Interface
 
 import json
 import logging
-import os
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+
+from dharma_swarm.runtime_state import default_dharma_home
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +83,7 @@ class ConnectionGraph(BaseModel):
     edges: List[GraphEdge]
 
 
-DHARMA_HOME = Path(os.getenv("DHARMA_HOME", Path.home() / ".dharma"))
+DHARMA_HOME = default_dharma_home()
 GINKO_AGENTS_DIR = DHARMA_HOME / "ginko" / "agents"
 STIGMERGY_MARKS_PATH = DHARMA_HOME / "stigmergy" / "marks.jsonl"
 GRAPH_ROOT_ALIASES = {
@@ -261,14 +262,14 @@ async def get_agent_identity(agent_id: str):
         )
 
     # Read from ~/.dharma/ginko/agents/{agent_id}/identity.json
-    identity_path = os.path.expanduser(f"~/.dharma/ginko/agents/{agent_id}/identity.json")
-    
-    if not os.path.exists(identity_path):
+    identity_path = default_dharma_home() / "ginko" / "agents" / agent_id / "identity.json"
+
+    if not identity_path.exists():
         raise HTTPException(status_code=404, detail="Agent not found")
-    
-    with open(identity_path, 'r') as f:
+
+    with identity_path.open("r") as f:
         data = json.load(f)
-    
+
     return AgentIdentity(
         id=data.get("id", agent_id),
         name=data.get("name", agent_id),
@@ -307,7 +308,7 @@ async def get_stigmergy_marks(
         for line in f:
             try:
                 data = json.loads(line.strip())
-                
+
                 # Apply filters
                 if agent and data.get("agent") != agent:
                     continue
@@ -315,7 +316,7 @@ async def get_stigmergy_marks(
                     continue
                 if min_salience and data.get("salience", 0) < min_salience:
                     continue
-                
+
                 marks.append(StigmergyMark(
                     id=data.get("id", ""),
                     agent=data.get("agent", ""),
@@ -330,12 +331,12 @@ async def get_stigmergy_marks(
                     linked_objects=data.get("linked_objects", []),
                     timestamp=datetime.fromisoformat(data.get("timestamp", datetime.now().isoformat())),
                 ))
-                
+
                 if len(marks) >= limit:
                     break
             except Exception:
                 continue
-    
+
     return marks
 
 
