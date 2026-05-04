@@ -21,6 +21,8 @@ from textwrap import shorten
 from typing import Any, Callable
 from zoneinfo import ZoneInfo
 
+from dharma_swarm.llm_burn import load_llm_burn_rollup
+
 WITA = ZoneInfo("Asia/Makassar")
 DEFAULT_SINCE_HOURS = 24.0
 DEFAULT_OUTPUT_DIR = Path.home() / "dharma_briefs"
@@ -59,6 +61,13 @@ class CostSnapshot:
     routing_decisions: int = 0
     routing_failures: int = 0
     routing_token_estimate: int = 0
+    llm_spans: int = 0
+    llm_logged_cost_usd: float = 0.0
+    llm_estimated_cost_usd: float = 0.0
+    llm_zero_token_spans: int = 0
+    llm_unpriced_spans: int = 0
+    llm_top_failure_provider: str = ""
+    llm_top_failure_model: str = ""
     malformed_lines: int = 0
 
 
@@ -235,7 +244,30 @@ def load_burn_snapshot(
         load_trace_dispatch_snapshot(state_dir / "traces", now=now, since_hours=since_hours),
         load_router_decision_snapshot(state_dir, now=now, since_hours=since_hours),
     ]
-    return merge_cost_snapshots(snapshots)
+    merged = merge_cost_snapshots(snapshots)
+    llm = load_llm_burn_rollup(state_dir, now=now, since_hours=since_hours)
+    return CostSnapshot(
+        calls=merged.calls,
+        total_cost_usd=merged.total_cost_usd,
+        input_tokens=merged.input_tokens,
+        output_tokens=merged.output_tokens,
+        by_provider=merged.by_provider,
+        by_tier=merged.by_tier,
+        by_source=merged.by_source,
+        trace_spans=merged.trace_spans,
+        trace_errors=merged.trace_errors,
+        routing_decisions=merged.routing_decisions,
+        routing_failures=merged.routing_failures,
+        routing_token_estimate=merged.routing_token_estimate,
+        llm_spans=llm.spans,
+        llm_logged_cost_usd=llm.logged_cost_usd,
+        llm_estimated_cost_usd=llm.estimated_cost_usd,
+        llm_zero_token_spans=llm.zero_token_spans,
+        llm_unpriced_spans=llm.unpriced_spans,
+        llm_top_failure_provider=llm.top_failure_provider,
+        llm_top_failure_model=llm.top_failure_model,
+        malformed_lines=merged.malformed_lines,
+    )
 
 
 def load_cost_snapshot(
@@ -602,6 +634,8 @@ def choose_next_move(
         )
     if not agentops:
         return "Run the next repo task through an AgentOps packet so the brief has gate evidence."
+    if cost.llm_unpriced_spans:
+        return "Close the unpriced LLM span gap before scaling another long autonomous run."
     if cost.calls == 0 and (cost.trace_spans or cost.routing_decisions):
         return "Normalize unpriced trace/routing activity into priced spend before scaling long runs."
     if cost.calls == 0:
@@ -689,6 +723,20 @@ def _render_cost(snapshot: CostSnapshot, *, since_hours: float) -> list[str]:
                 f"Trace spans: {snapshot.trace_spans} dispatch span(s), "
                 f"{snapshot.trace_errors} error(s)."
             )
+        if snapshot.llm_spans:
+            lines.append(
+                "- OpenInference-style LLM burn spans: "
+                f"{snapshot.llm_spans} span(s), recorded=${snapshot.llm_logged_cost_usd:.4f}, "
+                f"estimated=${snapshot.llm_estimated_cost_usd:.4f}, "
+                f"zero-token={snapshot.llm_zero_token_spans}, "
+                f"unpriced={snapshot.llm_unpriced_spans}."
+            )
+            if snapshot.llm_top_failure_provider or snapshot.llm_top_failure_model:
+                lines.append(
+                    "- LLM failure hot spot: "
+                    f"provider={snapshot.llm_top_failure_provider or 'n/a'}, "
+                    f"model={snapshot.llm_top_failure_model or 'n/a'}."
+                )
         if snapshot.routing_decisions:
             lines.append(
                 "- "

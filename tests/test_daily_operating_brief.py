@@ -174,6 +174,7 @@ def test_daily_operating_brief_composes_existing_signals(tmp_path: Path) -> None
     assert "Cost entries: 3 call(s), $0.0280" in brief.content
     assert "Sources: cost_log=1, trace_cost_ledger=1, trace_dispatch=1" in brief.content
     assert "Trace spans: 1 dispatch span(s), 1 error(s)." in brief.content
+    assert "OpenInference-style LLM burn spans: 3 span(s), recorded=$0.0000, estimated=$0.0280" in brief.content
     assert "Routing decisions: 1, failures=3, token_estimate=123." in brief.content
     assert "`5.13a` docs/governance/AGENTOPS.md" in brief.content
     assert "Aligned revenue engines garden exists" in brief.content
