@@ -25,11 +25,13 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from dharma_swarm.runtime_state import default_dharma_home
+
 logger = logging.getLogger(__name__)
 
 # ── Configuration ────────────────────────────────────────────────────
 
-DHARMA_DIR = Path(os.getenv("DHARMA_HOME", Path.home() / ".dharma"))
+DHARMA_DIR = default_dharma_home()
 FOREMAN_DIR = DHARMA_DIR / "foreman"
 PROJECTS_FILE = FOREMAN_DIR / "projects.json"
 CYCLES_FILE = FOREMAN_DIR / "cycles.jsonl"

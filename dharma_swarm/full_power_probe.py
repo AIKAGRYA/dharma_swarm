@@ -11,8 +11,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from dharma_swarm.runtime_state import default_dharma_home
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
-STATE_DIR = Path.home() / ".dharma"
+STATE_DIR = default_dharma_home()
 SHARED_DIR = STATE_DIR / "shared"
 REPORT_DIR = REPO_ROOT / "reports" / "verification"
 

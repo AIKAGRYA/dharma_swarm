@@ -13,11 +13,12 @@ from dharma_swarm.scout_audit import (
     render_pipeline_markdown,
     write_pipeline_audit,
 )
+from dharma_swarm.runtime_state import default_dharma_home
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Check scout pipeline health")
-    parser.add_argument("--state-dir", default=str(Path.home() / ".dharma"))
+    parser.add_argument("--state-dir", default=str(default_dharma_home()))
     parser.add_argument("--expected-domain", action="append", default=[])
     parser.add_argument("--domain-max-age-hours", type=float, default=26.0)
     parser.add_argument("--synthesis-max-age-hours", type=float, default=26.0)

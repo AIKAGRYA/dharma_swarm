@@ -7,6 +7,7 @@ from pathlib import Path
 from dharma_swarm.conversation_store import ConversationStore
 from dharma_swarm.contracts import SovereignRuntimeLayer, build_sovereign_runtime_layer
 from dharma_swarm.graduation_engine import GraduationEngine
+from dharma_swarm.runtime_state import default_dharma_home
 
 OPERATOR_PORT = 8420
 
@@ -27,7 +28,7 @@ class ResidentOperator:
         session_id: str = "resident_operator",
         bridge_agent_id: str = "operator_bridge",
     ) -> None:
-        self.state_dir = Path(state_dir) if state_dir is not None else Path.home() / ".dharma"
+        self.state_dir = Path(state_dir) if state_dir is not None else default_dharma_home()
         self.session_id = session_id
         self.bridge_agent_id = bridge_agent_id
         self._conversations = ConversationStore(

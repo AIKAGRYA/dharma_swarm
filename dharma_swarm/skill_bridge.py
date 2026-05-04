@@ -32,10 +32,11 @@ from dharma_swarm.pending_proposals import (
     PENDING_PROPOSALS_FILE as _DEFAULT_PENDING_PROPOSALS_FILE,
     append_pending_proposals,
 )
+from dharma_swarm.runtime_state import default_dharma_home
 
 logger = logging.getLogger(__name__)
 
-STATE_DIR = Path.home() / ".dharma"
+STATE_DIR = default_dharma_home()
 INBOX_DIR = STATE_DIR / "skill_bridge"
 INBOX_FILE = INBOX_DIR / "inbox.jsonl"
 PROPOSALS_FILE = _DEFAULT_PENDING_PROPOSALS_FILE

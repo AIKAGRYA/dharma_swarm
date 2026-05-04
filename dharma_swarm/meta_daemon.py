@@ -21,10 +21,11 @@ from pathlib import Path
 from typing import Any
 
 from dharma_swarm.models import _utc_now
+from dharma_swarm.runtime_state import default_dharma_home
 
 logger = logging.getLogger(__name__)
 
-STATE_DIR = Path.home() / ".dharma"
+STATE_DIR = default_dharma_home()
 META_DIR = STATE_DIR / "meta"
 HISTORY_DIR = META_DIR / "history"
 

@@ -28,9 +28,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from dharma_swarm.runtime_state import default_dharma_home
+
 logger = logging.getLogger(__name__)
 
-STATE_DIR = Path.home() / ".dharma"
+STATE_DIR = default_dharma_home()
 CYCLE_DIR = STATE_DIR / "self_improve"
 DHARMA_SWARM_DIR = Path.home() / "dharma_swarm"
 

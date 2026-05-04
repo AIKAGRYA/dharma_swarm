@@ -10,9 +10,10 @@ from pathlib import Path
 from typing import Any, Sequence
 
 from dharma_swarm.codex_cli import dgc_codex_exec_prefix
+from dharma_swarm.runtime_state import default_dharma_home
 
 ROOT = Path.home() / "dharma_swarm"
-STATE = Path.home() / ".dharma"
+STATE = default_dharma_home()
 LOG_ROOT = STATE / "logs" / "codex_overnight"
 HEARTBEAT_FILE = STATE / "codex_overnight_heartbeat.json"
 RUN_FILE = STATE / "codex_overnight_run_dir.txt"

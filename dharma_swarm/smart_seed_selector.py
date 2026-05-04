@@ -21,6 +21,8 @@ import random
 from pathlib import Path
 from typing import Any
 
+from dharma_swarm.runtime_state import default_dharma_home
+
 logger = logging.getLogger(__name__)
 
 # PSMV root (same as thinkodynamic_director.py)
@@ -48,7 +50,7 @@ class SmartSeedSelector:
     """
 
     def __init__(self, state_dir: Path | None = None) -> None:
-        self._state_dir = state_dir or Path.home() / ".dharma"
+        self._state_dir = state_dir or default_dharma_home()
 
     async def select(
         self,

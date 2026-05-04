@@ -17,6 +17,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from dharma_swarm.runtime_state import default_dharma_home
+
 try:
     import yaml
 
@@ -25,7 +27,7 @@ except ImportError:  # pragma: no cover
     _YAML_AVAILABLE = False
 
 
-DEFAULT_STATE_DIR = Path.home() / ".dharma"
+DEFAULT_STATE_DIR = default_dharma_home()
 DEFAULT_SCOUTS_DIR = DEFAULT_STATE_DIR / "scouts"
 DEFAULT_HEALTH_DIR = DEFAULT_SCOUTS_DIR / "health"
 DEFAULT_DOMAIN_MAX_AGE_SECONDS = 26 * 3600
