@@ -14,6 +14,8 @@ If another doc disagrees with this file, verify against code, GitNexus, ContextP
 
 ## Current Verdict
 
+- 2026-05-04 control-plane addendum: `chore/phase2-governance-rollup` is locally brake-green at `3e5b8d9`, but it is not promotion-ready without reconciliation. It is `89` commits ahead and `71` commits behind `origin/main`, and `origin/main` now carries a separate `dharma_swarm/operator_brief/` seam while rollup carries top-level Daily Insight/Telic seam work.
+- Governance scanner addendum: assurance provider-contract noise has been reduced to zero in `chore/governance-truth-repairs`; remaining high assurance findings are concentrated in real dashboard/API route-contract drift. Do not treat this as permission to add new API/product surface.
 - Clean enough to trust: desktop-shell boot path, 4-route dashboard control-plane deck, API lifespan/auth boundary, runtime fetch contract.
 - Runtime authority membrane now exists: `ACTIVE_SURFACE_MANIFEST.yaml` classifies API routers, dashboard pages, cron jobs, state writers, and overlap families without deleting research artifacts.
 - Noisy: API/router sprawl, dashboard surface count, `~/.dharma` state spread, many overlapping docs claiming canonical truth.
@@ -23,6 +25,9 @@ If another doc disagrees with this file, verify against code, GitNexus, ContextP
 
 ## Hot Items
 
+- [ ] Reconcile `chore/phase2-governance-rollup` with `origin/main` before new feature work.
+- [ ] Choose one canonical Operator Brief / Daily Insight Brief entrypoint; do not let `dharma_swarm/operator_brief/` and top-level `dharma_swarm/insight_brief.py` harden as parallel systems.
+- [ ] Classify unsupported dashboard/API projections as inactive or fail-closed; do not add backend endpoints only to satisfy stale helpers.
 - [ ] Collapse `terminal-v2/` into reference-only status and stop shell-core duplication.
 - [ ] Replace implicit TUI fallback behavior with one explicit shell policy.
 - [ ] Split `dharma_swarm/terminal_bridge.py` into transport, session, snapshot, and command slices.
@@ -155,16 +160,19 @@ If another doc disagrees with this file, verify against code, GitNexus, ContextP
 
 ## Recommended Patch Order
 
-1. Collapse duplicate shell ownership around `terminal/`.
-2. Make terminal fallback behavior explicit and non-default.
-3. Split `TerminalBridge` by responsibility.
-4. Keep `ThinkodynamicDirector.execute_pending_tasks()` in the focused smoke suite; worker-loop dependency gating is currently green.
-5. Modularize `SwarmManager` optional boot wiring.
-6. Introduce a single typed state-root contract for `~/.dharma`.
-7. Remove dead/placeholder routes and nav entries.
-8. Collapse `organism.py` to one runtime surface.
-9. Re-label projections as projections, not authority.
-10. Re-run verification and refresh this file.
+1. Reconcile rollup with `origin/main`; local green is not enough while the branch is `89` ahead and `71` behind.
+2. Resolve the Operator Brief / Daily Insight seam fork and preserve TelicSeam proposal, gate, outcome, value-event, and citation linkage.
+3. Classify unsupported dashboard/API projections as inactive or fail-closed instead of adding new product surface.
+4. Collapse duplicate shell ownership around `terminal/`.
+5. Make terminal fallback behavior explicit and non-default.
+6. Split `TerminalBridge` by responsibility.
+7. Keep `ThinkodynamicDirector.execute_pending_tasks()` in the focused smoke suite; worker-loop dependency gating is currently green.
+8. Modularize `SwarmManager` optional boot wiring.
+9. Introduce a single typed state-root contract for `~/.dharma`.
+10. Remove dead/placeholder routes and nav entries.
+11. Collapse `organism.py` to one runtime surface.
+12. Re-label projections as projections, not authority.
+13. Re-run verification and refresh this file.
 
 ## Verification Snapshot
 

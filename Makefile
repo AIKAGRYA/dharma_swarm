@@ -3,6 +3,7 @@ PYTEST ?= pytest
 DASHBOARD_DIR ?= dashboard
 
 .PHONY: help xray xray-json compile test-smoke test-all ci-local dashboard-lint dashboard-build \
+        test-contracts \
         semgrep gitleaks precommit-install precommit-run governance-baseline
 
 help:
@@ -48,7 +49,7 @@ setup-hooks:
 	bash scripts/setup_hooks.sh
 
 test-contracts:
-	$(PYTEST) tests/test_contracts.py tests/test_private_access.py -v --tb=short
+	scripts/governance/run_pytest_with_repo_env.sh tests/test_contracts_scaffold.py tests/test_operator_core_contracts.py tests/test_runtime_contract.py tests/test_runtime_contract_adapters.py -q --tb=line
 
 # ============================================================================
 # Governance targets (Phase 1)
