@@ -51,16 +51,23 @@ class LineageEdge(BaseModel):
 
     This is the atomic unit of provenance: task X consumed [A, B] and
     produced [C, D] at time T, executed by agent Y in pipeline Z.
+
+    Derivation support (otel-agent-provenance):
+      delegated_by — When agent B was delegated work by agent A,
+      this field records A's identity so the output is traceable
+      back through the delegation chain.
     """
     edge_id: str = Field(default_factory=_new_id)
     task_id: str
     input_artifacts: list[str] = Field(default_factory=list)
     output_artifacts: list[str] = Field(default_factory=list)
     agent: str = ""
+    delegated_by: str = ""
     pipeline_id: str = ""
     pipeline_label: str = ""
     block_id: str = ""
     operation: str = ""  # e.g., "compute_rv", "archive", "design"
+    trace_id: str = ""
     timestamp: str = Field(default_factory=lambda: _utc_now().isoformat())
     metadata: dict[str, Any] = Field(default_factory=dict)
 
@@ -101,10 +108,12 @@ CREATE TABLE IF NOT EXISTS lineage_edges (
     edge_id TEXT PRIMARY KEY,
     task_id TEXT NOT NULL,
     agent TEXT DEFAULT '',
+    delegated_by TEXT DEFAULT '',
     pipeline_id TEXT DEFAULT '',
     pipeline_label TEXT DEFAULT '',
     block_id TEXT DEFAULT '',
     operation TEXT DEFAULT '',
+    trace_id TEXT DEFAULT '',
     timestamp TEXT NOT NULL,
     metadata TEXT DEFAULT '{}'
 );
@@ -167,6 +176,14 @@ class LineageGraph:
     def _init_db(self) -> None:
         with self._conn() as conn:
             conn.executescript(_SCHEMA)
+            for col in ("delegated_by", "trace_id"):
+                try:
+                    conn.execute(
+                        f"ALTER TABLE lineage_edges ADD COLUMN {col}"
+                        " TEXT DEFAULT ''"
+                    )
+                except Exception:
+                    pass
 
     @contextmanager
     def _conn(self):
@@ -186,13 +203,16 @@ class LineageGraph:
         with self._conn() as conn:
             conn.execute(
                 """INSERT INTO lineage_edges
-                   (edge_id, task_id, agent, pipeline_id, pipeline_label,
-                    block_id, operation, timestamp, metadata)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                   (edge_id, task_id, agent, delegated_by,
+                    pipeline_id, pipeline_label,
+                    block_id, operation, trace_id, timestamp, metadata)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     edge.edge_id, edge.task_id, edge.agent,
+                    edge.delegated_by,
                     edge.pipeline_id, edge.pipeline_label,
-                    edge.block_id, edge.operation, edge.timestamp,
+                    edge.block_id, edge.operation, edge.trace_id,
+                    edge.timestamp,
                     json.dumps(edge.metadata),
                 ),
             )
@@ -255,6 +275,12 @@ class LineageGraph:
 
     # ── Querying ──────────────────────────────────────────────────────
 
+    _EDGE_COLS = (
+        "edge_id, task_id, agent, delegated_by, pipeline_id,"
+        " pipeline_label, block_id, operation, trace_id,"
+        " timestamp, metadata"
+    )
+
     def _row_to_edge(self, row: tuple) -> LineageEdge:
         """Convert a DB row + its inputs/outputs to a LineageEdge."""
         edge_id = row[0]
@@ -271,16 +297,21 @@ class LineageGraph:
                     (edge_id,),
                 ).fetchall()
             ]
+        # Column order: edge_id(0), task_id(1), agent(2), delegated_by(3),
+        #   pipeline_id(4), pipeline_label(5), block_id(6), operation(7),
+        #   trace_id(8), timestamp(9), metadata(10)
         return LineageEdge(
             edge_id=row[0],
             task_id=row[1],
             agent=row[2] or "",
-            pipeline_id=row[3] or "",
-            pipeline_label=row[4] or "",
-            block_id=row[5] or "",
-            operation=row[6] or "",
-            timestamp=row[7],
-            metadata=json.loads(row[8]) if row[8] else {},
+            delegated_by=row[3] or "",
+            pipeline_id=row[4] or "",
+            pipeline_label=row[5] or "",
+            block_id=row[6] or "",
+            operation=row[7] or "",
+            trace_id=row[8] or "",
+            timestamp=row[9],
+            metadata=json.loads(row[10]) if row[10] else {},
             input_artifacts=inputs,
             output_artifacts=outputs,
         )
@@ -289,7 +320,8 @@ class LineageGraph:
         """Retrieve a single edge by ID."""
         with self._conn() as conn:
             row = conn.execute(
-                "SELECT * FROM lineage_edges WHERE edge_id = ?", (edge_id,)
+                f"SELECT {self._EDGE_COLS} FROM lineage_edges WHERE edge_id = ?",
+                (edge_id,),
             ).fetchone()
         if row is None:
             return None
@@ -299,7 +331,8 @@ class LineageGraph:
         """Get all lineage edges for a task."""
         with self._conn() as conn:
             rows = conn.execute(
-                "SELECT * FROM lineage_edges WHERE task_id = ? ORDER BY timestamp",
+                f"SELECT {self._EDGE_COLS} FROM lineage_edges"
+                " WHERE task_id = ? ORDER BY timestamp",
                 (task_id,),
             ).fetchall()
         return [self._row_to_edge(r) for r in rows]
@@ -308,7 +341,8 @@ class LineageGraph:
         """Get all lineage edges for a pipeline execution."""
         with self._conn() as conn:
             rows = conn.execute(
-                "SELECT * FROM lineage_edges WHERE pipeline_id = ? ORDER BY timestamp",
+                f"SELECT {self._EDGE_COLS} FROM lineage_edges"
+                " WHERE pipeline_id = ? ORDER BY timestamp",
                 (pipeline_id,),
             ).fetchall()
         return [self._row_to_edge(r) for r in rows]
@@ -327,7 +361,8 @@ class LineageGraph:
         with self._conn() as conn:
             placeholders = ",".join("?" * len(edge_ids))
             rows = conn.execute(
-                f"SELECT * FROM lineage_edges WHERE edge_id IN ({placeholders})",
+                f"SELECT {self._EDGE_COLS} FROM lineage_edges"
+                f" WHERE edge_id IN ({placeholders})",
                 edge_ids,
             ).fetchall()
         return [self._row_to_edge(r) for r in rows]
@@ -346,7 +381,8 @@ class LineageGraph:
         with self._conn() as conn:
             placeholders = ",".join("?" * len(edge_ids))
             rows = conn.execute(
-                f"SELECT * FROM lineage_edges WHERE edge_id IN ({placeholders})",
+                f"SELECT {self._EDGE_COLS} FROM lineage_edges"
+                f" WHERE edge_id IN ({placeholders})",
                 edge_ids,
             ).fetchall()
         return [self._row_to_edge(r) for r in rows]

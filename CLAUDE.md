@@ -143,7 +143,7 @@ bash run_operator.sh
 
 ## Navigation
 
-See `NAVIGATION.md` for the full module map (500 modules, 12 architectural layers).
+See [`docs/architecture/NAVIGATION.md`](docs/architecture/NAVIGATION.md) for the full module map (500+ modules, 12 architectural layers).
 See `README.md` for repo map and common commands.
 See `foundations/` for the 10-pillar intellectual genome.
 
