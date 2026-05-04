@@ -27,6 +27,7 @@ from typing import Any
 # Add project root to path so imports work when run as a script
 import sys
 sys.path.insert(0, str(Path.home() / "dharma_swarm"))
+from dharma_swarm.daemon_config import dharma_state_dir
 
 from dharma_swarm.master_prompt_engineer import (
     assess_quality,
@@ -36,7 +37,7 @@ from dharma_swarm.master_prompt_engineer import (
 )
 
 ROOT = Path.home() / "dharma_swarm"
-STATE = Path.home() / ".dharma"
+STATE = dharma_state_dir()
 LOG_DIR = STATE / "logs" / "allout"
 HEARTBEAT_FILE = STATE / "allout_heartbeat.json"
 SHARED_DIR = STATE / "shared"

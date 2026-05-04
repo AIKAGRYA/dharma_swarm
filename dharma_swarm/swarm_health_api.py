@@ -28,11 +28,12 @@ import os
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+from dharma_swarm.daemon_config import dharma_state_dir
 
 logger = logging.getLogger(__name__)
 
 _PORT = int(os.environ.get("DHARMA_API_PORT", "7433"))
-_STATE_DIR = Path(os.environ.get("DHARMA_STATE_DIR", Path.home() / ".dharma"))
+_STATE_DIR = dharma_state_dir("DHARMA_STATE_DIR")
 _START_TIME = time.monotonic()
 
 

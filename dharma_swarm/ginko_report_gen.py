@@ -20,6 +20,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from html import escape as html_escape
 from pathlib import Path
+from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 from dharma_swarm.ginko_brier import BrierDashboard, build_dashboard
@@ -29,7 +30,7 @@ from dharma_swarm.ginko_signals import load_latest_report
 
 logger = logging.getLogger(__name__)
 
-GINKO_DIR = Path(os.getenv("DHARMA_HOME", Path.home() / ".dharma")) / "ginko"
+GINKO_DIR = dharma_state_dir("DHARMA_HOME") / "ginko"
 REPORTS_DIR = GINKO_DIR / "reports"
 
 SATYA_DISCLOSURE = (

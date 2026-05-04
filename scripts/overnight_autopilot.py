@@ -22,11 +22,13 @@ import traceback
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 
 ROOT = Path.home() / "dharma_swarm"
-STATE_DIR = Path.home() / ".dharma"
+STATE_DIR = dharma_state_dir()
 DB_TASKS = STATE_DIR / "db" / "tasks.db"
 LOG_ROOT = STATE_DIR / "logs" / "overnight"
 STOP_FILE = STATE_DIR / "STOP_OVERNIGHT"

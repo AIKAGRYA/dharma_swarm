@@ -11,10 +11,11 @@ import logging
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from dharma_swarm.daemon_config import dharma_state_dir
 
 logger = logging.getLogger(__name__)
 
-_STATE_DIR = Path.home() / ".dharma"
+_STATE_DIR = dharma_state_dir()
 _COST_LOG = _STATE_DIR / "cost_log.jsonl"
 
 # Approximate cost per million tokens (input) by model pattern.

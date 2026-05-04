@@ -33,6 +33,7 @@ import os
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 from dharma_swarm.signal_bus import SignalBus
@@ -44,7 +45,7 @@ logger = logging.getLogger(__name__)
 # Paths
 # ---------------------------------------------------------------------------
 
-_DHARMA = Path.home() / ".dharma"
+_DHARMA = dharma_state_dir()
 _CONTEXT_DIR = _DHARMA / "context"
 _PACKAGES_DIR = _CONTEXT_DIR / "packages"
 _DISTILLED_DIR = _CONTEXT_DIR / "distilled"

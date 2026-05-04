@@ -22,10 +22,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from dharma_swarm.daemon_config import dharma_state_dir
 
 logging.basicConfig(level=logging.WARNING, format="%(asctime)s [%(name)s] %(message)s", datefmt="%H:%M:%S")
 
-STATE_DIR = Path.home() / ".dharma"
+STATE_DIR = dharma_state_dir()
 
 
 @dataclass

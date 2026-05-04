@@ -22,11 +22,12 @@ import shutil
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
-GINKO_DIR = Path(os.getenv("DHARMA_HOME", Path.home() / ".dharma")) / "ginko"
+GINKO_DIR = dharma_state_dir("DHARMA_HOME") / "ginko"
 
 # $/token pricing for cost computation.
 # Keys are full OpenRouter model identifiers.

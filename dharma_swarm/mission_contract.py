@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
@@ -11,7 +12,7 @@ from pydantic import BaseModel, Field, ValidationError, field_validator, model_v
 
 MISSION_CONTRACT_VERSION = "1.0.0"
 CAMPAIGN_CONTRACT_VERSION = "1.0.0"
-DEFAULT_STATE_DIR = Path.home() / ".dharma"
+DEFAULT_STATE_DIR = dharma_state_dir()
 
 
 def _normalize_text(value: Any) -> str:

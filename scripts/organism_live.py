@@ -21,6 +21,7 @@ from pathlib import Path
 
 # Ensure dharma_swarm is importable
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from dharma_swarm.daemon_config import dharma_state_dir
 
 from dharma_swarm.organism import (
     AlgedonicSignal,
@@ -232,7 +233,7 @@ async def main() -> None:
     parser.add_argument("--cycles", type=int, default=5, help="Number of heartbeats")
     parser.add_argument("--verbose", action="store_true", help="Show all details")
     parser.add_argument(
-        "--state-dir", type=str, default=str(Path.home() / ".dharma"),
+        "--state-dir", type=str, default=str(dharma_state_dir()),
         help="State directory (default: ~/.dharma)",
     )
     args = parser.parse_args()

@@ -5,6 +5,9 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from dharma_swarm.daemon_config import dharma_state_dir
 
 from dharma_swarm.roaming_onboarding import (
     RoamingAgentRegistration,
@@ -12,7 +15,7 @@ from dharma_swarm.roaming_onboarding import (
 )
 
 
-STATE_DIR = Path.home() / ".dharma"
+STATE_DIR = dharma_state_dir()
 TEAM_ID = "cybernetics_directive"
 DIRECTIVE_DOC = str(Path.home() / "dharma_swarm" / "docs" / "missions" / "CYBERNETIC_DIRECTIVE.md")
 

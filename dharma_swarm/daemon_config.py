@@ -8,12 +8,22 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+
+def dharma_state_dir(*env_vars: str) -> Path:
+    """Return the canonical local Dharma state directory."""
+    for env_var in env_vars:
+        raw = os.getenv(env_var)
+        if raw is not None:
+            return Path(raw)
+    return Path.home() / ".dharma"
 
 
 @dataclass
@@ -217,7 +227,7 @@ class AdaptiveQuietHours:
         activity_threshold: int = _QUIET_HOUR_ACTIVITY_THRESHOLD,
         static_floor: list[int] | None = None,
     ) -> None:
-        self.state_dir = state_dir or Path.home() / ".dharma"
+        self.state_dir = state_dir or dharma_state_dir()
         self.window_days = max(1, int(window_days))
         self.activity_threshold = max(1, int(activity_threshold))
         self.static_floor: frozenset[int] = frozenset(

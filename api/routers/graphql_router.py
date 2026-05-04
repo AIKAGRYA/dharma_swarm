@@ -7,6 +7,7 @@ import logging
 import os
 from datetime import datetime
 from pathlib import Path
+from dharma_swarm.daemon_config import dharma_state_dir
 from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException
@@ -82,7 +83,7 @@ class ConnectionGraph(BaseModel):
     edges: List[GraphEdge]
 
 
-DHARMA_HOME = Path(os.getenv("DHARMA_HOME", Path.home() / ".dharma"))
+DHARMA_HOME = dharma_state_dir("DHARMA_HOME")
 GINKO_AGENTS_DIR = DHARMA_HOME / "ginko" / "agents"
 STIGMERGY_MARKS_PATH = DHARMA_HOME / "stigmergy" / "marks.jsonl"
 GRAPH_ROOT_ALIASES = {

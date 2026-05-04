@@ -25,6 +25,7 @@ import time
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
+from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any, Optional
 
 from dharma_swarm.runtime_artifacts import freshest_pulse_log_path
@@ -136,7 +137,7 @@ class SamvaraEngine:
     ACTIVATION_THRESHOLD: int = 2
 
     def __init__(self, state_dir: Optional[Path] = None) -> None:
-        self._state_dir = state_dir or (Path.home() / ".dharma")
+        self._state_dir = state_dir or (dharma_state_dir())
         self._state = SamvaraState()
 
     @property

@@ -69,6 +69,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 from dharma_swarm.guardian_runtime_checks import (
@@ -644,7 +645,7 @@ async def run_router_probe(state_dir: Path) -> list[GuardianFinding]:
     # Check for dead provider patterns in logs
     log_dir = state_dir.parent / ".dharma" / "logs" if (state_dir.parent / ".dharma").exists() else state_dir / "logs"
     if not log_dir.exists():
-        log_dir = Path.home() / ".dharma" / "logs"
+        log_dir = dharma_state_dir() / "logs"
 
     if log_dir.exists():
         try:
@@ -832,7 +833,7 @@ async def run_guardian_cycle(
         Dict with finding counts, report path, and issue creation results.
     """
     src_root = src_root or Path.home() / "dharma_swarm" / "dharma_swarm"
-    state_dir = state_dir or Path.home() / ".dharma"
+    state_dir = state_dir or dharma_state_dir()
     generated_at = datetime.now(timezone.utc).isoformat()
 
     logger.info("Guardian Crew: starting cycle (src=%s)", src_root)

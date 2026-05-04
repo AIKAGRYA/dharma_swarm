@@ -28,6 +28,7 @@ import time
 from collections import deque
 from datetime import date, datetime
 from pathlib import Path
+from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any, Optional
 
 from pydantic import BaseModel, Field
@@ -144,7 +145,7 @@ class IdentityMonitor:
     CRITICAL_THRESHOLD: float = 0.25
 
     def __init__(self, state_dir: Path | None = None) -> None:
-        self._state_dir = state_dir or (Path.home() / ".dharma")
+        self._state_dir = state_dir or (dharma_state_dir())
         self._history: deque[IdentityState] = deque(maxlen=1000)
 
     # -- public API ---------------------------------------------------------
@@ -597,7 +598,7 @@ class LiveCoherenceSensor:
     FRESHNESS_HOURS: float = 24.0
 
     def __init__(self, state_dir: Optional[Path] = None) -> None:
-        self._state_dir = state_dir or (Path.home() / ".dharma")
+        self._state_dir = state_dir or (dharma_state_dir())
 
     def measure(self) -> dict[str, Any]:
         """Measure present-moment coherence.
