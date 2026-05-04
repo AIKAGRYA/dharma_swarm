@@ -6,6 +6,11 @@ and groups results by ``Contribution.agent_id`` (the ``attributed_to``
 field in the TODO spec).
 
 See ``docs/plans/NEXT_10_SUBSTRATE_TODO.md`` item 9.
+
+Usage::
+
+    dgc value-events --since 2025-01-01
+    dgc value-events --since 2025-01-01 --json
 """
 
 from __future__ import annotations
