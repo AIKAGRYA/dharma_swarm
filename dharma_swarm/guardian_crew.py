@@ -72,6 +72,7 @@ from pathlib import Path
 from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
+from dharma_swarm.consistency_guard import run_task_consistency_guard
 from dharma_swarm.guardian_runtime_checks import (
     run_guardian_warning_checks,
     runtime_context_bundle_injection_findings,
@@ -131,8 +132,8 @@ _METHOD_EXISTENCE_CHECKS: list[tuple[str, str, str, str]] = [
     ("dharma_swarm.gnani_lodestone", "GnaniLodestone", "seed_all", "BLOCKER"),
     ("dharma_swarm.telos_gates", "TelosGatekeeper", "check", "BLOCKER"),
     ("dharma_swarm.stigmergy", "StigmergyStore", "leave_mark", "BLOCKER"),
-    ("dharma_swarm.task_board", "TaskBoard", "get_by_title", "DEGRADED"),
-    ("dharma_swarm.telos_graph", "TelosGraph", "get_by_name", "DEGRADED"),
+    ("dharma_swarm.task_board", "TaskBoard", "get_by_title", "BLOCKER"),
+    ("dharma_swarm.telos_graph", "TelosGraph", "get_by_name", "BLOCKER"),
 ]
 
 # Import chains that must succeed
@@ -704,15 +705,18 @@ def synthesize_report(
     src_root: Path,
     ledger_findings: list[GuardianFinding] | None = None,
     warning_findings: list[GuardianFinding] | None = None,
+    consistency_findings: list[GuardianFinding] | None = None,
 ) -> str:
     ledger_findings = ledger_findings or []
     warning_findings = warning_findings or []
+    consistency_findings = consistency_findings or []
     all_findings = (
         auditor_findings
         + loop_findings
         + router_findings
         + ledger_findings
         + warning_findings
+        + consistency_findings
     )
     all_findings.sort(key=lambda f: _severity_rank(f.severity))
 
@@ -762,6 +766,7 @@ def synthesize_report(
         "- **LOOP_WATCHER**: Cybernetic loop artifact existence + freshness + evolution quality",
         "- **LEDGER_WATCHER**: RuntimeStateStore row counts for session events and structured producers",
         "- **GUARDIAN_WARNINGS**: Repo report freshness and registered .dharma top-level directories",
+        "- **CONSISTENCY_GUARD**: Task-claim lifecycle cross-store consistency (NEW-05)",
         "- **ROUTER_PROBE**: Circuit breaker state, log error patterns, missing API keys",
         "",
         "---",
@@ -845,12 +850,14 @@ async def run_guardian_cycle(
         router_findings,
         ledger_findings,
         warning_findings,
+        consistency_findings,
     ) = await asyncio.gather(
         run_auditor(src_root),
         run_loop_watcher(state_dir),
         run_router_probe(state_dir),
         run_ledger_watcher(state_dir),
         run_guardian_warning_checks(src_root, state_dir),
+        run_task_consistency_guard(state_dir),
         return_exceptions=False,
     )
 
@@ -863,6 +870,7 @@ async def run_guardian_cycle(
         src_root=src_root,
         ledger_findings=ledger_findings,
         warning_findings=warning_findings,
+        consistency_findings=consistency_findings,
     )
 
     # Write report to disk
@@ -886,6 +894,7 @@ async def run_guardian_cycle(
         + router_findings
         + ledger_findings
         + warning_findings
+        + consistency_findings
     )
     blockers = [f for f in all_findings if f.severity == "BLOCKER"]
 
