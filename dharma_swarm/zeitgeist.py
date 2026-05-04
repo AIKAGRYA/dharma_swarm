@@ -1,8 +1,8 @@
 """S4 Environmental Intelligence -- zeitgeist awareness.
 
 Beer's Viable System Model System 4: outside-and-future awareness.
-Scans local files for research-relevant signals and optionally uses
-``claude -p`` subprocess for AI landscape scanning (when available).
+Scans local files for research-relevant signals and optionally uses a
+configured LLM subprocess for AI landscape scanning when enabled.
 
 Output: ``~/.dharma/meta/zeitgeist.md`` + ``zeitgeist.jsonl``
 Orchestrated cadence: every 600 s (ZEITGEIST_INTERVAL in orchestrate_live).
@@ -113,7 +113,8 @@ class ZeitgeistScanner:
     """S4 scanner that detects research-relevant environmental signals.
 
     The scanner inspects local state (shared notes, stigmergy density) and
-    optionally delegates to ``claude -p`` for broader landscape awareness.
+    optionally delegates to a configured LLM command for broader landscape
+    awareness.
     Results are persisted as a Markdown summary and a JSONL log.
 
     Args:
@@ -146,10 +147,10 @@ class ZeitgeistScanner:
         # run unattended without surprise network/model calls.
         if os.environ.get(LLM_SCAN_ENABLED_ENV) == "1":
             try:
-                claude_signals = await self._scan_claude()
-                self._signals.extend(claude_signals)
+                llm_signals = await self._scan_llm()
+                self._signals.extend(llm_signals)
             except Exception as exc:
-                logger.debug("Claude scan unavailable: %s", exc)
+                logger.debug("LLM scan unavailable: %s", exc)
 
         # Persist
         self._save()
@@ -329,7 +330,7 @@ class ZeitgeistScanner:
 
         return signals
 
-    async def _scan_claude(self) -> list[ZeitgeistSignal]:
+    async def _scan_llm(self) -> list[ZeitgeistSignal]:
         """Use an opt-in LLM command for AI landscape scanning."""
         prompt = (
             "Return only compact JSON for DHARMA SWARM S4. Produce 3 current "
