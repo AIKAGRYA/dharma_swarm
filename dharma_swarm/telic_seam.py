@@ -515,7 +515,9 @@ class TelicSeam:
         value_events = self._registry.get_objects_by_type("ValueEvent")
         contributions = self._registry.get_objects_by_type("Contribution")
 
-        report = {
+        report: dict[str, Any] = {
+            "empty_proposal_id_outcomes": [],
+            "unknown_proposal_id_outcomes": [],
             "proposal_outcome_agent_mismatches": [],
             "outcome_value_agent_mismatches": [],
             "orphan_outcomes": [],
@@ -528,6 +530,13 @@ class TelicSeam:
         outcomes_by_proposal: dict[str, list[str]] = {}
         for outcome in outcomes:
             proposal_id = str(outcome.properties.get("proposal_id") or "")
+            if not proposal_id:
+                report["empty_proposal_id_outcomes"].append(outcome.id)
+                continue
+            if proposal_id not in proposals:
+                report["unknown_proposal_id_outcomes"].append(
+                    {"outcome_id": outcome.id, "proposal_id": proposal_id}
+                )
             if proposal_id:
                 outcomes_by_proposal.setdefault(proposal_id, []).append(outcome.id)
                 proposal = proposals.get(proposal_id)

@@ -78,4 +78,9 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+if ! command -v semgrep &>/dev/null; then
+  echo "semgrep not found on PATH — skipping (install with 'pip install semgrep' or 'brew install semgrep')" >&2
+  exit 0
+fi
+
 exec semgrep "${args[@]}"

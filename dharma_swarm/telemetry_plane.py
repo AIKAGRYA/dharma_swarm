@@ -258,6 +258,7 @@ def ensure_telemetry_schema_sync(db: sqlite3.Connection) -> None:
         _INTERVENTION_OUTCOMES_DDL,
         _ECONOMIC_EVENTS_DDL,
         _EXTERNAL_OUTCOMES_DDL,
+        _OVERNIGHT_METRICS_DDL,
     ):
         db.execute(ddl)
     for idx in _INDEXES:
@@ -1200,6 +1201,65 @@ class TelemetryPlaneStore:
             db.row_factory = aiosqlite.Row
             rows = await (await db.execute(query, params)).fetchall()
         return [_row_to_external_outcome(row) for row in rows]
+
+    # ── Sync helpers ──────────────────────────────────────────────────
+
+    def init_db_sync(self) -> None:
+        if self._initialized:
+            return
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        with sqlite3.connect(self.db_path) as db:
+            db.execute("PRAGMA journal_mode=WAL")
+            db.execute("PRAGMA busy_timeout=30000")
+            ensure_telemetry_schema_sync(db)
+        self._initialized = True
+
+    def record_economic_event_sync(
+        self,
+        *,
+        event_kind: str,
+        amount: float,
+        currency: str = "USD",
+        description: str = "",
+        session_id: str = "",
+        task_id: str = "",
+        run_id: str = "",
+        metadata: dict[str, Any] | None = None,
+    ) -> EconomicEventRecord:
+        """Synchronous convenience for recording an economic event."""
+        self.init_db_sync()
+        record = EconomicEventRecord(
+            event_id=_new_id("economic"),
+            event_kind=event_kind,
+            amount=amount,
+            currency=currency,
+            summary=description,
+            session_id=session_id,
+            task_id=task_id,
+            run_id=run_id,
+            metadata=metadata or {},
+        )
+        with sqlite3.connect(self.db_path) as db:
+            db.execute(
+                "INSERT INTO economic_events (event_id, session_id, task_id, run_id,"
+                " event_kind, amount, currency, counterparty, summary, metadata_json,"
+                " created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                (
+                    record.event_id,
+                    record.session_id,
+                    record.task_id,
+                    record.run_id,
+                    record.event_kind,
+                    float(record.amount),
+                    record.currency,
+                    record.counterparty,
+                    record.summary,
+                    _json_dump(record.metadata),
+                    record.created_at.isoformat(),
+                ),
+            )
+            db.commit()
+        return record
 
     @staticmethod
     def new_agent_id() -> str:
