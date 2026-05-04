@@ -32,6 +32,7 @@ from collections import defaultdict, deque
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any, Iterable, Mapping, Sequence
 
 from dharma_swarm.codex_cli import dgc_codex_exec_prefix
@@ -52,7 +53,7 @@ from dharma_swarm.task_board import TaskBoard
 logger = logging.getLogger(__name__)
 
 ROOT = Path.home() / "dharma_swarm"
-STATE = Path.home() / ".dharma"
+STATE = dharma_state_dir()
 SHARED_DIR = STATE / "shared"
 LOG_DIR = STATE / "logs" / "thinkodynamic_director"
 PSMV_ROOT = Path.home() / "Persistent-Semantic-Memory-Vault"
@@ -979,7 +980,7 @@ def _read_telos_gradient() -> str:
 
         telos = TelosGraph()
         # Sync load — check if files exist first to avoid async in sync context
-        telos_dir = Path.home() / ".dharma" / "telos"
+        telos_dir = dharma_state_dir() / "telos"
         if not (telos_dir / "objectives.jsonl").exists():
             return ""
 

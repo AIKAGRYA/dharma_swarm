@@ -66,11 +66,14 @@ import time
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
 from pathlib import Path
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any, Callable, Awaitable
 
 logger = logging.getLogger(__name__)
 
-STATE_DIR = Path.home() / ".dharma"
+STATE_DIR = dharma_state_dir()
 GAUNTLET_DIR = STATE_DIR / "gauntlet"
 
 

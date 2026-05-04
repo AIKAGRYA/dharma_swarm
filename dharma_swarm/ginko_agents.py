@@ -27,6 +27,7 @@ import time
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 from dharma_swarm.models import LLMRequest, ProviderType
@@ -37,7 +38,7 @@ from dharma_swarm.runtime_provider import (
 
 logger = logging.getLogger(__name__)
 
-GINKO_DIR = Path(os.getenv("DHARMA_HOME", Path.home() / ".dharma")) / "ginko"
+GINKO_DIR = dharma_state_dir("DHARMA_HOME") / "ginko"
 AGENTS_DIR = GINKO_DIR / "agents"
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 

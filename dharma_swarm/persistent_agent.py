@@ -16,6 +16,7 @@ import logging
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
+from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any, Callable, Awaitable
 
 from dharma_swarm.autonomous_agent import AgentIdentity, AgentResult, AutonomousAgent
@@ -139,7 +140,7 @@ class PersistentAgent:
         self.role = role
         self.provider_type = provider_type
         self.model = model
-        self.state_dir = state_dir or Path.home() / ".dharma"
+        self.state_dir = state_dir or dharma_state_dir()
         self.wake_interval = wake_interval_seconds
         self.system_prompt = system_prompt
 
@@ -287,7 +288,7 @@ class PersistentAgent:
     async def _get_bus(self):
         if self._bus is None:
             from dharma_swarm.message_bus import MessageBus
-            db_path = Path.home() / ".dharma" / "db" / "messages.db"
+            db_path = dharma_state_dir() / "db" / "messages.db"
             self._bus = MessageBus(db_path)
             await self._bus.init_db()
         return self._bus

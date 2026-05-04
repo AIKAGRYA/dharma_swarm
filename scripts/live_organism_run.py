@@ -18,6 +18,7 @@ from pathlib import Path
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
+from dharma_swarm.daemon_config import dharma_state_dir
 
 import httpx
 
@@ -25,7 +26,7 @@ from dharma_swarm.organism import OrganismRuntime
 from dharma_swarm.samvara import Power, DiagnosticResult
 from dharma_swarm.organism import HeartbeatResult
 
-STATE_DIR = Path.home() / ".dharma"
+STATE_DIR = dharma_state_dir()
 OPENROUTER_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 

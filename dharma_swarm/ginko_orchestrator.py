@@ -28,6 +28,7 @@ import os
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 from dharma_swarm.ginko_brier import (
@@ -53,7 +54,7 @@ from dharma_swarm.ginko_signals import (
 
 logger = logging.getLogger(__name__)
 
-GINKO_DIR = Path(os.getenv("DHARMA_HOME", Path.home() / ".dharma")) / "ginko"
+GINKO_DIR = dharma_state_dir("DHARMA_HOME") / "ginko"
 STATE_FILE = GINKO_DIR / "ginko_state.json"
 
 

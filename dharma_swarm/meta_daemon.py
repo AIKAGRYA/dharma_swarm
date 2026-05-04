@@ -18,13 +18,14 @@ import json
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
+from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 from dharma_swarm.models import _utc_now
 
 logger = logging.getLogger(__name__)
 
-STATE_DIR = Path.home() / ".dharma"
+STATE_DIR = dharma_state_dir()
 META_DIR = STATE_DIR / "meta"
 HISTORY_DIR = META_DIR / "history"
 

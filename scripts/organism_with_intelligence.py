@@ -23,6 +23,7 @@ from pathlib import Path
 import httpx
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from dharma_swarm.daemon_config import dharma_state_dir
 
 from dharma_swarm.identity import (
     IdentityMonitor,
@@ -31,7 +32,7 @@ from dharma_swarm.identity import (
 )
 from dharma_swarm.samvara import Power
 
-STATE = Path.home() / ".dharma"
+STATE = dharma_state_dir()
 API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 
 # Models to try, in preference order

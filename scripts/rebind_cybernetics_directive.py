@@ -7,6 +7,9 @@ import argparse
 import asyncio
 import json
 from pathlib import Path
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 from dharma_swarm.models import TaskStatus
@@ -14,7 +17,7 @@ from dharma_swarm.task_board import TaskBoard
 from dharma_swarm.thinkodynamic_director import CYBERNETICS_STEWARD_AGENTS
 
 
-STATE_DIR = Path.home() / ".dharma"
+STATE_DIR = dharma_state_dir()
 TASK_DB = STATE_DIR / "db" / "tasks.db"
 
 CYBERNETICS_BACKENDS = ["provider-fallback", "codex-cli", "claude-cli"]

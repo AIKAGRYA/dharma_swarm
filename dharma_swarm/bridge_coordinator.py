@@ -26,6 +26,7 @@ from __future__ import annotations
 import logging
 import time
 from pathlib import Path
+from dharma_swarm.daemon_config import dharma_state_dir
 from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field
@@ -82,7 +83,7 @@ class BridgeCoordinator:
     """
 
     def __init__(self, state_dir: Path | None = None) -> None:
-        self._state_dir = state_dir or Path.home() / ".dharma"
+        self._state_dir = state_dir or dharma_state_dir()
 
     # -- public API ----------------------------------------------------------
 

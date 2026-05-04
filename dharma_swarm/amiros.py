@@ -24,6 +24,7 @@ import json
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
+from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -171,7 +172,7 @@ class AMIROSRegistry:
     """
 
     def __init__(self, state_dir: Path | None = None) -> None:
-        self._base = (state_dir or Path.home() / ".dharma") / "amiros"
+        self._base = (state_dir or dharma_state_dir()) / "amiros"
         self._base.mkdir(parents=True, exist_ok=True)
 
         # v0.6.1: explicit persist path (alias to _base for API compatibility)

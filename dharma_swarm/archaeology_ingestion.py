@@ -68,6 +68,7 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -524,7 +525,7 @@ async def query_archaeology(
     Returns:
         List of MemoryHit ordered by relevance.
     """
-    state_dir = state_dir or Path.home() / ".dharma"
+    state_dir = state_dir or dharma_state_dir()
 
     try:
         from dharma_swarm.memory_palace import MemoryPalace, PalaceQuery
@@ -600,7 +601,7 @@ class ArchaeologyIngestionDaemon:
         state_dir: Path | None = None,
         interval_seconds: int = _DEFAULT_INGESTION_INTERVAL,
     ) -> None:
-        self._state_dir = state_dir or Path.home() / ".dharma"
+        self._state_dir = state_dir or dharma_state_dir()
         self._interval = interval_seconds
 
     async def run_once(self) -> dict[str, int]:

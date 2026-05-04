@@ -21,6 +21,7 @@ import shutil
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any, Callable
 
 from dharma_swarm.agent_constitution import MAX_STABLE_AGENTS
@@ -143,7 +144,7 @@ class PopulationController:
         daily_token_budget: int = 500_000,
         agent_registry: Any = None,
     ) -> None:
-        self._state_dir = state_dir or Path.home() / ".dharma"
+        self._state_dir = state_dir or dharma_state_dir()
         self._max_population = max_population
         self._apoptosis_threshold = apoptosis_fitness_threshold
         self._apoptosis_cycles = apoptosis_cycle_count

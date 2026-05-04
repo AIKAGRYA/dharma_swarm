@@ -29,6 +29,7 @@ import logging
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -43,7 +44,7 @@ PROPOSALS_FILE = "proposals.jsonl"
 REPLICATION_DIR = "replication"
 
 # Module-level witness directory (same as telos_gates.py)
-_WITNESS_DIR = Path.home() / ".dharma" / "witness"
+_WITNESS_DIR = dharma_state_dir() / "witness"
 
 
 def _utc_now() -> datetime:
@@ -156,7 +157,7 @@ class ReplicationProtocol:
         agent_registry: Any | None = None,
         dynamic_roster: Any | None = None,
     ) -> None:
-        self._state_dir = state_dir or Path.home() / ".dharma"
+        self._state_dir = state_dir or dharma_state_dir()
         self._proposals_dir = self._state_dir / REPLICATION_DIR
         self._proposals_path = self._proposals_dir / PROPOSALS_FILE
         self._witness_dir = self._state_dir / "witness"

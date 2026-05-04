@@ -888,7 +888,7 @@ def _build_self_state_block(agent_name: str) -> str:
     Reads identity snapshot, organism state (samvara), and recognition seed.
     Returns a compact text block (~500 chars) or empty string if unavailable.
     """
-    state_dir = Path.home() / ".dharma"
+    state_dir = dharma_state_dir()
     lines: list[str] = ["## Self-State"]
 
     # Agent identity
@@ -944,7 +944,7 @@ def _build_system_prompt(config: AgentConfig) -> str:
     if config.system_prompt and config.provider != ProviderType.CLAUDE_CODE:
         return config.system_prompt
 
-    from dharma_swarm.daemon_config import V7_BASE_RULES, ROLE_BRIEFINGS
+    from dharma_swarm.daemon_config import ROLE_BRIEFINGS, V7_BASE_RULES, dharma_state_dir
 
     if config.system_prompt:
         # CLAUDE_CODE with explicit prompt: use it as base, append context

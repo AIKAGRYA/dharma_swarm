@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
+from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 from textual.app import ComposeResult
@@ -21,7 +22,7 @@ BENGARA = "#C19392"
 ASH = "#A7AEBE"
 PAPER = "#D8DCE6"
 
-DHARMA_STATE = Path.home() / ".dharma"
+DHARMA_STATE = dharma_state_dir()
 
 
 def _status_color(status: str) -> str:
