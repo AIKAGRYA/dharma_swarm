@@ -163,7 +163,7 @@ End with ~ when the vibration stops, not when you've concluded.
         try:
             from dharma_swarm.providers import AnthropicProvider
             from dharma_swarm.models import LLMRequest
-            
+
             provider = AnthropicProvider()
         except Exception:
             return None  # Fail silently — can't dream without provider
@@ -179,7 +179,7 @@ End with ~ when the vibration stops, not when you've concluded.
                 temperature=self.temperature,
                 max_tokens=2048,  # Longer for liquid transmission
             )
-            
+
             response = await provider.complete(request)
 
             # Extract the dream texture

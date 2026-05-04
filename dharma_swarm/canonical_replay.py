@@ -27,14 +27,14 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ReplayResult:
     """Result of replaying a session."""
-    
+
     session_id: str
     original_event_count: int
     replayed_event_count: int
     final_state_hash: str
     deterministic: bool
     errors: list[str]
-    
+
     def passed(self) -> bool:
         """Check if replay passed all validations."""
         return (
@@ -46,11 +46,11 @@ class ReplayResult:
 
 class CanonicalReplayEngine:
     """Replays sessions from event log and validates determinism."""
-    
+
     def __init__(self, event_log_dir: Path | None = None):
         self.event_log_dir = event_log_dir or (Path.home() / ".dharma" / "events")
         self.event_log_dir.mkdir(parents=True, exist_ok=True)
-    
+
     async def replay_session(
         self,
         session_id: str,
@@ -59,26 +59,26 @@ class CanonicalReplayEngine:
         num_replays: int = 3,
     ) -> ReplayResult:
         """Replay a session and verify determinism.
-        
+
         Args:
             session_id: The session to replay
             verify_determinism: If True, replay N times and check same result
             num_replays: Number of times to replay for determinism check
-        
+
         Returns:
             ReplayResult with validation status
         """
         from dharma_swarm.event_log import EventLog
-        
+
         log = EventLog(self.event_log_dir)
-        
+
         # Load original events
         events = log.read_envelopes(
             stream="runtime",
             session_id=session_id,
             newest_first=False,
         )
-        
+
         if not events:
             return ReplayResult(
                 session_id=session_id,
@@ -88,9 +88,9 @@ class CanonicalReplayEngine:
                 deterministic=False,
                 errors=["No events found for session"],
             )
-        
+
         errors: list[str] = []
-        
+
         # Replay once
         try:
             final_state = await self._execute_replay(events)
@@ -105,7 +105,7 @@ class CanonicalReplayEngine:
                 deterministic=False,
                 errors=errors,
             )
-        
+
         # Check determinism if requested
         deterministic = True
         if verify_determinism and num_replays > 1:
@@ -122,7 +122,7 @@ class CanonicalReplayEngine:
                 except Exception as e:
                     deterministic = False
                     errors.append(f"Replay {i+1} failed: {e}")
-        
+
         return ReplayResult(
             session_id=session_id,
             original_event_count=len(events),
@@ -131,15 +131,15 @@ class CanonicalReplayEngine:
             deterministic=deterministic,
             errors=errors,
         )
-    
+
     async def _execute_replay(self, events: list[dict[str, Any]]) -> dict[str, Any]:
         """Execute a replay of events and return final state.
-        
+
         This is a SKELETON implementation. Full replay would:
         1. Initialize clean state
         2. Apply each event as a state transition
         3. Return final state
-        
+
         For now, we simulate by returning event metadata.
         """
         # TODO: Implement actual state reconstruction from events
@@ -147,7 +147,7 @@ class CanonicalReplayEngine:
         # - State machine for each event type
         # - Clean initial state
         # - Deterministic event application
-        
+
         # For now, return a deterministic hash of the event sequence
         state = {
             "event_count": len(events),
@@ -155,13 +155,13 @@ class CanonicalReplayEngine:
             "final_timestamp": events[-1].get("emitted_at", "") if events else "",
         }
         return state
-    
+
     def _hash_state(self, state: dict[str, Any]) -> str:
         """Compute deterministic hash of state."""
         # Sort keys for determinism
         canonical = json.dumps(state, sort_keys=True, ensure_ascii=True)
         return hashlib.sha256(canonical.encode()).hexdigest()
-    
+
     async def verify_all_recent_sessions(
         self,
         *,
@@ -169,21 +169,21 @@ class CanonicalReplayEngine:
         min_events: int = 5,
     ) -> list[ReplayResult]:
         """Verify the most recent N sessions are replayable.
-        
+
         Args:
             limit: Max number of sessions to check
             min_events: Skip sessions with fewer than this many events
-        
+
         Returns:
             List of ReplayResults
         """
         from dharma_swarm.event_log import EventLog
-        
+
         log = EventLog(self.event_log_dir)
-        
+
         # Get all events to find unique session IDs
         all_events = log.read_envelopes(stream="runtime", newest_first=True)
-        
+
         # Extract unique session IDs
         session_ids = []
         seen = set()
@@ -194,7 +194,7 @@ class CanonicalReplayEngine:
                 session_ids.append(sid)
                 if len(session_ids) >= limit:
                     break
-        
+
         # Replay each session
         results = []
         for sid in session_ids:
@@ -205,14 +205,14 @@ class CanonicalReplayEngine:
             )
             if len(events) < min_events:
                 continue
-            
+
             result = await self.replay_session(
                 sid,
                 verify_determinism=True,
                 num_replays=2,  # Quick check (2 replays instead of 3)
             )
             results.append(result)
-        
+
         return results
 
 

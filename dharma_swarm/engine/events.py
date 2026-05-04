@@ -104,4 +104,3 @@ class CanonicalEvent:
             payload=dict(data.get("payload", {})),
             metadata=dict(data.get("metadata", {})),
         )
-

@@ -1,9 +1,10 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene module-budget governance-all
+.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts uplift-guards module-budget governance-all
 
 PYTHON ?= python3
+SEMGREP ?= scripts/governance/run_semgrep_with_ca.sh
 SWARM_PLIST := $(HOME)/Library/LaunchAgents/com.dharma.swarm.plist
 STATE_DIR    := $(HOME)/.dharma
 
@@ -30,6 +31,8 @@ help:
 	@echo "  make gitleaks     Scan for secrets"
 	@echo "  make precommit-run Run pre-commit on all files"
 	@echo "  make governance-baseline Capture scanner baselines"
+	@echo "  make test-contracts Run governance contract tests"
+	@echo "  make uplift-guards Run uplift pre-commit guards"
 	@echo ""
 
 install:
@@ -128,10 +131,10 @@ semgrep:
 	# Phase 1 is warn-only locally so the install does not block on the
 	# 4 pre-existing real findings (3 shell=True + 1 eval). CI (Phase 2)
 	# uses the stricter mode below; Phase 4 promotes anti-slop rules to ERROR.
-	semgrep --config .semgrep --metrics=off
+	$(SEMGREP) --config .semgrep --metrics=off
 
 semgrep-strict:
-	semgrep --config .semgrep --error --metrics=off
+	$(SEMGREP) --config .semgrep --error --metrics=off
 
 gitleaks:
 	gitleaks detect --source . --redact --no-banner --exit-code 1
@@ -144,7 +147,7 @@ precommit-run:
 
 governance-baseline:
 	@mkdir -p reports/governance
-	semgrep --config .semgrep --json --metrics=off \
+	$(SEMGREP) --config .semgrep --json --metrics=off \
 		--output reports/governance/semgrep-baseline.json || true
 	gitleaks detect --source . --redact --no-banner --exit-code 0 \
 		--report-format json \
@@ -158,8 +161,19 @@ governance-baseline:
 test-hygiene:
 	$(PYTHON) scripts/governance/check_test_hygiene.py
 
+test-contracts:
+	scripts/governance/run_pytest_with_repo_env.sh -q \
+		tests/test_contracts_scaffold.py \
+		tests/test_operator_core_contracts.py \
+		tests/test_runtime_contract.py \
+		tests/test_runtime_contract_adapters.py \
+		--tb=line
+
+uplift-guards:
+	python3 scripts/uplift_guards/run_pre_commit.py
+
 module-budget:
 	$(PYTHON) scripts/governance/check_module_budget.py \
 		--base-ref origin/main --head-ref HEAD
 
-governance-all: semgrep gitleaks test-hygiene module-budget
+governance-all: semgrep gitleaks test-hygiene test-contracts uplift-guards module-budget

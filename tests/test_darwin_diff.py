@@ -45,11 +45,11 @@ VALID_DIFF = """\
 +++ b/dharma_swarm/selector.py
 @@ -10,6 +10,7 @@
  import logging
- 
+
  logger = logging.getLogger(__name__)
 +# Improvement: added structured logging for parent selection tracing
- 
- 
+
+
  def select_parent(entries):
 """
 
