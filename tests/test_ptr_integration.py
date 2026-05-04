@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
+from types import SimpleNamespace
 
-from dharma_swarm import causal_ledger, r_repair_metric
 from dharma_swarm.ptr_integrity import read_governance_integrity, read_repo_integrity
 from dharma_swarm.ptr_metric import (
     PTRInputs,
@@ -18,22 +18,20 @@ from dharma_swarm.ptr_metric import (
 )
 
 
-def _seed_repaired_kind(log_path: Path, subject_kind: str, n: int) -> None:
-    for i in range(n):
-        pred = causal_ledger.declare_prediction(
-            subject_kind=subject_kind,
-            subject_id=f"{subject_kind}-{i}",
-            expected={"repair": 1.0},
-            window_heartbeats=1,
-            log_path=log_path,
-        )
-        assert pred is not None
-        causal_ledger.resolve_prediction(
-            prediction_mark_id=pred.mark_id,
-            actual={"repair": 1.0},
-            expected={"repair": 1.0},
-            log_path=log_path,
-        )
+def _repair_score(
+    *,
+    r_aggregate: float = 1.0,
+    confidence: float = 1.0,
+    provisional: bool = False,
+    near_eigenform: bool = False,
+) -> SimpleNamespace:
+    return SimpleNamespace(
+        r_aggregate=r_aggregate,
+        confidence=confidence,
+        provisional=provisional,
+        near_eigenform=near_eigenform,
+        notes=["synthetic repair evidence"],
+    )
 
 
 def test_ptr_score_from_repair_and_integrity_artifacts(tmp_path: Path) -> None:
@@ -42,18 +40,7 @@ def test_ptr_score_from_repair_and_integrity_artifacts(tmp_path: Path) -> None:
     meta_dir.mkdir(parents=True)
     now = datetime(2026, 5, 4, tzinfo=timezone.utc)
 
-    register_log = tmp_path / "register_marks.jsonl"
-    _seed_repaired_kind(register_log, "gate", 10)
-    _seed_repaired_kind(register_log, "mutation", 10)
-    _seed_repaired_kind(register_log, "welfare_proposal", 10)
-
-    repair = r_repair_metric.compute_repair_score(
-        log_path=register_log,
-        history_path=tmp_path / "repair_history.jsonl",
-        launched_at=now - timedelta(days=120),
-        now=now,
-    )
-    predictive_repair = pillar_from_repair_score(repair)
+    predictive_repair = pillar_from_repair_score(_repair_score())
 
     (meta_dir / "repo_integrity.json").write_text(
         json.dumps(
