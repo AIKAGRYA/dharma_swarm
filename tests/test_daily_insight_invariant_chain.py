@@ -99,6 +99,11 @@ def _record_value_chain(
         task_type=value_event.properties["task_type"],
     )
     assert contribution_id is not None
+    core_four_metric_ids = seam.record_core_four_metrics(
+        value_event_id,
+        evidence_summary="Core Four dimensions derived from invariant outcome telemetry.",
+    )
+    assert len(core_four_metric_ids) == 4
     return value_event_id, contribution_id
 
 
@@ -186,6 +191,21 @@ def test_daily_insight_brief_uses_telic_outcome_and_cites_full_chain(
         target_id=contribution_id,
         link_name="has_contribution",
     )
+    core_four_metrics = seam.query_core_four_metrics(value_event_id=value_event_id)
+    assert [m.properties["dimension"] for m in core_four_metrics] == [
+        "speed", "effectiveness", "quality", "impact",
+    ]
+    for metric in core_four_metrics:
+        assert registry.get_links(
+            source_id=value_event_id,
+            target_id=metric.id,
+            link_name="has_core_four_metric",
+        )
+        assert registry.get_links(
+            source_id=metric.id,
+            target_id=outcome_id,
+            link_name="measures_outcome",
+        )
     assert registry.get_links(
         source_id=brief.id,
         target_id=outcome_id,
