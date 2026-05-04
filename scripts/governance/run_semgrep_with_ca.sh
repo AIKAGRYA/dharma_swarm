@@ -78,4 +78,15 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+if ! command -v semgrep &>/dev/null; then
+  echo "SEMGREP NOT INSTALLED — gate status: NOT RUN" >&2
+  echo "  Install: pip install semgrep  (or brew install semgrep)" >&2
+  echo "  To skip explicitly: DHARMA_SKIP_SEMGREP=1 git commit ..." >&2
+  if [[ "${DHARMA_SKIP_SEMGREP:-}" == "1" ]]; then
+    echo "  DHARMA_SKIP_SEMGREP=1 — skipping (operator-acknowledged)" >&2
+    exit 0
+  fi
+  exit 1
+fi
+
 exec semgrep "${args[@]}"

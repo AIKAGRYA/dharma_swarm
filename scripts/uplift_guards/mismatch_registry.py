@@ -110,10 +110,33 @@ def check_mismatch_adjacency(
     repo_root: Path | None = None,
 ) -> tuple[bool, str]:
     """Refuse commits that touch a caller/callee in an open BLOCKER mismatch."""
+    import os
     repo_root = repo_root or Path.cwd()
+    if os.environ.get("DHARMA_SKIP_MISMATCH_GUARD", "").strip() == "1":
+        return True, "mismatch adjacency skipped by DHARMA_SKIP_MISMATCH_GUARD=1"
+    registry_path = repo_root / REGISTRY_REL_PATH
+    if not registry_path.exists():
+        return (
+            False,
+            f"MISMATCH REGISTRY MISSING: {REGISTRY_REL_PATH} does not exist.\n"
+            "  Create it from INTERFACE_MISMATCH_MAP.md or run:\n"
+            "    make mismatch-sync\n"
+            "  To skip: DHARMA_SKIP_MISMATCH_GUARD=1",
+        )
+    if yaml is None:
+        return (
+            False,
+            "MISMATCH REGISTRY UNREADABLE: PyYAML not installed.\n"
+            "  Install: pip install pyyaml",
+        )
     registry = load_mismatch_registry(repo_root)
     if not registry.entries:
-        return True, "mismatch registry empty or unreadable — skipping"
+        return (
+            False,
+            f"MISMATCH REGISTRY EMPTY: {REGISTRY_REL_PATH} has no entries.\n"
+            "  Populate from INTERFACE_MISMATCH_MAP.md or run:\n"
+            "    make mismatch-sync",
+        )
 
     staged = _staged_files(repo_root)
     if not staged:

@@ -1,7 +1,7 @@
 # Interface Mismatch Map — dharma_swarm
 
-**Last X-Ray:** 2026-04-08 (fresh audit against current HEAD `c73db94`+)
-**Previous version:** 2026-04-04 (55 module pairs, 13 mismatches, 9 prioritized)
+**Last X-Ray:** 2026-05-04 (Repo Reality Gauntlet audit against HEAD `3919207`)
+**Previous version:** 2026-04-08 (55 module pairs, 13 mismatches, 9 prioritized)
 **Maintainer:** Guardian Crew (`guardian_crew.py`) — auto-updates every 4 hours
 **How to read this:** Severity = BLOCKER (crashes at runtime), DEGRADED (silent failure / wrong behavior), WARNING (structural smell).
 
@@ -12,7 +12,7 @@
 | Mismatch | Old Status | New Status | Resolution |
 |----------|-----------|-----------|-----------|
 | MM-01: huggingface_hub ImportError | BLOCKER | ✅ RESOLVED | `try/except ImportError` added; heuristic fallback path confirmed |
-| MM-02/03: PersistentAgent enum coercion | BLOCKER | ⚠️ STILL LIVE | `orchestrate_live.py:1247` still passes bare strings — confirmed by x-ray |
+| MM-02/03: PersistentAgent enum coercion | BLOCKER | ✅ RESOLVED | `orchestrate_live.py:1363` now wraps in `AgentRole()` / `PT()` — verified 2026-05-04 |
 | MM-04: AgentPool None guard | DEGRADED | ✅ RESOLVED | `SubsystemNotReady` raised at line 870, `_agent_pool` guard present |
 | MM-06: Dual StigmergyStore | DEGRADED | ✅ RESOLVED | `run_living_layers_loop` now accepts `stigmergy_store` param; passes swarm's store |
 | MM-08: ECC_INSTINCT_SIGNAL constant | DEGRADED | ✅ RESOLVED | `SIGNAL_ECC_INSTINCT` defined in `signal_bus.py:40`, used in `instinct_bridge.py` |
@@ -21,35 +21,32 @@
 | MM-11: WitnessAuditor ModelRouter provider | DEGRADED | ✅ RESOLVED | `swarm.py:456-457` now uses `OpenRouterFreeProvider()` |
 | NEW-01: archaeology_ingestion palace.query | BLOCKER | ✅ FIXED THIS SESSION | Replaced with `palace.recall(PalaceQuery(...))` + correct `max_results=` |
 | NEW-02: dgm_loop _provider attr | DEGRADED | ✅ FIXED THIS SESSION | Removed nonexistent `hasattr(engine, '_provider')` check |
+| NEW-03: TelicSeam constructor kwarg | BLOCKER | ✅ FIXED THIS SESSION | `orchestrator.py:154` passed `registry_path=` but `TelicSeam.__init__` expects `path=` |
+| MM-13: message_bus.receive semantics | DEGRADED | ⚠️ OPEN | `orchestrate_live` → `message_bus.receive()` semantics unclear |
+| MM-17: gnani → TaskBoard.get_by_title | DEGRADED | ⚠️ OPEN | `gnani_lodestone.py:562` calls `get_by_title()` but method does not exist on `TaskBoard` |
+| MM-18: gnani → TelosGraph.get_by_name | DEGRADED | ⚠️ OPEN | `gnani_lodestone.py:518` calls `get_by_name()` but method does not exist on `TelosGraph` |
 
-**Net change:** 7 resolved, 2 new fixed, 1 still live BLOCKER, 4 structural degraded remain.
+**Net change:** 9 resolved (MM-02/03 confirmed fixed, NEW-03 TelicSeam constructor fixed 2026-05-04), 2 new fixed, 0 open BLOCKERs, 5 structural degraded remain.
 
 ---
 
 ## Current Live Mismatches
 
-### MM-02/03 — BLOCKER: PersistentAgent enum deserialization (still live)
+### MM-02/03 — ✅ RESOLVED: PersistentAgent enum deserialization
 
-**File:** `orchestrate_live.py:1247`
-**What's wrong:** `child_spec.get("role", "worker")` returns a bare string (`"conductor"`).
-`PersistentAgent.__init__` declares `role: AgentRole`. Pydantic v2 lax mode may coerce it — but this is brittle and will break on any invalid value.
+**File:** `orchestrate_live.py:1361-1366`
+**Status:** Fixed. Both call sites now wrap bare strings in `AgentRole()` / `PT()`.
+**Verified:** 2026-05-04 by grep + code inspection.
+**Pinning test:** `tests/test_mismatch_blockers.py::test_mm02_persistent_agent_enum`
 
 ```python
-# CURRENT (brittle):
-child = PersistentAgent(
-    role=outcome.child_spec.get("role", "worker"),           # str
-    provider_type=outcome.child_spec.get("default_provider", "openrouter_free"),  # str
-)
-
-# CORRECT:
+# CURRENT (correct):
 from dharma_swarm.models import AgentRole, ProviderType as PT
 child = PersistentAgent(
-    role=AgentRole(outcome.child_spec.get("role", "worker")),
+    role=AgentRole(outcome.child_spec.get("role", "general")),
     provider_type=PT(outcome.child_spec.get("default_provider", "openrouter_free")),
 )
 ```
-
-**Fix complexity:** 2 lines. High leverage — replication is a critical path.
 
 ---
 
@@ -71,10 +68,10 @@ child = PersistentAgent(
 
 ---
 
-### MM-12 — DEGRADED: Same as MM-02/03 (second call site)
+### MM-12 — ✅ RESOLVED: Second PersistentAgent call site
 
-**File:** `orchestrate_live.py:1354-1364` (conductor configs path)
-**Status:** This path uses already-constructed enum values (`role=cfg["role"]` where `cfg["role"]` is `AgentRole.CONDUCTOR`) — no mismatch here. **This is fine.** The problem is only in the replication monitor path at line 1247.
+**File:** `orchestrate_live.py:1471` (conductor configs path)
+**Status:** This path uses already-constructed enum values (`cfg["role"]` is `AgentRole.CONDUCTOR`). No mismatch. The replication path (MM-02/03) is also now fixed.
 
 ---
 
@@ -153,7 +150,7 @@ ROUTER_PROBE   — Reads circuit_breakers.json for open providers
 | 8 | `swarm` → `organism.OrganismRuntime.samvara` | ✅ |
 | 9 | `swarm` → `witness.WitnessAuditor` | ✅ |
 | 10 | `swarm` → `stigmergy.StigmergyStore` | ✅ |
-| 11 | `orchestrate_live` → `persistent_agent.PersistentAgent` (replication) | ⚠️ BLOCKER |
+| 11 | `orchestrate_live` → `persistent_agent.PersistentAgent` (replication) | ✅ (enum wrapping fixed) |
 | 12 | `orchestrate_live` → `message_bus.receive()` semantics | ⚠️ DEGRADED |
 | 13 | `orchestrate_live` → `meta_evolution.observe_cycle_result` cadence | ⚠️ DEGRADED |
 | 14 | `orchestrate_live` → `living_layers` (dual StigmergyStore) | ✅ |

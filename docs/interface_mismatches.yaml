@@ -1,0 +1,174 @@
+# Interface Mismatch Registry — machine-readable source of truth.
+#
+# Normalized from INTERFACE_MISMATCH_MAP.md.
+# Both files MUST agree: if you add/resolve a mismatch, update both.
+#
+# Schema per entry:
+#   id:        unique identifier (MM-XX or NEW-XX)
+#   severity:  BLOCKER | DEGRADED | WARNING
+#   status:    open | resolved
+#   caller:    module:line or module path that makes the call
+#   callee:    module.Class.method that is called incorrectly
+#   summary:   one-line description
+#   fixed_in:  commit hash or PR (empty if open)
+#   test_path: path to test that pins the fix (empty if no test yet)
+#
+# Last synced: 2026-05-04 from INTERFACE_MISMATCH_MAP.md (HEAD 3919207)
+
+entries:
+  # ── Resolved ────────────────────────────────────────────────────
+
+  - id: MM-01
+    severity: BLOCKER
+    status: resolved
+    caller: dharma_swarm/orchestrator.py
+    callee: huggingface_hub
+    summary: "huggingface_hub ImportError crashes orchestrator startup"
+    fixed_in: "try/except ImportError added; heuristic fallback"
+    test_path: ""
+
+  - id: MM-04
+    severity: DEGRADED
+    status: resolved
+    caller: dharma_swarm/swarm.py:870
+    callee: dharma_swarm.agent_runner.AgentPool
+    summary: "AgentPool None guard missing — SubsystemNotReady now raised"
+    fixed_in: "SubsystemNotReady raised at line 870"
+    test_path: ""
+
+  - id: MM-06
+    severity: DEGRADED
+    status: resolved
+    caller: dharma_swarm/orchestrate_live.py
+    callee: dharma_swarm.living_map.run_living_layers_loop
+    summary: "Dual StigmergyStore — swarm and living_layers each created own store"
+    fixed_in: "run_living_layers_loop now accepts stigmergy_store param"
+    test_path: ""
+
+  - id: MM-08
+    severity: DEGRADED
+    status: resolved
+    caller: dharma_swarm/instinct_bridge.py
+    callee: dharma_swarm.signal_bus.SIGNAL_ECC_INSTINCT
+    summary: "ECC_INSTINCT_SIGNAL constant undefined in signal_bus"
+    fixed_in: "SIGNAL_ECC_INSTINCT defined in signal_bus.py:40"
+    test_path: ""
+
+  - id: MM-09
+    severity: DEGRADED
+    status: resolved
+    caller: dharma_swarm/swarm.py:2182
+    callee: dharma_swarm.organism.OrganismRuntime.samvara.current_power
+    summary: "samvara.current_power None chain — no guard"
+    fixed_in: "Double guard at swarm.py:2182-2184"
+    test_path: ""
+
+  - id: MM-10
+    severity: DEGRADED
+    status: resolved
+    caller: dharma_swarm/auto_proposer.py:297
+    callee: dharma_swarm.stigmergy.StigmergyStore
+    summary: "AutoProposer crashes on None stigmergy store"
+    fixed_in: "auto_proposer.py:297 has 'if self._stigmergy is None: return'"
+    test_path: ""
+
+  - id: MM-11
+    severity: DEGRADED
+    status: resolved
+    caller: dharma_swarm/swarm.py:456
+    callee: dharma_swarm.witness.WitnessAuditor
+    summary: "WitnessAuditor ModelRouter provider mismatch"
+    fixed_in: "swarm.py:456-457 now uses OpenRouterFreeProvider()"
+    test_path: ""
+
+  - id: NEW-01
+    severity: BLOCKER
+    status: resolved
+    caller: dharma_swarm/archaeology_ingestion.py
+    callee: dharma_swarm.memory_palace.MemoryPalace.recall
+    summary: "palace.query() called but method is palace.recall(PalaceQuery(...))"
+    fixed_in: "Replaced with palace.recall(PalaceQuery(...)) + max_results="
+    test_path: ""
+
+  - id: NEW-02
+    severity: DEGRADED
+    status: resolved
+    caller: dharma_swarm/dgm_loop.py
+    callee: dharma_swarm.evolution.DarwinEngine
+    summary: "hasattr(engine, '_provider') checks nonexistent attribute"
+    fixed_in: "Removed nonexistent hasattr check"
+    test_path: ""
+
+  - id: NEW-03
+    severity: BLOCKER
+    status: resolved
+    caller: dharma_swarm/orchestrator.py:154
+    callee: dharma_swarm.telic_seam.TelicSeam.__init__
+    summary: "TelicSeam() called with registry_path= but __init__ expects path="
+    fixed_in: "Changed registry_path=ontology_db to path=ontology_db (this PR)"
+    test_path: tests/test_mismatch_blockers.py::test_new03_telic_seam_constructor
+
+  # ── Open ────────────────────────────────────────────────────────
+
+  - id: MM-02
+    severity: BLOCKER
+    status: resolved
+    caller: dharma_swarm/orchestrate_live.py:1361
+    callee: dharma_swarm.persistent_agent.PersistentAgent.__init__
+    summary: "PersistentAgent role/provider_type passed as bare strings, not AgentRole/ProviderType enums"
+    fixed_in: "orchestrate_live.py:1363 now uses AgentRole(), :1364 uses PT()"
+    test_path: tests/test_mismatch_blockers.py::test_mm02_persistent_agent_enum
+
+  - id: MM-05
+    severity: DEGRADED
+    status: open
+    caller: dharma_swarm/swarm.py:1883
+    callee: dharma_swarm.orchestrator.Orchestrator._classify_failure
+    summary: "swarm.py calls private Orchestrator methods (_classify_failure, _resolve_retry_policy, _apply_failure_retry_defaults)"
+    fixed_in: ""
+    test_path: tests/test_mismatch_blockers.py::test_mm05_orchestrator_private_methods
+
+  - id: MM-07
+    severity: DEGRADED
+    status: open
+    caller: dharma_swarm/orchestrate_live.py:399
+    callee: dharma_swarm.meta_evolution.MetaEvolutionEngine.observe_cycle_result
+    summary: "observe_cycle_result called twice per cycle — meta-adaptation fires within single cycle"
+    fixed_in: ""
+    test_path: tests/test_mismatch_blockers.py::test_mm07_meta_evolution_cadence
+
+  - id: MM-12
+    severity: WARNING
+    status: resolved
+    caller: dharma_swarm/orchestrate_live.py:1354
+    callee: dharma_swarm.persistent_agent.PersistentAgent.__init__
+    summary: "Second PersistentAgent call site — uses constructed enum values, no mismatch"
+    fixed_in: "Verified correct: cfg['role'] is already AgentRole.CONDUCTOR"
+    test_path: ""
+
+  - id: MM-13
+    severity: DEGRADED
+    status: open
+    caller: dharma_swarm/orchestrate_live.py
+    callee: dharma_swarm.message_bus.receive
+    summary: "message_bus.receive() semantics unclear across orchestrator boundary"
+    fixed_in: ""
+    test_path: ""
+
+  - id: MM-17
+    severity: DEGRADED
+    status: open
+    caller: dharma_swarm/gnani_lodestone.py
+    callee: dharma_swarm.task_board.TaskBoard.get_by_title
+    summary: "get_by_title() method may not exist on TaskBoard"
+    fixed_in: ""
+    test_path: tests/test_mismatch_blockers.py::test_mm17_gnani_task_board
+
+  - id: MM-18
+    severity: DEGRADED
+    status: open
+    caller: dharma_swarm/gnani_lodestone.py
+    callee: dharma_swarm.telos_graph.TelosGraph.get_by_name
+    summary: "get_by_name() method may not exist on TelosGraph"
+    fixed_in: ""
+    test_path: tests/test_mismatch_blockers.py::test_mm18_gnani_telos_graph

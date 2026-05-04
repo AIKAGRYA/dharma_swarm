@@ -1,7 +1,7 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts uplift-guards module-budget governance-all
+.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts uplift-guards module-budget mismatch-check mismatch-tests governance-all
 
 PYTHON ?= python3
 SEMGREP ?= scripts/governance/run_semgrep_with_ca.sh
@@ -176,4 +176,24 @@ module-budget:
 	$(PYTHON) scripts/governance/check_module_budget.py \
 		--base-ref origin/main --head-ref HEAD
 
-governance-all: semgrep gitleaks test-hygiene test-contracts uplift-guards module-budget
+mismatch-check:
+	@echo "=== Mismatch Registry Check ==="
+	$(PYTHON) -c "\
+import yaml, sys; \
+p='docs/interface_mismatches.yaml'; \
+d=yaml.safe_load(open(p)); \
+entries=d.get('entries',[]); \
+ob=[e for e in entries if e['status']=='open' and e['severity']=='BLOCKER']; \
+od=[e for e in entries if e['status']=='open' and e['severity']=='DEGRADED']; \
+print(f'  Total entries: {len(entries)}'); \
+print(f'  Open BLOCKERs: {len(ob)}'); \
+print(f'  Open DEGRADED: {len(od)}'); \
+print(f'  Resolved: {len([e for e in entries if e[\"status\"]==\"resolved\"])}'); \
+[print(f'    {e[\"id\"]}: {e[\"summary\"]}') for e in ob]; \
+sys.exit(1) if ob else None; \
+print('  No open BLOCKERs — gate PASS')"
+
+mismatch-tests:
+	$(PYTHON) -m pytest tests/test_mismatch_blockers.py -v --tb=short
+
+governance-all: semgrep gitleaks test-hygiene test-contracts uplift-guards module-budget mismatch-check mismatch-tests
