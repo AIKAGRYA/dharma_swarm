@@ -891,6 +891,29 @@ class TestLifecycleIntegrityReport:
         assert len(report["orphan_outcomes"]) == 1
 
 
+class TestOrchestratorTelicSeamInit:
+    def test_local_telic_seam_initializes_and_persists(
+        self,
+        tmp_path,
+        sample_task,
+    ):
+        from dharma_swarm.orchestrator import Orchestrator
+
+        runtime_root = tmp_path / "runtime"
+        orch = Orchestrator(ledger_dir=runtime_root / "ledgers")
+
+        assert orch._telic_seam is not None
+        proposal_id = orch._telic_seam.record_dispatch(sample_task, "agent_alpha")
+        assert proposal_id is not None
+
+        ontology_db = runtime_root / "ontology.db"
+        reset_shared_registry()
+        fresh = get_shared_registry(path=ontology_db, force_reload=True)
+
+        proposals = fresh.get_objects_by_type("ActionProposal")
+        assert any(obj.id == proposal_id for obj in proposals)
+
+
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Fitness-biased Routing (Phase B.1)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

@@ -146,12 +146,10 @@ class Orchestrator:
     def _init_telic_seam(self) -> Any | None:
         """Prefer a state-local ontology seam over the global singleton."""
         try:
-            from dharma_swarm.ontology_runtime import get_shared_registry
             from dharma_swarm.telic_seam import TelicSeam
 
             ontology_db = self._runtime_root() / "ontology.db"
-            registry = get_shared_registry(path=ontology_db)
-            return TelicSeam(registry=registry, registry_path=ontology_db)
+            return TelicSeam(path=ontology_db)
         except Exception:
             logger.debug("Failed to initialize local telic seam", exc_info=True)
             return None
