@@ -2417,11 +2417,18 @@ class AgentRunner:
                 if telic_ontology_path is not None:
                     from dharma_swarm.telic_seam import get_seam
                     telic_seam = get_seam(telic_ontology_path)
-                    telic_proposal_id = telic_seam.record_dispatch(
-                        task,
-                        telic_agent_id,
-                        topology="pipeline",
-                    )
+                    existing_proposal_id = str(meta.get("telic_proposal_id") or "").strip()
+                    if existing_proposal_id:
+                        telic_proposal_id = telic_seam.bind_proposal(
+                            task.id,
+                            existing_proposal_id,
+                        )
+                    if telic_proposal_id is None:
+                        telic_proposal_id = telic_seam.record_dispatch(
+                            task,
+                            telic_agent_id,
+                            topology="pipeline",
+                        )
             except Exception:
                 logger.debug("Telic seam dispatch recording failed", exc_info=True)
 

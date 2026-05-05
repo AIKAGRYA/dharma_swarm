@@ -212,6 +212,59 @@ async def test_runner_records_telic_chain_with_stable_agent_id_and_cell_scope(
 
 
 @pytest.mark.asyncio
+async def test_runner_reuses_orchestrator_telic_proposal(
+    config,
+    fast_gate,
+    tmp_path: Path,
+):
+    import dharma_swarm.telic_seam as telic_module
+
+    provider = AsyncMock()
+    provider.complete = AsyncMock(return_value=LLMResponse(content="done", model="test"))
+    ontology_path = _ontology_path(tmp_path)
+
+    seam = TelicSeam(
+        registry=OntologyRegistry.create_dharma_registry(),
+        lineage=LineageGraph(db_path=tmp_path / "telic-lineage-reuse.db"),
+        path=ontology_path,
+    )
+    old_seam = telic_module._SEAM
+    telic_module._SEAM = seam
+
+    try:
+        named_config = _with_state_dir(config, tmp_path).model_copy(
+            update={"name": "display-name", "id": "agent-stable-id"}
+        )
+        task = Task(
+            title="Reuse orchestrator proposal",
+            metadata={"task_type": "research", "cell_id": "rv-cell"},
+        )
+        proposal_id = seam.record_dispatch(task, "agent-stable-id", topology="dispatch")
+        assert proposal_id is not None
+        task.metadata["telic_proposal_id"] = proposal_id
+
+        runner = AgentRunner(named_config, provider=provider, ontology_path=ontology_path)
+        await runner.start()
+        await runner.run_task(task)
+
+        proposals = seam.registry.get_objects_by_type("ActionProposal")
+        gate_decision = seam.registry.get_objects_by_type("GateDecisionRecord")[0]
+        outcome = seam.registry.get_objects_by_type("Outcome")[0]
+        value_event = seam.registry.get_objects_by_type("ValueEvent")[0]
+        contribution = seam.registry.get_objects_by_type("Contribution")[0]
+
+        assert len(proposals) == 1
+        assert proposals[0].id == proposal_id
+        assert gate_decision.properties["proposal_id"] == proposal_id
+        assert outcome.properties["proposal_id"] == proposal_id
+        assert value_event.properties["outcome_id"] == outcome.id
+        assert contribution.properties["value_event_id"] == value_event.id
+        assert seam.get_proposal_for_task(task.id) == proposal_id
+    finally:
+        telic_module._SEAM = old_seam
+
+
+@pytest.mark.asyncio
 async def test_runner_records_telic_block_chain_before_provider_execution(
     config,
     monkeypatch,

@@ -95,6 +95,31 @@ class MockEventMemory:
         self.envelopes.append(envelope)
 
 
+def test_orchestrator_skips_telic_without_explicit_runtime_state(monkeypatch):
+    monkeypatch.delenv("DGC_LEDGER_DIR", raising=False)
+    monkeypatch.delenv("DHARMA_ONTOLOGY_PATH", raising=False)
+
+    orch = Orchestrator()
+
+    assert orch._telic_seam is None
+
+
+def test_orchestrator_initializes_state_local_telic_seam(tmp_path):
+    from dharma_swarm.ontology_runtime import reset_shared_registry
+    from dharma_swarm.telic_seam import TelicSeam, reset_seam
+
+    reset_shared_registry()
+    reset_seam()
+    try:
+        orch = Orchestrator(ledger_dir=tmp_path, session_id="sess_telic")
+
+        assert isinstance(orch._telic_seam, TelicSeam)
+        assert getattr(orch._telic_seam, "_path", None) == tmp_path / "ontology.db"
+    finally:
+        reset_seam()
+        reset_shared_registry()
+
+
 @pytest.fixture(autouse=True)
 def fast_dispatch_gate():
     """Default orchestrator dispatch gates to ALLOW for non-gate tests."""
@@ -564,6 +589,129 @@ async def test_assign_dispatch_telos_block_marks_failed_and_skips_assignment(age
         and "TELOS BLOCK (dispatch)" in str(fields.get("result", ""))
         for task_id, fields in board.updates
     )
+
+
+@pytest.mark.asyncio
+async def test_assign_dispatch_records_telic_gate_lease_and_metadata(tmp_path):
+    from dharma_swarm.ontology_runtime import reset_shared_registry
+    from dharma_swarm.telic_seam import reset_seam
+
+    reset_shared_registry()
+    reset_seam()
+    try:
+        task = Task(
+            id="telic-route",
+            title="Record telic dispatch",
+            description="safe",
+            metadata={"cell_id": "cell-a", "task_type": "research"},
+        )
+        board = MockTaskBoard()
+        board.tasks = [task]
+        pool = MockAgentPool([
+            AgentState(
+                id="a1",
+                name="agent-1",
+                role=AgentRole.GENERAL,
+                status=AgentStatus.IDLE,
+            )
+        ])
+        pool.set_runner("a1", DummyRunner(result="ok"))
+        orch = Orchestrator(
+            task_board=board,
+            agent_pool=pool,
+            ledger_dir=tmp_path,
+            session_id="sess_telic",
+        )
+
+        dispatches = await orch.route_next()
+        for _ in range(50):
+            if not orch._running_tasks:
+                break
+            await orch._collect_completed()
+            await asyncio.sleep(0.01)
+        await orch._collect_completed()
+
+        proposal = orch._telic_seam.registry.get_objects_by_type("ActionProposal")[0]
+        gate = orch._telic_seam.registry.get_objects_by_type("GateDecisionRecord")[0]
+        lease = orch._telic_seam.registry.get_objects_by_type("ExecutionLease")[0]
+
+        assert len(dispatches) == 1
+        assert dispatches[0].metadata["telic_proposal_id"] == proposal.id
+        assert dispatches[0].metadata["telic_gate_decision_id"] == gate.id
+        assert dispatches[0].metadata["telic_execution_lease_id"] == lease.id
+        assert task.metadata["telic_proposal_id"] == proposal.id
+        assert task.metadata["telic_gate_decision_id"] == gate.id
+        assert task.metadata["telic_execution_lease_id"] == lease.id
+        assert gate.properties["proposal_id"] == proposal.id
+        assert lease.properties["proposal_id"] == proposal.id
+    finally:
+        reset_seam()
+        reset_shared_registry()
+
+
+@pytest.mark.asyncio
+async def test_assign_dispatch_telos_block_records_telic_terminal_chain(
+    tmp_path,
+    monkeypatch,
+):
+    from dharma_swarm.models import TaskDispatch
+    from dharma_swarm.ontology_runtime import reset_shared_registry
+    from dharma_swarm.telic_seam import reset_seam
+    from dharma_swarm.telos_gates import ReflectiveGateOutcome
+
+    reset_shared_registry()
+    reset_seam()
+
+    monkeypatch.setattr(
+        "dharma_swarm.orchestrator.check_with_reflective_reroute",
+        lambda **_: ReflectiveGateOutcome(
+            result=GateCheckResult(
+                decision=GateDecision.BLOCK,
+                reason="Mock telos block",
+            ),
+        ),
+        raising=True,
+    )
+
+    try:
+        task = Task(id="telic-block", title="Blocked dispatch", description="unsafe")
+        board = MockTaskBoard()
+        board.tasks = [task]
+        pool = MockAgentPool([
+            AgentState(
+                id="a1",
+                name="agent-1",
+                role=AgentRole.GENERAL,
+                status=AgentStatus.IDLE,
+            )
+        ])
+        orch = Orchestrator(
+            task_board=board,
+            agent_pool=pool,
+            ledger_dir=tmp_path,
+            session_id="sess_telic",
+        )
+
+        await orch._assign_dispatch(TaskDispatch(task_id="telic-block", agent_id="a1"))
+
+        proposal = orch._telic_seam.registry.get_objects_by_type("ActionProposal")[0]
+        gate = orch._telic_seam.registry.get_objects_by_type("GateDecisionRecord")[0]
+        outcome = orch._telic_seam.registry.get_objects_by_type("Outcome")[0]
+        value_event = orch._telic_seam.registry.get_objects_by_type("ValueEvent")[0]
+        contribution = orch._telic_seam.registry.get_objects_by_type("Contribution")[0]
+
+        assert pool._assignments == []
+        assert task.status == TaskStatus.FAILED
+        assert task.metadata["telic_proposal_id"] == proposal.id
+        assert task.metadata["telic_gate_decision_id"] == gate.id
+        assert gate.properties["decision"] == "block"
+        assert outcome.properties["proposal_id"] == proposal.id
+        assert outcome.properties["success"] is False
+        assert value_event.properties["outcome_id"] == outcome.id
+        assert contribution.properties["value_event_id"] == value_event.id
+    finally:
+        reset_seam()
+        reset_shared_registry()
 
 
 @pytest.mark.asyncio

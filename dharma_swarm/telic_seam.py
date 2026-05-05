@@ -441,6 +441,22 @@ class TelicSeam:
             logger.debug("TelicSeam.record_dispatch failed: %s", exc)
             return None
 
+    def bind_proposal(self, task_id: str, proposal_id: str | None) -> str | None:
+        """Bind an existing ActionProposal to a task for later outcome writes."""
+        normalized_task_id = str(task_id or "").strip()
+        normalized_proposal_id = str(proposal_id or "").strip()
+        if not normalized_task_id or not normalized_proposal_id:
+            return None
+        proposal = self._registry.get_object(normalized_proposal_id)
+        if proposal is None or proposal.type_name != "ActionProposal":
+            logger.debug(
+                "TelicSeam.bind_proposal skipped non-proposal id: %s",
+                normalized_proposal_id,
+            )
+            return None
+        self._proposal_map[normalized_task_id] = normalized_proposal_id
+        return normalized_proposal_id
+
     def record_gate_decision(
         self,
         proposal_id: str | None,
