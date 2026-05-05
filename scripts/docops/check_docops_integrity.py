@@ -40,6 +40,7 @@ MARKDOWN_LINK_RE = re.compile(r"(?<!!)\[[^\]]+\]\(([^)\s]+)(?:\s+\"[^\"]*\")?\)"
 CODE_PATH_RE = re.compile(
     r"`([A-Za-z0-9_./-]+\.(?:md|py|yaml|yml|json|toml|sh|ts|tsx|js|jsx|txt)(?::\d+)?)`"
 )
+ABSOLUTE_REPO_PATH_RE = re.compile(r"/Users/dhyana/dharma_swarm/[A-Za-z0-9_./:-]+")
 AUTO_START_RE = re.compile(r"<!--\s*DOCOPS:START\s+([^>]+?)\s*-->")
 AUTO_END = "<!-- DOCOPS:END -->"
 
@@ -295,6 +296,11 @@ def doc_contains_authority_claim(path: Path) -> bool:
     return any(term in text for term in AUTHORITY_TERMS)
 
 
+def authority_terms_in_text(text: str) -> list[str]:
+    lowered = text.lower()
+    return [term for term in AUTHORITY_TERMS if term in lowered]
+
+
 def check_canonical_guard(
     repo_root: Path,
     config: dict[str, Any],
@@ -519,6 +525,160 @@ def run_checks(
     return findings, metrics
 
 
+def finding_to_dict(finding: Finding) -> dict[str, str]:
+    return {
+        "severity": finding.severity,
+        "check": finding.check,
+        "message": finding.message,
+    }
+
+
+def write_json(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def check_report_payload(
+    findings: list[Finding], metrics: dict[str, int], today: date
+) -> dict[str, Any]:
+    failures = [finding for finding in findings if finding.severity == "FAIL"]
+    warnings = [finding for finding in findings if finding.severity == "WARN"]
+    return {
+        "date": today.isoformat(),
+        "passed": not failures,
+        "failure_count": len(failures),
+        "warning_count": len(warnings),
+        "metrics": metrics,
+        "findings": [finding_to_dict(finding) for finding in findings],
+    }
+
+
+def scan_doc_inventory(
+    repo_root: Path,
+    config: dict[str, Any],
+    patterns: Iterable[str],
+    missing_limit: int = 200,
+) -> dict[str, Any]:
+    registered = set(config.get("canonical_guard", {}).get("registered", []))
+    ignore_targets = config.get("path_guards", {}).get("ignore_targets", [])
+    docs = iter_files(repo_root, patterns)
+
+    authority_docs: list[dict[str, Any]] = []
+    frontmatter_docs: list[str] = []
+    absolute_path_refs: list[dict[str, Any]] = []
+    missing_refs: list[dict[str, Any]] = []
+    path_reference_count = 0
+
+    for doc in docs:
+        rel = repo_relative(doc, repo_root)
+        text = doc.read_text(encoding="utf-8", errors="ignore")
+        terms = authority_terms_in_text(text)
+        if terms:
+            authority_docs.append(
+                {
+                    "path": rel,
+                    "terms": terms,
+                    "registered": rel in registered,
+                }
+            )
+        if text.startswith("---\n"):
+            frontmatter_docs.append(rel)
+
+        for match in ABSOLUTE_REPO_PATH_RE.finditer(text):
+            line = text.count("\n", 0, match.start()) + 1
+            absolute_path_refs.append(
+                {
+                    "path": rel,
+                    "line": line,
+                    "target": match.group(0),
+                }
+            )
+
+        for ref in extract_path_references(doc):
+            if should_ignore_target(ref.target, ignore_targets):
+                continue
+            path_reference_count += 1
+            if len(missing_refs) >= missing_limit:
+                continue
+            if not target_exists(repo_root, doc, ref.target):
+                missing_refs.append(
+                    {
+                        "path": rel,
+                        "line": ref.line,
+                        "target": ref.target,
+                    }
+                )
+
+    unregistered_authority = [
+        item for item in authority_docs if not bool(item.get("registered"))
+    ]
+    return {
+        "markdown_files_scanned": len(docs),
+        "authority_docs": authority_docs,
+        "authority_doc_count": len(authority_docs),
+        "unregistered_authority_doc_count": len(unregistered_authority),
+        "frontmatter_doc_count": len(frontmatter_docs),
+        "frontmatter_docs": frontmatter_docs[:200],
+        "absolute_path_ref_count": len(absolute_path_refs),
+        "absolute_path_refs": absolute_path_refs[:200],
+        "path_reference_count": path_reference_count,
+        "missing_reference_count_capped": len(missing_refs),
+        "missing_reference_limit": missing_limit,
+        "missing_references": missing_refs,
+    }
+
+
+def render_inventory_markdown(inventory: dict[str, Any]) -> str:
+    lines = [
+        "# DocOps Corpus Inventory",
+        "",
+        "This is a non-blocking inventory for doc cleanup agents. The blocking gate",
+        "remains `scripts/docops/check_docops_integrity.py` without report flags.",
+        "",
+        "## Summary",
+        "",
+        "| Metric | Value |",
+        "|---|---:|",
+        f"| Markdown files scanned | {inventory['markdown_files_scanned']:,} |",
+        f"| Authority candidate docs | {inventory['authority_doc_count']:,} |",
+        f"| Unregistered authority docs | {inventory['unregistered_authority_doc_count']:,} |",
+        f"| Frontmatter docs | {inventory['frontmatter_doc_count']:,} |",
+        f"| Absolute repo path references | {inventory['absolute_path_ref_count']:,} |",
+        f"| Path references scanned | {inventory['path_reference_count']:,} |",
+        f"| Missing references reported | {inventory['missing_reference_count_capped']:,} |",
+        "",
+        "## Unregistered Authority Docs",
+        "",
+    ]
+    unregistered = [
+        item for item in inventory["authority_docs"] if not bool(item.get("registered"))
+    ]
+    if not unregistered:
+        lines.append("None found.")
+    else:
+        lines.extend(["| Path | Terms |", "|---|---|"])
+        for item in unregistered[:80]:
+            terms = ", ".join(item["terms"])
+            lines.append(f"| `{item['path']}` | {terms} |")
+
+    lines.extend(["", "## Absolute Repo Path References", ""])
+    if not inventory["absolute_path_refs"]:
+        lines.append("None found.")
+    else:
+        lines.extend(["| Path | Line | Target |", "|---|---:|---|"])
+        for item in inventory["absolute_path_refs"][:80]:
+            lines.append(f"| `{item['path']}` | {item['line']} | `{item['target']}` |")
+
+    lines.extend(["", "## Missing References", ""])
+    if not inventory["missing_references"]:
+        lines.append("None found.")
+    else:
+        lines.extend(["| Path | Line | Target |", "|---|---:|---|"])
+        for item in inventory["missing_references"][:80]:
+            lines.append(f"| `{item['path']}` | {item['line']} | `{item['target']}` |")
+    return "\n".join(lines) + "\n"
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", default=".", type=Path)
@@ -526,6 +686,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--changed-from")
     parser.add_argument("--today")
     parser.add_argument("--write-auto-sections", action="store_true")
+    parser.add_argument("--report-json", type=Path)
+    parser.add_argument("--inventory-json", type=Path)
+    parser.add_argument("--inventory-markdown", type=Path)
+    parser.add_argument(
+        "--inventory-glob",
+        action="append",
+        default=[],
+        help="Markdown glob for non-blocking corpus inventory; defaults to **/*.md.",
+    )
     args = parser.parse_args(argv)
 
     repo_root = args.repo_root.resolve()
@@ -541,6 +710,30 @@ def main(argv: list[str] | None = None) -> int:
         today=today,
         write_auto_sections=args.write_auto_sections,
     )
+    if args.report_json:
+        report_path = args.report_json
+        if not report_path.is_absolute():
+            report_path = repo_root / report_path
+        write_json(report_path, check_report_payload(findings, metrics, today))
+
+    if args.inventory_json or args.inventory_markdown:
+        config = load_config(config_path)
+        patterns = args.inventory_glob or ["**/*.md"]
+        inventory = scan_doc_inventory(repo_root, config, patterns)
+        if args.inventory_json:
+            inventory_json = args.inventory_json
+            if not inventory_json.is_absolute():
+                inventory_json = repo_root / inventory_json
+            write_json(inventory_json, inventory)
+        if args.inventory_markdown:
+            inventory_markdown = args.inventory_markdown
+            if not inventory_markdown.is_absolute():
+                inventory_markdown = repo_root / inventory_markdown
+            inventory_markdown.parent.mkdir(parents=True, exist_ok=True)
+            inventory_markdown.write_text(
+                render_inventory_markdown(inventory), encoding="utf-8"
+            )
+
     for key in sorted(metrics):
         print(f"metric {key}={metrics[key]}")
     for finding in findings:
