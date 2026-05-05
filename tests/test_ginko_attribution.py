@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from dharma_swarm.ginko_attribution import (
+from dharma_swarm.ginko.attribution import (
     AttributionReport,
     _KNOWN_AGENTS,
     _SIGNAL_TYPE_PATTERNS,

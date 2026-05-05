@@ -23,10 +23,10 @@ from pathlib import Path
 from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
-from dharma_swarm.ginko_brier import BrierDashboard, build_dashboard
-from dharma_swarm.ginko_data import load_latest_pull
-from dharma_swarm.ginko_regime import load_regime_history
-from dharma_swarm.ginko_signals import load_latest_report
+from dharma_swarm.ginko.brier import BrierDashboard, build_dashboard
+from dharma_swarm.ginko.data import load_latest_pull
+from dharma_swarm.ginko.regime import load_regime_history
+from dharma_swarm.ginko.signals import load_latest_report
 
 logger = logging.getLogger(__name__)
 
@@ -181,7 +181,7 @@ def generate_daily_report() -> DailyReport:
 
     # -- Paper portfolio (optional module) --
     try:
-        from dharma_swarm.ginko_paper_trade import PaperPortfolio
+        from dharma_swarm.ginko.paper_trade import PaperPortfolio
 
         portfolio = PaperPortfolio()
         report.paper_portfolio_summary = portfolio.get_portfolio_stats()

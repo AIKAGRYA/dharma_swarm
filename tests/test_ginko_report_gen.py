@@ -11,7 +11,7 @@ import pytest
 _temp_dir = tempfile.mkdtemp()
 os.environ.setdefault("DHARMA_HOME", _temp_dir)
 
-from dharma_swarm.ginko_report_gen import (
+from dharma_swarm.ginko.report_gen import (
     DailyReport,
     format_report_markdown,
     format_report_html,

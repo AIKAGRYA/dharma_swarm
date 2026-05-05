@@ -6,7 +6,7 @@ import math
 
 import pytest
 
-from dharma_swarm.ginko_signals import (
+from dharma_swarm.ginko.signals import (
     SignalDirection,
     SignalStrength,
     TechnicalIndicators,

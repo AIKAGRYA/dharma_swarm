@@ -1158,7 +1158,7 @@ class AutonomousAgent:
     # -- Ginko trading bridge tools ------------------------------------------
 
     async def _tool_ginko_signals(self, inputs: dict) -> str:
-        from dharma_swarm.ginko_bridge import ginko_get_signals, format_signals
+        from dharma_swarm.ginko.bridge import ginko_get_signals, format_signals
         symbol = inputs.get("symbol", "BTC")
         lookback_days = int(inputs.get("lookback_days", 7))
         try:
@@ -1168,7 +1168,7 @@ class AutonomousAgent:
             return f"Ginko signals error: {e}"
 
     async def _tool_ginko_regime(self, inputs: dict) -> str:
-        from dharma_swarm.ginko_bridge import ginko_get_regime
+        from dharma_swarm.ginko.bridge import ginko_get_regime
         symbol = inputs.get("symbol", "BTC")
         try:
             regime = await ginko_get_regime(symbol=symbol)

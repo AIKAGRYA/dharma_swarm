@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from dharma_swarm.ginko_agents import (
+from dharma_swarm.ginko.agents import (
     DOMAIN_CREW,
     FLEET_SPEC,
     GinkoAgent,
@@ -154,13 +154,13 @@ class TestGinkoAgent:
 
 class TestPersistence:
     def test_ensure_agent_dirs(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("dharma_swarm.ginko_agents.AGENTS_DIR", tmp_path / "agents")
+        monkeypatch.setattr("dharma_swarm.ginko.agents.AGENTS_DIR", tmp_path / "agents")
         _ensure_agent_dirs("alpha")
         assert (tmp_path / "agents" / "alpha").is_dir()
         assert (tmp_path / "agents" / "alpha" / "prompt_variants").is_dir()
 
     def test_save_and_load(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("dharma_swarm.ginko_agents.AGENTS_DIR", tmp_path / "agents")
+        monkeypatch.setattr("dharma_swarm.ginko.agents.AGENTS_DIR", tmp_path / "agents")
         agent = GinkoAgent(name="x", role="r", model="m/m", system_prompt="hello")
         _save_agent_to_disk(agent)
 
@@ -175,14 +175,14 @@ class TestPersistence:
         assert prompt_path.read_text() == "hello"
 
     def test_load_nonexistent_returns_none(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("dharma_swarm.ginko_agents.AGENTS_DIR", tmp_path / "agents")
+        monkeypatch.setattr("dharma_swarm.ginko.agents.AGENTS_DIR", tmp_path / "agents")
         assert _load_agent_from_disk("nope") is None
 
     def test_legacy_migration(self, tmp_path, monkeypatch):
         """Loading from legacy flat file (agents/name.json) works."""
         agents_dir = tmp_path / "agents"
         agents_dir.mkdir()
-        monkeypatch.setattr("dharma_swarm.ginko_agents.AGENTS_DIR", agents_dir)
+        monkeypatch.setattr("dharma_swarm.ginko.agents.AGENTS_DIR", agents_dir)
 
         legacy_data = {"name": "hermes", "role": "coordinator", "model": "m/m", "system_prompt": "old"}
         (agents_dir / "hermes.json").write_text(json.dumps(legacy_data))
@@ -194,14 +194,14 @@ class TestPersistence:
 
     def test_load_corrupt_json_returns_none(self, tmp_path, monkeypatch):
         agents_dir = tmp_path / "agents"
-        monkeypatch.setattr("dharma_swarm.ginko_agents.AGENTS_DIR", agents_dir)
+        monkeypatch.setattr("dharma_swarm.ginko.agents.AGENTS_DIR", agents_dir)
         d = agents_dir / "bad"
         d.mkdir(parents=True)
         (d / "identity.json").write_text("{not valid json")
         assert _load_agent_from_disk("bad") is None
 
     def test_append_task_log(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("dharma_swarm.ginko_agents.AGENTS_DIR", tmp_path / "agents")
+        monkeypatch.setattr("dharma_swarm.ginko.agents.AGENTS_DIR", tmp_path / "agents")
         _append_task_log("loggy", {"task": "hello", "success": True})
         _append_task_log("loggy", {"task": "world", "success": False})
 
@@ -212,7 +212,7 @@ class TestPersistence:
         assert json.loads(lines[0])["task"] == "hello"
 
     def test_append_fitness_snapshot(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("dharma_swarm.ginko_agents.AGENTS_DIR", tmp_path / "agents")
+        monkeypatch.setattr("dharma_swarm.ginko.agents.AGENTS_DIR", tmp_path / "agents")
         _append_fitness_snapshot("fitty", 0.85)
 
         path = tmp_path / "agents" / "fitty" / "fitness_history.jsonl"
@@ -307,30 +307,30 @@ class TestFitness:
 
 class TestGinkoFleet:
     def test_fleet_creation(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("dharma_swarm.ginko_agents.AGENTS_DIR", tmp_path / "agents")
+        monkeypatch.setattr("dharma_swarm.ginko.agents.AGENTS_DIR", tmp_path / "agents")
         fleet = GinkoFleet()
         assert len(fleet.list_agents()) == len(FLEET_SPEC)
 
     def test_fleet_get_agent(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("dharma_swarm.ginko_agents.AGENTS_DIR", tmp_path / "agents")
+        monkeypatch.setattr("dharma_swarm.ginko.agents.AGENTS_DIR", tmp_path / "agents")
         fleet = GinkoFleet()
         agent = fleet.get_agent("kimi")
         assert agent is not None
         assert agent.name == "kimi"
 
     def test_fleet_get_nonexistent(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("dharma_swarm.ginko_agents.AGENTS_DIR", tmp_path / "agents")
+        monkeypatch.setattr("dharma_swarm.ginko.agents.AGENTS_DIR", tmp_path / "agents")
         fleet = GinkoFleet()
         assert fleet.get_agent("nonexistent") is None
 
     def test_fleet_agent_names_sorted(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("dharma_swarm.ginko_agents.AGENTS_DIR", tmp_path / "agents")
+        monkeypatch.setattr("dharma_swarm.ginko.agents.AGENTS_DIR", tmp_path / "agents")
         fleet = GinkoFleet()
         names = fleet.agent_names()
         assert names == sorted(names)
 
     def test_fleet_save_agent(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("dharma_swarm.ginko_agents.AGENTS_DIR", tmp_path / "agents")
+        monkeypatch.setattr("dharma_swarm.ginko.agents.AGENTS_DIR", tmp_path / "agents")
         fleet = GinkoFleet()
         agent = fleet.get_agent("kimi")
         agent.fitness = 0.99
@@ -340,7 +340,7 @@ class TestGinkoFleet:
         assert reloaded.fitness == 0.99
 
     def test_fleet_summary_returns_string(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("dharma_swarm.ginko_agents.AGENTS_DIR", tmp_path / "agents")
+        monkeypatch.setattr("dharma_swarm.ginko.agents.AGENTS_DIR", tmp_path / "agents")
         fleet = GinkoFleet()
         summary = fleet.fleet_summary()
         assert "Dharmic Quant" in summary
@@ -349,7 +349,7 @@ class TestGinkoFleet:
     def test_fleet_preserves_existing_identity(self, tmp_path, monkeypatch):
         """If agent already exists on disk, fleet doesn't overwrite it."""
         agents_dir = tmp_path / "agents"
-        monkeypatch.setattr("dharma_swarm.ginko_agents.AGENTS_DIR", agents_dir)
+        monkeypatch.setattr("dharma_swarm.ginko.agents.AGENTS_DIR", agents_dir)
 
         # Pre-create kimi with custom fitness
         _ensure_agent_dirs("kimi")
@@ -372,7 +372,7 @@ class TestGinkoFleet:
 
 class TestFleetStatus:
     def _make_fleet(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("dharma_swarm.ginko_agents.AGENTS_DIR", tmp_path / "agents")
+        monkeypatch.setattr("dharma_swarm.ginko.agents.AGENTS_DIR", tmp_path / "agents")
         return GinkoFleet()
 
     def test_fitness_ranking(self, tmp_path, monkeypatch):
@@ -428,7 +428,7 @@ class TestFleetStatus:
 class TestAgentTask:
     @pytest.mark.asyncio
     async def test_agent_not_found(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("dharma_swarm.ginko_agents.AGENTS_DIR", tmp_path / "agents")
+        monkeypatch.setattr("dharma_swarm.ginko.agents.AGENTS_DIR", tmp_path / "agents")
         fleet = GinkoFleet()
         result = await agent_task(fleet, "nonexistent", "hello")
         assert result["success"] is False
@@ -436,7 +436,7 @@ class TestAgentTask:
 
     @pytest.mark.asyncio
     async def test_successful_task(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("dharma_swarm.ginko_agents.AGENTS_DIR", tmp_path / "agents")
+        monkeypatch.setattr("dharma_swarm.ginko.agents.AGENTS_DIR", tmp_path / "agents")
         fleet = GinkoFleet()
 
         mock_response = {
@@ -446,7 +446,7 @@ class TestAgentTask:
             "model": "moonshotai/kimi-k2.5",
             "error": False,
         }
-        with patch("dharma_swarm.ginko_agents._call_openrouter", new_callable=AsyncMock, return_value=mock_response):
+        with patch("dharma_swarm.ginko.agents._call_openrouter", new_callable=AsyncMock, return_value=mock_response):
             result = await agent_task(fleet, "kimi", "analyze macro")
 
         assert result["success"] is True
@@ -458,7 +458,7 @@ class TestAgentTask:
 
     @pytest.mark.asyncio
     async def test_failed_task_updates_counters(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("dharma_swarm.ginko_agents.AGENTS_DIR", tmp_path / "agents")
+        monkeypatch.setattr("dharma_swarm.ginko.agents.AGENTS_DIR", tmp_path / "agents")
         fleet = GinkoFleet()
 
         mock_response = {
@@ -468,7 +468,7 @@ class TestAgentTask:
             "model": "moonshotai/kimi-k2.5",
             "error": True,
         }
-        with patch("dharma_swarm.ginko_agents._call_openrouter", new_callable=AsyncMock, return_value=mock_response):
+        with patch("dharma_swarm.ginko.agents._call_openrouter", new_callable=AsyncMock, return_value=mock_response):
             result = await agent_task(fleet, "kimi", "fail task")
 
         assert result["success"] is False
@@ -477,7 +477,7 @@ class TestAgentTask:
 
     @pytest.mark.asyncio
     async def test_task_history_bounded(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("dharma_swarm.ginko_agents.AGENTS_DIR", tmp_path / "agents")
+        monkeypatch.setattr("dharma_swarm.ginko.agents.AGENTS_DIR", tmp_path / "agents")
         fleet = GinkoFleet()
         agent = fleet.get_agent("kimi")
         # Pre-fill history near the limit
@@ -491,7 +491,7 @@ class TestAgentTask:
             "model": "m/m",
             "error": False,
         }
-        with patch("dharma_swarm.ginko_agents._call_openrouter", new_callable=AsyncMock, return_value=mock_response):
+        with patch("dharma_swarm.ginko.agents._call_openrouter", new_callable=AsyncMock, return_value=mock_response):
             await agent_task(fleet, "kimi", "one more")
 
         agent = fleet.get_agent("kimi")
@@ -506,7 +506,7 @@ class TestAgentTask:
 class TestFleetAnalyze:
     @pytest.mark.asyncio
     async def test_parallel_dispatch(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("dharma_swarm.ginko_agents.AGENTS_DIR", tmp_path / "agents")
+        monkeypatch.setattr("dharma_swarm.ginko.agents.AGENTS_DIR", tmp_path / "agents")
         fleet = GinkoFleet()
 
         mock_response = {
@@ -516,7 +516,7 @@ class TestFleetAnalyze:
             "model": "m/m",
             "error": False,
         }
-        with patch("dharma_swarm.ginko_agents._call_openrouter", new_callable=AsyncMock, return_value=mock_response):
+        with patch("dharma_swarm.ginko.agents._call_openrouter", new_callable=AsyncMock, return_value=mock_response):
             results = await fleet_analyze(fleet, "test question", ["kimi", "scout"])
 
         assert "kimi" in results
@@ -524,7 +524,7 @@ class TestFleetAnalyze:
 
     @pytest.mark.asyncio
     async def test_invalid_agent_in_list(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("dharma_swarm.ginko_agents.AGENTS_DIR", tmp_path / "agents")
+        monkeypatch.setattr("dharma_swarm.ginko.agents.AGENTS_DIR", tmp_path / "agents")
         fleet = GinkoFleet()
 
         mock_response = {
@@ -534,7 +534,7 @@ class TestFleetAnalyze:
             "model": "m/m",
             "error": False,
         }
-        with patch("dharma_swarm.ginko_agents._call_openrouter", new_callable=AsyncMock, return_value=mock_response):
+        with patch("dharma_swarm.ginko.agents._call_openrouter", new_callable=AsyncMock, return_value=mock_response):
             results = await fleet_analyze(fleet, "q", ["kimi", "nonexistent"])
 
         assert "nonexistent" in results
@@ -550,7 +550,7 @@ class TestFleetAnalyze:
 class TestFleetPipelines:
     @pytest.mark.asyncio
     async def test_macro_analysis(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("dharma_swarm.ginko_agents.AGENTS_DIR", tmp_path / "agents")
+        monkeypatch.setattr("dharma_swarm.ginko.agents.AGENTS_DIR", tmp_path / "agents")
         fleet = GinkoFleet()
 
         mock_response = {
@@ -560,7 +560,7 @@ class TestFleetPipelines:
             "model": "m/m",
             "error": False,
         }
-        with patch("dharma_swarm.ginko_agents._call_openrouter", new_callable=AsyncMock, return_value=mock_response):
+        with patch("dharma_swarm.ginko.agents._call_openrouter", new_callable=AsyncMock, return_value=mock_response):
             result = await fleet_macro_analysis(fleet, {"macro": {"fed_funds_rate": 5.25}})
 
         assert "consensus_regime" in result
@@ -568,7 +568,7 @@ class TestFleetPipelines:
 
     @pytest.mark.asyncio
     async def test_sec_analysis(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("dharma_swarm.ginko_agents.AGENTS_DIR", tmp_path / "agents")
+        monkeypatch.setattr("dharma_swarm.ginko.agents.AGENTS_DIR", tmp_path / "agents")
         fleet = GinkoFleet()
 
         mock_response = {
@@ -578,14 +578,14 @@ class TestFleetPipelines:
             "model": "m/m",
             "error": False,
         }
-        with patch("dharma_swarm.ginko_agents._call_openrouter", new_callable=AsyncMock, return_value=mock_response):
+        with patch("dharma_swarm.ginko.agents._call_openrouter", new_callable=AsyncMock, return_value=mock_response):
             result = await fleet_sec_analysis(fleet, {"risk_factors": "inflation risk", "management_discussion": "stable"})
 
         assert "findings" in result
 
     @pytest.mark.asyncio
     async def test_risk_check(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("dharma_swarm.ginko_agents.AGENTS_DIR", tmp_path / "agents")
+        monkeypatch.setattr("dharma_swarm.ginko.agents.AGENTS_DIR", tmp_path / "agents")
         fleet = GinkoFleet()
 
         mock_response = {
@@ -595,7 +595,7 @@ class TestFleetPipelines:
             "model": "m/m",
             "error": False,
         }
-        with patch("dharma_swarm.ginko_agents._call_openrouter", new_callable=AsyncMock, return_value=mock_response):
+        with patch("dharma_swarm.ginko.agents._call_openrouter", new_callable=AsyncMock, return_value=mock_response):
             result = await fleet_risk_check(
                 fleet,
                 {"total_value": 100000, "max_drawdown": 0.05, "open_positions": 3},
@@ -606,7 +606,7 @@ class TestFleetPipelines:
 
     @pytest.mark.asyncio
     async def test_alpha_scan(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("dharma_swarm.ginko_agents.AGENTS_DIR", tmp_path / "agents")
+        monkeypatch.setattr("dharma_swarm.ginko.agents.AGENTS_DIR", tmp_path / "agents")
         fleet = GinkoFleet()
 
         mock_response = {
@@ -616,7 +616,7 @@ class TestFleetPipelines:
             "model": "m/m",
             "error": False,
         }
-        with patch("dharma_swarm.ginko_agents._call_openrouter", new_callable=AsyncMock, return_value=mock_response):
+        with patch("dharma_swarm.ginko.agents._call_openrouter", new_callable=AsyncMock, return_value=mock_response):
             result = await fleet_alpha_scan(
                 fleet,
                 {"BTC": [60000.0, 61000.0, 62000.0], "ETH": [3000.0, 2900.0, 2800.0]},
@@ -628,7 +628,7 @@ class TestFleetPipelines:
 
     @pytest.mark.asyncio
     async def test_consensus(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("dharma_swarm.ginko_agents.AGENTS_DIR", tmp_path / "agents")
+        monkeypatch.setattr("dharma_swarm.ginko.agents.AGENTS_DIR", tmp_path / "agents")
         fleet = GinkoFleet()
 
         mock_response = {
@@ -638,7 +638,7 @@ class TestFleetPipelines:
             "model": "m/m",
             "error": False,
         }
-        with patch("dharma_swarm.ginko_agents._call_openrouter", new_callable=AsyncMock, return_value=mock_response):
+        with patch("dharma_swarm.ginko.agents._call_openrouter", new_callable=AsyncMock, return_value=mock_response):
             result = await fleet_consensus(fleet, "Should we go long BTC?")
 
         assert "votes" in result
@@ -675,7 +675,7 @@ class TestModelFallbacks:
 class TestCallOpenRouter:
     @pytest.mark.asyncio
     async def test_no_api_key(self, monkeypatch):
-        from dharma_swarm.ginko_agents import _call_openrouter
+        from dharma_swarm.ginko.agents import _call_openrouter
 
         monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
         result = await _call_openrouter("m/m", [{"role": "user", "content": "hi"}])
@@ -685,7 +685,7 @@ class TestCallOpenRouter:
     @pytest.mark.asyncio
     async def test_timeout_handling(self, monkeypatch):
         import httpx
-        from dharma_swarm.ginko_agents import _call_openrouter
+        from dharma_swarm.ginko.agents import _call_openrouter
 
         monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
 

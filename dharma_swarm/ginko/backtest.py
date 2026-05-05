@@ -7,7 +7,7 @@ day-by-day, and computes performance metrics vs benchmark.
 Usage:
     python3 -m dharma_swarm.ginko_backtest
     # or
-    from dharma_swarm.ginko_backtest import BacktestConfig, run_backtest
+    from dharma_swarm.ginko.backtest import BacktestConfig, run_backtest
     result = await run_backtest(BacktestConfig(symbols=["AAPL"]))
 
 Output persisted to: ~/.dharma/ginko/backtest/
@@ -35,14 +35,14 @@ except ImportError:
     _HAS_YFINANCE = False
 
 # Internal ginko imports -- regime detection, signal synthesis, analytics
-from dharma_swarm.ginko_regime import ReturnSeries, analyze_regime
-from dharma_swarm.ginko_signals import (
+from dharma_swarm.ginko.regime import ReturnSeries, analyze_regime
+from dharma_swarm.ginko.signals import (
     Signal,
     SignalReport,
     compute_indicators,
     synthesize_signal,
 )
-from dharma_swarm.ginko_paper_trade import compute_sharpe, compute_max_drawdown
+from dharma_swarm.ginko.paper_trade import compute_sharpe, compute_max_drawdown
 
 logger = logging.getLogger(__name__)
 

@@ -12,7 +12,7 @@ import pytest
 _temp_dir = tempfile.mkdtemp()
 os.environ.setdefault("DHARMA_HOME", _temp_dir)
 
-from dharma_swarm.ginko_data import (
+from dharma_swarm.ginko.data import (
     CryptoPrice,
     MacroSnapshot,
     MarketDataPull,
@@ -143,7 +143,7 @@ class TestFREDSeries:
     @pytest.mark.asyncio
     async def test_no_api_key(self):
         """Without API key, should return None and not crash."""
-        from dharma_swarm.ginko_data import fetch_fred_series
+        from dharma_swarm.ginko.data import fetch_fred_series
 
         old_key = os.environ.pop("FRED_API_KEY", None)
         try:
@@ -158,7 +158,7 @@ class TestFinnhub:
     @pytest.mark.asyncio
     async def test_no_api_key(self):
         """Without API key, should return None and not crash."""
-        from dharma_swarm.ginko_data import fetch_stock_quote
+        from dharma_swarm.ginko.data import fetch_stock_quote
 
         old_key = os.environ.pop("FINNHUB_API_KEY", None)
         try:

@@ -11,7 +11,7 @@ import pytest
 _temp_dir = tempfile.mkdtemp()
 os.environ.setdefault("DHARMA_HOME", _temp_dir)
 
-from dharma_swarm.ginko_orchestrator import (
+from dharma_swarm.ginko.orchestrator import (
     AUTONOMY_REQUIREMENTS,
     GinkoState,
     check_autonomy_advancement,

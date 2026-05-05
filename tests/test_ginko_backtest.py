@@ -11,7 +11,7 @@ from unittest.mock import patch
 
 import pytest
 
-from dharma_swarm.ginko_backtest import (
+from dharma_swarm.ginko.backtest import (
     BacktestConfig,
     BacktestResult,
     TradeRecord,
@@ -453,7 +453,7 @@ class TestBacktestPortfolio:
 
 class TestPersistResult:
     def test_saves_files(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("dharma_swarm.ginko_backtest.BACKTEST_DIR", tmp_path)
+        monkeypatch.setattr("dharma_swarm.ginko.backtest.BACKTEST_DIR", tmp_path)
         result = BacktestResult(
             total_return=0.05,
             annualized_return=0.06,
@@ -486,7 +486,7 @@ class TestPersistResult:
 
     def test_creates_directory(self, tmp_path, monkeypatch):
         target = tmp_path / "nested" / "dir"
-        monkeypatch.setattr("dharma_swarm.ginko_backtest.BACKTEST_DIR", target)
+        monkeypatch.setattr("dharma_swarm.ginko.backtest.BACKTEST_DIR", target)
         result = BacktestResult(
             total_return=0.0, annualized_return=0.0, sharpe_ratio=0.0,
             max_drawdown=0.0, win_rate=0.0, total_trades=0,
@@ -580,7 +580,7 @@ class TestRunBacktest:
     @pytest.mark.asyncio
     async def test_no_yfinance_returns_error(self):
         """When yfinance is not available, run_backtest returns error result."""
-        with patch("dharma_swarm.ginko_backtest._HAS_YFINANCE", False):
+        with patch("dharma_swarm.ginko.backtest._HAS_YFINANCE", False):
             result = await run_backtest(BacktestConfig(symbols=["AAPL"]))
         assert result.total_trades == 0
         assert len(result.errors) >= 1
@@ -589,8 +589,8 @@ class TestRunBacktest:
     @pytest.mark.asyncio
     async def test_no_data_returns_error(self):
         """When download returns empty, run_backtest returns error."""
-        with patch("dharma_swarm.ginko_backtest._HAS_YFINANCE", True), \
-             patch("dharma_swarm.ginko_backtest._download_ohlcv", return_value={}):
+        with patch("dharma_swarm.ginko.backtest._HAS_YFINANCE", True), \
+             patch("dharma_swarm.ginko.backtest._download_ohlcv", return_value={}):
             result = await run_backtest(BacktestConfig(symbols=["AAPL"]))
         assert result.total_trades == 0
         assert any("No data" in e for e in result.errors)
@@ -616,8 +616,8 @@ class TestRunBacktest:
                 "volume": [5000, 5100],
             },
         }
-        with patch("dharma_swarm.ginko_backtest._HAS_YFINANCE", True), \
-             patch("dharma_swarm.ginko_backtest._download_ohlcv", return_value=sparse_data):
+        with patch("dharma_swarm.ginko.backtest._HAS_YFINANCE", True), \
+             patch("dharma_swarm.ginko.backtest._download_ohlcv", return_value=sparse_data):
             result = await run_backtest(BacktestConfig(symbols=["AAPL"]))
         assert result.total_trades == 0
         assert any("Insufficient" in e for e in result.errors)
@@ -625,7 +625,7 @@ class TestRunBacktest:
     @pytest.mark.asyncio
     async def test_full_backtest_with_mocked_data(self, tmp_path, monkeypatch):
         """Full backtest with synthetic data — no yfinance needed."""
-        monkeypatch.setattr("dharma_swarm.ginko_backtest.BACKTEST_DIR", tmp_path)
+        monkeypatch.setattr("dharma_swarm.ginko.backtest.BACKTEST_DIR", tmp_path)
 
         # Generate 80 trading days of synthetic price data
         base_date = date(2024, 1, 1)
@@ -653,7 +653,7 @@ class TestRunBacktest:
         }
 
         # Mock the signal pipeline to produce actionable signals
-        from dharma_swarm.ginko_signals import Signal
+        from dharma_swarm.ginko.signals import Signal
 
         def mock_synthesize(symbol, indicators, regime, regime_conf):
             return Signal(
@@ -665,9 +665,9 @@ class TestRunBacktest:
                 indicators=indicators,
             )
 
-        with patch("dharma_swarm.ginko_backtest._HAS_YFINANCE", True), \
-             patch("dharma_swarm.ginko_backtest._download_ohlcv", return_value=mock_data), \
-             patch("dharma_swarm.ginko_backtest.synthesize_signal", side_effect=mock_synthesize):
+        with patch("dharma_swarm.ginko.backtest._HAS_YFINANCE", True), \
+             patch("dharma_swarm.ginko.backtest._download_ohlcv", return_value=mock_data), \
+             patch("dharma_swarm.ginko.backtest.synthesize_signal", side_effect=mock_synthesize):
             cfg = BacktestConfig(
                 symbols=["AAPL"],
                 start_date=dates[0],
@@ -691,7 +691,7 @@ class TestRunBacktest:
 
 class TestDownloadOhlcv:
     def test_no_yfinance_returns_empty(self):
-        from dharma_swarm.ginko_backtest import _download_ohlcv
-        with patch("dharma_swarm.ginko_backtest._HAS_YFINANCE", False):
+        from dharma_swarm.ginko.backtest import _download_ohlcv
+        with patch("dharma_swarm.ginko.backtest._HAS_YFINANCE", False):
             result = _download_ohlcv(["AAPL"], "2024-01-01", "2024-12-31")
         assert result == {}

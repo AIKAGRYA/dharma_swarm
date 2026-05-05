@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
-from dharma_swarm.ginko_audit import (
+from dharma_swarm.ginko.audit import (
     AuditReport,
     CheckResult,
     Enhancement,
@@ -128,16 +128,16 @@ class TestCheckFileManifest:
         tests = tmp_path / "tests"
         src.mkdir()
         tests.mkdir()
-        monkeypatch.setattr("dharma_swarm.ginko_audit.DHARMA_SWARM_ROOT", tmp_path)
-        monkeypatch.setattr("dharma_swarm.ginko_audit.SRC_DIR", src)
-        monkeypatch.setattr("dharma_swarm.ginko_audit.TEST_DIR", tests)
-        monkeypatch.setattr("dharma_swarm.ginko_audit.AUDIT_HOME", tmp_path / "audit")
+        monkeypatch.setattr("dharma_swarm.ginko.audit.DHARMA_SWARM_ROOT", tmp_path)
+        monkeypatch.setattr("dharma_swarm.ginko.audit.SRC_DIR", src)
+        monkeypatch.setattr("dharma_swarm.ginko.audit.TEST_DIR", tests)
+        monkeypatch.setattr("dharma_swarm.ginko.audit.AUDIT_HOME", tmp_path / "audit")
         # Rebuild file lists relative to tmp_path
-        monkeypatch.setattr("dharma_swarm.ginko_audit.EXPECTED_NEW_FILES", [
+        monkeypatch.setattr("dharma_swarm.ginko.audit.EXPECTED_NEW_FILES", [
             src / "ginko_agents.py",
             tests / "test_ginko_integration.py",
         ])
-        monkeypatch.setattr("dharma_swarm.ginko_audit.EXPECTED_MODIFIED_FILES", [
+        monkeypatch.setattr("dharma_swarm.ginko.audit.EXPECTED_MODIFIED_FILES", [
             src / "ginko_signals.py",
         ])
         (tmp_path / "audit").mkdir(parents=True)
@@ -151,24 +151,24 @@ class TestCheckFileManifest:
 
     def test_existing_files_pass(self, monkeypatch, tmp_path):
         """When files exist with >100 bytes, manifest checks PASS."""
-        monkeypatch.setattr("dharma_swarm.ginko_audit.DHARMA_SWARM_ROOT", tmp_path)
+        monkeypatch.setattr("dharma_swarm.ginko.audit.DHARMA_SWARM_ROOT", tmp_path)
         src = tmp_path / "dharma_swarm"
         tests = tmp_path / "tests"
         docs = tmp_path / "docs"
         src.mkdir()
         tests.mkdir()
         docs.mkdir()
-        monkeypatch.setattr("dharma_swarm.ginko_audit.SRC_DIR", src)
-        monkeypatch.setattr("dharma_swarm.ginko_audit.TEST_DIR", tests)
-        monkeypatch.setattr("dharma_swarm.ginko_audit.AUDIT_HOME", tmp_path / "audit")
+        monkeypatch.setattr("dharma_swarm.ginko.audit.SRC_DIR", src)
+        monkeypatch.setattr("dharma_swarm.ginko.audit.TEST_DIR", tests)
+        monkeypatch.setattr("dharma_swarm.ginko.audit.AUDIT_HOME", tmp_path / "audit")
         (tmp_path / "audit").mkdir()
 
         # Build the expected new file list with tmp_path base
-        from dharma_swarm.ginko_audit import EXPECTED_NEW_FILES, EXPECTED_MODIFIED_FILES
-        monkeypatch.setattr("dharma_swarm.ginko_audit.EXPECTED_NEW_FILES", [
+        from dharma_swarm.ginko.audit import EXPECTED_NEW_FILES, EXPECTED_MODIFIED_FILES
+        monkeypatch.setattr("dharma_swarm.ginko.audit.EXPECTED_NEW_FILES", [
             src / "ginko_agents.py",
         ])
-        monkeypatch.setattr("dharma_swarm.ginko_audit.EXPECTED_MODIFIED_FILES", [
+        monkeypatch.setattr("dharma_swarm.ginko.audit.EXPECTED_MODIFIED_FILES", [
             src / "ginko_signals.py",
         ])
 
@@ -183,7 +183,7 @@ class TestCheckFileManifest:
 
 class TestCheckDependencies:
     def test_importable_deps_pass(self, monkeypatch, tmp_path):
-        monkeypatch.setattr("dharma_swarm.ginko_audit.AUDIT_HOME", tmp_path / "audit")
+        monkeypatch.setattr("dharma_swarm.ginko.audit.AUDIT_HOME", tmp_path / "audit")
         (tmp_path / "audit").mkdir(parents=True)
 
         auditor = GinkoAuditor()
@@ -197,11 +197,11 @@ class TestCheckDependencies:
 class TestCheckFacts:
     def test_fc02_agent_registry_exists(self, monkeypatch, tmp_path):
         """FC-02 checks agent_registry.py follows identity.json pattern."""
-        monkeypatch.setattr("dharma_swarm.ginko_audit.DHARMA_SWARM_ROOT", tmp_path)
+        monkeypatch.setattr("dharma_swarm.ginko.audit.DHARMA_SWARM_ROOT", tmp_path)
         src = tmp_path / "dharma_swarm"
         src.mkdir()
-        monkeypatch.setattr("dharma_swarm.ginko_audit.SRC_DIR", src)
-        monkeypatch.setattr("dharma_swarm.ginko_audit.AUDIT_HOME", tmp_path / "audit")
+        monkeypatch.setattr("dharma_swarm.ginko.audit.SRC_DIR", src)
+        monkeypatch.setattr("dharma_swarm.ginko.audit.AUDIT_HOME", tmp_path / "audit")
         (tmp_path / "audit").mkdir()
 
         # Create agent_registry.py with expected patterns
@@ -216,8 +216,8 @@ class TestCheckFacts:
         assert result.status == "PASS"
 
     def test_fc02_no_file(self, monkeypatch, tmp_path):
-        monkeypatch.setattr("dharma_swarm.ginko_audit.SRC_DIR", tmp_path)
-        monkeypatch.setattr("dharma_swarm.ginko_audit.AUDIT_HOME", tmp_path / "audit")
+        monkeypatch.setattr("dharma_swarm.ginko.audit.SRC_DIR", tmp_path)
+        monkeypatch.setattr("dharma_swarm.ginko.audit.AUDIT_HOME", tmp_path / "audit")
         (tmp_path / "audit").mkdir()
 
         auditor = GinkoAuditor()
@@ -225,9 +225,9 @@ class TestCheckFacts:
         assert result.status == "WARN"
 
     def test_fc04_deps_in_pyproject(self, monkeypatch, tmp_path):
-        monkeypatch.setattr("dharma_swarm.ginko_audit.DHARMA_SWARM_ROOT", tmp_path)
-        monkeypatch.setattr("dharma_swarm.ginko_audit.SRC_DIR", tmp_path / "src")
-        monkeypatch.setattr("dharma_swarm.ginko_audit.AUDIT_HOME", tmp_path / "audit")
+        monkeypatch.setattr("dharma_swarm.ginko.audit.DHARMA_SWARM_ROOT", tmp_path)
+        monkeypatch.setattr("dharma_swarm.ginko.audit.SRC_DIR", tmp_path / "src")
+        monkeypatch.setattr("dharma_swarm.ginko.audit.AUDIT_HOME", tmp_path / "audit")
         (tmp_path / "audit").mkdir()
 
         (tmp_path / "pyproject.toml").write_text(
@@ -238,8 +238,8 @@ class TestCheckFacts:
         assert result.status == "PASS"
 
     def test_fc04_missing_deps(self, monkeypatch, tmp_path):
-        monkeypatch.setattr("dharma_swarm.ginko_audit.DHARMA_SWARM_ROOT", tmp_path)
-        monkeypatch.setattr("dharma_swarm.ginko_audit.AUDIT_HOME", tmp_path / "audit")
+        monkeypatch.setattr("dharma_swarm.ginko.audit.DHARMA_SWARM_ROOT", tmp_path)
+        monkeypatch.setattr("dharma_swarm.ginko.audit.AUDIT_HOME", tmp_path / "audit")
         (tmp_path / "audit").mkdir()
 
         (tmp_path / "pyproject.toml").write_text("[project]\ndependencies = []\n")
@@ -248,8 +248,8 @@ class TestCheckFacts:
         assert result.status == "FAIL"
 
     def test_fc11_test_count(self, monkeypatch, tmp_path):
-        monkeypatch.setattr("dharma_swarm.ginko_audit.TEST_DIR", tmp_path)
-        monkeypatch.setattr("dharma_swarm.ginko_audit.AUDIT_HOME", tmp_path / "audit")
+        monkeypatch.setattr("dharma_swarm.ginko.audit.TEST_DIR", tmp_path)
+        monkeypatch.setattr("dharma_swarm.ginko.audit.AUDIT_HOME", tmp_path / "audit")
         (tmp_path / "audit").mkdir()
 
         # Create some test files
@@ -261,8 +261,8 @@ class TestCheckFacts:
         assert result.status == "PASS"
 
     def test_fc11_too_few_tests(self, monkeypatch, tmp_path):
-        monkeypatch.setattr("dharma_swarm.ginko_audit.TEST_DIR", tmp_path)
-        monkeypatch.setattr("dharma_swarm.ginko_audit.AUDIT_HOME", tmp_path / "audit")
+        monkeypatch.setattr("dharma_swarm.ginko.audit.TEST_DIR", tmp_path)
+        monkeypatch.setattr("dharma_swarm.ginko.audit.AUDIT_HOME", tmp_path / "audit")
         (tmp_path / "audit").mkdir()
 
         (tmp_path / "test_ginko_one.py").write_text("# test")
@@ -274,8 +274,8 @@ class TestCheckFacts:
 
 class TestDetectGaps:
     def test_returns_gap_checks(self, monkeypatch, tmp_path):
-        monkeypatch.setattr("dharma_swarm.ginko_audit.SRC_DIR", tmp_path / "src")
-        monkeypatch.setattr("dharma_swarm.ginko_audit.AUDIT_HOME", tmp_path / "audit")
+        monkeypatch.setattr("dharma_swarm.ginko.audit.SRC_DIR", tmp_path / "src")
+        monkeypatch.setattr("dharma_swarm.ginko.audit.AUDIT_HOME", tmp_path / "audit")
         (tmp_path / "audit").mkdir()
 
         auditor = GinkoAuditor()
@@ -286,8 +286,8 @@ class TestDetectGaps:
     def test_backtesting_gap_when_missing(self, monkeypatch, tmp_path):
         src = tmp_path / "src"
         src.mkdir()
-        monkeypatch.setattr("dharma_swarm.ginko_audit.SRC_DIR", src)
-        monkeypatch.setattr("dharma_swarm.ginko_audit.AUDIT_HOME", tmp_path / "audit")
+        monkeypatch.setattr("dharma_swarm.ginko.audit.SRC_DIR", src)
+        monkeypatch.setattr("dharma_swarm.ginko.audit.AUDIT_HOME", tmp_path / "audit")
         (tmp_path / "audit").mkdir()
 
         auditor = GinkoAuditor()
@@ -300,8 +300,8 @@ class TestDetectGaps:
         src = tmp_path / "src"
         src.mkdir()
         (src / "ginko_backtest.py").write_text("# backtest engine")
-        monkeypatch.setattr("dharma_swarm.ginko_audit.SRC_DIR", src)
-        monkeypatch.setattr("dharma_swarm.ginko_audit.AUDIT_HOME", tmp_path / "audit")
+        monkeypatch.setattr("dharma_swarm.ginko.audit.SRC_DIR", src)
+        monkeypatch.setattr("dharma_swarm.ginko.audit.AUDIT_HOME", tmp_path / "audit")
         (tmp_path / "audit").mkdir()
 
         auditor = GinkoAuditor()
@@ -312,7 +312,7 @@ class TestDetectGaps:
 
 class TestScoreEnhancements:
     def test_returns_ranked_list(self, monkeypatch, tmp_path):
-        monkeypatch.setattr("dharma_swarm.ginko_audit.AUDIT_HOME", tmp_path / "audit")
+        monkeypatch.setattr("dharma_swarm.ginko.audit.AUDIT_HOME", tmp_path / "audit")
         (tmp_path / "audit").mkdir()
 
         auditor = GinkoAuditor()
@@ -329,9 +329,9 @@ class TestScoreEnhancements:
 
 class TestFixes:
     def test_generate_fixes_from_results(self, monkeypatch, tmp_path):
-        monkeypatch.setattr("dharma_swarm.ginko_audit.DHARMA_SWARM_ROOT", tmp_path)
-        monkeypatch.setattr("dharma_swarm.ginko_audit.SRC_DIR", tmp_path / "src")
-        monkeypatch.setattr("dharma_swarm.ginko_audit.AUDIT_HOME", tmp_path / "audit")
+        monkeypatch.setattr("dharma_swarm.ginko.audit.DHARMA_SWARM_ROOT", tmp_path)
+        monkeypatch.setattr("dharma_swarm.ginko.audit.SRC_DIR", tmp_path / "src")
+        monkeypatch.setattr("dharma_swarm.ginko.audit.AUDIT_HOME", tmp_path / "audit")
         (tmp_path / "audit").mkdir()
 
         results = [
@@ -348,7 +348,7 @@ class TestFixes:
         assert fixes[0].fix_id == "FIX-01"
 
     def test_apply_fixes_dry_run(self, monkeypatch, tmp_path):
-        monkeypatch.setattr("dharma_swarm.ginko_audit.AUDIT_HOME", tmp_path / "audit")
+        monkeypatch.setattr("dharma_swarm.ginko.audit.AUDIT_HOME", tmp_path / "audit")
         (tmp_path / "audit").mkdir()
 
         fixes = [
@@ -370,7 +370,7 @@ class TestFixes:
 
 class TestReportFormatting:
     def test_format_terminal_report(self, monkeypatch, tmp_path):
-        monkeypatch.setattr("dharma_swarm.ginko_audit.AUDIT_HOME", tmp_path / "audit")
+        monkeypatch.setattr("dharma_swarm.ginko.audit.AUDIT_HOME", tmp_path / "audit")
         (tmp_path / "audit").mkdir()
 
         report = AuditReport(
@@ -394,7 +394,7 @@ class TestReportFormatting:
 
     def test_save_report(self, monkeypatch, tmp_path):
         audit_dir = tmp_path / "audit"
-        monkeypatch.setattr("dharma_swarm.ginko_audit.AUDIT_HOME", audit_dir)
+        monkeypatch.setattr("dharma_swarm.ginko.audit.AUDIT_HOME", audit_dir)
         audit_dir.mkdir(parents=True)
 
         report = AuditReport(

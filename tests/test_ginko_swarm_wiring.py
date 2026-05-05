@@ -59,7 +59,7 @@ class TestGinkoInit:
             new_callable=AsyncMock,
         ):
             # Simulate what init() does for Ginko
-            from dharma_swarm.ginko_agents import GinkoFleet
+            from dharma_swarm.ginko.agents import GinkoFleet
             sm._ginko_fleet = GinkoFleet()
             sm._ginko_enabled = True
 
@@ -93,7 +93,7 @@ class TestRunGinkoCycle:
             "report": {"action": "generate_report", "report_text": "..."},
         }
         with patch(
-            "dharma_swarm.ginko_orchestrator.action_full_cycle",
+            "dharma_swarm.ginko.orchestrator.action_full_cycle",
             new_callable=AsyncMock,
             return_value=mock_result,
         ):
@@ -110,7 +110,7 @@ class TestRunGinkoCycle:
         sm._ginko_running = True
 
         with patch(
-            "dharma_swarm.ginko_orchestrator.action_full_cycle",
+            "dharma_swarm.ginko.orchestrator.action_full_cycle",
             new_callable=AsyncMock,
         ) as mock_cycle:
             await sm._run_ginko_cycle()
@@ -123,7 +123,7 @@ class TestRunGinkoCycle:
         sm._ginko_fleet = FakeGinkoFleet()
 
         with patch(
-            "dharma_swarm.ginko_orchestrator.action_full_cycle",
+            "dharma_swarm.ginko.orchestrator.action_full_cycle",
             new_callable=AsyncMock,
             side_effect=RuntimeError("API down"),
         ):
@@ -139,7 +139,7 @@ class TestRunGinkoCycle:
         sm._ginko_enabled = True
 
         with patch(
-            "dharma_swarm.ginko_orchestrator.action_full_cycle",
+            "dharma_swarm.ginko.orchestrator.action_full_cycle",
             new_callable=AsyncMock,
             side_effect=Exception("boom"),
         ):

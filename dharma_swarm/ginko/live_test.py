@@ -61,7 +61,7 @@ def _phase_header(num: int, total: int, name: str) -> str:
 
 async def _phase_data_pull() -> dict[str, Any]:
     """Pull market data from FRED, finnhub, and CoinGecko."""
-    from dharma_swarm.ginko_data import MarketDataPull, pull_all_data
+    from dharma_swarm.ginko.data import MarketDataPull, pull_all_data
 
     t0 = time.monotonic()
     pull: MarketDataPull = await pull_all_data()
@@ -108,7 +108,7 @@ async def _phase_regime_detection(
     data_pull: Any | None,
 ) -> dict[str, Any]:
     """Detect market regime using HMM/rule-based analysis."""
-    from dharma_swarm.ginko_regime import ReturnSeries, analyze_regime
+    from dharma_swarm.ginko.regime import ReturnSeries, analyze_regime
 
     t0 = time.monotonic()
 
@@ -167,7 +167,7 @@ async def _phase_signal_generation(
     regime_detection: Any | None,
 ) -> dict[str, Any]:
     """Generate trading signals from price data and regime."""
-    from dharma_swarm.ginko_signals import (
+    from dharma_swarm.ginko.signals import (
         SignalReport,
         format_signal_report,
         generate_signal_report,
@@ -247,7 +247,7 @@ async def _phase_predictions_brier(
     signal_report: Any | None,
 ) -> dict[str, Any]:
     """Record a test prediction and build the Brier dashboard."""
-    from dharma_swarm.ginko_brier import (
+    from dharma_swarm.ginko.brier import (
         BrierDashboard,
         build_dashboard,
         format_dashboard_report,
@@ -317,7 +317,7 @@ async def _phase_predictions_brier(
 
 async def _phase_report_generation() -> dict[str, Any]:
     """Generate, format, and save the daily report."""
-    from dharma_swarm.ginko_report_gen import (
+    from dharma_swarm.ginko.report_gen import (
         DailyReport,
         format_report_markdown,
         generate_daily_report,

@@ -7,7 +7,7 @@ from dataclasses import asdict, dataclass
 
 import pytest
 
-from dharma_swarm.ginko_sentiment import (
+from dharma_swarm.ginko.sentiment import (
     BEARISH_KEYWORDS,
     BULLISH_KEYWORDS,
     SentimentSignal,
@@ -225,7 +225,7 @@ class TestFormatSentimentReport:
 
 class TestPersistSentiment:
     def test_saves_file(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("dharma_swarm.ginko_sentiment.SENTIMENT_DIR", tmp_path)
+        monkeypatch.setattr("dharma_swarm.ginko.sentiment.SENTIMENT_DIR", tmp_path)
         signals = [
             SentimentSignal(ticker="AAPL", score=0.3, tweet_count=10),
         ]
@@ -239,7 +239,7 @@ class TestPersistSentiment:
 
 class TestLoadLatestSentiment:
     def test_loads_latest(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("dharma_swarm.ginko_sentiment.SENTIMENT_DIR", tmp_path)
+        monkeypatch.setattr("dharma_swarm.ginko.sentiment.SENTIMENT_DIR", tmp_path)
         # Create two files — "latest" alphabetically last
         (tmp_path / "sentiment_20240101_000000.json").write_text(
             json.dumps({"count": 1}), encoding="utf-8"
@@ -252,11 +252,11 @@ class TestLoadLatestSentiment:
         assert data["count"] == 2
 
     def test_no_files(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("dharma_swarm.ginko_sentiment.SENTIMENT_DIR", tmp_path)
+        monkeypatch.setattr("dharma_swarm.ginko.sentiment.SENTIMENT_DIR", tmp_path)
         assert load_latest_sentiment() is None
 
     def test_no_directory(self, tmp_path, monkeypatch):
         monkeypatch.setattr(
-            "dharma_swarm.ginko_sentiment.SENTIMENT_DIR", tmp_path / "nope"
+            "dharma_swarm.ginko.sentiment.SENTIMENT_DIR", tmp_path / "nope"
         )
         assert load_latest_sentiment() is None

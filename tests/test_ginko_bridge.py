@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from dharma_swarm.ginko_bridge import (
+from dharma_swarm.ginko.bridge import (
     format_signals,
     ginko_get_brier_scores,
     ginko_get_regime,

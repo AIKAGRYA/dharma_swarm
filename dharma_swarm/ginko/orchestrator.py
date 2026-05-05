@@ -31,22 +31,22 @@ from pathlib import Path
 from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
-from dharma_swarm.ginko_brier import (
+from dharma_swarm.ginko.brier import (
     build_dashboard,
     check_edge_validation,
     format_dashboard_report,
     record_prediction,
 )
-from dharma_swarm.ginko_data import (
+from dharma_swarm.ginko.data import (
     MarketDataPull,
     load_latest_pull,
     pull_all_data,
 )
-from dharma_swarm.ginko_regime import (
+from dharma_swarm.ginko.regime import (
     ReturnSeries,
     analyze_regime,
 )
-from dharma_swarm.ginko_signals import (
+from dharma_swarm.ginko.signals import (
     SignalReport,
     format_signal_report,
     generate_signal_report,
@@ -266,7 +266,7 @@ async def action_generate_report() -> dict[str, Any]:
     ]
 
     # Include latest signal report
-    from dharma_swarm.ginko_signals import load_latest_report
+    from dharma_swarm.ginko.signals import load_latest_report
     latest_signals = load_latest_report()
     if latest_signals:
         lines.append("SIGNALS:")
@@ -331,7 +331,7 @@ async def action_execute_paper_trades(signals: Any) -> dict[str, Any]:
     Returns:
         Summary dict with executed trades and portfolio value.
     """
-    from dharma_swarm.ginko_paper_trade import PaperPortfolio
+    from dharma_swarm.ginko.paper_trade import PaperPortfolio
 
     portfolio = PaperPortfolio()
     trades_executed: list[dict[str, Any]] = []
@@ -417,7 +417,7 @@ async def action_sec_analysis(
 
     Returns SEC signals for incorporation into signal generation.
     """
-    from dharma_swarm.ginko_sec import (
+    from dharma_swarm.ginko.sec import (
         analyze_filing_with_agent,
         extract_financial_sections,
         fetch_recent_10k_batch,
@@ -473,7 +473,7 @@ async def action_ensemble_predict(
     Returns:
         Summary dict with individual and ensemble probabilities.
     """
-    from dharma_swarm.ginko_agents import GinkoFleet, agent_task
+    from dharma_swarm.ginko.agents import GinkoFleet, agent_task
     from dharma_swarm.transcendence_aggregation import (
         temperature_concentrate,
         inverse_brier_weights,
@@ -618,7 +618,7 @@ async def action_full_cycle() -> dict[str, Any]:
         results["sec_analysis"] = sec_result
         # Convert to SECSignal objects for signal generation
         if sec_result.get("results"):
-            from dharma_swarm.ginko_signals import SECSignal
+            from dharma_swarm.ginko.signals import SECSignal
 
             sec_signals = [
                 SECSignal(
@@ -641,7 +641,7 @@ async def action_full_cycle() -> dict[str, Any]:
 
     # Phase 4: Paper trades
     try:
-        from dharma_swarm.ginko_signals import load_latest_report as _load_report
+        from dharma_swarm.ginko.signals import load_latest_report as _load_report
 
         latest = _load_report()
         if latest:

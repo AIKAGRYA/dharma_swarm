@@ -25,7 +25,7 @@ import pytest
 _temp_dir = tempfile.mkdtemp(prefix="ginko_integration_")
 os.environ["DHARMA_HOME"] = _temp_dir
 
-from dharma_swarm.ginko_data import (
+from dharma_swarm.ginko.data import (
     CryptoPrice,
     MacroSnapshot,
     MarketDataPull,
@@ -44,14 +44,14 @@ from dharma_swarm.ginko_data import (
     FINNHUB_QUOTE,
     COINGECKO_MARKETS,
 )
-from dharma_swarm.ginko_regime import (
+from dharma_swarm.ginko.regime import (
     MarketRegime,
     RegimeDetection,
     ReturnSeries,
     analyze_regime,
     detect_regime_rules,
 )
-from dharma_swarm.ginko_signals import (
+from dharma_swarm.ginko.signals import (
     SignalDirection,
     SignalReport,
     compute_indicators,
@@ -201,7 +201,7 @@ class TestFREDFetcher:
                 return float(val_str)
             return None
 
-        with patch("dharma_swarm.ginko_data.fetch_fred_series", side_effect=mock_fetch):
+        with patch("dharma_swarm.ginko.data.fetch_fred_series", side_effect=mock_fetch):
             snap = await fetch_macro_snapshot(api_key="test_key")
 
         assert snap.fed_funds_rate == 5.25
@@ -272,7 +272,7 @@ class TestFinnhubFetcher:
                 timestamp="2026-03-16T00:00:00Z",
             )
 
-        with patch("dharma_swarm.ginko_data.fetch_stock_quote", side_effect=mock_fetch):
+        with patch("dharma_swarm.ginko.data.fetch_stock_quote", side_effect=mock_fetch):
             quotes = await fetch_stock_quotes(symbols, api_key="test_key")
 
         assert len(quotes) == 3
@@ -396,21 +396,21 @@ class TestPullAllData:
         }
         with (
             patch(
-                "dharma_swarm.ginko_data.validate_api_keys",
+                "dharma_swarm.ginko.data.validate_api_keys",
                 return_value=all_keys_present,
             ),
             patch(
-                "dharma_swarm.ginko_data.fetch_macro_snapshot",
+                "dharma_swarm.ginko.data.fetch_macro_snapshot",
                 new_callable=AsyncMock,
                 return_value=mock_macro,
             ),
             patch(
-                "dharma_swarm.ginko_data.fetch_stock_quotes",
+                "dharma_swarm.ginko.data.fetch_stock_quotes",
                 new_callable=AsyncMock,
                 return_value=mock_stocks,
             ),
             patch(
-                "dharma_swarm.ginko_data.fetch_crypto_prices",
+                "dharma_swarm.ginko.data.fetch_crypto_prices",
                 new_callable=AsyncMock,
                 return_value=mock_crypto,
             ),
@@ -439,21 +439,21 @@ class TestPullAllData:
         }
         with (
             patch(
-                "dharma_swarm.ginko_data.validate_api_keys",
+                "dharma_swarm.ginko.data.validate_api_keys",
                 return_value=all_keys_present,
             ),
             patch(
-                "dharma_swarm.ginko_data.fetch_macro_snapshot",
+                "dharma_swarm.ginko.data.fetch_macro_snapshot",
                 new_callable=AsyncMock,
                 return_value=mock_macro,
             ),
             patch(
-                "dharma_swarm.ginko_data.fetch_stock_quotes",
+                "dharma_swarm.ginko.data.fetch_stock_quotes",
                 new_callable=AsyncMock,
                 side_effect=Exception("Finnhub timeout"),
             ),
             patch(
-                "dharma_swarm.ginko_data.fetch_crypto_prices",
+                "dharma_swarm.ginko.data.fetch_crypto_prices",
                 new_callable=AsyncMock,
                 return_value=[],
             ),
@@ -480,21 +480,21 @@ class TestPullAllData:
         }
         with (
             patch(
-                "dharma_swarm.ginko_data.validate_api_keys",
+                "dharma_swarm.ginko.data.validate_api_keys",
                 return_value=all_keys_present,
             ),
             patch(
-                "dharma_swarm.ginko_data.fetch_macro_snapshot",
+                "dharma_swarm.ginko.data.fetch_macro_snapshot",
                 new_callable=AsyncMock,
                 return_value=mock_macro,
             ),
             patch(
-                "dharma_swarm.ginko_data.fetch_stock_quotes",
+                "dharma_swarm.ginko.data.fetch_stock_quotes",
                 new_callable=AsyncMock,
                 return_value=[],
             ),
             patch(
-                "dharma_swarm.ginko_data.fetch_crypto_prices",
+                "dharma_swarm.ginko.data.fetch_crypto_prices",
                 new_callable=AsyncMock,
                 return_value=[],
             ),

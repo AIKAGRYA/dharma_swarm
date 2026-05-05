@@ -1,12 +1,18 @@
-"""Extended LLM Providers for Subconscious Fleet.
+"""Extended LLM Providers for Subconscious Fleet — DEPRECATED.
 
-Adds support for:
-- Ollama (local models)
-- NVIDIA NIM (NVIDIA Inference Microservices)
-- Moonshot (Moonshot AI)
-- Groq (fast inference)
-- Deepseek
-- Together AI
+.. deprecated::
+    This module is dead code (zero runtime imports as of 2026-05-05).
+    OllamaProvider and NVIDIANIMProvider are duplicates of the canonical
+    implementations in ``dharma_swarm.providers``.  MoonshotProvider is
+    unique but unused.  See INTERFACE_MISMATCH_MAP.md NEW-12/NEW-14.
+
+Original support:
+- Ollama (local models) — canonical copy in providers.py
+- NVIDIA NIM — canonical copy in providers.py
+- Moonshot (Moonshot AI) — unique, unused
+- Groq (fast inference) — not implemented here
+- Deepseek — not implemented here
+- Together AI — not implemented here
 """
 
 from __future__ import annotations

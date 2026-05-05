@@ -34,6 +34,18 @@
 
 **Net change:** 13 resolved, 5 fixed prior sessions, 6 new entries (NEW-05 guarded, NEW-07/NEW-08 partially resolved, NEW-09/10/11 fixed), 0 open BLOCKERs, 3 structural degraded remain.
 
+### Consolidation Actions Completed (2026-05-05)
+
+| Action | Status | Detail |
+|--------|--------|--------|
+| SessionStore merge | ✅ DONE | `tui/engine/session_store.py` → thin re-export of `operator_core/session_store.py` |
+| ClaudeAdapter merge | ✅ DONE | `terminal_adapters/claude.py` confirmed dead code (broken `from .base` import, zero runtime importers); `__init__.py` deprecation marker added |
+| Model routing facade | ✅ DONE | `routing_facade.py` created — single entry: `classify_and_route()`, `detect_language()`, `select_provider()` |
+| dgc_cli.py decomposition | ✅ DONE | 7078→5784 LOC; extracted `cli/evolution_cmds.py`, `cli/integrations_cmds.py`, `cli/semantic_cmds.py` |
+| Ginko subdirectory packaging | ✅ DONE | 17 `ginko_*` modules moved to `dharma_swarm/ginko/`; all imports updated |
+| providers_extended.py cleanup | ✅ DONE | Marked deprecated with clear documentation; zero runtime imports confirmed |
+| AutonomyLevel dedup | ✅ DONE (prior commit) | `profiles.py` now imports from `models.py` instead of redefining |
+
 ---
 
 ## Current Live Mismatches
@@ -183,10 +195,10 @@ Per MODULE_METABOLISM_STRATEGY.md §8, the 7 priority corridors were scanned wit
 | CLI Inventory | 37 | 4 | 2 | 1 | 8 | `dgc_cli.py` at 7078 LOC (top split target); 8 tui widgets without test coverage |
 
 **Key observations:**
-- **Session store** is the highest-leverage merge: same authority, same lifecycle, same failure mode. The `tui/engine/session_store.py` should become a thin import of `operator_core/session_store.py`.
-- **Model routing** has 3 facade candidates — `smart_router.py`, `router_v1.py`, and `swarm_router.py` — that could be consolidated behind a single routing facade.
-- **CLI inventory** has the most dead weight: 8 archive-review candidates in the TUI widgets, all with zero test coverage and zero inbound imports.
-- **Ginko** is the largest domain (17 modules, 12,986 total LOC) and would benefit most from subdirectory packaging.
+- **Session store** — ✅ MERGED. `tui/engine/session_store.py` is now a thin re-export of `operator_core/session_store.py`.
+- **Model routing** — ✅ FACADE. `routing_facade.py` provides `classify_and_route()`, `detect_language()`, `select_provider()` as single entry points.
+- **CLI inventory** — ✅ DECOMPOSED. `dgc_cli.py` reduced from 7078→5784 LOC. 3 command groups extracted to `cli/` subpackage. 8 archive-review TUI widgets still pending.
+- **Ginko** — ✅ PACKAGED. 17 modules moved from flat `dharma_swarm/ginko_*.py` to `dharma_swarm/ginko/` subdirectory. All imports updated.
 
 ---
 

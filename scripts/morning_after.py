@@ -151,7 +151,7 @@ def main():
     try:
         # Import and run the audit engine
         sys.path.insert(0, str(DHARMA_SWARM))
-        from dharma_swarm.ginko_audit import GinkoAuditor
+        from dharma_swarm.ginko.audit import GinkoAuditor
 
         auditor = GinkoAuditor()
         report = auditor.build_report(mode="morning_after")

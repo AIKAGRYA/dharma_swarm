@@ -11,7 +11,7 @@ Decomposes realized P&L along four axes:
 Data source: ~/.dharma/ginko/trades.jsonl (appended by PaperPortfolio.close_position)
 
 Usage:
-    from dharma_swarm.ginko_attribution import load_trades, compute_attribution, format_attribution_report
+    from dharma_swarm.ginko.attribution import load_trades, compute_attribution, format_attribution_report
     trades = load_trades()
     report = compute_attribution(trades)
     print(format_attribution_report(report))

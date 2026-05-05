@@ -17,7 +17,7 @@ import pytest
 _temp_dir = tempfile.mkdtemp()
 os.environ.setdefault("DHARMA_HOME", _temp_dir)
 
-from dharma_swarm.ginko_paper_trade import (
+from dharma_swarm.ginko.paper_trade import (
     AHIMSA_MAX_POSITION_PCT,
     PaperPortfolio,
     Position,

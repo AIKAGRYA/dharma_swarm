@@ -71,8 +71,8 @@ def run_signal_pipeline(
     symbols: list[str], days: int
 ) -> None:
     """Main pipeline: fetch data -> regime detection -> signal generation -> report."""
-    from dharma_swarm.ginko_regime import ReturnSeries, analyze_regime
-    from dharma_swarm.ginko_signals import (
+    from dharma_swarm.ginko.regime import ReturnSeries, analyze_regime
+    from dharma_swarm.ginko.signals import (
         compute_indicators,
         format_signal_report,
         generate_signal_report,
@@ -136,7 +136,7 @@ def run_signal_pipeline(
         sym = signal.symbol
         if sym in hist_data:
             d = hist_data[sym]
-            from dharma_swarm.ginko_signals import compute_indicators as _ci
+            from dharma_swarm.ginko.signals import compute_indicators as _ci
             signal.indicators = _ci(
                 sym, d["close"],
                 highs=d["high"],
@@ -182,7 +182,7 @@ def run_signal_pipeline(
             print(f"  {k}: {v}")
 
     # Confirm save location
-    from dharma_swarm.ginko_signals import SIGNALS_DIR
+    from dharma_swarm.ginko.signals import SIGNALS_DIR
     print(f"\nReport saved to: {SIGNALS_DIR}/")
 
     # Return for programmatic use

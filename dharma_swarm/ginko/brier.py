@@ -716,7 +716,7 @@ async def auto_resolve_predictions() -> list[dict[str, Any]]:
 
         # Try to get current price
         try:
-            from dharma_swarm.ginko_data import fetch_stock_quote
+            from dharma_swarm.ginko.data import fetch_stock_quote
 
             quote = await fetch_stock_quote(ticker)
             if not quote:

@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from dharma_swarm.ginko_risk import (
+from dharma_swarm.ginko.risk import (
     DEFAULT_SECTOR_MAP,
     RiskReport,
     _classify_risk_score,

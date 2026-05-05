@@ -15,7 +15,7 @@ os.environ["DHARMA_HOME"] = _temp_dir
 
 from unittest.mock import AsyncMock, Mock, patch
 
-from dharma_swarm.ginko_brier import (
+from dharma_swarm.ginko.brier import (
     BrierDashboard,
     Prediction,
     build_dashboard,
@@ -340,7 +340,7 @@ class TestWebhookNotify:
         mock_client.__aexit__ = AsyncMock(return_value=False)
 
         with patch.dict(os.environ, {"GINKO_WEBHOOK_URL": "https://example.com/hook"}):
-            with patch("dharma_swarm.ginko_brier.httpx.AsyncClient", return_value=mock_client):
+            with patch("dharma_swarm.ginko.brier.httpx.AsyncClient", return_value=mock_client):
                 result = await webhook_notify(
                     {"question": "Will SPY go up?", "probability": 0.7},
                     outcome=1.0,
@@ -381,7 +381,7 @@ class TestWebhookNotify:
         mock_client.__aexit__ = AsyncMock(return_value=False)
 
         with patch.dict(os.environ, {"GINKO_WEBHOOK_URL": "https://example.com/hook"}):
-            with patch("dharma_swarm.ginko_brier.httpx.AsyncClient", return_value=mock_client):
+            with patch("dharma_swarm.ginko.brier.httpx.AsyncClient", return_value=mock_client):
                 result = await webhook_notify(
                     {"question": "Test?", "probability": 0.5},
                     outcome=0.0,
@@ -398,7 +398,7 @@ class TestWebhookNotify:
         mock_client.__aexit__ = AsyncMock(return_value=False)
 
         with patch.dict(os.environ, {"GINKO_WEBHOOK_URL": "https://example.com/hook"}):
-            with patch("dharma_swarm.ginko_brier.httpx.AsyncClient", return_value=mock_client):
+            with patch("dharma_swarm.ginko.brier.httpx.AsyncClient", return_value=mock_client):
                 result = await webhook_notify(
                     {"question": "Test?", "probability": 0.5},
                     outcome=1.0,

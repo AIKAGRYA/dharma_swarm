@@ -11,7 +11,7 @@ import pytest
 _temp_dir = tempfile.mkdtemp()
 os.environ.setdefault("DHARMA_HOME", _temp_dir)
 
-from dharma_swarm.ginko_regime import (
+from dharma_swarm.ginko.regime import (
     MarketRegime,
     RegimeDetection,
     ReturnSeries,

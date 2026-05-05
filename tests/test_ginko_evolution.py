@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from dharma_swarm.ginko_evolution import (
+from dharma_swarm.ginko.evolution import (
     FLEET_AGENTS,
     MUTATION_MODEL,
     PromptTournament,
@@ -158,7 +158,7 @@ class TestComputeFitnessFromLog:
             )
 
     def test_from_task_log(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("dharma_swarm.ginko_evolution.AGENTS_DIR", tmp_path)
+        monkeypatch.setattr("dharma_swarm.ginko.evolution.AGENTS_DIR", tmp_path)
         self._setup_agent(tmp_path, "kimi", task_entries=[
             {"success": True, "latency_ms": 2000.0, "quality": 0.8},
             {"success": True, "latency_ms": 3000.0, "quality": 0.7},
@@ -171,7 +171,7 @@ class TestComputeFitnessFromLog:
         assert result["composite_fitness"] > 0
 
     def test_from_identity_fallback(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("dharma_swarm.ginko_evolution.AGENTS_DIR", tmp_path)
+        monkeypatch.setattr("dharma_swarm.ginko.evolution.AGENTS_DIR", tmp_path)
         self._setup_agent(tmp_path, "scout", identity={
             "total_calls": 10,
             "tasks_completed": 8,
@@ -184,14 +184,14 @@ class TestComputeFitnessFromLog:
         assert result["composite_fitness"] == 0.65
 
     def test_no_data(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("dharma_swarm.ginko_evolution.AGENTS_DIR", tmp_path)
+        monkeypatch.setattr("dharma_swarm.ginko.evolution.AGENTS_DIR", tmp_path)
         (tmp_path / "ghost").mkdir()
         result = _compute_fitness_from_log("ghost")
         assert result["total_calls"] == 0
         assert result["composite_fitness"] == 0.0
 
     def test_speed_score_fast(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("dharma_swarm.ginko_evolution.AGENTS_DIR", tmp_path)
+        monkeypatch.setattr("dharma_swarm.ginko.evolution.AGENTS_DIR", tmp_path)
         # All calls under 5s -> speed score = 1.0
         self._setup_agent(tmp_path, "fast", task_entries=[
             {"success": True, "latency_ms": 1000.0, "quality": 0.9},
@@ -202,7 +202,7 @@ class TestComputeFitnessFromLog:
         assert result["composite_fitness"] >= 0.95
 
     def test_speed_score_slow(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("dharma_swarm.ginko_evolution.AGENTS_DIR", tmp_path)
+        monkeypatch.setattr("dharma_swarm.ginko.evolution.AGENTS_DIR", tmp_path)
         # All calls over 120s -> speed score = 0.0
         self._setup_agent(tmp_path, "slow", task_entries=[
             {"success": True, "latency_ms": 200_000.0, "quality": 0.5},
@@ -325,7 +325,7 @@ class TestPromptTournament:
 
     def test_tournament_history(self, tmp_path, monkeypatch):
         history_path = tmp_path / "history.jsonl"
-        monkeypatch.setattr("dharma_swarm.ginko_evolution.TOURNAMENT_HISTORY_PATH", history_path)
+        monkeypatch.setattr("dharma_swarm.ginko.evolution.TOURNAMENT_HISTORY_PATH", history_path)
         t = PromptTournament(agents_dir=tmp_path)
         t.save_tournament_result({"tournament_id": "t1", "status": "ok"})
         t.save_tournament_result({"tournament_id": "t2", "status": "ok"})
@@ -342,7 +342,7 @@ class TestPromptTournament:
     @pytest.mark.asyncio
     async def test_run_tournament_no_agents(self, tmp_path, monkeypatch):
         history_path = tmp_path / "history.jsonl"
-        monkeypatch.setattr("dharma_swarm.ginko_evolution.TOURNAMENT_HISTORY_PATH", history_path)
+        monkeypatch.setattr("dharma_swarm.ginko.evolution.TOURNAMENT_HISTORY_PATH", history_path)
         t = PromptTournament(agents_dir=tmp_path / "empty")
         result = await t.run_tournament()
         assert result["status"] == "no_agents"
@@ -350,9 +350,9 @@ class TestPromptTournament:
 
     @pytest.mark.asyncio
     async def test_run_tournament_with_agents(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("dharma_swarm.ginko_evolution.AGENTS_DIR", tmp_path)
+        monkeypatch.setattr("dharma_swarm.ginko.evolution.AGENTS_DIR", tmp_path)
         history_path = tmp_path / "history.jsonl"
-        monkeypatch.setattr("dharma_swarm.ginko_evolution.TOURNAMENT_HISTORY_PATH", history_path)
+        monkeypatch.setattr("dharma_swarm.ginko.evolution.TOURNAMENT_HISTORY_PATH", history_path)
 
         self._setup_fleet(tmp_path, ["a", "b", "c", "d", "e"])
         t = PromptTournament(agents_dir=tmp_path)
@@ -374,8 +374,8 @@ class TestPromptTournament:
     @pytest.mark.asyncio
     async def test_tournament_few_agents(self, tmp_path, monkeypatch):
         history_path = tmp_path / "history.jsonl"
-        monkeypatch.setattr("dharma_swarm.ginko_evolution.TOURNAMENT_HISTORY_PATH", history_path)
-        monkeypatch.setattr("dharma_swarm.ginko_evolution.AGENTS_DIR", tmp_path)
+        monkeypatch.setattr("dharma_swarm.ginko.evolution.TOURNAMENT_HISTORY_PATH", history_path)
+        monkeypatch.setattr("dharma_swarm.ginko.evolution.AGENTS_DIR", tmp_path)
 
         self._setup_fleet(tmp_path, ["a", "b"])
         t = PromptTournament(agents_dir=tmp_path)

@@ -14,7 +14,7 @@ import pytest
 _temp_dir = tempfile.mkdtemp()
 os.environ.setdefault("DHARMA_HOME", _temp_dir)
 
-from dharma_swarm.ginko_sec import (
+from dharma_swarm.ginko.sec import (
     FilingAnalysis,
     FilingSections,
     SECFiling,
@@ -190,7 +190,7 @@ class TestFetchCompanyFilings:
 
         mock_get = AsyncMock(return_value=mock_resp)
 
-        with patch("dharma_swarm.ginko_sec._client") as mock_client:
+        with patch("dharma_swarm.ginko.sec._client") as mock_client:
             mock_client.get = mock_get
             filings = await fetch_company_filings("AAPL", filing_type="10-K", limit=1)
 
@@ -203,7 +203,7 @@ class TestFetchCompanyFilings:
     async def test_fetch_filings_not_found(self):
         """CIK resolution failure for unknown ticker returns empty list."""
         # Patch _resolve_cik to return None (unknown ticker, no network)
-        with patch("dharma_swarm.ginko_sec._resolve_cik", new_callable=AsyncMock, return_value=None):
+        with patch("dharma_swarm.ginko.sec._resolve_cik", new_callable=AsyncMock, return_value=None):
             filings = await fetch_company_filings("ZZZZZZ_FAKE", filing_type="10-K")
 
         assert filings == []
@@ -213,7 +213,7 @@ class TestFetchCompanyFilings:
         """httpx error during fetch should return empty list, not raise."""
         mock_get = AsyncMock(side_effect=httpx.HTTPError("connection refused"))
 
-        with patch("dharma_swarm.ginko_sec._client") as mock_client:
+        with patch("dharma_swarm.ginko.sec._client") as mock_client:
             mock_client.get = mock_get
             filings = await fetch_company_filings("AAPL")
 
@@ -247,8 +247,8 @@ class TestFetchRecent10K:
             return mock_doc_resp
 
         with (
-            patch("dharma_swarm.ginko_sec._client") as mock_client,
-            patch("dharma_swarm.ginko_sec._load_cached", return_value=None),
+            patch("dharma_swarm.ginko.sec._client") as mock_client,
+            patch("dharma_swarm.ginko.sec._load_cached", return_value=None),
         ):
             mock_client.get = mock_get
             filing = await fetch_recent_10k("AAPL")
@@ -267,8 +267,8 @@ class TestFetchRecent10K:
         mock_get = AsyncMock(return_value=mock_submissions_resp)
 
         with (
-            patch("dharma_swarm.ginko_sec._client") as mock_client,
-            patch("dharma_swarm.ginko_sec._load_cached", return_value="cached filing content"),
+            patch("dharma_swarm.ginko.sec._client") as mock_client,
+            patch("dharma_swarm.ginko.sec._load_cached", return_value="cached filing content"),
         ):
             mock_client.get = mock_get
             filing = await fetch_recent_10k("AAPL")
@@ -441,7 +441,7 @@ class TestBatchFetch:
             call_log.append(ticker)
             return _make_filing(ticker=ticker, raw_text=f"{ticker} filing content")
 
-        with patch("dharma_swarm.ginko_sec.fetch_recent_10k", side_effect=mock_fetch_10k):
+        with patch("dharma_swarm.ginko.sec.fetch_recent_10k", side_effect=mock_fetch_10k):
             results = await fetch_recent_10k_batch(tickers)
 
         assert len(results) == 3
@@ -482,7 +482,7 @@ class TestSearchFilings:
         mock_resp = _mock_httpx_response(json_data=mock_efts_response)
         mock_get = AsyncMock(return_value=mock_resp)
 
-        with patch("dharma_swarm.ginko_sec._client") as mock_client:
+        with patch("dharma_swarm.ginko.sec._client") as mock_client:
             mock_client.get = mock_get
             results = await search_filings("Apple revenue growth", forms="10-K")
 
@@ -495,7 +495,7 @@ class TestSearchFilings:
         mock_resp = _mock_httpx_response(json_data={"hits": {"hits": []}})
         mock_get = AsyncMock(return_value=mock_resp)
 
-        with patch("dharma_swarm.ginko_sec._client") as mock_client:
+        with patch("dharma_swarm.ginko.sec._client") as mock_client:
             mock_client.get = mock_get
             results = await search_filings("zzzzz nonexistent query")
 
