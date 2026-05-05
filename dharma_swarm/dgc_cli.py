@@ -3593,6 +3593,14 @@ def cmd_context_search(query: str, budget: int = 10_000) -> None:
         print()
 
 
+def cmd_intent_plan(prompt: str) -> None:
+    """Inspect the intent-to-work-packet pipeline for a prompt (non-executing)."""
+    from dharma_swarm.operator_core.intent_payloads import build_intent_plan
+
+    data = build_intent_plan(prompt)
+    print(json.dumps(data, indent=2, default=str))
+
+
 def cmd_compose(description: str) -> None:
     """Compose a task into a DAG execution plan."""
     async def _compose():
@@ -5866,6 +5874,14 @@ def _build_parser() -> argparse.ArgumentParser:
     p_cs.add_argument("cs_query", nargs="+", help="Search query")
     p_cs.add_argument("--budget", type=int, default=10000)
 
+    # -- intent-plan --
+    p_ip = sub.add_parser(
+        "intent-plan",
+        help="Inspect the intent-to-work-packet pipeline for a prompt (non-executing)",
+    )
+    p_ip.add_argument("ip_prompt", nargs="+", help="Operator prompt to analyze")
+    p_ip.add_argument("--json", action="store_true", help="Emit JSON output (default)")
+
     # -- compose (v0.4.1) --
     p_comp = sub.add_parser("compose", help="Compose a task into DAG execution plan (v0.4.1)")
     p_comp.add_argument("comp_desc", nargs="+", help="Task description")
@@ -6772,6 +6788,8 @@ def main() -> None:
             cmd_autonomy(" ".join(args.auto_action))
         case "context-search":
             cmd_context_search(" ".join(args.cs_query))
+        case "intent-plan":
+            cmd_intent_plan(" ".join(args.ip_prompt))
         case "compose":
             cmd_compose(" ".join(args.comp_desc))
         case "execute-compose":
