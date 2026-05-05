@@ -65,11 +65,12 @@ def _outcome(
     *,
     success: bool = True,
     summary: str = "Verified substrate-backed result",
+    proposal_id: str | None = None,
 ):
     obj, errors = registry.create_object(
         "Outcome",
         {
-            "proposal_id": f"proposal-{task_id}",
+            "proposal_id": proposal_id or f"proposal-{task_id}",
             "task_id": task_id,
             "agent_id": "agent-alpha",
             "success": success,
@@ -153,6 +154,103 @@ def _evidence(registry: OntologyRegistry, claim_id: str):
     )
     assert link is not None, link_errors
     return obj
+
+
+def _telic_chain(registry: OntologyRegistry):
+    proposal, errors = registry.create_object(
+        "ActionProposal",
+        {
+            "task_id": "task-chain",
+            "agent_id": "agent-alpha",
+            "action_type": "dispatch",
+            "title": "Brief telic chain",
+            "description": "audit fixture",
+            "status": "proposed",
+            "priority": "normal",
+        },
+        created_by="test",
+    )
+    assert proposal is not None, errors
+    outcome = _outcome(
+        registry,
+        task_id="task-chain",
+        summary="Verified telic lifecycle chain is complete.",
+        proposal_id=proposal.id,
+    )
+
+    gate, errors = registry.create_object(
+        "GateDecisionRecord",
+        {
+            "proposal_id": proposal.id,
+            "decision": "allow",
+            "reason": "test allow",
+            "gate_results": {},
+            "witness_reroutes": 0,
+        },
+        created_by="test",
+    )
+    assert gate is not None, errors
+    lease, errors = registry.create_object(
+        "ExecutionLease",
+        {
+            "proposal_id": proposal.id,
+            "claim_id": "claim-brief",
+            "agent_id": outcome.properties["agent_id"],
+            "claimed_at": _now().isoformat(),
+            "claim_timeout_seconds": 30.0,
+            "claim_expires_at_epoch": 0.0,
+            "dispatch_timeout_seconds": 60.0,
+            "dispatch_attempt": 1,
+        },
+        created_by="test",
+    )
+    assert lease is not None, errors
+    value, errors = registry.create_object(
+        "ValueEvent",
+        {
+            "outcome_id": outcome.id,
+            "agent_id": outcome.properties["agent_id"],
+            "cell_id": "",
+            "task_id": outcome.properties["task_id"],
+            "task_type": "general",
+            "behavioral_signal": 0.5,
+            "success_value": 1.0,
+            "duration_efficiency": 1.0,
+            "composite_value": 0.8,
+            "scoring_method": "test",
+        },
+        created_by="test",
+    )
+    assert value is not None, errors
+    contribution, errors = registry.create_object(
+        "Contribution",
+        {
+            "value_event_id": value.id,
+            "agent_id": outcome.properties["agent_id"],
+            "cell_id": "",
+            "task_type": "general",
+            "credit_share": 1.0,
+            "attributed_value": 0.8,
+        },
+        created_by="test",
+    )
+    assert contribution is not None, errors
+
+    for link_name, source, target in (
+        ("has_gate_decision", proposal, gate),
+        ("has_execution_lease", proposal, lease),
+        ("has_outcome", proposal, outcome),
+        ("has_value_event", outcome, value),
+        ("has_contribution", value, contribution),
+    ):
+        link, link_errors = registry.create_link(
+            link_name,
+            source.id,
+            target.id,
+            created_by="test",
+        )
+        assert link is not None, link_errors
+    return proposal, outcome
 
 
 def test_brief_creates_typed_objects(
@@ -240,6 +338,25 @@ def test_brief_surfaces_open_claims_and_questions(
     assert "The inquiry chain is now ontology-native." in content
     assert "## Outstanding Questions (n=1)" in content
     assert "priority=urgent domain=governance" in content
+
+
+def test_brief_surfaces_telic_lifecycle_audit(
+    registry: OntologyRegistry,
+    gateway: OntologyActionGateway,
+    tmp_path,
+) -> None:
+    _proposal, outcome = _telic_chain(registry)
+    builder = InsightBriefBuilder(gateway, output_dir=tmp_path, now_fn=_now)
+    brief = builder.compose([outcome])
+    content = str(brief.properties["content"])
+
+    assert "## Telic Lifecycle Audit" in content
+    assert "complete=1/1" in content
+    assert "incomplete=0" in content
+    assert "Missing stages: gate=0 outcome=0 value=0 contribution=0" in content
+    assert "Action types: dispatch=1" in content
+    assert "`task-chain` status=complete gate=allow type=dispatch lease=yes missing=none" in content
+    assert f"outcome=`Outcome/{outcome.id}`" in content
 
 
 def test_brief_skips_empty_inquiry_sections(

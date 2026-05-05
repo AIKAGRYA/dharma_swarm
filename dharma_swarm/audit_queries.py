@@ -198,6 +198,16 @@ def lifecycle_audit_report(
 ) -> LifecycleAuditReport:
     """Aggregate recent proposal lifecycle health for operator review."""
     registry = get_shared_registry(force_reload=True)
+    return lifecycle_audit_report_for_registry(registry, days=days, limit=limit)
+
+
+def lifecycle_audit_report_for_registry(
+    registry: OntologyRegistry,
+    days: int = 7,
+    *,
+    limit: int | None = 50,
+) -> LifecycleAuditReport:
+    """Aggregate recent proposal lifecycle health from an explicit registry."""
     all_chains = _lifecycle_chain_audits(registry, days, limit=None)
     chains = all_chains if limit is None else all_chains[:max(0, limit)]
     link_gaps = _lifecycle_link_gaps(registry, days)

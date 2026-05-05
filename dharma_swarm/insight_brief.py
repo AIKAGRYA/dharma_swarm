@@ -10,6 +10,7 @@ from textwrap import shorten
 from typing import Callable, Iterable
 from zoneinfo import ZoneInfo
 
+from dharma_swarm.audit_queries import lifecycle_audit_report_for_registry
 from dharma_swarm.ontology import OntologyObj
 from dharma_swarm.ontology_action_gateway import (
     OntologyActionGateway,
@@ -114,6 +115,11 @@ class InsightBriefBuilder:
         claims = self._claims_for(artifact.id, outcomes)
         open_claims = self._open_claim_summaries()
         open_questions = self._open_question_summaries()
+        lifecycle_report = lifecycle_audit_report_for_registry(
+            self.gateway.registry,
+            days=7,
+            limit=5,
+        )
         content = self._render_markdown(
             today,
             artifact.id,
@@ -121,6 +127,7 @@ class InsightBriefBuilder:
             claims,
             open_claims=open_claims,
             open_questions=open_questions,
+            lifecycle_report=lifecycle_report,
         )
         artifact = self.gateway.update_object_or_fail(
             artifact.id,
@@ -262,6 +269,7 @@ class InsightBriefBuilder:
         *,
         open_claims: list[BriefOpenClaim] | None = None,
         open_questions: list[BriefOpenQuestion] | None = None,
+        lifecycle_report: dict | None = None,
     ) -> str:
         open_claims = open_claims or []
         open_questions = open_questions or []
@@ -303,13 +311,73 @@ class InsightBriefBuilder:
                     f"{question.text}"
                 )
             lines.append("")
+        if lifecycle_report is not None:
+            InsightBriefBuilder._append_lifecycle_audit(lines, lifecycle_report)
         lines.extend([
             "## Decision Surface",
             "",
             "- Read only claims with resolvable Outcome citations.",
             "- Treat missing citations as a build failure, not editorial drift.",
+            "- Treat telic lifecycle gaps as orchestration repairs, not narrative summaries.",
         ])
         return "\n".join(lines)
+
+    @staticmethod
+    def _append_lifecycle_audit(lines: list[str], report: dict) -> None:
+        total = int(report.get("total_proposals") or 0)
+        complete = int(report.get("complete_chains") or 0)
+        incomplete = int(report.get("incomplete_chains") or 0)
+        blocked = int(report.get("blocked_chains") or 0)
+        link_gaps = int(report.get("link_gaps") or 0)
+        lease_count = int(report.get("with_execution_lease") or 0)
+        lines.extend([
+            "## Telic Lifecycle Audit",
+            "",
+            (
+                f"- Window: {int(report.get('days') or 0)}d; "
+                f"complete={complete}/{total}; incomplete={incomplete}; "
+                f"blocked={blocked}; leased={lease_count}; link_gaps={link_gaps}"
+            ),
+            (
+                "- Missing stages: "
+                f"gate={int(report.get('missing_gate_decision') or 0)} "
+                f"outcome={int(report.get('missing_outcome') or 0)} "
+                f"value={int(report.get('missing_value_event') or 0)} "
+                f"contribution={int(report.get('missing_contribution') or 0)}"
+            ),
+        ])
+
+        by_action_type = report.get("by_action_type") or {}
+        if by_action_type:
+            action_counts = ", ".join(
+                f"{name}={count}"
+                for name, count in sorted(by_action_type.items())
+            )
+            lines.append(f"- Action types: {action_counts}")
+
+        chains = list(report.get("chains") or [])
+        if not chains:
+            lines.extend(["- No ActionProposal rows in this window.", ""])
+            return
+
+        lines.append("")
+        for chain in chains[:5]:
+            refs = chain.get("refs") or {}
+            brief = chain.get("brief") or {}
+            missing = ", ".join(chain.get("missing") or []) or "none"
+            outcome_ref = refs.get("outcome") or "Outcome/missing"
+            lease_state = "yes" if chain.get("has_execution_lease") else "no"
+            text = InsightBriefBuilder._clean_summary(str(brief.get("text") or ""))
+            lines.append(
+                "- "
+                f"`{chain.get('task_id') or 'unknown-task'}` "
+                f"status={chain.get('status') or 'unknown'} "
+                f"gate={chain.get('decision') or 'unknown'} "
+                f"type={chain.get('action_type') or 'unknown'} "
+                f"lease={lease_state} missing={missing} "
+                f"outcome=`{outcome_ref}`: {text}"
+            )
+        lines.append("")
 
     @staticmethod
     def _outcome_score(outcome: OntologyObj) -> int:
