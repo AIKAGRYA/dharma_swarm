@@ -19,11 +19,31 @@ paths only:
   exist.
 - `yds_ratings_path`: reads JSON or JSONL human rating records.
 - `cost_report_path`: reads JSON or JSONL burn/cost records.
+- `llm_burn_state_dir`: optionally reads local LLM usage from
+  `cost_log.jsonl`, `traces/cost_ledger.jsonl`, and dated trace JSONL files.
 - `hot_items_path`: reads current stop/next-move signals.
 - `revenue_notes_path`: reads plain text or markdown revenue notes.
 
 The generator does not read `~/.dharma` unless the caller explicitly passes a
 path there.
+
+## LLM Burn Normalization
+
+The brief can ingest the recent LLM burn upgrade through an explicit
+`llm_burn_state_dir`. That logic is implemented in `dharma_swarm.llm_burn` and
+normalizes local LLM usage records into OpenInference-style spans without adding
+OpenInference, OpenTelemetry, Langfuse, or LiteLLM as runtime dependencies.
+
+The normalizer reads:
+
+- `cost_log.jsonl`
+- `traces/cost_ledger.jsonl`
+- `traces/traces_YYYY-MM-DD.jsonl`
+
+It reports span count, token count, logged cost, estimated cost, zero-token
+spans, unpriced spans, source breakdown, cost-source breakdown, and failure hot
+spots. If unpriced spans are present, the conservative next move is to close the
+pricing gap before scaling another long autonomous run.
 
 ## Output
 

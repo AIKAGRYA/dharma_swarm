@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 from dharma_swarm.daily_operating_brief import (
@@ -166,6 +167,58 @@ def test_reads_simple_cost_jsonl_when_provided(tmp_path: Path) -> None:
     rendered = render_markdown(brief)
     assert "$0.1000 observed" in rendered
     assert "42 token(s)" in rendered
+
+
+def test_reads_llm_burn_state_dir_when_explicitly_provided(tmp_path: Path) -> None:
+    reports_dir = tmp_path / "reports" / "agentops"
+    _write_agentops_report(reports_dir, job_id="job-green")
+    state = tmp_path / ".dharma"
+    traces = state / "traces"
+    traces.mkdir(parents=True)
+    now = datetime(2026, 5, 9, 1, tzinfo=timezone.utc)
+    (state / "cost_log.jsonl").write_text(
+        json.dumps(
+            {
+                "timestamp": now.timestamp(),
+                "provider": "openai",
+                "model": "gpt-4o",
+                "input_tokens": 100,
+                "output_tokens": 50,
+                "estimated_cost_usd": 0.000625,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (traces / "traces_2026-05-09.jsonl").write_text(
+        json.dumps(
+            {
+                "trace_id": "trace-1",
+                "span_id": "span-1",
+                "kind": "agent_dispatch",
+                "status": "error",
+                "end_time": now.isoformat(),
+                "attributes": {"success": False, "error": "provider failed"},
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    brief = build_daily_operating_brief(
+        DailyOperatingBriefInputs(
+            agentops_reports_dir=reports_dir,
+            llm_burn_state_dir=state,
+            now=now,
+        )
+    )
+
+    rendered = render_markdown(brief)
+    assert "OpenInference-style LLM burn spans: 2 span(s)" in rendered
+    assert "estimated=$0.0006" in rendered
+    assert "zero-token=1" in rendered
+    assert "unpriced=1" in rendered
+    assert "Close the unpriced LLM span gap" in rendered
 
 
 def test_reads_simple_revenue_notes_when_provided(tmp_path: Path) -> None:

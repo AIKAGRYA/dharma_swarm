@@ -10,9 +10,11 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
+
+from dharma_swarm.llm_burn import load_llm_burn_rollup
 
 
 REVENUE_KEYWORDS = (
@@ -39,8 +41,11 @@ class DailyOperatingBriefInputs:
     kaizen_reports_dir: Path | None = None
     yds_ratings_path: Path | None = None
     cost_report_path: Path | None = None
+    llm_burn_state_dir: Path | None = None
     hot_items_path: Path | None = None
     revenue_notes_path: Path | None = None
+    now: datetime | None = None
+    llm_burn_since_hours: float = 24.0
 
 
 @dataclass(frozen=True)
@@ -64,6 +69,7 @@ def build_daily_operating_brief(
 ) -> DailyOperatingBrief:
     """Build a Daily Operating Brief from explicit local evidence paths."""
 
+    now = inputs.now or datetime.now(timezone.utc)
     missing: list[str] = []
     what_happened, gate_health, value_produced, stop_doing = _agentops_sections(
         inputs.agentops_reports_dir,
@@ -74,15 +80,21 @@ def build_daily_operating_brief(
         value_produced.extend(kaizen_lines)
 
     yds_lines = _yds_lines(inputs.yds_ratings_path, missing)
-    burn_lines = _cost_lines(inputs.cost_report_path, missing)
+    burn_lines = _burn_lines(
+        cost_report_path=inputs.cost_report_path,
+        llm_burn_state_dir=inputs.llm_burn_state_dir,
+        now=now,
+        since_hours=inputs.llm_burn_since_hours,
+        missing=missing,
+    )
     revenue_lines = _revenue_lines(inputs.revenue_notes_path, missing)
     hot_stop, hot_next = _hot_item_lines(inputs.hot_items_path, missing)
 
     stop_doing.extend(hot_stop)
-    next_move = _next_move(gate_health, what_happened, hot_next)
+    next_move = _next_move(gate_health, what_happened, hot_next, burn_lines)
 
     return DailyOperatingBrief(
-        date=date.today().isoformat(),
+        date=now.date().isoformat(),
         what_happened=_with_default(what_happened, "No operating events found."),
         gate_health=_with_default(gate_health, "No gate health evidence found."),
         value_produced=_with_default(value_produced, "No value-produced evidence found."),
@@ -244,7 +256,28 @@ def _yds_lines(path: Path | None, missing: list[str]) -> list[str]:
     return ["No human YDS ratings found."]
 
 
-def _cost_lines(path: Path | None, missing: list[str]) -> list[str]:
+def _burn_lines(
+    *,
+    cost_report_path: Path | None,
+    llm_burn_state_dir: Path | None,
+    now: datetime,
+    since_hours: float,
+    missing: list[str],
+) -> list[str]:
+    if cost_report_path is None and llm_burn_state_dir is None:
+        missing.append("Burn/cost source")
+        return ["No burn source found."]
+
+    lines: list[str] = []
+    if cost_report_path is not None:
+        lines.extend(_cost_lines(cost_report_path, missing))
+    if llm_burn_state_dir is not None:
+        lines.extend(_llm_burn_lines(llm_burn_state_dir, now=now, since_hours=since_hours, missing=missing))
+
+    return lines or ["No burn source found."]
+
+
+def _cost_lines(path: Path, missing: list[str]) -> list[str]:
     records = _load_records(path)
     if records is None:
         missing.append("Burn/cost source")
@@ -285,6 +318,53 @@ def _cost_lines(path: Path | None, missing: list[str]) -> list[str]:
     return lines
 
 
+def _llm_burn_lines(
+    state_dir: Path,
+    *,
+    now: datetime,
+    since_hours: float,
+    missing: list[str],
+) -> list[str]:
+    if not state_dir.exists():
+        missing.append("LLM burn state directory")
+        return []
+
+    rollup = load_llm_burn_rollup(state_dir, now=now, since_hours=since_hours)
+    if rollup.spans == 0:
+        return [f"OpenInference-style LLM burn spans: none found in the last {since_hours:.0f}h."]
+
+    lines = [
+        (
+            "OpenInference-style LLM burn spans: "
+            f"{rollup.spans} span(s), recorded=${rollup.logged_cost_usd:.4f}, "
+            f"estimated=${rollup.estimated_cost_usd:.4f}, "
+            f"tokens={rollup.total_tokens:,}, "
+            f"errors={rollup.error_spans}, "
+            f"zero-token={rollup.zero_token_spans}, "
+            f"unpriced={rollup.unpriced_spans}."
+        )
+    ]
+    if rollup.by_source:
+        lines.append(
+            "LLM burn sources: "
+            + ", ".join(f"{source}={count}" for source, count in rollup.by_source.items())
+            + "."
+        )
+    if rollup.by_cost_source:
+        lines.append(
+            "LLM burn cost sources: "
+            + ", ".join(f"{source}={count}" for source, count in rollup.by_cost_source.items())
+            + "."
+        )
+    if rollup.top_failure_provider or rollup.top_failure_model:
+        lines.append(
+            "LLM failure hot spot: "
+            f"provider={rollup.top_failure_provider or 'n/a'}, "
+            f"model={rollup.top_failure_model or 'n/a'}."
+        )
+    return lines
+
+
 def _revenue_lines(path: Path | None, missing: list[str]) -> list[str]:
     if path is None or not path.exists():
         missing.append("Revenue notes")
@@ -321,11 +401,18 @@ def _hot_item_lines(path: Path | None, missing: list[str]) -> tuple[list[str], l
     return stop_lines[:5], next_lines[:3]
 
 
-def _next_move(gate_health: list[str], what_happened: list[str], hot_next: list[str]) -> str:
+def _next_move(
+    gate_health: list[str],
+    what_happened: list[str],
+    hot_next: list[str],
+    burn_lines: list[str],
+) -> str:
     if any("not all green" in line for line in gate_health):
         return "Fix the first failed AgentOps gate or scope violation before expanding work."
     if any("No AgentOps reports found." in line for line in what_happened):
         return "Run one bounded AgentOps work packet and feed its report into tomorrow's brief."
+    if any(re.search(r"unpriced=[1-9]", line) for line in burn_lines):
+        return "Close the unpriced LLM span gap before scaling another long autonomous run."
     if hot_next:
         return hot_next[0]
     return "Pick one bounded, tested operating improvement and capture its evidence through AgentOps."
