@@ -1,6 +1,6 @@
 # Fractal Venture Cell: Research Foundations
 
-**Status:** Research artifact (informs `dharma_swarm/fractal_room.py` build)
+**Status:** Research artifact (informs `dharma_swarm/fractal/fractal_room.py` build)
 **Build plan:** [BUILD_PLAN_FRACTAL_ROOM_V0.md](BUILD_PLAN_FRACTAL_ROOM_V0.md)
 
 ---

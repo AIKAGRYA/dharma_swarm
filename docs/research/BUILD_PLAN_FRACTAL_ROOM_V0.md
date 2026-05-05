@@ -13,7 +13,7 @@
 **Goal:** Establish the recursive building block. Prove the Five Laws hold.
 
 **Files:**
-- `dharma_swarm/fractal_room.py` — FractalRoom, VentureCellV1, WorkPacket, RoomRegistry (in-memory)
+- `dharma_swarm/fractal/fractal_room.py` — FractalRoom, VentureCellV1, WorkPacket, RoomRegistry (in-memory)
 - `tests/test_fractal_room.py` — 20+ tests proving the Five Laws
 
 **What gets built:**
@@ -163,6 +163,8 @@ test_yds_rating_human_only                      # agent_id must be human operato
 - `dharma_swarm/kaizen_ops_local.py` — add `room_id` column
 - `tests/test_fractal_room_integration.py` — integration tests
 
+**Note:** Per SOVEREIGN_MANIFEST axiom A1, no new `.py` files at `dharma_swarm/` top level. All new modules go into `dharma_swarm/fractal/`.
+
 **Depends on:** Build 1 merged
 
 ---
@@ -184,7 +186,7 @@ test_yds_rating_human_only                      # agent_id must be human operato
 **Goal:** Implement the SECI cycle at room level.
 
 **Files:**
-- `dharma_swarm/kaizen_review.py` — KaizenReview dataclass + evaluator
+- `dharma_swarm/fractal/kaizen_review.py` — KaizenReview dataclass + evaluator
 - `tests/test_kaizen_review.py` — outcome → review → playbook update cycle
 
 **Depends on:** Build 1 merged

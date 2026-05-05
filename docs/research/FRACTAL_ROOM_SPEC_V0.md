@@ -305,7 +305,7 @@ All rooms pass the recursion check. Each can (in principle) operate as a standal
 The Room/VentureCell schema does NOT replace the existing `VentureCell` ObjectType in `ontology.py:1444`. Instead:
 
 - `ontology.py:VentureCell` remains the **identity record** in the ontology graph
-- `fractal_room.py:FractalRoom` is the **runtime container** that scopes operations
+- `fractal/fractal_room.py:FractalRoom` is the **runtime container** that scopes operations
 - The link between them is `cell_id` — both reference the same ID
 - The ontology type gains new properties over time (as the Room schema matures)
 - Existing instances (Shakti Ginko, Operator Brief v0) become rooms when Build 2 lands
