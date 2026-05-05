@@ -12,7 +12,7 @@
 | Mismatch | Old Status | New Status | Resolution |
 |----------|-----------|-----------|-----------|
 | MM-01: huggingface_hub ImportError | BLOCKER | ✅ RESOLVED | `try/except ImportError` added; heuristic fallback path confirmed |
-| MM-02/03: PersistentAgent enum coercion | BLOCKER | ⚠️ STILL LIVE | `orchestrate_live.py:1247` still passes bare strings — confirmed by x-ray |
+| MM-02/03: PersistentAgent enum coercion | BLOCKER | ✅ RESOLVED | Both call sites now use `AgentRole()` / `PT()` enum constructors (lines 1363-1366) |
 | MM-04: AgentPool None guard | DEGRADED | ✅ RESOLVED | `SubsystemNotReady` raised at line 870, `_agent_pool` guard present |
 | MM-06: Dual StigmergyStore | DEGRADED | ✅ RESOLVED | `run_living_layers_loop` now accepts `stigmergy_store` param; passes swarm's store |
 | MM-08: ECC_INSTINCT_SIGNAL constant | DEGRADED | ✅ RESOLVED | `SIGNAL_ECC_INSTINCT` defined in `signal_bus.py:40`, used in `instinct_bridge.py` |
@@ -32,52 +32,30 @@
 | NEW-10: lineage edges lack delegation chain | — | ✅ FIXED | `LineageEdge.delegated_by` + `trace_id` fields added; `agent_runner.spawn_worker` records delegation lineage |
 | NEW-11: TelicSeam singleton missing signal_bus | — | ✅ FIXED | `get_seam()` now passes `signal_bus=SignalBus.get()` to singleton |
 
-**Net change:** 10 resolved, 5 fixed prior sessions, 6 new entries (NEW-05 guarded, NEW-07/NEW-08 partially resolved, NEW-09/10/11 fixed), 0 open BLOCKERs, 5 structural degraded remain.
+**Net change:** 13 resolved, 5 fixed prior sessions, 6 new entries (NEW-05 guarded, NEW-07/NEW-08 partially resolved, NEW-09/10/11 fixed), 0 open BLOCKERs, 3 structural degraded remain.
 
 ---
 
 ## Current Live Mismatches
 
-### MM-02/03 — BLOCKER: PersistentAgent enum deserialization (still live)
+### MM-02/03 — ✅ RESOLVED: PersistentAgent enum deserialization
 
-**File:** `orchestrate_live.py:1247`
-**What's wrong:** `child_spec.get("role", "worker")` returns a bare string (`"conductor"`).
-`PersistentAgent.__init__` declares `role: AgentRole`. Pydantic v2 lax mode may coerce it — but this is brittle and will break on any invalid value.
-
-```python
-# CURRENT (brittle):
-child = PersistentAgent(
-    role=outcome.child_spec.get("role", "worker"),           # str
-    provider_type=outcome.child_spec.get("default_provider", "openrouter_free"),  # str
-)
-
-# CORRECT:
-from dharma_swarm.models import AgentRole, ProviderType as PT
-child = PersistentAgent(
-    role=AgentRole(outcome.child_spec.get("role", "worker")),
-    provider_type=PT(outcome.child_spec.get("default_provider", "openrouter_free")),
-)
-```
-
-**Fix complexity:** 2 lines. High leverage — replication is a critical path.
+**File:** `orchestrate_live.py:1359-1366`
+**Resolution:** Both call sites now use `AgentRole(...)` and `PT(...)` enum constructors. The replication monitor path (line 1363) wraps `child_spec.get("role", "general")` in `AgentRole()`. The conductor path uses pre-constructed enum values from `CONDUCTOR_CONFIGS`.
 
 ---
 
-### MM-05 — DEGRADED: Private Orchestrator method coupling
+### MM-05 — ✅ RESOLVED: Private Orchestrator method coupling
 
-**File:** `swarm.py:1883-1895`
-**What's wrong:** `swarm.py` calls `self._orchestrator._classify_failure()`, `_resolve_retry_policy()`, `_apply_failure_retry_defaults()` — all single-underscore private methods. Any internal refactor of `orchestrator.py` silently breaks `swarm.py`'s retry logic.
-
-**Fix:** Add `Orchestrator.retry_policy_for_failure(task, error, source, meta)` as a public API method. 1-hour refactor.
+**File:** `orchestrator.py:730-752`, `swarm.py:1978-1985`
+**Resolution:** Added `Orchestrator.retry_policy_for_failure(task, error, source, meta)` as a public API method that wraps `_classify_failure`, `_resolve_retry_policy`, and `_apply_failure_retry_defaults`. Updated `swarm.py` to call the public API instead of reaching into private methods.
 
 ---
 
-### MM-07 — DEGRADED: MetaEvolutionEngine cadence mismatch
+### MM-07 — ✅ RESOLVED: MetaEvolutionEngine cadence mismatch
 
-**File:** `orchestrate_live.py:399,407`
-**What's wrong:** `observe_cycle_result()` is called twice per cycle number (once with synthetic fitness, once with `auto_evolve` result). `n_object_cycles_per_meta=2` fires after 2 total calls — so meta-adaptation can trigger within a single evolution cycle, not after 2 separate cycles as intended.
-
-**Fix:** Only call `observe_cycle_result` once per cycle — with the actual `CycleResult` from `auto_evolve`, not the synthetic fitness estimate.
+**File:** `orchestrate_live.py:448-634`
+**Resolution:** Added `_meta_observed_this_cycle` flag. The synthetic `observe_cycle_result` call sets the flag; the `auto_evolve` path skips its call if the flag is already set. This ensures exactly one meta-observation per evolution cycle.
 
 ---
 

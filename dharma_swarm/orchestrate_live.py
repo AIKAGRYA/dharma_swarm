@@ -441,8 +441,11 @@ async def run_evolution_loop(shutdown_event: asyncio.Event) -> None:
                      f"avg={sum(live_fitness_scores)/len(live_fitness_scores):.3f} "
                      f"max={max(live_fitness_scores):.3f}")
 
-            # Feed meta-evolution with observed fitness
-            # Prefer live agent fitness; fall back to historical archive average
+            # Feed meta-evolution with observed fitness (once per cycle).
+            # Prefer live agent fitness; fall back to historical archive average.
+            # auto_evolve (below) may call observe_cycle_result with a real
+            # CycleResult — the flag prevents double-firing within a single cycle.
+            _meta_observed_this_cycle = False
             if avg_fitness > 0 or fitness_events:
                 if live_fitness_scores:
                     best_fitness = max(live_fitness_scores)
@@ -454,6 +457,7 @@ async def run_evolution_loop(shutdown_event: asyncio.Event) -> None:
                     proposals_submitted=len(fitness_events),
                 )
                 meta_result = meta_engine.observe_cycle_result(synthetic_result)
+                _meta_observed_this_cycle = True
                 if meta_result is not None:
                     if meta_result.evolved_parameters:
                         _log(
@@ -624,8 +628,10 @@ async def run_evolution_loop(shutdown_event: asyncio.Event) -> None:
                                     )
                                 _log("evolution", f"Live cycle: {_committed} commits on {_branch}")
 
-                            # Feed result to meta-evolution
-                            meta_engine.observe_cycle_result(result)
+                            # Feed result to meta-evolution (skip if synthetic
+                            # observation already fired this cycle)
+                            if not _meta_observed_this_cycle:
+                                meta_engine.observe_cycle_result(result)
                     else:
                         _log("evolution", "Auto-evolve skipped: OPENROUTER_API_KEY not set")
                 except Exception as exc:

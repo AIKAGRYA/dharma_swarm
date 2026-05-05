@@ -1975,22 +1975,16 @@ class SwarmManager:
                 continue
 
             source = self._derive_failure_source(task)
-            failure_class = self._orchestrator._classify_failure(
-                error=str(task.result or ""),
-                source=source,
-                task=task,
+            failure_class, retry_count, max_retries, backoff = (
+                self._orchestrator.retry_policy_for_failure(
+                    task=task,
+                    error=str(task.result or ""),
+                    source=source,
+                    meta=meta,
+                )
             )
             if failure_class not in {"connection_transient", "long_timeout"}:
                 continue
-
-            retry_count, max_retries, backoff = self._orchestrator._resolve_retry_policy(task)
-            max_retries, backoff = self._orchestrator._apply_failure_retry_defaults(
-                task=task,
-                meta=meta,
-                failure_class=failure_class,
-                max_retries=max_retries,
-                backoff=backoff,
-            )
 
             meta["retry_count"] = 0
             meta["max_retries"] = max_retries
