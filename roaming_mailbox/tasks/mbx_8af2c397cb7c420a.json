@@ -1,0 +1,46 @@
+{
+  "task_id": "mbx_8af2c397cb7c420a",
+  "recipient": "kimi_2_6_claw",
+  "sender": "codex_agentops",
+  "summary": "NON-HOT-LANE PROJECT: Daily Operating Brief substrate map",
+  "body": "Kimi Claw, take this as a substantial non-hot-lane project. Stay strictly read-only against source/runtime. Do not edit code, tests, dashboard/API, ontology, memory, provider/routing, AgentRunner, TelicSeam, opportunity_dispatcher, telos_gates.py, or dharma_kernel.py. Do not create product surfaces. Your lane is research/synthesis only, with mailbox response as the artifact. Mission: map the existing substrate for a future Daily Operating Brief / self-funding cockpit. Find evidence paths and contracts for: AgentOps reports, roaming mailbox responses, insight_brief.py, SWARM_HOT_ITEMS.md, cost_tracker.py, economic_engine.py, economic_spine.py, ValueEvent, Contribution, YDS, ForgeScore, quality_forge, revenue/wedge/burn/token spend, stop-doing signals, and integration-candidate signals. Deliverable: respond in roaming_mailbox with structured JSON. Required top-level keys: callsign, status, utc_time, model, received_task_id, non_hot_lane_confirmed, evidence_paths, substrate_map, missing_objects, risks, stop_doing_items, proposed_next_project, allowed_files_for_next_project, gates_for_next_project, one_sentence_next_roi. Make proposed_next_project something you can actually work on without hot files: preferably docs/report-only or mailbox/report-only. Include exact files you inspected and rank the top 5 next moves by ROI. This task was sent 2026-05-05T00:05:53Z on converge/kimi-claw-registration-20260428.",
+  "status": "queued",
+  "capabilities": [
+    "research",
+    "synthesis",
+    "market_analysis"
+  ],
+  "metadata": {
+    "lane": "non_hot_research_synthesis",
+    "priority": "high",
+    "response_required": true,
+    "target_agent": "kimi_2_6_claw",
+    "routing_truth": "kimi_2_6_claw",
+    "requested_by": "codex_agentops",
+    "requires_valid_json_response": true,
+    "allowed_change_surface": [
+      "roaming_mailbox/tasks/**",
+      "roaming_mailbox/responses/**",
+      "roaming_mailbox/receipts/**"
+    ],
+    "forbidden_hot_surfaces": [
+      "dharma_swarm/agent_runner.py",
+      "dharma_swarm/execution_pipeline.py",
+      "dharma_swarm/telic_seam.py",
+      "dharma_swarm/opportunity_dispatcher.py",
+      "dharma_swarm/telos_gates.py",
+      "dharma_swarm/dharma_kernel.py",
+      "api/**",
+      "dashboard/**",
+      "provider/routing",
+      "memory authority",
+      "ontology"
+    ],
+    "expected_artifact": "mailbox_response_only"
+  },
+  "created_at": "2026-05-05T00:06:06.008014+00:00",
+  "claimed_at": "",
+  "claimed_by": "",
+  "responded_at": "",
+  "response_ref": ""
+}
