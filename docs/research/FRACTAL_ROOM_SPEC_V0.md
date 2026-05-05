@@ -281,7 +281,7 @@ revenue_target: 0
 allowed_work: [work_packets, agent_registration, session_management, authority_review]
 forbidden_work: [live_autonomy, broad_v3_impl, ontology_refactor, dashboard_expansion, memory_consolidation]
 gates: [AHIMSA, SATYA, REVERSIBILITY]
-approval_required_for: [merge, push, external_outreach, authority_escalation]
+approval_required_for: [merge, push, external_outreach, budget_increase, subcell_spawn, authority_escalation]
 ```
 
 ---

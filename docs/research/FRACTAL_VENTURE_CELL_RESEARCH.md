@@ -7,7 +7,7 @@
 
 ## 1. Source Models
 
-This document synthesizes six external bodies of work that inform how Dharma Swarm should model governed, fractal, self-funding venture cells.
+This document synthesizes seven external bodies of work that inform how Dharma Swarm should model governed, fractal, self-funding venture cells.
 
 ### 1.1 Stafford Beer — Viable System Model (VSM)
 
