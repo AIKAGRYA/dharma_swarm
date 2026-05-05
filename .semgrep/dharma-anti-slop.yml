@@ -30,6 +30,8 @@ rules:
         - "dharma_swarm/review_cycle.py"
         - "dharma_swarm/ginko_backtest.py"
         - "dharma_swarm/ginko_evolution.py"
+        - "dharma_swarm/ginko/backtest.py"
+        - "dharma_swarm/ginko/evolution.py"
     pattern: Path.home() / ".dharma"
 
   # ===========================================================================
