@@ -56,10 +56,10 @@ curl -X POST http://localhost:8000/api/verify/review \
 ```
 PR Diff → scorer.py → 6 dimensions → reviewer.py → verdict → reporter.py → GitHub comment
                                           ↓
-                              flywheel_bridge.py → trajectory_collector → training data
-                                          ↓
                               comprehension.py → debt tracking over time
 ```
+
+> Note: `flywheel_bridge.py` was deleted in PR #95 (zero importers).
 
 ## GitHub App Webhook
 
