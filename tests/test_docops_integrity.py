@@ -143,3 +143,61 @@ def test_staleness_ttl_expires(tmp_path: Path) -> None:
     config_path = base_config(repo)
     findings, _metrics = docops.run_checks(repo, config_path, None, docops.parse_iso_date("2026-06-01"), False)
     assert any(finding.check == "staleness" for finding in findings)
+
+
+def test_report_json_writes_machine_readable_check_result(tmp_path: Path) -> None:
+    repo = tmp_path
+    write(repo / "dharma_swarm" / "a.py", "x = 1\n")
+    write(repo / "docs" / "governance" / "SOVEREIGN_MANIFEST.md", "Total Python modules | **1** |\n")
+    config_path = base_config(repo)
+    config = load_config(config_path)
+    config["assertions"] = [
+        {
+            "id": "total-python",
+            "doc": "docs/governance/SOVEREIGN_MANIFEST.md",
+            "regex": r"Total Python modules \| \*\*(\d+)\*\*",
+            "metric": "dharma_python_modules",
+        }
+    ]
+    save_config(config_path, config)
+
+    report_path = repo / "reports" / "docops.json"
+    exit_code = docops.main(
+        [
+            "--repo-root",
+            str(repo),
+            "--assertions",
+            str(config_path),
+            "--today",
+            "2026-05-05",
+            "--report-json",
+            str(report_path),
+        ]
+    )
+    payload = json.loads(report_path.read_text(encoding="utf-8"))
+    assert exit_code == 0
+    assert payload["passed"] is True
+    assert payload["metrics"]["dharma_python_modules"] == 1
+
+
+def test_inventory_reports_non_blocking_corpus_debt(tmp_path: Path) -> None:
+    repo = tmp_path
+    write(repo / "docs" / "registered.md", "This is canonical for one narrow domain.\n")
+    write(
+        repo / "docs" / "loose.md",
+        "---\nstatus: active\n---\nThis is the source of truth. See `/Users/dhyana/dharma_swarm/docs/missing.md`.\n",
+    )
+    config_path = base_config(repo)
+    config = load_config(config_path)
+    config["canonical_guard"]["registered"] = ["docs/registered.md"]
+    save_config(config_path, config)
+
+    inventory = docops.scan_doc_inventory(repo, config, ["docs/*.md"])
+    assert inventory["markdown_files_scanned"] == 2
+    assert inventory["unregistered_authority_doc_count"] == 1
+    assert inventory["frontmatter_doc_count"] == 1
+    assert inventory["absolute_path_ref_count"] == 1
+
+    markdown = docops.render_inventory_markdown(inventory)
+    assert "docs/loose.md" in markdown
+    assert "Absolute Repo Path References" in markdown

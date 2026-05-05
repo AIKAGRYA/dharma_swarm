@@ -38,6 +38,13 @@ repos:
         pass_filenames: false
         always_run: true
         stages: [pre-commit]
+      - id: dharma-docops-integrity
+        name: dharma docops integrity
+        entry: python3 scripts/docops/check_docops_integrity.py
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
 
   # ---------------------------------------------------------------------------
   # Gitleaks — secret scanning on staged content.
