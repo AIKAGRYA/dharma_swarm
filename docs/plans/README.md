@@ -80,6 +80,7 @@ Current examples:
 - [YOLO_4AM_TASKS.md](/Users/dhyana/dharma_swarm/docs/plans/YOLO_4AM_TASKS.md)
 - [GINKO_ENHANCEMENT_WAVE.md](/Users/dhyana/dharma_swarm/docs/plans/GINKO_ENHANCEMENT_WAVE.md)
 - [SPRINT_GOTCHAS.md](/Users/dhyana/dharma_swarm/docs/plans/SPRINT_GOTCHAS.md)
+- [TRACE_ATTRACTOR_LEDGER_MASTER_SPEC.md](/Users/dhyana/dharma_swarm/docs/plans/TRACE_ATTRACTOR_LEDGER_MASTER_SPEC.md)
 - [2026-04-02-cleanup-control-center.md](/Users/dhyana/dharma_swarm/docs/plans/2026-04-02-cleanup-control-center.md)
 - [REPO_HYGIENE_TRIAGE_2026-04-01.md](/Users/dhyana/dharma_swarm/docs/plans/REPO_HYGIENE_TRIAGE_2026-04-01.md)
 
