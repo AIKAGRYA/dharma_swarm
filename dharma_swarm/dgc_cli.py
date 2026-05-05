@@ -515,6 +515,8 @@ def _handle_status(args: argparse.Namespace) -> int:
 
 def _handle_audit_gates(args: argparse.Namespace) -> int:
     from dharma_swarm.audit_queries import (
+        lifecycle_audit_report,
+        lifecycle_chain_audit,
         proposal_to_outcome_chain,
         recent_blocks,
         unrecorded_actions,
@@ -523,6 +525,7 @@ def _handle_audit_gates(args: argparse.Namespace) -> int:
     days = int(args.days)
     blocks = recent_blocks(days)
     gaps = unrecorded_actions(days)
+    lifecycle = lifecycle_audit_report(days, limit=5)
     proposal_ids: list[str] = []
     for row in gaps:
         proposal_ids.append(str(row["id"]))
@@ -539,6 +542,25 @@ def _handle_audit_gates(args: argparse.Namespace) -> int:
     print(f"Governance gate audit ({days}d)")
     print(f"  Recent blocks: {len(blocks)}")
     print(f"  Ungated proposals: {len(gaps)}")
+    print("  Lifecycle chains:")
+    print(f"    Total proposals: {lifecycle['total_proposals']}")
+    print(f"    Complete chains: {lifecycle['complete_chains']}")
+    print(f"    Incomplete chains: {lifecycle['incomplete_chains']}")
+    print(f"    Blocked chains: {lifecycle['blocked_chains']}")
+    print(
+        "    Missing links: "
+        f"gate={lifecycle['missing_gate_decision']} "
+        f"outcome={lifecycle['missing_outcome']} "
+        f"value={lifecycle['missing_value_event']} "
+        f"contribution={lifecycle['missing_contribution']}"
+    )
+    print(f"    Ontology link gaps: {lifecycle['link_gaps']}")
+    if lifecycle["by_action_type"]:
+        action_parts = [
+            f"{name}={count}"
+            for name, count in lifecycle["by_action_type"].items()
+        ]
+        print(f"    Action types: {', '.join(action_parts)}")
 
     if blocks:
         print("\nRecent blocks:")
@@ -559,6 +581,7 @@ def _handle_audit_gates(args: argparse.Namespace) -> int:
     if chains:
         print("\nSample chains:")
         for chain in chains:
+            audit_row = lifecycle_chain_audit(chain["proposal_id"])
             states = [
                 "P" if chain["proposal"] else "-",
                 "G" if chain["gate_decision"] else "-",
@@ -567,7 +590,12 @@ def _handle_audit_gates(args: argparse.Namespace) -> int:
                 "V" if chain["value_event"] else "-",
                 f"C{len(chain['contributions'])}",
             ]
-            print(f"  - {chain['proposal_id'][:12]} {'>'.join(states)}")
+            status = audit_row["status"]
+            decision = audit_row["decision"]
+            print(
+                f"  - {chain['proposal_id'][:12]} {'>'.join(states)} "
+                f"status={status} decision={decision or '-'}"
+            )
 
     return 0
 
