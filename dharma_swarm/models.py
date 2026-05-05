@@ -6,9 +6,11 @@ Every module imports from here — this is the schema contract.
 
 from __future__ import annotations
 
+import re
 import uuid
 from datetime import datetime, timezone
 from enum import Enum
+from pathlib import Path
 from typing import Any, Optional
 
 from pydantic import BaseModel, Field, model_validator
@@ -224,6 +226,128 @@ class AgentConfig(BaseModel):
         return data
 
 
+_SLUG_RE = re.compile(r"[^a-z0-9]+")
+
+
+class AgentIdentity(BaseModel):
+    """Canonical unified agent identity.
+
+    Single source of truth for who an agent IS.  Supersedes the four
+    legacy schemas (``AgentConfig``, ``AgentProfile``,
+    ``autonomous_agent.AgentIdentity``, and ``startup_crew`` dicts).
+
+    See ``AGENT_IDENTITY_UNIFICATION.md`` for the full migration spec.
+    ``AgentConfig`` remains for backward compatibility; new code should
+    construct ``AgentIdentity`` instead.
+    """
+
+    # ── Identity (required) ──
+    name: str
+    role: AgentRole = AgentRole.GENERAL
+    provider: ProviderType = ProviderType.ANTHROPIC
+    model: str = ""
+    system_prompt: str = ""
+
+    # ── Identity (optional) ──
+    thread: Optional[str] = None
+    working_directory: str = Field(default_factory=lambda: str(Path.home()))
+
+    # ── Execution config ──
+    max_turns: int = 25
+    allowed_tools: list[str] = Field(default_factory=list)
+    denied_tools: list[str] = Field(default_factory=list)
+    wake_interval: float = 3600.0
+    autonomy: AutonomyLevel = AutonomyLevel.BALANCED
+    max_tokens: int = 4096
+    temperature: float = 0.7
+    context_budget: int = 30_000
+    timeout: int = 300
+
+    # ── Classification ──
+    skill_name: str = ""
+    tags: list[str] = Field(default_factory=list)
+    display_name: str = ""
+    agent_slug: str = ""
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_enums(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            for key in ("provider", "provider_type"):
+                val = data.get(key)
+                if isinstance(val, str) and not isinstance(val, ProviderType):
+                    try:
+                        data["provider"] = ProviderType(val.lower())
+                    except ValueError:
+                        pass
+            val = data.get("role")
+            if isinstance(val, str) and not isinstance(val, AgentRole):
+                try:
+                    data["role"] = AgentRole(val.lower())
+                except ValueError:
+                    pass
+        return data
+
+    def resolved_display_name(self) -> str:
+        return self.display_name or self.name
+
+    def resolved_agent_slug(self) -> str:
+        if self.agent_slug:
+            return self.agent_slug
+        return _SLUG_RE.sub("-", self.name.strip().lower()).strip("-") or "agent"
+
+    def resolved_model(self) -> str:
+        return self.model or "claude-sonnet-4-20250514"
+
+    def provider_string(self) -> str:
+        return self.provider.value
+
+    def to_agent_config(self) -> AgentConfig:
+        """Downcast to legacy AgentConfig for backward compatibility."""
+        return AgentConfig(
+            name=self.name,
+            role=self.role,
+            provider=self.provider,
+            model=self.resolved_model(),
+            system_prompt=self.system_prompt,
+            max_turns=self.max_turns,
+            thread=self.thread,
+            tools=self.allowed_tools,
+            autonomy=self.autonomy,
+            temperature=self.temperature,
+            max_tokens=self.max_tokens,
+            context_budget=self.context_budget,
+            timeout=self.timeout,
+            working_directory=self.working_directory,
+            wake_interval=int(self.wake_interval),
+            display_name=self.display_name,
+            tags=self.tags,
+        )
+
+    @classmethod
+    def from_agent_config(cls, cfg: AgentConfig) -> AgentIdentity:
+        """Upcast from legacy AgentConfig."""
+        return cls(
+            name=cfg.name,
+            role=cfg.role,
+            provider=cfg.provider,
+            model=cfg.model,
+            system_prompt=cfg.system_prompt,
+            thread=cfg.thread,
+            working_directory=cfg.working_directory or str(Path.home()),
+            max_turns=cfg.max_turns,
+            allowed_tools=cfg.tools,
+            wake_interval=float(cfg.wake_interval),
+            autonomy=cfg.autonomy,
+            max_tokens=cfg.max_tokens,
+            temperature=cfg.temperature,
+            context_budget=cfg.context_budget,
+            timeout=cfg.timeout,
+            display_name=cfg.display_name,
+            tags=cfg.tags,
+        )
+
+
 class AgentState(BaseModel):
     """Runtime state of an agent."""
     id: str
@@ -252,6 +376,7 @@ class Message(BaseModel):
     created_at: datetime = Field(default_factory=_utc_now)
     read_at: Optional[datetime] = None
     reply_to: Optional[str] = None
+    trace_id: str = ""
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 

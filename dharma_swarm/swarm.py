@@ -620,6 +620,7 @@ class SwarmManager:
         from dharma_swarm.memory import StrangeLoopMemory
         from dharma_swarm.message_bus import MessageBus
         from dharma_swarm.orchestrator import Orchestrator
+        from dharma_swarm.runtime_state import RuntimeStateStore
         from dharma_swarm.task_board import TaskBoard
         from dharma_swarm.telemetry_plane import TelemetryPlaneStore
         from dharma_swarm.telos_gates import DEFAULT_GATEKEEPER
@@ -629,7 +630,13 @@ class SwarmManager:
         db_dir.mkdir(exist_ok=True)
         state_runtime_db = self.state_dir / "state" / "runtime.db"
 
-        self._task_board = TaskBoard(db_dir / "tasks.db")
+        # NEW-05 fix: auto-close claims when tasks reach terminal states
+        _rss = RuntimeStateStore(db_path=db_dir / "runtime.db")
+
+        def _close_claims_on_terminal(task_id: str, status: str) -> None:
+            _rss.close_claims_for_task_sync(task_id, status=status)
+
+        self._task_board = TaskBoard(db_dir / "tasks.db", on_terminal=_close_claims_on_terminal)
         await self._task_board.init_db()
 
         self._message_bus = MessageBus(db_dir / "messages.db")

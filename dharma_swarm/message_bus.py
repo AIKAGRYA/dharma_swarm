@@ -20,6 +20,7 @@ from typing import Any
 
 import aiosqlite
 
+from dharma_swarm.correlation_context import get_correlation
 from dharma_swarm.models import (
     Message,
     MessagePriority,
@@ -32,8 +33,11 @@ CREATE TABLE IF NOT EXISTS messages (
     id TEXT PRIMARY KEY, from_agent TEXT NOT NULL, to_agent TEXT NOT NULL,
     subject TEXT, body TEXT NOT NULL, priority TEXT DEFAULT 'normal',
     status TEXT DEFAULT 'unread', created_at TEXT NOT NULL,
-    read_at TEXT, reply_to TEXT, metadata TEXT DEFAULT '{}'
+    read_at TEXT, reply_to TEXT, trace_id TEXT NOT NULL DEFAULT '',
+    metadata TEXT DEFAULT '{}'
 )"""
+
+_MIGRATE_TRACE_ID = "ALTER TABLE messages ADD COLUMN trace_id TEXT NOT NULL DEFAULT ''"
 
 _HEARTBEATS_DDL = """
 CREATE TABLE IF NOT EXISTS heartbeats (
@@ -96,6 +100,12 @@ def _now_iso() -> str:
 
 def _row_to_message(row: aiosqlite.Row) -> Message:
     """Convert a database row into a Message model."""
+    # trace_id may not exist in old databases before migration runs
+    trace_id = ""
+    try:
+        trace_id = row["trace_id"] or ""
+    except (IndexError, KeyError):
+        pass
     return Message(
         id=row["id"], from_agent=row["from_agent"], to_agent=row["to_agent"],
         subject=row["subject"], body=row["body"],
@@ -104,6 +114,7 @@ def _row_to_message(row: aiosqlite.Row) -> Message:
         created_at=datetime.fromisoformat(row["created_at"]),
         read_at=datetime.fromisoformat(row["read_at"]) if row["read_at"] else None,
         reply_to=row["reply_to"],
+        trace_id=trace_id,
         metadata=json.loads(row["metadata"]) if row["metadata"] else {},
     )
 
@@ -170,20 +181,25 @@ class MessageBus:
                 await db.execute(ddl)
             for idx in _INDEXES:
                 await db.execute(idx)
+            try:
+                await db.execute(_MIGRATE_TRACE_ID)
+            except Exception:
+                pass  # column already exists
             await db.commit()
 
     async def send(self, message: Message) -> str:
         """Insert a message into the bus. Returns the message ID."""
         async def _send() -> str:
             async with self._connect() as db:
+                trace_id = message.trace_id or get_correlation().trace_id
                 await db.execute(
                     "INSERT INTO messages (id, from_agent, to_agent, subject, body,"
-                    " priority, status, created_at, reply_to, metadata)"
-                    " VALUES (?,?,?,?,?,?,?,?,?,?)",
+                    " priority, status, created_at, reply_to, trace_id, metadata)"
+                    " VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                     (message.id, message.from_agent, message.to_agent,
                      message.subject, message.body, message.priority.value,
                      message.status.value, message.created_at.isoformat(),
-                     message.reply_to, json.dumps(message.metadata)),
+                     message.reply_to, trace_id, json.dumps(message.metadata)),
                 )
                 await db.commit()
             return message.id

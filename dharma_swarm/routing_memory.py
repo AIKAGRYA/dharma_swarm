@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
+from dharma_swarm.correlation_context import get_correlation
 from dharma_swarm.models import ProviderType
 
 _DEFAULT_DB = Path.home() / ".dharma" / "logs" / "router" / "routing_memory.sqlite3"
@@ -121,6 +122,7 @@ class RoutingMemoryStore:
                     latency_ms REAL NOT NULL,
                     total_tokens INTEGER NOT NULL,
                     error TEXT,
+                    trace_id TEXT NOT NULL DEFAULT '',
                     metadata_json TEXT NOT NULL DEFAULT '{}'
                 );
 
@@ -128,6 +130,11 @@ class RoutingMemoryStore:
                     ON routing_events(task_signature, provider, model, timestamp);
                 """
             )
+            # Migrate existing databases
+            try:
+                db.execute("ALTER TABLE routing_events ADD COLUMN trace_id TEXT NOT NULL DEFAULT ''")
+            except sqlite3.OperationalError:
+                pass  # column already exists
 
     def _load_lane(
         self,
@@ -491,13 +498,14 @@ class RoutingMemoryStore:
                     total_tokens=tokens,
                     error=error,
                 )
+            corr = get_correlation()
             db.execute(
                 """
                 INSERT INTO routing_events (
                     timestamp, provider, model, task_signature, action_name,
                     route_path, outcome, quality_score, latency_ms, total_tokens,
-                    error, metadata_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    error, trace_id, metadata_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     _utc_now_iso(),
@@ -511,6 +519,7 @@ class RoutingMemoryStore:
                     round(latency, 3),
                     tokens,
                     error,
+                    corr.trace_id,
                     payload,
                 ),
             )

@@ -1,6 +1,6 @@
 # Interface Mismatch Map — dharma_swarm
 
-**Last X-Ray:** 2026-05-04 (high-roi-fixes audit against HEAD `daa15b7`)
+**Last X-Ray:** 2026-05-05 (structural-coherence session against HEAD `74d015c`)
 **Previous version:** 2026-04-08 (55 module pairs, 13 mismatches, 9 prioritized)
 **Maintainer:** Guardian Crew (`guardian_crew.py`) — auto-updates every 4 hours
 **How to read this:** Severity = BLOCKER (crashes at runtime), DEGRADED (silent failure / wrong behavior), WARNING (structural smell).
@@ -25,14 +25,14 @@
 | MM-17: gnani → TaskBoard.get_by_title | DEGRADED | ✅RESOLVED | `TaskBoard.get_by_title()` added — SQL WHERE on title column |
 | MM-18: gnani → TelosGraph.get_by_name | DEGRADED | ✅RESOLVED | `TelosGraph.get_by_name()` added — linear scan on name field |
 | NEW-04: agent_runner → telic_seam dispatch gap | DEGRADED | ✅RESOLVED | `record_dispatch` + `record_gate_decision` added at task start in agent_runner |
-| NEW-05: task_board ↔ runtime_state split lifecycle | — | ⚠️ GUARDED | `run_task_consistency_guard` added to guardian_crew — detects COMPLETED tasks with still-OPEN claims |
-| NEW-07: 54 stores lack common trace_id | — | ⚠️ PARTIAL+ | `trace_id` column added to task_board, runtime_state, telemetry_plane, stigmergy, traces, artifact_manifest, handoff. CorrelationContext auto-populates memory_palace.ingest() and economic_engine transactions. |
+| NEW-05: task_board ↔ runtime_state split lifecycle | ⚠️ GUARDED | ✅ RESOLVED | `TaskBoard.on_terminal` callback auto-closes claims via `RuntimeStateStore.close_claims_for_task_sync()`. Wired in `swarm.py` init. |
+| NEW-07: 54 stores lack common trace_id | ⚠️ PARTIAL+ | ⚠️ ADVANCED | `trace_id` added to `message_bus` (messages table + Message model), `routing_memory` (routing_events + record_outcome). 8/42 stores now have trace_id. |
 | NEW-08: 12 independent record_outcome() | ⚠️ PARTIAL | ⚠️ PARTIAL+ | TelicSeam emits signals + SignalBus subscriber pattern added for automatic fanout |
 | NEW-09: orchestrator → TelicSeam registry_path kwarg | — | ✅ FIXED | `orchestrator.py:154` used `registry_path=` but TelicSeam accepts `path=`. TypeError at runtime. |
 | NEW-10: lineage edges lack delegation chain | — | ✅ FIXED | `LineageEdge.delegated_by` + `trace_id` fields added; `agent_runner.spawn_worker` records delegation lineage |
 | NEW-11: TelicSeam singleton missing signal_bus | — | ✅ FIXED | `get_seam()` now passes `signal_bus=SignalBus.get()` to singleton |
 
-**Net change:** 11 resolved, 5 fixed prior sessions, 6 new entries (NEW-05 guarded, NEW-07/NEW-08 partially resolved, NEW-09/10/11 fixed), 0 open BLOCKERs, 4 structural degraded remain.
+**Net change:** 12 resolved (including NEW-05), 5 fixed prior sessions, 6 new entries (NEW-07 advanced, NEW-08 partial+, NEW-09/10/11 fixed), 0 open BLOCKERs, 3 structural degraded remain.
 
 ---
 
@@ -152,9 +152,9 @@ ROUTER_PROBE   — Reads circuit_breakers.json for open providers
 | 17 | `gnani_lodestone` → `task_board.get_by_title()` | ✅ (method added this session) |
 | 18 | `gnani_lodestone` → `telos_graph.get_by_name()` | ✅ (method added this session) |
 | 21 | `agent_runner` → `telic_seam.record_dispatch()` (provenance) | ✅ (dispatch+gate wired this session) |
-| 22 | `task_board` ↔ `runtime_state` (lifecycle consistency) | ⚠️ GUARDED (NEW-05) |
+| 22 | `task_board` ↔ `runtime_state` (lifecycle consistency) | ✅ RESOLVED (NEW-05: on_terminal callback) |
 | 23 | `telic_seam` → `signal_bus` (outcome fanout) | ✅ (NEW-08: SIGNAL_OUTCOME_RECORDED emitted) |
-| 24 | `task_board` / `runtime_state` / `telemetry_plane` (trace_id) | ⚠️ PARTIAL (NEW-07) |
+| 24 | `task_board` / `runtime_state` / `message_bus` / `routing_memory` / `telemetry_plane` (trace_id) | ⚠️ ADVANCED (NEW-07: 8/42 stores) |
 | 19 | `guardian_crew` → `world_actions.github_create_issue()` | ✅ |
 | 20 | `orchestrate_live` → `guardian_crew.start_guardian_loop()` | ✅ |
 

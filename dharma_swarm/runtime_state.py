@@ -1452,6 +1452,29 @@ class RuntimeStateStore:
             db.commit()
         return self.get_task_claim_sync(claim_id)
 
+    def close_claims_for_task_sync(
+        self,
+        task_id: str,
+        *,
+        status: str = "completed",
+    ) -> int:
+        """Close all open claims for *task_id* (sync).
+
+        Returns the number of claims closed.  This resolves NEW-05:
+        split-lifecycle mismatches between task_board and runtime_state.
+        """
+        self.init_db_sync()
+        _TERMINAL_CLAIM = ("released", "completed", "failed", "expired")
+        with sqlite3.connect(self.db_path) as db:
+            _apply_connection_pragmas_sync(db)
+            cur = db.execute(
+                "UPDATE task_claims SET status = ?"
+                " WHERE task_id = ? AND status NOT IN (?, ?, ?, ?)",
+                (status, task_id, *_TERMINAL_CLAIM),
+            )
+            db.commit()
+            return cur.rowcount
+
     def create_delegation_run_sync(self, run: DelegationRun) -> DelegationRun:
         """Synchronous version of record_delegation_run."""
         self.init_db_sync()

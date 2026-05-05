@@ -6,9 +6,12 @@ finite-state machine so illegal moves (e.g. COMPLETED -> PENDING) raise.
 from __future__ import annotations
 
 import json
+import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
+
+logger = logging.getLogger(__name__)
 
 import aiosqlite
 
@@ -74,8 +77,16 @@ class TaskBoard:
 
     _BUSY_TIMEOUT_S = 30  # seconds — must survive contention with daemon + SwarmLens
 
-    def __init__(self, db_path: Path) -> None:
+    _TERMINAL_STATUSES = frozenset({TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED})
+
+    def __init__(
+        self,
+        db_path: Path,
+        *,
+        on_terminal: Callable[[str, str], None] | None = None,
+    ) -> None:
         self._db_path = db_path
+        self._on_terminal = on_terminal
 
     def _open(self) -> aiosqlite.Connection:
         """Open connection with busy_timeout to prevent 'database is locked'."""
@@ -162,7 +173,13 @@ class TaskBoard:
             cur = await db.execute("SELECT * FROM tasks WHERE id = ?", (task_id,))
             updated = await cur.fetchone()
             deps = await self._fetch_deps(db, task_id)
-            return self._row_to_task(updated, deps)  # type: ignore[arg-type]
+            task = self._row_to_task(updated, deps)  # type: ignore[arg-type]
+        if new in self._TERMINAL_STATUSES and self._on_terminal is not None:
+            try:
+                self._on_terminal(task_id, new.value)
+            except Exception:
+                logger.warning("on_terminal callback failed for task %s", task_id, exc_info=True)
+        return task
 
     async def _load_rows(self, db: aiosqlite.Connection, rows: list[Any]) -> list[Task]:
         tasks: list[Task] = []
