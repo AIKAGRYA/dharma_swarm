@@ -12,6 +12,7 @@ from typing import Any
 
 import aiosqlite
 
+from dharma_swarm.correlation_context import get_correlation
 from dharma_swarm.models import Task, TaskPriority, TaskStatus, _new_id, _utc_now
 from dharma_swarm.telos_gates import check_with_reflective_reroute
 
@@ -30,7 +31,12 @@ CREATE TABLE IF NOT EXISTS tasks (
     status TEXT NOT NULL DEFAULT 'pending', priority TEXT NOT NULL DEFAULT 'normal',
     assigned_to TEXT, created_by TEXT NOT NULL DEFAULT 'system',
     created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
-    result TEXT, metadata TEXT NOT NULL DEFAULT '{}')"""
+    result TEXT, metadata TEXT NOT NULL DEFAULT '{}',
+    trace_id TEXT NOT NULL DEFAULT '')"""
+
+_MIGRATE_TRACE_ID = (
+    "ALTER TABLE tasks ADD COLUMN trace_id TEXT NOT NULL DEFAULT ''"
+)
 
 _CREATE_DEPS = """
 CREATE TABLE IF NOT EXISTS task_dependencies (
@@ -83,6 +89,11 @@ class TaskBoard:
             await db.execute("PRAGMA synchronous=NORMAL")
             await db.execute(_CREATE_TASKS)
             await db.execute(_CREATE_DEPS)
+            # Migrate: add trace_id column if missing (existing databases)
+            try:
+                await db.execute(_MIGRATE_TRACE_ID)
+            except Exception:
+                pass  # column already exists
             await db.commit()
 
     # -- helpers ------------------------------------------------------------
@@ -197,12 +208,20 @@ class TaskBoard:
         now = _utc_now()
         dep_ids: list[str] = depends_on or []
         meta = dict(metadata or {})
+        corr = get_correlation()
+        trace_id = corr.trace_id
+        if trace_id:
+            meta.setdefault("trace_id", trace_id)
         async with self._open() as db:
             await db.execute(
-                "INSERT INTO tasks VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO tasks"
+                " (id, title, description, status, priority, assigned_to,"
+                "  created_by, created_at, updated_at, result, metadata, trace_id)"
+                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                 (task_id, title, description, TaskStatus.PENDING.value,
                  priority.value, None, created_by, now.isoformat(),
-                 now.isoformat(), None, json.dumps(meta, ensure_ascii=True)),
+                 now.isoformat(), None, json.dumps(meta, ensure_ascii=True),
+                 trace_id),
             )
             for dep_id in dep_ids:
                 await db.execute(
@@ -238,6 +257,9 @@ class TaskBoard:
         now = _utc_now()
         created_tasks: list[Task] = []
 
+        corr = get_correlation()
+        trace_id = corr.trace_id
+
         async with self._open() as db:
             # Single transaction for all tasks
             for spec in tasks:
@@ -248,12 +270,18 @@ class TaskBoard:
                 created_by = spec.get("created_by", "system")
                 dep_ids = spec.get("depends_on") or []
                 metadata = dict(spec.get("metadata") or {})
+                if trace_id:
+                    metadata.setdefault("trace_id", trace_id)
 
                 await db.execute(
-                    "INSERT INTO tasks VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                    "INSERT INTO tasks"
+                    " (id, title, description, status, priority, assigned_to,"
+                    "  created_by, created_at, updated_at, result, metadata, trace_id)"
+                    " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                     (task_id, title, description, TaskStatus.PENDING.value,
                      priority.value, None, created_by, now.isoformat(),
-                     now.isoformat(), None, json.dumps(metadata, ensure_ascii=True)),
+                     now.isoformat(), None, json.dumps(metadata, ensure_ascii=True),
+                     trace_id),
                 )
 
                 for dep_id in dep_ids:
@@ -282,6 +310,18 @@ class TaskBoard:
             if row is None:
                 return None
             deps = await self._fetch_deps(db, task_id)
+            return self._row_to_task(row, deps)
+
+    async def get_by_title(self, title: str) -> Task | None:
+        """Retrieve the first task matching *title*, or ``None``."""
+        async with self._open() as db:
+            cur = await db.execute(
+                "SELECT * FROM tasks WHERE title = ? LIMIT 1", (title,),
+            )
+            row = await cur.fetchone()
+            if row is None:
+                return None
+            deps = await self._fetch_deps(db, row[0])
             return self._row_to_task(row, deps)
 
     async def list_tasks(

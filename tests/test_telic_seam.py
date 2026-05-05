@@ -866,6 +866,17 @@ class TestLifecycleIntegrityReport:
         assert report["is_clean"] is False
         assert len(report["proposal_outcome_agent_mismatches"]) == 1
 
+    def test_detects_proposal_without_outcome(self, seam, sample_task):
+        """Dispatch without outcome = incomplete provenance chain."""
+        seam.record_dispatch(sample_task, "agent_alpha")
+        # No record_outcome call — chain is incomplete
+        report = seam.lifecycle_integrity_report()
+        assert report["is_clean"] is False
+        assert len(report["proposals_without_outcome"]) == 1
+        entry = report["proposals_without_outcome"][0]
+        assert entry["agent_id"] == "agent_alpha"
+        assert entry["task_id"] == sample_task.id
+
     def test_detects_duplicate_orphan_outcomes_for_single_proposal(self, seam, sample_task):
         proposal_id = seam.record_dispatch(sample_task, "agent_alpha")
         seam.record_outcome(sample_task, "agent_alpha", success=True)

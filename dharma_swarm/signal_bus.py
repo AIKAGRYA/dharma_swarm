@@ -43,6 +43,10 @@ SIGNAL_LIFECYCLE_COMPLETED = "AGENT_LIFECYCLE_COMPLETED"
 # ECC instinct signals
 SIGNAL_ECC_INSTINCT = "ECC_INSTINCT_SIGNAL"
 
+# Correlation spine signals — canonical outcome fanout
+SIGNAL_OUTCOME_RECORDED = "OUTCOME_RECORDED"
+SIGNAL_VALUE_EVENT_RECORDED = "VALUE_EVENT_RECORDED"
+
 
 class SignalBus:
     """Simple in-process event bus for inter-loop signaling.
