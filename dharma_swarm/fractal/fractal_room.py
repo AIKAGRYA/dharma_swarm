@@ -256,6 +256,9 @@ _KILL_CONDITION_EVALUATORS: dict[str, Any] = {
     "burn_exceeds_3x_revenue": lambda kpis: (
         kpis.get("burn_usd", 0) > 3 * max(kpis.get("revenue_usd", 0), 0.01)
     ),
+    "budget_exceeded": lambda kpis: (
+        kpis.get("budget_ratio", 0) > 1.2
+    ),
     "no_work_packets_30_days": lambda kpis: (
         kpis.get("days_since_last_packet", 0) > 30
     ),
@@ -265,6 +268,9 @@ _KILL_CONDITION_EVALUATORS: dict[str, Any] = {
     "welfare_tons_negative": lambda kpis: (
         kpis.get("welfare_tons", 0) < 0
     ),
+    "operator_override": lambda kpis: (
+        kpis.get("operator_kill", False) is True
+    ),
 }
 
 _SPINOUT_CONDITION_EVALUATORS: dict[str, Any] = {
@@ -272,8 +278,17 @@ _SPINOUT_CONDITION_EVALUATORS: dict[str, Any] = {
         kpis.get("revenue_usd", 0) >= kpis.get("burn_usd", 0)
         and kpis.get("revenue_usd", 0) > 0
     ),
+    "revenue_exceeds_burn": lambda kpis: (
+        kpis.get("monthly_revenue_gt_burn_months", 0) >= 3
+    ),
     "3_paying_customers": lambda kpis: (
         kpis.get("paying_customers", 0) >= 3
+    ),
+    "customer_validation": lambda kpis: (
+        kpis.get("paying_customers", 0) >= 3
+    ),
+    "operator_approval": lambda kpis: (
+        kpis.get("operator_approved_graduation", False) is True
     ),
     "autonomy_stage_5": lambda kpis: (
         kpis.get("autonomy_stage", 0) >= 5
