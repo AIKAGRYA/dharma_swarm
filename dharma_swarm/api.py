@@ -264,6 +264,20 @@ def create_app(
             ],
         })
 
+    # ── Hypernodes ───────────────────────────────────────────────────
+
+    @app.get("/api/hypernodes/empty-quadrant")
+    async def empty_quadrant_hypernode() -> ApiResponse:
+        from dharma_swarm.hypernode_seed import ensure_empty_quadrant_hypernode
+
+        seeded = ensure_empty_quadrant_hypernode(
+            _get_registry(),
+            created_by="dharma_swarm.api",
+        )
+        if seeded.errors:
+            raise HTTPException(400, "; ".join(seeded.errors))
+        return ApiResponse(data=seeded.payload.model_dump(mode="json"))
+
     # ── Tasks ────────────────────────────────────────────────────────
 
     @app.post("/api/tasks")

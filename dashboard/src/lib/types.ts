@@ -452,6 +452,93 @@ export interface OntologyGraphData {
 }
 
 // ---------------------------------------------------------------------------
+// Hypernodes (GET /api/hypernodes/empty-quadrant)
+// ---------------------------------------------------------------------------
+
+export interface HypernodeQuadrantFrame {
+  id: string;
+  label: string;
+  governance: string;
+  orientation: string;
+  description: string;
+  occupied: boolean;
+}
+
+export interface HypernodeProvenanceRecord {
+  id: string;
+  label: string;
+  source_type: string;
+  reference: string;
+  confidence: number;
+}
+
+export interface HypernodeCouncilVerdict {
+  id: string;
+  decision: string;
+  reason: string;
+  gate_results: Record<string, string>;
+  anekanta_frames: string[];
+  steelman_summary: string;
+  dogma_drift_summary: string;
+  mirofish_activated: boolean;
+  mirofish_reason: string;
+  quorum_participants: string[];
+}
+
+export interface HypernodeFitnessVector {
+  id: string;
+  auto_grade_score: number;
+  council_score: number;
+  provenance_score: number;
+  market_value_score: number;
+  welfare_score: number;
+  composite_score: number;
+  promotion_threshold: number;
+  threshold_met: boolean;
+  promotion_state: string;
+  scoring_method: string;
+}
+
+export interface HypernodeRevenueCell {
+  id: string;
+  name: string;
+  market_category: string;
+  target_customer: string;
+  revenue_model: string;
+  verified_revenue_usd: number;
+  expected_value_usd: number;
+  evidence_tier: string;
+  trustee_principle: string;
+  status: string;
+  next_actions: string[];
+}
+
+export interface HypernodeTypedLink {
+  source_id: string;
+  source_type: string;
+  link_name: string;
+  target_id: string;
+  target_type: string;
+}
+
+export interface HypernodePayload {
+  id: string;
+  slug: string;
+  title: string;
+  thesis: string;
+  public_path: string;
+  quadrant_map: HypernodeQuadrantFrame[];
+  provenance: HypernodeProvenanceRecord[];
+  council_verdict: HypernodeCouncilVerdict;
+  fitness_vector: HypernodeFitnessVector;
+  revenue_cell: HypernodeRevenueCell;
+  object_chain: Record<string, string[]>;
+  typed_links: HypernodeTypedLink[];
+  next_actions: string[];
+  ontology_counts: Record<string, number>;
+}
+
+// ---------------------------------------------------------------------------
 // Lineage (GET /api/lineage/*)
 // ---------------------------------------------------------------------------
 

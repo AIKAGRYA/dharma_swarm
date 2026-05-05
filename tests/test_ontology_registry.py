@@ -82,8 +82,9 @@ class TestRegistryFactory:
         # 16 base types (original metabolic chain + custodian + ExecutionLease)
         # + 6 spec-style additions (Claim, Doctrine, Capability, Cause, Movement, R_V_Measurement)
         # + 3 inquiry-chain (Signal, Question, Evidence)
-        # = 25 ObjectTypes
-        assert stats["registered_types"] == 25
+        # + 4 hypernode revenue-cell additions
+        # = 29 ObjectTypes
+        assert stats["registered_types"] == 29
         assert stats["registered_links"] >= 40  # original ~40 + inquiry-chain pairs
         assert stats["registered_actions"] >= 16
 
@@ -91,11 +92,11 @@ class TestRegistryFactory:
         names = registry.type_names()
         expected = [
             "ActionProposal", "AgentIdentity", "Capability", "Cause",
-            "Claim", "Contribution", "CustodianRole", "Doctrine",
+            "Claim", "Contribution", "CouncilVerdict", "CustodianRole", "Doctrine",
             "Evidence", "EvolutionEntry", "ExecutionLease", "Experiment",
-            "GateDecisionRecord", "KnowledgeArtifact", "Movement",
+            "FitnessVector", "GateDecisionRecord", "Hypernode", "KnowledgeArtifact", "Movement",
             "Outcome", "Paper", "Question", "R_V_Measurement",
-            "ResearchThread", "Signal", "TypedTask", "ValueEvent",
+            "ResearchThread", "RevenueCell", "Signal", "TypedTask", "ValueEvent",
             "VentureCell", "WitnessLog",
         ]
         assert names == expected
