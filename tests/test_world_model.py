@@ -15,8 +15,8 @@ Validates:
 
 from __future__ import annotations
 
+import copy
 import json
-from pathlib import Path
 
 import pytest
 
@@ -34,6 +34,22 @@ from dharma_swarm.world_model import (
     query_world_model,
     update_stock,
 )
+
+
+@pytest.fixture(autouse=True)
+def restore_initial_world_state():
+    """Restore the module singleton in place after tests that mutate stocks."""
+    snapshot = copy.deepcopy(INITIAL_WORLD_STATE)
+    yield
+    INITIAL_WORLD_STATE.version = snapshot.version
+    INITIAL_WORLD_STATE.timestamp = snapshot.timestamp
+    INITIAL_WORLD_STATE.stocks = snapshot.stocks
+    INITIAL_WORLD_STATE.flows = snapshot.flows
+    INITIAL_WORLD_STATE.feedback_loops = snapshot.feedback_loops
+    INITIAL_WORLD_STATE.telos_attractors = snapshot.telos_attractors
+    INITIAL_WORLD_STATE.confidence = snapshot.confidence
+    INITIAL_WORLD_STATE.last_research_update = snapshot.last_research_update
+    INITIAL_WORLD_STATE.agent_action_queue = snapshot.agent_action_queue
 
 
 # ---------------------------------------------------------------------------
@@ -222,20 +238,16 @@ class TestUpdateStock:
         result = update_stock("S01", 0.35, ["NOAA 2026"], "https://noaa.gov")
         assert result["old_value"] == old
         assert result["new_value"] == 0.35
-        # Restore
-        INITIAL_WORLD_STATE.stocks["S01"].current_value = old
 
     def test_trajectory_inference_rising(self):
         old = INITIAL_WORLD_STATE.stocks["S14"].current_value
         result = update_stock("S14", old + 0.05, [], "test")
         assert result["trajectory"] == "rising"
-        INITIAL_WORLD_STATE.stocks["S14"].current_value = old
 
     def test_trajectory_inference_falling(self):
         old = INITIAL_WORLD_STATE.stocks["S14"].current_value
         result = update_stock("S14", old - 0.05, [], "test")
         assert result["trajectory"] == "falling"
-        INITIAL_WORLD_STATE.stocks["S14"].current_value = old
 
     def test_unknown_stock_raises(self):
         with pytest.raises(ValueError, match="not found"):

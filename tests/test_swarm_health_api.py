@@ -14,21 +14,17 @@ Validates:
 from __future__ import annotations
 
 import json
-import time
-from pathlib import Path
 
 import pytest
 
-from dharma_swarm.swarm_health_api import (
-    _evolution_summary,
-    _loop_status,
-    _provider_status,
-    _read_json,
-    _read_lines,
-    _telos_summary,
-    _uptime,
-    _utc_now,
-)
+import dharma_swarm.swarm_health_api as health_api
+
+
+@pytest.fixture(autouse=True)
+def isolated_state_dir(tmp_path, monkeypatch):
+    monkeypatch.setattr(health_api, "_STATE_DIR", tmp_path)
+    monkeypatch.setenv("DHARMA_EVOLUTION_SHADOW", "1")
+    monkeypatch.setenv("DGC_AUTONOMY_LEVEL", "1")
 
 
 # ---------------------------------------------------------------------------
@@ -38,7 +34,7 @@ from dharma_swarm.swarm_health_api import (
 
 class TestUptime:
     def test_format(self):
-        result = _uptime()
+        result = health_api._uptime()
         parts = result.split(":")
         assert len(parts) == 3
         assert all(p.isdigit() for p in parts)
@@ -51,7 +47,7 @@ class TestUptime:
 
 class TestUtcNow:
     def test_iso_format(self):
-        now = _utc_now()
+        now = health_api._utc_now()
         assert "T" in now
         assert "+" in now or "Z" in now or now.endswith("00:00")
 
@@ -65,15 +61,15 @@ class TestReadJson:
     def test_valid_json(self, tmp_path):
         f = tmp_path / "data.json"
         f.write_text('{"key": "value"}')
-        assert _read_json(f) == {"key": "value"}
+        assert health_api._read_json(f) == {"key": "value"}
 
     def test_invalid_json(self, tmp_path):
         f = tmp_path / "bad.json"
         f.write_text("not json")
-        assert _read_json(f) == {}
+        assert health_api._read_json(f) == {}
 
     def test_missing_file(self, tmp_path):
-        assert _read_json(tmp_path / "missing.json") == {}
+        assert health_api._read_json(tmp_path / "missing.json") == {}
 
 
 # ---------------------------------------------------------------------------
@@ -85,18 +81,18 @@ class TestReadLines:
     def test_reads_last_n(self, tmp_path):
         f = tmp_path / "log.txt"
         f.write_text("\n".join(f"line {i}" for i in range(20)))
-        result = _read_lines(f, n=5)
+        result = health_api._read_lines(f, n=5)
         assert len(result) == 5
         assert result[-1] == "line 19"
 
     def test_empty_file(self, tmp_path):
         f = tmp_path / "empty.txt"
         f.write_text("")
-        result = _read_lines(f)
+        result = health_api._read_lines(f)
         assert result == []
 
     def test_missing_file(self, tmp_path):
-        result = _read_lines(tmp_path / "missing.txt")
+        result = health_api._read_lines(tmp_path / "missing.txt")
         assert result == []
 
 
@@ -107,12 +103,12 @@ class TestReadLines:
 
 class TestLoopStatus:
     def test_returns_list(self):
-        result = _loop_status()
+        result = health_api._loop_status()
         assert isinstance(result, list)
         assert len(result) > 0
 
     def test_structure(self):
-        for item in _loop_status():
+        for item in health_api._loop_status():
             assert "loop" in item
             assert "artifact_exists" in item
             assert "status" in item
@@ -126,10 +122,21 @@ class TestLoopStatus:
 
 class TestProviderStatus:
     def test_has_keys(self):
-        result = _provider_status()
+        result = health_api._provider_status()
         assert "circuit_breakers" in result
         assert "shadow_mode" in result
         assert "autonomy_level" in result
+
+    def test_reads_circuit_breakers_from_isolated_state(self):
+        meta = health_api._STATE_DIR / "meta"
+        meta.mkdir()
+        (meta / "circuit_breakers.json").write_text(json.dumps({"open": ["test"]}))
+
+        result = health_api._provider_status()
+
+        assert result["circuit_breakers"] == {"open": ["test"]}
+        assert result["shadow_mode"] is True
+        assert result["autonomy_level"] == 1
 
 
 # ---------------------------------------------------------------------------
@@ -139,8 +146,36 @@ class TestProviderStatus:
 
 class TestTelosSummary:
     def test_no_data(self):
-        result = _telos_summary()
-        assert result.get("status") == "no-data" or "total_objectives" in result
+        result = health_api._telos_summary()
+        assert result == {"status": "no-data"}
+
+    def test_with_data(self):
+        telos = health_api._STATE_DIR / "telos"
+        telos.mkdir()
+        rows = [
+            {
+                "name": "High priority objective",
+                "status": "active",
+                "progress": 0.5,
+                "priority": 9,
+            },
+            {
+                "name": "Lower priority objective",
+                "status": "complete",
+                "progress": 1.0,
+                "priority": 2,
+            },
+        ]
+        (telos / "objectives.jsonl").write_text("\n".join(json.dumps(row) for row in rows))
+
+        result = health_api._telos_summary()
+
+        assert result["total_objectives"] == 2
+        assert result["active"] == 1
+        assert result["avg_progress"] == 0.75
+        assert result["top_objectives"] == [
+            {"name": "High priority objective", "progress": 0.5}
+        ]
 
 
 # ---------------------------------------------------------------------------
@@ -150,5 +185,22 @@ class TestTelosSummary:
 
 class TestEvolutionSummary:
     def test_no_data(self):
-        result = _evolution_summary()
-        assert result.get("status") == "no-data" or "total_entries" in result
+        result = health_api._evolution_summary()
+        assert result == {"status": "no-data"}
+
+    def test_with_data(self):
+        evolution = health_api._STATE_DIR / "evolution"
+        evolution.mkdir()
+        rows = [
+            {"status": "applied"},
+            {"status": "rolled_back"},
+            {"status": "applied"},
+        ]
+        (evolution / "archive.jsonl").write_text("\n".join(json.dumps(row) for row in rows))
+
+        result = health_api._evolution_summary()
+
+        assert result["total_entries"] == 3
+        assert result["recent_applied"] == 2
+        assert result["recent_rolled_back"] == 1
+        assert result["shadow_mode"] is True
