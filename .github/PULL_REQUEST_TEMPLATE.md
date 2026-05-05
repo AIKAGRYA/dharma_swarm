@@ -17,6 +17,7 @@ Delete sections that don't apply, but keep at least: Why, Surface, Verification.
 - [ ] `dashboard/...`
 - [ ] `scripts/...`
 - [ ] `tests/...`
+- [ ] `docs/...` / DocOps
 - [ ] `.github/` / governance configs
 
 ### Worktree mirrors checked
@@ -45,6 +46,7 @@ How was the change verified end-to-end? Check all that apply.
 - [ ] `make test-all` (full suite)
 - [ ] `make semgrep` clean (or new findings triaged inline)
 - [ ] `make gitleaks` clean
+- [ ] `make docops-integrity` clean
 - [ ] Pre-commit hooks pass on each commit
 - [ ] Manual smoke (describe below)
 
@@ -56,6 +58,13 @@ How was the change verified end-to-end? Check all that apply.
 
 <!-- Link to the planning doc if this PR comes from a multi-step plan. -->
 - Plan: `~/.claude/plans/...` or N/A
+
+## DocOps impact
+
+- [ ] No count-sensitive documentation claims changed
+- [ ] Count-sensitive claims refreshed via `make docops-integrity`
+- [ ] Python-file changes reviewed against DocOps change-review warnings
+- [ ] New authority-scope language is registered or locally scoped
 
 ## Risk + rollback
 
