@@ -1526,7 +1526,8 @@ async def _run_world_model_loop(shutdown_event: asyncio.Event) -> None:
             if shutdown_event.is_set():
                 break
             try:
-                await asyncio.wait_for(agent.run_cycle(), timeout=300.0)
+                _wm_timeout = float(os.environ.get("DHARMA_WORLD_MODEL_TIMEOUT", "900"))
+                await asyncio.wait_for(agent.run_cycle(), timeout=_wm_timeout)
                 _log("world-model", "World model cycle complete")
             except Exception as exc:
                 _log("world-model", f"World model cycle error: {exc}")

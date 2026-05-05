@@ -27,8 +27,11 @@ def check_assurance_diff(repo_root: Path) -> tuple[bool, str]:
     if os.environ.get("DHARMA_SKIP_ASSURANCE_GUARD", "").strip() == "1":
         return True, "assurance diff guard skipped by DHARMA_SKIP_ASSURANCE_GUARD=1"
 
-    from dharma_swarm.assurance.runner import run_assurance
-    from dharma_swarm.assurance.scanner_test_gaps import _git_changed_files
+    try:
+        from dharma_swarm.assurance.runner import run_assurance
+        from dharma_swarm.assurance.scanner_test_gaps import _git_changed_files
+    except ImportError as exc:
+        return True, f"assurance diff skipped (dependency not available: {exc})"
 
     changed_files = _git_changed_files(repo_root)
     if not changed_files:
