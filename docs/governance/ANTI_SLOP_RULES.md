@@ -61,6 +61,12 @@ count before Rule 10 fails.
 | `dharma_swarm/orchestrator.py` | 2525 | 2777 |
 | `dharma_swarm/tui/app.py` | 2520 | 2772 |
 | `dharma_swarm/terminal_bridge.py` | 2192 | 2411 |
+| `dharma_swarm/opportunity_dispatcher.py` | 1386 | 1524 |
+| `dharma_swarm/telic_seam.py` | 1059 | 1164 |
+
+Tracking:
+- `dharma_swarm/opportunity_dispatcher.py`: [#122](https://github.com/AmitabhainArunachala/dharma_swarm/issues/122)
+- `dharma_swarm/telic_seam.py`: [#121](https://github.com/AmitabhainArunachala/dharma_swarm/issues/121)
 
 When one of these crosses its ceiling, the PR fails until either:
 - the file is decomposed (preferred), or
