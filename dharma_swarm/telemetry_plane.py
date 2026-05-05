@@ -940,6 +940,8 @@ class TelemetryPlaneStore:
     ) -> RoutingDecisionRecord:
         await self.init_db()
         corr = get_correlation()
+        if corr.cell_id:
+            record.metadata.setdefault("cell_id", corr.cell_id)
         async with self._open() as db:
             await db.execute(
                 "INSERT INTO routing_decisions (decision_id, session_id, task_id,"
@@ -1001,6 +1003,8 @@ class TelemetryPlaneStore:
     ) -> PolicyDecisionRecord:
         await self.init_db()
         corr = get_correlation()
+        if corr.cell_id:
+            record.metadata.setdefault("cell_id", corr.cell_id)
         async with self._open() as db:
             await db.execute(
                 "INSERT INTO policy_decisions (decision_id, session_id, task_id,"
@@ -1117,6 +1121,8 @@ class TelemetryPlaneStore:
     ) -> EconomicEventRecord:
         await self.init_db()
         corr = get_correlation()
+        if corr.cell_id:
+            record.metadata.setdefault("cell_id", corr.cell_id)
         async with self._open() as db:
             await db.execute(
                 "INSERT INTO economic_events (event_id, session_id, task_id, run_id,"

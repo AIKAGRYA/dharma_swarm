@@ -1116,6 +1116,8 @@ class RuntimeStateStore:
         await self.init_db()
         corr = get_correlation()
         trace_id = corr.trace_id
+        if corr.cell_id:
+            claim.metadata.setdefault("cell_id", corr.cell_id)
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute(
                 "INSERT INTO task_claims (claim_id, task_id, session_id, agent_id, status,"
@@ -1267,6 +1269,8 @@ class RuntimeStateStore:
         await self.init_db()
         corr = get_correlation()
         trace_id = corr.trace_id
+        if corr.cell_id:
+            run.metadata.setdefault("cell_id", corr.cell_id)
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute(
                 "INSERT INTO delegation_runs (run_id, session_id, task_id, claim_id,"
