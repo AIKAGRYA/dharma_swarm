@@ -7,6 +7,9 @@ import contextlib
 import json
 import os
 from pathlib import Path
+import shlex
+import subprocess
+import time
 from typing import Any, AsyncIterator
 
 from .base import Capability, CompletionRequest, ModelProfile, ProviderAdapter, ProviderConfig
@@ -83,6 +86,8 @@ class ClaudeAdapter(ProviderAdapter):
         self._cli_path = cli_path
         self._workdir = workdir or DHARMA_SWARM
         self._proc: asyncio.subprocess.Process | None = None
+        self._auth_status_cache: dict[str, Any] | None = None
+        self._auth_status_cached_at = 0.0
 
         self._profiles: dict[str, ModelProfile] = {
             "claude-sonnet-4-5": ModelProfile(
@@ -123,6 +128,77 @@ class ClaudeAdapter(ProviderAdapter):
     def get_profile(self, model_id: str | None = None) -> ModelProfile:
         model = model_id or self._config.default_model or "claude-sonnet-4-5"
         return self._profiles.get(model, next(iter(self._profiles.values())))
+
+    def _read_auth_status(self, *, without_api_key: bool = False) -> dict[str, Any]:
+        if without_api_key:
+            completed = subprocess.run(
+                [
+                    "/bin/zsh",
+                    "-lc",
+                    f"env -u ANTHROPIC_API_KEY {shlex.quote(self._cli_path)} auth status",
+                ],
+                cwd=str(self._workdir),
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
+                env=dict(os.environ),
+            )
+        else:
+            completed = subprocess.run(
+                [self._cli_path, "auth", "status"],
+                cwd=str(self._workdir),
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
+                env=dict(os.environ),
+            )
+        if completed.returncode != 0:
+            return {}
+        payload = json.loads((completed.stdout or "").strip() or "{}")
+        return {str(key): value for key, value in payload.items()} if isinstance(payload, dict) else {}
+
+    def auth_status(self, *, force: bool = False) -> dict[str, Any]:
+        now = time.monotonic()
+        if not force and self._auth_status_cache is not None and (now - self._auth_status_cached_at) < 30.0:
+            return dict(self._auth_status_cache)
+
+        status: dict[str, Any] = {"loggedIn": False, "authMethod": "unknown"}
+        try:
+            status = self._read_auth_status()
+            auth_method = str(status.get("authMethod", "") or "").strip().lower()
+            if auth_method == "api_key" and "ANTHROPIC_API_KEY" in os.environ:
+                native_status = self._read_auth_status(without_api_key=True)
+                native_method = str(native_status.get("authMethod", "") or "").strip().lower()
+                if bool(native_status.get("loggedIn")) and native_method not in {"", "unknown", "none", "api_key"}:
+                    status = {
+                        **native_status,
+                        "apiKeyConfigured": True,
+                        "fallbackAuthMethod": auth_method,
+                    }
+        except Exception:
+            pass
+
+        self._auth_status_cache = status
+        self._auth_status_cached_at = now
+        return dict(status)
+
+    def prefers_subscription_auth(self, model_id: str | None = None, *, explicit_mode: str | None = None) -> bool:
+        requested_mode = (explicit_mode or os.environ.get("DHARMA_CLAUDE_AUTH_MODE", "")).strip().lower()
+        if requested_mode in {"api_key", "apikey", "key"}:
+            return False
+        if requested_mode in {"subscription", "native", "oauth"}:
+            return True
+        if "ANTHROPIC_API_KEY" not in os.environ:
+            return True
+
+        status = self.auth_status()
+        auth_method = str(status.get("authMethod", "") or "").strip().lower()
+        normalized_model = str(model_id or "").strip().lower()
+        if "opus" not in normalized_model:
+            return auth_method not in {"", "unknown", "api_key"}
+        return bool(status.get("loggedIn")) and auth_method not in {"", "unknown", "api_key"}
 
     async def stream(
         self,
@@ -232,6 +308,9 @@ class ClaudeAdapter(ProviderAdapter):
     def _build_env(self, request: CompletionRequest) -> dict[str, str]:
         env = dict(os.environ)
         env.pop("CLAUDECODE", None)
+        explicit_auth_mode = str(request.provider_options.get("auth_mode", "") or "").strip().lower()
+        if self.prefers_subscription_auth(request.model, explicit_mode=explicit_auth_mode):
+            env.pop("ANTHROPIC_API_KEY", None)
         internet_enabled = bool(request.provider_options.get("internet_enabled", True))
         if internet_enabled:
             env.pop("CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC", None)

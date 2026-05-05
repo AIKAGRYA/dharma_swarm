@@ -46,8 +46,12 @@ from dharma_swarm.workspace_topology import build_workspace_topology
 from dharma_swarm.operator_core import build_session_catalog, build_session_detail
 from dharma_swarm.operator_core.session_store import SessionStore
 from dharma_swarm.terminal_control import load_terminal_control_state
-from dharma_swarm.terminal_engine.events import ToolCallComplete
-from dharma_swarm.terminal_engine.events import PermissionDecisionEvent, PermissionOutcomeEvent, PermissionResolutionEvent
+from dharma_swarm.tui.engine.events import (
+    PermissionDecisionEvent,
+    PermissionOutcomeEvent,
+    PermissionResolutionEvent,
+    ToolCallComplete,
+)
 
 
 def _json_default(value: object) -> object:
