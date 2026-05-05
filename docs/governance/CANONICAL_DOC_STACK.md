@@ -11,6 +11,7 @@
 TIER 1 — MANDATORY FIRST-READ (agents MUST ingest before any action)
 ├── CLAUDE.md                          → Agent operating instructions (OWNER of: behavioral rules, architecture, build commands)
 ├── docs/governance/SOVEREIGN_MANIFEST.md → Repo ground truth (OWNER of: axioms, domain map, invariants, locks)
+├── docs/governance/BUILD_SESSION_ENTRYPOINT.md → Current build-track pointer (OWNER of: what agents read next for the active seam)
 │
 TIER 2 — DOMAIN REFERENCE (read when working in that domain)
 ├── docs/architecture/NAVIGATION.md    → Module-level map (OWNER of: which file does what, layer assignments)
@@ -41,6 +42,7 @@ TIER 5 — ARCHIVE (do not read unless investigating history)
 |---------------|---------------|----------------------|
 | Agent behavior rules | `CLAUDE.md` | — |
 | Repo axioms & domain map | `SOVEREIGN_MANIFEST.md` | — |
+| Current build-track pointer | `BUILD_SESSION_ENTRYPOINT.md` | Must defer to `CLAUDE.md`, `SOVEREIGN_MANIFEST.md`, and explicit canonical decision docs |
 | Module-level what-does-what | `NAVIGATION.md` | — |
 | Model/provider routing | `MODEL_ROUTING_CANON.md` | model_routing.py files must not contradict |
 | Terminal protocol | `specs/DGC_TERMINAL_ARCHITECTURE_v1.1.md` | v1.0 is deprecated |
@@ -79,6 +81,7 @@ TIER 5 — ARCHIVE (do not read unless investigating history)
 | `docs/governance/SOVEREIGN_MANIFEST.md` | Repo ground truth for all agents | **EXISTS** — rewritten with filesystem-verified numbers |
 | `docs/governance/REPO_GOVERNANCE_AUDIT.md` | Audit findings and contradiction log | **EXISTS** — updated with re-audit corrections |
 | `docs/governance/CANONICAL_DOC_STACK.md` | This file — doc hierarchy | **EXISTS** |
+| `docs/governance/BUILD_SESSION_ENTRYPOINT.md` | Current-track pointer for build agents | **EXISTS** — subordinate to CLAUDE/SOVEREIGN and current canonical decision docs |
 
 ---
 

@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [[ "${DHARMA_SKIP_SEMGREP:-}" == "1" ]]; then
+  echo "SEMGREP SKIPPED - DHARMA_SKIP_SEMGREP=1 (operator-acknowledged)" >&2
+  exit 0
+fi
+
 ca_bundle=""
 
 if [[ -n "${SSL_CERT_FILE:-}" && -s "${SSL_CERT_FILE}" ]]; then
@@ -77,5 +82,12 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+if ! command -v semgrep &>/dev/null; then
+  echo "SEMGREP NOT INSTALLED - gate status: NOT RUN" >&2
+  echo "  Install: pip install semgrep  (or brew install semgrep)" >&2
+  echo "  To skip explicitly: DHARMA_SKIP_SEMGREP=1 git commit ..." >&2
+  exit 1
+fi
 
 exec semgrep "${args[@]}"

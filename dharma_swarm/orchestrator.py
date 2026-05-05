@@ -201,7 +201,7 @@ class Orchestrator:
 
             ontology_db = self._runtime_root() / "ontology.db"
             registry = get_shared_registry(path=ontology_db)
-            return TelicSeam(registry=registry, registry_path=ontology_db)
+            return TelicSeam(registry=registry, path=ontology_db)
         except Exception:
             logger.debug("Failed to initialize local telic seam", exc_info=True)
             return None

@@ -1,77 +1,152 @@
-# INTERFACE_MISMATCH_MAP — machine-readable form.
+# Interface Mismatch Registry - machine-readable source of truth.
 #
-# This file is the executable counterpart to INTERFACE_MISMATCH_MAP.md.
-# Each entry is consumed by:
-#   - scripts/uplift_guards/mismatch_registry.py (pre-commit guard)
-#   - tests/mismatches/test_MISMATCH_<nn>.py    (xfail until status: resolved)
-#   - dgc mismatch list                          (CLI surface)
+# Normalized from INTERFACE_MISMATCH_MAP.md.
+# Both files MUST agree: if you add/resolve a mismatch, update both.
 #
-# Severity:  BLOCKER (prevents task execution) | DEGRADED (silent loss / fragility)
-# Status:    open    (still a problem)        | resolved (fixed in `fixed_in` commit)
+# Schema per entry:
+#   id:        unique identifier (MM-XX or NEW-XX)
+#   severity: BLOCKER | DEGRADED | WARNING
+#   status:   open | resolved
+#   caller:   module:line or module path that makes the call
+#   callee:   module.Class.method that is called incorrectly
+#   summary:  one-line description
+#   fixed_in: commit hash or PR (empty if open)
+#   test_path: path to test that pins the fix (empty if no test yet)
 #
-# Adding a new entry: append below, increment id. Removing: never delete; flip
-# status to `resolved` and record `fixed_in`. Keep the historical lineage.
-#
-# This is a partial seed (5 of 25 entries) demonstrating the schema. The
-# remaining 20 entries should be migrated from INTERFACE_MISMATCH_MAP.md by
-# the Mismatch-Resolver agent (one entry per uplift-cron tick).
-
-version: 1
-generated_from: INTERFACE_MISMATCH_MAP.md
-last_synced: "2026-04-19"
+# Last synced: 2026-05-05 from INTERFACE_MISMATCH_MAP.md
 
 entries:
-  - id: MISMATCH-01
+  - id: MM-01
     severity: BLOCKER
     status: resolved
-    caller: dharma_swarm/tiny_router_shadow.py:494
-    callee: huggingface_hub.snapshot_download
-    summary: >-
-      Unguarded ImportError when huggingface_hub absent crashed
-      _load_tiny_router_artifacts and every infer_tiny_router_shadow() call
-      in default `auto` backend mode. Was the root blocker for Loop 1.
-    fixed_in: working-tree (verified 2026-04-19 — try/except ImportError → return None present at line 494)
-    test_path: tests/mismatches/test_MISMATCH_01.py
+    caller: dharma_swarm/orchestrator.py
+    callee: huggingface_hub
+    summary: "huggingface_hub ImportError crashes orchestrator startup"
+    fixed_in: "try/except ImportError added; heuristic fallback"
+    test_path: ""
 
-  - id: MISMATCH-02
+  - id: MM-04
+    severity: DEGRADED
+    status: resolved
+    caller: dharma_swarm/swarm.py:870
+    callee: dharma_swarm.agent_runner.AgentPool
+    summary: "AgentPool None guard missing; SubsystemNotReady now raised"
+    fixed_in: "SubsystemNotReady raised at line 870"
+    test_path: ""
+
+  - id: MM-06
+    severity: DEGRADED
+    status: resolved
+    caller: dharma_swarm/orchestrate_live.py
+    callee: dharma_swarm.living_map.run_living_layers_loop
+    summary: "Dual StigmergyStore; swarm and living_layers each created own store"
+    fixed_in: "run_living_layers_loop now accepts stigmergy_store param"
+    test_path: ""
+
+  - id: MM-08
+    severity: DEGRADED
+    status: resolved
+    caller: dharma_swarm/instinct_bridge.py
+    callee: dharma_swarm.signal_bus.SIGNAL_ECC_INSTINCT
+    summary: "ECC_INSTINCT_SIGNAL constant undefined in signal_bus"
+    fixed_in: "SIGNAL_ECC_INSTINCT defined in signal_bus.py:40"
+    test_path: ""
+
+  - id: MM-09
+    severity: DEGRADED
+    status: resolved
+    caller: dharma_swarm/swarm.py:2182
+    callee: dharma_swarm.organism.OrganismRuntime.samvara.current_power
+    summary: "samvara.current_power None chain had no guard"
+    fixed_in: "Double guard at swarm.py:2182-2184"
+    test_path: ""
+
+  - id: MM-10
+    severity: DEGRADED
+    status: resolved
+    caller: dharma_swarm/auto_proposer.py:297
+    callee: dharma_swarm.stigmergy.StigmergyStore
+    summary: "AutoProposer crashed on None stigmergy store"
+    fixed_in: "auto_proposer.py:297 has 'if self._stigmergy is None: return'"
+    test_path: ""
+
+  - id: MM-11
+    severity: DEGRADED
+    status: resolved
+    caller: dharma_swarm/swarm.py:456
+    callee: dharma_swarm.witness.WitnessAuditor
+    summary: "WitnessAuditor ModelRouter provider mismatch"
+    fixed_in: "swarm.py:456-457 now uses OpenRouterFreeProvider()"
+    test_path: ""
+
+  - id: NEW-01
     severity: BLOCKER
-    status: open
-    caller: dharma_swarm/orchestrate_live.py:1247
-    callee: dharma_swarm/persistent_agent.py:51-52
-    summary: >-
-      `role` and `provider_type` passed as raw strings; PersistentAgent.__init__
-      requires AgentRole and ProviderType enums. Pydantic v2 strict mode rejects.
-      Replication outcome path crashes here.
-    test_path: tests/mismatches/test_MISMATCH_02.py
+    status: resolved
+    caller: dharma_swarm/archaeology_ingestion.py
+    callee: dharma_swarm.memory_palace.MemoryPalace.recall
+    summary: "palace.query() called but method is palace.recall(PalaceQuery(...))"
+    fixed_in: "Replaced with palace.recall(PalaceQuery(...)) plus max_results="
+    test_path: ""
 
-  - id: MISMATCH-03
+  - id: NEW-02
+    severity: DEGRADED
+    status: resolved
+    caller: dharma_swarm/dgm_loop.py
+    callee: dharma_swarm.evolution.DarwinEngine
+    summary: "hasattr(engine, '_provider') checked nonexistent attribute"
+    fixed_in: "Removed nonexistent hasattr check"
+    test_path: ""
+
+  - id: NEW-03
     severity: BLOCKER
-    status: open
-    caller: dharma_swarm/orchestrate_live.py:1248
-    callee: dharma_swarm/persistent_agent.py:52
-    summary: >-
-      provider_type=outcome.child_spec.get("default_provider", "openrouter_free")
-      is a bare string — Pydantic v2 strict-mode validation rejects.
-    test_path: tests/mismatches/test_MISMATCH_03.py
+    status: resolved
+    caller: dharma_swarm/orchestrator.py:204
+    callee: dharma_swarm.telic_seam.TelicSeam.__init__
+    summary: "TelicSeam() called with registry_path= but __init__ expects path="
+    fixed_in: "Changed registry_path=ontology_db to path=ontology_db"
+    test_path: tests/test_mismatch_blockers.py::test_new03_telic_seam_constructor
 
-  - id: MISMATCH-05
+  - id: MM-02
+    severity: BLOCKER
+    status: resolved
+    caller: dharma_swarm/orchestrate_live.py:1361
+    callee: dharma_swarm.persistent_agent.PersistentAgent.__init__
+    summary: "PersistentAgent role/provider_type passed as bare strings, not AgentRole/ProviderType enums"
+    fixed_in: "orchestrate_live.py uses AgentRole() and PT() on child_spec values"
+    test_path: tests/test_mismatch_blockers.py::test_mm02_persistent_agent_enum
+
+  - id: MM-05
     severity: DEGRADED
     status: open
-    caller: dharma_swarm/orchestrate_live.py:359
-    callee: dharma_swarm/message_bus.py:193
-    summary: >-
-      receive("evolution_loop", limit=20) — `status` defaults to "unread"; after
-      mark_read the messages become invisible to the next receive() call. Silent
-      data loss in the evolution loop's message visibility.
-    test_path: tests/mismatches/test_MISMATCH_05.py
+    caller: dharma_swarm/swarm.py:1883
+    callee: dharma_swarm.orchestrator.Orchestrator._classify_failure
+    summary: "swarm.py calls private Orchestrator methods (_classify_failure, _resolve_retry_policy, _apply_failure_retry_defaults)"
+    fixed_in: ""
+    test_path: tests/test_mismatch_blockers.py::test_mm05_orchestrator_private_methods
 
-  - id: MISMATCH-07
+  - id: MM-07
     severity: DEGRADED
     status: open
-    caller: dharma_swarm/swarm.py:363-370
-    callee: dharma_swarm/auto_proposer.py:157
-    summary: >-
-      AutoProposer accepts stigmergy: StigmergyStore | None but several internal
-      methods call await self._stigmergy.read_marks(...) without None-guard.
-      If StigmergyStore init fails, AutoProposer crashes on first cycle.
-    test_path: tests/mismatches/test_MISMATCH_07.py
+    caller: dharma_swarm/orchestrate_live.py:399
+    callee: dharma_swarm.meta_evolution.MetaEvolutionEngine.observe_cycle_result
+    summary: "observe_cycle_result called twice per cycle; meta-adaptation can fire within one cycle"
+    fixed_in: ""
+    test_path: tests/test_mismatch_blockers.py::test_mm07_meta_evolution_cadence
+
+  - id: MM-12
+    severity: WARNING
+    status: resolved
+    caller: dharma_swarm/orchestrate_live.py:1354
+    callee: dharma_swarm.persistent_agent.PersistentAgent.__init__
+    summary: "Second PersistentAgent call site uses constructed enum values, no mismatch"
+    fixed_in: "Verified correct: cfg['role'] is already AgentRole.CONDUCTOR"
+    test_path: ""
+
+  - id: MM-13
+    severity: DEGRADED
+    status: open
+    caller: dharma_swarm/orchestrate_live.py
+    callee: dharma_swarm.message_bus.receive
+    summary: "message_bus.receive() semantics unclear across orchestrator boundary"
+    fixed_in: ""
+    test_path: ""

@@ -3,8 +3,9 @@ PYTEST ?= pytest
 DASHBOARD_DIR ?= dashboard
 
 .PHONY: help xray xray-json compile test-smoke test-all ci-local dashboard-lint dashboard-build \
-        test-contracts \
-        semgrep gitleaks precommit-install precommit-run governance-baseline
+        test-contracts uplift-guards \
+        semgrep gitleaks precommit-install precommit-run governance-baseline \
+        mismatch-check mismatch-tests test-hygiene module-budget governance-all
 
 help:
 	@printf "Available targets:\n"
@@ -21,6 +22,8 @@ help:
 	@printf "  make precommit-install # install pre-commit git hook\n"
 	@printf "  make precommit-run     # run pre-commit on all files\n"
 	@printf "  make governance-baseline # capture semgrep + gitleaks baselines\n"
+	@printf "  make mismatch-check    # summarize interface mismatch registry\n"
+	@printf "  make mismatch-tests    # run mismatch pinning tests\n"
 
 xray:
 	$(PYTHON) scripts/repo_xray.py
@@ -50,6 +53,9 @@ setup-hooks:
 
 test-contracts:
 	scripts/governance/run_pytest_with_repo_env.sh tests/test_contracts_scaffold.py tests/test_operator_core_contracts.py tests/test_runtime_contract.py tests/test_runtime_contract_adapters.py -q --tb=line
+
+uplift-guards:
+	python3 scripts/uplift_guards/run_pre_commit.py
 
 # ============================================================================
 # Governance targets (Phase 1)
@@ -90,6 +96,24 @@ governance-baseline:
 
 mismatch-check:
 	$(PYTHON) scripts/governance/check_mismatch_map.py
+	@echo "=== Mismatch Registry Check ==="
+	$(PYTHON) -c "\
+import yaml, sys; \
+p='docs/interface_mismatches.yaml'; \
+d=yaml.safe_load(open(p)); \
+entries=d.get('entries',[]); \
+ob=[e for e in entries if e['status']=='open' and e['severity']=='BLOCKER']; \
+od=[e for e in entries if e['status']=='open' and e['severity']=='DEGRADED']; \
+print(f'  Total entries: {len(entries)}'); \
+print(f'  Open BLOCKERs: {len(ob)}'); \
+print(f'  Open DEGRADED: {len(od)}'); \
+print(f'  Resolved: {len([e for e in entries if e[\"status\"]==\"resolved\"])}'); \
+[print(f'    {e[\"id\"]}: {e[\"summary\"]}') for e in ob]; \
+sys.exit(1) if ob else None; \
+print('  No open BLOCKERs; gate PASS')"
+
+mismatch-tests:
+	$(PYTHON) -m pytest tests/test_mismatch_blockers.py -q --tb=short
 
 test-hygiene:
 	$(PYTHON) scripts/governance/check_test_hygiene.py
@@ -98,4 +122,4 @@ module-budget:
 	$(PYTHON) scripts/governance/check_module_budget.py \
 		--base-ref origin/main --head-ref HEAD
 
-governance-all: semgrep gitleaks mismatch-check test-hygiene module-budget
+governance-all: semgrep gitleaks test-hygiene test-contracts uplift-guards module-budget mismatch-check mismatch-tests
