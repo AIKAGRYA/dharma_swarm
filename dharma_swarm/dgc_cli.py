@@ -562,11 +562,13 @@ def _accelerators_enabled() -> bool:
 # Commands — carried over from dgc-core
 # ---------------------------------------------------------------------------
 
-def cmd_status() -> None:
-    """System status overview."""
-    print("=== DGC CORE STATUS ===\n")
+def _build_status_data() -> dict:
+    """Collect system status data as a JSON-ready dict."""
+    from typing import Any
 
-    # Memory — try dharma_swarm async memory, fall back to summary
+    data: dict[str, Any] = {}
+
+    # Memory
     try:
         from dharma_swarm.memory import StrangeLoopMemory
 
@@ -577,51 +579,97 @@ def cmd_status() -> None:
             await mem.close()
             return len(entries)
 
-        count = _run(_mem_stats())
-        print(f"Memory (async SQLite): {count} recent entries")
+        data["memory_entries"] = _run(_mem_stats())
     except Exception as exc:
-        print(f"Memory: unavailable ({exc})")
+        data["memory_error"] = str(exc)
 
-    # Daemon state
+    # Pulse
     pulse_count, last_pulse, pulse_source = _canonical_pulse_summary()
-    if last_pulse:
-        source_note = f" via {pulse_source}" if pulse_source is not None else ""
-        print(f"Pulse: {pulse_count} logged{source_note}, last: {last_pulse}")
-    else:
-        print("Pulse: not yet run")
+    data["pulse"] = {
+        "count": pulse_count,
+        "last": last_pulse,
+        "source": pulse_source,
+    }
 
-    # Gate witness log
-    print(f"Gates today: {_canonical_gate_count()} checks")
+    # Gates
+    data["gates_today"] = _canonical_gate_count()
 
+    # Control plane
     snapshot = _control_plane_snapshot()
     if snapshot:
-        print(f"Control plane snapshot: {snapshot}")
+        data["control_plane_snapshot"] = snapshot
 
-    # AGNI sync
+    # AGNI
     agni = HOME / "agni-workspace"
     if agni.exists():
         working = agni / "WORKING.md"
         if working.exists():
-            age = (time.time() - working.stat().st_mtime) / 60
-            print(f"\nAGNI workspace: synced, WORKING.md updated {age:.0f} min ago")
+            age_min = (time.time() - working.stat().st_mtime) / 60
+            data["agni"] = {"synced": True, "working_md_age_min": round(age_min)}
         else:
-            print("\nAGNI workspace: synced but no WORKING.md")
+            data["agni"] = {"synced": True, "working_md": False}
     else:
-        print("\nAGNI workspace: NOT SYNCED")
+        data["agni"] = {"synced": False}
 
     # Trishula
     trishula = HOME / "trishula" / "inbox"
     if trishula.exists():
-        msgs = list(trishula.glob("*.json"))
-        print(f"Trishula inbox: {len(msgs)} messages")
+        data["trishula_messages"] = len(list(trishula.glob("*.json")))
 
     # Claude Code
     try:
         result = subprocess.run(
             ["claude", "--version"], capture_output=True, text=True, timeout=5,
         )
-        print(f"\nClaude Code: {result.stdout.strip()}")
+        data["claude_code"] = result.stdout.strip()
     except Exception:
+        data["claude_code"] = None
+
+    return data
+
+
+def cmd_status(*, as_json: bool = False) -> None:
+    """System status overview."""
+    data = _build_status_data()
+
+    if as_json:
+        print(json.dumps(data, indent=2, default=str))
+        return
+
+    print("=== DGC CORE STATUS ===\n")
+
+    if "memory_entries" in data:
+        print(f"Memory (async SQLite): {data['memory_entries']} recent entries")
+    else:
+        print(f"Memory: unavailable ({data.get('memory_error', 'unknown')})")
+
+    pulse = data["pulse"]
+    if pulse["last"]:
+        source_note = f" via {pulse['source']}" if pulse["source"] is not None else ""
+        print(f"Pulse: {pulse['count']} logged{source_note}, last: {pulse['last']}")
+    else:
+        print("Pulse: not yet run")
+
+    print(f"Gates today: {data['gates_today']} checks")
+
+    if "control_plane_snapshot" in data:
+        print(f"Control plane snapshot: {data['control_plane_snapshot']}")
+
+    agni = data.get("agni", {})
+    if agni.get("synced"):
+        if agni.get("working_md_age_min") is not None:
+            print(f"\nAGNI workspace: synced, WORKING.md updated {agni['working_md_age_min']} min ago")
+        else:
+            print("\nAGNI workspace: synced but no WORKING.md")
+    else:
+        print("\nAGNI workspace: NOT SYNCED")
+
+    if "trishula_messages" in data:
+        print(f"Trishula inbox: {data['trishula_messages']} messages")
+
+    if data.get("claude_code"):
+        print(f"\nClaude Code: {data['claude_code']}")
+    else:
         print("\nClaude Code: not found")
 
     print("\nMission spine: run `dgc mission-status` for full readiness lanes")
@@ -1220,28 +1268,43 @@ def cmd_develop(what: str, evidence: str) -> None:
     _run(_develop())
 
 
-def cmd_gates(action: str) -> None:
+def cmd_gates(action: str, *, as_json: bool = False) -> None:
     """Run telos gates on an action."""
     from dharma_swarm.telos_gates import DEFAULT_GATEKEEPER
 
     result = DEFAULT_GATEKEEPER.check(action=action)
+
+    if as_json:
+        data = result.model_dump()
+        data["action"] = action
+        print(json.dumps(data, indent=2, default=str))
+        return
+
     print(f"Decision: {result.decision.value.upper()}")
     print(f"Reason: {result.reason}")
 
 
-def cmd_health() -> None:
+def cmd_health(*, as_json: bool = False) -> None:
     """Check ecosystem file health."""
     try:
         from dharma_swarm.ecosystem_map import check_health
 
         h = check_health()
+
+        if as_json:
+            print(json.dumps(h, indent=2, default=str))
+            return
+
         print(f"Ecosystem: {h['ok']} OK, {h['missing']} MISSING")
         if h["details"]:
             print("\nMissing paths:")
             for p, d in h["details"].items():
                 print(f"  {p} -- {d}")
     except ImportError:
-        print("ecosystem_map not available")
+        if as_json:
+            print(json.dumps({"error": "ecosystem_map not available"}))
+        else:
+            print("ecosystem_map not available")
 
 
 def cmd_cascade(
@@ -2675,13 +2738,29 @@ def cmd_evolve_daemon(
     _run(_daemon())
 
 
-def cmd_stigmergy(file_path: str | None = None) -> None:
+def cmd_stigmergy(file_path: str | None = None, *, as_json: bool = False) -> None:
     """Show recent stigmergic marks, hot paths, and high salience marks."""
-    async def _stig() -> None:
+    async def _stig() -> dict | None:
         from dharma_swarm.stigmergy import StigmergyStore
 
         store = StigmergyStore(base_path=DHARMA_STATE / "stigmergy")
         density = store.density()
+
+        if as_json:
+            data: dict = {"density": density}
+            if file_path:
+                marks = await store.read_marks(file_path=file_path, limit=15)
+                data["marks"] = [m.model_dump() for m in marks]
+            else:
+                recent = await store.read_marks(limit=10)
+                data["recent"] = [m.model_dump() for m in recent]
+                hot = await store.hot_paths(window_hours=48, min_marks=2)
+                data["hot_paths"] = [{"path": p, "count": c} for p, c in hot]
+                high = await store.high_salience(threshold=0.7, limit=5)
+                data["high_salience"] = [m.model_dump() for m in high]
+            print(json.dumps(data, indent=2, default=str))
+            return None
+
         print(f"=== Stigmergy ({density} marks) ===\n")
 
         if file_path:
@@ -2696,7 +2775,6 @@ def cmd_stigmergy(file_path: str | None = None) -> None:
                     if m.connections:
                         print(f"    connections: {', '.join(m.connections)}")
         else:
-            # Recent marks
             recent = await store.read_marks(limit=10)
             if recent:
                 print("Recent marks:")
@@ -2705,14 +2783,12 @@ def cmd_stigmergy(file_path: str | None = None) -> None:
                     print(f"  [{ts}] {m.agent} -> {m.file_path}")
                     print(f"    {m.action}: {m.observation} [sal={m.salience:.1f}]")
 
-            # Hot paths
             hot = await store.hot_paths(window_hours=48, min_marks=2)
             if hot:
                 print("\nHot paths (last 48h):")
                 for path, count in hot:
                     print(f"  {path}: {count} marks")
 
-            # High salience
             high = await store.high_salience(threshold=0.7, limit=5)
             if high:
                 print("\nHigh salience marks (>= 0.7):")
@@ -2722,6 +2798,8 @@ def cmd_stigmergy(file_path: str | None = None) -> None:
 
             if not recent and not hot and not high:
                 print("No stigmergic marks yet. The lattice is empty.")
+
+        return None
 
     _run(_stig())
 
@@ -5215,7 +5293,8 @@ def _build_parser() -> argparse.ArgumentParser:
     p_map.add_argument("--layer", type=int, default=None, help="Single layer (0-7)")
 
     # -- status --
-    sub.add_parser("status", help="System status overview")
+    p_status = sub.add_parser("status", help="System status overview")
+    p_status.add_argument("--json", action="store_true", help="Emit JSON output")
     p_runtime = sub.add_parser("runtime-status", help="Canonical runtime control-plane summary")
     p_runtime.add_argument(
         "--limit",
@@ -5460,9 +5539,11 @@ def _build_parser() -> argparse.ArgumentParser:
     # -- gates --
     p_gates = sub.add_parser("gates", help="Run telos gates on an action")
     p_gates.add_argument("action", nargs="+")
+    p_gates.add_argument("--json", action="store_true", help="Emit JSON output")
 
     # -- health --
-    sub.add_parser("health", help="Ecosystem file health")
+    p_health = sub.add_parser("health", help="Ecosystem file health")
+    p_health.add_argument("--json", action="store_true", help="Emit JSON output")
 
     # -- health-check (v0.2.0 monitor) --
     sub.add_parser("health-check", help="Monitor-based system health check")
@@ -5604,6 +5685,7 @@ def _build_parser() -> argparse.ArgumentParser:
     # -- stigmergy --
     p_stig = sub.add_parser("stigmergy", help="Stigmergy marks and hot paths")
     p_stig.add_argument("--file", dest="stig_file", default=None)
+    p_stig.add_argument("--json", action="store_true", help="Emit JSON output")
 
     # -- hum --
     sub.add_parser("hum", help="Subconscious associations")
@@ -6296,7 +6378,7 @@ def main() -> None:
         case "ui":
             cmd_ui(getattr(args, "surface", "list"))
         case "status":
-            cmd_status()
+            cmd_status(as_json=args.json)
         case "runtime-status":
             cmd_runtime_status(limit=args.limit, db_path=args.db_path)
         case "mission-status":
@@ -6419,7 +6501,7 @@ def main() -> None:
         case "develop":
             cmd_develop(args.what, " ".join(args.evidence))
         case "gates":
-            cmd_gates(" ".join(args.action))
+            cmd_gates(" ".join(args.action), as_json=args.json)
         case "organism-pulse":
             cmd_organism_pulse(task=args.task, dry_run=args.dry_run)
         case "invariants":
@@ -6427,7 +6509,7 @@ def main() -> None:
         case "transcendence":
             cmd_transcendence()
         case "health":
-            cmd_health()
+            cmd_health(as_json=args.json)
         case "cascade":
             cmd_cascade(
                 domain=args.domain,
@@ -6680,7 +6762,7 @@ def main() -> None:
                 case _:
                     parser.parse_args(["dharma", "--help"])
         case "stigmergy":
-            cmd_stigmergy(args.stig_file)
+            cmd_stigmergy(args.stig_file, as_json=args.json)
         case "hum":
             cmd_hum()
         case "eval":

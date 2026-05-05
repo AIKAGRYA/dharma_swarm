@@ -2256,3 +2256,45 @@ def test_cmd_sprint_falls_back_to_local_on_non_runtime_error(
     contents = output.read_text()
     assert "Mode**: local (fallback)" in contents
     assert "LOCAL SPRINT" in contents
+
+
+# ---------------------------------------------------------------------------
+# JSON output tests for status, health, gates, stigmergy
+# ---------------------------------------------------------------------------
+
+
+def test_cmd_status_json_emits_valid_json(monkeypatch, tmp_path, capsys):
+    """status --json should emit parseable JSON with expected keys."""
+    import dharma_swarm.dgc_cli as cli
+
+    monkeypatch.setattr(cli, "DHARMA_STATE", tmp_path / ".dharma")
+    monkeypatch.setattr(cli, "HOME", tmp_path)
+
+    cli.cmd_status(as_json=True)
+    out = capsys.readouterr().out
+    data = json.loads(out)
+    assert "pulse" in data
+    assert "gates_today" in data
+
+
+def test_cmd_health_json_emits_valid_json(capsys):
+    """health --json should emit parseable JSON."""
+    import dharma_swarm.dgc_cli as cli
+
+    cli.cmd_health(as_json=True)
+    out = capsys.readouterr().out
+    data = json.loads(out)
+    assert "ok" in data
+    assert "missing" in data
+
+
+def test_cmd_gates_json_emits_valid_json(capsys):
+    """gates --json should emit parseable JSON with decision + action."""
+    import dharma_swarm.dgc_cli as cli
+
+    cli.cmd_gates("check status", as_json=True)
+    out = capsys.readouterr().out
+    data = json.loads(out)
+    assert "decision" in data
+    assert "action" in data
+    assert data["action"] == "check status"
