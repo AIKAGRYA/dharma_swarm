@@ -1,6 +1,8 @@
 """Tests for ``dgc trace-attractor`` CLI command.
 
-Verifies the CLI entry point produces correct JSON and human-readable output.
+Verifies the CLI entry point produces correct JSON and human-readable output
+using the pure projector API (build_packet with empty events when stores
+are unavailable).
 """
 
 from __future__ import annotations

@@ -268,31 +268,10 @@ async def telemetry_artifacts(
 @router.get("/trace-attractor/{trace_id}")
 async def telemetry_trace_attractor(trace_id: str) -> ApiResponse:
     """Project a trace_id into an AttractorPacket."""
+    from dharma_swarm.trace_attractor.cli import _collect_events
     from dharma_swarm.trace_attractor.projector import TraceAttractorProjector
-    from dharma_swarm.runtime_state import RuntimeStateStore
 
-    store = _get_telemetry_store()
-    rs = RuntimeStateStore(store.db_path)
-
-    ontology = None
-    try:
-        from dharma_swarm.ontology_runtime import get_shared_registry
-        ontology = get_shared_registry()
-    except Exception:
-        pass
-
-    lineage = None
-    try:
-        from dharma_swarm.lineage import LineageGraph
-        lineage = LineageGraph()
-    except Exception:
-        pass
-
-    projector = TraceAttractorProjector(
-        ontology=ontology,
-        runtime_state=rs,
-        telemetry_plane=store,
-        lineage_graph=lineage,
-    )
-    packet = await projector.project(trace_id)
+    events = await _collect_events(trace_id, None, None, None)
+    projector = TraceAttractorProjector()
+    packet = projector.build_packet(trace_id, events)
     return ApiResponse(data=packet.to_dict())

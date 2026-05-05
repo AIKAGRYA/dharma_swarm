@@ -1,284 +1,298 @@
-"""Tests for Trace Attractor Ledger projection.
-
-Builds synthetic trace data across ontology, runtime state, and telemetry
-stores, then verifies the projector assembles a stable AttractorPacket.
-"""
+"""Tests for pure Trace Attractor Ledger projection contracts."""
 
 from __future__ import annotations
 
-import asyncio
-import json
-import os
-import tempfile
-from datetime import datetime, timezone
-from pathlib import Path
-
-import pytest
-
-from dharma_swarm.trace_attractor.models import AttractorPacket, AttractorEvent
-from dharma_swarm.trace_attractor.projector import TraceAttractorProjector
-
-TRACE_ID = "trc_test_projection_001"
+from dharma_swarm.trace_attractor import (
+    AttractorEvent,
+    FindingSeverity,
+    TraceAttractorProjector,
+)
 
 
-class FakeOntologyObj:
-    """Minimal stand-in for OntologyObj."""
-
-    def __init__(self, *, obj_id: str, type_name: str, properties: dict, created_at=None):
-        self.id = obj_id
-        self.type_name = type_name
-        self.properties = properties
-        self.created_at = created_at or datetime.now(timezone.utc)
+FIXED_AT = "2026-05-05T00:00:00Z"
 
 
-class FakeOntologyRegistry:
-    """Minimal stand-in for OntologyRegistry."""
-
-    def __init__(self, objects: list[FakeOntologyObj]):
-        self._objects = objects
-
-    def get_objects_by_type(self, type_name: str) -> list[FakeOntologyObj]:
-        return [o for o in self._objects if o.type_name == type_name]
-
-
-@pytest.fixture()
-def ontology_with_trace():
-    return FakeOntologyRegistry([
-        FakeOntologyObj(
-            obj_id="prop_001",
-            type_name="ActionProposal",
-            properties={"trace_id": TRACE_ID, "task_id": "task_a"},
-        ),
-        FakeOntologyObj(
-            obj_id="gate_001",
-            type_name="GateDecision",
-            properties={"trace_id": TRACE_ID, "gate_name": "maheshwari_test", "decision": "pass"},
-        ),
-        FakeOntologyObj(
-            obj_id="out_001",
-            type_name="Outcome",
-            properties={"trace_id": TRACE_ID, "proposal_id": "prop_001"},
-        ),
-        FakeOntologyObj(
-            obj_id="ve_001",
-            type_name="ValueEvent",
-            properties={"trace_id": TRACE_ID, "outcome_id": "out_001", "task_type": "operator_brief"},
-        ),
-        FakeOntologyObj(
-            obj_id="contrib_001",
-            type_name="Contribution",
-            properties={"trace_id": TRACE_ID, "agent_id": "agent_alpha"},
-        ),
-        # Object NOT in this trace — should be excluded
-        FakeOntologyObj(
-            obj_id="prop_other",
-            type_name="ActionProposal",
-            properties={"trace_id": "trc_OTHER"},
-        ),
-    ])
-
-
-@pytest.fixture()
-def runtime_db(tmp_path):
-    """Create a temporary runtime_state DB with trace_id data."""
-    import aiosqlite
-    db_path = str(tmp_path / "runtime_state.db")
-
-    async def _setup():
-        async with aiosqlite.connect(db_path) as db:
-            await db.execute(
-                "CREATE TABLE IF NOT EXISTS task_claims ("
-                " claim_id TEXT PRIMARY KEY, task_id TEXT, session_id TEXT,"
-                " agent_id TEXT, status TEXT DEFAULT 'open', claimed_at TEXT,"
-                " completed_at TEXT, retry_count INTEGER DEFAULT 0,"
-                " metadata_json TEXT DEFAULT '{}', trace_id TEXT DEFAULT '')"
-            )
-            await db.execute(
-                "INSERT INTO task_claims (claim_id, task_id, session_id, trace_id)"
-                " VALUES (?, ?, ?, ?)",
-                ("claim_001", "task_a", "sess_001", TRACE_ID),
-            )
-            await db.execute(
-                "CREATE TABLE IF NOT EXISTS delegation_runs ("
-                " run_id TEXT PRIMARY KEY, session_id TEXT, task_id TEXT,"
-                " claim_id TEXT, parent_run_id TEXT, assigned_by TEXT,"
-                " assigned_to TEXT, requested_output_json TEXT,"
-                " current_artifact_id TEXT, status TEXT, started_at TEXT,"
-                " completed_at TEXT, failure_code TEXT,"
-                " metadata_json TEXT DEFAULT '{}', trace_id TEXT DEFAULT '')"
-            )
-            await db.execute(
-                "INSERT INTO delegation_runs (run_id, session_id, task_id, trace_id, status, started_at)"
-                " VALUES (?, ?, ?, ?, ?, ?)",
-                ("run_001", "sess_001", "task_a", TRACE_ID, "running", "2026-01-01T00:00:00Z"),
-            )
-            await db.execute(
-                "CREATE TABLE IF NOT EXISTS artifact_records ("
-                " artifact_id TEXT PRIMARY KEY, session_id TEXT, task_id TEXT,"
-                " run_id TEXT, artifact_kind TEXT, manifest_path TEXT,"
-                " payload_path TEXT, checksum TEXT, parent_artifact_id TEXT,"
-                " promotion_state TEXT, created_at TEXT,"
-                " metadata_json TEXT DEFAULT '{}')"
-            )
-            await db.commit()
-
-    asyncio.get_event_loop().run_until_complete(_setup())
-    return db_path
-
-
-@pytest.fixture()
-def telemetry_db(tmp_path):
-    """Create a temporary telemetry DB with trace_id data."""
-    import aiosqlite
-    db_path = str(tmp_path / "telemetry.db")
-
-    async def _setup():
-        async with aiosqlite.connect(db_path) as db:
-            await db.execute(
-                "CREATE TABLE IF NOT EXISTS economic_events ("
-                " event_id TEXT PRIMARY KEY, session_id TEXT, task_id TEXT,"
-                " run_id TEXT, event_kind TEXT, amount REAL, currency TEXT,"
-                " counterparty TEXT, summary TEXT,"
-                " metadata_json TEXT DEFAULT '{}', created_at TEXT,"
-                " trace_id TEXT DEFAULT '')"
-            )
-            await db.execute(
-                "INSERT INTO economic_events"
-                " (event_id, session_id, task_id, amount, currency, created_at, trace_id)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?)",
-                ("econ_001", "sess_001", "task_a", 42.50, "USD", "2026-01-01T00:00:00Z", TRACE_ID),
-            )
-            await db.commit()
-
-    asyncio.get_event_loop().run_until_complete(_setup())
-    return db_path
-
-
-class FakeRuntimeState:
-    """Minimal stand-in for RuntimeStateStore."""
-
-    def __init__(self, db_path: str):
-        self.db_path = db_path
-
-    async def init_db(self):
-        pass
-
-    async def list_artifacts(self, limit: int = 500):
-        return []
-
-
-class FakeTelemetryPlane:
-    """Minimal stand-in for TelemetryPlaneStore with _open()."""
-
-    def __init__(self, db_path: str):
-        self.db_path = db_path
-
-    async def init_db(self):
-        pass
-
-    def _open(self):
-        import aiosqlite
-        return aiosqlite.connect(self.db_path)
-
-
-async def test_projection_assembles_complete_packet(ontology_with_trace, runtime_db, telemetry_db):
-    projector = TraceAttractorProjector(
-        ontology=ontology_with_trace,
-        runtime_state=FakeRuntimeState(runtime_db),
-        telemetry_plane=FakeTelemetryPlane(telemetry_db),
-    )
-    packet = await projector.project(TRACE_ID)
-
-    assert packet.trace_id == TRACE_ID
-    assert packet.schema_version == 1
-    assert "prop_001" in packet.proposal_ids
-    assert "gate_001" in packet.gate_decision_ids
-    assert "out_001" in packet.outcome_ids
-    assert "ve_001" in packet.value_event_ids
-    assert "contrib_001" in packet.contribution_ids
-    assert "claim_001" in packet.claim_ids
-    assert "run_001" in packet.delegation_run_ids
-    assert "econ_001" in packet.economic_event_ids
-    # Excluded objects
-    assert "prop_other" not in packet.proposal_ids
-
-
-async def test_projection_json_is_stable(ontology_with_trace, runtime_db, telemetry_db):
-    projector = TraceAttractorProjector(
-        ontology=ontology_with_trace,
-        runtime_state=FakeRuntimeState(runtime_db),
-        telemetry_plane=FakeTelemetryPlane(telemetry_db),
+def _event(
+    event_id: str,
+    *,
+    source_store: str,
+    source_type: str,
+    source_object_id: str,
+    event_type: str,
+    trace_id: str = "trc-main",
+    proposal_id: str = "",
+    session_id: str = "sess-main",
+    occurred_at: str = FIXED_AT,
+    **attributes: object,
+) -> AttractorEvent:
+    return AttractorEvent(
+        event_id=event_id,
+        trace_id=trace_id,
+        proposal_id=proposal_id,
+        session_id=session_id,
+        source_store=source_store,
+        source_table_or_type=source_type,
+        source_object_id=source_object_id,
+        event_type=event_type,
+        subject=source_object_id,
+        occurred_at=occurred_at,
+        attributes=dict(attributes),
     )
 
-    packet1 = await projector.project(TRACE_ID)
-    packet2 = await projector.project(TRACE_ID)
 
-    d1 = packet1.to_dict()
-    d2 = packet2.to_dict()
+def test_projector_builds_stable_packet_from_synthetic_cross_substrate_trace() -> None:
+    events = [
+        _event(
+            "evt-econ",
+            source_store="telemetry_plane",
+            source_type="economic_events",
+            source_object_id="econ-1",
+            event_type="economic_event_recorded",
+            task_id="task-1",
+            run_id="run-1",
+            value_event_id="ve-1",
+            amount=1200.0,
+            currency="USD",
+            agent_id="agent-a",
+        ),
+        _event(
+            "evt-value-signal",
+            source_store="signal_bus",
+            source_type="VALUE_EVENT_RECORDED",
+            source_object_id="sig-ve-1",
+            event_type="value_event_recorded",
+            outcome_id="outcome-1",
+            value_event_id="ve-1",
+            composite_value=0.82,
+            agent_id="agent-a",
+        ),
+        _event(
+            "evt-claim",
+            source_store="runtime_state",
+            source_type="task_claims",
+            source_object_id="claim-1",
+            event_type="task_claim_recorded",
+            task_id="task-1",
+            claim_id="claim-1",
+            agent_id="agent-a",
+        ),
+        _event(
+            "evt-run",
+            source_store="runtime_state",
+            source_type="delegation_runs",
+            source_object_id="run-1",
+            event_type="delegation_run_recorded",
+            task_id="task-1",
+            claim_id="claim-1",
+            run_id="run-1",
+            agent_id="agent-a",
+        ),
+        _event(
+            "evt-proposal",
+            source_store="ontology",
+            source_type="ActionProposal",
+            source_object_id="proposal-1",
+            event_type="action_proposal_recorded",
+            proposal_id="proposal-1",
+            task_id="task-1",
+        ),
+        _event(
+            "evt-gate",
+            source_store="ontology",
+            source_type="GateDecisionRecord",
+            source_object_id="gate-1",
+            event_type="gate_decision_recorded",
+            proposal_id="proposal-1",
+            gate_decision_id="gate-1",
+        ),
+        _event(
+            "evt-artifact",
+            source_store="runtime_state",
+            source_type="artifact_records",
+            source_object_id="artifact-1",
+            event_type="artifact_recorded",
+            task_id="task-1",
+            run_id="run-1",
+            artifact_id="artifact-1",
+            manifest_path="reports/witness/trace.md",
+            checksum="sha256:abc",
+        ),
+        _event(
+            "evt-outcome",
+            source_store="ontology",
+            source_type="Outcome",
+            source_object_id="outcome-1",
+            event_type="outcome_recorded",
+            proposal_id="proposal-1",
+            task_id="task-1",
+            outcome_id="outcome-1",
+            agent_id="agent-a",
+        ),
+        _event(
+            "evt-contribution",
+            source_store="ontology",
+            source_type="Contribution",
+            source_object_id="contrib-1",
+            event_type="contribution_recorded",
+            value_event_id="ve-1",
+            contribution_id="contrib-1",
+            agent_id="agent-a",
+        ),
+        _event(
+            "evt-warrant",
+            source_store="governance",
+            source_type="FourfoldActionWarrant",
+            source_object_id="warrant-1",
+            event_type="fourfold_warrant_recorded",
+            status="pass",
+            maheshwari="pass",
+            mahakali="hold",
+            mahalakshmi="pass",
+            mahasaraswati="pass",
+        ),
+        _event(
+            "evt-other-trace",
+            source_store="ontology",
+            source_type="Outcome",
+            source_object_id="outcome-other",
+            event_type="outcome_recorded",
+            trace_id="trc-other",
+            outcome_id="outcome-other",
+        ),
+    ]
 
-    # Remove generated_at (varies by call time)
-    d1.pop("generated_at")
-    d2.pop("generated_at")
-
-    assert json.dumps(d1, sort_keys=True) == json.dumps(d2, sort_keys=True)
-
-
-async def test_projection_empty_trace():
     projector = TraceAttractorProjector()
-    packet = await projector.project("trc_nonexistent")
+    packet = projector.build_packet("trc-main", reversed(events), generated_at=FIXED_AT)
+    again = projector.build_packet("trc-main", events, generated_at=FIXED_AT)
 
-    assert packet.trace_id == "trc_nonexistent"
-    assert len(packet.proposal_ids) == 0
-    assert len(packet.events) == 0
-    assert packet.fourfold_warrant.status == "unknown"
+    assert packet.to_stable_json() == again.to_stable_json()
+    assert packet.trace_id == "trc-main"
+    assert packet.proposal_ids == ["proposal-1"]
+    assert packet.gate_decision_ids == ["gate-1"]
+    assert packet.task_ids == ["task-1"]
+    assert packet.claim_ids == ["claim-1"]
+    assert packet.delegation_run_ids == ["run-1"]
+    assert packet.artifact_ids == ["artifact-1"]
+    assert packet.outcome_ids == ["outcome-1"]
+    assert packet.value_event_ids == ["ve-1"]
+    assert packet.contribution_ids == ["contrib-1"]
+    assert packet.economic_event_ids == ["econ-1"]
+    assert packet.signal_event_ids == ["evt-value-signal"]
+    assert packet.value_summary.composite_value == 0.82
+    assert packet.value_summary.economic_amount == 1200.0
+    assert packet.value_summary.agent_count == 1
+    assert packet.value_summary.artifact_count == 1
+    assert packet.value_summary.task_count == 1
+    assert packet.fourfold_warrant.status == "pass"
+    assert "outcome-other" not in packet.to_stable_json()
 
 
-async def test_projection_value_summary(ontology_with_trace, runtime_db, telemetry_db):
-    projector = TraceAttractorProjector(
-        ontology=ontology_with_trace,
-        runtime_state=FakeRuntimeState(runtime_db),
-        telemetry_plane=FakeTelemetryPlane(telemetry_db),
+def test_projector_emits_lifecycle_findings_from_normalized_events() -> None:
+    events = [
+        _event(
+            "evt-orphan-outcome",
+            source_store="ontology",
+            source_type="Outcome",
+            source_object_id="outcome-orphan",
+            event_type="outcome_recorded",
+            outcome_id="outcome-orphan",
+        ),
+        _event(
+            "evt-orphan-ve",
+            source_store="ontology",
+            source_type="ValueEvent",
+            source_object_id="ve-orphan",
+            event_type="value_event_recorded",
+            value_event_id="ve-orphan",
+            composite_value=0.2,
+        ),
+        _event(
+            "evt-bare-artifact",
+            source_store="runtime_state",
+            source_type="artifact_records",
+            source_object_id="artifact-bare",
+            event_type="artifact_recorded",
+            artifact_id="artifact-bare",
+        ),
+        _event(
+            "evt-econ-unlinked",
+            source_store="telemetry_plane",
+            source_type="economic_events",
+            source_object_id="econ-unlinked",
+            event_type="economic_event_recorded",
+            amount=50.0,
+            currency="USD",
+        ),
+    ]
+
+    packet = TraceAttractorProjector().build_packet(
+        "trc-main",
+        events,
+        generated_at=FIXED_AT,
     )
-    packet = await projector.project(TRACE_ID)
 
-    assert packet.value_summary.economic_amount == 42.50
-    assert packet.value_summary.currency == "USD"
-    assert packet.value_summary.task_count >= 1
+    findings = {finding.code: finding for finding in packet.lifecycle_findings}
+    assert findings["orphan_outcome"].severity == FindingSeverity.DEGRADED.value
+    assert findings["orphan_value_event"].severity == FindingSeverity.DEGRADED.value
+    assert findings["artifact_without_manifest"].severity == FindingSeverity.DEGRADED.value
+    assert findings["economic_without_value_event"].severity == FindingSeverity.BLOCKER.value
+    assert findings["warrant_unknown"].severity == FindingSeverity.INFO.value
 
 
-async def test_projection_fourfold_warrant(ontology_with_trace, runtime_db, telemetry_db):
-    projector = TraceAttractorProjector(
-        ontology=ontology_with_trace,
-        runtime_state=FakeRuntimeState(runtime_db),
-        telemetry_plane=FakeTelemetryPlane(telemetry_db),
+def test_attractor_event_maps_to_cloudevent_envelope() -> None:
+    event = _event(
+        "evt-signal",
+        source_store="signal_bus",
+        source_type="VALUE_EVENT_RECORDED",
+        source_object_id="sig-1",
+        event_type="value_event_recorded",
+        proposal_id="proposal-1",
+        value_event_id="ve-1",
     )
-    packet = await projector.project(TRACE_ID)
 
-    assert packet.fourfold_warrant.maheshwari == "pass"
-    assert "gate_001" in packet.fourfold_warrant.evidence_refs
+    envelope = event.to_cloudevent()
+
+    assert envelope["specversion"] == "1.0"
+    assert envelope["id"] == "evt-signal"
+    assert envelope["source"] == "dharma://signal_bus/VALUE_EVENT_RECORDED"
+    assert envelope["type"] == "dev.dharma.value_event_recorded"
+    assert envelope["subject"] == "sig-1"
+    assert envelope["data"]["trace_id"] == "trc-main"
+    assert envelope["data"]["proposal_id"] == "proposal-1"
+    assert envelope["data"]["value_event_id"] == "ve-1"
 
 
-async def test_projection_provenance_graph(ontology_with_trace, runtime_db, telemetry_db):
-    projector = TraceAttractorProjector(
-        ontology=ontology_with_trace,
-        runtime_state=FakeRuntimeState(runtime_db),
-        telemetry_plane=FakeTelemetryPlane(telemetry_db),
+def test_packet_jsonld_stub_keeps_projection_data() -> None:
+    packet = TraceAttractorProjector().build_packet(
+        "trc-main",
+        [_event(
+            "evt-proposal",
+            source_store="ontology",
+            source_type="ActionProposal",
+            source_object_id="proposal-1",
+            event_type="action_proposal_recorded",
+        )],
+        generated_at=FIXED_AT,
     )
-    packet = await projector.project(TRACE_ID)
 
-    graph = packet.provenance_graph
-    assert "nodes" in graph
-    assert "edges" in graph
-    assert len(graph["nodes"]) > 0
+    jsonld = packet.to_jsonld_stub()
+
+    assert jsonld["@id"] == "dharma:trace/trc-main"
+    assert jsonld["@type"] == "dharma:AttractorPacket"
+    assert jsonld["@context"]["prov"] == "http://www.w3.org/ns/prov#"
+    assert jsonld["proposal_ids"] == ["proposal-1"]
 
 
-async def test_human_summary():
-    packet = AttractorPacket(
-        trace_id="trc_test",
-        proposal_ids=["p1"],
-        task_ids=["t1", "t2"],
+def test_empty_trace_packet_is_stable_and_read_only() -> None:
+    packet = TraceAttractorProjector().build_packet(
+        "trc-empty",
+        [],
+        generated_at=FIXED_AT,
     )
-    summary = packet.human_summary()
-    assert "trc_test" in summary
-    assert "proposals: 1" in summary
-    assert "tasks: 2" in summary
+
+    assert packet.to_dict()["trace_id"] == "trc-empty"
+    assert packet.to_dict()["generated_at"] == FIXED_AT
+    assert packet.value_summary.composite_value == 0.0
+    assert packet.provenance_graph.nodes == []
+    assert packet.provenance_graph.edges == []
+    assert [finding.code for finding in packet.lifecycle_findings] == ["warrant_unknown"]
