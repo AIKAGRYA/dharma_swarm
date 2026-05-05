@@ -86,3 +86,11 @@ The inventory mode scans a requested Markdown glob, defaults to all Markdown,
 and reports authority-term candidates, frontmatter files, absolute local repo
 paths, and a capped sample of missing references. It is deliberately
 non-blocking. Use it to assign cleanup lanes, not to reject commits.
+
+## CI
+
+`.github/workflows/docops.yml` runs the blocking DocOps gate on pull requests,
+manual dispatch, and a weekly schedule. The scheduled run exercises the
+`verified_at` TTL so stale assertion dates surface without waiting for a code
+change. The workflow also uploads JSON and Markdown inventory artifacts for
+cleanup agents.
