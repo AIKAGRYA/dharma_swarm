@@ -103,6 +103,31 @@ def test_canonical_guard_rejects_unregistered_authority_claim(tmp_path: Path) ->
     assert not any(finding.check == "canonical" for finding in findings)
 
 
+def test_changed_canonical_guard_fails_added_docs_and_warns_modified_docs(tmp_path: Path) -> None:
+    repo = tmp_path
+    write(repo / "docs" / "changed.md", "This is the canonical source of truth.\n")
+    config_path = base_config(repo)
+    config = load_config(config_path)
+    config["canonical_guard"]["changed_include"] = ["docs/*.md"]
+
+    added_findings = docops.check_canonical_guard(
+        repo, config, [("A", "docs/changed.md")]
+    )
+    assert any(
+        finding.check == "canonical" and finding.severity == "FAIL"
+        for finding in added_findings
+    )
+
+    modified_findings = docops.check_canonical_guard(
+        repo, config, [("M", "docs/changed.md")]
+    )
+    assert any(
+        finding.check == "canonical" and finding.severity == "WARN"
+        for finding in modified_findings
+    )
+    assert not any(finding.severity == "FAIL" for finding in modified_findings)
+
+
 def test_auto_section_update_writes_generated_inventory(tmp_path: Path) -> None:
     repo = tmp_path
     write(repo / "dharma_swarm" / "a.py", "x = 1\n")
