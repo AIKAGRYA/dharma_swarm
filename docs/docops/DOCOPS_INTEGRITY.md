@@ -50,6 +50,20 @@ Review docs affected by code changes:
 python scripts/docops/check_docops_integrity.py --changed-from origin/main
 ```
 
+Write a machine-readable check report for CI or agent handoff:
+
+```bash
+python scripts/docops/check_docops_integrity.py --report-json reports/docops/check.json
+```
+
+Write a non-blocking corpus inventory for cleanup planning:
+
+```bash
+python scripts/docops/check_docops_integrity.py \
+  --inventory-json reports/docops/corpus_inventory.json \
+  --inventory-markdown reports/docops/corpus_inventory.md
+```
+
 ## Scope
 
 This v0 intentionally checks the live governance and navigation surface first.
@@ -65,3 +79,10 @@ are promoted, archived, or brought under managed DocOps scope.
 - Stale auto-generated section: blocking unless regenerated.
 - Changed-code doc candidates: warning only.
 - Expired `verified_at`: blocking.
+
+## Corpus Inventory
+
+The inventory mode scans a requested Markdown glob, defaults to all Markdown,
+and reports authority-term candidates, frontmatter files, absolute local repo
+paths, and a capped sample of missing references. It is deliberately
+non-blocking. Use it to assign cleanup lanes, not to reject commits.
