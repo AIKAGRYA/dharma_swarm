@@ -1,0 +1,139 @@
+{
+  "version": 1,
+  "verified_at": "2026-05-05",
+  "ttl_days": 14,
+  "assertions": [
+    {
+      "id": "manifest-total-python-modules",
+      "doc": "docs/governance/SOVEREIGN_MANIFEST.md",
+      "regex": "Total Python modules \\| \\*\\*(\\d+)\\*\\*",
+      "metric": "dharma_python_modules",
+      "verify": "find dharma_swarm -name \"*.py\" -type f | wc -l"
+    },
+    {
+      "id": "manifest-top-level-python-modules",
+      "doc": "docs/governance/SOVEREIGN_MANIFEST.md",
+      "regex": "Top-level \\(flat\\) modules \\| \\*\\*(\\d+)",
+      "metric": "dharma_top_level_python_modules",
+      "verify": "find dharma_swarm -maxdepth 1 -name \"*.py\" -type f | wc -l"
+    },
+    {
+      "id": "manifest-test-files",
+      "doc": "docs/governance/SOVEREIGN_MANIFEST.md",
+      "regex": "Test files \\| \\*\\*(\\d+)\\*\\*",
+      "metric": "test_files",
+      "verify": "find tests -name \"*.py\" -type f | wc -l"
+    },
+    {
+      "id": "manifest-test-functions",
+      "doc": "docs/governance/SOVEREIGN_MANIFEST.md",
+      "regex": "Test functions \\| \\*\\*([\\d,]+) `def test_`",
+      "metric": "test_def_occurrences",
+      "verify": "rg \"def test_\" tests | wc -l"
+    },
+    {
+      "id": "manifest-markdown-files",
+      "doc": "docs/governance/SOVEREIGN_MANIFEST.md",
+      "regex": "Markdown files \\| \\*\\*(\\d+)\\*\\*",
+      "metric": "markdown_files",
+      "verify": "find . -name \"*.md\" -type f | wc -l"
+    },
+    {
+      "id": "manifest-markdown-lines",
+      "doc": "docs/governance/SOVEREIGN_MANIFEST.md",
+      "regex": "Markdown total lines \\| \\*\\*([\\d,]+)\\*\\*",
+      "metric": "markdown_total_lines",
+      "verify": "find . -name \"*.md\" -type f -print0 | xargs -0 wc -l"
+    },
+    {
+      "id": "manifest-bridge-files",
+      "doc": "docs/governance/SOVEREIGN_MANIFEST.md",
+      "regex": "Bridge files \\| \\*\\*(\\d+)\\*\\*",
+      "metric": "bridge_files",
+      "verify": "find dharma_swarm -name \"*bridge*.py\" -type f | wc -l"
+    },
+    {
+      "id": "manifest-adapter-files",
+      "doc": "docs/governance/SOVEREIGN_MANIFEST.md",
+      "regex": "Adapter files \\| \\*\\*(\\d+)",
+      "metric": "adapter_files",
+      "verify": "find dharma_swarm -type f | rg -i \"adapter\" | wc -l"
+    },
+    {
+      "id": "manifest-router-files",
+      "doc": "docs/governance/SOVEREIGN_MANIFEST.md",
+      "regex": "Router files \\| \\*\\*(\\d+)\\*\\*",
+      "metric": "router_files",
+      "verify": "find dharma_swarm -type f | rg -i \"rout\" | wc -l"
+    }
+  ],
+  "path_guards": {
+    "include": [
+      "AGENTS.md",
+      "CLAUDE.md",
+      "PRODUCT_SURFACE.md",
+      "docs/AGENTS.md",
+      "docs/governance/CANONICAL_DOC_STACK.md",
+      "docs/governance/BUILD_SESSION_ENTRYPOINT.md",
+      "docs/docops/*.md",
+      "specs/Dharma_Constitution_v0.md",
+      "specs/KERNEL_CORE_SPEC.md"
+    ],
+    "ignore_targets": [
+      "#*",
+      "http://*",
+      "https://*",
+      "mailto:*",
+      "app://*",
+      "plugin://*",
+      "file://*",
+      "foo.py",
+      "test_foo.py"
+    ]
+  },
+  "canonical_guard": {
+    "managed_include": [
+      "AGENTS.md",
+      "CLAUDE.md",
+      "PRODUCT_SURFACE.md",
+      "docs/governance/CANONICAL_DOC_STACK.md",
+      "docs/docops/DOCOPS_INTEGRITY.md",
+      "docs/docops/AUTO_INVENTORY.md"
+    ],
+    "changed_include": [
+      "*.md",
+      "docs/**/*.md",
+      "specs/**/*.md"
+    ],
+    "registered": [
+      "AGENTS.md",
+      "CLAUDE.md",
+      "docs/governance/BUILD_SESSION_ENTRYPOINT.md",
+      "docs/governance/SOVEREIGN_MANIFEST.md",
+      "docs/governance/CANONICAL_DOC_STACK.md",
+      "docs/governance/REPO_GOVERNANCE_AUDIT.md",
+      "docs/architecture/NAVIGATION.md",
+      "docs/architecture/MODEL_ROUTING_CANON.md",
+      "PRODUCT_SURFACE.md",
+      "specs/DGC_TERMINAL_ARCHITECTURE_v1.1.md",
+      "specs/Dharma_Constitution_v0.md",
+      "specs/KERNEL_CORE_SPEC.md",
+      "docs/docops/DOCOPS_INTEGRITY.md",
+      "docs/docops/AUTO_INVENTORY.md"
+    ]
+  },
+  "auto_sections": {
+    "include": [
+      "docs/docops/AUTO_INVENTORY.md"
+    ]
+  },
+  "change_review": {
+    "doc_include": [
+      "AGENTS.md",
+      "CLAUDE.md",
+      "README.md",
+      "docs/**/*.md",
+      "specs/**/*.md"
+    ]
+  }
+}
