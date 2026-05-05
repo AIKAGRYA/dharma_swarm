@@ -1622,7 +1622,7 @@ class DGCApp(App):
     def _run_dharma_status(self) -> None:
         try:
             import asyncio
-            from dharma_swarm.dgc_cli import _get_swarm
+            from dharma_swarm.terminal_commands._helpers import _get_swarm
 
             async def _status():
                 swarm = await _get_swarm()
@@ -1643,7 +1643,7 @@ class DGCApp(App):
         try:
             import asyncio
             from dharma_swarm.dharma_corpus import ClaimStatus
-            from dharma_swarm.dgc_cli import _get_swarm
+            from dharma_swarm.terminal_commands._helpers import _get_swarm
 
             # Parse --status STATUS filter
             status_filter: ClaimStatus | None = None
@@ -1682,7 +1682,7 @@ class DGCApp(App):
     def _run_stigmergy(self, arg: str = "") -> None:
         try:
             import asyncio
-            from dharma_swarm.dgc_cli import _get_swarm
+            from dharma_swarm.terminal_commands._helpers import _get_swarm
 
             async def _stig():
                 swarm = await _get_swarm()
@@ -1717,7 +1717,7 @@ class DGCApp(App):
     def _run_hum(self) -> None:
         try:
             import asyncio
-            from dharma_swarm.dgc_cli import _get_swarm
+            from dharma_swarm.terminal_commands._helpers import _get_swarm
 
             async def _hum():
                 swarm = await _get_swarm()
