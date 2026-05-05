@@ -94,3 +94,34 @@ manual dispatch, and a weekly schedule. The scheduled run exercises the
 `verified_at` TTL so stale assertion dates surface without waiting for a code
 change. The workflow also uploads JSON and Markdown inventory artifacts for
 cleanup agents.
+
+## PR-Ready Promotion Shape
+
+The current v0 branch is shaped for review as a governance/tooling change, not
+a runtime change:
+
+- It adds a local checker with stdlib-only parsing.
+- It adds focused tests for assertions, path guards, registry checks,
+  generated sections, TTL, review routing, and report generation.
+- It wires the check into local governance and a dedicated CI workflow.
+- It keeps generated reports under ignored `reports/docops/` output.
+- It leaves runtime, ontology, dashboard, provider, and agent execution code
+  untouched.
+
+Expected PR verification:
+
+```bash
+make docops-integrity
+make docops-report
+pre-commit run dharma-docops-integrity --all-files
+pre-commit run dharma-test-hygiene --all-files
+pre-commit run semgrep-local --all-files
+python3 -m compileall scripts/docops/check_docops_integrity.py tests/test_docops_integrity.py
+git diff --check
+```
+
+Related experimental docs:
+
+- `docs/docops/SEMANTIC_CODEC_V0.md`
+- `docs/docops/SEMANTIC_CODEC_OFFLINE_EXPERIMENT_2026_05_05.md`
+- `docs/docops/DAILY_OPERATING_BRIEF_FEED.md`

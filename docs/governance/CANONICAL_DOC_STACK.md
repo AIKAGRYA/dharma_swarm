@@ -62,6 +62,7 @@ using phrases such as "source of truth", "canonical", "authoritative", or
 |------|--------------------|
 | `AGENTS.md` | Cross-agent repo instructions and mandatory read order |
 | `CLAUDE.md` | Behavioral rules for coding agents |
+| `docs/AGENTS.md` | Documentation-specific cleanup and semantic-experiment rules |
 | `docs/governance/BUILD_SESSION_ENTRYPOINT.md` | Current build track and pre-change read order |
 | `docs/governance/SOVEREIGN_MANIFEST.md` | Repo architecture, invariants, domains, measured state |
 | `docs/governance/CANONICAL_DOC_STACK.md` | Documentation hierarchy and ownership |
@@ -158,7 +159,7 @@ spec with tests or witness evidence.
 
 ## Frontmatter Policy
 
-The Codex (GPT-5) frontmatter injection is present in 213 of 624 Markdown
+The Codex (GPT-5) frontmatter injection is present in 213 of 630 Markdown
 files, including 15 of 20 `docs/architecture` files. Policy going forward:
 
 1. **Root governance docs** (Tier 1-2): NO frontmatter. Plain markdown. Maximum clarity.

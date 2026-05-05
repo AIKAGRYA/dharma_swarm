@@ -87,6 +87,7 @@
       "app://*",
       "plugin://*",
       "file://*",
+      "reports/docops/**",
       "foo.py",
       "test_foo.py"
     ]
@@ -105,11 +106,12 @@
       "docs/**/*.md",
       "specs/**/*.md"
     ],
-    "registered": [
-      "AGENTS.md",
-      "CLAUDE.md",
-      "docs/governance/BUILD_SESSION_ENTRYPOINT.md",
-      "docs/governance/SOVEREIGN_MANIFEST.md",
+      "registered": [
+        "AGENTS.md",
+        "CLAUDE.md",
+        "docs/AGENTS.md",
+        "docs/governance/BUILD_SESSION_ENTRYPOINT.md",
+        "docs/governance/SOVEREIGN_MANIFEST.md",
       "docs/governance/CANONICAL_DOC_STACK.md",
       "docs/governance/REPO_GOVERNANCE_AUDIT.md",
       "docs/architecture/NAVIGATION.md",

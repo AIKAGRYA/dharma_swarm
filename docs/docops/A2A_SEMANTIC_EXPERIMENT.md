@@ -44,6 +44,6 @@ that always expands back to human-readable English and cites source files.
 ## Fit With DocOps
 
 DocOps treats these compact messages as generated or experimental artifacts,
-not canonical docs. A future checker can validate the required legend,
+not trusted governance documents. A future checker can validate the required legend,
 round-trip expansion, citations, and metrics before any A2A semantic artifact
 is accepted.
