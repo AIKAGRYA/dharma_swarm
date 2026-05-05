@@ -51,10 +51,11 @@ The order is load-bearing. Do not skip ahead. Each item lands as its own PR, wit
 
 ## Track 3 — Make the seam load-bearing for downstream substrates (items 7–8)
 
-### 7. Wire the brief artifact into `RuntimeStateStore.artifact_records`
-- Per audit §5 Slice 2, do not build a new artifact registry. Use `dharma_swarm/runtime_state.py` `record_artifact()`.
-- Add the read-before-propose guard: the operator-brief generator must cite at least one `session_events` or `memory_facts` row. Test asserts this fails closed if no source is cited.
-- Why now: this is the wiring step that prevents the seam from drifting back into a parallel data path. Without it, the brief is ontology-native in name only.
+### 7. Prove the brief reads runtime substrate before proposing
+- **Partial status:** artifact persistence is witnessed. The first-tick report confirms the `operator_brief` `KnowledgeArtifact` is persisted through `RuntimeStateStore.artifact_records`.
+- Remaining work: add the read-before-propose guard. The operator-brief generator must cite at least one `session_events` or `memory_facts` row. Test asserts this fails closed if no source is cited.
+- Per audit §5 Slice 2, do not build a new artifact registry. Continue using `dharma_swarm/runtime_state.py` `record_artifact()`.
+- Why now: artifact persistence prevents a parallel artifact path; the read-before-propose guard prevents an ontology-native artifact from being generated from empty runtime context.
 
 ### 8. Add `LEDGER_WATCHER` to Guardian for empty operator-brief output
 - Per audit §5 Slice 3 and §8 commit 3. Read-only against a temp `runtime.db`.

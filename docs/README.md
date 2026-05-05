@@ -3,17 +3,16 @@ title: DHARMA Documentation Index
 path: docs/README.md
 slug: dharma-documentation-index
 doc_type: readme
-status: canonical
-summary: Documentation entrypoint for canon, plans, prompts, reports, and archive material in the DHARMA SWARM repo.
+status: reference
+summary: Documentation entrypoint for plans, prompts, reports, reference material, and archive material in the DHARMA SWARM repo. Canonical authority is owned by docs/governance/CANONICAL_DOC_STACK.md.
 source:
   provenance: repo_local
   kind: readme
   origin_signals:
   - README.md
-  - docs/REPO_ONTOLOGY_AND_HYGIENE_MASTER_SPEC_2026-04-01.md
-  - docs/REPO_RECLASSIFICATION_MATRIX_2026-04-01.md
-  - docs/GENERATED_ARTIFACT_BOUNDARY_MATRIX_2026-04-02.md
-  - docs/plans/ROOT_DRAIN_VALIDATION_2026-04-02.md
+  - docs/governance/CANONICAL_DOC_STACK.md
+  - docs/governance/BUILD_SESSION_ENTRYPOINT.md
+  - docs/plans/2026-04-02-cleanup-control-center.md
   cited_urls: []
   generated_hint: human_or_agent_authored_repo_doc
 disciplines:
@@ -28,15 +27,11 @@ inspiration:
 - product_surface
 connected_relevant_files:
 - README.md
-- docs/REPO_ONTOLOGY_AND_HYGIENE_MASTER_SPEC_2026-04-01.md
-- docs/REPO_RECLASSIFICATION_MATRIX_2026-04-01.md
-- docs/GENERATED_ARTIFACT_BOUNDARY_MATRIX_2026-04-02.md
+- docs/governance/CANONICAL_DOC_STACK.md
+- docs/governance/BUILD_SESSION_ENTRYPOINT.md
 - docs/plans/2026-04-02-cleanup-control-center.md
 - docs/plans/2026-04-02-generated-artifact-control-center.md
 - docs/plans/2026-04-03-tui-baseline-protection-note.md
-- docs/plans/ROOT_DRAIN_VALIDATION_2026-04-02.md
-- docs/REPO_LIVING_MAP_2026-03-31.md
-- docs/SWARM_FRONTEND_MASTER_SPEC_2026-04-01.md
 improvement:
   room_for_improvement:
   - Keep the canon set small and explicit.
@@ -57,7 +52,7 @@ pkm:
   evergreen_potential: high
 stigmergy:
   meaning: This file is the entrypoint for the prose layer of the repo.
-  state: canonical
+  state: reference
   semantic_weight: 0.95
   coordination_comment: Use this file to decide where a document belongs before creating or moving it.
   trace_role: coordination_trace
@@ -70,27 +65,32 @@ curation:
 
 This directory is the prose layer for `dharma_swarm`. It is not one thing.
 
-Use the repo ontology from [REPO_ONTOLOGY_AND_HYGIENE_MASTER_SPEC_2026-04-01.md](/Users/dhyana/dharma_swarm/docs/REPO_ONTOLOGY_AND_HYGIENE_MASTER_SPEC_2026-04-01.md) as the governing contract for what belongs here and what does not.
+Use [CANONICAL_DOC_STACK.md](/Users/dhyana/dharma_swarm/docs/governance/CANONICAL_DOC_STACK.md) as the governing contract for document authority. Use this file for navigation only.
 
 ## Start Here
 
-If you need the current repo and product truth:
+If you need current repo truth:
 
 - [README.md](/Users/dhyana/dharma_swarm/README.md): top-level operator entrypoint
 - [CLAUDE.md](/Users/dhyana/dharma_swarm/CLAUDE.md): agent operating contract
-- [PRODUCT_SURFACE.md](/Users/dhyana/dharma_swarm/PRODUCT_SURFACE.md): canonical product-surface statement
-- [REPO_LIVING_MAP_2026-03-31.md](/Users/dhyana/dharma_swarm/docs/REPO_LIVING_MAP_2026-03-31.md): human repo orientation layer
-- [SWARM_FRONTEND_MASTER_SPEC_2026-04-01.md](/Users/dhyana/dharma_swarm/docs/SWARM_FRONTEND_MASTER_SPEC_2026-04-01.md): current frontend doctrine
+- [BUILD_SESSION_ENTRYPOINT.md](/Users/dhyana/dharma_swarm/docs/governance/BUILD_SESSION_ENTRYPOINT.md): current build track and read order
+- [SOVEREIGN_MANIFEST.md](/Users/dhyana/dharma_swarm/docs/governance/SOVEREIGN_MANIFEST.md): architecture, invariants, and measured repo state
+- [CANONICAL_DOC_STACK.md](/Users/dhyana/dharma_swarm/docs/governance/CANONICAL_DOC_STACK.md): document hierarchy and authority registry
 
 ## Document Classes
 
 Treat prose files in this repo as one of these classes:
 
-- `canon`: durable operator, product, or architecture truth
+- `canon`: durable authority named in `CANONICAL_DOC_STACK.md`
+- `ADR`: one accepted, proposed, superseded, or rejected decision
 - `active spec`: implementation-driving design docs for current work
 - `working plan`: bounded execution plans, missions, or handoff packets
 - `foundation`: conceptual substrate and research synthesis
 - `report`: dated descriptive outputs and audits
+- `witness`: falsifiability artifact with captured evidence
+- `reference`: useful background that is not operational authority
+- `archive`: retained history, not current instruction
+- `experiment`: bounded exploration with no runtime authority
 - `generated state`: machine-produced traces and branch artifacts
 
 If a file does not fit one of those classes, it probably should not be created yet.
@@ -134,16 +134,9 @@ If a file does not fit one of those classes, it probably should not be created y
 - topic subtrees such as `docs/dse/`, `docs/merge/`, `docs/reports/`:
   domain-local material that should not compete with canon
 
-## Current Canon Set
+## Current Authority Set
 
-The current compact canon for repo understanding is:
-
-- [README.md](/Users/dhyana/dharma_swarm/README.md)
-- [CLAUDE.md](/Users/dhyana/dharma_swarm/CLAUDE.md)
-- [PRODUCT_SURFACE.md](/Users/dhyana/dharma_swarm/PRODUCT_SURFACE.md)
-- [REPO_LIVING_MAP_2026-03-31.md](/Users/dhyana/dharma_swarm/docs/REPO_LIVING_MAP_2026-03-31.md)
-- [SWARM_FRONTEND_MASTER_SPEC_2026-04-01.md](/Users/dhyana/dharma_swarm/docs/SWARM_FRONTEND_MASTER_SPEC_2026-04-01.md)
-- [REPO_ONTOLOGY_AND_HYGIENE_MASTER_SPEC_2026-04-01.md](/Users/dhyana/dharma_swarm/docs/REPO_ONTOLOGY_AND_HYGIENE_MASTER_SPEC_2026-04-01.md)
+The current compact authority set is owned by [CANONICAL_DOC_STACK.md](/Users/dhyana/dharma_swarm/docs/governance/CANONICAL_DOC_STACK.md). Do not add another canon list here.
 
 ## Architecture-Local Docs
 
@@ -190,7 +183,6 @@ These are useful, but they should not compete with repo-level canon:
 Operational helper:
 
 - `bash scripts/start_autonomous_cleanup_tmux.sh`: start the bounded non-TUI overnight cleanup launcher
-- [HOT_PATH_INTEGRATION_PROTOCOL_2026-04-01.md](/Users/dhyana/dharma_swarm/docs/HOT_PATH_INTEGRATION_PROTOCOL_2026-04-01.md): dashboard hot-path freeze and integration rules
 
 ## Rules
 
@@ -198,6 +190,7 @@ Operational helper:
 - Do not treat prompts, reports, and plans as product truth.
 - Do not put generated state in `docs/`.
 - Do not treat `reports/historical/` or `.dharma_psmv_hyperfile_branch*/` as canonical inputs to runtime work.
+- Do not treat AI-to-AI compact language or semantic clusters as authority unless they include a human-readable legend and are promoted through an owner doc.
 - When in doubt, place a new prose file under a subdirectory, not `docs/` top level.
 
 ## Next Cleanup Targets

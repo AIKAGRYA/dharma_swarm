@@ -1,6 +1,6 @@
 # CANONICAL DOC STACK
 
-**Date**: 2026-04-04
+**Date**: 2026-05-05
 **Purpose**: Define the minimal root-adjacent file stack for repo integrity.
 
 ---
@@ -40,6 +40,7 @@ TIER 5 — ARCHIVE (do not read unless investigating history)
 | Kind of Truth | Canonical File | All Others Must Defer |
 |---------------|---------------|----------------------|
 | Agent behavior rules | `CLAUDE.md` | — |
+| Cross-agent repo instructions | `AGENTS.md` | `docs/AGENTS.md` for documentation-specific rules |
 | Repo axioms & domain map | `SOVEREIGN_MANIFEST.md` | — |
 | Module-level what-does-what | `NAVIGATION.md` | — |
 | Model/provider routing | `MODEL_ROUTING_CANON.md` | model_routing.py files must not contradict |
@@ -47,6 +48,71 @@ TIER 5 — ARCHIVE (do not read unless investigating history)
 | Constitutional axioms | `specs/Dharma_Constitution_v0.md` | — |
 | Kernel spec | `specs/KERNEL_CORE_SPEC.md` | — |
 | Contradictions & staleness | `REPO_GOVERNANCE_AUDIT.md` | — |
+
+---
+
+## Authority Registry
+
+Only the files below may claim repo-wide canonical authority. Any other file
+using phrases such as "source of truth", "canonical", "authoritative", or
+"ground truth" must scope the claim to its local domain or be corrected.
+
+| File | Authority Boundary |
+|------|--------------------|
+| `AGENTS.md` | Cross-agent repo instructions and mandatory read order |
+| `CLAUDE.md` | Behavioral rules for coding agents |
+| `docs/governance/BUILD_SESSION_ENTRYPOINT.md` | Current build track and pre-change read order |
+| `docs/governance/SOVEREIGN_MANIFEST.md` | Repo architecture, invariants, domains, measured state |
+| `docs/governance/CANONICAL_DOC_STACK.md` | Documentation hierarchy and ownership |
+| `docs/governance/REPO_GOVERNANCE_AUDIT.md` | Contradiction, staleness, and drift ledger |
+| `docs/architecture/NAVIGATION.md` | Module map, after count refresh |
+| `docs/architecture/MODEL_ROUTING_CANON.md` | Provider/model routing, after merge with root routing map |
+| `specs/DGC_TERMINAL_ARCHITECTURE_v1.1.md` | Terminal protocol, after Bun/Textual split is reconciled |
+| `specs/Dharma_Constitution_v0.md` | Constitutional rules |
+| `specs/KERNEL_CORE_SPEC.md` | Kernel immutability |
+
+All reports, plans, prompts, generated outputs, missions, and research notes
+are evidence or context unless explicitly promoted through this registry.
+
+---
+
+## DocOps Lifecycle
+
+Use this lifecycle before moving or deleting docs:
+
+1. **Inventory**: identify current claims, incoming links, and replacement owner.
+2. **Demote**: mark stale or historical docs with replacement and reason.
+3. **Redirect**: update live links to the replacement owner.
+4. **Archive**: move only after links and hardcoded paths are accounted for.
+5. **Delete later**: remove only generated or duplicate material with no remaining authority or path dependency.
+
+Documentation PRs should classify changed files as one of:
+`canon`, `ADR`, `active_spec`, `working_plan`, `report`, `witness`,
+`reference`, `archive`, or `experiment`.
+
+---
+
+## Agent-Native Semantic Layer
+
+AI-to-AI compressed language and emergent semantic ontologies are valid
+research directions, but they are not canonical documentation or runtime
+authority by default.
+
+Allowed now:
+
+- read-only extraction of repeated semantic patterns during doc cleanup;
+- reports or plans that include a human-readable legend;
+- round-trip experiments where compact agent messages expand back to clear
+  English and cite source files.
+
+Not allowed yet:
+
+- opaque compact language controlling runtime behavior;
+- new ontology schema created from clustering alone;
+- hidden symbolic instructions that replace docs, gates, witnesses, or ADRs.
+
+If a semantic pattern becomes load-bearing, promote it through an ADR or active
+spec with tests or witness evidence.
 
 ---
 
@@ -80,6 +146,12 @@ TIER 5 — ARCHIVE (do not read unless investigating history)
 | `docs/governance/REPO_GOVERNANCE_AUDIT.md` | Audit findings and contradiction log | **EXISTS** — updated with re-audit corrections |
 | `docs/governance/CANONICAL_DOC_STACK.md` | This file — doc hierarchy | **EXISTS** |
 
+### CREATED BY DOCOPS AUTHORITY PASS (2026-05-05)
+| File | Purpose | Status |
+|------|---------|--------|
+| `AGENTS.md` | Repo-local agent instruction entrypoint | **EXISTS** — thin pointer to canonical read order |
+| `docs/AGENTS.md` | Documentation-specific agent rules | **EXISTS** — doc taxonomy, cleanup lifecycle, semantic experiment boundary |
+
 ---
 
 ## Frontmatter Policy
@@ -100,3 +172,5 @@ The Codex (GPT-5) frontmatter injection added 80+ lines of YAML to every markdow
 3. **Any new doc must identify which existing doc it replaces or subordinates to**
 4. **No doc may claim "single source of truth" for something another doc also covers**
 5. **Stale docs must be archived within 2 weeks of becoming stale**
+6. **Generated artifacts are never canonical unless promoted through a human-readable owner doc**
+7. **Machine-native semantic experiments must include a human legend and may not control runtime behavior**

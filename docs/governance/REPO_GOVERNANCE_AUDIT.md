@@ -353,3 +353,57 @@ A parallel re-audit using Claude Code's filesystem tools (Grep, Glob, Read, Bash
 | runtime_bridge.py | — | **ZOMBIE** | 0 importers |
 | math_bridges.py | — | **ZOMBIE** | 0 importers |
 | offline_training_bridge.py | — | **ZOMBIE** | 0 importers |
+
+---
+
+## 11. DOCOPS AUTHORITY PASS (2026-05-05, Six-Agent Read-Only Cartography)
+
+Six read-only documentation lanes reviewed governance, architecture/runtime,
+operator-brief substrate, cleanup/archive policy, ops/CI, and
+product/research/foundations. No files were edited during the cartography pass.
+
+### Fresh Measured Counts In This Worktree
+
+| Metric | Current value | Prior doc claim now stale |
+|--------|---------------|---------------------------|
+| Python modules under `dharma_swarm/` | **523** | `SOVEREIGN_MANIFEST.md` says 514 |
+| Top-level Python modules under `dharma_swarm/` | **377** | `SOVEREIGN_MANIFEST.md` says 375 |
+| Test files | **506** | `SOVEREIGN_MANIFEST.md` says 502 |
+| Markdown files after this docops patch | **624** | `SOVEREIGN_MANIFEST.md` says 1,789 |
+
+### Converged Findings
+
+| ID | Severity | Finding |
+|----|----------|---------|
+| DOCOPS-1 | HIGH | `docs/README.md` carried an older canon set that conflicts with `CANONICAL_DOC_STACK.md` and referenced missing files. |
+| DOCOPS-2 | HIGH | `NEXT_10_SUBSTRATE_TODO.md` item 7 treated `artifact_records` wiring as pending even though the operator-brief witness report confirms persistence in `RuntimeStateStore.artifact_records`. The read-before-propose guard remains pending. |
+| DOCOPS-3 | HIGH | `PRODUCT_SURFACE.md` claims dashboard product authority while `SOVEREIGN_MANIFEST.md` says the dashboard is not the primary interface. |
+| DOCOPS-4 | HIGH | Production/deployment docs describe stale systemd and enterprise paths while local ops reality is launchd plus `dgc orchestrate-live`. |
+| DOCOPS-5 | MEDIUM | Architecture truth is split across `NAVIGATION.md`, `MODEL_ROUTING_CANON.md`, root `MODEL_ROUTING_MAP.md`, terminal specs, and audit reports. |
+| DOCOPS-6 | MEDIUM | Generated artifacts and archived docs still carry active-looking metadata or incoming links from live docs. |
+| DOCOPS-7 | MEDIUM | The repo lacked a repo-local `AGENTS.md`; agents depended on parent/global instructions plus `CLAUDE.md`. |
+
+### Immediate Remediation Landed By This Patch
+
+- Add `AGENTS.md` as a thin repo-local agent instruction entrypoint.
+- Add `docs/AGENTS.md` for documentation-specific agent rules, doc roles,
+  deprecation format, and AI-to-AI semantic experiment boundaries.
+- Extend `CANONICAL_DOC_STACK.md` with an authority registry, DocOps lifecycle,
+  and rules for generated artifacts and machine-native semantic experiments.
+- Update `docs/README.md` so it is a reference/navigation page rather than a
+  competing canon list.
+- Split `NEXT_10_SUBSTRATE_TODO.md` item 7 into witnessed artifact persistence
+  and remaining read-before-propose proof.
+
+### Follow-Up PRs
+
+1. Refresh `SOVEREIGN_MANIFEST.md`, `CLAUDE.md`, and `NAVIGATION.md` measured
+   counts from current filesystem state.
+2. Merge root `MODEL_ROUTING_MAP.md` into `docs/architecture/MODEL_ROUTING_CANON.md`
+   and demote the root copy.
+3. Create or update a single operational runbook that owns launchd, health,
+   Docker caveats, CI, pre-commit, and recovery.
+4. Reconcile operator-brief master spec and handoff now that the first live
+   tick is witnessed.
+5. Normalize generated/archive metadata so generated probes and archived docs do
+   not look active.
