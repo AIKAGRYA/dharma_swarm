@@ -24,5 +24,7 @@
 /.pre-commit-config.yaml                @AmitabhainArunachala
 /scripts/uplift_guards/                 @AmitabhainArunachala
 /scripts/governance/                    @AmitabhainArunachala
+/scripts/docops/                        @AmitabhainArunachala
+/docs/docops/                           @AmitabhainArunachala
 /INTERFACE_MISMATCH_MAP.md              @AmitabhainArunachala
 /SWARM_HOT_ITEMS.md                     @AmitabhainArunachala
