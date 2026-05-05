@@ -311,28 +311,44 @@ def authority_terms_in_text(text: str) -> list[str]:
 def check_canonical_guard(
     repo_root: Path,
     config: dict[str, Any],
-    changed_files: list[str] | None,
+    changed_files: list[tuple[str, str]] | None,
 ) -> list[Finding]:
     guard = config.get("canonical_guard", {})
     registered = set(guard.get("registered", []))
     patterns = guard.get("managed_include", [])
     files = {repo_relative(path, repo_root): path for path in iter_files(repo_root, patterns)}
 
+    changed_doc_statuses: dict[str, str] = {}
     if changed_files:
         changed_patterns = guard.get("changed_include", ["**/*.md"])
-        for rel in changed_files:
+        for status, rel in changed_files:
             if not rel.endswith(".md"):
                 continue
             if any(fnmatch.fnmatch(rel, pattern) for pattern in changed_patterns):
                 path = repo_root / rel
                 if path.exists() and path.is_file():
                     files[rel] = path
+                    changed_doc_statuses[rel] = status
 
     findings: list[Finding] = []
     for rel, path in sorted(files.items()):
         if rel in registered:
             continue
         if doc_contains_authority_claim(path):
+            status = changed_doc_statuses.get(rel)
+            if status and not status.startswith("A"):
+                findings.append(
+                    Finding(
+                        "WARN",
+                        "canonical",
+                        (
+                            f"{rel} contains an authority term but is not registered "
+                            "in docs/governance/CANONICAL_DOC_STACK.md; review before "
+                            "relying on it as live guidance"
+                        ),
+                    )
+                )
+                continue
             findings.append(
                 Finding(
                     "FAIL",
@@ -346,12 +362,14 @@ def check_canonical_guard(
     return findings
 
 
-def git_changed_files(repo_root: Path, base_ref: str | None) -> list[str]:
+def git_changed_file_statuses(
+    repo_root: Path, base_ref: str | None
+) -> list[tuple[str, str]]:
     if not base_ref:
         return []
     try:
         result = subprocess.run(
-            ["git", "diff", "--name-only", "--diff-filter=ACMRTUXB", f"{base_ref}...HEAD"],
+            ["git", "diff", "--name-status", "--diff-filter=ACMRTUXB", f"{base_ref}...HEAD"],
             cwd=repo_root,
             check=True,
             capture_output=True,
@@ -359,7 +377,19 @@ def git_changed_files(repo_root: Path, base_ref: str | None) -> list[str]:
         )
     except (OSError, subprocess.CalledProcessError):
         return []
-    return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    statuses: list[tuple[str, str]] = []
+    for line in result.stdout.splitlines():
+        parts = line.strip().split("\t")
+        if len(parts) < 2:
+            continue
+        status = parts[0]
+        rel = parts[-1]
+        statuses.append((status, rel))
+    return statuses
+
+
+def git_changed_files(repo_root: Path, base_ref: str | None) -> list[str]:
+    return [rel for _status, rel in git_changed_file_statuses(repo_root, base_ref)]
 
 
 def doc_review_candidates(
@@ -520,13 +550,14 @@ def run_checks(
 ) -> tuple[list[Finding], dict[str, int]]:
     config = load_config(config_path)
     metrics = collect_metrics(repo_root)
-    changed_files = git_changed_files(repo_root, changed_from)
+    changed_file_statuses = git_changed_file_statuses(repo_root, changed_from)
+    changed_files = [rel for _status, rel in changed_file_statuses]
 
     findings: list[Finding] = []
     findings.extend(check_staleness(config, today))
     findings.extend(check_assertions(repo_root, config, metrics))
     findings.extend(check_path_guards(repo_root, config))
-    findings.extend(check_canonical_guard(repo_root, config, changed_files))
+    findings.extend(check_canonical_guard(repo_root, config, changed_file_statuses))
     findings.extend(check_or_write_auto_sections(repo_root, config, metrics, write_auto_sections))
     findings.extend(doc_review_candidates(repo_root, config, changed_files))
     return findings, metrics
