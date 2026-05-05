@@ -5268,6 +5268,12 @@ def _build_parser() -> argparse.ArgumentParser:
     p_canonical = sub.add_parser("canonical-status", help="Show canonical DGC/SAB repo topology")
     p_canonical.add_argument("--json", action="store_true", help="Emit JSON report")
 
+    # -- value-events --
+    p_ve = sub.add_parser("value-events", help="List operator_brief ValueEvents grouped by agent")
+    p_ve.add_argument("--since", required=True, help="Show events since date (YYYY-MM-DD or ISO-8601)")
+    p_ve.add_argument("--json", action="store_true", help="Emit JSON output")
+    p_ve.add_argument("--registry-path", default=None, help="Override ontology registry path")
+
     # -- chat --
     p_chat = sub.add_parser("chat", help="Launch native Claude Code interactive UI")
     p_chat.add_argument(
@@ -6306,6 +6312,13 @@ def main() -> None:
             rc = cmd_canonical_status(as_json=args.json)
             if rc != 0:
                 raise SystemExit(rc)
+        case "value-events":
+            from dharma_swarm.operator_brief.value_events import run_value_events
+            print(run_value_events(
+                since=args.since,
+                as_json=args.json,
+                registry_path=args.registry_path,
+            ))
         case "up":
             cmd_up(background=args.background)
         case "down":

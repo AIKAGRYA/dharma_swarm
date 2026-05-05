@@ -2,7 +2,7 @@
 # Kept in sync with INTERFACE_MISMATCH_MAP.md
 # Updated: 2026-05-04 (correlation-context session)
 
-mismatches:
+entries:
   - id: MM-02
     title: "PersistentAgent enum deserialization"
     severity: BLOCKER

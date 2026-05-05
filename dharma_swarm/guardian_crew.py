@@ -460,6 +460,8 @@ async def run_ledger_watcher(
                 since_iso,
             )
             context_status_counts = runtime_context_status_counts(db, since_iso)
+            from dharma_swarm.operator_brief.watchdog import check_operator_brief_output
+            ob_findings = check_operator_brief_output(db, str(runtime_db))
     except sqlite3.Error as exc:
         return [
             GuardianFinding(
@@ -600,6 +602,7 @@ async def run_ledger_watcher(
                 ),
             )
         )
+    findings.extend(ob_findings)
     return findings
 
 
