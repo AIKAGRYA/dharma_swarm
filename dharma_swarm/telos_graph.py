@@ -300,6 +300,13 @@ class TelosGraph:
         """Return an objective by id, or ``None``."""
         return self._objectives.get(obj_id)
 
+    async def get_by_name(self, name: str) -> TelosObjective | None:
+        """Return the first objective whose *name* matches, or ``None``."""
+        for obj in self._objectives.values():
+            if obj.name == name:
+                return obj
+        return None
+
     def list_objectives(
         self,
         perspective: TelosPerspective | None = None,

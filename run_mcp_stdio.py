@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
+from dharma_swarm.daemon_config import dharma_state_dir
 
 from mcp.server.stdio import stdio_server
 
@@ -12,7 +13,7 @@ from dharma_swarm.mcp_server import create_mcp_server
 
 
 async def main() -> None:
-    state_dir = str(Path.home() / ".dharma")
+    state_dir = str(dharma_state_dir())
     server = create_mcp_server(state_dir=state_dir)
     async with stdio_server() as (read_stream, write_stream):
         await server.run(

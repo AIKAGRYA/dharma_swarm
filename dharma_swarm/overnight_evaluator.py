@@ -26,6 +26,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
+from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -276,7 +277,7 @@ class OvernightEvaluator:
         project_dir: Path | None = None,
     ) -> None:
         self.date = date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        self.state_dir = Path(state_dir) if state_dir is not None else Path.home() / ".dharma"
+        self.state_dir = Path(state_dir) if state_dir is not None else dharma_state_dir()
         self.project_dir = Path(project_dir) if project_dir is not None else Path.home() / "dharma_swarm"
 
         self._baseline: dict[str, Any] | None = None

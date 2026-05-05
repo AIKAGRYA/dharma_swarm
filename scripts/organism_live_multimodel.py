@@ -20,6 +20,7 @@ from pathlib import Path
 
 # Ensure dharma_swarm importable
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from dharma_swarm.daemon_config import dharma_state_dir
 
 from dharma_swarm.models import LLMRequest, LLMResponse, ProviderType
 from dharma_swarm.organism import AlgedonicSignal, GnaniVerdict, OrganismRuntime
@@ -149,7 +150,7 @@ async def fire_provider(
 
 async def run_experiment(n_cycles: int = 3) -> None:
     """Run the full experiment."""
-    state_dir = Path.home() / ".dharma"
+    state_dir = dharma_state_dir()
 
     # Algedonic + Gnani callbacks
     algedonic_log: list[AlgedonicSignal] = []

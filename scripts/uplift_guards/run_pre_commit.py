@@ -15,6 +15,7 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from scripts.uplift_guards import (
     check_autonomous_destruction,
+    check_fourfold_shakti_warrant,
     check_hotpath_acknowledged,
     check_kernel_integrity,
     check_mismatch_adjacency,
@@ -74,6 +75,7 @@ GUARDS = [
     ("secrets-scan", check_no_secrets),
     ("autonomous-destruction", check_autonomous_destruction),
     ("hotpath-ack", check_hotpath_acknowledged),
+    ("fourfold-shakti-warrant", check_fourfold_shakti_warrant),
     ("mismatch-adjacency", check_mismatch_adjacency),
     ("assurance-diff", check_assurance_diff),
 ]

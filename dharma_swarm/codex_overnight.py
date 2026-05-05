@@ -7,12 +7,13 @@ import time
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any, Sequence
 
 from dharma_swarm.codex_cli import dgc_codex_exec_prefix
 
 ROOT = Path.home() / "dharma_swarm"
-STATE = Path.home() / ".dharma"
+STATE = dharma_state_dir()
 LOG_ROOT = STATE / "logs" / "codex_overnight"
 HEARTBEAT_FILE = STATE / "codex_overnight_heartbeat.json"
 RUN_FILE = STATE / "codex_overnight_run_dir.txt"

@@ -75,8 +75,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from dharma_swarm.daemon_config import dharma_state_dir
+
 HOME = Path.home()
-DHARMA_STATE = HOME / ".dharma"
+DHARMA_STATE = dharma_state_dir()
 DHARMA_SWARM = HOME / "dharma_swarm"
 DGC_CORE = HOME / "dgc-core"
 DEFAULT_SPRINT_LLM_TIMEOUT_SEC = 12.0
@@ -1599,7 +1601,7 @@ def cmd_invariants() -> None:
     from pathlib import Path
     import json
 
-    state_dir = Path.home() / ".dharma"
+    state_dir = dharma_state_dir()
 
     # 1. Catalytic graph → criticality + closure
     try:
@@ -3965,7 +3967,7 @@ def cmd_ledger(
     limit_sessions: int | None = None,
 ) -> None:
     """Inspect orchestrator session ledgers."""
-    ledger_base = Path.home() / ".dharma" / "ledgers"
+    ledger_base = dharma_state_dir() / "ledgers"
 
     if ledger_cmd == "sessions" or ledger_cmd is None:
         if not ledger_base.exists():
@@ -5266,6 +5268,12 @@ def _build_parser() -> argparse.ArgumentParser:
     p_canonical = sub.add_parser("canonical-status", help="Show canonical DGC/SAB repo topology")
     p_canonical.add_argument("--json", action="store_true", help="Emit JSON report")
 
+    # -- value-events --
+    p_ve = sub.add_parser("value-events", help="List operator_brief ValueEvents grouped by agent")
+    p_ve.add_argument("--since", required=True, help="Show events since date (YYYY-MM-DD or ISO-8601)")
+    p_ve.add_argument("--json", action="store_true", help="Emit JSON output")
+    p_ve.add_argument("--registry-path", default=None, help="Override ontology registry path")
+
     # -- chat --
     p_chat = sub.add_parser("chat", help="Launch native Claude Code interactive UI")
     p_chat.add_argument(
@@ -6186,7 +6194,7 @@ def _cmd_agent_list() -> None:
 
 def _cmd_agent_runs() -> None:
     """Show recent agent run reports."""
-    report_dir = Path.home() / ".dharma" / "agent_runs"
+    report_dir = dharma_state_dir() / "agent_runs"
     if not report_dir.exists():
         print("No agent runs yet.")
         return
@@ -6304,6 +6312,13 @@ def main() -> None:
             rc = cmd_canonical_status(as_json=args.json)
             if rc != 0:
                 raise SystemExit(rc)
+        case "value-events":
+            from dharma_swarm.operator_brief.value_events import run_value_events
+            print(run_value_events(
+                since=args.since,
+                as_json=args.json,
+                registry_path=args.registry_path,
+            ))
         case "up":
             cmd_up(background=args.background)
         case "down":
@@ -6679,7 +6694,7 @@ def main() -> None:
                     parser.parse_args(["eval", "--help"])
         case "log":
             import subprocess as _sp_log
-            checker = str(Path.home() / ".dharma" / "conversation_log" / "promise_checker.py")
+            checker = str(dharma_state_dir() / "conversation_log" / "promise_checker.py")
             match args.log_cmd:
                 case "promises":
                     _sp_log.run([sys.executable, checker, "--promises"])

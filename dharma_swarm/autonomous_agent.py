@@ -33,6 +33,7 @@ from dharma_swarm.models import Message, MessagePriority
 from dharma_swarm.runtime_provider import (
     create_runtime_provider,
     preferred_runtime_provider_configs,
+    resolve_runtime_provider_config,
 )
 
 logger = logging.getLogger(__name__)
@@ -506,7 +507,6 @@ class AutonomousAgent:
     def __init__(self, identity: AgentIdentity) -> None:
         self.identity = identity
         self.memory = AgentMemoryBank(identity.name)
-        self._anthropic_client: Any = None
         self._openai_client: Any = None
         self._message_bus: Any = None
         self._stigmergy: Any = None
@@ -646,38 +646,42 @@ class AutonomousAgent:
     async def _call_anthropic(
         self, system: str, messages: list[dict], tools: list[dict],
     ) -> dict[str, Any]:
-        if self._anthropic_client is None:
-            from anthropic import AsyncAnthropic
-            self._anthropic_client = AsyncAnthropic(
-                api_key=os.environ.get("ANTHROPIC_API_KEY"),
-            )
+        from dharma_swarm.models import LLMRequest, ProviderType
 
+        config = resolve_runtime_provider_config(
+            ProviderType.ANTHROPIC,
+            model=self.identity.model,
+        )
+        provider = create_runtime_provider(config)
         kwargs: dict[str, Any] = {
-            "model": self.identity.model,
+            "model": config.default_model or self.identity.model,
             "system": system,
             "messages": messages,
             "max_tokens": 4096,
+            "temperature": 0.0,
         }
         if tools:
             kwargs["tools"] = tools
 
-        resp = await self._anthropic_client.messages.create(**kwargs)
+        response = await provider.complete(LLMRequest(**kwargs))
 
-        text_parts: list[str] = []
-        tool_uses: list[dict] = []
-        for block in resp.content:
-            if hasattr(block, "text"):
-                text_parts.append(block.text)
-            elif block.type == "tool_use":
-                tool_uses.append({"id": block.id, "name": block.name, "input": block.input})
+        text_parts = [response.content] if response.content else []
+        tool_uses: list[dict[str, Any]] = []
+        for tc in response.tool_calls or []:
+            tool_uses.append({
+                "id": tc.get("id"),
+                "name": tc.get("name"),
+                "input": tc.get("input"),
+            })
 
+        usage = response.usage or {}
         return {
             "text": text_parts,
             "tool_uses": tool_uses,
-            "raw_content": resp.content,
-            "stop_reason": resp.stop_reason,
-            "tokens_in": resp.usage.input_tokens,
-            "tokens_out": resp.usage.output_tokens,
+            "raw_content": response.content,
+            "stop_reason": response.stop_reason,
+            "tokens_in": int(usage.get("input_tokens", 0) or 0),
+            "tokens_out": int(usage.get("output_tokens", 0) or 0),
         }
 
     async def _call_openrouter(

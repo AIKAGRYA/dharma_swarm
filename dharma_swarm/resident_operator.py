@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from dharma_swarm.daemon_config import dharma_state_dir
 
 from dharma_swarm.conversation_store import ConversationStore
 from dharma_swarm.contracts import SovereignRuntimeLayer, build_sovereign_runtime_layer
@@ -27,7 +28,7 @@ class ResidentOperator:
         session_id: str = "resident_operator",
         bridge_agent_id: str = "operator_bridge",
     ) -> None:
-        self.state_dir = Path(state_dir) if state_dir is not None else Path.home() / ".dharma"
+        self.state_dir = Path(state_dir) if state_dir is not None else dharma_state_dir()
         self.session_id = session_id
         self.bridge_agent_id = bridge_agent_id
         self._conversations = ConversationStore(

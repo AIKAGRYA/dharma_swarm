@@ -14,6 +14,7 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from dharma_swarm.daemon_config import dharma_state_dir
 
 from dharma_swarm.identity import (
     IdentityMonitor,
@@ -21,7 +22,7 @@ from dharma_swarm.identity import (
     _bsi_proxy_score,
 )
 
-STATE = Path.home() / ".dharma"
+STATE = dharma_state_dir()
 
 
 async def decompose() -> None:

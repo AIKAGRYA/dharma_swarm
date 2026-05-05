@@ -65,6 +65,7 @@ import random
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
+from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -279,7 +280,7 @@ class DGMLoop:
         shadow_mode: bool | None = None,
     ) -> None:
         self._engine = engine
-        self._state_dir = state_dir or Path.home() / ".dharma"
+        self._state_dir = state_dir or dharma_state_dir()
         self._novelty_pressure = novelty_pressure
 
         import os
@@ -557,7 +558,7 @@ async def run_dgm_evolution_task(
     Returns:
         Dict with results, summary, and lineage information.
     """
-    state_dir = state_dir or Path.home() / ".dharma"
+    state_dir = state_dir or dharma_state_dir()
 
     # Load the DarwinEngine from the running swarm
     try:

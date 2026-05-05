@@ -15,6 +15,7 @@ import os
 import asyncio
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
+from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 from fastapi import FastAPI
@@ -30,7 +31,7 @@ logger = logging.getLogger(__name__)
 # ── Singleton State ───────────────────────────────────────────────
 
 _state: dict[str, Any] = {}
-_OPERATOR_STATE_DIR = Path.home() / ".dharma"
+_OPERATOR_STATE_DIR = dharma_state_dir()
 _OPERATOR_PID_FILE = _OPERATOR_STATE_DIR / "operator.pid"
 
 

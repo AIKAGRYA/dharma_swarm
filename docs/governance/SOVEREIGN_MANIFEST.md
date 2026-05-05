@@ -8,6 +8,8 @@
 
 **Verification method**: Every number below was verified against the actual filesystem on 2026-04-04 using Grep, Glob, Read, and Bash. Numbers marked (V) have filesystem proof.
 
+**Substrate-nativeness status**: The current runtime is ~10–15% ontology-native; ~85–90% of runtime work bypasses substrate. The current build track is the ontology-native Operator Brief seam ([`docs/plans/ONTOLOGY_NATIVE_OPERATOR_BRIEF_MASTER_SPEC.md`](../plans/ONTOLOGY_NATIVE_OPERATOR_BRIEF_MASTER_SPEC.md)). Do not open additional tracks until that seam ships. See [`reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md`](../../reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md) for the audit that established this estimate.
+
 ---
 
 ## GLOBAL AXIOMS

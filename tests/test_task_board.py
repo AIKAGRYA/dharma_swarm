@@ -228,6 +228,31 @@ async def test_stats(board):
 
 
 @pytest.mark.asyncio
+async def test_get_by_title(board):
+    """MM-17 pinning test: get_by_title must exist and find tasks by title."""
+    await board.create("Unique title")
+    await board.create("Other title")
+    found = await board.get_by_title("Unique title")
+    assert found is not None
+    assert found.title == "Unique title"
+    missing = await board.get_by_title("nonexistent")
+    assert missing is None
+
+
+@pytest.mark.asyncio
+async def test_get_by_title_dedup(board):
+    """MM-17: gnani_lodestone uses get_by_title for deduplication during seeding."""
+    await board.create("Seed task")
+    first = await board.get_by_title("Seed task")
+    assert first is not None
+    # Creating a second with same title - get_by_title returns the first
+    await board.create("Seed task")
+    found = await board.get_by_title("Seed task")
+    assert found is not None
+    assert found.id == first.id
+
+
+@pytest.mark.asyncio
 async def test_complete_transition_block_raises(board, monkeypatch):
     class _Outcome:
         def __init__(self):

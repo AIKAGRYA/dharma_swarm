@@ -25,9 +25,11 @@ import sys
 from collections import defaultdict
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
-DHARMA = Path.home() / ".dharma"
+DHARMA = dharma_state_dir()
 JIKOKU_LOG = DHARMA / "jikoku" / "JIKOKU_LOG.jsonl"
 JIKOKU_PRE = DHARMA / "jikoku" / "JIKOKU_LOG.20260322_pre_rotation.jsonl"
 THINKODYNAMIC_LOG = DHARMA / "jikoku" / "THINKODYNAMIC_DIRECTOR_LOG.jsonl"

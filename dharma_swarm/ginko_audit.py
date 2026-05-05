@@ -39,6 +39,7 @@ import time
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
 from pathlib import Path
+from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 logger = logging.getLogger("ginko_audit")
@@ -48,7 +49,7 @@ logger = logging.getLogger("ginko_audit")
 DHARMA_SWARM_ROOT = Path.home() / "dharma_swarm"
 SRC_DIR = DHARMA_SWARM_ROOT / "dharma_swarm"
 TEST_DIR = DHARMA_SWARM_ROOT / "tests"
-DHARMA_HOME = Path.home() / ".dharma"
+DHARMA_HOME = dharma_state_dir()
 GINKO_HOME = DHARMA_HOME / "ginko"
 AUDIT_HOME = GINKO_HOME / "audit"
 

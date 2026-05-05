@@ -31,6 +31,7 @@ import logging
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
+from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 from dharma_swarm.models import AgentRole, ProviderType
@@ -430,7 +431,7 @@ class DynamicRoster:
     def __init__(self, state_dir: Path | None = None) -> None:
         self._static: dict[str, AgentSpec] = {s.name: s for s in CONSTITUTIONAL_ROSTER}
         self._dynamic: dict[str, AgentSpec] = {}
-        self._state_dir = state_dir or Path.home() / ".dharma"
+        self._state_dir = state_dir or dharma_state_dir()
         self._roster_path = self._state_dir / "replication" / "dynamic_roster.json"
         self._load()
 

@@ -20,6 +20,7 @@ from uuid import uuid4
 
 import aiosqlite
 
+from dharma_swarm.correlation_context import get_correlation
 from dharma_swarm.engine.event_memory import (
     ensure_memory_plane_schema_async,
     ensure_memory_plane_schema_sync,
@@ -52,7 +53,8 @@ CREATE TABLE IF NOT EXISTS task_claims (
     stale_after TEXT,
     recovered_at TEXT,
     retry_count INTEGER NOT NULL DEFAULT 0,
-    metadata_json TEXT NOT NULL DEFAULT '{}'
+    metadata_json TEXT NOT NULL DEFAULT '{}',
+    trace_id TEXT NOT NULL DEFAULT ''
 )"""
 
 _DELEGATION_RUNS_DDL = """
@@ -70,7 +72,8 @@ CREATE TABLE IF NOT EXISTS delegation_runs (
     started_at TEXT NOT NULL,
     completed_at TEXT,
     failure_code TEXT NOT NULL DEFAULT '',
-    metadata_json TEXT NOT NULL DEFAULT '{}'
+    metadata_json TEXT NOT NULL DEFAULT '{}',
+    trace_id TEXT NOT NULL DEFAULT ''
 )"""
 
 _WORKSPACE_LEASES_DDL = """
@@ -319,6 +322,14 @@ async def ensure_runtime_state_schema_async(
         await db.execute(ddl)
     for idx in _INDEXES:
         await db.execute(idx)
+    # Migrate: add trace_id column to existing task_claims/delegation_runs
+    for tbl in ("task_claims", "delegation_runs"):
+        try:
+            await db.execute(
+                f"ALTER TABLE {tbl} ADD COLUMN trace_id TEXT NOT NULL DEFAULT ''"
+            )
+        except Exception:
+            pass  # column already exists
     if include_memory_plane:
         await ensure_memory_plane_schema_async(db)
     await db.commit()
@@ -1103,12 +1114,14 @@ class RuntimeStateStore:
 
     async def record_task_claim(self, claim: TaskClaim) -> TaskClaim:
         await self.init_db()
+        corr = get_correlation()
+        trace_id = corr.trace_id
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute(
                 "INSERT INTO task_claims (claim_id, task_id, session_id, agent_id, status,"
                 " claimed_at, acked_at, heartbeat_at, stale_after, recovered_at,"
-                " retry_count, metadata_json)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                " retry_count, metadata_json, trace_id)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
                 " ON CONFLICT(claim_id) DO UPDATE SET"
                 " task_id = excluded.task_id,"
                 " session_id = excluded.session_id,"
@@ -1120,7 +1133,8 @@ class RuntimeStateStore:
                 " stale_after = excluded.stale_after,"
                 " recovered_at = excluded.recovered_at,"
                 " retry_count = excluded.retry_count,"
-                " metadata_json = excluded.metadata_json",
+                " metadata_json = excluded.metadata_json,"
+                " trace_id = excluded.trace_id",
                 (
                     claim.claim_id,
                     claim.task_id,
@@ -1134,6 +1148,7 @@ class RuntimeStateStore:
                     claim.recovered_at.isoformat() if claim.recovered_at else None,
                     int(claim.retry_count),
                     _json_dump(claim.metadata),
+                    trace_id,
                 ),
             )
             await db.commit()
@@ -1250,13 +1265,15 @@ class RuntimeStateStore:
 
     async def record_delegation_run(self, run: DelegationRun) -> DelegationRun:
         await self.init_db()
+        corr = get_correlation()
+        trace_id = corr.trace_id
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute(
                 "INSERT INTO delegation_runs (run_id, session_id, task_id, claim_id,"
                 " parent_run_id, assigned_by, assigned_to, requested_output_json,"
                 " current_artifact_id, status, started_at, completed_at, failure_code,"
-                " metadata_json)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                " metadata_json, trace_id)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
                 " ON CONFLICT(run_id) DO UPDATE SET"
                 " session_id = excluded.session_id,"
                 " task_id = excluded.task_id,"
@@ -1270,7 +1287,8 @@ class RuntimeStateStore:
                 " started_at = excluded.started_at,"
                 " completed_at = excluded.completed_at,"
                 " failure_code = excluded.failure_code,"
-                " metadata_json = excluded.metadata_json",
+                " metadata_json = excluded.metadata_json,"
+                " trace_id = excluded.trace_id",
                 (
                     run.run_id,
                     run.session_id,
@@ -1286,6 +1304,7 @@ class RuntimeStateStore:
                     run.completed_at.isoformat() if run.completed_at else None,
                     run.failure_code,
                     _json_dump(run.metadata),
+                    trace_id,
                 ),
             )
             await db.commit()

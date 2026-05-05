@@ -36,6 +36,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -88,7 +89,7 @@ class OverseeingI:
     """
 
     def __init__(self, state_dir: Path | None = None) -> None:
-        self._state_dir = state_dir or Path.home() / ".dharma"
+        self._state_dir = state_dir or dharma_state_dir()
 
     async def assess(self) -> Assessment:
         """Run a full assessment of the system. Returns Assessment."""

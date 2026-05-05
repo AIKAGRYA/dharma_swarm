@@ -7,6 +7,7 @@ import json
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Iterable
 
 
@@ -405,7 +406,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--dharma-home",
         type=Path,
-        default=Path.home() / ".dharma",
+        default=dharma_state_dir(),
         help="Path to dharma home containing memory and trace artifacts.",
     )
     parser.add_argument(

@@ -34,12 +34,18 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from dharma_swarm.correlation_context import get_correlation
 from dharma_swarm.lineage import LineageEdge, LineageGraph
 from dharma_swarm.models import GateCheckResult, GateDecision, Task
 from dharma_swarm.ontology import OntologyRegistry
 from dharma_swarm.ontology_runtime import (
     get_shared_registry,
     persist_shared_registry,
+)
+from dharma_swarm.signal_bus import (
+    SIGNAL_OUTCOME_RECORDED,
+    SIGNAL_VALUE_EVENT_RECORDED,
+    SignalBus,
 )
 
 logger = logging.getLogger(__name__)
@@ -57,11 +63,13 @@ class TelicSeam:
         registry: OntologyRegistry | None = None,
         lineage: LineageGraph | None = None,
         path: str | Path | None = None,
+        signal_bus: SignalBus | None = None,
     ) -> None:
         self._path = path
         self._registry = registry or get_shared_registry(path)
         self._persist_registry = registry is None
         self._lineage = lineage or LineageGraph()
+        self._signal_bus = signal_bus
         self._proposal_map: dict[str, str] = {}  # task_id -> proposal obj_id
         self._duplicate_suppressions: dict[str, int] = {
             "execution_leases": 0,
@@ -99,7 +107,8 @@ class TelicSeam:
                     "task_id": task.id,
                     "agent_id": agent_id,
                     "action_type": topology if topology in (
-                        "dispatch", "fan_out", "pipeline", "evolution", "manual"
+                        "dispatch", "fan_out", "pipeline", "evolution", "manual",
+                        "agent_runner",
                     ) else "dispatch",
                     "title": task.title,
                     "description": task.description[:500] if task.description else "",
@@ -295,18 +304,33 @@ class TelicSeam:
                 input_artifacts.extend(task.depends_on)
             output_artifacts = [f"outcome:{obj.id}"]
 
+            corr = get_correlation()
             self._lineage.record(LineageEdge(
                 task_id=task.id,
                 input_artifacts=input_artifacts,
                 output_artifacts=output_artifacts,
                 agent=agent_id,
                 operation="task_execution",
+                trace_id=corr.trace_id,
                 metadata={
                     "success": success,
                     "proposal_id": proposal_id or "",
                     "outcome_id": obj.id,
                 },
             ))
+
+            # Emit canonical outcome signal for cross-store fanout
+            if self._signal_bus is not None:
+                self._signal_bus.emit({
+                    "type": SIGNAL_OUTCOME_RECORDED,
+                    "outcome_id": obj.id,
+                    "proposal_id": proposal_id or "",
+                    "task_id": task.id,
+                    "agent_id": agent_id,
+                    "success": success,
+                    "trace_id": corr.trace_id,
+                    "session_id": corr.session_id,
+                })
 
             self._flush_registry()
             return obj.id
@@ -384,6 +408,19 @@ class TelicSeam:
                 target_id=obj.id,
                 created_by="telic_seam",
             )
+
+            # Emit canonical value event signal for cross-store fanout
+            if self._signal_bus is not None:
+                corr = get_correlation()
+                self._signal_bus.emit({
+                    "type": SIGNAL_VALUE_EVENT_RECORDED,
+                    "value_event_id": obj.id,
+                    "outcome_id": outcome_id,
+                    "agent_id": agent_id,
+                    "composite_value": composite_value,
+                    "trace_id": corr.trace_id,
+                    "session_id": corr.session_id,
+                })
 
             self._flush_registry()
             return obj.id
@@ -525,6 +562,7 @@ class TelicSeam:
             "orphan_contributions": [],
             "duplicate_outcomes_per_proposal": [],
             "contribution_scope_mismatches": [],
+            "proposals_without_outcome": [],
         }
 
         outcomes_by_proposal: dict[str, list[str]] = {}
@@ -620,7 +658,23 @@ class TelicSeam:
                     }
                 )
 
-        issue_count = sum(len(items) for items in report.values())
+        # Detect proposals that were dispatched but never got an outcome
+        for proposal_id, proposal in proposals.items():
+            if proposal_id not in outcomes_by_proposal:
+                status = str(proposal.properties.get("status") or "proposed")
+                if status not in ("completed", "failed", "cancelled", "rejected"):
+                    report["proposals_without_outcome"].append(
+                        {
+                            "proposal_id": proposal_id,
+                            "task_id": str(proposal.properties.get("task_id") or ""),
+                            "agent_id": str(proposal.properties.get("agent_id") or ""),
+                            "status": status,
+                        }
+                    )
+
+        issue_count = sum(
+            len(items) for items in report.values() if isinstance(items, list)
+        )
         report["is_clean"] = issue_count == 0
         report["issue_count"] = issue_count
         return report
@@ -718,10 +772,13 @@ _SEAM: TelicSeam | None = None
 
 
 def get_seam(path: str | Path | None = None) -> TelicSeam:
-    """Get or create the module-level TelicSeam singleton."""
+    """Get or create the module-level TelicSeam singleton.
+
+    Automatically wires the SignalBus singleton for outcome fanout.
+    """
     global _SEAM
     if _SEAM is None or getattr(_SEAM, "_path", None) != path:
-        _SEAM = TelicSeam(path=path)
+        _SEAM = TelicSeam(path=path, signal_bus=SignalBus.get())
     return _SEAM
 
 

@@ -888,7 +888,7 @@ def _build_self_state_block(agent_name: str) -> str:
     Reads identity snapshot, organism state (samvara), and recognition seed.
     Returns a compact text block (~500 chars) or empty string if unavailable.
     """
-    state_dir = Path.home() / ".dharma"
+    state_dir = dharma_state_dir()
     lines: list[str] = ["## Self-State"]
 
     # Agent identity
@@ -944,7 +944,7 @@ def _build_system_prompt(config: AgentConfig) -> str:
     if config.system_prompt and config.provider != ProviderType.CLAUDE_CODE:
         return config.system_prompt
 
-    from dharma_swarm.daemon_config import V7_BASE_RULES, ROLE_BRIEFINGS
+    from dharma_swarm.daemon_config import ROLE_BRIEFINGS, V7_BASE_RULES, dharma_state_dir
 
     if config.system_prompt:
         # CLAUDE_CODE with explicit prompt: use it as base, append context
@@ -2156,6 +2156,23 @@ class AgentRunner:
             if gate.result.decision == GateDecision.BLOCK:
                 raise RuntimeError(f"Telos block: {gate.result.reason}")
 
+            # ── Telic Seam: record dispatch + gate decision (provenance) ──
+            telic_proposal_id: str | None = None
+            try:
+                from dharma_swarm.telic_seam import get_seam
+                ontology_path = _resolve_ontology_path(task, self._config, self._ontology_path)
+                if ontology_path is not None:
+                    seam = get_seam(ontology_path)
+                    telic_proposal_id = seam.record_dispatch(
+                        task, telic_agent_id, topology="agent_runner",
+                    )
+                    if telic_proposal_id:
+                        seam.record_gate_decision(
+                            telic_proposal_id, gate.result,
+                        )
+            except Exception:
+                logger.debug("Telic seam dispatch recording failed", exc_info=True)
+
             plan_context = ""
             if gate.attempts:
                 plan_context = (
@@ -2734,7 +2751,34 @@ class AgentRunner:
             parent_agent=self._config.name,
             **kwargs,
         )
-        return await self._worker_spawner.spawn(spec, provider=self._provider)
+        result = await self._worker_spawner.spawn(spec, provider=self._provider)
+
+        # Record derivation lineage: parent→worker delegation chain
+        try:
+            from dharma_swarm.correlation_context import get_correlation
+            from dharma_swarm.lineage import LineageEdge
+
+            corr = get_correlation()
+            worker_id = result.worker_id if result else ""
+            from dharma_swarm.telic_seam import get_seam
+            ontology_path = _resolve_ontology_path(
+                None, self._config, self._ontology_path,
+            )
+            if ontology_path is not None:
+                seam = get_seam(ontology_path)
+                seam.lineage.record(LineageEdge(
+                    task_id=task_title,
+                    agent=worker_id or worker_type,
+                    delegated_by=self._config.name,
+                    operation="worker_delegation",
+                    trace_id=corr.trace_id,
+                    input_artifacts=[f"parent:{self._config.name}"],
+                    output_artifacts=[f"worker:{worker_id or worker_type}"],
+                ))
+        except Exception:
+            logger.debug("Derivation lineage recording failed", exc_info=True)
+
+        return result
 
     def _record_router_feedback(
         self,

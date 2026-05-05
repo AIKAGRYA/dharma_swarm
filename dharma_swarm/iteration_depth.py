@@ -17,6 +17,7 @@ import uuid
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
+from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -25,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 # ── Configuration ────────────────────────────────────────────────────
 
-DHARMA_DIR = Path(os.getenv("DHARMA_HOME", Path.home() / ".dharma"))
+DHARMA_DIR = dharma_state_dir("DHARMA_HOME")
 ITERATION_DIR = DHARMA_DIR / "iteration"
 INITIATIVES_FILE = ITERATION_DIR / "initiatives.jsonl"
 QUEUE_FILE = ITERATION_DIR / "queue.jsonl"

@@ -12,9 +12,10 @@ import json
 import os
 from datetime import datetime, timezone
 from pathlib import Path
+from dharma_swarm.daemon_config import dharma_state_dir
 
 
-STATE_DIR = Path.home() / ".dharma"
+STATE_DIR = dharma_state_dir()
 OVERNIGHT_DIR = STATE_DIR / "overnight"
 DATE = datetime.now().strftime("%Y-%m-%d")
 
