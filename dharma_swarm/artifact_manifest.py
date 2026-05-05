@@ -140,6 +140,15 @@ class ArtifactManifestStore:
         if not payload_path.exists():
             raise FileNotFoundError(payload_path)
 
+        # Auto-populate trace_id from CorrelationContext if not set
+        if not trace_id:
+            try:
+                from dharma_swarm.correlation_context import get_correlation
+                corr = get_correlation()
+                trace_id = corr.trace_id
+            except Exception:
+                pass
+
         merged_metadata = dict(ref.metadata)
         if metadata:
             merged_metadata.update(metadata)
