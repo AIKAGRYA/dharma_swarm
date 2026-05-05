@@ -304,12 +304,14 @@ class TelicSeam:
                 input_artifacts.extend(task.depends_on)
             output_artifacts = [f"outcome:{obj.id}"]
 
+            corr = get_correlation()
             self._lineage.record(LineageEdge(
                 task_id=task.id,
                 input_artifacts=input_artifacts,
                 output_artifacts=output_artifacts,
                 agent=agent_id,
                 operation="task_execution",
+                trace_id=corr.trace_id,
                 metadata={
                     "success": success,
                     "proposal_id": proposal_id or "",
@@ -319,7 +321,6 @@ class TelicSeam:
 
             # Emit canonical outcome signal for cross-store fanout
             if self._signal_bus is not None:
-                corr = get_correlation()
                 self._signal_bus.emit({
                     "type": SIGNAL_OUTCOME_RECORDED,
                     "outcome_id": obj.id,
@@ -762,10 +763,13 @@ _SEAM: TelicSeam | None = None
 
 
 def get_seam(path: str | Path | None = None) -> TelicSeam:
-    """Get or create the module-level TelicSeam singleton."""
+    """Get or create the module-level TelicSeam singleton.
+
+    Automatically wires the SignalBus singleton for outcome fanout.
+    """
     global _SEAM
     if _SEAM is None or getattr(_SEAM, "_path", None) != path:
-        _SEAM = TelicSeam(path=path)
+        _SEAM = TelicSeam(path=path, signal_bus=SignalBus.get())
     return _SEAM
 
 
