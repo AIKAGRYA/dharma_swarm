@@ -59,9 +59,10 @@ class ContextSearchEngine:
         if self._built and not force:
             return len(self._keyword_index)
 
-        # If no explicit paths, use ecosystem map
+        # If no explicit paths, use ecosystem map + repo source
         if not self._paths:
             self._paths = self._load_ecosystem_map()
+            self._paths.update(self._load_repo_source_paths())
 
         count = 0
         for path_str, meta in self._paths.items():
@@ -248,3 +249,17 @@ class ContextSearchEngine:
             return result
         except ImportError:
             return {}
+
+    def _load_repo_source_paths(self) -> dict[str, dict]:
+        """Index dharma_swarm/ source modules and docs/ for code-level search."""
+        repo_root = Path(__file__).resolve().parent.parent
+        result: dict[str, dict] = {}
+        for pattern, category in [
+            ("dharma_swarm/**/*.py", "source"),
+            ("docs/**/*.md", "docs"),
+        ]:
+            for p in repo_root.glob(pattern):
+                if "__pycache__" in str(p):
+                    continue
+                result[str(p)] = {"category": category}
+        return result
