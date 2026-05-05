@@ -1021,3 +1021,33 @@ async def test_dispatch_dropoff_requeues_once_when_runner_missing(tmp_path):
         task_id == "t-dropoff" and fields.get("status") == TaskStatus.PENDING
         for task_id, fields in board.updates
     )
+
+
+# ---------------------------------------------------------------------------
+# retry_policy_for_failure public API (MM-05 resolution)
+# ---------------------------------------------------------------------------
+
+
+def test_retry_policy_for_failure_connection_transient():
+    """Public API returns correct policy for transient connection failures."""
+    orch = Orchestrator(agent_pool=None, task_board=None)
+    task = Task(title="test", metadata={"max_retries": 2, "retry_backoff_seconds": 5.0})
+    meta: dict = dict(task.metadata)
+    failure_class, retry_count, max_retries, backoff = orch.retry_policy_for_failure(
+        task=task, error="API connection error: server disconnected", source="execution_error", meta=meta,
+    )
+    assert failure_class == "connection_transient"
+    assert max_retries >= 2
+    assert backoff >= 5.0
+
+
+def test_retry_policy_for_failure_passthrough():
+    """Non-transient failures pass through without retry boost."""
+    orch = Orchestrator(agent_pool=None, task_board=None)
+    task = Task(title="test", metadata={})
+    meta: dict = {}
+    failure_class, retry_count, max_retries, backoff = orch.retry_policy_for_failure(
+        task=task, error="ValueError: bad input", source="execution_error", meta=meta,
+    )
+    assert failure_class == "execution_error"
+    assert retry_count == 0

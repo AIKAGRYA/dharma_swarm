@@ -26,7 +26,7 @@
 | MM-18: gnani → TelosGraph.get_by_name | DEGRADED | ✅RESOLVED | `TelosGraph.get_by_name()` added — linear scan on name field |
 | NEW-04: agent_runner → telic_seam dispatch gap | DEGRADED | ✅RESOLVED | `record_dispatch` + `record_gate_decision` added at task start in agent_runner |
 | NEW-05: task_board ↔ runtime_state split lifecycle | — | ⚠️ GUARDED | `run_task_consistency_guard` added to guardian_crew — detects COMPLETED tasks with still-OPEN claims |
-| NEW-07: 54 stores lack common trace_id | — | ⚠️ PARTIAL | `trace_id` column added to task_board, runtime_state (claims+runs), telemetry_plane (routing, policy, economic) |
+| NEW-07: 54 stores lack common trace_id | — | ⚠️ PARTIAL+ | `trace_id` column added to task_board, runtime_state, telemetry_plane, stigmergy, traces, artifact_manifest, handoff. CorrelationContext auto-populates memory_palace.ingest() and economic_engine transactions. |
 | NEW-08: 12 independent record_outcome() | ⚠️ PARTIAL | ⚠️ PARTIAL+ | TelicSeam emits signals + SignalBus subscriber pattern added for automatic fanout |
 | NEW-09: orchestrator → TelicSeam registry_path kwarg | — | ✅ FIXED | `orchestrator.py:154` used `registry_path=` but TelicSeam accepts `path=`. TypeError at runtime. |
 | NEW-10: lineage edges lack delegation chain | — | ✅ FIXED | `LineageEdge.delegated_by` + `trace_id` fields added; `agent_runner.spawn_worker` records delegation lineage |
@@ -71,10 +71,10 @@
 
 ---
 
-### MM-12 — DEGRADED: Same as MM-02/03 (second call site)
+### MM-12 — RESOLVED: Same as MM-02/03 (second call site)
 
-**File:** `orchestrate_live.py:1354-1364` (conductor configs path)
-**Status:** This path uses already-constructed enum values (`role=cfg["role"]` where `cfg["role"]` is `AgentRole.CONDUCTOR`) — no mismatch here. **This is fine.** The problem is only in the replication monitor path at line 1247.
+**File:** `orchestrate_live.py:1471` (conductor configs path)
+**Status:** ✅ RESOLVED — uses `AgentRole.CONDUCTOR` from `CONDUCTOR_CONFIGS`. No bare string coercion.
 
 ---
 
