@@ -45,12 +45,10 @@
 
 ---
 
-### MM-05 — DEGRADED: Private Orchestrator method coupling
+### MM-05 — RESOLVED: Private Orchestrator method coupling
 
-**File:** `swarm.py:1883-1895`
-**What's wrong:** `swarm.py` calls `self._orchestrator._classify_failure()`, `_resolve_retry_policy()`, `_apply_failure_retry_defaults()` — all single-underscore private methods. Any internal refactor of `orchestrator.py` silently breaks `swarm.py`'s retry logic.
-
-**Fix:** Add `Orchestrator.retry_policy_for_failure(task, error, source, meta)` as a public API method. 1-hour refactor.
+**File:** `orchestrator.py:730`, `swarm.py:1978`
+**Status:** ✅ RESOLVED — `Orchestrator.retry_policy_for_failure(task, error, source, meta)` added as public API. `swarm.py` now calls this single method instead of 3 private methods. Internal refactors of orchestrator retry logic won't break swarm.py.
 
 ---
 
@@ -63,10 +61,10 @@
 
 ---
 
-### MM-12 — DEGRADED: Same as MM-02/03 (second call site)
+### MM-12 — RESOLVED: Same as MM-02/03 (second call site)
 
-**File:** `orchestrate_live.py:1354-1364` (conductor configs path)
-**Status:** This path uses already-constructed enum values (`role=cfg["role"]` where `cfg["role"]` is `AgentRole.CONDUCTOR`) — no mismatch here. **This is fine.** The problem is only in the replication monitor path at line 1247.
+**File:** `orchestrate_live.py:1471` (conductor configs path)
+**Status:** ✅ RESOLVED — uses `AgentRole.CONDUCTOR` from `CONDUCTOR_CONFIGS`. No bare string coercion.
 
 ---
 

@@ -727,6 +727,31 @@ class Orchestrator:
             return (updated_max, updated_backoff)
         return (max_retries, backoff)
 
+    def retry_policy_for_failure(
+        self,
+        task: Task | None,
+        error: str,
+        source: str,
+        meta: dict[str, Any],
+    ) -> tuple[str, int, int, float]:
+        """Public API for retry policy resolution.
+
+        Returns (failure_class, retry_count, max_retries, backoff).
+        Also mutates *meta* in-place with updated retry settings.
+        """
+        failure_class = self._classify_failure(
+            error=error, source=source, task=task,
+        )
+        retry_count, max_retries, backoff = self._resolve_retry_policy(task)
+        max_retries, backoff = self._apply_failure_retry_defaults(
+            task=task,
+            meta=meta,
+            failure_class=failure_class,
+            max_retries=max_retries,
+            backoff=backoff,
+        )
+        return failure_class, retry_count, max_retries, backoff
+
     def _is_retry_window_open(self, task: Task) -> bool:
         meta = self._task_meta(task)
         not_before_raw = meta.get("retry_not_before_epoch")
