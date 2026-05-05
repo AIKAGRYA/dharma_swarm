@@ -85,9 +85,9 @@ async def _collect_events(
     # --- RuntimeState (task_claims, delegation_runs) ---
     try:
         import aiosqlite
-        from dharma_swarm.daemon_config import dharma_state_dir
+        from dharma_swarm.runtime_state import DEFAULT_RUNTIME_DB
 
-        db = runtime_db or str(dharma_state_dir() / "runtime_state.db")
+        db = runtime_db or str(DEFAULT_RUNTIME_DB)
         async with aiosqlite.connect(db) as conn:
             conn.row_factory = aiosqlite.Row
             for table, id_col in [
@@ -125,9 +125,9 @@ async def _collect_events(
     # --- TelemetryPlane (economic_events) ---
     try:
         import aiosqlite
-        from dharma_swarm.daemon_config import dharma_state_dir
+        from dharma_swarm.telemetry_plane import DEFAULT_TELEMETRY_DB
 
-        db = telemetry_db or str(dharma_state_dir() / "telemetry.db")
+        db = telemetry_db or str(DEFAULT_TELEMETRY_DB)
         async with aiosqlite.connect(db) as conn:
             conn.row_factory = aiosqlite.Row
             try:

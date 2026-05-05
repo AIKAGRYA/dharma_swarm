@@ -192,22 +192,22 @@ docker run -v ~/.dharma:/root/.dharma dharma-swarm dgc orchestrate-live
 ### Inspect runtime state
 
 ```bash
-sqlite3 ~/.dharma/runtime_state.db ".tables"
-sqlite3 ~/.dharma/runtime_state.db "SELECT count(*) FROM task_claims"
+sqlite3 ~/.dharma/state/runtime.db ".tables"
+sqlite3 ~/.dharma/state/runtime.db "SELECT count(*) FROM task_claims"
 ```
 
 ### Inspect telemetry
 
+Telemetry tables share the runtime DB:
+
 ```bash
-sqlite3 ~/.dharma/telemetry.db ".tables"
-sqlite3 ~/.dharma/telemetry.db "SELECT count(*) FROM economic_events"
+sqlite3 ~/.dharma/state/runtime.db "SELECT count(*) FROM economic_events"
 ```
 
 ### Backup
 
 ```bash
-cp ~/.dharma/runtime_state.db ~/.dharma/runtime_state.db.bak
-cp ~/.dharma/telemetry.db ~/.dharma/telemetry.db.bak
+cp ~/.dharma/state/runtime.db ~/.dharma/state/runtime.db.bak
 ```
 
 ## 10. Recovery Procedures
@@ -215,9 +215,9 @@ cp ~/.dharma/telemetry.db ~/.dharma/telemetry.db.bak
 ### Corrupted SQLite database
 
 ```bash
-sqlite3 ~/.dharma/runtime_state.db ".recover" | sqlite3 ~/.dharma/runtime_state_recovered.db
-mv ~/.dharma/runtime_state.db ~/.dharma/runtime_state.db.corrupt
-mv ~/.dharma/runtime_state_recovered.db ~/.dharma/runtime_state.db
+sqlite3 ~/.dharma/state/runtime.db ".recover" | sqlite3 ~/.dharma/state/runtime_recovered.db
+mv ~/.dharma/state/runtime.db ~/.dharma/state/runtime.db.corrupt
+mv ~/.dharma/state/runtime_recovered.db ~/.dharma/state/runtime.db
 ```
 
 ### Stuck daemon
