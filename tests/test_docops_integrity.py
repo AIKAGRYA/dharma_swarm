@@ -1,0 +1,145 @@
+from __future__ import annotations
+
+import importlib.util
+import json
+import sys
+from pathlib import Path
+
+
+SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "docops" / "check_docops_integrity.py"
+spec = importlib.util.spec_from_file_location("check_docops_integrity", SCRIPT_PATH)
+docops = importlib.util.module_from_spec(spec)
+assert spec and spec.loader
+sys.modules["check_docops_integrity"] = docops
+spec.loader.exec_module(docops)
+
+
+def write(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+
+
+def base_config(repo: Path) -> Path:
+    config = {
+        "version": 1,
+        "verified_at": "2026-05-05",
+        "ttl_days": 14,
+        "assertions": [],
+        "path_guards": {"include": [], "ignore_targets": ["http://*", "https://*"]},
+        "canonical_guard": {
+            "managed_include": [],
+            "changed_include": ["**/*.md"],
+            "registered": [],
+        },
+        "auto_sections": {"include": []},
+        "change_review": {"doc_include": []},
+    }
+    path = repo / "docs" / "docops" / "assertions.yaml"
+    write(path, json.dumps(config, indent=2))
+    return path
+
+
+def load_config(path: Path) -> dict:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def save_config(path: Path, config: dict) -> None:
+    path.write_text(json.dumps(config, indent=2), encoding="utf-8")
+
+
+def test_executable_assertion_passes_and_fails(tmp_path: Path) -> None:
+    repo = tmp_path
+    write(repo / "dharma_swarm" / "a.py", "x = 1\n")
+    write(repo / "docs" / "governance" / "SOVEREIGN_MANIFEST.md", "Total Python modules | **1** |\n")
+    config_path = base_config(repo)
+    config = load_config(config_path)
+    config["assertions"] = [
+        {
+            "id": "total-python",
+            "doc": "docs/governance/SOVEREIGN_MANIFEST.md",
+            "regex": r"Total Python modules \| \*\*(\d+)\*\*",
+            "metric": "dharma_python_modules",
+            "verify": "find dharma_swarm -name '*.py' -type f",
+        }
+    ]
+    save_config(config_path, config)
+
+    findings, _metrics = docops.run_checks(repo, config_path, None, docops.parse_iso_date("2026-05-05"), False)
+    assert [finding for finding in findings if finding.severity == "FAIL"] == []
+
+    write(repo / "dharma_swarm" / "b.py", "y = 2\n")
+    findings, _metrics = docops.run_checks(repo, config_path, None, docops.parse_iso_date("2026-05-05"), False)
+    assert any("doc says 1" in finding.message for finding in findings)
+
+
+def test_path_guard_catches_missing_markdown_link_and_backticked_path(tmp_path: Path) -> None:
+    repo = tmp_path
+    write(repo / "README.md", "See [missing](docs/missing.md) and `dharma_swarm/nope.py`.\n")
+    config_path = base_config(repo)
+    config = load_config(config_path)
+    config["path_guards"]["include"] = ["README.md"]
+    save_config(config_path, config)
+
+    findings, _metrics = docops.run_checks(repo, config_path, None, docops.parse_iso_date("2026-05-05"), False)
+    messages = [finding.message for finding in findings]
+    assert any("docs/missing.md" in message for message in messages)
+    assert any("dharma_swarm/nope.py" in message for message in messages)
+
+
+def test_canonical_guard_rejects_unregistered_authority_claim(tmp_path: Path) -> None:
+    repo = tmp_path
+    write(repo / "docs" / "new.md", "This is the canonical source of truth.\n")
+    config_path = base_config(repo)
+    config = load_config(config_path)
+    config["canonical_guard"]["managed_include"] = ["docs/*.md"]
+    save_config(config_path, config)
+
+    findings, _metrics = docops.run_checks(repo, config_path, None, docops.parse_iso_date("2026-05-05"), False)
+    assert any(finding.check == "canonical" for finding in findings)
+
+    config["canonical_guard"]["registered"] = ["docs/new.md"]
+    save_config(config_path, config)
+    findings, _metrics = docops.run_checks(repo, config_path, None, docops.parse_iso_date("2026-05-05"), False)
+    assert not any(finding.check == "canonical" for finding in findings)
+
+
+def test_auto_section_update_writes_generated_inventory(tmp_path: Path) -> None:
+    repo = tmp_path
+    write(repo / "dharma_swarm" / "a.py", "x = 1\n")
+    write(
+        repo / "docs" / "docops" / "AUTO_INVENTORY.md",
+        "# Inventory\n\n<!-- DOCOPS:START metric=repo_inventory -->\nstale\n<!-- DOCOPS:END -->\n",
+    )
+    config_path = base_config(repo)
+    config = load_config(config_path)
+    config["auto_sections"]["include"] = ["docs/docops/AUTO_INVENTORY.md"]
+    save_config(config_path, config)
+
+    findings, _metrics = docops.run_checks(repo, config_path, None, docops.parse_iso_date("2026-05-05"), False)
+    assert any(finding.check == "auto-section" for finding in findings)
+
+    findings, _metrics = docops.run_checks(repo, config_path, None, docops.parse_iso_date("2026-05-05"), True)
+    assert not any(finding.check == "auto-section" for finding in findings)
+    text = (repo / "docs" / "docops" / "AUTO_INVENTORY.md").read_text(encoding="utf-8")
+    assert "| Dharma Python modules | 1 |" in text
+
+
+def test_change_review_reports_docs_that_reference_changed_python(tmp_path: Path) -> None:
+    repo = tmp_path
+    write(repo / "dharma_swarm" / "runner.py", "x = 1\n")
+    write(repo / "docs" / "architecture" / "NAVIGATION.md", "See dharma_swarm/runner.py.\n")
+    config_path = base_config(repo)
+    config = load_config(config_path)
+    config["change_review"]["doc_include"] = ["docs/**/*.md"]
+    save_config(config_path, config)
+
+    findings = docops.doc_review_candidates(repo, config, ["dharma_swarm/runner.py"])
+    assert any("NAVIGATION.md" in finding.message for finding in findings)
+    assert all(finding.severity == "WARN" for finding in findings)
+
+
+def test_staleness_ttl_expires(tmp_path: Path) -> None:
+    repo = tmp_path
+    config_path = base_config(repo)
+    findings, _metrics = docops.run_checks(repo, config_path, None, docops.parse_iso_date("2026-06-01"), False)
+    assert any(finding.check == "staleness" for finding in findings)

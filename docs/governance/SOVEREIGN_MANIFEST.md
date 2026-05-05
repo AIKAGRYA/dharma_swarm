@@ -20,7 +20,7 @@ These are immutable engineering laws for this repository. Violation = architectu
 The `dharma_swarm/` package currently has **375 files at its top level (73% of 514 total modules)** (V). No new .py file may be added to the top level. New modules must go into an appropriate subdirectory. Existing top-level files will be organized over time.
 
 ### A2: NO DUPLICATE IMPLEMENTATIONS
-Before creating a new file for routing, bridging, adapting, or orchestrating, check if one already exists. The repo currently has **20 bridge files** (V), **3 model_routing copies** (2 are identical, 1 is different) (V), **4 orchestrators** (V), **18 adapter files across 6 locations** (V), and **14 router files** (V). Do not add more without deprecating an existing one.
+Before creating a new file for routing, bridging, adapting, or orchestrating, check if one already exists. The repo currently has **21 bridge files** (V), **3 model_routing copies** (2 are identical, 1 is different) (V), **4 orchestrators** (V), **14 adapter files across 7 locations** (V), and **13 router files** (V). Do not add more without deprecating an existing one.
 
 ### A3: NO UNDOCUMENTED SEAMS
 If your code creates a new interface between domains (a bridge, adapter, or protocol), you must update `NAVIGATION.md` with its purpose, entry point, and boundary constraints. Undocumented seams become invisible coupling.
@@ -41,7 +41,7 @@ No single file should exceed 3,000 lines. Current violations (V):
 **148 files exceed 500 lines; 39 exceed 1,000; 7 exceed 3,000** (V). These must be decomposed over time, not grown further.
 
 ### A6: DOCS DECAY -- CHECK BEFORE CITING
-All numerical claims in docs become stale within weeks. Before citing module counts, test counts, or line counts from any doc (including this one), verify against the actual filesystem. See `REPO_GOVERNANCE_AUDIT.md` for the current staleness log. **74 files in this repo claim to be "source of truth" or "canonical"** (V) -- most are stale.
+All numerical claims in docs become stale within weeks. Before citing module counts, test counts, or line counts from any doc (including this one), verify against the actual filesystem. See `REPO_GOVERNANCE_AUDIT.md` for the current staleness log. **233 Markdown files contain "source of truth" or "canonical"; 245 contain one of "source of truth", "canonical", "authoritative", or "ground truth"** (V). Treat these as authority-scope review candidates, not confirmed repo-wide authority.
 
 ### A7: NO CIRCULAR IMPORTS
 The repo has **9 verified circular dependency chains** (V). The worst:
@@ -52,7 +52,7 @@ The repo has **9 verified circular dependency chains** (V). The worst:
 All 9 cycles were independently confirmed with exact import lines. Most are mitigated by lazy imports but remain architectural debt. **New code must not create circular imports.**
 
 ### A8: FRONTMATTER DISCIPLINE
-Do not inject machine-readable YAML frontmatter into governance or architecture docs unless explicitly requested. Current state: **100% of architecture docs have Codex-injected YAML frontmatter averaging 86 lines (27% overhead)** (V). Worst offenders: README.md (74.4% frontmatter), ORCHESTRATOR_LEDGERS.md (61.9%), MODEL_ROUTING_CANON.md (55.4%).
+Do not inject machine-readable YAML frontmatter into governance or architecture docs unless explicitly requested. Current state: **213 of 627 Markdown files start with YAML frontmatter; 15 of 20 docs/architecture Markdown files do so** (V). Long frontmatter remains an authority/noise risk even when the prose is useful.
 
 ---
 
@@ -62,19 +62,19 @@ These are the ground-truth metrics. All other documents citing different numbers
 
 | Metric | Value | Verification |
 |--------|-------|-------------|
-| Total Python modules | **514** | find dharma_swarm -name "*.py" |
-| Top-level (flat) modules | **375 (73%)** | find dharma_swarm -maxdepth 1 -name "*.py" |
-| Total Python LOC | **227,486** | wc -l across all modules |
-| Test files | **502** | find tests -name "*.py" |
-| Test functions | **8,956** | grep "def test_" count |
-| Tests collected (pytest) | **8,571** | pytest --collect-only |
-| Collection errors | **16** (10 numpy, 2 textual, 1 typer, 1 pytest_asyncio, 1 yaml, 1 tui.app) | pytest --collect-only |
-| Markdown files | **1,789** | find . -name "*.md" |
-| Markdown total lines | **521,438** | wc -l across all .md |
-| Bridge files | **20** | find dharma_swarm -name "*bridge*" |
-| Adapter files | **18 across 6 locations** | find dharma_swarm -name "*adapter*" |
-| Orchestrator files | **4** (5,360 LOC total) | find dharma_swarm -name "*orchestrat*" |
-| Router files | **14** (5,057 LOC total) | find dharma_swarm -name "*rout*" |
+| Total Python modules | **523** | find dharma_swarm -name "*.py" -type f |
+| Top-level (flat) modules | **377 (72.1%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
+| Total Python LOC | **237,618** | wc -l across dharma_swarm Python modules |
+| Test files | **507** | find tests -name "*.py" -type f |
+| Test functions | **9,018 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
+| Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
+| Markdown files | **627** | find . -name "*.md" -type f |
+| Markdown total lines | **162,351** | wc -l across all .md |
+| Bridge files | **21** | find dharma_swarm -name "*bridge*.py" |
+| Adapter files | **14 across 7 locations** | find dharma_swarm -type f \| rg -i "adapter" |
+| Orchestrator files | **4** (6,034 LOC total) | find dharma_swarm -name "*orchestrat*" |
+| Router files | **13** (4,976 LOC total) | find dharma_swarm -type f \| rg -i "rout" |
 | Memory modules | **11** (5,848 LOC) | find dharma_swarm -name "*memory*" |
 | Context modules | **8** (5,828 LOC) | find dharma_swarm -name "*context*" |
 | Provider types (enum) | **18** | models.py ProviderType enum |
@@ -171,7 +171,7 @@ These are the ground-truth metrics. All other documents citing different numbers
 
 ### Domain 6: Bridges (Integration Layer)
 
-**20 bridge files** (V), **11,663 total LOC**:
+**21 bridge files** (V), **10,602 total LOC**:
 
 | Bridge | Lines | Importers | Status |
 |--------|-------|-----------|--------|
@@ -191,6 +191,10 @@ These are the ground-truth metrics. All other documents citing different numbers
 | skill_bridge.py | 201 | 2 | ALIVE |
 | optimizer_bridge.py | 191 | 8 | ALIVE |
 | ecosystem_bridge.py | 170 | 3 | ALIVE |
+| verify/flywheel_bridge.py | 118 | 0 | **ZOMBIE** |
+| offline_training_bridge.py | 111 | 0 | **ZOMBIE** |
+| runtime_bridge.py | 98 | 0 | **ZOMBIE** |
+| ginko_bridge.py | 94 | 1 | ALIVE |
 
 - **Primary Entry Points**: `terminal_bridge.py` (Bun<->Python), `bridge.py` (core abstraction)
 - **State Management**: Bridges are stateless translators (mostly)
@@ -349,7 +353,7 @@ This re-audit found errors in the earlier 5-model audit:
 | Error in prior audit | Corrected value |
 |---------------------|----------------|
 | "codex_overnight.py is 10K lines" | **1,008 lines** (V) |
-| "17 bridge files" / "19 bridge files" (self-contradicting) | **20 bridge files** (V) |
+| "17 bridge files" / "19 bridge files" (self-contradicting) | **21 bridge files** (V) |
 | "16 TUI test errors" | **16 total errors: 10 numpy, 2 textual, 1 typer, 1 pytest_asyncio, 1 yaml, 1 tui.app** -- only 3 are TUI-specific (V) |
 | "10 pillars" with "PILLAR_04 missing, PILLAR_11 present" | **10 pillar files exist** (PILLAR_01-03, 05-11; PILLAR_04 never created). Sparse numbering, not 11. (V) |
 | "router_v1.py is LEGACY" | **router_v1.py is ALIVE** -- actively used by providers.py for signal generation (V) |
@@ -383,8 +387,8 @@ SOVEREIGN_MANIFEST.md (this file)
 
 **Stale numbers to fix**:
 - "~1,700 lines" for swarm.py -> **3,119** (V)
-- References NAVIGATION.md which claims "500 modules" -> actual **514** (V)
-- No mention of the 20 bridges, 14 routers, 18 adapters, or their hierarchy
+- References NAVIGATION.md which claims "500 modules" -> current filesystem count **523 dharma_swarm Python modules** (V)
+- No mention of the 21 bridges, 13 routers, 14 adapters, or their hierarchy
 - Provider list says 9 -> should acknowledge **18 types** (V)
 
 **Do NOT**:
