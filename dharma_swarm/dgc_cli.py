@@ -632,16 +632,30 @@ def cmd_runtime_status(
     *,
     limit: int = 5,
     db_path: str | None = None,
+    as_json: bool = False,
 ) -> None:
     """Show the canonical runtime control-plane summary."""
-    from dharma_swarm.tui_helpers import build_runtime_status_text
+    if as_json:
+        from dharma_swarm.tui_helpers import build_runtime_status_data
 
-    print(
-        build_runtime_status_text(
-            limit=limit,
-            runtime_db_path=Path(db_path) if db_path else None,
+        print(
+            json.dumps(
+                build_runtime_status_data(
+                    limit=limit,
+                    runtime_db_path=Path(db_path) if db_path else None,
+                ),
+                indent=2,
+            )
         )
-    )
+    else:
+        from dharma_swarm.tui_helpers import build_runtime_status_text
+
+        print(
+            build_runtime_status_text(
+                limit=limit,
+                runtime_db_path=Path(db_path) if db_path else None,
+            )
+        )
 
 
 def _read_openclaw_summary() -> dict[str, Any]:
@@ -5220,6 +5234,7 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Override runtime SQLite path (defaults to ~/.dharma/state/runtime.db)",
     )
+    p_runtime.add_argument("--json", action="store_true", help="Emit JSON output")
     p_mission = sub.add_parser("mission-status", help="Mission readiness lanes + gap report")
     p_mission.add_argument("--json", action="store_true", help="Emit JSON report")
     p_mission.add_argument(
@@ -6282,7 +6297,7 @@ def main() -> None:
         case "status":
             cmd_status()
         case "runtime-status":
-            cmd_runtime_status(limit=args.limit, db_path=args.db_path)
+            cmd_runtime_status(limit=args.limit, db_path=args.db_path, as_json=args.json)
         case "mission-status":
             rc = cmd_mission_status(
                 as_json=args.json,

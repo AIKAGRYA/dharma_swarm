@@ -7,9 +7,18 @@ import sys
 from pathlib import Path
 
 CHECK_SCRIPT = Path(__file__).resolve().parents[1] / "governance/check_shakti_warrant.py"
+_REPO_ROOT = Path(__file__).resolve().parents[2]
 ACK_TAG = "[impact-checked]"
 ACK_ENV = "DHARMA_UPLIFT_ACK"
 ACK_ENV_VALUE = "impact-checked"
+
+
+def _python_executable() -> str:
+    """Return the venv Python if available, else fall back to sys.executable."""
+    venv_python = _REPO_ROOT / ".venv" / "bin" / "python"
+    if venv_python.is_file():
+        return str(venv_python)
+    return sys.executable
 
 
 def _read_commit_message(repo_root: Path, msg_file: str | None) -> str:
@@ -38,7 +47,7 @@ def _summarize_warrant_output(output: str) -> str:
 
 def _command(repo_root: Path, *, impact_checked: bool) -> list[str]:
     cmd = [
-        sys.executable,
+        _python_executable(),
         str(CHECK_SCRIPT),
         "--intent",
         (
