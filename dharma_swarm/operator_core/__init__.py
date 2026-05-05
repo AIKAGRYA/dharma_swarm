@@ -24,6 +24,26 @@ from .permission_payloads import (
     permission_resolution_payload_from_resolution,
 )
 from .command_payloads import build_command_graph_summary, build_command_registry_payload
+from .command_spine import (
+    AgentOpsReportSummary,
+    AgentOpsReview,
+    HumanYDSRating,
+    MissionAttachment,
+    OperatorCommandPlan,
+    OperatorCommandRequest,
+    PlannedSubTask,
+    PromptIntent,
+    RustReadinessDecision,
+    RustReadinessSignal,
+    WorkPacketDraft,
+    evaluate_rust_readiness,
+    plan_operator_command,
+    plan_to_dict,
+    record_human_yds_rating,
+    resolve_prompt_intent,
+    review_agentops_reports,
+    work_packet_to_dict,
+)
 from .routing_payloads import build_agent_routes_payload, build_model_policy_summary, build_routing_decision_payload
 from .routing_manifest_payloads import (
     build_routing_manifest_payload,
@@ -59,6 +79,8 @@ from .contracts import (
 )
 
 __all__ = [
+    "AgentOpsReportSummary",
+    "AgentOpsReview",
     "CanonicalEntity",
     "CanonicalEventEnvelope",
     "CanonicalPermissionDecision",
@@ -75,6 +97,12 @@ __all__ = [
     "EventTransport",
     "GovernanceFilter",
     "GovernancePolicy",
+    "HumanYDSRating",
+    "MissionAttachment",
+    "OperatorCommandPlan",
+    "OperatorCommandRequest",
+    "PlannedSubTask",
+    "PromptIntent",
     "build_permission_decision_payload",
     "build_permission_history_payload",
     "build_permission_outcome_payload",
@@ -87,12 +115,16 @@ __all__ = [
     "build_routing_manifest_payload",
     "build_runtime_snapshot_payload",
     "build_workspace_snapshot_payload",
+    "evaluate_rust_readiness",
     "PermissionDecisionKind",
     "PermissionResolutionKind",
     "PermissionRisk",
     "RuntimeHealth",
+    "RustReadinessDecision",
+    "RustReadinessSignal",
     "SessionStore",
     "WorkflowExecutionMode",
+    "WorkPacketDraft",
     "build_session_catalog",
     "build_session_catalog_payload",
     "build_session_detail",
@@ -108,5 +140,11 @@ __all__ = [
     "normalize_agent_assignments",
     "normalize_legacy_targets",
     "runtime_snapshot_from_operator_snapshot",
+    "plan_operator_command",
+    "plan_to_dict",
+    "record_human_yds_rating",
+    "resolve_prompt_intent",
+    "review_agentops_reports",
     "session_from_meta",
+    "work_packet_to_dict",
 ]
