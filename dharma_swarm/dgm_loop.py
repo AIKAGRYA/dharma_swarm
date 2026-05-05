@@ -142,7 +142,7 @@ async def _sample_parent_qd(
     try:
         # Get ALL entries from the archive (not just "best N")
         # This is the DGM pattern: any stepping stone is a valid parent
-        entries = list(archive._entries.values()) if hasattr(archive, '_entries') else []
+        entries = archive.entries if hasattr(archive, 'entries') else []
         if not entries:
             return None, 0
 
@@ -315,7 +315,7 @@ class DGMLoop:
         result = DGMResult(shadow_mode=self._shadow_mode)
 
         archive = getattr(self._engine, 'archive', None)
-        archive_size_before = len(archive._entries) if archive and hasattr(archive, '_entries') else 0
+        archive_size_before = len(archive) if archive else 0
         result.archive_size_before = archive_size_before
 
         # Step 1: Sample a parent from the archive using quality-diversity
@@ -398,12 +398,12 @@ class DGMLoop:
             result.fitness_delta = result.fitness_after - result.fitness_before
 
             # Find the new archive entry (the child)
-            archive_size_after = len(archive._entries) if archive and hasattr(archive, '_entries') else 0
+            archive_size_after = len(archive) if archive else 0
             result.archive_size_after = archive_size_after
 
             if archive_size_after > archive_size_before:
                 # New entry was archived — find it
-                all_entries = list(archive._entries.values()) if hasattr(archive, '_entries') else []
+                all_entries = archive.entries if hasattr(archive, 'entries') else []
                 new_entries = [
                     e for e in all_entries
                     if getattr(e, 'parent_id', None) == result.parent_id

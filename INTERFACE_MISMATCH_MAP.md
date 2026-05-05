@@ -1,7 +1,7 @@
 # Interface Mismatch Map — dharma_swarm
 
-**Last X-Ray:** 2026-05-04 (provenance-wiring audit against HEAD `2fcd2cf`)
-**Previous version:** 2026-04-08 (55 module pairs, 13 mismatches, 9 prioritized)
+**Last X-Ray:** 2026-05-05 (deep consolidation scan — 509 modules, AST + import graph analysis)
+**Previous version:** 2026-05-04 (provenance-wiring audit against HEAD `2fcd2cf`)
 **Maintainer:** Guardian Crew (`guardian_crew.py`) — auto-updates every 4 hours
 **How to read this:** Severity = BLOCKER (crashes at runtime), DEGRADED (silent failure / wrong behavior), WARNING (structural smell).
 
@@ -82,6 +82,89 @@ These contracts must be maintained by any future changes:
 | `world_actions.py` | `WorldActionResult` | `to_json()` | Returns JSON string | |
 | `gnani_lodestone.py` | `GnaniLodestone` | `seed_all()` | async, returns `dict[str, int]` | idempotent |
 | `guardian_crew.py` | `GuardianFinding` | attrs | `.severity`, `.check`, `.title`, `.detail`, `.file`, `.line`, `.fix_hint` | |
+
+---
+
+## New Mismatches Discovered (Deep Scan 2026-05-05)
+
+### NEW-12 — WARNING: `providers_extended.py` dead duplicates
+
+**Files:** `providers_extended.py` (223 LOC) vs `providers.py` (2,473 LOC)
+**What's wrong:** `providers_extended.py` contains duplicate `OllamaProvider` and `NVIDIANIMProvider` classes that already exist in `providers.py`. The file is **never imported at runtime** — confirmed by `api_key_audit.py:141` which notes "not wired into runtime_provider.py." The unique `MoonshotProvider` class (lines 136-188) is also unreachable.
+
+**Impact:** Low — no runtime failure. But developers may edit the wrong copy and wonder why changes have no effect.
+
+**Metabolism decision:** Archive. Unique `MoonshotProvider` should be moved to `providers.py` if needed; the rest can be deleted.
+
+---
+
+### NEW-13 — STRUCTURAL: Duplicate type definitions (50+ class name collisions)
+
+The deep scan found **50+ class names defined in multiple files**. Most are independent domains (different authority, different lifecycle) that collide by naming convention. The highest-risk collisions:
+
+| Class | Files | Shared Methods | Metabolism Decision |
+|-------|-------|---------------|-------------------|
+| `SessionStore` | `operator_core/session_store.py`, `tui/engine/session_store.py` | 19 | MERGE (same authority, same lifecycle, same query surface) |
+| `ClaudeAdapter` | `terminal_adapters/claude.py`, `tui/engine/adapters/claude.py` | 11 | MERGE (same authority, same failure mode) |
+| `GovernanceFilter` | `operator_core/permissions.py`, `tui/engine/governance.py` | 3 | MERGE (same authority) |
+| `ProviderAdapter` | `engine/adapters/base.py`, `tui/engine/adapters/base.py` | full | MERGE (identical interface) |
+| `ProviderRunner` | `engine/provider_runner.py`, `tui/engine/provider_runner.py` | full | MERGE (identical interface) |
+| `CycleResult` | `evolution.py`, `overnight_evaluator.py` | 1 (name only) | BRIDGE — different authority, different fields |
+| `TaskStatus` | `models.py`, `economic_agent.py` | 0 | BRIDGE — `models.py` is canonical, `economic_agent.py` defines local enum |
+| `AutonomyLevel` | `models.py`, `guardrails.py`, `profiles.py` | 0 | MERGE to `models.py` — 3 definitions, 0 cross-imports |
+| `AgentIdentity` | `agent_registry.py`, `autonomous_agent.py` | 0 | See `AGENT_IDENTITY_UNIFICATION.md` |
+| `AgentPool` | `orchestrator.py` (Protocol), `agent_runner.py` (impl) | 5 | KEEP — Protocol + Implementation is correct pattern |
+| `TaskBoard` | `orchestrator.py` (Protocol), `task_board.py` (impl) | 3 | KEEP — Protocol + Implementation is correct pattern |
+
+**Priority corridors for merge** (per MODULE_METABOLISM_STRATEGY.md §8):
+1. **Session store** — `tui/engine/session_store.py` should become a thin subclass or re-export of `operator_core/session_store.py`
+2. **Claude adapter** — `tui/engine/adapters/claude.py` should delegate to `terminal_adapters/claude.py`
+3. **Provider base** — `tui/engine/adapters/base.py` is a copy of `engine/adapters/base.py`; one should import the other
+
+---
+
+### NEW-14 — WARNING: `providers.py` → `providers_extended.py` split creates dead code
+
+**File:** `providers_extended.py`
+**Status:** The entire module is dead — zero runtime imports. `api_key_audit.py` explicitly notes "not wired into runtime_provider.py."
+
+**Fix:** Move unique `MoonshotProvider` to `providers.py`. Delete `providers_extended.py`.
+
+---
+
+### NEW-15 — WARNING: `hasattr(engine, '_entries')` pattern in `dgm_loop.py`
+
+**File:** `dgm_loop.py:145,318,401,406`
+**What's wrong:** Four calls to `hasattr(archive, '_entries')` — reaching into the private implementation detail of the evolution archive. If the archive changes its internal storage, these guards silently break.
+
+**Fix:** Add a public `Archive.has_entries() -> bool` method or use `len(archive)`.
+
+---
+
+### NEW-16 — WARNING: `hasattr(engine, '_state_dir')` in `strange_loop.py`
+
+**File:** `strange_loop.py:346`
+**What's wrong:** Checks for a private attribute on another module's class to decide behavior.
+
+**Fix:** Add a public property or method for state dir availability.
+
+---
+
+### NEW-17 — DEGRADED: Multiple `record_outcome()` signatures across modules
+
+**Files:** 8 independent `record_outcome()` implementations with different signatures:
+- `telic_seam.py:243` — `record_outcome(task, agent_id, *, success, result_summary, error, duration_ms, fitness_score)`
+- `routing_memory.py:458` — `record_outcome(request_id, provider, model, *, success, latency_ms, error)`
+- `fitness_predictor.py:105` — `record_outcome(features, actual_fitness)`
+- `adaptive_autonomy.py:193` — `record_outcome(self, success: bool)`
+- `ai_reciprocity_ledger.py:453` — `record_outcome(self, outcome: OutcomeRecord)`
+- `strategy_reinforcer.py:363` — `record_outcome(...)`
+- `engine/retrieval_feedback.py:306` — `record_outcome(query_id, outcome, consumer)`
+- `provider_policy.py:550` — `routing_memory.record_outcome(...)`
+
+**Impact:** Callers must know which `record_outcome` they're calling. The `operator_brief/insight_brief.py` has its own `_record_outcome` wrapper (4 call sites) that delegates to `telic_seam.record_outcome`. If a caller confuses which `record_outcome` to use, it will get a TypeError at runtime.
+
+**Status:** Partially mitigated by NEW-08 (TelicSeam emits `SIGNAL_OUTCOME_RECORDED` for fanout). Full resolution requires a unified outcome recording facade.
 
 ---
 

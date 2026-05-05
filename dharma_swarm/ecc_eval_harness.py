@@ -148,7 +148,7 @@ def eval_evolution_archive() -> EvalResult:
         archive = EvolutionArchive(archive_path)
 
         # Check it loads without error
-        count = len(archive._entries) if hasattr(archive, "_entries") else 0
+        count = len(archive)
         # Verify fitness_over_time method exists and runs
         has_fitness_method = hasattr(archive, "fitness_over_time")
         return EvalResult(

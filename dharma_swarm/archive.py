@@ -300,6 +300,14 @@ class EvolutionArchive:
         merkle_path = self.path.parent / "merkle_log.json"
         self.merkle_log = MerkleLog(merkle_path)
 
+    def __len__(self) -> int:
+        return len(self._entries)
+
+    @property
+    def entries(self) -> list[ArchiveEntry]:
+        """Public read-only view of all entries."""
+        return list(self._entries.values())
+
     # -- persistence ---------------------------------------------------------
 
     async def load(self) -> None:
