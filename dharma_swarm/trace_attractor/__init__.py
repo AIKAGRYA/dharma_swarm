@@ -20,11 +20,19 @@ from dharma_swarm.trace_attractor.models import (
     WarrantStatus,
 )
 from dharma_swarm.trace_attractor.projector import TraceAttractorProjector
+from dharma_swarm.trace_attractor.readers import (
+    DEFAULT_ONTOLOGY_TYPES,
+    TraceAttractorStoreReader,
+    read_ontology_events,
+    read_runtime_events,
+    read_telemetry_events,
+)
 
 __all__ = [
     "ATTRACTOR_PACKET_SCHEMA_VERSION",
     "AttractorEvent",
     "AttractorPacket",
+    "DEFAULT_ONTOLOGY_TYPES",
     "FindingSeverity",
     "FourfoldWarrantSummary",
     "LifecycleFinding",
@@ -32,6 +40,10 @@ __all__ = [
     "ProvenanceGraph",
     "ProvenanceNode",
     "TraceAttractorProjector",
+    "TraceAttractorStoreReader",
     "ValueSummary",
     "WarrantStatus",
+    "read_ontology_events",
+    "read_runtime_events",
+    "read_telemetry_events",
 ]
