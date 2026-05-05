@@ -1,7 +1,7 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene module-budget docops-integrity governance-all
+.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene module-budget docops-integrity docops-report governance-all
 
 PYTHON ?= python3
 SWARM_PLIST := $(HOME)/Library/LaunchAgents/com.dharma.swarm.plist
@@ -31,6 +31,7 @@ help:
 	@echo "  make precommit-run Run pre-commit on all files"
 	@echo "  make governance-baseline Capture scanner baselines"
 	@echo "  make docops-integrity Run machine-verifiable documentation checks"
+	@echo "  make docops-report Generate local DocOps JSON/Markdown reports"
 	@echo ""
 
 install:
@@ -165,5 +166,12 @@ module-budget:
 
 docops-integrity:
 	$(PYTHON) scripts/docops/check_docops_integrity.py
+
+docops-report:
+	@mkdir -p reports/docops
+	$(PYTHON) scripts/docops/check_docops_integrity.py \
+		--report-json reports/docops/check.json \
+		--inventory-json reports/docops/corpus_inventory.json \
+		--inventory-markdown reports/docops/corpus_inventory.md
 
 governance-all: semgrep gitleaks test-hygiene module-budget docops-integrity
