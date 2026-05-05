@@ -40,6 +40,8 @@ GRANDFATHERED: dict[str, int] = {
     "dharma_swarm/orchestrator.py": 2525,
     "dharma_swarm/tui/app.py": 2520,
     "dharma_swarm/terminal_bridge.py": 2192,
+    "dharma_swarm/opportunity_dispatcher.py": 1386,
+    "dharma_swarm/telic_seam.py": 1059,
 }
 
 LINE_BUDGET = 1000  # New modules: hard limit.

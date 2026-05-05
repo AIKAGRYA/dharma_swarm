@@ -19,6 +19,7 @@ import hashlib
 import inspect
 import json
 import logging
+import os
 import re
 import time
 from datetime import datetime, timezone
@@ -112,7 +113,14 @@ class Orchestrator:
             session_id=session_id,
             runtime_db_path=resolved_runtime_db_path,
         )
-        self._telic_seam = self._init_telic_seam()
+        explicit_runtime_state = (
+            ledger is not None
+            or resolved_ledger_dir is not None
+            or resolved_runtime_db_path is not None
+            or bool(os.getenv("DGC_LEDGER_DIR"))
+            or bool(os.getenv("DHARMA_ONTOLOGY_PATH"))
+        )
+        self._telic_seam = self._init_telic_seam(enabled=explicit_runtime_state)
         self._shared_dir = shared_dir or self._derive_runtime_artifact_dir("shared")
         self._stigmergy_dir = stigmergy_dir or self._derive_runtime_artifact_dir("stigmergy")
         self._running = False
@@ -142,15 +150,15 @@ class Orchestrator:
             return base_dir.parent
         return base_dir
 
-    def _init_telic_seam(self) -> Any | None:
+    def _init_telic_seam(self, *, enabled: bool = True) -> Any | None:
         """Prefer a state-local ontology seam over the global singleton."""
+        if not enabled:
+            return None
         try:
-            from dharma_swarm.ontology_runtime import get_shared_registry
             from dharma_swarm.telic_seam import TelicSeam
 
             ontology_db = self._runtime_root() / "ontology.db"
-            registry = get_shared_registry(path=ontology_db)
-            return TelicSeam(registry=registry, registry_path=ontology_db)
+            return TelicSeam(path=ontology_db)
         except Exception:
             logger.debug("Failed to initialize local telic seam", exc_info=True)
             return None
@@ -530,9 +538,22 @@ class Orchestrator:
         agent_id: str,
         extra: dict[str, Any] | None = None,
     ) -> None:
-        """Fire-and-forget lifecycle event — non-blocking to avoid stalling dispatch."""
+        """Emit lifecycle event, awaiting explicit event-memory durability when wired."""
+        if self._event_memory is not None:
+            await self._emit_lifecycle_event_impl(
+                event,
+                task_id=task_id,
+                agent_id=agent_id,
+                extra=extra,
+            )
+            return
         asyncio.create_task(
-            self._emit_lifecycle_event_impl(event, task_id=task_id, agent_id=agent_id, extra=extra),
+            self._emit_lifecycle_event_impl(
+                event,
+                task_id=task_id,
+                agent_id=agent_id,
+                extra=extra,
+            ),
             name=f"lifecycle-{event}-{task_id[:8]}",
         )
 
@@ -655,6 +676,53 @@ class Orchestrator:
         if task is None or not isinstance(task.metadata, dict):
             return {}
         return dict(task.metadata)
+
+    def _record_telic_block_outcome(
+        self,
+        *,
+        task: Task | None,
+        agent_id: str,
+        reason: str,
+    ) -> None:
+        if self._telic_seam is None or task is None:
+            return
+        try:
+            meta = self._task_meta(task)
+            outcome_id = self._telic_seam.record_outcome(
+                task,
+                agent_id,
+                success=False,
+                error=reason[:200],
+                duration_ms=0.0,
+            )
+            if outcome_id is None:
+                return
+            value_event_id = self._telic_seam.record_value_event(
+                outcome_id,
+                task,
+                agent_id,
+                result_text=reason[:200],
+                success=False,
+                duration_ms=0.0,
+                cell_id=str(meta.get("cell_id") or ""),
+            )
+            if value_event_id is None:
+                return
+            value_event = self._telic_seam.registry.get_object(value_event_id)
+            composite_value = (
+                value_event.properties.get("composite_value", 0.0)
+                if value_event is not None
+                else 0.0
+            )
+            self._telic_seam.record_contribution(
+                value_event_id,
+                agent_id,
+                composite_value=float(composite_value or 0.0),
+                cell_id=str(meta.get("cell_id") or ""),
+                task_type=str(meta.get("task_type") or "general"),
+            )
+        except Exception:
+            logger.debug("Telic seam block outcome recording failed", exc_info=True)
 
     def _resolve_timeout_seconds(self, task: Task | None, fallback: float) -> float:
         meta = self._task_meta(task)
@@ -1721,15 +1789,22 @@ class Orchestrator:
 
         # ── Telic Seam: record ActionProposal in ontology ──
         proposal_id: str | None = None
+        gate_decision_id: str | None = None
         if task_for_gate is not None:
             try:
                 if self._telic_seam is not None:
+                    action_type = td.topology.value if td.topology else "dispatch"
                     proposal_id = self._telic_seam.record_dispatch(
                         task_for_gate,
                         td.agent_id,
-                        topology=td.topology.value if td.topology else "dispatch",
+                        topology=action_type,
                     )
-                    td.metadata["telic_proposal_id"] = proposal_id or ""
+                    if proposal_id:
+                        td.metadata["telic_proposal_id"] = proposal_id
+                        task_meta = self._task_meta(task_for_gate)
+                        task_meta["telic_proposal_id"] = proposal_id
+                        task_meta["telic_dispatch_action_type"] = action_type
+                        task_for_gate.metadata = task_meta
             except Exception:
                 logger.debug("Telic seam dispatch recording failed", exc_info=True)
 
@@ -1761,20 +1836,33 @@ class Orchestrator:
         if proposal_id is not None:
             try:
                 if self._telic_seam is not None:
-                    self._telic_seam.record_gate_decision(
+                    gate_decision_id = self._telic_seam.record_gate_decision(
                         proposal_id,
                         gate.result,
                         witness_reroutes=gate.attempts,
                     )
+                    if gate_decision_id:
+                        td.metadata["telic_gate_decision_id"] = gate_decision_id
+                        if task_for_gate is not None:
+                            task_meta = self._task_meta(task_for_gate)
+                            task_meta["telic_gate_decision_id"] = gate_decision_id
+                            task_for_gate.metadata = task_meta
             except Exception:
                 logger.debug("Telic seam gate decision recording failed", exc_info=True)
 
         if gate.result.decision.value == "block":
-            await self._safe_update_task(
-                td.task_id,
-                status=TaskStatus.FAILED,
-                result=f"TELOS BLOCK (dispatch): {gate.result.reason}",
+            self._record_telic_block_outcome(
+                task=task_for_gate,
+                agent_id=td.agent_id,
+                reason=f"TELOS BLOCK (dispatch): {gate.result.reason}",
             )
+            block_fields: dict[str, Any] = {
+                "status": TaskStatus.FAILED,
+                "result": f"TELOS BLOCK (dispatch): {gate.result.reason}",
+            }
+            if task_for_gate is not None:
+                block_fields["metadata"] = self._task_meta(task_for_gate)
+            await self._safe_update_task(td.task_id, **block_fields)
             self._record_task_event(
                 "dispatch_blocked",
                 task_id=td.task_id,
@@ -1808,15 +1896,24 @@ class Orchestrator:
 
         claim_meta = self._prepare_claim(task_for_gate, td)
         claim_meta = self._attach_latent_gold(task_for_gate, claim_meta)
+        if proposal_id:
+            claim_meta["telic_proposal_id"] = proposal_id
+        if gate_decision_id:
+            claim_meta["telic_gate_decision_id"] = gate_decision_id
         if task_for_gate is not None:
             task_for_gate.metadata = dict(claim_meta)
         if proposal_id is not None:
             try:
                 if self._telic_seam is not None:
-                    self._telic_seam.record_execution_lease(
+                    lease_id = self._telic_seam.record_execution_lease(
                         proposal_id,
                         claim_meta.get("active_claim"),
                     )
+                    if lease_id:
+                        td.metadata["telic_execution_lease_id"] = lease_id
+                        claim_meta["telic_execution_lease_id"] = lease_id
+                        if task_for_gate is not None:
+                            task_for_gate.metadata = dict(claim_meta)
             except Exception:
                 logger.debug("Telic seam execution lease recording failed", exc_info=True)
 
@@ -1891,10 +1988,12 @@ class Orchestrator:
         pool_get = getattr(self._pool, "get", None)
         runner = await pool_get(td.agent_id) if pool_get else None
         task = task_for_gate or await self._safe_get_task(td.task_id)
+        list_agents = getattr(self._pool, "list_agents", None)
+        pool_agents = list((await list_agents()) if callable(list_agents) else [])[:3]
         logger.info(
             "_assign_dispatch(%s): runner=%s task=%s pool_agents=%s",
             td.task_id[:8], bool(runner), bool(task),
-            list((await self._pool.list_agents()) if self._pool else [])[:3],
+            pool_agents,
         )
         if runner and task:
             run_meta = self._task_meta(task)

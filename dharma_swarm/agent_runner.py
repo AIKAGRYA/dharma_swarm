@@ -37,6 +37,7 @@ from dharma_swarm.model_catalog import (
     selector_from_metadata,
 )
 from dharma_swarm.execution_pipeline import (
+    GateDecisionRecorder,
     PipelineError,
     TaskExecutionPipeline,
     looks_like_provider_failure as _pipeline_looks_like_provider_failure,
@@ -2306,7 +2307,11 @@ class AgentRunner:
         except Exception:
             logger.debug("Conversation turn logging failed", exc_info=True)
 
-    def _build_execution_pipeline(self) -> TaskExecutionPipeline:
+    def _build_execution_pipeline(
+        self,
+        *,
+        gate_decision_recorder: GateDecisionRecorder | None = None,
+    ) -> TaskExecutionPipeline:
         return TaskExecutionPipeline(
             config=self._config,
             has_provider=self._provider is not None,
@@ -2332,6 +2337,7 @@ class AgentRunner:
             ),
             artifact_path_resolver=_required_artifact_paths,
             gate_checker=check_with_reflective_reroute,
+            gate_decision_recorder=gate_decision_recorder,
         )
 
     # -- lifecycle ----------------------------------------------------------
@@ -2383,6 +2389,13 @@ class AgentRunner:
         active_inference_engine: Any | None = None
         active_inference_prediction: Any | None = None
         observed_quality_score: float | None = None
+        meta: dict[str, Any] = {}
+        telic_agent_id = self.agent_id
+        telic_cell_id = ""
+        telic_task_type = "general"
+        telic_seam: Any | None = None
+        telic_ontology_path: Path | None = None
+        telic_proposal_id: str | None = None
 
         _task_tracer = _jikoku_tracer()
         _task_span = _task_tracer.start(
@@ -2393,11 +2406,45 @@ class AgentRunner:
         )
         try:
             meta = task.metadata if isinstance(task.metadata, dict) else {}
-            telic_agent_id = self.agent_id
             telic_cell_id = str(meta.get("cell_id", "") or "")
             telic_task_type = str(meta.get("task_type", "general") or "general")
+            telic_ontology_path = _resolve_ontology_path(
+                task,
+                self._config,
+                self._ontology_path,
+            )
             try:
-                pipeline_result = await self._build_execution_pipeline().run(task)
+                if telic_ontology_path is not None:
+                    from dharma_swarm.telic_seam import get_seam
+                    telic_seam = get_seam(telic_ontology_path)
+                    existing_proposal_id = str(meta.get("telic_proposal_id") or "").strip()
+                    if existing_proposal_id:
+                        telic_proposal_id = telic_seam.bind_proposal(
+                            task.id,
+                            existing_proposal_id,
+                        )
+                    if telic_proposal_id is None:
+                        telic_proposal_id = telic_seam.record_dispatch(
+                            task,
+                            telic_agent_id,
+                            topology="pipeline",
+                        )
+            except Exception:
+                logger.debug("Telic seam dispatch recording failed", exc_info=True)
+
+            def _record_telic_gate_decision(_task: Task, gate: Any) -> None:
+                if telic_seam is None or telic_proposal_id is None:
+                    return
+                telic_seam.record_gate_decision(
+                    telic_proposal_id,
+                    gate.result,
+                    witness_reroutes=int(getattr(gate, "attempts", 0) or 0),
+                )
+
+            try:
+                pipeline_result = await self._build_execution_pipeline(
+                    gate_decision_recorder=_record_telic_gate_decision,
+                ).run(task)
             except PipelineError as pipeline_exc:
                 request = pipeline_exc.request
                 route_request = pipeline_exc.route_request
@@ -2599,9 +2646,8 @@ class AgentRunner:
             # ── Telic Seam: record Outcome + ValueEvent + Contribution ──
             try:
                 from dharma_swarm.telic_seam import get_seam
-                ontology_path = _resolve_ontology_path(task, self._config, self._ontology_path)
-                if ontology_path is not None:
-                    seam = get_seam(ontology_path)
+                if telic_ontology_path is not None:
+                    seam = telic_seam or get_seam(telic_ontology_path)
                     outcome_id = seam.record_outcome(
                         task,
                         telic_agent_id,
@@ -2729,9 +2775,8 @@ class AgentRunner:
             # ── Telic Seam: record failure Outcome + ValueEvent + Contribution ──
             try:
                 from dharma_swarm.telic_seam import get_seam
-                ontology_path = _resolve_ontology_path(task, self._config, self._ontology_path)
-                if ontology_path is not None:
-                    seam = get_seam(ontology_path)
+                if telic_ontology_path is not None:
+                    seam = telic_seam or get_seam(telic_ontology_path)
                     outcome_id = seam.record_outcome(
                         task,
                         telic_agent_id,
