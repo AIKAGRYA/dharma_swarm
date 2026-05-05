@@ -12,10 +12,17 @@ v2: Three-tier evaluation replaces naive keyword matching:
 
 from __future__ import annotations
 
+import json
+import os
 from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
+from dharma_swarm.fourfold_action_warrant import (
+    FourfoldActionWarrant,
+    trigger_reasons_for_action,
+)
+from dharma_swarm.models import GateDecision
 from dharma_swarm.models import _utc_now
 from dharma_swarm.structured_predicate import (
     CompoundPredicate,
@@ -44,6 +51,10 @@ _SEVERITY_TO_ENFORCEMENT: dict[str, EnforcementLevel] = {
 # database now"), so 0.7 is the correct block boundary for this embedding.
 _SIMILARITY_BLOCK_THRESHOLD = 0.7
 _SIMILARITY_WARN_THRESHOLD = 0.45
+FOURFOLD_ACTION_WARRANT_GATE_ENV = "DHARMA_FOURFOLD_ACTION_WARRANT_GATE"
+FOURFOLD_ACTION_WARRANT_METADATA_KEY = "fourfold_action_warrant"
+FOURFOLD_ACTION_WARRANT_LEGACY_METADATA_KEY = "fourfold_warrant"
+FOURFOLD_ACTION_WARRANT_RULE_SOURCE = "kernel:fourfold_action_warrant"
 
 
 class PolicyRule(BaseModel):
@@ -87,6 +98,8 @@ class Policy(BaseModel):
         action: str,
         context: str = "",
         action_metadata: dict[str, Any] | None = None,
+        *,
+        enforce_fourfold_warrant: bool | None = None,
     ) -> PolicyDecision:
         """Evaluate an action against all policy rules using three-tier matching.
 
@@ -112,11 +125,24 @@ class Policy(BaseModel):
             context: Optional free-text context for the action.
             action_metadata: Optional dict of structured metadata for Tier 1
                 evaluation (e.g. {"evaluator_count": 1, "action_type": "destructive"}).
+            enforce_fourfold_warrant: Optional explicit override for the
+                Fourfold Action Warrant runtime gate. If omitted, the
+                ``DHARMA_FOURFOLD_ACTION_WARRANT_GATE`` environment flag
+                controls enforcement.
 
         Returns:
             PolicyDecision with allowed flag, violated rules, warnings, and reason.
         """
         metadata = action_metadata or {}
+        warrant_decision = _check_fourfold_action_warrant_gate(
+            action,
+            context,
+            metadata,
+            enforce=enforce_fourfold_warrant,
+        )
+        if warrant_decision is not None:
+            return warrant_decision
+
         combined = (action + " " + context).lower()
         violated: list[PolicyRule] = []
         warned: list[PolicyRule] = []
@@ -289,3 +315,100 @@ def _extract_compound_predicate(obj: Any) -> CompoundPredicate | None:
         except Exception:
             return None
     return None
+
+
+def fourfold_action_warrant_gate_enabled() -> bool:
+    """Whether the opt-in Fourfold Action Warrant runtime gate is active."""
+
+    value = os.getenv(FOURFOLD_ACTION_WARRANT_GATE_ENV, "")
+    return value.strip().lower() in {"1", "true", "yes", "on", "enforce", "block"}
+
+
+def _check_fourfold_action_warrant_gate(
+    action: str,
+    context: str,
+    metadata: dict[str, Any],
+    *,
+    enforce: bool | None,
+) -> PolicyDecision | None:
+    if enforce is None:
+        enforce = fourfold_action_warrant_gate_enabled()
+    if not enforce:
+        return None
+
+    trigger_reasons = trigger_reasons_for_action(action, context, metadata)
+    if not trigger_reasons:
+        return None
+
+    warrant, load_error = _load_fourfold_action_warrant(metadata)
+    if warrant is None:
+        return _fourfold_action_warrant_block(
+            trigger_reasons,
+            load_error or "missing_fourfold_action_warrant",
+        )
+
+    if not warrant.required:
+        return _fourfold_action_warrant_block(
+            trigger_reasons,
+            "stale_or_irrelevant_fourfold_action_warrant",
+        )
+
+    missing_reasons = sorted(set(trigger_reasons) - set(warrant.trigger_reasons))
+    if missing_reasons:
+        return _fourfold_action_warrant_block(
+            trigger_reasons,
+            "warrant_missing_trigger_reasons:" + ",".join(missing_reasons),
+        )
+
+    if warrant.decision is GateDecision.ALLOW:
+        return None
+
+    reason = f"fourfold_action_warrant_{warrant.decision.value}"
+    if warrant.blockers:
+        reason += ": " + ",".join(warrant.blockers)
+    return _fourfold_action_warrant_block(trigger_reasons, reason)
+
+
+def _load_fourfold_action_warrant(
+    metadata: dict[str, Any],
+) -> tuple[FourfoldActionWarrant | None, str | None]:
+    for key in (
+        FOURFOLD_ACTION_WARRANT_METADATA_KEY,
+        FOURFOLD_ACTION_WARRANT_LEGACY_METADATA_KEY,
+    ):
+        if key not in metadata:
+            continue
+        raw = metadata[key]
+        if isinstance(raw, FourfoldActionWarrant):
+            return raw, None
+        if isinstance(raw, str):
+            try:
+                raw = json.loads(raw)
+            except json.JSONDecodeError:
+                return None, "invalid_fourfold_action_warrant_json"
+        try:
+            return FourfoldActionWarrant.model_validate(raw), None
+        except (TypeError, ValidationError, ValueError):
+            return None, "invalid_fourfold_action_warrant"
+    return None, "missing_fourfold_action_warrant"
+
+
+def _fourfold_action_warrant_block(
+    trigger_reasons: list[str],
+    detail: str,
+) -> PolicyDecision:
+    rule = PolicyRule(
+        source=FOURFOLD_ACTION_WARRANT_RULE_SOURCE,
+        rule_text="high-authority actions require an allowing Fourfold Action Warrant",
+        weight=1.0,
+        is_immutable=True,
+        enforcement_level="block",
+    )
+    return PolicyDecision(
+        allowed=False,
+        violated_rules=[rule],
+        reason=(
+            "fourfold action warrant gate: "
+            f"{detail}; triggers={','.join(trigger_reasons)}"
+        ),
+    )

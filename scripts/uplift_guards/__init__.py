@@ -8,6 +8,7 @@ autonomous-build damage post-mortem (commit d7af817).
 from __future__ import annotations
 
 from .autonomous_guard import check_autonomous_destruction
+from .shakti_warrant_guard import check_fourfold_shakti_warrant
 from .kernel_guard import check_kernel_integrity
 from .secrets_guard import check_no_secrets
 from .hotpath_guard import check_hotpath_acknowledged
@@ -18,6 +19,7 @@ from .mismatch_registry import (
 
 __all__ = [
     "check_autonomous_destruction",
+    "check_fourfold_shakti_warrant",
     "check_kernel_integrity",
     "check_no_secrets",
     "check_hotpath_acknowledged",

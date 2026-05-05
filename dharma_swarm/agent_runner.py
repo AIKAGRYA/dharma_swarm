@@ -2156,6 +2156,23 @@ class AgentRunner:
             if gate.result.decision == GateDecision.BLOCK:
                 raise RuntimeError(f"Telos block: {gate.result.reason}")
 
+            # ── Telic Seam: record dispatch + gate decision (provenance) ──
+            telic_proposal_id: str | None = None
+            try:
+                from dharma_swarm.telic_seam import get_seam
+                ontology_path = _resolve_ontology_path(task, self._config, self._ontology_path)
+                if ontology_path is not None:
+                    seam = get_seam(ontology_path)
+                    telic_proposal_id = seam.record_dispatch(
+                        task, telic_agent_id, topology="agent_runner",
+                    )
+                    if telic_proposal_id:
+                        seam.record_gate_decision(
+                            telic_proposal_id, gate.result,
+                        )
+            except Exception:
+                logger.debug("Telic seam dispatch recording failed", exc_info=True)
+
             plan_context = ""
             if gate.attempts:
                 plan_context = (

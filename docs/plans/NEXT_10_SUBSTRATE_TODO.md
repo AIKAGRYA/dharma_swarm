@@ -41,6 +41,7 @@ The order is load-bearing. Do not skip ahead. Each item lands as its own PR, wit
 - Why now: the spec is only proven when one tick of the live cron writes one `KnowledgeArtifact` of subtype `operator_brief` linked correctly. Anything less is documentation theatre.
 
 ### 6. Flip the feature flag on for one operator profile and witness one tick
+- **Status: done** — witness commit `f57ccad`.
 - No new code. Configuration change only.
 - Capture the resulting `KnowledgeArtifact` id, the linked `WitnessLog` ids, the four `GateDecisionRecord` ids (one per applied gate), the `ActionProposal` id, the `Outcome` id, and the `ValueEvent` id.
 - Land them in a one-page report under `reports/witness/<date>-operator-brief-first-tick.md`. This is the falsifiability checkpoint the audit asks for.
@@ -65,6 +66,7 @@ The order is load-bearing. Do not skip ahead. Each item lands as its own PR, wit
 ## Track 4 — Generalise to a value loop (items 9–10)
 
 ### 9. Add a `ValueEvent` aggregation read in the dashboard or CLI
+- **Status: done** — PR #85 (pending merge)
 - One new read-only surface: `dgc value-events --since <date>` lists `ValueEvent` rows linked from `operator_brief` artifacts, grouped by `Contribution.attributed_to`.
 - No new substrate. Reads from existing ontology tables only.
 - Why now: this is the smallest possible value-loop closure. Once value events from one seam are visible to operators, the case for opening a second seam (Dharma Radar v0) becomes empirical instead of aspirational.
