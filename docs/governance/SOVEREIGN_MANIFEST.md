@@ -187,14 +187,10 @@ These are the ground-truth metrics. All other documents citing different numbers
 | session_event_bridge.py | 311 | 2 | ALIVE |
 | a2a/a2a_bridge.py | 309 | 2 | ALIVE |
 | review_bridge.py | 224 | 4 | ALIVE |
-| math_bridges.py | 223 | 0 | **ZOMBIE** |
 | roaming_operator_bridge.py | 202 | 3 | ALIVE (boundary violation) |
 | skill_bridge.py | 201 | 2 | ALIVE |
 | optimizer_bridge.py | 191 | 8 | ALIVE |
 | ecosystem_bridge.py | 170 | 3 | ALIVE |
-| verify/flywheel_bridge.py | 118 | 0 | **ZOMBIE** |
-| offline_training_bridge.py | 111 | 0 | **ZOMBIE** |
-| runtime_bridge.py | 98 | 0 | **ZOMBIE** |
 
 - **Primary Entry Points**: `terminal_bridge.py` (Bun<->Python), `bridge.py` (core abstraction)
 - **State Management**: Bridges are stateless translators (mostly)
@@ -203,7 +199,7 @@ These are the ground-truth metrics. All other documents citing different numbers
   - ALLOWED: May import from any domain they bridge between
   - FORBIDDEN: Bridges must NOT import from other bridges (no bridge chains)
 - **Boundary Status**: **FAIL** (V) -- `roaming_operator_bridge.py:14` imports `operator_bridge` directly; `bridge_coordinator.py` imports `bridge_registry` via late imports (6 locations)
-- **4 zombie bridges** with zero importers: math_bridges, flywheel_bridge, offline_training_bridge, runtime_bridge
+- **4 zombie bridges deleted** in PR #95: math_bridges, flywheel_bridge, offline_training_bridge, runtime_bridge
 
 ### Domain 7: Terminal / TUI
 
@@ -306,7 +302,7 @@ These are the ground-truth metrics. All other documents citing different numbers
 - `swarmlens_app.py` is the old TUI (zero importers) (V). The current TUI is Bun/Ink in `tui/`.
 - `specs/DGC_TERMINAL_ARCHITECTURE.md` (v1.0) is superseded by v1.1.
 - `router_v1.py` is **NOT legacy** -- it is actively used in the routing chain for signal generation (V). The manifest previously labeled it "legacy" incorrectly.
-- **4 zombie bridges** can be safely archived: `math_bridges.py`, `verify/flywheel_bridge.py`, `offline_training_bridge.py`, `runtime_bridge.py` (all have zero importers) (V)
+- **4 zombie bridges** deleted in PR #95: `math_bridges.py`, `verify/flywheel_bridge.py`, `offline_training_bridge.py`, `runtime_bridge.py`
 
 ### Test / Verification Expectations
 - `python3 -m pytest tests/ -q` must pass before any commit
