@@ -8,6 +8,7 @@ Telos check -> prompt/context preparation -> provider call -> semantic repair
 from __future__ import annotations
 
 import asyncio
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Awaitable, Callable
@@ -52,6 +53,9 @@ CompletionAttemptExecutor = Callable[[Task, LLMRequest, int], Awaitable[Completi
 DeepResearchRunner = Callable[[Task], Awaitable[tuple[str, float]]]
 ArtifactPathResolver = Callable[[Task], list[Path]]
 GateChecker = Callable[..., Any]
+GateDecisionRecorder = Callable[[Task, Any], None]
+
+logger = logging.getLogger(__name__)
 
 
 def task_metadata(task: Task) -> dict[str, Any]:
@@ -158,6 +162,7 @@ class TaskExecutionPipeline:
     memory_context_provider: MemoryContextProvider | None = None
     artifact_path_resolver: ArtifactPathResolver = required_artifact_paths
     gate_checker: GateChecker = check_with_reflective_reroute
+    gate_decision_recorder: GateDecisionRecorder | None = None
 
     async def run(self, task: Task) -> PipelineResult:
         request: LLMRequest | None = None
@@ -196,6 +201,11 @@ class TaskExecutionPipeline:
                 spec_ref=spec_ref,
                 requirement_refs=req_refs,
             )
+            if self.gate_decision_recorder is not None:
+                try:
+                    self.gate_decision_recorder(task, gate)
+                except Exception:
+                    logger.debug("Gate decision recorder failed", exc_info=True)
             if gate.result.decision == GateDecision.BLOCK:
                 raise RuntimeError(f"Telos block: {gate.result.reason}")
 

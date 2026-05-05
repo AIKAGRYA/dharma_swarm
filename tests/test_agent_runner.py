@@ -145,7 +145,6 @@ async def test_runner_records_telic_chain_with_stable_agent_id_and_cell_scope(
     import dharma_swarm.telic_seam as telic_module
 
     provider = AsyncMock()
-    provider.complete = AsyncMock(return_value=LLMResponse(content="done", model="test"))
     ontology_path = _ontology_path(tmp_path)
 
     seam = TelicSeam(
@@ -153,6 +152,13 @@ async def test_runner_records_telic_chain_with_stable_agent_id_and_cell_scope(
         lineage=LineageGraph(db_path=tmp_path / "telic-lineage.db"),
         path=ontology_path,
     )
+
+    async def _complete_after_telic_gate(_request):
+        assert len(seam.registry.get_objects_by_type("ActionProposal")) == 1
+        assert len(seam.registry.get_objects_by_type("GateDecisionRecord")) == 1
+        return LLMResponse(content="done", model="test")
+
+    provider.complete = AsyncMock(side_effect=_complete_after_telic_gate)
     old_seam = telic_module._SEAM
     telic_module._SEAM = seam
 
@@ -172,10 +178,18 @@ async def test_runner_records_telic_chain_with_stable_agent_id_and_cell_scope(
 
         await runner.run_task(task)
 
+        proposal = seam.registry.get_objects_by_type("ActionProposal")[0]
+        gate_decision = seam.registry.get_objects_by_type("GateDecisionRecord")[0]
         outcome = seam.registry.get_objects_by_type("Outcome")[0]
         value_event = seam.registry.get_objects_by_type("ValueEvent")[0]
         contribution = seam.registry.get_objects_by_type("Contribution")[0]
 
+        assert proposal.properties["task_id"] == task.id
+        assert proposal.properties["agent_id"] == named_config.id
+        assert proposal.properties["action_type"] == "pipeline"
+        assert gate_decision.properties["proposal_id"] == proposal.id
+        assert gate_decision.properties["decision"] == "allow"
+        assert outcome.properties["proposal_id"] == proposal.id
         assert outcome.properties["agent_id"] == named_config.id
         assert value_event.properties["agent_id"] == named_config.id
         assert value_event.properties["cell_id"] == "rv-cell"
@@ -190,6 +204,80 @@ async def test_runner_records_telic_chain_with_stable_agent_id_and_cell_scope(
         )
         assert n == 1
         assert score > 0.5
+
+        report = seam.lifecycle_integrity_report()
+        assert report["is_clean"] is True
+    finally:
+        telic_module._SEAM = old_seam
+
+
+@pytest.mark.asyncio
+async def test_runner_records_telic_block_chain_before_provider_execution(
+    config,
+    monkeypatch,
+    tmp_path: Path,
+):
+    from dharma_swarm.models import GateCheckResult, GateDecision, LLMResponse
+    from dharma_swarm.telos_gates import ReflectiveGateOutcome
+    import dharma_swarm.agent_runner as agent_runner_module
+    import dharma_swarm.telic_seam as telic_module
+
+    provider = AsyncMock()
+    provider.complete = AsyncMock(
+        return_value=LLMResponse(content="should not run", model="test")
+    )
+    ontology_path = _ontology_path(tmp_path)
+
+    seam = TelicSeam(
+        registry=OntologyRegistry.create_dharma_registry(),
+        lineage=LineageGraph(db_path=tmp_path / "telic-lineage-block.db"),
+        path=ontology_path,
+    )
+    old_seam = telic_module._SEAM
+    telic_module._SEAM = seam
+
+    def _block_gate(**_: object) -> ReflectiveGateOutcome:
+        return ReflectiveGateOutcome(
+            result=GateCheckResult(
+                decision=GateDecision.BLOCK,
+                reason="blocked for invariant test",
+            )
+        )
+
+    monkeypatch.setattr(
+        agent_runner_module,
+        "check_with_reflective_reroute",
+        _block_gate,
+        raising=True,
+    )
+
+    try:
+        named_config = _with_state_dir(
+            config,
+            tmp_path,
+        ).model_copy(
+            update={"name": "display-name", "id": "agent-stable-id"}
+        )
+        runner = AgentRunner(named_config, provider=provider, ontology_path=ontology_path)
+        await runner.start()
+        task = Task(title="Blocked telic action")
+
+        with pytest.raises(RuntimeError, match="Telos block"):
+            await runner.run_task(task)
+
+        provider.complete.assert_not_awaited()
+
+        proposal = seam.registry.get_objects_by_type("ActionProposal")[0]
+        gate_decision = seam.registry.get_objects_by_type("GateDecisionRecord")[0]
+        outcome = seam.registry.get_objects_by_type("Outcome")[0]
+
+        assert proposal.properties["task_id"] == task.id
+        assert proposal.properties["agent_id"] == named_config.id
+        assert gate_decision.properties["proposal_id"] == proposal.id
+        assert gate_decision.properties["decision"] == "block"
+        assert outcome.properties["proposal_id"] == proposal.id
+        assert outcome.properties["success"] is False
+        assert "Telos block: blocked for invariant test" in outcome.properties["error"]
 
         report = seam.lifecycle_integrity_report()
         assert report["is_clean"] is True
