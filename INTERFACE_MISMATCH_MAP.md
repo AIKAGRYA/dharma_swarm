@@ -1,6 +1,6 @@
 # Interface Mismatch Map — dharma_swarm
 
-**Last X-Ray:** 2026-05-04 (provenance-completion audit against HEAD `2fafd00`)
+**Last X-Ray:** 2026-05-04 (provenance-completion audit against HEAD `74d015c`)
 **Previous version:** 2026-04-08 (55 module pairs, 13 mismatches, 9 prioritized)
 **Maintainer:** Guardian Crew (`guardian_crew.py`) — auto-updates every 4 hours
 **How to read this:** Severity = BLOCKER (crashes at runtime), DEGRADED (silent failure / wrong behavior), WARNING (structural smell).
@@ -12,7 +12,7 @@
 | Mismatch | Old Status | New Status | Resolution |
 |----------|-----------|-----------|-----------|
 | MM-01: huggingface_hub ImportError | BLOCKER | ✅ RESOLVED | `try/except ImportError` added; heuristic fallback path confirmed |
-| MM-02/03: PersistentAgent enum coercion | BLOCKER | ✅ RESOLVED | `orchestrate_live.py:1363` now wraps with `AgentRole()` and `PT()` — confirmed by x-ray |
+| MM-02/03: PersistentAgent enum coercion | BLOCKER | ✅ RESOLVED | `orchestrate_live.py:1363` wraps with `AgentRole()` and `PT()`. Conductor path uses enum values from config. |
 | MM-04: AgentPool None guard | DEGRADED | ✅ RESOLVED | `SubsystemNotReady` raised at line 870, `_agent_pool` guard present |
 | MM-06: Dual StigmergyStore | DEGRADED | ✅ RESOLVED | `run_living_layers_loop` now accepts `stigmergy_store` param; passes swarm's store |
 | MM-08: ECC_INSTINCT_SIGNAL constant | DEGRADED | ✅ RESOLVED | `SIGNAL_ECC_INSTINCT` defined in `signal_bus.py:40`, used in `instinct_bridge.py` |
@@ -26,7 +26,7 @@
 | MM-18: gnani → TelosGraph.get_by_name | DEGRADED | ✅RESOLVED | `TelosGraph.get_by_name()` added — linear scan on name field |
 | NEW-04: agent_runner → telic_seam dispatch gap | DEGRADED | ✅RESOLVED | `record_dispatch` + `record_gate_decision` added at task start in agent_runner |
 | NEW-05: task_board ↔ runtime_state split lifecycle | — | ⚠️ GUARDED | `run_task_consistency_guard` added to guardian_crew — detects COMPLETED tasks with still-OPEN claims |
-| NEW-07: 54 stores lack common trace_id | — | ⚠️ PARTIAL+ | `trace_id` added to task_board, runtime_state, telemetry_plane, stigmergy, traces, artifact_manifest, handoff |
+| NEW-07: 54 stores lack common trace_id | — | ⚠️ PARTIAL+ | `trace_id` column added to task_board, runtime_state, telemetry_plane, stigmergy, traces, artifact_manifest, handoff. CorrelationContext auto-populates memory_palace.ingest(), economic_engine transactions, and ai_reciprocity_ledger entries. |
 | NEW-08: 12 independent record_outcome() | ⚠️ PARTIAL | ⚠️ PARTIAL+ | TelicSeam emits signals + SignalBus subscriber pattern added for automatic fanout |
 | NEW-09: orchestrator → TelicSeam registry_path kwarg | — | ✅ FIXED | `orchestrator.py:154` used `registry_path=` but TelicSeam accepts `path=`. TypeError at runtime. |
 | NEW-10: lineage edges lack delegation chain | — | ✅ FIXED | `LineageEdge.delegated_by` + `trace_id` fields added; `agent_runner.spawn_worker` records delegation lineage |
@@ -38,19 +38,17 @@
 
 ## Current Live Mismatches
 
-### MM-02/03 — ✅ RESOLVED: PersistentAgent enum deserialization
+### MM-02/03 — RESOLVED: PersistentAgent enum deserialization
 
-**File:** `orchestrate_live.py:1363-1366`
-**Fixed:** Now wraps with `AgentRole()` and `PT()` enum constructors. Confirmed by filesystem verification.
+**File:** `orchestrate_live.py:1361-1366`
+**Status:** ✅ RESOLVED — replication path wraps with `AgentRole()` and `PT()` at line 1363-1365. Conductor path at line 1471 uses already-constructed enum values from `CONDUCTOR_CONFIGS` (`AgentRole.CONDUCTOR`).
 
 ---
 
-### MM-05 — DEGRADED: Private Orchestrator method coupling
+### MM-05 — RESOLVED: Private Orchestrator method coupling
 
-**File:** `swarm.py:1883-1895`
-**What's wrong:** `swarm.py` calls `self._orchestrator._classify_failure()`, `_resolve_retry_policy()`, `_apply_failure_retry_defaults()` — all single-underscore private methods. Any internal refactor of `orchestrator.py` silently breaks `swarm.py`'s retry logic.
-
-**Fix:** Add `Orchestrator.retry_policy_for_failure(task, error, source, meta)` as a public API method. 1-hour refactor.
+**File:** `orchestrator.py:730`, `swarm.py:1978`
+**Status:** ✅ RESOLVED — `Orchestrator.retry_policy_for_failure(task, error, source, meta)` added as public API. `swarm.py` now calls this single method instead of 3 private methods. Internal refactors of orchestrator retry logic won't break swarm.py.
 
 ---
 
@@ -63,10 +61,10 @@
 
 ---
 
-### MM-12 — DEGRADED: Same as MM-02/03 (second call site)
+### MM-12 — RESOLVED: Same as MM-02/03 (second call site)
 
-**File:** `orchestrate_live.py:1354-1364` (conductor configs path)
-**Status:** This path uses already-constructed enum values (`role=cfg["role"]` where `cfg["role"]` is `AgentRole.CONDUCTOR`) — no mismatch here. **This is fine.** The problem is only in the replication monitor path at line 1247.
+**File:** `orchestrate_live.py:1471` (conductor configs path)
+**Status:** ✅ RESOLVED — uses `AgentRole.CONDUCTOR` from `CONDUCTOR_CONFIGS`. No bare string coercion.
 
 ---
 

@@ -327,7 +327,6 @@ Generated: 2026-03-29 | 500 Python modules | 494 test files | 8,848 tests
 | `info_geometry.py` | 665 | Information geometry (Fisher metrics, KL divergence) |
 | `monad.py` | 575 | Monadic composition for effect management |
 | `sheaf.py` | 456 | Sheaf-theoretic consistency checking |
-| `math_bridges.py` | var | Bridges between mathematical abstractions and runtime |
 | `cohomology_cechcohomology_to_sheaf_coord.py` | var | Cech cohomology to sheaf coordinate transforms |
 
 ### Subdirectory Packages

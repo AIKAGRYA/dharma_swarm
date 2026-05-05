@@ -152,10 +152,10 @@ See `foundations/` for the 10-pillar intellectual genome.
 **Build-session entrypoint:** Before any build work, read [`docs/governance/BUILD_SESSION_ENTRYPOINT.md`](docs/governance/BUILD_SESSION_ENTRYPOINT.md). It carries the canonical read order and the current build track. The current track is the ontology-native Operator Brief seam ([`docs/plans/ONTOLOGY_NATIVE_OPERATOR_BRIEF_MASTER_SPEC.md`](docs/plans/ONTOLOGY_NATIVE_OPERATOR_BRIEF_MASTER_SPEC.md)). Substrate-nativeness is currently estimated at ~10–15% per [`reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md`](reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md); the goal is to bring one user-visible seam fully native before opening another.
 
 See [`INTERFACE_MISMATCH_MAP.md`](INTERFACE_MISMATCH_MAP.md) for the complete map of every interface mismatch between modules. **This is the #1 source of runtime failures.** The map documents:
-- 3 BLOCKER mismatches that prevent the system from executing any task
-- 9 DEGRADED mismatches that silently lose data or crash specific subsystems
-- 55 module pairs verified (42 correct, 13 with issues)
-- A prioritized **Bootstrap Sequence** of 9 fixes in the order they should be applied
+- 0 BLOCKER mismatches (all 3 original BLOCKERs resolved)
+- 4 DEGRADED mismatches remaining (MM-05 private coupling, NEW-05 guarded, NEW-07/08 partial)
+- 55 module pairs verified, 11 resolved, 6 new entries added and fixed
+- A prioritized **Bootstrap Sequence** of fixes (most now resolved)
 
 **Rule for all sessions:** Before fixing a bug or adding a feature, check the mismatch map first. If the module pair you're touching has a known mismatch, fix the mismatch as part of your change. Do not add new callers to broken interfaces.
 
