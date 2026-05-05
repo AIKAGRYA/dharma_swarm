@@ -2751,7 +2751,34 @@ class AgentRunner:
             parent_agent=self._config.name,
             **kwargs,
         )
-        return await self._worker_spawner.spawn(spec, provider=self._provider)
+        result = await self._worker_spawner.spawn(spec, provider=self._provider)
+
+        # Record derivation lineage: parent→worker delegation chain
+        try:
+            from dharma_swarm.correlation_context import get_correlation
+            from dharma_swarm.lineage import LineageEdge
+
+            corr = get_correlation()
+            worker_id = result.worker_id if result else ""
+            from dharma_swarm.telic_seam import get_seam
+            ontology_path = _resolve_ontology_path(
+                None, self._config, self._ontology_path,
+            )
+            if ontology_path is not None:
+                seam = get_seam(ontology_path)
+                seam.lineage.record(LineageEdge(
+                    task_id=task_title,
+                    agent=worker_id or worker_type,
+                    delegated_by=self._config.name,
+                    operation="worker_delegation",
+                    trace_id=corr.trace_id,
+                    input_artifacts=[f"parent:{self._config.name}"],
+                    output_artifacts=[f"worker:{worker_id or worker_type}"],
+                ))
+        except Exception:
+            logger.debug("Derivation lineage recording failed", exc_info=True)
+
+        return result
 
     def _record_router_feedback(
         self,

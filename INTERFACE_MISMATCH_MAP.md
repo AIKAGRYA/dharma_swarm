@@ -31,9 +31,12 @@
 | NEW-04: agent_runner → telic_seam dispatch gap | DEGRADED | ✅RESOLVED | `record_dispatch` + `record_gate_decision` added at task start in agent_runner |
 | NEW-05: task_board ↔ runtime_state split lifecycle | — | ⚠️ GUARDED | `run_task_consistency_guard` added to guardian_crew — detects COMPLETED tasks with still-OPEN claims |
 | NEW-07: 54 stores lack common trace_id | — | ⚠️ PARTIAL | `trace_id` column added to task_board, runtime_state (claims+runs), telemetry_plane (routing, policy, economic) |
-| NEW-08: 12 independent record_outcome() | — | ⚠️ PARTIAL | TelicSeam emits `SIGNAL_OUTCOME_RECORDED` / `SIGNAL_VALUE_EVENT_RECORDED` to signal_bus for canonical fanout |
+| NEW-08: 12 independent record_outcome() | ⚠️ PARTIAL | ⚠️ PARTIAL+ | TelicSeam emits signals + SignalBus subscriber pattern added for automatic fanout |
+| NEW-09: orchestrator → TelicSeam registry_path kwarg | — | ✅ FIXED | `orchestrator.py:154` used `registry_path=` but TelicSeam accepts `path=`. TypeError at runtime. |
+| NEW-10: lineage edges lack delegation chain | — | ✅ FIXED | `LineageEdge.delegated_by` + `trace_id` fields added; `agent_runner.spawn_worker` records delegation lineage |
+| NEW-11: TelicSeam singleton missing signal_bus | — | ✅ FIXED | `get_seam()` now passes `signal_bus=SignalBus.get()` to singleton |
 
-**Net change:** 9 resolved (MM-02/03 confirmed fixed, NEW-03 TelicSeam constructor fixed), 5 fixed in prior sessions, 3 new entries (NEW-05 guarded, NEW-07/NEW-08 partially resolved), 0 open BLOCKERs, 7 structural degraded remain.
+**Net change:** 10 resolved, 5 fixed prior sessions, 6 new entries (NEW-05 guarded, NEW-07/NEW-08 partially resolved, NEW-09/10/11 fixed), 0 open BLOCKERs, 5 structural degraded remain.
 
 ---
 

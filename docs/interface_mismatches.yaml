@@ -131,11 +131,47 @@ entries:
     description: >
       TelicSeam now emits SIGNAL_OUTCOME_RECORDED and
       SIGNAL_VALUE_EVENT_RECORDED to signal_bus for canonical fanout.
+      SignalBus.subscribe() added for automatic callback dispatch.
       Other 11 consumers not yet subscribed. Fanout infrastructure ready.
 
+  - id: NEW-09
+    title: "orchestrator → TelicSeam registry_path kwarg TypeError"
+    severity: BLOCKER
+    status: RESOLVED
+    caller: orchestrator.py:154
+    callee: telic_seam.py:61
+    description: >
+      orchestrator._init_telic_seam() called TelicSeam(registry_path=...)
+      but __init__ only accepts path=. TypeError at runtime prevented all
+      ontology recording from the orchestrator. Fixed: registry_path → path.
+
+  - id: NEW-10
+    title: "lineage edges lack delegation chain metadata"
+    severity: DEGRADED
+    status: RESOLVED
+    caller: agent_runner.py (spawn_worker)
+    callee: lineage.py (LineageEdge)
+    description: >
+      When agent A delegates to worker B via spawn_worker(), no lineage
+      edge recorded the delegation relationship. Added delegated_by and
+      trace_id fields to LineageEdge + schema. agent_runner.spawn_worker
+      now records a worker_delegation lineage edge.
+
+  - id: NEW-11
+    title: "TelicSeam singleton (get_seam) missing signal_bus"
+    severity: DEGRADED
+    status: RESOLVED
+    caller: agent_runner.py (via get_seam())
+    callee: telic_seam.py (get_seam singleton)
+    description: >
+      get_seam() created TelicSeam(path=...) without signal_bus, so
+      outcome events emitted by agent_runner's seam instance were never
+      broadcast to signal_bus subscribers. Fixed: get_seam() now passes
+      signal_bus=SignalBus.get().
+
 # Summary counts:
-# Total entries: 13
-# RESOLVED: 6 (MM-12, MM-17, MM-18, NEW-01, NEW-02, NEW-04)
+# Total entries: 16
+# RESOLVED: 9 (MM-12, MM-17, MM-18, NEW-01, NEW-02, NEW-04, NEW-09, NEW-10, NEW-11)
 # STILL_LIVE/OPEN: 4 (MM-02, MM-05, MM-07, MM-13)
 # GUARDED: 1 (NEW-05)
 # PARTIAL: 2 (NEW-07, NEW-08)

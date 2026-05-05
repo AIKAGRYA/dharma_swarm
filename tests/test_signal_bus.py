@@ -72,3 +72,62 @@ class TestSignalBus:
         bus = SignalBus()
         assert bus.drain() == []
         assert bus.drain(["ANYTHING"]) == []
+
+    # ------------------------------------------------------------------
+    # Subscriber pattern tests
+    # ------------------------------------------------------------------
+
+    def test_subscribe_fires_on_emit(self):
+        bus = SignalBus()
+        received: list[dict] = []
+        bus.subscribe("OUTCOME_RECORDED", lambda e: received.append(e))
+        bus.emit({"type": "OUTCOME_RECORDED", "task_id": "t1"})
+        assert len(received) == 1
+        assert received[0]["task_id"] == "t1"
+
+    def test_subscribe_only_matching_type(self):
+        bus = SignalBus()
+        received: list[dict] = []
+        bus.subscribe("OUTCOME_RECORDED", lambda e: received.append(e))
+        bus.emit({"type": "OTHER_EVENT", "val": 1})
+        assert len(received) == 0
+
+    def test_multiple_subscribers(self):
+        bus = SignalBus()
+        a: list[dict] = []
+        b: list[dict] = []
+        bus.subscribe("X", lambda e: a.append(e))
+        bus.subscribe("X", lambda e: b.append(e))
+        bus.emit({"type": "X"})
+        assert len(a) == 1
+        assert len(b) == 1
+
+    def test_subscriber_error_does_not_break_emit(self):
+        bus = SignalBus()
+        received: list[dict] = []
+
+        def bad_cb(e):
+            raise ValueError("boom")
+
+        bus.subscribe("X", bad_cb)
+        bus.subscribe("X", lambda e: received.append(e))
+        bus.emit({"type": "X"})
+        # Second subscriber still fires despite first raising
+        assert len(received) == 1
+        # Event still in deque
+        assert bus.pending_count == 1
+
+    def test_unsubscribe(self):
+        bus = SignalBus()
+        received: list[dict] = []
+        cb = lambda e: received.append(e)
+        bus.subscribe("X", cb)
+        bus.emit({"type": "X"})
+        assert len(received) == 1
+        bus.unsubscribe("X", cb)
+        bus.emit({"type": "X"})
+        assert len(received) == 1  # no new callback
+
+    def test_unsubscribe_nonexistent_is_noop(self):
+        bus = SignalBus()
+        bus.unsubscribe("X", lambda e: None)  # should not raise

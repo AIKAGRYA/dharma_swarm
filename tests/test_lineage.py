@@ -350,3 +350,77 @@ class TestPersistence:
         assert hub.total_objects() == 0
 
         hub.close()
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Derivation metadata
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+class TestDerivation:
+    def test_delegated_by_stored_and_retrieved(self, graph):
+        edge = LineageEdge(
+            task_id="delegated_task",
+            input_artifacts=["parent:conductor"],
+            output_artifacts=["worker:researcher_01"],
+            agent="researcher_01",
+            delegated_by="conductor",
+            operation="worker_delegation",
+        )
+        edge_id = graph.record(edge)
+        retrieved = graph.get_edge(edge_id)
+        assert retrieved is not None
+        assert retrieved.delegated_by == "conductor"
+        assert retrieved.agent == "researcher_01"
+
+    def test_trace_id_stored_and_retrieved(self, graph):
+        edge = LineageEdge(
+            task_id="traced_task",
+            input_artifacts=["x"],
+            output_artifacts=["y"],
+            agent="agent_a",
+            trace_id="tr_abc123",
+            operation="compute",
+        )
+        edge_id = graph.record(edge)
+        retrieved = graph.get_edge(edge_id)
+        assert retrieved is not None
+        assert retrieved.trace_id == "tr_abc123"
+
+    def test_delegation_chain_traversal(self, graph):
+        """A→B→C delegation chain is fully traversable."""
+        graph.record(LineageEdge(
+            task_id="t1",
+            input_artifacts=["parent:A"],
+            output_artifacts=["worker:B"],
+            agent="B", delegated_by="A",
+            operation="worker_delegation",
+            trace_id="tr_chain",
+        ))
+        graph.record(LineageEdge(
+            task_id="t2",
+            input_artifacts=["parent:B"],
+            output_artifacts=["worker:C"],
+            agent="C", delegated_by="B",
+            operation="worker_delegation",
+            trace_id="tr_chain",
+        ))
+        # C's output traces back through B to A
+        b_edges = [e for e in graph.edges_for_task("t1") if e.delegated_by == "A"]
+        c_edges = [e for e in graph.edges_for_task("t2") if e.delegated_by == "B"]
+        assert len(b_edges) == 1
+        assert len(c_edges) == 1
+        assert b_edges[0].agent == "B"
+        assert c_edges[0].agent == "C"
+
+    def test_default_empty_derivation_fields(self, graph):
+        """Edges without delegation still work — fields default to empty."""
+        edge = LineageEdge(
+            task_id="normal_task",
+            input_artifacts=["a"],
+            output_artifacts=["b"],
+        )
+        edge_id = graph.record(edge)
+        retrieved = graph.get_edge(edge_id)
+        assert retrieved.delegated_by == ""
+        assert retrieved.trace_id == ""
