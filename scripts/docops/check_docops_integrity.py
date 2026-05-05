@@ -30,6 +30,9 @@ IGNORE_DIR_NAMES = {
     "__pycache__",
     "node_modules",
 }
+IGNORE_REL_PATTERNS = (
+    "reports/docops/**",
+)
 AUTHORITY_TERMS = (
     "source of truth",
     "canonical",
@@ -67,7 +70,11 @@ def repo_relative(path: Path, repo_root: Path) -> str:
 
 
 def is_ignored(path: Path, repo_root: Path) -> bool:
-    rel_parts = path.resolve().relative_to(repo_root.resolve()).parts
+    rel = path.resolve().relative_to(repo_root.resolve())
+    rel_parts = rel.parts
+    rel_text = rel.as_posix()
+    if any(fnmatch.fnmatch(rel_text, pattern) for pattern in IGNORE_REL_PATTERNS):
+        return True
     return any(part in IGNORE_DIR_NAMES for part in rel_parts)
 
 

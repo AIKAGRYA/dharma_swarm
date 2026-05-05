@@ -201,3 +201,13 @@ def test_inventory_reports_non_blocking_corpus_debt(tmp_path: Path) -> None:
     markdown = docops.render_inventory_markdown(inventory)
     assert "docs/loose.md" in markdown
     assert "Absolute Repo Path References" in markdown
+
+
+def test_generated_docops_reports_are_ignored_by_metrics(tmp_path: Path) -> None:
+    repo = tmp_path
+    write(repo / "docs" / "note.md", "live doc\n")
+    write(repo / "reports" / "docops" / "corpus_inventory.md", "generated doc\n")
+
+    metrics = docops.collect_metrics(repo)
+    assert metrics["markdown_files"] == 1
+    assert metrics["markdown_total_lines"] == 1
