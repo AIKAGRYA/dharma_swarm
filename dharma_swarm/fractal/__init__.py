@@ -18,13 +18,21 @@ from dharma_swarm.fractal.fractal_room import (
     WorkPacket,
     YDSRating,
 )
+from dharma_swarm.fractal.room_brief import (
+    render_room_section,
+    render_room_summary_line,
+)
+from dharma_swarm.fractal.room_bridge import RoomBridge
 
 __all__ = [
     "FractalRoom",
+    "RoomBridge",
     "RoomKind",
     "RoomRegistry",
     "RoomStatus",
     "VentureCellV1",
     "WorkPacket",
     "YDSRating",
+    "render_room_section",
+    "render_room_summary_line",
 ]

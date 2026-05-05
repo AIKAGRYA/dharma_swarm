@@ -504,10 +504,19 @@ class RoomRegistry:
                 break
         return depth
 
+    def all_rooms(self) -> list[FractalRoom]:
+        return list(self._rooms.values())
+
     def active_rooms(self) -> list[FractalRoom]:
         return [
             r for r in self._rooms.values()
             if r.status not in (RoomStatus.ARCHIVED, RoomStatus.SPUN_OUT)
+        ]
+
+    def children_of(self, room_id: str) -> list[FractalRoom]:
+        return [
+            r for r in self._rooms.values()
+            if r.parent_id == room_id
         ]
 
     def venture_cells(self) -> list[VentureCellV1]:
