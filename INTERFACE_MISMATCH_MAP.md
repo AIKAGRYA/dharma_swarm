@@ -168,6 +168,28 @@ The deep scan found **50+ class names defined in multiple files**. Most are inde
 
 ---
 
+## Corridor Analysis (Metabolism Report 2026-05-05)
+
+Per MODULE_METABOLISM_STRATEGY.md §8, the 7 priority corridors were scanned with the metabolism report. Summary:
+
+| Corridor | Modules | split-review | merge-review | facade | archive-review | Top Finding |
+|----------|---------|-------------|-------------|--------|---------------|-------------|
+| Session Store | 7 | 0 | 2 | 0 | 1 | Two `SessionStore` classes (402 + 369 LOC) — merge to `operator_core` |
+| Permissions/Governance | 5 | 0 | 0 | 0 | 0 | `GovernanceFilter` duplicated in `tui/engine/governance.py` |
+| Claude Adapters | 12 | 2 | 2 | 0 | 0 | `ClaudeAdapter` 11 shared methods; `runtime_adapters.py` at 1182 LOC |
+| Model Routing | 7 | 0 | 0 | 3 | 0 | Three facade candidates: smart_router, router_v1, swarm_router |
+| Runtime/Ontology | 9 | 2 | 2 | 0 | 0 | `runtime_state.py` (2049 LOC, 24 inbound) and `ontology.py` (1823 LOC) both split-review |
+| Ginko | 17 | 4 | 3 | 0 | 1 | 4 files over 1000 LOC; `ginko_evolution.py` merge candidate with `ginko_brier.py` |
+| CLI Inventory | 37 | 4 | 2 | 1 | 8 | `dgc_cli.py` at 7078 LOC (top split target); 8 tui widgets without test coverage |
+
+**Key observations:**
+- **Session store** is the highest-leverage merge: same authority, same lifecycle, same failure mode. The `tui/engine/session_store.py` should become a thin import of `operator_core/session_store.py`.
+- **Model routing** has 3 facade candidates — `smart_router.py`, `router_v1.py`, and `swarm_router.py` — that could be consolidated behind a single routing facade.
+- **CLI inventory** has the most dead weight: 8 archive-review candidates in the TUI widgets, all with zero test coverage and zero inbound imports.
+- **Ginko** is the largest domain (17 modules, 12,986 total LOC) and would benefit most from subdirectory packaging.
+
+---
+
 ## The Guardian Crew (Future-Proofing)
 
 The old approach was: audit manually every few days, miss things, fix them under fire.

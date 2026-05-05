@@ -14,22 +14,14 @@ from __future__ import annotations
 
 import json
 import logging
-from enum import Enum
 from pathlib import Path
 from typing import Optional
 
 from pydantic import BaseModel, Field
 
+from dharma_swarm.models import AutonomyLevel
+
 logger = logging.getLogger(__name__)
-
-
-class AutonomyLevel(str, Enum):
-    """How much freedom an agent has to act without confirmation."""
-    LOCKED = "locked"           # No autonomous actions — human approves everything
-    CAUTIOUS = "cautious"       # Ask before any file writes or bash commands
-    BALANCED = "balanced"       # Auto for safe ops (read, search), ask for risky (write, delete)
-    AGGRESSIVE = "aggressive"   # Auto most things, ask only for destructive ops
-    FULL = "full"               # Complete autonomy — only dharmic gates constrain
 
 
 # Map string autonomy names to levels
