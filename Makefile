@@ -1,7 +1,7 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene module-budget governance-all
+.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene module-budget docops-integrity governance-all
 
 PYTHON ?= python3
 SWARM_PLIST := $(HOME)/Library/LaunchAgents/com.dharma.swarm.plist
@@ -30,6 +30,7 @@ help:
 	@echo "  make gitleaks     Scan for secrets"
 	@echo "  make precommit-run Run pre-commit on all files"
 	@echo "  make governance-baseline Capture scanner baselines"
+	@echo "  make docops-integrity Run machine-verifiable documentation checks"
 	@echo ""
 
 install:
@@ -162,4 +163,7 @@ module-budget:
 	$(PYTHON) scripts/governance/check_module_budget.py \
 		--base-ref origin/main --head-ref HEAD
 
-governance-all: semgrep gitleaks test-hygiene module-budget
+docops-integrity:
+	$(PYTHON) scripts/docops/check_docops_integrity.py
+
+governance-all: semgrep gitleaks test-hygiene module-budget docops-integrity
