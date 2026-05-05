@@ -123,12 +123,12 @@ It combines a Python orchestration core, a FastAPI backend, a Next.js dashboard,
 ## Common Commands
 
 ```bash
-make xray
-make compile
-make test-smoke
-make test-all
-make dashboard-lint
-make dashboard-build
+dgc xray .
+python -m compileall dharma_swarm api scripts
+make test-fast
+python3 -m pytest tests/ -q
+npm --prefix dashboard run lint
+npm --prefix dashboard run build
 ```
 
 ## What The Inventory Says
@@ -136,7 +136,7 @@ make dashboard-build
 Use the built-in static inventory pass to get a current snapshot:
 
 ```bash
-make xray
+dgc xray .
 ```
 
 That report is the fastest way to answer:
@@ -151,6 +151,7 @@ That report is the fastest way to answer:
 - The codebase is split across active runtime code and a large documentation/spec corpus; not every markdown file describes shipped behavior.
 - The most coupled runtime surfaces currently sit in the Python core, especially `dharma_swarm/dgc_cli.py`, `dharma_swarm/swarm.py`, `dharma_swarm/agent_runner.py`, and `dharma_swarm/evolution.py`.
 - Dashboard and API development are active; expect local changes in `dashboard/`, `api/`, and resident-operator code during ongoing work.
+- Product-surface authority lives in [`PRODUCT_SURFACE.md`](PRODUCT_SURFACE.md); terminal and CLI surfaces remain operator shells unless explicitly promoted.
 
 ## Before Writing Any Code
 
@@ -158,8 +159,8 @@ That report is the fastest way to answer:
 - **Current build track:** ontology-native Operator Brief seam. See [`docs/plans/ONTOLOGY_NATIVE_OPERATOR_BRIEF_MASTER_SPEC.md`](docs/plans/ONTOLOGY_NATIVE_OPERATOR_BRIEF_MASTER_SPEC.md), [`docs/plans/NEXT_10_SUBSTRATE_TODO.md`](docs/plans/NEXT_10_SUBSTRATE_TODO.md), and [`docs/plans/HANDOFF_ONTOLOGY_NATIVE_OPERATOR_BRIEF.md`](docs/plans/HANDOFF_ONTOLOGY_NATIVE_OPERATOR_BRIEF.md). Do not open a second seam until this one ships.
 - **Read [`CLAUDE.md`](CLAUDE.md)** — system genome, key abstractions, behavioral rules, the Transcendence Principle.
 - **Read [`INTERFACE_MISMATCH_MAP.md`](INTERFACE_MISMATCH_MAP.md)** — every known interface mismatch between modules, with exact line numbers, root causes, and fixes. This is the primary source of runtime failures. Follow the Bootstrap Sequence to unblock the system.
-- **Read [`NAVIGATION.md`](NAVIGATION.md)** — full module map across 12 architectural layers with line counts and "When to Touch" guidance.
-- **Read [`MODEL_ROUTING_MAP.md`](MODEL_ROUTING_MAP.md)** — how every LLM call flows through the system. 18 providers, 3 calling surfaces, 5 inconsistencies, the HuggingFace fix, and the minimum viable path to first LLM call.
+- **Read [`docs/architecture/NAVIGATION.md`](docs/architecture/NAVIGATION.md)** — module map with "When to Touch" guidance. Verify exact counts before citing them.
+- **Read [`MODEL_ROUTING_MAP.md`](MODEL_ROUTING_MAP.md)** — how every LLM call flows through the system. 18 providers, 3 calling surfaces, and remaining routing inconsistencies.
 
 ## First Places To Look
 
@@ -170,6 +171,6 @@ That report is the fastest way to answer:
 
 ## GAIA Docs
 
-- `docs/dse/GAIA_UI.md`: current user manual for the tracked GAIA runtime surface
+- `gaia_ui.md`: current user manual for the tracked GAIA subsystem runtime surface
 - `docs/dse/GAIA_TRAINING_WORKBOOK.md`: hands-on onboarding exercises for new GAIA users
 - `docs/dse/GAIA_FACILITATOR_GUIDE.md`: facilitator notes, review keys, and assessment rubric

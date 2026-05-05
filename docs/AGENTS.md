@@ -42,6 +42,13 @@ Do not let one file play more than one authority role.
 - Plans and reports must not become product truth by repetition.
 - Root docs are exceptional. New root Markdown needs explicit justification.
 
+## Path-Class Invariants
+
+- `docs/archive/**` is `archive` or `archive_index`; child frontmatter cannot make it active canon.
+- `reports/generated/**`, `.dharma_psmv_hyperfile_branch*/**`, and `reports/psmv_hyperfiles_*/**` are `generated_evidence`.
+- `reports/historical/**` is `historical_report` or `resolved_report`.
+- Generated, archived, and historical path classes may be cited as evidence, but they must not claim repo-level authority unless promoted through `docs/governance/CANONICAL_DOC_STACK.md`.
+
 ## Deprecation Format
 
 When demoting a doc, use this information in the target owner or audit log:

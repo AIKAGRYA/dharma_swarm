@@ -30,7 +30,7 @@ TIER 5 — ARCHIVE (do not read unless investigating history)
 ├── docs/archive/*                     → Correctly quarantined old docs
 ├── LIVING_LAYERS.md                   → Demote to archive (stale, overlaps NAVIGATION.md)
 ├── program.md                         → Demote to archive (overlaps README)
-├── PRODUCT_SURFACE.md                 → Demote to archive or merge into SOVEREIGN_MANIFEST
+├── PRODUCT_SURFACE.md                 → Product-surface precedence, narrower than governance canon
 ```
 
 ---
@@ -45,6 +45,7 @@ TIER 5 — ARCHIVE (do not read unless investigating history)
 | Module-level what-does-what | `NAVIGATION.md` | — |
 | Model/provider routing | `MODEL_ROUTING_CANON.md` | model_routing.py files must not contradict |
 | Terminal protocol | `specs/DGC_TERMINAL_ARCHITECTURE_v1.1.md` | v1.0 is deprecated |
+| Product surface precedence | `PRODUCT_SURFACE.md` | Terminal/CLI docs must scope themselves as operator shells unless promoted |
 | Constitutional axioms | `specs/Dharma_Constitution_v0.md` | — |
 | Kernel spec | `specs/KERNEL_CORE_SPEC.md` | — |
 | Contradictions & staleness | `REPO_GOVERNANCE_AUDIT.md` | — |
@@ -67,6 +68,7 @@ using phrases such as "source of truth", "canonical", "authoritative", or
 | `docs/governance/REPO_GOVERNANCE_AUDIT.md` | Contradiction, staleness, and drift ledger |
 | `docs/architecture/NAVIGATION.md` | Module map, after count refresh |
 | `docs/architecture/MODEL_ROUTING_CANON.md` | Provider/model routing, after merge with root routing map |
+| `PRODUCT_SURFACE.md` | Product-surface precedence for dashboard, browser shell, and desktop shell |
 | `specs/DGC_TERMINAL_ARCHITECTURE_v1.1.md` | Terminal protocol, after Bun/Textual split is reconciled |
 | `specs/Dharma_Constitution_v0.md` | Constitutional rules |
 | `specs/KERNEL_CORE_SPEC.md` | Kernel immutability |
@@ -123,7 +125,6 @@ spec with tests or witness evidence.
 |------|--------|
 | `LIVING_LAYERS.md` | Overlaps NAVIGATION.md, stale line counts, bloated frontmatter |
 | `program.md` | Overlaps README.md |
-| `PRODUCT_SURFACE.md` | Content belongs in SOVEREIGN_MANIFEST or README |
 | `specs/DGC_TERMINAL_ARCHITECTURE.md` (v1.0) | Superseded by v1.1 |
 | `specs/SOVEREIGN_BUILD_PHASE_MASTER_SPEC_2026-03-19.md` | Stale build plan |
 | `specs/ONTOLOGY_PHASE2_*.md` | Stale migration spec |
@@ -134,9 +135,10 @@ spec with tests or witness evidence.
 ### RETAIN AND UPDATE
 | File | Action Needed |
 |------|--------------|
-| `CLAUDE.md` | Fix stale numbers (514 modules, 8571 collected tests, swarm.py 3119 lines, 18 providers not 9). Add pointer to SOVEREIGN_MANIFEST.md. |
+| `CLAUDE.md` | Keep command examples aligned with Makefile and point count-sensitive work to SOVEREIGN_MANIFEST.md. |
 | `docs/architecture/NAVIGATION.md` | Fix stale numbers, add bridge/adapter/orchestrator maps |
 | `docs/architecture/MODEL_ROUTING_CANON.md` | Acknowledge 3 routing files, define which is canonical |
+| `PRODUCT_SURFACE.md` | Retain as narrow product-surface authority; terminal/CLI docs defer for product precedence |
 | `README.md` | Strip excessive Codex frontmatter, keep concise |
 
 ### CREATED BY GOVERNANCE AUDIT (2026-04-04)
@@ -156,11 +158,12 @@ spec with tests or witness evidence.
 
 ## Frontmatter Policy
 
-The Codex (GPT-5) frontmatter injection added 80+ lines of YAML to every markdown file. Policy going forward:
+The Codex (GPT-5) frontmatter injection is present in 213 of 624 Markdown
+files, including 15 of 20 `docs/architecture` files. Policy going forward:
 
 1. **Root governance docs** (Tier 1-2): NO frontmatter. Plain markdown. Maximum clarity.
 2. **Architecture docs** (Tier 2-3): Minimal frontmatter (title, date, status only — 5 lines max).
-3. **Archive docs**: Leave existing frontmatter in place (it's archived, doesn't matter).
+3. **Archive and generated docs**: Frontmatter may remain structurally intact, but it must not claim `status: active`, `state: active`/`working`, `canonical_truth`, or unscoped `evergreen_potential: high`.
 4. **New docs**: No frontmatter unless the doc is consumed by a machine-readable pipeline.
 
 ---

@@ -4,7 +4,7 @@ path: terminal/README.md
 slug: dharma-terminal
 doc_type: readme
 status: reference
-summary: This package is the replacement seam for the current Python dgc terminal UI.
+summary: This package is the replacement-seam scaffold for the current Python dgc terminal UI.
 source:
   provenance: repo_local
   kind: readme
@@ -54,7 +54,7 @@ pkm:
   evergreen_potential: high
 stigmergy:
   meaning: This file is a shared environmental trace in the DHARMA corpus. Its path, recency, and linked surfaces guide future agent attention; its frontmatter now adds machine-readable coordination cues.
-  state: canonical
+  state: reference
   semantic_weight: 0.9
   coordination_comment: This package is the replacement seam for the current Python dgc terminal UI.
   levels:
@@ -78,7 +78,8 @@ curation:
 ---
 # Dharma Terminal
 
-This package is the replacement seam for the current Python `dgc` terminal UI.
+This package is the replacement-seam scaffold for the current Python `dgc`
+terminal UI. Product-surface authority remains with `PRODUCT_SURFACE.md`.
 
 ## Why it exists
 
@@ -95,7 +96,7 @@ adapter core.
 ## Architecture
 
 - `src/index.tsx`: Ink entrypoint
-- Python bridge: `python3 -m dharma_swarm.terminal_bridge stdio`
+- Python bridge: `python3 -m dharma_swarm.terminal_bridge stdio` (partial; verify bridge imports before relying on it in a live session)
 - Protocol: line-delimited JSON over stdio
 
 The bridge exposes:

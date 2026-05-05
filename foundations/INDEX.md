@@ -4,7 +4,7 @@ path: foundations/INDEX.md
 slug: foundations-intellectual-pillars-of-the-telos-engine
 doc_type: readme
 status: reference
-summary: The scientific and philosophical grounding for dharma swarm. Every engineering decision traces to at least one pillar.
+summary: The scientific and philosophical grounding for dharma swarm. Major engineering decisions may be informed by one or more pillars, but runtime truth lives in code, tests, and promoted specs.
 source:
   provenance: repo_local
   kind: readme
@@ -92,7 +92,7 @@ curation:
 ---
 # Foundations — Intellectual Pillars of the Telos Engine
 
-The scientific and philosophical grounding for dharma_swarm. Every engineering decision traces to at least one pillar.
+The scientific and philosophical grounding for dharma_swarm. Many major engineering decisions are informed by one or more pillars; this layer is conceptual substrate, not runtime or product truth.
 
 ## Layer Role
 

@@ -3,7 +3,7 @@ title: DGC Full Power Probe
 path: reports/generated/verification/dgc_full_power_probe_20260312T131318Z.md
 slug: dgc-full-power-probe
 doc_type: report
-status: active
+status: generated_evidence
 summary: 'DGC Full Power Probe - Timestamp (UTC): 2026-03-12T13:13:18.501313+00:00 - Workspace: /Users/dhyana/dharma swarm - Python: /opt/homebrew/opt/python@3.14/bin/python3.14'
 source:
   provenance: repo_local
@@ -15,7 +15,7 @@ source:
   - dharma_swarm/full_power_probe.py
   - dharma_swarm/thinkodynamic_director.py
   cited_urls: []
-  generated_hint: human_or_agent_authored_repo_doc
+  generated_hint: machine_generated_or_probe_output
 disciplines:
 - swarm_intelligence
 - multi_agent_systems

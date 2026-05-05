@@ -7,7 +7,10 @@
 
 ---
 
-## 1. VERIFIED NUMBERS
+## 1. VERIFIED NUMBERS (2026-04-04 HISTORICAL)
+
+These numbers are retained for audit history. Count-sensitive work should use
+Section 11, the 2026-05-05 count refresh, or a fresh filesystem measurement.
 
 | Metric | CLAUDE.md Claim | NAVIGATION.md Claim | Actual (2026-04-04) | Verdict |
 |--------|----------------|--------------------|--------------------|---------|
@@ -16,7 +19,7 @@
 | Test files | — | "494 test files" | **497-501** | CLOSE (grew) |
 | swarm.py lines | "~1,700 lines" | "2,359 lines" | **3,119 lines** | BOTH STALE |
 | orchestrator.py lines | — | "2,078 lines" | **2,272 lines** | NAV STALE |
-| Providers | "9 LLM providers" | "9 LLM providers" | **9** | VERIFIED |
+| Providers | "9 LLM providers" | "9 LLM providers" | **9** | HISTORICAL; current ProviderType enum has 18 values |
 | Top-level .py files | — | — | **375 / 514 (73%)** | UNREPORTED PROBLEM |
 
 ---
@@ -376,7 +379,7 @@ product/research/foundations. No files were edited during the cartography pass.
 | ID | Severity | Finding |
 |----|----------|---------|
 | DOCOPS-1 | HIGH | `docs/README.md` carried an older canon set that conflicts with `CANONICAL_DOC_STACK.md` and referenced missing files. |
-| DOCOPS-2 | HIGH | `NEXT_10_SUBSTRATE_TODO.md` item 7 treated `artifact_records` wiring as pending even though the operator-brief witness report confirms persistence in `RuntimeStateStore.artifact_records`. The read-before-propose guard remains pending. |
+| DOCOPS-2 | HIGH | `NEXT_10_SUBSTRATE_TODO.md` item 7 lagged the implementation: `artifact_records` persistence is witnessed, and code/tests now prove the read-before-propose guard. |
 | DOCOPS-3 | HIGH | `PRODUCT_SURFACE.md` claims dashboard product authority while `SOVEREIGN_MANIFEST.md` says the dashboard is not the primary interface. |
 | DOCOPS-4 | HIGH | Production/deployment docs describe stale systemd and enterprise paths while local ops reality is launchd plus `dgc orchestrate-live`. |
 | DOCOPS-5 | MEDIUM | Architecture truth is split across `NAVIGATION.md`, `MODEL_ROUTING_CANON.md`, root `MODEL_ROUTING_MAP.md`, terminal specs, and audit reports. |
@@ -392,18 +395,17 @@ product/research/foundations. No files were edited during the cartography pass.
   and rules for generated artifacts and machine-native semantic experiments.
 - Update `docs/README.md` so it is a reference/navigation page rather than a
   competing canon list.
-- Split `NEXT_10_SUBSTRATE_TODO.md` item 7 into witnessed artifact persistence
-  and remaining read-before-propose proof.
+- Update `NEXT_10_SUBSTRATE_TODO.md` item 7 as done now that artifact
+  persistence and read-before-propose proof are both covered.
 
 ### Follow-Up PRs
 
-1. Refresh `SOVEREIGN_MANIFEST.md`, `CLAUDE.md`, and `NAVIGATION.md` measured
-   counts from current filesystem state.
+1. Mechanically refresh the large `NAVIGATION.md` line-count tables or replace
+   per-file line counts with generated inventory output.
 2. Merge root `MODEL_ROUTING_MAP.md` into `docs/architecture/MODEL_ROUTING_CANON.md`
    and demote the root copy.
 3. Create or update a single operational runbook that owns launchd, health,
    Docker caveats, CI, pre-commit, and recovery.
-4. Reconcile operator-brief master spec and handoff now that the first live
-   tick is witnessed.
+4. Reconcile operator-brief master spec and handoff now that item 7 has proof.
 5. Normalize generated/archive metadata so generated probes and archived docs do
    not look active.

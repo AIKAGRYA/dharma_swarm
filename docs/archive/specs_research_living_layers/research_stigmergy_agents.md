@@ -70,7 +70,7 @@ pkm:
   - digital
   - pheromone
   - trails
-  evergreen_potential: high
+  evergreen_potential: medium
 stigmergy:
   meaning: This file is a shared environmental trace in the DHARMA corpus. Its path, recency, and linked surfaces guide future agent attention; its frontmatter now adds machine-readable coordination cues.
   state: canonical

@@ -2,8 +2,8 @@
 title: Production Deployment Guide
 path: docs/architecture/PRODUCTION_DEPLOYMENT_GUIDE.md
 slug: production-deployment-guide
-doc_type: documentation
-status: active
+doc_type: reference
+status: historical_reference
 summary: 'Version : 1.0 Date : 2026-03-09 Target : Enterprise deployment of dharma swarm with full Unassailable System guarantees'
 source:
   provenance: repo_local
@@ -73,7 +73,7 @@ pkm:
   evergreen_potential: medium
 stigmergy:
   meaning: This file is a shared environmental trace in the DHARMA corpus. Its path, recency, and linked surfaces guide future agent attention; its frontmatter now adds machine-readable coordination cues.
-  state: working
+  state: historical_reference
   semantic_weight: 0.6
   coordination_comment: 'Version : 1.0 Date : 2026-03-09 Target : Enterprise deployment of dharma swarm with full Unassailable System guarantees'
   levels:
@@ -96,6 +96,13 @@ curation:
   schema_version: pkm-phd-stigmergy-v1
 ---
 # Production Deployment Guide
+
+**Status note (2026-05-05):** historical/aspirational deployment guide. Several
+commands below are stale (`dgc evolve verify`, `dgc compliance export`,
+`dgc run --daemon`, `dgc shutdown`, and systemd setup). Current local ops are
+macOS launchd via `make boot`, `make health`, `make logs`, and foreground
+runtime via `dgc orchestrate-live`. Do not use this as the operational runbook
+until it is reconciled.
 
 **Version**: 1.0
 **Date**: 2026-03-09

@@ -3,7 +3,7 @@ title: THE COMPLETE CIRCUIT
 path: docs/archive/VISION_COMPLETE_CIRCUIT.md
 slug: the-complete-circuit
 doc_type: documentation
-status: active
+status: archive
 summary: THE COMPLETE CIRCUIT From Recognition to Economic Sustainability to Evolutionary Engine
 source:
   provenance: repo_local

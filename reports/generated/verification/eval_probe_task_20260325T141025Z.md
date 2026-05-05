@@ -3,7 +3,7 @@ title: Eval Probe Task Report
 path: reports/generated/verification/eval_probe_task_20260325T141025Z.md
 slug: eval-probe-task-report
 doc_type: report
-status: active
+status: generated_evidence
 summary: 'Timestamp: 2026-03-25T14:10:25Z Task: eval probe task Spec refs: - dharma swarm/ecc eval harness.py (eval task roundtrip, eval fitness signal flow) - dharma swarm/message bus.py (cross-process event rail)'
 source:
   provenance: repo_local
@@ -14,7 +14,7 @@ source:
   - tests/test_message_bus.py
   - tests/test_ecc_eval_harness.py
   cited_urls: []
-  generated_hint: human_or_agent_authored_repo_doc
+  generated_hint: machine_generated_or_probe_output
 disciplines:
 - knowledge_management
 - verification

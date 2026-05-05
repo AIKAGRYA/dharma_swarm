@@ -88,16 +88,16 @@ python3 -m pytest tests/ -q
 python3 -m pytest tests/test_cascade.py -q
 
 # Smoke test (fast subset)
-make test-smoke
+make test-fast
 
 # Full test suite
-make test-all
+python3 -m pytest tests/ -q
 
 # Static analysis / repo inventory
-make xray
+dgc xray .
 
 # Dashboard lint
-make dashboard-lint
+npm --prefix dashboard run lint
 ```
 
 - ALWAYS run tests after making code changes
@@ -143,7 +143,7 @@ bash run_operator.sh
 
 ## Navigation
 
-See `NAVIGATION.md` for the full module map (500 modules, 12 architectural layers).
+See `docs/architecture/NAVIGATION.md` for the module map. Count-sensitive claims must be rechecked against the filesystem before use.
 See `README.md` for repo map and common commands.
 See `foundations/` for the 10-pillar intellectual genome.
 
@@ -161,7 +161,7 @@ See [`INTERFACE_MISMATCH_MAP.md`](INTERFACE_MISMATCH_MAP.md) for the complete ma
 
 **Rule for all sessions:** After fixing a mismatch, update the map. Remove the entry or mark it RESOLVED with the commit hash.
 
-See [`MODEL_ROUTING_MAP.md`](MODEL_ROUTING_MAP.md) for the complete model routing architecture — all 18 providers, 3 calling surfaces (swarm/CLI/dashboard), 5 inconsistencies between them, the HuggingFace blocker fix, and the minimum viable path to getting one LLM call working. **Any change to how models are called must check this map first.**
+See [`MODEL_ROUTING_MAP.md`](MODEL_ROUTING_MAP.md) for the complete model routing architecture — all 18 providers, 3 calling surfaces (swarm/CLI/dashboard), remaining inconsistencies between them, and the minimum viable path to getting one LLM call working. **Any change to how models are called must check this map first.**
 
 See [`CYBERNETIC_LOOP_MAP.md`](CYBERNETIC_LOOP_MAP.md) for every feedback loop's sense→act→evaluate→adapt path, current closure status, and verification commands.
 

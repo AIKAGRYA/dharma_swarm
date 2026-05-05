@@ -13,7 +13,7 @@ source:
   - docs/plans/2026-04-03-verification-family-retention-policy.md
   - docs/plans/2026-04-03-verification-probe-citation-census.md
   cited_urls: []
-  generated_hint: human_or_agent_authored_repo_doc
+  generated_hint: generated_reports_index
 disciplines:
 - verification
 - operations
@@ -21,7 +21,6 @@ disciplines:
 - knowledge_management
 inspiration:
 - verification
-- canonical_truth
 connected_relevant_files:
 - reports/generated/README.md
 - docs/plans/2026-04-03-verification-family-retention-policy.md
@@ -43,7 +42,7 @@ pkm:
   - reports
   - audit
   - replay
-  evergreen_potential: high
+  evergreen_potential: medium
 stigmergy:
   meaning: This file makes the generated verification subtree legible as retained generated evidence rather than a silent spillover from reports/verification.
   state: reference

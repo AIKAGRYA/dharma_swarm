@@ -3,8 +3,8 @@ title: DGC Terminal Interface — Definitive Component Architecture
 path: specs/DGC_TERMINAL_ARCHITECTURE_v1.1.md
 slug: dgc-terminal-interface-definitive-component-architecture
 doc_type: spec
-status: canonical
-summary: 'Version 1.1 provider-agnostic terminal architecture. This is the current governing DGC terminal spec and supersedes specs/DGC_TERMINAL_ARCHITECTURE.md.'
+status: active_spec_partial
+summary: 'Version 1.1 provider-agnostic terminal architecture. This spec supersedes specs/DGC_TERMINAL_ARCHITECTURE.md, but implementation-status labels still need reconciliation against dharma_swarm/tui/.'
 source:
   provenance: repo_local
   kind: spec
@@ -71,8 +71,8 @@ pkm:
   - supersedes v1.0
   evergreen_potential: high
 stigmergy:
-  meaning: This file is the current governing DGC terminal architecture spec and should take precedence over the retained v1.0 baseline in citations and cleanup decisions.
-  state: canonical
+  meaning: This file is the current terminal architecture spec candidate and should take precedence over the retained v1.0 baseline after implementation-status reconciliation.
+  state: active_spec_partial
   semantic_weight: 0.86
   coordination_comment: 'Current governing DGC terminal spec. Supersedes specs/DGC_TERMINAL_ARCHITECTURE.md.'
   levels:
@@ -101,7 +101,7 @@ curation:
 **Baseline:** v1.0 (2026-03-05) — Claude-specific architecture  
 **Target:** Python Textual 8.0.2 + Any LLM provider (Claude, OpenAI, OpenRouter, Ollama, custom)  
 **Platform:** macOS M3 Pro, Python 3.14  
-**Status:** Current governing terminal architecture spec
+**Status:** Active spec, partially reconciled. It supersedes v1.0, but sections that reference `dgc/tui/`, OpenAI/Ollama adapters, or bridge launch paths must be checked against the current implementation under `dharma_swarm/tui/` before being treated as runtime truth.
 
 This file supersedes `specs/DGC_TERMINAL_ARCHITECTURE.md`.
 

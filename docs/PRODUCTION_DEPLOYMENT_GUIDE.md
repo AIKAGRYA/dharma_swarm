@@ -1,5 +1,12 @@
 # Production Deployment Guide
 
+**Status note (2026-05-05):** historical/aspirational deployment guide. Several
+commands below are stale (`dgc evolve verify`, `dgc compliance export`,
+`dgc run --daemon`, `dgc shutdown`, and systemd setup). Current local ops are
+macOS launchd via `make boot`, `make health`, `make logs`, and foreground
+runtime via `dgc orchestrate-live`. Do not use this as the operational runbook
+until it is reconciled.
+
 **Version**: 1.0
 **Date**: 2026-03-09
 **Target**: Enterprise deployment of dharma_swarm with full Unassailable System guarantees

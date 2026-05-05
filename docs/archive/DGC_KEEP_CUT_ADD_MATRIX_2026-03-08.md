@@ -3,7 +3,7 @@ title: DGC Keep/Cut/Add Matrix (System-by-System)
 path: docs/archive/DGC_KEEP_CUT_ADD_MATRIX_2026-03-08.md
 slug: dgc-keep-cut-add-matrix-system-by-system
 doc_type: documentation
-status: active
+status: archive
 summary: 'Date: 2026-03-08 Scope: DGC vs Codex, Claude Code, Magentic-One, Aider, OpenHands, SWE-agent'
 source:
   provenance: repo_local

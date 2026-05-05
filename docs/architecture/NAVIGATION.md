@@ -87,7 +87,10 @@ curation:
 ---
 # dharma_swarm Navigation Map
 
-Generated: 2026-03-29 | 500 Python modules | 494 test files | 8,848 tests
+Generated: 2026-03-29 | Count refresh: 2026-05-05 | 523 `dharma_swarm` Python modules | 506 test files | 9,012 `def test_` occurrences under `tests/`
+
+Count-sensitive and line-count entries below are a navigation snapshot, not a
+fresh inventory guarantee. Recheck the filesystem before citing exact numbers.
 
 ---
 
@@ -96,8 +99,8 @@ Generated: 2026-03-29 | 500 Python modules | 494 test files | 8,848 tests
 | Need to... | Go to... |
 |------------|----------|
 | Understand the system | `CLAUDE.md` (this repo root) |
-| Find all interface bugs | [`INTERFACE_MISMATCH_MAP.md`](INTERFACE_MISMATCH_MAP.md) — 55 module pairs verified, 13 with issues, 9 prioritized fixes |
-| Understand model routing | [`MODEL_ROUTING_MAP.md`](MODEL_ROUTING_MAP.md) — 18 providers, 3 calling surfaces, 5 inconsistencies, HuggingFace fix |
+| Find all interface bugs | [`../../INTERFACE_MISMATCH_MAP.md`](../../INTERFACE_MISMATCH_MAP.md) — 55 module pairs verified, 13 with issues, 9 prioritized fixes |
+| Understand model routing | [`../../MODEL_ROUTING_MAP.md`](../../MODEL_ROUTING_MAP.md) — 18 providers, 3 calling surfaces, remaining routing inconsistencies |
 | Run the live orchestrator | `dgc orchestrate-live` (or `--background`) |
 | Check system health | `dgc status` / `dgc health` |
 | Run all tests | `python3 -m pytest tests/ -q` (~6 min) |
@@ -109,7 +112,7 @@ Generated: 2026-03-29 | 500 Python modules | 494 test files | 8,848 tests
 | Check kernel integrity | `dgc dharma status` |
 | See evolution trend | `dgc evolve trend` |
 | See subconscious dreams | `dgc hum` |
-| Find a module | Search this file or `ls dharma_swarm/dharma_swarm/*.py` |
+| Find a module | Search this file or `ls dharma_swarm/*.py` |
 | Find the data model | `dharma_swarm/models.py` |
 | Find the config | `dharma_swarm/config.py` (env var overrides) |
 | Add a new gate | `dharma_swarm/telos_gates.py` (GateRegistry.propose) |
@@ -153,7 +156,7 @@ Generated: 2026-03-29 | 500 Python modules | 494 test files | 8,848 tests
 | `swarm.py` | 2,359 | **SwarmManager** -- the facade. Integrates agent pool, task board, message bus, orchestrator, evolution, monitoring. Uses `TYPE_CHECKING` for lazy imports of 20+ subsystems. | Adding new subsystem integrations |
 | `orchestrator.py` | 2,078 | Task routing, dispatching, priority management, retry logic | Modifying task dispatch strategy |
 | `agent_runner.py` | 2,094 | **AgentRunner** (single agent lifecycle) + **AgentPool** (fleet management). Heartbeats, task execution, fitness signal emission. | Modifying agent execution behavior |
-| `providers.py` | 2,098 | 9 LLM providers: Anthropic, OpenAI, OpenRouter, NVIDIA NIM, Local, ClaudeCode, Codex, OpenRouter Free, Ollama. `create_default_router()`. | Adding providers or changing routing |
+| `providers.py` | 3,005 | 18 provider types across API and CLI providers. `create_default_router()`. | Adding providers or changing routing |
 | `providers_extended.py` | 214 | Extended provider configurations | Provider-specific extensions |
 | `base_provider.py` | 198 | Abstract base class for all providers | Only if changing provider contract |
 | `free_fleet.py` | 408 | Free model fleet (Ollama Cloud, NVIDIA NIM, OpenRouter Free) | Adding free model sources |
@@ -186,7 +189,7 @@ Generated: 2026-03-29 | 500 Python modules | 494 test files | 8,848 tests
 | `decision_router.py` | 323 | Routes decisions to appropriate evaluators | Modifying routing logic |
 | `intent_router.py` | 563 | Routes user/agent intents to handlers | Adding intent types |
 | `swarm_router.py` | 383 | Routes tasks across the swarm | Modifying swarm routing |
-| `router_v1.py` | 391 | V1 routing algorithm | Legacy; prefer decision_router |
+| `router_v1.py` | 391 | Active request classification and routing-signal generation for provider policy | Changing routing signals |
 | `routing_memory.py` | 579 | Remembers routing outcomes for learning | Modifying routing feedback |
 | `selector.py` | 252 | Parent selection for evolution | Changing selection algorithm |
 | `ucb_selector.py` | 97 | UCB1 (Upper Confidence Bound) parent selection | Changing exploration/exploitation balance |
@@ -436,8 +439,8 @@ Notable standalone docs:
 
 ## Tests (tests/)
 
-- **351 test files** in `tests/`
-- **4,300+ tests** total
+- **506 test files** under `tests/` (recursive filesystem count, 2026-05-05)
+- **9,012 `def test_` occurrences** under `tests/` (grep count, not pytest collection)
 - `conftest.py` provides shared fixtures: `state_dir`, `db_path`, `tmp_path_factory_custom`, Docker skip marker, Hypothesis profiles, DGC env var isolation
 - Pattern: one test file per module (`test_telos_gates.py` tests `telos_gates.py`)
 - Uses `pytest-asyncio` with `asyncio_mode = "auto"` (from pyproject.toml)
@@ -489,10 +492,10 @@ Notable standalone docs:
 models.py (schema contract)
     |
     v
-providers.py (9 LLM providers) ---> agent_runner.py (agent lifecycle)
+providers.py (18 provider types) ---> agent_runner.py (agent lifecycle)
     |                                      |
     v                                      v
-orchestrator.py (task routing) <--- swarm.py (facade, 2359 lines)
+orchestrator.py (task routing) <--- swarm.py (facade; verify current line count before citing)
     |                                      |
     v                                      v
 telos_gates.py (governance) <--- dharma_kernel.py (25 axioms)
@@ -513,6 +516,9 @@ dgc_cli.py (CLI) / tui/app.py (TUI) / api.py (REST)
 ---
 
 ## Module Count by Category
+
+This table is historical and intentionally approximate. Use a fresh static
+inventory before making budget, ownership, or migration decisions from it.
 
 | Category | Count | Combined Lines (approx) |
 |----------|-------|------------------------|

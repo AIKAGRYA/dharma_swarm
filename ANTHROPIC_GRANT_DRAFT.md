@@ -45,18 +45,18 @@ value of AI displacement compensation concrete and measurable.
 
 ## Why DHARMA SWARM Is Uniquely Positioned
 
-DHARMA SWARM is not a general-purpose agent framework. Its entire telos (declared
-purpose system) is structured around Jagat Kalyan — universal welfare — as a T7
-objective (the highest priority, always non-negotiable). Every agent action passes
-through 11 dharmic gates before execution. The welfare-ton MRV loop is not an
-add-on — it is the system's declared reason for existing.
+DHARMA SWARM is designed around Jagat Kalyan — universal welfare — as a T7
+objective in its telos vocabulary. The architecture intends for agent actions to
+pass through dharmic gates before execution. The welfare-ton MRV loop is a
+target value seam, not yet a production-certified external claim.
 
 Specifically:
-- **Telos Gate enforcement** means no agent can be repurposed away from welfare
-  objectives, even under optimization pressure. This is architectural, not policy.
+- **Telos Gate enforcement** is intended to constrain agent actions toward welfare
+  objectives, even under optimization pressure. This is architectural intent that
+  still needs seam-by-seam runtime proof.
 - **Darwin Engine** allows the MRV agents to improve their satellite interpretation,
   documentation quality, and carbon credit application success rate autonomously.
-- **Existing infrastructure** includes an economic engine (tracks all resource flows),
+- **Existing/prototype infrastructure** includes an economic engine (tracks all resource flows),
   a ginko trading bridge (for carbon market integration), and a welfare-ton calculator
   already in the telos substrate.
 

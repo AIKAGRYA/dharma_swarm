@@ -52,12 +52,12 @@ The order is load-bearing. Do not skip ahead. Each item lands as its own PR, wit
 ## Track 3 — Make the seam load-bearing for downstream substrates (items 7–8)
 
 ### 7. Prove the brief reads runtime substrate before proposing
-- **Partial status:** artifact persistence is witnessed. The first-tick report confirms the `operator_brief` `KnowledgeArtifact` is persisted through `RuntimeStateStore.artifact_records`.
-- Remaining work: add the read-before-propose guard. The operator-brief generator must cite at least one `session_events` or `memory_facts` row. Test asserts this fails closed if no source is cited.
+- **Status: done** — runtime substrate read-before-propose guard is implemented and tested. The first-tick report confirms the `operator_brief` `KnowledgeArtifact` is persisted through `RuntimeStateStore.artifact_records`; the implementation now cites `session_events` or `memory_facts` before success and fails closed when neither source exists.
 - Per audit §5 Slice 2, do not build a new artifact registry. Continue using `dharma_swarm/runtime_state.py` `record_artifact()`.
 - Why now: artifact persistence prevents a parallel artifact path; the read-before-propose guard prevents an ontology-native artifact from being generated from empty runtime context.
 
 ### 8. Add `LEDGER_WATCHER` to Guardian for empty operator-brief output
+- **Status: pending.** A generic `LEDGER_WATCHER` exists, but it does not satisfy the operator-brief-specific zero-output watcher below.
 - Per audit §5 Slice 3 and §8 commit 3. Read-only against a temp `runtime.db`.
 - DEGRADED when the brief cron has fired ≥10 times with zero new `KnowledgeArtifact` rows of subtype `operator_brief`. BLOCKER at ≥100 ticks.
 - Why now: the seam needs a watchdog so silent failure is impossible. Without it, the next agent will not know if the substrate path has rotted out under them.

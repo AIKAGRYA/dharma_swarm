@@ -2,8 +2,8 @@
 title: Archive Index
 path: docs/archive/README.md
 slug: archive-index
-doc_type: readme
-status: active
+doc_type: archive_index
+status: archive_index
 summary: Index for superseded, historical, or authority-reduced prose that should remain readable without competing with current canon.
 source:
   provenance: repo_local
@@ -21,7 +21,6 @@ disciplines:
   - documentation
   - verification
 inspiration:
-  - canonical_truth
   - repo_topology
 connected_relevant_files:
   - docs/README.md
@@ -41,10 +40,10 @@ pkm:
     - archive
     - historical
     - superseded
-  evergreen_potential: high
+  evergreen_potential: medium
 stigmergy:
   meaning: This file keeps archived prose legible without letting it impersonate current doctrine.
-  state: active
+  state: archive_index
   semantic_weight: 0.83
   coordination_comment: Use this file when deciding whether a document should be archived instead of left visible at top-level docs.
   trace_role: coordination_trace
@@ -57,6 +56,9 @@ curation:
 
 `docs/archive/` is for prose that still matters historically or contextually, but should not compete with current canon.
 
+Frontmatter in child files is subordinate to the path-class policy in
+`docs/AGENTS.md`; archived files cannot promote themselves into current canon.
+
 Use it for:
 
 - superseded vision waves
@@ -66,17 +68,17 @@ Use it for:
 
 Current examples:
 
-- [DGC_100X_LEAN_ESSENCE_2026-03-08.md](/Users/dhyana/dharma_swarm/docs/archive/DGC_100X_LEAN_ESSENCE_2026-03-08.md)
-- [DGC_KEEP_CUT_ADD_MATRIX_2026-03-08.md](/Users/dhyana/dharma_swarm/docs/archive/DGC_KEEP_CUT_ADD_MATRIX_2026-03-08.md)
-- [DHARMA_SWARM_1000X_MASTERPLAN_2026-03-16.md](/Users/dhyana/dharma_swarm/docs/archive/DHARMA_SWARM_1000X_MASTERPLAN_2026-03-16.md)
-- [FIRST_LIVE_RUN_REPORT.md](/Users/dhyana/dharma_swarm/docs/archive/FIRST_LIVE_RUN_REPORT.md)
-- [KAIZEN_IMPLEMENTATION_SUMMARY.md](/Users/dhyana/dharma_swarm/docs/archive/KAIZEN_IMPLEMENTATION_SUMMARY.md)
-- [OVERNIGHT_AUTOPILOT.md](/Users/dhyana/dharma_swarm/docs/archive/OVERNIGHT_AUTOPILOT.md)
-- [PUBLISH_TOMORROW.md](/Users/dhyana/dharma_swarm/docs/archive/PUBLISH_TOMORROW.md)
-- [OVERNIGHT_BUILD_PLAN.md](/Users/dhyana/dharma_swarm/docs/archive/OVERNIGHT_BUILD_PLAN.md)
-- [TEST_STRATEGY.md](/Users/dhyana/dharma_swarm/docs/archive/TEST_STRATEGY.md)
-- [VISION_COMPLETE_CIRCUIT.md](/Users/dhyana/dharma_swarm/docs/archive/VISION_COMPLETE_CIRCUIT.md)
-- [specs_research_living_layers/README.md](/Users/dhyana/dharma_swarm/docs/archive/specs_research_living_layers/README.md)
+- [DGC_100X_LEAN_ESSENCE_2026-03-08.md](DGC_100X_LEAN_ESSENCE_2026-03-08.md)
+- [DGC_KEEP_CUT_ADD_MATRIX_2026-03-08.md](DGC_KEEP_CUT_ADD_MATRIX_2026-03-08.md)
+- [DHARMA_SWARM_1000X_MASTERPLAN_2026-03-16.md](DHARMA_SWARM_1000X_MASTERPLAN_2026-03-16.md)
+- [FIRST_LIVE_RUN_REPORT.md](FIRST_LIVE_RUN_REPORT.md)
+- [KAIZEN_IMPLEMENTATION_SUMMARY.md](KAIZEN_IMPLEMENTATION_SUMMARY.md)
+- [OVERNIGHT_AUTOPILOT.md](OVERNIGHT_AUTOPILOT.md)
+- [PUBLISH_TOMORROW.md](PUBLISH_TOMORROW.md)
+- [OVERNIGHT_BUILD_PLAN.md](OVERNIGHT_BUILD_PLAN.md)
+- [TEST_STRATEGY.md](TEST_STRATEGY.md)
+- [VISION_COMPLETE_CIRCUIT.md](VISION_COMPLETE_CIRCUIT.md)
+- [specs_research_living_layers/README.md](specs_research_living_layers/README.md)
 
 Rule:
 

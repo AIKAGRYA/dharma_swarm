@@ -3,7 +3,7 @@ title: Kaizen Efficiency Analysis - Implementation Summary
 path: docs/archive/KAIZEN_IMPLEMENTATION_SUMMARY.md
 slug: kaizen-efficiency-analysis-implementation-summary
 doc_type: documentation
-status: active
+status: archive
 summary: What Was Delivered
 source:
   provenance: repo_local

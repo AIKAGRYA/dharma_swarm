@@ -72,27 +72,27 @@ Files here should be one of:
 
 If a document is mostly a mission brief, planning memo, prompt, or historical note, it belongs elsewhere.
 
-`specs/` is also not the incubation lane. Draft and exploratory spec work belongs in [spec-forge/README.md](/Users/dhyana/dharma_swarm/spec-forge/README.md), not here.
+`specs/` is also not the incubation lane. Draft and exploratory spec work belongs in [spec-forge/README.md](../spec-forge/README.md), not here.
 
 ## Priority Specs
 
 Current high-signal specs in this directory:
 
-- [TaskBoardCoordination.tla](/Users/dhyana/dharma_swarm/specs/TaskBoardCoordination.tla) and [TaskBoardCoordination.cfg](/Users/dhyana/dharma_swarm/specs/TaskBoardCoordination.cfg): formal task-board coordination model
-- [KERNEL_CORE_SPEC.md](/Users/dhyana/dharma_swarm/specs/KERNEL_CORE_SPEC.md): bounded core-kernel specification
-- [DGC_TERMINAL_ARCHITECTURE_v1.1.md](/Users/dhyana/dharma_swarm/specs/DGC_TERMINAL_ARCHITECTURE_v1.1.md): current provider-agnostic terminal architecture spec
-- [ONTOLOGY_PHASE2_SQLITE_UNIFICATION_SPEC_2026-03-19.md](/Users/dhyana/dharma_swarm/specs/ONTOLOGY_PHASE2_SQLITE_UNIFICATION_SPEC_2026-03-19.md): active ontology runtime spec
-- [ONTOLOGY_PHASE2_SQLITE_UNIFICATION_TODO_2026-03-19.md](/Users/dhyana/dharma_swarm/specs/ONTOLOGY_PHASE2_SQLITE_UNIFICATION_TODO_2026-03-19.md): execution companion checklist for that ontology pass
-- [STIGMERGY_11_LAYER_SPEC_2026-03-23.md](/Users/dhyana/dharma_swarm/specs/STIGMERGY_11_LAYER_SPEC_2026-03-23.md): structured subsystem spec
+- [TaskBoardCoordination.tla](TaskBoardCoordination.tla) and [TaskBoardCoordination.cfg](TaskBoardCoordination.cfg): formal task-board coordination model
+- [KERNEL_CORE_SPEC.md](KERNEL_CORE_SPEC.md): bounded core-kernel specification
+- [DGC_TERMINAL_ARCHITECTURE_v1.1.md](DGC_TERMINAL_ARCHITECTURE_v1.1.md): current provider-agnostic terminal architecture spec, with implementation status still needing reconciliation against `dharma_swarm/tui/`
+- [ONTOLOGY_PHASE2_SQLITE_UNIFICATION_SPEC_2026-03-19.md](ONTOLOGY_PHASE2_SQLITE_UNIFICATION_SPEC_2026-03-19.md): active ontology runtime spec
+- [ONTOLOGY_PHASE2_SQLITE_UNIFICATION_TODO_2026-03-19.md](ONTOLOGY_PHASE2_SQLITE_UNIFICATION_TODO_2026-03-19.md): execution companion checklist for that ontology pass
+- [STIGMERGY_11_LAYER_SPEC_2026-03-23.md](STIGMERGY_11_LAYER_SPEC_2026-03-23.md): structured subsystem spec
 
 ## Version And Companion Precedence
 
 Use these rules when multiple spec-shaped files exist for one surface:
 
-- [DGC_TERMINAL_ARCHITECTURE_v1.1.md](/Users/dhyana/dharma_swarm/specs/DGC_TERMINAL_ARCHITECTURE_v1.1.md) is the current governing DGC terminal architecture spec.
-- [DGC_TERMINAL_ARCHITECTURE.md](/Users/dhyana/dharma_swarm/specs/DGC_TERMINAL_ARCHITECTURE.md) is retained as the v1.0 baseline, not the current precedence file.
-- [ONTOLOGY_PHASE2_SQLITE_UNIFICATION_SPEC_2026-03-19.md](/Users/dhyana/dharma_swarm/specs/ONTOLOGY_PHASE2_SQLITE_UNIFICATION_SPEC_2026-03-19.md) is the canonical ontology Phase 2 spec.
-- [ONTOLOGY_PHASE2_SQLITE_UNIFICATION_TODO_2026-03-19.md](/Users/dhyana/dharma_swarm/specs/ONTOLOGY_PHASE2_SQLITE_UNIFICATION_TODO_2026-03-19.md) is a companion execution checklist, not an independent canonical spec.
+- [DGC_TERMINAL_ARCHITECTURE_v1.1.md](DGC_TERMINAL_ARCHITECTURE_v1.1.md) is the current DGC terminal architecture spec, but implementation-status labels still need a reconciliation pass.
+- [DGC_TERMINAL_ARCHITECTURE.md](DGC_TERMINAL_ARCHITECTURE.md) is retained as the v1.0 baseline, not the current precedence file.
+- [ONTOLOGY_PHASE2_SQLITE_UNIFICATION_SPEC_2026-03-19.md](ONTOLOGY_PHASE2_SQLITE_UNIFICATION_SPEC_2026-03-19.md) is the canonical ontology Phase 2 spec.
+- [ONTOLOGY_PHASE2_SQLITE_UNIFICATION_TODO_2026-03-19.md](ONTOLOGY_PHASE2_SQLITE_UNIFICATION_TODO_2026-03-19.md) is a companion execution checklist, not an independent canonical spec.
 
 ## Classification Rules
 
@@ -135,4 +135,4 @@ This directory still contains some mixed-purpose material. The cleanup goal is:
 - make supersession and status explicit for every versioned spec
 - keep `spec-forge/` as the place where emerging specs mature before entering `specs/`
 
-For the governing repo-wide ontology, see [REPO_ONTOLOGY_AND_HYGIENE_MASTER_SPEC_2026-04-01.md](/Users/dhyana/dharma_swarm/docs/REPO_ONTOLOGY_AND_HYGIENE_MASTER_SPEC_2026-04-01.md).
+For the governing repo-wide ontology, see [REPO_ONTOLOGY_AND_HYGIENE_MASTER_SPEC_2026-04-01.md](../docs/REPO_ONTOLOGY_AND_HYGIENE_MASTER_SPEC_2026-04-01.md).

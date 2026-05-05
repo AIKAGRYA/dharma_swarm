@@ -1,7 +1,7 @@
 # Model Routing Map — dharma_swarm
 
 **Generated:** 2026-04-04 | **Purpose:** Complete map of how every LLM call flows through the system.
-Three calling surfaces exist. This document maps each one, identifies inconsistencies between them, and documents the exact fix for the HuggingFace blocker.
+Three calling surfaces exist. This document maps each one, identifies inconsistencies between them, and records the historical HuggingFace blocker as resolved in current code.
 
 ---
 
@@ -9,7 +9,7 @@ Three calling surfaces exist. This document maps each one, identifies inconsiste
 
 ### Surface 1: Swarm Agents (orchestrate_live → swarm → orchestrator → agent_runner → providers)
 **How it works:** SwarmManager.init() creates a ModelRouter via create_default_router(). The ModelRouter holds 18 provider instances. When an agent needs to call an LLM, agent_runner._invoke_provider() calls ModelRouter.complete_for_task() which:
-1. Calls router_v1.build_routing_signals() to classify the request (this is where HuggingFace crashes)
+1. Calls router_v1.build_routing_signals() to classify the request. This historically crashed on missing HuggingFace dependencies; current `tiny_router_shadow.py` catches `ImportError` and falls back.
 2. Calls ProviderPolicyRouter.route() to pick a provider chain
 3. Tries each provider in the chain with fallback
 4. Records telemetry, EWMA scores, and audit logs
@@ -114,18 +114,25 @@ Dashboard defines profiles like "qwen35_surgeon" with Groq as first provider. Th
 
 ---
 
-## The HuggingFace Blocker: Exact Fix
+## Historical HuggingFace Blocker: Resolved
 
-### What happens
+### What happened
 Every swarm agent call goes through:
 agent_runner._invoke_provider() → ModelRouter.complete_for_task() → router_v1.build_routing_signals() → tiny_router_shadow.infer_tiny_router_shadow_from_messages() → ... → _load_tiny_router_artifacts() → `from huggingface_hub import snapshot_download` → ImportError
 
-### Why it exists
+### Why it existed
 tiny_router_shadow.py is an ML-based message transition classifier. It tries to load a HuggingFace checkpoint model for better accuracy. If the checkpoint isn't available, it falls back to a pure-Python heuristic (line 647-651). The fallback WORKS — but the ImportError crashes before the fallback can trigger.
 
-### The fix (choose ONE)
+### Current status
 
-**Option A — 3-line code fix (recommended):**
+Resolved in current code. `dharma_swarm/tiny_router_shadow.py` catches
+`ImportError` in `_load_tiny_router_artifacts()` and returns `None`; Python 3.14
+also skips checkpoint runtime. Keep `TINY_ROUTER_BACKEND=heuristic` as a useful
+runtime override, but do not reapply the old patch below as if it were pending.
+
+### Historical fix
+
+**Option A — 3-line code fix (already present):**
 In dharma_swarm/tiny_router_shadow.py, line 494-495, change:
 ```python
 # BEFORE:
@@ -146,13 +153,13 @@ Set `TINY_ROUTER_BACKEND=heuristic` in your environment. The _requested_backend(
 **Option C — install the dependency:**
 `pip install huggingface-hub` — this makes the import succeed, but the model download will likely fail on first run without internet access to HuggingFace. On subsequent runs with `local_files_only=True`, it would use cached artifacts.
 
-**Recommendation:** Apply Option A AND set the env var as a belt-and-suspenders approach. The heuristic fallback is good enough for routing — the checkpoint model is a marginal accuracy improvement.
+**Recommendation:** Keep the existing ImportError fallback. Set the env var only when you want to force the heuristic backend.
 
 ---
 
 ## Minimum Viable Model Path (Getting One LLM Call Working)
 
-1. Apply the HuggingFace fix (Option A above)
+1. Confirm the HuggingFace fallback is present, or set `TINY_ROUTER_BACKEND=heuristic`.
 2. Get ONE free API key. Easiest options:
    - GROQ_API_KEY from console.groq.com (free, instant, Qwen3-32B at 3000 tok/s)
    - NVIDIA_NIM_API_KEY from build.nvidia.com (free, 50 req/day)

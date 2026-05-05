@@ -1,6 +1,6 @@
 # Master Build Spec — Ontology-Native Operator Brief (Daily Insight Brief)
 
-**Status:** spec, not implemented
+**Status:** partly implemented; items 5-7 have code/test or witness proof, item 8 remains pending
 **Owner of:** the contract for the first ontology-native seam in dharma_swarm.
 **Read first:** [`docs/governance/BUILD_SESSION_ENTRYPOINT.md`](../governance/BUILD_SESSION_ENTRYPOINT.md), [`docs/governance/SOVEREIGN_MANIFEST.md`](../governance/SOVEREIGN_MANIFEST.md), [`reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md`](../../reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md).
 **Companion:** [`HANDOFF_ONTOLOGY_NATIVE_OPERATOR_BRIEF.md`](HANDOFF_ONTOLOGY_NATIVE_OPERATOR_BRIEF.md) (copy-paste handoff for the next code agent).
@@ -160,8 +160,8 @@ The "best effort, never blocks" pattern called out by the audit is explicitly re
 2. Implement module + tests behind feature flag (`NEXT_10_SUBSTRATE_TODO` item 5). Do not flip the flag in this PR.
 3. Code review against §11 acceptance criteria. No merge until tests pass.
 4. Flip flag for one operator profile, capture first-tick report (`NEXT_10_SUBSTRATE_TODO` item 6).
-5. Wire artifact rows into `RuntimeStateStore.artifact_records` (`NEXT_10_SUBSTRATE_TODO` item 7).
-6. Add Guardian `LEDGER_WATCHER` thresholds (`NEXT_10_SUBSTRATE_TODO` item 8).
+5. Done: wire artifact rows into `RuntimeStateStore.artifact_records` and prove read-before-propose citations (`NEXT_10_SUBSTRATE_TODO` item 7).
+6. Pending: add operator-brief-specific Guardian `LEDGER_WATCHER` thresholds (`NEXT_10_SUBSTRATE_TODO` item 8). The existing generic watcher does not satisfy this requirement.
 7. Add `dgc value-events` read surface (`NEXT_10_SUBSTRATE_TODO` item 9).
 8. Only after item 9: open Dharma Radar v0 design (`NEXT_10_SUBSTRATE_TODO` item 10).
 
@@ -169,7 +169,7 @@ The "best effort, never blocks" pattern called out by the audit is explicitly re
 
 Recorded so the next agent does not silently re-decide them:
 
-- Whether the brief should also emit a `Stigmergy` mark. v0: no. Reconsider after item 7.
+- Whether the brief should also emit a `Stigmergy` mark. v0: no. Reconsider after item 8 lands.
 - Whether `BHED_GNAN` should ever block in this seam. v0: no, mirrors current implementation. Reconsider when the gate is strengthened repo-wide.
 - Whether the brief should be cryptographically signed by the kernel. v0: SHA-256 only. Kernel signing is a separate spec.
 - Whether multiple operator profiles should each get their own brief. v0: one profile, configured by env. Multi-profile is item 11+ of a later todo file.

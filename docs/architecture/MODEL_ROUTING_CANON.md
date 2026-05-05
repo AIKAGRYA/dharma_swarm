@@ -89,12 +89,16 @@ curation:
 
 This is the single story for model and provider selection in `dharma_swarm`.
 
+Status note: the root [`MODEL_ROUTING_MAP.md`](../../MODEL_ROUTING_MAP.md)
+remains a useful routing audit/report, but this file owns the architecture
+canon. Merge durable facts here before treating the root map as current truth.
+
 ## Source Of Truth
 
-- Provider lanes, default models, and paid/free ordering live in [model_hierarchy.py](/Users/dhyana/dharma_swarm/dharma_swarm/model_hierarchy.py).
-- Live free-tier OpenRouter rosters live in [free_fleet.py](/Users/dhyana/dharma_swarm/dharma_swarm/free_fleet.py).
-- Human-friendly selectors such as `top open models` and `tier one models` live in [model_catalog.py](/Users/dhyana/dharma_swarm/dharma_swarm/model_catalog.py).
-- Routing execution still lives in [provider_policy.py](/Users/dhyana/dharma_swarm/dharma_swarm/provider_policy.py) and [providers.py](/Users/dhyana/dharma_swarm/dharma_swarm/providers.py).
+- Provider lanes, default models, and paid/free ordering live in [model_hierarchy.py](../../dharma_swarm/model_hierarchy.py).
+- Live free-tier OpenRouter rosters live in [free_fleet.py](../../dharma_swarm/free_fleet.py).
+- Human-friendly selectors such as `top open models` and `tier one models` live in [model_catalog.py](../../dharma_swarm/model_catalog.py).
+- Routing execution still lives in [provider_policy.py](../../dharma_swarm/provider_policy.py) and [providers.py](../../dharma_swarm/providers.py).
 
 ## Canonical Selectors
 
@@ -137,9 +141,9 @@ That expands into the routing keys the runtime already understands:
 
 This expansion is now honored in:
 
-- [swarm.py](/Users/dhyana/dharma_swarm/dharma_swarm/swarm.py)
-- [agent_runner.py](/Users/dhyana/dharma_swarm/dharma_swarm/agent_runner.py)
-- [worker_spawn.py](/Users/dhyana/dharma_swarm/dharma_swarm/worker_spawn.py)
+- [swarm.py](../../dharma_swarm/swarm.py)
+- [agent_runner.py](../../dharma_swarm/agent_runner.py)
+- [worker_spawn.py](../../dharma_swarm/worker_spawn.py)
 
 ## Inspection
 
@@ -152,6 +156,6 @@ dgc model-catalog "tier one models" --json
 ## Mental Model
 
 1. Human or spec chooses a canonical selector.
-2. [model_catalog.py](/Users/dhyana/dharma_swarm/dharma_swarm/model_catalog.py) resolves it into routing metadata.
+2. [model_catalog.py](../../dharma_swarm/model_catalog.py) resolves it into routing metadata.
 3. Agent and worker execution honor that metadata through the shared router.
-4. [provider_policy.py](/Users/dhyana/dharma_swarm/dharma_swarm/provider_policy.py) and [providers.py](/Users/dhyana/dharma_swarm/dharma_swarm/providers.py) still make the final path decision, but they now start from one shared vocabulary instead of ad hoc lists.
+4. [provider_policy.py](../../dharma_swarm/provider_policy.py) and [providers.py](../../dharma_swarm/providers.py) still make the final path decision, but they now start from one shared vocabulary instead of ad hoc lists.

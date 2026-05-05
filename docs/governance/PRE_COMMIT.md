@@ -1,11 +1,11 @@
 # Pre-commit Hooks (dharma_swarm)
 
-dharma_swarm runs three layers of pre-commit safety on every staged commit:
+dharma_swarm currently runs pre-commit safety through test hygiene, gitleaks,
+semgrep, and generic file hygiene hooks. Legacy uplift guards are deferred until
+their entrypoint is promoted back into `.pre-commit-config.yaml`.
 
-1. **`scripts/uplift_guards/run_pre_commit.py`** — domain-specific guards:
-   kernel SHA-256 integrity, secrets, autonomous-destruction tripwires,
-   hot-path ack, and interface-mismatch registry checks. This existed
-   before the governance install and remains the primary defense.
+1. **`scripts/governance/check_test_hygiene.py`** — local test hygiene guard
+   for known test anti-patterns.
 2. **`gitleaks`** — secret-scan staged content with allowlists tuned
    for the dharma_swarm false-positive surface (see `.gitleaks.toml`).
 3. **`semgrep`** — `.semgrep/` rules: a curated security pack plus
@@ -57,9 +57,9 @@ Acceptable bypass reasons:
 - Mass file rename / move where individual rules can't disambiguate.
 - Tool failure on the CI runner that the local hook reproduces.
 
-**Never** bypass `dharma-uplift-guards`. Those are domain guards (kernel
-integrity, mismatch registry); a real bypass need indicates either a
-genuine emergency or that the guard logic itself needs an update.
+Avoid bypassing configured security hooks without a written justification in the
+commit message. If uplift guards are restored in a later commit, update this
+document and the bypass policy in the same PR.
 
 ## When a new false positive appears
 

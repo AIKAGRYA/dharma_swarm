@@ -1,12 +1,12 @@
 # How Foundations Evolve the System
 
-**Generated:** 2026-04-04 | **Purpose:** Trace every connection between the 10 intellectual pillars and the running code. Show how the foundations are not decorative — they are the system's evolutionary compass.
+**Generated:** 2026-04-04 | **Purpose:** Trace intended and implemented connections between the 10 intellectual pillars and the running code. Show where foundations inform the system, without treating unwired correspondences as runtime truth.
 
 ---
 
 ## The Architecture
 
-The foundations layer is not documentation. It is an active component of the runtime, injected into every agent's context at task time, shaping how agents think, what they notice, and what they optimize for.
+The foundations layer is not merely reference documentation; selected excerpts are intended to shape agent context where wired. Only tested/runtime-wired paths should be treated as implementation truth.
 
 ```
 foundations/*.md (10 pillars + syntheses + empirical claims)

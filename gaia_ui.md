@@ -1,6 +1,6 @@
 # GAIA User Manual
 
-Status: current tracked runtime manual for the GAIA surfaces that exist in this repository on March 27, 2026.
+Status: subsystem runtime manual for the GAIA Python/terminal surfaces present as of March 27, 2026. Product-surface authority lives in `PRODUCT_SURFACE.md`.
 
 GAIA is the ecological accountability slice inside `dharma_swarm`. In the current tracked tree, the user-facing surface is Python-first:
 
@@ -10,7 +10,7 @@ GAIA is the ecological accountability slice inside `dharma_swarm`. In the curren
 - `dharma_swarm/gaia_platform.py`
 - `scripts/gaia_demo.py`
 
-This manual documents those runnable surfaces. The tracked repository now ships a terminal dashboard in `dharma_swarm/gaia_platform.py`; it still does not include a production web product for GAIA.
+This manual documents those runnable surfaces, not the canonical DHARMA product surface. The tracked repository now ships a terminal dashboard in `dharma_swarm/gaia_platform.py`; it still does not include a production web product for GAIA.
 
 ## What GAIA Does
 

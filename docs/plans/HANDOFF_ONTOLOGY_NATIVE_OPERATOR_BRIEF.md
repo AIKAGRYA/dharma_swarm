@@ -1,6 +1,6 @@
 # Handoff — Ontology-Native Operator Brief, First Implementation
 
-**Status:** ready for the next code agent to pick up.
+**Status:** historical handoff; items 5-7 have advanced since this was written.
 **Scope:** implements [`ONTOLOGY_NATIVE_OPERATOR_BRIEF_MASTER_SPEC.md`](ONTOLOGY_NATIVE_OPERATOR_BRIEF_MASTER_SPEC.md) item 5 and (separately) item 6 from [`NEXT_10_SUBSTRATE_TODO.md`](NEXT_10_SUBSTRATE_TODO.md).
 **Read first:** [`docs/governance/BUILD_SESSION_ENTRYPOINT.md`](../governance/BUILD_SESSION_ENTRYPOINT.md). All of it. Then the master spec linked above.
 
@@ -114,4 +114,4 @@ If any of those is missing, you are not done.
 
 [`NEXT_10_SUBSTRATE_TODO.md`](NEXT_10_SUBSTRATE_TODO.md) item 6: flip the flag for one operator profile, capture the first live tick into `reports/witness/<date>-operator-brief-first-tick.md`. That is a configuration-only PR. Do not bundle it with yours.
 
-After item 6, items 7 (RuntimeStateStore wiring), 8 (Guardian LEDGER_WATCHER), and 9 (`dgc value-events`) follow in order. Item 10 (Dharma Radar v0) does not start until item 9 has been in production use for at least one week.
+After item 7, item 8 (operator-brief-specific Guardian LEDGER_WATCHER) and item 9 (`dgc value-events`) follow in order. Item 10 (Dharma Radar v0) does not start until item 9 has been in production use for at least one week.

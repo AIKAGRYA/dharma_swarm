@@ -21,7 +21,6 @@ disciplines:
 - documentation
 inspiration:
 - repo_topology
-- canonical_truth
 connected_relevant_files:
 - docs/GENERATED_ARTIFACT_BOUNDARY_MATRIX_2026-04-02.md
 - docs/plans/2026-04-02-generated-artifact-control-center.md
@@ -44,7 +43,7 @@ pkm:
   - artifacts
   - nightwatch
   - quarantine
-  evergreen_potential: high
+  evergreen_potential: medium
 stigmergy:
   meaning: This file makes the reports/generated subtree legible as retained machine-produced evidence rather than letting it read like an accidental dump.
   state: reference
@@ -65,6 +64,10 @@ curation:
 
 This subtree is for retained machine-produced report artifacts.
 
+Frontmatter in child files is subordinate to the path-class policy in
+`docs/AGENTS.md`; generated artifacts cannot promote themselves into current
+canon.
+
 These files may still have audit, replay, or forensic value, but they are not:
 
 - product truth
@@ -84,6 +87,6 @@ These files may still have audit, replay, or forensic value, but they are not:
 
 ## Control Docs
 
-- [generated-artifact-control-center.md](/Users/dhyana/dharma_swarm/docs/plans/2026-04-02-generated-artifact-control-center.md)
-- [GENERATED_ARTIFACT_BOUNDARY_MATRIX_2026-04-02.md](/Users/dhyana/dharma_swarm/docs/GENERATED_ARTIFACT_BOUNDARY_MATRIX_2026-04-02.md)
-- [verification-family-retention-policy.md](/Users/dhyana/dharma_swarm/docs/plans/2026-04-03-verification-family-retention-policy.md)
+- [generated-artifact-control-center.md](../../docs/plans/2026-04-02-generated-artifact-control-center.md)
+- [GENERATED_ARTIFACT_BOUNDARY_MATRIX_2026-04-02.md](../../docs/GENERATED_ARTIFACT_BOUNDARY_MATRIX_2026-04-02.md)
+- [verification-family-retention-policy.md](../../docs/plans/2026-04-03-verification-family-retention-policy.md)

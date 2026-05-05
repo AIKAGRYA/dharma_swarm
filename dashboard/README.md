@@ -7,7 +7,8 @@ It is not a consumer product site. It is the browser control surface for
 
 ## Canonical stance
 
-- TUI is the primary operator cockpit.
+- The dashboard is the primary product-facing operator surface.
+- TUI and terminal shells remain supported local/operator workflows where wired.
 - This dashboard is the canonical web operator surface.
 - `SwarmLens` remains a legacy/alternate web surface in
   `dharma_swarm/swarmlens_app.py`.

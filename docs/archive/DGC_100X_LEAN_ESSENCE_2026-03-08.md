@@ -3,7 +3,7 @@ title: DGC 100x Lean Essence Blueprint (2026-03-08)
 path: docs/archive/DGC_100X_LEAN_ESSENCE_2026-03-08.md
 slug: dgc-100x-lean-essence-blueprint-2026-03-08
 doc_type: documentation
-status: active
+status: archive
 summary: North Star Revision (2026-03-11)
 source:
   provenance: repo_local

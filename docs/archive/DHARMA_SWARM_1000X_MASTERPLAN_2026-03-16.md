@@ -3,7 +3,7 @@ title: DHARMA SWARM 1000x Masterplan
 path: docs/archive/DHARMA_SWARM_1000X_MASTERPLAN_2026-03-16.md
 slug: dharma-swarm-1000x-masterplan
 doc_type: documentation
-status: active
+status: archive
 summary: 'Date: 2026-03-16'
 source:
   provenance: repo_local
