@@ -829,105 +829,6 @@ async def _create_issue_if_needed(finding: GuardianFinding, repo: str, state_dir
     return False
 
 
-# ---------------------------------------------------------------------------
-# ROOM_WATCHER: Fractal room health checker
-# ---------------------------------------------------------------------------
-
-
-async def run_room_health_watcher() -> list[GuardianFinding]:
-    """ROOM_WATCHER: Check fractal room health — budget, kill/spinout conditions."""
-    findings: list[GuardianFinding] = []
-    try:
-        from dharma_swarm.fractal.room_configs import bootstrap_registry
-        from dharma_swarm.fractal.fractal_room import VentureCellV1, evaluate_kill_conditions
-    except ImportError:
-        return findings
-
-    try:
-        registry = bootstrap_registry()
-        active = registry.active_rooms()
-        for room in active:
-            remaining = room.remaining_budget()
-            if remaining <= 0:
-                findings.append(
-                    GuardianFinding(
-                        severity="BLOCKER",
-                        check="ROOM_WATCHER:budget_depleted",
-                        title=f"Room '{room.id}' budget fully depleted",
-                        detail=(
-                            f"Room '{room.id}' ({room.kind.value}) has exhausted its budget: "
-                            f"0/{room.budget_tokens:,} tokens remaining."
-                        ),
-                        fix_hint="Allocate additional budget or archive the room.",
-                    )
-                )
-            elif remaining < room.budget_tokens * 0.2:
-                findings.append(
-                    GuardianFinding(
-                        severity="WARNING",
-                        check="ROOM_WATCHER:budget_low",
-                        title=f"Room '{room.id}' budget below 20%",
-                        detail=(
-                            f"Room '{room.id}' ({room.kind.value}) budget is low: "
-                            f"{remaining:,}/{room.budget_tokens:,} tokens remaining "
-                            f"({int(100 * remaining / room.budget_tokens)}%)."
-                        ),
-                        fix_hint="Monitor burn rate and consider budget allocation.",
-                    )
-                )
-            if isinstance(room, VentureCellV1):
-                from datetime import datetime, timezone
-                try:
-                    created = datetime.fromisoformat(room.created_at)
-                    age_days = (datetime.now(timezone.utc) - created).days
-                except (ValueError, TypeError):
-                    age_days = 0
-                kpis = {
-                    "days_since_creation": age_days,
-                    "total_revenue": 0,
-                    "total_budget": room.budget_tokens,
-                    "total_burn": room.current_burn,
-                    "operator_override": False,
-                }
-                kill = evaluate_kill_conditions(room.kill_conditions, kpis)
-                if kill:
-                    findings.append(
-                        GuardianFinding(
-                            severity="DEGRADED",
-                            check="ROOM_WATCHER:kill_condition",
-                            title=f"VentureCell '{room.id}' kill condition triggered",
-                            detail=(
-                                f"VentureCell '{room.id}' has triggered kill conditions: {kill}. "
-                                f"Age: {age_days} days, revenue: $0, burn: {room.current_burn} tokens."
-                            ),
-                            fix_hint="Review kill conditions and decide whether to archive or adjust.",
-                        )
-                    )
-        if not findings:
-            findings.append(
-                GuardianFinding(
-                    severity="OK",
-                    check="ROOM_WATCHER:all_healthy",
-                    title=f"All {len(active)} fractal rooms healthy",
-                    detail=f"All {len(active)} active rooms have healthy budgets and no triggered kill conditions.",
-                )
-            )
-    except Exception as exc:
-        findings.append(
-            GuardianFinding(
-                severity="WARNING",
-                check="ROOM_WATCHER:error",
-                title="Room health check failed",
-                detail=f"Room health watcher encountered an error: {exc}",
-            )
-        )
-    return findings
-
-
-# ---------------------------------------------------------------------------
-# Main guardian run function
-# ---------------------------------------------------------------------------
-
 async def run_guardian_cycle(
     src_root: Path | None = None,
     state_dir: Path | None = None,
@@ -944,6 +845,8 @@ async def run_guardian_cycle(
     generated_at = datetime.now(timezone.utc).isoformat()
 
     logger.info("Guardian Crew: starting cycle (src=%s)", src_root)
+
+    from dharma_swarm.fractal.room_health import run_room_health_watcher
 
     # Run all Guardian checks in parallel.
     (
