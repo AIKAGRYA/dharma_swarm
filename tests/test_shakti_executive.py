@@ -69,6 +69,44 @@ def test_shakti_executive_preview_uses_recognition_and_directives(tmp_path: Path
     assert any(row["thesis"] == "operator_directive" for row in preview)
 
 
+def test_cron_handler_shakti_executive_is_opt_in_for_writes(tmp_path: Path) -> None:
+    from dharma_swarm.cron_job_runtime import CronJobRunStatus
+    from dharma_swarm.cron_runner import execute_cron_job
+
+    state = tmp_path / "dharma"
+    _write_zeitgeist(
+        state,
+        {
+            "id": "zg-cron",
+            "category": "opportunity",
+            "title": "Governed revenue audit service",
+            "relevance_score": 0.9,
+            "description": "External revenue wedge with governance proof.",
+        },
+    )
+
+    dry = execute_cron_job({
+        "handler": "shakti_executive",
+        "state_dir": str(state),
+        "top_k": 1,
+        "min_score": 30.0,
+    })
+    assert dry.status == CronJobRunStatus.COMPLETED
+    assert "dry_run=True" in dry.output
+    assert not (state / "meta" / "opportunity_board.json").exists()
+
+    written = execute_cron_job({
+        "handler": "shakti_executive",
+        "state_dir": str(state),
+        "top_k": 1,
+        "min_score": 30.0,
+        "write": True,
+    })
+    assert written.status == CronJobRunStatus.COMPLETED
+    assert "dry_run=False" in written.output
+    assert (state / "meta" / "opportunity_board.json").exists()
+
+
 def _write_zeitgeist(state: Path, row: dict[str, object]) -> None:
     meta = state / "meta"
     meta.mkdir(parents=True)
