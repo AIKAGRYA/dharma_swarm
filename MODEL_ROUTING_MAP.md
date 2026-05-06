@@ -3,6 +3,16 @@
 **Generated:** 2026-04-04 | **Purpose:** Complete map of how every LLM call flows through the system.
 Three calling surfaces exist. This document maps each one, identifies inconsistencies between them, and documents the exact fix for the HuggingFace blocker.
 
+## Current Branch Overlay — 2026-05-06
+
+The HuggingFace blocker described below is no longer the current Loop 1 blocker
+on `chore/loop1-truth-registry`; `docs/interface_mismatches.yaml` records
+`MISMATCH-01` as resolved. The surface inconsistency diagnosis remains current:
+`SwarmManager` constructs the shared `ModelRouter`, `AgentRunner` can call
+`complete_for_task()`, while `AutonomousAgent` and dashboard chat still create
+runtime providers directly. `tests/test_routing_surface_inventory.py` now pins
+that inventory until a focused routing PR removes those bypasses.
+
 ---
 
 ## The Three Calling Surfaces

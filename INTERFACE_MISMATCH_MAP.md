@@ -6,6 +6,19 @@ This document exists because the codebase grew across many sprints without a uni
 integration-test harness. Mismatches are silent until the specific call path is exercised
 at runtime — usually in production under the live orchestrator.
 
+## Current Branch Overlay — 2026-05-06
+
+This markdown map is historical narrative. The executable truth source is now
+`docs/interface_mismatches.yaml`, enforced by
+`tests/test_interface_mismatch_registry.py` and the mismatch uplift guard.
+
+On `chore/loop1-truth-registry`, the machine registry marks these entries
+resolved: `MISMATCH-01`, `MISMATCH-02`, `MISMATCH-03`, `MISMATCH-05`, and
+`MISMATCH-07`. The Loop 1 bootstrap harness also verifies the current code
+paths no longer fake the stigmergy mark or lifecycle/fintess signal. Entries
+below remain useful for historical diagnosis until migrated, but should not
+override the machine registry.
+
 ---
 
 ## Summary Table

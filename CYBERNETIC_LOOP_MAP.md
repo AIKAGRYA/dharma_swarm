@@ -3,6 +3,18 @@
 **Generated:** 2026-04-04 | **Purpose:** Document every feedback loop's sense→act→evaluate→adapt path.
 Each loop is traced from data source to data sink. A loop is "closed" only when its output feeds back as input to a future cycle.
 
+## Current Branch Overlay — 2026-05-06
+
+This map predates the `chore/loop1-truth-registry` branch. Its Loop 1 blocker
+text still names the HuggingFace import crash and replication enum mismatch as
+live blockers, but the executable mismatch registry now marks `MISMATCH-01`,
+`MISMATCH-02`, and `MISMATCH-03` resolved.
+
+The current proof level is still modest: `tests/test_bootstrap_loops.py` verifies
+the mocked Loop 1 bootstrap path uses real stigmergy and lifecycle/fitness signal
+paths, not hand-filled stand-ins. That is stronger than the April 4 map, but it
+is not the same as a live workload completing through external providers.
+
 ---
 
 ## Loop Status Summary
