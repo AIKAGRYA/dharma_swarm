@@ -105,6 +105,53 @@ def test_curriculum_engine_derives_frontier_tasks_from_failures_and_uncertainty(
     assert any(task.provenance.get("claim_id") == "claim-low-confidence" for task in tasks)
 
 
+def test_curriculum_engine_derives_campaign_chain_from_opportunity_board() -> None:
+    from dharma_swarm.curriculum_engine import (
+        OPPORTUNITY_BOOTSTRAP_STAGES,
+        CurriculumEngine,
+    )
+
+    board = [
+        {
+            "opportunity_id": "opp_low",
+            "title": "Low alignment",
+            "domain": "research",
+            "thesis": "weak",
+            "factor_scores": {"telos_alignment": 0.1},
+            "final_score": 99.0,
+        },
+        {
+            "opportunity_id": "opp_high",
+            "title": "Governed execution wedge",
+            "domain": "external_revenue",
+            "thesis": "wedge",
+            "factor_scores": {"telos_alignment": 0.92},
+            "final_score": 88.0,
+        },
+        {
+            "opportunity_id": "opp_mid",
+            "title": "Research validation",
+            "domain": "research",
+            "thesis": "evidence",
+            "factor_scores": {"telos_alignment": 0.8},
+            "final_score": 50.0,
+        },
+    ]
+
+    tasks = CurriculumEngine().derive_from_opportunity_board(
+        board,
+        top_k=1,
+        min_telos_alignment=0.5,
+        addressed_ids={"already_done"},
+    )
+
+    assert len(tasks) == len(OPPORTUNITY_BOOTSTRAP_STAGES)
+    assert [task.metadata["stage"] for task in tasks] == list(OPPORTUNITY_BOOTSTRAP_STAGES)
+    assert {task.provenance["opportunity_id"] for task in tasks} == {"opp_high"}
+    assert all(task.metadata["seed_kind"] == "opportunity_bootstrap" for task in tasks)
+    assert any(task.source == "opportunity:deep_research" for task in tasks)
+
+
 @pytest.mark.asyncio
 async def test_darwin_engine_exposes_explicit_curriculum_hook_without_archive_side_effects(
     tmp_path,
