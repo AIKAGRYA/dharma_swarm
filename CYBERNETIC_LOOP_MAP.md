@@ -30,7 +30,7 @@ Each loop is "closed" only when its output feeds back as input to a future cycle
 | 3 | Evolution Loop | every 3rd tick | **PARTIAL** | MetaEvolutionEngine records meta_fitness (3 entries in `evolution/meta_archive.jsonl`, fitness=0.58494). AutoProposer stigmergy guard fixed. Still needs real fitness data from completed tasks. |
 | 4 | Consolidation Loop | configurable | **PARTIAL** | 89 organism_memory entities exist (algedonic_event: 48, gnani_verdict: 18, decision: 18, insight: 5). Consolidation dedup working (invalidation_reason logged). No agent-produced outputs to consolidate yet. |
 | 5 | Zeitgeist Scanner | configurable | **PARTIAL** | Local scanning works. Gate pressure feedback path structurally present. No real gate check data flowing yet. |
-| 6 | Witness Auditor | 3600s | **YES (in test)** | 1,013 witness entries across 2 days. BLOCKED "rm -rf /important" (AHIMSA gate). PASSED 444, BLOCKED 230, WARN 4. Provider mismatch (MM-11) RESOLVED. Code path fully functional — operates on test data from pytest; will audit real agent actions when Loop 1 closes. |
+| 6 | Witness Auditor | 3600s | **YES (in test)** | 1,013 witness entries across 2 days. BLOCKED destructive filesystem commands (AHIMSA gate). PASSED 444, BLOCKED 230, WARN 4. Provider mismatch (MM-11) RESOLVED. Code path fully functional — operates on test data from pytest; will audit real agent actions when Loop 1 closes. |
 | 7 | Training Flywheel | 300s | **PARTIAL** | Quality gate evaluations running (structural scorer, 5+ evaluations logged in `quality_gates/log/evaluations.jsonl`). 182 trace entries. Trajectory scoring from real tasks still blocked on Loop 1. |
 | 8 | Recognition Loop | 7200s | **NO** | Recognition seed never generated. 89 organism_memory entities provide input data. Cascade computation not yet triggered. |
 | 9 | Conductors | 120s | **PARTIAL** | Conductor configs use proper enum values. Cron health shows 7 jobs tracked (pulse: 3 runs, 0 failures). Blocked on LLM provider availability for actual conductor work. |
@@ -204,7 +204,7 @@ ADAPT:   Record witness observation to ~/.dharma/witness/
          Evolution engine uses witness scores as fitness signal
 ```
 
-**Current state (updated):** **Fully functional in test context.** 1,013 witness entries recorded across 2 days. Correctly BLOCKED "rm -rf /important" (AHIMSA violation). PASSED 444 actions, BLOCKED 230, WARNED 4. Provider mismatch (MM-11) RESOLVED — uses `OpenRouterFreeProvider`. Phases audited: before_write (394), before_complete (144), before_pivot (134), conductor_wake (2), before_git (2), before_debug (2). **This loop closes when real agent actions replace test-generated actions.**
+**Current state (updated):** **Fully functional in test context.** 1,013 witness entries recorded across 2 days. Correctly BLOCKED destructive filesystem commands (AHIMSA violation). PASSED 444 actions, BLOCKED 230, WARNED 4. Provider mismatch (MM-11) RESOLVED — uses `OpenRouterFreeProvider`. Phases audited: before_write (394), before_complete (144), before_pivot (134), conductor_wake (2), before_git (2), before_debug (2). **This loop closes when real agent actions replace test-generated actions.**
 
 ---
 
