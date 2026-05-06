@@ -52,6 +52,8 @@ TASK_STATUS_RE = re.compile(r"^\s*\S+\s+(pending|running|completed|failed)\b", r
 
 @dataclass(frozen=True)
 class ProbeSpec:
+    """Frozen spec for a single full-power probe command (name, command tuple, timeout, allow_failure)."""
+
     name: str
     command: tuple[str, ...]
     timeout_sec: float = 20.0
@@ -60,6 +62,8 @@ class ProbeSpec:
 
 @dataclass
 class ProbeResult:
+    """Captured outcome of a single probe command (stdout, stderr, return code, timing)."""
+
     name: str
     command: list[str]
     elapsed_sec: float
@@ -71,10 +75,12 @@ class ProbeResult:
 
     @property
     def ok(self) -> bool:
+        """Return True when the probe finished cleanly (no timeout, return code 0)."""
         return not self.timed_out and self.returncode == 0
 
     @property
     def status(self) -> str:
+        """Return a short status label: ``timeout``, ``ok``, ``error``, or ``fail``."""
         if self.timed_out:
             return "timeout"
         if self.returncode == 0:
@@ -84,11 +90,13 @@ class ProbeResult:
         return "fail"
 
     def preview(self, lines: int = 8) -> str:
+        """Return a truncated preview of stdout, falling back to stderr when stdout is empty."""
         primary = self.stdout.strip() or self.stderr.strip()
         return preview_text(primary, lines=lines)
 
 
 def preview_text(text: str, *, lines: int = 8, chars: int = 1000) -> str:
+    """Truncate ``text`` to at most ``lines`` lines and ``chars`` characters, marking truncation with an ellipsis."""
     text = text.strip()
     if not text:
         return "(no output)"
@@ -103,6 +111,7 @@ def preview_text(text: str, *, lines: int = 8, chars: int = 1000) -> str:
 
 
 def read_json(path: Path) -> dict[str, Any] | None:
+    """Read a JSON file at ``path`` and return it as a dict (wrapping non-dict roots), or None if missing or unparseable."""
     if not path.exists():
         return None
     try:
@@ -113,16 +122,19 @@ def read_json(path: Path) -> dict[str, Any] | None:
 
 
 def latest_files(path: Path, pattern: str, *, limit: int = 5) -> list[Path]:
+    """Return up to ``limit`` files matching ``pattern`` under ``path``, newest first by mtime; empty list if path is missing."""
     if not path.exists():
         return []
     return sorted(path.glob(pattern), key=lambda item: item.stat().st_mtime, reverse=True)[:limit]
 
 
 def iso_mtime(path: Path) -> str:
+    """Return the file's last-modified time as an ISO-8601 UTC string."""
     return datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc).isoformat()
 
 
 def parse_task_status_counts(text: str) -> dict[str, int]:
+    """Count occurrences of pending/running/completed/failed status tokens in dgc task-list CLI output."""
     counts = {name: 0 for name in ("pending", "running", "completed", "failed")}
     for status in TASK_STATUS_RE.findall(text):
         counts[status] += 1
@@ -136,6 +148,7 @@ def run_command(
     cwd: Path = REPO_ROOT,
     name: str,
 ) -> ProbeResult:
+    """Run ``command`` as a subprocess with the given timeout, returning a ProbeResult that captures status, output, and timing."""
     started = time.monotonic()
     try:
         completed = subprocess.run(
@@ -197,6 +210,7 @@ def build_probe_specs(
     autonomy_action: str,
     include_sprint_probe: bool,
 ) -> list[ProbeSpec]:
+    """Build the list of dgc CLI ProbeSpec entries the full-power probe should execute."""
     dgc = (python_executable, "-m", "dharma_swarm.dgc_cli")
     specs = [
         ProbeSpec("status", dgc + ("status",)),
@@ -242,6 +256,7 @@ def build_probe_specs(
 
 
 def collect_state_snapshot() -> dict[str, Any]:
+    """Read the canonical state JSON files from STATE_DIR into a single snapshot dict."""
     return {
         "thread_state": read_json(STATE_DIR / "thread_state.json"),
         "mission": read_json(STATE_DIR / "mission.json"),
@@ -254,6 +269,7 @@ def collect_state_snapshot() -> dict[str, Any]:
 
 
 def collect_recent_paths() -> dict[str, list[dict[str, str]]]:
+    """Return recent active modules, repo reports, and shared artifacts grouped by category for the report."""
     module_paths = [
         {
             "path": str(path.relative_to(REPO_ROOT)),
@@ -288,6 +304,7 @@ def collect_recent_paths() -> dict[str, list[dict[str, str]]]:
 
 
 def collect_stress_summary() -> dict[str, Any] | None:
+    """Read the latest dgc_max_stress_*.json artifact and return a flattened summary, or None if absent."""
     latest_json = next(iter(latest_files(SHARED_DIR, "dgc_max_stress_*.json", limit=1)), None)
     latest_md = next(iter(latest_files(SHARED_DIR, "dgc_max_stress_*.md", limit=1)), None)
     if latest_json is None:
@@ -321,6 +338,7 @@ def collect_stress_summary() -> dict[str, Any] | None:
 
 
 def collect_pytest_summary(result: ProbeResult | None) -> dict[str, Any] | None:
+    """Extract a compact summary (status, elapsed, summary line, preview) from a pytest ProbeResult, or None if absent."""
     if result is None:
         return None
     summary_line = ""
@@ -348,6 +366,7 @@ def derive_findings(
     recent_paths: dict[str, list[dict[str, str]]],
     stress_summary: dict[str, Any] | None,
 ) -> list[str]:
+    """Convert probe results, state snapshot, and stress summary into human-readable bullet findings."""
     findings: list[str] = []
     by_name = {result.name: result for result in probe_results}
 
@@ -448,6 +467,7 @@ def derive_findings(
 
 
 def render_markdown_report(payload: dict[str, Any]) -> str:
+    """Render the full-power probe payload into a Markdown report string."""
     state = payload["state_snapshot"]
     recent = payload["recent_paths"]
     findings = payload["findings"]
@@ -551,6 +571,7 @@ def run_full_power_probe(
     run_pytest: bool = True,
     pytest_targets: tuple[str, ...] = DEFAULT_PYTEST_TARGETS,
 ) -> dict[str, Any]:
+    """Run the full DGC probe (CLI commands, optional stress, optional pytest), write artifacts to REPORT_DIR, and return the payload dict."""
     probe_results: list[ProbeResult] = []
 
     for spec in build_probe_specs(
@@ -649,6 +670,7 @@ def run_full_power_probe(
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
+    """Build the argparse parser exposed by the full-power probe CLI."""
     parser = argparse.ArgumentParser(description="Run a reusable DGC full-power probe.")
     parser.add_argument("--route-task", default=DEFAULT_ROUTE_TASK)
     parser.add_argument("--context-search-query", default=DEFAULT_CONTEXT_SEARCH_QUERY)
@@ -661,6 +683,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """CLI entry point: parse args, run the full-power probe, print artifact paths, and return an exit code."""
     args = build_arg_parser().parse_args(argv)
     payload = run_full_power_probe(
         route_task=args.route_task,
