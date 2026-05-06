@@ -1330,8 +1330,10 @@ async def _run_replication_monitor_loop(shutdown_event: asyncio.Event) -> None:
 
     # Lazy imports to avoid circular deps and startup cost
     from dharma_swarm.replication_protocol import ReplicationProtocol
+    from dharma_swarm.providers import create_default_router
 
     protocol = ReplicationProtocol(state_dir=STATE_DIR)
+    replication_router = create_default_router()
 
     # Track spawned child tasks so we can cancel on shutdown
     child_tasks: list[asyncio.Task[None]] = []
@@ -1371,6 +1373,7 @@ async def _run_replication_monitor_loop(shutdown_event: asyncio.Event) -> None:
                                     outcome.child_spec.get("wake_interval", 3600)
                                 ),
                                 system_prompt=outcome.child_spec.get("system_prompt", ""),
+                                model_router=replication_router,
                             )
                             task = asyncio.create_task(
                                 child.run_loop(shutdown_event),
@@ -1464,6 +1467,9 @@ async def run_conductor_loop(shutdown_event: asyncio.Event) -> None:
     """
     from dharma_swarm.persistent_agent import PersistentAgent
     from dharma_swarm.conductors import CONDUCTOR_CONFIGS
+    from dharma_swarm.providers import create_default_router
+
+    conductor_router = create_default_router()
 
     _log("conductors", f"Initializing {len(CONDUCTOR_CONFIGS)} conductors...")
 
@@ -1478,6 +1484,7 @@ async def run_conductor_loop(shutdown_event: asyncio.Event) -> None:
             wake_interval_seconds=cfg["wake_interval_seconds"],
             system_prompt=cfg["system_prompt"],
             max_turns=cfg.get("max_turns", 25),
+            model_router=conductor_router,
         )
         conductors.append(agent)
         _log("conductors", f"  {cfg['name']}: {cfg['model']} every {cfg['wake_interval_seconds']}s")

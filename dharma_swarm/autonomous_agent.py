@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import Any
 
 from dharma_swarm.agent_memory import AgentMemoryBank
-from dharma_swarm.models import Message, MessagePriority
+from dharma_swarm.models import LLMResponse, Message, MessagePriority, ProviderType
 from dharma_swarm.runtime_provider import (
     create_runtime_provider,
     preferred_runtime_provider_configs,
@@ -294,6 +294,58 @@ class AgentIdentity:
     working_directory: str = field(default_factory=lambda: str(Path.home()))
 
 
+def _providers_registered_on_router(
+    router: Any,
+    candidate_order: list[ProviderType],
+) -> list[ProviderType]:
+    """Keep cheap-first order; drop types the router did not instantiate."""
+    out: list[ProviderType] = []
+    for provider in candidate_order:
+        try:
+            router.get_provider(provider)
+        except KeyError:
+            continue
+        out.append(provider)
+    return out
+
+
+def _llm_response_to_react_shape(response: LLMResponse) -> dict[str, Any]:
+    """Normalize an LLMResponse into the dict _reason_and_act expects."""
+    text_parts = [response.content] if response.content else []
+    tool_uses: list[dict[str, Any]] = []
+    for tc in response.tool_calls or []:
+        parsed_input = tc.get("input")
+        if parsed_input is None and "arguments" in tc:
+            try:
+                parsed_input = json.loads(tc["arguments"])
+            except Exception:
+                parsed_input = tc.get("arguments")
+        tool_uses.append({
+            "id": tc.get("id"),
+            "name": tc.get("name"),
+            "input": parsed_input,
+        })
+    raw_content: list[dict[str, Any]] = []
+    if response.content:
+        raw_content.append({"type": "text", "text": response.content})
+    for tu in tool_uses:
+        raw_content.append({
+            "type": "tool_use",
+            "id": tu["id"],
+            "name": tu["name"],
+            "input": tu["input"],
+        })
+    usage = response.usage or {}
+    return {
+        "text": text_parts,
+        "tool_uses": tool_uses,
+        "raw_content": raw_content or (response.content or ""),
+        "stop_reason": response.stop_reason,
+        "tokens_in": int(usage.get("prompt_tokens", usage.get("input_tokens", 0)) or 0),
+        "tokens_out": int(usage.get("completion_tokens", usage.get("output_tokens", 0)) or 0),
+    }
+
+
 # ---------------------------------------------------------------------------
 # The autonomous agent
 # ---------------------------------------------------------------------------
@@ -308,6 +360,16 @@ class AutonomousAgent:
     - Persistence: remembers across sessions via AgentMemoryBank
     - Communication: messages other agents, reads/writes stigmergy marks
 
+    When ``model_router`` is set, the ``openrouter`` lane uses
+    ``ModelRouter.complete_for_task`` for providers the router actually
+    registers (routing memory, breakers, telemetry). The ``codex`` lane
+    always calls ``create_runtime_provider`` with
+    ``working_dir=identity.working_directory`` because shared routers from
+    ``create_default_router()`` are not built per-agent cwd — routing Codex
+    through them would regress CLI working directory. Without an injected
+    router, ``openrouter`` uses the cheap-first runtime chain as before.
+    ``anthropic`` still uses the Anthropic SDK directly.
+
     Usage::
 
         agent = AutonomousAgent(AgentIdentity(
@@ -321,9 +383,10 @@ class AutonomousAgent:
         # Agent recalls from persistent memory
     """
 
-    def __init__(self, identity: AgentIdentity) -> None:
+    def __init__(self, identity: AgentIdentity, *, model_router: Any | None = None) -> None:
         self.identity = identity
         self.memory = AgentMemoryBank(identity.name)
+        self._model_router = model_router
         self._anthropic_client: Any = None
         self._openai_client: Any = None
         self._message_bus: Any = None
@@ -461,6 +524,61 @@ class AutonomousAgent:
             return await self._call_codex(system, messages, tools)
         raise ValueError(f"Unsupported provider: {self.identity.provider}")
 
+    def _build_autonomous_route_request(
+        self,
+        *,
+        has_tools: bool,
+        available_provider_types: list[ProviderType],
+    ) -> Any:
+        from dharma_swarm.provider_policy import ProviderRouteRequest
+
+        uncertainty = 0.42 if has_tools else 0.22
+        risk = 0.32 if has_tools else 0.14
+        ctx: dict[str, Any] = {
+            "language_code": "en",
+            "complexity_tier": "HIGH" if has_tools else "MEDIUM",
+            "context_tier": "LONG",
+            "requires_tooling": has_tools,
+            "session_id": f"autonomous:{self.identity.name}",
+            "agent_name": self.identity.name,
+            "agent_role": self.identity.role,
+            "preferred_model": self.identity.model,
+            "task_brief": "autonomous_react_loop",
+            "preserve_requested_model": len(available_provider_types) == 1,
+            "available_provider_types": [p.value for p in available_provider_types],
+        }
+        return ProviderRouteRequest(
+            action_name="autonomous_react",
+            risk_score=min(1.0, risk),
+            uncertainty=min(1.0, uncertainty),
+            novelty=0.15,
+            urgency=0.35,
+            expected_impact=0.38,
+            estimated_latency_ms=2400 if has_tools else 1000,
+            estimated_tokens=1600 if has_tools else 900,
+            preferred_low_cost=True,
+            requires_frontier_precision=False,
+            privileged_action=False,
+            requires_human_consent=False,
+            context=ctx,
+        )
+
+    @staticmethod
+    def _openapi_tools_payload(tools: list[dict]) -> list[dict[str, Any]] | None:
+        if not tools:
+            return None
+        return [
+            {
+                "type": "function",
+                "function": {
+                    "name": t["name"],
+                    "description": t["description"],
+                    "parameters": t["input_schema"],
+                },
+            }
+            for t in tools
+        ]
+
     async def _call_anthropic(
         self, system: str, messages: list[dict], tools: list[dict],
     ) -> dict[str, Any]:
@@ -501,11 +619,8 @@ class AutonomousAgent:
     async def _call_openrouter(
         self, system: str, messages: list[dict], tools: list[dict],
     ) -> dict[str, Any]:
-        from dharma_swarm.models import LLMRequest, ProviderType
+        from dharma_swarm.models import LLMRequest
 
-        # Prefer Ollama and NVIDIA NIM before any OpenRouter lane to avoid
-        # unnecessary paid routing. OpenRouter model hint only applies to the
-        # OpenRouter providers; local/NIM lanes use their configured defaults.
         configs = preferred_runtime_provider_configs(
             model_overrides={
                 ProviderType.OPENROUTER_FREE: self.identity.model,
@@ -517,69 +632,53 @@ class AutonomousAgent:
                 "No preferred providers available; configure Ollama, NVIDIA NIM, or OpenRouter"
             )
 
+        routed_order = (
+            _providers_registered_on_router(
+                self._model_router, [c.provider for c in configs]
+            )
+            if self._model_router is not None
+            else []
+        )
+        if self._model_router is not None and routed_order:
+            payload = AutonomousAgent._openapi_tools_payload(tools)
+            lm_args: dict[str, Any] = {
+                "model": self.identity.model,
+                "system": system,
+                "messages": messages,
+                "max_tokens": 4096,
+                "temperature": 0.0,
+            }
+            if payload is not None:
+                lm_args["tools"] = payload
+            llm_req = LLMRequest(**lm_args)
+            route_req = self._build_autonomous_route_request(
+                has_tools=bool(payload),
+                available_provider_types=routed_order,
+            )
+            _, response = await self._model_router.complete_for_task(
+                route_req,
+                llm_req,
+                available_provider_types=routed_order,
+            )
+            return _llm_response_to_react_shape(response)
+
         last_exc: Exception | None = None
         for config in configs:
             provider = create_runtime_provider(config)
             try:
-                request_kwargs: dict[str, Any] = {
+                payload = AutonomousAgent._openapi_tools_payload(tools)
+                request_kwargs = {
                     "model": config.default_model or self.identity.model,
                     "system": system,
                     "messages": messages,
                     "max_tokens": 4096,
                     "temperature": 0.0,
                 }
-                if tools:
-                    request_kwargs["tools"] = [
-                        {
-                            "type": "function",
-                            "function": {
-                                "name": t["name"],
-                                "description": t["description"],
-                                "parameters": t["input_schema"],
-                            },
-                        }
-                        for t in tools
-                    ]
+                if payload is not None:
+                    request_kwargs["tools"] = payload
+                response = await provider.complete(LLMRequest(**request_kwargs))
 
-                response = await provider.complete(
-                    LLMRequest(**request_kwargs)
-                )
-
-                text_parts = [response.content] if response.content else []
-                tool_uses: list[dict[str, Any]] = []
-                for tc in response.tool_calls or []:
-                    parsed_input = tc.get("input")
-                    if parsed_input is None and "arguments" in tc:
-                        try:
-                            parsed_input = json.loads(tc["arguments"])
-                        except Exception:
-                            parsed_input = tc.get("arguments")
-                    tool_uses.append({
-                        "id": tc.get("id"),
-                        "name": tc.get("name"),
-                        "input": parsed_input,
-                    })
-
-                raw_content: list[dict[str, Any]] = []
-                if response.content:
-                    raw_content.append({"type": "text", "text": response.content})
-                for tu in tool_uses:
-                    raw_content.append({
-                        "type": "tool_use",
-                        "id": tu["id"],
-                        "name": tu["name"],
-                        "input": tu["input"],
-                    })
-
-                usage = response.usage or {}
-                return {
-                    "text": text_parts,
-                    "tool_uses": tool_uses,
-                    "raw_content": raw_content or (response.content or ""),
-                    "stop_reason": response.stop_reason,
-                    "tokens_in": int(usage.get("prompt_tokens", usage.get("input_tokens", 0)) or 0),
-                    "tokens_out": int(usage.get("completion_tokens", usage.get("output_tokens", 0)) or 0),
-                }
+                return _llm_response_to_react_shape(response)
             except Exception as exc:
                 last_exc = exc
                 logger.warning(
@@ -602,7 +701,7 @@ class AutonomousAgent:
     ) -> dict[str, Any]:
         del tools
 
-        from dharma_swarm.models import LLMRequest, ProviderType
+        from dharma_swarm.models import LLMRequest
 
         configs = preferred_runtime_provider_configs(
             provider_order=(ProviderType.CODEX,),
@@ -625,19 +724,7 @@ class AutonomousAgent:
                         temperature=0.0,
                     )
                 )
-                usage = response.usage or {}
-                return {
-                    "text": [response.content] if response.content else [],
-                    "tool_uses": [],
-                    "raw_content": response.content or "",
-                    "stop_reason": response.stop_reason,
-                    "tokens_in": int(
-                        usage.get("prompt_tokens", usage.get("input_tokens", 0)) or 0
-                    ),
-                    "tokens_out": int(
-                        usage.get("completion_tokens", usage.get("output_tokens", 0)) or 0
-                    ),
-                }
+                return _llm_response_to_react_shape(response)
             except Exception as exc:
                 last_exc = exc
                 logger.warning(
@@ -1073,12 +1160,13 @@ class AgentOrchestrator:
     The orchestrator decides who wakes up when and with what task.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, *, model_router: Any | None = None) -> None:
         self.agents: dict[str, AutonomousAgent] = {}
         self._run_log: list[dict[str, Any]] = []
+        self._model_router = model_router
 
     def register(self, identity: AgentIdentity) -> AutonomousAgent:
-        agent = AutonomousAgent(identity)
+        agent = AutonomousAgent(identity, model_router=self._model_router)
         self.agents[identity.name] = agent
         return agent
 
@@ -1210,7 +1298,14 @@ PRESET_AGENTS: dict[str, AgentIdentity] = {
 
 
 async def cli_wake(agent_name: str, task: str, model: str | None = None) -> None:
-    """CLI entry point: wake an agent with a task."""
+    """CLI entry point: wake an agent with a task.
+
+    Accepted legacy behavior: constructs ``AutonomousAgent`` **without**
+    ``model_router``, so completions use direct runtime / SDK paths only (no
+    shared routing memory). Use ``PersistentAgent`` / conductors or pass
+    ``model_router=create_default_router()`` here if CLI should join the
+    router substrate.
+    """
     if agent_name in PRESET_AGENTS:
         identity = PRESET_AGENTS[agent_name]
     else:

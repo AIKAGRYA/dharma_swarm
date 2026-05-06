@@ -18,7 +18,7 @@
 
 version: 1
 generated_from: INTERFACE_MISMATCH_MAP.md
-last_synced: "2026-04-19"
+last_synced: "2026-05-06"
 
 entries:
   - id: MISMATCH-01
@@ -35,23 +35,29 @@ entries:
 
   - id: MISMATCH-02
     severity: BLOCKER
-    status: open
-    caller: dharma_swarm/orchestrate_live.py:1247
+    status: resolved
+    caller: dharma_swarm/orchestrate_live.py:~1364
     callee: dharma_swarm/persistent_agent.py:51-52
     summary: >-
       `role` and `provider_type` passed as raw strings; PersistentAgent.__init__
       requires AgentRole and ProviderType enums. Pydantic v2 strict mode rejects.
       Replication outcome path crashes here.
+    fixed_in: >-
+      routing coherence — replication spawn wraps child_spec strings with
+      AgentRole(...) and ProviderType(...) before PersistentAgent(...)
     test_path: tests/mismatches/test_MISMATCH_02.py
 
   - id: MISMATCH-03
     severity: BLOCKER
-    status: open
-    caller: dharma_swarm/orchestrate_live.py:1248
+    status: resolved
+    caller: dharma_swarm/orchestrate_live.py:~1368
     callee: dharma_swarm/persistent_agent.py:52
     summary: >-
       provider_type=outcome.child_spec.get("default_provider", "openrouter_free")
       is a bare string — Pydantic v2 strict-mode validation rejects.
+    fixed_in: >-
+      routing coherence — same coercion path as MISMATCH-02 (ProviderType
+      construction at replication child spawn).
     test_path: tests/mismatches/test_MISMATCH_03.py
 
   - id: MISMATCH-05

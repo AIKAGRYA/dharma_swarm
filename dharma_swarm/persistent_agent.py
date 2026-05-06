@@ -134,6 +134,7 @@ class PersistentAgent:
         wake_interval_seconds: float = 3600.0,
         system_prompt: str = "",
         max_turns: int = 25,
+        model_router: Any | None = None,
     ) -> None:
         self.name = name
         self.role = role
@@ -153,7 +154,7 @@ class PersistentAgent:
             max_turns=max_turns,
             working_directory=str(Path.home() / "dharma_swarm"),
         )
-        self._agent = AutonomousAgent(identity)
+        self._agent = AutonomousAgent(identity, model_router=model_router)
 
         # Lazy-init subsystems
         self._stigmergy: Any = None
