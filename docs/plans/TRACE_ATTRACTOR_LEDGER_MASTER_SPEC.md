@@ -3,8 +3,8 @@ title: Trace Attractor Ledger Master Spec
 path: docs/plans/TRACE_ATTRACTOR_LEDGER_MASTER_SPEC.md
 slug: trace-attractor-ledger-master-spec
 doc_type: master_spec
-status: proposed
-summary: A bounded next-seam spec for turning partial trace propagation, SignalBus fanout, telic provenance, runtime artifacts, economic telemetry, and value events into one rebuildable operator-visible read model.
+status: shadow_implemented_not_runtime_authority
+summary: A bounded next-seam spec and shadow implementation for turning partial trace propagation, SignalBus fanout, telic provenance, runtime artifacts, economic telemetry, and value events into one rebuildable operator-visible read model.
 source:
   provenance: repo_local_plus_external_standards
   kind: execution_spec
@@ -56,7 +56,7 @@ connected_relevant_files:
   - dharma_swarm/operator_brief/value_events.py
 stigmergy:
   meaning: Defines the next bounded seam after the operator brief and value-event loop: a rebuildable trace-level projection that makes the existing substrates legible as one causal packet.
-  state: proposed
+  state: shadow_implemented
   semantic_weight: 0.93
   coordination_comment: Use this before implementing Dharma Radar, Hypernode evidence routing, or any cross-store trace consolidation.
   trace_role: next_seam_contract
@@ -64,9 +64,13 @@ stigmergy:
 
 # Trace Attractor Ledger Master Spec
 
-Status: proposed master spec.
+Status: shadow implemented, not runtime authority.
 
-Branch intent: spec only. Implementation must be a later PR series.
+Current code truth: `dharma_swarm/trace_attractor/` now contains typed packet
+models, a pure projector, read-only store readers, and regression tests. The
+implementation remains a shadow read model. It must not become a mutable source
+of truth, dashboard trigger, autonomy trigger, or merge excuse for unrelated
+work.
 
 ## One Sentence
 
@@ -101,9 +105,9 @@ This seam answers that question.
 
 ## Readiness Boundary
 
-This spec may merge immediately as a coordination artifact.
+This spec and the shadow read model may merge as coordination artifacts.
 
-Implementation must wait until one of these is true:
+Runtime/dashboard/autonomy wiring must wait until one of these is true:
 
 - The `dgc value-events` read has been used on real operator data for at least
   seven calendar days after the value-loop merge.

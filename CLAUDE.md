@@ -1,5 +1,11 @@
 # dharma_swarm — Claude Code Configuration
 
+## Current Repo Truth
+
+Before coding, read `AGENTS.md` and `docs/governance/BUILD_SESSION_ENTRYPOINT.md`.
+This file owns behavior; the build-session entrypoint owns the current
+operating picture, active locks, merge boundaries, and next-step queue.
+
 ## Behavioral Rules (Always Enforced)
 
 - Do what has been asked; nothing more, nothing less

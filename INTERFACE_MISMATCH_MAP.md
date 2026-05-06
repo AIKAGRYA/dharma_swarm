@@ -1,6 +1,6 @@
 # Interface Mismatch Map — dharma_swarm
 
-**Last X-Ray:** 2026-05-04 (high-roi-fixes audit against HEAD `daa15b7`)
+**Last X-Ray:** 2026-05-06 (current-truth refresh against `origin/main` + DocOps branch)
 **Previous version:** 2026-04-08 (55 module pairs, 13 mismatches, 9 prioritized)
 **Maintainer:** Guardian Crew (`guardian_crew.py`) — auto-updates every 4 hours
 **How to read this:** Severity = BLOCKER (crashes at runtime), DEGRADED (silent failure / wrong behavior), WARNING (structural smell).
@@ -32,7 +32,7 @@
 | NEW-10: lineage edges lack delegation chain | — | ✅ FIXED | `LineageEdge.delegated_by` + `trace_id` fields added; `agent_runner.spawn_worker` records delegation lineage |
 | NEW-11: TelicSeam singleton missing signal_bus | — | ✅ FIXED | `get_seam()` now passes `signal_bus=SignalBus.get()` to singleton |
 
-**Net change:** 11 resolved, 5 fixed prior sessions, 6 new entries (NEW-05 guarded, NEW-07/NEW-08 partially resolved, NEW-09/10/11 fixed), 0 open BLOCKERs, 4 structural degraded remain.
+**Net change:** 11 resolved, 5 fixed prior sessions, 6 new entries (NEW-05 guarded, NEW-07/NEW-08 partially resolved, NEW-09/10/11 fixed), 0 open BLOCKERs, 2 open DEGRADED mismatches remain, plus 1 guarded and 2 partial cross-cutting debts.
 
 ---
 
@@ -58,6 +58,15 @@
 **What's wrong:** `observe_cycle_result()` is called twice per cycle number (once with synthetic fitness, once with `auto_evolve` result). `n_object_cycles_per_meta=2` fires after 2 total calls — so meta-adaptation can trigger within a single evolution cycle, not after 2 separate cycles as intended.
 
 **Fix:** Only call `observe_cycle_result` once per cycle — with the actual `CycleResult` from `auto_evolve`, not the synthetic fitness estimate.
+
+---
+
+### MM-13 — DEGRADED: message_bus receive semantics
+
+**File:** `orchestrate_live.py`, `message_bus.py`
+**Status:** OPEN — receive semantics still need a focused contract check.
+
+**Fix:** Add an explicit contract test for the expected receive/blocking/timeout behavior, then align the caller or bus implementation to that test.
 
 ---
 
@@ -135,7 +144,7 @@ ROUTER_PROBE   — Reads circuit_breakers.json for open providers
 |---|-------------|--------|
 | 1 | `orchestrate_live` → `swarm.SwarmManager` | ✅ |
 | 2 | `swarm` → `orchestrator.Orchestrator` (public API) | ✅ |
-| 3 | `swarm` → `orchestrator._classify_failure` (private) | ⚠️ DEGRADED |
+| 3 | `swarm` → orchestrator retry policy API | ✅ |
 | 4 | `swarm` → `agent_runner.AgentPool` | ✅ |
 | 5 | `swarm` → `evolution.DarwinEngine` | ✅ |
 | 6 | `swarm` → `meta_evolution.MetaEvolutionEngine` | ⚠️ DEGRADED (cadence) |
@@ -143,7 +152,7 @@ ROUTER_PROBE   — Reads circuit_breakers.json for open providers
 | 8 | `swarm` → `organism.OrganismRuntime.samvara` | ✅ |
 | 9 | `swarm` → `witness.WitnessAuditor` | ✅ |
 | 10 | `swarm` → `stigmergy.StigmergyStore` | ✅ |
-| 11 | `orchestrate_live` → `persistent_agent.PersistentAgent` (replication) | ⚠️ BLOCKER |
+| 11 | `orchestrate_live` → `persistent_agent.PersistentAgent` (replication) | ✅ |
 | 12 | `orchestrate_live` → `message_bus.receive()` semantics | ⚠️ DEGRADED |
 | 13 | `orchestrate_live` → `meta_evolution.observe_cycle_result` cadence | ⚠️ DEGRADED |
 | 14 | `orchestrate_live` → `living_layers` (dual StigmergyStore) | ✅ |

@@ -7,6 +7,32 @@
 
 ---
 
+## 0. 2026-05-06 Current-Truth Addendum
+
+The April audit below is historical evidence. Do not treat its counts as current without checking `SOVEREIGN_MANIFEST.md` and `BUILD_SESSION_ENTRYPOINT.md`.
+
+Current verified deltas:
+
+- Python modules: 532.
+- Top-level Python modules: 381.
+- Test files: 535.
+- Test collection: 9,729 tests collected, exit 0 on 2026-05-06.
+- Markdown files: 635.
+- Markdown total lines: 164,408.
+- Bridge files: 17 after PR #95 removed four zombie bridges.
+- Authority-candidate Markdown files in DocOps inventory: 260.
+
+Current operating shift:
+
+- Operator Brief v0 is implemented and witnessed, not merely planned.
+- `dgc value-events` exists as the first value-loop read surface.
+- Trace Attractor has shadow packet/projector/reader code and tests, but remains a read model rather than runtime authority.
+- DocOps integrity is staged on the truth-refresh branch and should be merged before further broad documentation work.
+
+Replacement owner for live status: [`BUILD_SESSION_ENTRYPOINT.md`](BUILD_SESSION_ENTRYPOINT.md).
+
+---
+
 ## 1. VERIFIED NUMBERS
 
 | Metric | CLAUDE.md Claim | NAVIGATION.md Claim | Actual (2026-04-04) | Verdict |

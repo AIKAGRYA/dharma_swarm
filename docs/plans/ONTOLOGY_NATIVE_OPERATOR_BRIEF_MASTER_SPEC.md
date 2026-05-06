@@ -1,9 +1,27 @@
 # Master Build Spec — Ontology-Native Operator Brief (Daily Insight Brief)
 
-**Status:** spec, not implemented
+**Status:** implemented v0; this remains the contract and regression checklist.
 **Owner of:** the contract for the first ontology-native seam in dharma_swarm.
 **Read first:** [`docs/governance/BUILD_SESSION_ENTRYPOINT.md`](../governance/BUILD_SESSION_ENTRYPOINT.md), [`docs/governance/SOVEREIGN_MANIFEST.md`](../governance/SOVEREIGN_MANIFEST.md), [`reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md`](../../reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md).
 **Companion:** [`HANDOFF_ONTOLOGY_NATIVE_OPERATOR_BRIEF.md`](HANDOFF_ONTOLOGY_NATIVE_OPERATOR_BRIEF.md) (copy-paste handoff for the next code agent).
+
+---
+
+## 0. Implementation Status (2026-05-06)
+
+This spec is no longer aspirational. The v0 seam exists on current main:
+
+| Requirement | Current evidence |
+|---|---|
+| Operator Brief package | `dharma_swarm/operator_brief/__init__.py`, `insight_brief.py`, `persistence.py`, `types.py`, `watchdog.py`, `value_events.py` |
+| Cron integration | `dharma_swarm/cron_runner.py` handles `operator_brief`; feature flag remains `DHARMA_OPERATOR_BRIEF_ENABLED` |
+| Ontology artifact and gates | `tests/test_operator_brief_insight_brief.py` covers creation, gate-block, runtime artifact, cron, and no raw bypass paths |
+| Runtime artifact row | `dharma_swarm/operator_brief/persistence.py` records `ArtifactRecord` through `RuntimeStateStore.record_artifact()` |
+| Live first tick | `reports/witness/2026-05-05-operator-brief-first-tick.md` captures artifact, proposal, gate, outcome, value, and witness ids |
+| Empty-output guard | `dharma_swarm/operator_brief/watchdog.py` feeds `guardian_crew.py` findings |
+| Value read surface | `dgc value-events --since <date>` is implemented by `dharma_swarm/operator_brief/value_events.py` |
+
+Remaining proof boundary: `dgc value-events` still needs real operator usage over time before the next seam is treated as unlocked. The Trace Attractor read model has a shadow implementation, but runtime/dashboard/autonomy wiring remains gated.
 
 ---
 
@@ -43,17 +61,21 @@ The following are explicitly out of scope for this seam:
 
 ## 4. Files and modules touched
 
-This seam is intentionally narrow. Listed in expected order of edit:
+This seam was intentionally narrow. The original expected edit list was:
 
 | File | Action | Why |
 |---|---|---|
-| `dharma_swarm/operator_brief/__init__.py` | new | package marker for new subdirectory (axiom A1: no flat top-level growth) |
-| `dharma_swarm/operator_brief/insight_brief.py` | new | sole new logic module: `generate_operator_brief()`, `_apply_gates()`, `_materialise_artifact()` |
-| `cron_jobs.json` | edit | one new cron entry pointing at `insight_brief.run_once` |
-| `dharma_swarm/cron_scheduler.py` | edit | dispatch the new entry. Confirm the existing dispatch already handles named callable; if it does, no edit needed here. |
-| `tests/test_operator_brief_insight_brief.py` | new | the three required tests in §10 |
+| `dharma_swarm/operator_brief/__init__.py` | implemented | package marker for new subdirectory (axiom A1: no flat top-level growth) |
+| `dharma_swarm/operator_brief/insight_brief.py` | implemented | main seam entrypoint and gate/materialisation orchestration |
+| `dharma_swarm/operator_brief/persistence.py` | implemented | artifact file, ontology object, and `RuntimeStateStore.artifact_records` persistence |
+| `dharma_swarm/operator_brief/watchdog.py` | implemented | empty-output Guardian sub-check |
+| `dharma_swarm/operator_brief/value_events.py` | implemented | read-only `dgc value-events` aggregation |
+| `dharma_swarm/cron_runner.py` | implemented | cron handler dispatches the seam |
+| `tests/test_operator_brief_insight_brief.py` | implemented | regression coverage for the seam |
+| `tests/test_guardian_crew.py` | implemented | ledger watcher cases |
+| `tests/test_value_events_cli.py` | implemented | value read surface |
 
-Do not touch any other file. If you find you need to, pause and re-read [`SOVEREIGN_MANIFEST.md`](../governance/SOVEREIGN_MANIFEST.md) §SHARED INVARIANTS and the audit synthesis §5.
+Future changes must remain as narrow as this seam. If you need to touch unrelated routers, bridges, adapters, ledgers, or stores, pause and re-read [`SOVEREIGN_MANIFEST.md`](../governance/SOVEREIGN_MANIFEST.md) and the audit synthesis §5.
 
 ## 5. Typed objects used
 
@@ -154,16 +176,22 @@ The seam is accepted when, simultaneously:
 
 The "best effort, never blocks" pattern called out by the audit is explicitly rejected. Every failure produces a row.
 
-## 13. Rollout sequence
+## 13. Rollout Status
 
-1. Land this spec, the entrypoint, and the next-10 todo (this PR).
-2. Implement module + tests behind feature flag (`NEXT_10_SUBSTRATE_TODO` item 5). Do not flip the flag in this PR.
-3. Code review against §11 acceptance criteria. No merge until tests pass.
-4. Flip flag for one operator profile, capture first-tick report (`NEXT_10_SUBSTRATE_TODO` item 6).
-5. Wire artifact rows into `RuntimeStateStore.artifact_records` (`NEXT_10_SUBSTRATE_TODO` item 7).
-6. Add Guardian `LEDGER_WATCHER` thresholds (`NEXT_10_SUBSTRATE_TODO` item 8).
-7. Add `dgc value-events` read surface (`NEXT_10_SUBSTRATE_TODO` item 9).
-8. Only after item 9: open Dharma Radar v0 design (`NEXT_10_SUBSTRATE_TODO` item 10).
+Completed:
+
+1. Spec, entrypoint, and next-10 todo landed.
+2. Module and tests landed behind `DHARMA_OPERATOR_BRIEF_ENABLED`.
+3. First live tick witnessed in `reports/witness/2026-05-05-operator-brief-first-tick.md`.
+4. Artifact rows wired into `RuntimeStateStore.artifact_records`.
+5. Guardian `LEDGER_WATCHER` thresholds landed.
+6. `dgc value-events` read surface landed.
+
+Still gated:
+
+7. Real operator use of `dgc value-events` over at least seven calendar days, or an explicit Fourfold Action Warrant override.
+8. Any runtime/dashboard/autonomy expansion from the Trace Attractor shadow read model.
+9. Dharma Radar v0 design.
 
 ## 14. Open questions deferred out of v0
 

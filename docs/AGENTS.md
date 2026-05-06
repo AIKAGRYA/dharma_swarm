@@ -12,7 +12,7 @@ Only these files may make repo-level authority claims:
 - `CLAUDE.md` for agent behavior.
 - `docs/governance/SOVEREIGN_MANIFEST.md` for architecture, domains, invariants, and measured repo state.
 - `docs/governance/CANONICAL_DOC_STACK.md` for document hierarchy and ownership.
-- `docs/governance/BUILD_SESSION_ENTRYPOINT.md` for current build track and read order.
+- `docs/governance/BUILD_SESSION_ENTRYPOINT.md` for current operating picture, current build track, locks, next steps, and read order.
 - `docs/governance/REPO_GOVERNANCE_AUDIT.md` for contradictions and staleness.
 
 All other docs must declare a narrower role: reference, plan, report, witness, archive, research, or experiment.

@@ -1,7 +1,7 @@
 # CANONICAL DOC STACK
 
-**Date**: 2026-04-04
-**Purpose**: Define the minimal root-adjacent file stack for repo integrity.
+**Date**: 2026-05-06 refresh
+**Purpose**: Define the minimal root-adjacent file stack for repo integrity and current-truth routing.
 
 ---
 
@@ -10,6 +10,7 @@
 ```
 TIER 1 — MANDATORY FIRST-READ (agents MUST ingest before any action)
 ├── CLAUDE.md                          → Agent operating instructions (OWNER of: behavioral rules, architecture, build commands)
+├── docs/governance/BUILD_SESSION_ENTRYPOINT.md → Current operating picture (OWNER of: current track, locks, next steps)
 ├── docs/governance/SOVEREIGN_MANIFEST.md → Repo ground truth (OWNER of: axioms, domain map, invariants, locks)
 │
 TIER 2 — DOMAIN REFERENCE (read when working in that domain)
@@ -40,6 +41,7 @@ TIER 5 — ARCHIVE (do not read unless investigating history)
 | Kind of Truth | Canonical File | All Others Must Defer |
 |---------------|---------------|----------------------|
 | Agent behavior rules | `CLAUDE.md` | — |
+| Current code truth, locks, and next-step queue | `BUILD_SESSION_ENTRYPOINT.md` | plans and reports must defer |
 | Repo axioms & domain map | `SOVEREIGN_MANIFEST.md` | — |
 | Module-level what-does-what | `NAVIGATION.md` | — |
 | Model/provider routing | `MODEL_ROUTING_CANON.md` | model_routing.py files must not contradict |
@@ -61,7 +63,7 @@ using phrases such as "source of truth", "canonical", "authoritative", or
 | `AGENTS.md` | Cross-agent repo instructions and mandatory read order |
 | `CLAUDE.md` | Behavioral rules for coding agents |
 | `docs/AGENTS.md` | Documentation-specific cleanup and semantic-experiment rules |
-| `docs/governance/BUILD_SESSION_ENTRYPOINT.md` | Current build track and pre-change read order |
+| `docs/governance/BUILD_SESSION_ENTRYPOINT.md` | Current operating picture, current build track, locks, and pre-change read order |
 | `docs/governance/SOVEREIGN_MANIFEST.md` | Repo architecture, invariants, domains, measured state |
 | `docs/governance/CANONICAL_DOC_STACK.md` | Documentation hierarchy and ownership |
 | `docs/governance/REPO_GOVERNANCE_AUDIT.md` | Contradiction, staleness, and drift ledger |
@@ -151,7 +153,7 @@ spec with tests or witness evidence.
 
 ## Frontmatter Policy
 
-The Codex (GPT-5) frontmatter injection is present in 214 of 632 Markdown
+The Codex (GPT-5) frontmatter injection is present in 214 of 635 Markdown
 files, including 15 of 20 `docs/architecture` files. Policy going forward:
 
 1. **Root governance docs** (Tier 1-2): NO frontmatter. Plain markdown. Maximum clarity.

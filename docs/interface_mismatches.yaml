@@ -1,27 +1,27 @@
 # Interface Mismatch Registry — machine-readable source of truth
 # Kept in sync with INTERFACE_MISMATCH_MAP.md
-# Updated: 2026-05-04 (correlation-context session)
+# Updated: 2026-05-06 (current-truth refresh)
 
 mismatches:
   - id: MM-02
     title: "PersistentAgent enum deserialization"
     severity: BLOCKER
-    status: STILL_LIVE
-    caller: orchestrate_live.py:1247
+    status: RESOLVED
+    caller: orchestrate_live.py:1361-1366
     callee: persistent_agent.PersistentAgent.__init__
     description: >
-      Bare string passed for AgentRole/ProviderType instead of enum.
-      Pydantic lax mode may coerce but breaks on invalid values.
+      Replication path now wraps child role/provider strings with AgentRole()
+      and ProviderType(). Conductor path uses enum-valued configs.
 
   - id: MM-05
     title: "Private Orchestrator method coupling"
     severity: DEGRADED
-    status: OPEN
-    caller: swarm.py:1883-1895
-    callee: orchestrator._classify_failure, _resolve_retry_policy
+    status: RESOLVED
+    caller: swarm.py:1977-1985
+    callee: orchestrator.retry_policy_for_failure
     description: >
-      swarm.py calls single-underscore private methods on orchestrator.
-      Any internal refactor silently breaks retry logic.
+      Orchestrator.retry_policy_for_failure() is now the public API.
+      swarm.py no longer calls the private retry helpers directly.
 
   - id: MM-07
     title: "MetaEvolutionEngine cadence mismatch"
@@ -171,7 +171,7 @@ mismatches:
 
 # Summary counts:
 # Total entries: 16
-# RESOLVED: 9 (MM-12, MM-17, MM-18, NEW-01, NEW-02, NEW-04, NEW-09, NEW-10, NEW-11)
-# STILL_LIVE/OPEN: 4 (MM-02, MM-05, MM-07, MM-13)
+# RESOLVED: 11 (MM-02, MM-05, MM-12, MM-17, MM-18, NEW-01, NEW-02, NEW-04, NEW-09, NEW-10, NEW-11)
+# STILL_LIVE/OPEN: 2 (MM-07, MM-13)
 # GUARDED: 1 (NEW-05)
 # PARTIAL: 2 (NEW-07, NEW-08)

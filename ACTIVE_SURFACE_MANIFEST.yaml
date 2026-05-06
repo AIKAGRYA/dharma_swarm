@@ -5,7 +5,7 @@
 # Any edit to hot-path modules requires ACK/warrant path documented here.
 
 schema_version: 1
-last_updated: "2026-05-04"
+last_updated: "2026-05-06"
 
 state_dir:
   canonical: "~/.dharma"
@@ -15,6 +15,7 @@ state_dir:
   sessions: "~/.dharma/sessions"
   economics: "~/.dharma/economics"
   revenue_packets: "~/.dharma/revenue_packets"
+  operator_brief_artifacts: "~/.dharma/artifacts/operator_brief"
   env_override: "DHARMA_STATE_DIR"
 
 api_routers:
@@ -100,6 +101,24 @@ hot_path_modules:
   - module: dharma_swarm/telic_seam.py
     ack_required: true
     warrant: "Ontology write-through. Must pass test_telic_seam."
+  - module: dharma_swarm/operator_brief/insight_brief.py
+    ack_required: true
+    warrant: "First ontology-native operator seam. Must pass test_operator_brief_insight_brief."
+  - module: dharma_swarm/operator_brief/persistence.py
+    ack_required: true
+    warrant: "Operator Brief artifact and runtime_state artifact_records persistence."
+  - module: dharma_swarm/operator_brief/watchdog.py
+    ack_required: true
+    warrant: "Guardian empty-output protection for operator brief cron."
+  - module: dharma_swarm/operator_brief/value_events.py
+    ack_required: true
+    warrant: "Read-only value loop surface for operator brief."
+  - module: dharma_swarm/trace_attractor/projector.py
+    ack_required: true
+    warrant: "Shadow trace read model; must remain pure and rebuildable."
+  - module: dharma_swarm/trace_attractor/readers.py
+    ack_required: true
+    warrant: "Read-only event collection from ontology/runtime/telemetry stores."
 
 governance_rules:
   semgrep_rule_1:
@@ -115,6 +134,29 @@ governance_rules:
       - hotpath-ack
       - mismatch-adjacency
       - assurance-diff
+  docops_integrity:
+    description: "Machine-verifiable documentation assertions, path guards, authority guard, and generated inventory checks"
+    enforced_by: scripts/docops/check_docops_integrity.py
+  current_truth:
+    description: "Current operating picture, locks, and next-step queue"
+    authority_doc: docs/governance/BUILD_SESSION_ENTRYPOINT.md
+
+operator_brief:
+  status: implemented_v0
+  feature_flag: DHARMA_OPERATOR_BRIEF_ENABLED
+  artifact_kind: operator_brief
+  package: dharma_swarm/operator_brief
+  value_read: "dgc value-events --since <date>"
+  witness_report: reports/witness/2026-05-05-operator-brief-first-tick.md
+  next_gate: "Seven calendar days of real value-events use, or explicit Fourfold Action Warrant override"
+
+trace_attractor:
+  status: shadow_implemented_not_runtime_authority
+  package: dharma_swarm/trace_attractor
+  tests:
+    - tests/test_trace_attractor_projection.py
+    - tests/test_trace_attractor_readers.py
+  runtime_wiring: gated
 
 opportunity_stages:
   - scope
