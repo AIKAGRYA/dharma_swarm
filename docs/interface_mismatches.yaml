@@ -18,7 +18,7 @@
 
 version: 1
 generated_from: INTERFACE_MISMATCH_MAP.md
-last_synced: "2026-04-19"
+last_synced: "2026-05-06"
 
 entries:
   - id: MISMATCH-01
@@ -35,43 +35,49 @@ entries:
 
   - id: MISMATCH-02
     severity: BLOCKER
-    status: open
+    status: resolved
     caller: dharma_swarm/orchestrate_live.py:1247
     callee: dharma_swarm/persistent_agent.py:51-52
     summary: >-
-      `role` and `provider_type` passed as raw strings; PersistentAgent.__init__
-      requires AgentRole and ProviderType enums. Pydantic v2 strict mode rejects.
-      Replication outcome path crashes here.
-    test_path: tests/mismatches/test_MISMATCH_02.py
+      Replication child materialization used to pass `role` as a raw string
+      into PersistentAgent. orchestrate_live now coerces the serialized
+      child_spec role through AgentRole(...) before constructing the agent.
+    fixed_in: 98341b4
+    test_path: tests/test_interface_mismatch_registry.py
 
   - id: MISMATCH-03
     severity: BLOCKER
-    status: open
+    status: resolved
     caller: dharma_swarm/orchestrate_live.py:1248
     callee: dharma_swarm/persistent_agent.py:52
     summary: >-
-      provider_type=outcome.child_spec.get("default_provider", "openrouter_free")
-      is a bare string — Pydantic v2 strict-mode validation rejects.
-    test_path: tests/mismatches/test_MISMATCH_03.py
+      Replication child materialization used to pass default_provider as a raw
+      string into PersistentAgent. orchestrate_live now coerces the serialized
+      provider through ProviderType(...) before constructing the agent.
+    fixed_in: 98341b4
+    test_path: tests/test_interface_mismatch_registry.py
 
   - id: MISMATCH-05
     severity: DEGRADED
-    status: open
+    status: resolved
     caller: dharma_swarm/orchestrate_live.py:359
     callee: dharma_swarm/message_bus.py:193
     summary: >-
-      receive("evolution_loop", limit=20) — `status` defaults to "unread"; after
-      mark_read the messages become invisible to the next receive() call. Silent
-      data loss in the evolution loop's message visibility.
-    test_path: tests/mismatches/test_MISMATCH_05.py
+      Evolution loop message visibility used receive()/mark_read semantics that
+      made prior lifecycle events invisible on later cycles. orchestrate_live now
+      drains durable AGENT_FITNESS and AGENT_LIFECYCLE_COMPLETED events with
+      consume_events().
+    fixed_in: b7f5c3e
+    test_path: tests/test_interface_mismatch_registry.py
 
   - id: MISMATCH-07
     severity: DEGRADED
-    status: open
+    status: resolved
     caller: dharma_swarm/swarm.py:363-370
     callee: dharma_swarm/auto_proposer.py:157
     summary: >-
-      AutoProposer accepts stigmergy: StigmergyStore | None but several internal
-      methods call await self._stigmergy.read_marks(...) without None-guard.
-      If StigmergyStore init fails, AutoProposer crashes on first cycle.
-    test_path: tests/mismatches/test_MISMATCH_07.py
+      AutoProposer accepts stigmergy: StigmergyStore | None. The hotspot
+      observer now returns no observations when stigmergy is absent instead of
+      dereferencing None.
+    fixed_in: working-tree (guard present in auto_proposer._observe_hotspots)
+    test_path: tests/test_interface_mismatch_registry.py

@@ -611,8 +611,8 @@ async def test_full_loop_closure(tmp_path: Path) -> None:
     """
     from dharma_swarm.task_board import TaskBoard
     from dharma_swarm.orchestrator import Orchestrator
-    from dharma_swarm.stigmergy import StigmergyStore, StigmergicMark
-    from dharma_swarm.signal_bus import SignalBus
+    from dharma_swarm.stigmergy import StigmergyStore
+    from dharma_swarm.signal_bus import SignalBus, SIGNAL_LIFECYCLE_COMPLETED
     from dharma_swarm.models import (
         AgentState,
         AgentStatus,
@@ -633,8 +633,9 @@ async def test_full_loop_closure(tmp_path: Path) -> None:
     stigmergy_path = state_dir / "stigmergy"
     store = StigmergyStore(base_path=stigmergy_path)
 
-    # Signal bus
-    bus = SignalBus(ttl_seconds=300.0)
+    # Shared signal bus used by the real orchestrator completion path.
+    bus = SignalBus.get()
+    bus.clear()
 
     # Mock LLM provider — returns a fixed response
     FIXED_RESPONSE = "The answer is 42."
@@ -726,42 +727,33 @@ async def test_full_loop_closure(tmp_path: Path) -> None:
         f"result={completed_task.result!r}"
     )
 
-    mark = StigmergicMark(
-        agent=agent_id,
-        file_path=f"tasks/{task.id}",
-        action="write",
-        observation=f"Task completed: {completed_task.title}",
-        salience=0.75,
-    )
-    mark_id = await store.leave_mark(mark)
-    assert mark_id, "Stigmergy mark must have an id"
-
-    # Step 5: emit completion signal to signal bus
-    bus.emit({
-        "type": "TASK_COMPLETED",
-        "task_id": task.id,
-        "agent_id": agent_id,
-        "result_preview": TASK_RESULT[:80],
-    })
-
-    # Step 6: verify result is stored (the feedback that closes the loop)
+    # Step 5: verify result is stored (the feedback that closes the loop)
     # Note: the orchestrator writes the result from run_task() directly
     assert completed_task.result == TASK_RESULT
 
-    # Step 7: verify stigmergy mark is readable (ADAPT input for next tick).
-    # The orchestrator may also leave its own marks on task completion
-    # (this is the real loop working) — assert at least our mark exists.
+    # Step 6: verify the orchestrator's own stigmergy mark is readable
+    # (ADAPT input for next tick). The test must not fake this evidence.
     marks = await store.read_marks(limit=10)
-    assert len(marks) >= 1, "At least one stigmergy mark must exist after task completion"
-    agent_marks = [m for m in marks if m.agent == agent_id]
-    assert len(agent_marks) >= 1, f"Mark from {agent_id} must exist; got agents {[m.agent for m in marks]}"
+    orchestrator_marks = [
+        mark for mark in marks
+        if mark.file_path == f"task:{task.id[:8]}" and mark.action == "write"
+    ]
+    assert orchestrator_marks, (
+        "The orchestrator completion path must leave the stigmergy mark; "
+        f"got marks={[(m.agent, m.file_path, m.action) for m in marks]}"
+    )
+    assert orchestrator_marks[0].observation.startswith(
+        "Integration task completed with mock LLM"
+    )
 
-    # Step 8: verify signal bus has the completion event
-    events = bus.drain(event_types=["TASK_COMPLETED"])
-    assert len(events) == 1
-    assert events[0]["task_id"] == task.id
+    # Step 7: verify the real completion signal was emitted.
+    events = bus.drain(event_types=[SIGNAL_LIFECYCLE_COMPLETED])
+    matching = [event for event in events if event.get("task_id") == task.id]
+    assert matching, f"Expected lifecycle completion for {task.id}, got {events}"
+    assert matching[0]["agent_id"] == agent_id
+    assert matching[0]["result_chars"] == len(TASK_RESULT)
 
-    # Step 9: second tick — orchestrator should see no pending tasks
+    # Step 8: second tick — orchestrator should see no pending tasks
     tick2 = await orch.tick()
     assert tick2["dispatched"] == 0, "No new tasks: dispatched must be 0"
     # tick2 may have settled the completed work
