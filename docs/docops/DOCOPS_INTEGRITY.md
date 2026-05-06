@@ -1,0 +1,127 @@
+# DocOps Integrity System
+
+**Status:** v0 governance gate
+**Owner:** `docs/governance/CANONICAL_DOC_STACK.md`
+**Checker:** `scripts/docops/check_docops_integrity.py`
+
+## Purpose
+
+Documentation in a multi-agent repository decays at code-change speed. The
+fix is not more prose. The fix is tested documentation infrastructure: claims,
+paths, authority, generated inventory, review hints, and freshness are checked
+by a repeatable script.
+
+## Primitives
+
+1. **Executable doc assertions**: `docs/docops/assertions.yaml` pairs selected
+   count-sensitive claims with a metric and a human verification command. The
+   checker fails when the doc claim and filesystem metric diverge.
+2. **Path existence guards**: managed docs are scanned for Markdown links and
+   simple backticked file paths. Missing repo paths fail the gate.
+3. **Canonical registry enforcement**: managed docs that use authority terms
+   such as "source of truth", "canonical", "authoritative", or "ground truth"
+   must be registered in `docs/governance/CANONICAL_DOC_STACK.md`.
+4. **Auto-generated sections**: generated blocks use markers of the form
+   `<!-- DOCOPS:START metric=repo_inventory -->` and are refreshed by the
+   checker with `--write-auto-sections`.
+5. **Change-triggered doc review**: `--changed-from <ref>` reports docs that
+   mention changed Python files. This is advisory so it can guide PR review
+   without blocking unrelated code fixes.
+6. **Staleness TTL**: the assertion config has `verified_at` and `ttl_days`.
+   Expired assertions fail until the verification date is refreshed.
+
+## Commands
+
+Run the full managed check:
+
+```bash
+python scripts/docops/check_docops_integrity.py
+```
+
+Refresh generated sections:
+
+```bash
+python scripts/docops/check_docops_integrity.py --write-auto-sections
+```
+
+Review docs affected by code changes:
+
+```bash
+python scripts/docops/check_docops_integrity.py --changed-from origin/main
+```
+
+Write a machine-readable check report for CI or agent handoff:
+
+```bash
+python scripts/docops/check_docops_integrity.py --report-json reports/docops/check.json
+```
+
+Write a non-blocking corpus inventory for cleanup planning:
+
+```bash
+python scripts/docops/check_docops_integrity.py \
+  --inventory-json reports/docops/corpus_inventory.json \
+  --inventory-markdown reports/docops/corpus_inventory.md
+```
+
+## Scope
+
+This v0 intentionally checks the live governance and navigation surface first.
+It does not try to make every historical plan, prompt, archive, generated
+report, or research memo clean in one pass. Those files remain debt until they
+are promoted, archived, or brought under managed DocOps scope.
+
+## Failure Policy
+
+- Assertion mismatch: blocking.
+- Missing managed path reference: blocking.
+- Unregistered authority term in managed docs or changed docs: blocking.
+- Stale auto-generated section: blocking unless regenerated.
+- Changed-code doc candidates: warning only.
+- Expired `verified_at`: blocking.
+
+## Corpus Inventory
+
+The inventory mode scans a requested Markdown glob, defaults to all Markdown,
+and reports authority-term candidates, frontmatter files, absolute local repo
+paths, and a capped sample of missing references. It is deliberately
+non-blocking. Use it to assign cleanup lanes, not to reject commits.
+
+## CI
+
+`.github/workflows/docops.yml` runs the blocking DocOps gate on pull requests,
+manual dispatch, and a weekly schedule. The scheduled run exercises the
+`verified_at` TTL so stale assertion dates surface without waiting for a code
+change. The workflow also uploads JSON and Markdown inventory artifacts for
+cleanup agents.
+
+## PR-Ready Promotion Shape
+
+The current v0 branch is shaped for review as a governance/tooling change, not
+a runtime change:
+
+- It adds a local checker with stdlib-only parsing.
+- It adds focused tests for assertions, path guards, registry checks,
+  generated sections, TTL, review routing, and report generation.
+- It wires the check into local governance and a dedicated CI workflow.
+- It keeps generated reports under ignored `reports/docops/` output.
+- It leaves runtime, ontology, dashboard, provider, and agent execution code
+  untouched.
+
+Expected PR verification:
+
+```bash
+make docops-integrity
+make docops-report
+pre-commit run dharma-docops-integrity --all-files
+pre-commit run dharma-test-hygiene --all-files
+pre-commit run semgrep-local --all-files
+python3 -m compileall scripts/docops/check_docops_integrity.py tests/test_docops_integrity.py
+git diff --check
+```
+
+Related experimental docs:
+
+- `docs/docops/SEMANTIC_CODEC_V0.md`
+- `docs/docops/SEMANTIC_CODEC_OFFLINE_EXPERIMENT_2026_05_05.md`
+- `docs/docops/DAILY_OPERATING_BRIEF_FEED.md`

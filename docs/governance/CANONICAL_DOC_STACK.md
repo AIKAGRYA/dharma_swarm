@@ -50,6 +50,73 @@ TIER 5 — ARCHIVE (do not read unless investigating history)
 
 ---
 
+## Authority Registry
+
+Only the files below may claim repo-wide canonical authority. Any other file
+using phrases such as "source of truth", "canonical", "authoritative", or
+"ground truth" must scope the claim to its local domain or be corrected.
+
+| File | Authority Boundary |
+|------|--------------------|
+| `AGENTS.md` | Cross-agent repo instructions and mandatory read order |
+| `CLAUDE.md` | Behavioral rules for coding agents |
+| `docs/AGENTS.md` | Documentation-specific cleanup and semantic-experiment rules |
+| `docs/governance/BUILD_SESSION_ENTRYPOINT.md` | Current build track and pre-change read order |
+| `docs/governance/SOVEREIGN_MANIFEST.md` | Repo architecture, invariants, domains, measured state |
+| `docs/governance/CANONICAL_DOC_STACK.md` | Documentation hierarchy and ownership |
+| `docs/governance/REPO_GOVERNANCE_AUDIT.md` | Contradiction, staleness, and drift ledger |
+| `docs/architecture/NAVIGATION.md` | Module map, after count refresh |
+| `docs/architecture/MODEL_ROUTING_CANON.md` | Provider/model routing, after merge with root routing map |
+| `PRODUCT_SURFACE.md` | Product-surface precedence for dashboard, browser shell, and desktop shell |
+| `specs/DGC_TERMINAL_ARCHITECTURE_v1.1.md` | Terminal protocol, after Bun/Textual split is reconciled |
+| `specs/Dharma_Constitution_v0.md` | Constitutional rules |
+| `specs/KERNEL_CORE_SPEC.md` | Kernel immutability |
+
+All reports, plans, prompts, generated outputs, missions, and research notes
+are evidence or context unless explicitly promoted through this registry.
+
+---
+
+## DocOps Lifecycle
+
+Use this lifecycle before moving or deleting docs:
+
+1. **Inventory**: identify current claims, incoming links, and replacement owner.
+2. **Demote**: mark stale or historical docs with replacement and reason.
+3. **Redirect**: update live links to the replacement owner.
+4. **Archive**: move only after links and hardcoded paths are accounted for.
+5. **Delete later**: remove only generated or duplicate material with no remaining authority or path dependency.
+
+Documentation PRs should classify changed files as one of:
+`canon`, `ADR`, `active_spec`, `working_plan`, `report`, `witness`,
+`reference`, `archive`, or `experiment`.
+
+---
+
+## Agent-Native Semantic Layer
+
+AI-to-AI compressed language and emergent semantic ontologies are valid
+research directions, but they are not canonical documentation or runtime
+authority by default.
+
+Allowed now:
+
+- read-only extraction of repeated semantic patterns during doc cleanup;
+- reports or plans that include a human-readable legend;
+- round-trip experiments where compact agent messages expand back to clear
+  English and cite source files.
+
+Not allowed yet:
+
+- opaque compact language controlling runtime behavior;
+- new ontology schema created from clustering alone;
+- hidden symbolic instructions that replace docs, gates, witnesses, or ADRs.
+
+If a semantic pattern becomes load-bearing, promote it through an ADR or active
+spec with tests or witness evidence.
+
+---
+
 ## Deprecation / Merge Decisions
 
 ### DEPRECATE (move to docs/archive/)
@@ -84,7 +151,8 @@ TIER 5 — ARCHIVE (do not read unless investigating history)
 
 ## Frontmatter Policy
 
-The Codex (GPT-5) frontmatter injection added 80+ lines of YAML to every markdown file. Policy going forward:
+The Codex (GPT-5) frontmatter injection is present in 214 of 632 Markdown
+files, including 15 of 20 `docs/architecture` files. Policy going forward:
 
 1. **Root governance docs** (Tier 1-2): NO frontmatter. Plain markdown. Maximum clarity.
 2. **Architecture docs** (Tier 2-3): Minimal frontmatter (title, date, status only — 5 lines max).

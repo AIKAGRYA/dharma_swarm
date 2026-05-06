@@ -39,7 +39,7 @@ jobs:
         # security pack. Phase 4 will hard-fail on dharma-anti-slop rules;
         # for now CI is fail-on-ERROR and warn-on-WARNING.
         run: |
-          semgrep ci \
+          scripts/governance/run_semgrep_with_ca.sh ci \
             --config .semgrep \
             --config p/python \
             --config p/owasp-top-ten \
@@ -68,7 +68,7 @@ jobs:
           fi
 
           if [ -n "$base" ] && git cat-file -e "$base^{commit}" 2>/dev/null; then
-            semgrep --config .semgrep --error --metrics=off --baseline-commit "$base"
+            scripts/governance/run_semgrep_with_ca.sh --config .semgrep --error --metrics=off --baseline-commit "$base"
           else
-            semgrep --config .semgrep --error --metrics=off
+            scripts/governance/run_semgrep_with_ca.sh --config .semgrep --error --metrics=off
           fi

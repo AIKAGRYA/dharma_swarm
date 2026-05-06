@@ -1,7 +1,7 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts uplift-guards module-budget governance-all
+.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts uplift-guards module-budget docops-integrity docops-report governance-all
 
 PYTHON ?= python3
 SEMGREP ?= scripts/governance/run_semgrep_with_ca.sh
@@ -33,6 +33,8 @@ help:
 	@echo "  make governance-baseline Capture scanner baselines"
 	@echo "  make test-contracts Run governance contract tests"
 	@echo "  make uplift-guards Run uplift pre-commit guards"
+	@echo "  make docops-integrity Run machine-verifiable documentation checks"
+	@echo "  make docops-report Generate local DocOps JSON/Markdown reports"
 	@echo ""
 
 install:
@@ -131,6 +133,8 @@ semgrep:
 	# Phase 1 is warn-only locally so the install does not block on the
 	# 4 pre-existing real findings (3 shell=True + 1 eval). CI (Phase 2)
 	# uses the stricter mode below; Phase 4 promotes anti-slop rules to ERROR.
+	# The wrapper expands --config .semgrep to production configs only;
+	# .semgrep/tests remains reserved for explicit rule-test runs.
 	$(SEMGREP) --config .semgrep --metrics=off
 
 semgrep-strict:
@@ -176,4 +180,14 @@ module-budget:
 	$(PYTHON) scripts/governance/check_module_budget.py \
 		--base-ref origin/main --head-ref HEAD
 
-governance-all: semgrep gitleaks test-hygiene test-contracts uplift-guards module-budget
+docops-integrity:
+	$(PYTHON) scripts/docops/check_docops_integrity.py
+
+docops-report:
+	@mkdir -p reports/docops
+	$(PYTHON) scripts/docops/check_docops_integrity.py \
+		--report-json reports/docops/check.json \
+		--inventory-json reports/docops/corpus_inventory.json \
+		--inventory-markdown reports/docops/corpus_inventory.md
+
+governance-all: semgrep gitleaks test-hygiene test-contracts uplift-guards module-budget docops-integrity

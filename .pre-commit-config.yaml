@@ -38,6 +38,13 @@ repos:
         pass_filenames: false
         always_run: true
         stages: [pre-commit]
+      - id: dharma-docops-integrity
+        name: dharma docops integrity
+        entry: python3 scripts/docops/check_docops_integrity.py
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
 
   # ---------------------------------------------------------------------------
   # Gitleaks — secret scanning on staged content.
@@ -49,14 +56,14 @@ repos:
         name: gitleaks (secret scan)
 
   # ---------------------------------------------------------------------------
-  # Semgrep — local config only (no registry fetch on commit; CI does that).
+  # Semgrep — production local config only (no registry fetch on commit; CI does that).
   # Phase 1 enforces only proof-of-life + the curated security pack.
   # Phase 4 expands `.semgrep/dharma-anti-slop.yml` with 10 rules.
   # ---------------------------------------------------------------------------
   - repo: local
     hooks:
       - id: semgrep-local
-        name: semgrep (.semgrep/ local rules, warn-only in Phase 1)
+        name: semgrep (production .semgrep rules, warn-only in Phase 1)
         # Phase 1 is warn-only so the install does not block on the 4
         # pre-existing real findings. CI (Phase 2) runs in strict mode;
         # Phase 4 promotes anti-slop rules to ERROR locally as well.

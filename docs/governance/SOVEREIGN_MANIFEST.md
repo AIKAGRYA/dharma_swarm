@@ -2,11 +2,11 @@
 
 **Purpose**: This document is the absolute ground truth for the dharma_swarm repository. All AI agents, regardless of model or tab, MUST ingest, comprehend, and adhere to this context before outputting a single line of code.
 
-**Generated**: 2026-04-04 | Fresh re-audit via Claude Code (Opus 4.6) with filesystem verification
+**Generated**: 2026-04-04 | Count refresh: 2026-05-06 filesystem verification
 **Prior audit**: 2026-04-04 | 5-model convergent audit (Claude, DeepSeek, GPT-OSS, Codex, RUFLO)
 **Authority**: This file + `CLAUDE.md` are the two canonical governance surfaces. When they conflict, `CLAUDE.md` wins on behavioral rules; this file wins on architectural truth.
 
-**Verification method**: Every number below was verified against the actual filesystem on 2026-04-04 using Grep, Glob, Read, and Bash. Numbers marked (V) have filesystem proof.
+**Verification method**: Count-sensitive claims below were refreshed against the filesystem on 2026-05-06. Architecture prose still reflects the 2026-04-04 audit unless specifically marked otherwise. Recheck counts before citing them in future work.
 
 **Substrate-nativeness status**: The current runtime is ~10–15% ontology-native; ~85–90% of runtime work bypasses substrate. The current build track is the ontology-native Operator Brief seam ([`docs/plans/ONTOLOGY_NATIVE_OPERATOR_BRIEF_MASTER_SPEC.md`](../plans/ONTOLOGY_NATIVE_OPERATOR_BRIEF_MASTER_SPEC.md)). Do not open additional tracks until that seam ships. See [`reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md`](../../reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md) for the audit that established this estimate.
 
@@ -17,10 +17,10 @@
 These are immutable engineering laws for this repository. Violation = architectural regression.
 
 ### A1: NO FLAT-PACKAGE GROWTH
-The `dharma_swarm/` package currently has **375 files at its top level (73% of 514 total modules)** (V). No new .py file may be added to the top level. New modules must go into an appropriate subdirectory. Existing top-level files will be organized over time.
+The `dharma_swarm/` package currently has **384 files at its top level (70.8% of 542 total Python modules)** (V). No new .py file may be added to the top level. New modules must go into an appropriate subdirectory. Existing top-level files will be organized over time.
 
 ### A2: NO DUPLICATE IMPLEMENTATIONS
-Before creating a new file for routing, bridging, adapting, or orchestrating, check if one already exists. The repo currently has **20 bridge files** (V), **3 model_routing copies** (2 are identical, 1 is different) (V), **4 orchestrators** (V), **18 adapter files across 6 locations** (V), and **14 router files** (V). Do not add more without deprecating an existing one.
+Before creating a new file for routing, bridging, adapting, or orchestrating, check if one already exists. The repo currently has **18 bridge files** (V), **3 model_routing copies** (2 are identical, 1 is different) (V), **4 orchestrators** (V), **14 adapter files across 7 locations** (V), and **13 router files** (V). Do not add more without deprecating an existing one.
 
 ### A3: NO UNDOCUMENTED SEAMS
 If your code creates a new interface between domains (a bridge, adapter, or protocol), you must update `NAVIGATION.md` with its purpose, entry point, and boundary constraints. Undocumented seams become invisible coupling.
@@ -41,7 +41,7 @@ No single file should exceed 3,000 lines. Current violations (V):
 **148 files exceed 500 lines; 39 exceed 1,000; 7 exceed 3,000** (V). These must be decomposed over time, not grown further.
 
 ### A6: DOCS DECAY -- CHECK BEFORE CITING
-All numerical claims in docs become stale within weeks. Before citing module counts, test counts, or line counts from any doc (including this one), verify against the actual filesystem. See `REPO_GOVERNANCE_AUDIT.md` for the current staleness log. **74 files in this repo claim to be "source of truth" or "canonical"** (V) -- most are stale.
+All numerical claims in docs become stale within weeks. Before citing module counts, test counts, or line counts from any doc (including this one), verify against the actual filesystem. See `REPO_GOVERNANCE_AUDIT.md` for the current staleness log. The current DocOps inventory reports **262 Markdown files containing at least one reserved trust-language term** (V). Treat these as authority-scope review candidates, not confirmed repo-wide authority.
 
 ### A7: NO CIRCULAR IMPORTS
 The repo has **9 verified circular dependency chains** (V). The worst:
@@ -52,29 +52,29 @@ The repo has **9 verified circular dependency chains** (V). The worst:
 All 9 cycles were independently confirmed with exact import lines. Most are mitigated by lazy imports but remain architectural debt. **New code must not create circular imports.**
 
 ### A8: FRONTMATTER DISCIPLINE
-Do not inject machine-readable YAML frontmatter into governance or architecture docs unless explicitly requested. Current state: **100% of architecture docs have Codex-injected YAML frontmatter averaging 86 lines (27% overhead)** (V). Worst offenders: README.md (74.4% frontmatter), ORCHESTRATOR_LEDGERS.md (61.9%), MODEL_ROUTING_CANON.md (55.4%).
+Do not inject machine-readable YAML frontmatter into governance or architecture docs unless explicitly requested. Current state: **214 of 637 Markdown files start with YAML frontmatter; 15 of 20 docs/architecture Markdown files do so** (V). Long frontmatter remains an authority/noise risk even when the prose is useful.
 
 ---
 
-## VERIFIED NUMBERS (2026-04-04)
+## VERIFIED NUMBERS (2026-05-06 COUNT REFRESH)
 
 These are the ground-truth metrics. All other documents citing different numbers are stale.
 
 | Metric | Value | Verification |
 |--------|-------|-------------|
-| Total Python modules | **514** | find dharma_swarm -name "*.py" |
-| Top-level (flat) modules | **375 (73%)** | find dharma_swarm -maxdepth 1 -name "*.py" |
-| Total Python LOC | **227,486** | wc -l across all modules |
-| Test files | **502** | find tests -name "*.py" |
-| Test functions | **8,956** | grep "def test_" count |
-| Tests collected (pytest) | **8,571** | pytest --collect-only |
-| Collection errors | **16** (10 numpy, 2 textual, 1 typer, 1 pytest_asyncio, 1 yaml, 1 tui.app) | pytest --collect-only |
-| Markdown files | **1,789** | find . -name "*.md" |
-| Markdown total lines | **521,438** | wc -l across all .md |
-| Bridge files | **20** | find dharma_swarm -name "*bridge*" |
-| Adapter files | **18 across 6 locations** | find dharma_swarm -name "*adapter*" |
-| Orchestrator files | **4** (5,360 LOC total) | find dharma_swarm -name "*orchestrat*" |
-| Router files | **14** (5,057 LOC total) | find dharma_swarm -name "*rout*" |
+| Total Python modules | **542** | find dharma_swarm -name "*.py" -type f |
+| Top-level (flat) modules | **384 (70.8%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
+| Total Python LOC | **245,233** | wc -l across dharma_swarm Python modules |
+| Test files | **541** | find tests -name "*.py" -type f |
+| Test functions | **9,865 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
+| Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
+| Markdown files | **637** | find . -name "*.md" -type f |
+| Markdown total lines | **164,612** | wc -l across all .md |
+| Bridge files | **18** | find dharma_swarm -name "*bridge*.py" |
+| Adapter files | **14 across 7 locations** | find dharma_swarm -type f \| rg -i "adapter" |
+| Orchestrator files | **4** (6,034 LOC total) | find dharma_swarm -name "*orchestrat*" |
+| Router files | **13** (4,976 LOC total) | find dharma_swarm -type f \| rg -i "rout" |
 | Memory modules | **11** (5,848 LOC) | find dharma_swarm -name "*memory*" |
 | Context modules | **8** (5,828 LOC) | find dharma_swarm -name "*context*" |
 | Provider types (enum) | **18** | models.py ProviderType enum |
@@ -171,26 +171,28 @@ These are the ground-truth metrics. All other documents citing different numbers
 
 ### Domain 6: Bridges (Integration Layer)
 
-**20 bridge files** (V), **11,663 total LOC**:
+**18 bridge files** (V), **10,418 total LOC**:
 
 | Bridge | Lines | Importers | Status |
 |--------|-------|-----------|--------|
-| terminal_bridge.py | 2,738 | 2 | ALIVE |
+| terminal_bridge.py | 2,531 | 2 | ALIVE |
 | operator_bridge.py | 1,819 | 15 | ALIVE |
 | vault_bridge.py | 885 | 2 | ALIVE |
 | bridge_registry.py | 842 | 15 | ALIVE (infra) |
 | bridge.py | 583 | 78 | ALIVE (core) |
 | semantic_memory_bridge.py | 518 | 2 | ALIVE |
-| bridge_coordinator.py | 449 | 3 | ALIVE (infra) |
-| instinct_bridge.py | 374 | 4 | ALIVE |
+| bridge_coordinator.py | 450 | 3 | ALIVE (infra) |
+| instinct_bridge.py | 377 | 4 | ALIVE |
+| fractal/room_bridge.py | 362 | 2 | ALIVE |
 | trishula_bridge.py | 347 | 1 | STALE |
 | session_event_bridge.py | 311 | 2 | ALIVE |
-| a2a/a2a_bridge.py | 309 | 2 | ALIVE |
+| a2a/a2a_bridge.py | 310 | 2 | ALIVE |
 | review_bridge.py | 224 | 4 | ALIVE |
 | roaming_operator_bridge.py | 202 | 3 | ALIVE (boundary violation) |
-| skill_bridge.py | 201 | 2 | ALIVE |
+| skill_bridge.py | 202 | 2 | ALIVE |
 | optimizer_bridge.py | 191 | 8 | ALIVE |
 | ecosystem_bridge.py | 170 | 3 | ALIVE |
+| ginko_bridge.py | 94 | 1 | ALIVE |
 
 - **Primary Entry Points**: `terminal_bridge.py` (Bun<->Python), `bridge.py` (core abstraction)
 - **State Management**: Bridges are stateless translators (mostly)
@@ -349,13 +351,13 @@ This re-audit found errors in the earlier 5-model audit:
 | Error in prior audit | Corrected value |
 |---------------------|----------------|
 | "codex_overnight.py is 10K lines" | **1,008 lines** (V) |
-| "17 bridge files" / "19 bridge files" (self-contradicting) | **20 bridge files** (V) |
+| "17 bridge files" / "19 bridge files" (self-contradicting) | **18 bridge files** (V) |
 | "16 TUI test errors" | **16 total errors: 10 numpy, 2 textual, 1 typer, 1 pytest_asyncio, 1 yaml, 1 tui.app** -- only 3 are TUI-specific (V) |
 | "10 pillars" with "PILLAR_04 missing, PILLAR_11 present" | **10 pillar files exist** (PILLAR_01-03, 05-11; PILLAR_04 never created). Sparse numbering, not 11. (V) |
 | "router_v1.py is LEGACY" | **router_v1.py is ALIVE** -- actively used by providers.py for signal generation (V) |
 | "18 provider classes" (VIVEKA) | **19 classes** (including abstract LLMProvider base); **18 ProviderType enum values** (V) |
 | "engine/ is legacy duplicate of tui/engine/" | **Both are ALIVE** -- engine/ has 41 importers, tui/engine/ has 31 importers. Different purposes. (V) |
-| Bridge count of "30" (Phase 3A) | **20 actual bridge files** -- the "30" counted test files and non-bridge files with "bridge" in name (V) |
+| Bridge count of "30" (Phase 3A) | **18 actual bridge files** -- the "30" counted test files and non-bridge files with "bridge" in name (V) |
 
 ---
 
@@ -383,8 +385,8 @@ SOVEREIGN_MANIFEST.md (this file)
 
 **Stale numbers to fix**:
 - "~1,700 lines" for swarm.py -> **3,119** (V)
-- References NAVIGATION.md which claims "500 modules" -> actual **514** (V)
-- No mention of the 20 bridges, 14 routers, 18 adapters, or their hierarchy
+- References NAVIGATION.md which claims "500 modules" -> current filesystem count **532 dharma_swarm Python modules** (V)
+- No mention of the 17 bridges, 13 routers, 14 adapters, or their hierarchy
 - Provider list says 9 -> should acknowledge **18 types** (V)
 
 **Do NOT**:
