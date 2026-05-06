@@ -47,3 +47,59 @@ def test_governance_scan_builds_wave_a_commands() -> None:
     assert any("check_test_hygiene.py" in command for command in joined)
     assert any("check_module_budget.py" in command for command in joined)
     assert any("--warn-only" in command for command in joined)
+
+
+def test_module_budget_uses_explicit_head_ref(tmp_path: Path) -> None:
+    """CI checks out a PR merge commit, so the gate must not count worktree lines."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+
+    def git(*args: str) -> str:
+        result = subprocess.run(
+            ["git", *args],
+            cwd=repo,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.stdout.strip()
+
+    git("init")
+    git("config", "user.email", "test@example.com")
+    git("config", "user.name", "Test")
+
+    target = repo / "dharma_swarm" / "example.py"
+    target.parent.mkdir()
+    target.write_text("BASE = True\n", encoding="utf-8")
+    git("add", "dharma_swarm/example.py")
+    git("commit", "-m", "base")
+    base_sha = git("rev-parse", "HEAD")
+
+    target.write_text(
+        "".join(f"HEAD_{i} = {i}\n" for i in range(900)),
+        encoding="utf-8",
+    )
+    git("commit", "-am", "head under budget")
+    head_sha = git("rev-parse", "HEAD")
+
+    target.write_text(
+        "".join(f"MERGE_{i} = {i}\n" for i in range(1100)),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(REPO_ROOT / "scripts" / "governance" / "check_module_budget.py"),
+            "--base-ref",
+            base_sha,
+            "--head-ref",
+            head_sha,
+        ],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr

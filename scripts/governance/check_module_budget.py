@@ -62,14 +62,6 @@ def is_target_file(path: str) -> bool:
     return not any(p.match(path) for p in EXCLUDE_PATTERNS)
 
 
-def line_count(path: Path) -> int:
-    try:
-        with path.open("rb") as f:
-            return sum(1 for _ in f)
-    except FileNotFoundError:
-        return 0
-
-
 def file_at_ref(ref: str, path: str) -> str | None:
     """Return file content at `ref`, or None if it didn't exist there."""
     result = subprocess.run(
@@ -113,9 +105,8 @@ def main() -> int:
     warnings: list[str] = []
 
     for path in files:
-        head_path = repo_root / path
-        head_lines = line_count(head_path)
-
+        head_content = file_at_ref(args.head_ref, path)
+        head_lines = head_content.count("\n") + 1 if head_content else 0
         base_content = file_at_ref(args.base_ref, path)
         base_lines = base_content.count("\n") + 1 if base_content else 0
 
