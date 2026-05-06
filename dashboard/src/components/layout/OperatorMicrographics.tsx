@@ -20,6 +20,11 @@ const MicrographicsScene = dynamic(
 
 const COLLAPSED_KEY = "dharma-micrographics-collapsed";
 
+function seededUnit(seed: number) {
+  const value = Math.sin(seed * 12.9898) * 43758.5453;
+  return value - Math.floor(value);
+}
+
 /* ─── Tooltip ────────────────────────────────────────────── */
 
 function Tip({ text }: { text: string }) {
@@ -434,6 +439,15 @@ export default function OperatorMicrographics() {
   const models = new Set(agents.map((a) => a.model)).size;
   const roles = new Set(agents.map((a) => a.role)).size;
   const busyAgents = agents.filter((a) => a.status === "busy").length;
+  const agentBlips = useMemo(
+    () =>
+      agents.slice(0, 12).map((a, i) => ({
+        angle: (i / Math.max(agents.length, 1)) * Math.PI * 2,
+        dist: 0.3 + seededUnit(i + 1) * 0.6,
+        intensity: a.status === "busy" ? 1.0 : a.status === "idle" ? 0.4 : 0.1,
+      })),
+    [agents],
+  );
 
   // Health layers for ring
   const agentHealth = health?.agent_health ?? [];
@@ -603,11 +617,7 @@ export default function OperatorMicrographics() {
                 healthScore={meanSuccess}
                 evolutionEntries={evoEntries}
                 fitnessTrend={heartbeatData}
-                agentBlips={agents.slice(0, 12).map((a, i) => ({
-                  angle: (i / Math.max(agents.length, 1)) * Math.PI * 2,
-                  dist: 0.3 + Math.random() * 0.6,
-                  intensity: a.status === "busy" ? 1.0 : a.status === "idle" ? 0.4 : 0.1,
-                }))}
+                agentBlips={agentBlips}
               />
             </div>
           </motion.div>

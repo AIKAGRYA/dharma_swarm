@@ -38,17 +38,17 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import os
 import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
+
+from dharma_swarm.daemon_config import dharma_state_dir
 
 logger = logging.getLogger(__name__)
 
-DHARMA_HOME = Path.home() / ".dharma"
+DHARMA_HOME = dharma_state_dir()
 SIGNALS_PATH = DHARMA_HOME / "algedonic_signals.jsonl"
 WITNESS_DIR = DHARMA_HOME / "witness"
 EMERGENCY_HOLD_PATH = DHARMA_HOME / "EMERGENCY_HOLD"

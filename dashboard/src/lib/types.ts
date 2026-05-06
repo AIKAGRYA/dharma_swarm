@@ -210,6 +210,66 @@ export interface TaskLogEntry {
   response_preview?: string | null;
 }
 
+export interface AgentTraceOut {
+  id: string;
+  timestamp: string;
+  action: string;
+  state: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface AgentHealthStatsOut {
+  total_actions: number;
+  failures: number;
+  success_rate: number;
+  last_seen: string | null;
+}
+
+export interface AgentAssignedTaskOut {
+  id: string;
+  title: string;
+  status: string;
+  priority: string;
+  created_at: string;
+  result: string | null;
+}
+
+export interface AgentProviderStatusOut {
+  provider: string;
+  available: boolean;
+}
+
+export interface AgentDetailPayload {
+  agent: AgentOut;
+  config: AgentConfigOut;
+  recent_traces: AgentTraceOut[];
+  health_stats: AgentHealthStatsOut;
+  assigned_tasks: AgentAssignedTaskOut[];
+  fitness_history: FitnessHistoryEntry[];
+  cost: AgentCostOut;
+  core_files: CoreFileOut[];
+  available_models: AvailableModelOut[];
+  available_roles: string[];
+  provider_status: AgentProviderStatusOut[];
+  task_history: TaskLogEntry[];
+}
+
+export type AgentMemoryTierEntry = Record<string, unknown>;
+
+export interface AgentMemoryOut {
+  working: AgentMemoryTierEntry[];
+  archival: AgentMemoryTierEntry[];
+  persona: AgentMemoryTierEntry[];
+  [tier: string]: AgentMemoryTierEntry[];
+}
+
+export interface AgentNoteOut {
+  filename: string;
+  content: string;
+  size: number;
+  modified: number;
+}
+
 export interface ModelVerificationOut {
   status: string;
   verified_at?: string | null;
@@ -505,6 +565,301 @@ export interface HeatmapCell {
 export interface HotPath {
   path: string;
   count: number;
+}
+
+export interface StigmergyGraphData {
+  nodes: {
+    id: string;
+    label?: string;
+    type?: string;
+    data?: Record<string, unknown>;
+    position?: { x: number; y: number };
+    [key: string]: unknown;
+  }[];
+  edges: {
+    id: string;
+    source: string;
+    target: string;
+    label?: string;
+    data?: Record<string, unknown>;
+    [key: string]: unknown;
+  }[];
+}
+
+export type EvolutionStats = Record<string, unknown>;
+
+export interface RoutingManifestOut {
+  version: string;
+  domain: string;
+  selected_route: string;
+  strategy: string;
+  model_policy: Record<string, unknown>;
+  routing_decision: Record<string, unknown>;
+  agent_routes: Record<string, unknown>;
+  selectable_routes: Record<string, unknown>[];
+  adapter_catalog: Record<string, unknown>[];
+  legacy_targets: Record<string, unknown>[];
+  agent_assignments: Record<string, unknown>[];
+  counts: Record<string, number>;
+  drift: Record<string, unknown>[];
+}
+
+export interface ChatHistoryMessage {
+  role: string;
+  content: string;
+  timestamp: string;
+  session_id: string;
+}
+
+export interface ChatHistoryPayload {
+  messages: ChatHistoryMessage[];
+  total: number;
+}
+
+export interface ConversationEntry {
+  timestamp: string;
+  role: string;
+  interface: string;
+  session_id: string;
+  content: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface PromiseEntry {
+  timestamp: string;
+  session_id: string;
+  interface: string;
+  type: string;
+  count: number;
+  promises: string[];
+}
+
+export interface VizNode {
+  id: string;
+  label: string;
+  node_type: string;
+  status: string;
+  metrics: Record<string, number>;
+  position: { x: number; y: number } | null;
+  metadata: Record<string, unknown>;
+}
+
+export interface VizEdge {
+  id: string;
+  source: string;
+  target: string;
+  edge_type: string;
+  weight: number;
+  metadata: Record<string, unknown>;
+}
+
+export interface VizEvent {
+  timestamp: number;
+  event_type: string;
+  node_id: string | null;
+  edge_id: string | null;
+  data: Record<string, unknown>;
+}
+
+export interface VizSnapshot {
+  timestamp: number;
+  nodes: VizNode[];
+  edges: VizEdge[];
+  summary: Record<string, unknown>;
+}
+
+export interface SupervisorLoopHealth {
+  name: string;
+  last_tick: number;
+  expected_interval: number;
+  tick_count: number;
+  error_count: number;
+  last_errors: string[];
+  last_progress_score: number | null;
+  best_progress_score: number | null;
+  stagnant_cycles: number;
+  stale_seconds: number;
+  is_stalled: boolean;
+}
+
+export interface SupervisorAlert {
+  alert_type: string;
+  loop_name: string;
+  severity: string;
+  message: string;
+  intervention: string;
+  timestamp: string;
+}
+
+export interface SupervisorStatus {
+  loops: Record<string, SupervisorLoopHealth>;
+  recent_alerts: SupervisorAlert[];
+  total_alerts: number;
+}
+
+export interface AlgedonicSignal {
+  id: string;
+  severity: string;
+  source_system: string;
+  title: string;
+  description: string;
+  recommended_action: string;
+  context: Record<string, unknown>;
+  acknowledged: boolean;
+  timestamp: string;
+}
+
+export interface GatePattern {
+  id: string;
+  gate_name: string;
+  failure_count: number;
+  total_checks: number;
+  failure_rate: number;
+  recent_reasons: string[];
+  trending: string;
+  timestamp: string;
+}
+
+export interface AgentViabilityEntry {
+  agent_id: string;
+  s1_operations: number;
+  s2_coordination: number;
+  s3_control: number;
+  s4_intelligence: number;
+  s5_identity: number;
+  overall: number;
+  timestamp: string;
+}
+
+export interface AuditResultOut {
+  id: string;
+  agent_id: string;
+  audit_type: string;
+  passed: boolean;
+  findings: string[];
+  timestamp: string;
+}
+
+export interface GateExpansionProposal {
+  id: string;
+  proposed_gate: string;
+  tier: string;
+  rationale: string;
+  triggered_by: string;
+  proposed_check: string;
+  status: string;
+  reviewed_by: string;
+  timestamp: string;
+}
+
+export interface CatalyticSummary {
+  nodes?: number;
+  edges?: number;
+  sccs?: number;
+  autocatalytic_sets?: number;
+  [key: string]: unknown;
+}
+
+export interface CatalyticNode {
+  id: string;
+  label?: string;
+  node_type?: string;
+  metadata?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+export interface CatalyticEdge {
+  id?: string;
+  source: string;
+  target: string;
+  edge_type?: string;
+  weight?: number;
+  metadata?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+export interface LoopClosurePriority {
+  node_id?: string;
+  score?: number;
+  reason?: string;
+  [key: string]: unknown;
+}
+
+export type StrangeLoopStats = Record<string, unknown>;
+
+export interface MutationEntry {
+  id?: string;
+  timestamp?: string;
+  component?: string;
+  mutation_type?: string;
+  description?: string;
+  status?: string;
+  fitness_delta?: number;
+  [key: string]: unknown;
+}
+
+export interface GateDefinition {
+  name: string;
+  tier: string;
+  description?: string;
+  trigger_patterns?: string[];
+  [key: string]: unknown;
+}
+
+export interface GateCheckResult {
+  decision: string;
+  reason: string;
+  gate: string;
+  gate_results: Record<string, [string, string]>;
+  timestamp: string;
+}
+
+export interface GateProposalOut {
+  name: string;
+  tier: string;
+  justification: string;
+  trigger_patterns: string[];
+  proposed_by: string;
+  proposed_at: string;
+  status: string;
+  reviewed_at: string;
+  review_note: string;
+}
+
+export interface CascadeDomainConfig {
+  name: string;
+  generate_fn: string;
+  test_fn: string;
+  score_fn: string;
+  gate_fn: string;
+  mutate_fn: string;
+  select_fn: string;
+  eigenform_fn: string;
+  max_iterations: number;
+  fitness_threshold: number;
+  eigenform_epsilon: number;
+  convergence_window: number;
+  max_duration_seconds: number;
+  mutation_rate: number;
+}
+
+export interface CascadeCheckpoint {
+  domain: string;
+  cycle_id: string;
+  iteration: number;
+  current: Record<string, unknown> | null;
+  previous: Record<string, unknown> | null;
+  candidates: Record<string, unknown>[];
+  best_score: number;
+  fitness_trajectory: number[];
+  eigenform_trajectory: number[];
+  elapsed_seconds: number;
+  converged: boolean;
+  convergence_reason: string;
+  interrupted: boolean;
+  interrupt_reason: string;
+  version: string;
+  saved_at: string;
 }
 
 // ---------------------------------------------------------------------------

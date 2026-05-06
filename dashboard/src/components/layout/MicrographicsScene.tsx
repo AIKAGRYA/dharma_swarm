@@ -6,6 +6,11 @@ import { EffectComposer, Bloom, ChromaticAberration, Vignette } from "@react-thr
 import { BlendFunction } from "postprocessing";
 import * as THREE from "three";
 
+function seededUnit(seed: number) {
+  const value = Math.sin(seed * 12.9898) * 43758.5453;
+  return value - Math.floor(value);
+}
+
 /* ─── Emissive Ring ──────────────────────────────────────── */
 
 function GlowRing({
@@ -171,9 +176,9 @@ function Particles({ count, color, spread }: { count: number; color: string; spr
   const positions = useMemo(() => {
     const arr = new Float32Array(count * 3);
     for (let i = 0; i < count; i++) {
-      arr[i * 3] = (Math.random() - 0.5) * spread;
-      arr[i * 3 + 1] = (Math.random() - 0.5) * spread * 0.6;
-      arr[i * 3 + 2] = (Math.random() - 0.5) * spread * 0.2 - 0.5;
+      arr[i * 3] = (seededUnit(i * 3 + 1) - 0.5) * spread;
+      arr[i * 3 + 1] = (seededUnit(i * 3 + 2) - 0.5) * spread * 0.6;
+      arr[i * 3 + 2] = (seededUnit(i * 3 + 3) - 0.5) * spread * 0.2 - 0.5;
     }
     return arr;
   }, [count, spread]);
