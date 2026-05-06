@@ -124,6 +124,7 @@ async def run_swarm_loop(
     shutdown_event: asyncio.Event,
     signal_bus: "Any | None" = None,
     supervisor: "Any | None" = None,
+    room_registry: "Any | None" = None,
 ) -> None:
     """Primary loop: SwarmManager.tick() -- the ONE control path.
 
@@ -140,6 +141,11 @@ async def run_swarm_loop(
 
     swarm = SwarmManager(state_dir=str(STATE_DIR), daemon_config=cfg)
     await swarm.init()
+    if room_registry is not None:
+        swarm._room_registry = room_registry
+        if swarm._orchestrator is not None:
+            swarm._orchestrator._room_registry = room_registry
+        _log("swarm", f"Room registry attached: {len(room_registry.active_rooms())} active rooms")
     try:
         from dharma_swarm.startup_crew import spawn_cybernetics_crew
 
@@ -1595,6 +1601,63 @@ async def _run_health_api(shutdown_event: asyncio.Event) -> None:
         _log("health-api", f"Health API crashed: {exc}")
 
 
+async def _run_room_health_loop(
+    shutdown_event: asyncio.Event,
+    registry: Any,
+    bridge: Any,
+) -> None:
+    """Fractal room health monitor — evaluates kill/spinout conditions.
+
+    Runs every 30 minutes. Checks budget depletion, kill conditions,
+    and spinout readiness for all active venture cells. Emits signals
+    for any triggered conditions.
+    """
+    _log("room-health", "Starting room health loop (interval=1800s)")
+    from dharma_swarm.fractal.fractal_room import VentureCellV1
+
+    while not shutdown_event.is_set():
+        try:
+            active = registry.active_rooms()
+            now = datetime.now(timezone.utc)
+            for room in active:
+                if not isinstance(room, VentureCellV1):
+                    continue
+                try:
+                    created = datetime.fromisoformat(room.created_at)
+                    age_days = (now - created).days
+                except (ValueError, TypeError):
+                    age_days = 0
+                kpis = {
+                    "days_since_creation": age_days,
+                    "total_revenue": 0,
+                    "total_budget": room.budget_tokens,
+                    "total_burn": room.current_burn,
+                    "operator_override": False,
+                    "revenue_exceeds_burn": False,
+                    "operator_approval": False,
+                    "customer_validation": False,
+                }
+                report = bridge.evaluate_room_health(room.id, kpis)
+                if report.get("kill_triggered"):
+                    _log("room-health", f"KILL triggered for {room.id}: {report.get('kill_conditions_met', [])}")
+                if report.get("spinout_triggered"):
+                    _log("room-health", f"SPINOUT ready for {room.id}: {report.get('spinout_conditions_met', [])}")
+                remaining = room.remaining_budget()
+                if remaining <= 0:
+                    _log("room-health", f"Budget DEPLETED for {room.id}")
+                elif remaining < room.budget_tokens * 0.2:
+                    _log("room-health", f"Budget LOW for {room.id}: {remaining}/{room.budget_tokens}")
+            _log("room-health", f"Health check: {len(active)} active rooms evaluated")
+        except Exception as exc:
+            _log("room-health", f"Health check error: {exc}")
+
+        try:
+            await asyncio.wait_for(shutdown_event.wait(), timeout=1800)
+            break
+        except asyncio.TimeoutError:
+            pass
+
+
 async def _run_guardian_loop(shutdown_event: asyncio.Event) -> None:
     """Guardian Crew: continuous interface + loop + router health checking.
 
@@ -1709,6 +1772,13 @@ async def orchestrate(background: bool = False) -> None:
     from dharma_swarm.signal_bus import SignalBus
     bus = SignalBus.get()
 
+    # Phase 2b: Bootstrap fractal room registry + bridge
+    from dharma_swarm.fractal.room_configs import bootstrap_registry
+    from dharma_swarm.fractal.room_bridge import RoomBridge
+    room_registry = bootstrap_registry()
+    room_bridge = RoomBridge(room_registry, signal_bus=bus)
+    _log("orchestrator", f"Fractal rooms: {len(room_registry.all_rooms())} rooms bootstrapped")
+
     _log("orchestrator", "=" * 60)
     _log("orchestrator", "DGC Live Orchestrator starting (Strange Loop v1)")
     _log("orchestrator", f"  PID: {os.getpid()}")
@@ -1717,6 +1787,7 @@ async def orchestrate(background: bool = False) -> None:
     _log("orchestrator", f"  Pulse interval: {PULSE_INTERVAL}s")
     _log("orchestrator", f"  Max daily: {MAX_DAILY}")
     _log("orchestrator", f"  Signal bus: active")
+    _log("orchestrator", f"  Fractal rooms: {len(room_registry.active_rooms())} active")
     _log("orchestrator", "=" * 60)
 
     # Constitutional size check (Power Prompt Commandment #3)
@@ -1751,12 +1822,13 @@ async def orchestrate(background: bool = False) -> None:
         "consolidation": CONSOLIDATION_INTERVAL, "recognition": 7200,
         "replication": 3600, "self-improve": 3600, "free-grind": 600,
         "flywheel": 300, "conductors": 120, "context-agent": 60,
+        "room-health": 1800,
     }
     for loop_name, interval in _loop_intervals.items():
         _supervisor.register_loop(loop_name, expected_interval=float(interval))
 
     task_factories: dict[str, Any] = {
-        "swarm": lambda: run_swarm_loop(shutdown_event, signal_bus=bus, supervisor=_supervisor),
+        "swarm": lambda: run_swarm_loop(shutdown_event, signal_bus=bus, supervisor=_supervisor, room_registry=room_registry),
         "pulse": lambda: run_pulse_loop(shutdown_event),
         "recognition": lambda: _run_recognition_loop(shutdown_event),
         "conductors": lambda: run_conductor_loop(shutdown_event),
@@ -1778,6 +1850,7 @@ async def orchestrate(background: bool = False) -> None:
         # Runs at boot + every 4 hours. Writes GUARDIAN_REPORT.md.
         # Creates GitHub issues for BLOCKER-severity findings.
         "guardian": lambda: _run_guardian_loop(shutdown_event),
+        "room-health": lambda: _run_room_health_loop(shutdown_event, room_registry, room_bridge),
         # ── Health API: curl http://localhost:7433/health ──
         "health-api": lambda: _run_health_api(shutdown_event),
         # ── Gauntlet: adversarial eval pressure + DGM feedback loop ──

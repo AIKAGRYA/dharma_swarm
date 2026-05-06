@@ -609,11 +609,26 @@ def _draft_brief(
         if brief_input.cited_fact_ids
         else "- (no sources cited)"
     )
+
+    # Fractal room status section
+    room_section = ""
+    try:
+        from dharma_swarm.fractal.room_configs import bootstrap_registry
+        from dharma_swarm.fractal.room_brief import render_room_section, render_room_summary_line
+        registry = bootstrap_registry()
+        room_section = render_room_section(registry)
+    except Exception:
+        logger.debug("Room brief section generation failed", exc_info=True)
+
     body = (
         f"# {title}\n\n"
         f"_Drafted by `{agent_name}` for the ontology-native operator brief seam (v0)._\n\n"
         "## Summary\n"
         f"{summary_section}\n\n"
+    )
+    if room_section:
+        body += f"{room_section}\n\n"
+    body += (
         "## Cited runtime facts\n"
         f"{sources_section}\n\n"
         "## Steelman / opposing read\n"

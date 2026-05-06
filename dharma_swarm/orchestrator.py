@@ -136,6 +136,7 @@ class Orchestrator:
         self._last_coordination_signature = ""
         self._last_coordination_refresh_at: float = 0.0  # monotonic timestamp
         self._coordination_refresh_interval_s: float = 120.0  # skip if refreshed within this window
+        self._room_registry: Any = None  # RoomRegistry (set by SwarmManager)
 
     def _runtime_root(self) -> Path:
         base_dir = self._ledger.base_dir
@@ -786,6 +787,16 @@ class Orchestrator:
                 "active_claim": claim,
             }
         )
+        # Inject cell_id from room registry if agent is assigned to a room
+        if self._room_registry is not None and not meta.get("cell_id"):
+            try:
+                for room in self._room_registry.active_rooms():
+                    if td.agent_id in room.agents:
+                        meta["cell_id"] = room.id
+                        td.metadata["cell_id"] = room.id
+                        break
+            except Exception:
+                logger.debug("Room registry lookup failed during claim prep", exc_info=True)
         td.metadata["claim_id"] = claim_id
         td.metadata["claim_timeout_seconds"] = claim_timeout_seconds
         td.metadata["claim_expires_monotonic"] = time.monotonic() + claim_timeout_seconds
@@ -2123,6 +2134,22 @@ class Orchestrator:
             0.01,
             self._coerce_float(td.timeout_seconds, self._default_timeout_seconds),
         )
+
+        # Set CorrelationContext with cell_id for room-scoped tracing
+        cell_id = td.metadata.get("cell_id", "")
+        if cell_id:
+            try:
+                from dharma_swarm.correlation_context import (
+                    CorrelationContext,
+                    set_correlation,
+                    get_correlation,
+                )
+                current = get_correlation()
+                ctx = current.with_cell(cell_id)
+                set_correlation(ctx)
+            except Exception:
+                logger.debug("cell_id correlation context setup failed", exc_info=True)
+
         try:
             await self._runtime_lifecycle.record_delegation_run(
                 td,
@@ -2412,6 +2439,26 @@ class Orchestrator:
                 result=result,
                 run_id=str(td.metadata.get("runtime_run_id", "") or ""),
             )
+
+            # Emit room-scoped task completion signal for kaizen review
+            cell_id = td.metadata.get("cell_id", "")
+            if cell_id and self._bus is not None:
+                try:
+                    emit = getattr(self._bus, "emit_event", None)
+                    if emit:
+                        await emit(
+                            "ROOM_TASK_COMPLETED",
+                            task_id=td.task_id,
+                            agent_id=td.agent_id,
+                            payload={
+                                "cell_id": cell_id,
+                                "task_title": task.title[:120],
+                                "duration_sec": round(duration_sec, 4),
+                                "result_chars": len(result or ""),
+                            },
+                        )
+                except Exception:
+                    logger.debug("Room task completion signal failed", exc_info=True)
 
         except asyncio.TimeoutError:
             error = f"Task execution timed out after {timeout_seconds:.1f}s"
