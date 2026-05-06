@@ -325,6 +325,10 @@ def _legacy_normalize(fm: dict[str, Any], *, source_path: str | None) -> dict[st
     if "confidence" not in fm:
         fm["confidence"] = 0.5
     fm.setdefault("stale_after", default_stale_after())
+    if isinstance(fm.get("stale_after"), str) and fm["stale_after"].strip().lower() in {
+        "never", "none", "n/a", "-",
+    }:
+        fm["stale_after"] = default_stale_after(days=36500)
     fm.setdefault("title", "Untitled")
 
     fm["source"] = _normalize_source_entries(
