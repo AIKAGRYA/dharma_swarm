@@ -10,6 +10,14 @@ Current canonical writer on this branch is `dharma_swarm.insight_brief`.
 the PR57 `operator_brief` package and says it must stay disabled unless Dhyana
 promotes it.
 
+Branch truth:
+
+- `InsightBriefBuilder.publish()` executes `KnowledgeArtifact.Publish` through
+  `OntologyActionGateway.execute_action_or_fail()`.
+- `tests/test_insight_brief.py::test_publish_action_passes_gates` verifies the
+  resulting action history and required gates.
+- no `dharma_swarm/operator_brief` package is present in this branch.
+
 Therefore the next safe action is not to force `operator_brief` ActionExec
 wiring into this branch. The safe path is:
 
