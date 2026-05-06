@@ -128,3 +128,69 @@ def test_validate_frontmatter_dict_path():
     fm_dict = schema.model_dump(mode="json", exclude_none=True)
     re_validated = validate_frontmatter(fm_dict)
     assert re_validated.title == schema.title
+
+
+def test_validate_frontmatter_accepts_single_dict_source():
+    validated = validate_frontmatter(
+        {
+            "title": "Bridge hypothesis atom",
+            "atom_id": new_atom_id(),
+            "type": "atomic",
+            "confidence": 0.8,
+            "source": {
+                "kind": "external",
+                "path": "bridge-hypothesis-extended.md",
+                "captured": "2026-05-06",
+                "captured_by": "test",
+            },
+            "stale_after": default_stale_after(),
+        }
+    )
+
+    assert validated.source[0].kind == "external"
+    assert validated.source[0].path == "bridge-hypothesis-extended.md"
+
+
+def test_parse_frontmatter_strict_accepts_source_path_dict():
+    text = f"""---
+title: Source path dict
+atom_id: {new_atom_id()}
+type: atomic
+confidence: 0.8
+source:
+  source: local
+  path: bridge-hypothesis-extended.md
+stale_after: {default_stale_after()}
+---
+body
+"""
+
+    parsed, body = parse_frontmatter(text)
+
+    assert parsed is not None
+    assert parsed.source[0].kind == "external"
+    assert parsed.source[0].path == "bridge-hypothesis-extended.md"
+    assert parsed.source[0].span == "local"
+    assert body == "body\n"
+
+
+def test_parse_frontmatter_lenient_flattens_category_source_map():
+    text = """---
+title: Category source atom
+source:
+  canonical:
+    - foundations/EMPIRICAL_CLAIMS_REGISTRY.md
+  contemplative: foundations/PILLAR_09_DADA_BHAGWAN.md
+---
+body
+"""
+
+    parsed, _body = parse_frontmatter(
+        text, lenient=True, source_path="/tmp/bridge-hypothesis-extended.md"
+    )
+
+    assert parsed is not None
+    assert [(source.path, source.span) for source in parsed.source] == [
+        ("foundations/EMPIRICAL_CLAIMS_REGISTRY.md", "canonical"),
+        ("foundations/PILLAR_09_DADA_BHAGWAN.md", "contemplative"),
+    ]
