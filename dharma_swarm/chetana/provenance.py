@@ -20,7 +20,7 @@ import hashlib
 import re
 import uuid
 from datetime import date, datetime, timedelta, timezone
-from typing import Any, Literal
+from typing import Any, Literal, get_args
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -29,6 +29,7 @@ PARAClass = Literal["P", "A", "R", "Ar"]
 SourceKind = Literal[
     "session", "webclip", "pdf", "note", "wiki_extract", "voice", "external", "synthesis"
 ]
+_SOURCE_KIND_VALUES = set(get_args(SourceKind))
 GateResult = Literal["ALLOW", "WARN", "BLOCK"]
 ReviewStatus = Literal["staged", "approved", "rejected", "auto_promoted"]
 # NOTE on `approved`: as of 2026-04-28, the promote/staging code path never sets
@@ -64,6 +65,90 @@ class AtomSource(BaseModel):
         except ValueError:
             datetime.fromisoformat(v)
         return v
+
+
+_SOURCE_RECORD_KEYS = set(AtomSource.model_fields) | {"source"}
+
+
+def _is_source_kind(value: Any) -> bool:
+    return isinstance(value, str) and value in _SOURCE_KIND_VALUES
+
+
+def _looks_like_source_record(value: dict[str, Any]) -> bool:
+    keys = set(value)
+    return (
+        "path" in keys
+        or keys <= set(AtomSource.model_fields)
+        or ("source" in keys and len(keys & _SOURCE_RECORD_KEYS) > 1)
+    )
+
+
+def _normalize_source_entries(
+    src: Any, *, source_path: str | None, captured_by: str
+) -> list[dict[str, Any]]:
+    captured = date.today().isoformat()
+
+    def fallback(path: Any = None, *, span: str | None = None) -> dict[str, Any]:
+        record = {
+            "kind": "external",
+            "path": str(path if path not in (None, "") else source_path or "<unknown>"),
+            "captured": captured,
+            "captured_by": captured_by,
+        }
+        if span:
+            record["span"] = span
+        return record
+
+    def coerce_record(item: Any, *, span: str | None = None) -> dict[str, Any]:
+        if isinstance(item, AtomSource):
+            data = item.model_dump()
+            if span and not data.get("span"):
+                data["span"] = span
+            return data
+        if not isinstance(item, dict):
+            return fallback(item, span=span)
+
+        data = dict(item)
+        source_value = data.pop("source", None)
+        kind = data.get("kind")
+        if not _is_source_kind(kind):
+            if _is_source_kind(source_value):
+                data["kind"] = source_value
+            else:
+                if kind and not data.get("span"):
+                    data["span"] = str(kind)
+                elif source_value and "path" in data and not data.get("span"):
+                    data["span"] = str(source_value)
+                data["kind"] = "external"
+        if not data.get("path"):
+            if source_value and not _is_source_kind(source_value):
+                data["path"] = str(source_value)
+            else:
+                data["path"] = source_path or "<unknown>"
+        if span and not data.get("span"):
+            data["span"] = span
+        data.setdefault("captured", captured)
+        data.setdefault("captured_by", captured_by)
+        return {k: v for k, v in data.items() if k in AtomSource.model_fields}
+
+    if not src:
+        return [fallback()]
+    if isinstance(src, list):
+        return [coerce_record(item) for item in src] or [fallback()]
+    if isinstance(src, dict):
+        if _looks_like_source_record(src):
+            return [coerce_record(src)]
+        entries: list[dict[str, Any]] = []
+        for category, items in src.items():
+            span = str(category)
+            if not items:
+                continue
+            if isinstance(items, list):
+                entries.extend(coerce_record(item, span=span) for item in items)
+            else:
+                entries.append(coerce_record(items, span=span))
+        return entries or [fallback()]
+    return [fallback(src)]
 
 
 class GateCheckRecord(BaseModel):
@@ -114,6 +199,11 @@ class FrontmatterSchema(BaseModel):
     stale_after: str
     related: list[str] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
+
+    @field_validator("source", mode="before")
+    @classmethod
+    def _normalize_source(cls, v: Any) -> list[dict[str, Any]]:
+        return _normalize_source_entries(v, source_path=None, captured_by="schema_normalize")
 
     @field_validator("stale_after")
     @classmethod
@@ -237,45 +327,9 @@ def _legacy_normalize(fm: dict[str, Any], *, source_path: str | None) -> dict[st
     fm.setdefault("stale_after", default_stale_after())
     fm.setdefault("title", "Untitled")
 
-    # source: [str, ...] → list[dict{kind,path,captured,captured_by}]
-    src = fm.get("source")
-    if not src:
-        fm["source"] = [
-            {
-                "kind": "external",
-                "path": source_path or "<unknown>",
-                "captured": date.today().isoformat(),
-                "captured_by": "legacy_normalize",
-            }
-        ]
-    elif isinstance(src, str):
-        fm["source"] = [
-            {
-                "kind": "external",
-                "path": src,
-                "captured": date.today().isoformat(),
-                "captured_by": "legacy_normalize",
-            }
-        ]
-    elif isinstance(src, list):
-        normalized = []
-        for item in src:
-            if isinstance(item, dict):
-                item.setdefault("kind", "external")
-                item.setdefault("path", "<unknown>")
-                item.setdefault("captured", date.today().isoformat())
-                item.setdefault("captured_by", "legacy_normalize")
-                normalized.append(item)
-            else:
-                normalized.append(
-                    {
-                        "kind": "external",
-                        "path": str(item),
-                        "captured": date.today().isoformat(),
-                        "captured_by": "legacy_normalize",
-                    }
-                )
-        fm["source"] = normalized
+    fm["source"] = _normalize_source_entries(
+        fm.get("source"), source_path=source_path, captured_by="legacy_normalize"
+    )
 
     # confidence float coercion
     try:
