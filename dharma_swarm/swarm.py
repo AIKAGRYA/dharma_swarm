@@ -179,6 +179,9 @@ class SwarmManager:
         # v0.9.0: Decision Ontology — structured decision governance
         self._decision_log: Any = None  # DecisionLog
 
+        # v1.0: Fractal Room Registry — rooms govern work
+        self._room_registry: Any = None  # RoomRegistry
+
         # v0.9.3: AutoProposer — closes the autonomy loop
         self._auto_proposer: AutoProposer | None = None
         self._auto_proposer_interval_ticks: int = 60  # every ~30 min (60 × 30s)
@@ -660,6 +663,8 @@ class SwarmManager:
             event_memory=self._event_memory,
             yoga=self._yoga,
         )
+        if self._room_registry is not None:
+            self._orchestrator._room_registry = self._room_registry
 
         self._running = True
 
