@@ -108,6 +108,61 @@ async def test_init_uses_state_local_ledger_dir(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_init_terminal_callback_closes_claims_in_state_runtime_db(
+    tmp_path,
+    monkeypatch,
+):
+    from dharma_swarm.runtime_state import RuntimeStateStore, TaskClaim, _new_id
+
+    state_dir = tmp_path / ".dharma"
+    meta_dir = state_dir / "meta"
+    meta_dir.mkdir(parents=True)
+    (meta_dir / "telos_seeded").write_text("test\n", encoding="utf-8")
+    (meta_dir / "gnani_seeded").write_text("test\n", encoding="utf-8")
+    monkeypatch.setenv("DHARMA_READ_ONLY_BOOT", "1")
+
+    swarm = SwarmManager(state_dir=state_dir)
+    await swarm.init()
+    try:
+        assert swarm._task_board is not None
+        task = await swarm._task_board.create("Close claim in canonical runtime DB")
+
+        state_store = RuntimeStateStore(state_dir / "state" / "runtime.db")
+        stale_store = RuntimeStateStore(state_dir / "db" / "runtime.db")
+        state_claim_id = _new_id("claim")
+        stale_claim_id = _new_id("claim")
+        state_store.create_task_claim_sync(
+            TaskClaim(
+                claim_id=state_claim_id,
+                task_id=task.id,
+                agent_id="agent-1",
+                session_id="session-state",
+            )
+        )
+        stale_store.create_task_claim_sync(
+            TaskClaim(
+                claim_id=stale_claim_id,
+                task_id=task.id,
+                agent_id="agent-1",
+                session_id="session-stale",
+            )
+        )
+
+        await swarm._task_board.assign(task.id, "agent-1")
+        await swarm._task_board.start(task.id)
+        await swarm._task_board.complete(task.id, result="done")
+
+        state_claim = state_store.get_task_claim_sync(state_claim_id)
+        stale_claim = stale_store.get_task_claim_sync(stale_claim_id)
+        assert state_claim is not None
+        assert stale_claim is not None
+        assert state_claim.status == "completed"
+        assert stale_claim.status == "claimed"
+    finally:
+        await swarm.shutdown()
+
+
+@pytest.mark.asyncio
 async def test_init_fast_boot_defers_default_crew_and_optional_subsystems(
     tmp_path,
     monkeypatch,

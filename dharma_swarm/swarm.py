@@ -631,7 +631,7 @@ class SwarmManager:
         state_runtime_db = self.state_dir / "state" / "runtime.db"
 
         # NEW-05 fix: auto-close claims when tasks reach terminal states
-        _rss = RuntimeStateStore(db_path=db_dir / "runtime.db")
+        _rss = RuntimeStateStore(db_path=state_runtime_db)
 
         def _close_claims_on_terminal(task_id: str, status: str) -> None:
             _rss.close_claims_for_task_sync(task_id, status=status)
