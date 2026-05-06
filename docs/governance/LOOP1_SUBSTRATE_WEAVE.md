@@ -36,6 +36,17 @@ accepted as explicitly non-runtime projection schemas.
 routing substrate. Some surfaces still call runtime providers directly,
 including autonomous agents and dashboard chat subprocess completion.
 
+Current inventory:
+
+- `dharma_swarm.swarm.SwarmManager` constructs the shared router with
+  `create_default_router()`.
+- `dharma_swarm.agent_runner.AgentRunner` uses `complete_for_task()` when its
+  provider is routed.
+- `dharma_swarm.autonomous_agent.AutonomousAgent` still creates runtime
+  providers directly in two provider loops.
+- `api.routers.chat` still creates a runtime provider directly for dashboard
+  chat subprocess completion.
+
 Those are hot paths. The safe weave is a separate routing PR with focused tests
 for provider selection, fallback behavior, routing-memory writes, and dashboard
 chat compatibility. It should not be bundled with identity or daily-brief work.
