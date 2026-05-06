@@ -42,6 +42,8 @@ class DailyOperatingBriefInputs:
     yds_ratings_path: Path | None = None
     cost_report_path: Path | None = None
     llm_burn_state_dir: Path | None = None
+    docops_check_report_path: Path | None = None
+    docops_inventory_path: Path | None = None
     hot_items_path: Path | None = None
     revenue_notes_path: Path | None = None
     now: datetime | None = None
@@ -61,6 +63,7 @@ class DailyOperatingBrief:
     revenue_moves: list[str] = field(default_factory=list)
     stop_doing: list[str] = field(default_factory=list)
     next_highest_leverage_move: list[str] = field(default_factory=list)
+    doc_integrity_signals: list[str] = field(default_factory=list)
     missing_sources: list[str] = field(default_factory=list)
 
 
@@ -87,11 +90,22 @@ def build_daily_operating_brief(
         since_hours=inputs.llm_burn_since_hours,
         missing=missing,
     )
+    doc_integrity_lines = _docops_lines(
+        check_report_path=inputs.docops_check_report_path,
+        inventory_path=inputs.docops_inventory_path,
+        missing=missing,
+    )
     revenue_lines = _revenue_lines(inputs.revenue_notes_path, missing)
     hot_stop, hot_next = _hot_item_lines(inputs.hot_items_path, missing)
 
     stop_doing.extend(hot_stop)
-    next_move = _next_move(gate_health, what_happened, hot_next, burn_lines)
+    next_move = _next_move(
+        gate_health,
+        what_happened,
+        hot_next,
+        burn_lines,
+        doc_integrity_lines,
+    )
 
     return DailyOperatingBrief(
         date=now.date().isoformat(),
@@ -103,6 +117,7 @@ def build_daily_operating_brief(
         revenue_moves=revenue_lines,
         stop_doing=_with_default(stop_doing, "No stop-doing signal found."),
         next_highest_leverage_move=[next_move],
+        doc_integrity_signals=doc_integrity_lines,
         missing_sources=missing or ["No missing sources detected."],
     )
 
@@ -119,7 +134,8 @@ def render_markdown(brief: DailyOperatingBrief) -> str:
         ("6. Revenue / self-funding moves", brief.revenue_moves),
         ("7. Stop doing", brief.stop_doing),
         ("8. Next highest-leverage move", brief.next_highest_leverage_move),
-        ("9. Missing sources", brief.missing_sources),
+        ("9. Doc drift / claim integrity", brief.doc_integrity_signals),
+        ("10. Missing sources", brief.missing_sources),
     ]
     lines = [f"# Daily Operating Brief {brief.date}", ""]
     for title, items in sections:
@@ -381,6 +397,110 @@ def _revenue_lines(path: Path | None, missing: list[str]) -> list[str]:
     return matches[:8]
 
 
+def _docops_lines(
+    *,
+    check_report_path: Path | None,
+    inventory_path: Path | None,
+    missing: list[str],
+) -> list[str]:
+    lines: list[str] = []
+
+    if check_report_path is None or not check_report_path.exists():
+        missing.append("DocOps integrity report")
+        lines.append("No DocOps integrity report found.")
+    else:
+        report = _read_json(check_report_path)
+        if isinstance(report, dict):
+            lines.extend(_docops_check_lines(report))
+        else:
+            lines.append("DocOps integrity report present, but unreadable.")
+
+    if inventory_path is None or not inventory_path.exists():
+        missing.append("DocOps corpus inventory")
+        lines.append("No DocOps corpus inventory found.")
+    else:
+        inventory = _read_json(inventory_path)
+        if isinstance(inventory, dict):
+            lines.extend(_docops_inventory_lines(inventory))
+        else:
+            lines.append("DocOps corpus inventory present, but unreadable.")
+
+    return lines
+
+
+def _docops_check_lines(report: dict[str, Any]) -> list[str]:
+    passed = bool(report.get("passed"))
+    status = "passed" if passed else "failed"
+    failures = _intish(report.get("failure_count"))
+    warnings = _intish(report.get("warning_count"))
+    date = _string(report.get("date"))
+    date_note = f" on {date}" if date else ""
+    lines = [
+        (
+            f"DocOps integrity {status}{date_note}: "
+            f"{failures} failure(s), {warnings} warning(s)."
+        )
+    ]
+
+    metrics = report.get("metrics")
+    if isinstance(metrics, dict):
+        markdown_files = _intish(metrics.get("markdown_files"))
+        authority_docs = _intish(metrics.get("authority_candidate_docs"))
+        assertions = _intish(metrics.get("doc_assertions"))
+        if markdown_files or authority_docs or assertions:
+            details = []
+            if markdown_files:
+                details.append(f"{markdown_files} markdown file(s)")
+            if authority_docs:
+                details.append(f"{authority_docs} authority-candidate doc(s)")
+            if assertions:
+                details.append(f"{assertions} executable assertion(s)")
+            lines.append("DocOps metric snapshot: " + ", ".join(details) + ".")
+
+    findings = report.get("findings")
+    if isinstance(findings, list) and findings:
+        for finding in findings[:3]:
+            if isinstance(finding, dict):
+                lines.append("DocOps finding: " + _docops_finding_label(finding) + ".")
+    return lines
+
+
+def _docops_inventory_lines(inventory: dict[str, Any]) -> list[str]:
+    details = []
+    for key, label in (
+        ("markdown_files", "markdown file(s) indexed"),
+        ("markdown_file_count", "markdown file(s) indexed"),
+        ("absolute_path_ref_count", "absolute path reference(s)"),
+        ("path_ref_count", "path reference(s)"),
+        ("broken_path_ref_count", "broken path reference(s)"),
+        ("canonical_claim_count", "canonical/source-of-truth claim(s)"),
+    ):
+        value = _intish(inventory.get(key))
+        if value:
+            details.append(f"{value} {label}")
+    if details:
+        return ["DocOps corpus inventory: " + ", ".join(details[:4]) + "."]
+    return ["DocOps corpus inventory present."]
+
+
+def _docops_finding_label(finding: dict[str, Any]) -> str:
+    rule = _string(
+        finding.get("rule")
+        or finding.get("rule_id")
+        or finding.get("kind")
+        or finding.get("type")
+        or "unlabeled"
+    )
+    path = _string(finding.get("path") or finding.get("file") or "")
+    message = _string(finding.get("message") or finding.get("detail") or "")
+    parts = [rule]
+    if path:
+        parts.append(path)
+    if message:
+        parts.append(message)
+    return " - ".join(parts)
+
+
 def _hot_item_lines(path: Path | None, missing: list[str]) -> tuple[list[str], list[str]]:
     if path is None or not path.exists():
         missing.append("Hot items")
@@ -406,9 +526,12 @@ def _next_move(
     what_happened: list[str],
     hot_next: list[str],
     burn_lines: list[str],
+    doc_integrity_lines: list[str],
 ) -> str:
     if any("not all green" in line for line in gate_health):
         return "Fix the first failed AgentOps gate or scope violation before expanding work."
+    if any("DocOps integrity failed" in line for line in doc_integrity_lines):
+        return "Fix DocOps integrity failures before adding or promoting more documentation."
     if any("No AgentOps reports found." in line for line in what_happened):
         return "Run one bounded AgentOps work packet and feed its report into tomorrow's brief."
     if any(re.search(r"unpriced=[1-9]", line) for line in burn_lines):
@@ -491,6 +614,19 @@ def _first_number(record: dict[str, Any], keys: Iterable[str]) -> float | None:
             except ValueError:
                 continue
     return None
+
+
+def _intish(value: Any) -> int:
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int | float):
+        return int(value)
+    if isinstance(value, str):
+        try:
+            return int(float(value))
+        except ValueError:
+            return 0
+    return 0
 
 
 def _token_total(record: dict[str, Any]) -> int | None:
