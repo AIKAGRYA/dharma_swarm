@@ -194,3 +194,22 @@ body
         ("foundations/EMPIRICAL_CLAIMS_REGISTRY.md", "canonical"),
         ("foundations/PILLAR_09_DADA_BHAGWAN.md", "contemplative"),
     ]
+
+
+def test_parse_frontmatter_lenient_coerces_stale_after_never():
+    text = """---
+title: Never-stale atom
+stale_after: never
+source: foundations/PILLAR_09_DADA_BHAGWAN.md
+---
+body
+"""
+
+    parsed, _body = parse_frontmatter(
+        text, lenient=True, source_path="/tmp/never-stale.md"
+    )
+
+    assert parsed is not None
+    from datetime import date
+    parsed_stale = date.fromisoformat(parsed.stale_after)
+    assert (parsed_stale - date.today()).days >= 365 * 50
