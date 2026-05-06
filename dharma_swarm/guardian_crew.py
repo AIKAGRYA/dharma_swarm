@@ -709,10 +709,12 @@ def synthesize_report(
     ledger_findings: list[GuardianFinding] | None = None,
     warning_findings: list[GuardianFinding] | None = None,
     consistency_findings: list[GuardianFinding] | None = None,
+    room_findings: list[GuardianFinding] | None = None,
 ) -> str:
     ledger_findings = ledger_findings or []
     warning_findings = warning_findings or []
     consistency_findings = consistency_findings or []
+    room_findings = room_findings or []
     all_findings = (
         auditor_findings
         + loop_findings
@@ -720,6 +722,7 @@ def synthesize_report(
         + ledger_findings
         + warning_findings
         + consistency_findings
+        + room_findings
     )
     all_findings.sort(key=lambda f: _severity_rank(f.severity))
 
@@ -771,6 +774,7 @@ def synthesize_report(
         "- **GUARDIAN_WARNINGS**: Repo report freshness and registered .dharma top-level directories",
         "- **CONSISTENCY_GUARD**: Task-claim lifecycle cross-store consistency (NEW-05)",
         "- **ROUTER_PROBE**: Circuit breaker state, log error patterns, missing API keys",
+        "- **ROOM_WATCHER**: Fractal room budget, kill/spinout condition health",
         "",
         "---",
         "*Guardian Crew runs every 4 hours. Report overwrites previous. "
@@ -825,15 +829,12 @@ async def _create_issue_if_needed(finding: GuardianFinding, repo: str, state_dir
     return False
 
 
-# ---------------------------------------------------------------------------
-# Main guardian run function
-# ---------------------------------------------------------------------------
-
 async def run_guardian_cycle(
     src_root: Path | None = None,
     state_dir: Path | None = None,
     github_repo: str = "AmitabhainArunachala/dharma_swarm",
     create_issues: bool = True,
+    room_registry: Any | None = None,
 ) -> dict[str, Any]:
     """Run one full guardian cycle: audit + loop_watch + router_probe + report.
 
@@ -846,6 +847,8 @@ async def run_guardian_cycle(
 
     logger.info("Guardian Crew: starting cycle (src=%s)", src_root)
 
+    from dharma_swarm.fractal.room_health import run_room_health_watcher
+
     # Run all Guardian checks in parallel.
     (
         auditor_findings,
@@ -854,6 +857,7 @@ async def run_guardian_cycle(
         ledger_findings,
         warning_findings,
         consistency_findings,
+        room_findings,
     ) = await asyncio.gather(
         run_auditor(src_root),
         run_loop_watcher(state_dir),
@@ -861,6 +865,7 @@ async def run_guardian_cycle(
         run_ledger_watcher(state_dir),
         run_guardian_warning_checks(src_root, state_dir),
         run_task_consistency_guard(state_dir),
+        run_room_health_watcher(room_registry),
         return_exceptions=False,
     )
 
@@ -874,6 +879,7 @@ async def run_guardian_cycle(
         ledger_findings=ledger_findings,
         warning_findings=warning_findings,
         consistency_findings=consistency_findings,
+        room_findings=room_findings,
     )
 
     # Write report to disk
@@ -898,6 +904,7 @@ async def run_guardian_cycle(
         + ledger_findings
         + warning_findings
         + consistency_findings
+        + room_findings
     )
     blockers = [f for f in all_findings if f.severity == "BLOCKER"]
 
@@ -934,6 +941,7 @@ async def start_guardian_loop(
     github_repo: str = "AmitabhainArunachala/dharma_swarm",
     interval_seconds: int = _GUARDIAN_INTERVAL,
     shutdown_event: asyncio.Event | None = None,
+    room_registry: Any | None = None,
 ) -> None:
     """Run the guardian crew in a continuous loop (called from orchestrate_live).
 
@@ -942,12 +950,15 @@ async def start_guardian_loop(
     logger.info("Guardian Crew: starting loop (interval=%ds)", interval_seconds)
     _shutdown = shutdown_event or asyncio.Event()
 
-    # Boot-time run
-    try:
+    async def _run_cycle_once() -> None:
         await asyncio.wait_for(
-            run_guardian_cycle(src_root=src_root, state_dir=state_dir, github_repo=github_repo),
+            run_guardian_cycle(src_root=src_root, state_dir=state_dir, github_repo=github_repo, room_registry=room_registry),
             timeout=300.0,
         )
+
+    # Boot-time run
+    try:
+        await _run_cycle_once()
     except asyncio.TimeoutError:
         logger.warning("Guardian Crew: boot-time cycle timed out (300s)")
     except Exception as exc:
@@ -963,10 +974,7 @@ async def start_guardian_loop(
         if _shutdown.is_set():
             break
         try:
-            await asyncio.wait_for(
-                run_guardian_cycle(src_root=src_root, state_dir=state_dir, github_repo=github_repo),
-                timeout=300.0,
-            )
+            await _run_cycle_once()
         except asyncio.TimeoutError:
             logger.warning("Guardian Crew: cycle timed out (300s)")
         except Exception as exc:

@@ -405,6 +405,8 @@ class AIReciprocityLedger:
             corr = get_correlation()
             if corr.trace_id:
                 payload.setdefault("trace_id", corr.trace_id)
+            if corr.cell_id:
+                payload.setdefault("cell_id", corr.cell_id)
         except Exception:
             pass
         prev_hash = self.chain_head

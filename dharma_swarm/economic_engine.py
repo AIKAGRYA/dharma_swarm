@@ -162,6 +162,8 @@ class EconomicEngine:
             corr = get_correlation()
             if corr.trace_id:
                 meta.setdefault("trace_id", corr.trace_id)
+            if corr.cell_id:
+                meta.setdefault("cell_id", corr.cell_id)
         except Exception:
             pass
         return meta

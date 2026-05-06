@@ -13,6 +13,7 @@ from dharma_swarm.models import (
     GateDecision,
     Message,
     Task,
+    TaskDispatch,
     TaskStatus,
     TopologyType,
 )
@@ -1021,6 +1022,35 @@ async def test_dispatch_dropoff_requeues_once_when_runner_missing(tmp_path):
         task_id == "t-dropoff" and fields.get("status") == TaskStatus.PENDING
         for task_id, fields in board.updates
     )
+
+
+def test_prepare_claim_uses_explicit_room_metadata() -> None:
+    orch = Orchestrator(agent_pool=None, task_board=None)
+    task = Task(
+        id="t-room",
+        title="Room scoped",
+        metadata={"source_room_id": "revenue-wedge"},
+    )
+    dispatch = TaskDispatch(task_id="t-room", agent_id="codex.local")
+
+    meta = orch._prepare_claim(task, dispatch)
+
+    assert meta["cell_id"] == "revenue-wedge"
+    assert dispatch.metadata["cell_id"] == "revenue-wedge"
+
+
+def test_prepare_claim_does_not_guess_ambiguous_shared_agent_room() -> None:
+    from dharma_swarm.fractal.room_configs import bootstrap_registry
+
+    orch = Orchestrator(agent_pool=None, task_board=None)
+    orch._room_registry = bootstrap_registry()
+    task = Task(id="t-ambiguous", title="Ambiguous room", metadata={})
+    dispatch = TaskDispatch(task_id="t-ambiguous", agent_id="codex.local")
+
+    meta = orch._prepare_claim(task, dispatch)
+
+    assert "cell_id" not in meta
+    assert "cell_id" not in dispatch.metadata
 
 
 # ---------------------------------------------------------------------------

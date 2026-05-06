@@ -1,7 +1,7 @@
 """CorrelationContext — unified trace propagation across all stores.
 
-Carries trace_id, proposal_id, and session_id through every subsystem
-operation via contextvars. When any store records data, it can read
+Carries trace_id, proposal_id, session_id, and cell_id through every
+subsystem operation via contextvars. When any store records data, it can read
 the current correlation context to tag the record with cross-store
 identifiers — enabling queries like "show me everything about trace X."
 
@@ -64,6 +64,7 @@ class CorrelationContext:
     trace_id: str = field(default_factory=_new_trace_id)
     proposal_id: str = ""
     session_id: str = ""
+    cell_id: str = ""
 
     def with_proposal(self, proposal_id: str) -> CorrelationContext:
         """Return a new context with the proposal_id set."""
@@ -71,18 +72,31 @@ class CorrelationContext:
             trace_id=self.trace_id,
             proposal_id=proposal_id,
             session_id=self.session_id,
+            cell_id=self.cell_id,
+        )
+
+    def with_cell(self, cell_id: str) -> CorrelationContext:
+        """Return a new context with the cell_id (room) set."""
+        return CorrelationContext(
+            trace_id=self.trace_id,
+            proposal_id=self.proposal_id,
+            session_id=self.session_id,
+            cell_id=cell_id,
         )
 
     def as_dict(self) -> dict[str, str]:
         """Serialize to a dict for metadata_json embedding."""
-        return {
+        d: dict[str, str] = {
             "trace_id": self.trace_id,
             "proposal_id": self.proposal_id,
             "session_id": self.session_id,
         }
+        if self.cell_id:
+            d["cell_id"] = self.cell_id
+        return d
 
 
-_EMPTY = CorrelationContext(trace_id="", proposal_id="", session_id="")
+_EMPTY = CorrelationContext(trace_id="", proposal_id="", session_id="", cell_id="")
 
 _correlation_var: contextvars.ContextVar[CorrelationContext] = contextvars.ContextVar(
     "dharma_correlation_context",
@@ -100,18 +114,25 @@ def set_correlation(ctx: CorrelationContext) -> contextvars.Token[CorrelationCon
     return _correlation_var.set(ctx)
 
 
+def reset_correlation(token: contextvars.Token[CorrelationContext]) -> None:
+    """Restore a token returned by set_correlation()."""
+    _correlation_var.reset(token)
+
+
 @asynccontextmanager
 async def correlation_scope(
     *,
     trace_id: str = "",
     proposal_id: str = "",
     session_id: str = "",
+    cell_id: str = "",
 ) -> AsyncIterator[CorrelationContext]:
     """Async context manager that sets and restores correlation context."""
     ctx = CorrelationContext(
         trace_id=trace_id or _new_trace_id(),
         proposal_id=proposal_id,
         session_id=session_id,
+        cell_id=cell_id,
     )
     token = _correlation_var.set(ctx)
     try:
@@ -126,12 +147,14 @@ def correlation_scope_sync(
     trace_id: str = "",
     proposal_id: str = "",
     session_id: str = "",
+    cell_id: str = "",
 ) -> Iterator[CorrelationContext]:
     """Sync context manager that sets and restores correlation context."""
     ctx = CorrelationContext(
         trace_id=trace_id or _new_trace_id(),
         proposal_id=proposal_id,
         session_id=session_id,
+        cell_id=cell_id,
     )
     token = _correlation_var.set(ctx)
     try:

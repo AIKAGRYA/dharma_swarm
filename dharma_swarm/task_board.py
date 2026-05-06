@@ -212,6 +212,8 @@ class TaskBoard:
         trace_id = corr.trace_id
         if trace_id:
             meta.setdefault("trace_id", trace_id)
+        if corr.cell_id:
+            meta.setdefault("cell_id", corr.cell_id)
         async with self._open() as db:
             await db.execute(
                 "INSERT INTO tasks"
@@ -272,6 +274,8 @@ class TaskBoard:
                 metadata = dict(spec.get("metadata") or {})
                 if trace_id:
                     metadata.setdefault("trace_id", trace_id)
+                if corr.cell_id:
+                    metadata.setdefault("cell_id", corr.cell_id)
 
                 await db.execute(
                     "INSERT INTO tasks"

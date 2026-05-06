@@ -460,14 +460,17 @@ class MemoryPalace:
         """
         doc_id = ""
 
-        # Auto-populate trace_id from CorrelationContext
+        # Auto-populate trace_id + cell_id from CorrelationContext
         try:
             from dharma_swarm.correlation_context import get_correlation
             corr = get_correlation()
-            if corr.trace_id:
+            if corr.trace_id or corr.cell_id:
                 if metadata is None:
                     metadata = {}
-                metadata.setdefault("trace_id", corr.trace_id)
+                if corr.trace_id:
+                    metadata.setdefault("trace_id", corr.trace_id)
+                if corr.cell_id:
+                    metadata.setdefault("cell_id", corr.cell_id)
         except Exception:
             pass
 
