@@ -335,20 +335,6 @@ def check_canonical_guard(
         if rel in registered:
             continue
         if doc_contains_authority_claim(path):
-            status = changed_doc_statuses.get(rel)
-            if status and not status.startswith("A"):
-                findings.append(
-                    Finding(
-                        "WARN",
-                        "canonical",
-                        (
-                            f"{rel} contains an authority term but is not registered "
-                            "in docs/governance/CANONICAL_DOC_STACK.md; review before "
-                            "relying on it as live guidance"
-                        ),
-                    )
-                )
-                continue
             findings.append(
                 Finding(
                     "FAIL",

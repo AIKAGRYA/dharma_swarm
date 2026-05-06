@@ -36,19 +36,47 @@
       "doc": "docs/governance/SOVEREIGN_MANIFEST.md",
       "regex": "Markdown files \\| \\*\\*(\\d+)\\*\\*",
       "metric": "markdown_files",
-      "verify": "find . -name \"*.md\" -type f | wc -l"
+      "verify": "find . -name \"*.md\" -type f ! -path \"./reports/docops/*\" | wc -l"
     },
     {
       "id": "manifest-markdown-lines",
       "doc": "docs/governance/SOVEREIGN_MANIFEST.md",
       "regex": "Markdown total lines \\| \\*\\*([\\d,]+)\\*\\*",
       "metric": "markdown_total_lines",
-      "verify": "find . -name \"*.md\" -type f -print0 | xargs -0 wc -l"
+      "verify": "find . -name \"*.md\" -type f ! -path \"./reports/docops/*\" -print0 | xargs -0 wc -l"
     },
     {
       "id": "manifest-bridge-files",
       "doc": "docs/governance/SOVEREIGN_MANIFEST.md",
       "regex": "Bridge files \\| \\*\\*(\\d+)\\*\\*",
+      "metric": "bridge_files",
+      "verify": "find dharma_swarm -name \"*bridge*.py\" -type f | wc -l"
+    },
+    {
+      "id": "manifest-axiom-bridge-files",
+      "doc": "docs/governance/SOVEREIGN_MANIFEST.md",
+      "regex": "repo currently has \\*\\*(\\d+) bridge files\\*\\*",
+      "metric": "bridge_files",
+      "verify": "find dharma_swarm -name \"*bridge*.py\" -type f | wc -l"
+    },
+    {
+      "id": "manifest-domain-bridge-files",
+      "doc": "docs/governance/SOVEREIGN_MANIFEST.md",
+      "regex": "\\*\\*(\\d+) bridge files\\*\\* \\(V\\), \\*\\*[\\d,]+ total LOC\\*\\*",
+      "metric": "bridge_files",
+      "verify": "find dharma_swarm -name \"*bridge*.py\" -type f | wc -l"
+    },
+    {
+      "id": "manifest-prior-audit-bridge-files",
+      "doc": "docs/governance/SOVEREIGN_MANIFEST.md",
+      "regex": "\"17 bridge files\" / \"19 bridge files\" \\(self-contradicting\\) \\| \\*\\*(\\d+) bridge files\\*\\*",
+      "metric": "bridge_files",
+      "verify": "find dharma_swarm -name \"*bridge*.py\" -type f | wc -l"
+    },
+    {
+      "id": "manifest-phase3a-bridge-files",
+      "doc": "docs/governance/SOVEREIGN_MANIFEST.md",
+      "regex": "Bridge count of \"30\" \\(Phase 3A\\) \\| \\*\\*(\\d+) actual bridge files\\*\\*",
       "metric": "bridge_files",
       "verify": "find dharma_swarm -name \"*bridge*.py\" -type f | wc -l"
     },
