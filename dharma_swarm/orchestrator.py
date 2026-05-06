@@ -787,22 +787,58 @@ class Orchestrator:
                 "active_claim": claim,
             }
         )
-        # Inject cell_id from room registry if agent is assigned to a room
-        if self._room_registry is not None and not meta.get("cell_id"):
-            try:
-                for room in self._room_registry.active_rooms():
-                    if td.agent_id in room.agents:
-                        meta["cell_id"] = room.id
-                        td.metadata["cell_id"] = room.id
-                        break
-            except Exception:
-                logger.debug("Room registry lookup failed during claim prep", exc_info=True)
+        cell_id = self._resolve_dispatch_cell_id(td.agent_id, meta)
+        if cell_id:
+            meta["cell_id"] = cell_id
+            td.metadata["cell_id"] = cell_id
         td.metadata["claim_id"] = claim_id
         td.metadata["claim_timeout_seconds"] = claim_timeout_seconds
         td.metadata["claim_expires_monotonic"] = time.monotonic() + claim_timeout_seconds
         td.metadata["retry_count"] = retry_count
         td.metadata["max_retries"] = max_retries
         return meta
+
+    def _resolve_dispatch_cell_id(self, agent_id: str, meta: dict[str, Any]) -> str:
+        """Resolve a room cell_id from explicit task metadata or one clear fallback.
+
+        Explicit task/work-packet metadata is authoritative. Agent roster membership
+        is only a fallback when it maps to exactly one active room; shared agents
+        must not collapse work into the first registered room.
+        """
+        for key in (
+            "cell_id",
+            "room_id",
+            "source_room_id",
+            "target_room_id",
+            "venture_cell_id",
+            "revenue_cell_id",
+        ):
+            value = meta.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+
+        if self._room_registry is None:
+            return ""
+
+        try:
+            matches = [
+                room.id for room in self._room_registry.active_rooms()
+                if agent_id in getattr(room, "agents", [])
+            ]
+        except Exception:
+            logger.debug("Room registry lookup failed during claim prep", exc_info=True)
+            return ""
+
+        if len(matches) == 1:
+            return matches[0]
+        if len(matches) > 1:
+            logger.debug(
+                "Ambiguous room assignment for agent %s across rooms %s; "
+                "leaving cell_id unset until task metadata names a room.",
+                agent_id,
+                matches,
+            )
+        return ""
 
     def _memory_plane_db_path(self, task: Task | None) -> Path | None:
         meta = self._task_meta(task)
@@ -2135,18 +2171,23 @@ class Orchestrator:
             self._coerce_float(td.timeout_seconds, self._default_timeout_seconds),
         )
 
-        # Set CorrelationContext with cell_id for room-scoped tracing
+        correlation_token = None
+        reset_correlation = None
+
+        # Set CorrelationContext with cell_id for room-scoped tracing.
+        # The token is reset in finally to avoid context leakage across tasks.
         cell_id = td.metadata.get("cell_id", "")
         if cell_id:
             try:
                 from dharma_swarm.correlation_context import (
-                    CorrelationContext,
                     set_correlation,
+                    reset_correlation as _reset_correlation,
                     get_correlation,
                 )
                 current = get_correlation()
                 ctx = current.with_cell(cell_id)
-                set_correlation(ctx)
+                correlation_token = set_correlation(ctx)
+                reset_correlation = _reset_correlation
             except Exception:
                 logger.debug("cell_id correlation context setup failed", exc_info=True)
 
@@ -2484,6 +2525,11 @@ class Orchestrator:
                 source="execution_error",
             )
         finally:
+            if correlation_token is not None and reset_correlation is not None:
+                try:
+                    reset_correlation(correlation_token)
+                except Exception:
+                    logger.debug("cell_id correlation context reset failed", exc_info=True)
             # NOTE: Do NOT pop from _running_tasks here.
             # _collect_completed() is the sole cleanup mechanism — it checks
             # atask.done() and counts settled tasks. If we pop here, the task

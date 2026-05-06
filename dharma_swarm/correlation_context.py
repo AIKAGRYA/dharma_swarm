@@ -114,6 +114,11 @@ def set_correlation(ctx: CorrelationContext) -> contextvars.Token[CorrelationCon
     return _correlation_var.set(ctx)
 
 
+def reset_correlation(token: contextvars.Token[CorrelationContext]) -> None:
+    """Restore a token returned by set_correlation()."""
+    _correlation_var.reset(token)
+
+
 @asynccontextmanager
 async def correlation_scope(
     *,

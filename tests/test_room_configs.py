@@ -6,6 +6,8 @@ and satisfy all Five Laws of Fractal Rooms.
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
+
 import pytest
 
 from dharma_swarm.fractal.fractal_room import (
@@ -27,6 +29,7 @@ from dharma_swarm.fractal.room_configs import (
     make_core_ops_room,
     make_revenue_wedge_cell,
 )
+from dharma_swarm.fractal.room_health import room_runtime_kpis, run_room_health_watcher
 
 
 # -----------------------------------------------------------------------
@@ -175,6 +178,25 @@ class TestRevenueWedgeHealth:
         cell = make_revenue_wedge_cell()
         kpis = {"revenue_usd": 100, "days_active": 10, "budget_ratio": 1.25}
         assert evaluate_kill_conditions(cell.kill_conditions, kpis)
+
+    def test_runtime_kpis_match_kill_condition_contract(self):
+        cell = make_revenue_wedge_cell()
+        cell.created_at = (datetime.now(timezone.utc) - timedelta(days=65)).isoformat()
+        kpis = room_runtime_kpis(cell)
+
+        assert kpis["revenue_usd"] == 0
+        assert kpis["days_active"] >= 64
+        assert "budget_ratio" in kpis
+        assert "operator_kill" in kpis
+        assert evaluate_kill_conditions(cell.kill_conditions, kpis)
+
+    @pytest.mark.asyncio
+    async def test_room_health_watcher_requires_live_registry(self):
+        findings = await run_room_health_watcher()
+
+        assert len(findings) == 1
+        assert findings[0].check == "ROOM_WATCHER:not_configured"
+        assert findings[0].severity == "WARNING"
 
     def test_spinout_ready(self):
         cell = make_revenue_wedge_cell()

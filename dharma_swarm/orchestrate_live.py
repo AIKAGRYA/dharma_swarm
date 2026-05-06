@@ -1614,6 +1614,7 @@ async def _run_room_health_loop(
     """
     _log("room-health", "Starting room health loop (interval=1800s)")
     from dharma_swarm.fractal.fractal_room import VentureCellV1
+    from dharma_swarm.fractal.room_health import room_runtime_kpis
 
     while not shutdown_event.is_set():
         try:
@@ -1622,21 +1623,7 @@ async def _run_room_health_loop(
             for room in active:
                 if not isinstance(room, VentureCellV1):
                     continue
-                try:
-                    created = datetime.fromisoformat(room.created_at)
-                    age_days = (now - created).days
-                except (ValueError, TypeError):
-                    age_days = 0
-                kpis = {
-                    "days_since_creation": age_days,
-                    "total_revenue": 0,
-                    "total_budget": room.budget_tokens,
-                    "total_burn": room.current_burn,
-                    "operator_override": False,
-                    "revenue_exceeds_burn": False,
-                    "operator_approval": False,
-                    "customer_validation": False,
-                }
+                kpis = room_runtime_kpis(room, now=now)
                 report = bridge.evaluate_room_health(room.id, kpis)
                 if report.get("kill_triggered"):
                     _log("room-health", f"KILL triggered for {room.id}: {report.get('kill_conditions_met', [])}")
@@ -1658,7 +1645,10 @@ async def _run_room_health_loop(
             pass
 
 
-async def _run_guardian_loop(shutdown_event: asyncio.Event) -> None:
+async def _run_guardian_loop(
+    shutdown_event: asyncio.Event,
+    room_registry: Any | None = None,
+) -> None:
     """Guardian Crew: continuous interface + loop + router health checking.
 
     Three specialist agents running every 4 hours:
@@ -1675,6 +1665,7 @@ async def _run_guardian_loop(shutdown_event: asyncio.Event) -> None:
             state_dir=STATE_DIR,
             github_repo="AmitabhainArunachala/dharma_swarm",
             shutdown_event=shutdown_event,
+            room_registry=room_registry,
         )
     except Exception as exc:
         _log("guardian", f"Guardian loop crashed: {exc}")
@@ -1772,12 +1763,25 @@ async def orchestrate(background: bool = False) -> None:
     from dharma_swarm.signal_bus import SignalBus
     bus = SignalBus.get()
 
-    # Phase 2b: Bootstrap fractal room registry + bridge
-    from dharma_swarm.fractal.room_configs import bootstrap_registry
-    from dharma_swarm.fractal.room_bridge import RoomBridge
-    room_registry = bootstrap_registry()
-    room_bridge = RoomBridge(room_registry, signal_bus=bus)
-    _log("orchestrator", f"Fractal rooms: {len(room_registry.all_rooms())} rooms bootstrapped")
+    # Phase 2b: optional fractal room registry + bridge.
+    room_registry = None
+    room_bridge = None
+    rooms_enabled = os.environ.get("DHARMA_FRACTAL_ROOMS", "").lower() in {
+        "1", "true", "yes", "on",
+    }
+    if rooms_enabled:
+        try:
+            from dharma_swarm.fractal.room_configs import bootstrap_registry
+            from dharma_swarm.fractal.room_bridge import RoomBridge
+            room_registry = bootstrap_registry()
+            room_bridge = RoomBridge(room_registry, signal_bus=bus)
+            _log("orchestrator", f"Fractal rooms: {len(room_registry.all_rooms())} rooms bootstrapped")
+        except Exception as exc:
+            _log("orchestrator", f"Fractal rooms disabled: bootstrap failed: {exc}")
+            room_registry = None
+            room_bridge = None
+    else:
+        _log("orchestrator", "Fractal rooms: disabled (set DHARMA_FRACTAL_ROOMS=1 to enable)")
 
     _log("orchestrator", "=" * 60)
     _log("orchestrator", "DGC Live Orchestrator starting (Strange Loop v1)")
@@ -1787,7 +1791,10 @@ async def orchestrate(background: bool = False) -> None:
     _log("orchestrator", f"  Pulse interval: {PULSE_INTERVAL}s")
     _log("orchestrator", f"  Max daily: {MAX_DAILY}")
     _log("orchestrator", f"  Signal bus: active")
-    _log("orchestrator", f"  Fractal rooms: {len(room_registry.active_rooms())} active")
+    if room_registry is not None:
+        _log("orchestrator", f"  Fractal rooms: {len(room_registry.active_rooms())} active")
+    else:
+        _log("orchestrator", "  Fractal rooms: disabled")
     _log("orchestrator", "=" * 60)
 
     # Constitutional size check (Power Prompt Commandment #3)
@@ -1822,8 +1829,9 @@ async def orchestrate(background: bool = False) -> None:
         "consolidation": CONSOLIDATION_INTERVAL, "recognition": 7200,
         "replication": 3600, "self-improve": 3600, "free-grind": 600,
         "flywheel": 300, "conductors": 120, "context-agent": 60,
-        "room-health": 1800,
     }
+    if room_registry is not None and room_bridge is not None:
+        _loop_intervals["room-health"] = 1800
     for loop_name, interval in _loop_intervals.items():
         _supervisor.register_loop(loop_name, expected_interval=float(interval))
 
@@ -1849,8 +1857,7 @@ async def orchestrate(background: bool = False) -> None:
         # ── Guardian Crew: continuous interface + loop + router health checks ──
         # Runs at boot + every 4 hours. Writes GUARDIAN_REPORT.md.
         # Creates GitHub issues for BLOCKER-severity findings.
-        "guardian": lambda: _run_guardian_loop(shutdown_event),
-        "room-health": lambda: _run_room_health_loop(shutdown_event, room_registry, room_bridge),
+        "guardian": lambda: _run_guardian_loop(shutdown_event, room_registry=room_registry),
         # ── Health API: curl http://localhost:7433/health ──
         "health-api": lambda: _run_health_api(shutdown_event),
         # ── Gauntlet: adversarial eval pressure + DGM feedback loop ──
@@ -1858,6 +1865,12 @@ async def orchestrate(background: bool = False) -> None:
         # ── World Model: living Forrester-style world state updated by research ──
         "world-model": lambda: _run_world_model_loop(shutdown_event),
     }
+    if room_registry is not None and room_bridge is not None:
+        task_factories["room-health"] = lambda: _run_room_health_loop(
+            shutdown_event,
+            room_registry,
+            room_bridge,
+        )
     optional_clean_exit = {"pulse"}
     tasks = {
         name: asyncio.create_task(factory(), name=name)

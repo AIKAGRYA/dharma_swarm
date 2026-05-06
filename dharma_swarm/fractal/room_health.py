@@ -14,7 +14,6 @@ from dharma_swarm.fractal.fractal_room import (
     VentureCellV1,
     evaluate_kill_conditions,
 )
-from dharma_swarm.fractal.room_configs import bootstrap_registry
 
 
 def _guardian_finding(
@@ -29,11 +28,56 @@ def _guardian_finding(
     )
 
 
-async def run_room_health_watcher() -> list[Any]:
-    """ROOM_WATCHER: Check fractal room health — budget, kill/spinout conditions."""
-    findings: list[Any] = []
+def room_runtime_kpis(
+    room: VentureCellV1,
+    *,
+    now: datetime | None = None,
+    revenue_usd: float = 0.0,
+    burn_usd: float = 0.0,
+    paying_customers: int = 0,
+    operator_kill: bool = False,
+    operator_approved_graduation: bool = False,
+) -> dict[str, Any]:
+    """Build KPI keys that match fractal_room evaluator contracts."""
+    now = now or datetime.now(timezone.utc)
     try:
-        registry = bootstrap_registry()
+        created = datetime.fromisoformat(room.created_at)
+        age_days = (now - created).days
+    except (ValueError, TypeError):
+        age_days = 0
+
+    return {
+        "days_active": age_days,
+        "revenue_usd": revenue_usd,
+        "burn_usd": burn_usd,
+        "budget_ratio": room.current_burn / max(room.budget_tokens, 1),
+        "operator_kill": operator_kill,
+        "monthly_revenue_gt_burn_months": 0,
+        "paying_customers": paying_customers,
+        "operator_approved_graduation": operator_approved_graduation,
+        "autonomy_stage": room.autonomy_stage,
+        "agent_count": len(room.agents),
+        "welfare_tons": room.welfare_tons_produced,
+    }
+
+
+async def run_room_health_watcher(registry: Any | None = None) -> list[Any]:
+    """ROOM_WATCHER: Check live fractal room health when a registry is supplied."""
+    findings: list[Any] = []
+    if registry is None:
+        findings.append(_guardian_finding(
+            severity="WARNING",
+            check="ROOM_WATCHER:not_configured",
+            title="Room health watcher has no live room registry",
+            detail=(
+                "Guardian room health is disabled because no runtime RoomRegistry "
+                "was supplied. Avoiding static bootstrap prevents decorative health."
+            ),
+            fix_hint="Run live orchestration with DHARMA_FRACTAL_ROOMS=1 or pass a live registry.",
+        ))
+        return findings
+
+    try:
         active = registry.active_rooms()
     except Exception as exc:
         findings.append(_guardian_finding(
@@ -70,18 +114,7 @@ async def run_room_health_watcher() -> list[Any]:
                 fix_hint="Monitor burn rate and consider budget allocation.",
             ))
         if isinstance(room, VentureCellV1):
-            try:
-                created = datetime.fromisoformat(room.created_at)
-                age_days = (datetime.now(timezone.utc) - created).days
-            except (ValueError, TypeError):
-                age_days = 0
-            kpis = {
-                "days_since_creation": age_days,
-                "total_revenue": 0,
-                "total_budget": room.budget_tokens,
-                "total_burn": room.current_burn,
-                "operator_override": False,
-            }
+            kpis = room_runtime_kpis(room)
             kill = evaluate_kill_conditions(room.kill_conditions, kpis)
             if kill:
                 findings.append(_guardian_finding(
@@ -90,7 +123,8 @@ async def run_room_health_watcher() -> list[Any]:
                     title=f"VentureCell '{room.id}' kill condition triggered",
                     detail=(
                         f"VentureCell '{room.id}' has triggered kill conditions. "
-                        f"Age: {age_days} days, revenue: $0, burn: {room.current_burn} tokens."
+                        f"Age: {kpis['days_active']} days, revenue: ${kpis['revenue_usd']}, "
+                        f"budget ratio: {kpis['budget_ratio']:.2f}."
                     ),
                     fix_hint="Review kill conditions and decide whether to archive or adjust.",
                 ))

@@ -834,6 +834,7 @@ async def run_guardian_cycle(
     state_dir: Path | None = None,
     github_repo: str = "AmitabhainArunachala/dharma_swarm",
     create_issues: bool = True,
+    room_registry: Any | None = None,
 ) -> dict[str, Any]:
     """Run one full guardian cycle: audit + loop_watch + router_probe + report.
 
@@ -864,7 +865,7 @@ async def run_guardian_cycle(
         run_ledger_watcher(state_dir),
         run_guardian_warning_checks(src_root, state_dir),
         run_task_consistency_guard(state_dir),
-        run_room_health_watcher(),
+        run_room_health_watcher(room_registry),
         return_exceptions=False,
     )
 
@@ -940,6 +941,7 @@ async def start_guardian_loop(
     github_repo: str = "AmitabhainArunachala/dharma_swarm",
     interval_seconds: int = _GUARDIAN_INTERVAL,
     shutdown_event: asyncio.Event | None = None,
+    room_registry: Any | None = None,
 ) -> None:
     """Run the guardian crew in a continuous loop (called from orchestrate_live).
 
@@ -948,12 +950,15 @@ async def start_guardian_loop(
     logger.info("Guardian Crew: starting loop (interval=%ds)", interval_seconds)
     _shutdown = shutdown_event or asyncio.Event()
 
-    # Boot-time run
-    try:
+    async def _run_cycle_once() -> None:
         await asyncio.wait_for(
-            run_guardian_cycle(src_root=src_root, state_dir=state_dir, github_repo=github_repo),
+            run_guardian_cycle(src_root=src_root, state_dir=state_dir, github_repo=github_repo, room_registry=room_registry),
             timeout=300.0,
         )
+
+    # Boot-time run
+    try:
+        await _run_cycle_once()
     except asyncio.TimeoutError:
         logger.warning("Guardian Crew: boot-time cycle timed out (300s)")
     except Exception as exc:
@@ -969,10 +974,7 @@ async def start_guardian_loop(
         if _shutdown.is_set():
             break
         try:
-            await asyncio.wait_for(
-                run_guardian_cycle(src_root=src_root, state_dir=state_dir, github_repo=github_repo),
-                timeout=300.0,
-            )
+            await _run_cycle_once()
         except asyncio.TimeoutError:
             logger.warning("Guardian Crew: cycle timed out (300s)")
         except Exception as exc:
