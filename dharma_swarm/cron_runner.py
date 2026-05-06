@@ -436,6 +436,47 @@ def _run_operator_brief(job: dict[str, Any]) -> CronJobExecutionResult:
         )
 
 
+# --------------------------------------------------------------------------
+# Layer C handler — Shakti executive refreshes the opportunity board.
+# --------------------------------------------------------------------------
+
+
+def _run_shakti_executive(job: dict[str, Any]) -> CronJobExecutionResult:
+    """Run the Layer C executive that refreshes the opportunity board."""
+    try:
+        from dharma_swarm.shakti_executive import ShaktiExecutive
+        top_k = int(job.get("top_k", 12))
+        min_score = float(job.get("min_score", 45.0))
+        write = bool(job.get("write", False)) and not bool(job.get("dry_run", False))
+        state_dir = job.get("state_dir") or None
+        res = ShaktiExecutive(state_dir=state_dir).run(
+            write=write,
+            top_k=top_k,
+            min_score=min_score,
+        )
+        if res.errors:
+            return CronJobExecutionResult(
+                status=CronJobRunStatus.FAILED,
+                output=f"shakti_executive errors: {list(res.errors)}",
+                error="; ".join(res.errors)[:500],
+            )
+        output = (
+            f"shakti_executive: dry_run={res.dry_run} scanned={res.scanned_signals} "
+            f"selected={res.selected_candidates} board_before={res.board_count_before} "
+            f"board_after={res.board_count_after}"
+        )
+        return CronJobExecutionResult(
+            status=CronJobRunStatus.COMPLETED,
+            output=output,
+        )
+    except Exception as e:  # noqa: BLE001
+        return CronJobExecutionResult(
+            status=CronJobRunStatus.FAILED,
+            output=str(e),
+            error=str(e),
+        )
+
+
 def execute_cron_job(job: dict[str, Any]) -> CronJobExecutionResult:
     """Dispatch a cron job to the configured runner with structured status.
 
@@ -446,6 +487,8 @@ def execute_cron_job(job: dict[str, Any]) -> CronJobExecutionResult:
         foreman          — foreman quality forge cycle
         custodians       — custodian maintenance fleet (no quality re-scan)
         custodians_forge — custodian fleet + foreman quality re-scan
+        operator_brief   — ontology-native operator brief seam (v0, default-disabled)
+        shakti_executive — Layer C opportunity board refresh
     """
     handler = str(job.get("handler", "headless_prompt")).strip() or "headless_prompt"
 
@@ -475,6 +518,8 @@ def execute_cron_job(job: dict[str, Any]) -> CronJobExecutionResult:
         return _run_scout_synthesis(job)
     if handler == "operator_brief":
         return _run_operator_brief(job)
+    if handler == "shakti_executive":
+        return _run_shakti_executive(job)
 
     error = f"Unsupported cron handler: {handler}"
     return CronJobExecutionResult(
