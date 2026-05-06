@@ -1,0 +1,39 @@
+{
+  "id": "swarmmanager-boot-extraction",
+  "base_ref": "origin/main",
+  "branch": "refactor/swarmmanager-boot-extraction",
+  "worktree": "/Users/dhyana/promotion_worktrees/dharma_swarm_swarmmanager_boot_extraction",
+  "intent": "Extract optional SwarmManager subsystem initialization in a behavior-preserving way with focused boot tests.",
+  "allowed_files": [
+    "dharma_swarm/swarm.py",
+    "dharma_swarm/organism.py",
+    "tests/test_swarm.py",
+    "tests/test_organism_boot.py",
+    "reports/agentops/**"
+  ],
+  "forbidden_files": [
+    "api/**",
+    "dashboard/**",
+    "dharma_swarm/daily_operating_brief.py",
+    "dharma_swarm/insight_brief.py",
+    "dharma_swarm/orchestrate_live.py"
+  ],
+  "gates": [
+    {
+      "name": "diff-check",
+      "command": "git diff --check"
+    },
+    {
+      "name": "boot-tests",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_swarm.py tests/test_organism_boot.py"
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "refactor(swarm): extract optional boot initialization seams"
+  },
+  "approval": {
+    "before_commit": true,
+    "before_merge": true
+  }
+}

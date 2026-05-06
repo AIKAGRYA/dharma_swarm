@@ -1,0 +1,37 @@
+{
+  "id": "terminal-duplication-freeze",
+  "base_ref": "origin/main",
+  "branch": "chore/terminal-duplication-freeze",
+  "worktree": "/Users/dhyana/promotion_worktrees/dharma_swarm_terminal_duplication_freeze",
+  "intent": "Classify terminal-v2 as freeze/demote candidate and document explicit fallback policy without rewriting terminal UX.",
+  "allowed_files": [
+    "terminal-v2/**",
+    "terminal/**",
+    "docs/governance/TERMINAL_OPERATING_MODEL.md",
+    "reports/agentops/**"
+  ],
+  "forbidden_files": [
+    "api/**",
+    "dashboard/**",
+    "dharma_swarm/orchestrate_live.py",
+    "dharma_swarm/swarm.py"
+  ],
+  "gates": [
+    {
+      "name": "diff-check",
+      "command": "git diff --check"
+    },
+    {
+      "name": "terminal-tests",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_terminal_bridge.py tests/test_terminal_control.py"
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "chore(terminal): freeze terminal-v2 and document fallback policy"
+  },
+  "approval": {
+    "before_commit": true,
+    "before_merge": true
+  }
+}

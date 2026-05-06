@@ -77,6 +77,30 @@ def test_reads_failed_gate_and_marks_gate_health_not_all_green(tmp_path: Path) -
     assert any("Stop integrating `job-red`" in line for line in brief.stop_doing)
 
 
+def test_reads_kaizen_review_from_agentops_bridge_output(tmp_path: Path) -> None:
+    kaizen_dir = tmp_path / "reports" / "kaizen" / "kaizen-v0"
+    kaizen_dir.mkdir(parents=True)
+    (kaizen_dir / "kaizen_review.json").write_text(
+        json.dumps(
+            {
+                "id": "kaizen-v0",
+                "title": "KaizenReview for kaizen-v0",
+                "status": "recorded",
+                "quality_score": 0.82,
+                "human_yds_rating": None,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    brief = build_daily_operating_brief(
+        DailyOperatingBriefInputs(kaizen_reports_dir=tmp_path / "reports" / "kaizen")
+    )
+
+    rendered = render_markdown(brief)
+    assert "KaizenReview `KaizenReview for kaizen-v0` recorded, advisory score `0.82`." in rendered
+
+
 def test_reads_human_yds_jsonl_rating_and_includes_it(tmp_path: Path) -> None:
     yds_path = tmp_path / "yds.jsonl"
     yds_path.write_text(
