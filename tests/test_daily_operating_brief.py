@@ -21,7 +21,8 @@ REQUIRED_SECTIONS = [
     "## 6. Revenue / self-funding moves",
     "## 7. Stop doing",
     "## 8. Next highest-leverage move",
-    "## 9. Missing sources",
+    "## 9. Doc drift / claim integrity",
+    "## 10. Missing sources",
 ]
 
 
@@ -43,6 +44,7 @@ def test_gracefully_handles_all_sources_missing() -> None:
     assert "No human YDS ratings found." in markdown
     assert "No burn source found." in markdown
     assert "No revenue source found." in markdown
+    assert "No DocOps integrity report found." in markdown
 
 
 def test_reads_one_agentops_report_and_summarizes_gate_health(tmp_path: Path) -> None:
@@ -240,6 +242,93 @@ def test_reads_simple_revenue_notes_when_provided(tmp_path: Path) -> None:
     assert "Random note without signal" not in rendered
 
 
+def test_reads_docops_report_and_renders_claim_integrity_section(tmp_path: Path) -> None:
+    report_path = tmp_path / "reports" / "docops" / "check.json"
+    inventory_path = tmp_path / "reports" / "docops" / "corpus_inventory.json"
+    report_path.parent.mkdir(parents=True)
+    report_path.write_text(
+        json.dumps(
+            {
+                "date": "2026-05-06",
+                "passed": True,
+                "failure_count": 0,
+                "warning_count": 1,
+                "metrics": {
+                    "markdown_files": 632,
+                    "authority_candidate_docs": 259,
+                    "doc_assertions": 12,
+                },
+                "findings": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    inventory_path.write_text(
+        json.dumps(
+            {
+                "absolute_path_ref_count": 1516,
+                "broken_path_ref_count": 0,
+                "canonical_claim_count": 74,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    brief = build_daily_operating_brief(
+        DailyOperatingBriefInputs(
+            docops_check_report_path=report_path,
+            docops_inventory_path=inventory_path,
+        )
+    )
+
+    rendered = render_markdown(brief)
+    assert "## 9. Doc drift / claim integrity" in rendered
+    assert "DocOps integrity passed on 2026-05-06: 0 failure(s), 1 warning(s)." in rendered
+    assert "632 markdown file(s)" in rendered
+    assert "259 authority-candidate doc(s)" in rendered
+    assert "1516 absolute path reference(s)" in rendered
+    assert "74 canonical/source-of-truth claim(s)" in rendered
+
+
+def test_failed_docops_report_becomes_conservative_next_move(tmp_path: Path) -> None:
+    report_path = tmp_path / "check.json"
+    inventory_path = tmp_path / "corpus_inventory.json"
+    report_path.write_text(
+        json.dumps(
+            {
+                "passed": False,
+                "failure_count": 2,
+                "warning_count": 3,
+                "findings": [
+                    {
+                        "rule_id": "path-exists",
+                        "path": "docs/example.md",
+                        "message": "referenced path missing",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    inventory_path.write_text(json.dumps({"path_ref_count": 4}), encoding="utf-8")
+
+    brief = build_daily_operating_brief(
+        DailyOperatingBriefInputs(
+            agentops_reports_dir=_green_agentops_dir(tmp_path),
+            docops_check_report_path=report_path,
+            docops_inventory_path=inventory_path,
+        )
+    )
+
+    rendered = render_markdown(brief)
+    assert "DocOps integrity failed: 2 failure(s), 3 warning(s)." in rendered
+    assert "DocOps finding: path-exists - docs/example.md - referenced path missing." in rendered
+    assert (
+        "Fix DocOps integrity failures before adding or promoting more documentation."
+        in rendered
+    )
+
+
 def test_writes_markdown_to_explicit_output_path(tmp_path: Path) -> None:
     output_path = tmp_path / "briefs" / "today.md"
 
@@ -290,3 +379,9 @@ def _write_agentops_report(
     path = report_dir / "report.json"
     path.write_text(json.dumps(report), encoding="utf-8")
     return path
+
+
+def _green_agentops_dir(tmp_path: Path) -> Path:
+    reports_dir = tmp_path / "reports" / "agentops"
+    _write_agentops_report(reports_dir, job_id="job-green")
+    return reports_dir

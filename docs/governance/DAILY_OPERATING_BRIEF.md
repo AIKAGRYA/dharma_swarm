@@ -21,6 +21,10 @@ paths only:
 - `cost_report_path`: reads JSON or JSONL burn/cost records.
 - `llm_burn_state_dir`: optionally reads local LLM usage from
   `cost_log.jsonl`, `traces/cost_ledger.jsonl`, and dated trace JSONL files.
+- `docops_check_report_path`: optionally reads the DocOps integrity check
+  report, usually `reports/docops/check.json`.
+- `docops_inventory_path`: optionally reads the DocOps corpus inventory,
+  usually `reports/docops/corpus_inventory.json`.
 - `hot_items_path`: reads current stop/next-move signals.
 - `revenue_notes_path`: reads plain text or markdown revenue notes.
 
@@ -57,7 +61,8 @@ pricing gap before scaling another long autonomous run.
 6. Revenue / self-funding moves
 7. Stop doing
 8. Next highest-leverage move
-9. Missing sources
+9. Doc drift / claim integrity
+10. Missing sources
 
 `write_daily_operating_brief()` writes markdown only to the explicit output path
 provided by the caller.
@@ -71,6 +76,8 @@ The v0 brief fails visible, not silent:
 - No YDS ledger: `No human YDS ratings found.`
 - No cost source: `No burn source found.`
 - No revenue notes: `No revenue source found.`
+- No DocOps integrity report: `No DocOps integrity report found.`
+- No DocOps corpus inventory: `No DocOps corpus inventory found.`
 
 Missing sources also appear in the final `Missing sources` section.
 
@@ -102,6 +109,20 @@ AgentOps v0 reports already contain enough structure for the brief:
 
 The brief summarizes these reports as operating evidence. Failed gates or failed
 scope checks become stop-doing signals until resolved.
+
+## DocOps Bridge
+
+The brief can read the DocOps integrity artifacts produced by
+`make docops-report`:
+
+- `reports/docops/check.json`
+- `reports/docops/corpus_inventory.json`
+
+This keeps documentation drift visible in the same morning cockpit as runtime
+gates, burn, and revenue signals. A failing DocOps report does not mutate docs
+or become a new authority, but it does become a conservative next-move signal:
+fix claim/path/canonical-doc failures before adding or promoting more
+documentation.
 
 ## Deliberately Not Included Yet
 
