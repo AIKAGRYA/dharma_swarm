@@ -30,6 +30,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any, Optional, Protocol, runtime_checkable
 
 logger = logging.getLogger(__name__)
@@ -38,8 +39,8 @@ logger = logging.getLogger(__name__)
 # Configuration
 # ---------------------------------------------------------------------------
 
-_CORRECTIONS_DIR = Path.home() / ".dharma" / "consolidation" / "corrections"
-_REPORTS_DIR = Path.home() / ".dharma" / "consolidation" / "reports"
+_CORRECTIONS_DIR = dharma_state_dir() / "consolidation" / "corrections"
+_REPORTS_DIR = dharma_state_dir() / "consolidation" / "reports"
 _MAX_TRACES = 50  # Recent traces to read per forward scan
 _MAX_MARKS = 100  # Recent stigmergy marks to read
 _MAX_CORRECTIONS = 10  # Max corrections per cycle
@@ -185,7 +186,7 @@ class NeuralConsolidator:
         reports_dir: Optional[Path] = None,
     ) -> None:
         self._provider = provider
-        self._base = base_path or Path.home() / ".dharma"
+        self._base = base_path or dharma_state_dir()
         self._corrections_dir = corrections_dir or _CORRECTIONS_DIR
         self._reports_dir = reports_dir or _REPORTS_DIR
 

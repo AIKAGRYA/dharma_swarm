@@ -33,4 +33,3 @@ def test_write_dgc_health_snapshot_persists_fresh_runtime_metadata(tmp_path: Pat
     summary = dgc_health_snapshot_summary(state_dir)
     assert summary["status"] == "fresh"
     assert summary["daemon_pid_mismatch"] is False
-

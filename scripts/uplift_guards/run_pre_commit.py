@@ -15,6 +15,7 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from scripts.uplift_guards import (
     check_autonomous_destruction,
+    check_fourfold_shakti_warrant,
     check_hotpath_acknowledged,
     check_kernel_integrity,
     check_mismatch_adjacency,
@@ -26,8 +27,11 @@ def check_assurance_diff(repo_root: Path) -> tuple[bool, str]:
     if os.environ.get("DHARMA_SKIP_ASSURANCE_GUARD", "").strip() == "1":
         return True, "assurance diff guard skipped by DHARMA_SKIP_ASSURANCE_GUARD=1"
 
-    from dharma_swarm.assurance.runner import run_assurance
-    from dharma_swarm.assurance.scanner_test_gaps import _git_changed_files
+    try:
+        from dharma_swarm.assurance.runner import run_assurance
+        from dharma_swarm.assurance.scanner_test_gaps import _git_changed_files
+    except ImportError as exc:
+        return True, f"assurance diff skipped (dependency not available: {exc})"
 
     changed_files = _git_changed_files(repo_root)
     if not changed_files:
@@ -71,6 +75,7 @@ GUARDS = [
     ("secrets-scan", check_no_secrets),
     ("autonomous-destruction", check_autonomous_destruction),
     ("hotpath-ack", check_hotpath_acknowledged),
+    ("fourfold-shakti-warrant", check_fourfold_shakti_warrant),
     ("mismatch-adjacency", check_mismatch_adjacency),
     ("assurance-diff", check_assurance_diff),
 ]

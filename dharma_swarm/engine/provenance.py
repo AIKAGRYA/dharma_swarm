@@ -110,4 +110,3 @@ class ProvenanceLogger:
         if limit is None or limit <= 0:
             return entries
         return entries[-limit:]
-

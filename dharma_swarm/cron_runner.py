@@ -416,60 +416,41 @@ def _run_scout_synthesis(job: dict[str, Any]) -> CronJobExecutionResult:
         )
 
 
-# --------------------------------------------------------------------------
-# Layer A/B handlers (PR6) — frontier dispatcher + refill
-# --------------------------------------------------------------------------
+def _run_operator_brief(job: dict[str, Any]) -> CronJobExecutionResult:
+    """Cron handler for the ontology-native Operator Brief seam (v0).
 
-
-def _run_frontier_dispatcher(job: dict[str, Any]) -> CronJobExecutionResult:
-    """Run a single dispatcher tick (Layer B promoter)."""
+    Default-disabled via ``DHARMA_OPERATOR_BRIEF_ENABLED``. When the
+    flag is off, the handler reports ``WAITING_EXTERNAL`` (meaning:
+    "ran but did nothing, awaiting flag flip") and performs no source
+    mutation. See ``docs/plans/ONTOLOGY_NATIVE_OPERATOR_BRIEF_MASTER_SPEC.md``.
+    """
     try:
-        from dharma_swarm.opportunity_dispatcher import main as dispatcher_main
-        argv: list[str] = []
-        if job.get("dry_run"):
-            argv.append("--dry-run")
-        max_promotions = job.get("max_promotions")
-        if max_promotions is not None:
-            argv.extend(["--max", str(int(max_promotions))])
-        rc = dispatcher_main(argv)
-        return CronJobExecutionResult(
-            status=CronJobRunStatus.COMPLETED if rc == 0 else CronJobRunStatus.FAILED,
-            output=f"opportunity_dispatcher exit_code={rc}",
-        )
-    except Exception as e:  # noqa: BLE001
+        from dharma_swarm.operator_brief.insight_brief import cron_run
+        result = cron_run(job)
+        status = result.get("status", "unknown")
+        outcome = result.get("outcome", "")
+        if status == "disabled":
+            return CronJobExecutionResult(
+                status=CronJobRunStatus.WAITING_EXTERNAL,
+                output=f"operator_brief disabled: {result.get('reason', '')}",
+                metadata=result,
+            )
+        if outcome == "success":
+            return CronJobExecutionResult(
+                status=CronJobRunStatus.COMPLETED,
+                output=(
+                    f"operator_brief artifact={result.get('artifact_id')} "
+                    f"witnesses={len(result.get('witness_log_ids', []))}"
+                ),
+                metadata=result,
+            )
         return CronJobExecutionResult(
             status=CronJobRunStatus.FAILED,
-            output=str(e),
-            error=str(e),
+            output=f"operator_brief outcome={outcome}",
+            error=outcome,
+            metadata=result,
         )
-
-
-def _run_frontier_refill(job: dict[str, Any]) -> CronJobExecutionResult:
-    """Run a single refill cycle (Layer A — bootstrap top opportunities)."""
-    try:
-        from dharma_swarm.opportunity_refill import refill_frontier_tasks_pending
-        top_k = int(job.get("top_k", 3))
-        min_telos = float(job.get("min_telos_alignment", 0.5))
-        dry_run = bool(job.get("dry_run", False))
-        res = refill_frontier_tasks_pending(
-            top_k=top_k, min_telos_alignment=min_telos, dry_run=dry_run,
-        )
-        if res.error:
-            return CronJobExecutionResult(
-                status=CronJobRunStatus.FAILED,
-                output=f"frontier_refill error: {res.error}",
-                error=res.error,
-            )
-        output = (
-            f"frontier_refill: paused={res.paused} board={res.board_count} "
-            f"addressed={res.addressed_count} appended_rows={res.appended_rows} "
-            f"appended_ids={res.appended_opportunity_ids}"
-        )
-        return CronJobExecutionResult(
-            status=CronJobRunStatus.COMPLETED,
-            output=output,
-        )
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         return CronJobExecutionResult(
             status=CronJobRunStatus.FAILED,
             output=str(e),
@@ -512,18 +493,12 @@ def execute_cron_job(job: dict[str, Any]) -> CronJobExecutionResult:
 
     if handler == "insight_brief":
         return _run_insight_brief(job)
-
     if handler == "scout_sweep":
         return _run_scout_sweep(job)
     if handler == "scout_synthesis":
         return _run_scout_synthesis(job)
-
-    # Layer A/B handlers (PR6) — opportunity board → frontier_tasks_pending →
-    # canonical task_board via the dispatcher promoter.
-    if handler == "frontier_dispatcher":
-        return _run_frontier_dispatcher(job)
-    if handler == "frontier_refill":
-        return _run_frontier_refill(job)
+    if handler == "operator_brief":
+        return _run_operator_brief(job)
 
     error = f"Unsupported cron handler: {handler}"
     return CronJobExecutionResult(

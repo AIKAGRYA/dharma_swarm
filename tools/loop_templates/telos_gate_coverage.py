@@ -18,6 +18,9 @@ import time
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
 from pathlib import Path
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -27,7 +30,7 @@ try:
 except ImportError:  # pragma: no cover - direct script fallback
     from progress_protocol import LoopProgressTracker, ProgressSnapshot
 
-STATE_DIR = Path.home() / ".dharma"
+STATE_DIR = dharma_state_dir()
 OVERNIGHT_DIR = STATE_DIR / "overnight"
 LOG_FILE = OVERNIGHT_DIR / "gate_coverage.jsonl"
 

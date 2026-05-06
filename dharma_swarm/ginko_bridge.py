@@ -24,7 +24,7 @@ _GINKO_SIGNAL_FILE = Path.home() / ".dharma" / "shared" / "ginko_signals.json"
 
 async def ginko_get_signals(symbol: str = "BTC", lookback_days: int = 7) -> dict[str, Any]:
     """Get current Ginko market signals for a symbol.
-    
+
     Falls back gracefully if Ginko is not installed.
     """
     try:
@@ -41,13 +41,13 @@ async def ginko_get_signals(symbol: str = "BTC", lookback_days: int = 7) -> dict
             )
             stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=30)
             return json.loads(stdout.decode())
-        
+
         # Fallback: read cached signal file if it exists
         if _GINKO_SIGNAL_FILE.exists():
             data = json.loads(_GINKO_SIGNAL_FILE.read_text())
             data['_source'] = 'cached'
             return data
-        
+
         return {
             "symbol": symbol,
             "regime": "unknown",
@@ -83,12 +83,12 @@ def format_signals(signals: dict[str, Any]) -> str:
     """Format Ginko signals for agent consumption."""
     if signals.get("error"):
         return f"Ginko unavailable: {signals['error']}"
-    
+
     regime = signals.get("regime", "unknown")
     symbol = signals.get("symbol", "?")
     lines = [f"## Ginko Market Signals: {symbol}", f"**Regime:** {regime}"]
-    
+
     for sig in signals.get("signals", []):
         lines.append(f"- {sig.get('name', '?')}: {sig.get('value', '?')} ({sig.get('direction', '?')})")
-    
+
     return "\n".join(lines)

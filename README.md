@@ -177,6 +177,8 @@ That sends the reader to:
 
 ## Before Writing Any Code
 
+- **Read [`docs/governance/BUILD_SESSION_ENTRYPOINT.md`](docs/governance/BUILD_SESSION_ENTRYPOINT.md)** — canonical read order, current build track, and the seven ontology-native checks. Every build session starts here.
+- **Current build track:** ontology-native Operator Brief seam. See [`docs/plans/ONTOLOGY_NATIVE_OPERATOR_BRIEF_MASTER_SPEC.md`](docs/plans/ONTOLOGY_NATIVE_OPERATOR_BRIEF_MASTER_SPEC.md), [`docs/plans/NEXT_10_SUBSTRATE_TODO.md`](docs/plans/NEXT_10_SUBSTRATE_TODO.md), and [`docs/plans/HANDOFF_ONTOLOGY_NATIVE_OPERATOR_BRIEF.md`](docs/plans/HANDOFF_ONTOLOGY_NATIVE_OPERATOR_BRIEF.md). Do not open a second seam until this one ships.
 - **Read [`CLAUDE.md`](CLAUDE.md)** — system genome, key abstractions, behavioral rules, the Transcendence Principle.
 - **Read [`docs/governance/README.md`](docs/governance/README.md)** — the active governance hub and recommended orientation order for humans and agents.
 - **Read [`INTERFACE_MISMATCH_MAP.md`](INTERFACE_MISMATCH_MAP.md)** — every known interface mismatch between modules, with exact line numbers, root causes, and fixes. This is the primary source of runtime failures. Follow the Bootstrap Sequence to unblock the system.

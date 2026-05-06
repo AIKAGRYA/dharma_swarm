@@ -28,4 +28,3 @@ else
 fi
 
 echo "Run dir: $(cat "$RUN_FILE" 2>/dev/null || echo unknown)"
-

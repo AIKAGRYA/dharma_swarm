@@ -24,13 +24,14 @@ import tempfile
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
 # ── Configuration ────────────────────────────────────────────────────
 
-DHARMA_DIR = Path(os.getenv("DHARMA_HOME", Path.home() / ".dharma"))
+DHARMA_DIR = dharma_state_dir("DHARMA_HOME")
 CRON_DIR = DHARMA_DIR / "cron"
 JOBS_FILE = CRON_DIR / "jobs.json"
 OUTPUT_DIR = CRON_DIR / "output"

@@ -1,5 +1,7 @@
 """Tests for persisted Darwin meta-evolution."""
 
+import json
+
 import pytest
 
 from dharma_swarm.archive import FITNESS_DIMENSIONS
@@ -55,6 +57,53 @@ async def test_meta_cycle_archives_and_evolves_when_poor(engine_paths, tmp_path,
     assert len(meta.meta_archive) == 1
     assert meta.meta_params != initial
     assert engine.get_fitness_weights() == meta.meta_params.fitness_weights
+
+
+def test_meta_archive_loads_legacy_economic_fitness_dimensions(
+    engine_paths,
+    tmp_path,
+):
+    archive_path = tmp_path / "meta_archive_legacy.jsonl"
+    archive_path.write_text(
+        json.dumps(
+            {
+                "meta_parameters": {
+                    "fitness_weights": {
+                        "correctness": 0.18,
+                        "dharmic_alignment": 0.13,
+                        "swabhaav_alignment": 0.08,
+                        "performance": 0.11,
+                        "utilization": 0.11,
+                        "economic_savings": 0.04,
+                        "paper_profit": 0.04,
+                        "verified_revenue": 0.05,
+                        "elegance": 0.10,
+                        "efficiency": 0.10,
+                        "safety": 0.06,
+                    },
+                    "mutation_rate": 0.2,
+                    "exploration_coeff": 0.5,
+                    "circuit_breaker_limit": 4,
+                    "map_elites_n_bins": 6,
+                },
+                "meta_fitness": 0.7,
+                "n_object_cycles": 3,
+                "fitness_trajectory": [0.5, 0.6, 0.7],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    engine = DarwinEngine(**engine_paths)
+    meta = MetaEvolutionEngine(engine, meta_archive_path=archive_path)
+
+    assert len(meta.meta_archive) == 1
+    weights = meta.meta_archive[0].meta_parameters.fitness_weights
+    assert "economic_savings" not in weights
+    assert "paper_profit" not in weights
+    assert "verified_revenue" not in weights
+    assert weights["economic_value"] > 0.0
 
 
 @pytest.mark.asyncio

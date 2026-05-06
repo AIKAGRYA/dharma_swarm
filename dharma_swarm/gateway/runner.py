@@ -12,6 +12,7 @@ import os
 import threading
 import time
 from pathlib import Path
+from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 import yaml
@@ -20,7 +21,7 @@ from dharma_swarm.gateway.base import MessageEvent, PlatformAdapter
 
 logger = logging.getLogger(__name__)
 
-GATEWAY_CONFIG_PATH = Path(os.getenv("DHARMA_HOME", Path.home() / ".dharma")) / "gateway.yaml"
+GATEWAY_CONFIG_PATH = dharma_state_dir("DHARMA_HOME") / "gateway.yaml"
 
 # Default cron tick interval (seconds)
 CRON_TICK_INTERVAL = 60

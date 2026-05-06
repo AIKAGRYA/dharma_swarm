@@ -20,6 +20,7 @@ from uuid import uuid4
 
 import aiosqlite
 
+from dharma_swarm.correlation_context import get_correlation
 from dharma_swarm.engine.event_memory import (
     ensure_memory_plane_schema_async,
     ensure_memory_plane_schema_sync,
@@ -52,7 +53,8 @@ CREATE TABLE IF NOT EXISTS task_claims (
     stale_after TEXT,
     recovered_at TEXT,
     retry_count INTEGER NOT NULL DEFAULT 0,
-    metadata_json TEXT NOT NULL DEFAULT '{}'
+    metadata_json TEXT NOT NULL DEFAULT '{}',
+    trace_id TEXT NOT NULL DEFAULT ''
 )"""
 
 _DELEGATION_RUNS_DDL = """
@@ -70,7 +72,8 @@ CREATE TABLE IF NOT EXISTS delegation_runs (
     started_at TEXT NOT NULL,
     completed_at TEXT,
     failure_code TEXT NOT NULL DEFAULT '',
-    metadata_json TEXT NOT NULL DEFAULT '{}'
+    metadata_json TEXT NOT NULL DEFAULT '{}',
+    trace_id TEXT NOT NULL DEFAULT ''
 )"""
 
 _WORKSPACE_LEASES_DDL = """
@@ -319,6 +322,14 @@ async def ensure_runtime_state_schema_async(
         await db.execute(ddl)
     for idx in _INDEXES:
         await db.execute(idx)
+    # Migrate: add trace_id column to existing task_claims/delegation_runs
+    for tbl in ("task_claims", "delegation_runs"):
+        try:
+            await db.execute(
+                f"ALTER TABLE {tbl} ADD COLUMN trace_id TEXT NOT NULL DEFAULT ''"
+            )
+        except Exception:
+            pass  # column already exists
     if include_memory_plane:
         await ensure_memory_plane_schema_async(db)
     await db.commit()
@@ -1103,12 +1114,14 @@ class RuntimeStateStore:
 
     async def record_task_claim(self, claim: TaskClaim) -> TaskClaim:
         await self.init_db()
+        corr = get_correlation()
+        trace_id = corr.trace_id
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute(
                 "INSERT INTO task_claims (claim_id, task_id, session_id, agent_id, status,"
                 " claimed_at, acked_at, heartbeat_at, stale_after, recovered_at,"
-                " retry_count, metadata_json)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                " retry_count, metadata_json, trace_id)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
                 " ON CONFLICT(claim_id) DO UPDATE SET"
                 " task_id = excluded.task_id,"
                 " session_id = excluded.session_id,"
@@ -1120,7 +1133,8 @@ class RuntimeStateStore:
                 " stale_after = excluded.stale_after,"
                 " recovered_at = excluded.recovered_at,"
                 " retry_count = excluded.retry_count,"
-                " metadata_json = excluded.metadata_json",
+                " metadata_json = excluded.metadata_json,"
+                " trace_id = excluded.trace_id",
                 (
                     claim.claim_id,
                     claim.task_id,
@@ -1134,6 +1148,7 @@ class RuntimeStateStore:
                     claim.recovered_at.isoformat() if claim.recovered_at else None,
                     int(claim.retry_count),
                     _json_dump(claim.metadata),
+                    trace_id,
                 ),
             )
             await db.commit()
@@ -1250,13 +1265,15 @@ class RuntimeStateStore:
 
     async def record_delegation_run(self, run: DelegationRun) -> DelegationRun:
         await self.init_db()
+        corr = get_correlation()
+        trace_id = corr.trace_id
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute(
                 "INSERT INTO delegation_runs (run_id, session_id, task_id, claim_id,"
                 " parent_run_id, assigned_by, assigned_to, requested_output_json,"
                 " current_artifact_id, status, started_at, completed_at, failure_code,"
-                " metadata_json)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                " metadata_json, trace_id)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
                 " ON CONFLICT(run_id) DO UPDATE SET"
                 " session_id = excluded.session_id,"
                 " task_id = excluded.task_id,"
@@ -1270,7 +1287,8 @@ class RuntimeStateStore:
                 " started_at = excluded.started_at,"
                 " completed_at = excluded.completed_at,"
                 " failure_code = excluded.failure_code,"
-                " metadata_json = excluded.metadata_json",
+                " metadata_json = excluded.metadata_json,"
+                " trace_id = excluded.trace_id",
                 (
                     run.run_id,
                     run.session_id,
@@ -1286,6 +1304,7 @@ class RuntimeStateStore:
                     run.completed_at.isoformat() if run.completed_at else None,
                     run.failure_code,
                     _json_dump(run.metadata),
+                    trace_id,
                 ),
             )
             await db.commit()
@@ -1339,6 +1358,182 @@ class RuntimeStateStore:
             db.row_factory = aiosqlite.Row
             rows = await (await db.execute(query, params)).fetchall()
         return [_row_to_run(row) for row in rows]
+
+    # ── Sync helpers (for non-async callers like OpportunityDispatcher) ──
+
+    def create_task_claim_sync(self, claim: TaskClaim) -> TaskClaim:
+        """Synchronous version of record_task_claim."""
+        self.init_db_sync()
+        with sqlite3.connect(self.db_path) as db:
+            _apply_connection_pragmas_sync(db)
+            db.execute(
+                "INSERT INTO task_claims (claim_id, task_id, session_id, agent_id, status,"
+                " claimed_at, acked_at, heartbeat_at, stale_after, recovered_at,"
+                " retry_count, metadata_json)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                " ON CONFLICT(claim_id) DO UPDATE SET"
+                " task_id = excluded.task_id,"
+                " session_id = excluded.session_id,"
+                " agent_id = excluded.agent_id,"
+                " status = excluded.status,"
+                " claimed_at = excluded.claimed_at,"
+                " acked_at = excluded.acked_at,"
+                " heartbeat_at = excluded.heartbeat_at,"
+                " stale_after = excluded.stale_after,"
+                " recovered_at = excluded.recovered_at,"
+                " retry_count = excluded.retry_count,"
+                " metadata_json = excluded.metadata_json",
+                (
+                    claim.claim_id,
+                    claim.task_id,
+                    claim.session_id,
+                    claim.agent_id,
+                    claim.status,
+                    claim.claimed_at.isoformat(),
+                    claim.acked_at.isoformat() if claim.acked_at else None,
+                    claim.heartbeat_at.isoformat() if claim.heartbeat_at else None,
+                    claim.stale_after.isoformat() if claim.stale_after else None,
+                    claim.recovered_at.isoformat() if claim.recovered_at else None,
+                    int(claim.retry_count),
+                    _json_dump(claim.metadata),
+                ),
+            )
+            db.commit()
+        return self.get_task_claim_sync(claim.claim_id) or claim
+
+    def get_task_claim_sync(self, claim_id: str) -> TaskClaim | None:
+        self.init_db_sync()
+        with sqlite3.connect(self.db_path) as db:
+            _apply_connection_pragmas_sync(db)
+            db.row_factory = sqlite3.Row
+            row = db.execute(
+                "SELECT claim_id, task_id, session_id, agent_id, status, claimed_at,"
+                " acked_at, heartbeat_at, stale_after, recovered_at, retry_count,"
+                " metadata_json FROM task_claims WHERE claim_id = ?",
+                (claim_id,),
+            ).fetchone()
+        return _row_to_claim(row) if row is not None else None
+
+    def heartbeat_claim_sync(self, claim_id: str) -> TaskClaim | None:
+        """Update heartbeat_at timestamp for a claim (sync)."""
+        existing = self.get_task_claim_sync(claim_id)
+        if existing is None:
+            return None
+        now = _utc_now()
+        self.init_db_sync()
+        with sqlite3.connect(self.db_path) as db:
+            _apply_connection_pragmas_sync(db)
+            db.execute(
+                "UPDATE task_claims SET heartbeat_at = ? WHERE claim_id = ?",
+                (now.isoformat(), claim_id),
+            )
+            db.commit()
+        return self.get_task_claim_sync(claim_id)
+
+    def close_claim_sync(
+        self,
+        claim_id: str,
+        *,
+        status: str = "completed",
+        metadata: dict[str, Any] | None = None,
+    ) -> TaskClaim | None:
+        """Close a claim with a terminal status (sync)."""
+        existing = self.get_task_claim_sync(claim_id)
+        if existing is None:
+            return None
+        merged = {**existing.metadata, **(metadata or {})}
+        self.init_db_sync()
+        with sqlite3.connect(self.db_path) as db:
+            _apply_connection_pragmas_sync(db)
+            db.execute(
+                "UPDATE task_claims SET status = ?, metadata_json = ? WHERE claim_id = ?",
+                (status, _json_dump(merged), claim_id),
+            )
+            db.commit()
+        return self.get_task_claim_sync(claim_id)
+
+    def create_delegation_run_sync(self, run: DelegationRun) -> DelegationRun:
+        """Synchronous version of record_delegation_run."""
+        self.init_db_sync()
+        with sqlite3.connect(self.db_path) as db:
+            _apply_connection_pragmas_sync(db)
+            db.execute(
+                "INSERT INTO delegation_runs (run_id, session_id, task_id, claim_id,"
+                " parent_run_id, assigned_by, assigned_to, requested_output_json,"
+                " current_artifact_id, status, started_at, completed_at, failure_code,"
+                " metadata_json)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                " ON CONFLICT(run_id) DO UPDATE SET"
+                " session_id = excluded.session_id,"
+                " task_id = excluded.task_id,"
+                " claim_id = excluded.claim_id,"
+                " parent_run_id = excluded.parent_run_id,"
+                " assigned_by = excluded.assigned_by,"
+                " assigned_to = excluded.assigned_to,"
+                " requested_output_json = excluded.requested_output_json,"
+                " current_artifact_id = excluded.current_artifact_id,"
+                " status = excluded.status,"
+                " started_at = excluded.started_at,"
+                " completed_at = excluded.completed_at,"
+                " failure_code = excluded.failure_code,"
+                " metadata_json = excluded.metadata_json",
+                (
+                    run.run_id,
+                    run.session_id,
+                    run.task_id,
+                    run.claim_id,
+                    run.parent_run_id,
+                    run.assigned_by,
+                    run.assigned_to,
+                    _json_dump(run.requested_output),
+                    run.current_artifact_id,
+                    run.status,
+                    run.started_at.isoformat(),
+                    run.completed_at.isoformat() if run.completed_at else None,
+                    run.failure_code,
+                    _json_dump(run.metadata),
+                ),
+            )
+            db.commit()
+        return self.get_delegation_run_sync(run.run_id) or run
+
+    def get_delegation_run_sync(self, run_id: str) -> DelegationRun | None:
+        self.init_db_sync()
+        with sqlite3.connect(self.db_path) as db:
+            _apply_connection_pragmas_sync(db)
+            db.row_factory = sqlite3.Row
+            row = db.execute(
+                "SELECT run_id, session_id, task_id, claim_id, parent_run_id,"
+                " assigned_by, assigned_to, requested_output_json,"
+                " current_artifact_id, status, started_at, completed_at,"
+                " failure_code, metadata_json FROM delegation_runs WHERE run_id = ?",
+                (run_id,),
+            ).fetchone()
+        return _row_to_run(row) if row is not None else None
+
+    def close_delegation_run_sync(
+        self,
+        run_id: str,
+        *,
+        status: str = "completed",
+        failure_code: str = "",
+        metadata: dict[str, Any] | None = None,
+    ) -> DelegationRun | None:
+        """Close a delegation run (sync)."""
+        existing = self.get_delegation_run_sync(run_id)
+        if existing is None:
+            return None
+        merged = {**existing.metadata, **(metadata or {})}
+        self.init_db_sync()
+        with sqlite3.connect(self.db_path) as db:
+            _apply_connection_pragmas_sync(db)
+            db.execute(
+                "UPDATE delegation_runs SET status = ?, completed_at = ?,"
+                " failure_code = ?, metadata_json = ? WHERE run_id = ?",
+                (status, _utc_now_iso(), failure_code, _json_dump(merged), run_id),
+            )
+            db.commit()
+        return self.get_delegation_run_sync(run_id)
 
     async def record_workspace_lease(self, lease: WorkspaceLease) -> WorkspaceLease:
         await self.init_db()
@@ -1707,6 +1902,18 @@ class RuntimeStateStore:
                     " created_at, metadata_json FROM context_bundles WHERE bundle_id = ?",
                     (bundle_id,),
                 )
+            ).fetchone()
+        return _row_to_context_bundle(row) if row is not None else None
+
+    def get_context_bundle_sync(self, bundle_id: str) -> ContextBundleRecord | None:
+        self.init_db_sync()
+        with sqlite3.connect(self.db_path) as db:
+            db.row_factory = sqlite3.Row
+            row = db.execute(
+                "SELECT bundle_id, session_id, task_id, run_id, token_budget,"
+                " rendered_text, sections_json, source_refs_json, checksum,"
+                " created_at, metadata_json FROM context_bundles WHERE bundle_id = ?",
+                (bundle_id,),
             ).fetchone()
         return _row_to_context_bundle(row) if row is not None else None
 

@@ -12,6 +12,7 @@ concurrency:
 
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
   gitleaks:
@@ -32,9 +33,8 @@ jobs:
           # repos run without it. Set as a secret if/when the repo moves
           # under an org.
           GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Default-ignore commits already in the baseline; the
           # .gitleaks.toml allowlist is the canonical config.
+          GITLEAKS_CONFIG: .gitleaks.toml
           GITLEAKS_NOTIFY_USER_LIST: '@AmitabhainArunachala'
-        with:
-          # Inputs reference the bundled .gitleaks.toml at repo root.
-          config-path: .gitleaks.toml

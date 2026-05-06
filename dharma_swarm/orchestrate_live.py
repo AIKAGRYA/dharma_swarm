@@ -1501,14 +1501,184 @@ async def run_conductor_loop(shutdown_event: asyncio.Event) -> None:
     )
 
 
+async def _run_world_model_loop(shutdown_event: asyncio.Event) -> None:
+    """World Model: living Forrester-style world state, updated every 6h by research agents.
+
+    Seeded with 15 stocks (CO2, biodiversity, AI capability, institutional trust...),
+    8 flows, 6 feedback loops. Each cycle: update stocks via web_search, assess
+    telos pressure, emit algedonic signal if any stock crosses critical threshold.
+    """
+    try:
+        from dharma_swarm.world_model import WorldModelAgent
+        agent = WorldModelAgent(state_dir=STATE_DIR)
+        # Seed on first boot
+        try:
+            await asyncio.wait_for(agent.initialize(), timeout=60.0)
+            _log("world-model", "World model initialized and seeded")
+        except Exception as exc:
+            _log("world-model", f"World model init failed (non-fatal): {exc}")
+        # Run update loop every 6 hours
+        while not shutdown_event.is_set():
+            try:
+                await asyncio.wait_for(shutdown_event.wait(), timeout=21600)
+                break
+            except asyncio.TimeoutError:
+                pass
+            if shutdown_event.is_set():
+                break
+            try:
+                _wm_timeout = float(os.environ.get("DHARMA_WORLD_MODEL_TIMEOUT", "900"))
+                await asyncio.wait_for(agent.run_cycle(), timeout=_wm_timeout)
+                _log("world-model", "World model cycle complete")
+            except Exception as exc:
+                _log("world-model", f"World model cycle error: {exc}")
+    except Exception as exc:
+        _log("world-model", f"World model loop crashed: {exc}")
+
+
+async def _run_gauntlet_loop(shutdown_event: asyncio.Event) -> None:
+    """Gauntlet: run adversarial eval pressure on a schedule, feed scores into DGM.
+
+    Tier 1+2 (correctness + research): every 2 hours.
+    Tier 3 (self-modification): every 6 hours.
+    Tier 4+5 (adversarial + emergent): every 12 hours.
+    Scores written to ~/.dharma/gauntlet/ and fed back to BenchmarkRegistry.
+    """
+    import random as _random
+    _log("gauntlet", "Gauntlet loop starting")
+    _cycle = 0
+    while not shutdown_event.is_set():
+        try:
+            await asyncio.wait_for(shutdown_event.wait(), timeout=7200)
+            break
+        except asyncio.TimeoutError:
+            pass
+        if shutdown_event.is_set():
+            break
+
+        _cycle += 1
+        tiers = [1, 2]
+        if _cycle % 3 == 0:
+            tiers.append(3)
+        if _cycle % 6 == 0:
+            tiers += [4, 5]
+
+        try:
+            from benchmarks.gauntlet import run_gauntlet
+            _log("gauntlet", f"Running tiers {tiers} (cycle {_cycle})")
+            report = await asyncio.wait_for(run_gauntlet(tiers=tiers), timeout=1800)
+            _log("gauntlet",
+                 f"Score: {report.gauntlet_score:.3f} (Δ{report.delta:+.3f}) | "
+                 f"DGM targets: {report.dgm_targets}")
+            # Feed DGM targets into evolution loop via signal bus
+            if report.dgm_targets and report.delta < 0:
+                try:
+                    from dharma_swarm.signal_bus import SignalBus
+                    SignalBus.get().emit("GAUNTLET_REGRESSION", {
+                        "score": report.gauntlet_score,
+                        "delta": report.delta,
+                        "dgm_targets": report.dgm_targets,
+                    })
+                except Exception:
+                    pass
+        except asyncio.TimeoutError:
+            _log("gauntlet", "Gauntlet cycle timed out (1800s)")
+        except Exception as exc:
+            _log("gauntlet", f"Gauntlet cycle failed: {exc}")
+
+
+async def _run_health_api(shutdown_event: asyncio.Event) -> None:
+    """Health API: serves http://localhost:7433/health|metrics|loops|providers|telos"""
+    try:
+        from dharma_swarm.swarm_health_api import run_health_api
+        await run_health_api(shutdown_event)
+    except Exception as exc:
+        _log("health-api", f"Health API crashed: {exc}")
+
+
+async def _run_guardian_loop(shutdown_event: asyncio.Event) -> None:
+    """Guardian Crew: continuous interface + loop + router health checking.
+
+    Three specialist agents running every 4 hours:
+      AUDITOR        — import chains, method existence, syntax errors
+      LOOP_WATCHER   — cybernetic loop health, evolution archive freshness
+      ROUTER_PROBE   — circuit breaker state, dead providers, missing keys
+
+    Writes GUARDIAN_REPORT.md to repo root and ~/.dharma/guardian/.
+    Creates GitHub issues for BLOCKER-severity findings.
+    """
+    try:
+        from dharma_swarm.guardian_crew import start_guardian_loop
+        await start_guardian_loop(
+            state_dir=STATE_DIR,
+            github_repo="AmitabhainArunachala/dharma_swarm",
+            shutdown_event=shutdown_event,
+        )
+    except Exception as exc:
+        _log("guardian", f"Guardian loop crashed: {exc}")
+
+
+async def _run_archaeology_loop(shutdown_event: asyncio.Event) -> None:
+    """Fang 7: Self-Reading Archaeology loop.
+
+    Runs ArchaeologyIngestionDaemon on a 30-minute cycle.
+    Ingests: evolution archive, shared research, stigmergy marks, task completions.
+    Produces: ~/.dharma/meta/lessons_learned.md (anti-amnesia context prefix).
+    Agents gain query_archaeology tool access to all ingested institutional memory.
+    """
+    _log("archaeology", "Starting archaeology ingestion loop (interval=1800s)")
+    try:
+        from dharma_swarm.archaeology_ingestion import ArchaeologyIngestionDaemon
+        daemon = ArchaeologyIngestionDaemon(state_dir=STATE_DIR, interval_seconds=1800)
+
+        # Run once immediately at boot
+        try:
+            counts = await asyncio.wait_for(daemon.run_once(), timeout=120.0)
+            _log("archaeology", f"Boot ingestion complete: {counts}")
+        except asyncio.TimeoutError:
+            _log("archaeology", "Boot ingestion timed out (120s) — continuing")
+        except Exception as exc:
+            _log("archaeology", f"Boot ingestion failed (non-fatal): {exc}")
+
+        # Then loop every 30 minutes
+        while not shutdown_event.is_set():
+            try:
+                await asyncio.wait_for(shutdown_event.wait(), timeout=1800)
+                break  # shutdown
+            except asyncio.TimeoutError:
+                pass  # interval elapsed, run ingestion
+            if shutdown_event.is_set():
+                break
+            try:
+                counts = await asyncio.wait_for(daemon.run_once(), timeout=120.0)
+                _log("archaeology", f"Ingestion cycle complete: {counts}")
+            except asyncio.TimeoutError:
+                _log("archaeology", "Ingestion cycle timed out (120s) — continuing")
+            except Exception as exc:
+                _log("archaeology", f"Ingestion cycle error: {exc}")
+
+    except Exception as exc:
+        _log("archaeology", f"Archaeology loop crashed: {exc}")
+
+
 async def orchestrate(background: bool = False) -> None:
     """Main entry point — run all systems concurrently."""
     # Ensure Python logging is configured so module-level logger.info() calls
     # (from orchestrator.py, swarm.py, agent_runner.py etc.) are visible.
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(name)s [%(levelname)s] %(message)s",
-    )
+    # Rotating file logs: 10MB × 5 files → ~/.dharma/logs/swarm.log
+    _log_dir = STATE_DIR / "logs"
+    _log_dir.mkdir(parents=True, exist_ok=True)
+    _root = logging.getLogger()
+    if not _root.handlers:
+        _root.setLevel(logging.INFO)
+        _fmt = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+        _ch = logging.StreamHandler()
+        _ch.setFormatter(_fmt)
+        _root.addHandler(_ch)
+        from logging.handlers import RotatingFileHandler as _RFH
+        _fh = _RFH(_log_dir / "swarm.log", maxBytes=10 * 1024 * 1024, backupCount=5)
+        _fh.setFormatter(_fmt)
+        _root.addHandler(_fh)
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     LOG_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -1600,6 +1770,21 @@ async def orchestrate(background: bool = False) -> None:
         "health": lambda: run_health_loop(shutdown_event),
         "self-improve": lambda: run_self_improvement_loop(shutdown_event, interval=3600),
         "free-grind": lambda: run_free_evolution_grind(shutdown_event),
+        # ── Fang 7: Self-Reading Archaeology ──
+        # Ingests evolution archive, shared research, stigmergy marks, task
+        # completions into MemoryPalace every 30 minutes. Produces
+        # lessons_learned.md at ~/.dharma/meta/ — the anti-amnesia mechanism.
+        "archaeology": lambda: _run_archaeology_loop(shutdown_event),
+        # ── Guardian Crew: continuous interface + loop + router health checks ──
+        # Runs at boot + every 4 hours. Writes GUARDIAN_REPORT.md.
+        # Creates GitHub issues for BLOCKER-severity findings.
+        "guardian": lambda: _run_guardian_loop(shutdown_event),
+        # ── Health API: curl http://localhost:7433/health ──
+        "health-api": lambda: _run_health_api(shutdown_event),
+        # ── Gauntlet: adversarial eval pressure + DGM feedback loop ──
+        "gauntlet": lambda: _run_gauntlet_loop(shutdown_event),
+        # ── World Model: living Forrester-style world state updated by research ──
+        "world-model": lambda: _run_world_model_loop(shutdown_event),
     }
     optional_clean_exit = {"pulse"}
     tasks = {

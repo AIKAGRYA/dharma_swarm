@@ -460,6 +460,17 @@ class MemoryPalace:
         """
         doc_id = ""
 
+        # Auto-populate trace_id from CorrelationContext
+        try:
+            from dharma_swarm.correlation_context import get_correlation
+            corr = get_correlation()
+            if corr.trace_id:
+                if metadata is None:
+                    metadata = {}
+                metadata.setdefault("trace_id", corr.trace_id)
+        except Exception:
+            pass
+
         # Existing lattice ingestion (unchanged)
         if self._lattice is not None:
             try:

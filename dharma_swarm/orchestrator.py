@@ -36,6 +36,7 @@ from dharma_swarm.models import (
     TopologyType,
     _new_id,
 )
+from dharma_swarm.runtime_lifecycle import RuntimeLifecycle
 from dharma_swarm.runtime_contract import RuntimeEnvelope, RuntimeEventType
 from dharma_swarm.session_ledger import SessionLedger
 from dharma_swarm.sheaf import (
@@ -112,6 +113,7 @@ class Orchestrator:
             session_id=session_id,
             runtime_db_path=resolved_runtime_db_path,
         )
+        self._runtime_lifecycle = RuntimeLifecycle(self._ledger)
         self._telic_seam = self._init_telic_seam()
         self._shared_dir = shared_dir or self._derive_runtime_artifact_dir("shared")
         self._stigmergy_dir = stigmergy_dir or self._derive_runtime_artifact_dir("stigmergy")
@@ -146,11 +148,15 @@ class Orchestrator:
         """Prefer a state-local ontology seam over the global singleton."""
         try:
             from dharma_swarm.ontology_runtime import get_shared_registry
+            from dharma_swarm.signal_bus import SignalBus
             from dharma_swarm.telic_seam import TelicSeam
 
             ontology_db = self._runtime_root() / "ontology.db"
             registry = get_shared_registry(path=ontology_db)
-            return TelicSeam(registry=registry, registry_path=ontology_db)
+            return TelicSeam(
+                registry=registry, path=ontology_db,
+                signal_bus=SignalBus.get(),
+            )
         except Exception:
             logger.debug("Failed to initialize local telic seam", exc_info=True)
             return None
@@ -722,6 +728,31 @@ class Orchestrator:
             return (updated_max, updated_backoff)
         return (max_retries, backoff)
 
+    def retry_policy_for_failure(
+        self,
+        task: Task | None,
+        error: str,
+        source: str,
+        meta: dict[str, Any],
+    ) -> tuple[str, int, int, float]:
+        """Public API for retry policy resolution.
+
+        Returns (failure_class, retry_count, max_retries, backoff).
+        Also mutates *meta* in-place with updated retry settings.
+        """
+        failure_class = self._classify_failure(
+            error=error, source=source, task=task,
+        )
+        retry_count, max_retries, backoff = self._resolve_retry_policy(task)
+        max_retries, backoff = self._apply_failure_retry_defaults(
+            task=task,
+            meta=meta,
+            failure_class=failure_class,
+            max_retries=max_retries,
+            backoff=backoff,
+        )
+        return failure_class, retry_count, max_retries, backoff
+
     def _is_retry_window_open(self, task: Task) -> bool:
         meta = self._task_meta(task)
         not_before_raw = meta.get("retry_not_before_epoch")
@@ -813,6 +844,108 @@ class Orchestrator:
         meta["latent_gold_count"] = len(shards)
         meta["latent_gold_query"] = query[:280]
         meta["latent_gold_refreshed_at"] = datetime.now(timezone.utc).isoformat()
+        return meta
+
+    def _operator_intent_for_task(self, task: Task, meta: dict[str, Any]) -> str:
+        for key in (
+            "operator_intent",
+            "user_intent",
+            "mission_intent",
+            "intent",
+            "operator_directive",
+        ):
+            raw = meta.get(key)
+            if isinstance(raw, str) and raw.strip():
+                return raw.strip()
+        return str(task.title or "").strip()
+
+    async def _attach_context_bundle(
+        self,
+        task: Task | None,
+        td: TaskDispatch,
+        meta: dict[str, Any],
+    ) -> dict[str, Any]:
+        if task is None:
+            meta["context_bundle_status"] = "missing_task"
+            td.metadata["context_bundle_status"] = "missing_task"
+            return meta
+
+        store = self._runtime_lifecycle._runtime_state_store()
+        if store is None:
+            meta["context_bundle_status"] = "missing_runtime_state"
+            td.metadata["context_bundle_status"] = "missing_runtime_state"
+            return meta
+
+        run_id = self._runtime_lifecycle.ensure_runtime_run_id(td)
+        runtime_root = self._runtime_root()
+        operator_intent = self._operator_intent_for_task(task, meta)
+        task_description = "\n\n".join(
+            part.strip()
+            for part in (task.title, task.description)
+            if isinstance(part, str) and part.strip()
+        )
+        token_budget = max(200, self._coerce_int(meta.get("context_token_budget"), 1200))
+        lattice = None
+        try:
+            from dharma_swarm.context_compiler import ContextCompiler
+            from dharma_swarm.memory_lattice import MemoryLattice
+
+            lattice = MemoryLattice(
+                db_path=store.db_path,
+                event_log_dir=runtime_root / "events",
+            )
+            compiler = ContextCompiler(
+                runtime_state=store,
+                memory_lattice=lattice,
+            )
+            bundle = await compiler.compile_bundle(
+                session_id=self._ledger.session_id,
+                task_id=td.task_id,
+                run_id=run_id,
+                operator_intent=operator_intent,
+                task_description=task_description,
+                query=str(meta.get("context_query") or task.description or task.title or ""),
+                token_budget=token_budget,
+                metadata={
+                    "source": "orchestrator._assign_dispatch",
+                    "agent_id": td.agent_id,
+                    "topology": td.topology.value if td.topology else "dispatch",
+                },
+                workspace_root=runtime_root,
+            )
+        except Exception as exc:
+            error = str(exc)[:300]
+            meta["context_bundle_status"] = "failed"
+            meta["context_bundle_error"] = error
+            td.metadata["context_bundle_status"] = "failed"
+            td.metadata["context_bundle_error"] = error
+            self._record_progress_event(
+                "context_bundle_failed",
+                task_id=td.task_id,
+                agent_id=td.agent_id,
+                error=error,
+            )
+            logger.debug("Context bundle compilation failed", exc_info=True)
+            return meta
+        finally:
+            if lattice is not None:
+                try:
+                    await lattice.close()
+                except Exception:
+                    logger.debug("Memory lattice close failed", exc_info=True)
+
+        bundle_id = bundle.bundle_id
+        runtime_db_path = str(store.db_path)
+        state_dir = str(runtime_root)
+        meta["context_bundle_id"] = bundle_id
+        meta["context_bundle_status"] = "attached"
+        meta["runtime_run_id"] = run_id
+        meta["runtime_db_path"] = runtime_db_path
+        meta.setdefault("state_dir", state_dir)
+        td.metadata["context_bundle_id"] = bundle_id
+        td.metadata["context_bundle_status"] = "attached"
+        td.metadata["runtime_db_path"] = runtime_db_path
+        td.metadata.setdefault("state_dir", state_dir)
         return meta
 
     @staticmethod
@@ -1584,6 +1717,20 @@ class Orchestrator:
             max_retries=max_retries,
             backoff=backoff,
         )
+        await self._runtime_lifecycle.record_task_claim(
+            td,
+            task=task,
+            status="failed",
+            failure_code=failure_class,
+            error=error,
+        )
+        await self._runtime_lifecycle.record_delegation_run(
+            td,
+            task=task,
+            status="failed",
+            failure_code=failure_class,
+            error=error,
+        )
         meta.pop("active_claim", None)
         meta["last_error"] = error
         meta["last_failure_class"] = failure_class
@@ -1807,6 +1954,8 @@ class Orchestrator:
             td.metadata["witness_reroutes"] = gate.attempts
 
         claim_meta = self._prepare_claim(task_for_gate, td)
+        self._runtime_lifecycle.ensure_runtime_run_id(td)
+        claim_meta = await self._attach_context_bundle(task_for_gate, td, claim_meta)
         claim_meta = self._attach_latent_gold(task_for_gate, claim_meta)
         if task_for_gate is not None:
             task_for_gate.metadata = dict(claim_meta)
@@ -1833,6 +1982,11 @@ class Orchestrator:
         )
         logger.info("_assign_dispatch(%s): update_task=%.2fs", td.task_id[:8], _adt.monotonic() - _pe_t1)
         self._active_dispatches[td.task_id] = td
+        await self._runtime_lifecycle.record_task_claim(
+            td,
+            task=task_for_gate,
+            status="claimed",
+        )
         _pe_t2 = _adt.monotonic()
         if self._bus is not None:
             await self._bus.send(Message(
@@ -1891,10 +2045,21 @@ class Orchestrator:
         pool_get = getattr(self._pool, "get", None)
         runner = await pool_get(td.agent_id) if pool_get else None
         task = task_for_gate or await self._safe_get_task(td.task_id)
+        pool_agents_sample: list[Any] = []
+        list_agents = getattr(self._pool, "list_agents", None) if self._pool else None
+        if list_agents:
+            try:
+                agents_result = list_agents()
+                if inspect.isawaitable(agents_result):
+                    agents_result = await agents_result
+                if isinstance(agents_result, list):
+                    pool_agents_sample = list(agents_result[:3])
+            except Exception:
+                logger.debug("Pool agent sample failed", exc_info=True)
         logger.info(
             "_assign_dispatch(%s): runner=%s task=%s pool_agents=%s",
             td.task_id[:8], bool(runner), bool(task),
-            list((await self._pool.list_agents()) if self._pool else [])[:3],
+            pool_agents_sample,
         )
         if runner and task:
             run_meta = self._task_meta(task)
@@ -1904,6 +2069,11 @@ class Orchestrator:
                 td.task_id,
                 status=TaskStatus.RUNNING,
                 metadata=run_meta,
+            )
+            await self._runtime_lifecycle.record_task_claim(
+                td,
+                task=task,
+                status="running",
             )
             td.metadata["run_started_monotonic"] = time.monotonic()
             self._record_progress_event(
@@ -1955,6 +2125,11 @@ class Orchestrator:
             self._coerce_float(td.timeout_seconds, self._default_timeout_seconds),
         )
         try:
+            await self._runtime_lifecycle.record_delegation_run(
+                td,
+                task=task,
+                status="running",
+            )
             result = await asyncio.wait_for(
                 runner.run_task(task),
                 timeout=timeout_seconds,
@@ -2046,6 +2221,17 @@ class Orchestrator:
                 self._yoga.record_completion(td.agent_id)
             logger.info("Task %s completed by agent %s", td.task_id, td.agent_id)
             duration_sec = max(0.0, time.monotonic() - run_started)
+            await self._runtime_lifecycle.record_task_claim(
+                td,
+                task=task,
+                status="completed",
+            )
+            await self._runtime_lifecycle.record_delegation_run(
+                td,
+                task=task,
+                status="completed",
+                result=result,
+            )
 
             # Emit to signal_bus so organism heartbeat, evolution loop,
             # and consolidation loop can sense completed work.
@@ -2123,6 +2309,8 @@ class Orchestrator:
                             ProviderType.GROQ,
                             ProviderType.NVIDIA_NIM,
                             ProviderType.CEREBRAS,
+                            ProviderType.OPENROUTER,   # fallback: always available if key set
+                            ProviderType.OPENROUTER_FREE,  # final free tier fallback
                         ]
                         for ptype in cheap_providers:
                             try:
@@ -2252,6 +2440,7 @@ class Orchestrator:
                 provider_name=str(provider_name),
                 task=task,
                 result=result,
+                run_id=str(td.metadata.get("runtime_run_id", "") or ""),
             )
 
         except asyncio.TimeoutError:
@@ -2292,6 +2481,7 @@ class Orchestrator:
         provider_name: str,
         task: Task,
         result: str | None,
+        run_id: str = "",
     ) -> None:
         """Write agent result to shared notes and stigmergy marks.
 
@@ -2333,6 +2523,7 @@ class Orchestrator:
             "source": "orchestrator._persist_result",
         }
         provenance_path = provenance_dir / f"{task.id}.json"
+        shared_artifact: Path | None = None
         entry = (
             f"\n---\n## {task.title}\n"
             f"*{timestamp} | task: {task.id[:8]} | trace: {trace_id}*\n\n"
@@ -2381,6 +2572,25 @@ class Orchestrator:
             logger.debug("Shared artifact written: %s", shared_artifact.name)
         except Exception as exc:
             logger.debug("Shared artifact write failed (non-fatal): %s", exc)
+
+        if shared_artifact is not None:
+            await self._runtime_lifecycle.record_artifact(
+                task=task,
+                artifact_id=f"artifact_task_result_{task.id}",
+                artifact_kind="task_result",
+                payload_path=shared_artifact,
+                manifest_path=provenance_path,
+                checksum=result_hash,
+                run_id=run_id,
+                metadata={
+                    "agent": agent_name,
+                    "model": model_name,
+                    "provider": provider_name,
+                    "trace_id": trace_id,
+                    "notes_file": str(notes_file),
+                    "result_chars": len(result or ""),
+                },
+            )
 
         # Fix 2: Feed result into MemoryPalace for cross-session semantic recall.
         # Even with TF-IDF only (sqlite-vec not installed), this builds the corpus

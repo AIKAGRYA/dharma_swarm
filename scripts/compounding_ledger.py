@@ -7,9 +7,12 @@ import argparse
 import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
-STATE = Path.home() / ".dharma"
+STATE = dharma_state_dir()
 LOG_DIR = STATE / "logs" / "allout"
 SHARED_DIR = STATE / "shared"
 ALL_OUT_HEARTBEAT = STATE / "allout_heartbeat.json"

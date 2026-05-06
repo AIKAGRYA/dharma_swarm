@@ -1,7 +1,7 @@
 """Thin async LLM client for OpenRouter.
 
-Zero dharma_swarm imports. Uses the openai SDK pointed at OpenRouter,
-replicating the pattern from providers.py:224-271.
+Uses the canonical runtime provider factory so experiment code does not
+instantiate provider SDK clients directly.
 """
 
 from __future__ import annotations
@@ -9,6 +9,12 @@ from __future__ import annotations
 import logging
 import os
 from typing import Any
+
+from dharma_swarm.models import LLMRequest, ProviderType
+from dharma_swarm.runtime_provider import (
+    create_runtime_provider,
+    resolve_runtime_provider_config,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -23,22 +29,18 @@ class PetriDishLLM:
     ) -> None:
         self._api_key = api_key or os.environ.get("OPENROUTER_API_KEY", "")
         self._base_url = base_url
-        self._client: Any = None
         self._total_calls = 0
         self._total_tokens = 0
 
-    def _get_client(self) -> Any:
-        if self._client is not None:
-            return self._client
+    def _get_provider(self) -> Any:
         if not self._api_key:
             raise RuntimeError("OPENROUTER_API_KEY not set")
-        from openai import AsyncOpenAI
-
-        self._client = AsyncOpenAI(
+        config = resolve_runtime_provider_config(
+            ProviderType.OPENROUTER,
             api_key=self._api_key,
             base_url=self._base_url,
         )
-        return self._client
+        return create_runtime_provider(config)
 
     async def complete(
         self,
@@ -56,7 +58,7 @@ class PetriDishLLM:
         (system prompt is still prepended). Otherwise, a single user message
         is constructed from `user_message`.
         """
-        client = self._get_client()
+        provider = self._get_provider()
 
         msg_list: list[dict[str, str]] = [{"role": "system", "content": system}]
         if messages:
@@ -65,17 +67,18 @@ class PetriDishLLM:
             msg_list.append({"role": "user", "content": user_message})
 
         try:
-            resp = await client.chat.completions.create(
-                model=model,
-                messages=msg_list,
-                max_tokens=max_tokens,
-                temperature=temperature,
+            resp = await provider.complete(
+                LLMRequest(
+                    model=model,
+                    messages=msg_list,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                )
             )
             self._total_calls += 1
-            if resp.usage:
-                self._total_tokens += resp.usage.total_tokens
-            content = resp.choices[0].message.content or ""
-            return content
+            usage = resp.usage or {}
+            self._total_tokens += int(usage.get("total_tokens", 0) or 0)
+            return resp.content or ""
         except Exception as e:
             logger.error("LLM call failed (model=%s): %s", model, e)
             raise

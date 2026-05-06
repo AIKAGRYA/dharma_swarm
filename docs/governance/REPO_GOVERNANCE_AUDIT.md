@@ -353,3 +353,14 @@ A parallel re-audit using Claude Code's filesystem tools (Grep, Glob, Read, Bash
 | runtime_bridge.py | — | **ZOMBIE** | 0 importers |
 | math_bridges.py | — | **ZOMBIE** | 0 importers |
 | offline_training_bridge.py | — | **ZOMBIE** | 0 importers |
+
+---
+
+## 11. POINTER FILES ADDED
+
+The following pointer and plan files were added to root the ontology-native build track (per `CANONICAL_DOC_STACK.md`, every new doc must identify its place in the stack):
+
+- `docs/governance/BUILD_SESSION_ENTRYPOINT.md` — canonical read-order and current-track pointers for every build session
+- `docs/plans/ONTOLOGY_NATIVE_OPERATOR_BRIEF_MASTER_SPEC.md` — master spec for the first ontology-native seam
+- `docs/plans/HANDOFF_ONTOLOGY_NATIVE_OPERATOR_BRIEF.md` — handoff notes for the next code agent
+- `docs/plans/NEXT_10_SUBSTRATE_TODO.md` — prioritised 10-item build queue for the substrate track

@@ -19,6 +19,7 @@ import logging
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
+from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -70,7 +71,7 @@ class SleepReport(BaseModel):
 # Sleep cycle
 # ---------------------------------------------------------------------------
 
-_REPORTS_DIR = Path.home() / ".dharma" / "sleep_reports"
+_REPORTS_DIR = dharma_state_dir() / "sleep_reports"
 
 
 class SleepCycle:
@@ -88,7 +89,7 @@ class SleepCycle:
         reports_dir: Path | None = None,
     ) -> None:
         self._memory_dir = agent_memory_dir or (
-            Path.home() / ".dharma" / "agent_memory"
+            dharma_state_dir() / "agent_memory"
         )
         self._stigmergy = stigmergy_store
         self._subconscious = subconscious_stream
@@ -398,7 +399,7 @@ class SleepCycle:
         # Update bootstrap manifest so next instance is oriented
         manifest_path = ""
         state_root = self._memory_dir.parent
-        default_state_root = Path.home() / ".dharma"
+        default_state_root = dharma_state_dir()
         if state_root == default_state_root:
             try:
                 from dharma_swarm.bootstrap import NOW_PATH, generate_manifest

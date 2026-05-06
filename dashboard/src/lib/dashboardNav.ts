@@ -62,6 +62,7 @@ export function buildDashboardNavSections(): DashboardNavSection[] {
         { label: "Synthesizer", href: "/dashboard/synthesizer", icon: "Sparkles", level: 1 },
         { label: "Agents", href: "/dashboard/agents", icon: "Bot", level: 1 },
         { label: "Tasks", href: "/dashboard/tasks", icon: "ListTodo", level: 1 },
+        { label: "Opportunities", href: "/dashboard/opportunities", icon: "Sparkles", level: 1 },
       ],
     },
     {

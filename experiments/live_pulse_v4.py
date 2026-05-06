@@ -17,6 +17,12 @@ import re
 import time
 from dataclasses import dataclass
 
+from dharma_swarm.models import LLMRequest, ProviderType
+from dharma_swarm.runtime_provider import (
+    create_runtime_provider,
+    resolve_runtime_provider_config,
+)
+
 # ---------------------------------------------------------------------------
 # CONFIG
 # ---------------------------------------------------------------------------
@@ -135,15 +141,11 @@ than one that treats each requirement in isolation."""
 # LLM CLIENT
 # ---------------------------------------------------------------------------
 
-from openai import AsyncOpenAI
 
-_clients: dict[str, AsyncOpenAI] = {}
-
-def _get_client(base_url: str, api_key: str) -> AsyncOpenAI:
-    key = f"{base_url}:{api_key[:8]}"
-    if key not in _clients:
-        _clients[key] = AsyncOpenAI(api_key=api_key, base_url=base_url)
-    return _clients[key]
+def _provider_type_for_base_url(base_url: str) -> ProviderType:
+    if "api.groq.com" in base_url:
+        return ProviderType.GROQ
+    return ProviderType.OPENROUTER
 
 
 async def call_model(
@@ -156,21 +158,29 @@ async def call_model(
     max_tokens: int = 4096,
     timeout: float = 180.0,
 ) -> str:
-    client = _get_client(base_url, api_key)
+    config = resolve_runtime_provider_config(
+        _provider_type_for_base_url(base_url),
+        model=model_id,
+        api_key=api_key,
+        base_url=base_url,
+    )
+    provider = create_runtime_provider(config)
     try:
         resp = await asyncio.wait_for(
-            client.chat.completions.create(
-                model=model_id,
-                messages=[
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": user_msg},
-                ],
-                max_tokens=max_tokens,
-                temperature=temperature,
+            provider.complete(
+                LLMRequest(
+                    model=model_id,
+                    messages=[
+                        {"role": "user", "content": user_msg},
+                    ],
+                    system=system,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                )
             ),
             timeout=timeout,
         )
-        return resp.choices[0].message.content or ""
+        return resp.content or ""
     except asyncio.TimeoutError:
         return f"[TIMEOUT after {timeout}s]"
     except Exception as e:

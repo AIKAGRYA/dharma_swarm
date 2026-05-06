@@ -588,6 +588,31 @@ class SwarmManager:
         else:
             logger.info("TelosSubstrate already seeded (flag: %s)", _telos_flag)
 
+        # ── Gnani Lodestone: seed witness-upstream philosophy + Gnani tasks ──
+        # Runs after TelosSubstrate. Idempotent via separate flag.
+        # Seeds: stigmergy marks (gnani channel), ConceptGraph nodes,
+        # TelosGraph objectives, TaskBoard self-knowledge tasks.
+        # Non-blocking — all exceptions are caught inside GnaniLodestone.
+        _gnani_flag = self.state_dir / "meta" / "gnani_seeded"
+        if not _gnani_flag.exists():
+            try:
+                from dharma_swarm.gnani_lodestone import GnaniLodestone
+                _gnani = GnaniLodestone(state_dir=self.state_dir)
+                _gnani_result = await asyncio.wait_for(
+                    _gnani.seed_all(), timeout=60.0
+                )
+                _gnani_flag.parent.mkdir(parents=True, exist_ok=True)
+                _gnani_flag.write_text(
+                    f"seeded: {_gnani_result}\n", encoding="utf-8"
+                )
+                logger.info("GnaniLodestone seeded on init: %s", _gnani_result)
+            except asyncio.TimeoutError:
+                logger.warning("GnaniLodestone seeding timed out (60s) — continuing")
+            except Exception as exc:
+                logger.warning("GnaniLodestone seeding failed (non-fatal): %s", exc)
+        else:
+            logger.info("GnaniLodestone already seeded (flag: %s)", _gnani_flag)
+
         from dharma_swarm.agent_constitution import bootstrap_dynamic_roster
 
         from dharma_swarm.agent_runner import AgentPool
@@ -1956,22 +1981,16 @@ class SwarmManager:
                 continue
 
             source = self._derive_failure_source(task)
-            failure_class = self._orchestrator._classify_failure(
-                error=str(task.result or ""),
-                source=source,
-                task=task,
+            failure_class, retry_count, max_retries, backoff = (
+                self._orchestrator.retry_policy_for_failure(
+                    task=task,
+                    error=str(task.result or ""),
+                    source=source,
+                    meta=meta,
+                )
             )
             if failure_class not in {"connection_transient", "long_timeout"}:
                 continue
-
-            retry_count, max_retries, backoff = self._orchestrator._resolve_retry_policy(task)
-            max_retries, backoff = self._orchestrator._apply_failure_retry_defaults(
-                task=task,
-                meta=meta,
-                failure_class=failure_class,
-                max_retries=max_retries,
-                backoff=backoff,
-            )
 
             meta["retry_count"] = 0
             meta["max_retries"] = max_retries

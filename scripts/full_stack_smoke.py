@@ -15,6 +15,9 @@ import time
 import traceback
 from datetime import datetime
 from pathlib import Path
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from dharma_swarm.daemon_config import dharma_state_dir
 
 # dharma_swarm imports
 from dharma_swarm.swarm import SwarmManager
@@ -28,7 +31,7 @@ from dharma_swarm.cost_tracker import cost_summary
 # Configuration
 # ═══════════════════════════════════════════════════════════════════
 
-STATE_DIR = Path.home() / ".dharma"
+STATE_DIR = dharma_state_dir()
 REPORT_PATH = STATE_DIR / "graphs" / "smoke_test_report.json"
 
 # 5 agents, 5 lenses, different models via OpenRouter

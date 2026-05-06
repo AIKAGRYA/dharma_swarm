@@ -26,6 +26,7 @@ from collections import Counter
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 try:
@@ -37,7 +38,7 @@ except ImportError:  # pragma: no cover
 
 logger = logging.getLogger(__name__)
 
-STATE_DIR = Path.home() / ".dharma"
+STATE_DIR = dharma_state_dir()
 OVERNIGHT_DIR = STATE_DIR / "overnight"
 DHARMA_SWARM_ROOT = Path.home() / "dharma_swarm"
 

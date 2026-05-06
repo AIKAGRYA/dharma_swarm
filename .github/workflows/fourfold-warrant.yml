@@ -1,0 +1,83 @@
+name: fourfold-warrant
+
+on:
+  pull_request:
+    branches: [main, "promote/**", "governance/**", "codex/**"]
+
+concurrency:
+  group: fourfold-warrant-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  fourfold-warrant:
+    name: Fourfold Shakti Warrant
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install package
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run Fourfold Shakti Warrant on PR diff
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          WARRANT_INTENT: >-
+            CI PR diff fourfold governance warrant for system telos, semantic
+            architecture, bounded change, deterministic evidence, exact paths,
+            and verification
+        run: |
+          mkdir -p reports/governance
+          impact_checked=false
+          if [[ "$PR_TITLE" == *"[impact-checked]"* || "$PR_BODY" == *"[impact-checked]"* ]]; then
+            impact_checked=true
+          fi
+          set +e
+          python3 scripts/governance/check_shakti_warrant.py \
+            --intent "$WARRANT_INTENT" \
+            --diff-scope base \
+            --base-ref "${{ github.event.pull_request.base.sha }}" \
+            --no-include-untracked \
+            --pass-on-empty-diff \
+            --max-diff-chars 20000 \
+            --tool "pytest" \
+            --metadata allowed_tools=pytest \
+            --metadata requires_diff_evidence=true \
+            --metadata enforce_hotpath_ack=true \
+            --metadata impact_checked="${impact_checked}" \
+            --fail-on block \
+            --fail-on hold \
+            --report-output reports/governance/fourfold-warrant.txt \
+            --json-output reports/governance/fourfold-warrant.json
+          status=$?
+          {
+            echo "## Fourfold Shakti Warrant"
+            echo
+            echo '```text'
+            cat reports/governance/fourfold-warrant.txt 2>/dev/null || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
+      - name: Upload warrant artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fourfold-warrant
+          path: reports/governance/fourfold-warrant.*
+          if-no-files-found: ignore

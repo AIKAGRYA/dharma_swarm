@@ -16,6 +16,7 @@ import json
 import os
 from datetime import date, datetime, timezone
 from pathlib import Path
+from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 from dharma_swarm.runtime_provider import (
@@ -36,7 +37,7 @@ def _days_to_colm() -> tuple[int, int]:
         max(0, (_COLM_PAPER_DATE - today).days),
     )
 
-_STATE_DIR = Path.home() / ".dharma"
+_STATE_DIR = dharma_state_dir()
 _SHARED_DIR = _STATE_DIR / "shared"
 _HISTORY_FILE = _STATE_DIR / "prompt_evolution_history.jsonl"
 

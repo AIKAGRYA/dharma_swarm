@@ -15,6 +15,7 @@ Thread-safe via asyncio primitives (designed for single event loop).
 
 from __future__ import annotations
 
+import logging
 import time
 from collections import deque
 from typing import Any
@@ -43,6 +44,10 @@ SIGNAL_LIFECYCLE_COMPLETED = "AGENT_LIFECYCLE_COMPLETED"
 # ECC instinct signals
 SIGNAL_ECC_INSTINCT = "ECC_INSTINCT_SIGNAL"
 
+# Correlation spine signals — canonical outcome fanout
+SIGNAL_OUTCOME_RECORDED = "OUTCOME_RECORDED"
+SIGNAL_VALUE_EVENT_RECORDED = "VALUE_EVENT_RECORDED"
+
 
 class SignalBus:
     """Simple in-process event bus for inter-loop signaling.
@@ -58,6 +63,41 @@ class SignalBus:
     def __init__(self, ttl_seconds: float = 300.0) -> None:
         self.ttl_seconds = ttl_seconds
         self._events: deque[tuple[float, dict[str, Any]]] = deque()
+        self._subscribers: dict[str, list[Any]] = {}
+
+    # ------------------------------------------------------------------
+    # Subscriber pattern — register callbacks for specific signal types
+    # ------------------------------------------------------------------
+
+    def subscribe(
+        self,
+        event_type: str,
+        callback: Any,
+    ) -> None:
+        """Register a callback for a specific signal type.
+
+        The callback is invoked synchronously on emit(). It receives the
+        full event dict. Exceptions in callbacks are logged but never
+        propagate — subscribers cannot break the emitter.
+
+        Example::
+
+            bus.subscribe("OUTCOME_RECORDED", lambda e: print(e["task_id"]))
+        """
+        self._subscribers.setdefault(event_type, []).append(callback)
+
+    def unsubscribe(
+        self,
+        event_type: str,
+        callback: Any,
+    ) -> None:
+        """Remove a previously registered callback."""
+        listeners = self._subscribers.get(event_type)
+        if listeners:
+            try:
+                listeners.remove(callback)
+            except ValueError:
+                pass
 
     def emit(self, event: dict[str, Any]) -> None:
         """Emit a signal event.
@@ -71,6 +111,15 @@ class SignalBus:
             bus.emit({"type": "ANOMALY_DETECTED", "severity": "high"})
         """
         self._events.append((time.monotonic(), event))
+        event_type = event.get("type", "")
+        for cb in self._subscribers.get(event_type, []):
+            try:
+                cb(event)
+            except Exception:
+                logging.getLogger(__name__).debug(
+                    "SignalBus subscriber error for %s", event_type,
+                    exc_info=True,
+                )
 
     def drain(
         self,

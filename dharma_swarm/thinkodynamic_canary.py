@@ -12,6 +12,7 @@ import time
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 
@@ -657,7 +658,7 @@ def run_canary(args: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", default=str(Path.home() / "dharma_swarm"))
-    parser.add_argument("--state-dir", default=str(Path.home() / ".dharma"))
+    parser.add_argument("--state-dir", default=str(dharma_state_dir()))
     parser.add_argument("--mode", choices=("preview", "direct"), default="direct")
     parser.add_argument("--hours", type=float, default=8.0)
     parser.add_argument("--interval-seconds", type=int, default=1800)

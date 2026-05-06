@@ -13,15 +13,50 @@ and ``stigmergy.py``.  All I/O is async via aiofiles.
 from __future__ import annotations
 
 import asyncio
+import ast
+import operator
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
 import aiofiles
 from pydantic import BaseModel, Field
 
 from dharma_swarm.models import _new_id, _utc_now
+
+_SAFE_VERIFICATION_NAMES = {
+    "True": True,
+    "False": False,
+    "None": None,
+    "int": int,
+    "float": float,
+    "str": str,
+    "bool": bool,
+    "len": len,
+    "abs": abs,
+    "Path": Path,
+    "min": min,
+    "max": max,
+}
+
+_SAFE_BIN_OPS = {
+    ast.Add: operator.add,
+    ast.Sub: operator.sub,
+    ast.Mult: operator.mul,
+    ast.Div: operator.truediv,
+    ast.FloorDiv: operator.floordiv,
+    ast.Mod: operator.mod,
+}
+
+_SAFE_CMP_OPS = {
+    ast.Eq: operator.eq,
+    ast.NotEq: operator.ne,
+    ast.Lt: operator.lt,
+    ast.LtE: operator.le,
+    ast.Gt: operator.gt,
+    ast.GtE: operator.ge,
+}
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -59,6 +94,58 @@ class Citation(BaseModel):
     access_count: int = 0
     last_accessed: Optional[datetime] = None
     last_verified: Optional[datetime] = None
+
+
+def _eval_verification_expr(expr: str) -> Any:
+    """Evaluate the small expression subset allowed for citation checks."""
+
+    tree = ast.parse(expr, mode="eval")
+    return _eval_verification_node(tree.body)
+
+
+def _eval_verification_node(node: ast.AST) -> Any:
+    if isinstance(node, ast.Constant):
+        return node.value
+    if isinstance(node, ast.Name):
+        if node.id not in _SAFE_VERIFICATION_NAMES:
+            raise ValueError(f"name not allowed: {node.id}")
+        return _SAFE_VERIFICATION_NAMES[node.id]
+    if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub):
+        return -_eval_verification_node(node.operand)
+    if isinstance(node, ast.BinOp):
+        op = _SAFE_BIN_OPS.get(type(node.op))
+        if op is None:
+            raise ValueError(f"operator not allowed: {type(node.op).__name__}")
+        return op(_eval_verification_node(node.left), _eval_verification_node(node.right))
+    if isinstance(node, ast.BoolOp):
+        values = [_eval_verification_node(value) for value in node.values]
+        if isinstance(node.op, ast.And):
+            return all(values)
+        if isinstance(node.op, ast.Or):
+            return any(values)
+        raise ValueError(f"boolean operator not allowed: {type(node.op).__name__}")
+    if isinstance(node, ast.Compare):
+        left = _eval_verification_node(node.left)
+        for op_node, comparator in zip(node.ops, node.comparators):
+            op = _SAFE_CMP_OPS.get(type(op_node))
+            if op is None:
+                raise ValueError(f"comparison not allowed: {type(op_node).__name__}")
+            right = _eval_verification_node(comparator)
+            if not op(left, right):
+                return False
+            left = right
+        return True
+    if isinstance(node, ast.Call):
+        func = _eval_verification_node(node.func)
+        args = [_eval_verification_node(arg) for arg in node.args]
+        kwargs = {kw.arg: _eval_verification_node(kw.value) for kw in node.keywords if kw.arg}
+        return func(*args, **kwargs)
+    if isinstance(node, ast.Attribute):
+        value = _eval_verification_node(node.value)
+        if isinstance(value, Path) and node.attr == "exists":
+            return value.exists
+        raise ValueError(f"attribute not allowed: {node.attr}")
+    raise ValueError(f"expression not allowed: {type(node).__name__}")
 
 
 # ---------------------------------------------------------------------------
@@ -165,29 +252,18 @@ class CitationIndex:
     async def verify_all(self) -> dict[str, bool]:
         """Run verification tests for all citations that have them.
 
-        Each ``verification_test`` is a Python expression evaluated in
-        a namespace containing ``Path`` and ``os``.  Returns a mapping
-        of citation id to pass/fail.
+        Each ``verification_test`` is a small Python expression subset
+        evaluated without ``eval``.  Returns a mapping of citation id to
+        pass/fail.
         """
-        import os
-
         results: dict[str, bool] = {}
         for cid, citation in self._citations.items():
             if not citation.verification_test:
                 continue
             try:
-                # Safety: use compile+eval with restricted builtins instead of open eval
-                # Allows simple expressions (1+1==2, Path(...).exists()) but blocks
-                # os.system, __import__, exec, open, etc.
                 test_expr = citation.verification_test.strip()
-                _safe_builtins = {"True": True, "False": False, "None": None,
-                                  "int": int, "float": float, "str": str,
-                                  "bool": bool, "len": len, "abs": abs,
-                                  "Path": Path, "min": min, "max": max}
                 try:
-                    code = compile(test_expr, "<verification>", "eval")
-                    # Block any name not in safe_builtins
-                    passed = bool(eval(code, {"__builtins__": {}}, _safe_builtins))  # noqa: S307
+                    passed = bool(_eval_verification_expr(test_expr))
                 except Exception:
                     passed = False
             except Exception:

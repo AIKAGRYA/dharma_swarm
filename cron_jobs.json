@@ -245,5 +245,18 @@
     "handler": "scout_synthesis",
     "enabled": true,
     "prompt": "Scout synthesis placeholder — execution handled by scout_synthesis handler."
+  },
+  {
+    "id": "operator_brief",
+    "name": "Ontology-Native Operator Brief",
+    "trigger": "cron",
+    "schedule": {
+      "hour": 9,
+      "minute": 0
+    },
+    "handler": "operator_brief",
+    "enabled": false,
+    "env_flag": "DHARMA_OPERATOR_BRIEF_ENABLED",
+    "prompt": "Operator Brief seam (v0). No-op unless DHARMA_OPERATOR_BRIEF_ENABLED=1. See docs/plans/ONTOLOGY_NATIVE_OPERATOR_BRIEF_MASTER_SPEC.md."
   }
 ]

@@ -1,0 +1,125 @@
+# ACTIVE_SURFACE_MANIFEST.yaml
+# Canonical truth about what surfaces, routes, state dirs, and rules are active.
+# This file MUST agree with: dashboardNav.ts, controlPlaneRouteDeck.js,
+# registered API routers (api/main.py), STATE_DIR ownership, and Semgrep Rule 1.
+# Any edit to hot-path modules requires ACK/warrant path documented here.
+
+schema_version: 1
+last_updated: "2026-05-04"
+
+state_dir:
+  canonical: "~/.dharma"
+  runtime_db: "~/.dharma/state/runtime.db"
+  telemetry_db: "~/.dharma/state/runtime.db"
+  ontology_db: "~/.dharma/ontology.db"
+  sessions: "~/.dharma/sessions"
+  economics: "~/.dharma/economics"
+  revenue_packets: "~/.dharma/revenue_packets"
+  env_override: "DHARMA_STATE_DIR"
+
+api_routers:
+  - id: health
+    prefix: /api/health
+    module: api.routers.health
+  - id: agents
+    prefix: /api/agents
+    module: api.routers.agents
+  - id: evolution
+    prefix: /api/evolution
+    module: api.routers.evolution
+  - id: ontology
+    prefix: /api/ontology
+    module: api.routers.ontology
+  - id: lineage
+    prefix: /api/lineage
+    module: api.routers.lineage
+  - id: stigmergy
+    prefix: /api/stigmergy
+    module: api.routers.stigmergy
+  - id: commands
+    prefix: /api/commands
+    module: api.routers.commands
+  - id: modules
+    prefix: /api/modules
+    module: api.routers.modules
+  - id: dashboard_new
+    prefix: /api/dashboard
+    module: api.routers.dashboard_new
+  - id: telemetry
+    prefix: /api/telemetry
+    module: api.routers.telemetry
+  - id: graphql
+    prefix: /api/graphql
+    module: api.routers.graphql_router
+  - id: verify
+    prefix: /api/verify
+    module: api.routers.verify
+  - id: opportunities
+    prefix: /api/opportunities
+    module: api.routers.opportunities
+  - id: chat
+    prefix: /api/chat
+    module: api.routers.chat
+
+dashboard_nav_sections:
+  - label: COMMAND
+    items:
+      - Overview
+      - Command Post
+      - Qwen Surgeon
+      - Observatory
+      - Runtime
+      - Opportunities
+      - Conv. Log
+      - Truth Map
+      - Semantic Graph
+      - Models
+      - GLM-5
+      - Telemetry
+      - Ecosystem Map
+      - Synthesizer
+      - Agents
+      - Tasks
+  - label: INTELLIGENCE
+    items: [Eval Harness, System Audit, Evolution, Gates]
+  - label: DEEP
+    items: [Ontology, Lineage, Stigmergy]
+  - label: COMPOSE
+    items: [Workflows, Blocks]
+
+hot_path_modules:
+  - module: dharma_swarm/swarm.py
+    ack_required: true
+    warrant: "Changes here affect all orchestration. Must pass test_swarm_integration."
+  - module: dharma_swarm/orchestrator.py
+    ack_required: true
+    warrant: "Dispatch and retry logic. Must pass test_orchestrator."
+  - module: dharma_swarm/dgc_cli.py
+    ack_required: true
+    warrant: "Operator CLI entry point."
+  - module: dharma_swarm/telic_seam.py
+    ack_required: true
+    warrant: "Ontology write-through. Must pass test_telic_seam."
+
+governance_rules:
+  semgrep_rule_1:
+    description: "No bare RuntimeStateStore() in tests"
+    enforced_by: scripts/governance/check_test_hygiene.py
+  uplift_guards:
+    description: "Pre-commit guard suite"
+    enforced_by: scripts/uplift_guards/run_pre_commit.py
+    guards:
+      - kernel-integrity
+      - secrets-scan
+      - autonomous-destruction
+      - hotpath-ack
+      - mismatch-adjacency
+      - assurance-diff
+
+opportunity_stages:
+  - scope
+  - validate
+  - deep_research
+  - capability
+  - mvp
+  - first_artifact

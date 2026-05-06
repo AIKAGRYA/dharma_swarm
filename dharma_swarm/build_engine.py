@@ -202,7 +202,12 @@ def _git_diff_files(project_path: str) -> list[str]:
             capture_output=True, text=True, cwd=project_path, timeout=30,
         )
         staged = result2.stdout.strip().splitlines() if result2.stdout.strip() else []
-        return list(set(unstaged + staged))
+        result3 = subprocess.run(
+            ["git", "ls-files", "--others", "--exclude-standard"],
+            capture_output=True, text=True, cwd=project_path, timeout=30,
+        )
+        untracked = result3.stdout.strip().splitlines() if result3.stdout.strip() else []
+        return sorted(set(unstaged + staged + untracked))
     except (subprocess.TimeoutExpired, OSError):
         return []
 
@@ -223,10 +228,13 @@ def _git_reset_hard(project_path: str) -> None:
 
 
 def _git_commit(project_path: str, message: str) -> bool:
-    """Stage all changes and commit. Returns True on success."""
+    """Stage explicit changed paths and commit. Returns True on success."""
     try:
+        changed_paths = _git_diff_files(project_path)
+        if not changed_paths:
+            return False
         subprocess.run(
-            ["git", "add", "-A"],
+            ["git", "add", "--", *changed_paths],
             capture_output=True, text=True, cwd=project_path, timeout=30,
         )
         result = subprocess.run(

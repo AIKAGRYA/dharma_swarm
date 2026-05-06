@@ -31,6 +31,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -74,7 +75,7 @@ class Pruner:
         trace_max_days: int = 14,
         dry_run: bool = False,
     ) -> None:
-        self._state_dir = state_dir or Path.home() / ".dharma"
+        self._state_dir = state_dir or dharma_state_dir()
         self._stig_threshold = stigmergy_threshold
         self._bridge_threshold = bridge_threshold
         self._trace_max_days = trace_max_days

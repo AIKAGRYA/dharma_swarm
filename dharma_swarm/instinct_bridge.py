@@ -15,13 +15,14 @@ import json
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
+from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 from dharma_swarm.signal_bus import SIGNAL_ECC_INSTINCT
 
 logger = logging.getLogger(__name__)
 
-STATE_DIR = Path.home() / ".dharma"
+STATE_DIR = dharma_state_dir()
 
 # ECC observation and instinct paths
 _ECC_BASE = Path.home() / ".claude" / "homunculus" / "projects" / "ba3bce345c46"

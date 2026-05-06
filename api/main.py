@@ -15,6 +15,7 @@ import os
 import asyncio
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
+from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 from fastapi import FastAPI
@@ -30,7 +31,7 @@ logger = logging.getLogger(__name__)
 # ── Singleton State ───────────────────────────────────────────────
 
 _state: dict[str, Any] = {}
-_OPERATOR_STATE_DIR = Path.home() / ".dharma"
+_OPERATOR_STATE_DIR = dharma_state_dir()
 _OPERATOR_PID_FILE = _OPERATOR_STATE_DIR / "operator.pid"
 
 
@@ -259,6 +260,7 @@ def _register_routers(api_app: FastAPI) -> None:
     from api.routers.routing import router as routing_router
     from api.routers.graphql_router import router as graphql_router
     from api.routers.verify import router as verify_router
+    from api.routers.opportunities import router as opportunities_router
 
     api_app.include_router(health_router)
     api_app.include_router(agents_router)
@@ -273,6 +275,7 @@ def _register_routers(api_app: FastAPI) -> None:
     api_app.include_router(routing_router)
     api_app.include_router(graphql_router)
     api_app.include_router(verify_router)
+    api_app.include_router(opportunities_router)
 
     from api.routers.chat import router as chat_router, ws_router as chat_ws_router
 

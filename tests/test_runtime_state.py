@@ -57,6 +57,9 @@ async def test_runtime_state_initializes_wal_and_core_tables(tmp_path) -> None:
     assert fact.fact_id == "fact-1"
     assert bundle.bundle_id == "ctx-1"
     assert (await store.get_session("sess-1")) is not None
+    loaded_bundle = store.get_context_bundle_sync("ctx-1")
+    assert loaded_bundle is not None
+    assert loaded_bundle.rendered_text == "# Context"
 
     with sqlite3.connect(db_path) as db:
         tables = {

@@ -26,8 +26,9 @@ import logging
 import sqlite3
 import time
 from collections import deque
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
+from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any, Optional
 
 from pydantic import BaseModel, Field
@@ -36,6 +37,38 @@ from dharma_swarm.models import _new_id, _utc_now
 from dharma_swarm.runtime_artifacts import freshest_pulse_log_path, pulse_log_fresh
 
 logger = logging.getLogger(__name__)
+
+_CHETANA_RECENCY_WINDOW_DAYS = 30.0
+_CHETANA_VOLUME_NORMALIZER = 50.0
+
+
+def _markdown_files(root: Path) -> list[Path]:
+    if not root.exists():
+        return []
+    try:
+        return sorted(path for path in root.rglob("*.md") if path.is_file())
+    except Exception:
+        logger.debug("Markdown file scan failed for %s", root, exc_info=True)
+        return []
+
+
+def _chetana_stale_after(path: Path) -> date | None:
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except Exception:
+        logger.debug("chetana atom read failed for %s", path, exc_info=True)
+        return None
+
+    for line in text.splitlines()[:80]:
+        if not line.startswith("stale_after:"):
+            continue
+        raw = line.split(":", 1)[1].split("#", 1)[0].strip().strip("'\"")
+        try:
+            return date.fromisoformat(raw[:10])
+        except ValueError:
+            return None
+    return None
+
 
 _SEMANTIC_PULSE_FAILURES: tuple[tuple[str, str, str, float], ...] = (
     ("claude cli not found", "pulse_binary_missing", "critical", 0.35),
@@ -112,7 +145,7 @@ class IdentityMonitor:
     CRITICAL_THRESHOLD: float = 0.25
 
     def __init__(self, state_dir: Path | None = None) -> None:
-        self._state_dir = state_dir or (Path.home() / ".dharma")
+        self._state_dir = state_dir or (dharma_state_dir())
         self._history: deque[IdentityState] = deque(maxlen=1000)
 
     # -- public API ---------------------------------------------------------
@@ -281,6 +314,7 @@ class IdentityMonitor:
         - Evolution archive entry count (normalized to 100).
         - *Valid* stigmergy mark density (corrupt JSON filtered out).
         - Shared note count (normalized to 50).
+        - chetana atom volume, recency, and stale_after freshness when present.
 
         Returns:
             Float in [0.0, 1.0], defaulting to 0.5 when no data.
@@ -322,7 +356,56 @@ class IdentityMonitor:
             count = len(list(shared_dir.glob("*.md")))
             signals.append(min(1.0, count / 50.0))
 
+        chetana_signal = self._measure_chetana_rm_signal()
+        if chetana_signal is not None:
+            signals.append(chetana_signal)
+
         return sum(signals) / len(signals) if signals else 0.5
+
+    def _measure_chetana_rm_signal(self) -> float | None:
+        """Read chetana atom health from the existing knowledge tree.
+
+        This deliberately avoids importing ``dharma_swarm.chetana`` because
+        chetana may live in a sibling checkout. The canonical runtime signal is
+        the existing ``<state_dir>/knowledge`` markdown atom tree.
+        """
+        knowledge_dir = self._state_dir / "knowledge"
+        if not knowledge_dir.exists():
+            return None
+
+        trusted = _markdown_files(knowledge_dir / "wiki" / "concepts")
+        staged = _markdown_files(knowledge_dir / "staging")
+        quarantined = _markdown_files(knowledge_dir / "quarantine")
+        all_atoms = trusted + staged + quarantined
+        if not all_atoms:
+            return None
+
+        weighted_count = len(trusted) + (0.5 * len(staged))
+        volume_score = min(1.0, weighted_count / _CHETANA_VOLUME_NORMALIZER)
+
+        mtimes: list[float] = []
+        for path in all_atoms:
+            try:
+                mtimes.append(path.stat().st_mtime)
+            except OSError:
+                continue
+        newest_mtime = max(mtimes, default=0.0)
+        if newest_mtime <= 0:
+            recency_score = 0.0
+        else:
+            age_days = max(0.0, (time.time() - newest_mtime) / 86400.0)
+            recency_score = max(0.0, 1.0 - (age_days / _CHETANA_RECENCY_WINDOW_DAYS))
+
+        today = date.today()
+        stale_count = sum(
+            1
+            for path in trusted
+            if (stale_after := _chetana_stale_after(path)) is not None
+            and stale_after <= today
+        )
+        freshness_score = max(0.0, 1.0 - (stale_count / max(1, len(trusted))))
+
+        return (0.4 * volume_score) + (0.4 * recency_score) + (0.2 * freshness_score)
 
     # -- correction ---------------------------------------------------------
 
@@ -515,7 +598,7 @@ class LiveCoherenceSensor:
     FRESHNESS_HOURS: float = 24.0
 
     def __init__(self, state_dir: Optional[Path] = None) -> None:
-        self._state_dir = state_dir or (Path.home() / ".dharma")
+        self._state_dir = state_dir or (dharma_state_dir())
 
     def measure(self) -> dict[str, Any]:
         """Measure present-moment coherence.

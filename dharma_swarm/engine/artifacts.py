@@ -169,4 +169,3 @@ class ArtifactStore:
             depends_on=ref.depends_on if depends_on is None else list(depends_on),
             metadata=dict(ref.metadata),
         )
-

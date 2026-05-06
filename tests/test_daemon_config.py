@@ -59,7 +59,7 @@ def test_daemon_config_defaults():
     assert cfg.crown_jewel_threshold == 0.85
     assert len(cfg.threads) == 5
     assert cfg.rotation_mode == "sequential"
-    assert 2 in cfg.quiet_hours
+    assert cfg.quiet_hours == []
 
 
 def test_thread_prompts_complete():

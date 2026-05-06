@@ -591,7 +591,7 @@ def daemon_loop(config: DaemonConfig | None = None):
 
         # Check and run any due cron jobs
         _check_and_run_cron_jobs(cfg)
-        
+
         time.sleep(interval)
 
 

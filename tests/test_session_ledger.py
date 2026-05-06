@@ -7,7 +7,12 @@ from dharma_swarm.session_ledger import SessionLedger
 
 
 def test_session_ledger_writes_task_and_progress(tmp_path):
-    ledger = SessionLedger(base_dir=tmp_path, session_id="sess_a")
+    runtime_db = tmp_path / "runtime.db"
+    ledger = SessionLedger(
+        base_dir=tmp_path,
+        session_id="sess_a",
+        runtime_db_path=runtime_db,
+    )
 
     ledger.task_event("dispatch_assigned", task_id="t1", agent_id="a1")
     ledger.progress_event("task_started", task_id="t1", agent_id="a1")
@@ -28,7 +33,7 @@ def test_session_ledger_writes_task_and_progress(tmp_path):
 def test_session_ledger_uses_env_dir_and_session(tmp_path, monkeypatch):
     monkeypatch.setenv("DGC_LEDGER_DIR", str(tmp_path))
     monkeypatch.setenv("DGC_SESSION_ID", "sess_env")
-    ledger = SessionLedger()
+    ledger = SessionLedger(runtime_db_path=tmp_path / "runtime.db")
     ledger.task_event("dispatch_blocked", task_id="t2", reason="blocked")
 
     task_path = tmp_path / "sess_env" / "task_ledger.jsonl"

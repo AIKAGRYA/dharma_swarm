@@ -33,4 +33,3 @@ class EngineSettings:
             qdrant_collection=os.getenv("DGC_QDRANT_COLLECTION", "dgc_artifacts"),
             qdrant_vector_size=vector_size,
         )
-

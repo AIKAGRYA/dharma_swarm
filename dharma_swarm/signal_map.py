@@ -55,10 +55,10 @@ class SignalMapEntry:
         self.scores.append(score)
         self.coverage_count = len(self.scores)
         self.last_scanned = score.timestamp
-        
+
         # Update aggregate (simple average for now, could weight by recency)
         self.aggregate = statistics.mean([s.composite for s in self.scores])
-        
+
         # Update confidence based on coverage (0.5 base, +0.1 per scan, max 0.9)
         self.confidence = min(0.5 + (self.coverage_count - 1) * 0.1, 0.9)
 
@@ -79,9 +79,9 @@ class ScanHistory:
 
 class SignalMap:
     """Living map of semantic density across the ecosystem"""
-    
+
     DEFAULT_PATH = Path.home() / ".dharma" / "signal_map.json"
-    
+
     def __init__(
         self,
         files: Dict[str, SignalMapEntry] = None,
@@ -99,13 +99,13 @@ class SignalMap:
     def load(cls, path: Path = None) -> "SignalMap":
         """Load signal map from JSON file"""
         path = path or cls.DEFAULT_PATH
-        
+
         if not path.exists():
             return cls()  # Return empty map if no file exists
-        
+
         with open(path, 'r') as f:
             data = json.load(f)
-        
+
         # Reconstruct entries from JSON
         files = {}
         for file_path, file_data in data.get("files", {}).items():
@@ -118,7 +118,7 @@ class SignalMap:
                 )
                 for s in file_data.get("scores", [])
             ]
-            
+
             files[file_path] = SignalMapEntry(
                 path=file_path,
                 scores=scores,
@@ -131,11 +131,11 @@ class SignalMap:
                 last_file_modified=file_data.get("last_file_modified"),
                 last_scanned=scores[-1].timestamp if scores else None
             )
-        
+
         scan_history = [
             ScanHistory(**hist) for hist in data.get("scan_history", [])
         ]
-        
+
         return cls(
             files=files,
             blind_spots=data.get("blind_spots", []),
@@ -147,7 +147,7 @@ class SignalMap:
         """Save signal map to JSON file"""
         path = path or self.DEFAULT_PATH
         path.parent.mkdir(parents=True, exist_ok=True)
-        
+
         # Convert to JSON-serializable format
         data = {
             "version": self.version,
@@ -169,7 +169,7 @@ class SignalMap:
             "blind_spots": self.blind_spots,
             "scan_history": [asdict(hist) for hist in self.scan_history]
         }
-        
+
         with open(path, 'w') as f:
             json.dump(data, f, indent=2)
 
@@ -188,7 +188,7 @@ class SignalMap:
             composite=composite,
             criteria=criteria
         )
-        
+
         if file_path not in self.files:
             self.files[file_path] = SignalMapEntry(
                 path=file_path,
@@ -199,7 +199,7 @@ class SignalMap:
                 domain=domain,
                 one_liner=one_liner
             )
-        
+
         self.files[file_path].add_score(score)
 
     def merge_scan_results(
@@ -208,7 +208,7 @@ class SignalMap:
         scan_id: str
     ):
         """Merge a batch of scan results
-        
+
         Args:
             scan_results: {file_path: (composite, criteria, domain, one_liner)}
             scan_id: ID for this scan pass
@@ -227,11 +227,11 @@ class SignalMap:
 
     def get_top_n(self, n: int = 25, min_confidence: float = 0.0) -> List[SignalMapEntry]:
         """Get top N files by aggregate score
-        
+
         Args:
             n: Number of files to return
             min_confidence: Minimum confidence threshold
-        
+
         Returns:
             List of entries sorted by aggregate score descending
         """
@@ -244,7 +244,7 @@ class SignalMap:
 
     def get_low_confidence(self, threshold: float = 0.6) -> List[SignalMapEntry]:
         """Get files with confidence below threshold
-        
+
         These are candidates for re-scanning to build confidence.
         """
         return [
@@ -254,7 +254,7 @@ class SignalMap:
 
     def decay_all(self, decay_rate: float = 0.1):
         """Decay confidence for all entries
-        
+
         Call this periodically (e.g., monthly) to prevent stale information
         from maintaining artificially high confidence.
         """
@@ -268,22 +268,22 @@ class SignalMap:
         tier_thresholds: Tuple[float, float] = (9.5, 9.0)
     ) -> str:
         """Generate agent briefing text
-        
+
         Args:
             max_files: Maximum files to include
             include_blind_spots: Include blind spot list
             tier_thresholds: (tier1_min, tier2_min) for Load-Bearing/Structural
-        
+
         Returns:
             Markdown-formatted briefing
         """
         top_files = self.get_top_n(max_files)
-        
+
         # Tier files
         tier1 = [f for f in top_files if f.aggregate >= tier_thresholds[0]]
         tier2 = [f for f in top_files if tier_thresholds[1] <= f.aggregate < tier_thresholds[0]]
         tier3 = [f for f in top_files if f.aggregate < tier_thresholds[1]]
-        
+
         lines = [
             "# Signal Map Agent Briefing",
             f"**Generated**: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}",
@@ -293,14 +293,14 @@ class SignalMap:
             "## Tier 1: Load-Bearing Walls (9.5+)",
             ""
         ]
-        
+
         for entry in tier1:
             confidence_bar = "■" * int(entry.confidence * 10)
             lines.append(
                 f"- **{Path(entry.path).name}** ({entry.aggregate:.1f}) "
                 f"[{confidence_bar}] — {entry.one_liner}"
             )
-        
+
         if tier2:
             lines.extend([
                 "",
@@ -313,7 +313,7 @@ class SignalMap:
                     f"- **{Path(entry.path).name}** ({entry.aggregate:.1f}) "
                     f"[{confidence_bar}] — {entry.one_liner}"
                 )
-        
+
         if tier3:
             lines.extend([
                 "",
@@ -326,7 +326,7 @@ class SignalMap:
                     f"- **{Path(entry.path).name}** ({entry.aggregate:.1f}) "
                     f"[{confidence_bar}] — {entry.one_liner}"
                 )
-        
+
         if include_blind_spots and self.blind_spots:
             lines.extend([
                 "",
@@ -335,7 +335,7 @@ class SignalMap:
             ])
             for spot in self.blind_spots:
                 lines.append(f"- {spot}")
-        
+
         return "\n".join(lines)
 
     def get_by_domain(self, domain: str) -> List[SignalMapEntry]:
@@ -356,11 +356,11 @@ class SignalMap:
                 "total_scans": len(self.scan_history),
                 "blind_spots": len(self.blind_spots)
             }
-        
+
         domain_counts = {}
         for entry in self.files.values():
             domain_counts[entry.domain] = domain_counts.get(entry.domain, 0) + 1
-        
+
         return {
             "total_files": len(self.files),
             "avg_score": statistics.mean([e.aggregate for e in self.files.values()]),

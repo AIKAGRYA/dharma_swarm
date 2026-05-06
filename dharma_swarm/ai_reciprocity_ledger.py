@@ -400,6 +400,13 @@ class AIReciprocityLedger:
         return self._entries[-1].compute_hash()
 
     def _append_entry(self, entry_type: str, payload: dict[str, Any]) -> LedgerEntry:
+        try:
+            from dharma_swarm.correlation_context import get_correlation
+            corr = get_correlation()
+            if corr.trace_id:
+                payload.setdefault("trace_id", corr.trace_id)
+        except Exception:
+            pass
         prev_hash = self.chain_head
         payload_hash = _blake2b(json.dumps(payload, sort_keys=True, default=str))
         entry = LedgerEntry(
