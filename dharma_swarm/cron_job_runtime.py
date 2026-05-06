@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
@@ -21,6 +20,8 @@ def _new_run_id() -> str:
 
 
 class CronJobRunStatus(str, Enum):
+    """Lifecycle states for a CronJobRun, from planned through terminal."""
+
     PLANNED = "planned"
     SUBMITTED = "submitted"
     WAITING_EXTERNAL = "waiting_external"
@@ -64,7 +65,11 @@ class CronJobRuntimeStore:
     """Filesystem-backed state store for cron jobs."""
 
     def __init__(self, base_dir: Path | None = None) -> None:
-        self.base_dir = Path(base_dir) if base_dir is not None else (Path.home() / ".dharma" / "cron" / "state")
+        self.base_dir = (
+            Path(base_dir)
+            if base_dir is not None
+            else (Path.home() / ".dharma" / "cron" / "state")
+        )
         self.latest_dir = self.base_dir / "latest"
         self.history_dir = self.base_dir / "history"
 
@@ -77,6 +82,7 @@ class CronJobRuntimeStore:
         now: datetime | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> CronJobRun:
+        """Persist a new PLANNED run for job_id and return it."""
         current = now or _utc_now()
         run = CronJobRun(
             job_id=job_id,
@@ -103,6 +109,7 @@ class CronJobRuntimeStore:
         wake_at: datetime | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> CronJobRun:
+        """Move the latest run for job_id to a new status, persisting any provided fields."""
         current = self.load_latest(job_id)
         if current is None or current.run_id != run_id:
             raise KeyError(f"Latest run for {job_id} does not match {run_id}")
@@ -119,10 +126,16 @@ class CronJobRuntimeStore:
                 "status": status,
                 "updated_at": current_time,
                 "finished_at": current_time if terminal else current.finished_at,
-                "output_file": current.output_file if output_file is None else output_file,
-                "output_preview": current.output_preview if output_preview is None else output_preview,
+                "output_file": current.output_file
+                if output_file is None
+                else output_file,
+                "output_preview": current.output_preview
+                if output_preview is None
+                else output_preview,
                 "error": current.error if error is None else error,
-                "next_action": current.next_action if next_action is None else next_action,
+                "next_action": current.next_action
+                if next_action is None
+                else next_action,
                 "wake_at": current.wake_at if wake_at is None else wake_at,
                 "metadata": merged_metadata,
             }
@@ -131,12 +144,14 @@ class CronJobRuntimeStore:
         return updated
 
     def load_latest(self, job_id: str) -> CronJobRun | None:
+        """Return the most recently persisted run for job_id, or None if no runs exist."""
         path = self.latest_dir / f"{job_id}.json"
         if not path.exists():
             return None
         return CronJobRun.model_validate_json(path.read_text(encoding="utf-8"))
 
     def list_history(self, job_id: str) -> list[CronJobRun]:
+        """Return every persisted run for job_id in append order."""
         path = self.history_dir / f"{job_id}.jsonl"
         if not path.exists():
             return []
@@ -153,6 +168,7 @@ class CronJobRuntimeStore:
         *,
         now: datetime | None = None,
     ) -> CronJobRun | None:
+        """If the latest run is WAITING_EXTERNAL with wake_at past, transition it to READY_TO_RESUME."""
         latest = self.load_latest(job_id)
         if latest is None or latest.status is not CronJobRunStatus.WAITING_EXTERNAL:
             return None
@@ -176,7 +192,9 @@ class CronJobRuntimeStore:
             run.model_dump_json(indent=2) + "\n",
             encoding="utf-8",
         )
-        with (self.history_dir / f"{run.job_id}.jsonl").open("a", encoding="utf-8") as handle:
+        with (self.history_dir / f"{run.job_id}.jsonl").open(
+            "a", encoding="utf-8"
+        ) as handle:
             handle.write(run.model_dump_json() + "\n")
 
 
