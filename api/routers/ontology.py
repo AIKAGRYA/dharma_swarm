@@ -25,6 +25,10 @@ _TYPE_CATEGORIES: dict[str, tuple[str, str]] = {
     "TypedTask": ("task", "execution rail"),
     "EvolutionEntry": ("artifact", "evolution archive"),
     "WitnessLog": ("gate", "witness field"),
+    "Hypernode": ("concept", "revenue/welfare cell"),
+    "RevenueCell": ("artifact", "metabolic market proof"),
+    "CouncilVerdict": ("gate", "quorum trace"),
+    "FitnessVector": ("gate", "promotion score"),
 }
 
 _CATEGORY_LAYOUT: dict[str, tuple[int, int]] = {

@@ -54,6 +54,7 @@ export function buildDashboardNavSections(): DashboardNavSection[] {
         ...canonicalOperatorDeckItems(),
         { label: "Conv. Log", href: "/dashboard/log", icon: "MessageSquare", level: 1 },
         { label: "Truth Map", href: "/dashboard/modules", icon: "Activity", level: 1 },
+        { label: "Hypernode #1", href: "/dashboard/hypernodes/empty-quadrant", icon: "HeartPulse", level: 1 },
         { label: "Semantic Graph", href: "/dashboard/claude", icon: "Globe", level: 1 },
         { label: "Models", href: "/dashboard/models", icon: "Sparkles", level: 1 },
         { label: "GLM-5", href: "/dashboard/glm5", icon: "Brain", level: 1 },

@@ -18,6 +18,7 @@ import type {
   HeatmapCell,
   HealthOut,
   HotPath,
+  HypernodePayload,
   ImpactOut,
   LineageEdgeOut,
   ModuleTruthOut,
@@ -488,6 +489,12 @@ export function fetchOntologyStats(): Promise<
   ApiResponse<Record<string, unknown>>
 > {
   return apiGet<Record<string, unknown>>("/api/ontology/stats");
+}
+
+// -- Hypernodes --------------------------------------------------------------
+
+export function fetchEmptyQuadrantHypernode(): Promise<ApiResponse<HypernodePayload>> {
+  return apiGet<HypernodePayload>("/api/hypernodes/empty-quadrant");
 }
 
 // ---------------------------------------------------------------------------

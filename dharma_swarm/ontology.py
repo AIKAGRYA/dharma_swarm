@@ -848,6 +848,9 @@ class OntologyRegistry:
             registry.register_link(link_def)
         for link_def in _METABOLIC_LINKS:
             registry.register_link(link_def)
+        from dharma_swarm.hypernode_ontology import register_hypernode_types
+
+        register_hypernode_types(registry)
         return registry
 
 

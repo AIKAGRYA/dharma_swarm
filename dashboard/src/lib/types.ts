@@ -48,6 +48,19 @@ export interface ChatProfileOut {
   status_note?: string;
 }
 
+export interface ChatHistoryPayload {
+  entries?: ConversationEntry[];
+  [key: string]: unknown;
+}
+
+export interface ConversationEntry {
+  id?: string;
+  timestamp?: string;
+  role?: string;
+  content?: string;
+  [key: string]: unknown;
+}
+
 // ---------------------------------------------------------------------------
 // Swarm overview (GET /api/overview)
 // ---------------------------------------------------------------------------
@@ -147,6 +160,23 @@ export interface AgentOut {
   model_label: string;
   model_key: string;
   error: string | null;
+}
+
+export interface AgentDetailPayload {
+  agent?: AgentOut;
+  [key: string]: unknown;
+}
+
+export interface AgentMemoryOut {
+  memories?: unknown[];
+  [key: string]: unknown;
+}
+
+export interface AgentNoteOut {
+  id?: string;
+  text?: string;
+  created_at?: string;
+  [key: string]: unknown;
 }
 
 export interface AgentConfigOut {
@@ -325,6 +355,10 @@ export interface ArchiveEntryOut {
   model: string;
 }
 
+export interface EvolutionStats {
+  [key: string]: unknown;
+}
+
 export interface FitnessTrendPoint {
   timestamp: string;
   fitness: number;
@@ -452,6 +486,93 @@ export interface OntologyGraphData {
 }
 
 // ---------------------------------------------------------------------------
+// Hypernodes (GET /api/hypernodes/empty-quadrant)
+// ---------------------------------------------------------------------------
+
+export interface HypernodeQuadrantFrame {
+  id: string;
+  label: string;
+  governance: string;
+  orientation: string;
+  description: string;
+  occupied: boolean;
+}
+
+export interface HypernodeProvenanceRecord {
+  id: string;
+  label: string;
+  source_type: string;
+  reference: string;
+  confidence: number;
+}
+
+export interface HypernodeCouncilVerdict {
+  id: string;
+  decision: string;
+  reason: string;
+  gate_results: Record<string, string>;
+  anekanta_frames: string[];
+  steelman_summary: string;
+  dogma_drift_summary: string;
+  mirofish_activated: boolean;
+  mirofish_reason: string;
+  quorum_participants: string[];
+}
+
+export interface HypernodeFitnessVector {
+  id: string;
+  auto_grade_score: number;
+  council_score: number;
+  provenance_score: number;
+  market_value_score: number;
+  welfare_score: number;
+  composite_score: number;
+  promotion_threshold: number;
+  threshold_met: boolean;
+  promotion_state: string;
+  scoring_method: string;
+}
+
+export interface HypernodeRevenueCell {
+  id: string;
+  name: string;
+  market_category: string;
+  target_customer: string;
+  revenue_model: string;
+  verified_revenue_usd: number;
+  expected_value_usd: number;
+  evidence_tier: string;
+  trustee_principle: string;
+  status: string;
+  next_actions: string[];
+}
+
+export interface HypernodeTypedLink {
+  source_id: string;
+  source_type: string;
+  link_name: string;
+  target_id: string;
+  target_type: string;
+}
+
+export interface HypernodePayload {
+  id: string;
+  slug: string;
+  title: string;
+  thesis: string;
+  public_path: string;
+  quadrant_map: HypernodeQuadrantFrame[];
+  provenance: HypernodeProvenanceRecord[];
+  council_verdict: HypernodeCouncilVerdict;
+  fitness_vector: HypernodeFitnessVector;
+  revenue_cell: HypernodeRevenueCell;
+  object_chain: Record<string, string[]>;
+  typed_links: HypernodeTypedLink[];
+  next_actions: string[];
+  ontology_counts: Record<string, number>;
+}
+
+// ---------------------------------------------------------------------------
 // Lineage (GET /api/lineage/*)
 // ---------------------------------------------------------------------------
 
@@ -506,6 +627,58 @@ export interface HotPath {
   path: string;
   count: number;
 }
+
+export interface StigmergyGraphData {
+  nodes: unknown[];
+  edges: unknown[];
+  [key: string]: unknown;
+}
+
+export interface RoutingManifestOut {
+  routes?: unknown[];
+  [key: string]: unknown;
+}
+
+export interface SupervisorStatus {
+  status?: string;
+  [key: string]: unknown;
+}
+
+export interface PromiseEntry {
+  id?: string;
+  text?: string;
+  status?: string;
+  [key: string]: unknown;
+}
+
+export interface VizSnapshot {
+  nodes?: unknown[];
+  edges?: unknown[];
+  [key: string]: unknown;
+}
+
+export interface VizEvent {
+  event?: string;
+  timestamp?: string;
+  [key: string]: unknown;
+}
+
+export interface AlgedonicSignal { [key: string]: unknown; }
+export interface GatePattern { [key: string]: unknown; }
+export interface AgentViabilityEntry { [key: string]: unknown; }
+export interface AuditResultOut { [key: string]: unknown; }
+export interface GateExpansionProposal { [key: string]: unknown; }
+export interface CatalyticSummary { [key: string]: unknown; }
+export interface CatalyticNode { [key: string]: unknown; }
+export interface CatalyticEdge { [key: string]: unknown; }
+export interface LoopClosurePriority { [key: string]: unknown; }
+export interface StrangeLoopStats { [key: string]: unknown; }
+export interface MutationEntry { [key: string]: unknown; }
+export interface GateDefinition { [key: string]: unknown; }
+export interface GateCheckResult { [key: string]: unknown; }
+export interface GateProposalOut { [key: string]: unknown; }
+export interface CascadeDomainConfig { [key: string]: unknown; }
+export interface CascadeCheckpoint { [key: string]: unknown; }
 
 // ---------------------------------------------------------------------------
 // WebSocket events
