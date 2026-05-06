@@ -1,0 +1,38 @@
+{
+  "id": "routing-coherence-autonomous-agent",
+  "base_ref": "origin/main",
+  "branch": "chore/routing-coherence-autonomous-agent",
+  "worktree": "/Users/dhyana/promotion_worktrees/dharma_swarm_routing_coherence_autonomous_agent",
+  "intent": "Reconcile AutonomousAgent routing to avoid direct create_runtime_provider bypasses while keeping dashboard chat in a separate PR.",
+  "allowed_files": [
+    "dharma_swarm/autonomous_agent.py",
+    "dharma_swarm/persistent_agent.py",
+    "tests/test_autonomous_agent_router_path.py",
+    "tests/test_model_router_routing_memory.py",
+    "reports/agentops/**"
+  ],
+  "forbidden_files": [
+    "dashboard/**",
+    "api/**",
+    "dharma_swarm/daily_operating_brief.py",
+    "dharma_swarm/insight_brief.py"
+  ],
+  "gates": [
+    {
+      "name": "diff-check",
+      "command": "git diff --check"
+    },
+    {
+      "name": "routing-tests",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_autonomous_agent_router_path.py tests/test_model_router_routing_memory.py tests/test_orchestrate_router_lifetime.py"
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(routing): enforce autonomous agent model-router path"
+  },
+  "approval": {
+    "before_commit": true,
+    "before_merge": true
+  }
+}

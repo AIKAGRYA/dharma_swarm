@@ -1,0 +1,36 @@
+{
+  "id": "state-root-contract",
+  "base_ref": "origin/main",
+  "branch": "chore/state-root-contract",
+  "worktree": "/Users/dhyana/promotion_worktrees/dharma_swarm_state_root_contract",
+  "intent": "Inventory Path.home()/~/.dharma writes and propose a single state-root helper contract without migration.",
+  "allowed_files": [
+    "docs/governance/SOVEREIGN_MANIFEST.md",
+    "docs/governance/REPO_GOVERNANCE_AUDIT.md",
+    "reports/agentops/**"
+  ],
+  "forbidden_files": [
+    "dharma_swarm/**/*.py",
+    "api/**",
+    "dashboard/**",
+    "scripts/**"
+  ],
+  "gates": [
+    {
+      "name": "diff-check",
+      "command": "git diff --check"
+    },
+    {
+      "name": "docops-integrity",
+      "command": "python3 scripts/docops/check_docops_integrity.py"
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "chore(state): document state-root contract inventory"
+  },
+  "approval": {
+    "before_commit": true,
+    "before_merge": true
+  }
+}
