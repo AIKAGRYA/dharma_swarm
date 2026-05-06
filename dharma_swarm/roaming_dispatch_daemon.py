@@ -23,11 +23,15 @@ from dharma_swarm.roaming_operator_bridge import RoamingOperatorBridge, _build_b
 
 @dataclass(frozen=True)
 class DaemonCycleResult:
+    """One iteration's outcome: bridge task IDs collected and mailbox task IDs dispatched."""
+
     collected_bridge_task_ids: list[str] = field(default_factory=list)
     dispatched_mailbox_task_ids: list[str] = field(default_factory=list)
 
 
 class MailboxRepoSync:
+    """Git wrapper for fetching and pushing the roaming mailbox queue directories."""
+
     def __init__(self, repo_root: Path, branch: str) -> None:
         self.repo_root = repo_root
         self.branch = branch
@@ -41,11 +45,13 @@ class MailboxRepoSync:
         )
 
     def sync_inbound(self) -> None:
+        """Fetch the configured branch and fast-forward the local mailbox repo."""
         self._run("fetch", "origin", self.branch)
         self._run("checkout", self.branch)
         self._run("pull", "--ff-only", "origin", self.branch)
 
     def sync_outbound(self, *, note: str) -> None:
+        """Commit and push any changes inside the mailbox tasks/responses/receipts dirs."""
         status = self._run(
             "status",
             "--short",
@@ -67,6 +73,8 @@ class MailboxRepoSync:
 
 
 class RoamingDispatchDaemon:
+    """Local-side daemon that bridges OperatorBridge tasks to the roaming mailbox queue."""
+
     def __init__(
         self,
         *,
@@ -92,8 +100,11 @@ class RoamingDispatchDaemon:
         ).exists()
 
     async def collect_available(self) -> list[str]:
+        """Pull every responded mailbox task back into the bridge and return their bridge IDs."""
         collected: list[str] = []
-        responded = self.mailbox.list_tasks(recipient=self.recipient, status="responded")
+        responded = self.mailbox.list_tasks(
+            recipient=self.recipient, status="responded"
+        )
         for task in responded:
             if self._receipt_exists(task.task_id):
                 continue
@@ -105,6 +116,7 @@ class RoamingDispatchDaemon:
         return collected
 
     async def dispatch_available(self) -> list[str]:
+        """Push up to dispatch_limit pending bridge tasks into the mailbox; return mailbox IDs."""
         dispatched: list[str] = []
         for _ in range(self.dispatch_limit):
             task = await self.adapter.dispatch_next(recipient=self.recipient)
@@ -114,6 +126,7 @@ class RoamingDispatchDaemon:
         return dispatched
 
     async def cycle_once(self) -> DaemonCycleResult:
+        """Run one full sync-collect-dispatch-push cycle and return what moved."""
         if self.git_sync is not None:
             self.git_sync.sync_inbound()
 
@@ -126,7 +139,9 @@ class RoamingDispatchDaemon:
                 parts.append(f"collect {len(collected)}")
             if dispatched:
                 parts.append(f"dispatch {len(dispatched)}")
-            self.git_sync.sync_outbound(note=f"Roaming daemon {' + '.join(parts)} for {self.recipient}")
+            self.git_sync.sync_outbound(
+                note=f"Roaming daemon {' + '.join(parts)} for {self.recipient}"
+            )
 
         return DaemonCycleResult(
             collected_bridge_task_ids=collected,
@@ -134,6 +149,7 @@ class RoamingDispatchDaemon:
         )
 
     async def run_loop(self, *, interval_seconds: float = 10.0) -> None:
+        """Run cycle_once forever, sleeping interval_seconds between iterations."""
         while True:
             try:
                 await self.cycle_once()
@@ -143,7 +159,9 @@ class RoamingDispatchDaemon:
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Run the local roaming dispatch/collect daemon.")
+    parser = argparse.ArgumentParser(
+        description="Run the local roaming dispatch/collect daemon."
+    )
     parser.add_argument("--db-path", required=True)
     parser.add_argument("--mailbox-root", default="")
     parser.add_argument("--ledger-dir", default="")
@@ -170,7 +188,9 @@ async def _main_async(argv: list[str] | None = None) -> int:
     )
     git_sync = None
     if args.repo_root and args.git_branch:
-        git_sync = MailboxRepoSync(repo_root=Path(args.repo_root), branch=args.git_branch)
+        git_sync = MailboxRepoSync(
+            repo_root=Path(args.repo_root), branch=args.git_branch
+        )
     daemon = RoamingDispatchDaemon(
         adapter=adapter,
         recipient=args.recipient,
@@ -194,6 +214,7 @@ async def _main_async(argv: list[str] | None = None) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """CLI entrypoint: parse argv and run the daemon in run-once or run-loop mode."""
     import asyncio
 
     return asyncio.run(_main_async(argv))
