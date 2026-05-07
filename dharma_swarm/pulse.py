@@ -425,11 +425,22 @@ def pulse(config: DaemonConfig | None = None) -> str:
     return result
 
 
+CRON_JOBS_FILE = Path(__file__).resolve().parent.parent / "cron_jobs.json"
+"""Default path to the declarative cron-job spec file.
+
+Resolved relative to this module so the lookup works across any user's
+checkout. Runtime state (last_status / last_run_at) lives in
+`~/.dharma/cron/jobs.json` owned by `cron_scheduler.py`; this module only
+consumes declarative specs. Tests monkeypatch this constant; production code
+should not reassign it.
+"""
+
+
 def _check_and_run_cron_jobs(cfg: DaemonConfig | None = None) -> None:
-    """Check and run due cron jobs from `~/dharma_swarm/cron_jobs.json`."""
+    """Check and run due cron jobs declared in repo `cron_jobs.json`."""
     _ = cfg  # reserved for future per-job policy wiring
 
-    cron_file = Path.home() / "dharma_swarm" / "cron_jobs.json"
+    cron_file = CRON_JOBS_FILE
     if not cron_file.exists():
         return
 

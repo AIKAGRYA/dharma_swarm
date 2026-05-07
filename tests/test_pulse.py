@@ -199,7 +199,6 @@ def test_check_and_run_cron_jobs_runs_due_job_once_per_slot(tmp_path: Path, monk
             return fixed_now if tz is None else fixed_now.astimezone(tz)
 
     monkeypatch.setattr(pulse, "datetime", _FixedDateTime)
-    monkeypatch.setattr(pulse.Path, "home", lambda: tmp_path)
 
     state_dir = tmp_path / ".dharma"
     state_dir.mkdir(parents=True, exist_ok=True)
@@ -208,6 +207,7 @@ def test_check_and_run_cron_jobs_runs_due_job_once_per_slot(tmp_path: Path, monk
     cron_dir = tmp_path / "dharma_swarm"
     cron_dir.mkdir(parents=True, exist_ok=True)
     cron_file = cron_dir / "cron_jobs.json"
+    monkeypatch.setattr(pulse, "CRON_JOBS_FILE", cron_file)
     cron_file.write_text(
         json.dumps(
             [
@@ -243,12 +243,12 @@ def test_check_and_run_cron_jobs_runs_due_job_once_per_slot(tmp_path: Path, monk
 
 
 def test_check_and_run_cron_jobs_ignores_invalid_job_payload(tmp_path: Path, monkeypatch):
-    monkeypatch.setattr(pulse.Path, "home", lambda: tmp_path)
     monkeypatch.setattr(pulse, "STATE_DIR", tmp_path / ".dharma")
 
     cron_dir = tmp_path / "dharma_swarm"
     cron_dir.mkdir(parents=True, exist_ok=True)
     cron_file = cron_dir / "cron_jobs.json"
+    monkeypatch.setattr(pulse, "CRON_JOBS_FILE", cron_file)
     cron_file.write_text(
         json.dumps(
             [
@@ -280,7 +280,6 @@ def test_check_and_run_cron_jobs_runs_due_interval_job_once(tmp_path: Path, monk
             return fixed_now if tz is None else fixed_now.astimezone(tz)
 
     monkeypatch.setattr(pulse, "datetime", _FixedDateTime)
-    monkeypatch.setattr(pulse.Path, "home", lambda: tmp_path)
 
     state_dir = tmp_path / ".dharma"
     state_dir.mkdir(parents=True, exist_ok=True)
@@ -289,6 +288,7 @@ def test_check_and_run_cron_jobs_runs_due_interval_job_once(tmp_path: Path, monk
     cron_dir = tmp_path / "dharma_swarm"
     cron_dir.mkdir(parents=True, exist_ok=True)
     cron_file = cron_dir / "cron_jobs.json"
+    monkeypatch.setattr(pulse, "CRON_JOBS_FILE", cron_file)
     cron_file.write_text(
         json.dumps(
             [
