@@ -315,6 +315,7 @@ def check_canonical_guard(
 ) -> list[Finding]:
     guard = config.get("canonical_guard", {})
     registered = set(guard.get("registered", []))
+    ignore_patterns = guard.get("ignore", [])
     patterns = guard.get("managed_include", [])
     files = {repo_relative(path, repo_root): path for path in iter_files(repo_root, patterns)}
 
@@ -324,6 +325,8 @@ def check_canonical_guard(
         for status, rel in changed_files:
             if not rel.endswith(".md"):
                 continue
+            if any(fnmatch.fnmatch(rel, pattern) for pattern in ignore_patterns):
+                continue
             if any(fnmatch.fnmatch(rel, pattern) for pattern in changed_patterns):
                 path = repo_root / rel
                 if path.exists() and path.is_file():
@@ -332,6 +335,8 @@ def check_canonical_guard(
 
     findings: list[Finding] = []
     for rel, path in sorted(files.items()):
+        if any(fnmatch.fnmatch(rel, pattern) for pattern in ignore_patterns):
+            continue
         if rel in registered:
             continue
         if doc_contains_authority_claim(path):
