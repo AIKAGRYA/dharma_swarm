@@ -1009,6 +1009,28 @@ def test_cmd_runtime_status_prints_runtime_control_plane(capsys, monkeypatch):
     assert "Sessions=2" in out
 
 
+def test_cmd_runtime_status_json_emits_json(capsys, monkeypatch):
+    """runtime-status --json should emit JSON from build_runtime_status_data."""
+    import dharma_swarm.dgc_cli as cli
+
+    def _fake_build_runtime_status_data(*, limit, runtime_db_path):
+        return {"db_exists": True, "counts": {"sessions": 5}}
+
+    monkeypatch.setattr(
+        "dharma_swarm.tui_helpers.build_runtime_status_data",
+        _fake_build_runtime_status_data,
+    )
+
+    cli.cmd_runtime_status(limit=3, db_path="/tmp/runtime.db", as_json=True)
+
+    out = capsys.readouterr().out
+    import json
+
+    parsed = json.loads(out)
+    assert parsed["db_exists"] is True
+    assert parsed["counts"]["sessions"] == 5
+
+
 def test_cmd_status_prefers_canonical_runtime_artifacts(monkeypatch, tmp_path, capsys):
     """status should prefer live ~/.dharma pulse evidence over absorbed legacy state."""
     import dharma_swarm.dgc_cli as cli

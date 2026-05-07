@@ -21,6 +21,7 @@ from dharma_swarm.runtime_state import (
 from dharma_swarm.tui_helpers import (
     _read_json,
     build_darwin_status_text,
+    build_runtime_status_data,
     build_runtime_status_text,
     build_status_text,
 )
@@ -567,3 +568,69 @@ def test_build_runtime_status_text_handles_missing_runtime_db(tmp_path, monkeypa
     assert "Runtime Control Plane" in result
     assert "No canonical runtime database found" in result
     assert "Toolchain" in result
+
+
+def test_build_runtime_status_data_returns_structured_dict(tmp_path, monkeypatch):
+    """build_runtime_status_data returns JSON-serializable dict with counts."""
+    import dharma_swarm.tui_helpers as helpers
+
+    dharma_dir = tmp_path / ".dharma"
+    runtime_dir = dharma_dir / "state"
+    runtime_dir.mkdir(parents=True)
+    runtime_db = runtime_dir / "runtime.db"
+
+    now = datetime(2026, 3, 11, 1, 2, 3, tzinfo=timezone.utc)
+
+    async def seed_runtime() -> None:
+        store = RuntimeStateStore(runtime_db)
+        await store.init_db()
+        await store.upsert_session(
+            SessionState(
+                session_id="sess-json",
+                operator_id="operator",
+                current_task_id="task-json",
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        await store.record_task_claim(
+            TaskClaim(
+                claim_id="claim-json",
+                session_id="sess-json",
+                task_id="task-json",
+                agent_id="codex",
+                status="acknowledged",
+                claimed_at=now,
+                acked_at=now,
+            )
+        )
+
+    asyncio.run(seed_runtime())
+
+    monkeypatch.setattr(helpers, "DHARMA_STATE", dharma_dir)
+    monkeypatch.setattr(
+        helpers.shutil, "which",
+        lambda prog: f"/mock/bin/{prog}" if prog != "claude" else None,
+    )
+
+    data = build_runtime_status_data()
+    assert data["db_exists"] is True
+    assert data["counts"]["sessions"] == 1
+    assert data["counts"]["claims"] == 1
+    assert data["counts"]["acknowledged_claims"] == 1
+    assert data["toolchain"]["python3"] == "/mock/bin/python3"
+    assert data["toolchain"]["claude"] is None
+    serialized = json.dumps(data)
+    assert isinstance(json.loads(serialized), dict)
+
+
+def test_build_runtime_status_data_handles_missing_db(tmp_path, monkeypatch):
+    """build_runtime_status_data returns db_exists=False for missing DB."""
+    import dharma_swarm.tui_helpers as helpers
+
+    dharma_dir = tmp_path / ".dharma"
+    monkeypatch.setattr(helpers, "DHARMA_STATE", dharma_dir)
+
+    data = build_runtime_status_data()
+    assert data["db_exists"] is False
+    assert "counts" not in data
