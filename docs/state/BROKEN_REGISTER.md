@@ -36,7 +36,9 @@
 - **root_cause:** Board → VentureCell → gates → dispatch → outcome → witness/algedonic → board feedback path is not closed. Outcomes do not feed back into opportunity_board.json.
 - **blast_radius:** Shakti always re-derives from raw signals; opportunity loop is forward-only; "later VentureCells more powerful than earlier" is aspiration, not mechanism.
 - **evidence:** `~/.dharma/audit/central_loop_trace_2026-05-07.md`; vision_maps `06_outward_organs.md`; survey synthesis Finding 2.
-- **status:** WORKAROUND — 2026-05-07 partial closure: `dharma_swarm/shakti_executive/inputs.py` now reads TelicSeam `Outcome` / `ValueEvent` / `Contribution`, dispatcher health, campaign manifests, and Darwin sealed-packet archive rows as feedback signals. Full VentureCell polymorphism remains open.
+- **status:** PARTIAL — 2026-05-07 partial closure across two writes:
+  1. **Read side (this branch):** `dharma_swarm/shakti_executive/inputs.py` reads TelicSeam `Outcome` / `ValueEvent` / `Contribution`, dispatcher health, campaign manifests, and Darwin sealed-packet archive rows as feedback signals.
+  2. **Write side (this commit):** `dharma_swarm/shakti_executive/feedback_writer.py` exposes `update_opportunity_outcome(opp_id, outcome)` that appends realized outcomes to `opportunity_board.json` and updates `learned_score_delta`. Atomic write, idempotent on duplicate `outcome_id`, capped per-outcome score delta. 8/8 tests pass under `tests/test_feedback_writer.py`. **Caller wiring (proposal_id → campaign manifest → opportunity_id resolution) is NOT yet in place** — the writer is a public-API library; the resolver is a follow-up. Full VentureCell polymorphism (BR-008) and full loop closure remain open.
 
 ### BR-003 — Apply gate present but closed (self-evolution loop)
 - **first_observed:** 2026-05-07
