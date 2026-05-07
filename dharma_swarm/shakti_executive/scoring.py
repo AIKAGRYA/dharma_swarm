@@ -21,6 +21,12 @@ _INTERNAL_WORDS = frozenset({
     "dependency",
     "gate",
     "guardian",
+    "outcome",
+    "dispatcher",
+    "campaign",
+    "sealed",
+    "packet",
+    "feedback",
 })
 _REVENUE_WORDS = frozenset({
     "revenue",
@@ -54,6 +60,10 @@ _URGENCY_WORDS = frozenset({
     "scooped",
     "failing",
     "drift",
+    "failed",
+    "failure",
+    "blocked",
+    "quarantined",
     "operator",
     "now",
 })
@@ -117,6 +127,8 @@ def _candidate_from_signal(
 def _domain_for_signal(signal: ExecutiveSignal, words: set[str]) -> str:
     if signal.domain_hint:
         hint = signal.domain_hint.lower().strip()
+        if hint in {"runtime_feedback", "dispatcher_health", "campaign_feedback", "sealed_packet"}:
+            return "internal_maintenance"
         if hint in {"security", "tests", "architecture", "routing", "evolution"}:
             return "internal_maintenance"
         if hint in {"external", "market", "revenue", "external_revenue"}:
@@ -134,6 +146,15 @@ def _domain_for_signal(signal: ExecutiveSignal, words: set[str]) -> str:
 
 def _thesis_for_signal(signal: ExecutiveSignal, words: set[str]) -> str:
     category = signal.category.lower()
+    if category in {
+        "runtime_outcome",
+        "value_event_feedback",
+        "contribution_feedback",
+        "dispatcher_health",
+        "campaign_feedback",
+        "sealed_packet_archive",
+    }:
+        return "feedback_closure"
     if category in {"threat", "operator_directive"}:
         return category
     if words & _REVENUE_WORDS:
