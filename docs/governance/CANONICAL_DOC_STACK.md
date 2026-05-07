@@ -68,6 +68,18 @@ using phrases such as "source of truth", "canonical", "authoritative", or
 | `docs/governance/REPO_GOVERNANCE_AUDIT.md` | Contradiction, staleness, and drift ledger |
 | `docs/architecture/NAVIGATION.md` | Module map, after count refresh |
 | `docs/architecture/MODEL_ROUTING_CANON.md` | Provider/model routing, after merge with root routing map |
+| `docs/architecture/WIRING_AND_LOOPS.md` | Build Protocol and feedback-loop wiring map |
+| `docs/MEGAFILE_INDEX.md` | Onboarding megafile slot index and convergence map |
+| `docs/state/BROKEN_REGISTER.md` | Persistent broken/degraded surface register |
+| `docs/vision_maps/MASTER_2026-05-07_attractor_closure.md` | Attractor-closure synthesis source map |
+| `docs/vision_maps/MASTER_2026-05-07_attractor_closure_synthesis.md` | Attractor-closure synthesis entry point |
+| `docs/vision_maps/2026-05-07_attractor_closure/01_gnani_prakruti.md` | Attractor-closure source map: gnani/prakruti |
+| `docs/vision_maps/2026-05-07_attractor_closure/02_vsm_viability.md` | Attractor-closure source map: VSM viability |
+| `docs/vision_maps/2026-05-07_attractor_closure/03_omega_state.md` | Attractor-closure source map: omega state |
+| `docs/vision_maps/2026-05-07_attractor_closure/04_recognition_self_model.md` | Attractor-closure source map: recognition self-model |
+| `docs/vision_maps/2026-05-07_attractor_closure/05_autopoiesis_evolution.md` | Attractor-closure source map: autopoiesis/evolution |
+| `docs/vision_maps/2026-05-07_attractor_closure/06_outward_organs.md` | Attractor-closure source map: outward organs |
+| `docs/vision_maps/_archive/codex_DHARMA_SWARM_MASTER_MAP_2026-05-07.md` | Archived source map retained as historical evidence |
 | `PRODUCT_SURFACE.md` | Product-surface precedence for dashboard, browser shell, and desktop shell |
 | `specs/DGC_TERMINAL_ARCHITECTURE_v1.1.md` | Terminal protocol, after Bun/Textual split is reconciled |
 | `specs/Dharma_Constitution_v0.md` | Constitutional rules |
