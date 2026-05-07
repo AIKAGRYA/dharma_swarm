@@ -11,6 +11,7 @@ This is the bootstrap control loop for roaming agents:
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -32,38 +33,55 @@ class MailboxRepoSync:
         self.repo_root = repo_root
         self.branch = branch
 
-    def _run(self, *args: str) -> subprocess.CompletedProcess[str]:
-        return subprocess.run(
-            ["git", "-C", str(self.repo_root), *args],
-            check=True,
-            capture_output=True,
-            text=True,
+    async def _run(self, *args: str) -> subprocess.CompletedProcess[str]:
+        process = await asyncio.create_subprocess_exec(
+            "git",
+            "-C",
+            str(self.repo_root),
+            *args,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await process.communicate()
+        if process.returncode != 0:
+            raise subprocess.CalledProcessError(
+                process.returncode or -1,
+                ["git", "-C", str(self.repo_root), *args],
+                output=stdout.decode(),
+                stderr=stderr.decode(),
+            )
+        return subprocess.CompletedProcess(
+            args=["git", "-C", str(self.repo_root), *args],
+            returncode=process.returncode or 0,
+            stdout=stdout.decode(),
+            stderr=stderr.decode(),
         )
 
-    def sync_inbound(self) -> None:
-        self._run("fetch", "origin", self.branch)
-        self._run("checkout", self.branch)
-        self._run("pull", "--ff-only", "origin", self.branch)
+    async def sync_inbound(self) -> None:
+        await self._run("fetch", "origin", self.branch)
+        await self._run("checkout", self.branch)
+        await self._run("pull", "--ff-only", "origin", self.branch)
 
-    def sync_outbound(self, *, note: str) -> None:
-        status = self._run(
+    async def sync_outbound(self, *, note: str) -> None:
+        result = await self._run(
             "status",
             "--short",
             "--",
             "roaming_mailbox/tasks",
             "roaming_mailbox/responses",
             "roaming_mailbox/receipts",
-        ).stdout.strip()
+        )
+        status = result.stdout.strip()
         if not status:
             return
-        self._run(
+        await self._run(
             "add",
             "roaming_mailbox/tasks",
             "roaming_mailbox/responses",
             "roaming_mailbox/receipts",
         )
-        self._run("commit", "-m", note)
-        self._run("push", "origin", f"HEAD:refs/heads/{self.branch}")
+        await self._run("commit", "-m", note)
+        await self._run("push", "origin", f"HEAD:refs/heads/{self.branch}")
 
 
 class RoamingDispatchDaemon:
@@ -115,7 +133,7 @@ class RoamingDispatchDaemon:
 
     async def cycle_once(self) -> DaemonCycleResult:
         if self.git_sync is not None:
-            self.git_sync.sync_inbound()
+            await self.git_sync.sync_inbound()
 
         collected = await self.collect_available()
         dispatched = await self.dispatch_available()
@@ -126,7 +144,7 @@ class RoamingDispatchDaemon:
                 parts.append(f"collect {len(collected)}")
             if dispatched:
                 parts.append(f"dispatch {len(dispatched)}")
-            self.git_sync.sync_outbound(note=f"Roaming daemon {' + '.join(parts)} for {self.recipient}")
+            await self.git_sync.sync_outbound(note=f"Roaming daemon {' + '.join(parts)} for {self.recipient}")
 
         return DaemonCycleResult(
             collected_bridge_task_ids=collected,
@@ -139,7 +157,7 @@ class RoamingDispatchDaemon:
                 await self.cycle_once()
             except Exception:
                 pass
-            time.sleep(interval_seconds)
+            await asyncio.sleep(interval_seconds)
 
 
 def _parser() -> argparse.ArgumentParser:
