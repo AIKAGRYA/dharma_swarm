@@ -177,13 +177,33 @@ def test_parse_worktree_porcelain_handles_trailing_no_blank(ogt):
     assert out[0]["path"] == "/a"
 
 
+def test_branch_names_strip_current_and_linked_worktree_markers(ogt, tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        ogt,
+        "_run",
+        lambda *a, **k: "* main\n+ feature/in-worktree\n  feature/plain\n",
+    )
+
+    assert ogt._branch_names(["branch"], tmp_path) == [
+        "main",
+        "feature/in-worktree",
+        "feature/plain",
+    ]
+
+
 # ---------------------------------------------------------------------------
 # 3. JSON output / top-level keys
 # ---------------------------------------------------------------------------
 
 
 def _git(args, cwd):
-    subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True)
+    return subprocess.run(
+        ["git", *args],
+        cwd=cwd,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
 
 
 def _make_minimal_repo(tmp_path: Path) -> Path:
@@ -198,11 +218,59 @@ def _make_minimal_repo(tmp_path: Path) -> Path:
     return repo
 
 
+def _repo_with_cleanup_shapes(tmp_path: Path) -> tuple[Path, Path]:
+    repo = _make_minimal_repo(tmp_path)
+    remote = tmp_path / "remote.git"
+    dirty_worktree = tmp_path / "dirty-worktree"
+
+    _git(["init", "--bare", str(remote)], cwd=tmp_path)
+    _git(["remote", "add", "origin", str(remote)], cwd=repo)
+    _git(["push", "-u", "origin", "main"], cwd=repo)
+
+    (repo / "dharma_swarm").mkdir()
+    (repo / "dharma_swarm" / "agent_runner.py").write_text(
+        "class AgentRunner:\n    pass\n",
+        encoding="utf-8",
+    )
+    _git(["add", "dharma_swarm/agent_runner.py"], cwd=repo)
+    _git(["commit", "-q", "-m", "add agent runner"], cwd=repo)
+    _git(["push"], cwd=repo)
+
+    _git(["checkout", "-b", "feature/remote-open"], cwd=repo)
+    (repo / "README").write_text("hi\nremote work\n", encoding="utf-8")
+    _git(["add", "README"], cwd=repo)
+    _git(["commit", "-q", "-m", "remote branch work"], cwd=repo)
+    _git(["push", "-u", "origin", "feature/remote-open"], cwd=repo)
+    _git(["checkout", "main"], cwd=repo)
+
+    _git(["branch", "feature/already-merged"], cwd=repo)
+    _git(["branch", "feature/no-upstream"], cwd=repo)
+    _git(["worktree", "add", str(dirty_worktree), "feature/no-upstream"], cwd=repo)
+    (dirty_worktree / "dharma_swarm" / "agent_runner.py").write_text(
+        "class AgentRunner:\n    pass\n\nHOT = True\n",
+        encoding="utf-8",
+    )
+    (dirty_worktree / "scratch.txt").write_text("untracked\n", encoding="utf-8")
+    return repo, dirty_worktree
+
+
 def test_build_report_top_level_keys_and_json_roundtrip(ogt, tmp_path):
     repo = _make_minimal_repo(tmp_path)
     report = ogt.build_report(repo, include_processes=False, include_runtime_dbs=True)
     payload = report.to_dict()
-    for key in ("repo", "worktrees", "runtime_dbs", "processes", "test_surface", "warnings", "summary", "generated_at"):
+    for key in (
+        "repo",
+        "worktrees",
+        "repository_state",
+        "repo_cleanup_pressure",
+        "repo_cleanup",
+        "runtime_dbs",
+        "processes",
+        "test_surface",
+        "warnings",
+        "summary",
+        "generated_at",
+    ):
         assert key in payload, f"missing top-level key {key}"
     # JSON must be serialisable
     s = json.dumps(payload)
@@ -229,6 +297,76 @@ def test_main_writes_output_and_returns_zero_on_clean_repo(ogt, tmp_path, capsys
     payload = json.loads(out_file.read_text())
     assert payload["repo"]["root"] == str(repo)
     assert payload["worktrees"], "minimal repo should have at least its own worktree"
+    assert "repo_cleanup" in payload
+
+
+def test_repo_cleanup_classifies_worktrees_and_unmerged_branches(ogt, tmp_path):
+    repo, dirty_worktree = _repo_with_cleanup_shapes(tmp_path)
+
+    report = ogt.build_report(
+        repo,
+        include_processes=False,
+        include_runtime_dbs=False,
+        include_tests=False,
+    )
+    payload = report.to_dict()
+    cleanup = payload["repo_cleanup"]
+    dirty_entry = next(
+        item for item in payload["worktrees"] if item["path"] == str(dirty_worktree)
+    )
+
+    assert payload["repository_state"]["fact_type"] == "RepositoryStateFact"
+    assert cleanup["fact_type"] == "RepoCleanupFact"
+    assert cleanup["dirty_worktree_count"] == 1
+    assert cleanup["dirty_hot_lane_count"] == 1
+    assert cleanup["remote_branch_not_merged_count"] == 1
+    assert cleanup["local_branch_merged_count"] >= 1
+    assert dirty_entry["category"] == "dirty-hot"
+    assert dirty_entry["untracked"] == 1
+    assert dirty_entry["modified"] == 1
+    assert "dharma_swarm/agent_runner.py" in dirty_entry["changed_files"]
+    assert any(
+        item["label"] == "origin/feature/remote-open"
+        and item["category"] == "salvage-candidate"
+        for item in cleanup["top_cleanup_candidates"]
+    )
+    assert any(
+        item["label"] == "feature/already-merged"
+        and item["category"] == "superseded-likely"
+        for item in cleanup["top_cleanup_candidates"]
+    )
+    assert "dirty hot lane(s)" in payload["summary"]
+
+
+def test_repo_cleanup_classification_helpers_are_path_aware(ogt):
+    assert (
+        ogt.classify_repo_cleanup_worktree(
+            dirty=True,
+            changed_files=["docs/ontology_notes.md"],
+        )
+        == "dirty-docops"
+    )
+    assert (
+        ogt.classify_repo_cleanup_worktree(
+            dirty=True,
+            changed_files=["reports/repo_runway/2026-05-07/worktrees.json"],
+        )
+        == "dirty-generated"
+    )
+    assert (
+        ogt.classify_repo_cleanup_worktree(
+            dirty=True,
+            changed_files=[".pytest_cache/v/cache/nodeids"],
+        )
+        == "dirty-generated"
+    )
+    assert (
+        ogt.classify_repo_cleanup_worktree(
+            dirty=True,
+            changed_files=["dharma_swarm/providers/openrouter.py"],
+        )
+        == "dirty-hot"
+    )
 
 
 # ---------------------------------------------------------------------------

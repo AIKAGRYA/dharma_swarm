@@ -25,6 +25,9 @@ paths only:
   report, usually `reports/docops/check.json`.
 - `docops_inventory_path`: optionally reads the DocOps corpus inventory,
   usually `reports/docops/corpus_inventory.json`.
+- `operator_ground_truth_path`: optionally reads
+  `reports/operator_ground_truth/latest.json` for repository state and
+  repo cleanup pressure.
 - `hot_items_path`: reads current stop/next-move signals.
 - `revenue_notes_path`: reads plain text or markdown revenue notes.
 
@@ -67,6 +70,14 @@ pricing gap before scaling another long autonomous run.
 `write_daily_operating_brief()` writes markdown only to the explicit output path
 provided by the caller.
 
+`scripts/governance/morning_cockpit.py` is the thin evidence runner for the
+morning loop. It runs Operator Ground Truth, runs DocOps report generation,
+builds the brief, and writes a manifest at
+`reports/morning_cockpit/latest.json`. It does not schedule agents, allocate
+worktrees, or merge branches. `make morning-cockpit` runs the non-strict
+version, and `make morning-cockpit-strict` exits non-zero when major evidence
+sources such as AgentOps or KaizenReview reports are missing.
+
 ## Missing Sources
 
 The v0 brief fails visible, not silent:
@@ -78,6 +89,8 @@ The v0 brief fails visible, not silent:
 - No revenue notes: `No revenue source found.`
 - No DocOps integrity report: `No DocOps integrity report found.`
 - No DocOps corpus inventory: `No DocOps corpus inventory found.`
+- No Operator Ground Truth repo cleanup pressure:
+  `No operator ground truth repo cleanup pressure found.`
 
 Missing sources also appear in the final `Missing sources` section.
 
@@ -96,6 +109,10 @@ Supported rating fields include:
 - `human_comment`
 - `source`
 
+Legacy live rows may use `grade` or `normalized_grade` for the rating, `target`
+for the artifact, and `note` for the human comment. The human/operator source
+check still applies.
+
 ## AgentOps Bridge
 
 AgentOps v0 reports already contain enough structure for the brief:
@@ -109,6 +126,17 @@ AgentOps v0 reports already contain enough structure for the brief:
 
 The brief summarizes these reports as operating evidence. Failed gates or failed
 scope checks become stop-doing signals until resolved.
+
+## Operator Ground Truth Bridge
+
+The brief may read the generated Operator Ground Truth JSON report for
+repository state and repo cleanup pressure. Operator Ground Truth is the
+sensor: it measures worktrees, branches, dirty paths, runtime databases, and
+processes. The repository fact adapter interprets that raw state into
+cleanup-pressure categories. The brief renders the pressure; it does not retire
+branches, delete worktrees, or become a canonical architecture source. Dirty hot
+lanes become stop-doing signals; cleanup candidates stay advisory until a human
+retires, salvages, or quarantines the branch/worktree.
 
 ## DocOps Bridge
 
@@ -127,7 +155,6 @@ documentation.
 ## Deliberately Not Included Yet
 
 - Dashboard or API surface
-- YDS ledger implementation
 - BurnReport canonical schema
 - RevenueWedge canonical schema
 - Contribution to Memory implementation

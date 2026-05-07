@@ -99,6 +99,54 @@ def test_load_filters_advisory_non_human_rows(tmp_path: Path) -> None:
     ]
 
 
+def test_load_accepts_legacy_human_rating_shape(tmp_path: Path) -> None:
+    ledger_path = tmp_path / "yds.jsonl"
+    ledger_path.write_text(
+        json.dumps(
+            {
+                "timestamp": "2026-05-07T02:00:00Z",
+                "target": "repo-runway-daily-brief",
+                "grade": "5.10c",
+                "note": "live YDS row is visible",
+                "source": "operator_dhyana",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    loaded = load_human_yds_ratings(ledger_path)
+
+    assert len(loaded) == 1
+    assert loaded[0].artifact == "repo-runway-daily-brief"
+    assert loaded[0].rating == "5.10c"
+    assert loaded[0].human_comment == "live YDS row is visible"
+
+
+def test_load_legacy_ai_or_self_rating_only_when_advisory_included(tmp_path: Path) -> None:
+    ledger_path = tmp_path / "yds.jsonl"
+    ledger_path.write_text(
+        json.dumps(
+            {
+                "timestamp": "2026-05-07T02:00:00Z",
+                "target": "self-score",
+                "normalized_grade": "5.13d",
+                "note": "advisory only",
+                "source": "ai_self_grader",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    assert load_human_yds_ratings(ledger_path) == []
+    advisory = load_human_yds_ratings(ledger_path, include_advisory=True)
+
+    assert len(advisory) == 1
+    assert advisory[0].artifact == "self-score"
+    assert advisory[0].rating == "5.13d"
+
+
 def test_ledger_records_feed_daily_operating_brief(tmp_path: Path) -> None:
     ledger_path = tmp_path / "yds.jsonl"
     append_human_yds_rating(
@@ -133,4 +181,7 @@ def test_missing_ledger_loads_empty_and_does_not_touch_home(
 def test_human_source_detection_is_explicit() -> None:
     assert is_human_source("human_operator") is True
     assert is_human_source("operator_dhyana") is True
+    assert is_human_source("human-operator") is True
     assert is_human_source("ai_self_grader") is False
+    assert is_human_source("nonhuman_bot") is False
+    assert is_human_source("ai_humanlike_self_grader") is False

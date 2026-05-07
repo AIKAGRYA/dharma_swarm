@@ -34,6 +34,18 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from dharma_swarm.operator_core.repository_facts import (
+    RepositoryStateFact,
+    build_repo_cleanup_fact,
+    classify_repo_cleanup_worktree,
+    is_hot_repo_path as _is_hot_repo_path,
+    repo_cleanup_recommendation as _repo_cleanup_recommendation,
+)
+
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -111,6 +123,8 @@ class Warning_:  # trailing underscore to avoid shadowing builtin Warning
 class Report:
     repo: dict[str, Any] = field(default_factory=dict)
     worktrees: list[dict[str, Any]] = field(default_factory=list)
+    repository_state: dict[str, Any] = field(default_factory=dict)
+    repo_cleanup: dict[str, Any] = field(default_factory=dict)
     runtime_dbs: list[dict[str, Any]] = field(default_factory=list)
     processes: list[dict[str, Any]] = field(default_factory=list)
     test_surface: dict[str, Any] = field(default_factory=dict)
@@ -122,6 +136,9 @@ class Report:
         return {
             "repo": self.repo,
             "worktrees": self.worktrees,
+            "repository_state": self.repository_state,
+            "repo_cleanup_pressure": self.repo_cleanup,
+            "repo_cleanup": self.repo_cleanup,
             "runtime_dbs": self.runtime_dbs,
             "processes": self.processes,
             "test_surface": self.test_surface,
@@ -234,6 +251,8 @@ def collect_worktrees(repo_root: Path) -> list[dict[str, Any]]:
         info["dirty"] = False
         info["modified"] = 0
         info["untracked"] = 0
+        info["changed_files"] = []
+        info["changed_file_count"] = 0
         info["ahead"] = None
         info["behind"] = None
         info["warnings"] = []
@@ -243,14 +262,19 @@ def collect_worktrees(repo_root: Path) -> list[dict[str, Any]]:
             if status is not None:
                 modified = 0
                 untracked = 0
+                changed_files: list[str] = []
                 for s in status.splitlines():
                     if s.startswith("?? "):
                         untracked += 1
+                        changed_files.append(s[3:].strip())
                     elif s.strip():
                         modified += 1
+                        changed_files.append(_status_path(s))
                 info["modified"] = modified
                 info["untracked"] = untracked
                 info["dirty"] = (modified + untracked) > 0
+                info["changed_files"] = [p for p in changed_files if p]
+                info["changed_file_count"] = len(info["changed_files"])
             # ahead/behind vs origin/main if tracking exists
             ab = _run(
                 ["git", "rev-list", "--left-right", "--count", "HEAD...origin/main"],
@@ -264,8 +288,26 @@ def collect_worktrees(repo_root: Path) -> list[dict[str, Any]]:
                         info["behind"] = int(parts[1])
                     except ValueError:
                         pass
+        category = classify_repo_cleanup_worktree(
+            dirty=bool(info["dirty"]),
+            changed_files=info["changed_files"],
+            ahead=info.get("ahead"),
+            behind=info.get("behind"),
+            branch=info.get("branch_name"),
+        )
+        info["category"] = category
+        info["has_hot_changes"] = any(_is_hot_repo_path(p) for p in info["changed_files"])
+        info["recommendation"] = _repo_cleanup_recommendation(category)
         enriched.append(info)
     return enriched
+
+
+def _status_path(status_line: str) -> str:
+    """Extract a repo-relative path from ``git status --porcelain=v1``."""
+    path = status_line[3:].strip()
+    if " -> " in path:
+        return path.rsplit(" -> ", 1)[-1].strip()
+    return path
 
 
 def collect_repo_identity(repo_root: Path) -> dict[str, Any]:
@@ -294,6 +336,101 @@ def collect_repo_identity(repo_root: Path) -> dict[str, Any]:
         "ahead": ahead,
         "behind": behind,
     }
+
+
+def collect_repository_state(
+    repo_root: Path,
+    repo: dict[str, Any],
+    worktrees: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Collect raw repository state for the cleanup-pressure fact adapter."""
+    local_not_merged = _branch_names(["branch", "--no-merged", "origin/main"], repo_root)
+    local_merged = _branch_names(["branch", "--merged", "origin/main"], repo_root)
+    remote_not_merged = _branch_names(["branch", "-r", "--no-merged", "origin/main"], repo_root)
+    remote_merged = _branch_names(["branch", "-r", "--merged", "origin/main"], repo_root)
+
+    return RepositoryStateFact(
+        repo=repo,
+        worktrees=worktrees,
+        local_branches=_branch_state_records(
+            repo_root,
+            kind="local-branch",
+            merged_names=local_merged,
+            not_merged_names=local_not_merged,
+        ),
+        remote_branches=_branch_state_records(
+            repo_root,
+            kind="remote-branch",
+            merged_names=remote_merged,
+            not_merged_names=remote_not_merged,
+        ),
+    ).to_dict()
+
+
+def collect_repo_cleanup(repository_state: dict[str, Any]) -> dict[str, Any]:
+    """Build interpreted cleanup pressure from raw repository state."""
+    return build_repo_cleanup_fact(
+        RepositoryStateFact.from_dict(repository_state)
+    ).to_dict()
+
+
+def _branch_state_records(
+    repo_root: Path,
+    *,
+    kind: str,
+    merged_names: list[str],
+    not_merged_names: list[str],
+) -> list[dict[str, Any]]:
+    merged = set(merged_names)
+    not_merged = set(not_merged_names)
+    records: list[dict[str, Any]] = []
+    for name in sorted(merged | not_merged):
+        if not name:
+            continue
+        is_merged = name in merged
+        origin_main_is_ancestor = (
+            None
+            if is_merged or " -> " in name
+            else _git_is_ancestor(repo_root, "origin/main", name)
+        )
+        records.append(
+            {
+                "kind": kind,
+                "name": name,
+                "merged_into_origin_main": is_merged,
+                "origin_main_is_ancestor": origin_main_is_ancestor,
+            }
+        )
+    return records
+
+
+def _branch_names(args: list[str], repo_root: Path) -> list[str]:
+    out = _run(["git", *args], cwd=repo_root)
+    if not out:
+        return []
+    names: list[str] = []
+    for raw in out.splitlines():
+        name = raw.strip()
+        if name.startswith(("* ", "+ ")):
+            name = name[2:].strip()
+        if name:
+            names.append(name)
+    return names
+
+
+def _git_is_ancestor(repo_root: Path, ancestor: str, descendant: str) -> bool:
+    try:
+        proc = subprocess.run(
+            ["git", "merge-base", "--is-ancestor", ancestor, descendant],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            timeout=SUBPROC_TIMEOUT,
+            check=False,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        return False
+    return proc.returncode == 0
 
 
 # ---------------------------------------------------------------------------
@@ -537,6 +674,17 @@ def classify_warnings(report: Report) -> list[Warning_]:
                 )
             )
 
+    # Repo cleanup-pressure level: hot dirty lanes should stop parallel runtime work.
+    cleanup = report.repo_cleanup or {}
+    dirty_hot = cleanup.get("dirty_hot_lane_count") or 0
+    if dirty_hot:
+        out.append(
+            Warning_(
+                "warning",
+                f"repo cleanup pressure has {dirty_hot} dirty hot lane(s) requiring manual reconciliation",
+            )
+        )
+
     # Runtime DB-level: session_events without structured rows
     for db in report.runtime_dbs:
         rc = db.get("row_counts") or {}
@@ -605,6 +753,9 @@ def _strip_refs_heads(branch: str | None) -> str | None:
 def render_summary(report: Report) -> str:
     n_wt = len(report.worktrees)
     n_dirty = sum(1 for w in report.worktrees if w.get("dirty"))
+    cleanup = report.repo_cleanup or {}
+    dirty_hot = cleanup.get("dirty_hot_lane_count") or 0
+    remote_not_merged = cleanup.get("remote_branch_not_merged_count") or 0
     feature_branches: set[str] = set()
     for w in report.worktrees:
         b = _strip_refs_heads(w.get("branch"))
@@ -627,6 +778,8 @@ def render_summary(report: Report) -> str:
     n_procs = len(report.processes)
     return (
         f"Current truth: {n_wt} worktrees found, {n_dirty} dirty, "
+        f"{dirty_hot} dirty hot lane(s), "
+        f"{remote_not_merged} remote branch(es) not merged, "
         f"{len(feature_branches)} active feature branch(es), "
         f"{n_runtime_with_structured_rows} runtime DB(s) with structured rows, "
         f"{n_procs} relevant daemon(s)."
@@ -668,7 +821,31 @@ def render_terminal(report: Report) -> str:
             f"  M={w.get('modified', 0)} U={w.get('untracked', 0)}{ab}"
         )
 
-    lines.append(_hr("C. Runtime DBs"))
+    lines.append(_hr("C. Repo Cleanup Pressure"))
+    cleanup = report.repo_cleanup or {}
+    if not cleanup:
+        lines.append("  (not collected)")
+    else:
+        lines.append(
+            "  "
+            f"dirty={cleanup.get('dirty_worktree_count', 0)}/"
+            f"{cleanup.get('worktree_count', 0)} worktrees, "
+            f"dirty_hot={cleanup.get('dirty_hot_lane_count', 0)}, "
+            f"local_unmerged={cleanup.get('local_branch_not_merged_count', 0)}, "
+            f"remote_unmerged={cleanup.get('remote_branch_not_merged_count', 0)}"
+        )
+        candidates = cleanup.get("top_cleanup_candidates")
+        if isinstance(candidates, list) and candidates:
+            for item in candidates[:5]:
+                if not isinstance(item, dict):
+                    continue
+                lines.append(
+                    "  "
+                    f"- {item.get('label')} "
+                    f"({item.get('category')}, {item.get('kind')})"
+                )
+
+    lines.append(_hr("D. Runtime DBs"))
     if not report.runtime_dbs:
         lines.append("  (none discovered)")
     for db in report.runtime_dbs:
@@ -682,25 +859,25 @@ def render_terminal(report: Report) -> str:
             shown = "—" if v is None else str(v)
             lines.append(f"    {tbl:<18s} {shown}")
 
-    lines.append(_hr("D. Processes"))
+    lines.append(_hr("E. Processes"))
     if not report.processes:
         lines.append("  (none relevant)")
     for p in report.processes:
         lines.append(f"  pid={p['pid']:>6}  cwd={p.get('cwd') or '-'}  cmd={p['command']}")
 
-    lines.append(_hr("E. Test Surface"))
+    lines.append(_hr("F. Test Surface"))
     ts = report.test_surface
     lines.append(f"  tests_dir              : {ts.get('tests_dir')}")
     lines.append(f"  pytest_files           : {ts.get('pytest_files')}")
     lines.append(f"  suggested smoke command: {ts.get('suggested_smoke_command')}")
 
-    lines.append(_hr("F. Warnings"))
+    lines.append(_hr("G. Warnings"))
     if not report.warnings:
         lines.append("  (none)")
     for w in report.warnings:
         lines.append(f"  [{w['severity'].upper():8s}] {w['message']}")
 
-    lines.append(_hr("G. Summary"))
+    lines.append(_hr("H. Summary"))
     lines.append(f"  {report.summary}")
     lines.append("")
     return "\n".join(lines)
@@ -722,6 +899,12 @@ def build_report(
     report = Report()
     report.repo = collect_repo_identity(repo_root)
     report.worktrees = collect_worktrees(repo_root)
+    report.repository_state = collect_repository_state(
+        repo_root,
+        report.repo,
+        report.worktrees,
+    )
+    report.repo_cleanup = collect_repo_cleanup(report.repository_state)
 
     worktree_paths = {w["path"] for w in report.worktrees if w.get("path")}
 

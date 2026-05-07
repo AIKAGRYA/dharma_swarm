@@ -126,6 +126,31 @@ def test_reads_human_yds_jsonl_rating_and_includes_it(tmp_path: Path) -> None:
     assert "clear and useful" in rendered
 
 
+def test_reads_legacy_human_yds_jsonl_rating_shape(tmp_path: Path) -> None:
+    yds_path = tmp_path / "yds.jsonl"
+    yds_path.write_text(
+        json.dumps(
+            {
+                "timestamp": "2026-05-07T01:00:00Z",
+                "grade": "5.10c",
+                "target": "repo-runway-brief",
+                "note": "makes operator judgment visible",
+                "source": "operator_dhyana",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    brief = build_daily_operating_brief(
+        DailyOperatingBriefInputs(yds_ratings_path=yds_path)
+    )
+
+    rendered = render_markdown(brief)
+    assert "`repo-runway-brief` rated `5.10c`" in rendered
+    assert "makes operator judgment visible" in rendered
+
+
 def test_does_not_treat_ai_or_self_yds_as_authoritative(tmp_path: Path) -> None:
     yds_path = tmp_path / "yds.jsonl"
     yds_path.write_text(
@@ -148,6 +173,31 @@ def test_does_not_treat_ai_or_self_yds_as_authoritative(tmp_path: Path) -> None:
     assert "No human YDS ratings found." in rendered
     assert "Advisory only" in rendered
     assert "`self-score` rated `5.13d`" in rendered
+
+
+def test_legacy_ai_or_self_yds_shape_remains_advisory(tmp_path: Path) -> None:
+    yds_path = tmp_path / "yds.jsonl"
+    yds_path.write_text(
+        json.dumps(
+            {
+                "grade": "5.14a",
+                "target": "legacy-self-score",
+                "note": "not authoritative",
+                "source": "ai_self_grader",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    brief = build_daily_operating_brief(
+        DailyOperatingBriefInputs(yds_ratings_path=yds_path)
+    )
+
+    rendered = render_markdown(brief)
+    assert "No human YDS ratings found." in rendered
+    assert "Advisory only" in rendered
+    assert "`legacy-self-score` rated `5.14a`" in rendered
 
 
 def test_reads_simple_cost_json_when_provided(tmp_path: Path) -> None:
@@ -245,6 +295,72 @@ def test_reads_llm_burn_state_dir_when_explicitly_provided(tmp_path: Path) -> No
     assert "zero-token=1" in rendered
     assert "unpriced=1" in rendered
     assert "Close the unpriced LLM span gap" in rendered
+
+
+def test_missing_operator_ground_truth_repo_cleanup_pressure_is_called_out() -> None:
+    brief = build_daily_operating_brief(DailyOperatingBriefInputs())
+
+    rendered = render_markdown(brief)
+    assert "No operator ground truth repo cleanup pressure found." in rendered
+
+
+def test_reads_operator_ground_truth_repo_cleanup_pressure_when_provided(tmp_path: Path) -> None:
+    report_path = tmp_path / "reports" / "operator_ground_truth" / "latest.json"
+    report_path.parent.mkdir(parents=True)
+    report_path.write_text(
+        json.dumps(
+            {
+                "repo_cleanup_pressure": {
+                    "worktree_count": 4,
+                    "dirty_worktree_count": 3,
+                    "dirty_hot_lane_count": 2,
+                    "remote_branch_not_merged_count": 7,
+                    "local_branch_merged_count": 1,
+                    "top_cleanup_candidates": [
+                        {
+                            "label": "chore/hot-runtime",
+                            "category": "dirty-hot",
+                            "kind": "worktree",
+                        },
+                        {
+                            "label": "chore/quarantine-wide",
+                            "category": "quarantine",
+                            "kind": "worktree",
+                        },
+                        {
+                            "label": "chore/salvage-docs",
+                            "category": "salvage-candidate",
+                            "kind": "worktree",
+                        },
+                        {
+                            "label": "chore/already-merged",
+                            "category": "superseded-likely",
+                            "kind": "local-branch",
+                        },
+                    ],
+                },
+                "worktrees": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    brief = build_daily_operating_brief(
+        DailyOperatingBriefInputs(
+            operator_ground_truth_path=report_path
+        )
+    )
+
+    rendered = render_markdown(brief)
+    assert (
+        "Repo cleanup pressure: 3/4 worktree(s) dirty, 2 dirty hot lane(s), "
+        "7 remote branch(es) not merged, 1 merged local branch(es) ready to verify."
+        in rendered
+    )
+    assert "`chore/quarantine-wide` (quarantine)" in rendered
+    assert "`chore/salvage-docs` (salvage-candidate)" in rendered
+    assert "`chore/already-merged` (superseded-likely)" in rendered
+    assert "Stop starting new runtime/API/dashboard/provider/ontology lanes" in rendered
 
 
 def test_reads_simple_revenue_notes_when_provided(tmp_path: Path) -> None:

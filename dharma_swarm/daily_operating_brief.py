@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
+from dharma_swarm.human_yds_ledger import is_human_source
 from dharma_swarm.llm_burn import load_llm_burn_rollup
 
 
@@ -30,9 +31,6 @@ REVENUE_KEYWORDS = (
     "sell",
 )
 
-HUMAN_SOURCE_MARKERS = ("human", "operator", "dhyana")
-
-
 @dataclass(frozen=True)
 class DailyOperatingBriefInputs:
     """Explicit source paths for a Daily Operating Brief build."""
@@ -44,6 +42,7 @@ class DailyOperatingBriefInputs:
     llm_burn_state_dir: Path | None = None
     docops_check_report_path: Path | None = None
     docops_inventory_path: Path | None = None
+    operator_ground_truth_path: Path | None = None
     hot_items_path: Path | None = None
     revenue_notes_path: Path | None = None
     now: datetime | None = None
@@ -97,12 +96,18 @@ def build_daily_operating_brief(
     )
     revenue_lines = _revenue_lines(inputs.revenue_notes_path, missing)
     hot_stop, hot_next = _hot_item_lines(inputs.hot_items_path, missing)
+    repo_cleanup_gate, repo_cleanup_stop, repo_cleanup_next = _repo_cleanup_pressure_lines(
+        inputs.operator_ground_truth_path,
+        missing,
+    )
 
+    gate_health.extend(repo_cleanup_gate)
     stop_doing.extend(hot_stop)
+    stop_doing.extend(repo_cleanup_stop)
     next_move = _next_move(
         gate_health,
         what_happened,
-        hot_next,
+        repo_cleanup_next + hot_next,
         burn_lines,
         doc_integrity_lines,
     )
@@ -249,18 +254,21 @@ def _yds_lines(path: Path | None, missing: list[str]) -> list[str]:
     advisory: list[str] = []
     for record in records:
         source = _string(record.get("source") or "")
-        rating = _string(record.get("rating") or record.get("yds") or "")
+        rating = _record_string(
+            record,
+            ("rating", "yds", "grade", "normalized_grade"),
+        )
         if not rating:
             continue
-        artifact = _string(record.get("artifact") or "unknown artifact")
-        comment = _string(record.get("human_comment") or record.get("comment") or "")
+        artifact = _record_string(record, ("artifact", "target")) or "unknown artifact"
+        comment = _record_string(record, ("human_comment", "comment", "note"))
         timestamp = _string(record.get("timestamp") or "")
         line = f"`{artifact}` rated `{rating}`"
         if timestamp:
             line += f" at {timestamp}"
         if comment:
             line += f": {comment}"
-        if _is_human_source(source):
+        if is_human_source(source):
             human.append(line)
         else:
             advisory.append(f"Advisory only, non-human source `{source or 'unknown'}`: {line}.")
@@ -521,6 +529,103 @@ def _hot_item_lines(path: Path | None, missing: list[str]) -> tuple[list[str], l
     return stop_lines[:5], next_lines[:3]
 
 
+def _repo_cleanup_pressure_lines(
+    path: Path | None,
+    missing: list[str],
+) -> tuple[list[str], list[str], list[str]]:
+    if path is None or not path.exists():
+        missing.append("Operator Ground Truth report")
+        return ["No operator ground truth repo cleanup pressure found."], [], []
+
+    payload = _read_json(path)
+    if not isinstance(payload, dict):
+        missing.append("Operator Ground Truth report")
+        return ["Operator Ground Truth report found, but JSON is unreadable."], [], []
+
+    cleanup = payload.get("repo_cleanup_pressure") or payload.get("repo_cleanup")
+    worktrees = _dict_records(payload.get("worktrees"))
+    if not isinstance(cleanup, dict):
+        missing.append("Operator Ground Truth repo cleanup pressure")
+        return ["Operator Ground Truth found, but repo cleanup pressure is missing."], [], []
+
+    dirty_worktrees = _summary_int(
+        cleanup,
+        "dirty_worktree_count",
+        default=sum(1 for item in worktrees if bool(item.get("dirty"))),
+    )
+    hot_dirty_lanes = _summary_int(
+        cleanup,
+        "dirty_hot_lane_count",
+        default=_summary_int(
+            cleanup,
+            "hot_dirty_lane_count",
+            default=sum(
+                1
+                for item in worktrees
+                if bool(item.get("dirty"))
+                and _string(item.get("category")) == "dirty-hot"
+            ),
+        ),
+    )
+    remote_not_merged = _summary_int(
+        cleanup,
+        "remote_branch_not_merged_count",
+        default=0,
+    )
+    local_merged = _summary_int(
+        cleanup,
+        "local_branch_merged_count",
+        default=0,
+    )
+    worktree_count = _summary_int(cleanup, "worktree_count", default=len(worktrees))
+
+    gate_lines = [
+        (
+            "Repo cleanup pressure: "
+            f"{dirty_worktrees}/{worktree_count} worktree(s) dirty, "
+            f"{hot_dirty_lanes} dirty hot lane(s), "
+            f"{remote_not_merged} remote branch(es) not merged, "
+            f"{local_merged} merged local branch(es) ready to verify."
+        )
+    ]
+    candidates = _repo_cleanup_pressure_candidates(cleanup)
+    if candidates:
+        gate_lines.append(
+            "Repo cleanup pressure top candidates: "
+            + "; ".join(
+                f"`{label}` ({category})" for label, category in candidates
+            )
+            + "."
+        )
+    else:
+        gate_lines.append("Repo cleanup pressure: no cleanup candidates listed.")
+
+    stop_lines: list[str] = []
+    next_lines: list[str] = []
+    if hot_dirty_lanes > 0:
+        stop_lines.append(
+            "Stop starting new runtime/API/dashboard/provider/ontology lanes until "
+            f"{hot_dirty_lanes} dirty hot lane(s) are reconciled."
+        )
+        next_lines.append("Reconcile dirty hot repo cleanup pressure before opening new runtime work.")
+    return gate_lines, stop_lines, next_lines
+
+
+def _repo_cleanup_pressure_candidates(
+    cleanup: dict[str, Any],
+) -> list[tuple[str, str]]:
+    candidates: list[tuple[str, str]] = []
+    for item in _dict_records(cleanup.get("top_cleanup_candidates")):
+        category = _string(item.get("category"))
+        if category not in {"dirty-hot", "quarantine", "salvage-candidate", "superseded-likely"}:
+            continue
+        label = _string(item.get("label") or item.get("path") or "unknown-candidate")
+        candidates.append((label, category))
+        if len(candidates) >= 5:
+            break
+    return candidates
+
+
 def _next_move(
     gate_health: list[str],
     what_happened: list[str],
@@ -598,9 +703,26 @@ def _string(value: Any) -> str:
     return str(value).strip()
 
 
-def _is_human_source(source: str) -> bool:
-    lowered = source.lower()
-    return any(marker in lowered for marker in HUMAN_SOURCE_MARKERS)
+def _record_string(record: dict[str, Any], keys: Iterable[str]) -> str:
+    for key in keys:
+        value = _string(record.get(key))
+        if value:
+            return value
+    return ""
+
+
+def _dict_records(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, dict)]
+
+
+def _summary_int(summary: dict[str, Any], key: str, *, default: int = 0) -> int:
+    value = summary.get(key)
+    parsed = _intish(value)
+    if parsed or value in {0, "0", 0.0}:
+        return parsed
+    return default
 
 
 def _first_number(record: dict[str, Any], keys: Iterable[str]) -> float | None:

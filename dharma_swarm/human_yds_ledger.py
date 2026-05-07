@@ -9,6 +9,7 @@ writer, or memory consolidation path.
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -91,8 +92,11 @@ def load_human_yds_ratings(
         source = str(record.get("source") or "").strip()
         if not include_advisory and not is_human_source(source):
             continue
-        rating = str(record.get("rating") or record.get("yds") or "").strip()
-        artifact = str(record.get("artifact") or "").strip()
+        rating = _record_string(
+            record,
+            ("rating", "yds", "grade", "normalized_grade"),
+        )
+        artifact = _record_string(record, ("artifact", "target"))
         timestamp = str(record.get("timestamp") or "").strip()
         if not rating or not artifact or not timestamp:
             continue
@@ -101,9 +105,7 @@ def load_human_yds_ratings(
                 timestamp=timestamp,
                 rating=rating,
                 artifact=artifact,
-                human_comment=str(
-                    record.get("human_comment") or record.get("comment") or ""
-                ).strip(),
+                human_comment=_record_string(record, ("human_comment", "comment", "note")),
                 source=source,
                 operator_id=str(record.get("operator_id") or "").strip(),
                 metadata=record.get("metadata")
@@ -117,8 +119,9 @@ def load_human_yds_ratings(
 def is_human_source(source: str) -> bool:
     """Return whether a source string names a human/operator authority."""
 
-    lowered = source.lower()
-    return any(marker in lowered for marker in HUMAN_SOURCE_MARKERS)
+    lowered = source.strip().lower()
+    tokens = [token for token in re.split(r"[^a-z0-9]+", lowered) if token]
+    return any(token in HUMAN_SOURCE_MARKERS for token in tokens)
 
 
 def _human_source(source: str) -> str:
@@ -133,6 +136,14 @@ def _required(field_name: str, value: str) -> str:
     if not normalized:
         raise ValueError(f"{field_name} is required")
     return normalized
+
+
+def _record_string(record: dict[str, Any], keys: Iterable[str]) -> str:
+    for key in keys:
+        value = str(record.get(key) or "").strip()
+        if value:
+            return value
+    return ""
 
 
 def _timestamp(value: datetime | str | None) -> str:

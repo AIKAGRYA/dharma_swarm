@@ -1,7 +1,7 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts uplift-guards module-budget docops-integrity docops-report governance-all
+.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts uplift-guards module-budget docops-integrity docops-report morning-cockpit morning-cockpit-strict governance-all
 
 PYTHON ?= python3
 SEMGREP ?= scripts/governance/run_semgrep_with_ca.sh
@@ -35,6 +35,7 @@ help:
 	@echo "  make uplift-guards Run uplift pre-commit guards"
 	@echo "  make docops-integrity Run machine-verifiable documentation checks"
 	@echo "  make docops-report Generate local DocOps JSON/Markdown reports"
+	@echo "  make morning-cockpit Build Operator Ground Truth + DocOps + Daily Brief"
 	@echo ""
 
 install:
@@ -189,5 +190,11 @@ docops-report:
 		--report-json reports/docops/check.json \
 		--inventory-json reports/docops/corpus_inventory.json \
 		--inventory-markdown reports/docops/corpus_inventory.md
+
+morning-cockpit:
+	$(PYTHON) scripts/governance/morning_cockpit.py $(MORNING_COCKPIT_FLAGS)
+
+morning-cockpit-strict:
+	$(PYTHON) scripts/governance/morning_cockpit.py --fail-on-missing-major $(MORNING_COCKPIT_FLAGS)
 
 governance-all: semgrep gitleaks test-hygiene test-contracts uplift-guards module-budget docops-integrity
