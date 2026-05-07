@@ -25,6 +25,8 @@ def _sha256(payload: str) -> str:
 
 @dataclass(frozen=True)
 class SnapshotRecord:
+    """Immutable session-state snapshot with id, ISO recorded_at, payload, and sha256 checksum."""
+
     snapshot_id: str
     recorded_at: str
     state: dict[str, Any]
@@ -38,6 +40,7 @@ class SnapshotRecord:
         snapshot_id: str | None = None,
         recorded_at: str | None = None,
     ) -> "SnapshotRecord":
+        """Build a SnapshotRecord from ``state``, generating ``snp_<uuid4>`` and a UTC timestamp when not provided, then computing the sha256 checksum over the canonical JSON form."""
         sid = snapshot_id or f"snp_{uuid4().hex}"
         ts = recorded_at or _utc_now_iso()
         material = {
@@ -49,6 +52,7 @@ class SnapshotRecord:
         return cls(snapshot_id=sid, recorded_at=ts, state=state, checksum=checksum)
 
     def as_dict(self) -> dict[str, Any]:
+        """Serialize the SnapshotRecord to a JSON-ready dict (id, recorded_at, state, checksum)."""
         return {
             "snapshot_id": self.snapshot_id,
             "recorded_at": self.recorded_at,
@@ -58,6 +62,7 @@ class SnapshotRecord:
 
 
 def validate_snapshot(record: dict[str, Any]) -> tuple[bool, str]:
+    """Verify ``record`` has all required snapshot fields and that its checksum matches the recomputed sha256; return ``(ok, error_message)``."""
     for key in ("snapshot_id", "recorded_at", "state", "checksum"):
         if key not in record:
             return (False, f"missing field '{key}'")
@@ -75,6 +80,7 @@ def validate_snapshot(record: dict[str, Any]) -> tuple[bool, str]:
 
 
 def append_snapshot(path: Path, state: dict[str, Any]) -> SnapshotRecord:
+    """Build a SnapshotRecord from ``state`` and append it as a JSON line to ``path`` (creating parent dirs); return the new record."""
     record = SnapshotRecord.from_state(state)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as handle:
@@ -83,6 +89,7 @@ def append_snapshot(path: Path, state: dict[str, Any]) -> SnapshotRecord:
 
 
 def load_snapshots(path: Path) -> list[SnapshotRecord]:
+    """Load every SnapshotRecord row from the JSONL log at ``path``, in file order; return ``[]`` if the file is missing."""
     if not path.exists():
         return []
     rows: list[SnapshotRecord] = []
@@ -104,6 +111,7 @@ def load_snapshots(path: Path) -> list[SnapshotRecord]:
 
 
 def verify_replay_integrity(path: Path) -> tuple[bool, list[str]]:
+    """Validate every snapshot line in the log at ``path`` (json + checksum); return ``(ok, errors)`` where ok is True only when the file exists and every record passes ``validate_snapshot``."""
     errors: list[str] = []
     if not path.exists():
         return (False, ["snapshot log missing"])

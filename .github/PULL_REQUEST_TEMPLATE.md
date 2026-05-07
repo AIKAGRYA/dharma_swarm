@@ -38,6 +38,15 @@ and any `swarm.py` / `orchestrator.py` / `runtime_state.py` change.
 - [ ] Existing mismatch resolved — `INTERFACE_MISMATCH_MAP.md` updated
 - [ ] Net-new mismatch documented in the map (transitional)
 
+## Coherence Delta
+
+Every PR must answer these four fields. If any answer is UNKNOWN, say why.
+
+- Organ touched:
+- Declared-vs-actual gap closed:
+- Proof that re-reads the map:
+- New drift introduced:
+
 ## Verification
 
 How was the change verified end-to-end? Check all that apply.

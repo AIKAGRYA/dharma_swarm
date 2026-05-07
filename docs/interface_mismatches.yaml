@@ -1,177 +1,83 @@
-# Interface Mismatch Registry — machine-readable source of truth
-# Kept in sync with INTERFACE_MISMATCH_MAP.md
-# Updated: 2026-05-04 (correlation-context session)
+# INTERFACE_MISMATCH_MAP — machine-readable form.
+#
+# This file is the executable counterpart to INTERFACE_MISMATCH_MAP.md.
+# Each entry is consumed by:
+#   - scripts/uplift_guards/mismatch_registry.py (pre-commit guard)
+#   - tests/mismatches/test_MISMATCH_<nn>.py    (xfail until status: resolved)
+#   - dgc mismatch list                          (CLI surface)
+#
+# Severity:  BLOCKER (prevents task execution) | DEGRADED (silent loss / fragility)
+# Status:    open    (still a problem)        | resolved (fixed in `fixed_in` commit)
+#
+# Adding a new entry: append below, increment id. Removing: never delete; flip
+# status to `resolved` and record `fixed_in`. Keep the historical lineage.
+#
+# This is a partial seed (5 of 25 entries) demonstrating the schema. The
+# remaining 20 entries should be migrated from INTERFACE_MISMATCH_MAP.md by
+# the Mismatch-Resolver agent (one entry per uplift-cron tick).
 
-mismatches:
-  - id: MM-02
-    title: "PersistentAgent enum deserialization"
+version: 1
+generated_from: INTERFACE_MISMATCH_MAP.md
+last_synced: "2026-05-06"
+
+entries:
+  - id: MISMATCH-01
     severity: BLOCKER
-    status: STILL_LIVE
-    caller: orchestrate_live.py:1247
-    callee: persistent_agent.PersistentAgent.__init__
-    description: >
-      Bare string passed for AgentRole/ProviderType instead of enum.
-      Pydantic lax mode may coerce but breaks on invalid values.
+    status: resolved
+    caller: dharma_swarm/tiny_router_shadow.py:494
+    callee: huggingface_hub.snapshot_download
+    summary: >-
+      Unguarded ImportError when huggingface_hub absent crashed
+      _load_tiny_router_artifacts and every infer_tiny_router_shadow() call
+      in default `auto` backend mode. Was the root blocker for Loop 1.
+    fixed_in: working-tree (verified 2026-04-19 — try/except ImportError → return None present at line 494)
+    test_path: tests/mismatches/test_MISMATCH_01.py
 
-  - id: MM-05
-    title: "Private Orchestrator method coupling"
-    severity: DEGRADED
-    status: OPEN
-    caller: swarm.py:1883-1895
-    callee: orchestrator._classify_failure, _resolve_retry_policy
-    description: >
-      swarm.py calls single-underscore private methods on orchestrator.
-      Any internal refactor silently breaks retry logic.
-
-  - id: MM-07
-    title: "MetaEvolutionEngine cadence mismatch"
-    severity: DEGRADED
-    status: OPEN
-    caller: orchestrate_live.py:399,407
-    callee: meta_evolution.MetaEvolutionEngine.observe_cycle_result
-    description: >
-      observe_cycle_result called twice per cycle number.
-      n_object_cycles_per_meta=2 fires after 2 calls, not 2 cycles.
-
-  - id: MM-12
-    title: "Same as MM-02/03 second call site"
-    severity: DEGRADED
-    status: RESOLVED
-    caller: orchestrate_live.py:1354-1364
-    callee: persistent_agent.PersistentAgent.__init__
-    description: >
-      This path uses already-constructed enum values. No mismatch.
-
-  - id: MM-13
-    title: "message_bus receive semantics"
-    severity: DEGRADED
-    status: OPEN
-    caller: orchestrate_live.py
-    callee: message_bus.receive
-    description: >
-      Message bus receive semantics may differ from expectations.
-
-  - id: MM-17
-    title: "gnani_lodestone -> TaskBoard.get_by_title"
-    severity: DEGRADED
-    status: RESOLVED
-    caller: gnani_lodestone.py
-    callee: task_board.TaskBoard.get_by_title
-    resolved_commit: cd0f862
-    description: >
-      TaskBoard.get_by_title() method added. SQL WHERE on title column.
-
-  - id: MM-18
-    title: "gnani_lodestone -> TelosGraph.get_by_name"
-    severity: DEGRADED
-    status: RESOLVED
-    caller: gnani_lodestone.py
-    callee: telos_graph.TelosGraph.get_by_name
-    resolved_commit: cd0f862
-    description: >
-      TelosGraph.get_by_name() method added. Linear scan on name field.
-
-  - id: NEW-01
-    title: "archaeology_ingestion palace.query"
+  - id: MISMATCH-02
     severity: BLOCKER
-    status: RESOLVED
-    caller: archaeology_ingestion.py
-    callee: memory_palace.MemoryPalace.recall
-    description: >
-      Replaced with palace.recall(PalaceQuery(...)) + correct max_results=.
+    status: resolved
+    caller: dharma_swarm/orchestrate_live.py:~1364
+    callee: dharma_swarm/persistent_agent.py:51-52
+    summary: >-
+      `role` and `provider_type` passed as raw strings; PersistentAgent.__init__
+      requires AgentRole and ProviderType enums. Pydantic v2 strict mode rejects.
+      Replication outcome path crashes here.
+    fixed_in: >-
+      routing coherence — replication spawn wraps child_spec strings with
+      AgentRole(...) and ProviderType(...) before PersistentAgent(...)
+    test_path: tests/mismatches/test_MISMATCH_02.py
 
-  - id: NEW-02
-    title: "dgm_loop _provider attr"
-    severity: DEGRADED
-    status: RESOLVED
-    caller: dgm_loop.py
-    callee: evolution.DarwinEngine
-    description: >
-      Removed nonexistent hasattr(engine, '_provider') check.
-
-  - id: NEW-04
-    title: "agent_runner -> telic_seam dispatch gap"
-    severity: DEGRADED
-    status: RESOLVED
-    caller: agent_runner.py
-    callee: telic_seam.TelicSeam.record_dispatch
-    resolved_commit: cd0f862
-    description: >
-      record_dispatch + record_gate_decision added at task start in agent_runner.
-
-  - id: NEW-05
-    title: "task_board <-> runtime_state split lifecycle"
-    severity: DEGRADED
-    status: GUARDED
-    caller: task_board.py
-    callee: runtime_state.py
-    description: >
-      COMPLETED tasks may have still-OPEN claims in runtime_state.
-      run_task_consistency_guard added to guardian_crew to detect mismatches.
-      Not yet auto-fixed; guard raises BLOCKER finding for manual review.
-
-  - id: NEW-07
-    title: "54 stores lack common trace_id"
-    severity: DEGRADED
-    status: PARTIAL
-    caller: "(cross-cutting)"
-    callee: "task_board, runtime_state, telemetry_plane + 51 others"
-    description: >
-      CorrelationContext + trace_id column added to 6 critical tables
-      (tasks, task_claims, delegation_runs, routing_decisions,
-      policy_decisions, economic_events). 48 remaining stores untouched.
-      Enables cross-store queries on trace_id for the primary data path.
-
-  - id: NEW-08
-    title: "12 independent record_outcome() implementations"
-    severity: DEGRADED
-    status: PARTIAL
-    caller: "telic_seam.py, strategy_reinforcer, routing_memory, etc."
-    callee: signal_bus.py
-    description: >
-      TelicSeam now emits SIGNAL_OUTCOME_RECORDED and
-      SIGNAL_VALUE_EVENT_RECORDED to signal_bus for canonical fanout.
-      SignalBus.subscribe() added for automatic callback dispatch.
-      Other 11 consumers not yet subscribed. Fanout infrastructure ready.
-
-  - id: NEW-09
-    title: "orchestrator → TelicSeam registry_path kwarg TypeError"
+  - id: MISMATCH-03
     severity: BLOCKER
-    status: RESOLVED
-    caller: orchestrator.py:154
-    callee: telic_seam.py:61
-    description: >
-      orchestrator._init_telic_seam() called TelicSeam(registry_path=...)
-      but __init__ only accepts path=. TypeError at runtime prevented all
-      ontology recording from the orchestrator. Fixed: registry_path → path.
+    status: resolved
+    caller: dharma_swarm/orchestrate_live.py:~1368
+    callee: dharma_swarm/persistent_agent.py:52
+    summary: >-
+      provider_type=outcome.child_spec.get("default_provider", "openrouter_free")
+      is a bare string — Pydantic v2 strict-mode validation rejects.
+    fixed_in: >-
+      routing coherence — same coercion path as MISMATCH-02 (ProviderType
+      construction at replication child spawn).
+    test_path: tests/mismatches/test_MISMATCH_03.py
 
-  - id: NEW-10
-    title: "lineage edges lack delegation chain metadata"
+  - id: MISMATCH-05
     severity: DEGRADED
-    status: RESOLVED
-    caller: agent_runner.py (spawn_worker)
-    callee: lineage.py (LineageEdge)
-    description: >
-      When agent A delegates to worker B via spawn_worker(), no lineage
-      edge recorded the delegation relationship. Added delegated_by and
-      trace_id fields to LineageEdge + schema. agent_runner.spawn_worker
-      now records a worker_delegation lineage edge.
+    status: open
+    caller: dharma_swarm/orchestrate_live.py:359
+    callee: dharma_swarm/message_bus.py:193
+    summary: >-
+      receive("evolution_loop", limit=20) — `status` defaults to "unread"; after
+      mark_read the messages become invisible to the next receive() call. Silent
+      data loss in the evolution loop's message visibility.
+    test_path: tests/mismatches/test_MISMATCH_05.py
 
-  - id: NEW-11
-    title: "TelicSeam singleton (get_seam) missing signal_bus"
+  - id: MISMATCH-07
     severity: DEGRADED
-    status: RESOLVED
-    caller: agent_runner.py (via get_seam())
-    callee: telic_seam.py (get_seam singleton)
-    description: >
-      get_seam() created TelicSeam(path=...) without signal_bus, so
-      outcome events emitted by agent_runner's seam instance were never
-      broadcast to signal_bus subscribers. Fixed: get_seam() now passes
-      signal_bus=SignalBus.get().
-
-# Summary counts:
-# Total entries: 16
-# RESOLVED: 9 (MM-12, MM-17, MM-18, NEW-01, NEW-02, NEW-04, NEW-09, NEW-10, NEW-11)
-# STILL_LIVE/OPEN: 4 (MM-02, MM-05, MM-07, MM-13)
-# GUARDED: 1 (NEW-05)
-# PARTIAL: 2 (NEW-07, NEW-08)
+    status: open
+    caller: dharma_swarm/swarm.py:363-370
+    callee: dharma_swarm/auto_proposer.py:157
+    summary: >-
+      AutoProposer accepts stigmergy: StigmergyStore | None but several internal
+      methods call await self._stigmergy.read_marks(...) without None-guard.
+      If StigmergyStore init fails, AutoProposer crashes on first cycle.
+    test_path: tests/mismatches/test_MISMATCH_07.py

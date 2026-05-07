@@ -1,0 +1,39 @@
+{
+  "id": "identity-coherence",
+  "base_ref": "origin/main",
+  "branch": "chore/identity-coherence",
+  "worktree": "/Users/dhyana/promotion_worktrees/dharma_swarm_identity_coherence",
+  "intent": "Reconcile current AgentConfig/AgentIdentity truth with #131 direction, requiring converter and guard tests before merge.",
+  "allowed_files": [
+    "AGENT_IDENTITY_UNIFICATION.md",
+    "dharma_swarm/models.py",
+    "dharma_swarm/profiles.py",
+    "tests/test_identity.py",
+    "tests/test_identity_v2.py",
+    "reports/agentops/**"
+  ],
+  "forbidden_files": [
+    "api/**",
+    "dashboard/**",
+    "dharma_swarm/swarm.py",
+    "dharma_swarm/orchestrator.py"
+  ],
+  "gates": [
+    {
+      "name": "diff-check",
+      "command": "git diff --check"
+    },
+    {
+      "name": "identity-tests",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_identity.py tests/test_identity_v2.py"
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "fix(identity): reconcile agent identity schemas with guard coverage"
+  },
+  "approval": {
+    "before_commit": true,
+    "before_merge": true
+  }
+}

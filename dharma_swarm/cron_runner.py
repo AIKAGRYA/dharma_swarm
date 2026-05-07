@@ -53,6 +53,86 @@ def _as_float(value: Any, default: float) -> float:
     return parsed if parsed > 0 else default
 
 
+def _run_system_map_populator(job: dict[str, Any]) -> CronJobExecutionResult:
+    """Refresh reports/system_map/latest.json from local read-only probes."""
+
+    import subprocess
+
+    repo_root = Path(str(job.get("repo_root") or Path(__file__).resolve().parent.parent))
+    script = repo_root / "scripts" / "system_map_populator.py"
+    if not script.exists():
+        error = f"missing script: {script}"
+        return CronJobExecutionResult(
+            status=CronJobRunStatus.FAILED,
+            output=error,
+            error=error,
+        )
+    args = ["python3", str(script)]
+    audit_dir = str(job.get("audit_dir", "")).strip()
+    output = str(job.get("output", "")).strip()
+    if audit_dir:
+        args.extend(["--audit-dir", audit_dir])
+    if output:
+        args.extend(["--output", output])
+    proc = subprocess.run(
+        args,
+        capture_output=True,
+        text=True,
+        timeout=_as_int(job.get("timeout_sec"), 60),
+        cwd=str(repo_root),
+    )
+    output_text = (proc.stdout or "").strip()
+    err = (proc.stderr or "").strip()
+    status = CronJobRunStatus.COMPLETED if proc.returncode == 0 else CronJobRunStatus.FAILED
+    return CronJobExecutionResult(
+        status=status,
+        output=output_text or "(no output)",
+        error=err if proc.returncode != 0 else "",
+    )
+
+
+def _run_tcs_heartbeat(job: dict[str, Any]) -> CronJobExecutionResult:
+    """Sample IdentityMonitor.measure() and append identity history locally."""
+
+    try:
+        from dharma_swarm.identity import IdentityMonitor
+
+        state_dir = Path(str(job.get("state_dir") or Path.home() / ".dharma"))
+        monitor = IdentityMonitor(state_dir=state_dir)
+        state = asyncio.run(
+            monitor.measure(threat_boost=bool(job.get("threat_boost", False)))
+        )
+        raw_history_path = str(job.get("history_path") or "").strip()
+        history_path = Path(raw_history_path).expanduser() if raw_history_path else None
+        monitor.save_history(history_path)
+        written_path = history_path or (state_dir / "meta" / "identity_history.jsonl")
+        output = (
+            "TCS heartbeat: "
+            f"tcs={state.tcs:.4f} regime={state.regime} "
+            f"gpr={state.gpr:.4f} bsi={state.bsi:.4f} rm={state.rm:.4f} "
+            f"history={written_path}"
+        )
+        return CronJobExecutionResult(
+            status=CronJobRunStatus.COMPLETED,
+            output=output,
+            metadata={
+                "tcs": state.tcs,
+                "gpr": state.gpr,
+                "bsi": state.bsi,
+                "rm": state.rm,
+                "regime": state.regime,
+                "history_path": str(written_path),
+            },
+        )
+    except Exception as exc:
+        error = f"TCS heartbeat failed: {exc}"
+        return CronJobExecutionResult(
+            status=CronJobRunStatus.FAILED,
+            output=error,
+            error=error,
+        )
+
+
 def _run_overnight_director(job: dict[str, Any]) -> CronJobExecutionResult:
     """Launch the overnight director as a long-running process."""
     import asyncio
@@ -446,6 +526,8 @@ def execute_cron_job(job: dict[str, Any]) -> CronJobExecutionResult:
         foreman          — foreman quality forge cycle
         custodians       — custodian maintenance fleet (no quality re-scan)
         custodians_forge — custodian fleet + foreman quality re-scan
+        system_map_populator — local system map refresh
+        tcs_heartbeat   — local IdentityMonitor time-series sample
     """
     handler = str(job.get("handler", "headless_prompt")).strip() or "headless_prompt"
 
@@ -475,6 +557,10 @@ def execute_cron_job(job: dict[str, Any]) -> CronJobExecutionResult:
         return _run_scout_synthesis(job)
     if handler == "operator_brief":
         return _run_operator_brief(job)
+    if handler == "system_map_populator":
+        return _run_system_map_populator(job)
+    if handler == "tcs_heartbeat":
+        return _run_tcs_heartbeat(job)
 
     error = f"Unsupported cron handler: {handler}"
     return CronJobExecutionResult(

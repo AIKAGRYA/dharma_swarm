@@ -163,6 +163,31 @@ class TestGetDueJobs:
         due = cron_scheduler.get_due_jobs(quiet_hours=set())
         assert len(due) == 0
 
+    def test_enabled_job_without_next_run_is_repaired_and_due(self):
+        cron_scheduler.save_jobs(
+            [
+                {
+                    "id": "legacy-heartbeat",
+                    "name": "Legacy heartbeat",
+                    "handler": "tcs_heartbeat",
+                    "schedule": {
+                        "kind": "interval",
+                        "minutes": 30,
+                        "display": "every 30m",
+                    },
+                    "enabled": True,
+                }
+            ]
+        )
+
+        due = cron_scheduler.get_due_jobs(quiet_hours=set())
+        repaired = cron_scheduler.get_job("legacy-heartbeat")
+
+        assert len(due) == 1
+        assert due[0]["id"] == "legacy-heartbeat"
+        assert repaired is not None
+        assert repaired["next_run_at"]
+
 
 class TestSaveJobOutput:
     """Tests for save_job_output()."""

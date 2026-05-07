@@ -1009,6 +1009,28 @@ def test_cmd_runtime_status_prints_runtime_control_plane(capsys, monkeypatch):
     assert "Sessions=2" in out
 
 
+def test_cmd_runtime_status_json_emits_json(capsys, monkeypatch):
+    """runtime-status --json should emit JSON from build_runtime_status_data."""
+    import dharma_swarm.dgc_cli as cli
+
+    def _fake_build_runtime_status_data(*, limit, runtime_db_path):
+        return {"db_exists": True, "counts": {"sessions": 5}}
+
+    monkeypatch.setattr(
+        "dharma_swarm.tui_helpers.build_runtime_status_data",
+        _fake_build_runtime_status_data,
+    )
+
+    cli.cmd_runtime_status(limit=3, db_path="/tmp/runtime.db", as_json=True)
+
+    out = capsys.readouterr().out
+    import json
+
+    parsed = json.loads(out)
+    assert parsed["db_exists"] is True
+    assert parsed["counts"]["sessions"] == 5
+
+
 def test_cmd_status_prefers_canonical_runtime_artifacts(monkeypatch, tmp_path, capsys):
     """status should prefer live ~/.dharma pulse evidence over absorbed legacy state."""
     import dharma_swarm.dgc_cli as cli
@@ -2256,3 +2278,45 @@ def test_cmd_sprint_falls_back_to_local_on_non_runtime_error(
     contents = output.read_text()
     assert "Mode**: local (fallback)" in contents
     assert "LOCAL SPRINT" in contents
+
+
+# ---------------------------------------------------------------------------
+# JSON output tests for status, health, gates, stigmergy
+# ---------------------------------------------------------------------------
+
+
+def test_cmd_status_json_emits_valid_json(monkeypatch, tmp_path, capsys):
+    """status --json should emit parseable JSON with expected keys."""
+    import dharma_swarm.dgc_cli as cli
+
+    monkeypatch.setattr(cli, "DHARMA_STATE", tmp_path / ".dharma")
+    monkeypatch.setattr(cli, "HOME", tmp_path)
+
+    cli.cmd_status(as_json=True)
+    out = capsys.readouterr().out
+    data = json.loads(out)
+    assert "pulse" in data
+    assert "gates_today" in data
+
+
+def test_cmd_health_json_emits_valid_json(capsys):
+    """health --json should emit parseable JSON."""
+    import dharma_swarm.dgc_cli as cli
+
+    cli.cmd_health(as_json=True)
+    out = capsys.readouterr().out
+    data = json.loads(out)
+    assert "ok" in data
+    assert "missing" in data
+
+
+def test_cmd_gates_json_emits_valid_json(capsys):
+    """gates --json should emit parseable JSON with decision + action."""
+    import dharma_swarm.dgc_cli as cli
+
+    cli.cmd_gates("check status", as_json=True)
+    out = capsys.readouterr().out
+    data = json.loads(out)
+    assert "decision" in data
+    assert "action" in data
+    assert data["action"] == "check status"
