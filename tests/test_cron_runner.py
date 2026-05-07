@@ -368,6 +368,36 @@ def test_run_cron_job_dispatches_doctor_assurance():
     mock.assert_called_once()
 
 
+def test_run_cron_job_dispatches_system_map_populator(tmp_path):
+    from types import SimpleNamespace
+
+    script = tmp_path / "scripts" / "system_map_populator.py"
+    script.parent.mkdir()
+    script.write_text("print('ok')\n", encoding="utf-8")
+    with patch(
+        "subprocess.run",
+        return_value=SimpleNamespace(returncode=0, stdout="Wrote reports/system_map/latest.json", stderr=""),
+    ) as mock_run:
+        success, output, error = run_cron_job(
+            {
+                "handler": "system_map_populator",
+                "timeout_sec": 12,
+                "repo_root": str(tmp_path),
+                "audit_dir": "/tmp/audit",
+                "output": "/tmp/latest.json",
+            }
+        )
+
+    assert success is True
+    assert output == "Wrote reports/system_map/latest.json"
+    assert error is None
+    args = mock_run.call_args.args[0]
+    assert args[1] == str(script)
+    assert ["--audit-dir", "/tmp/audit"] == args[2:4]
+    assert ["--output", "/tmp/latest.json"] == args[4:6]
+    assert mock_run.call_args.kwargs["timeout"] == 12
+
+
 def test_run_cron_job_rejects_unknown_handler():
     success, output, error = run_cron_job({"handler": "mystery"})
 

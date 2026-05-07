@@ -4607,6 +4607,85 @@ def cmd_cron(
             print("Usage: dgc cron {add|list|remove|tick|daemon}")
 
 
+def cmd_system_map(
+    map_cmd: str,
+    *,
+    organ: str | None = None,
+    map_path: str | Path = "reports/system_map/latest.json",
+    json_output: bool = False,
+) -> int:
+    """Read reports/system_map/latest.json and answer OrganState queries."""
+
+    path = Path(map_path).expanduser()
+    if not path.exists():
+        print(f"System map not found: {path}", file=sys.stderr)
+        return 2
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        print(f"System map is invalid JSON: {path}: {exc}", file=sys.stderr)
+        return 2
+
+    organs = payload.get("organs")
+    if not isinstance(organs, list):
+        print(f"System map has no organs list: {path}", file=sys.stderr)
+        return 2
+
+    if map_cmd == "list":
+        rows = organs
+    elif map_cmd == "drifted":
+        rows = [
+            item
+            for item in organs
+            if str(item.get("coherence_state")) in {"drifted", "partial", "declared_only", "unknown"}
+        ]
+    elif map_cmd == "gaps":
+        rows = [
+            item
+            for item in organs
+            if item.get("next_bindable_gap") or item.get("next_packet_hint") or item.get("open_gap")
+        ]
+    elif map_cmd == "show":
+        rows = [item for item in organs if item.get("name") == organ]
+        if not rows:
+            print(f"Organ not found: {organ}", file=sys.stderr)
+            return 1
+    else:
+        print("Usage: dgc map {list|drifted|gaps|show}", file=sys.stderr)
+        return 2
+
+    if json_output:
+        print(json.dumps(rows, indent=2, sort_keys=True))
+        return 0
+
+    if map_cmd in {"list", "drifted"}:
+        for item in rows:
+            print(f"{item.get('name')}\t{item.get('coherence_state')}\t{item.get('owns')}")
+    elif map_cmd == "gaps":
+        for item in rows:
+            gap = item.get("next_bindable_gap") or item.get("next_packet_hint") or item.get("open_gap")
+            print(f"{item.get('name')}: {gap}")
+    elif map_cmd == "show":
+        item = rows[0]
+        for key in (
+            "name",
+            "owns",
+            "declared_state",
+            "observed_state",
+            "coherence_state",
+            "open_gap",
+            "next_bindable_gap",
+            "risk",
+        ):
+            print(f"{key}: {item.get(key)}")
+        refs = item.get("evidence_refs") or []
+        if refs:
+            print("evidence_refs:")
+            for ref in refs:
+                print(f"  - {ref}")
+    return 0
+
+
 def cmd_xray(
     repo_path: str,
     output: str | None = None,
@@ -5205,6 +5284,20 @@ def _build_parser() -> argparse.ArgumentParser:
     p_map = sub.add_parser("map", help="Living map — all 8 layers, regenerated fresh from live sources")
     p_map.add_argument("--json", action="store_true", help="JSON output")
     p_map.add_argument("--layer", type=int, default=None, help="Single layer (0-7)")
+    map_sub = p_map.add_subparsers(dest="map_cmd")
+    p_map_list = map_sub.add_parser("list", help="List organs from reports/system_map/latest.json")
+    p_map_list.add_argument("--path", default="reports/system_map/latest.json")
+    p_map_list.add_argument("--json", dest="system_map_json_output", action="store_true")
+    p_map_drifted = map_sub.add_parser("drifted", help="List drifted/partial/unknown organs")
+    p_map_drifted.add_argument("--path", default="reports/system_map/latest.json")
+    p_map_drifted.add_argument("--json", dest="system_map_json_output", action="store_true")
+    p_map_gaps = map_sub.add_parser("gaps", help="List next bindable gaps")
+    p_map_gaps.add_argument("--path", default="reports/system_map/latest.json")
+    p_map_gaps.add_argument("--json", dest="system_map_json_output", action="store_true")
+    p_map_show = map_sub.add_parser("show", help="Show one organ from reports/system_map/latest.json")
+    p_map_show.add_argument("organ")
+    p_map_show.add_argument("--path", default="reports/system_map/latest.json")
+    p_map_show.add_argument("--json", dest="system_map_json_output", action="store_true")
 
     # -- status --
     sub.add_parser("status", help="System status overview")
@@ -7046,6 +7139,15 @@ def main() -> None:
                 run_immediately=getattr(args, "run_immediately", True),
             )
         case "map":
+            if getattr(args, "map_cmd", None):
+                raise SystemExit(
+                    cmd_system_map(
+                        map_cmd=args.map_cmd,
+                        organ=getattr(args, "organ", None),
+                        map_path=getattr(args, "path", "reports/system_map/latest.json"),
+                        json_output=getattr(args, "system_map_json_output", False),
+                    )
+                )
             from dharma_swarm.living_map import generate, generate_json
             if getattr(args, "json", False):
                 import json as _json

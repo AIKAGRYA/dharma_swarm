@@ -55,6 +55,7 @@ reports/psmv_hyperfiles_20260313/graphs/*.json
 
 # Generated outputs (not source)
 reports/docops/
+reports/system_map/latest.json
 results.tsv
 run.log
 synthesizer_memory.json
