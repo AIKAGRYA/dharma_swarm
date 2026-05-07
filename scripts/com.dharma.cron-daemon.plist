@@ -7,9 +7,8 @@
 
     <key>ProgramArguments</key>
     <array>
-        <string>/opt/homebrew/bin/dgc</string>
-        <string>cron</string>
-        <string>daemon</string>
+        <string>/bin/bash</string>
+        <string>/Users/dhyana/dharma_swarm/scripts/start_cron_daemon.sh</string>
     </array>
 
     <key>RunAtLoad</key>
