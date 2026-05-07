@@ -66,6 +66,7 @@ using phrases such as "source of truth", "canonical", "authoritative", or
 |------|--------------------|
 | `AGENTS.md` | Cross-agent repo instructions and mandatory read order |
 | `CLAUDE.md` | Behavioral rules for coding agents |
+| `README.md` | Public repo overview, quick-start, and pointer surface into canonical docs |
 | `docs/AGENTS.md` | Documentation-specific cleanup and semantic-experiment rules |
 | `docs/governance/BUILD_SESSION_ENTRYPOINT.md` | Current build track and pre-change read order |
 | `docs/governance/COHERENCE_DELTA.md` | PR Coherence Delta field semantics and merge-boundary discipline |

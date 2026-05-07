@@ -137,6 +137,7 @@
       "registered": [
         "AGENTS.md",
         "CLAUDE.md",
+        "README.md",
         "docs/AGENTS.md",
         "docs/governance/BUILD_SESSION_ENTRYPOINT.md",
         "docs/governance/COHERENCE_DELTA.md",
