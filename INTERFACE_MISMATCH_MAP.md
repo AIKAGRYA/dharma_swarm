@@ -8,6 +8,57 @@ at runtime — usually in production under the live orchestrator.
 
 ---
 
+## ⚠️ Status — Partial Re-verification 2026-05-07
+
+**The 2026-04-04 table below is stale.** Line numbers have drifted, several BLOCKERs are
+already fixed, and entries cite addresses that no longer exist. Treat the original table
+as a historical investigation log, not a current to-do list. A fresh regeneration is overdue.
+
+Re-verified against canonical worktree on 2026-05-07: `~/dharma_swarm_provider_lane_fix/`
+— canonical because `python3 -c "import dharma_swarm; print(dharma_swarm.__file__)"`
+resolves there (last `pip install -e .` was done in that worktree). **Note the structural
+fragility: canonical worktree shifts silently with every `pip install -e .` invocation.
+This should probably be pinned.**
+
+### Resolution log (2026-05-07)
+
+| # | Original status | Re-verification | Current locus |
+|---|---|---|---|
+| 1 | BLOCKER `tiny_router_shadow.py:542` (`huggingface_hub` ImportError uncaught) | ✅ RESOLVED | `tiny_router_shadow.py:494-510` — `try/except ImportError: return None` wraps `from huggingface_hub import snapshot_download`, plus second `try/except Exception` around the `snapshot_download(...)` call. Fix present in main, lf5, and fractal_main_proof worktrees. |
+| 2 | BLOCKER `orchestrate_live.py:1247` (raw `role` string passed to `PersistentAgent`) | ✅ RESOLVED | `orchestrate_live.py:1367` — call site is now `role=AgentRole(outcome.child_spec.get("role", "general"))`. Enum coercion in place. |
+| 3 | BLOCKER `orchestrate_live.py:1248` (raw `provider_type` string) | ✅ RESOLVED | `orchestrate_live.py:1369-1371` — `provider_type=PT(outcome.child_spec.get("default_provider", "openrouter_free"))`. Enum coercion in place. |
+| 4 | DEGRADED `tiny_router_shadow.py:494` (huggingface_hub import unguarded) | ✅ RESOLVED | Same fix as #1; same physical lines. |
+| 16 | DEGRADED `orchestrate_live.py:1247` (caller imports `AgentRole`/`PT` but never uses them to coerce) | ✅ RESOLVED | Same fix as #2/#3 — coercion now applied at line 1367-1371. This entry was the structural root-cause behind #2/#3. |
+| 21 | BLOCKER `tiny_router_shadow.py` (any caller chain triggers unguarded ImportError) | ✅ RESOLVED | Same fix as #1 — ImportError now returns `None` instead of propagating. |
+
+**Entries 5–15, 17–20, 22–25 have NOT been re-verified.** Line numbers and bug status
+unknown. Do not act on them without re-verification against the canonical worktree.
+
+### Cross-reference: existing commit-tagged resolutions
+
+The "Resolution Status" table at the bottom of this file (search for `## Resolution Status`)
+documents **9 commit-tagged fixes** for MISMATCH-01 through MISMATCH-12. The two tables
+(this top header and that bottom table) have not been merged. Until they are, both are
+authoritative for what they cover. Specifically the bottom table marks resolved:
+MISMATCH-01 (`5ed4a3e`), MISMATCH-02/12 (`98341b4`), MISMATCH-03 (`b7f5c3e`),
+MISMATCH-04 (`d0ecc87`), MISMATCH-06 (`b56d208`), MISMATCH-08 (`38c5f61`),
+MISMATCH-09 (`3816065`), MISMATCH-11 (`d45a5e0`), and MISMATCH-10 (already-guarded).
+
+**Net status across both tables:** of the 25 numbered entries, ~12 are confirmed resolved
+(via fix commit or "no mismatch" disposition), ~5 are documented as non-issues from the
+start (14, 17, 19, 22, 25), and ~7 remain unverified DEGRADED (7, 8, 9, 10, 12, 15, 18).
+The map is much less alarming than its top table appears.
+
+### Recommended next regeneration
+
+Rather than entry-by-entry verification, a cleaner path: boot the system (`dgc up`),
+let actual runtime crashes surface, and document those. The 2026-04-04 entries were
+manually compiled by reading code; a runtime-crash log would be self-validating and
+would naturally exclude already-fixed mismatches. Until then: this map is mostly a
+memorial, not a battle plan.
+
+---
+
 ## Summary Table
 
 | # | Severity | Caller | Callee | What's Wrong |

@@ -15,7 +15,7 @@
 These are immutable engineering laws for this repository. Violation = architectural regression.
 
 ### A1: NO FLAT-PACKAGE GROWTH
-The `dharma_swarm/` package currently has **375 files at its top level (73% of 514 total modules)** (V). No new .py file may be added to the top level. New modules must go into an appropriate subdirectory. Existing top-level files will be organized over time.
+The `dharma_swarm/` package currently has **375 files at its top level (66% of 567 total modules)** (V, refreshed 2026-05-07). No new .py file may be added to the top level. New modules must go into an appropriate subdirectory. Existing top-level files will be organized over time.
 
 ### A2: NO DUPLICATE IMPLEMENTATIONS
 Before creating a new file for routing, bridging, adapting, or orchestrating, check if one already exists. The repo currently has **20 bridge files** (V), **3 model_routing copies** (2 are identical, 1 is different) (V), **4 orchestrators** (V), **18 adapter files across 6 locations** (V), and **14 router files** (V). Do not add more without deprecating an existing one.
@@ -60,8 +60,8 @@ These are the ground-truth metrics. All other documents citing different numbers
 
 | Metric | Value | Verification |
 |--------|-------|-------------|
-| Total Python modules | **514** | find dharma_swarm -name "*.py" |
-| Top-level (flat) modules | **375 (73%)** | find dharma_swarm -maxdepth 1 -name "*.py" |
+| Total Python modules | **567** | `find dharma_swarm -name "*.py" -type f` (refreshed 2026-05-07) |
+| Top-level (flat) modules | **375 (66%)** | `find dharma_swarm -maxdepth 1 -name "*.py" -type f` (refreshed 2026-05-07) |
 | Total Python LOC | **227,486** | wc -l across all modules |
 | Test files | **502** | find tests -name "*.py" |
 | Test functions | **8,956** | grep "def test_" count |
@@ -385,7 +385,7 @@ SOVEREIGN_MANIFEST.md (this file)
 
 **Stale numbers to fix**:
 - "~1,700 lines" for swarm.py -> **3,119** (V)
-- References NAVIGATION.md which claims "500 modules" -> actual **514** (V)
+- References NAVIGATION.md which claims "500 modules" -> actual **567** (V, refreshed 2026-05-07; was 514 prior)
 - No mention of the 20 bridges, 14 routers, 18 adapters, or their hierarchy
 - Provider list says 9 -> should acknowledge **18 types** (V)
 

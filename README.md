@@ -178,6 +178,7 @@ That sends the reader to:
 ## Before Writing Any Code
 
 - **Read [`CLAUDE.md`](CLAUDE.md)** — system genome, key abstractions, behavioral rules, the Transcendence Principle.
+- **Read [`docs/MEGAFILE_INDEX.md`](docs/MEGAFILE_INDEX.md)** — the canonical onboarding index. Reserves 10 onboarding slots (vision, doctrine, roadmap, limbs, wiring, live ops, broken register, runbook, agent contract, contemplative spine). Reading order 1→10. Points to all existing substrate.
 - **Read [`docs/governance/README.md`](docs/governance/README.md)** — the active governance hub and recommended orientation order for humans and agents.
 - **Read [`INTERFACE_MISMATCH_MAP.md`](INTERFACE_MISMATCH_MAP.md)** — every known interface mismatch between modules, with exact line numbers, root causes, and fixes. This is the primary source of runtime failures. Follow the Bootstrap Sequence to unblock the system.
 - **Run `make xray`** — generates a live module map across all architectural layers with line counts (replaces the former static NAVIGATION.md).
