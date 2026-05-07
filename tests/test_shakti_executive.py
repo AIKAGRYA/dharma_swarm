@@ -95,6 +95,30 @@ def test_shakti_executive_reads_feedback_surfaces(tmp_path: Path) -> None:
     )
 
 
+def test_shakti_executive_reads_feedback_surfaces(tmp_path: Path) -> None:
+    state = tmp_path / "dharma"
+    _write_ontology_feedback(state)
+    _write_dispatcher_health(state)
+    _write_campaign_manifest(state)
+    _write_darwin_archive(state)
+
+    signals = read_all_signals(state)
+    sources = {signal.source for signal in signals}
+    categories = {signal.category for signal in signals}
+
+    assert {"telic:Outcome", "telic:ValueEvent", "telic:Contribution"} <= sources
+    assert "dispatcher_health" in categories
+    assert "campaign_feedback" in categories
+    assert "sealed_packet_archive" in categories
+
+    preview = ShaktiExecutive(state).preview(top_k=10, min_score=30.0)
+    assert any(
+        source["source"] == "telic:Outcome"
+        for row in preview
+        for source in row["source_inputs"]
+    )
+
+
 def _write_zeitgeist(state: Path, row: dict[str, object]) -> None:
     meta = state / "meta"
     meta.mkdir(parents=True)

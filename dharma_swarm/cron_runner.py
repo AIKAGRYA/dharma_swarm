@@ -474,6 +474,106 @@ def _run_scout_synthesis(job: dict[str, Any]) -> CronJobExecutionResult:
         )
 
 
+def _run_shakti_executive(job: dict[str, Any]) -> CronJobExecutionResult:
+    """Run the Layer C executive that refreshes the opportunity board."""
+
+    try:
+        from dharma_swarm.shakti_executive import ShaktiExecutive
+
+        top_k = int(job.get("top_k", 12))
+        min_score = float(job.get("min_score", 45.0))
+        write = bool(job.get("write", False)) and not bool(job.get("dry_run", False))
+        state_dir = job.get("state_dir") or None
+        res = ShaktiExecutive(state_dir=state_dir).run(
+            write=write,
+            top_k=top_k,
+            min_score=min_score,
+        )
+        if res.errors:
+            return CronJobExecutionResult(
+                status=CronJobRunStatus.FAILED,
+                output=f"shakti_executive errors: {list(res.errors)}",
+                error="; ".join(res.errors)[:500],
+            )
+        output = (
+            f"shakti_executive: dry_run={res.dry_run} scanned={res.scanned_signals} "
+            f"selected={res.selected_candidates} board_before={res.board_count_before} "
+            f"board_after={res.board_count_after}"
+        )
+        return CronJobExecutionResult(
+            status=CronJobRunStatus.COMPLETED,
+            output=output,
+        )
+    except Exception as e:  # noqa: BLE001
+        return CronJobExecutionResult(
+            status=CronJobRunStatus.FAILED,
+            output=str(e),
+            error=str(e),
+        )
+
+
+def _run_frontier_dispatcher(job: dict[str, Any]) -> CronJobExecutionResult:
+    """Run a single dispatcher tick from opportunity board into task board."""
+
+    try:
+        from dharma_swarm.opportunity_dispatcher import main as dispatcher_main
+
+        argv: list[str] = []
+        if job.get("dry_run"):
+            argv.append("--dry-run")
+        max_promotions = job.get("max_promotions")
+        if max_promotions is not None:
+            argv.extend(["--max", str(int(max_promotions))])
+        rc = dispatcher_main(argv)
+        return CronJobExecutionResult(
+            status=CronJobRunStatus.COMPLETED if rc == 0 else CronJobRunStatus.FAILED,
+            output=f"opportunity_dispatcher exit_code={rc}",
+        )
+    except Exception as e:  # noqa: BLE001
+        return CronJobExecutionResult(
+            status=CronJobRunStatus.FAILED,
+            output=str(e),
+            error=str(e),
+        )
+
+
+def _run_frontier_refill(job: dict[str, Any]) -> CronJobExecutionResult:
+    """Run a single refill cycle for top pending opportunities."""
+
+    try:
+        from dharma_swarm.opportunity_refill import refill_frontier_tasks_pending
+
+        top_k = int(job.get("top_k", 3))
+        min_telos = float(job.get("min_telos_alignment", 0.5))
+        dry_run = bool(job.get("dry_run", False))
+        res = refill_frontier_tasks_pending(
+            top_k=top_k,
+            min_telos_alignment=min_telos,
+            dry_run=dry_run,
+        )
+        if res.error:
+            return CronJobExecutionResult(
+                status=CronJobRunStatus.FAILED,
+                output=f"frontier_refill error: {res.error}",
+                error=res.error,
+            )
+        output = (
+            f"frontier_refill: paused={res.paused} board={res.board_count} "
+            f"addressed={res.addressed_count} appended_rows={res.appended_rows} "
+            f"appended_ids={res.appended_opportunity_ids}"
+        )
+        return CronJobExecutionResult(
+            status=CronJobRunStatus.COMPLETED,
+            output=output,
+        )
+    except Exception as e:  # noqa: BLE001
+        return CronJobExecutionResult(
+            status=CronJobRunStatus.FAILED,
+            output=str(e),
+            error=str(e),
+        )
+
+
 def _run_operator_brief(job: dict[str, Any]) -> CronJobExecutionResult:
     """Cron handler for the ontology-native Operator Brief seam (v0).
 
@@ -526,6 +626,9 @@ def execute_cron_job(job: dict[str, Any]) -> CronJobExecutionResult:
         foreman          — foreman quality forge cycle
         custodians       — custodian maintenance fleet (no quality re-scan)
         custodians_forge — custodian fleet + foreman quality re-scan
+        shakti_executive — Layer C opportunity board refresh
+        frontier_dispatcher — promote opportunity rows into tasks
+        frontier_refill — bootstrap top opportunities into frontier queue
         system_map_populator — local system map refresh
         tcs_heartbeat   — local IdentityMonitor time-series sample
     """
@@ -555,6 +658,12 @@ def execute_cron_job(job: dict[str, Any]) -> CronJobExecutionResult:
         return _run_scout_sweep(job)
     if handler == "scout_synthesis":
         return _run_scout_synthesis(job)
+    if handler == "shakti_executive":
+        return _run_shakti_executive(job)
+    if handler == "frontier_dispatcher":
+        return _run_frontier_dispatcher(job)
+    if handler == "frontier_refill":
+        return _run_frontier_refill(job)
     if handler == "operator_brief":
         return _run_operator_brief(job)
     if handler == "system_map_populator":
