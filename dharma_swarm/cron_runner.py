@@ -53,6 +53,72 @@ def _as_float(value: Any, default: float) -> float:
     return parsed if parsed > 0 else default
 
 
+def _run_tcs_heartbeat(job: dict[str, Any]) -> CronJobExecutionResult:
+    """Sample IdentityMonitor.measure() and append a row to identity_history.jsonl.
+
+    Implements Plan B L2: persistent TCS time-series (the metric the system
+    optimizes against was previously in-memory only).
+    """
+    import subprocess
+    repo_root = Path(__file__).resolve().parent.parent
+    script = repo_root / "scripts" / "tcs_history_writer.py"
+    if not script.exists():
+        return CronJobExecutionResult(
+            status=CronJobRunStatus.FAILED,
+            output=f"missing script: {script}",
+            error=f"missing script: {script}",
+        )
+    proc = subprocess.run(
+        ["python3", str(script)],
+        capture_output=True,
+        text=True,
+        timeout=_as_int(job.get("timeout_sec"), 30),
+        cwd=str(repo_root),
+    )
+    output = (proc.stdout or "").strip()
+    err = (proc.stderr or "").strip()
+    status = CronJobRunStatus.COMPLETED if proc.returncode == 0 else CronJobRunStatus.FAILED
+    return CronJobExecutionResult(status=status, output=output or "(no output)", error=err if proc.returncode != 0 else "")
+
+
+def _run_system_map_populator(job: dict[str, Any]) -> CronJobExecutionResult:
+    """Refresh reports/system_map/latest.json from local read-only probes."""
+
+    import subprocess
+
+    repo_root = Path(__file__).resolve().parent.parent
+    script = repo_root / "scripts" / "system_map_populator.py"
+    if not script.exists():
+        error = f"missing script: {script}"
+        return CronJobExecutionResult(
+            status=CronJobRunStatus.FAILED,
+            output=error,
+            error=error,
+        )
+    args = ["python3", str(script)]
+    audit_dir = str(job.get("audit_dir", "")).strip()
+    output = str(job.get("output", "")).strip()
+    if audit_dir:
+        args.extend(["--audit-dir", audit_dir])
+    if output:
+        args.extend(["--output", output])
+    proc = subprocess.run(
+        args,
+        capture_output=True,
+        text=True,
+        timeout=_as_int(job.get("timeout_sec"), 60),
+        cwd=str(repo_root),
+    )
+    output_text = (proc.stdout or "").strip()
+    err = (proc.stderr or "").strip()
+    status = CronJobRunStatus.COMPLETED if proc.returncode == 0 else CronJobRunStatus.FAILED
+    return CronJobExecutionResult(
+        status=status,
+        output=output_text or "(no output)",
+        error=err if proc.returncode != 0 else "",
+    )
+
+
 def _run_overnight_director(job: dict[str, Any]) -> CronJobExecutionResult:
     """Launch the overnight director as a long-running process."""
     import asyncio
@@ -524,6 +590,7 @@ def execute_cron_job(job: dict[str, Any]) -> CronJobExecutionResult:
         custodians       — custodian maintenance fleet (no quality re-scan)
         custodians_forge — custodian fleet + foreman quality re-scan
         shakti_executive — Layer C opportunity board refresh
+        system_map_populator — local system map refresh
     """
     handler = str(job.get("handler", "headless_prompt")).strip() or "headless_prompt"
 
@@ -563,6 +630,11 @@ def execute_cron_job(job: dict[str, Any]) -> CronJobExecutionResult:
         return _run_frontier_dispatcher(job)
     if handler == "frontier_refill":
         return _run_frontier_refill(job)
+
+    if handler == "tcs_heartbeat":
+        return _run_tcs_heartbeat(job)
+    if handler == "system_map_populator":
+        return _run_system_map_populator(job)
 
     error = f"Unsupported cron handler: {handler}"
     return CronJobExecutionResult(

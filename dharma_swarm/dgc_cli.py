@@ -572,6 +572,141 @@ def _handle_audit_gates(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_cron(
+    cron_cmd: str,
+    *,
+    interval_sec: float = 60.0,
+    max_loops: int | None = None,
+    run_immediately: bool = True,
+) -> int:
+    """Run cron scheduler commands through the installed DGC surface."""
+
+    if cron_cmd == "tick":
+        from dharma_swarm import cron_scheduler
+        from dharma_swarm.cron_runner import run_cron_job
+
+        executed = cron_scheduler.tick(verbose=True, run_fn=run_cron_job)
+        print(f"Tick complete: {executed} job(s) executed")
+        return 0
+    if cron_cmd == "daemon":
+        from dharma_swarm.cron_daemon import run_cron_daemon
+
+        executed = run_cron_daemon(
+            interval_sec=interval_sec,
+            max_loops=max_loops,
+            run_immediately=run_immediately,
+            tick_verbose=False,
+        )
+        print(f"Cron daemon exited: {executed} job(s) executed")
+        return 0
+    if cron_cmd == "list":
+        from dharma_swarm.cron_scheduler import load_jobs
+
+        for job in load_jobs():
+            status = job.get("last_status") or "UNKNOWN"
+            enabled = "enabled" if job.get("enabled", True) else "disabled"
+            command = job.get("command") or job.get("handler") or job.get("prompt", "")
+            print(f"{job.get('id')}\t{enabled}\t{status}\t{command}")
+        return 0
+    raise ValueError(f"unknown cron command: {cron_cmd}")
+
+
+def _handle_cron(args: argparse.Namespace) -> int:
+    return cmd_cron(
+        cron_cmd=args.cron_cmd,
+        interval_sec=getattr(args, "interval_sec", 60.0),
+        max_loops=getattr(args, "max_loops", None),
+        run_immediately=not getattr(args, "no_run_immediately", False),
+    )
+
+
+def cmd_map(
+    map_cmd: str,
+    *,
+    organ: str | None = None,
+    map_path: str | Path = "reports/system_map/latest.json",
+    json_output: bool = False,
+) -> int:
+    """Read reports/system_map/latest.json and answer map queries."""
+
+    path = Path(map_path).expanduser()
+    if not path.exists():
+        print(f"System map not found: {path}", file=sys.stderr)
+        return 2
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        print(f"System map is invalid JSON: {path}: {exc}", file=sys.stderr)
+        return 2
+
+    organs = payload.get("organs")
+    if not isinstance(organs, list):
+        print(f"System map has no organs list: {path}", file=sys.stderr)
+        return 2
+
+    if map_cmd == "list":
+        rows = organs
+    elif map_cmd == "drifted":
+        rows = [
+            item
+            for item in organs
+            if str(item.get("coherence_state")) in {"drifted", "partial", "declared_only", "unknown"}
+        ]
+    elif map_cmd == "gaps":
+        rows = [
+            item
+            for item in organs
+            if item.get("next_bindable_gap") or item.get("next_packet_hint") or item.get("open_gap")
+        ]
+    elif map_cmd == "show":
+        rows = [item for item in organs if item.get("name") == organ]
+        if not rows:
+            print(f"Organ not found: {organ}", file=sys.stderr)
+            return 1
+    else:
+        raise ValueError(f"unknown map command: {map_cmd}")
+
+    if json_output:
+        print(json.dumps(rows, indent=2, sort_keys=True))
+        return 0
+
+    if map_cmd in {"list", "drifted"}:
+        for item in rows:
+            print(f"{item.get('name')}\t{item.get('coherence_state')}\t{item.get('owns')}")
+    elif map_cmd == "gaps":
+        for item in rows:
+            gap = item.get("next_bindable_gap") or item.get("next_packet_hint") or item.get("open_gap")
+            print(f"{item.get('name')}: {gap}")
+    elif map_cmd == "show":
+        item = rows[0]
+        for key in (
+            "name",
+            "owns",
+            "declared_state",
+            "observed_state",
+            "coherence_state",
+            "open_gap",
+            "next_bindable_gap",
+            "risk",
+        ):
+            print(f"{key}: {item.get(key)}")
+        refs = item.get("evidence_refs") or []
+        if refs:
+            print("evidence_refs:")
+            for ref in refs:
+                print(f"  - {ref}")
+    return 0
+
+
+def _handle_map(args: argparse.Namespace) -> int:
+    return cmd_map(
+        map_cmd=args.map_cmd,
+        organ=getattr(args, "organ", None),
+        map_path=getattr(args, "path", "reports/system_map/latest.json"),
+        json_output=getattr(args, "json_output", False),
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="dgc", description="DGC command line interface")
     subparsers = parser.add_subparsers(dest="command")
@@ -586,7 +721,36 @@ def main(argv: list[str] | None = None) -> int:
     gates_parser.add_argument("--days", type=int, default=7)
     gates_parser.set_defaults(func=_handle_audit_gates)
 
-    # ... other command parsers ...
+    cron_parser = subparsers.add_parser("cron", help="Cron scheduler commands")
+    cron_subparsers = cron_parser.add_subparsers(dest="cron_cmd")
+    cron_list_parser = cron_subparsers.add_parser("list", help="List scheduled jobs")
+    cron_list_parser.set_defaults(func=_handle_cron)
+    cron_tick_parser = cron_subparsers.add_parser("tick", help="Run one scheduler tick")
+    cron_tick_parser.set_defaults(func=_handle_cron)
+    cron_daemon_parser = cron_subparsers.add_parser("daemon", help="Run the cron daemon")
+    cron_daemon_parser.add_argument("--interval-sec", type=float, default=60.0)
+    cron_daemon_parser.add_argument("--max-loops", type=int, default=None)
+    cron_daemon_parser.add_argument("--no-run-immediately", action="store_true")
+    cron_daemon_parser.set_defaults(func=_handle_cron)
+
+    map_common = argparse.ArgumentParser(add_help=False)
+    map_common.add_argument("--path", default="reports/system_map/latest.json")
+    map_common.add_argument("--json", dest="json_output", action="store_true")
+    map_parser = subparsers.add_parser("map", help="Read the latest system map")
+    map_subparsers = map_parser.add_subparsers(dest="map_cmd")
+    map_list_parser = map_subparsers.add_parser("list", parents=[map_common], help="List organs")
+    map_list_parser.set_defaults(func=_handle_map)
+    map_drifted_parser = map_subparsers.add_parser(
+        "drifted",
+        parents=[map_common],
+        help="List organs with drift, partial, declared-only, or unknown state",
+    )
+    map_drifted_parser.set_defaults(func=_handle_map)
+    map_gaps_parser = map_subparsers.add_parser("gaps", parents=[map_common], help="List next bindable gaps")
+    map_gaps_parser.set_defaults(func=_handle_map)
+    map_show_parser = map_subparsers.add_parser("show", parents=[map_common], help="Show one organ")
+    map_show_parser.add_argument("organ")
+    map_show_parser.set_defaults(func=_handle_map)
 
     args = parser.parse_args(argv)
     if not hasattr(args, "func"):

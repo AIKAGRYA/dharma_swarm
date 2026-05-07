@@ -37,6 +37,7 @@ class TaskResult:
 
     @property
     def is_ok(self) -> bool:
+        """Return True when the task chain has not recorded an error."""
         return self.error is None
 
     def bind(self, fn: Callable[[Any], "TaskResult"], label: str = "") -> "TaskResult":
