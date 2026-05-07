@@ -134,6 +134,10 @@
       "docs/**/*.md",
       "specs/**/*.md"
     ],
+    "ignore": [
+      "docs/archive/**",
+      "docs/_archive/**"
+    ],
       "registered": [
         "AGENTS.md",
         "CLAUDE.md",
