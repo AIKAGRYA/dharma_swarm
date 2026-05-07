@@ -25,6 +25,9 @@ TIER 3 — FOUNDATIONAL (read for deep context, rarely changes)
 TIER 4 — OPERATIONAL REFERENCE (read when operating the system)
 ├── README.md                          → Repo overview, quick-start
 ├── docs/governance/REPO_GOVERNANCE_AUDIT.md → Audit findings, contradictions, stale doc log
+├── docs/MEGAFILE_INDEX.md          → Ten-slot onboarding map
+├── docs/state/LIVE_OPS_DASHBOARD.md → Current live state front door
+├── docs/state/BROKEN_REGISTER.md    → Declared-vs-actual contradiction register
 │
 TIER 5 — ARCHIVE (do not read unless investigating history)
 ├── docs/archive/*                     → Correctly quarantined old docs
@@ -47,6 +50,9 @@ TIER 5 — ARCHIVE (do not read unless investigating history)
 | Constitutional axioms | `specs/Dharma_Constitution_v0.md` | — |
 | Kernel spec | `specs/KERNEL_CORE_SPEC.md` | — |
 | Contradictions & staleness | `REPO_GOVERNANCE_AUDIT.md` | — |
+| Megafile onboarding slots | `docs/MEGAFILE_INDEX.md` | slot files defer to their registered boundary |
+| Current live state | `docs/state/LIVE_OPS_DASHBOARD.md` | live probes override stale prose |
+| Declared-vs-actual gaps | `docs/state/BROKEN_REGISTER.md` | PR bodies must update relevant entries |
 
 ---
 
@@ -66,6 +72,10 @@ using phrases such as "source of truth", "canonical", "authoritative", or
 | `docs/governance/SOVEREIGN_MANIFEST.md` | Repo architecture, invariants, domains, measured state |
 | `docs/governance/CANONICAL_DOC_STACK.md` | Documentation hierarchy and ownership |
 | `docs/governance/REPO_GOVERNANCE_AUDIT.md` | Contradiction, staleness, and drift ledger |
+| `docs/MEGAFILE_INDEX.md` | Ten-slot highest-system onboarding index |
+| `docs/vision_maps/MASTER_2026-05-07_attractor_closure_synthesis.md` | Highest vision / Attractor Closure synthesis |
+| `docs/state/LIVE_OPS_DASHBOARD.md` | Current live operating-state front door |
+| `docs/state/BROKEN_REGISTER.md` | Declared-vs-actual contradiction register |
 | `docs/architecture/NAVIGATION.md` | Module map, after count refresh |
 | `docs/architecture/MODEL_ROUTING_CANON.md` | Provider/model routing, after merge with root routing map |
 | `PRODUCT_SURFACE.md` | Product-surface precedence for dashboard, browser shell, and desktop shell |
