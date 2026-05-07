@@ -79,6 +79,7 @@ using phrases such as "source of truth", "canonical", "authoritative", or
 | `docs/state/BROKEN_REGISTER.md` | Declared-vs-actual contradiction register |
 | `docs/architecture/NAVIGATION.md` | Module map, after count refresh |
 | `docs/architecture/MODEL_ROUTING_CANON.md` | Provider/model routing, after merge with root routing map |
+| `docs/architecture/WIRING_AND_LOOPS.md` | Build Protocol and feedback-loop wiring map |
 | `PRODUCT_SURFACE.md` | Product-surface precedence for dashboard, browser shell, and desktop shell |
 | `specs/DGC_TERMINAL_ARCHITECTURE_v1.1.md` | Terminal protocol, after Bun/Textual split is reconciled |
 | `specs/Dharma_Constitution_v0.md` | Constitutional rules |

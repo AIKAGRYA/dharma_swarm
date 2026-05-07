@@ -160,6 +160,22 @@ class CycleResult(BaseModel):
     lessons_learned: list[str] = Field(default_factory=list)
 
 
+class SealedPacketApplyResult(BaseModel):
+    """Outcome of ingesting a sealed Build Protocol packet."""
+
+    packet_root: str
+    accepted: bool = False
+    applied: bool = False
+    shadow: bool = True
+    reason: str = ""
+    refused_checks: list[str] = Field(default_factory=list)
+    proposal_id: str | None = None
+    archive_entry_id: str | None = None
+    proof_exit_code: int | None = None
+    files_changed: list[str] = Field(default_factory=list)
+    test_results: dict[str, Any] = Field(default_factory=dict)
+
+
 class EvolutionPlan(BaseModel):
     """Planner output consumed by execution loops."""
 
@@ -2221,6 +2237,29 @@ class DarwinEngine:
             pass_rate = 0.0
 
         return (proposal, {"pass_rate": pass_rate, "rolled_back": result.rolled_back})
+
+    async def apply_sealed_packet(
+        self,
+        dryrun_root: Path,
+        *,
+        shadow: bool = True,
+        workspace: Path | None = None,
+        proof_timeout: float = 120.0,
+        max_diff_lines: int = 50,
+        halt_path: Path | None = None,
+    ) -> SealedPacketApplyResult:
+        """Ingest a sealed Build Protocol packet through Darwin guards."""
+        from dharma_swarm.sealed_packet_apply import apply_sealed_packet
+
+        return await apply_sealed_packet(
+            self,
+            dryrun_root,
+            shadow=shadow,
+            workspace=workspace,
+            proof_timeout=proof_timeout,
+            max_diff_lines=max_diff_lines,
+            halt_path=halt_path,
+        )
 
     async def apply_in_sandbox(
         self,
