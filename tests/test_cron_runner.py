@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from dharma_swarm.cron_job_runtime import CronJobRunStatus
@@ -369,8 +370,6 @@ def test_run_cron_job_dispatches_doctor_assurance():
 
 
 def test_run_cron_job_dispatches_system_map_populator(tmp_path):
-    from types import SimpleNamespace
-
     script = tmp_path / "scripts" / "system_map_populator.py"
     script.parent.mkdir()
     script.write_text("print('ok')\n", encoding="utf-8")
@@ -396,6 +395,45 @@ def test_run_cron_job_dispatches_system_map_populator(tmp_path):
     assert ["--audit-dir", "/tmp/audit"] == args[2:4]
     assert ["--output", "/tmp/latest.json"] == args[4:6]
     assert mock_run.call_args.kwargs["timeout"] == 12
+
+
+def test_run_cron_job_dispatches_tcs_heartbeat(tmp_path):
+    class FakeIdentityMonitor:
+        def __init__(self, state_dir):
+            self.state_dir = state_dir
+            self.saved_path = None
+
+        async def measure(self, *, threat_boost=False):
+            assert threat_boost is True
+            return SimpleNamespace(
+                tcs=0.8123,
+                gpr=0.7,
+                bsi=0.8,
+                rm=0.9,
+                regime="stable",
+            )
+
+        def save_history(self, path=None):
+            self.saved_path = path
+            target = path or (self.state_dir / "meta" / "identity_history.jsonl")
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text('{"tcs":0.8123}\n', encoding="utf-8")
+
+    history_path = tmp_path / "history" / "identity_history.jsonl"
+    with patch("dharma_swarm.identity.IdentityMonitor", FakeIdentityMonitor):
+        success, output, error = run_cron_job(
+            {
+                "handler": "tcs_heartbeat",
+                "state_dir": str(tmp_path),
+                "history_path": str(history_path),
+                "threat_boost": True,
+            }
+        )
+
+    assert success is True
+    assert error is None
+    assert "TCS heartbeat: tcs=0.8123 regime=stable" in output
+    assert history_path.exists()
 
 
 def test_run_cron_job_rejects_unknown_handler():
