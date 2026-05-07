@@ -62,6 +62,7 @@ using phrases such as "source of truth", "canonical", "authoritative", or
 | `CLAUDE.md` | Behavioral rules for coding agents |
 | `docs/AGENTS.md` | Documentation-specific cleanup and semantic-experiment rules |
 | `docs/governance/BUILD_SESSION_ENTRYPOINT.md` | Current build track and pre-change read order |
+| `docs/governance/COHERENCE_DELTA.md` | PR Coherence Delta field semantics and merge-boundary discipline |
 | `docs/governance/SOVEREIGN_MANIFEST.md` | Repo architecture, invariants, domains, measured state |
 | `docs/governance/CANONICAL_DOC_STACK.md` | Documentation hierarchy and ownership |
 | `docs/governance/REPO_GOVERNANCE_AUDIT.md` | Contradiction, staleness, and drift ledger |
