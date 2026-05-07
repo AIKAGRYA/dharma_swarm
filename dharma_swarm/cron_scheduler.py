@@ -345,13 +345,16 @@ def get_due_jobs(quiet_hours: set[int] | None = None) -> list[dict[str, Any]]:
 
     jobs = load_jobs()
     due: list[dict[str, Any]] = []
+    repaired = False
 
     for job in jobs:
         if not job.get("enabled", True):
             continue
         next_run = job.get("next_run_at")
         if not next_run:
-            continue
+            job["next_run_at"] = now.isoformat()
+            next_run = job["next_run_at"]
+            repaired = True
         next_dt = datetime.fromisoformat(next_run)
         if next_dt.tzinfo is None:
             next_dt = next_dt.replace(tzinfo=timezone.utc)
@@ -360,6 +363,9 @@ def get_due_jobs(quiet_hours: set[int] | None = None) -> list[dict[str, Any]]:
                 logger.debug("Job '%s' deferred (quiet hours)", job.get("name"))
                 continue
             due.append(job)
+
+    if repaired:
+        save_jobs(jobs)
 
     return due
 
