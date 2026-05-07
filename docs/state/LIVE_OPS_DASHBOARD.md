@@ -1,7 +1,7 @@
 # LIVE OPS DASHBOARD — Slot 6 of MEGAFILE_INDEX
 **Path:** `dharma_swarm/docs/state/LIVE_OPS_DASHBOARD.md`
 **Status:** SEEDED — 2026-05-07 inaugural snapshot
-**Refresh cadence:** daily target. Currently manual. Auto-refresh is not wired; BR-001 must be fixed before relying on cron to refresh this file.
+**Refresh cadence:** daily target. Currently manual. Auto-refresh is not wired; BR-001 fixed cron-daemon restart safety, but no job owns this file yet.
 **Mode:** Today's truth — what's running, what fired, what crashed, what's stale. Aggregates fresh audit substrate into one read.
 
 ---
@@ -28,7 +28,7 @@ When refreshing, replace each section's date and content. **Snapshot the previou
 
 **Live Python daemons (per `~/.dharma/audit/system_inventory_2026-05-07.md`):**
 - `orchestrate_live` PID 90494 in `dharma_swarm_lf5` worktree, since 2026-04-30 (running ~7 days)
-- `com.dharma.cron-daemon` PID 10579 — **launchd running under `gui/501`, but restart-incoherent; see BR-001**
+- `com.dharma.cron-daemon` — path/version drift fixed in BR-001; verify current PID with `launchctl print gui/501/com.dharma.cron-daemon`
 - 731 live `claude|codex` processes (per inventory section 4B)
 - 9 active git worktrees (direct `git worktree list` check, 2026-05-07)
 
@@ -55,12 +55,21 @@ When refreshing, replace each section's date and content. **Snapshot the previou
 
 **5 of 7 enabled live `jobs.json` jobs have error status; 1 is ok; 1 has no recorded status.** Pattern: jobs that need ANTHROPIC_API_KEY in `--bare` mode are failing. Doctor assurance fails for a different reason (not API-key).
 
+**Phase 1 perception surfaces now present:**
+
+| Surface | Path / command | Role |
+|---|---|---|
+| System map report | `reports/system_map/latest.json` | OrganState perception output |
+| System map CLI | `dgc map list`, `dgc map drifted`, `dgc map gaps` | Read-only organ queries |
+| Coherence Delta gate | `.github/workflows/coherence-delta.yml` | PR-body map reread discipline |
+| DocOps gate | `make docops-integrity` | Documentation authority and count checks |
+
 **Crontab (3 active rules):**
 - `mech-interp tick` every 30 min (separate repo)
 - `dharma_swarm_rollup_brake_matrix` daily 7:10 (until 2026-06-01)
 - `dharma_swarm_rollup_status` 9:30 + 21:30 (until 2026-06-01)
 
-**14 LaunchAgents** (9 com.dharma.* + 5 com.dhyana.chetana.*) loaded. Per BR-001, `com.dharma.cron-daemon.plist` currently has a running process, but the installed CLI rejects the same command on fresh invocation; restart behavior is unsafe.
+**14 LaunchAgents** (9 com.dharma.* + 5 com.dhyana.chetana.*) loaded. BR-001 fixed the cron-daemon executable mismatch by pinning the plist to the lf5 virtualenv `dgc`; individual failing jobs remain separate triage items.
 
 ### 3. Loops
 
@@ -108,7 +117,6 @@ When refreshing, replace each section's date and content. **Snapshot the previou
 
 | ID | Item | Severity |
 |---|---|---|
-| BR-001 | Cron daemon LaunchAgent is restart-incoherent | **BLOCKER** (upstream/correlated with BR-005, BR-006) |
 | BR-002 | Central VentureCell loop is open | **BLOCKER** |
 | BR-003 | Apply gate present but closed | **BLOCKER** |
 | BR-007 | Two stores for one self (runtime ↔ ontology) | **BLOCKER** (architectural) |
@@ -123,13 +131,13 @@ See `BROKEN_REGISTER.md` for full register.
 
 ## Health Verdict (one paragraph)
 
-The swarm is structurally alive but operationally degraded. Substrate (orchestrate_live, dashboard, chetana plist set, kaizen db, ontology db, identity history) is fresh today. **5 of 7 enabled cron jobs are erroring** — most blocked on missing ANTHROPIC_API_KEY in `--bare` mode; one enabled job has no recorded status. Recognition seed is 6 days stale, correlated with BR-001 cron path/version drift but not proven caused by daemon death because launchd reports a live process. Central VentureCell loop and apply gate are both architecturally present but operationally closed — sediment is not crystallizing into new gates / skills / organs. 47% of in-flight branches have no plan-doc anchor. **Strategy is ~10x ahead of code.** The single highest-leverage fix is BR-001 (make cron daemon restart-safe) — that one verification likely clarifies BR-005 + BR-006 + parts of BR-002 downstream.
+The swarm is structurally alive but operationally degraded. Substrate (orchestrate_live, dashboard, chetana plist set, kaizen db, ontology db, identity history) is fresh today. BR-001 fixed cron-daemon restart safety, but **5 of 7 enabled cron jobs are still erroring** — most blocked on missing ANTHROPIC_API_KEY in `--bare` mode; one enabled job has no recorded status. Recognition seed remains stale after the cron fix, so BR-006 is independent of the daemon path issue. Central VentureCell loop and apply gate are both architecturally present but operationally closed — sediment is not crystallizing into new gates / skills / organs. 47% of in-flight branches have no plan-doc anchor. **Strategy is ~10x ahead of code.** The highest-leverage next fixes are scoped investigations of BR-005 and BR-006 plus one consumer of the new OrganState perception surface.
 
 ---
 
 ## Next Refresh
 
-Recommend daily refresh, rolling old snapshot to `_archive/LIVE_OPS_DASHBOARD_2026-05-07.md`. Until cron daemon verified working, refresh is manual.
+Recommend daily refresh, rolling old snapshot to `_archive/LIVE_OPS_DASHBOARD_2026-05-07.md`. Until a job explicitly owns this dashboard, refresh is manual.
 
 **Refresh procedure (target):**
 1. Re-run `~/.dharma/audit/48h_status` generation
