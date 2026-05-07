@@ -62,25 +62,25 @@
 
 ### BR-005 — Algedonic stream in degenerate steady-state
 - **first_observed:** ~2026-05-02 (5 days prior to audit)
-- **last_verified:** 2026-05-07
+- **last_verified:** 2026-05-07 20:30 (post-BR-001-fix verification)
 - **age_days:** ~5
 - **severity:** DEGRADED
 - **domain:** runtime
-- **root_cause:** Current last-200 algedonic rows contain only `omega_divergence medium rebalance_priorities`: 116 rows at `0.683`, 84 rows at `0.6527`. Not literally one identical value, but still a low-information steady-state. Consumer side likely dead or under-wired.
+- **root_cause:** Current last-200 algedonic rows contain only `omega_divergence medium rebalance_priorities`: 116 rows at `0.683`, 84 rows at `0.6527`. Not literally one identical value, but still a low-information steady-state. Consumer side likely dead or under-wired. **POST-BR-001 VERIFICATION**: 2 hours after the cron-daemon plist fix landed (PID 35207 running lf5-venv binary), `tail -50 ~/.dharma/algedonic_signals.jsonl | jq '.value' | sort -u` returns ONLY `0.683` (1 distinct value). Conclusion: BR-005 root cause is NOT the cron daemon path/version drift. Independent issue.
 - **blast_radius:** No rich causal feedback into the swarm. EMERGENCY_HOLD never escalates. Algedonic channel is structurally present (`vsm_channels.py:373`, `organism.py:968` — note duplicate types) but operationally inert.
-- **evidence:** `tail -200 ~/.dharma/algedonic_signals.jsonl | jq '[.kind,.severity,.action,.value]'` summary on 2026-05-07; `~/.dharma/audit/ten_megafiles_q3_2026-05-07.md`; `vsm_channels.py:373`; `organism.py:968`.
-- **status:** OPEN.
+- **evidence:** `tail -200 ~/.dharma/algedonic_signals.jsonl | jq '[.kind,.severity,.action,.value]'` summary on 2026-05-07; `~/.dharma/audit/ten_megafiles_q3_2026-05-07.md`; `vsm_channels.py:373`; `organism.py:968`. Post-fix verification: `launchctl print gui/501/com.dharma.cron-daemon` shows running PID 35207 with lf5-venv binary; algedonic stream still emits one value.
+- **status:** OPEN — needs SCOPED INVESTIGATION (likely consumer-side: where does `algedonic_signals.jsonl` get read, and does that reader emit anything OTHER than the one stuck signal?). Not auto-resolved by cron daemon fix.
 
 ### BR-006 — Recognition seed stale
 - **first_observed:** ~2026-05-01 (6 days prior to audit)
-- **last_verified:** 2026-05-07
+- **last_verified:** 2026-05-07 20:30 (post-BR-001-fix verification)
 - **age_days:** 6
 - **severity:** DEGRADED
 - **domain:** runtime / agent
-- **root_cause:** `~/.dharma/meta/recognition_seed.md` is 6 days old despite metabolic-clock doctrine claiming nightly regeneration. Correlates with BR-001 cron LaunchAgent drift; direct causality is not proven because launchd reports the daemon process still running.
+- **root_cause:** `~/.dharma/meta/recognition_seed.md` is 6 days old despite metabolic-clock doctrine claiming nightly regeneration. Correlates with BR-001 cron LaunchAgent drift; direct causality is not proven because launchd reports the daemon process still running. **POST-BR-001 VERIFICATION**: 2 hours after cron-daemon plist fix landed, `stat -f "%Sm" ~/.dharma/meta/recognition_seed.md` returns `May 1 08:58:32 2026` — seed mtime is UNCHANGED. Conclusion: BR-006 is NOT downstream of BR-001. The cron daemon firing more reliably does not by itself trigger recognition_seed regeneration. Independent issue.
 - **blast_radius:** Agents loading context get stale self-model. Recognition is recognition of yesterday's state.
-- **evidence:** `~/.dharma/audit/ten_megafiles_q6_2026-05-07.md`; vision_maps `04_recognition_self_model.md`.
-- **status:** OPEN — re-check after BR-001 is fixed or the cron daemon is safely restarted.
+- **evidence:** `~/.dharma/audit/ten_megafiles_q6_2026-05-07.md`; vision_maps `04_recognition_self_model.md`. Post-fix verification: cron daemon PID 35207 running lf5-venv binary; recognition_seed mtime unchanged at May 1.
+- **status:** OPEN — needs SCOPED INVESTIGATION (where in the metabolic clock does recognition_seed regeneration happen? `meta_daemon.py:RecognitionEngine`? Is there a separate cron handler that should fire it? The `meta_daemon.py:272-285` hard-coded March 2026 thesis-timing logic — does that gate regeneration?). Not auto-resolved by cron daemon fix.
 
 ### BR-007 — Two stores for one self (runtime.db ↔ ontology.db never synced)
 - **first_observed:** 2026-05-07
