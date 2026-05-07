@@ -47,6 +47,15 @@ Every PR must answer these four fields. If any answer is UNKNOWN, say why.
 - Proof that re-reads the map:
 - New drift introduced:
 
+## Pre-flight check (collision prevention)
+
+Before opening this PR, did you check that no other open PR addresses the same BR-id(s)?
+
+- [ ] Ran `gh pr list --state open --search "BR-NNN"` for each cited BR-id, OR no BR-id cited
+- [ ] No collision found, OR collision noted and coordinated:
+
+A `pr-collision-detect` workflow runs on PR open and posts a warning comment if any BR-id in this body matches an open PR. See `docs/governance/COHERENCE_DELTA.md` § "Pre-flight check" for why this matters.
+
 ## Verification
 
 How was the change verified end-to-end? Check all that apply.

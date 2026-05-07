@@ -98,6 +98,35 @@ Every PR must answer all four. If any answer is genuinely UNKNOWN, the PR must s
 
 ---
 
+## Pre-flight check (collision prevention)
+
+The four fields above describe what THIS PR is. The pre-flight check asks: is anyone else already doing this?
+
+**The failure mode this section guards against:** two PRs landing within minutes of each other, both citing the same BR-id, both modifying the same hot-path file, neither author aware of the other. This happened on 2026-05-07 with PR #159 and PR #160 (both closed BR-002 + BR-003; #160 closed redundantly with provenance pointing at #159). The 4-field gate above did not catch it because the gate is filled per-PR, not cross-checked across open PRs.
+
+**What the check is:** before opening any PR that closes / demotes / adds a BR-id, run
+
+```
+gh pr list --state open --search "BR-NNN"
+```
+
+for each BR-id you cite. If another open PR cites the same id, you have three options:
+
+1. **Rebase your work onto the other PR's branch** if the scopes overlap meaningfully
+2. **Split your scope** so this PR addresses a non-intersecting subset of the BR (cite only the subset)
+3. **Close one as redundant** with a provenance comment pointing at the survivor (this is what happened to #160)
+
+**What automation enforces it:** the `.github/workflows/pr-collision-detect.yml` workflow (added alongside this section) fires on `pull_request: opened, reopened, edited, synchronize`. It greps the PR body for `BR-\d+` ids, queries other open PRs for matches, and posts a warning comment if collisions are found. It does NOT block the PR; it surfaces the collision for human resolution within ~1 minute of opening.
+
+**Why this lives here, not in the four-field gate:** the four fields describe one PR's intent. Collision detection is a property of the OPEN PR SET, not of any single PR. The check is a separate mechanism, anchored to the same `Declared-vs-actual gap closed` field that the bot greps.
+
+**What this does NOT cover:**
+- Two PRs that touch the same files but cite different (or no) BR-ids — the bot only matches BR-id text
+- Branch-level collisions where one branch is rebased on top of work-in-flight elsewhere — that's a separate problem (branch-naming convention; tracked as future hardening)
+- PRs that should have cited a BR-id but didn't — the four-field gate is the catch for that, not this check
+
+---
+
 ## Honor-system enforcement, for now
 
 The Coherence Delta gate is **honor-system enforced** as of this PR's merge. Pre-commit hooks cover secrets, hotpath, contract tests, and gitleaks; GitHub Actions validate commit messages and run tests. **No tooling validates that the four fields are filled.**
