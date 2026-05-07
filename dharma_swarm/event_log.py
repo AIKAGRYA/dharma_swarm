@@ -21,10 +21,12 @@ class EventLog:
     """Manage append-only runtime envelope and snapshot streams."""
 
     def __init__(self, base_dir: Path | str | None = None) -> None:
+        """Initialize the log under ``base_dir`` (defaults to ~/.dharma/events), creating it if missing."""
         self.base_dir = Path(base_dir or DEFAULT_EVENT_LOG_DIR)
         self.base_dir.mkdir(parents=True, exist_ok=True)
 
     def stream_path(self, stream: str) -> Path:
+        """Return the JSONL file path for ``stream``; falls back to ``runtime`` if the name is empty."""
         safe_name = str(stream).strip() or "runtime"
         return self.base_dir / f"{safe_name}.jsonl"
 
@@ -34,6 +36,7 @@ class EventLog:
         *,
         stream: str = "runtime",
     ) -> dict[str, Any]:
+        """Validate ``envelope`` against the runtime contract and append it as a JSON line to ``stream``; returns the stored dict. Raises ``ValueError`` on invalid input."""
         data = envelope.as_dict() if isinstance(envelope, RuntimeEnvelope) else dict(envelope)
         ok, errors = validate_envelope(data)
         if not ok:
@@ -49,6 +52,7 @@ class EventLog:
         *,
         stream: str = "snapshots",
     ) -> SnapshotRecord:
+        """Append a state snapshot to ``stream`` via continuity_harness; returns the resulting SnapshotRecord."""
         return append_snapshot(self.stream_path(stream), state)
 
     def read_envelopes(
@@ -61,6 +65,7 @@ class EventLog:
         limit: int | None = None,
         newest_first: bool = False,
     ) -> list[dict[str, Any]]:
+        """Load envelopes from ``stream``, optionally filtered by ``session_id`` / ``trace_id`` / ``event_type``, sorted by emitted_at, then truncated to ``limit``."""
         path = self.stream_path(stream)
         if not path.exists():
             return []
@@ -98,6 +103,7 @@ class EventLog:
         return rows
 
     def tail(self, *, stream: str = "runtime", limit: int = 20) -> list[dict[str, Any]]:
+        """Return the most recent ``limit`` envelopes from ``stream``, newest first."""
         return self.read_envelopes(stream=stream, limit=limit, newest_first=True)
 
     def read_snapshots(
@@ -106,12 +112,14 @@ class EventLog:
         stream: str = "snapshots",
         limit: int | None = None,
     ) -> list[SnapshotRecord]:
+        """Load all SnapshotRecord rows from ``stream``; if ``limit`` is set, return only the last ``limit`` rows."""
         rows = load_snapshots(self.stream_path(stream))
         if limit is not None and limit > 0:
             return rows[-limit:]
         return rows
 
     def verify_stream(self, *, stream: str = "runtime") -> tuple[bool, list[str]]:
+        """Validate every line of ``stream`` against the runtime envelope contract; return ``(ok, errors)``."""
         path = self.stream_path(stream)
         if not path.exists():
             return (False, ["runtime stream missing"])
@@ -133,6 +141,7 @@ class EventLog:
         return (len(errors) == 0, errors)
 
     def verify_snapshot_stream(self, *, stream: str = "snapshots") -> tuple[bool, list[str]]:
+        """Validate every line of the snapshot ``stream`` via continuity_harness; return ``(ok, errors)``."""
         path = self.stream_path(stream)
         if not path.exists():
             return (False, ["snapshot stream missing"])
