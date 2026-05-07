@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import sqlite3
 from typing import Any
+from urllib.parse import quote
 
 from dharma_swarm.shakti_executive.models import ExecutiveSignal
 
@@ -22,6 +24,10 @@ def read_all_signals(state_dir: Path, *, max_zeitgeist: int = 80) -> list[Execut
     if seed is not None:
         signals.append(seed)
     signals.extend(read_operator_directives(state_dir))
+    signals.extend(read_telic_feedback(state_dir))
+    signals.extend(read_dispatcher_health(state_dir))
+    signals.extend(read_campaign_manifests(state_dir))
+    signals.extend(read_sealed_packet_archive_results(state_dir))
     return signals
 
 
@@ -152,11 +158,228 @@ def read_operator_directives(state_dir: Path) -> list[ExecutiveSignal]:
     return signals
 
 
+def read_telic_feedback(state_dir: Path, *, max_rows: int = 40) -> list[ExecutiveSignal]:
+    """Read Outcome / ValueEvent / Contribution rows from the ontology DB."""
+    rows = _read_ontology_objects(
+        state_dir / "ontology.db",
+        ("Outcome", "ValueEvent", "Contribution"),
+        limit=max_rows,
+    )
+    signals: list[ExecutiveSignal] = []
+    for row in rows:
+        type_name = str(row.get("type_name") or "")
+        props = dict(row.get("properties") or {})
+        obj_id = str(row.get("id") or "")
+        if type_name == "Outcome":
+            signals.append(_outcome_signal(obj_id, props, row))
+        elif type_name == "ValueEvent":
+            signals.append(_value_event_signal(obj_id, props, row))
+        elif type_name == "Contribution":
+            signals.append(_contribution_signal(obj_id, props, row))
+    return signals
+
+
+def read_dispatcher_health(state_dir: Path) -> list[ExecutiveSignal]:
+    """Read the opportunity dispatcher health facade as feedback."""
+    path = state_dir / "meta" / "opportunity_dispatcher.health.json"
+    row = _read_json(path)
+    if not isinstance(row, dict):
+        return []
+
+    failures = _int_count(row.get("consecutive_failures"))
+    pending = _int_count(row.get("last_run_pending_count"))
+    dispatched = _int_count(row.get("last_run_dispatched"))
+    in_flight = _int_count(row.get("last_run_observed_in_flight"))
+    errors = [str(e) for e in list(row.get("last_run_errors") or [])[:3]]
+    paused = bool(row.get("last_run_paused") or False)
+
+    relevance = 0.45
+    title = "Opportunity dispatcher health summary"
+    suggested = "Keep monitoring dispatcher throughput."
+    if failures:
+        relevance = min(1.0, 0.72 + failures * 0.08)
+        title = f"Opportunity dispatcher has {failures} consecutive failure(s)"
+        suggested = "Investigate dispatcher failures before adding more opportunities."
+    elif paused:
+        relevance = 0.78
+        title = "Opportunity dispatcher is paused"
+        suggested = "Resolve dispatcher pause before promoting new opportunity work."
+    elif pending and dispatched == 0:
+        relevance = 0.7
+        title = "Opportunity dispatcher has pending work but dispatched nothing"
+        suggested = "Check promotion gates, budget, and campaign manifests."
+
+    description = (
+        f"pending={pending}; dispatched={dispatched}; in_flight={in_flight}; "
+        f"errors={'; '.join(errors) if errors else 'none'}"
+    )
+    return [
+        ExecutiveSignal(
+            source="dispatcher_health",
+            title=title,
+            category="dispatcher_health",
+            description=description,
+            relevance_score=relevance,
+            confidence=0.82,
+            domain_hint="runtime_feedback",
+            evidence_ref=str(path),
+            keywords=("dispatcher", "campaign", "feedback", "opportunity"),
+            suggested_action=suggested,
+            raw=row,
+        )
+    ]
+
+
+def read_campaign_manifests(state_dir: Path, *, max_manifests: int = 40) -> list[ExecutiveSignal]:
+    """Read campaign manifests as opportunity feedback."""
+    root = state_dir / "campaigns"
+    if not root.exists():
+        return []
+
+    manifests = sorted(
+        (path for path in root.glob("*/manifest.json") if path.is_file()),
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )[:max_manifests]
+    signals: list[ExecutiveSignal] = []
+    for path in manifests:
+        row = _read_json(path)
+        if not isinstance(row, dict):
+            continue
+        opp_id = str(row.get("opportunity_id") or path.parent.name)
+        stages = dict(row.get("stages") or {})
+        counts: dict[str, int] = {}
+        for stage in stages.values():
+            if isinstance(stage, dict):
+                status = str(stage.get("status") or "unknown")
+                counts[status] = counts.get(status, 0) + 1
+        bad = sum(counts.get(s, 0) for s in ("failed", "quarantined", "abandoned", "blocked"))
+        completed = counts.get("completed", 0)
+        in_flight = sum(counts.get(s, 0) for s in ("promoted", "dispatched"))
+        if bad:
+            relevance = min(1.0, 0.78 + bad * 0.06)
+            title = f"Campaign {opp_id} has blocked or failed stage feedback"
+            suggested = "Use campaign failure evidence before selecting the next opportunity move."
+        elif completed and completed == len(stages):
+            relevance = 0.58
+            title = f"Campaign {opp_id} completed all tracked stages"
+            suggested = "Promote the proven campaign pattern or harvest a knowledge artifact."
+        elif in_flight:
+            relevance = 0.5
+            title = f"Campaign {opp_id} is still in flight"
+            suggested = "Avoid duplicate opportunity expansion until in-flight stages settle."
+        else:
+            relevance = 0.42
+            title = f"Campaign {opp_id} is present but has no decisive feedback"
+            suggested = "Monitor the campaign before changing priority."
+        signals.append(
+            ExecutiveSignal(
+                source="campaign_manifest",
+                title=title,
+                category="campaign_feedback",
+                description=f"stage_counts={counts}",
+                relevance_score=relevance,
+                confidence=0.78,
+                domain_hint="runtime_feedback",
+                evidence_ref=str(path),
+                keywords=("campaign", "opportunity", "feedback", *counts.keys()),
+                suggested_action=suggested,
+                raw=row,
+            )
+        )
+    return signals
+
+
+def read_sealed_packet_archive_results(state_dir: Path, *, max_lines: int = 80) -> list[ExecutiveSignal]:
+    """Read Darwin archive entries produced by sealed packet shadow application."""
+    path = state_dir / "evolution" / "archive.jsonl"
+    rows = _read_jsonl_tail(path, max_lines=max_lines)
+    signals: list[ExecutiveSignal] = []
+    for idx, row in enumerate(rows):
+        test_results = dict(row.get("test_results") or {})
+        sealed = dict(test_results.get("sealed_packet") or {})
+        if not sealed and row.get("change_type") != "sealed_packet":
+            continue
+        shadow = bool(sealed.get("shadow") if sealed else True)
+        diff_missing = bool(sealed.get("diff_missing") or False)
+        pass_rate = _float(test_results.get("pass_rate"), default=0.5)
+        relevance = 0.58 if pass_rate >= 1.0 and not diff_missing else 0.82
+        mode = "shadow" if shadow else "live"
+        title = f"Sealed packet archived through Darwin {mode} evaluation"
+        if diff_missing:
+            title = "Sealed packet archived without diff artifact"
+        signals.append(
+            ExecutiveSignal(
+                source="darwin_archive",
+                title=title,
+                category="sealed_packet_archive",
+                description=str(row.get("description") or "")[:600],
+                relevance_score=relevance,
+                confidence=0.8,
+                domain_hint="runtime_feedback",
+                evidence_ref=f"{path}:tail:{idx}",
+                keywords=("sealed", "packet", "darwin", "shadow", "proof"),
+                suggested_action="Use sealed packet proof results when selecting the next build move.",
+                raw=row,
+            )
+        )
+    return signals
+
+
 def _read_json(path: Path) -> Any:
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return None
+
+
+def _read_ontology_objects(
+    path: Path,
+    type_names: tuple[str, ...],
+    *,
+    limit: int,
+) -> list[dict[str, Any]]:
+    if not path.exists() or not type_names:
+        return []
+    uri = "file:" + quote(str(path.resolve()), safe="/") + "?mode=ro"
+    try:
+        conn = sqlite3.connect(uri, uri=True)
+        conn.row_factory = sqlite3.Row
+        try:
+            rows = []
+            for type_name in type_names:
+                rows.extend(
+                    conn.execute(
+                        """
+                        SELECT id, type_name, properties, created_at
+                        FROM objects
+                        WHERE type_name = ?
+                        ORDER BY created_at DESC
+                        LIMIT ?
+                        """,
+                        (type_name, int(limit)),
+                    ).fetchall()
+                )
+            rows.sort(key=lambda row: str(row["created_at"] or ""), reverse=True)
+            rows = rows[: int(limit)]
+        finally:
+            conn.close()
+    except Exception:
+        return []
+
+    out: list[dict[str, Any]] = []
+    for row in rows:
+        try:
+            properties = json.loads(row["properties"] or "{}")
+        except json.JSONDecodeError:
+            properties = {}
+        out.append({
+            "id": row["id"],
+            "type_name": row["type_name"],
+            "properties": properties if isinstance(properties, dict) else {},
+            "created_at": row["created_at"],
+        })
+    return out
 
 
 def _read_jsonl_tail(path: Path, *, max_lines: int) -> list[dict[str, Any]]:
@@ -184,6 +407,86 @@ def _float(value: Any, *, default: float) -> float:
         return max(0.0, min(1.0, float(value)))
     except (TypeError, ValueError):
         return default
+
+
+def _int_count(value: Any) -> int:
+    try:
+        return max(0, int(value))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _outcome_signal(obj_id: str, props: dict[str, Any], raw: dict[str, Any]) -> ExecutiveSignal:
+    success = bool(props.get("success"))
+    task_id = str(props.get("task_id") or "")
+    summary = str(props.get("result_summary") or "")
+    error = str(props.get("error") or "")
+    title = f"{'Successful' if success else 'Failed'} task outcome"
+    if task_id:
+        title = f"{title}: {task_id}"
+    return ExecutiveSignal(
+        source="telic:Outcome",
+        title=title,
+        category="runtime_outcome",
+        description=(summary or error)[:700],
+        relevance_score=0.58 if success else 0.88,
+        confidence=0.82,
+        domain_hint="runtime_feedback",
+        evidence_ref=f"ontology://Outcome/{obj_id}",
+        keywords=("outcome", "success" if success else "failure", "telic", "feedback"),
+        suggested_action=(
+            "Harvest the successful outcome as a reusable pattern."
+            if success else "Investigate failed outcome before expanding this opportunity lane."
+        ),
+        raw=raw,
+    )
+
+
+def _value_event_signal(obj_id: str, props: dict[str, Any], raw: dict[str, Any]) -> ExecutiveSignal:
+    composite = _float(props.get("composite_value"), default=0.5)
+    low_value = composite < 0.45
+    return ExecutiveSignal(
+        source="telic:ValueEvent",
+        title=f"ValueEvent composite score {composite:.2f}",
+        category="value_event_feedback",
+        description=(
+            f"task_id={props.get('task_id') or ''}; "
+            f"agent_id={props.get('agent_id') or ''}; "
+            f"task_type={props.get('task_type') or ''}"
+        ),
+        relevance_score=max(0.45, 1.0 - composite) if low_value else 0.54,
+        confidence=0.78,
+        domain_hint="runtime_feedback",
+        evidence_ref=f"ontology://ValueEvent/{obj_id}",
+        keywords=("value_event", "telic", "feedback", "low_value" if low_value else "value"),
+        suggested_action=(
+            "Review low-value execution before selecting similar work."
+            if low_value else "Prefer patterns that produced measurable value."
+        ),
+        raw=raw,
+    )
+
+
+def _contribution_signal(obj_id: str, props: dict[str, Any], raw: dict[str, Any]) -> ExecutiveSignal:
+    attributed = _float(props.get("attributed_value"), default=0.5)
+    agent_id = str(props.get("agent_id") or "unknown")
+    return ExecutiveSignal(
+        source="telic:Contribution",
+        title=f"Contribution feedback for {agent_id}",
+        category="contribution_feedback",
+        description=(
+            f"task_type={props.get('task_type') or ''}; "
+            f"credit_share={props.get('credit_share') or ''}; "
+            f"attributed_value={attributed:.2f}"
+        ),
+        relevance_score=max(0.4, min(0.85, 1.0 - attributed)),
+        confidence=0.72,
+        domain_hint="runtime_feedback",
+        evidence_ref=f"ontology://Contribution/{obj_id}",
+        keywords=("contribution", "credit", "telic", "feedback"),
+        suggested_action="Use contribution feedback when assigning future work.",
+        raw=raw,
+    )
 
 
 def _severity_relevance(severity: str) -> float:

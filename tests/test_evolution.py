@@ -1,6 +1,7 @@
 """Tests for dharma_swarm.evolution -- DarwinEngine orchestration loop."""
 
 import asyncio
+import json
 import sys
 import types
 
@@ -20,6 +21,7 @@ from dharma_swarm.meta_evolution import MetaParameters
 from dharma_swarm.experiment_log import ExperimentRecord
 from dharma_swarm.models import GateDecision, LLMResponse, SandboxResult
 from dharma_swarm.router_retrospective import RouteOutcomeRecord
+from dharma_swarm.runtime_contract import RuntimeEnvelope, RuntimeEventType
 from dharma_swarm.ucb_selector import UCBConfig
 
 
@@ -131,6 +133,132 @@ def _review_proposal(**kw) -> Proposal:
     }
     defaults.update(kw)
     return Proposal(**defaults)
+
+
+def _proof_command(exit_code: int = 0, output: str = "1 passed in 0.1s") -> str:
+    script = (
+        "import sys; "
+        f"print({output!r}); "
+        f"sys.exit({exit_code})"
+    )
+    return f"{sys.executable} -c {script!r}"
+
+
+def _write_sealed_packet(
+    root,
+    *,
+    build_packet_id="sealed-smoke",
+    work_packet_id="wp_001",
+    merge_decision="seal",
+    gate_result="pass",
+    review_status="approved",
+    review_decision="pass",
+    reviewer_agent="reviewer",
+    builder_agent="builder",
+    diff_text=None,
+    diff_ref="diff.patch",
+    proof_command=None,
+    allowed_paths=None,
+):
+    """Write a minimal Build Protocol dryrun bundle for sealed packet tests."""
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "work_packets").mkdir()
+    allowed = list(allowed_paths or ["dharma_swarm/safe_leaf.py"])
+    command = proof_command or _proof_command()
+    build_packet = {
+        "title": build_packet_id,
+        "description": (
+            "Improve activation mechanism with consciousness witness "
+            "and ecosystem resilience feedback"
+        ),
+        "metadata": {
+            "kind": "build_packet",
+            "protocol_version": "v0",
+            "spec_path": str(root / "source_spec_copy.md"),
+            "telos_statement": "Improve bounded sealed packet ingestion.",
+            "proof_command": command,
+        },
+    }
+    work_packet = {
+        "id": work_packet_id,
+        "scope": allowed,
+        "payload": {
+            "allowed_paths": allowed,
+            "scoped_tests": [command],
+        },
+    }
+    review_packet = {
+        "checkpoint_id": f"review_{work_packet_id}",
+        "task_id": work_packet_id,
+        "status": review_status,
+        "metadata": {
+            "kind": "review_packet",
+            "work_packet_id": work_packet_id,
+            "reviewer_agent": reviewer_agent,
+            "builder_agent": builder_agent,
+            "diff_ref": diff_ref,
+            "gate_results": {
+                "scoped_tests": {
+                    "result": gate_result,
+                    "reason": gate_result,
+                    "evidence": "test",
+                }
+            },
+            "decision": review_decision,
+        },
+    }
+    proof_result = "pass" if merge_decision == "seal" else "hold"
+    proof_payload = {
+        "build_packet_id": build_packet_id,
+        "work_packet_id": work_packet_id,
+        "gate": "proof_seal",
+        "result": proof_result,
+        "reason": "sealed packet test fixture",
+        "gate_results_aggregate": {
+            "scoped_tests": {
+                "pass_count": 1 if gate_result == "pass" else 0,
+                "fail_count": 1 if gate_result == "fail" else 0,
+                "hold_count": 1 if gate_result == "hold" else 0,
+            }
+        },
+        "test_outputs_ref": "test_output.txt",
+        "diff_summary": {"files": 1, "added": 1, "removed": 1},
+        "signed_by": [reviewer_agent],
+        "witness_log_ref": "",
+        "child_checkpoint_ids": [f"review_{work_packet_id}"],
+        "merge_decision": merge_decision,
+    }
+    proof_packet = RuntimeEnvelope.create(
+        event_type=RuntimeEventType.AUDIT_EVENT,
+        source="sealed-packet-test",
+        agent_id=reviewer_agent,
+        session_id=root.name,
+        payload=proof_payload,
+    ).as_dict()
+    (root / "build_packet.json").write_text(
+        json.dumps(build_packet), encoding="utf-8"
+    )
+    (root / "work_packets" / f"{work_packet_id}.json").write_text(
+        json.dumps(work_packet), encoding="utf-8"
+    )
+    (root / "review_packet.json").write_text(
+        json.dumps(review_packet), encoding="utf-8"
+    )
+    (root / "proof_packet.json").write_text(
+        json.dumps(proof_packet), encoding="utf-8"
+    )
+    (root / "proof_command.txt").write_text(command + "\n", encoding="utf-8")
+    if diff_text is not None:
+        (root / diff_ref).write_text(diff_text, encoding="utf-8")
+
+
+def _safe_diff(path: str = "dharma_swarm/safe_leaf.py") -> str:
+    return f"""--- a/{path}
++++ b/{path}
+@@ -1 +1 @@
+-old
++new
+"""
 
 
 # ---------------------------------------------------------------------------
@@ -1772,6 +1900,214 @@ async def test_run_cycle_with_sandbox(engine):
     assert result.proposals_archived >= 1
     latest = await engine.archive.get_latest(n=2)
     assert all(entry.promotion_state == "local_pass" for entry in latest)
+
+
+async def test_apply_sealed_packet_kill_switch_refuses(engine, tmp_path):
+    root = tmp_path / "dryrun"
+    halt = tmp_path / "HALT_DARWIN_PROPOSALS"
+    halt.write_text("", encoding="utf-8")
+
+    result = await engine.apply_sealed_packet(root, halt_path=halt)
+
+    assert result.accepted is False
+    assert result.applied is False
+    assert result.refused_checks == ["kill_switch"]
+    assert "halt" in result.reason
+
+
+async def test_apply_sealed_packet_missing_packet_files_refuses(engine, tmp_path):
+    root = tmp_path / "dryrun"
+    root.mkdir()
+
+    result = await engine.apply_sealed_packet(
+        root,
+        halt_path=tmp_path / "missing-halt",
+    )
+
+    assert result.accepted is False
+    assert result.refused_checks == ["packet_shape"]
+    assert "missing packet files" in result.reason
+
+
+async def test_apply_sealed_packet_unsealed_proof_refuses(engine, tmp_path):
+    root = tmp_path / "dryrun"
+    _write_sealed_packet(root, merge_decision="hold")
+
+    result = await engine.apply_sealed_packet(
+        root,
+        halt_path=tmp_path / "missing-halt",
+    )
+
+    assert result.accepted is False
+    assert result.refused_checks == ["proof_seal"]
+    assert "merge_decision" in result.reason
+
+
+async def test_apply_sealed_packet_invalid_proof_envelope_refuses(engine, tmp_path):
+    root = tmp_path / "dryrun"
+    _write_sealed_packet(root)
+    proof_path = root / "proof_packet.json"
+    proof_packet = json.loads(proof_path.read_text(encoding="utf-8"))
+    proof_packet["checksum"] = "invalid"
+    proof_path.write_text(json.dumps(proof_packet), encoding="utf-8")
+
+    result = await engine.apply_sealed_packet(
+        root,
+        halt_path=tmp_path / "missing-halt",
+    )
+
+    assert result.accepted is False
+    assert result.applied is False
+    assert result.refused_checks == ["proof_envelope:checksum mismatch"]
+
+
+async def test_apply_sealed_packet_unapproved_review_refuses(engine, tmp_path):
+    root = tmp_path / "dryrun"
+    _write_sealed_packet(root, review_status="rejected", review_decision="reject")
+
+    result = await engine.apply_sealed_packet(
+        root,
+        halt_path=tmp_path / "missing-halt",
+    )
+
+    assert result.accepted is False
+    assert result.applied is False
+    assert "review_status:rejected" in result.refused_checks
+    assert "review_decision:reject" in result.refused_checks
+
+
+async def test_apply_sealed_packet_self_review_refuses(engine, tmp_path):
+    root = tmp_path / "dryrun"
+    _write_sealed_packet(root, reviewer_agent="same-agent", builder_agent="same-agent")
+
+    result = await engine.apply_sealed_packet(
+        root,
+        halt_path=tmp_path / "missing-halt",
+    )
+
+    assert result.accepted is False
+    assert result.applied is False
+    assert result.refused_checks == ["reviewer_builder_identity"]
+
+
+async def test_apply_sealed_packet_failing_fresh_proof_refuses(engine, tmp_path):
+    root = tmp_path / "dryrun"
+    _write_sealed_packet(root, proof_command=_proof_command(exit_code=3))
+
+    result = await engine.apply_sealed_packet(
+        root,
+        proof_timeout=5.0,
+        halt_path=tmp_path / "missing-halt",
+    )
+
+    assert result.accepted is False
+    assert result.proof_exit_code == 3
+    assert result.refused_checks == ["fresh_proof"]
+    assert result.proposal_id is not None
+
+
+async def test_apply_sealed_packet_shadow_archives_without_apply(
+    engine,
+    tmp_path,
+    monkeypatch,
+):
+    root = tmp_path / "dryrun"
+    _write_sealed_packet(root, diff_text=_safe_diff())
+
+    async def fail_apply(*args, **kwargs):
+        del args, kwargs
+        raise AssertionError("shadow sealed packet must not apply diffs")
+
+    monkeypatch.setattr(engine, "apply_diff_and_test", fail_apply)
+
+    result = await engine.apply_sealed_packet(
+        root,
+        shadow=True,
+        proof_timeout=5.0,
+        halt_path=tmp_path / "missing-halt",
+    )
+
+    assert result.accepted is True
+    assert result.applied is False
+    assert result.archive_entry_id is not None
+    stored = await engine.archive.get_entry(result.archive_entry_id)
+    assert stored is not None
+    assert stored.component == "dharma_swarm/safe_leaf.py"
+    assert stored.test_results["sealed_packet"]["shadow"] is True
+    assert stored.test_results["sealed_packet"]["files_changed"] == [
+        "dharma_swarm/safe_leaf.py"
+    ]
+
+
+async def test_apply_sealed_packet_live_calls_apply_after_guards(
+    engine,
+    tmp_path,
+    monkeypatch,
+):
+    root = tmp_path / "dryrun"
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    _write_sealed_packet(root, diff_text=_safe_diff())
+    calls = []
+
+    async def fake_apply(
+        proposal,
+        test_command="python3 -m pytest tests/ -q --tb=short",
+        timeout=120.0,
+        workspace=None,
+    ):
+        calls.append((proposal.id, test_command, timeout, workspace))
+        proposal.status = EvolutionStatus.TESTING
+        return proposal, {"pass_rate": 1.0, "rolled_back": False}
+
+    monkeypatch.setattr(engine, "apply_diff_and_test", fake_apply)
+
+    result = await engine.apply_sealed_packet(
+        root,
+        shadow=False,
+        workspace=workspace,
+        proof_timeout=5.0,
+        halt_path=tmp_path / "missing-halt",
+    )
+
+    assert result.accepted is True
+    assert result.applied is True
+    assert result.archive_entry_id is not None
+    assert len(calls) == 1
+    assert calls[0][3] == workspace
+
+
+async def test_apply_sealed_packet_blocked_path_refuses_before_apply(
+    engine,
+    tmp_path,
+    monkeypatch,
+):
+    root = tmp_path / "dryrun"
+    _write_sealed_packet(
+        root,
+        diff_text=_safe_diff("dharma_swarm/dharma_kernel.py"),
+        allowed_paths=["dharma_swarm/dharma_kernel.py"],
+    )
+    called = False
+
+    async def fake_apply(*args, **kwargs):
+        nonlocal called
+        del args, kwargs
+        called = True
+        raise AssertionError("blocked path must not be applied")
+
+    monkeypatch.setattr(engine, "apply_diff_and_test", fake_apply)
+
+    result = await engine.apply_sealed_packet(
+        root,
+        shadow=False,
+        proof_timeout=5.0,
+        halt_path=tmp_path / "missing-halt",
+    )
+
+    assert result.accepted is False
+    assert called is False
+    assert result.refused_checks == ["blocked_path:dharma_swarm/dharma_kernel.py"]
 
 
 def test_parse_sandbox_passed_failed_error():
