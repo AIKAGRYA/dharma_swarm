@@ -16,7 +16,6 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 import subprocess
-import time
 
 from dharma_swarm.roaming_mailbox import RoamingMailbox
 from dharma_swarm.roaming_operator_bridge import RoamingOperatorBridge, _build_bridge
