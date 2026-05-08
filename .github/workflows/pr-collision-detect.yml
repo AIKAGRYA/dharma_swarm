@@ -1,0 +1,116 @@
+name: PR collision detect
+
+on:
+  pull_request:
+    types: [opened, reopened, edited, synchronize]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  detect-br-collision:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: github.event.pull_request.state == 'open'
+    env:
+      GH_REPO: ${{ github.repository }}
+
+    steps:
+      - name: Extract BR-ids from this PR body
+        id: this_pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          # Match BR-\d{3} (or any digit count) anywhere in the PR body.
+          # Extract unique sorted ids; emit as a comma-separated list.
+          ids="$(printf '%s' "${PR_BODY:-}" | grep -oE 'BR-[0-9]+' | sort -u | paste -sd, -)"
+          echo "br_ids=${ids}" >> "${GITHUB_OUTPUT}"
+          echo "This PR cites BR-ids: ${ids:-(none)}"
+
+      - name: Skip if no BR-ids cited
+        if: steps.this_pr.outputs.br_ids == ''
+        run: |
+          echo "No BR-ids found in PR body; nothing to check."
+
+      - name: Scan all OTHER open PRs for collisions
+        if: steps.this_pr.outputs.br_ids != ''
+        id: scan
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          THIS_BR_IDS: ${{ steps.this_pr.outputs.br_ids }}
+        run: |
+          set -euo pipefail
+          # Convert comma-separated to a set we can iterate.
+          IFS=',' read -ra THIS_IDS <<< "${THIS_BR_IDS}"
+
+          # Fetch all OTHER open PRs (json: number, body, title, headRefName).
+          gh pr list --state open --limit 200 \
+            --json number,title,body,headRefName \
+            > /tmp/other_prs.json
+
+          collisions=""
+          for id in "${THIS_IDS[@]}"; do
+            # For each id, find OTHER PRs whose body mentions it (excluding self).
+            matches="$(jq -r --arg id "${id}" --argjson self "${PR_NUMBER}" '
+              .[] | select(.number != $self) |
+              select(.body // "" | test("\\b" + $id + "\\b")) |
+              "  - PR #\(.number): \(.title) [\(.headRefName)]"
+            ' /tmp/other_prs.json)"
+            if [ -n "${matches}" ]; then
+              collisions+="\n**${id}** is also addressed by:\n${matches}\n"
+            fi
+          done
+
+          if [ -n "${collisions}" ]; then
+            {
+              echo "collision_found=true"
+              echo "collision_message<<EOF"
+              echo -e "${collisions}"
+              echo "EOF"
+            } >> "${GITHUB_OUTPUT}"
+          else
+            echo "collision_found=false" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Post / update warning comment on this PR
+        if: steps.scan.outputs.collision_found == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          MESSAGE: ${{ steps.scan.outputs.collision_message }}
+        run: |
+          marker="<!-- pr-collision-detect:auto -->"
+          body="${marker}
+          ## ⚠️ BR-id collision detected
+
+          Open PRs cite the same BR-id(s) as this PR. Coordinate before merging:
+          ${MESSAGE}
+
+          *Per \`docs/governance/COHERENCE_DELTA.md\` § Pre-flight check, the PR
+          author should run \`gh pr list --state open\` for each cited BR-id
+          before opening a new PR. This bot fires the check after-the-fact;
+          a fix-now is to either rebase one PR onto the other, close the
+          duplicate with provenance pointing at the survivor, or split the
+          intersection cleanly. See \`docs/governance/COHERENCE_DELTA.md\`.*"
+
+          # Find an existing bot comment with our marker (idempotent re-runs).
+          existing="$(gh pr view "${PR_NUMBER}" --json comments \
+            --jq '.comments[] | select(.body | startswith("'"${marker}"'")) | .id' \
+            | head -1)"
+
+          if [ -n "${existing}" ]; then
+            gh api --method PATCH \
+              "/repos/${GITHUB_REPOSITORY}/issues/comments/${existing}" \
+              -f body="${body}"
+          else
+            gh pr comment "${PR_NUMBER}" --body "${body}"
+          fi
+
+      - name: Surface as PR check status
+        if: steps.scan.outputs.collision_found == 'true'
+        run: |
+          echo "::warning title=BR-id collision detected::Another open PR cites the same BR-id(s). See PR comment for details."
