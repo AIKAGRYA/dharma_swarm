@@ -127,17 +127,18 @@ for each BR-id you cite. If another open PR cites the same id, you have three op
 
 ---
 
-## Honor-system enforcement, for now
+## Machine Enforcement
 
-The Coherence Delta gate is **honor-system enforced** as of this PR's merge. Pre-commit hooks cover secrets, hotpath, contract tests, and gitleaks; GitHub Actions validate commit messages and run tests. **No tooling validates that the four fields are filled.**
+The Coherence Delta gate is machine-checked by
+`.github/workflows/coherence-delta.yml`. The workflow runs
+`scripts/governance/check_pr_coherence_delta.py` against the pull request body
+and fails if any of the four field markers is missing, empty, or left as a
+placeholder.
 
-This is intentional and time-boxed. Future hardening options (in priority order):
-
-1. **CodeRabbit review prompt** — when CodeRabbit lands as a Phase-3+ tool, configure its review prompt to flag PRs missing any of the four fields. Lightweight, advisory.
-2. **GitHub Action template-validator** — a workflow that fails the PR check if any of the four field markers (`- Organ touched:` etc.) is empty after the colon. Hard gate.
-3. **Pre-commit hook on PR-body draft** — local check; lower friction.
-
-Tracked as a register entry (BR-019 once `docs/state/BROKEN_REGISTER.md` lands). Until that hardening exists, the gate works the way every honor system works: it is real because every PR honors it. The first sloppy PR breaks the discipline; please don't be that PR.
+This is still not semantic proof. CI can verify that a PR body names an organ,
+gap, map reread, and drift statement; it cannot prove those answers are true.
+That residual limitation is tracked in `docs/state/BROKEN_REGISTER.md` as the
+next hardening target.
 
 ---
 
