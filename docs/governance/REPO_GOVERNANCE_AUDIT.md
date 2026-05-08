@@ -353,3 +353,52 @@ A parallel re-audit using Claude Code's filesystem tools (Grep, Glob, Read, Bash
 | runtime_bridge.py | — | **ZOMBIE** | 0 importers |
 | math_bridges.py | — | **ZOMBIE** | 0 importers |
 | offline_training_bridge.py | — | **ZOMBIE** | 0 importers |
+
+---
+
+## 2026-05-08 — Telos Hierarchy Correction (Track 2 doctrine drift log)
+
+Drift discovered while landing the canonical telos hierarchy in `SOVEREIGN_MANIFEST.md §Telos Hierarchy` and aligning the doctrine + Loomwork surfaces. Each entry is a contradiction that existed before this commit; resolution noted inline.
+
+### C1 — JAGAT_KALYAN_MASTER_VISION.md self-claims canonical authority outside the registry
+- **Evidence:** `docs/dse/JAGAT_KALYAN_MASTER_VISION.md:1` self-titles "Master Vision Document"; the file is not in `CANONICAL_DOC_STACK.md` Authority Registry (lines 60–75 of that doc).
+- **Resolution (2026-05-08):** added status header demoting the canonical claim and pointing to `SOVEREIGN_MANIFEST.md §Telos Hierarchy` as the registry-named owner of the telos invariant. Body preserved for archival continuity.
+
+### C2 — Same doc collapses Jagat Kalyan into the GAIA platform
+- **Evidence:** `docs/dse/JAGAT_KALYAN_MASTER_VISION.md` §I–§II frame JK as "AI-Coordinated Ecological Restoration & Grassroots Livelihood System" (the GAIA platform's mission).
+- **Resolution (2026-05-08):** status header explicitly flags the hierarchy collapse and points to the corrected structure (JK > SIS > {GAIA, Loomwork}; Shakti Ginko under JK as metabolism; AE separate, unresolved).
+
+### C3 — SIS / Silicon Is Sand was scattered, never named as a typed JK-level objective
+- **Evidence:** SIS appears as adjective/concept in ~20 docs across `docs/`; no doc named it as the parent objective layer between JK and GAIA. `JAGAT_KALYAN_MASTER_VISION.md` had zero SIS occurrences.
+- **Resolution (2026-05-08):** SIS named explicitly as a JK-level child objective in `SOVEREIGN_MANIFEST.md §Telos Hierarchy` with full definition (energy, water, chips, minerals, fabs, labor, land, emissions, e-waste).
+
+### C4 — Loomwork docs framed Loomwork as peer of Shakti Ginko under JK constitutional layer
+- **Evidence:** `docs/doctrine/OPERATIONAL_DOCTRINE.md:12` ("both peer VentureCells under the same constitutional layer"); `docs/loomwork/2026-05-07-loomwork-design.md:14` ("an arm — peer to Shakti Ginko").
+- **Resolution (2026-05-08):** patched both docs. Loomwork is now named as a child of SIS (domain organ); Shakti Ginko is named as the wealth-metabolism organ under JK directly. Both are VentureCell-pattern instantiations but in distinct categorical positions (domain organ vs metabolism organ).
+
+### C5 — Loomwork CompassRoom scored against "Jagat Kalyan fitness" (skipped SIS layer)
+- **Evidence:** `docs/loomwork/2026-05-07-loomwork-design.md:60` defines `CompassRoom` as "Telos-driven filter. Scores any candidate atom/feed against Jagat Kalyan fitness." This collapses SIS into JK at the runtime-scoring layer.
+- **Resolution (2026-05-08):** flagged in the loomwork-design.md status header. Runtime correction (`compass.py` scoring axis) is out of Track 2 scope (no-runtime invariant); future implementation should score against SIS-fitness primarily, with JK as the ultimate telos. Tracked as drift, not patched here.
+
+### C6 — Attention Emancipation absent from this repo entirely
+- **Evidence:** grep for "Attention Emancipation" / "attention emancipation" returned zero hits across `docs/`.
+- **Resolution (2026-05-08):** AE named explicitly in `SOVEREIGN_MANIFEST.md §Telos Hierarchy` as a separate JK-level domain, marked **unresolved / not yet typed**, with explicit anti-collapse language (AE is not SIS, not productivity tooling, not generic focus work).
+
+### C7 — Shakti Ginko placement was undefined relative to corrected hierarchy
+- **Evidence:** Operational reality (AGNI VPS trading lab, `ginko_orchestrator.py`, Polymarket Rushabdev v4, Vraj nightly review, +$466/7d revenue) but no doctrine-level placement under the JK > SIS > {GAIA, Loomwork} + AE structure proposed in the doctrine correction.
+- **Resolution (2026-05-08):** Shakti Ginko named in `SOVEREIGN_MANIFEST.md §Telos Hierarchy` as a JK-level child at peer priority to SIS but in a categorically distinct position (metabolism vs domain). Function: wealth-generation by all means possible. Discipline: trustee, not possessor (Sri Aurobindo, *The Mother* Ch. IV; `~/.claude/cabinet/worldview/money_as_divine_force.md`). Internal: trustee discipline gate-enforced (`shakti.py` quadrature). Outward function: unconstrained.
+
+### C8 — MEGAFILE_INDEX Slot 2 (STUB) and Slot 3 (CONTESTED) were stale relative to ported substrate
+- **Evidence:** `docs/MEGAFILE_INDEX.md:70` marked Slot 2 as STUB; line 86 marked Slot 3 as CONTESTED. The substrate files (`docs/doctrine/OPERATIONAL_DOCTRINE.md`, `docs/doctrine/LIVE_ROADMAP.md`) were ported onto this branch in commit `20a239a` (Track 2 Step 0).
+- **Resolution (2026-05-08):** flipped Slot 2 STUB → SEEDED and Slot 3 CONTESTED → SEEDED. Roadmap contestation between `LOOMWORK_v0_MASTER.md` and `2026-05-07-loomwork-design.md` (cabinet) is preserved as a separate convergence track, not a blocker for slot graduation.
+
+### C9 — SOVEREIGN_MANIFEST silent on the highest invariant (telos hierarchy)
+- **Evidence:** `docs/governance/SOVEREIGN_MANIFEST.md` (registry-named owner of axioms + invariants per `CANONICAL_DOC_STACK.md`) had no Telos Hierarchy section before 2026-05-08.
+- **Resolution (2026-05-08):** added §Telos Hierarchy as a new top-level section between Purpose and Global Axioms in commit `7ecf285`. The section names the full hierarchy, defines each layer (JK, Dharma Swarm-as-VSM, SIS, GAIA, Loomwork, AE, Shakti Ginko), cites Sri Aurobindo's *The Mother* Ch. IV as the source authority for Shakti Ginko, and lists conditions of consistency for downstream docs.
+
+### Cross-track follow-ups (NOT resolved here)
+
+- **Cabinet alignment:** `~/.claude/cabinet/ARJUNA.md`, `~/.claude/cabinet/strategy/LOOMWORK_v0_MASTER.md`, `~/.claude/cabinet/worldview/telos.md` are out-of-repo and were not touched by Track 2. They may carry the older Loomwork-as-peer-of-JK framing and should be aligned in a separate cabinet-side track.
+- **`compass.py` runtime scoring axis (C5):** out of Track 2 scope (no-runtime). Future: score against SIS-fitness primarily, with JK as ultimate telos.
+- **Cross-branch MEGAFILE_INDEX convergence:** other worktrees (notably `feat/loomwork-venture-cell` at `/Users/dhyana/dharma_swarm_loomwork`) lack `docs/MEGAFILE_INDEX.md`. Not resolved in Track 2; belongs to a separate convergence track.
+- **`shakti.py` quadrature gate enforcement:** doctrine names trustee discipline as gate-enforced; runtime verification of "extractive behavior is a gate violation" is out of Track 2 scope and tracked separately.

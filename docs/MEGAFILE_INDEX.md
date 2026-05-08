@@ -67,11 +67,12 @@ The 8 unstubbed slots below get filled by **pointing into the authority stack**,
 - `dharma_swarm/lodestones/CONSCIOUS_INFRASTRUCTURE.md`
 
 ### Slot 2 — Operational Doctrine
-**Path:** `dharma_swarm/docs/doctrine/OPERATIONAL_DOCTRINE.md` (STUB — to be consolidated)
-**Status:** STUB (6 cabinet fragments un-consolidated)
+**Path:** `dharma_swarm/docs/doctrine/OPERATIONAL_DOCTRINE.md`
+**Status:** SEEDED (2026-05-07 inaugural content; 2026-05-08 hierarchy aligned to SOVEREIGN_MANIFEST §Telos Hierarchy)
 **Audience:** Operator, Agent
-**Read for:** kill conditions, mission, what we WILL NOT DO, success/failure definitions.
-**Substrate to consolidate:**
+**Read for:** kill conditions, mission, what we WILL NOT DO, success/failure definitions, and the compressed telos hierarchy pointer to SOVEREIGN_MANIFEST.
+**Telos hierarchy invariant lives in:** [`../governance/SOVEREIGN_MANIFEST.md §Telos Hierarchy`](governance/SOVEREIGN_MANIFEST.md). Slot 2 file carries a compressed pointer; the manifest is the owner.
+**Substrate referenced from this slot:**
 - `~/.claude/cabinet/ARJUNA.md` (locked 2026-05-07)
 - `~/.claude/cabinet/strategy/LOOMWORK_v0_MASTER.md`
 - `~/.claude/cabinet/strategy/ARJUNA_DIRECTIVE_v1.md`
@@ -79,19 +80,20 @@ The 8 unstubbed slots below get filled by **pointing into the authority stack**,
 - `~/.claude/cabinet/strategy/arjuna_targets.md`
 - `~/.claude/cabinet/strategy/arjuna_weapons_manifest.md`
 - `~/.claude/cabinet/worldview/telos.md` (STALE — `stale_after: 2026-05-15`)
+- `~/.claude/cabinet/worldview/money_as_divine_force.md` (Aurobindo, *The Mother* Ch. IV — Shakti Ginko source)
 **Known gap:** no machine-checkable kill conditions for the project itself; `jagat_kalyan` has in-repo references and skills, but no proven live core-engine consumer.
 
 ### Slot 3 — Live Roadmap
-**Path:** `dharma_swarm/docs/doctrine/LIVE_ROADMAP.md` (STUB — to be consolidated)
-**Status:** CONTESTED (3 docs each claim primacy on 2026-05-07)
+**Path:** `dharma_swarm/docs/doctrine/LIVE_ROADMAP.md`
+**Status:** SEEDED (2026-05-07 inaugural content; 2026-05-08 telos invariant pointer added)
 **Audience:** Engineer, Operator, Agent
-**Read for:** what's shipping in the next 14 / 30 / 90 days.
-**Substrate to reconcile:**
+**Read for:** what's shipping in the next 14 / 30 / 90 days, with telos invariant pointer to SOVEREIGN_MANIFEST §Telos Hierarchy.
+**Substrate referenced from this slot:**
 - `~/.claude/cabinet/strategy/LOOMWORK_v0_MASTER.md` (self-declares OPERATIONAL)
 - `~/.claude/cabinet/strategy/2026-05-07-loomwork-design.md` (self-declares "draft, awaiting review" — but `MEMORY.md:37` says it supersedes the master)
 - `~/.claude/cabinet/strategy/ARJUNA_DIRECTIVE_v1.md` (still owns Q2/Q3 sequence)
 - `~/.claude/projects/-Users-dhyana/memory/MEMORY.md` Active Project State section
-**Known gap:** 47% of in-flight branches have no anchor in any plan doc. Strategy is ~10x ahead of code (`dharma_swarm/loomwork/` package does not exist).
+**Known gap:** 47% of in-flight branches have no anchor in any plan doc. Strategy is ~10x ahead of code (`dharma_swarm/loomwork/` package does not exist). Roadmap-vs-design contestation between `LOOMWORK_v0_MASTER.md` and `2026-05-07-loomwork-design.md` is logged in `governance/REPO_GOVERNANCE_AUDIT.md` as a separate convergence track and is not blocked by this slot's seeding.
 
 ### Slot 4 — Limbs Atlas
 **Path:** `dharma_swarm/docs/architecture/LIMBS_ATLAS.md` (STUB — points to existing NAVIGATION.md + ACTIVE_SURFACE_MANIFEST.yaml)

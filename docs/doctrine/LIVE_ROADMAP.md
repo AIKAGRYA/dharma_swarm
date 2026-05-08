@@ -3,10 +3,13 @@
 **Locked:** 2026-05-07
 **Mode:** What is shipping in 14 / 90 / 365 days. Updated quarterly.
 
+**Telos hierarchy invariant:** [`../governance/SOVEREIGN_MANIFEST.md §Telos Hierarchy`](../governance/SOVEREIGN_MANIFEST.md). Jagat Kalyan is the highest telos. Loomwork is a child of SIS (material-body domain). Shakti Ginko is the wealth-metabolism organ under JK directly — not a peer of Loomwork.
+
 **Authority sources:**
 - Vision: [`../loomwork/vision/MASTER_loomwork_level_100.md`](../loomwork/vision/MASTER_loomwork_level_100.md)
 - Active spec: [`../loomwork/2026-05-07-loomwork-design.md`](../loomwork/2026-05-07-loomwork-design.md)
 - Operational layer: [`./OPERATIONAL_DOCTRINE.md`](./OPERATIONAL_DOCTRINE.md)
+- Telos invariant: [`../governance/SOVEREIGN_MANIFEST.md §Telos Hierarchy`](../governance/SOVEREIGN_MANIFEST.md)
 - Approved execution plan: `~/.claude/plans/floating-launching-summit.md`
 
 ---
