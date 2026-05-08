@@ -1,0 +1,8 @@
+{
+  "correlation_id": "corr_v0_test_001",
+  "evidence_receipt_id": "ev_4e0ac0996b77",
+  "has_human_yds": false,
+  "next_recommendation": "Promote pattern; queue follow-up packet to extend coverage.",
+  "review_id": "kz_c4da3afa9488",
+  "waste_patterns": []
+}

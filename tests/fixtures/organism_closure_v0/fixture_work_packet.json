@@ -1,0 +1,14 @@
+{
+  "acceptance_test": "tests/test_organism_closure_v0.py",
+  "allowed_paths": [
+    "dharma_swarm/operator_core/closure_v0.py"
+  ],
+  "cell_id": "cell_governance_audit",
+  "correlation_id": "corr_v0_test_001",
+  "forbidden_paths": [],
+  "objective_id": "jagat_kalyan",
+  "packet_id": "wp_v0_test_001",
+  "review_tier": "review",
+  "rollback_plan": "git checkout HEAD -- dharma_swarm/operator_core/closure_v0.py",
+  "title": "Closure v0 proof packet"
+}
