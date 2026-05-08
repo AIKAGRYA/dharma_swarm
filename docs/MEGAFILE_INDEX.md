@@ -23,19 +23,20 @@ A separate convergence audit (`~/.dharma/audit/truth_spine_convergence_2026-05-0
 | Order | Surface | Path | Role |
 |---|---|---|---|
 | 1 | Project agent contract | `dharma_swarm/CLAUDE.md` | Behavioral rules + Transcendence Principle |
-| 2 | Sovereign authority | `docs/governance/SOVEREIGN_MANIFEST.md` | Governance scope (NOTE: file count 514 vs actual 567 — see BR-016) |
+| 2 | Sovereign authority | `docs/governance/SOVEREIGN_MANIFEST.md` | Governance scope and verified DocOps metrics |
 | 3 | Doc-stack registry | `docs/governance/CANONICAL_DOC_STACK.md` | Names which docs are canonical |
-| 4 | Practical session entrypoint | `docs/governance/BUILD_SESSION_ENTRYPOINT.md` | **ON origin/main, NOT in current checkout — see BR-017** |
+| 4 | Practical session entrypoint | `docs/governance/BUILD_SESSION_ENTRYPOINT.md` | Short build-session pointer layer |
 | 5 | Conceptual / vision spine | `docs/vision_maps/MASTER_2026-05-07_attractor_closure_synthesis.md` | This index's Slot 1 (note stale `.FOCUS` claim — see BR-015) |
 | 6 | Machine-readable surface authority | `dharma_swarm/ACTIVE_SURFACE_MANIFEST.yaml` | Which API routes / dashboard surfaces are active / projection / adapter / research / frozen |
 
 **The convergence work** (instead of inventing 8 new megafiles):
-- Promote `BUILD_SESSION_ENTRYPOINT.md` from origin/main into current branch (BR-017)
-- Refresh `SOVEREIGN_MANIFEST.md` count drift (BR-016)
+- Keep `BUILD_SESSION_ENTRYPOINT.md` present in this checkout (BR-017 closed)
+- Keep `SOVEREIGN_MANIFEST.md` count-sensitive claims refreshed by DocOps (BR-016 closed)
 - Patch synthesis stale claim about `.FOCUS` (closing follow-up to BR-015)
 - Regenerate stale `docs/architecture/NAVIGATION.md`; `CLAUDE.md` pointer was patched 2026-05-07 (BR-010 revised)
 - Archive `dharma_swarm/DHARMA_SWARM_MASTER_MAP.md` (root-violating, superseded by Slot 1)
 - Use `ACTIVE_SURFACE_MANIFEST.yaml` as the membrane between docs and runtime
+- Use the Coherence Delta CI gate as the merge membrane for changes to these surfaces
 - Stub slots remain stubs; their substrate already lives in the authority stack above
 
 The 8 unstubbed slots below get filled by **pointing into the authority stack**, not by writing new master docs.
@@ -106,7 +107,7 @@ The 8 unstubbed slots below get filled by **pointing into the authority stack**,
 - `~/.claude/cabinet/systems/dharma_swarm.md`, `connections.md`, `repo_map.md` (topical maps)
 - `make xray` output (ephemeral; per `README.md:184`)
 - GitNexus index `.gitnexus/` (30,672 symbols, 78,911 relationships — MCP-accessible)
-**Known gap:** module count contested across 5 sources (370 / 421 / 479 / 500 / 567 actual). `CLAUDE.md` now points to both `docs/architecture/NAVIGATION.md` and `make xray`; the static file still needs regeneration against current code.
+**Known gap:** module count remains historically contested across older sources. Treat `docs/governance/SOVEREIGN_MANIFEST.md` plus the latest DocOps inventory as current for measured counts. `CLAUDE.md` points to both `docs/architecture/NAVIGATION.md` and `make xray`; the static file still needs regeneration against current code.
 
 ### Slot 5 — Wiring + Loop Ledger
 **Path:** `dharma_swarm/docs/architecture/WIRING_AND_LOOPS.md` (STUB — to be consolidated)
@@ -165,7 +166,7 @@ The 8 unstubbed slots below get filled by **pointing into the authority stack**,
 - `crontab -l`
 - `dharma_swarm/scripts/cron_unify.py` (the unifier; documents the split)
 - `~/.dharma/audit/cron_split_brain_*.json`
-**Known critical gap:** `com.dharma.cron-daemon.plist` invokes `dgc cron daemon`. Direct check on 2026-05-07 shows launchd still has a live `gui/501` process, but the currently installed `/opt/homebrew/bin/dgc` exposes only `status` / `audit` and rejects `cron`; restart behavior is incoherent. **FIX BR-001 BEFORE WRITING THIS RUNBOOK.**
+**Known critical gap:** BR-001 fixed the cron-daemon path/version drift, but Slot 8 still has no canonical operator runbook that reconciles launchd, live `~/.dharma/cron/jobs.json`, repo `cron_jobs.json`, and failure triage.
 
 ### Slot 9 — Agent Contract + Team
 **Path:** `dharma_swarm/docs/agent/AGENT_CONTRACT_AND_TEAM.md` (STUB — to be consolidated; see Convergence Reframe)
@@ -173,9 +174,9 @@ The 8 unstubbed slots below get filled by **pointing into the authority stack**,
 **Audience:** Agent (primary); Engineer, Operator (secondary)
 **Read for:** identity, behavioral feedback, decision protocols, who's-who in the agent ecosystem.
 **Substrate (corrected 2026-05-07 18:00):**
-- **`docs/governance/BUILD_SESSION_ENTRYPOINT.md`** — the strongest practical session-entrypoint (ON origin/main, NOT in current checkout — see BR-017)
+- **`docs/governance/BUILD_SESSION_ENTRYPOINT.md`** — the strongest practical session-entrypoint (present in this checkout; see BR-017)
 - **`docs/governance/CANONICAL_DOC_STACK.md`** — names which docs are canonical
-- **`docs/governance/SOVEREIGN_MANIFEST.md`** — governance scope (count drift; see BR-016)
+- **`docs/governance/SOVEREIGN_MANIFEST.md`** — governance scope and measured DocOps inventory (see BR-016)
 - `dharma_swarm/CLAUDE.md` (project-level agent contract; Transcendence Principle; behavioral rules)
 - `/Users/dhyana/CLAUDE.md` (308 lines — canonical user-global agent context, despite path)
 - `~/.claude/CLAUDE.md` (4-line ruflo stub — NOT canonical despite conventional path)
@@ -185,7 +186,7 @@ The 8 unstubbed slots below get filled by **pointing into the authority stack**,
 - `~/.claude/agents/altitude.md`, `mahakali.md` (agent-as-skill definitions)
 **Known critical gaps:**
 - Non-Claude-Code agents (Codex sub-agents, headless invocations, MCP workers) may have NO path to this substrate at all (BR-013).
-- The strongest in-repo entrypoint (`BUILD_SESSION_ENTRYPOINT.md`) lives only on origin/main; current branch agents onboard without it.
+- The strongest in-repo entrypoint (`BUILD_SESSION_ENTRYPOINT.md`) is present; the residual gap is whether every agent loader actually reads it.
 
 ### Slot 10 — Contemplative Spine + Glossary
 **Path:** `dharma_swarm/docs/foundations/CONTEMPLATIVE_SPINE.md` (STUB — to be authored as entry-point)
@@ -243,6 +244,7 @@ The synthesis report is at `~/.dharma/audit/ten_megafiles_survey_2026-05-07.md`.
 4. **STALE flags require evidence.** Mark a file STALE only with a date and a specific contradiction.
 5. **Replacement is allowed; deletion is not.** When a slot's file is superseded, the prior version moves to `_archive/<slot>/<DATE>_<filename>.md`.
 6. **Date-stamping convention:** snapshots and dailies use `<NAME>_<YYYY-MM-DD>.md`. The index itself is undated and stable.
+7. **Merge discipline:** PRs touching slot files must satisfy the Coherence Delta gate in `.github/workflows/coherence-delta.yml`.
 
 ---
 

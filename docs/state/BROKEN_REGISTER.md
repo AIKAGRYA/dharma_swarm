@@ -23,7 +23,7 @@
 
 ## OPEN ITEMS (14 open after convergence pass 2026-05-07 18:08; 5 closed below)
 
-> **Convergence pass executed 2026-05-07 18:00–18:10:** Plan at `~/.claude/plans/yes-write-a-plan-wobbly-cerf.md`. Closed items moved to CLOSED section: BR-001 (cron daemon plist fixed), BR-016 (SOVEREIGN_MANIFEST counts refreshed 514→567), BR-017 (BUILD_SESSION_ENTRYPOINT.md cherry-picked), BR-018 (MEGAFILE_INDEX referenced from CLAUDE.md + README). BR-015 was already CLOSED. Total CLOSED = 5; OPEN = 14.
+> **Convergence pass executed 2026-05-07 18:00–18:10:** Plan at `~/.claude/plans/yes-write-a-plan-wobbly-cerf.md`. Closed items moved to CLOSED section: BR-001 (cron daemon plist fixed), BR-016 (SOVEREIGN_MANIFEST counts refreshed and now DocOps-verified), BR-017 (BUILD_SESSION_ENTRYPOINT.md present), BR-018 (MEGAFILE_INDEX referenced from CLAUDE.md + README), BR-019 (Coherence Delta CI validator installed). BR-015 was already CLOSED. Total CLOSED = 6; OPEN = 13.
 
 *(BR-001 moved to CLOSED ITEMS — see below)*
 
@@ -47,7 +47,7 @@
 - **root_cause:** Two parallel apply paths share zero import edge. Build Protocol (`tools/build_protocol/`) self-declared shape-only; DarwinEngine `apply_diff_and_test` at `evolution.py:2156` env-locked closed by `DHARMA_EVOLUTION_SHADOW=1` default. `grep "from dharma_swarm.tools.build_protocol"` returns 0 hits inside `dharma_swarm/dharma_swarm/`.
 - **blast_radius:** Self-evolution trace reported 96 dryruns; direct disk check on 2026-05-07 found 9 current dryrun dirs, 4 `proof_packet.json` files, and 0 `applied` markers. Sediment-to-crystallization mechanism remains absent. Kernel + telos_gates static for 6+ weeks.
 - **evidence:** `~/.dharma/audit/self_evolution_trace_2026-05-07.md`; `find ~/.dharma/build_protocol/dryruns -mindepth 1 -maxdepth 1 -type d | wc -l` = 9; `find ~/.dharma/build_protocol -name proof_packet.json | wc -l` = 4; vision_maps `05_autopoiesis_evolution.md`.
-- **status:** WORKAROUND — 2026-05-07 partial closure: `tools/build_protocol/cli.py` now exposes `dharma-build shadow-apply <dryrun_root>`, which calls `DarwinEngine.apply_sealed_packet(..., shadow=True)` and archives the proof result without live mutation. Live apply remains intentionally gated.
+- **status:** PARTIAL — 2026-05-07 partial closure: `tools/build_protocol/cli.py` now exposes `dharma-build shadow-apply <dryrun_root>`, which calls `DarwinEngine.apply_sealed_packet(..., shadow=True)` and archives the proof result without live mutation. Live apply remains intentionally gated. **End-to-end exercise on 2026-05-07 (this commit):** ran `python -m tools.build_protocol.cli shadow-apply ~/.dharma/build_protocol/dryruns/wp005-seal-cli-20260506`. Result: `accepted: true`, `archive_entry_id: 64280c7685784e63`, `shadow: true`, `proof_exit_code: 0` (5 tests pass), packet archived as line in `~/.dharma/evolution/archive.jsonl` with id `64280c7685784e63` and `shadow:true`. First confirmed end-to-end shadow-apply on this branch. `applied:false` is correct — `diff_missing:true` for this dryrun (test-only seal, no diff to apply); the seam itself is now exercised. Full closure (live, non-shadow apply) remains a multi-day plan gated by `DHARMA_EVOLUTION_SHADOW=0` and a real telos-gate→kernel→apply traversal.
 
 ### BR-004 — Cron split-brain (repo vs live)
 - **first_observed:** ≤ 2026-05-06
@@ -121,10 +121,10 @@
 - **age_days:** generated 2026-03-29 → 39 days stale
 - **severity:** STALE
 - **domain:** docs
-- **root_cause:** **REVISED 3x:** `NAVIGATION.md` DOES exist at `dharma_swarm/docs/architecture/NAVIGATION.md` BUT the file itself was generated 2026-03-29 with old counts and has not been refreshed against current 567-Python-file reality. `CLAUDE.md` now points to both `docs/architecture/NAVIGATION.md` and `make xray`; remaining disagreement is stale static map vs generated live map.
-- **blast_radius:** Slot 4 (Limbs Atlas) — substrate exists but stale. Module count drift (370/421/479/500/567 actual) unresolved across sources.
+- **root_cause:** **REVISED 3x:** `NAVIGATION.md` DOES exist at `dharma_swarm/docs/architecture/NAVIGATION.md` BUT the file itself was generated 2026-03-29 with old counts and has not been refreshed against current DocOps-measured reality. `CLAUDE.md` now points to both `docs/architecture/NAVIGATION.md` and `make xray`; remaining disagreement is stale static map vs generated live map.
+- **blast_radius:** Slot 4 (Limbs Atlas) — substrate exists but stale. Module count drift across older sources remains unresolved; current measured counts live in `docs/governance/SOVEREIGN_MANIFEST.md` and `docs/docops/AUTO_INVENTORY.md`.
 - **evidence:** `find . -maxdepth 4 -name NAVIGATION.md` returns `./docs/architecture/NAVIGATION.md`; codex validation pass at `~/.dharma/audit/ten_megafiles_survey_2026-05-07.md` cites `docs/architecture/NAVIGATION.md:1-7, :88-119` confirming 2026-03-29 generation date and old counts.
-- **status:** OPEN — 2026-05-07 partial fix: `CLAUDE.md` now points to `docs/MEGAFILE_INDEX.md`, `docs/architecture/NAVIGATION.md`, and `make xray`; remaining fix is regenerate stale `docs/architecture/NAVIGATION.md` against current 567-file reality.
+- **status:** OPEN — 2026-05-07 partial fix: `CLAUDE.md` now points to `docs/MEGAFILE_INDEX.md`, `docs/architecture/NAVIGATION.md`, and `make xray`; remaining fix is regenerate stale `docs/architecture/NAVIGATION.md` against current measured reality.
 
 ### BR-011 — `INTERFACE_MISMATCH_MAP.md` self-declared stale
 - **first_observed:** ≤ 2026-04-25
@@ -189,10 +189,10 @@
 - **age_days:** 0
 - **severity:** STALE
 - **domain:** docs
-- **root_cause:** `docs/governance/SOVEREIGN_MANIFEST.md` claims 514 Python files under `dharma_swarm/`. Actual count `find dharma_swarm -name "*.py" -type f | wc -l` = **567**. Drift of 53 files, ~10%.
+- **root_cause:** `docs/governance/SOVEREIGN_MANIFEST.md` carried stale Python-file counts. Earlier convergence saw 514 vs 567; after subsequent build-spine merges the current DocOps-measured count is **550**.
 - **blast_radius:** SOVEREIGN_MANIFEST is named as authority surface in CANONICAL_DOC_STACK; agents reading it for governance scope get a stale picture. Affects Slot 2 (Operational Doctrine) and Slot 4 (Limbs Atlas) consolidation.
-- **evidence:** `find dharma_swarm -name "*.py" -type f | wc -l` returns 567 (verified 2026-05-07). Agent C convergence audit cites SOVEREIGN_MANIFEST count claim.
-- **status:** **FIXED 2026-05-07 18:08** — `docs/governance/SOVEREIGN_MANIFEST.md` lines 18, 63, 388 refreshed: 514 → 567. Top-level percentage recomputed: 73% → 66% (375/567). Convergence pass action 3.
+- **evidence:** `python scripts/docops/check_docops_integrity.py --changed-from origin/main` reports `dharma_python_modules=550`, `dharma_top_level_python_modules=385`, and passes against `docs/governance/SOVEREIGN_MANIFEST.md`.
+- **status:** **FIXED 2026-05-07 18:08; refreshed again during PR #167 merge resolution** — count-sensitive claims are now checked by DocOps rather than frozen to one audit snapshot.
 
 ### BR-018 — `MEGAFILE_INDEX.md` was not referenced from `CLAUDE.md` or `README.md` (discoverability gap)
 - **first_observed:** 2026-05-07
@@ -239,7 +239,7 @@
 - **Required follow-up:** patch `MASTER_2026-05-07_attractor_closure_synthesis.md` to remove the stale `.FOCUS` claim. Tracked via the synthesis master's own update path, not a BR item.
 
 ### BR-016 (CLOSED 2026-05-07 18:08) — SOVEREIGN_MANIFEST.md count drift
-- **Closing evidence:** `docs/governance/SOVEREIGN_MANIFEST.md` lines 18, 63, 388 refreshed from 514 → 567. Top-level flat-package percentage recomputed: 73% → 66% (375/567). Verification `grep -n "514" docs/governance/SOVEREIGN_MANIFEST.md` returns no count claims at the three patched locations. Convergence pass action 3.
+- **Closing evidence:** `docs/governance/SOVEREIGN_MANIFEST.md` count-sensitive claims are enforced by `scripts/docops/check_docops_integrity.py`; after PR #167 merge resolution the manifest and `docs/docops/AUTO_INVENTORY.md` report `dharma_python_modules=550`, `dharma_top_level_python_modules=385`, `test_files=556`, and `test_def_occurrences=9970`.
 
 ### BR-017 (CLOSED 2026-05-07 18:06) — BUILD_SESSION_ENTRYPOINT.md cherry-picked
 - **Closing evidence:** `git checkout origin/main -- docs/governance/BUILD_SESSION_ENTRYPOINT.md` brought the file into current checkout `feat/brief-to-spec-seam-2026-05-07` (7,837 bytes). Slot 9 of MEGAFILE_INDEX now has the in-repo session-entrypoint pointer it was missing. Convergence pass action 4.
@@ -254,24 +254,15 @@
 - **Likely auto-resolves:** BR-006 (recognition_seed stale) within 24-48h once metabolic clock fires regeneration. May also un-stick BR-005 (algedonic degenerate steady-state) if consumer was waiting on the daemon.
 - **Convergence pass action 7.**
 
+### BR-019 (CLOSED 2026-05-07) — Coherence Delta gate enforced honor-system only
+- **Closing evidence:** `.github/workflows/coherence-delta.yml` runs `scripts/governance/check_pr_coherence_delta.py` against PR bodies and rejects missing, placeholder, or bare-UNKNOWN Coherence Delta fields. PR #167 is the first self-test of the gate.
+- **Residual drift:** CI validates field presence and minimum substance, not semantic truth. Treat that residual as reviewer responsibility until a later semantic validator exists.
+
 ---
 
 ## ID Reservation
 
 Next id: `BR-020`. Append below. Do NOT renumber existing items.
-
----
-
-### BR-019 — Coherence Delta gate enforced honor-system only
-- **first_observed:** 2026-05-07
-- **last_verified:** 2026-05-07 18:50
-- **age_days:** 0 (born today)
-- **severity:** DEGRADED
-- **domain:** governance
-- **root_cause:** The Coherence Delta gate (4 mandatory PR-template fields installed by commit `8e1dccb` on `codex/pr-coherence-delta-template` and PR #154 with rationale doc) is not validated by any tooling. No pre-commit hook checks the field markers; no GitHub Action validates that the colon-fields are non-empty; no review bot flags omissions.
-- **blast_radius:** Gate is bypassable. The first sloppy PR breaks the discipline. Architectural intent ("convergence not invention") relies on every PR re-reading the maps and registering its drift; honor-system means a single PR that skips the fields silently disconnects the loop.
-- **evidence:** `dharma_swarm/.pre-commit-config.yaml` does not reference template fields; `.github/workflows/*` runs `commit-lint` + tests but no template-body validator; `docs/governance/COHERENCE_DELTA.md` § "Honor-system enforcement, for now" explicitly acknowledges the gap and names three future-hardening paths (CodeRabbit, GitHub Action template-validator, pre-commit hook).
-- **status:** OPEN — track CodeRabbit install OR template-validator GitHub Action as future fix. Recommended priority: medium (DEGRADED, not BLOCKER); convert to BLOCKER if any merged PR ships with the four fields un-filled within the next 30 days.
 
 ---
 

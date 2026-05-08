@@ -322,6 +322,25 @@ These compose: the field cannot be one live causal surface if (a) the self-model
 
 ---
 
+## 12.1 Phase 1 Causal Membrane Added 2026-05-07
+
+After this synthesis was first written, the governance layer gained a narrow
+causal membrane around the map stack:
+
+- `.github/workflows/coherence-delta.yml` now validates that PR bodies contain
+  substantive Coherence Delta fields.
+- `scripts/governance/check_pr_coherence_delta.py` rejects missing fields,
+  placeholders, and bare `UNKNOWN` values.
+- `scripts/system_map_populator.py` and `dgc map` expose OrganState perception
+  as a read-only map surface.
+- `docs/state/BROKEN_REGISTER.md` tracks the residual drift: the gate checks
+  field presence and minimum substance, not semantic truth.
+
+This does not close Attractor Closure. It narrows one bypass: a PR can no
+longer silently skip the map reread discipline.
+
+---
+
 ## 13. Filesystem Recursion Rules
 
 Where future maps land so they remain discoverable.
