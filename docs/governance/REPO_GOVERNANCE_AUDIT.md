@@ -405,6 +405,22 @@ Drift discovered while landing the canonical telos hierarchy in `SOVEREIGN_MANIF
 - **Evidence:** `docs/governance/SOVEREIGN_MANIFEST.md` (registry-named owner of axioms + invariants per `CANONICAL_DOC_STACK.md`) had no Telos Hierarchy section before 2026-05-08.
 - **Resolution (2026-05-08):** added §Telos Hierarchy as a new top-level section between Purpose and Global Axioms in commit `7ecf285`. The section names the full hierarchy, defines each layer (JK, Dharma Swarm-as-VSM, SIS, GAIA, Loomwork, AE, Shakti Ginko), cites Sri Aurobindo's *The Mother* Ch. IV as the source authority for Shakti Ginko, and lists conditions of consistency for downstream docs.
 
+### C10 — JAGAT_KALYAN_CANONICAL_SYNTHESIS_2026-03-11.md is a second registry-violating canonical claim
+- **Evidence:** `docs/reports/JAGAT_KALYAN_CANONICAL_SYNTHESIS_2026-03-11.md:1` self-titles "Jagat Kalyan Canonical Synthesis"; the file is not in `CANONICAL_DOC_STACK.md` Authority Registry. The doc defines a 4-layer "Canonical Stack" (`Jagat Kalyan Protocol` / `Planetary Reciprocity Commons` / `AI Reciprocity Ledger` / `GAIA`) where GAIA is positioned as a peer-level "deployment platform / operating system" alongside JK — incompatible with the corrected hierarchy where GAIA is an accounting kernel under SIS.
+- **Resolution (2026-05-08):** added status header demoting the canonical claim and pointing to `SOVEREIGN_MANIFEST.md §Telos Hierarchy`. Body preserved for archival continuity. This is a parallel correction to C1 (JAGAT_KALYAN_MASTER_VISION.md); both files claim canonical authority by name without registry sanction. Found in fine-tooth review pass after C2.
+
+### Verification pass (2026-05-08, post-C2)
+
+A fine-tooth adversarial self-review pass after C2 verified:
+- **Link integrity:** all 14 markdown cross-doc links added by C1+C2 resolve to existing files on this branch.
+- **Runtime impact:** zero Python files reference the patched docs; no-runtime invariant holds.
+- **Test impact:** zero test files reference the patched docs by filename.
+- **DocOps anchor stability:** `assertions.yaml` (carried by build_spine_clean branch, not present on this branch) uses text-pattern regexes against the verified-numbers table; the §Telos Hierarchy insertion is upstream of those anchors and does not disturb them. When this branch eventually merges into a branch that carries the DocOps gate, the gate is expected to pass.
+- **Cross-track contamination:** zero overlap between Track 1's commits since `a8206f6` (`telic_seam.py`, `test_telic_seam.py`, `system_map/latest.json`) and Track 2's commits (doctrine docs only). No merge-conflict potential.
+- **Frontmatter compliance:** no YAML frontmatter added to any governance doc. CANONICAL_DOC_STACK Tier 1–2 frontmatter policy honored.
+- **Anti-doc-maze compliance:** zero new files added by C1+C2+C3 (only edits + Step 0 ports). Authority Registry unchanged.
+- **JK_MASTER_VISION body preservation:** 13-line diff confirms header-only change.
+
 ### Cross-track follow-ups (NOT resolved here)
 
 - **Cabinet alignment:** `~/.claude/cabinet/ARJUNA.md`, `~/.claude/cabinet/strategy/LOOMWORK_v0_MASTER.md`, `~/.claude/cabinet/worldview/telos.md` are out-of-repo and were not touched by Track 2. They may carry the older Loomwork-as-peer-of-JK framing and should be aligned in a separate cabinet-side track.
