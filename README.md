@@ -155,11 +155,10 @@ That report is the fastest way to answer:
 ## Before Writing Any Code
 
 - **Read [`docs/governance/BUILD_SESSION_ENTRYPOINT.md`](docs/governance/BUILD_SESSION_ENTRYPOINT.md)** — canonical read order, current build track, and the seven ontology-native checks. Every build session starts here.
-- **Read [`docs/MEGAFILE_INDEX.md`](docs/MEGAFILE_INDEX.md)** — ten highest-system onboarding slots, current canonical/partial/missing status, and where future megafiles belong.
 - **Current build track:** ontology-native Operator Brief seam. See [`docs/plans/ONTOLOGY_NATIVE_OPERATOR_BRIEF_MASTER_SPEC.md`](docs/plans/ONTOLOGY_NATIVE_OPERATOR_BRIEF_MASTER_SPEC.md), [`docs/plans/NEXT_10_SUBSTRATE_TODO.md`](docs/plans/NEXT_10_SUBSTRATE_TODO.md), and [`docs/plans/HANDOFF_ONTOLOGY_NATIVE_OPERATOR_BRIEF.md`](docs/plans/HANDOFF_ONTOLOGY_NATIVE_OPERATOR_BRIEF.md). Do not open a second seam until this one ships.
 - **Read [`CLAUDE.md`](CLAUDE.md)** — system genome, key abstractions, behavioral rules, the Transcendence Principle.
 - **Read [`INTERFACE_MISMATCH_MAP.md`](INTERFACE_MISMATCH_MAP.md)** — every known interface mismatch between modules, with exact line numbers, root causes, and fixes. This is the primary source of runtime failures. Follow the Bootstrap Sequence to unblock the system.
-- **Read [`docs/architecture/NAVIGATION.md`](docs/architecture/NAVIGATION.md)** — full module map across 12 architectural layers with line counts and "When to Touch" guidance.
+- **Read [`NAVIGATION.md`](NAVIGATION.md)** — full module map across 12 architectural layers with line counts and "When to Touch" guidance.
 - **Read [`MODEL_ROUTING_MAP.md`](MODEL_ROUTING_MAP.md)** — how every LLM call flows through the system. 18 providers, 3 calling surfaces, 5 inconsistencies, the HuggingFace fix, and the minimum viable path to first LLM call.
 
 ## First Places To Look

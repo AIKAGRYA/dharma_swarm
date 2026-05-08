@@ -29,7 +29,6 @@ def base_config(repo: Path) -> Path:
         "canonical_guard": {
             "managed_include": [],
             "changed_include": ["**/*.md"],
-            "ignore": [],
             "registered": [],
         },
         "auto_sections": {"include": []},
@@ -126,29 +125,6 @@ def test_changed_canonical_guard_fails_added_and_modified_docs(tmp_path: Path) -
         finding.check == "canonical" and finding.severity == "FAIL"
         for finding in modified_findings
     )
-
-
-def test_canonical_guard_ignores_archived_docs(tmp_path: Path) -> None:
-    repo = tmp_path
-    write(repo / "docs" / "_archive" / "2026-04" / "old.md", "Historical source of truth.\n")
-    write(repo / "docs" / "live.md", "Live source of truth.\n")
-    config_path = base_config(repo)
-    config = load_config(config_path)
-    config["canonical_guard"]["changed_include"] = ["docs/*.md", "docs/**/*.md"]
-    config["canonical_guard"]["ignore"] = ["docs/_archive/**"]
-
-    findings = docops.check_canonical_guard(
-        repo,
-        config,
-        [
-            ("A", "docs/_archive/2026-04/old.md"),
-            ("A", "docs/live.md"),
-        ],
-    )
-
-    messages = [finding.message for finding in findings]
-    assert not any("docs/_archive/2026-04/old.md" in message for message in messages)
-    assert any("docs/live.md" in message for message in messages)
 
 
 def test_auto_section_update_writes_generated_inventory(tmp_path: Path) -> None:
