@@ -1,15 +1,40 @@
 # OPERATIONAL DOCTRINE
 **MEGAFILE_INDEX Slot 2 — Operational Doctrine**
-**Locked:** 2026-05-07
+**Locked:** 2026-05-07 | **Hierarchy aligned:** 2026-05-08
 **Mode:** Concise canonical operational layer. Detailed substrate cited inline.
+**Subordinate to:** [`../governance/SOVEREIGN_MANIFEST.md §Telos Hierarchy`](../governance/SOVEREIGN_MANIFEST.md) — the registry-named owner of the JK / Dharma Swarm / SIS / GAIA / Loomwork / Shakti Ginko / AE invariant. When this doc disagrees with the manifest's hierarchy section, the manifest wins.
+
+---
+
+## Telos Hierarchy (compressed)
+
+```
+Jagat Kalyan (highest telos)
+├── DOMAINS — what we work on
+│   ├── Silicon Is Sand (SIS) — material-body recognition
+│   │   ├── GAIA / Reciprocity (accounting kernel)
+│   │   └── Loomwork (evidence-weaving organ)
+│   └── Attention Emancipation (separate, unresolved)
+└── METABOLISM — how we sustain the work
+    └── Shakti Ginko (wealth-generation organ — by all means possible)
+
+Dharma Swarm = the self-evolving VSM organism that enacts all of the above.
+```
+
+Full text and source citations: [`../governance/SOVEREIGN_MANIFEST.md §Telos Hierarchy`](../governance/SOVEREIGN_MANIFEST.md).
 
 ---
 
 ## What We Are
 
-**dharma_swarm = the Palantir of good works.** A multi-agent orchestration substrate pointed at what is broken in the world. Forward-deployed AI for NGOs, advocacy groups, investigators, conservation orgs, journalists, public defenders, climate organizers, refugee networks, accountability movements. Operator software for people fighting actual battles.
+**dharma_swarm = the self-evolving VSM/cybernetic organism that serves Jagat Kalyan**, with S1–S5 anatomy (operations, coordination, control, intelligence, identity) plus Kaizen and DGM (Darwin–Gödel Machine) learning loops. Operationally, it is also "the Palantir of good works" — a multi-agent orchestration substrate pointed at what is broken in the world. Forward-deployed AI for NGOs, advocacy groups, investigators, conservation orgs, journalists, public defenders, climate organizers, refugee networks, accountability movements. Operator software for people fighting actual battles.
 
-The contemplative spine (Akram lineage, R_V research, Triple Mapping, witness mode, viveka discrimination, telos gates, kernel guards) is **the immune system** that keeps the weapon from being a weapon for the wrong things. It is **NOT the product**. The product is **action against suffering**, expressed through Loomwork (outward arm — pattern surfacing) and Shakti Ginko (outward arm — wealth/economic engine), both peer VentureCells under the same constitutional layer.
+The contemplative spine (Akram lineage, R_V research, Triple Mapping, witness mode, viveka discrimination, telos gates, kernel guards) is **the immune system** that keeps the weapon from being a weapon for the wrong things. It is **NOT the product**. The product is **action against suffering**, expressed through two structurally distinct arms:
+
+- **Loomwork** — outward arm, **child of SIS**: ecological/material pattern surfacing. Casefiles, alerts, maps, briefs, action intelligence for journalists, NGOs, regulators, citizens.
+- **Shakti Ginko** — outward arm, **child of Jagat Kalyan directly as the metabolism layer**: wealth-generation by all means possible, in service of funding every other domain. Per Sri Aurobindo's *The Mother*: trustee discipline internal, outward function unconstrained.
+
+Both are VentureCell-pattern instantiations, but **they are not peer in the hierarchy** — Loomwork is a domain organ under SIS; Shakti Ginko is the wealth-metabolism organ under JK directly. See [`../governance/SOVEREIGN_MANIFEST.md §Telos Hierarchy`](../governance/SOVEREIGN_MANIFEST.md) for the full structure and source citations.
 
 Source: `dharma_swarm/dharma_swarm/ontology.py:1-30` declares "Palantir built this pattern for supply chains and kill chains. We take the engineering and reforge it for Jagat Kalyan." This doctrine is the literal operationalization of that line.
 

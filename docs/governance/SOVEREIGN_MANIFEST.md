@@ -121,7 +121,7 @@ No single file should exceed 3,000 lines. Current violations (V):
 **148 files exceed 500 lines; 39 exceed 1,000; 7 exceed 3,000** (V). These must be decomposed over time, not grown further.
 
 ### A6: DOCS DECAY -- CHECK BEFORE CITING
-All numerical claims in docs become stale within weeks. Before citing module counts, test counts, or line counts from any doc (including this one), verify against the actual filesystem. See `REPO_GOVERNANCE_AUDIT.md` for the current staleness log. The current DocOps inventory reports **276 Markdown files containing at least one reserved trust-language term** (V). Treat these as authority-scope review candidates, not confirmed repo-wide authority.
+All numerical claims in docs become stale within weeks. Before citing module counts, test counts, or line counts from any doc (including this one), verify against the actual filesystem. See `REPO_GOVERNANCE_AUDIT.md` for the current staleness log. The current DocOps inventory reports **288 Markdown files containing at least one reserved trust-language term** (V). Treat these as authority-scope review candidates, not confirmed repo-wide authority.
 
 ### A7: NO CIRCULAR IMPORTS
 The repo has **9 verified circular dependency chains** (V). The worst:
@@ -132,7 +132,7 @@ The repo has **9 verified circular dependency chains** (V). The worst:
 All 9 cycles were independently confirmed with exact import lines. Most are mitigated by lazy imports but remain architectural debt. **New code must not create circular imports.**
 
 ### A8: FRONTMATTER DISCIPLINE
-Do not inject machine-readable YAML frontmatter into governance or architecture docs unless explicitly requested. Current state: **214 of 664 Markdown files start with YAML frontmatter; 15 of 21 docs/architecture Markdown files do so** (V). Long frontmatter remains an authority/noise risk even when the prose is useful.
+Do not inject machine-readable YAML frontmatter into governance or architecture docs unless explicitly requested. Current state: **214 of 682 Markdown files start with YAML frontmatter; 15 of 21 docs/architecture Markdown files do so** (V). Long frontmatter remains an authority/noise risk even when the prose is useful.
 
 ---
 
@@ -149,8 +149,8 @@ These are the ground-truth metrics. All other documents citing different numbers
 | Test functions | **9,995 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
-| Markdown files | **664** | find . -name "*.md" -type f |
-| Markdown total lines | **168,937** | wc -l across all .md |
+| Markdown files | **682** | find . -name "*.md" -type f |
+| Markdown total lines | **174,622** | wc -l across all .md |
 | Bridge files | **18** | find dharma_swarm -name "*bridge*.py" |
 | Adapter files | **14 across 7 locations** | find dharma_swarm -type f \| rg -i "adapter" |
 | Orchestrator files | **4** (6,034 LOC total) | find dharma_swarm -name "*orchestrat*" |
