@@ -1,0 +1,14 @@
+{
+  "captured_at": "2026-05-08T00:00:01+00:00",
+  "correlation_id": "corr_v0_test_001",
+  "projection_id": "vsm_4e6c2c9f748c",
+  "s1_failed_24h": 1,
+  "s1_open_packets": 0,
+  "s1_success_24h": 0,
+  "s2_collisions_24h": 0,
+  "s3_packets_blocked_24h": 0,
+  "s4_algedonic_unique_values_last_200": 5,
+  "s4_recognition_seed_age_hours": 2.0,
+  "s5_kernel_signature_match": true,
+  "truth_stale": false
+}

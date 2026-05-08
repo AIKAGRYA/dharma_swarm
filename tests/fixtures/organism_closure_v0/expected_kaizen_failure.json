@@ -1,0 +1,8 @@
+{
+  "correlation_id": "corr_v0_test_001",
+  "evidence_receipt_id": "ev_1138ad394a3b",
+  "has_human_yds": false,
+  "next_recommendation": "Hold packet; narrow allowed_paths and rerun acceptance_test before proposing a successor.",
+  "review_id": "kz_ea481d4c8832",
+  "waste_patterns": []
+}

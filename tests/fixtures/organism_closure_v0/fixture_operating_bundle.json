@@ -1,0 +1,14 @@
+{
+  "agentops": [],
+  "burn": [],
+  "human_yds": [],
+  "kaizen": [],
+  "missing_sources": [
+    "AgentOps reports",
+    "KaizenReview reports",
+    "Human YDS ledger",
+    "Burn/cost report",
+    "Revenue notes"
+  ],
+  "revenue": []
+}

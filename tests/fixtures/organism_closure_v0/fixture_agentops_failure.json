@@ -1,0 +1,23 @@
+{
+  "approval_state": "not_needed",
+  "branch": "feat/organism-closure-v0",
+  "changed_files": [
+    "dharma_swarm/operator_core/closure_v0.py",
+    "dharma_swarm/operator_core/contracts.py"
+  ],
+  "commit_hash": null,
+  "commit_state": "no_commit",
+  "failed_gates": [
+    "SCOPE",
+    "ACCEPTANCE"
+  ],
+  "gate_state": "some_red",
+  "job_id": "job_v0_failure_001",
+  "scope_state": "scope_violation",
+  "scope_violations": [
+    "dharma_swarm/operator_core/contracts.py"
+  ],
+  "source_path": "tests/fixtures/organism_closure_v0/fixture_agentops_failure.json",
+  "status": "failed",
+  "worktree": "/Users/dhyana/dharma_swarm_closure_v0"
+}

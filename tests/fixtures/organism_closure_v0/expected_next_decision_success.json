@@ -1,0 +1,18 @@
+{
+  "candidate_packet_ids": [
+    "wp_v0_test_001"
+  ],
+  "chosen_packet_id": "wp_v0_test_001",
+  "confidence": 0.7,
+  "correlation_id": "corr_v0_test_001",
+  "decided_at": "2026-05-08T00:00:02+00:00",
+  "decided_by": "policy",
+  "decision_id": "nd_f9ebd3a53865",
+  "expires_at": "2026-05-08T01:00:00+00:00",
+  "input_refs": [
+    "vsm_4e6c2c9f748c",
+    "kz_c4da3afa9488",
+    "ev_4e0ac0996b77"
+  ],
+  "reason": "evidence_accepted: KaizenReview promotes pattern"
+}
