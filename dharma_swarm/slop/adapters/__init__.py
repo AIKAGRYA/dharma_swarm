@@ -23,6 +23,7 @@ from dharma_swarm.slop.adapters.dependency_cruiser_adapter import (
 )
 from dharma_swarm.slop.adapters.eslint_adapter import run_eslint
 from dharma_swarm.slop.adapters.fallow_adapter import run_fallow
+from dharma_swarm.slop.adapters.grimp_adapter import run_grimp
 from dharma_swarm.slop.adapters.jscpd_adapter import run_jscpd
 from dharma_swarm.slop.adapters.knip_adapter import run_knip
 from dharma_swarm.slop.adapters.oxlint_adapter import run_oxlint
@@ -40,6 +41,7 @@ REGISTRY: dict[str, AdapterCallable] = {
     # Python detectors
     "vulture": run_vulture,
     "ai-slop-detector": run_ai_slop_detector,
+    "grimp": run_grimp,
     # Telemetry
     "sentry-spotlight": run_spotlight,
     # JS/TS detectors
@@ -62,6 +64,7 @@ __all__ = [
     "run_dependency_cruiser",
     "run_eslint",
     "run_fallow",
+    "run_grimp",
     "run_jscpd",
     "run_knip",
     "run_oxlint",
