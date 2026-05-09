@@ -18,6 +18,10 @@ from pathlib import Path
 
 from dharma_swarm.slop.adapters.ai_slop_detector import run_ai_slop_detector
 from dharma_swarm.slop.adapters.base import BaseAdapter, run_subprocess
+from dharma_swarm.slop.adapters.spotlight_adapter import (
+    probe_spotlight,
+    run_spotlight,
+)
 from dharma_swarm.slop.adapters.vulture_adapter import run_vulture
 from dharma_swarm.slop.models import DetectorResult
 
@@ -26,6 +30,7 @@ AdapterCallable = Callable[[Iterable[Path]], DetectorResult]
 REGISTRY: dict[str, AdapterCallable] = {
     "vulture": run_vulture,
     "ai-slop-detector": run_ai_slop_detector,
+    "sentry-spotlight": run_spotlight,
 }
 
 
@@ -33,7 +38,9 @@ __all__ = [
     "AdapterCallable",
     "BaseAdapter",
     "REGISTRY",
+    "probe_spotlight",
     "run_ai_slop_detector",
+    "run_spotlight",
     "run_subprocess",
     "run_vulture",
 ]

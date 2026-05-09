@@ -54,12 +54,12 @@ MODE_PROFILES: dict[str, dict[str, object]] = {
         "default_threshold": 0.50,
     },
     "ci": {
-        "detectors": ("vulture", "ai-slop-detector"),
+        "detectors": ("vulture", "ai-slop-detector", "sentry-spotlight"),
         "budget_sec": 90.0,
         "default_threshold": 0.50,
     },
     "nightly": {
-        "detectors": ("vulture", "ai-slop-detector"),
+        "detectors": ("vulture", "ai-slop-detector", "sentry-spotlight"),
         "budget_sec": 600.0,
         "default_threshold": 0.30,
     },
