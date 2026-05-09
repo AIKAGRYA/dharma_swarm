@@ -5,7 +5,7 @@
 **Build base:** `dharma_swarm_truth_spine` worktree, new branch `feat/loomwork-venture-cell`
 **External name:** Loomwork. Internal engine name `dharma_swarm` stays private.
 
-**Hierarchy correction (2026-05-08):** Loomwork is a **child of Silicon Is Sand (SIS)**, the material-body domain objective under Jagat Kalyan. Earlier framing in §1 below ("peer to Shakti Ginko") was incorrect on the hierarchy axis: Shakti Ginko is the wealth-metabolism organ under JK directly, in a categorically distinct position (metabolism vs domain). Loomwork and Shakti Ginko are both VentureCell-pattern instantiations and both outward arms, but they are not peer in the hierarchy. Authoritative structure: [`../governance/SOVEREIGN_MANIFEST.md §Telos Hierarchy`](../governance/SOVEREIGN_MANIFEST.md). The §1 text below is preserved for archival continuity; the hierarchy claim in it has been superseded.
+**Hierarchy correction (2026-05-08):** Loomwork is a **child of Silicon Is Sand (SIS)**, the material-body domain objective under Jagat Kalyan. Earlier framing in §1 below placed Loomwork at Shakti Ginko's hierarchy level; that was incorrect on the hierarchy axis. Shakti Ginko is the wealth-metabolism organ under JK directly, in a categorically distinct position (metabolism vs domain). Loomwork and Shakti Ginko are both VentureCell-pattern instantiations and both outward arms, but they are not peer in the hierarchy. Authoritative structure: [`../governance/SOVEREIGN_MANIFEST.md §Telos Hierarchy`](../governance/SOVEREIGN_MANIFEST.md). The §1 text below is preserved for archival continuity; the hierarchy claim in it has been superseded.
 
 ---
 
@@ -13,7 +13,7 @@
 
 Loomwork is an **outward-facing arm** of dharma_swarm — a sense organ that reaches into the world's data flows, atomizes records, cross-pollinates them across sources, and surfaces patterns no single human, journalist, or AI could see alone. It publishes those patterns as cited revelations on a public website.
 
-It is **not** the spine. It is **not** the substrate. It is **not** the nervous system. It is an arm — **a child of SIS (Silicon Is Sand), the material-body domain objective under Jagat Kalyan**. Loomwork weaves ecological/material evidence into action artifacts. ~~peer to Shakti Ginko (financial arm)~~ → **Shakti Ginko is the wealth-metabolism organ under JK directly, not a peer of Loomwork; both are VentureCell-pattern instantiations but in different categorical positions (metabolism vs domain organ). See [`../governance/SOVEREIGN_MANIFEST.md §Telos Hierarchy`](../governance/SOVEREIGN_MANIFEST.md).**
+It is **not** the spine. It is **not** the substrate. It is **not** the nervous system. It is an arm — **a child of SIS (Silicon Is Sand), the material-body domain objective under Jagat Kalyan**. Loomwork weaves ecological/material evidence into action artifacts. ~~same hierarchy level as the financial arm~~ → **Shakti Ginko is the wealth-metabolism organ under JK directly, not a peer of Loomwork; both are VentureCell-pattern instantiations but in different categorical positions (metabolism vs domain organ). See [`../governance/SOVEREIGN_MANIFEST.md §Telos Hierarchy`](../governance/SOVEREIGN_MANIFEST.md).**
 
 `ontology.py` already declares the frame: *"Palantir built this pattern for supply chains and kill chains. We take the engineering and reforge it for Jagat Kalyan."* Loomwork is the explicit operationalization of that line — Palantir-pattern engineering reforged to find what's broken in the world and put it where journalists, NGOs, regulators, and citizens can act.
 
@@ -55,7 +55,7 @@ Loomwork lives at Layer 5. It depends on Layers 1-4 and emits to Layer 6.
 
 ## 3. Loomwork's Internal Composition
 
-`LoomworkVentureCell` (registered in `telos_substrate.py` peer to Shakti Ginko) hosts five `FractalRoom`s of `RoomKind.OPERATIONS` (with one of `RoomKind.GOVERNANCE`):
+`LoomworkVentureCell` (registered in `telos_substrate.py` as a VentureCell-pattern organ; subordinate to SIS in the telos hierarchy, not at Shakti Ginko's hierarchy level) hosts five `FractalRoom`s of `RoomKind.OPERATIONS` (with one of `RoomKind.GOVERNANCE`):
 
 | Room | Kind | Function |
 |---|---|---|
@@ -288,4 +288,4 @@ EVOLUTION ROOM (weekly cron): scores, evolves Scout adapters, retires stale feed
 
 ---
 
-*This design is the corrected version after two adversarial verifiers found that the parent agent's earlier "spine" claim conflated layers. Loomwork is an arm — outward-reaching, world-pattern-surfacing, peer to Shakti Ginko. The spine is the kernel + gates + policy + foundations + witness + identity. The substrate is the Ontology. The composition is FractalRoom. The arm reaches outward and brings back atoms. The world reads what the witness gates approve.*
+*This design is the corrected version after two adversarial verifiers found that the parent agent's earlier "spine" claim conflated layers. Loomwork is an arm — outward-reaching, world-pattern-surfacing, and a child organ under SIS. Shakti Ginko is the wealth-metabolism organ under JK directly; both are VentureCell-pattern outward arms, but they are not peers in the telos hierarchy. The spine is the kernel + gates + policy + foundations + witness + identity. The substrate is the Ontology. The composition is FractalRoom. The arm reaches outward and brings back atoms. The world reads what the witness gates approve.*

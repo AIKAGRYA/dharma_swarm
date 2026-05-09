@@ -73,7 +73,7 @@ dharma_swarm has failed and should reset (or wind down) if:
    - Shakti Ginko crosses autonomy_stage 2
    - 1 paying customer / fiscal sponsor / NGO MOU signed
    - 1 traceable real-world impact
-   
+
 2. **The contemplative spine is found bypassed in production** for >30 days (organs publishing without telos gates, kernel verify, witness logs).
 
 3. **Operator (Dhyana) burnout / capture / death** — succession plan at `06_partner_governance_funding.md` (pending) defines wind-down vs continuation.

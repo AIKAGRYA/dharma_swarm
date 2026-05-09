@@ -173,7 +173,7 @@ The level-100 trajectory continues through B3 (Y2–Y5, NGO-tier), B4 (Y5–Y10,
 - **dharma_swarm BR-007 (ontology↔runtime sync) closure** — separate work stream, runs parallel
 - **dharma_swarm BR-008 (VentureCell polymorphism gap) closure** — separate work stream; Loomwork is bespoke until then (path B accepts this debt; eventual retrofit estimated 1–2 weeks when polymorphism lands)
 - **R_V research / NeurIPS / contemplative-bridge work** — separate priority; see `dharma_swarm/CLAUDE.md` and worldview docs
-- **Shakti Ginko VentureCell evolution** — peer outward arm, separately tracked
+- **Shakti Ginko VentureCell evolution** — separate outward arm and JK-level wealth-metabolism track, not a Loomwork peer in the telos hierarchy
 - **Federation protocol specific choice (ActivityPub overlay vs AT Protocol vs Nostr vs purpose-built)** — defer until Y3+; build atoms portably until then
 
 ---
