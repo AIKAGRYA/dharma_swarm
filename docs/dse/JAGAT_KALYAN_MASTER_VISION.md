@@ -3,6 +3,8 @@
 
 *3am vision — synthesized from 6 agent perspectives, March 11, 2026*
 
+> **Status (2026-05-08, doctrine correction):** Vision artifact, dated 2026-03-11. **Not in the doc-stack registry.** Governing ownership of the telos hierarchy (Jagat Kalyan, Dharma Swarm as VSM organism, Silicon Is Sand, GAIA / Reciprocity, Loomwork, Shakti Ginko, Attention Emancipation) belongs to [`../governance/SOVEREIGN_MANIFEST.md §Telos Hierarchy`](../governance/SOVEREIGN_MANIFEST.md). The body below is preserved as historical 3am-vision continuity; its "Master Vision Document" subtitle does not confer registry authority. On the corrected hierarchy: Jagat Kalyan is the highest telos; SIS is a JK-level child objective; **GAIA is the accounting kernel under SIS, not the central platform-instantiation of JK**; Loomwork is a child of SIS (not present in this 2026-03 vision; introduced 2026-05); Shakti Ginko is the wealth-metabolism organ under JK directly (not present in this 2026-03 vision); Attention Emancipation is a separate JK-level domain marked unresolved. Earlier framings in this document where GAIA reads as platform-equivalent of JK are superseded by the manifest section.
+
 ---
 
 ## I. THE CORE INSIGHT

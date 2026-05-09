@@ -1,11 +1,13 @@
-# Jagat Kalyan Canonical Synthesis
+# Jagat Kalyan Synthesis
 
 Date: 2026-03-11
 Status: additive synthesis across parallel Jagat Kalyan / GAIA streams
 Purpose: define the clean stack so the movement, institution, platform, and
 trust object stop competing with each other
 
-## Canonical Stack
+> **Status (2026-05-08, doctrine correction):** Reports artifact, dated 2026-03-11. **Not in the doc-stack registry.** The "Synthesis" wording in the title does not confer registry-level authority. Governing ownership of the telos hierarchy belongs to [`../governance/SOVEREIGN_MANIFEST.md §Telos Hierarchy`](../governance/SOVEREIGN_MANIFEST.md). The 4-layer "Early Stack" defined below (`Jagat Kalyan Protocol` / `Planetary Reciprocity Commons` / `AI Reciprocity Ledger` / `GAIA`) is preserved for archival continuity but **does not match the corrected hierarchy** (JK as highest telos; Dharma Swarm as VSM organism serving JK; SIS as material-body domain; GAIA as accounting kernel under SIS; Loomwork as evidence-weaving organ under SIS; Shakti Ginko as wealth-metabolism organ under JK directly; Attention Emancipation as separate unresolved domain). On the corrected hierarchy, **GAIA is not a peer-level "deployment platform / operating system" alongside JK Protocol; GAIA is an accounting kernel under SIS, which is itself one of two named domain objectives under JK**. The body below reads as one early framing; SOVEREIGN_MANIFEST §Telos Hierarchy supersedes it.
+
+## Early Stack
 
 The strongest integrated form is a four-layer stack:
 
@@ -143,7 +145,7 @@ It wants to become the cognition and orchestration layer for the whole stack:
 
 That is the deepest fit between Dharma Swarm and Jagat Kalyan.
 
-## Canonical Message
+## Message
 
 If asked for the one-line answer:
 
