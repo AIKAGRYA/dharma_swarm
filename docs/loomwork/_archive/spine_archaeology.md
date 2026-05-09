@@ -9,7 +9,7 @@
 
 ## SECTION 1 — What is the actual spine?
 
-The deepest layer is **the Gnani / Prakruti dichotomy**, where the spine is *Gnani* (the immutable observer/skeleton) and everything else is *Prakruti* (the dynamic flesh that hangs off it). This is not metaphor — it is named explicitly in the canonical architecture document at `~/dharma_swarm_truth_spine/LIVING_LAYERS.md`:
+The deepest layer is **the Gnani / Prakruti dichotomy**, where the spine is *Gnani* (the immutable observer/skeleton) and everything else is *Prakruti* (the dynamic flesh that hangs off it). This is not metaphor — it is named explicitly in the architecture document at `~/dharma_swarm_truth_spine/LIVING_LAYERS.md`:
 
 > "The Godel Claw has two halves:
 >
@@ -125,29 +125,29 @@ These are five additional spine-contract obligations the parent agent did not na
 
 ## SECTION 4 — The truth_spine worktree
 
-`/Users/dhyana/dharma_swarm_truth_spine/` is the **assembly point for the canonical spine**. Confirmed by inspection.
+`/Users/dhyana/dharma_swarm_truth_spine/` is the **assembly point for the spine**. Confirmed by inspection.
 
 ### 4.1 What it has that main does NOT
 
-- `LIVING_LAYERS.md` — the canonical architecture document quoted in Section 1 (Gnani/Prakruti dichotomy)
-- `MASTER_BUILD_SPEC.md` — the canonical build spec
+- `LIVING_LAYERS.md` — the architecture document quoted in Section 1 (Gnani/Prakruti dichotomy)
+- `MASTER_BUILD_SPEC.md` — the build spec
 - `FOUNDATIONS_TO_CODE_MAP.md` — pillar → code traceability
 - `FOUNDATIONS_SYNTHESIS.md` (in `foundations/`) — the cross-pillar synthesis injected into agent prompts
 - `SOVEREIGN_MANIFEST.md` (referenced in CLAUDE.md) — governance master
 - `BUILD_SESSION_ENTRYPOINT.md` (referenced) — current-track pointer
-- `dharma_swarm/fractal/fractal_room.py` — the canonical Fractal Room primitive (also in 9 other worktrees, NOT in main)
-- `dharma_swarm/jagat_kalyan.py` — the canonical JagatKalyanEngine (NOT in main)
+- `dharma_swarm/fractal/fractal_room.py` — the Fractal Room primitive (also in 9 other worktrees, NOT in main)
+- `dharma_swarm/jagat_kalyan.py` — the JagatKalyanEngine (NOT in main)
 - `ACTIVE_SURFACE_MANIFEST.yaml`, `LIVING_LAYERS.md`, `CYBERNETIC_LOOP_MAP.md`, `INTERFACE_MISMATCH_MAP.md`, `PRODUCT_SURFACE.md`, `MODEL_ROUTING_MAP.md`
 
-### 4.2 Is it the canonical spine?
+### 4.2 Is it the spine assembly?
 
 Yes — operationally. Quoting the worktree's CLAUDE.md:
 
 > "Start with `docs/governance/BUILD_SESSION_ENTRYPOINT.md`. It is the short current-track pointer for build agents. It does not override this file or `docs/governance/SOVEREIGN_MANIFEST.md`; it tells agents which current operating seam and governance docs to read next."
 
-`SOVEREIGN_MANIFEST.md` exists in this worktree and is referenced as governance master. The interface mismatch map shows "0 open BLOCKER mismatches, 3 open DEGRADED" — substantially cleaner than main's earlier state. The fractal package is present here. The JagatKalyanEngine is present here. The foundations corpus and pillar→code map are canonicalized here.
+`SOVEREIGN_MANIFEST.md` exists in this worktree and is referenced as governance master. The interface mismatch map shows "0 open BLOCKER mismatches, 3 open DEGRADED" — substantially cleaner than main's earlier state. The fractal package is present here. The JagatKalyanEngine is present here. The foundations corpus and pillar→code map are made explicit here.
 
-**The truth_spine worktree IS the canonical spine assembly. Main is missing the spine.** Specifically: main does NOT have the fractal package, the SOVEREIGN_MANIFEST, the LIVING_LAYERS doc, or the JagatKalyanEngine. These are awaiting merge.
+**The truth_spine worktree IS the spine assembly. Main is missing the spine.** Specifically: main does NOT have the fractal package, the SOVEREIGN_MANIFEST, the LIVING_LAYERS doc, or the JagatKalyanEngine. These are awaiting merge.
 
 ### 4.3 Has its content merged?
 
@@ -162,7 +162,7 @@ No. The fractal_main_proof worktree shows commits ahead of main with `feat(fract
 The parent recommended building Loomwork on a branch off `dharma_swarm_fractal_main_proof`. **Half right.** That worktree has the fractal package and fractal-runtime wiring, but it does NOT have:
 - JagatKalyanEngine (which truth_spine has)
 - LIVING_LAYERS / SOVEREIGN_MANIFEST / FOUNDATIONS_TO_CODE_MAP
-- The canonical spine documentation
+- The spine documentation
 
 **Loomwork wants Jagat Kalyan as fitness function. JagatKalyanEngine lives in truth_spine, not fractal_main_proof. The parent missed this.**
 
@@ -170,7 +170,7 @@ The parent recommended building Loomwork on a branch off `dharma_swarm_fractal_m
 
 **Build Loomwork as a new branch off `dharma_swarm_truth_spine`,** named e.g., `feat/loomwork-venture-cell` or `seam/loomwork`. Reasons:
 
-1. **truth_spine has the full spine** — DharmaKernel (inherited from main), TelosGatekeeper (main), foundations Corpus (truth_spine has the canonical version + maps), FractalRoom (present), JagatKalyanEngine (present), SOVEREIGN_MANIFEST (governance), LIVING_LAYERS (architecture).
+1. **truth_spine has the full spine** — DharmaKernel (inherited from main), TelosGatekeeper (main), foundations Corpus (truth_spine has the mapped version + maps), FractalRoom (present), JagatKalyanEngine (present), SOVEREIGN_MANIFEST (governance), LIVING_LAYERS (architecture).
 2. **truth_spine already names "the next user-visible seam"** as the operating thesis. Loomwork IS that seam — and arguably a higher-leverage one than the ontology-native Operator Brief.
 3. **The merge story converges:** truth_spine + Loomwork merging together to main IS the integrated narrative — *"the spine proves itself by the first organ that serves the world."* This is one merge story, not two.
 4. **fractal_main_proof can rebase onto truth_spine + Loomwork** rather than be its own track — consolidating worktree proliferation.

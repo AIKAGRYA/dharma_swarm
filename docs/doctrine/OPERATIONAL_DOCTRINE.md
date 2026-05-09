@@ -1,7 +1,7 @@
 # OPERATIONAL DOCTRINE
 **MEGAFILE_INDEX Slot 2 — Operational Doctrine**
 **Locked:** 2026-05-07 | **Hierarchy aligned:** 2026-05-08
-**Mode:** Concise canonical operational layer. Detailed substrate cited inline.
+**Mode:** Concise operational layer. Detailed substrate cited inline.
 **Subordinate to:** [`../governance/SOVEREIGN_MANIFEST.md §Telos Hierarchy`](../governance/SOVEREIGN_MANIFEST.md) — the registry-named owner of the JK / Dharma Swarm / SIS / GAIA / Loomwork / Shakti Ginko / AE invariant. When this doc disagrees with the manifest's hierarchy section, the manifest wins.
 
 ---
@@ -40,7 +40,7 @@ Source: `dharma_swarm/dharma_swarm/ontology.py:1-30` declares "Palantir built th
 
 ## What We Will Not Do
 
-1. **Will not write papers about ourselves.** No internal-facing research artifacts. The Mirror Experiment (archived at `dharma_swarm/docs/loomwork/_archive/`) is the canonical anti-pattern — beautiful, recursive, world-zero.
+1. **Will not write papers about ourselves.** No internal-facing research artifacts. The Mirror Experiment (archived at `dharma_swarm/docs/loomwork/_archive/`) is the named anti-pattern — beautiful, recursive, world-zero.
 2. **Will not add lattice-amplifier skills.** Skills that orchestrate other skills with no external user. See archived navel-gaze list in `dharma_swarm/docs/loomwork/_archive/spine_arm_discrimination.md`.
 3. **Will not optimize prompt aesthetics or transmission depth without an external user named.**
 4. **Will not call dharma_swarm by its internal name externally.** The world meets `Loomwork` (pattern-surfacing arm) and `Shakti Ginko` (economic engine) — not "dharma_swarm". Engine name internal; vertical product names external.
@@ -113,7 +113,7 @@ dharma_swarm is succeeding if:
 
 | Concern | File |
 |---|---|
-| Identity, priorities, system separation | `~/CLAUDE.md` (canonical user-global) |
+| Identity, priorities, system separation | `~/CLAUDE.md` (user-global) |
 | Project agent contract | `dharma_swarm/CLAUDE.md` (Transcendence Principle) |
 | Vision synthesis | `dharma_swarm/docs/vision_maps/MASTER_2026-05-07_attractor_closure_synthesis.md` |
 | Live roadmap | `dharma_swarm/docs/doctrine/LIVE_ROADMAP.md` (sibling to this doc) |

@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-07
 **Status:** long-horizon vision map, not an implementation grant
-**Subordinate to:** `docs/governance/BUILD_SESSION_ENTRYPOINT.md`, `docs/governance/SOVEREIGN_MANIFEST.md`, and `docs/governance/CANONICAL_DOC_STACK.md`
+**Subordinate to:** `docs/governance/BUILD_SESSION_ENTRYPOINT.md`, `docs/governance/SOVEREIGN_MANIFEST.md`, and the doc-stack registry
 
 This document names the long-horizon architecture for Dharma Swarm as an
 AI-native operating company kernel. It does not replace the active
@@ -78,11 +78,11 @@ attach to them before adding any new organ.
 
 | Organ | Current surface | How the kernel should reuse it | Status |
 |---|---|---|---|
-| Operator Ground Truth | `dharma_swarm/operator_core/operating_facts.py` | Use `OperatingFactBundle`, `OrganBoundary`, source manifests, missing-source reporting, Human YDS, burn, and revenue facts as the first truth intake. | PARTIAL |
+| Operator Facts | `dharma_swarm/operator_core/operating_facts.py` | Use `OperatingFactBundle`, `OrganBoundary`, source manifests, missing-source reporting, Human YDS, burn, and revenue facts as the first truth intake. | PARTIAL |
 | Daily Operating Brief | `dharma_swarm/daily_operating_brief.py` | Reuse as the human-facing synthesis layer inside Morning Cockpit rather than creating another brief writer. | PARTIAL |
 | AgentOps | `AgentOpsRunFact` and `agentops` organ boundary in `operating_facts.py` | Treat bounded repo execution reports as the only admissible autonomous-work evidence. Resolve branch-specific runner/script availability before scaling. | DECLARED/PARTIAL |
 | KaizenReview | `KaizenReviewFact`, `dharma_swarm/kaizen_ops_local.py`, `dharma_swarm/kaizen_stats.py` | Consume completed AgentOps reports, extract waste/playbook candidates, and feed next-packet recommendations. | PARTIAL |
-| Human YDS | `HumanQualityRatingFact`, `append_human_yds_rating()` | Preserve human quality ratings as authoritative; AI ratings are advisory only. | PARTIAL |
+| Human YDS | `HumanQualityRatingFact`, `append_human_yds_rating()` | Preserve human quality ratings as binding; AI ratings are advisory only. | PARTIAL |
 | RuntimeState | `dharma_swarm/runtime_state.py` | Keep live operational state in the existing runtime-state store rather than creating a new state memory. | PRESENT |
 | DocOps | `docs/governance/*`, `scripts/system_map_populator.py`, `reports/system_map/latest.json` | Treat doc/system-map checks as truth inputs to Morning Cockpit when available; expose absence explicitly. | PARTIAL |
 | DarwinEngine | `dharma_swarm/evolution.py` | Use for proposal/evolution pressure only after evidence and safety gates exist; do not bypass its shadow/autonomy locks by documentation. | PRESENT, APPLY BLOCKED |
@@ -193,7 +193,7 @@ Rules:
   be measured first.
 
 `ComputeTreasury` is the future accounting surface for this. Until then, burn
-reports and model-routing telemetry are the source of truth.
+reports and model-routing telemetry are the state record.
 
 ---
 
@@ -211,7 +211,7 @@ this document.
 | `RevenueLedger` | Commercial fact producer for offers, invoices, replies, paid work, and customer outcomes. | EconomicEngine/EconomicLedger/RevenueSignalFact. | One offer or audit has durable revenue/customer-status rows. |
 | `ComputeTreasury` | Cost, budget, utilization, model allocation, and GPU lease/own decisions. | BurnReportFact, model routing, economic modules. | Model spend can be attributed to packet, artifact, and outcome. |
 | `ModelFoundry` | Eval, route, fine-tune, and maintain specialist models. | Provider/model routing, QLoRA/LoRA/DPO lanes, verified traces. | A specialist beats baseline on held-out eval and has rollback. |
-| `SkillLibrary` | Promote recurring successful work patterns into reusable playbooks. | KaizenReview, Human YDS, existing `docs/SKILL_LIBRARY.md` if kept canonical. | One promoted skill is reused in a later packet and improves the run. |
+| `SkillLibrary` | Promote recurring successful work patterns into reusable playbooks. | KaizenReview, Human YDS, existing `docs/SKILL_LIBRARY.md` if retained. | One promoted skill is reused in a later packet and improves the run. |
 | `SafetyKernel` | Governance wrapper for autonomy, security, safety evals, and release gates. | Telos gates, kernel, OWASP/NIST/MLCommons references, existing test/gate surfaces. | A risky packet is blocked or routed to human review with durable evidence. |
 
 ---
@@ -250,7 +250,7 @@ Build target:
 
 Required inputs:
 
-- Operator Ground Truth via `OperatingFactBundle`
+- Operator Facts via `OperatingFactBundle`
 - DocOps/system-map report if available
 - latest AgentOps reports
 - latest KaizenReview
@@ -337,7 +337,7 @@ as new parallel substrates without an accepted WorkPacket:
 - `MorningCockpit`
 
 Implementation rule: every reserved interface must first declare which existing
-substrate it reuses and which existing source of truth it refuses to duplicate.
+substrate it reuses and which existing state owner it refuses to duplicate.
 
 ---
 

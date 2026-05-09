@@ -1,7 +1,7 @@
 # MASTER — Loomwork at Level 100
 
 **Date:** 2026-05-07 | **Hierarchy aligned:** 2026-05-08
-**Status:** Synthesis of six vision-research documents (01–06). Authority: this is the canonical level-100 articulation; the six sources remain readable but this is the single point-of-entry. Subordinate on telos hierarchy to [`../../governance/SOVEREIGN_MANIFEST.md §Telos Hierarchy`](../../governance/SOVEREIGN_MANIFEST.md).
+**Status:** Synthesis of six vision-research documents (01–06). Authority: this is the level-100 articulation; the six sources remain readable but this is the single point-of-entry. Subordinate on telos hierarchy to [`../../governance/SOVEREIGN_MANIFEST.md §Telos Hierarchy`](../../governance/SOVEREIGN_MANIFEST.md).
 **Anchor docs:** [`01_frontier_landscape.md`](./01_frontier_landscape.md), [`02_theory_of_change.md`](./02_theory_of_change.md), [`03_adversarial_architecture.md`](./03_adversarial_architecture.md), [`04_scale_architecture.md`](./04_scale_architecture.md), [`05_future_inference.md`](./05_future_inference.md), [`06_partner_governance_funding.md`](./06_partner_governance_funding.md). Active spec: [`../2026-05-07-loomwork-design.md`](../2026-05-07-loomwork-design.md). Operational layer: [`../../doctrine/OPERATIONAL_DOCTRINE.md`](../../doctrine/OPERATIONAL_DOCTRINE.md). Approved plan: `~/.claude/plans/floating-launching-summit.md`.
 
 **Hierarchy position:** Loomwork is a child of **Silicon Is Sand (SIS)** — the material-body domain objective under Jagat Kalyan. Loomwork is not a peer of JK. Loomwork is not a peer of Shakti Ginko. The level-100 endowment / federation / public-utility vision below describes Loomwork's *outward scale* as a SIS-domain organ; the *priority hierarchy* under JK is unchanged: SIS is one of two named domain objectives under JK (with Attention Emancipation as the unresolved second), and Loomwork is one of two organs under SIS (with GAIA as the accounting-kernel sibling).
@@ -64,7 +64,7 @@ The design composes ten layers that interlock at v0 and remain coherent through 
 - Content-hash field reserved at B0 (computed at B4)
 - Evaluator-stack provenance recorded per atom (auditable forever)
 - No rendered HTML/CSS in atom content
-- Append-only event log as source of truth (B2+)
+- Append-only event log as the state record (B2+)
 - Multilingual atom content from B0 (i18n decisions don't survive retrofit)
 
 **Inference and honesty**
@@ -186,4 +186,4 @@ Five honest unknowns the research did not close:
 
 ---
 
-*This master synthesis is the canonical level-100 articulation of Loomwork. The six source documents remain readable as substrate. The active spec is the 14-day v0 design; the operational layer is `OPERATIONAL_DOCTRINE.md`; the approved plan is `floating-launching-summit.md`. Everything else flows from these.*
+*This master synthesis is the level-100 articulation of Loomwork. The six source documents remain readable as substrate. The active spec is the 14-day v0 design; the operational layer is `OPERATIONAL_DOCTRINE.md`; the approved plan is `floating-launching-summit.md`. Everything else flows from these.*

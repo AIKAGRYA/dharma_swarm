@@ -5,7 +5,7 @@
 **Build base:** `dharma_swarm_truth_spine` worktree, new branch `feat/loomwork-venture-cell`
 **External name:** Loomwork. Internal engine name `dharma_swarm` stays private.
 
-**Hierarchy correction (2026-05-08):** Loomwork is a **child of Silicon Is Sand (SIS)**, the material-body domain objective under Jagat Kalyan. Earlier framing in §1 below ("peer to Shakti Ginko") was incorrect on the hierarchy axis: Shakti Ginko is the wealth-metabolism organ under JK directly, in a categorically distinct position (metabolism vs domain). Loomwork and Shakti Ginko are both VentureCell-pattern instantiations and both outward arms, but they are not peer in the hierarchy. Authoritative structure: [`../governance/SOVEREIGN_MANIFEST.md §Telos Hierarchy`](../governance/SOVEREIGN_MANIFEST.md). The §1 text below is preserved for archival continuity; the hierarchy claim in it has been superseded.
+**Hierarchy correction (2026-05-08):** Loomwork is a **child of Silicon Is Sand (SIS)**, the material-body domain objective under Jagat Kalyan. Earlier framing in §1 below ("peer to Shakti Ginko") was incorrect on the hierarchy axis: Shakti Ginko is the wealth-metabolism organ under JK directly, in a categorically distinct position (metabolism vs domain). Loomwork and Shakti Ginko are both VentureCell-pattern instantiations and both outward arms, but they are not peer in the hierarchy. Governing structure: [`../governance/SOVEREIGN_MANIFEST.md §Telos Hierarchy`](../governance/SOVEREIGN_MANIFEST.md). The §1 text below is preserved for archival continuity; the hierarchy claim in it has been superseded.
 
 ---
 
@@ -115,7 +115,7 @@ Loomwork is an arm, but it must satisfy seven spine contracts. These add ~4-6h t
 **Branch:** `feat/loomwork-venture-cell` off `dharma_swarm_truth_spine` HEAD.
 
 Reasons:
-- Truth_spine has the canonical spine docs (`LIVING_LAYERS.md`, `MASTER_BUILD_SPEC.md`, `FOUNDATIONS_TO_CODE_MAP.md`, `SOVEREIGN_MANIFEST`)
+- Truth_spine has the central spine docs (`LIVING_LAYERS.md`, `MASTER_BUILD_SPEC.md`, `FOUNDATIONS_TO_CODE_MAP.md`, `SOVEREIGN_MANIFEST`)
 - Truth_spine has the full ontology family (decision_ontology, action_gateway, adapters, agents, hub, query, runtime)
 - Truth_spine has `jagat_kalyan.py` AND `jk_stigmergy_seeds.py` already
 - Truth_spine has `fractal/` package with `fractal_room.py`
@@ -268,7 +268,7 @@ EVOLUTION ROOM (weekly cron): scores, evolves Scout adapters, retires stale feed
 
 ## 14. Open questions deferred to writing-plans
 
-- Concrete `JagatKalyanFitness` formula (V0 = simple heuristic; v1 needs the canonical spec)
+- Concrete `JagatKalyanFitness` formula (V0 = simple heuristic; v1 needs the governing spec)
 - Astro vs Quartz final pick (Astro recommended for control, Quartz already Obsidian-native)
 - ~~Domain registration~~ → **DEFERRED to v1** per Dhyana directive 2026-05-07; v0 is local-only
 - ~~Fiscal sponsor / 501(c)(3) wrap~~ → DEFERRED to v1

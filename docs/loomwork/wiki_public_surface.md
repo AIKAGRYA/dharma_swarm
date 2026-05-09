@@ -54,7 +54,7 @@
 
 - Why Astro over Quartz/Eleventy/Hugo: Astro renders Obsidian-style `[[wikilinks]]` natively (Quartz does too, but Astro has better partial-hydration for the atoms-graph view), TypeScript-native (matches the dharma_swarm engine layer), excellent RSS + JSON-feed plugins out of the box, and image performance (LQIP, AVIF) for revelation hero shots.
 - Static-first → near-zero hosting cost (Cloudflare Pages free tier handles 100K visitors/month) and no DDoS surface for the inevitable corrupt-target pushback.
-- Same markdown atoms can be ingested by Obsidian privately and rendered publicly — single source of truth.
+- Same markdown atoms can be ingested by Obsidian privately and rendered publicly — one shared record.
 
 ### Page inventory
 

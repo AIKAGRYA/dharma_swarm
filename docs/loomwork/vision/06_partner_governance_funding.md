@@ -204,7 +204,7 @@ Decision rights: chartered public-utility status; mission protected by foundatio
 **The general principle, lifted from precedents:**
 - **ICIJ's consortium model** scales coordination but limits speed — the embargo discipline that produced Panama Papers' impact is impossible without trust-network membership controls.
 - **ProPublica's 501(c)(3) board** demonstrates that even foundation-heavy funding can preserve editorial independence given chartered firewalls.
-- **Mozilla Foundation/Mozilla Corporation split** is the canonical model for separating mission-protection from commercial activity — Loomwork v3+ may need this structure for paid API tier.
+- **Mozilla Foundation/Mozilla Corporation split** is the primary model for separating mission-protection from commercial activity — Loomwork v3+ may need this structure for paid API tier.
 - **Wikipedia Foundation's evolution** (and its crises — Wikimania controversies, board recall procedures) is the most-studied case of mission preservation under scale; Loomwork should adopt its donor-disclosure norms.
 - **Linux Foundation's project governance** is the precedent for federation: per-project sovereignty with shared standards layer.
 

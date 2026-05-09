@@ -36,7 +36,7 @@ Seven bands. Each is a phase transition, not a knob.
 
 **Cost.** $500–1500/mo. Postgres-managed (Supabase, Neon, RDS small) ~$300; R2 storage ~$50; CDN ~$50; paid inference for high-confidence telos gates ~$300; ops + monitoring ~$100; ~$200 buffer for spikes.
 
-**Governance.** Dhyana + advisory board (3–5 names). Per-revelation review still single-operator; partner inputs treated as advisory not authoritative. Capture risk: still zero (single-funder doesn't exist yet).
+**Governance.** Dhyana + advisory board (3–5 names). Per-revelation review still single-operator; partner inputs treated as advisory, not binding. Capture risk: still zero (single-funder doesn't exist yet).
 
 **Threat model.** First adversaries arrive: SEO spam, low-effort harassment, occasional cease-and-desist letter from a shell-company target. Real but manageable. Need: a documented retraction policy, a public methodology page, a no-PII-of-vulnerable-persons gate that's already proven (carry from Band 0).
 
@@ -148,7 +148,7 @@ Migrate the SQLite ontology registry to Postgres. Add a GraphQL API with persist
 
 ### Band 2 — Event-sourcing (atoms are events), CQRS, materialized views
 
-The atom *log* becomes the source of truth. Mutations are append-only events; the queryable atom-state is a materialized view computed from the log. This is the move that makes Band 3's hot/warm/cold tiering and Band 4's federation possible — federation is fundamentally about replicating event logs across instances.
+The atom *log* becomes the state record. Mutations are append-only events; the queryable atom-state is a materialized view computed from the log. This is the move that makes Band 3's hot/warm/cold tiering and Band 4's federation possible — federation is fundamentally about replicating event logs across instances.
 
 **Decision:** event log on Postgres logical replication or a dedicated event store (EventStoreDB, or just Postgres with ordering guarantees). Materialized views in ClickHouse for analytics; in pgvector for vector search; in OpenSearch or Quickwit for full-text; the read-side is whatever fits the query, the write-side is one log.
 
@@ -355,7 +355,7 @@ Every band, monthly cost broken into five buckets.
 
 ## SECTION 7: Technology Stack Recommendations
 
-For each band, the canonical stack and the defense for each choice.
+For each band, the recommended stack and the defense for each choice.
 
 | Layer | B0 | B1 | B2 | B3 | B4 | B5 | B6 |
 |---|---|---|---|---|---|---|---|

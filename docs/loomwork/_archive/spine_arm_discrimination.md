@@ -13,7 +13,7 @@ For each component, three signals were combined:
 
 Source files inspected (`/Users/dhyana/dharma_swarm/dharma_swarm/`): `organism.py`, `swarm.py`, `dharma_kernel.py`, `cascade.py`, `strange_loop.py`, `telos_gates.py`, `vsm_channels.py`, `signal_bus.py`, `stigmergy.py`, `catalytic_graph.py`, `evolution.py`, `jagat_kalyan.py`, `hypernode.py`, `insight_brief.py`, `kaizen_ops_local.py`, `telos_substrate.py`, `ontology.py`. Worktree spot-check: `/Users/dhyana/dharma_swarm_fractal_main_proof/dharma_swarm/fractal/fractal_room.py`. Foundations: `/Users/dhyana/dharma_swarm/foundations/`. Self-model: `~/.dharma/meta/recognition_seed.md`.
 
-Import counts (canonical centrality table; **higher = closer to spine**):
+Import counts (centrality table; **higher = closer to spine**):
 
 | Module | Imported by | Notes |
 |---|---:|---|

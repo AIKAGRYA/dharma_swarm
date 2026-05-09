@@ -189,7 +189,7 @@
 
 ## 🎯 TOP-30 PRIORITY LIST (ranked: signal-density × atomization-fit × cross-pollination × cost-efficiency − political-radioactivity)
 
-1. **GFW Integrated Disturbance Alerts** — global, near-real-time, free, perfect atom shape, the canonical first ingest. Cross-pollinates with everything land-based.
+1. **GFW Integrated Disturbance Alerts** — global, near-real-time, free, perfect atom shape, the preferred first ingest. Cross-pollinates with everything land-based.
 2. **OCCRP Aleph** — 50TB / 3.8B entries / 200+ datasets in one API. Single most pollinatable corruption substrate on Earth.
 3. **Carbon Mapper Data Portal** — facility-attributable plumes, free, daily atoms feeding EDGAR / Climate TRACE / Aleph cross-links.
 4. **Climate TRACE** — 352M+ asset-level emissions records, CC-BY, monthly cadence, beta API. Each asset = one atom.
@@ -201,7 +201,7 @@
 10. **HDX (Humanitarian Data Exchange)** — 20K+ humanitarian datasets in one bulk API. Meta-pollinator for crisis work.
 11. **Federal Register + Regulations.gov** — daily public-domain US rulemaking + comments. Lobbying-influence cross-link bedrock.
 12. **OpenSecrets** — US lobbying + campaign finance, free API. Pollinates with EDGAR, FTC, regulations.gov.
-13. **AI Incident Database (AIID)** — 1361+ AI harms via GraphQL, CC-BY-SA, the canonical AI-harm substrate.
+13. **AI Incident Database (AIID)** — 1361+ AI harms via GraphQL, CC-BY-SA, the primary AI-harm substrate.
 14. **Trase.earth** — commodity supply-chain flows, CC-BY API. Connects deforestation atoms to corporate buyers.
 15. **MethaneSAT / MethaneAIR (via GEE)** — free w/ application, complements Carbon Mapper, satellite-lost but backlog still releasing.
 16. **GDACS** — disaster alerts via RSS/API, real-time, public domain. Crisis-spine.

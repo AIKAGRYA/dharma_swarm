@@ -59,7 +59,7 @@ The most dangerous attack class for a typed-ontology platform. Threat vectors:
 - **"They're a CIA front" / "Russian front" framing.** [Bellingcat already faces this](https://en.wikipedia.org/wiki/Bellingcat) from multiple political sides; Loomwork will too. The asymmetry is that defending against narrative attacks is exhausting and unbounded.
 - **Manufactured controversies attacking the operator.** Personal life, past statements, religious framing — anything to delegitimize.
 - **Astroturfed bad-faith readers flooding the submit form.** Easy to deploy, hard to filter at scale.
-- **Bot-driven Wikipedia editing about Loomwork.** Wikipedia is the de-facto "ground truth" for journalists doing background research; capturing the Wikipedia article means capturing the public framing.
+- **Bot-driven Wikipedia editing about Loomwork.** Wikipedia is the de-facto background reference for journalists doing background research; capturing the Wikipedia article means capturing the public framing.
 - **LLM-generated "expert critique" floods.** As of 2026, distinguishable from human criticism only with effort.
 
 ### 1.6 Capture / regulatory — Severity 4
@@ -100,7 +100,7 @@ Minimum-N ≥ 2 independent sources before publication; minimum-N ≥ 3 for name
 - Domain: registered through registrar in jurisdiction without single-government takedown power; mirror domains in ≥3 ccTLDs
 
 ### 2.5 Pre-emptive legal defense fund
-$50K minimum reserve at v0; $500K target at v1 (post fiscal sponsor). Outside counsel retainer with an experienced press-freedom firm (Davis Wright Tremaine, Levine Sullivan Koch & Schulz, or Reporters Committee for Freedom of the Press direct support). [RCFP's anti-SLAPP guide](https://www.rcfp.org/anti-slapp-legal-guide/) is the canonical operational reference.
+$50K minimum reserve at v0; $500K target at v1 (post fiscal sponsor). Outside counsel retainer with an experienced press-freedom firm (Davis Wright Tremaine, Levine Sullivan Koch & Schulz, or Reporters Committee for Freedom of the Press direct support). [RCFP's anti-SLAPP guide](https://www.rcfp.org/anti-slapp-legal-guide/) is the primary operational reference.
 
 ### 2.6 Pre-emptive press relationships
 Cultivate 5-10 high-trust journalists at major outlets (NYT, Guardian, ProPublica, Der Spiegel, ICIJ network) BEFORE the first major revelation. When attack arrives, these relationships convert attacks into stories. The Wikileaks failure mode was burning press relationships through "publish first, edit never"; Loomwork inherits the inverse discipline.
@@ -121,7 +121,7 @@ Cultivate 5-10 high-trust journalists at major outlets (NYT, Guardian, ProPublic
 - Personal umbrella coverage for operator
 
 ### 2.9 501(c)(3) shielding (US) or fiscal sponsor wrapping
-Standalone 501(c)(3) protects board members from individual liability and provides tax-deductible donation infrastructure. Fiscal sponsor candidates: Code for Science & Society, NumFOCUS, Open Collective Foundation, Software Freedom Conservancy. ProPublica is the canonical investigative-501(c)(3) precedent.
+Standalone 501(c)(3) protects board members from individual liability and provides tax-deductible donation infrastructure. Fiscal sponsor candidates: Code for Science & Society, NumFOCUS, Open Collective Foundation, Software Freedom Conservancy. ProPublica is the primary investigative-501(c)(3) precedent.
 
 ### 2.10 Open-source mirror / fork-resilience
 Loomwork code MIT or Apache 2.0; atom schema CC0; revelations CC-BY. The work survives Loomwork's death because the code, schema, and ontology can be forked. Critical: separate "the platform" (forkable software) from "the institution" (Loomwork the entity). Even if the entity is destroyed, the substrate persists.
@@ -139,7 +139,7 @@ Per [NIST FIPS 203/204/205](https://csrc.nist.gov/news/2024/postquantum-cryptogr
 
 ## Section 3 — Wikileaks Lessons
 
-The canonical adversarial-architecture case study, 2006-2024.
+The main adversarial-architecture case study, 2006-2024.
 
 ### 3.1 What Worked (2006-2010 ascendancy)
 
