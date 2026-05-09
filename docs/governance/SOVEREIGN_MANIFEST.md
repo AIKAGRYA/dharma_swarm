@@ -52,11 +52,11 @@ The repo has **9 verified circular dependency chains** (V). The worst:
 All 9 cycles were independently confirmed with exact import lines. Most are mitigated by lazy imports but remain architectural debt. **New code must not create circular imports.**
 
 ### A8: FRONTMATTER DISCIPLINE
-Do not inject machine-readable YAML frontmatter into governance or architecture docs unless explicitly requested. Current state: **214 of 684 Markdown files start with YAML frontmatter; 15 of 21 docs/architecture Markdown files do so** (V). Long frontmatter remains an authority/noise risk even when the prose is useful.
+Do not inject machine-readable YAML frontmatter into governance or architecture docs unless explicitly requested. Current state: **214 of 685 Markdown files start with YAML frontmatter; 15 of 21 docs/architecture Markdown files do so** (V). Long frontmatter remains an authority/noise risk even when the prose is useful.
 
 ---
 
-## VERIFIED NUMBERS (2026-05-09 COUNT REFRESH)
+## VERIFIED NUMBERS (2026-05-07 COUNT REFRESH)
 
 These are the ground-truth metrics. All other documents citing different numbers are stale.
 
@@ -64,13 +64,13 @@ These are the ground-truth metrics. All other documents citing different numbers
 |--------|-------|-------------|
 | Total Python modules | **553** | find dharma_swarm -name "*.py" -type f |
 | Top-level (flat) modules | **385 (70.0%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
-| Total Python LOC | **249,079** | wc -l across dharma_swarm Python modules |
+| Total Python LOC | **248,966** | wc -l across dharma_swarm Python modules |
 | Test files | **562** | find tests -name "*.py" -type f |
 | Test functions | **10,014 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
-| Markdown files | **684** | find . -name "*.md" -type f |
-| Markdown total lines | **174,847** | wc -l across all .md |
+| Markdown files | **685** | find . -name "*.md" -type f |
+| Markdown total lines | **175,003** | wc -l across all .md |
 | Bridge files | **19** | find dharma_swarm -name "*bridge*.py" |
 | Adapter files | **14 across 7 locations** | find dharma_swarm -type f \| rg -i "adapter" |
 | Orchestrator files | **4** (6,034 LOC total) | find dharma_swarm -name "*orchestrat*" |
@@ -171,7 +171,7 @@ These are the ground-truth metrics. All other documents citing different numbers
 
 ### Domain 6: Bridges (Integration Layer)
 
-**19 bridge files** (V), **10,531 total LOC**:
+**19 bridge files** (V), **10,418 total LOC**:
 
 | Bridge | Lines | Importers | Status |
 |--------|-------|-----------|--------|
@@ -192,7 +192,6 @@ These are the ground-truth metrics. All other documents citing different numbers
 | skill_bridge.py | 202 | 2 | ALIVE |
 | optimizer_bridge.py | 191 | 8 | ALIVE |
 | ecosystem_bridge.py | 170 | 3 | ALIVE |
-| operator_core/go_evidence_bridge.py | 113 | 1 | ALIVE |
 | ginko_bridge.py | 94 | 1 | ALIVE |
 
 - **Primary Entry Points**: `terminal_bridge.py` (Bun<->Python), `bridge.py` (core abstraction)

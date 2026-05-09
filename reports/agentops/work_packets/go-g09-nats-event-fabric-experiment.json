@@ -1,0 +1,46 @@
+{
+  "id": "go-g09-nats-event-fabric-experiment",
+  "base_ref": "origin/main",
+  "branch": "exp/go-nats-event-fabric",
+  "worktree": "/Users/dhyana/promotion_worktrees/dharma_swarm_go_g09_nats_experiment",
+  "intent": "Prototype optional NATS/JetStream event fabric behind explicit build tags and config, with file spool remaining the default path.",
+  "allowed_files": [
+    "tools/nats_event_fabric_go/**",
+    "tools/go_sdk/**",
+    "tests/test_go_nats_event_fabric.py",
+    "tests/fixtures/go_nats_event_fabric/**",
+    "docs/plans/2026-05-09-go-sense-organ-pr-scaffold.md",
+    "Makefile",
+    ".github/workflows/tests.yml",
+    "docs/docops/AUTO_INVENTORY.md",
+    "docs/governance/SOVEREIGN_MANIFEST.md"
+  ],
+  "forbidden_files": [
+    "dharma_swarm/ontology.py",
+    "dharma_swarm/telic_seam.py",
+    "dharma_swarm/evolution.py",
+    "dharma_swarm/telos_gates.py",
+    "dharma_swarm/dharma_kernel.py",
+    "dharma_swarm/swarm.py",
+    "dharma_swarm/agent_runner.py",
+    "dharma_swarm/orchestrator.py"
+  ],
+  "gates": [
+    {
+      "name": "go-ci",
+      "command": "make go-ci"
+    },
+    {
+      "name": "nats-experiment-tests",
+      "command": "python3 -m pytest -q tests/test_go_nats_event_fabric.py"
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "exp(go): prototype optional NATS event fabric [impact-checked]"
+  },
+  "approval": {
+    "before_commit": true,
+    "before_merge": true
+  }
+}

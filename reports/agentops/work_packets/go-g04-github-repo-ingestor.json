@@ -1,0 +1,46 @@
+{
+  "id": "go-g04-github-repo-ingestor",
+  "base_ref": "origin/main",
+  "branch": "feat/go-github-repo-ingestor",
+  "worktree": "/Users/dhyana/promotion_worktrees/dharma_swarm_go_g04_github_ingestor",
+  "intent": "Add a GitHub/repository event ingestor that normalizes PR, commit, check, and release payloads into Go evidence receipts using fixtures only in CI.",
+  "allowed_files": [
+    "tools/github_ingestor_go/**",
+    "tools/go_sdk/**",
+    "dharma_swarm/operator_core/go_github_bridge.py",
+    "tests/test_go_github_ingestor_bridge.py",
+    "tests/fixtures/go_github_ingestor/**",
+    "Makefile",
+    ".github/workflows/tests.yml",
+    "docs/docops/AUTO_INVENTORY.md",
+    "docs/governance/SOVEREIGN_MANIFEST.md"
+  ],
+  "forbidden_files": [
+    "dharma_swarm/ontology.py",
+    "dharma_swarm/telic_seam.py",
+    "dharma_swarm/evolution.py",
+    "dharma_swarm/telos_gates.py",
+    "dharma_swarm/dharma_kernel.py",
+    "dharma_swarm/swarm.py",
+    "dharma_swarm/agent_runner.py",
+    "dharma_swarm/orchestrator.py"
+  ],
+  "gates": [
+    {
+      "name": "go-ci",
+      "command": "make go-ci"
+    },
+    {
+      "name": "github-bridge-tests",
+      "command": "python3 -m pytest -q tests/test_go_github_ingestor_bridge.py"
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "feat(go): add GitHub evidence ingestor [impact-checked]"
+  },
+  "approval": {
+    "before_commit": true,
+    "before_merge": true
+  }
+}

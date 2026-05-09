@@ -1,0 +1,49 @@
+{
+  "id": "go-g00-evidence-sense-organ-v0",
+  "base_ref": "origin/main",
+  "branch": "feat/go-evidence-sense-organ-v0-closure",
+  "worktree": "/Users/dhyana/dharma_swarm_go_closure_v0",
+  "intent": "Merge PR #176 as the first bounded Go sidecar: a file-native evidence receipt ingestor with Python closure_v0 projection.",
+  "allowed_files": [
+    ".github/workflows/tests.yml",
+    "Makefile",
+    "dharma_swarm/operator_core/go_evidence_bridge.py",
+    "docs/docops/AUTO_INVENTORY.md",
+    "docs/governance/SOVEREIGN_MANIFEST.md",
+    "tests/test_go_evidence_ingestor_bridge.py",
+    "tools/evidence_ingestor_go/**"
+  ],
+  "forbidden_files": [
+    "dharma_swarm/ontology.py",
+    "dharma_swarm/telic_seam.py",
+    "dharma_swarm/evolution.py",
+    "dharma_swarm/telos_gates.py",
+    "dharma_swarm/dharma_kernel.py",
+    "dharma_swarm/swarm.py",
+    "dharma_swarm/agent_runner.py",
+    "dharma_swarm/orchestrator.py",
+    "dharma_swarm/ACTIVE_SURFACE_MANIFEST.yaml"
+  ],
+  "gates": [
+    {
+      "name": "go-ci",
+      "command": "make go-ci"
+    },
+    {
+      "name": "bridge-tests",
+      "command": "python3 -m pytest -q tests/test_go_evidence_ingestor_bridge.py"
+    },
+    {
+      "name": "pr-checks",
+      "command": "gh pr checks 176 --watch --interval 10 --fail-fast"
+    }
+  ],
+  "commit": {
+    "allowed": false,
+    "message": "feat(go): add evidence sense-organ v0 [impact-checked]"
+  },
+  "approval": {
+    "before_commit": false,
+    "before_merge": true
+  }
+}

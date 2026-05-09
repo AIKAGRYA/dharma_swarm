@@ -1,0 +1,43 @@
+{
+  "id": "go-g02-receipt-sdk",
+  "base_ref": "origin/main",
+  "branch": "feat/go-receipt-sdk",
+  "worktree": "/Users/dhyana/promotion_worktrees/dharma_swarm_go_g02_receipt_sdk",
+  "intent": "Extract the G0 receipt shape into a reusable Go SDK package with deterministic hashing, validation, atomic write, and reject semantics.",
+  "allowed_files": [
+    "tools/go_sdk/**",
+    "tools/evidence_ingestor_go/**",
+    "Makefile",
+    ".github/workflows/tests.yml",
+    "docs/docops/AUTO_INVENTORY.md",
+    "docs/governance/SOVEREIGN_MANIFEST.md"
+  ],
+  "forbidden_files": [
+    "dharma_swarm/ontology.py",
+    "dharma_swarm/telic_seam.py",
+    "dharma_swarm/evolution.py",
+    "dharma_swarm/telos_gates.py",
+    "dharma_swarm/dharma_kernel.py",
+    "dharma_swarm/swarm.py",
+    "dharma_swarm/agent_runner.py",
+    "dharma_swarm/orchestrator.py"
+  ],
+  "gates": [
+    {
+      "name": "go-ci",
+      "command": "make go-ci"
+    },
+    {
+      "name": "docops",
+      "command": "python3 scripts/docops/check_docops_integrity.py --changed-from origin/main"
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "feat(go): add receipt SDK for sense organs [impact-checked]"
+  },
+  "approval": {
+    "before_commit": true,
+    "before_merge": true
+  }
+}
