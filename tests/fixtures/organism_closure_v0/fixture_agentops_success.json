@@ -1,0 +1,17 @@
+{
+  "approval_state": "not_needed",
+  "branch": "feat/organism-closure-v0",
+  "changed_files": [
+    "dharma_swarm/operator_core/closure_v0.py"
+  ],
+  "commit_hash": "deadbeef0001",
+  "commit_state": "commit_created",
+  "failed_gates": [],
+  "gate_state": "all_green",
+  "job_id": "job_v0_success_001",
+  "scope_state": "scope_clean",
+  "scope_violations": [],
+  "source_path": "tests/fixtures/organism_closure_v0/fixture_agentops_success.json",
+  "status": "completed",
+  "worktree": "/Users/dhyana/dharma_swarm_closure_v0"
+}

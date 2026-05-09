@@ -1,0 +1,21 @@
+{
+  "agentops_source": "tests/fixtures/organism_closure_v0/fixture_agentops_failure.json",
+  "correlation_id": "corr_v0_test_001",
+  "created_at": "2026-05-08T00:00:00+00:00",
+  "duration_ms": 1234.5,
+  "files_changed": [
+    [
+      "dharma_swarm/operator_core/closure_v0.py",
+      "4699b45d098b"
+    ],
+    [
+      "dharma_swarm/operator_core/contracts.py",
+      "dd101c56c2d3"
+    ]
+  ],
+  "receipt_id": "ev_1138ad394a3b",
+  "replay_command": "pytest tests/test_organism_closure_v0.py -q",
+  "success": false,
+  "test_exit_code": 1,
+  "work_packet_id": "wp_v0_test_001"
+}
