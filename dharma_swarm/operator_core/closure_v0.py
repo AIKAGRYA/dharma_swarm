@@ -103,6 +103,7 @@ class KaizenReviewLink:
     correlation_id: str
     evidence_receipt_id: str
     next_recommendation: str
+    accepted: bool
     waste_patterns: tuple[str, ...] = ()
     has_human_yds: bool = False
 
@@ -219,6 +220,7 @@ def kaizen_link(
         correlation_id=receipt.correlation_id,
         evidence_receipt_id=receipt.receipt_id,
         next_recommendation=rec,
+        accepted=receipt.success,
         waste_patterns=waste_patterns,
         has_human_yds=human_yds is not None,
     )
@@ -233,7 +235,7 @@ def decide_next(
     decided_by: str = "policy",
 ) -> NextDecision:
     cids = tuple(p.packet_id for p in candidates)
-    accepted = "Promote" in review.next_recommendation
+    accepted = review.accepted
     if projection.truth_stale:
         chosen, reason, conf = None, "truth_stale: S4/algedonic/S5 integrity flagged", 0.0
     elif accepted and cids:
