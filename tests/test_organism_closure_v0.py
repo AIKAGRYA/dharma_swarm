@@ -170,8 +170,15 @@ def test_t4_vsm_fresh_when_inputs_fresh() -> None:
 
 def test_t5_kaizen_link_recommends_promote_on_success() -> None:
     _, _, review, _ = _run_loop("success")
+    assert review.accepted is True
     assert "Promote" in review.next_recommendation
     assert review.has_human_yds is False
+
+
+def test_t5b_kaizen_link_holds_on_failure() -> None:
+    _, _, review, _ = _run_loop("failure")
+    assert review.accepted is False
+    assert "Hold" in review.next_recommendation
 
 
 # ---------------------------------------------------------------------------
