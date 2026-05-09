@@ -1,12 +1,17 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts uplift-guards module-budget docops-integrity docops-report governance-all
+.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts uplift-guards module-budget docops-integrity docops-report governance-all go-fmt-check go-test go-vet go-ci
 
 PYTHON ?= python3
+GO ?= go
+GOFMT ?= gofmt
 SEMGREP ?= scripts/governance/run_semgrep_with_ca.sh
 SWARM_PLIST := $(HOME)/Library/LaunchAgents/com.dharma.swarm.plist
 STATE_DIR    := $(HOME)/.dharma
+GO_EVIDENCE_MODULE := tools/evidence_ingestor_go
+GO_CACHE_DIR ?= /tmp/dharma-swarm-go-build
+GO_MOD_CACHE_DIR ?= /tmp/dharma-swarm-go-mod
 
 help:
 	@echo ""
@@ -35,6 +40,7 @@ help:
 	@echo "  make uplift-guards Run uplift pre-commit guards"
 	@echo "  make docops-integrity Run machine-verifiable documentation checks"
 	@echo "  make docops-report Generate local DocOps JSON/Markdown reports"
+	@echo "  make go-ci        Run Go evidence sense-organ fmt/vet/test gates"
 	@echo ""
 
 install:
@@ -191,3 +197,24 @@ docops-report:
 		--inventory-markdown reports/docops/corpus_inventory.md
 
 governance-all: semgrep gitleaks test-hygiene test-contracts uplift-guards module-budget docops-integrity
+
+# ============================================================================
+# Go evidence sense-organ gates (Track G)
+# ============================================================================
+
+go-fmt-check:
+	@files="$$( $(GOFMT) -l $(GO_EVIDENCE_MODULE) )"; \
+	if [ -n "$$files" ]; then \
+		printf "Go files need gofmt:\n%s\n" "$$files"; \
+		exit 1; \
+	fi
+
+go-test:
+	@mkdir -p $(GO_CACHE_DIR) $(GO_MOD_CACHE_DIR)
+	cd $(GO_EVIDENCE_MODULE) && GOCACHE=$(GO_CACHE_DIR) GOMODCACHE=$(GO_MOD_CACHE_DIR) $(GO) test ./...
+
+go-vet:
+	@mkdir -p $(GO_CACHE_DIR) $(GO_MOD_CACHE_DIR)
+	cd $(GO_EVIDENCE_MODULE) && GOCACHE=$(GO_CACHE_DIR) GOMODCACHE=$(GO_MOD_CACHE_DIR) $(GO) vet ./...
+
+go-ci: go-fmt-check go-vet go-test
