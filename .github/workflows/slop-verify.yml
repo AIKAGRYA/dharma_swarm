@@ -1,0 +1,162 @@
+name: slop-verify
+
+on:
+  pull_request:
+    branches: [main, "feat/**", "chore/**", "fix/**"]
+    paths:
+      - "dharma_swarm/**"
+      - "dashboard/**"
+      - "terminal/**"
+      - "terminal-v2/**"
+      - "desktop-shell/**"
+      - "codex_skills/**"
+      - "scripts/governance/slop_verify.py"
+      - "dharma_swarm/slop/**"
+      - ".github/workflows/slop-verify.yml"
+  push:
+    branches: [main]
+  schedule:
+    # Nightly full scan, full detector pool
+    - cron: "13 3 * * *"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Verification mode"
+        required: false
+        default: "ci"
+        type: choice
+        options: [pre-commit, ci, nightly]
+
+concurrency:
+  group: slop-verify-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  slop-verify:
+    name: slop-verify (${{ matrix.mode }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        mode:
+          - ${{ github.event_name == 'schedule' && 'nightly' || (inputs.mode || 'ci') }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Python detectors
+        run: |
+          python3 -m pip install --quiet \
+            vulture \
+            ai-slop-detector \
+            sloppylint \
+            grimp \
+            semgrep \
+            pip-audit
+
+      - name: Install JS/TS detectors (npm-global)
+        run: |
+          npm install --silent --global \
+            knip \
+            jscpd \
+            dependency-cruiser \
+            oxlint \
+            fallow \
+            || true
+
+      - name: Install dashboard node_modules (if present)
+        run: |
+          for project in dashboard terminal terminal-v2 desktop-shell codex_skills; do
+            if [ -f "$project/package.json" ]; then
+              echo "::group::npm install $project"
+              (cd "$project" && npm install --silent) || true
+              echo "::endgroup::"
+            fi
+          done
+
+      - name: Determine scope
+        id: scope
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "changed_since=origin/${{ github.base_ref }}" >> "$GITHUB_OUTPUT"
+            echo "scope_paths=" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed_since=" >> "$GITHUB_OUTPUT"
+            echo "scope_paths=dharma_swarm dashboard/src" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run slop-verify
+        id: verify
+        run: |
+          set -o pipefail
+          mkdir -p reports/slop
+          args=(--mode "${{ matrix.mode }}" --output-format json)
+          if [ -n "${{ steps.scope.outputs.changed_since }}" ]; then
+            git fetch origin "${{ github.base_ref }}" --depth=1 || true
+            args+=(--changed-since "${{ steps.scope.outputs.changed_since }}")
+          fi
+          if [ -n "${{ steps.scope.outputs.scope_paths }}" ]; then
+            args+=(${{ steps.scope.outputs.scope_paths }})
+          fi
+          python3 scripts/governance/slop_verify.py "${args[@]}" \
+            > reports/slop/result.json
+          # Always emit a summary even if exit_code != 0
+          python3 -c "
+          import json, pathlib
+          d = json.loads(pathlib.Path('reports/slop/result.json').read_text())
+          print('## Slop verification summary')
+          print()
+          print('| metric | value |')
+          print('|---|---|')
+          print(f\"| mode | \`{d['mode']}\` |\")
+          print(f\"| threshold | {d['threshold']} |\")
+          print(f\"| modules scored | {len(d['module_scores'])} |\")
+          print()
+          print('| detector | family | findings | duration_s |')
+          print('|---|---|---:|---:|')
+          for r in d['detector_results']:
+              print(f\"| \`{r['tool']}\` | {r['family']} | {r['finding_count']} | {r['duration_sec']:.2f} |\")
+          print()
+          print('| action | count |')
+          print('|---|---:|')
+          for k, v in d['summary'].items():
+              if v: print(f\"| {k} | {v} |\")
+          " | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Render trend report
+        if: always()
+        run: |
+          python3 scripts/governance/slop_trend.py --days 14 \
+            > reports/slop/trend.md || true
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: slop-reports-${{ matrix.mode }}-${{ github.run_id }}
+          path: reports/slop/
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request' && always()
+        uses: marocchino/sticky-pull-request-comment@v2
+        continue-on-error: true
+        with:
+          header: slop-verify-${{ matrix.mode }}
+          path: reports/slop/result.json

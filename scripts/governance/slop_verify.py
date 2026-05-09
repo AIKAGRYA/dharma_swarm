@@ -49,13 +49,14 @@ from dharma_swarm.slop.router import Action, route_score, severity_summary  # no
 
 MODE_PROFILES: dict[str, dict[str, object]] = {
     "pre-commit": {
-        "detectors": ("vulture", "oxlint"),
+        "detectors": ("vulture", "oxlint", "semgrep"),
         "budget_sec": 5.0,
         "default_threshold": 0.50,
     },
     "ci": {
         "detectors": (
             "vulture", "ai-slop-detector", "sentry-spotlight",
+            "grimp", "semgrep",
             "fallow", "knip", "jscpd", "tsc", "eslint",
         ),
         "budget_sec": 90.0,
@@ -64,6 +65,7 @@ MODE_PROFILES: dict[str, dict[str, object]] = {
     "nightly": {
         "detectors": (
             "vulture", "ai-slop-detector", "sentry-spotlight",
+            "grimp", "semgrep",
             "fallow", "knip", "jscpd", "tsc", "eslint",
             "dependency-cruiser",
         ),

@@ -27,6 +27,7 @@ from dharma_swarm.slop.adapters.grimp_adapter import run_grimp
 from dharma_swarm.slop.adapters.jscpd_adapter import run_jscpd
 from dharma_swarm.slop.adapters.knip_adapter import run_knip
 from dharma_swarm.slop.adapters.oxlint_adapter import run_oxlint
+from dharma_swarm.slop.adapters.semgrep_adapter import run_semgrep
 from dharma_swarm.slop.adapters.spotlight_adapter import (
     probe_spotlight,
     run_spotlight,
@@ -42,6 +43,7 @@ REGISTRY: dict[str, AdapterCallable] = {
     "vulture": run_vulture,
     "ai-slop-detector": run_ai_slop_detector,
     "grimp": run_grimp,
+    "semgrep": run_semgrep,
     # Telemetry
     "sentry-spotlight": run_spotlight,
     # JS/TS detectors
@@ -68,6 +70,7 @@ __all__ = [
     "run_jscpd",
     "run_knip",
     "run_oxlint",
+    "run_semgrep",
     "run_spotlight",
     "run_subprocess",
     "run_tsc",

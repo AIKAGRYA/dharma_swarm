@@ -86,6 +86,23 @@ repos:
         stages: [pre-commit]
 
   # ---------------------------------------------------------------------------
+  # Slop-verify (pre-commit lane: vulture + oxlint + semgrep on changed files
+  # only, target <5s). Soft-fail at p>=0.50 with cross-family agreement; below
+  # that, findings flow to ~/.dharma/slop_ledger and surface via slop_trend.py.
+  # The agreement-cap in dharma_swarm/slop/aggregate.py prevents single-tool
+  # noise from blocking commits.
+  # ---------------------------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: slop-verify-precommit
+        name: slop-verify (pre-commit lane, changed files only)
+        entry: python3 scripts/governance/slop_verify.py --mode pre-commit --threshold 0.50
+        language: system
+        pass_filenames: true
+        types_or: [python, ts, tsx, javascript, jsx]
+        stages: [pre-commit]
+
+  # ---------------------------------------------------------------------------
   # Whitespace / EOF / large-file hygiene.
   # ---------------------------------------------------------------------------
   - repo: https://github.com/pre-commit/pre-commit-hooks

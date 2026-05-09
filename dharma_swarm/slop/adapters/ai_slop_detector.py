@@ -109,12 +109,19 @@ def run_ai_slop_detector(
     target_paths = [str(p) for p in paths]
     if not target_paths:
         return empty_result(TOOL, FAMILY, "no paths supplied")
+    scope_dirs = sorted({
+        str(Path(p).parent if Path(p).is_file() else Path(p))
+        for p in target_paths
+    })
+    common_root = _common_root(scope_dirs)
+    invocation_targets = [common_root] if common_root else scope_dirs
+
     findings: list[Finding] = []
     duration = 0.0
     last_stderr = ""
     last_exit = 0
-    for path in target_paths:
-        argv = ["ai-slop-detector", "--json", path]
+    for target in invocation_targets:
+        argv = ["ai-slop-detector", "--json", target]
         exit_code, stdout, stderr, d = run_subprocess(
             argv, cwd=repo_root, timeout=timeout
         )
@@ -134,3 +141,20 @@ def run_ai_slop_detector(
         exit_code=last_exit if last_exit in (0, 1) else last_exit,
         error=last_stderr.strip() if last_exit > 1 else None,
     )
+
+
+def _common_root(paths: list[str]) -> str | None:
+    if not paths:
+        return None
+    if len(paths) == 1:
+        return paths[0]
+    parts_list = [Path(p).resolve().parts for p in paths]
+    common: list[str] = []
+    for column in zip(*parts_list, strict=False):
+        if len(set(column)) == 1:
+            common.append(column[0])
+        else:
+            break
+    if len(common) < 2:
+        return None
+    return str(Path(*common))
