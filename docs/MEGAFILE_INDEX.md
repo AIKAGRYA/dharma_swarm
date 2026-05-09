@@ -8,9 +8,19 @@ This file is the **stable shape** for dharma_swarm onboarding. Only this file is
 
 ## How To Use This File
 
-If you are a new agent (human or AI) walking into dharma_swarm cold, read the slots in order 1 → 10. Each slot tells you which file(s) to read for that onboarding question. Where status is **CANONICAL**, read the file. Where **STUB**, read the pointed-to substrate. Where **STALE / CONTESTED / MISSING**, read with the marked caveat.
+If you are a new agent (human or AI) walking into dharma_swarm cold, start with the quick assimilation paths below. If you need the full doctrine, read the slots in order 1 -> 10. Each slot tells you which file(s) to read for that onboarding question. Where status is **CANONICAL**, read the file. Where **STUB**, read the pointed-to substrate. Where **STALE / CONTESTED / MISSING**, read with the marked caveat.
 
 If you are doing work that should be captured, ask: "which slot does this belong to?" Append there. Do not create parallel artifacts.
+
+---
+
+## Agent Assimilation Paths
+
+**15 minutes:** read `docs/foundations/CONTEMPLATIVE_SPINE.md`, `docs/architecture/WIRING_AND_LOOPS.md`, `docs/governance/BUILD_SESSION_ENTRYPOINT.md`, `docs/state/BROKEN_REGISTER.md`, and `reports/system_map/latest.json`. This is the fastest path to the grand vision, the core loop, and the current broken surfaces.
+
+**60 minutes:** add `CLAUDE.md`, this index, `docs/governance/SOVEREIGN_MANIFEST.md`, `docs/governance/CANONICAL_DOC_STACK.md`, `docs/vision_maps/MASTER_2026-05-07_attractor_closure_synthesis.md`, `foundations/INDEX.md`, `foundations/GLOSSARY.md`, `docs/telos-engine/INDEX.md`, and `specs/GODEL_CLAW_V1_SPEC.md`.
+
+**Deep read:** read all ten slots below, then inspect the implementation membranes named in Slot 10: `operating_facts.py`, `telic_seam.py`, `shakti_executive/executive.py`, `vsm_channels.py`, `organism.py`, `meta_daemon.py`, `strange_loop.py`, and `evolution.py`.
 
 ---
 
@@ -23,15 +33,15 @@ A separate convergence audit (`~/.dharma/audit/truth_spine_convergence_2026-05-0
 | Order | Surface | Path | Role |
 |---|---|---|---|
 | 1 | Project agent contract | `dharma_swarm/CLAUDE.md` | Behavioral rules + Transcendence Principle |
-| 2 | Sovereign authority | `docs/governance/SOVEREIGN_MANIFEST.md` | Governance scope (NOTE: file count 514 vs actual 567 — see BR-016) |
+| 2 | Sovereign authority | `docs/governance/SOVEREIGN_MANIFEST.md` | Governance scope and measured boundaries |
 | 3 | Doc-stack registry | `docs/governance/CANONICAL_DOC_STACK.md` | Names which docs are canonical |
-| 4 | Practical session entrypoint | `docs/governance/BUILD_SESSION_ENTRYPOINT.md` | **ON origin/main, NOT in current checkout — see BR-017** |
+| 4 | Practical session entrypoint | `docs/governance/BUILD_SESSION_ENTRYPOINT.md` | Present in current checkout; build-session pointer layer |
 | 5 | Conceptual / vision spine | `docs/vision_maps/MASTER_2026-05-07_attractor_closure_synthesis.md` | This index's Slot 1 (note stale `.FOCUS` claim — see BR-015) |
 | 6 | Machine-readable surface authority | `dharma_swarm/ACTIVE_SURFACE_MANIFEST.yaml` | Which API routes / dashboard surfaces are active / projection / adapter / research / frozen |
 
 **The convergence work** (instead of inventing 8 new megafiles):
-- Promote `BUILD_SESSION_ENTRYPOINT.md` from origin/main into current branch (BR-017)
-- Refresh `SOVEREIGN_MANIFEST.md` count drift (BR-016)
+- Keep `BUILD_SESSION_ENTRYPOINT.md` current in checkout (BR-017 closed; maintain as pointer layer)
+- Keep `SOVEREIGN_MANIFEST.md` count drift closed (BR-016 closed; refresh when code inventory changes)
 - Patch synthesis stale claim about `.FOCUS` (closing follow-up to BR-015)
 - Regenerate stale `docs/architecture/NAVIGATION.md`; `CLAUDE.md` pointer was patched 2026-05-07 (BR-010 revised)
 - Archive `dharma_swarm/DHARMA_SWARM_MASTER_MAP.md` (root-violating, superseded by Slot 1)
@@ -110,10 +120,17 @@ The 8 unstubbed slots below get filled by **pointing into the authority stack**,
 
 ### Slot 5 — Wiring + Loop Ledger
 **Path:** `dharma_swarm/docs/architecture/WIRING_AND_LOOPS.md` (STUB — to be consolidated)
-**Status:** PARTIAL + STALE
+**Status:** SEEDED (active wiring map; legacy loop ledgers still stale)
 **Audience:** Engineer, Agent
 **Read for:** edges between limbs (imports, file IO, shared DBs, cron, message buses) and per-loop runtime closure status.
 **Substrate to reconcile:**
+- `dharma_swarm/docs/architecture/WIRING_AND_LOOPS.md` (current canonical build spine)
+- `dharma_swarm/reports/system_map/latest.json` (15-organ operational diagnosis)
+- `dharma_swarm/dharma_swarm/operator_core/operating_facts.py` (operating fact membrane)
+- `dharma_swarm/dharma_swarm/telic_seam.py` (telic write-through)
+- `dharma_swarm/dharma_swarm/shakti_executive/executive.py` (upstream selector; ranks, does not execute)
+- `dharma_swarm/dharma_swarm/vsm_channels.py` and `dharma_swarm/dharma_swarm/organism.py` (VSM/cybernetic nervous system)
+- `dharma_swarm/dharma_swarm/meta_daemon.py`, `strange_loop.py`, and `evolution.py` (recognition/self-evolution surfaces)
 - `dharma_swarm/INTERFACE_MISMATCH_MAP.md` (self-flagged "memorial, not battle plan"; ~12/25 entries resolved, ~7 unverified)
 - `dharma_swarm/CYBERNETIC_LOOP_MAP.md` (6 days stale; recognition-seed claim contradicts current code)
 - `dharma_swarm/MODEL_ROUTING_MAP.md` (32+ days stale)
@@ -173,7 +190,7 @@ The 8 unstubbed slots below get filled by **pointing into the authority stack**,
 **Audience:** Agent (primary); Engineer, Operator (secondary)
 **Read for:** identity, behavioral feedback, decision protocols, who's-who in the agent ecosystem.
 **Substrate (corrected 2026-05-07 18:00):**
-- **`docs/governance/BUILD_SESSION_ENTRYPOINT.md`** — the strongest practical session-entrypoint (ON origin/main, NOT in current checkout — see BR-017)
+- **`docs/governance/BUILD_SESSION_ENTRYPOINT.md`** — the strongest practical session-entrypoint (present in current checkout)
 - **`docs/governance/CANONICAL_DOC_STACK.md`** — names which docs are canonical
 - **`docs/governance/SOVEREIGN_MANIFEST.md`** — governance scope (count drift; see BR-016)
 - `dharma_swarm/CLAUDE.md` (project-level agent contract; Transcendence Principle; behavioral rules)
@@ -185,27 +202,33 @@ The 8 unstubbed slots below get filled by **pointing into the authority stack**,
 - `~/.claude/agents/altitude.md`, `mahakali.md` (agent-as-skill definitions)
 **Known critical gaps:**
 - Non-Claude-Code agents (Codex sub-agents, headless invocations, MCP workers) may have NO path to this substrate at all (BR-013).
-- The strongest in-repo entrypoint (`BUILD_SESSION_ENTRYPOINT.md`) lives only on origin/main; current branch agents onboard without it.
+- Non-human agent launchers still need explicit wiring to this read order; having the doc present does not prove every launcher consumes it.
 
 ### Slot 10 — Contemplative Spine + Glossary
-**Path:** `dharma_swarm/docs/foundations/CONTEMPLATIVE_SPINE.md` (STUB — to be authored as entry-point)
-**Status:** PARTIAL (spine canonical, glossary orphan from index)
+**Path:** `dharma_swarm/docs/foundations/CONTEMPLATIVE_SPINE.md`
+**Status:** SEEDED (Grand Vision Boot Packet)
 **Audience:** Agent, Operator (primary); Engineer (secondary)
-**Read for:** the doctrinal substrate that makes everything above legible — Akram, R_V, Triple Mapping, the 10 pillars, Sanskrit + technical glossary.
+**Read for:** the doctrinal substrate that makes everything above legible — Akram, R_V, Triple Mapping, cybernetics, ontology-native engineering, DGM/self-evolution, strategic arms, Sanskrit + technical glossary.
 **Substrate to consolidate / link:**
+- `dharma_swarm/docs/foundations/CONTEMPLATIVE_SPINE.md` (fast assimilation packet; compression layer, not replacement)
+- `dharma_swarm/docs/architecture/WIRING_AND_LOOPS.md` (core loop map)
+- `dharma_swarm/docs/governance/BUILD_SESSION_ENTRYPOINT.md` (active build-seam pointer)
 - `dharma_swarm/lodestones/CONSCIOUS_INFRASTRUCTURE.md` (canonical source for "morphogenetic field" + "Recognize not merely Reflect")
 - `dharma_swarm/foundations/INDEX.md` (canonical entry — 10 pillars + META_SYNTHESIS)
 - `dharma_swarm/foundations/GLOSSARY.md` (**ORPHAN** — the only single Sanskrit + technical glossary, not referenced from `CLAUDE.md`, `MEMORY.md`, or `cabinet/INDEX.md`)
+- `dharma_swarm/docs/telos-engine/INDEX.md`
+- `dharma_swarm/specs/GODEL_CLAW_V1_SPEC.md`
+- `dharma_swarm/docs/vision_maps/MASTER_2026-05-07_attractor_closure_synthesis.md`
 - `~/.claude/cabinet/research/rv_paper.md`
 - `~/.claude/cabinet/worldview/bridge.md`
 - `~/.claude/cabinet/worldview/telos.md`
-**Known gap:** discoverability path from `CLAUDE.md` to `foundations/GLOSSARY.md` does not exist; agents must already know the glossary exists to find it.
+**Known gap:** Slot 10 is now seeded, but deeper consolidation remains pending: glossary discoverability from `CLAUDE.md`, cabinet-to-repo doctrine pointers, and publication/wiki surfaces still need tighter wiring.
 
 ---
 
 ## Recommended Reading Order For New Agents
 
-**1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10**
+If time is short, use **Agent Assimilation Paths** above. If you are doing a deep onboarding pass, read **1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10**.
 
 A new agent reads in this order:
 1. Vision (what is this becoming)

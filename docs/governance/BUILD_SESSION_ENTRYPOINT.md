@@ -4,9 +4,9 @@
 **Owner of:** the read-order and current-track pointers every agent should hit before a build session.
 **Subordinate to:** [`CLAUDE.md`](../../CLAUDE.md) (behavior) and [`SOVEREIGN_MANIFEST.md`](SOVEREIGN_MANIFEST.md) (architectural truth). When this file disagrees with either, they win.
 
-This file exists because the audit synthesis at `reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md` found that agents repeatedly rebuild substrates that already exist or skip canonical reads before committing. This is a single short page that every build agent reads first, then proceeds to the canonical docs.
+This file exists because repo audits found that agents repeatedly rebuild substrates that already exist or skip canonical reads before committing. This is a single short page that every build agent reads first, then proceeds to the canonical docs.
 
-If you are about to write code in this repo, read this file fully, then read the four numbered files below in order. Do not skim. Do not skip the audit. The repo will not give you a second chance to re-orient mid-session.
+If you are about to write code in this repo, read this file fully, then read the numbered files below in order. Do not skim. Do not skip the live state surfaces. The repo will not give you a second chance to re-orient mid-session.
 
 ---
 
@@ -16,6 +16,8 @@ dharma_swarm is a Python multi-agent orchestration runtime with a typed ontology
 
 Current substrate-nativeness estimate (from audit): **~10–15% of runtime is ontology-native; ~85–90% bypasses substrate.** Goal of the current track: bring one user-visible seam to 100% native and prove it with tests.
 
+If you do not yet understand why the repo exists, read [`docs/foundations/CONTEMPLATIVE_SPINE.md`](../foundations/CONTEMPLATIVE_SPINE.md) before selecting a seam. It is the fast grand-vision packet; it compresses the loop stack without replacing the underlying docs.
+
 ---
 
 ## 1. Mandatory read order
@@ -23,11 +25,12 @@ Current substrate-nativeness estimate (from audit): **~10–15% of runtime is on
 Read in this exact order. Stop at each file until you have actually answered the questions next to it.
 
 1. [`CLAUDE.md`](../../CLAUDE.md) — behavioral rules, key abstractions, build/test commands. *What rules govern any change I make?*
-2. [`docs/governance/SOVEREIGN_MANIFEST.md`](SOVEREIGN_MANIFEST.md) — domain map, axioms, verified numbers, boundary constraints. *Which domain is my change in? Which boundaries must I not cross?*
-3. [`reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md`](../../reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md) — settled truths, top 20 unresolved gaps, "do not build new, wire existing" list, canonical substrate table. *Does what I'm about to do duplicate something that already exists?*
-4. [`docs/governance/CANONICAL_DOC_STACK.md`](CANONICAL_DOC_STACK.md) — doc hierarchy, ownership table, anti-doc-maze rules. *Which file owns the truth I'm about to write down?*
+2. [`docs/MEGAFILE_INDEX.md`](../MEGAFILE_INDEX.md) and [`docs/foundations/CONTEMPLATIVE_SPINE.md`](../foundations/CONTEMPLATIVE_SPINE.md) — onboarding slots plus the grand-vision boot packet. *Where does this truth belong, and which loop am I strengthening?*
+3. [`docs/governance/SOVEREIGN_MANIFEST.md`](SOVEREIGN_MANIFEST.md) — domain map, axioms, verified numbers, boundary constraints. *Which domain is my change in? Which boundaries must I not cross?*
+4. [`docs/state/BROKEN_REGISTER.md`](../state/BROKEN_REGISTER.md) and [`reports/system_map/latest.json`](../../reports/system_map/latest.json) — current broken surfaces and live organ diagnosis. *Am I about to duplicate or ignore a known gap?*
+5. [`docs/governance/CANONICAL_DOC_STACK.md`](CANONICAL_DOC_STACK.md) — doc hierarchy, ownership table, anti-doc-maze rules. *Which file owns the truth I'm about to write down?*
 
-If any of those four contradict each other on numbers, trust SOVEREIGN_MANIFEST first, then CLAUDE.md, then the audit, then CANONICAL_DOC_STACK. All four are still authoritative for the topic each one owns per CANONICAL_DOC_STACK.md.
+If any of those surfaces contradict each other on numbers, trust SOVEREIGN_MANIFEST first, then CLAUDE.md, then the live state surfaces, then CANONICAL_DOC_STACK. Each surface is authoritative only for the topic it owns per CANONICAL_DOC_STACK.md.
 
 ---
 
@@ -36,9 +39,8 @@ If any of those four contradict each other on numbers, trust SOVEREIGN_MANIFEST 
 The active engineering track is **one ontology-native seam, end-to-end, with gates and witness load-bearing**, before any second seam.
 
 - **Track name:** Ontology-Native Operator Brief (Daily Insight Brief)
-- **Master spec:** [`docs/plans/ONTOLOGY_NATIVE_OPERATOR_BRIEF_MASTER_SPEC.md`](../plans/ONTOLOGY_NATIVE_OPERATOR_BRIEF_MASTER_SPEC.md)
-- **Next ten substrate todos:** [`docs/plans/NEXT_10_SUBSTRATE_TODO.md`](../plans/NEXT_10_SUBSTRATE_TODO.md)
-- **Handoff to next code agent:** [`docs/plans/HANDOFF_ONTOLOGY_NATIVE_OPERATOR_BRIEF.md`](../plans/HANDOFF_ONTOLOGY_NATIVE_OPERATOR_BRIEF.md)
+- **Current local plan:** [`docs/plans/ontology-native-flow-001-insight-brief.md`](../plans/ontology-native-flow-001-insight-brief.md)
+- **Grand-vision context:** [`docs/foundations/CONTEMPLATIVE_SPINE.md`](../foundations/CONTEMPLATIVE_SPINE.md)
 
 Do not start work on a different seam (Dharma Radar v0, full identity unification, dashboard chat routing, training flywheel) until either the operator-brief seam is acceptance-tested or the active ledger in `SOVEREIGN_MANIFEST.md` lists a new track. Cross-track work fragments the substrate-nativeness measurement and is the failure mode the audit flagged.
 
