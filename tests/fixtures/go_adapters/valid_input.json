@@ -1,0 +1,11 @@
+{
+  "correlation_id": "corr_g03_fixture_001",
+  "source": "fixture_adapter",
+  "source_url": "fixture://go_adapters/valid",
+  "observed_at": "2026-05-09T00:00:00Z",
+  "payload": {
+    "kind": "adapter_contract",
+    "sequence": 1,
+    "status": "green"
+  }
+}
