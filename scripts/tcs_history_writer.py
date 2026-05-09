@@ -58,7 +58,7 @@ def _append_atomic(row: dict) -> None:
 
 def _try_lock() -> bool:
     try:
-        fd = os.open(str(LOCK_PATH), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+        fd = os.open(str(LOCK_PATH), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
         os.write(fd, str(os.getpid()).encode())
         os.close(fd)
         return True
