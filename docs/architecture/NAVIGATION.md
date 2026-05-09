@@ -119,6 +119,40 @@ Generated: 2026-03-29 | 500 Python modules | 494 test files | 8,848 tests
 
 ---
 
+## Go Evidence Sense-Organ Boundary
+
+G0 is PR #176, `feat(go): closure-based evidence sense-organ v0 [impact-checked]`. It introduces a bounded Go sidecar for evidence ingestion only. This navigation map keeps the language boundary explicit before later Go PRs expand adapters, receipts, health checks, or transport.
+
+Base rule: Go collects, normalizes, hashes, spools, observes, and transports evidence. Python remains the telos, policy, gate, dispatch, ontology, runtime database, and decision layer.
+
+| Go may own | Python must own |
+|------------|-----------------|
+| High-volume source collection | Telos and policy interpretation |
+| Payload normalization into receipts | Gate approval and rejection |
+| Content hashing and stable event IDs | Agent dispatch and `NextDecision` selection |
+| File-native spooling and idempotent replay | Ontology and runtime database writes |
+| Health, readiness, metrics, and backlog reporting | Evolution, kernel, and runtime mutation surfaces |
+| Source-specific connectors and read-only projections | Final trust assignment for evidence claims |
+
+Go receipts are evidence inputs, not verdicts. Python bridges may ingest Go receipts, re-read them against the current map, and use them as one signal in governed decision flows. No Go process may become a second control plane or an authority over closure, gates, ontology state, or dispatch.
+
+### Go Kill Criteria
+
+Stop the Go track and return to the operator if a Go PR does any of the following:
+
+- edits `dharma_swarm/ontology.py`
+- edits `dharma_swarm/telic_seam.py`
+- edits `dharma_swarm/evolution.py`
+- edits `dharma_swarm/telos_gates.py`
+- edits `dharma_swarm/dharma_kernel.py`
+- writes runtime or ontology database state from Go
+- exports a write-capable MCP tool
+- adds NATS or another broker to the default runtime path
+- makes CI depend on live network access
+- changes Python decision policy to trust Go verdicts directly
+
+---
+
 ## Core Architecture (dharma_swarm/dharma_swarm/)
 
 ### Layer 0: Schema & Configuration
