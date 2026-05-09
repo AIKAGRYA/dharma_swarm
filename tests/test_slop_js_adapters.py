@@ -111,20 +111,20 @@ class TestFallowAdapter:
         assert result.exit_code == 127
         assert result.findings == []
 
-    def test_parses_findings_routes_families(
+    def test_parses_real_fallow_json_routes_families(
         self, js_project: Path, tmp_path: Path
     ) -> None:
         payload = json.dumps({
-            "issues": [
-                {"path": "src/a.ts", "kind": "dead", "line": 1, "severity": "high",
-                 "message": "unused export"},
-                {"path": "src/b.tsx", "kind": "duplication", "line": 1, "severity": "medium",
-                 "message": "60-line clone"},
-                {"path": "src/a.ts", "kind": "complexity", "line": 1, "severity": "medium",
-                 "message": "cyclomatic 18"},
-                {"path": "src/a.ts", "kind": "circular", "severity": "warning",
-                 "message": "import cycle"},
-            ]
+            "schema_version": 5,
+            "version": "2.67.0",
+            "total_issues": 5,
+            "summary": {"total_issues": 5},
+            "unused_files": [{"path": "src/dead.ts"}],
+            "unused_exports": [{"path": "src/a.ts", "name": "deadFn", "line": 12}],
+            "duplicate_exports": [{"path": "src/a.ts", "name": "X"}],
+            "circular_dependencies": [{"path": "src/a.ts"}],
+            "boundary_violations": [{"path": "src/a.ts"}],
+            "unused_dependencies": [],
         })
         with patch_adapter_subprocess(
             "fallow_adapter", stdout=payload, exit_code=0
@@ -134,11 +134,16 @@ class TestFallowAdapter:
                 repo_root=tmp_path,
             )
         families = {f.family for f in result.findings}
+        types = {f.issue_type for f in result.findings}
         assert DetectorFamily.DEAD_CODE in families
         assert DetectorFamily.DUPLICATION in families
-        assert DetectorFamily.COMPLEXITY in families
         assert DetectorFamily.STRUCTURE in families
-        assert len(result.findings) == 4
+        assert DetectorFamily.BOUNDARY in families
+        assert "unused_file" in types
+        assert "unused_export" in types
+        assert "duplicate_export" in types
+        assert "circular_dependency" in types
+        assert "boundary_violation" in types
 
 
 class TestKnipAdapter:
@@ -202,9 +207,35 @@ class TestJscpdAdapter:
 
 
 class TestTscAdapter:
+    def test_skips_when_node_modules_missing(
+        self, js_project: Path, tmp_path: Path
+    ) -> None:
+        result = run_tsc(
+            [js_project / "src" / "a.ts"], repo_root=tmp_path
+        )
+        assert result.findings == []
+        assert "node_modules not installed" in (result.error or "")
+
+    def test_uses_local_tsc_when_available(
+        self, js_project: Path, tmp_path: Path
+    ) -> None:
+        bin_dir = js_project / "node_modules" / ".bin"
+        bin_dir.mkdir(parents=True)
+        (bin_dir / "tsc").write_text("#!/bin/sh\necho dummy\n", encoding="utf-8")
+        (bin_dir / "tsc").chmod(0o755)
+        with patch("dharma_swarm.slop.adapters.tsc_adapter.run_subprocess",
+                   return_value=(0, "", "", 0.05)) as mock:
+            run_tsc([js_project / "src" / "a.ts"], repo_root=tmp_path)
+            argv = mock.call_args.args[0]
+            assert argv[0].endswith("/node_modules/.bin/tsc")
+
     def test_parses_diagnostic_lines(
         self, js_project: Path, tmp_path: Path
     ) -> None:
+        bin_dir = js_project / "node_modules" / ".bin"
+        bin_dir.mkdir(parents=True)
+        (bin_dir / "tsc").write_text("#!/bin/sh\n", encoding="utf-8")
+        (bin_dir / "tsc").chmod(0o755)
         diagnostic = (
             "src/a.ts(5,10): error TS2322: Type 'string' is not assignable to type 'number'.\n"
             "src/b.tsx(12,3): warning TS6133: 'foo' is declared but never used.\n"
@@ -253,9 +284,22 @@ class TestDependencyCruiserAdapter:
 
 
 class TestEslintAdapter:
+    def test_skips_when_node_modules_missing(
+        self, js_project: Path, tmp_path: Path
+    ) -> None:
+        result = run_eslint(
+            [js_project / "src" / "a.ts"], repo_root=tmp_path
+        )
+        assert result.findings == []
+        assert "node_modules not installed" in (result.error or "")
+
     def test_parses_messages_routes_families(
         self, js_project: Path, tmp_path: Path
     ) -> None:
+        bin_dir = js_project / "node_modules" / ".bin"
+        bin_dir.mkdir(parents=True)
+        (bin_dir / "eslint").write_text("#!/bin/sh\n", encoding="utf-8")
+        (bin_dir / "eslint").chmod(0o755)
         payload = json.dumps([
             {
                 "filePath": str(js_project / "src" / "a.ts"),

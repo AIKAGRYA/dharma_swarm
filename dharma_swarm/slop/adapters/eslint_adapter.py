@@ -159,7 +159,17 @@ def run_eslint(
             str(p) for p in js_paths
             if str(p.resolve()).startswith(str(project))
         ] or ["."]
-        argv = ["npx", "--yes", "eslint", "--format", "json", *files_in_project]
+        local_eslint = project / "node_modules" / ".bin" / "eslint"
+        if local_eslint.is_file():
+            argv = [str(local_eslint), "--format", "json", *files_in_project]
+        elif (project / "node_modules").is_dir():
+            argv = ["npx", "--no-install", "eslint", "--format", "json", *files_in_project]
+        else:
+            last_error = (
+                f"node_modules not installed in {project.name}; run `npm install` "
+                f"to enable eslint scanning"
+            )
+            continue
         exit_code, stdout, stderr, duration = run_subprocess(
             argv, cwd=project, timeout=timeout
         )

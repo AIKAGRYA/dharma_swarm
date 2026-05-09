@@ -98,7 +98,17 @@ def run_tsc(
     last_exit = 0
     last_error: str | None = None
     for project in projects:
-        argv = ["npx", "--yes", "tsc", "--noEmit", "--pretty", "false"]
+        local_tsc = project / "node_modules" / ".bin" / "tsc"
+        if local_tsc.is_file():
+            argv = [str(local_tsc), "--noEmit", "--pretty", "false"]
+        elif (project / "node_modules").is_dir():
+            argv = ["npx", "--no-install", "tsc", "--noEmit", "--pretty", "false"]
+        else:
+            last_error = (
+                f"node_modules not installed in {project.name}; run `npm install` "
+                f"to enable tsc type-checking"
+            )
+            continue
         exit_code, stdout, stderr, duration = run_subprocess(
             argv, cwd=project, timeout=timeout
         )

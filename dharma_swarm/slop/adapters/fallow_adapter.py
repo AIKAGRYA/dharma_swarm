@@ -1,15 +1,12 @@
 """Fallow adapter — JS/TS codebase intelligence (THE benchmark tool).
 
-Fallow is Rust-native, sub-second, covers Fallow's namesake dimensions:
-unused code, duplication, circular deps, complexity hotspots,
-architecture boundaries. CRAP score combines complexity with test
-coverage. Drop-in for the JS/TS surfaces (dashboard/, terminal/,
-desktop-shell/, codex_skills/).
-
-The adapter discovers package.json-rooted projects in scope, runs
-Fallow at each root, emits findings tagged with the appropriate
-DetectorFamily based on the issue type. Findings span multiple
-families because Fallow is a multi-dimensional tool.
+Wraps the real `fallow` CLI (fallow-rs/fallow). Runs `fallow dead-code
+--format json` at each package.json-rooted project in scope. Fallow's
+output is a single top-level dict where each issue category is its own
+key (unused_files, unused_exports, circular_dependencies,
+boundary_violations, etc.). The adapter routes each category into the
+appropriate DetectorFamily, so a single Fallow run produces multi-family
+findings.
 """
 
 from __future__ import annotations
@@ -37,114 +34,95 @@ from dharma_swarm.slop.models import (
 TOOL = "fallow"
 PRIMARY_FAMILY = DetectorFamily.STRUCTURE
 
-_FAMILY_BY_KIND: dict[str, DetectorFamily] = {
-    "dead": DetectorFamily.DEAD_CODE,
-    "unused": DetectorFamily.DEAD_CODE,
-    "duplication": DetectorFamily.DUPLICATION,
-    "duplicate": DetectorFamily.DUPLICATION,
-    "circular": DetectorFamily.STRUCTURE,
-    "complexity": DetectorFamily.COMPLEXITY,
-    "crap": DetectorFamily.COMPLEXITY,
-    "architecture": DetectorFamily.BOUNDARY,
-    "boundary": DetectorFamily.BOUNDARY,
-}
 
-_SEVERITY_BY_LABEL: dict[str, Severity] = {
-    "critical": Severity.CRITICAL,
-    "high": Severity.HIGH,
-    "medium": Severity.MEDIUM,
-    "low": Severity.LOW,
-    "info": Severity.INFO,
-    "warning": Severity.MEDIUM,
-    "error": Severity.HIGH,
-}
-
-
-def _family_for_issue(issue: dict) -> DetectorFamily:
-    raw = " ".join(
-        str(issue.get(k, "")).lower()
-        for k in ("kind", "category", "rule", "rule_id", "type")
-    )
-    for key, fam in _FAMILY_BY_KIND.items():
-        if key in raw:
-            return fam
-    return PRIMARY_FAMILY
-
-
-def _severity_for_issue(issue: dict) -> Severity:
-    label = str(issue.get("severity") or issue.get("level") or "medium").lower()
-    return _SEVERITY_BY_LABEL.get(label, Severity.MEDIUM)
+_CATEGORY_SPECS: list[tuple[str, str, DetectorFamily, Severity, float, str]] = [
+    ("unused_files", "unused_file", DetectorFamily.DEAD_CODE, Severity.HIGH, 0.85,
+     "Delete the file or wire it into an entry point"),
+    ("unused_exports", "unused_export", DetectorFamily.DEAD_CODE, Severity.MEDIUM, 0.75,
+     "Stop exporting or remove the unused symbol"),
+    ("unused_types", "unused_type", DetectorFamily.DEAD_CODE, Severity.MEDIUM, 0.70,
+     "Remove unused type export"),
+    ("unused_class_members", "unused_class_member", DetectorFamily.DEAD_CODE, Severity.LOW, 0.60,
+     "Remove unused class member"),
+    ("unused_enum_members", "unused_enum_member", DetectorFamily.DEAD_CODE, Severity.LOW, 0.55,
+     "Remove unused enum member"),
+    ("unused_dependencies", "unused_dependency", DetectorFamily.DEAD_CODE, Severity.HIGH, 0.85,
+     "Remove unused dependency from package.json"),
+    ("unused_dev_dependencies", "unused_dev_dependency", DetectorFamily.DEAD_CODE, Severity.MEDIUM, 0.70,
+     "Remove unused devDependency"),
+    ("unused_optional_dependencies", "unused_optional_dependency", DetectorFamily.DEAD_CODE, Severity.LOW, 0.55,
+     "Review optional dependency usage"),
+    ("unresolved_imports", "unresolved_import", DetectorFamily.STRUCTURE, Severity.HIGH, 0.85,
+     "Resolve the missing import or remove the dead reference"),
+    ("unlisted_dependencies", "unlisted_dependency", DetectorFamily.STRUCTURE, Severity.MEDIUM, 0.75,
+     "Add the dependency to package.json or remove the import"),
+    ("duplicate_exports", "duplicate_export", DetectorFamily.DUPLICATION, Severity.LOW, 0.60,
+     "Resolve duplicate export"),
+    ("circular_dependencies", "circular_dependency", DetectorFamily.STRUCTURE, Severity.HIGH, 0.85,
+     "Break the cycle (lazy import, refactor, or extract shared module)"),
+    ("boundary_violations", "boundary_violation", DetectorFamily.BOUNDARY, Severity.HIGH, 0.85,
+     "Honor architecture boundaries; route through proper interface"),
+    ("private_type_leaks", "private_type_leak", DetectorFamily.BOUNDARY, Severity.MEDIUM, 0.65,
+     "Stop exposing private type through public API"),
+    ("type_only_dependencies", "type_only_dependency", DetectorFamily.DEAD_CODE, Severity.INFO, 0.30,
+     "Move dependency to devDependencies (type-only at runtime)"),
+    ("test_only_dependencies", "test_only_dependency", DetectorFamily.DEAD_CODE, Severity.INFO, 0.30,
+     "Move dependency to devDependencies (test-only)"),
+]
 
 
-def _confidence_for_issue(issue: dict, severity: Severity) -> float:
-    raw = issue.get("confidence")
-    if isinstance(raw, (int, float)):
-        c = float(raw)
-        if c > 1.0:
-            c /= 100.0
-        return max(0.0, min(1.0, c))
-    return {
-        Severity.CRITICAL: 0.90,
-        Severity.HIGH: 0.78,
-        Severity.MEDIUM: 0.62,
-        Severity.LOW: 0.45,
-        Severity.INFO: 0.25,
-    }[severity]
+def _extract_path_and_line(item: dict) -> tuple[str | None, int | None, str | None]:
+    if isinstance(item, str):
+        return item, None, None
+    if not isinstance(item, dict):
+        return None, None, None
+    path = item.get("path") or item.get("file") or item.get("filename")
+    line_raw = item.get("line") or item.get("line_number") or item.get("lineno")
+    line = int(line_raw) if isinstance(line_raw, int) else None
+    symbol = item.get("name") or item.get("symbol") or item.get("export")
+    if not path:
+        return None, line, symbol if isinstance(symbol, str) else None
+    return str(path), line, symbol if isinstance(symbol, str) else None
 
 
-def _parse_fallow_json(payload: str, repo_root: Path, project_root: Path) -> list[Finding]:
+def _parse_fallow_json(payload: str, project_root: Path, repo_root: Path) -> list[Finding]:
     try:
         data = json.loads(payload)
     except json.JSONDecodeError:
         return []
-    if isinstance(data, dict):
-        items = data.get("issues") or data.get("findings") or data.get("results") or []
-    elif isinstance(data, list):
-        items = data
-    else:
+    if not isinstance(data, dict):
         return []
     findings: list[Finding] = []
-    for item in items:
-        if not isinstance(item, dict):
+    for category, issue_type, family, severity, confidence, suggestion in _CATEGORY_SPECS:
+        items = data.get(category)
+        if not isinstance(items, list):
             continue
-        rel_path = item.get("path") or item.get("file") or item.get("filename")
-        if not rel_path:
-            continue
-        full = (project_root / rel_path).resolve() if not Path(rel_path).is_absolute() else Path(rel_path)
-        family = _family_for_issue(item)
-        severity = _severity_for_issue(item)
-        confidence = _confidence_for_issue(item, severity)
-        line = item.get("line") or item.get("line_number") or item.get("lineno")
-        if isinstance(line, str) and line.isdigit():
-            line = int(line)
-        elif not isinstance(line, int):
-            line = None
-        symbol = item.get("symbol") or item.get("function") or item.get("name")
-        issue_type = str(
-            item.get("kind")
-            or item.get("rule_id")
-            or item.get("rule")
-            or item.get("category")
-            or "fallow_issue"
-        )
-        message = str(
-            item.get("message") or item.get("description") or item.get("details") or ""
-        )
-        suggestion = str(item.get("suggestion") or item.get("fix") or "")
-        findings.append(
-            Finding(
-                tool=TOOL,
-                family=family,
-                issue_type=issue_type,
-                path=normalize_path(str(full), repo_root),
-                line=line,
-                symbol=symbol if isinstance(symbol, str) else None,
-                severity=severity,
-                confidence=confidence,
-                evidence=message,
-                suggested_action=suggestion,
+        for item in items:
+            raw_path, line, symbol = _extract_path_and_line(item)
+            if not raw_path:
+                if isinstance(item, dict) and category in {"unused_dependencies", "unused_dev_dependencies", "unused_optional_dependencies"}:
+                    raw_path = "package.json"
+                    symbol = item.get("name") or item.get("dependency") or symbol
+                else:
+                    continue
+            full = (project_root / raw_path).resolve() if not Path(raw_path).is_absolute() else Path(raw_path)
+            evidence = (
+                f"fallow {category}: {symbol}" if symbol else f"fallow {category}"
             )
-        )
+            findings.append(
+                Finding(
+                    tool=TOOL,
+                    family=family,
+                    issue_type=issue_type,
+                    path=normalize_path(str(full), repo_root),
+                    line=line,
+                    symbol=symbol,
+                    severity=severity,
+                    confidence=confidence,
+                    evidence=evidence,
+                    suggested_action=suggestion,
+                )
+            )
     return findings
 
 
@@ -167,7 +145,7 @@ def run_fallow(
     last_error: str | None = None
     last_exit = 0
     for project in projects:
-        argv = ["fallow", "scan", "--format", "json"]
+        argv = ["fallow", "dead-code", "--format", "json", "--quiet"]
         exit_code, stdout, stderr, duration = run_subprocess(
             argv, cwd=project, timeout=timeout
         )
@@ -177,19 +155,20 @@ def run_fallow(
             return empty_result(
                 TOOL,
                 PRIMARY_FAMILY,
-                stderr or "fallow not installed (cargo install fallow)",
+                stderr or "fallow not installed (npm i -g fallow OR cargo install fallow)",
                 total_duration,
             )
-        if stderr.strip():
+        if stderr.strip() and exit_code not in (0, 1):
             last_error = stderr.strip()
-        all_findings.extend(_parse_fallow_json(stdout, repo_root, project))
+        if stdout.strip():
+            all_findings.extend(_parse_fallow_json(stdout, project, repo_root))
     return DetectorResult(
         tool=TOOL,
         family=PRIMARY_FAMILY,
         findings=all_findings,
         duration_sec=total_duration,
-        exit_code=last_exit if last_exit in (0, 1) else last_exit,
-        error=last_error if last_exit > 1 else None,
+        exit_code=last_exit if last_exit in (0, 1, 2) else last_exit,
+        error=last_error,
     )
 
 
