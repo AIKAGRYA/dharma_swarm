@@ -49,21 +49,35 @@ from dharma_swarm.slop.router import Action, route_score, severity_summary  # no
 
 MODE_PROFILES: dict[str, dict[str, object]] = {
     "pre-commit": {
-        "detectors": ("vulture",),
+        "detectors": ("vulture", "oxlint"),
         "budget_sec": 5.0,
         "default_threshold": 0.50,
     },
     "ci": {
-        "detectors": ("vulture", "ai-slop-detector", "sentry-spotlight"),
+        "detectors": (
+            "vulture", "ai-slop-detector", "sentry-spotlight",
+            "fallow", "knip", "jscpd", "tsc", "eslint",
+        ),
         "budget_sec": 90.0,
         "default_threshold": 0.50,
     },
     "nightly": {
-        "detectors": ("vulture", "ai-slop-detector", "sentry-spotlight"),
+        "detectors": (
+            "vulture", "ai-slop-detector", "sentry-spotlight",
+            "fallow", "knip", "jscpd", "tsc", "eslint",
+            "dependency-cruiser",
+        ),
         "budget_sec": 600.0,
         "default_threshold": 0.30,
     },
 }
+
+SOURCE_SUFFIXES: frozenset[str] = frozenset(
+    {".py", ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"}
+)
+EXCLUDE_DIR_NAMES: frozenset[str] = frozenset(
+    {"__pycache__", ".venv", "node_modules", ".next", "dist", "build", ".turbo", ".git"}
+)
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -129,7 +143,7 @@ def changed_files(ref: str, *, repo_root: Path = REPO_ROOT) -> list[Path]:
         if not line:
             continue
         p = (repo_root / line).resolve()
-        if p.exists() and p.suffix == ".py":
+        if p.exists() and p.suffix in SOURCE_SUFFIXES:
             out.append(p)
     return out
 
@@ -141,14 +155,16 @@ def expand_paths(paths: Iterable[str], *, repo_root: Path = REPO_ROOT) -> list[P
         if not p.is_absolute():
             p = repo_root / p
         if p.is_file():
-            if p.suffix == ".py":
+            if p.suffix in SOURCE_SUFFIXES:
                 out.append(p)
         elif p.is_dir():
-            out.extend(sorted(p.rglob("*.py")))
-    return [
-        p for p in out
-        if "__pycache__" not in p.parts and ".venv" not in p.parts
-    ]
+            for child in p.rglob("*"):
+                if not child.is_file() or child.suffix not in SOURCE_SUFFIXES:
+                    continue
+                if any(part in EXCLUDE_DIR_NAMES for part in child.parts):
+                    continue
+                out.append(child)
+    return sorted(set(out))
 
 
 def select_detectors(

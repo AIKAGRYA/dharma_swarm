@@ -18,19 +18,38 @@ from pathlib import Path
 
 from dharma_swarm.slop.adapters.ai_slop_detector import run_ai_slop_detector
 from dharma_swarm.slop.adapters.base import BaseAdapter, run_subprocess
+from dharma_swarm.slop.adapters.dependency_cruiser_adapter import (
+    run_dependency_cruiser,
+)
+from dharma_swarm.slop.adapters.eslint_adapter import run_eslint
+from dharma_swarm.slop.adapters.fallow_adapter import run_fallow
+from dharma_swarm.slop.adapters.jscpd_adapter import run_jscpd
+from dharma_swarm.slop.adapters.knip_adapter import run_knip
+from dharma_swarm.slop.adapters.oxlint_adapter import run_oxlint
 from dharma_swarm.slop.adapters.spotlight_adapter import (
     probe_spotlight,
     run_spotlight,
 )
+from dharma_swarm.slop.adapters.tsc_adapter import run_tsc
 from dharma_swarm.slop.adapters.vulture_adapter import run_vulture
 from dharma_swarm.slop.models import DetectorResult
 
 AdapterCallable = Callable[[Iterable[Path]], DetectorResult]
 
 REGISTRY: dict[str, AdapterCallable] = {
+    # Python detectors
     "vulture": run_vulture,
     "ai-slop-detector": run_ai_slop_detector,
+    # Telemetry
     "sentry-spotlight": run_spotlight,
+    # JS/TS detectors
+    "fallow": run_fallow,
+    "knip": run_knip,
+    "jscpd": run_jscpd,
+    "tsc": run_tsc,
+    "dependency-cruiser": run_dependency_cruiser,
+    "eslint": run_eslint,
+    "oxlint": run_oxlint,
 }
 
 
@@ -40,7 +59,14 @@ __all__ = [
     "REGISTRY",
     "probe_spotlight",
     "run_ai_slop_detector",
+    "run_dependency_cruiser",
+    "run_eslint",
+    "run_fallow",
+    "run_jscpd",
+    "run_knip",
+    "run_oxlint",
     "run_spotlight",
     "run_subprocess",
+    "run_tsc",
     "run_vulture",
 ]
