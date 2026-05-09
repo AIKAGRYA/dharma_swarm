@@ -1,0 +1,11 @@
+{
+  "correlation_id": "corr_v0_test_001",
+  "source": "github_pull_request",
+  "source_url": "https://github.com/AmitabhainArunachala/dharma_swarm/pull/998",
+  "observed_at": "2026-05-09T00:00:00Z",
+  "payload": {
+    "number": 998,
+    "state": "open",
+    "head_sha": "deadbeef"
+  }
+}
