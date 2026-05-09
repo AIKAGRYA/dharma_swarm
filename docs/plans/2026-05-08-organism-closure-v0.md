@@ -3,7 +3,7 @@
 **Date locked:** 2026-05-08
 **Status:** SHIPPED — closure proof green
 **Owner:** Track 4
-**Subordinate to:** [`docs/governance/CANONICAL_DOC_STACK.md`](../governance/CANONICAL_DOC_STACK.md), [`docs/governance/SOVEREIGN_MANIFEST.md`](../governance/SOVEREIGN_MANIFEST.md)
+**Subordinate to:** the doc-stack registry and [`docs/governance/SOVEREIGN_MANIFEST.md`](../governance/SOVEREIGN_MANIFEST.md)
 
 This plan documents a self-contained, file-native proof that the organism's
 evidence changes its next decision. It is implemented as a single module
@@ -154,7 +154,7 @@ That non-zero exit IS the closure proof.
 
 ## Acceptance gate (run before each PR)
 
-The canonical entrypoint is `replay.sh`, which auto-resolves to a Python
+The portable entrypoint is `replay.sh`, which auto-resolves to a Python
 interpreter that has pytest available (lf5 venv, `./.venv`, or
 `$PYTEST_PYTHON`). System `python3` is a fallback only.
 
@@ -197,7 +197,7 @@ commit `fix(closure): codex triplecheck`:
    `KaizenReviewLink.accepted: bool`, set by `kaizen_link()` from
    `receipt.success`. The prose `next_recommendation` is now display-only.
    New test `test_t5b_kaizen_link_holds_on_failure` asserts the bool.
-2. **CHECK 2.1 — Documented `python3 -m pytest` failed in the canonical
+2. **CHECK 2.1 — Documented `python3 -m pytest` failed in the default
    shell.** `replay.sh` now auto-resolves a pytest-bearing interpreter
    (lf5 venv → `./.venv` → `$PYTEST_PYTHON` → system `python3`) and fails
    clearly if none has pytest.
@@ -234,12 +234,15 @@ contract baseline.
 
 ## Coherence Delta (BR-019 honor-system)
 
-```
-Stack-touched: dharma_swarm/operator_core/closure_v0.py (NEW), tests
-Ledgers-affected: none (no DB / ledger writes)
-Drift-introduced: file-native closure layer (ontology promotion deferred to v1)
-Drift-resolved: closure-discipline contract proven; correlation_id discipline
-                established; Darwin evidence-gate as data contract; partial
-                schematic for BR-002 follow-up (closure object now exists
-                independent of opportunity_board.json)
-```
+- Organ touched: `dharma_swarm/operator_core/closure_v0.py`, tests, fixture
+  proof artifacts, and DocOps count refresh only.
+- Declared-vs-actual gap closed: Closure-discipline contract proven;
+  correlation_id discipline established; Darwin evidence-gate represented as
+  a data contract; partial schematic for the BR-002 follow-up now exists
+  independent of `opportunity_board.json`.
+- Proof that re-reads the map: `bash
+  tests/fixtures/organism_closure_v0/replay.sh`; `python3
+  scripts/docops/check_docops_integrity.py --changed-from origin/main`; success
+  vs failure `NextDecision` fixtures differ.
+- New drift introduced: File-native closure layer exists before ontology
+  promotion; v1 must either promote or deliberately retire this proof module.
