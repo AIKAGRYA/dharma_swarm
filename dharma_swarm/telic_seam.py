@@ -332,6 +332,36 @@ class TelicSeam:
                     "session_id": corr.session_id,
                 })
 
+            # BR-002 closure: feed realized outcomes back to opportunity_board.json
+            # so future Shakti scoring sees what already happened. Best-effort —
+            # failure here does NOT break the canonical Outcome write to ontology.db.
+            # Resolves opportunity_id from task.metadata, set by
+            # opportunity_dispatcher._create_task_board_row (line ~508).
+            opp_id = ""
+            try:
+                opp_id = str((task.metadata or {}).get("opportunity_id") or "")
+            except (AttributeError, TypeError):
+                opp_id = ""
+            if opp_id:
+                try:
+                    from dharma_swarm.shakti_executive.feedback_writer import (
+                        OutcomeRecord,
+                        update_opportunity_outcome,
+                    )
+                    update_opportunity_outcome(
+                        opp_id,
+                        OutcomeRecord(
+                            outcome_id=obj.id,
+                            proposal_id=proposal_id or "",
+                            success=success,
+                            fitness_score=fitness_score,
+                            duration_ms=duration_ms,
+                            result_summary=result_summary[:500] if result_summary else "",
+                        ),
+                    )
+                except Exception as exc:
+                    logger.debug("BR-002 board feedback failed: %s", exc)
+
             self._flush_registry()
             return obj.id
 

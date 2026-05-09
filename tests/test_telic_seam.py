@@ -13,6 +13,8 @@ Verifies:
 9. Stats reflect the metabolic state
 """
 
+import json
+
 import pytest
 
 from dharma_swarm.lineage import LineageGraph
@@ -441,6 +443,85 @@ class TestRecordOutcome:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Full Metabolic Loop
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+class TestRecordOutcomeBoardFeedback:
+    """BR-002 closure: record_outcome must feed back to opportunity_board.json
+    when the task carries metadata.opportunity_id. Failure on the board side
+    must not break the canonical Outcome write."""
+
+    def _opp_task(self, opp_id: str) -> Task:
+        return Task(
+            title="opp-task",
+            metadata={"opportunity_id": opp_id, "source": "frontier_task"},
+        )
+
+    def _seed_board(self, board_path, *opp_ids: str) -> None:
+        rows = [{"opportunity_id": opp_id, "title": f"opp {opp_id}"} for opp_id in opp_ids]
+        board_path.write_text(json.dumps(rows), encoding="utf-8")
+
+    def test_writes_to_board_when_metadata_has_opp_id(self, seam, tmp_path, monkeypatch):
+        board = tmp_path / "opportunity_board.json"
+        self._seed_board(board, "opp-A")
+        monkeypatch.setattr(
+            "dharma_swarm.shakti_executive.feedback_writer.DEFAULT_BOARD_PATH",
+            board,
+        )
+        task = self._opp_task("opp-A")
+        seam.record_dispatch(task, "agent_alpha")
+
+        outcome_id = seam.record_outcome(
+            task, "agent_alpha", success=True, fitness_score=0.7
+        )
+        assert outcome_id is not None
+
+        rows = json.loads(board.read_text())
+        a = next(r for r in rows if r["opportunity_id"] == "opp-A")
+        assert "realized_outcomes" in a
+        assert len(a["realized_outcomes"]) == 1
+        assert a["realized_outcomes"][0]["outcome_id"] == outcome_id
+        assert a["realized_outcomes"][0]["success"] is True
+        assert a["learned_score_delta"] == pytest.approx(0.7)
+
+    def test_does_not_touch_board_when_no_opp_id(self, seam, sample_task, tmp_path, monkeypatch):
+        board = tmp_path / "opportunity_board.json"
+        self._seed_board(board, "opp-A")
+        monkeypatch.setattr(
+            "dharma_swarm.shakti_executive.feedback_writer.DEFAULT_BOARD_PATH",
+            board,
+        )
+        seam.record_dispatch(sample_task, "agent_alpha")
+
+        outcome_id = seam.record_outcome(sample_task, "agent_alpha", success=True)
+        assert outcome_id is not None
+
+        rows = json.loads(board.read_text())
+        a = next(r for r in rows if r["opportunity_id"] == "opp-A")
+        assert "realized_outcomes" not in a
+        assert "learned_score_delta" not in a
+
+    def test_board_write_failure_does_not_break_outcome_recording(
+        self, seam, tmp_path, monkeypatch
+    ):
+        # Point feedback_writer at a non-existent board to force the no-op path,
+        # then additionally make update_opportunity_outcome raise to simulate
+        # an unexpected error.
+        def _raise(*_args, **_kwargs):
+            raise RuntimeError("simulated board write failure")
+
+        monkeypatch.setattr(
+            "dharma_swarm.shakti_executive.feedback_writer.update_opportunity_outcome",
+            _raise,
+        )
+        task = self._opp_task("opp-X")
+        seam.record_dispatch(task, "agent_alpha")
+
+        outcome_id = seam.record_outcome(task, "agent_alpha", success=True)
+        # Canonical write still succeeds; board failure logged at debug level.
+        assert outcome_id is not None
+        obj = seam.registry.get_object(outcome_id)
+        assert obj is not None
+        assert obj.properties["success"] is True
 
 
 class TestFullLoop:
