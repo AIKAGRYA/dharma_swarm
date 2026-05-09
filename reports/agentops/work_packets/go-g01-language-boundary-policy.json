@@ -1,0 +1,39 @@
+{
+  "id": "go-g01-language-boundary-policy",
+  "base_ref": "origin/main",
+  "branch": "docs/go-language-boundary-policy",
+  "worktree": "/Users/dhyana/promotion_worktrees/dharma_swarm_go_g01_language_boundary",
+  "intent": "Record the Go/Python boundary, kill criteria, dependency graph, and PR sequencing after G0 lands.",
+  "allowed_files": [
+    "docs/plans/2026-05-09-go-sense-organ-pr-scaffold.md",
+    "docs/architecture/NAVIGATION.md",
+    "reports/agentops/work_packets/go-g*.json",
+    "docs/docops/AUTO_INVENTORY.md",
+    "docs/governance/SOVEREIGN_MANIFEST.md"
+  ],
+  "forbidden_files": [
+    "dharma_swarm/**",
+    "tools/**",
+    "tests/**",
+    ".github/**",
+    "Makefile"
+  ],
+  "gates": [
+    {
+      "name": "diff-check",
+      "command": "git diff --check"
+    },
+    {
+      "name": "docops",
+      "command": "python3 scripts/docops/check_docops_integrity.py --changed-from origin/main"
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "docs(go): scaffold sense-organ roadmap and PR packets [impact-checked]"
+  },
+  "approval": {
+    "before_commit": true,
+    "before_merge": true
+  }
+}

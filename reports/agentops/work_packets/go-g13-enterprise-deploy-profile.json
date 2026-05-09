@@ -1,0 +1,46 @@
+{
+  "id": "go-g13-enterprise-deploy-profile",
+  "base_ref": "origin/main",
+  "branch": "feat/go-enterprise-deploy-profile",
+  "worktree": "/Users/dhyana/promotion_worktrees/dharma_swarm_go_g13_enterprise_deploy",
+  "intent": "Add deploy profiles for Go sense organs across launchd, systemd, container, and Kubernetes sidecar shapes, all disabled by default.",
+  "allowed_files": [
+    "deploy/go/**",
+    "tools/dharma_go/**",
+    "tests/test_go_deploy_profiles.py",
+    "tests/fixtures/go_deploy_profiles/**",
+    "docs/examples/go_deploy_profiles.md",
+    "Makefile",
+    ".github/workflows/tests.yml",
+    "docs/docops/AUTO_INVENTORY.md",
+    "docs/governance/SOVEREIGN_MANIFEST.md"
+  ],
+  "forbidden_files": [
+    "dharma_swarm/ontology.py",
+    "dharma_swarm/telic_seam.py",
+    "dharma_swarm/evolution.py",
+    "dharma_swarm/telos_gates.py",
+    "dharma_swarm/dharma_kernel.py",
+    "dharma_swarm/swarm.py",
+    "dharma_swarm/agent_runner.py",
+    "dharma_swarm/orchestrator.py"
+  ],
+  "gates": [
+    {
+      "name": "go-ci",
+      "command": "make go-ci"
+    },
+    {
+      "name": "deploy-profile-tests",
+      "command": "python3 -m pytest -q tests/test_go_deploy_profiles.py"
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "feat(go): add enterprise deploy profiles [impact-checked]"
+  },
+  "approval": {
+    "before_commit": true,
+    "before_merge": true
+  }
+}

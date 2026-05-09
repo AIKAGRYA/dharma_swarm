@@ -1,0 +1,45 @@
+{
+  "id": "go-g07-health-metrics",
+  "base_ref": "origin/main",
+  "branch": "feat/go-health-metrics",
+  "worktree": "/Users/dhyana/promotion_worktrees/dharma_swarm_go_g07_health_metrics",
+  "intent": "Standardize Go organ health, readiness, and Prometheus-style metrics without making metrics a decision input.",
+  "allowed_files": [
+    "tools/go_sdk/**",
+    "tools/evidence_ingestor_go/**",
+    "tests/test_go_health_metrics.py",
+    "tests/fixtures/go_health_metrics/**",
+    "Makefile",
+    ".github/workflows/tests.yml",
+    "docs/docops/AUTO_INVENTORY.md",
+    "docs/governance/SOVEREIGN_MANIFEST.md"
+  ],
+  "forbidden_files": [
+    "dharma_swarm/ontology.py",
+    "dharma_swarm/telic_seam.py",
+    "dharma_swarm/evolution.py",
+    "dharma_swarm/telos_gates.py",
+    "dharma_swarm/dharma_kernel.py",
+    "dharma_swarm/swarm.py",
+    "dharma_swarm/agent_runner.py",
+    "dharma_swarm/orchestrator.py"
+  ],
+  "gates": [
+    {
+      "name": "go-ci",
+      "command": "make go-ci"
+    },
+    {
+      "name": "health-metrics-tests",
+      "command": "python3 -m pytest -q tests/test_go_health_metrics.py"
+    }
+  ],
+  "commit": {
+    "allowed": true,
+    "message": "feat(go): add health and metrics substrate [impact-checked]"
+  },
+  "approval": {
+    "before_commit": true,
+    "before_merge": true
+  }
+}
