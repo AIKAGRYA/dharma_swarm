@@ -1,0 +1,16 @@
+{
+  "receipt_id": "goev_fe86673511f54340ca15fb7d",
+  "correlation_id": "corr_g03_fixture_001",
+  "source": "fixture_adapter",
+  "source_url": "fixture://go_adapters/valid",
+  "observed_at": "2026-05-09T00:00:00Z",
+  "content_hash": "sha256:9e171752d29af7adddf987c38211aec38fb669fc64cabf9a9d3c0b16fe3cee2d",
+  "event_uid": "evt_8060689a6607f173a542ee31",
+  "schema_version": "go_evidence_receipt.v0",
+  "status": "accepted",
+  "payload": {
+    "kind": "adapter_contract",
+    "sequence": 1,
+    "status": "green"
+  }
+}
