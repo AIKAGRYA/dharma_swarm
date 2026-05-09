@@ -412,6 +412,35 @@ A fine-tooth adversarial self-review pass after C2 verified:
 - **Anti-doc-maze compliance:** zero new files added by C1+C2+C3 (only edits + Step 0 ports). Authority Registry unchanged.
 - **JK_MASTER_VISION body preservation:** 13-line diff confirms header-only change.
 
+### Codex repair pass (2026-05-09, post-C3)
+
+Follow-up review found three issues in the C3-ready state and repaired them in
+commit `184f4df`:
+
+- **Parent rebase:** Track 2 was still based on `a8206f6`; current Track 1 parent
+  had advanced to `7cf1adc`. Rebased onto `7cf1adc`, so the PR delta no longer
+  reverses Track 1's `telic_seam.py`, `test_telic_seam.py`, or
+  `reports/system_map/latest.json` changes.
+- **Residual hierarchy wording:** `docs/loomwork/2026-05-07-loomwork-design.md`
+  still contained two stale Shakti-Ginko peer-level phrasings outside the
+  corrected header path, and `docs/doctrine/LIVE_ROADMAP.md` still called
+  Shakti Ginko a "peer outward arm." Reworded all three to preserve
+  VentureCell-pattern similarity while denying hierarchy peerhood.
+- **Whitespace gate:** `git diff --check` still failed on
+  `docs/doctrine/OPERATIONAL_DOCTRINE.md:76`. Removed the trailing whitespace.
+
+Post-repair verification:
+
+- `git diff --check 7cf1adc..HEAD` exits clean.
+- `pre-commit run --from-ref 7cf1adc --to-ref HEAD` passes.
+- Changed-doc internal markdown link scan: 23 markdown files, 54 internal links,
+  0 missing links.
+- No Python, test, or `reports/system_map/latest.json` files remain in the
+  Track-2 delta against `7cf1adc`.
+- `scripts/docops/check_docops_integrity.py` is absent on this branch, so
+  DocOps integrity remains a cross-branch/post-merge expectation, not a
+  branch-local verified gate.
+
 ### Cross-track follow-ups (NOT resolved here)
 
 - **Cabinet alignment:** `~/.claude/cabinet/ARJUNA.md`, `~/.claude/cabinet/strategy/LOOMWORK_v0_MASTER.md`, `~/.claude/cabinet/worldview/telos.md` are out-of-repo and were not touched by Track 2. They may carry the older Loomwork-as-peer-of-JK framing and should be aligned in a separate cabinet-side track.
