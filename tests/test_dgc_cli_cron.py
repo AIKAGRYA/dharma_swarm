@@ -41,6 +41,37 @@ def test_cmd_cron_daemon_forwards_flags(capsys) -> None:
     }
 
 
+def test_cmd_cron_list_reads_scheduler_dicts(capsys) -> None:
+    import dharma_swarm.dgc_cli as cli
+
+    with patch(
+        "dharma_swarm.cron_scheduler.load_jobs",
+        return_value=[
+            {
+                "id": "job-1",
+                "enabled": True,
+                "last_status": None,
+                "handler": "system_map_populator",
+            },
+            {
+                "id": "job-2",
+                "enabled": False,
+                "last_status": "error",
+                "prompt": "fallback prompt",
+            },
+        ],
+    ):
+        cli.cmd_cron("list")
+
+    out = capsys.readouterr().out
+    assert "job-1" in out
+    assert "system_map_populator" in out
+    assert "last=UNKNOWN" in out
+    assert "job-2" in out
+    assert "fallback prompt" in out
+    assert "last=error" in out
+
+
 def test_dgc_cli_main_dispatches_cron_daemon_flags() -> None:
     from dharma_swarm.dgc_cli import main
 

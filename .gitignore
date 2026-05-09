@@ -65,3 +65,28 @@ dashboard/test-results/
 desktop-shell/src-tauri/target/
 spec-forge/
 .superpowers/
+
+# Local agent/tool indexes and runtime traces.
+.agents/
+.codex/
+.gitnexus/
+.mcp_data/
+.playwright-mcp/
+
+# Generated verification screenshots.
+terminal/screenshots/
+terminal-v2/screenshots/
+
+# Generated session/audit artifacts (root-only).
+# Produced by claude-mem, audit hooks, and guardian crew.
+# CI Rule 9 already enforces GUARDIAN_REPORT.md must live under reports/.
+/AGENTS.md
+/AUDIT_*.md
+/GUARDIAN_REPORT.md
+
+# Experiment result subdirectories (each experiment writes a dated subdir).
+# Tracked top-level files under results/ are preserved.
+results/*/
+
+# Paper drafts (kept local until promoted to a tracked branch).
+paper/
