@@ -10,6 +10,8 @@ SEMGREP ?= scripts/governance/run_semgrep_with_ca.sh
 SWARM_PLIST := $(HOME)/Library/LaunchAgents/com.dharma.swarm.plist
 STATE_DIR    := $(HOME)/.dharma
 GO_EVIDENCE_MODULE := tools/evidence_ingestor_go
+GO_SDK_MODULE := tools/go_sdk
+GO_MODULES := $(GO_SDK_MODULE) $(GO_EVIDENCE_MODULE)
 GO_CACHE_DIR ?= /tmp/dharma-swarm-go-build
 GO_MOD_CACHE_DIR ?= /tmp/dharma-swarm-go-mod
 
@@ -203,18 +205,26 @@ governance-all: semgrep gitleaks test-hygiene test-contracts uplift-guards modul
 # ============================================================================
 
 go-fmt-check:
-	@files="$$( $(GOFMT) -l $(GO_EVIDENCE_MODULE) )"; \
-	if [ -n "$$files" ]; then \
-		printf "Go files need gofmt:\n%s\n" "$$files"; \
-		exit 1; \
-	fi
+	@for mod in $(GO_MODULES); do \
+		files="$$( $(GOFMT) -l $$mod )"; \
+		if [ -n "$$files" ]; then \
+			printf "Go files need gofmt in %s:\n%s\n" "$$mod" "$$files"; \
+			exit 1; \
+		fi; \
+	done
 
 go-test:
 	@mkdir -p $(GO_CACHE_DIR) $(GO_MOD_CACHE_DIR)
-	cd $(GO_EVIDENCE_MODULE) && GOCACHE=$(GO_CACHE_DIR) GOMODCACHE=$(GO_MOD_CACHE_DIR) $(GO) test ./...
+	@for mod in $(GO_MODULES); do \
+		echo "go test ./... in $$mod"; \
+		( cd $$mod && GOCACHE=$(GO_CACHE_DIR) GOMODCACHE=$(GO_MOD_CACHE_DIR) $(GO) test ./... ) || exit 1; \
+	done
 
 go-vet:
 	@mkdir -p $(GO_CACHE_DIR) $(GO_MOD_CACHE_DIR)
-	cd $(GO_EVIDENCE_MODULE) && GOCACHE=$(GO_CACHE_DIR) GOMODCACHE=$(GO_MOD_CACHE_DIR) $(GO) vet ./...
+	@for mod in $(GO_MODULES); do \
+		echo "go vet ./... in $$mod"; \
+		( cd $$mod && GOCACHE=$(GO_CACHE_DIR) GOMODCACHE=$(GO_MOD_CACHE_DIR) $(GO) vet ./... ) || exit 1; \
+	done
 
 go-ci: go-fmt-check go-vet go-test

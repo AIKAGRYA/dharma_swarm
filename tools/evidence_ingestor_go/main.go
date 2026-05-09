@@ -1,34 +1,31 @@
+// Command evidence_ingestor_go converts a payload file into a normalized
+// closure-v0 evidence receipt on disk. The receipt-building primitives live in
+// the canonical Go SDK at tools/go_sdk/receipt; this binary is a thin CLI
+// wrapper around that SDK so future sense-organ adapters share the same
+// validation, hashing, normalization, and atomic-write contract.
+//
+// Boundary: this tool emits receipts only. It does not decide, dispatch, write
+// runtime DB, write ontology DB, or call Python policy.
 package main
 
 import (
-	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
-	"time"
+
+	"github.com/AmitabhainArunachala/dharma_swarm/tools/go_sdk/receipt"
 )
 
-const defaultSchemaVersion = "go_evidence_receipt.v0"
+const defaultSchemaVersion = receipt.DefaultSchemaVersion
 
-type EvidenceReceipt struct {
-	ReceiptID      string          `json:"receipt_id"`
-	CorrelationID  string          `json:"correlation_id"`
-	Source         string          `json:"source"`
-	SourceURL      string          `json:"source_url"`
-	ObservedAt     string          `json:"observed_at"`
-	ContentHash    string          `json:"content_hash"`
-	EventUID       string          `json:"event_uid"`
-	SchemaVersion  string          `json:"schema_version"`
-	Status         string          `json:"status"`
-	RejectedReason string          `json:"rejected_reason,omitempty"`
-	Payload        json.RawMessage `json:"payload"`
-}
+// EvidenceReceipt is the on-the-wire receipt shape. It is a type alias for the
+// SDK Receipt so existing Python bridge code and existing tests in this
+// package keep working unchanged.
+type EvidenceReceipt = receipt.Receipt
 
+// Options carries the CLI surface for the evidence_ingestor_go binary.
 type Options struct {
 	InputPath     string
 	OutputPath    string
@@ -61,13 +58,16 @@ func parseFlags() Options {
 }
 
 func run(opts Options) error {
-	receipt, err := BuildReceipt(opts)
+	r, err := BuildReceipt(opts)
 	if err != nil {
 		return err
 	}
-	return WriteReceipt(opts.OutputPath, receipt)
+	return WriteReceipt(opts.OutputPath, r)
 }
 
+// BuildReceipt is a thin wrapper around receipt.Build that preserves the CLI's
+// historical contract: input/output paths required, source_url defaults to a
+// file:// URI of the input path, payload is read from disk by this CLI.
 func BuildReceipt(opts Options) (EvidenceReceipt, error) {
 	if opts.InputPath == "" {
 		return EvidenceReceipt{}, errors.New("--input is required")
@@ -75,31 +75,10 @@ func BuildReceipt(opts Options) (EvidenceReceipt, error) {
 	if opts.OutputPath == "" {
 		return EvidenceReceipt{}, errors.New("--output is required")
 	}
-	if opts.CorrelationID == "" {
-		return EvidenceReceipt{}, errors.New("--correlation-id is required")
-	}
-	if opts.Source == "" {
-		return EvidenceReceipt{}, errors.New("--source is required")
-	}
-	if opts.SchemaVersion == "" {
-		return EvidenceReceipt{}, errors.New("--schema-version is required")
-	}
 
 	payload, err := os.ReadFile(opts.InputPath)
 	if err != nil {
 		return EvidenceReceipt{}, err
-	}
-	normalized, err := normalizePayload(payload)
-	if err != nil {
-		return EvidenceReceipt{}, err
-	}
-
-	observedAt := opts.ObservedAt
-	if observedAt == "" {
-		observedAt = time.Now().UTC().Format(time.RFC3339)
-	}
-	if _, err := time.Parse(time.RFC3339, observedAt); err != nil {
-		return EvidenceReceipt{}, fmt.Errorf("--observed-at must be RFC3339: %w", err)
 	}
 
 	sourceURL := opts.SourceURL
@@ -111,79 +90,17 @@ func BuildReceipt(opts Options) (EvidenceReceipt, error) {
 		sourceURL = "file://" + filepath.ToSlash(abs)
 	}
 
-	contentHash := "sha256:" + sha256Hex(payload)
-	eventUID := "evt_" + shortDigest(opts.Source, sourceURL, contentHash)
-	receiptID := "goev_" + shortDigest(opts.CorrelationID, eventUID)
-
-	return EvidenceReceipt{
-		ReceiptID:     receiptID,
-		CorrelationID: opts.CorrelationID,
+	return receipt.Build(receipt.BuildSpec{
 		Source:        opts.Source,
 		SourceURL:     sourceURL,
-		ObservedAt:    observedAt,
-		ContentHash:   contentHash,
-		EventUID:      eventUID,
+		CorrelationID: opts.CorrelationID,
+		ObservedAt:    opts.ObservedAt,
 		SchemaVersion: opts.SchemaVersion,
-		Status:        "accepted",
-		Payload:       normalized,
-	}, nil
+	}, payload)
 }
 
-func normalizePayload(raw []byte) (json.RawMessage, error) {
-	trimmed := bytes.TrimSpace(raw)
-	if len(trimmed) == 0 {
-		return nil, errors.New("input payload is empty")
-	}
-	if json.Valid(trimmed) {
-		return append(json.RawMessage(nil), trimmed...), nil
-	}
-	wrapped, err := json.Marshal(map[string]string{"raw_text": string(raw)})
-	if err != nil {
-		return nil, err
-	}
-	return wrapped, nil
-}
-
-func WriteReceipt(path string, receipt EvidenceReceipt) error {
-	data, err := json.MarshalIndent(receipt, "", "  ")
-	if err != nil {
-		return err
-	}
-	data = append(data, '\n')
-
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".")
-	if err != nil {
-		return err
-	}
-	tmpName := tmp.Name()
-	defer os.Remove(tmpName)
-
-	if _, err := tmp.Write(data); err != nil {
-		_ = tmp.Close()
-		return err
-	}
-	if err := tmp.Close(); err != nil {
-		return err
-	}
-	return os.Rename(tmpName, path)
-}
-
-func sha256Hex(data []byte) string {
-	sum := sha256.Sum256(data)
-	return hex.EncodeToString(sum[:])
-}
-
-func shortDigest(parts ...string) string {
-	var buf bytes.Buffer
-	for i, part := range parts {
-		if i > 0 {
-			buf.WriteByte(0)
-		}
-		buf.WriteString(part)
-	}
-	sum := sha256.Sum256(buf.Bytes())
-	return hex.EncodeToString(sum[:12])
+// WriteReceipt is a thin wrapper around receipt.Write so existing tests in
+// this package, and any downstream callers, keep their import surface stable.
+func WriteReceipt(path string, r EvidenceReceipt) error {
+	return receipt.Write(path, r)
 }
