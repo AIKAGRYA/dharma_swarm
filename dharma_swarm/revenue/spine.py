@@ -73,9 +73,14 @@ class RevenueSpine:
         spine.reinvest(engagement.id, 6000, "training", "runpod")
     """
 
-    def __init__(self, storage_dir: Optional[Path] = None) -> None:
+    def __init__(
+        self,
+        storage_dir: Optional[Path] = None,
+        telic_bridge: Any | None = None,
+    ) -> None:
         self._dir = storage_dir or _SPINE_DIR
         self._dir.mkdir(parents=True, exist_ok=True)
+        self._bridge = telic_bridge
         self._targets: dict[str, RevenueTarget] = {}
         self._offers: dict[str, Offer] = {}
         self._outreach: dict[str, OutreachDraft] = {}
@@ -88,6 +93,8 @@ class RevenueSpine:
     def add_target(self, target: RevenueTarget) -> RevenueTarget:
         self._targets[target.id] = target
         self._append("targets", target)
+        if self._bridge:
+            self._bridge.record_target(target)
         logger.info("Target added: %s (%s)", target.name.replace('\n', ''), target.id)
         return target
 
@@ -187,6 +194,8 @@ class RevenueSpine:
         target.updated_at = _utc_now_iso()
         self._append("outreach", draft)
         self._append("targets", target)
+        if self._bridge:
+            self._bridge.record_outreach(draft)
         logger.info("Outreach drafted for %s: %s", target.name.replace('\n', ''), draft.id)
         return draft
 
@@ -249,6 +258,8 @@ class RevenueSpine:
         target.updated_at = _utc_now_iso()
         self._append("engagements", engagement)
         self._append("targets", target)
+        if self._bridge:
+            self._bridge.record_engagement(engagement)
         logger.info(
             "Engagement created: %s ($%.2f)", engagement.id, contracted_value_usd
         )
@@ -273,6 +284,8 @@ class RevenueSpine:
                 target.updated_at = _utc_now_iso()
                 self._append("targets", target)
         self._append("engagements", eng)
+        if self._bridge:
+            self._bridge.record_payment(eng, amount_usd)
 
         if economic_engine is not None:
             try:
@@ -306,6 +319,8 @@ class RevenueSpine:
         )
         self._reinvestments.append(record)
         self._append("reinvestments", record)
+        if self._bridge:
+            self._bridge.record_reinvestment(record)
 
         if economic_engine is not None:
             try:

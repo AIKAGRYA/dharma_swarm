@@ -265,8 +265,11 @@ class Organism:
 
         try:
             from dharma_swarm.revenue.spine import RevenueSpine
-            self.revenue_spine = RevenueSpine()
-            logger.info("Revenue pipeline initialized")
+            from dharma_swarm.revenue.telic_bridge import RevenueTelicBridge
+            from dharma_swarm.telic_seam import get_seam
+            bridge = RevenueTelicBridge(get_seam())
+            self.revenue_spine = RevenueSpine(telic_bridge=bridge)
+            logger.info("Revenue pipeline initialized (ontology-native)")
         except Exception as exc:
             logger.warning("Revenue pipeline init failed: %s", exc)
 

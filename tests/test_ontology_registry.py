@@ -702,7 +702,7 @@ class TestRevenueOntologyTypes:
         obj, errors = registry.create_object("RevenueEngagement", {
             "target_id": "tgt-001",
             "offer_id": "off-001",
-            "status": "active",
+            "status": "scoping",
             "contracted_value_usd": 15000.0,
         })
         assert obj is not None, f"Creation failed: {errors}"

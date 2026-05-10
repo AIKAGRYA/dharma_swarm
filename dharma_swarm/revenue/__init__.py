@@ -18,6 +18,7 @@ from dharma_swarm.revenue.spine import (
     RevenueTarget,
     TargetStatus,
 )
+from dharma_swarm.revenue.telic_bridge import RevenueTelicBridge
 from dharma_swarm.revenue.intelligence import (
     ClaimType,
     CompetitorProfile,
@@ -48,4 +49,5 @@ __all__ = [
     "IntelSource",
     "RevenueIntelligenceIngestor",
     "RevenuePattern",
+    "RevenueTelicBridge",
 ]
