@@ -340,6 +340,8 @@ def _list_daemon_like_processes() -> list[tuple[int, str]]:
         "ps -axo",
         "rg ",
         "pytest",
+        "pre-commit",
+        "check-added-large-files",
         "codex exec",
         "claude --bare -p",
     )

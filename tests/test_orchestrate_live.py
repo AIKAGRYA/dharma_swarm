@@ -1009,6 +1009,25 @@ def test_list_orchestrator_processes_detects_dgc_orchestrate_live(monkeypatch):
     ]
 
 
+def test_list_orchestrator_processes_ignores_pre_commit_file_args(monkeypatch):
+    """Process scan should not mistake pre-commit file lists for live orchestrators."""
+    from dharma_swarm import orchestrate_live as mod
+
+    monkeypatch.setattr(
+        mod.subprocess,
+        "run",
+        lambda *args, **kwargs: SimpleNamespace(
+            returncode=0,
+            stdout=(
+                "84641 /Users/dhyana/.cache/pre-commit/repo/bin/"
+                "check-added-large-files dharma_swarm/orchestrate_live.py\n"
+            ),
+        ),
+    )
+
+    assert mod._list_orchestrator_processes() == []
+
+
 # ---------------------------------------------------------------------------
 # run_pulse_loop — early exit in Claude Code session
 # ---------------------------------------------------------------------------

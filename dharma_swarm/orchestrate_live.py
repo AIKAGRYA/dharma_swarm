@@ -1815,6 +1815,8 @@ def _list_orchestrator_processes() -> list[tuple[int, str]]:
         "ps -axo",
         "rg ",
         "pytest",
+        "pre-commit",
+        "check-added-large-files",
         "codex exec",
         "claude --bare -p",
     )

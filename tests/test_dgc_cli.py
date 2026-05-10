@@ -607,6 +607,45 @@ def test_cmd_orchestrate_live_ignores_codex_exec_false_positive(
     assert launched is True
 
 
+def test_cmd_orchestrate_live_ignores_pre_commit_file_args(
+    monkeypatch,
+    tmp_path,
+    capsys,
+):
+    """Pre-commit file lists mentioning orchestrate_live should not block launch."""
+    from dharma_swarm import dgc_cli
+
+    monkeypatch.setattr(dgc_cli, "DHARMA_STATE", tmp_path)
+    monkeypatch.setattr(
+        dgc_cli.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args[0],
+            0,
+            (
+                "84641 /Users/dhyana/.cache/pre-commit/repo/bin/"
+                "check-added-large-files dharma_swarm/orchestrate_live.py\n"
+            ),
+            "",
+        ),
+    )
+
+    launched = False
+
+    def fake_run(_coro):
+        nonlocal launched
+        launched = True
+        _coro.close()
+
+    monkeypatch.setattr(asyncio, "run", fake_run)
+
+    dgc_cli.cmd_orchestrate_live(background=False)
+
+    out = capsys.readouterr().out
+    assert "already running" not in out.lower()
+    assert launched is True
+
+
 def test_cmd_ui_list_mentions_swarmlens_and_next(capsys):
     import dharma_swarm.dgc_cli as cli
 
