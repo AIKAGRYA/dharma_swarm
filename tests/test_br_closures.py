@@ -43,10 +43,10 @@ class TestFrontierRefill:
         board_path = tmp_path / "board.json"
         frontier_path = tmp_path / "frontier.jsonl"
         self._write_board(board_path, [
-            {"id": "opp-1", "title": "Alpha", "type": "external_revenue", "final_score": 90},
-            {"id": "opp-2", "title": "Beta", "type": "external_revenue", "final_score": 80},
-            {"id": "opp-3", "title": "Gamma", "type": "external_revenue", "final_score": 70},
-            {"id": "opp-4", "title": "Delta", "type": "external_revenue", "final_score": 60},
+            {"opportunity_id": "opp-1", "title": "Alpha", "domain": "research", "final_score": 90},
+            {"opportunity_id": "opp-2", "title": "Beta", "domain": "research", "final_score": 80},
+            {"opportunity_id": "opp-3", "title": "Gamma", "domain": "research", "final_score": 70},
+            {"opportunity_id": "opp-4", "title": "Delta", "domain": "research", "final_score": 60},
         ])
         result = refill_frontier_tasks_pending(
             top_k=2, board_path=board_path, frontier_path=frontier_path,
@@ -60,6 +60,19 @@ class TestFrontierRefill:
         assert len(lines) == 2 * len(OPPORTUNITY_STAGES)
         first_row = json.loads(lines[0])
         assert first_row["metadata"]["opportunity_id"] in {"opp-1", "opp-2"}
+
+    def test_refill_accepts_legacy_id(self, tmp_path: Path) -> None:
+        from dharma_swarm.opportunity_refill import refill_frontier_tasks_pending
+
+        board_path = tmp_path / "board.json"
+        frontier_path = tmp_path / "frontier.jsonl"
+        self._write_board(board_path, [
+            {"id": "legacy-1", "title": "Legacy", "final_score": 90},
+        ])
+        result = refill_frontier_tasks_pending(
+            board_path=board_path, frontier_path=frontier_path,
+        )
+        assert result.appended_opportunity_ids == ["legacy-1"]
 
     def test_refill_skips_addressed(self, tmp_path: Path) -> None:
         from dharma_swarm.opportunity_refill import refill_frontier_tasks_pending
@@ -122,6 +135,51 @@ class TestFrontierRefill:
         assert result.addressed_count == 1
         assert "opp-2" in result.appended_opportunity_ids
 
+    def test_refill_ignores_malformed_scores(self, tmp_path: Path) -> None:
+        from dharma_swarm.opportunity_refill import refill_frontier_tasks_pending
+
+        board_path = tmp_path / "board.json"
+        frontier_path = tmp_path / "frontier.jsonl"
+        self._write_board(board_path, [
+            {"opportunity_id": "bad", "title": "Bad", "final_score": "not-a-number"},
+            {"opportunity_id": "good", "title": "Good", "final_score": 0.8},
+        ])
+        result = refill_frontier_tasks_pending(
+            board_path=board_path,
+            frontier_path=frontier_path,
+        )
+        assert result.addressed_count == 1
+        assert result.appended_opportunity_ids == ["good"]
+
+    async def test_drain_frontier_queue_creates_taskboard_entries(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        from dharma_swarm import orchestrate_live
+        from dharma_swarm.task_board import TaskBoard
+
+        (tmp_path / "meta").mkdir()
+        (tmp_path / "db").mkdir()
+        frontier_path = tmp_path / "meta" / "frontier_tasks_pending.jsonl"
+        frontier_path.write_text(json.dumps({
+            "title": "Frontier task",
+            "description": "from opportunity",
+            "priority": "high",
+            "created_by": "frontier_refill",
+            "metadata": {"opportunity_id": "opp-1"},
+        }) + "\n", encoding="utf-8")
+        monkeypatch.setattr(orchestrate_live, "STATE_DIR", tmp_path)
+
+        board = TaskBoard(tmp_path / "db" / "tasks.db")
+        promoted = await orchestrate_live._drain_frontier_queue(board)
+        tasks = await board.list_tasks()
+
+        assert promoted == 1
+        assert len(tasks) == 1
+        assert tasks[0].metadata["opportunity_id"] == "opp-1"
+        assert frontier_path.read_text(encoding="utf-8") == ""
+
 
 # ---------------------------------------------------------------------------
 # BR-007: store_sync
@@ -131,8 +189,17 @@ class TestFrontierRefill:
 class TestStoreSync:
     """Tests for the ontology→runtime sync (BR-007 closure)."""
 
+    def test_cron_jobs_register_store_sync_and_frontier_refill(self) -> None:
+        jobs = json.loads(Path("cron_jobs.json").read_text(encoding="utf-8"))
+        handlers = {
+            str(job.get("handler")) for job in jobs
+            if isinstance(job, dict) and job.get("enabled") is True
+        }
+        assert "store_sync" in handlers
+        assert "frontier_refill" in handlers
+
     def test_sync_no_ontology_file(self, tmp_path: Path) -> None:
-        from dharma_swarm.store_sync import sync_outcomes_to_artifacts
+        from dharma_swarm.engine.store_sync import sync_outcomes_to_artifacts
 
         result = sync_outcomes_to_artifacts(
             ontology_db_path=tmp_path / "nonexistent.db",
@@ -149,7 +216,7 @@ class TestStoreSync:
 
     def test_sync_materializes_outcomes(self, tmp_path: Path) -> None:
         from dharma_swarm.ontology import OntologyRegistry
-        from dharma_swarm.store_sync import sync_outcomes_to_artifacts
+        from dharma_swarm.engine.store_sync import sync_outcomes_to_artifacts
 
         ont_path = tmp_path / "ontology.db"
         registry = OntologyRegistry.create_dharma_registry()
@@ -190,7 +257,7 @@ class TestStoreSync:
 
     def test_sync_idempotent(self, tmp_path: Path) -> None:
         from dharma_swarm.ontology import OntologyRegistry
-        from dharma_swarm.store_sync import sync_outcomes_to_artifacts
+        from dharma_swarm.engine.store_sync import sync_outcomes_to_artifacts
 
         ont_path = tmp_path / "ontology.db"
         registry = OntologyRegistry.create_dharma_registry()
@@ -357,6 +424,32 @@ class TestVentureCellPolymorphism:
         cell.autonomy_stage = 3
         obj2, err2 = venture_cell_to_ontology(cell, registry)
         assert not err2, err2
+        assert obj2 is not None
+        assert obj1.id == obj2.id == "upd-test"
+        assert len(registry.get_objects_by_type("VentureCell")) == 1
+        assert registry.get_object("upd-test").properties["description"] == "v2"
+
+    def test_status_roundtrip_all_room_statuses(self) -> None:
+        from dharma_swarm.fractal.fractal_room import RoomKind, RoomStatus, VentureCellV1
+        from dharma_swarm.fractal.room_bridge import (
+            ontology_to_venture_cell,
+            venture_cell_to_ontology,
+        )
+
+        for status in RoomStatus:
+            registry = self._registry()
+            cell = VentureCellV1(
+                id=f"status-{status.value}",
+                kind=RoomKind.VENTURE_CELL,
+                purpose="status test",
+                status=status,
+            )
+            obj, errors = venture_cell_to_ontology(cell, registry)
+            assert not errors, errors
+            assert obj is not None
+            hydrated = ontology_to_venture_cell(obj)
+            assert hydrated is not None
+            assert hydrated.status == status
 
 
 # ---------------------------------------------------------------------------

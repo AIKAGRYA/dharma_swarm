@@ -17,7 +17,7 @@
 These are immutable engineering laws for this repository. Violation = architectural regression.
 
 ### A1: NO FLAT-PACKAGE GROWTH
-The `dharma_swarm/` package currently has **385 files at its top level (70.0% of 550 total Python modules)** (V). No new .py file may be added to the top level. New modules must go into an appropriate subdirectory. Existing top-level files will be organized over time.
+The `dharma_swarm/` package currently has **385 files at its top level (69.5% of 554 total Python modules)** (V). No new .py file may be added to the top level. New modules must go into an appropriate subdirectory. Existing top-level files will be organized over time.
 
 ### A2: NO DUPLICATE IMPLEMENTATIONS
 Before creating a new file for routing, bridging, adapting, or orchestrating, check if one already exists. The repo currently has **19 bridge files** (V), **3 model_routing copies** (2 are identical, 1 is different) (V), **4 orchestrators** (V), **14 adapter files across 7 locations** (V), and **13 router files** (V). Do not add more without deprecating an existing one.
@@ -63,14 +63,14 @@ These are the ground-truth metrics. All other documents citing different numbers
 | Metric | Value | Verification |
 |--------|-------|-------------|
 | Total Python modules | **554** | find dharma_swarm -name "*.py" -type f |
-| Top-level (flat) modules | **386 (69.7%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
-| Total Python LOC | **248,966** | wc -l across dharma_swarm Python modules |
+| Top-level (flat) modules | **385 (69.5%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
+| Total Python LOC | **249,744** | wc -l across dharma_swarm Python modules |
 | Test files | **564** | find tests -name "*.py" -type f |
-| Test functions | **10,035 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Test functions | **10,040 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
 | Markdown files | **685** | find . -name "*.md" -type f |
-| Markdown total lines | **175,037** | wc -l across all .md |
+| Markdown total lines | **175,016** | wc -l across all .md |
 | Bridge files | **19** | find dharma_swarm -name "*bridge*.py" |
 | Adapter files | **14 across 7 locations** | find dharma_swarm -type f \| rg -i "adapter" |
 | Orchestrator files | **4** (6,034 LOC total) | find dharma_swarm -name "*orchestrat*" |

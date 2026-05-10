@@ -389,6 +389,9 @@ def venture_cell_to_ontology(
         "domain": "economic" if cell.value_proposition else "governance",
         "autonomy_stage": cell.autonomy_stage,
         "status": _room_status_to_ontology(cell.status),
+        "room_status": cell.status.value,
+        "value_proposition": cell.value_proposition,
+        "customer_or_beneficiary": cell.customer_or_beneficiary,
         "budget_tokens": cell.budget_tokens,
         "kpis": {
             "current_burn": cell.current_burn,
@@ -396,14 +399,27 @@ def venture_cell_to_ontology(
             "agent_count": len(cell.agents),
         },
     }
-    existing = registry.get_object(cell.id)
-    if existing is not None and existing.type_name == "VentureCell":
-        obj, errors = registry.update_object(cell.id, properties, updated_by=created_by)
+    try:
+        from dharma_swarm.ontology import OntologyObj
+
+        return registry.put_object(
+            OntologyObj(
+                id=cell.id,
+                type_name="VentureCell",
+                properties=properties,
+                created_by=created_by,
+            ),
+            updated_by=created_by,
+        )
+    except AttributeError:
+        existing = registry.get_object(cell.id)
+        if existing is not None and existing.type_name == "VentureCell":
+            obj, errors = registry.update_object(cell.id, properties, updated_by=created_by)
+            return obj, errors
+        obj, errors = registry.create_object(
+            "VentureCell", properties=properties, created_by=created_by,
+        )
         return obj, errors
-    obj, errors = registry.create_object(
-        "VentureCell", properties=properties, created_by=created_by,
-    )
-    return obj, errors
 
 
 def ontology_to_venture_cell(
@@ -420,9 +436,13 @@ def ontology_to_venture_cell(
         id=obj.id,
         purpose=str(props.get("description", "")),
         kind=RoomKind.VENTURE_CELL,
-        status=_ontology_status_to_room(str(props.get("status", "incubating"))),
+        status=_ontology_status_to_room(
+            str(props.get("room_status") or props.get("status", "incubating"))
+        ),
         budget_tokens=int(props.get("budget_tokens", 0) or 0),
         autonomy_stage=int(props.get("autonomy_stage", 1) or 1),
+        value_proposition=str(props.get("value_proposition", "")),
+        customer_or_beneficiary=str(props.get("customer_or_beneficiary", "")),
     )
 
 
@@ -458,10 +478,13 @@ def _room_status_to_ontology(status: RoomStatus) -> str:
 
 def _ontology_status_to_room(status: str) -> RoomStatus:
     mapping = {
-        "incubating": RoomStatus.ACTIVE,
+        "proposed": RoomStatus.PROPOSED,
+        "incubating": RoomStatus.INCUBATING,
         "active": RoomStatus.ACTIVE,
-        "mature": RoomStatus.ACTIVE,
-        "divesting": RoomStatus.ARCHIVED,
+        "graduating": RoomStatus.GRADUATING,
+        "mature": RoomStatus.GRADUATING,
+        "spun_out": RoomStatus.SPUN_OUT,
+        "divesting": RoomStatus.SPUN_OUT,
         "archived": RoomStatus.ARCHIVED,
     }
     return mapping.get(status, RoomStatus.ACTIVE)

@@ -323,6 +323,24 @@ def _read_board(board_path: Path | None = None) -> list[dict[str, Any]]:
         return []
 
 
+def _safe_float(value: Any, default: float = 0.0) -> float:
+    """Coerce numeric board fields without letting malformed rows crash refill."""
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _opportunity_id(row: dict[str, Any]) -> str:
+    """Return the canonical board identifier, accepting legacy ``id`` rows."""
+    raw = row.get("opportunity_id") or row.get("id")
+    if raw:
+        return str(raw)
+    generated = uuid4().hex[:12]
+    row["opportunity_id"] = generated
+    return generated
+
+
 def _select_pending(
     board: list[dict[str, Any]],
     *,
@@ -334,11 +352,11 @@ def _select_pending(
     for row in board:
         if row.get("addressed"):
             continue
-        telos = float(row.get("telos_alignment", row.get("final_score", 0)) or 0)
+        telos = _safe_float(row.get("telos_alignment", row.get("final_score", 0)))
         if telos < min_telos_alignment:
             continue
         pending.append(row)
-    pending.sort(key=lambda r: float(r.get("final_score", 0) or 0), reverse=True)
+    pending.sort(key=lambda r: _safe_float(r.get("final_score", 0)), reverse=True)
     return pending[:top_k]
 
 
@@ -365,7 +383,7 @@ def _mark_addressed(
     """Mark addressed opportunities on the board so they aren't re-promoted."""
     path = (board_path or Path.home() / ".dharma" / "meta" / "opportunity_board.json").expanduser()
     for row in board:
-        if row.get("id") in opp_ids:
+        if _opportunity_id(row) in opp_ids:
             row["addressed"] = True
             row["addressed_at"] = datetime.now(timezone.utc).isoformat()
     tmp = path.with_suffix(path.suffix + f".tmp.{int(time.time() * 1000)}")
@@ -407,9 +425,9 @@ def refill_frontier_tasks_pending(
     addressed_ids: set[str] = set()
 
     for opp in selected:
-        opp_id = str(opp.get("id", uuid4().hex[:12]))
+        opp_id = _opportunity_id(opp)
         opp_title = str(opp.get("title", "Untitled opportunity"))
-        opp_type = str(opp.get("type", "external_revenue"))
+        opp_type = str(opp.get("type") or opp.get("domain") or "external_revenue")
         addressed_ids.add(opp_id)
 
         for stage in OPPORTUNITY_STAGES:

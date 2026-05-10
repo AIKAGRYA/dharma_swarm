@@ -61,6 +61,24 @@ OPPORTUNITY_STAGES = (
 )
 
 
+def _safe_float(value: Any, default: float = 0.0) -> float:
+    """Coerce score fields without crashing cron on malformed board rows."""
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _opportunity_id(opportunity: dict[str, Any]) -> str:
+    """Return canonical opportunity ID, accepting older rows that used ``id``."""
+    raw = opportunity.get("opportunity_id") or opportunity.get("id")
+    if raw:
+        return str(raw)
+    generated = uuid4().hex[:12]
+    opportunity["opportunity_id"] = generated
+    return generated
+
+
 class DispatchResult:
     """Result of dispatching a single opportunity stage."""
 
@@ -126,9 +144,11 @@ class OpportunityDispatcher:
         for each stage. Records telic provenance if a seam is available.
         """
         results: list[DispatchResult] = []
-        opp_id = str(opportunity.get("id", uuid4().hex[:12]))
+        opp_id = _opportunity_id(opportunity)
         opp_title = str(opportunity.get("title", "Untitled opportunity"))
-        opp_type = str(opportunity.get("type", "external_revenue"))
+        opp_type = str(
+            opportunity.get("type") or opportunity.get("domain") or "external_revenue"
+        )
 
         for stage in OPPORTUNITY_STAGES:
             task_id = _new_id("task")
@@ -229,8 +249,8 @@ def main(argv: list[str] | None = None) -> int:
         logger.error("Board is not a list")
         return 1
 
-    pending = [r for r in board if not r.get("addressed")]
-    pending.sort(key=lambda r: float(r.get("final_score", 0) or 0), reverse=True)
+    pending = [r for r in board if isinstance(r, dict) and not r.get("addressed")]
+    pending.sort(key=lambda r: _safe_float(r.get("final_score", 0)), reverse=True)
     pending = pending[:args.max]
 
     if not pending:
@@ -239,13 +259,13 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.dry_run:
         for row in pending:
-            logger.info("[dry-run] Would dispatch: %s (%s)", row.get("title"), row.get("id"))
+            logger.info("[dry-run] Would dispatch: %s (%s)", row.get("title"), _opportunity_id(row))
         return 0
 
     dispatcher = OpportunityDispatcher()
     for row in pending:
         results = dispatcher.dispatch_opportunity_sync(row)
         for r in results:
-            logger.info("Dispatched %s/%s: success=%s", row.get("id"), r.stage, r.success)
+            logger.info("Dispatched %s/%s: success=%s", _opportunity_id(row), r.stage, r.success)
 
     return 0

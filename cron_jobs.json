@@ -244,5 +244,28 @@
     "enabled": false,
     "env_flag": "DHARMA_OPERATOR_BRIEF_ENABLED",
     "prompt": "Operator Brief seam (v0). No-op unless DHARMA_OPERATOR_BRIEF_ENABLED=1. See docs/plans/ONTOLOGY_NATIVE_OPERATOR_BRIEF_MASTER_SPEC.md."
+  },
+  {
+    "id": "frontier_refill",
+    "name": "Opportunity Frontier Refill",
+    "trigger": "cron",
+    "schedule": {
+      "hour": 4,
+      "minute": 30
+    },
+    "handler": "frontier_refill",
+    "top_k": 3,
+    "min_telos_alignment": 0.5,
+    "enabled": true,
+    "prompt": "Promote top opportunity_board.json rows into frontier_tasks_pending.jsonl for the live swarm loop to drain."
+  },
+  {
+    "id": "store_sync",
+    "name": "Ontology Runtime Store Sync",
+    "trigger": "interval",
+    "interval_seconds": 1800,
+    "handler": "store_sync",
+    "enabled": true,
+    "prompt": "Materialize ontology Outcome objects into runtime ArtifactRecords."
   }
 ]

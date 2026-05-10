@@ -23,6 +23,7 @@ Systems run concurrently:
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import signal
@@ -88,6 +89,16 @@ async def _drain_frontier_queue(board: Any, *, limit: int = 20) -> int:
         return 0
     if not lines:
         return 0
+    from dharma_swarm.models import TaskPriority
+
+    init_db = getattr(board, "init_db", None)
+    if callable(init_db):
+        try:
+            await init_db()
+        except Exception:
+            logger.debug("Frontier task board init failed", exc_info=True)
+            return 0
+
     promoted = 0
     remaining: list[str] = []
     for line in lines:
@@ -98,18 +109,36 @@ async def _drain_frontier_queue(board: Any, *, limit: int = 20) -> int:
             row = json.loads(line)
         except json.JSONDecodeError:
             continue
-        await board.create(
-            title=row.get("title", "frontier task"),
-            description=row.get("description", ""),
-            priority=row.get("priority", "normal"),
-            created_by=row.get("created_by", "frontier_refill"),
-            metadata=row.get("metadata"),
-        )
+        raw_priority = row.get("priority", TaskPriority.NORMAL)
+        try:
+            priority = (
+                raw_priority
+                if isinstance(raw_priority, TaskPriority)
+                else TaskPriority(str(raw_priority).lower())
+            )
+        except ValueError:
+            priority = TaskPriority.NORMAL
+        try:
+            await board.create(
+                title=row.get("title", "frontier task"),
+                description=row.get("description", ""),
+                priority=priority,
+                created_by=row.get("created_by", "frontier_refill"),
+                metadata=row.get("metadata"),
+            )
+        except Exception:
+            logger.debug("Frontier task promotion failed", exc_info=True)
+            remaining.append(line)
+            continue
         promoted += 1
-    frontier_path.write_text(
+    tmp = frontier_path.with_suffix(
+        frontier_path.suffix + f".tmp.{int(datetime.now(timezone.utc).timestamp() * 1000)}"
+    )
+    tmp.write_text(
         "\n".join(remaining) + ("\n" if remaining else ""),
         encoding="utf-8",
     )
+    tmp.replace(frontier_path)
     return promoted
 
 
@@ -1696,9 +1725,13 @@ async def _run_room_health_loop(
             # BR-008: sync rooms → ontology so VentureCell objects match running organs
             try:
                 from dharma_swarm.fractal.room_bridge import sync_registry_to_ontology
-                from dharma_swarm.ontology_runtime import get_shared_registry as _get_ont_reg
+                from dharma_swarm.ontology_runtime import (
+                    get_shared_registry as _get_ont_reg,
+                    persist_shared_registry as _persist_ont_reg,
+                )
                 ont_reg = _get_ont_reg(str(STATE_DIR / "ontology.db"))
                 sync_errors = sync_registry_to_ontology(registry, ont_reg)
+                _persist_ont_reg(ont_reg, path=str(STATE_DIR / "ontology.db"))
                 if sync_errors:
                     _log("room-health", f"Ontology sync had errors: {sync_errors}")
             except Exception as sync_exc:
@@ -1706,7 +1739,7 @@ async def _run_room_health_loop(
 
             # BR-007: sync ontology outcomes → runtime artifacts
             try:
-                from dharma_swarm.store_sync import sync_all
+                from dharma_swarm.engine.store_sync import sync_all
                 sr = sync_all(state_dir=STATE_DIR)
                 if sr.artifacts_created:
                     _log("room-health", f"Store sync: {sr.artifacts_created} new artifacts materialized")

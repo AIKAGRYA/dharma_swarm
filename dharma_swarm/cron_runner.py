@@ -577,7 +577,7 @@ def _run_frontier_refill(job: dict[str, Any]) -> CronJobExecutionResult:
 def _run_store_sync(job: dict[str, Any]) -> CronJobExecutionResult:
     """BR-007: sync ontology.db outcomes → runtime.db artifact_records."""
     try:
-        from dharma_swarm.store_sync import sync_all
+        from dharma_swarm.engine.store_sync import sync_all
         res = sync_all()
         return CronJobExecutionResult(
             status=CronJobRunStatus.COMPLETED,
@@ -653,6 +653,7 @@ def execute_cron_job(job: dict[str, Any]) -> CronJobExecutionResult:
         frontier_refill — bootstrap top opportunities into frontier queue
         system_map_populator — local system map refresh
         tcs_heartbeat   — local IdentityMonitor time-series sample
+        store_sync      — materialize ontology outcomes into runtime artifacts
     """
     handler = str(job.get("handler", "headless_prompt")).strip() or "headless_prompt"
 
