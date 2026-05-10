@@ -53,14 +53,12 @@ from dharma_swarm.terminal_control import load_terminal_control_state
 from dharma_swarm.terminal_engine.events import ToolCallComplete
 from dharma_swarm.terminal_engine.events import PermissionDecisionEvent, PermissionOutcomeEvent, PermissionResolutionEvent
 
-
 def _json_default(value: object) -> object:
     if is_dataclass(value):
         return asdict(value)
     if isinstance(value, set):
         return sorted(value)
     return str(value)
-
 
 def _bridge_provider_id(provider: ProviderType) -> str | None:
     if provider == ProviderType.CODEX:
@@ -71,12 +69,10 @@ def _bridge_provider_id(provider: ProviderType) -> str | None:
         return "openrouter"
     return None
 
-
 def _target_alias(model: str) -> str:
     normalized = model.split("/")[-1].split(":")[0].strip().lower()
     normalized = re.sub(r"[^a-z0-9.+-]+", "-", normalized)
     return normalized.strip("-") or "model"
-
 
 class TerminalBridge:
     """Minimal stdio protocol server for a terminal frontend."""
