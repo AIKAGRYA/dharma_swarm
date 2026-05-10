@@ -1,4 +1,4 @@
-import { CONTROL_PLANE_ROUTE_DECK as rawControlPlaneRouteDeck } from "./controlPlaneRouteDeck.js";
+import { RAW_CONTROL_PLANE_ROUTE_DECK as rawControlPlaneRouteDeck } from "./controlPlaneRouteDeck";
 import type {
   ControlPlaneRouteId,
   ControlPlaneRouteMeta,

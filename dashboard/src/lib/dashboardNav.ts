@@ -1,4 +1,4 @@
-import { CONTROL_PLANE_ROUTE_DECK } from "./controlPlaneRouteDeck.js";
+import { CONTROL_PLANE_ROUTE_DECK } from "./controlPlaneSurfaces";
 export { isDashboardPathActive } from "./dashboardPath.js";
 
 export type DashboardNavIcon =

@@ -1,4 +1,4 @@
-export const CONTROL_PLANE_ROUTE_DECK = [
+export const RAW_CONTROL_PLANE_ROUTE_DECK = [
   {
     id: "command-post",
     href: "/dashboard/command-post",

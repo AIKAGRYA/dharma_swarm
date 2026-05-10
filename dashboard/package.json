@@ -9,11 +9,12 @@
     "lint": "eslint",
     "test:visual": "playwright test",
     "test:visual:ui": "playwright test --ui",
-    "test:visual:update": "playwright test --update-snapshots"
+    "test:visual:update": "playwright test --update-snapshots",
+    "quality": "fallow check",
+    "quality:json": "fallow check --json",
+    "quality:fix": "fallow check --fix"
   },
   "dependencies": {
-    "@mdrbx/nerv-ui": "^1.0.5",
-    "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.5.0",
     "@react-three/postprocessing": "^3.0.4",
     "@tanstack/react-query": "^5.90.21",
@@ -22,18 +23,15 @@
     "@visx/scale": "^3.12.0",
     "@xyflow/react": "^12.10.1",
     "clsx": "^2.1.1",
-    "cmdk": "^1.1.1",
-    "d3-scale": "^4.0.2",
-    "elkjs": "^0.11.1",
     "framer-motion": "^12.36.0",
     "lucide-react": "^0.577.0",
     "next": "16.1.6",
+    "postprocessing": "^6.39.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "recharts": "^3.8.0",
     "tailwind-merge": "^3.5.0",
     "three": "^0.183.2",
-    "zod": "^4.3.6",
     "zustand": "^5.0.11"
   },
   "devDependencies": {
@@ -45,6 +43,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
+    "fallow": "^2.67.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

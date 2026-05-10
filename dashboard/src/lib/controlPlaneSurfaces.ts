@@ -2,7 +2,7 @@ import type {
   RuntimeControlPlaneSnapshot,
   RuntimeControlPlaneStatusKind,
 } from "./runtimeControlPlane";
-import { CONTROL_PLANE_ROUTE_DECK as rawControlPlaneRouteDeck } from "./controlPlaneRouteDeck.js";
+import { RAW_CONTROL_PLANE_ROUTE_DECK as rawControlPlaneRouteDeck } from "./controlPlaneRouteDeck";
 import { isDashboardPathActive } from "./dashboardPath.js";
 import type { ChatProfileOut, ChatStatusOut } from "./types";
 
