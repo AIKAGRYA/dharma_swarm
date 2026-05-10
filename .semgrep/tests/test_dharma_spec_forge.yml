@@ -1,0 +1,12 @@
+rules:
+  - id: dharma.spec-forge.no-autonomy-promotion-language
+    message: test fixture (mirror of real rule)
+    severity: WARNING
+    languages: [generic]
+    pattern-regex: '(?i)\b(yolo|internal_yolo|--yolo)\b'
+
+  - id: dharma.spec-forge.no-canonical-claim
+    message: test fixture (mirror of real rule)
+    severity: WARNING
+    languages: [generic]
+    pattern-regex: '(?i)\b(status:\s*canonical|current\s+truth|normative\s+contract)\b'

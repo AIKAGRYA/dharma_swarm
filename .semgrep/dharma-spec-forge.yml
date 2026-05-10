@@ -1,0 +1,44 @@
+rules:
+  # ===========================================================================
+  # Rule 1: dharma.spec-forge.no-autonomy-promotion-language
+  #
+  # D.3 in the hygiene-mesh plan says: "yolo keyword in commit msg + new
+  # feature dir without specs/ update -> block." Semgrep cannot read commit
+  # messages or prove absence of a co-committed specs/ update. That guard
+  # belongs in a custom PR/diff checker.
+  #
+  # This safe subset blocks YOLO/autonomy-launch language inside spec-forge
+  # documents, where exploratory specs should stay bounded and non-operational.
+  # ===========================================================================
+  - id: dharma.spec-forge.no-autonomy-promotion-language
+    message: |
+      YOLO/autonomy-launch language in spec-forge. Forge docs may incubate
+      designs, but operational YOLO directives need an explicit governed
+      mission/profile outside the forge lane.
+    severity: WARNING
+    languages: [generic]
+    paths:
+      include:
+        - "/spec-forge/**/*.md"
+    pattern-regex: '(?i)\b(yolo|internal_yolo|--yolo)\b'
+
+  # ===========================================================================
+  # Rule 2: dharma.spec-forge.no-canonical-claim
+  #
+  # spec-forge/ is the incubation lane. Except for the README that defines the
+  # lane itself, forge files should not self-declare as canonical/current truth.
+  # Promotion to durable contract truth belongs in specs/.
+  # ===========================================================================
+  - id: dharma.spec-forge.no-canonical-claim
+    message: |
+      spec-forge document claims canonical/current-truth status. If this is
+      ready to govern implementation, promote it to specs/ with an explicit
+      update instead of letting the forge lane become normative by accident.
+    severity: WARNING
+    languages: [generic]
+    paths:
+      include:
+        - "/spec-forge/**/*.md"
+      exclude:
+        - "/spec-forge/README.md"
+    pattern-regex: '(?i)\b(status:\s*canonical|current\s+truth|normative\s+contract)\b'

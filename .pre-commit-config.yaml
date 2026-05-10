@@ -44,6 +44,19 @@ repos:
         stages: [pre-commit]
 
   # ---------------------------------------------------------------------------
+  # Prompt-packet provenance — first ratchet is warn-only. This runs at
+  # commit-msg so it can inspect `Packet-Id: <prompt_hash>` lines and compare
+  # them to staged hot/governance/risky source changes.
+  # ---------------------------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: dharma-packet-provenance
+        name: dharma packet provenance (prompt lane Packet-Id; warn-only)
+        entry: python3 scripts/governance/check_packet_provenance.py --warn-only
+        language: system
+        stages: [commit-msg]
+
+  # ---------------------------------------------------------------------------
   # Test hygiene gate (Rules 3 + 5) — Semgrep can't scan tests/ so we
   # use a small Python script instead. Currently warn-only because the
   # known offender tests/test_full_loop.py:343 has not been fixed yet.
@@ -101,3 +114,75 @@ repos:
       - id: check-yaml
         exclude: '^\.semgrep/tests/'
       - id: check-toml
+
+  # ---------------------------------------------------------------------------
+  # Tier-A code-quality gates (added 2026-05-09) — all warn-only initially.
+  # Promote to error after baselines stabilize. See pyproject.toml [tool.*]
+  # blocks and `make quality` for full invocation.
+  # ---------------------------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: dharma-vulture
+        name: vulture (Python dead code; warn-only)
+        entry: bash -c 'python3 -m vulture dharma_swarm/ .vulture_whitelist.py --min-confidence 90 || true'
+        language: system
+        pass_filenames: false
+        types: [python]
+        stages: [pre-commit]
+      - id: dharma-radon-cc
+        name: radon CC (cyclomatic complexity flag C+; warn-only)
+        entry: bash -c 'python3 -m radon cc dharma_swarm/ -nc -a --min C || true'
+        language: system
+        pass_filenames: false
+        types: [python]
+        stages: [pre-commit]
+      - id: dharma-bandit
+        name: bandit (security; warn-only)
+        entry: bash -c 'python3 -m bandit -r dharma_swarm/ -ll -q || true'
+        language: system
+        pass_filenames: false
+        types: [python]
+        stages: [pre-commit]
+      - id: dharma-mypy
+        name: mypy (type check; warn-only)
+        entry: bash -c 'python3 -m mypy dharma_swarm/ --ignore-missing-imports --no-error-summary || true'
+        language: system
+        pass_filenames: false
+        types: [python]
+        stages: [pre-commit]
+      - id: dharma-fallow
+        name: fallow (dashboard TS quality; warn-only)
+        entry: bash -c 'cd dashboard && npx --yes fallow check || true'
+        language: system
+        pass_filenames: false
+        files: ^dashboard/.*\.(ts|tsx|js|jsx)$
+        stages: [pre-commit]
+
+  # ---------------------------------------------------------------------------
+  # Layer 7 cross-language hygiene (added 2026-05-09) — all warn-only.
+  # typos: spelling in code + docs (config: _typos.toml)
+  # shellcheck: shell-script linting
+  # shfmt: shell-script formatting
+  # ---------------------------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: dharma-typos
+        name: typos (spell-check; warn-only)
+        entry: bash -c 'typos dharma_swarm/ scripts/ docs/ || true'
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
+      - id: dharma-shellcheck
+        name: shellcheck (shell scripts; warn-only)
+        entry: bash -c 'shellcheck $0 "$@" || true'
+        language: system
+        files: \.(sh|bash)$
+        exclude: ^(node_modules|\.venv|terminal/node_modules)/
+        stages: [pre-commit]
+      - id: dharma-shfmt
+        name: shfmt (shell formatting diff; warn-only)
+        entry: bash -c 'shfmt -d -i 2 -ci $0 "$@" || true'
+        language: system
+        files: \.(sh|bash)$
+        exclude: ^(node_modules|\.venv|terminal/node_modules)/
+        stages: [pre-commit]

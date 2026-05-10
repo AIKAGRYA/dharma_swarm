@@ -1,7 +1,7 @@
 {
   "include": ["dharma_swarm", "tests"],
   "venvPath": ".",
-  "pythonVersion": "3.13",
+  "pythonVersion": "3.11",
   "pythonPlatform": "Darwin",
   "typeCheckingMode": "basic",
   "reportMissingImports": "warning",

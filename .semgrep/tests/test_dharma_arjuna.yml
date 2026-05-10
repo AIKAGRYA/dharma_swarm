@@ -1,0 +1,11 @@
+rules:
+  - id: dharma.arjuna.no-warrant-bypass
+    message: test fixture (mirror of real rule)
+    severity: ERROR
+    languages: [python]
+    pattern-either:
+      - pattern-regex: 'DHARMA_SKIP_SHAKTI_WARRANT_GUARD'
+      - pattern: |
+          $RUN([..., "git", "commit", ..., "--no-verify", ...], ...)
+      - pattern: |
+          $RUN("git commit --no-verify", ...)

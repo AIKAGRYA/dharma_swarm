@@ -1,0 +1,35 @@
+rules:
+  # ===========================================================================
+  # Rule: dharma.three-systems.no-direct-foreign-system-import
+  #
+  # The three systems are separate:
+  #   - ~/.claude/ is Claude Code/operator exocortex configuration.
+  #   - ~/dharma_swarm/ is the autonomous orchestration experiment.
+  #   - ~/mech-interp-latent-lab-phase1/ is the MI research lane.
+  #
+  # Semgrep cannot pull zone definitions from ACTIVE_SURFACE_MANIFEST.yaml or
+  # compare writes across separate repositories. This safe subset blocks direct
+  # Python import loading from dharma_swarm code into the foreign system roots.
+  # Cross-repo/diff-aware enforcement belongs in a custom checker.
+  # ===========================================================================
+  - id: dharma.three-systems.no-direct-foreign-system-import
+    message: |
+      Direct import loading from a foreign system root from dharma_swarm code.
+      Keep Claude Code config (~/.claude), dharma_swarm, and the MI lab as
+      separate systems. Use documented bridge surfaces such as ~/.dharma,
+      SMRITI, or an explicit adapter instead of importing from another system
+      root.
+    severity: WARNING
+    languages: [python]
+    paths:
+      include:
+        - "/api/**/*.py"
+        - "/dharma_swarm/**/*.py"
+        - "/scripts/**/*.py"
+      exclude:
+        # Canonical topology map: it names the systems but does not bridge them.
+        - "/dharma_swarm/ecosystem_map.py"
+    pattern-either:
+      - pattern-regex: 'sys\.path\.(insert|append)\([^\n]*(\.claude|mech-interp-latent-lab-phase1)'
+      - pattern-regex: 'importlib\.(import_module|util\.spec_from_file_location)\([^\n]*(\.claude|mech-interp-latent-lab-phase1)'
+      - pattern-regex: 'SourceFileLoader\([^\n]*(\.claude|mech-interp-latent-lab-phase1)'

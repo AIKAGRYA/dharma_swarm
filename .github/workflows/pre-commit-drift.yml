@@ -1,0 +1,32 @@
+name: pre-commit-drift
+
+on:
+  pull_request: {}
+  push:
+    branches: [main]
+
+concurrency:
+  group: pre-commit-drift-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check-pre-commit-drift:
+    name: Tier-A pre-commit drift (advisory)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Check Tier-A pre-commit hook IDs
+        run: |
+          python3 scripts/governance/check_precommit_drift.py

@@ -1,0 +1,21 @@
+rules:
+  - id: dharma-no-new-utc-now-copies
+    pattern: |
+      def _utc_now(...):
+        ...
+    message: |
+      A canonical `utc_now()` exists at `dharma_swarm/utils/time.py`.
+      Do not define a new local `_utc_now` — import the canonical one:
+          from dharma_swarm.utils.time import utc_now
+      or for ISO strings:
+          from dharma_swarm.utils.time import utc_now_iso
+      The 50+ existing copies are scheduled for migration (Phase 9.4 of
+      the slop governance plan). New copies expand the problem.
+    severity: WARNING
+    languages: [python]
+    paths:
+      include:
+        - "dharma_swarm/**/*.py"
+      exclude:
+        - "dharma_swarm/utils/time.py"
+        - "tests/**"

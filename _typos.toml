@@ -1,0 +1,78 @@
+# Typos config for dharma_swarm.
+# Whitelists short-name aliases and project-specific Sanskrit/contemplative
+# terms that English-spell-checkers misflag.
+#
+# Run:  typos              (check)
+#       typos --write-changes (auto-fix)
+
+[default]
+extend-ignore-re = [
+    # Hex-encoded hashes (md5/sha1/sha256) in test fixtures and IDs
+    "[a-f0-9]{12,64}",
+    # Long all-caps env-var names
+    "[A-Z][A-Z0-9_]{8,}",
+]
+
+[default.extend-identifiers]
+# Project-canonical aliases — short variable names that are intentional, not typos.
+ba = "ba"            # BrowserAgent
+te = "te"            # TestEnv shorthand
+nd = "nd"            # NodeDescriptor
+fo = "fo"            # FileObject
+ot = "ot"            # OperatorTransport
+ned = "ned"          # NodeEdgeDescriptor
+HEPA = "HEPA"        # HEPA filter pattern (not "HEAP")
+
+[default.extend-words]
+# Sanskrit / contemplative / dharma terminology — not English typos.
+akram = "akram"
+swabhaav = "swabhaav"
+samayik = "samayik"
+pratikraman = "pratikraman"
+mahatma = "mahatma"
+jagat = "jagat"
+kalyan = "kalyan"
+darshan = "darshan"
+jnana = "jnana"
+iccha = "iccha"
+kriya = "kriya"
+ahimsa = "ahimsa"
+satya = "satya"
+viveka = "viveka"
+drishti = "drishti"
+karya = "karya"
+smriti = "smriti"
+chetana = "chetana"
+mahakali = "mahakali"
+mahalakshmi = "mahalakshmi"
+mahasaraswati = "mahasaraswati"
+maheshwari = "maheshwari"
+mahavira = "mahavira"
+rushabdev = "rushabdev"
+krishna = "krishna"
+arjuna = "arjuna"
+shakti = "shakti"
+yatagarasu = "yatagarasu"
+karasu = "karasu"
+tombi = "tombi"
+ginko = "ginko"
+kala = "kala"
+nechung = "nechung"
+loomwork = "loomwork"
+kaizen = "kaizen"
+dharmic = "dharmic"
+pmll = "pmll"
+
+[files]
+extend-exclude = [
+    "*.lock",
+    "package-lock.json",
+    ".venv/**",
+    "node_modules/**",
+    "quality-reports/**",
+    ".gitnexus/**",
+    "dist/**",
+    "build/**",
+    "specs/**/research/papers/**",
+    ".dharma/**",
+]

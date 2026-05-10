@@ -1,0 +1,18 @@
+# Canonical Tier-A pre-commit policy fragment.
+#
+# pre-commit does not support native YAML includes. This file is a
+# source-of-truth fragment for drift checking; the executable hook entries
+# still live in the repository root .pre-commit-config.yaml.
+
+tier_a_quality_hooks:
+  policy:
+    mode: advisory
+    rationale: "Baseline quality signals before promotion to blocking gates."
+    expected_pre_commit_behavior: "Hook entries should remain warn-only."
+  required_hook_ids:
+    - dharma-vulture
+    - dharma-radon-cc
+    - dharma-bandit
+    - dharma-mypy
+    - dharma-fallow
+    - dharma-packet-provenance

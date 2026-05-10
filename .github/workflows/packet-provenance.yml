@@ -1,0 +1,162 @@
+name: packet-provenance
+
+# Catches `--no-verify` bypasses of the local commit-msg hook by re-running the
+# packet-provenance check on every commit landing via PR or push to main.
+#
+# Policy (per docs/governance/PROMPT_GOVERNANCE.md):
+#   Level 0 (docs/tests/typos/generated)    — no packet required (auto-exempt)
+#   Level 1 (source cleanup/refactor)        — Packet-Id OR Packet-Bypass-Reason
+#   Level 2 (hot-path / governance surfaces) — Packet-Id REQUIRED, no bypass
+#
+# Runtime stance: ADVISORY (continue-on-error: true) for the 7-day warn-only
+# window. After baseline confirms low false-positive rate, flip
+# `continue-on-error: false` to make Level 2 violations fail the merge.
+
+on:
+  pull_request: {}
+  push:
+    branches: [main]
+
+concurrency:
+  group: packet-provenance-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  check-packet-provenance:
+    name: Packet provenance (advisory)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # FLIP TO false AFTER 7-DAY WARN-ONLY WINDOW (target: 2026-05-16) to
+    # promote Level 2 (hot-path / governance) failures to blocking.
+    continue-on-error: true
+
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # need git rev-list across the PR/push range
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Determine commit range
+        id: range
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          else
+            # push event: github.event.before may be 0000... on first push to a branch
+            BASE_SHA="${{ github.event.before }}"
+            HEAD_SHA="${{ github.event.after }}"
+            if [ "${BASE_SHA}" = "0000000000000000000000000000000000000000" ]; then
+              # Initial push: just check the head commit
+              BASE_SHA="${HEAD_SHA}~1"
+            fi
+          fi
+          echo "base=${BASE_SHA}" >> "$GITHUB_OUTPUT"
+          echo "head=${HEAD_SHA}" >> "$GITHUB_OUTPUT"
+          printf "Checking provenance for range %s..%s\n" "${BASE_SHA}" "${HEAD_SHA}"
+
+      - name: Check provenance per commit
+        id: check
+        run: |
+          set +e  # collect all failures, don't bail on first
+          MSG_DIR=$(mktemp -d)
+          mkdir -p quality-reports/packet-provenance
+          BASE="${{ steps.range.outputs.base }}"
+          HEAD="${{ steps.range.outputs.head }}"
+
+          # Resolve the commit list. If git rev-list fails (e.g. shallow clone
+          # missing the base), fall back to checking just HEAD.
+          COMMITS=$(git rev-list "${BASE}..${HEAD}" 2>/dev/null)
+          if [ -z "${COMMITS}" ]; then
+            COMMITS="${HEAD}"
+            printf "::warning::Could not resolve commit range; checking HEAD only\n"
+          fi
+
+          TOTAL=0
+          FAILS=0
+          PASSES=0
+          EXEMPT=0
+          FAILURES_DETAIL=""
+
+          for sha in ${COMMITS}; do
+            TOTAL=$((TOTAL + 1))
+            msg_file="${MSG_DIR}/${sha}.msg"
+            git log -1 --format=%B "${sha}" > "${msg_file}"
+
+            # diff-tree returns the files in this commit (vs its parent).
+            # For the first commit of an empty branch, fall back to ls-tree.
+            files=$(git diff-tree --no-commit-id --name-only -r "${sha}" 2>/dev/null)
+            if [ -z "${files}" ]; then
+              EXEMPT=$((EXEMPT + 1))
+              continue
+            fi
+
+            result_json="quality-reports/packet-provenance/${sha}.json"
+            python3 scripts/governance/check_packet_provenance.py \
+              --commit-msg-file "${msg_file}" \
+              --files ${files} \
+              --json > "${result_json}" 2>&1
+            rc=$?
+
+            if [ "${rc}" = "0" ]; then
+              PASSES=$((PASSES + 1))
+            else
+              FAILS=$((FAILS + 1))
+              FAILURES_DETAIL="${FAILURES_DETAIL}\n- ${sha}"
+              SUBJECT=$(git log -1 --format=%s "${sha}")
+              printf "::error title=Packet provenance::commit %s (%s) failed: %s\n" \
+                "${sha:0:8}" "${SUBJECT}" "$(jq -r '.message // "no detail"' "${result_json}" 2>/dev/null || echo see-artifact)"
+            fi
+          done
+
+          {
+            echo "## Packet Provenance Summary"
+            echo ""
+            echo "| metric | value |"
+            echo "|---|---|"
+            echo "| commits checked | ${TOTAL} |"
+            echo "| passed | ${PASSES} |"
+            echo "| failed | ${FAILS} |"
+            echo "| exempt (no files) | ${EXEMPT} |"
+            echo ""
+            if [ "${FAILS}" != "0" ]; then
+              echo "### Failed commits"
+              printf "%s\n" "${FAILURES_DETAIL}"
+              echo ""
+              echo "Per-commit JSON evidence is uploaded as artifact \`packet-provenance-reports\`."
+              echo ""
+              echo "**Resolution:** add a \`Packet-Id: <hex>\` trailer to the commit message"
+              echo "referring to a packet generated via \`make prompt-lane-run\`. For Level 1"
+              echo "non-hot risky source work only, \`Packet-Bypass-Reason: <≥15 chars>\` is accepted."
+            else
+              echo "All commits in this range carry valid packet provenance (or are exempt)."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          echo "total=${TOTAL}" >> "$GITHUB_OUTPUT"
+          echo "fails=${FAILS}" >> "$GITHUB_OUTPUT"
+          echo "passes=${PASSES}" >> "$GITHUB_OUTPUT"
+
+          if [ "${FAILS}" != "0" ]; then
+            printf "\nFAIL: %d/%d commits missing packet provenance\n" "${FAILS}" "${TOTAL}"
+            exit 1
+          fi
+          printf "\nOK: %d/%d commits carry packet provenance\n" "${PASSES}" "${TOTAL}"
+
+      - name: Upload per-commit JSON evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: packet-provenance-reports
+          path: quality-reports/packet-provenance/
+          retention-days: 30

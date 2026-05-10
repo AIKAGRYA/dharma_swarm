@@ -1,0 +1,9 @@
+rules:
+  - id: dharma.three-systems.no-direct-foreign-system-import
+    message: test fixture (mirror of real rule)
+    severity: WARNING
+    languages: [python]
+    pattern-either:
+      - pattern-regex: 'sys\.path\.(insert|append)\([^\n]*(\.claude|mech-interp-latent-lab-phase1)'
+      - pattern-regex: 'importlib\.(import_module|util\.spec_from_file_location)\([^\n]*(\.claude|mech-interp-latent-lab-phase1)'
+      - pattern-regex: 'SourceFileLoader\([^\n]*(\.claude|mech-interp-latent-lab-phase1)'

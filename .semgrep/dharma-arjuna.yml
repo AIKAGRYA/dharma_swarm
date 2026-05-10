@@ -1,0 +1,30 @@
+rules:
+  # ===========================================================================
+  # Rule: dharma.arjuna.no-warrant-bypass
+  #
+  # D.2 in the hygiene-mesh plan says: "new top-level dharma_swarm/<module>/
+  # requires co-committed arjuna_warrant.md." That requires PR/diff state and
+  # cannot be expressed safely in Semgrep. A custom checker should compare
+  # added top-level directories against co-committed warrant files.
+  #
+  # This safe subset catches deterministic bypasses of the existing Fourfold
+  # Shakti/ARJUNA warrant path.
+  # ===========================================================================
+  - id: dharma.arjuna.no-warrant-bypass
+    message: |
+      ARJUNA/Fourfold Shakti warrant bypass detected. Significant changes
+      should flow through the existing warrant guard instead of disabling it or
+      committing with --no-verify.
+    severity: ERROR
+    languages: [python, bash]
+    paths:
+      exclude:
+        - "/scripts/uplift_guards/shakti_warrant_guard.py"
+        - "/tests/"
+        - "/.semgrep/tests/"
+    pattern-either:
+      - pattern-regex: 'DHARMA_SKIP_SHAKTI_WARRANT_GUARD'
+      - pattern: |
+          $RUN([..., "git", "commit", ..., "--no-verify", ...], ...)
+      - pattern: |
+          $RUN("git commit --no-verify", ...)

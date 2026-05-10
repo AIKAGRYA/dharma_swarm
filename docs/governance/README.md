@@ -21,6 +21,12 @@ This directory is the easiest single place to orient any human or agent before w
 5. [REPO_GOVERNANCE_AUDIT.md](/Users/dhyana/dharma_swarm/docs/governance/REPO_GOVERNANCE_AUDIT.md)  
    Contradictions, stale claims, and audit evidence.
 
+6. [HYGIENE_MESH.md](/Users/dhyana/dharma_swarm/docs/governance/HYGIENE_MESH.md)
+   Dharmic Hygiene Mesh index, quality gate policy links, and anti-slop surfaces.
+
+7. [QUALITY_GATES.md](/Users/dhyana/dharma_swarm/docs/governance/QUALITY_GATES.md)
+   Canonical Python quality targets, report names, budgets, and ratchet policy.
+
 ## Use
 
 - Read these before starting a new agent session.
