@@ -142,7 +142,12 @@ class LiveLoopConfig(BaseModel):
         description="Consolidation (sleep) cycle interval (default 24h)",
     )
     max_daily_tasks: int = Field(
-        default=int(os.environ.get("DGC_MAX_DAILY", "50")),
+        default_factory=lambda: int(
+            os.environ.get(
+                "DHARMA_PULSE_DAILY_LIMIT",
+                os.environ.get("DGC_MAX_DAILY", "500"),
+            )
+        ),
         ge=1, le=1000,
         description="Maximum tasks per day",
     )

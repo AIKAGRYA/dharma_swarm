@@ -57,7 +57,8 @@ class TestLiveLoopConfig:
         # Clear env vars so defaults apply
         for var in ("DGC_SWARM_TICK", "DGC_PULSE_INTERVAL",
                      "DGC_EVOLUTION_INTERVAL", "DGC_HEALTH_INTERVAL",
-                     "DGC_LIVING_INTERVAL", "DGC_MAX_DAILY"):
+                     "DGC_LIVING_INTERVAL", "DGC_MAX_DAILY",
+                     "DHARMA_PULSE_DAILY_LIMIT"):
             monkeypatch.delenv(var, raising=False)
         cfg = LiveLoopConfig()
         assert cfg.swarm_tick_seconds == 60
@@ -65,7 +66,18 @@ class TestLiveLoopConfig:
         assert cfg.evolution_interval_seconds == 600
         assert cfg.health_interval_seconds == 120
         assert cfg.living_interval_seconds == 180
-        assert cfg.max_daily_tasks == 50
+        assert cfg.max_daily_tasks == 500
+
+    def test_dharma_pulse_daily_limit_overrides_legacy_env(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setenv("DGC_MAX_DAILY", "50")
+        monkeypatch.setenv("DHARMA_PULSE_DAILY_LIMIT", "750")
+
+        cfg = LiveLoopConfig()
+
+        assert cfg.max_daily_tasks == 750
 
 
 class TestSwarmManagerConfig:
