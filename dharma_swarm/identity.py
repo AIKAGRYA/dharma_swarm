@@ -81,6 +81,7 @@ class IdentityState(BaseModel):
     gpr: float = 0.5
     bsi: float = 0.5
     rm: float = 0.5
+    warning_action_coupling: float = 0.5
     regime: str = "stable"
     correction_issued: bool = False
     timestamp: datetime = Field(default_factory=_utc_now)
@@ -131,6 +132,7 @@ class IdentityMonitor:
         gpr = await self._measure_gpr()
         bsi = await self._measure_bsi()
         rm = await self._measure_rm()
+        warning_action_coupling = await self._measure_warning_action_coupling()
 
         # S4 -> S5 feedback: threats boost RM weight
         if threat_boost:
@@ -162,6 +164,7 @@ class IdentityMonitor:
             gpr=round(gpr, 4),
             bsi=round(bsi, 4),
             rm=round(rm, 4),
+            warning_action_coupling=round(warning_action_coupling, 4),
             regime=regime,
             correction_issued=correction_issued,
         )
@@ -323,6 +326,41 @@ class IdentityMonitor:
             signals.append(min(1.0, count / 50.0))
 
         return sum(signals) / len(signals) if signals else 0.5
+
+    async def _measure_warning_action_coupling(self) -> float:
+        """Measure warning-to-action coupling from gate feedback rows."""
+
+        coupling_path = self._state_dir / "meta" / "gate_feedback_coupling.jsonl"
+        if not coupling_path.exists():
+            return 0.5
+
+        try:
+            lines = [
+                line for line in coupling_path.read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ][-200:]
+        except Exception:
+            return 0.5
+
+        if not lines:
+            return 0.5
+
+        warning_rows = 0
+        nudged_rows = 0
+        for line in lines:
+            try:
+                row = json.loads(line)
+            except Exception:
+                continue
+            warning_count = int(row.get("warning_count", 0) or 0)
+            if warning_count <= 0:
+                continue
+            warning_rows += 1
+            if bool(row.get("nudge_applied")):
+                nudged_rows += 1
+        if warning_rows == 0:
+            return 0.5
+        return nudged_rows / warning_rows
 
     # -- correction ---------------------------------------------------------
 

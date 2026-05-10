@@ -1,9 +1,6 @@
 """Anekanta (many-sidedness) epistemological gate.
 
-Checks that proposals consider multiple epistemological frames:
-mechanistic, phenomenological, and systems-level. Rooted in the
-Jain principle of Anekantavada -- reality is perceived differently
-from different vantage points, and no single view is complete.
+Compatibility wrapper around deterministic Semantic Anekanta v0.
 """
 
 from __future__ import annotations
@@ -11,28 +8,12 @@ from __future__ import annotations
 from pydantic import BaseModel
 
 from dharma_swarm.models import GateResult
-
-# ---------------------------------------------------------------------------
-# Keyword sets for each epistemological frame
-# ---------------------------------------------------------------------------
-
-MECHANISTIC_KEYWORDS: frozenset[str] = frozenset({
-    "mechanism", "circuit", "activation", "gradient", "weight",
-    "layer", "neuron", "parameter", "computation", "optimization",
-    "loss", "architecture",
-})
-
-PHENOMENOLOGICAL_KEYWORDS: frozenset[str] = frozenset({
-    "experience", "awareness", "consciousness", "perception", "witness",
-    "observer", "subjective", "phenomenal", "qualia", "first-person",
-    "introspection", "recognition",
-})
-
-SYSTEMS_KEYWORDS: frozenset[str] = frozenset({
-    "emergence", "feedback", "self-organization", "complexity",
-    "adaptation", "interaction", "holistic", "network", "ecosystem",
-    "integration", "dynamics", "resilience",
-})
+from dharma_swarm.semantic_anekanta import (
+    MECHANISTIC_KEYWORDS,
+    PHENOMENOLOGICAL_KEYWORDS,
+    SYSTEMS_KEYWORDS,
+    evaluate_semantic_anekanta,
+)
 
 _FRAME_MAP: dict[str, frozenset[str]] = {
     "mechanistic": MECHANISTIC_KEYWORDS,
@@ -69,37 +50,10 @@ def evaluate_anekanta(description: str, content: str = "") -> AnekantaResult:
     Returns:
         AnekantaResult with gate verdict, detected frames, and reason.
     """
-    combined = f"{description} {content}".lower()
-
-    frames_detected: list[str] = []
-    for frame_name, keywords in _FRAME_MAP.items():
-        if any(kw in combined for kw in keywords):
-            frames_detected.append(frame_name)
-
-    frame_count = len(frames_detected)
-
-    if frame_count == 3:
-        return AnekantaResult(
-            gate_result=GateResult.PASS,
-            frames_detected=frames_detected,
-            frame_count=frame_count,
-            reason="All three epistemological frames represented",
-        )
-
-    if frame_count == 2:
-        all_frames = set(_FRAME_MAP.keys())
-        diff = all_frames - set(frames_detected)
-        missing = diff.pop() if diff else "unknown"
-        return AnekantaResult(
-            gate_result=GateResult.WARN,
-            frames_detected=frames_detected,
-            frame_count=frame_count,
-            reason=f"Missing {missing} frame",
-        )
-
+    semantic = evaluate_semantic_anekanta(description, content)
     return AnekantaResult(
-        gate_result=GateResult.FAIL,
-        frames_detected=frames_detected,
-        frame_count=frame_count,
-        reason=f"Insufficient epistemological diversity: only {frame_count} frame(s)",
+        gate_result=semantic.gate_result,
+        frames_detected=semantic.named_frames,
+        frame_count=len(semantic.named_frames),
+        reason=semantic.reason,
     )

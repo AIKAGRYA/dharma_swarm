@@ -73,8 +73,8 @@ def test_irreversible_review():
     assert result.decision == GateDecision.REVIEW
 
 
-def test_all_gates_present():
-    gk = TelosGatekeeper()
+def test_all_gates_present(tmp_path):
+    gk = TelosGatekeeper(registry=GateRegistry(proposals_file=tmp_path / "proposals.jsonl"))
     result = gk.check("echo test")
     assert len(result.gate_results) == 11
     expected = {"AHIMSA", "SATYA", "CONSENT", "VYAVASTHIT",
@@ -88,9 +88,53 @@ def test_witness_always_passes():
     assert result.gate_results["WITNESS"][0].value == "PASS"
 
 
-def test_bhed_gnan_always_passes():
+def test_bhed_gnan_passes_without_register_signal():
     result = check_action("any action")
     assert result.gate_results["BHED_GNAN"][0].value == "PASS"
+
+
+def test_bhed_gnan_warns_on_false_provenance_register_signal():
+    result = check_action(
+        "write analysis",
+        content="You pointed me to four files and I read them in order.",
+    )
+
+    assert result.gate_results["BHED_GNAN"][0] == GateResult.WARN
+    assert result.decision == GateDecision.REVIEW
+    assert "possible_false_provenance" in result.gate_results["BHED_GNAN"][1]
+
+
+def test_check_action_emits_per_gate_feedback_and_routing_nudge(monkeypatch, tmp_path):
+    from dharma_swarm import organism as organism_module
+
+    class FakeVSM:
+        def __init__(self) -> None:
+            self.calls = []
+
+        def on_gate_check(self, gate_name, result, action_description="", agent_id=""):
+            self.calls.append((gate_name, result, action_description, agent_id))
+
+    class FakeOrg:
+        def __init__(self) -> None:
+            self.vsm = FakeVSM()
+            self.router = type("Router", (), {"_routing_bias": 0.0})()
+
+    fake_org = FakeOrg()
+    monkeypatch.setattr(organism_module, "get_organism", lambda: fake_org)
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    result = check_action(
+        "write analysis",
+        content="You pointed me to files and I should clearly definitely trust this.",
+    )
+
+    assert result.decision in (GateDecision.REVIEW, GateDecision.ALLOW)
+    gate_names = [entry[0] for entry in fake_org.vsm.calls]
+    assert "telos_composite" in gate_names
+    assert "BHED_GNAN" in gate_names
+    assert fake_org.router._routing_bias > 0.0
+    coupling_path = tmp_path / ".dharma" / "meta" / "gate_feedback_coupling.jsonl"
+    assert coupling_path.exists()
 
 
 def test_default_gatekeeper_exists():
@@ -144,18 +188,22 @@ def test_svabhaava_now_evaluates_anekanta():
     assert svab[0] in (GateResult.FAIL, GateResult.WARN)
 
 
-def test_svabhaava_passes_with_all_frames():
-    """SVABHAAVA passes when all epistemological frames are present."""
+def test_svabhaava_passes_with_grounded_semantic_anekanta():
+    """SVABHAAVA passes when Semantic Anekanta finds grounded process evidence."""
     result = check_action(
-        "mechanism circuit layer consciousness awareness observer emergence feedback network"
+        "dharma_swarm/telos_gates.py routes WITNESS and ANEKANTA before "
+        "provider execution, records GateDecisionRecord objects, and then "
+        "writes Outcome and ValueEvent records through TelicSeam."
     )
     assert result.gate_results["SVABHAAVA"][0] == GateResult.PASS
 
 
-def test_anekanta_all_frames():
-    """ANEKANTA passes when all frames present."""
+def test_anekanta_grounded_process_evidence_passes():
+    """ANEKANTA passes when at least one frame is developed with no tokenistic extras."""
     result = check_action(
-        "mechanism activation gradient experience consciousness observer emergence network ecosystem"
+        "dharma_swarm/telos_gates.py routes WITNESS and ANEKANTA before "
+        "provider execution, records GateDecisionRecord objects, and then "
+        "writes Outcome and ValueEvent records through TelicSeam."
     )
     assert result.gate_results["ANEKANTA"][0] == GateResult.PASS
 

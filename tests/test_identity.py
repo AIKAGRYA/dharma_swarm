@@ -58,6 +58,7 @@ class TestMeasureDefaults:
         # 0.35*0.5 + 0.35*0.5 + 0.30*0.5 = 0.5
         assert state.tcs == pytest.approx(0.5, abs=0.01)
         assert state.regime == "stable"
+        assert state.warning_action_coupling == pytest.approx(0.5, abs=0.01)
 
 
 # -- Regime classification -------------------------------------------------
@@ -256,6 +257,33 @@ class TestHistoryTracking:
         h1 = monitor.history
         h1.append(IdentityState())  # mutate the copy
         assert len(monitor.history) == 1  # original unchanged
+
+
+class TestWarningActionCoupling:
+    @pytest.mark.asyncio
+    async def test_warning_action_coupling_defaults_without_file(self, tmp_path: Path) -> None:
+        state_dir = tmp_path / ".dharma"
+        state_dir.mkdir(parents=True)
+        monitor = IdentityMonitor(state_dir=state_dir)
+        coupling = await monitor._measure_warning_action_coupling()
+        assert coupling == 0.5
+
+    @pytest.mark.asyncio
+    async def test_warning_action_coupling_reads_feedback_rows(self, tmp_path: Path) -> None:
+        state_dir = tmp_path / ".dharma"
+        meta_dir = state_dir / "meta"
+        meta_dir.mkdir(parents=True)
+        coupling_path = meta_dir / "gate_feedback_coupling.jsonl"
+        rows = [
+            {"warning_count": 2, "nudge_applied": True},
+            {"warning_count": 1, "nudge_applied": False},
+            {"warning_count": 0, "nudge_applied": True},
+        ]
+        coupling_path.write_text("\n".join(json.dumps(row) for row in rows))
+
+        monitor = IdentityMonitor(state_dir=state_dir)
+        coupling = await monitor._measure_warning_action_coupling()
+        assert coupling == pytest.approx(0.5, abs=0.01)
 
 
 # -- GPR edge cases --------------------------------------------------------

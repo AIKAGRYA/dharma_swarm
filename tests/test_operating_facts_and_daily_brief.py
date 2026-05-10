@@ -4,11 +4,13 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+from dharma_swarm import yds_funnel
 from dharma_swarm.daily_operating_brief import (
     DailyOperatingBriefInputs,
     build_daily_operating_brief,
     render_markdown,
 )
+import dharma_swarm.operator_core.operating_facts as operating_facts
 from dharma_swarm.operator_core.operating_facts import (
     OperatingFactBundle,
     OperatingFactInputs,
@@ -185,6 +187,43 @@ def test_non_human_yds_records_are_advisory_only(tmp_path: Path) -> None:
     facts = load_human_yds_rating_facts(yds)
 
     assert facts[0].authoritative is False
+
+
+def test_yds_funnel_records_messy_operator_phrase(tmp_path: Path) -> None:
+    ledger = tmp_path / "ratings.jsonl"
+
+    fact = yds_funnel.record_yds_from_text(
+        "YDS this 5.12 C, note: clicked because it named the apparatus category",
+        artifact_uri="conversation:test",
+        title="apparatus category response",
+        ledger_path=ledger,
+    )
+    loaded = load_human_yds_rating_facts(ledger)
+
+    assert fact.rating == "5.12c"
+    assert fact.authoritative is True
+    assert loaded[0].artifact_uri == "conversation:test"
+    assert "apparatus category" in loaded[0].human_note
+
+
+def test_operating_fact_bundle_uses_default_yds_path(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    ledger = tmp_path / "yds" / "ratings.jsonl"
+    monkeypatch.setattr(operating_facts, "DEFAULT_YDS_RATINGS_PATH", ledger)
+    append_human_yds_rating(
+        ledger,
+        artifact_uri="conversation:default",
+        rating="5.13a",
+        human_note="human marked this as unusually strong",
+    )
+
+    bundle = build_operating_fact_bundle(OperatingFactInputs())
+
+    assert bundle.human_yds[0].rating == "5.13a"
+    assert bundle.human_yds[0].authoritative is True
+    assert "Human YDS ledger" not in bundle.missing_sources
 
 
 def test_daily_operating_brief_consumes_operating_fact_bundle(tmp_path: Path) -> None:

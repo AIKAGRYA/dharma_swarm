@@ -12,28 +12,30 @@ from dharma_swarm.models import GateResult
 
 def test_all_three_frames_pass() -> None:
     text = (
-        "The circuit activation reveals a mechanism. "
-        "Subjective awareness and witness perception arise. "
-        "Emergence and feedback drive self-organization in the ecosystem."
+        "Writing this, I notice a felt uncertainty in the claim. "
+        "dharma_swarm/telos_gates.py records GateDecisionRecord objects, "
+        "and the feedback loop then writes Outcome and ValueEvent records "
+        "through TelicSeam."
     )
     result = evaluate_anekanta(text)
     assert result.gate_result == GateResult.PASS
     assert result.frame_count == 3
 
 
-def test_two_frames_warn() -> None:
+def test_grounded_plus_tokenistic_frame_warns() -> None:
     text = (
-        "Gradient optimization improves the architecture. "
-        "Emergence and complexity drive adaptation."
+        "The runtime combines kernel verification, telos gates, witness "
+        "chains, and ontology types into an integration layer that holds "
+        "the contemplative bridge."
     )
     result = evaluate_anekanta(text)
     assert result.gate_result == GateResult.WARN
     assert result.frame_count == 2
-    assert "Missing" in result.reason
+    assert "label=mixed" in result.reason
 
 
 def test_one_frame_fail() -> None:
-    text = "The neuron activation propagates through the layer."
+    text = "The mechanism architecture optimization substrate is robust."
     result = evaluate_anekanta(text)
     assert result.gate_result == GateResult.FAIL
     assert result.frame_count == 1
@@ -57,17 +59,17 @@ def test_mechanistic_only() -> None:
     assert result.frames_detected == ["mechanistic"]
 
 
-def test_phenomenological_only() -> None:
-    text = "Consciousness and introspection reveal qualia."
+def test_phenomenological_only_can_pass_when_grounded() -> None:
+    text = "Right now, I notice a felt uncertainty while writing this."
     result = evaluate_anekanta(text)
-    assert result.gate_result == GateResult.FAIL
+    assert result.gate_result == GateResult.PASS
     assert result.frames_detected == ["phenomenological"]
 
 
-def test_systems_only() -> None:
-    text = "Emergence and resilience characterise the ecosystem."
+def test_systems_only_can_pass_when_grounded() -> None:
+    text = "The signal flows through the network and then updates routing."
     result = evaluate_anekanta(text)
-    assert result.gate_result == GateResult.FAIL
+    assert result.gate_result == GateResult.PASS
     assert result.frames_detected == ["systems"]
 
 
@@ -97,8 +99,8 @@ def test_case_insensitive() -> None:
 
 
 def test_content_combined() -> None:
-    desc = "The circuit activates in the layer."
-    content = "Awareness and consciousness arise through introspection."
+    desc = "dharma_swarm/telos_gates.py records GateDecisionRecord objects."
+    content = "Right now, I notice uncertainty in the phenomenological claim."
     result = evaluate_anekanta(desc, content)
     assert "mechanistic" in result.frames_detected
     assert "phenomenological" in result.frames_detected
@@ -111,7 +113,7 @@ def test_content_combined() -> None:
 def test_frame_count_accurate() -> None:
     text = (
         "Gradient weight optimization. "
-        "Witness observer awareness. "
+        "Consciousness awareness. "
         "Emergence feedback resilience."
     )
     result = evaluate_anekanta(text)

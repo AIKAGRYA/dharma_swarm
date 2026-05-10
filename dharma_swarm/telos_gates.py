@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any
 
 from dharma_swarm.anekanta_gate import evaluate_anekanta
+from dharma_swarm.bhed_gnan_gate import evaluate_bhed_gnan
 
 logger = logging.getLogger(__name__)
 from dharma_swarm.models import (
@@ -406,11 +407,8 @@ class TelosGatekeeper:
         Returns:
             GateCheckResult with decision, reason, and per-gate results.
         """
-        resolved_mode = (
-            (trust_mode or os.getenv("DGC_TRUST_MODE", "internal_yolo"))
-            .strip()
-            .lower()
-        )
+        mode_value = trust_mode or os.getenv("DGC_TRUST_MODE") or "internal_yolo"
+        resolved_mode = mode_value.strip().lower()
         # ── S4→S3 feedback: zeitgeist gate pressure override ──
         resolved_mode = self._apply_gate_pressure(resolved_mode)
         action_lower = action.lower()
@@ -509,8 +507,9 @@ class TelosGatekeeper:
         else:
             results["SVABHAAVA"] = (GateResult.PASS, "Epistemological diversity confirmed")
 
-        # --- BHED_GNAN (Tier C) — doer-witness distinction (always passes) ---
-        results["BHED_GNAN"] = (GateResult.PASS, "Doer-witness distinction noted")
+        # --- BHED_GNAN (Tier C) — cheap register/substance discrimination ---
+        bhed_gnan = evaluate_bhed_gnan(action, content)
+        results["BHED_GNAN"] = (bhed_gnan.gate_result, bhed_gnan.reason)
 
         # --- WITNESS (Tier C, promoted to blocking for mandatory phases) ---
         phase_key = (think_phase or "").strip().lower()
@@ -796,18 +795,48 @@ def check_action(action: str, content: str = "") -> GateCheckResult:
         from dharma_swarm.organism import get_organism
         org = get_organism()
         if org is not None and hasattr(org, "vsm") and org.vsm is not None:
-            # Map GateDecision → GateResult for VSM compatibility
-            _decision_to_result = {
+            # Map GateDecision → GateResult for VSM compatibility.
+            decision_to_result = {
                 GateDecision.ALLOW: GateResult.PASS,
                 GateDecision.BLOCK: GateResult.FAIL,
                 GateDecision.REVIEW: GateResult.WARN,
             }
-            gate_result = _decision_to_result.get(result.decision, GateResult.WARN)
+            gate_result = decision_to_result.get(result.decision, GateResult.WARN)
             org.vsm.on_gate_check(
                 gate_name="telos_composite",
                 result=gate_result,
                 action_description=action[:200],
             )
+            warning_count = 0
+            for gate_name, gate_payload in result.gate_results.items():
+                payload_result = gate_payload[0] if isinstance(gate_payload, tuple) else GateResult.WARN
+                if payload_result in (GateResult.WARN, GateResult.FAIL):
+                    warning_count += 1
+                org.vsm.on_gate_check(
+                    gate_name=gate_name,
+                    result=payload_result,
+                    action_description=action[:200],
+                )
+
+            nudge_applied = False
+            if warning_count > 0 and getattr(org, "router", None) is not None:
+                current_bias = float(getattr(org.router, "_routing_bias", 0.0))
+                if current_bias < 0.5:
+                    setattr(org.router, "_routing_bias", min(0.5, current_bias + 0.02))
+                    nudge_applied = True
+
+            coupling_path = Path.home() / ".dharma" / "meta" / "gate_feedback_coupling.jsonl"
+            coupling_path.parent.mkdir(parents=True, exist_ok=True)
+            coupling_row = {
+                "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+                "action": action[:200],
+                "decision": result.decision.value,
+                "warning_count": warning_count,
+                "nudge_applied": nudge_applied,
+                "routing_bias": float(getattr(getattr(org, "router", None), "_routing_bias", 0.0)),
+            }
+            with coupling_path.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps(coupling_row, sort_keys=True) + "\n")
     except Exception:
         pass  # VSM feedback is best-effort, must not break gate checks
     return result

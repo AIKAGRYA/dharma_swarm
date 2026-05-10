@@ -18,6 +18,8 @@ from typing import Any, Iterable
 
 HUMAN_YDS_SOURCES = {"human", "operator", "dhyana"}
 YDS_RE = re.compile(r"^5\.(?:6|7|8|9|10|11|12|13|14|15)(?:[abcd])?$")
+DEFAULT_YDS_RATINGS_PATH = Path("~/.dharma/yds/ratings.jsonl")
+LEGACY_YDS_RATINGS_PATHS = (Path("~/.dharma/ysd/ratings.jsonl"),)
 REVENUE_KEYWORDS = (
     "revenue",
     "wedge",
@@ -256,8 +258,9 @@ def build_operating_fact_bundle(inputs: OperatingFactInputs) -> OperatingFactBun
     kaizen = load_kaizen_review_facts(inputs.kaizen_reports_dir)
     if inputs.kaizen_reports_dir is None or not kaizen:
         missing.append("KaizenReview reports")
-    human_yds = load_human_yds_rating_facts(inputs.yds_ratings_path)
-    if inputs.yds_ratings_path is None or not human_yds:
+    yds_path = resolve_yds_ratings_path(inputs.yds_ratings_path)
+    human_yds = load_human_yds_rating_facts(yds_path)
+    if not human_yds:
         missing.append("Human YDS ledger")
     burn = load_burn_report_facts(inputs.burn_report_path)
     if inputs.burn_report_path is None or not burn:
@@ -310,6 +313,26 @@ def load_human_yds_rating_facts(path: Path | None) -> list[HumanQualityRatingFac
         if fact is not None:
             facts.append(fact)
     return facts
+
+
+def resolve_yds_ratings_path(path: Path | None = None) -> Path:
+    """Return the canonical human YDS JSONL ledger path.
+
+    The runtime source is ``~/.dharma/yds/ratings.jsonl``. A previous inventory
+    used the transposed spelling ``ysd``; keep a read fallback so old local
+    ledgers do not disappear, but always write new ratings to the canonical path.
+    """
+
+    if path is not None:
+        return path.expanduser()
+    default = DEFAULT_YDS_RATINGS_PATH.expanduser()
+    if default.exists():
+        return default
+    for legacy in LEGACY_YDS_RATINGS_PATHS:
+        candidate = legacy.expanduser()
+        if candidate.exists():
+            return candidate
+    return default
 
 
 def load_burn_report_facts(path: Path | None) -> list[BurnReportFact]:
