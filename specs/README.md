@@ -30,6 +30,8 @@ connected_relevant_files:
 - specs/DGC_TERMINAL_ARCHITECTURE_v1.1.md
 - specs/ONTOLOGY_PHASE2_SQLITE_UNIFICATION_SPEC_2026-03-19.md
 - specs/ONTOLOGY_PHASE2_SQLITE_UNIFICATION_TODO_2026-03-19.md
+- specs/research/README.md
+- docs/archive/specs_research_living_layers/README.md
 - spec-forge/README.md
 - docs/REPO_ONTOLOGY_AND_HYGIENE_MASTER_SPEC_2026-04-01.md
 improvement:
@@ -38,7 +40,7 @@ improvement:
   - Keep versioned specs explicit about which file currently governs and which one is retained as prior baseline.
   - Keep companion checklists clearly subordinate to their canonical spec rather than letting them impersonate the spec itself.
   - Move non-spec planning material elsewhere over time.
-  next_review_at: '2026-04-05T12:00:00+09:00'
+  next_review_at: '2026-05-17T12:00:00+08:00'
 pkm:
   note_class: readme
   vault_path: specs/README.md
@@ -55,7 +57,7 @@ stigmergy:
   coordination_comment: Use this file to decide whether a document belongs in `specs/` or somewhere else.
   trace_role: coordination_trace
 curation:
-  last_frontmatter_refresh: '2026-04-03T20:34:00+09:00'
+  last_frontmatter_refresh: '2026-05-10T02:33:00+08:00'
   curated_by_model: Codex (GPT-5)
   schema_version: pkm-phd-stigmergy-v1
 ---
@@ -109,6 +111,7 @@ Use these rules when multiple spec-shaped files exist for one surface:
 - `specs/` defines precise contracts that should outlive any one planning wave.
 - `spec-forge/` is the draft and incubation lane for candidate specs that are not yet normative.
 - `specs/research/` is the active research companion subtree for current spec interpretation and alignment work.
+- Historical duplicate living-layers research inputs are archived under [docs/archive/specs_research_living_layers/README.md](/Users/dhyana/dharma_swarm/docs/archive/specs_research_living_layers/README.md), not under `specs/`.
 
 ## Specs vs Spec-Forge
 
@@ -134,5 +137,6 @@ This directory still contains some mixed-purpose material. The cleanup goal is:
 - move planning-heavy docs out over time
 - make supersession and status explicit for every versioned spec
 - keep `spec-forge/` as the place where emerging specs mature before entering `specs/`
+- keep duplicate research residue out of `specs/` once an active companion subtree or archive path exists
 
 For the governing repo-wide ontology, see [REPO_ONTOLOGY_AND_HYGIENE_MASTER_SPEC_2026-04-01.md](/Users/dhyana/dharma_swarm/docs/REPO_ONTOLOGY_AND_HYGIENE_MASTER_SPEC_2026-04-01.md).

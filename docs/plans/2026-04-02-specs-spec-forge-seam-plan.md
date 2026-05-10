@@ -25,17 +25,19 @@ inspiration:
   - canonical_truth
 connected_relevant_files:
   - specs/README.md
+  - specs/research/README.md
   - spec-forge/README.md
   - docs/prompts/PARALLEL_BUILD_AGENT_PROMPTS_2026-03-19.md
   - docs/prompts/SOVEREIGN_BUILD_PHASE_MASTER_PROMPT_2026-03-19.md
   - docs/archive/VERIFICATION_COMPLETE.md
+  - docs/archive/specs_research_living_layers/README.md
   - docs/REPO_ONTOLOGY_AND_HYGIENE_MASTER_SPEC_2026-04-01.md
 improvement:
   room_for_improvement:
-    - Turn this seam plan into a single executed tranche with updated indices.
+    - Keep direct references pointed at the prompt and archive destinations rather than the removed specs residues.
     - Mark superseded specs explicitly inside specs/.
-    - Classify research material under specs/ more sharply after the prompt tranche is removed.
-  next_review_at: '2026-04-03T12:00:00+09:00'
+    - Classify the remaining non-hot normative candidates without touching TUI-adjacent product code.
+  next_review_at: '2026-05-17T12:00:00+08:00'
 pkm:
   note_class: plan
   vault_path: docs/plans/2026-04-02-specs-spec-forge-seam-plan.md
@@ -53,7 +55,7 @@ stigmergy:
   coordination_comment: Use this file to choose one bounded specs cleanup tranche without widening into broad repo churn.
   trace_role: coordination_trace
 curation:
-  last_frontmatter_refresh: '2026-04-02T23:59:00+09:00'
+  last_frontmatter_refresh: '2026-05-10T02:33:00+08:00'
   curated_by_model: Codex (GPT-5)
   schema_version: pkm-phd-stigmergy-v1
 ---
@@ -96,34 +98,56 @@ These should not be moved in the first tranche without deeper coupling review:
 - `specs/SOVEREIGN_BUILD_PHASE_MASTER_SPEC_2026-03-19.md`
 - `specs/STIGMERGY_11_LAYER_SPEC_2026-03-23.md`
 - `specs/research/`
-- `specs/research_living_layers/`
 
 Reasons:
 
 - some still function as active architectural reference
 - some may belong in `docs/architecture/` rather than `spec-forge/`
 - some are research substrate, which is a separate classification question
+- the DGC terminal pair is TUI-adjacent and should not be edited by the overnight cleanup lane unless a separate owner explicitly authorizes that seam
 
-## Executed Tranche
+## Executed Tranches
 
-The strongest bounded move was a prompt-and-completion tranche out of `specs/`, and that move is now staged.
+### Prompt And Completion Residue
 
-### Moved Files
+The first bounded move was a prompt-and-completion tranche out of `specs/`, and that move is now completed.
+
+### Authoritative Destinations
 
 - `docs/prompts/PARALLEL_BUILD_AGENT_PROMPTS_2026-03-19.md`
 - `docs/prompts/SOVEREIGN_BUILD_PHASE_MASTER_PROMPT_2026-03-19.md`
 - `docs/archive/VERIFICATION_COMPLETE.md`
 
-### Destinations
+### Removed Specs Residue
+
+- `specs/PARALLEL_BUILD_AGENT_PROMPTS_2026-03-19.md`
+- `specs/SOVEREIGN_BUILD_PHASE_MASTER_PROMPT_2026-03-19.md`
+- `specs/VERIFICATION_COMPLETE.md`
+
+### Destination Rule
 
 - prompt-heavy files moved to `docs/prompts/` because they remain useful as reusable prompt artifacts
 - completion or wave-closeout material moved to `docs/archive/` because it reads as historical verification residue rather than current normative spec truth
+
+### Living-Layers Research Duplicate
+
+The second bounded move removed the stale tracked duplicate subtree:
+
+- `specs/research_living_layers/README.md`
+- `specs/research_living_layers/research_subconscious_ai.md`
+- `specs/research_living_layers/research_stigmergy_agents.md`
+- `specs/research_living_layers/research_shakti_creative_autonomy.md`
+
+Authority now splits cleanly:
+
+- current research companion truth stays under `specs/research/`
+- historical duplicate living-layers inputs stay under `docs/archive/specs_research_living_layers/`
 
 ## Working Rule
 
 Do not move architectural specs and prompt packets in the same tranche.
 
-The first tranche should only remove the obviously non-normative files from `specs/`.
+Do not edit TUI-adjacent DGC terminal architecture specs in the overnight cleanup lane without an explicit hot-lane owner.
 
 ## Validation Standard
 

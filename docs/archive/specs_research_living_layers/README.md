@@ -40,11 +40,11 @@ connected_relevant_files:
 - tests/test_agent_runner_semantic_acceptance.py
 improvement:
   room_for_improvement:
-  - Keep entry points and commands aligned with the current runtime.
-  - Add sharper cross-links into the most active specs, tests, and dashboards.
+  - Keep entry points and commands aligned with the current runtime when cited from active work.
+  - Add sharper cross-links into the most active specs and tests.
   - Make shipped behavior vs. exploratory material explicit.
-  - Review whether this file should stay in `specs/research_living_layers` or be consolidated elsewhere.
-  next_review_at: '2026-04-01T00:43:19+09:00'
+  - Keep this archived family from competing with the active `specs/research/` subtree.
+  next_review_at: '2026-05-17T12:00:00+08:00'
 pkm:
   note_class: readme
   vault_path: docs/archive/specs_research_living_layers/README.md
@@ -63,10 +63,10 @@ pkm:
   - subconscious
   evergreen_potential: high
 stigmergy:
-  meaning: This file is a shared environmental trace in the DHARMA corpus. Its path, recency, and linked surfaces guide future agent attention; its frontmatter now adds machine-readable coordination cues.
-  state: canonical
+  meaning: This file indexes the archived duplicate living-layers research inputs after active spec research was consolidated under `specs/research/`.
+  state: archive
   semantic_weight: 0.9
-  coordination_comment: 'These files are preserved as canonical research inputs for v2+ work on: - subconscious association layer - stigmergic coordination layer - shakti/creative autonomy layer'
+  coordination_comment: Cite this archive for historical duplicate inputs; cite `specs/research/` for active research companion truth.
   levels:
     sematectonic:
       what_it_is: The document itself is the mark. Its existence, filename, location, and revision history attract or repel future work.
@@ -76,7 +76,7 @@ stigmergy:
       semantic_mark: Semantic weight, improvement prompts, related files, and provenance comments tell later agents how to use this document.
   trace_role: coordination_trace
 curation:
-  last_frontmatter_refresh: '2026-04-01T00:43:19+09:00'
+  last_frontmatter_refresh: '2026-05-10T02:33:00+08:00'
   curated_by_model: Codex (GPT-5)
   source_model_in_file: 
   future_model_handoffs:

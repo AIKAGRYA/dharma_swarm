@@ -38,7 +38,7 @@ improvement:
   - Add a concrete external launcher only when a human-approved Claude/tmux owner is chosen.
   - Keep the lane queue updated as bounded seams are completed.
   - Archive completed seams instead of letting this become a backlog dump.
-  next_review_at: '2026-04-04T12:00:00+09:00'
+  next_review_at: '2026-05-17T12:00:00+08:00'
 pkm:
   note_class: plan
   vault_path: docs/plans/2026-04-03-autonomous-cleanup-overnight-control.md
@@ -57,7 +57,7 @@ stigmergy:
   coordination_comment: Start here for any overnight autonomous repo-hygiene run that must stay out of the TUI hot lane.
   trace_role: coordination_trace
 curation:
-  last_frontmatter_refresh: '2026-04-03T20:45:00+09:00'
+  last_frontmatter_refresh: '2026-05-10T02:33:00+08:00'
   curated_by_model: Codex (GPT-5)
   future_model_handoffs:
   - GPT-5 Codex
@@ -126,10 +126,15 @@ Each cycle should do exactly one bounded seam:
 
 ## Current Best Queue
 
-1. finish any remaining `specs/` precedence ambiguities
+1. classify the remaining non-hot ambiguous `specs/` occupants that are still normative candidates
 2. tighten cross-indexes after the `program*` root seam settles
 3. continue report-family doctrine only where path coupling is already explicit
 4. stop when the next seam would require hot-lane interference or unbounded research
+
+## Recent Tranche Notes
+
+- 2026-05-08, run `20260402T163603Z`: completed the `specs/` prompt-and-completion residue tranche by removing the stale tracked copies of `PARALLEL_BUILD_AGENT_PROMPTS_2026-03-19.md`, `SOVEREIGN_BUILD_PHASE_MASTER_PROMPT_2026-03-19.md`, and `VERIFICATION_COMPLETE.md` from `specs/`. The authoritative prompt and archive copies remain under `docs/prompts/` and `docs/archive/`.
+- 2026-05-10, run `20260402T163603Z`: completed the `specs/` living-layers research duplicate tranche by removing the stale tracked `specs/research_living_layers/` copies. Active research companion truth remains under `specs/research/`; historical duplicate authority remains under `docs/archive/specs_research_living_layers/`.
 
 ## Required Output Per Cycle
 

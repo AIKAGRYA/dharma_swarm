@@ -81,10 +81,10 @@ cat <<'EOF'
 #   specs/GODEL_CLAW_V1_SPEC.md \
 #   specs/Dharma_Constitution_v0.md \
 #   specs/Dharma_Corpus_Schema.md \
-#   specs/research_living_layers/README.md \
-#   specs/research_living_layers/research_subconscious_ai.md \
-#   specs/research_living_layers/research_stigmergy_agents.md \
-#   specs/research_living_layers/research_shakti_creative_autonomy.md
+#   docs/archive/specs_research_living_layers/README.md \
+#   docs/archive/specs_research_living_layers/research_subconscious_ai.md \
+#   docs/archive/specs_research_living_layers/research_stigmergy_agents.md \
+#   docs/archive/specs_research_living_layers/research_shakti_creative_autonomy.md
 # git commit -m "docs+e2e: godel v1 report, living layers architecture, end-to-end checks"
 
 # Commit D: Optional ops/docs

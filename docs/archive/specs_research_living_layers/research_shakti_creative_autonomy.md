@@ -51,8 +51,8 @@ improvement:
   - Add implementation status per section so the spec separates aspiration from runtime truth.
   - Attach acceptance criteria or invariants that can be tested.
   - Link every major claim to the modules that implement or contradict it.
-  - Review whether this file should stay in `specs/research_living_layers` or be consolidated elsewhere.
-  next_review_at: '2026-04-01T00:43:19+09:00'
+  - Keep this archived input subordinate to the active `specs/research/` companion subtree.
+  next_review_at: '2026-05-17T12:00:00+08:00'
 pkm:
   note_class: spec
   vault_path: docs/archive/specs_research_living_layers/research_shakti_creative_autonomy.md
@@ -71,10 +71,10 @@ pkm:
   - exhaustive
   evergreen_potential: high
 stigmergy:
-  meaning: This file is a shared environmental trace in the DHARMA corpus. Its path, recency, and linked surfaces guide future agent attention; its frontmatter now adds machine-readable coordination cues.
-  state: canonical
+  meaning: This file is an archived duplicate research input retained for historical living-layers context, not a current specs occupant.
+  state: archive
   semantic_weight: 0.75
-  coordination_comment: 'SHAKTI LAYER: PROACTIVE CREATIVE AUTONOMY IN AI AGENT SYSTEMS Exhaustive Research Report for DHARMA SWARM Architecture'
+  coordination_comment: Use this as historical research evidence; use `specs/research/` for active specs research coordination.
   levels:
     sematectonic:
       what_it_is: The document itself is the mark. Its existence, filename, location, and revision history attract or repel future work.
@@ -84,7 +84,7 @@ stigmergy:
       semantic_mark: Semantic weight, improvement prompts, related files, and provenance comments tell later agents how to use this document.
   trace_role: constraint_and_design_trace
 curation:
-  last_frontmatter_refresh: '2026-04-01T00:43:19+09:00'
+  last_frontmatter_refresh: '2026-05-10T02:33:00+08:00'
   curated_by_model: Codex (GPT-5)
   source_model_in_file: 
   future_model_handoffs:
