@@ -8,7 +8,7 @@ Searches for public signals of AI-heavy codebases that lack governance:
     - Open-source projects with agent integrations but no eval framework
 
 Rule: NO AUTONOMOUS SPAM. This script scouts and qualifies targets.
-All outreach requires explicit human approval via EconomicSpine.approve_outreach().
+All outreach requires explicit human approval via RevenueSpine.approve_outreach().
 
 Usage::
 
@@ -41,7 +41,7 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(_REPO_ROOT))
 
 from dharma_swarm.revenue.spine import (
-    EconomicSpine,
+    RevenueSpine,
     RevenueTarget,
     TargetStatus,
 )
@@ -258,7 +258,7 @@ def main() -> None:
                         help="Print targets without saving to spine")
     args = parser.parse_args()
 
-    spine = EconomicSpine()
+    spine = RevenueSpine()
 
     if args.qualify:
         scouted = spine.list_targets(status=TargetStatus.SCOUTED)

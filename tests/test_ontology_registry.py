@@ -78,17 +78,20 @@ def populated_registry(registry: OntologyRegistry) -> OntologyRegistry:
 class TestRegistryFactory:
     def test_create_dharma_registry(self, registry: OntologyRegistry) -> None:
         stats = registry.stats()
-        assert stats["registered_types"] == 15  # 8 original + 6 metabolic + 1 custodian type
+        assert stats["registered_types"] == 21  # 16 core + 5 revenue
         assert stats["registered_links"] >= 40  # 12+8 defs, each with inverse
         assert stats["registered_actions"] >= 16
 
     def test_all_type_names(self, registry: OntologyRegistry) -> None:
         names = registry.type_names()
         expected = [
-            "ActionProposal", "AgentIdentity", "Contribution",
-            "CustodianRole", "EvolutionEntry", "Experiment", "GateDecisionRecord",
+            "ActionProposal", "AgentIdentity", "ComputeReinvestment",
+            "Contribution", "CustodianRole", "EvolutionEntry",
+            "ExecutionLease", "Experiment", "GateDecisionRecord",
             "KnowledgeArtifact", "Outcome", "Paper", "ResearchThread",
-            "TypedTask", "ValueEvent", "VentureCell", "WitnessLog",
+            "RevenueEngagement", "RevenueOffer", "RevenueOutreachDraft",
+            "RevenueTarget", "TypedTask", "ValueEvent", "VentureCell",
+            "WitnessLog",
         ]
         assert names == expected
 
@@ -606,3 +609,101 @@ class TestDharmicExtensions:
             if a.telos_gates
         ]
         assert len(gated_actions) >= 5
+
+
+class TestRevenueOntologyTypes:
+    """Validate revenue pipeline types are registered and well-formed."""
+
+    REVENUE_TYPE_NAMES = [
+        "RevenueTarget", "RevenueOffer", "RevenueOutreachDraft",
+        "RevenueEngagement", "ComputeReinvestment",
+    ]
+
+    def test_all_revenue_types_registered(self, registry: OntologyRegistry) -> None:
+        for name in self.REVENUE_TYPE_NAMES:
+            assert registry.get_type(name) is not None, f"{name} not registered"
+
+    def test_revenue_target_properties(self, registry: OntologyRegistry) -> None:
+        rt = registry.get_type("RevenueTarget")
+        assert "name" in rt.properties
+        assert "status" in rt.properties
+        assert "qualification_score" in rt.properties
+        assert "spine_ref" in rt.properties
+
+    def test_revenue_engagement_has_contracted_value(self, registry: OntologyRegistry) -> None:
+        eng = registry.get_type("RevenueEngagement")
+        assert "contracted_value_usd" in eng.properties
+        assert eng.properties["contracted_value_usd"].required is True
+
+    def test_outreach_has_approval_gate(self, registry: OntologyRegistry) -> None:
+        od = registry.get_type("RevenueOutreachDraft")
+        approve = next((a for a in od.actions if a.name == "Approve"), None)
+        assert approve is not None
+        assert "AHIMSA" in approve.telos_gates
+
+    def test_action_proposal_accepts_revenue_type(self, registry: OntologyRegistry) -> None:
+        ap = registry.get_type("ActionProposal")
+        at_prop = ap.properties["action_type"]
+        assert "revenue" in at_prop.enum_values
+
+    def test_outcome_has_revenue_fields(self, registry: OntologyRegistry) -> None:
+        outcome = registry.get_type("Outcome")
+        assert "outcome_kind" in outcome.properties
+        assert "economic_amount_usd" in outcome.properties
+        assert "revenue" in outcome.properties["outcome_kind"].enum_values
+
+    def test_value_event_has_revenue_fields(self, registry: OntologyRegistry) -> None:
+        ve = registry.get_type("ValueEvent")
+        assert "value_kind" in ve.properties
+        assert "economic_value_usd" in ve.properties
+        assert "paid_revenue" in ve.properties["value_kind"].enum_values
+
+    def test_contribution_has_revenue_fields(self, registry: OntologyRegistry) -> None:
+        c = registry.get_type("Contribution")
+        assert "beneficiary_type" in c.properties
+        assert "revenue_ref" in c.properties
+
+    def test_revenue_links_registered(self, registry: OntologyRegistry) -> None:
+        link = registry.get_link_def("RevenueTarget", "has_offer")
+        assert link is not None
+        assert link.target_type == "RevenueOffer"
+
+    def test_engagement_to_outcome_link(self, registry: OntologyRegistry) -> None:
+        link = registry.get_link_def("RevenueEngagement", "engagement_outcome")
+        assert link is not None
+        assert link.target_type == "Outcome"
+
+    def test_engagement_to_reinvestment_link(self, registry: OntologyRegistry) -> None:
+        link = registry.get_link_def("RevenueEngagement", "engagement_reinvestment")
+        assert link is not None
+        assert link.target_type == "ComputeReinvestment"
+
+    def test_revenue_types_are_mahalakshmi(self, registry: OntologyRegistry) -> None:
+        for name in ["RevenueTarget", "RevenueOffer", "RevenueEngagement",
+                      "ComputeReinvestment"]:
+            t = registry.get_type(name)
+            assert t.shakti_energy == ShaktiEnergy.MAHALAKSHMI
+
+    def test_outreach_is_maheshwari(self, registry: OntologyRegistry) -> None:
+        od = registry.get_type("RevenueOutreachDraft")
+        assert od.shakti_energy == ShaktiEnergy.MAHESHWARI
+
+    def test_create_revenue_target_object(self, registry: OntologyRegistry) -> None:
+        obj, errors = registry.create_object("RevenueTarget", {
+            "name": "acme/widgets",
+            "source": "github_scout",
+            "status": "scouted",
+            "qualification_score": 0.75,
+        })
+        assert obj is not None, f"Creation failed: {errors}"
+        assert obj.type_name == "RevenueTarget"
+
+    def test_create_engagement_object(self, registry: OntologyRegistry) -> None:
+        obj, errors = registry.create_object("RevenueEngagement", {
+            "target_id": "tgt-001",
+            "offer_id": "off-001",
+            "status": "active",
+            "contracted_value_usd": 15000.0,
+        })
+        assert obj is not None, f"Creation failed: {errors}"
+        assert obj.properties["contracted_value_usd"] == 15000.0

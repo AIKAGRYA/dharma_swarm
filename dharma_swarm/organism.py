@@ -264,9 +264,7 @@ class Organism:
             logger.warning("EconomicEngine init failed: %s", exc)
 
         try:
-            from dharma_swarm.revenue.spine import (
-                EconomicSpine as RevenueSpine,
-            )
+            from dharma_swarm.revenue.spine import RevenueSpine
             self.revenue_spine = RevenueSpine()
             logger.info("Revenue pipeline initialized")
         except Exception as exc:

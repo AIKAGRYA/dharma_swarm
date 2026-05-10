@@ -33,7 +33,7 @@ from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
-_SPINE_DIR = Path.home() / ".dharma" / "economic_spine"
+_SPINE_DIR = Path.home() / ".dharma" / "revenue_spine"
 
 
 def _utc_now_iso() -> str:

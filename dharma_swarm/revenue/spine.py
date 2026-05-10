@@ -1,6 +1,6 @@
-"""Economic Spine — Revenue pipeline ledger for dharma_swarm.
+"""Revenue Spine — Revenue pipeline ledger for dharma_swarm.
 
-The ``EconomicSpine`` class manages the full revenue lifecycle.
+The ``RevenueSpine`` class manages the full revenue lifecycle.
 Models and enums live in ``spine_models.py``.
 """
 
@@ -32,7 +32,8 @@ logger = logging.getLogger(__name__)
 # Re-export models so callers can do ``from .spine import RevenueTarget``
 __all__ = [
     "ComputeReinvestment",
-    "EconomicSpine",
+    "RevenueSpine",
+    "EconomicSpine",  # backward compat alias
     "Engagement",
     "EngagementStatus",
     "Offer",
@@ -45,15 +46,15 @@ __all__ = [
 ]
 
 
-class EconomicSpine:
+class RevenueSpine:
     """Revenue pipeline ledger.
 
-    Persists all pipeline state to ``~/.dharma/economic_spine/`` as JSONL files.
+    Persists all pipeline state to ``~/.dharma/revenue_spine/`` as JSONL files.
     Each entity type gets its own append-only ledger file.
 
     Usage::
 
-        spine = EconomicSpine()
+        spine = RevenueSpine()
 
         # Scout a target
         target = spine.add_target(RevenueTarget(name="Acme Corp", ...))
@@ -415,3 +416,8 @@ class EconomicSpine:
                     continue
         except OSError:
             pass
+
+
+# Backward-compat alias — the codex spec renamed this to avoid
+# collision with the internal dharma_swarm/economic_spine.py class.
+EconomicSpine = RevenueSpine

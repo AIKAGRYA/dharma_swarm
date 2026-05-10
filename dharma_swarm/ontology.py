@@ -848,6 +848,8 @@ class OntologyRegistry:
             registry.register_link(link_def)
         for link_def in _METABOLIC_LINKS:
             registry.register_link(link_def)
+        for link_def in _REVENUE_LINKS:
+            registry.register_link(link_def)
         return registry
 
 
@@ -1246,7 +1248,8 @@ _ACTION_PROPOSAL = ObjectType(
         "action_type": PropertyDef(name="action_type", property_type=PropertyType.ENUM,
                                    enum_values=["dispatch", "fan_out", "pipeline",
                                                "evolution", "manual",
-                                               "agent_runner"],
+                                               "agent_runner",
+                                               "revenue"],
                                    description="How this action entered the system"),
         "title": PropertyDef(name="title", property_type=PropertyType.STRING,
                              required=True, searchable=True),
@@ -1363,6 +1366,14 @@ _OUTCOME = ObjectType(
         "duration_ms": PropertyDef(name="duration_ms", property_type=PropertyType.FLOAT),
         "fitness_score": PropertyDef(name="fitness_score", property_type=PropertyType.FLOAT,
                                      description="Behavioral fitness from MetricsAnalyzer"),
+        "outcome_kind": PropertyDef(name="outcome_kind", property_type=PropertyType.ENUM,
+                                    enum_values=["task", "revenue", "evolution", "governance"],
+                                    description="Domain of this outcome"),
+        "economic_amount_usd": PropertyDef(name="economic_amount_usd",
+                                           property_type=PropertyType.FLOAT,
+                                           description="USD value if revenue outcome"),
+        "external_ref": PropertyDef(name="external_ref", property_type=PropertyType.STRING,
+                                    description="External reference (engagement ID, invoice, etc.)"),
     },
     actions=[
         ActionDef(name="Record", object_type="Outcome",
@@ -1400,6 +1411,15 @@ _VALUE_EVENT = ObjectType(
                                         description="0.4*behavioral + 0.4*success + 0.2*duration"),
         "scoring_method": PropertyDef(name="scoring_method", property_type=PropertyType.STRING,
                                        description="Algorithm version used for scoring"),
+        "value_kind": PropertyDef(name="value_kind", property_type=PropertyType.ENUM,
+                                  enum_values=["task", "paid_revenue", "contracted_revenue",
+                                              "compute_reinvestment", "governance"],
+                                  description="Domain of this value event"),
+        "economic_value_usd": PropertyDef(name="economic_value_usd",
+                                          property_type=PropertyType.FLOAT,
+                                          description="USD value for revenue events"),
+        "revenue_source": PropertyDef(name="revenue_source", property_type=PropertyType.STRING,
+                                      description="Source of revenue (engagement ID, etc.)"),
     },
     actions=[
         ActionDef(name="Record", object_type="ValueEvent",
@@ -1430,6 +1450,11 @@ _CONTRIBUTION = ObjectType(
         "attributed_value": PropertyDef(name="attributed_value", property_type=PropertyType.FLOAT,
                                          required=True,
                                          description="composite_value * credit_share — what routing reads"),
+        "beneficiary_type": PropertyDef(name="beneficiary_type", property_type=PropertyType.ENUM,
+                                        enum_values=["agent", "compute", "training", "operator"],
+                                        description="Who/what receives the credit"),
+        "revenue_ref": PropertyDef(name="revenue_ref", property_type=PropertyType.STRING,
+                                   description="RevenueSpine engagement/payment ID"),
     },
     actions=[
         ActionDef(name="Record", object_type="Contribution",
@@ -1483,6 +1508,170 @@ _VENTURE_CELL = ObjectType(
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# REVENUE PIPELINE TYPES — Ontology-native revenue objects
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+_REVENUE_TARGET = ObjectType(
+    name="RevenueTarget",
+    description="A potential buyer/opportunity identified by scouting",
+    properties={
+        "name": PropertyDef(name="name", property_type=PropertyType.STRING,
+                            required=True, searchable=True),
+        "source": PropertyDef(name="source", property_type=PropertyType.ENUM,
+                              enum_values=["github_scout", "intel_parse", "referral",
+                                          "inbound", "manual"]),
+        "status": PropertyDef(name="status", property_type=PropertyType.ENUM,
+                              enum_values=["scouted", "qualified", "disqualified",
+                                          "outreach_drafted", "outreach_approved",
+                                          "outreach_sent", "engaged", "closed_won",
+                                          "closed_lost"]),
+        "qualification_score": PropertyDef(name="qualification_score",
+                                           property_type=PropertyType.FLOAT),
+        "pain_signals": PropertyDef(name="pain_signals", property_type=PropertyType.DICT,
+                                    description="Detected governance gaps / AI slop signals"),
+        "spine_ref": PropertyDef(name="spine_ref", property_type=PropertyType.STRING,
+                                 description="RevenueSpine target ID"),
+    },
+    actions=[
+        ActionDef(name="Scout", object_type="RevenueTarget",
+                  description="Create from scouting",
+                  telos_gates=["SATYA"]),
+        ActionDef(name="Qualify", object_type="RevenueTarget",
+                  description="Qualify after intelligence gathering",
+                  modifies=["status", "qualification_score"],
+                  telos_gates=["SATYA", "ANEKANTA"]),
+    ],
+    security=SecurityPolicy(audit_all=True),
+    telos_alignment=0.8,
+    shakti_energy=ShaktiEnergy.MAHALAKSHMI,
+    icon="🎯",
+)
+
+_REVENUE_OFFER = ObjectType(
+    name="RevenueOffer",
+    description="A packaged service offering mapped to target pain",
+    properties={
+        "title": PropertyDef(name="title", property_type=PropertyType.STRING,
+                             required=True, searchable=True),
+        "offer_type": PropertyDef(name="offer_type", property_type=PropertyType.ENUM,
+                                  enum_values=["code_governance_sprint",
+                                              "agent_audit", "custom"]),
+        "price_range_low_usd": PropertyDef(name="price_range_low_usd",
+                                           property_type=PropertyType.FLOAT),
+        "price_range_high_usd": PropertyDef(name="price_range_high_usd",
+                                            property_type=PropertyType.FLOAT),
+        "scope_summary": PropertyDef(name="scope_summary", property_type=PropertyType.TEXT),
+        "deliverables": PropertyDef(name="deliverables", property_type=PropertyType.LIST),
+    },
+    actions=[
+        ActionDef(name="Register", object_type="RevenueOffer",
+                  description="Register a new offer"),
+    ],
+    security=SecurityPolicy(audit_all=True),
+    telos_alignment=0.85,
+    shakti_energy=ShaktiEnergy.MAHALAKSHMI,
+    icon="📋",
+)
+
+_REVENUE_OUTREACH = ObjectType(
+    name="RevenueOutreachDraft",
+    description="A drafted outreach message awaiting human approval — NO autonomous send",
+    properties={
+        "target_id": PropertyDef(name="target_id", property_type=PropertyType.STRING,
+                                 required=True, immutable=True),
+        "offer_id": PropertyDef(name="offer_id", property_type=PropertyType.STRING,
+                                required=True, immutable=True),
+        "channel": PropertyDef(name="channel", property_type=PropertyType.ENUM,
+                               enum_values=["email", "github", "twitter",
+                                           "linkedin", "discord", "direct"]),
+        "subject": PropertyDef(name="subject", property_type=PropertyType.STRING),
+        "body": PropertyDef(name="body", property_type=PropertyType.TEXT),
+        "approved": PropertyDef(name="approved", property_type=PropertyType.BOOLEAN),
+        "approved_by": PropertyDef(name="approved_by", property_type=PropertyType.STRING,
+                                   description="Human approver name — required before send"),
+    },
+    actions=[
+        ActionDef(name="Draft", object_type="RevenueOutreachDraft",
+                  description="Draft outreach (not sent)",
+                  telos_gates=["AHIMSA", "SATYA"]),
+        ActionDef(name="Approve", object_type="RevenueOutreachDraft",
+                  description="Human approves for sending",
+                  modifies=["approved", "approved_by"],
+                  telos_gates=["AHIMSA", "SATYA", "APARIGRAHA"]),
+    ],
+    security=SecurityPolicy(
+        write_roles=["operator", "system"],
+        audit_all=True,
+    ),
+    telos_alignment=0.95,
+    shakti_energy=ShaktiEnergy.MAHESHWARI,
+    icon="✉",
+)
+
+_REVENUE_ENGAGEMENT = ObjectType(
+    name="RevenueEngagement",
+    description="An active paid engagement with a target",
+    properties={
+        "target_id": PropertyDef(name="target_id", property_type=PropertyType.STRING,
+                                 required=True, immutable=True),
+        "offer_id": PropertyDef(name="offer_id", property_type=PropertyType.STRING,
+                                required=True, immutable=True),
+        "status": PropertyDef(name="status", property_type=PropertyType.ENUM,
+                              enum_values=["active", "completed", "cancelled"],
+                              required=True),
+        "contracted_value_usd": PropertyDef(name="contracted_value_usd",
+                                            property_type=PropertyType.FLOAT, required=True),
+        "paid_usd": PropertyDef(name="paid_usd", property_type=PropertyType.FLOAT),
+        "spine_ref": PropertyDef(name="spine_ref", property_type=PropertyType.STRING,
+                                 description="RevenueSpine engagement ID"),
+    },
+    actions=[
+        ActionDef(name="Create", object_type="RevenueEngagement",
+                  description="Create engagement from approved outreach",
+                  telos_gates=["SATYA", "AHIMSA", "APARIGRAHA"]),
+        ActionDef(name="RecordPayment", object_type="RevenueEngagement",
+                  description="Record payment received",
+                  modifies=["paid_usd", "status"],
+                  telos_gates=["SATYA"]),
+    ],
+    security=SecurityPolicy(
+        write_roles=["operator", "system"],
+        audit_all=True,
+    ),
+    telos_alignment=0.9,
+    shakti_energy=ShaktiEnergy.MAHALAKSHMI,
+    icon="💰",
+)
+
+_REVENUE_REINVESTMENT = ObjectType(
+    name="ComputeReinvestment",
+    description="Reinvestment of revenue into compute, training, or infrastructure",
+    properties={
+        "engagement_id": PropertyDef(name="engagement_id", property_type=PropertyType.STRING,
+                                     required=True, immutable=True),
+        "amount_usd": PropertyDef(name="amount_usd", property_type=PropertyType.FLOAT,
+                                  required=True),
+        "category": PropertyDef(name="category", property_type=PropertyType.ENUM,
+                                enum_values=["training", "inference", "infrastructure",
+                                            "research", "operations"]),
+        "provider": PropertyDef(name="provider", property_type=PropertyType.STRING,
+                                description="Compute provider (runpod, lambda, etc.)"),
+        "spine_ref": PropertyDef(name="spine_ref", property_type=PropertyType.STRING,
+                                 description="RevenueSpine reinvestment ID"),
+    },
+    actions=[
+        ActionDef(name="Reinvest", object_type="ComputeReinvestment",
+                  description="Record compute reinvestment",
+                  telos_gates=["APARIGRAHA", "SATYA"]),
+    ],
+    security=SecurityPolicy(audit_all=True),
+    telos_alignment=0.9,
+    shakti_energy=ShaktiEnergy.MAHALAKSHMI,
+    icon="⚡",
+)
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # METABOLIC LOOP LINKS — Connecting proposals, gates, outcomes
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -1526,12 +1715,41 @@ _METABOLIC_LINKS: list[LinkDef] = [
             description="Credit attributions from this value event"),
 ]
 
+_REVENUE_LINKS: list[LinkDef] = [
+    LinkDef(name="has_offer", source_type="RevenueTarget",
+            target_type="RevenueOffer", cardinality=LinkCardinality.MANY_TO_ONE,
+            inverse_name="offer_targets",
+            description="Offer mapped to this target"),
+    LinkDef(name="has_outreach", source_type="RevenueTarget",
+            target_type="RevenueOutreachDraft", cardinality=LinkCardinality.ONE_TO_MANY,
+            inverse_name="outreach_target",
+            description="Outreach drafts for this target"),
+    LinkDef(name="has_engagement", source_type="RevenueTarget",
+            target_type="RevenueEngagement", cardinality=LinkCardinality.ONE_TO_MANY,
+            inverse_name="engagement_target",
+            description="Engagements with this target"),
+    LinkDef(name="engagement_outcome", source_type="RevenueEngagement",
+            target_type="Outcome", cardinality=LinkCardinality.ONE_TO_MANY,
+            inverse_name="outcome_engagement",
+            description="Outcomes from this engagement"),
+    LinkDef(name="engagement_reinvestment", source_type="RevenueEngagement",
+            target_type="ComputeReinvestment", cardinality=LinkCardinality.ONE_TO_MANY,
+            inverse_name="reinvestment_engagement",
+            description="Reinvestments funded by this engagement"),
+    LinkDef(name="revenue_proposal", source_type="RevenueEngagement",
+            target_type="ActionProposal", cardinality=LinkCardinality.ONE_TO_MANY,
+            inverse_name="proposal_engagement",
+            description="Action proposals generated for this engagement"),
+]
+
 
 _DOMAIN_TYPES: list[ObjectType] = [
     _RESEARCH_THREAD, _EXPERIMENT, _PAPER, _AGENT_IDENTITY, _CUSTODIAN_ROLE,
     _KNOWLEDGE_ARTIFACT, _TYPED_TASK, _EVOLUTION_ENTRY, _WITNESS_LOG,
     _ACTION_PROPOSAL, _GATE_DECISION_TYPE, _EXECUTION_LEASE, _OUTCOME, _VALUE_EVENT,
     _CONTRIBUTION, _VENTURE_CELL,
+    _REVENUE_TARGET, _REVENUE_OFFER, _REVENUE_OUTREACH, _REVENUE_ENGAGEMENT,
+    _REVENUE_REINVESTMENT,
 ]
 
 

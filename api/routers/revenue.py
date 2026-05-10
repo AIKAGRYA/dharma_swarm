@@ -12,7 +12,7 @@ router = APIRouter(prefix="/api/revenue", tags=["revenue"])
 
 
 def _get_spine():  # type: ignore[return]
-    from dharma_swarm.revenue.spine import EconomicSpine as RevenueSpine
+    from dharma_swarm.revenue.spine import RevenueSpine
     return RevenueSpine()
 
 

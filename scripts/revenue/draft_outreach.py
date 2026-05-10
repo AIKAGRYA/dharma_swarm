@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Outreach drafter — generates personalized outreach for qualified targets.
 
-Takes qualified RevenueTargets from the EconomicSpine and drafts outreach
+Takes qualified RevenueTargets from the RevenueSpine and drafts outreach
 messages tailored to each target's pain signals and context.
 
 Rule: NO AUTONOMOUS SPAM. This script only drafts. Every message must be
@@ -34,7 +34,7 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(_REPO_ROOT))
 
 from dharma_swarm.revenue.spine import (
-    EconomicSpine,
+    RevenueSpine,
     Offer,
     OutreachChannel,
     OutreachDraft,
@@ -131,7 +131,7 @@ dharma_swarm — Governed AI agent infrastructure"""
 
 
 def draft_for_target(
-    spine: EconomicSpine,
+    spine: RevenueSpine,
     target: RevenueTarget,
     offer: Offer | None = None,
     channel: OutreachChannel = OutreachChannel.EMAIL,
@@ -153,7 +153,7 @@ def draft_for_target(
     return draft
 
 
-def draft_all_qualified(spine: EconomicSpine) -> list[OutreachDraft]:
+def draft_all_qualified(spine: RevenueSpine) -> list[OutreachDraft]:
     """Draft outreach for all qualified targets without existing drafts."""
     qualified = spine.list_targets(status=TargetStatus.QUALIFIED)
     existing_target_ids = {d.target_id for d in spine.pending_outreach()}
@@ -187,7 +187,7 @@ def main() -> None:
                         help="Outreach channel")
     args = parser.parse_args()
 
-    spine = EconomicSpine()
+    spine = RevenueSpine()
 
     if args.list_pending:
         pending = spine.pending_outreach()

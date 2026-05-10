@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import pytest
 
-from dharma_swarm.revenue.spine import EconomicSpine, RevenueTarget, TargetStatus
+from dharma_swarm.revenue.spine import RevenueSpine, RevenueTarget, TargetStatus
 from dharma_swarm.revenue.intelligence import RevenueIntelligenceIngestor
 from dharma_swarm.revenue.scout_daemon import (
     RevenueScoutDaemon,
@@ -19,7 +19,7 @@ from dharma_swarm.revenue.scout_daemon import (
 
 @pytest.fixture()
 def daemon(tmp_path: Path) -> RevenueScoutDaemon:
-    spine = EconomicSpine(storage_dir=tmp_path / "spine")
+    spine = RevenueSpine(storage_dir=tmp_path / "spine")
     ingestor = RevenueIntelligenceIngestor(storage_dir=tmp_path / "intel")
     return RevenueScoutDaemon(
         spine=spine,

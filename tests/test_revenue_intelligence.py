@@ -124,8 +124,8 @@ class TestIngestor:
         assert len(summary["revenue_patterns"]) > 0
 
     def test_route_to_spine(self, ingestor: RevenueIntelligenceIngestor, tmp_path: Path) -> None:
-        from dharma_swarm.revenue.spine import EconomicSpine
-        spine = EconomicSpine(storage_dir=tmp_path / "spine")
+        from dharma_swarm.revenue.spine import RevenueSpine
+        spine = RevenueSpine(storage_dir=tmp_path / "spine")
         ingestor.ingest_text(SAMPLE_INTEL, title="Test")
         created = ingestor.route_to_spine(spine)
         assert created > 0

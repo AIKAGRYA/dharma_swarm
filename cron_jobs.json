@@ -254,6 +254,6 @@
     "min_qualification_score": 0.3,
     "max_targets_per_cycle": 10,
     "enabled": true,
-    "prompt": "Revenue scout cycle — execution handled by revenue_scout handler. Scouts GitHub for repos with AI governance gaps, ingests competitive intelligence from ~/.dharma/revenue_intel/inbox/, parses claims and patterns, routes qualified targets to the EconomicSpine, and drafts outreach (human approval required before send). Results logged to ~/.dharma/revenue_scout/cycle_log.jsonl. Stigmergy marks left on strategy channel."
+    "prompt": "Revenue scout cycle — execution handled by revenue_scout handler. Scouts GitHub for repos with AI governance gaps, ingests competitive intelligence from ~/.dharma/revenue_intel/inbox/, parses claims and patterns, routes qualified targets to the RevenueSpine, and drafts outreach (human approval required before send). Results logged to ~/.dharma/revenue_scout/cycle_log.jsonl. Stigmergy marks left on strategy channel."
   }
 ]

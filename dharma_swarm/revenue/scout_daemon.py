@@ -5,7 +5,7 @@ Runs on cron or triggered by stigmergy signals. The full loop:
     1. SCOUT  — search GitHub for repos with AI governance gaps
     2. INGEST — pull competitive intelligence from configured sources
     3. PARSE  — extract structured claims, competitor profiles, revenue patterns
-    4. ROUTE  — feed qualified targets + patterns into the EconomicSpine
+    4. ROUTE  — feed qualified targets + patterns into the RevenueSpine
     5. DRAFT  — generate outreach drafts for qualified targets (human-approved only)
     6. REPORT — log results to stigmergy + witness for the operator brief
 
@@ -34,7 +34,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from dharma_swarm.revenue.spine import (
-    EconomicSpine,
+    RevenueSpine,
     OutreachChannel,
     RevenueTarget,
     TargetStatus,
@@ -113,13 +113,13 @@ class RevenueScoutDaemon:
 
     def __init__(
         self,
-        spine: EconomicSpine | None = None,
+        spine: RevenueSpine | None = None,
         ingestor: RevenueIntelligenceIngestor | None = None,
         github_queries: list[str] | None = None,
         min_qualification_score: float = 0.3,
         max_targets_per_cycle: int = 10,
     ) -> None:
-        self._spine = spine or EconomicSpine()
+        self._spine = spine or RevenueSpine()
         self._ingestor = ingestor or RevenueIntelligenceIngestor()
         self._queries = github_queries or DEFAULT_GITHUB_QUERIES
         self._min_score = min_qualification_score

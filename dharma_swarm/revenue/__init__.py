@@ -7,6 +7,7 @@ and scout daemon for autonomous target scouting.
 from dharma_swarm.revenue.spine import (
     ComputeReinvestment,
     EconomicSpine,
+    RevenueSpine,
     Engagement,
     EngagementStatus,
     Offer,
@@ -29,6 +30,7 @@ from dharma_swarm.revenue.intelligence import (
 
 __all__ = [
     "ComputeReinvestment",
+    "RevenueSpine",
     "EconomicSpine",
     "Engagement",
     "EngagementStatus",
