@@ -10,10 +10,12 @@ Orchestrated cadence: every 600 s (ZEITGEIST_INTERVAL in orchestrate_live).
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
 import re
+import shlex
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
@@ -24,6 +26,12 @@ from pydantic import BaseModel, Field
 from dharma_swarm.models import _new_id, _utc_now
 
 logger = logging.getLogger(__name__)
+
+CLAUDE_SCAN_ENV = "DHARMA_ZEITGEIST_CLAUDE_SCAN"
+LLM_SCAN_CMD_ENV = "DHARMA_ZEITGEIST_LLM_CMD"
+LLM_SCAN_SOURCE_ENV = "DHARMA_ZEITGEIST_LLM_SOURCE"
+LLM_SCAN_TIMEOUT_ENV = "DHARMA_ZEITGEIST_LLM_TIMEOUT_S"
+CLAUDE_SCAN_TIMEOUT_S = 45
 
 
 # ---------------------------------------------------------------------------
@@ -134,8 +142,9 @@ class ZeitgeistScanner:
         local_signals = await self._scan_local()
         self._signals.extend(local_signals)
 
-        # Try claude scan if not in Claude Code session
-        if not os.environ.get("CLAUDECODE"):
+        # Try Claude scan only when explicitly enabled outside Claude Code,
+        # or when the opt-in env var deliberately forces a one-shot scan.
+        if os.environ.get(CLAUDE_SCAN_ENV) == "1" or not os.environ.get("CLAUDECODE"):
             try:
                 claude_signals = await self._scan_claude()
                 self._signals.extend(claude_signals)
@@ -383,13 +392,51 @@ class ZeitgeistScanner:
         return signals
 
     async def _scan_claude(self) -> list[ZeitgeistSignal]:
-        """Use ``claude -p`` for AI landscape scan.
+        """Use ``claude -p`` for an opt-in AI landscape scan."""
+        if os.environ.get(CLAUDE_SCAN_ENV) != "1":
+            return []
 
-        Currently a stub that returns no signals.  A real implementation
-        would invoke ``claude -p`` with a structured prompt and parse the
-        JSON response.
-        """
-        return []
+        prompt = (
+            "Return only compact JSON for DHARMA SWARM S4. Produce 3 current "
+            "frontier signals about agentic AI/autonomous coding agents, AI "
+            "governance, mech interp, or self-improving tool use. Schema: "
+            "{\"signals\":[{\"category\":\"competing_research|tool_release|"
+            "methodology|threat|opportunity\",\"title\":\"...\","
+            "\"relevance_score\":0.0,\"keywords\":[\"...\"],"
+            "\"description\":\"...\"}]}"
+        )
+
+        cmd = shlex.split(os.environ.get(LLM_SCAN_CMD_ENV, "claude -p"))
+        if "{prompt}" in cmd:
+            cmd = [prompt if part == "{prompt}" else part for part in cmd]
+        else:
+            cmd.append(prompt)
+
+        try:
+            timeout_s = float(os.environ.get(LLM_SCAN_TIMEOUT_ENV, CLAUDE_SCAN_TIMEOUT_S))
+        except ValueError:
+            timeout_s = CLAUDE_SCAN_TIMEOUT_S
+
+        def _run() -> subprocess.CompletedProcess[str]:
+            return subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=timeout_s,
+                check=False,
+            )
+
+        try:
+            proc = await asyncio.to_thread(_run)
+        except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
+            logger.debug("Claude scan unavailable: %s", exc)
+            return []
+
+        if proc.returncode != 0:
+            logger.debug("Claude scan failed: %s", proc.stderr.strip())
+            return []
+
+        return _parse_claude_signals(proc.stdout)
 
     # -- persistence --------------------------------------------------------
 
@@ -437,3 +484,78 @@ class ZeitgeistScanner:
     def clear(self) -> None:
         """Reset in-memory signal list (does not delete persisted files)."""
         self._signals = []
+
+
+def _parse_claude_signals(raw: str) -> list[ZeitgeistSignal]:
+    """Parse the opt-in Claude scanner JSON payload."""
+    text = raw.strip()
+    if not text:
+        return []
+
+    if not text.startswith(("{", "[")):
+        for line in reversed(text.splitlines()):
+            candidate = line.strip()
+            if candidate.startswith(("{", "[")) and _loads_signal_payload(candidate) is not None:
+                text = candidate
+                break
+        else:
+            match = re.search(r"(\{.*\}|\[.*\])", text, flags=re.S)
+            if not match:
+                return []
+            text = match.group(1)
+
+    payload = _loads_signal_payload(text)
+    if payload is None:
+        return []
+
+    rows = payload.get("signals", payload) if isinstance(payload, dict) else payload
+    if not isinstance(rows, list):
+        return []
+
+    signals: list[ZeitgeistSignal] = []
+    allowed_categories = {
+        "competing_research",
+        "tool_release",
+        "methodology",
+        "threat",
+        "opportunity",
+    }
+    for row in rows[:5]:
+        if not isinstance(row, dict):
+            continue
+        category = str(row.get("category") or "methodology").strip()
+        if category not in allowed_categories:
+            category = "methodology"
+        title = str(row.get("title") or "").strip()
+        if not title:
+            continue
+        try:
+            relevance = float(row.get("relevance_score", 0.0))
+        except (TypeError, ValueError):
+            relevance = 0.0
+        keywords_raw = row.get("keywords", [])
+        keywords = [str(k).strip() for k in keywords_raw if str(k).strip()] if isinstance(keywords_raw, list) else []
+        signals.append(
+            ZeitgeistSignal(
+                source=os.environ.get(LLM_SCAN_SOURCE_ENV, "claude_scan"),
+                category=category,
+                title=title[:140],
+                relevance_score=max(0.0, min(1.0, relevance)),
+                keywords=keywords[:8],
+                description=str(row.get("description") or "").strip()[:800],
+            )
+        )
+    return signals
+
+
+def _loads_signal_payload(text: str) -> Any | None:
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError as exc:
+        logger.debug("Claude scan JSON parse failed: %s", exc)
+        return None
+    if isinstance(payload, list):
+        return payload
+    if isinstance(payload, dict) and "signals" in payload:
+        return payload
+    return None

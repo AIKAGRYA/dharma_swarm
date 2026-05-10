@@ -16,6 +16,7 @@ from dharma_swarm.zeitgeist import (
     THREAT_KEYWORDS,
     ZeitgeistScanner,
     ZeitgeistSignal,
+    _parse_claude_signals,
 )
 
 
@@ -97,6 +98,49 @@ class TestDetectThreats:
         text = "Normal research progress on transformer architecture."
         threats = scanner.detect_threats(text)
         assert threats == []
+
+
+# -- Claude scan parsing tests ---------------------------------------------
+
+
+class TestClaudeSignalParsing:
+    def test_parse_claude_signal_payload(self) -> None:
+        raw = json.dumps(
+            {
+                "signals": [
+                    {
+                        "category": "threat",
+                        "title": "Agent eval pressure is rising",
+                        "relevance_score": 0.9,
+                        "keywords": ["agentic AI", "governance"],
+                        "description": "Frontier agent systems need stronger action gates.",
+                    }
+                ]
+            }
+        )
+
+        signals = _parse_claude_signals(raw)
+
+        assert len(signals) == 1
+        assert signals[0].source == "claude_scan"
+        assert signals[0].category == "threat"
+        assert signals[0].relevance_score == 0.9
+
+    def test_parse_cli_transcript_uses_last_json_payload(self) -> None:
+        raw = "\n".join(
+            [
+                "user",
+                '{"signals":[{"category":"opportunity","title":"prompt echo"}]}',
+                "codex",
+                '{"signals":[{"category":"methodology","title":"parsed result","relevance_score":0.7}]}',
+            ]
+        )
+
+        signals = _parse_claude_signals(raw)
+
+        assert len(signals) == 1
+        assert signals[0].category == "methodology"
+        assert signals[0].title == "parsed result"
 
 
 # -- Local scan tests ------------------------------------------------------

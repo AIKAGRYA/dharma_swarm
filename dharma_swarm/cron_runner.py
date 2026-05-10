@@ -53,6 +53,44 @@ def _as_float(value: Any, default: float) -> float:
     return parsed if parsed > 0 else default
 
 
+def _run_system_map_populator(job: dict[str, Any]) -> CronJobExecutionResult:
+    """Refresh the canonical system map from the active source worktree."""
+
+    import subprocess
+
+    repo_root = Path(str(job.get("repo_root") or "/Users/dhyana/dharma_swarm"))
+    script = repo_root / "scripts" / "system_map_populator.py"
+    if not script.exists():
+        error = f"missing script: {script}"
+        return CronJobExecutionResult(
+            status=CronJobRunStatus.FAILED,
+            output=error,
+            error=error,
+        )
+    args = ["python3", str(script)]
+    audit_dir = str(job.get("audit_dir", "")).strip()
+    output = str(job.get("output", "")).strip()
+    if audit_dir:
+        args.extend(["--audit-dir", audit_dir])
+    if output:
+        args.extend(["--output", output])
+    proc = subprocess.run(
+        args,
+        capture_output=True,
+        text=True,
+        timeout=_as_int(job.get("timeout_sec"), 60),
+        cwd=str(repo_root),
+    )
+    output_text = (proc.stdout or "").strip()
+    err = (proc.stderr or "").strip()
+    status = CronJobRunStatus.COMPLETED if proc.returncode == 0 else CronJobRunStatus.FAILED
+    return CronJobExecutionResult(
+        status=status,
+        output=output_text or "(no output)",
+        error=err if proc.returncode != 0 else "",
+    )
+
+
 def _run_overnight_director(job: dict[str, Any]) -> CronJobExecutionResult:
     """Launch the overnight director as a long-running process."""
     import asyncio
@@ -426,6 +464,7 @@ def execute_cron_job(job: dict[str, Any]) -> CronJobExecutionResult:
         custodians       — custodian maintenance fleet (no quality re-scan)
         custodians_forge — custodian fleet + foreman quality re-scan
         opportunity_refill — seed staged frontier rows from opportunity board
+        system_map_populator — local system map refresh
     """
     handler = str(job.get("handler", "headless_prompt")).strip() or "headless_prompt"
 
@@ -450,6 +489,8 @@ def execute_cron_job(job: dict[str, Any]) -> CronJobExecutionResult:
         return _result_from_legacy(*custodians_forge_fn(job))
     if handler == "opportunity_refill":
         return _run_opportunity_refill(job)
+    if handler == "system_map_populator":
+        return _run_system_map_populator(job)
 
     if handler == "scout_sweep":
         return _run_scout_sweep(job)
