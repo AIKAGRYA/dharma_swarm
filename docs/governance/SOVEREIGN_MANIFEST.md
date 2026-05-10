@@ -62,7 +62,7 @@ These are the ground-truth metrics. All other documents citing different numbers
 
 | Metric | Value | Verification |
 |--------|-------|-------------|
-| Total Python modules | **560** | find dharma_swarm -name "*.py" -type f |
+| Total Python modules | **561** | find dharma_swarm -name "*.py" -type f |
 | Top-level (flat) modules | **385 (68.9%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
 | Total Python LOC | **249,733** | wc -l across dharma_swarm Python modules |
 | Test files | **565** | find tests -name "*.py" -type f |
