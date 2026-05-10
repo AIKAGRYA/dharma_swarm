@@ -255,5 +255,28 @@
     "max_targets_per_cycle": 10,
     "enabled": true,
     "prompt": "Revenue scout cycle — execution handled by revenue_scout handler. Scouts GitHub for repos with AI governance gaps, ingests competitive intelligence from ~/.dharma/revenue_intel/inbox/, parses claims and patterns, routes qualified targets to the RevenueSpine, and drafts outreach (human approval required before send). Results logged to ~/.dharma/revenue_scout/cycle_log.jsonl. Stigmergy marks left on strategy channel."
+  },
+  {
+    "id": "frontier_refill",
+    "name": "Opportunity Frontier Refill",
+    "trigger": "cron",
+    "schedule": {
+      "hour": 4,
+      "minute": 30
+    },
+    "handler": "frontier_refill",
+    "top_k": 3,
+    "min_telos_alignment": 0.5,
+    "enabled": true,
+    "prompt": "Promote top opportunity_board.json rows into frontier_tasks_pending.jsonl for the live swarm loop to drain."
+  },
+  {
+    "id": "store_sync",
+    "name": "Ontology Runtime Store Sync",
+    "trigger": "interval",
+    "interval_seconds": 1800,
+    "handler": "store_sync",
+    "enabled": true,
+    "prompt": "Materialize ontology Outcome objects into runtime ArtifactRecords."
   }
 ]

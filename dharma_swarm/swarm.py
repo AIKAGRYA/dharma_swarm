@@ -3058,7 +3058,7 @@ class SwarmManager:
         from dharma_swarm.runtime_state import RuntimeStateStore, MemoryFact
         from uuid import uuid4
 
-        store = RuntimeStateStore(db_path=self.state_dir / "db" / "runtime.db")
+        store = RuntimeStateStore(db_path=self.state_dir / "state" / "runtime.db")
         await store.init_db()
 
         now = datetime.now(timezone.utc)

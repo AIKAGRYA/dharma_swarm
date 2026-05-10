@@ -23,6 +23,7 @@ Systems run concurrently:
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import signal
@@ -70,6 +71,75 @@ def _log(system: str, msg: str) -> None:
     line = f"[{ts}] [{system}] {msg}"
     print(line, flush=True)
     logger.info("[%s] %s", system, msg)
+
+
+async def _drain_frontier_queue(board: Any, *, limit: int = 20) -> int:
+    """Promote rows from frontier_tasks_pending.jsonl into the TaskBoard.
+
+    BR-002 closure: this is the edge that connects opportunity_refill output
+    to the swarm's task dispatch path. Each promoted row carries opportunity_id
+    in metadata so telic_seam.record_outcome can feed results back to the board.
+    """
+    frontier_path = STATE_DIR / "meta" / "frontier_tasks_pending.jsonl"
+    if not frontier_path.exists():
+        return 0
+    try:
+        lines = frontier_path.read_text(encoding="utf-8").strip().splitlines()
+    except OSError:
+        return 0
+    if not lines:
+        return 0
+    from dharma_swarm.models import TaskPriority
+
+    init_db = getattr(board, "init_db", None)
+    if callable(init_db):
+        try:
+            await init_db()
+        except Exception:
+            logger.debug("Frontier task board init failed", exc_info=True)
+            return 0
+
+    promoted = 0
+    remaining: list[str] = []
+    for line in lines:
+        if promoted >= limit:
+            remaining.append(line)
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        raw_priority = row.get("priority", TaskPriority.NORMAL)
+        try:
+            priority = (
+                raw_priority
+                if isinstance(raw_priority, TaskPriority)
+                else TaskPriority(str(raw_priority).lower())
+            )
+        except ValueError:
+            priority = TaskPriority.NORMAL
+        try:
+            await board.create(
+                title=row.get("title", "frontier task"),
+                description=row.get("description", ""),
+                priority=priority,
+                created_by=row.get("created_by", "frontier_refill"),
+                metadata=row.get("metadata"),
+            )
+        except Exception:
+            logger.debug("Frontier task promotion failed", exc_info=True)
+            remaining.append(line)
+            continue
+        promoted += 1
+    tmp = frontier_path.with_suffix(
+        frontier_path.suffix + f".tmp.{int(datetime.now(timezone.utc).timestamp() * 1000)}"
+    )
+    tmp.write_text(
+        "\n".join(remaining) + ("\n" if remaining else ""),
+        encoding="utf-8",
+    )
+    tmp.replace(frontier_path)
+    return promoted
 
 
 def _enqueue_shakti_escalations(
@@ -245,6 +315,15 @@ async def run_swarm_loop(
                             _log("swarm", f"  ↳ {p.get('pattern_type', '?')}: {p.get('detail', '')[:60]}")
                 except Exception:
                     logger.debug("Swarm: instinct drain failed", exc_info=True)
+
+                # BR-002: drain frontier_tasks_pending.jsonl → TaskBoard
+                try:
+                    _board = swarm._orchestrator._board
+                    _promoted = await _drain_frontier_queue(_board)
+                    if _promoted:
+                        _log("swarm", f"Frontier: promoted {_promoted} task(s) from opportunity board")
+                except Exception:
+                    logger.debug("Swarm: frontier drain failed", exc_info=True)
 
                 activity = await swarm.tick()
 
@@ -1642,6 +1721,30 @@ async def _run_room_health_loop(
                 elif remaining < room.budget_tokens * 0.2:
                     _log("room-health", f"Budget LOW for {room.id}: {remaining}/{room.budget_tokens}")
             _log("room-health", f"Health check: {len(active)} active rooms evaluated")
+
+            # BR-008: sync rooms → ontology so VentureCell objects match running organs
+            try:
+                from dharma_swarm.fractal.room_bridge import sync_registry_to_ontology
+                from dharma_swarm.ontology_runtime import (
+                    get_shared_registry as _get_ont_reg,
+                    persist_shared_registry as _persist_ont_reg,
+                )
+                ont_reg = _get_ont_reg(str(STATE_DIR / "ontology.db"))
+                sync_errors = sync_registry_to_ontology(registry, ont_reg)
+                _persist_ont_reg(ont_reg, path=str(STATE_DIR / "ontology.db"))
+                if sync_errors:
+                    _log("room-health", f"Ontology sync had errors: {sync_errors}")
+            except Exception as sync_exc:
+                logger.debug("Room→ontology sync failed: %s", sync_exc)
+
+            # BR-007: sync ontology outcomes → runtime artifacts
+            try:
+                from dharma_swarm.engine.store_sync import sync_all
+                sr = sync_all(state_dir=STATE_DIR)
+                if sr.artifacts_created:
+                    _log("room-health", f"Store sync: {sr.artifacts_created} new artifacts materialized")
+            except Exception as sync_exc:
+                logger.debug("Store sync failed: %s", sync_exc)
         except Exception as exc:
             _log("room-health", f"Health check error: {exc}")
 
