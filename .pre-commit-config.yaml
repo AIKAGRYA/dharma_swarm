@@ -74,6 +74,21 @@ repos:
         stages: [pre-commit]
 
   # ---------------------------------------------------------------------------
+  # Slop-verify — multi-detector code-quality verifier. The pre-commit lane
+  # scans changed files only and uses the agreement cap in
+  # dharma_swarm/slop/aggregate.py so single-tool noise does not block commits.
+  # ---------------------------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: slop-verify-precommit
+        name: slop-verify (pre-commit lane, changed files only)
+        entry: python3 scripts/governance/slop_verify.py --mode pre-commit --threshold 0.50
+        language: system
+        pass_filenames: true
+        types_or: [python, ts, tsx, javascript, jsx]
+        stages: [pre-commit]
+
+  # ---------------------------------------------------------------------------
   # Whitespace / EOF / large-file hygiene.
   # ---------------------------------------------------------------------------
   - repo: https://github.com/pre-commit/pre-commit-hooks

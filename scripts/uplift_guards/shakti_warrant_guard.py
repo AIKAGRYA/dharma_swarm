@@ -11,6 +11,9 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 ACK_TAG = "[impact-checked]"
 ACK_ENV = "DHARMA_UPLIFT_ACK"
 ACK_ENV_VALUE = "impact-checked"
+LARGE_DIFF_ACK_TAG = "[large-diff-ack]"
+LARGE_DIFF_ACK_ENV = "DHARMA_LARGE_DIFF_ACK"
+LARGE_DIFF_ACK_ENV_VALUE = "acknowledged"
 
 
 def _python_executable() -> str:
@@ -36,6 +39,15 @@ def _impact_acknowledged(repo_root: Path, msg_file: str | None = None) -> bool:
     return os.environ.get(ACK_ENV, "").strip().lower() == ACK_ENV_VALUE.lower()
 
 
+def _large_diff_acknowledged(repo_root: Path, msg_file: str | None = None) -> bool:
+    if LARGE_DIFF_ACK_TAG in _read_commit_message(repo_root, msg_file):
+        return True
+    return (
+        os.environ.get(LARGE_DIFF_ACK_ENV, "").strip().lower()
+        == LARGE_DIFF_ACK_ENV_VALUE.lower()
+    )
+
+
 def _summarize_warrant_output(output: str) -> str:
     lines = output.splitlines()
     first_line = lines[0] if lines else "no warrant output"
@@ -45,7 +57,12 @@ def _summarize_warrant_output(output: str) -> str:
     return first_line
 
 
-def _command(repo_root: Path, *, impact_checked: bool) -> list[str]:
+def _command(
+    repo_root: Path,
+    *,
+    impact_checked: bool,
+    large_diff_ack: bool,
+) -> list[str]:
     cmd = [
         _python_executable(),
         str(CHECK_SCRIPT),
@@ -76,6 +93,8 @@ def _command(repo_root: Path, *, impact_checked: bool) -> list[str]:
     ]
     if impact_checked:
         cmd.extend(["--metadata", "impact_checked=true"])
+    if large_diff_ack:
+        cmd.extend(["--metadata", "large_diff_ack=true"])
     return cmd
 
 
@@ -93,6 +112,7 @@ def check_fourfold_shakti_warrant(
         _command(
             repo_root,
             impact_checked=_impact_acknowledged(repo_root, commit_msg_file),
+            large_diff_ack=_large_diff_acknowledged(repo_root, commit_msg_file),
         ),
         cwd=str(repo_root),
         capture_output=True,
