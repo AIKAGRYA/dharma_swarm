@@ -39,8 +39,12 @@ from dharma_swarm.provider_matrix import build_default_matrix_targets
 from dharma_swarm.runtime_state import DEFAULT_RUNTIME_DB, OperatorAction, RuntimeStateStore, SessionEventRecord
 from dharma_swarm.models import ProviderType
 from dharma_swarm.tui import model_routing
-from dharma_swarm.terminal_commands import system_commands as system_commands_module
-from dharma_swarm.terminal_commands.system_commands import SystemCommandHandler
+try:
+    from dharma_swarm.terminal_commands import system_commands as system_commands_module
+    from dharma_swarm.terminal_commands.system_commands import SystemCommandHandler
+except ImportError:
+    system_commands_module = None  # type: ignore[assignment]
+    SystemCommandHandler = None  # type: ignore[assignment,misc]
 from dharma_swarm.tui_helpers import build_runtime_status_text
 from dharma_swarm.workspace_topology import build_workspace_topology
 from dharma_swarm.operator_core import build_session_catalog, build_session_detail
