@@ -73,8 +73,8 @@ def test_irreversible_review():
     assert result.decision == GateDecision.REVIEW
 
 
-def test_all_gates_present():
-    gk = TelosGatekeeper()
+def test_all_gates_present(tmp_path):
+    gk = TelosGatekeeper(registry=GateRegistry(proposals_file=tmp_path / "proposals.jsonl"))
     result = gk.check("echo test")
     assert len(result.gate_results) == 11
     expected = {"AHIMSA", "SATYA", "CONSENT", "VYAVASTHIT",
@@ -88,9 +88,20 @@ def test_witness_always_passes():
     assert result.gate_results["WITNESS"][0].value == "PASS"
 
 
-def test_bhed_gnan_always_passes():
+def test_bhed_gnan_passes_without_register_signal():
     result = check_action("any action")
     assert result.gate_results["BHED_GNAN"][0].value == "PASS"
+
+
+def test_bhed_gnan_warns_on_false_provenance_register_signal():
+    result = check_action(
+        "write analysis",
+        content="You pointed me to four files and I read them in order.",
+    )
+
+    assert result.gate_results["BHED_GNAN"][0] == GateResult.WARN
+    assert result.decision == GateDecision.REVIEW
+    assert "possible_false_provenance" in result.gate_results["BHED_GNAN"][1]
 
 
 def test_default_gatekeeper_exists():

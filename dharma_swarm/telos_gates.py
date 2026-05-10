@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any
 
 from dharma_swarm.anekanta_gate import evaluate_anekanta
+from dharma_swarm.bhed_gnan_gate import evaluate_bhed_gnan
 
 logger = logging.getLogger(__name__)
 from dharma_swarm.models import (
@@ -549,8 +550,9 @@ class TelosGatekeeper:
         else:
             results["SVABHAAVA"] = (GateResult.PASS, "Epistemological diversity confirmed")
 
-        # --- BHED_GNAN (Tier C) — doer-witness distinction (always passes) ---
-        results["BHED_GNAN"] = (GateResult.PASS, "Doer-witness distinction noted")
+        # --- BHED_GNAN (Tier C) — cheap register/substance discrimination ---
+        bhed_gnan = evaluate_bhed_gnan(action, content)
+        results["BHED_GNAN"] = (bhed_gnan.gate_result, bhed_gnan.reason)
 
         # --- WITNESS (Tier C, promoted to blocking for mandatory phases) ---
         phase_key = (think_phase or "").strip().lower()
