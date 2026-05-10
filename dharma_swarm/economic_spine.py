@@ -1,570 +1,592 @@
-"""Economic Spine — Revenue pipeline ledger for dharma_swarm.
+"""economic_spine.py — Internal swarm economy.
 
-Tracks the full lifecycle of revenue generation:
-    target -> offer -> outreach -> reply -> engagement -> paid_work -> compute_reinvestment
+CashClaw-inspired mission lifecycle + performance-based budget allocation.
+Every agent has a token budget, every mission tracks cost, and the organism
+periodically reallocates resources toward high performers.
 
-Every stage is telos-gated. The system scouts and drafts; humans approve sends.
-No autonomous spam. All outreach requires explicit human approval before dispatch.
-
-Integrates with:
-    - EconomicEngine (dharma_swarm/economic_engine.py) for transaction recording
-    - OpportunityDispatcher for stage execution
-    - TelicSeam for provenance and gate decisions
-    - AutoResearchEngine for target intelligence gathering
-
-Schema:
-    RevenueTarget  — a potential buyer/opportunity identified by scouting
-    Offer          — a packaged service offering mapped to the target's pain
-    OutreachDraft  — a drafted message awaiting human approval
-    Engagement     — an active paid engagement
-    ComputeReinvestment — reinvestment of revenue into compute/training
+SQLite-backed for persistence (consistent with HibernationManager and
+KnowledgeStore patterns from Sprint 1/2).
 """
 
 from __future__ import annotations
 
+import json
 import logging
-import time
+import os
+import sqlite3
+import uuid
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from pathlib import Path
-from typing import Any, Optional
-
-from pydantic import BaseModel, Field
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
-_SPINE_DIR = Path.home() / ".dharma" / "economic_spine"
+# ---------------------------------------------------------------------------
+# Environment config
+# ---------------------------------------------------------------------------
 
-
-def _utc_now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
-
-
-_SPINE_COUNTER = 0
-
-
-def _spine_id(prefix: str) -> str:
-    global _SPINE_COUNTER
-    _SPINE_COUNTER += 1
-    return f"{prefix}-{int(time.time() * 1000) % 1_000_000_000}-{_SPINE_COUNTER}"
+INITIAL_AGENT_BUDGET = int(os.environ.get("INITIAL_AGENT_BUDGET", "100000"))
+ENABLE_ECONOMIC_SPINE = os.environ.get(
+    "ENABLE_ECONOMIC_SPINE", "true"
+).strip().lower() in ("1", "true", "yes", "on")
 
 
 # ---------------------------------------------------------------------------
-# Enums
+# Mission state machine
 # ---------------------------------------------------------------------------
 
 
-class TargetStatus(str, Enum):
-    SCOUTED = "scouted"
-    QUALIFIED = "qualified"
-    OUTREACH_DRAFTED = "outreach_drafted"
-    OUTREACH_APPROVED = "outreach_approved"
-    OUTREACH_SENT = "outreach_sent"
-    REPLIED = "replied"
-    ENGAGED = "engaged"
-    CLOSED_WON = "closed_won"
-    CLOSED_LOST = "closed_lost"
-    DISQUALIFIED = "disqualified"
+class MissionState(str, Enum):
+    """CashClaw-inspired mission lifecycle."""
 
-
-class OfferType(str, Enum):
-    CODE_GOVERNANCE_SPRINT = "code_governance_sprint"
-    AGENT_EVAL_AUDIT = "agent_eval_audit"
-    PROVENANCE_INSTALL = "provenance_install"
-    CUSTOM = "custom"
-
-
-class OutreachChannel(str, Enum):
-    EMAIL = "email"
-    GITHUB = "github"
-    TWITTER = "twitter"
-    LINKEDIN = "linkedin"
-    DISCORD = "discord"
-    DIRECT = "direct"
-
-
-class EngagementStatus(str, Enum):
-    SCOPING = "scoping"
-    CONTRACTED = "contracted"
-    IN_PROGRESS = "in_progress"
+    RECEIVED = "received"
+    QUOTED = "quoted"
+    ACCEPTED = "accepted"
+    EXECUTING = "executing"
     DELIVERED = "delivered"
-    PAID = "paid"
+    VERIFIED = "verified"      # Gnani has verified output quality
+    PAID = "paid"              # Budget credited back / allocated
+    FAILED = "failed"
     CANCELLED = "cancelled"
 
 
-# ---------------------------------------------------------------------------
-# Models
-# ---------------------------------------------------------------------------
-
-
-class RevenueTarget(BaseModel):
-    """A potential buyer identified by scouting."""
-
-    id: str = Field(default_factory=lambda: _spine_id("tgt"))
-    name: str
-    org: str = ""
-    domain: str = ""
-    pain_signals: list[str] = Field(default_factory=list)
-    repo_urls: list[str] = Field(default_factory=list)
-    estimated_value_usd: float = 0.0
-    status: TargetStatus = TargetStatus.SCOUTED
-    qualification_score: float = 0.0
-    intelligence: dict[str, Any] = Field(default_factory=dict)
-    created_at: str = Field(default_factory=_utc_now_iso)
-    updated_at: str = Field(default_factory=_utc_now_iso)
-
-
-class Offer(BaseModel):
-    """A packaged service offering."""
-
-    id: str = Field(default_factory=lambda: _spine_id("ofr"))
-    offer_type: OfferType = OfferType.CODE_GOVERNANCE_SPRINT
-    title: str = "Agentic Code Governance Sprint"
-    price_range_low_usd: float = 5000.0
-    price_range_high_usd: float = 25000.0
-    scope_summary: str = ""
-    deliverables: list[str] = Field(default_factory=list)
-    duration_days: int = 5
-    created_at: str = Field(default_factory=_utc_now_iso)
-
-
-class OutreachDraft(BaseModel):
-    """A drafted outreach message awaiting human approval.
-
-    Rule: no autonomous spam. The system drafts; the human approves sends.
-    The ``approved`` field MUST be set to True by a human before dispatch.
-    """
-
-    id: str = Field(default_factory=lambda: _spine_id("out"))
-    target_id: str
-    offer_id: str
-    channel: OutreachChannel = OutreachChannel.EMAIL
-    subject: str = ""
-    body: str = ""
-    approved: bool = False
-    approved_by: str = ""
-    approved_at: str = ""
-    sent: bool = False
-    sent_at: str = ""
-    created_at: str = Field(default_factory=_utc_now_iso)
-
-
-class Engagement(BaseModel):
-    """An active paid engagement."""
-
-    id: str = Field(default_factory=lambda: _spine_id("eng"))
-    target_id: str
-    offer_id: str
-    status: EngagementStatus = EngagementStatus.SCOPING
-    contracted_value_usd: float = 0.0
-    paid_usd: float = 0.0
-    started_at: str = ""
-    delivered_at: str = ""
-    paid_at: str = ""
-    deliverables_completed: list[str] = Field(default_factory=list)
-    created_at: str = Field(default_factory=_utc_now_iso)
-
-
-class ComputeReinvestment(BaseModel):
-    """Record of revenue reinvested into compute/training."""
-
-    id: str = Field(default_factory=lambda: _spine_id("crv"))
-    engagement_id: str
-    amount_usd: float
-    target_category: str = "training"
-    provider: str = ""
-    expected_roi: str = ""
-    created_at: str = Field(default_factory=_utc_now_iso)
-
-
-class PipelineSnapshot(BaseModel):
-    """Point-in-time view of the full revenue pipeline."""
-
-    timestamp: str = Field(default_factory=_utc_now_iso)
-    targets_scouted: int = 0
-    targets_qualified: int = 0
-    outreach_drafted: int = 0
-    outreach_sent: int = 0
-    replies_received: int = 0
-    engagements_active: int = 0
-    total_pipeline_value_usd: float = 0.0
-    total_contracted_usd: float = 0.0
-    total_paid_usd: float = 0.0
-    total_reinvested_usd: float = 0.0
+# Valid transitions
+MISSION_TRANSITIONS: Dict[MissionState, set[MissionState]] = {
+    MissionState.RECEIVED: {MissionState.QUOTED, MissionState.CANCELLED},
+    MissionState.QUOTED: {MissionState.ACCEPTED, MissionState.CANCELLED},
+    MissionState.ACCEPTED: {MissionState.EXECUTING, MissionState.CANCELLED},
+    MissionState.EXECUTING: {MissionState.DELIVERED, MissionState.FAILED},
+    MissionState.DELIVERED: {MissionState.VERIFIED, MissionState.FAILED},
+    MissionState.VERIFIED: {MissionState.PAID},
+    MissionState.FAILED: {MissionState.RECEIVED},  # Can retry
+    MissionState.PAID: set(),
+    MissionState.CANCELLED: set(),
+}
 
 
 # ---------------------------------------------------------------------------
-# Spine
+# Data classes
 # ---------------------------------------------------------------------------
+
+
+@dataclass
+class AgentBudget:
+    """Token/compute budget for an agent."""
+
+    agent_id: str
+    total_tokens_allocated: int = INITIAL_AGENT_BUDGET
+    tokens_spent: int = 0
+    tokens_earned: int = 0
+    efficiency_score: float = 0.5
+    mission_count: int = 0
+    success_count: int = 0
+    last_allocation_at: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.last_allocation_at:
+            self.last_allocation_at = datetime.now(timezone.utc).isoformat()
+
+    @property
+    def tokens_remaining(self) -> int:
+        return self.total_tokens_allocated + self.tokens_earned - self.tokens_spent
+
+    @property
+    def success_rate(self) -> float:
+        return self.success_count / max(self.mission_count, 1)
+
+
+@dataclass
+class MissionRecord:
+    """Audit trail for an economic mission/task."""
+
+    id: str = ""
+    agent_id: str = ""
+    task_description: str = ""
+    state: MissionState = MissionState.RECEIVED
+    tokens_quoted: int = 0
+    tokens_actual: int = 0
+    quality_score: float = 0.0
+    created_at: str = ""
+    state_history: List[dict] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        if not self.id:
+            self.id = str(uuid.uuid4())
+        if not self.created_at:
+            self.created_at = datetime.now(timezone.utc).isoformat()
+
+    def transition_to(self, new_state: MissionState, reason: str = "") -> None:
+        """Validated state transition with audit trail."""
+        valid = MISSION_TRANSITIONS.get(self.state, set())
+        if new_state not in valid:
+            raise ValueError(
+                f"Invalid transition: {self.state.value} → {new_state.value}"
+            )
+        self.state_history.append(
+            {
+                "from": self.state.value,
+                "to": new_state.value,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "reason": reason,
+            }
+        )
+        self.state = new_state
+
+
+# ---------------------------------------------------------------------------
+# Custom exception
+# ---------------------------------------------------------------------------
+
+
+class InsufficientBudgetError(Exception):
+    """Raised when an agent lacks budget for a mission."""
+
+
+# ---------------------------------------------------------------------------
+# Economic Spine (SQLite-backed)
+# ---------------------------------------------------------------------------
+
+_DDL = """\
+CREATE TABLE IF NOT EXISTS agent_budgets (
+    agent_id           TEXT PRIMARY KEY,
+    total_tokens_allocated INTEGER NOT NULL DEFAULT 100000,
+    tokens_spent       INTEGER NOT NULL DEFAULT 0,
+    tokens_earned      INTEGER NOT NULL DEFAULT 0,
+    efficiency_score   REAL    NOT NULL DEFAULT 0.5,
+    mission_count      INTEGER NOT NULL DEFAULT 0,
+    success_count      INTEGER NOT NULL DEFAULT 0,
+    last_allocation_at TEXT    NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS missions (
+    id               TEXT PRIMARY KEY,
+    agent_id         TEXT    NOT NULL,
+    task_description TEXT    NOT NULL DEFAULT '',
+    state            TEXT    NOT NULL DEFAULT 'received',
+    tokens_quoted    INTEGER NOT NULL DEFAULT 0,
+    tokens_actual    INTEGER NOT NULL DEFAULT 0,
+    quality_score    REAL    NOT NULL DEFAULT 0.0,
+    created_at       TEXT    NOT NULL,
+    state_history    TEXT    NOT NULL DEFAULT '[]'
+);
+
+CREATE TABLE IF NOT EXISTS economic_events (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    agent_id   TEXT    NOT NULL,
+    event_type TEXT    NOT NULL,
+    amount     INTEGER NOT NULL DEFAULT 0,
+    mission_id TEXT    NOT NULL DEFAULT '',
+    details    TEXT    NOT NULL DEFAULT '',
+    created_at TEXT    NOT NULL
+);
+"""
 
 
 class EconomicSpine:
-    """Revenue pipeline ledger.
+    """SQLite-backed economic management for the swarm.
 
-    Persists all pipeline state to ``~/.dharma/economic_spine/`` as JSONL files.
-    Each entity type gets its own append-only ledger file.
-
-    Usage::
-
-        spine = EconomicSpine()
-
-        # Scout a target
-        target = spine.add_target(RevenueTarget(name="Acme Corp", ...))
-
-        # Draft outreach (not sent yet — needs human approval)
-        draft = spine.draft_outreach(target.id, offer.id, subject="...", body="...")
-
-        # Human approves
-        spine.approve_outreach(draft.id, approved_by="dhyana")
-
-        # Record engagement
-        engagement = spine.create_engagement(target.id, offer.id, value=10000)
-
-        # Record payment + reinvestment
-        spine.record_payment(engagement.id, 10000)
-        spine.reinvest(engagement.id, 6000, "training", "runpod")
+    Responsibilities:
+    1. Track agent budgets (allocation, spending, earning)
+    2. Track mission lifecycle (CashClaw-inspired state machine)
+    3. Allocate resources based on performance (higher performers get more)
+    4. Enforce spending limits (agents can't exceed budget)
+    5. Audit trail for all economic activity
     """
 
-    def __init__(self, storage_dir: Optional[Path] = None) -> None:
-        self._dir = storage_dir or _SPINE_DIR
-        self._dir.mkdir(parents=True, exist_ok=True)
-        self._targets: dict[str, RevenueTarget] = {}
-        self._offers: dict[str, Offer] = {}
-        self._outreach: dict[str, OutreachDraft] = {}
-        self._engagements: dict[str, Engagement] = {}
-        self._reinvestments: list[ComputeReinvestment] = []
-        self._load()
+    def __init__(self, db_path: str = ":memory:") -> None:
+        self._db_path = db_path
+        self._conn = sqlite3.connect(db_path)
+        self._conn.execute("PRAGMA journal_mode=WAL")
+        self._conn.execute("PRAGMA foreign_keys=ON")
+        self._conn.execute("PRAGMA synchronous=NORMAL")
+        self._conn.executescript(_DDL)
+        self._conn.commit()
 
-    # -- Targets -----------------------------------------------------------
+    def close(self) -> None:
+        """Close the database connection."""
+        self._conn.close()
 
-    def add_target(self, target: RevenueTarget) -> RevenueTarget:
-        self._targets[target.id] = target
-        self._append("targets", target)
-        logger.info("Target added: %s (%s)", target.name, target.id)
-        return target
+    # ------------------------------------------------------------------
+    # Budget management
+    # ------------------------------------------------------------------
 
-    def qualify_target(
-        self, target_id: str, score: float, intelligence: dict[str, Any] | None = None
-    ) -> RevenueTarget | None:
-        target = self._targets.get(target_id)
-        if not target:
-            return None
-        target.status = TargetStatus.QUALIFIED
-        target.qualification_score = score
-        if intelligence:
-            target.intelligence.update(intelligence)
-        target.updated_at = _utc_now_iso()
-        self._append("targets", target)
-        return target
-
-    def disqualify_target(self, target_id: str, reason: str = "") -> None:
-        target = self._targets.get(target_id)
-        if target:
-            target.status = TargetStatus.DISQUALIFIED
-            target.intelligence["disqualification_reason"] = reason
-            target.updated_at = _utc_now_iso()
-            self._append("targets", target)
-
-    def get_target(self, target_id: str) -> RevenueTarget | None:
-        return self._targets.get(target_id)
-
-    def list_targets(self, status: TargetStatus | None = None) -> list[RevenueTarget]:
-        targets = list(self._targets.values())
-        if status is not None:
-            targets = [t for t in targets if t.status == status]
-        return sorted(targets, key=lambda t: t.qualification_score, reverse=True)
-
-    # -- Offers ------------------------------------------------------------
-
-    def register_offer(self, offer: Offer) -> Offer:
-        self._offers[offer.id] = offer
-        self._append("offers", offer)
-        return offer
-
-    def get_offer(self, offer_id: str) -> Offer | None:
-        return self._offers.get(offer_id)
-
-    def default_offer(self) -> Offer:
-        """Return the default Code Governance Sprint offer."""
-        for o in self._offers.values():
-            if o.offer_type == OfferType.CODE_GOVERNANCE_SPRINT:
-                return o
-        offer = Offer(
-            offer_type=OfferType.CODE_GOVERNANCE_SPRINT,
-            title="Agentic Code Governance Sprint",
-            price_range_low_usd=5000.0,
-            price_range_high_usd=25000.0,
-            scope_summary=(
-                "3-7 day paid engagement: audit repo for AI slop, install "
-                "packet provenance + CI gates + evals + audit ledger, "
-                "optionally run governed agent repair loops."
+    def get_or_create_budget(self, agent_id: str) -> AgentBudget:
+        """Get existing budget or create one with default allocation."""
+        row = self._conn.execute(
+            "SELECT * FROM agent_budgets WHERE agent_id = ?", (agent_id,)
+        ).fetchone()
+        if row is not None:
+            return AgentBudget(
+                agent_id=row[0],
+                total_tokens_allocated=row[1],
+                tokens_spent=row[2],
+                tokens_earned=row[3],
+                efficiency_score=row[4],
+                mission_count=row[5],
+                success_count=row[6],
+                last_allocation_at=row[7],
+            )
+        now = datetime.now(timezone.utc).isoformat()
+        budget = AgentBudget(
+            agent_id=agent_id,
+            total_tokens_allocated=INITIAL_AGENT_BUDGET,
+            last_allocation_at=now,
+        )
+        self._conn.execute(
+            "INSERT INTO agent_budgets VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                budget.agent_id,
+                budget.total_tokens_allocated,
+                budget.tokens_spent,
+                budget.tokens_earned,
+                budget.efficiency_score,
+                budget.mission_count,
+                budget.success_count,
+                budget.last_allocation_at,
             ),
-            deliverables=[
-                "Ranked slop report (Markdown + JSON)",
-                "Provenance records (JSONL)",
-                "CI gate config (YAML / GitHub Actions)",
-                "Eval dashboard (JSON metrics)",
-                "Audit ledger (SQLite + JSONL)",
-                "Repair PRs with provenance (optional)",
-            ],
-            duration_days=5,
         )
-        self.register_offer(offer)
-        return offer
+        self._conn.commit()
+        return budget
 
-    # -- Outreach ----------------------------------------------------------
+    def _save_budget(self, budget: AgentBudget) -> None:
+        """Persist budget to database."""
+        self._conn.execute(
+            """UPDATE agent_budgets SET
+                total_tokens_allocated=?, tokens_spent=?, tokens_earned=?,
+                efficiency_score=?, mission_count=?, success_count=?,
+                last_allocation_at=?
+            WHERE agent_id=?""",
+            (
+                budget.total_tokens_allocated,
+                budget.tokens_spent,
+                budget.tokens_earned,
+                budget.efficiency_score,
+                budget.mission_count,
+                budget.success_count,
+                budget.last_allocation_at,
+                budget.agent_id,
+            ),
+        )
+        self._conn.commit()
 
-    def draft_outreach(
+    def spend_tokens(self, agent_id: str, amount: int, mission_id: str = "") -> bool:
+        """Record token spending. ALWAYS succeeds — tracking only, no enforcement.
+
+        Returns True always. Negative balance is tracked but not prevented.
+        """
+        budget = self.get_or_create_budget(agent_id)
+        budget.tokens_spent += amount
+        self._save_budget(budget)
+        self._log_event(agent_id, "spend", amount, mission_id)
+
+        if budget.tokens_remaining < 0:
+            logger.info(
+                "Agent %s over budget by %d tokens (tracking only, not blocking)",
+                agent_id,
+                abs(budget.tokens_remaining),
+            )
+
+        return True  # Always succeed — no enforcement
+
+    def earn_tokens(self, agent_id: str, amount: int, mission_id: str = "") -> None:
+        """Credit tokens for successful mission completion."""
+        budget = self.get_or_create_budget(agent_id)
+        budget.tokens_earned += amount
+        self._save_budget(budget)
+        self._log_event(agent_id, "earn", amount, mission_id)
+
+    def update_efficiency(self, agent_id: str, quality_score: float) -> None:
+        """Recalculate efficiency score after a mission."""
+        budget = self.get_or_create_budget(agent_id)
+        cost_ratio = budget.tokens_spent / max(budget.tokens_earned + 1, 1)
+        # efficiency = success_rate * quality_avg * (1 / cost_ratio)
+        # Clamp cost_factor so it doesn't explode
+        cost_factor = min(1.0 / max(cost_ratio, 0.01), 2.0)
+        raw = budget.success_rate * quality_score * cost_factor
+        # Exponential moving average
+        budget.efficiency_score = 0.7 * budget.efficiency_score + 0.3 * min(raw, 1.0)
+        self._save_budget(budget)
+
+    # ------------------------------------------------------------------
+    # Mission lifecycle
+    # ------------------------------------------------------------------
+
+    def create_mission(
         self,
-        target_id: str,
-        offer_id: str,
-        *,
-        channel: OutreachChannel = OutreachChannel.EMAIL,
-        subject: str = "",
-        body: str = "",
-    ) -> OutreachDraft | None:
-        target = self._targets.get(target_id)
-        if not target:
-            logger.warning("Cannot draft outreach: target %s not found", target_id)
-            return None
-        draft = OutreachDraft(
-            target_id=target_id,
-            offer_id=offer_id,
-            channel=channel,
-            subject=subject,
-            body=body,
+        agent_id: str,
+        task_description: str,
+        tokens_quoted: int,
+    ) -> MissionRecord:
+        """Create a new mission in RECEIVED state."""
+        mission = MissionRecord(
+            agent_id=agent_id,
+            task_description=task_description,
+            tokens_quoted=tokens_quoted,
         )
-        self._outreach[draft.id] = draft
-        target.status = TargetStatus.OUTREACH_DRAFTED
-        target.updated_at = _utc_now_iso()
-        self._append("outreach", draft)
-        self._append("targets", target)
-        logger.info("Outreach drafted for %s: %s", target.name, draft.id)
-        return draft
+        self._conn.execute(
+            "INSERT INTO missions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                mission.id,
+                mission.agent_id,
+                mission.task_description,
+                mission.state.value,
+                mission.tokens_quoted,
+                mission.tokens_actual,
+                mission.quality_score,
+                mission.created_at,
+                json.dumps(mission.state_history),
+            ),
+        )
+        self._conn.commit()
+        return mission
 
-    def approve_outreach(self, outreach_id: str, approved_by: str) -> bool:
-        """Human approves an outreach draft for sending."""
-        draft = self._outreach.get(outreach_id)
-        if not draft:
-            return False
-        draft.approved = True
-        draft.approved_by = approved_by
-        draft.approved_at = _utc_now_iso()
-        target = self._targets.get(draft.target_id)
-        if target:
-            target.status = TargetStatus.OUTREACH_APPROVED
-            target.updated_at = _utc_now_iso()
-            self._append("targets", target)
-        self._append("outreach", draft)
-        logger.info("Outreach %s approved by %s", outreach_id, approved_by)
-        return True
-
-    def mark_outreach_sent(self, outreach_id: str) -> bool:
-        """Mark an approved outreach as sent. Refuses if not approved."""
-        draft = self._outreach.get(outreach_id)
-        if not draft or not draft.approved:
-            logger.warning("Cannot send unapproved outreach: %s", outreach_id)
-            return False
-        draft.sent = True
-        draft.sent_at = _utc_now_iso()
-        target = self._targets.get(draft.target_id)
-        if target:
-            target.status = TargetStatus.OUTREACH_SENT
-            target.updated_at = _utc_now_iso()
-            self._append("targets", target)
-        self._append("outreach", draft)
-        return True
-
-    def pending_outreach(self) -> list[OutreachDraft]:
-        """Return all drafted but unapproved outreach."""
-        return [d for d in self._outreach.values() if not d.approved]
-
-    # -- Engagements -------------------------------------------------------
-
-    def create_engagement(
+    def transition_mission(
         self,
-        target_id: str,
-        offer_id: str,
-        contracted_value_usd: float = 0.0,
-    ) -> Engagement | None:
-        target = self._targets.get(target_id)
-        if not target:
+        mission_id: str,
+        new_state: MissionState,
+        reason: str = "",
+        quality_score: float = 0.0,
+        tokens_actual: int = 0,
+    ) -> MissionRecord:
+        """Transition a mission to a new state with validation."""
+        mission = self.get_mission(mission_id)
+        if mission is None:
+            raise ValueError(f"Mission not found: {mission_id}")
+
+        mission.transition_to(new_state, reason)
+
+        if tokens_actual > 0:
+            mission.tokens_actual = tokens_actual
+        if quality_score > 0:
+            mission.quality_score = quality_score
+
+        # Update stats on terminal states
+        if new_state in (MissionState.PAID, MissionState.FAILED):
+            budget = self.get_or_create_budget(mission.agent_id)
+            budget.mission_count += 1
+            if new_state == MissionState.PAID:
+                budget.success_count += 1
+            self._save_budget(budget)
+
+        self._save_mission(mission)
+        return mission
+
+    def get_mission(self, mission_id: str) -> Optional[MissionRecord]:
+        """Retrieve a mission by ID."""
+        row = self._conn.execute(
+            "SELECT * FROM missions WHERE id = ?", (mission_id,)
+        ).fetchone()
+        if row is None:
             return None
-        engagement = Engagement(
-            target_id=target_id,
-            offer_id=offer_id,
-            contracted_value_usd=contracted_value_usd,
-            started_at=_utc_now_iso(),
+        return MissionRecord(
+            id=row[0],
+            agent_id=row[1],
+            task_description=row[2],
+            state=MissionState(row[3]),
+            tokens_quoted=row[4],
+            tokens_actual=row[5],
+            quality_score=row[6],
+            created_at=row[7],
+            state_history=json.loads(row[8]),
         )
-        self._engagements[engagement.id] = engagement
-        target.status = TargetStatus.ENGAGED
-        target.updated_at = _utc_now_iso()
-        self._append("engagements", engagement)
-        self._append("targets", target)
+
+    def get_agent_missions(
+        self, agent_id: str, limit: int = 50
+    ) -> List[MissionRecord]:
+        """Get recent missions for an agent."""
+        rows = self._conn.execute(
+            "SELECT * FROM missions WHERE agent_id = ? ORDER BY created_at DESC LIMIT ?",
+            (agent_id, limit),
+        ).fetchall()
+        return [
+            MissionRecord(
+                id=r[0],
+                agent_id=r[1],
+                task_description=r[2],
+                state=MissionState(r[3]),
+                tokens_quoted=r[4],
+                tokens_actual=r[5],
+                quality_score=r[6],
+                created_at=r[7],
+                state_history=json.loads(r[8]),
+            )
+            for r in rows
+        ]
+
+    def _save_mission(self, mission: MissionRecord) -> None:
+        """Persist mission state to database."""
+        self._conn.execute(
+            """UPDATE missions SET
+                state=?, tokens_actual=?, quality_score=?, state_history=?
+            WHERE id=?""",
+            (
+                mission.state.value,
+                mission.tokens_actual,
+                mission.quality_score,
+                json.dumps(mission.state_history),
+                mission.id,
+            ),
+        )
+        self._conn.commit()
+
+    # ------------------------------------------------------------------
+    # Resource allocation
+    # ------------------------------------------------------------------
+
+    def reallocate_budgets(self, total_pool: int) -> Dict[str, int]:
+        """Redistribute token pool based on agent performance.
+
+        Algorithm:
+        1. Calculate efficiency_score for each agent
+        2. Normalize scores to proportional shares
+        3. Floor allocation (every agent gets at least 10% of average)
+        4. Distribute remaining pool proportionally
+        """
+        rows = self._conn.execute("SELECT * FROM agent_budgets").fetchall()
+        if not rows:
+            return {}
+
+        budgets = [
+            AgentBudget(
+                agent_id=r[0],
+                total_tokens_allocated=r[1],
+                tokens_spent=r[2],
+                tokens_earned=r[3],
+                efficiency_score=r[4],
+                mission_count=r[5],
+                success_count=r[6],
+                last_allocation_at=r[7],
+            )
+            for r in rows
+        ]
+
+        n = len(budgets)
+        avg_share = total_pool // max(n, 1)
+        floor_amount = max(avg_share // 10, 1)  # 10% floor
+
+        # Total efficiency for proportional allocation
+        total_efficiency = sum(b.efficiency_score for b in budgets)
+        if total_efficiency <= 0:
+            total_efficiency = n * 0.5  # fallback: equal
+
+        floor_total = floor_amount * n
+        distributable = max(total_pool - floor_total, 0)
+
+        allocations: Dict[str, int] = {}
+        now = datetime.now(timezone.utc).isoformat()
+
+        for budget in budgets:
+            proportion = budget.efficiency_score / total_efficiency
+            alloc = floor_amount + int(distributable * proportion)
+            budget.total_tokens_allocated = alloc
+            budget.last_allocation_at = now
+            self._save_budget(budget)
+            allocations[budget.agent_id] = alloc
+
         logger.info(
-            "Engagement created: %s ($%.2f)", engagement.id, contracted_value_usd
+            "Budget reallocation: pool=%d agents=%d allocations=%s",
+            total_pool,
+            n,
+            allocations,
         )
-        return engagement
+        return allocations
 
-    def record_payment(
-        self,
-        engagement_id: str,
-        amount_usd: float,
-        economic_engine: Any | None = None,
-    ) -> bool:
-        eng = self._engagements.get(engagement_id)
-        if not eng:
-            return False
-        eng.paid_usd += amount_usd
-        eng.paid_at = _utc_now_iso()
-        if eng.paid_usd >= eng.contracted_value_usd:
-            eng.status = EngagementStatus.PAID
-            target = self._targets.get(eng.target_id)
-            if target:
-                target.status = TargetStatus.CLOSED_WON
-                target.updated_at = _utc_now_iso()
-                self._append("targets", target)
-        self._append("engagements", eng)
+    # ------------------------------------------------------------------
+    # Reporting
+    # ------------------------------------------------------------------
 
-        if economic_engine is not None:
-            try:
-                from dharma_swarm.economic_engine import RevenueSource
-                economic_engine.record_revenue(
-                    amount_usd,
-                    RevenueSource.FREELANCE_CODING,
-                    f"Engagement {engagement_id} payment",
+    def get_agent_stats(self, agent_id: str) -> dict:
+        """Full economic stats for an agent."""
+        budget = self.get_or_create_budget(agent_id)
+        missions = self.get_agent_missions(agent_id, limit=100)
+        return {
+            "agent_id": agent_id,
+            "tokens_allocated": budget.total_tokens_allocated,
+            "tokens_spent": budget.tokens_spent,
+            "tokens_earned": budget.tokens_earned,
+            "tokens_remaining": budget.tokens_remaining,
+            "efficiency_score": budget.efficiency_score,
+            "mission_count": budget.mission_count,
+            "success_count": budget.success_count,
+            "success_rate": budget.success_rate,
+            "active_missions": sum(
+                1
+                for m in missions
+                if m.state
+                in (
+                    MissionState.RECEIVED,
+                    MissionState.QUOTED,
+                    MissionState.ACCEPTED,
+                    MissionState.EXECUTING,
+                    MissionState.DELIVERED,
                 )
-            except Exception as exc:
-                logger.warning("Failed to record revenue: %s", exc)
-        return True
-
-    # -- Compute reinvestment ----------------------------------------------
-
-    def reinvest(
-        self,
-        engagement_id: str,
-        amount_usd: float,
-        target_category: str = "training",
-        provider: str = "",
-        expected_roi: str = "",
-        economic_engine: Any | None = None,
-    ) -> ComputeReinvestment:
-        record = ComputeReinvestment(
-            engagement_id=engagement_id,
-            amount_usd=amount_usd,
-            target_category=target_category,
-            provider=provider,
-            expected_roi=expected_roi,
-        )
-        self._reinvestments.append(record)
-        self._append("reinvestments", record)
-
-        if economic_engine is not None:
-            try:
-                from dharma_swarm.economic_engine import (
-                    BudgetCategory,
-                    ExpenseCategory,
-                )
-                cat_map = {
-                    "training": (ExpenseCategory.GPU_TRAINING, BudgetCategory.TRAINING),
-                    "inference": (ExpenseCategory.GPU_INFERENCE, BudgetCategory.INFERENCE),
-                    "operations": (ExpenseCategory.VPS_HOSTING, BudgetCategory.OPERATIONS),
-                }
-                exp_cat, bud_cat = cat_map.get(
-                    target_category,
-                    (ExpenseCategory.OTHER, BudgetCategory.REINVESTMENT),
-                )
-                economic_engine.record_expense(
-                    amount_usd, exp_cat,
-                    f"Reinvestment from {engagement_id}",
-                    budget_source=bud_cat,
-                )
-            except Exception as exc:
-                logger.warning("Failed to record reinvestment expense: %s", exc)
-        return record
-
-    # -- Pipeline snapshot -------------------------------------------------
-
-    def snapshot(self) -> PipelineSnapshot:
-        targets = list(self._targets.values())
-        return PipelineSnapshot(
-            targets_scouted=sum(1 for t in targets if t.status == TargetStatus.SCOUTED),
-            targets_qualified=sum(1 for t in targets if t.status == TargetStatus.QUALIFIED),
-            outreach_drafted=sum(1 for d in self._outreach.values() if not d.approved),
-            outreach_sent=sum(1 for d in self._outreach.values() if d.sent),
-            replies_received=sum(
-                1 for t in targets if t.status == TargetStatus.REPLIED
             ),
-            engagements_active=sum(
-                1 for e in self._engagements.values()
-                if e.status in (EngagementStatus.SCOPING, EngagementStatus.CONTRACTED,
-                                EngagementStatus.IN_PROGRESS)
+        }
+
+    def get_swarm_economics(self) -> dict:
+        """Aggregate economic health of the swarm."""
+        rows = self._conn.execute("SELECT * FROM agent_budgets").fetchall()
+        if not rows:
+            return {
+                "total_agents": 0,
+                "total_allocated": 0,
+                "total_spent": 0,
+                "total_earned": 0,
+                "avg_efficiency": 0.0,
+                "total_missions": 0,
+                "total_successes": 0,
+            }
+
+        total_allocated = sum(r[1] for r in rows)
+        total_spent = sum(r[2] for r in rows)
+        total_earned = sum(r[3] for r in rows)
+        avg_efficiency = sum(r[4] for r in rows) / len(rows)
+        total_missions = sum(r[5] for r in rows)
+        total_successes = sum(r[6] for r in rows)
+
+        return {
+            "total_agents": len(rows),
+            "total_allocated": total_allocated,
+            "total_spent": total_spent,
+            "total_earned": total_earned,
+            "avg_efficiency": round(avg_efficiency, 4),
+            "total_missions": total_missions,
+            "total_successes": total_successes,
+            "overall_success_rate": round(
+                total_successes / max(total_missions, 1), 4
             ),
-            total_pipeline_value_usd=sum(t.estimated_value_usd for t in targets
-                                         if t.status not in (TargetStatus.DISQUALIFIED,
-                                                             TargetStatus.CLOSED_LOST)),
-            total_contracted_usd=sum(e.contracted_value_usd
-                                     for e in self._engagements.values()),
-            total_paid_usd=sum(e.paid_usd for e in self._engagements.values()),
-            total_reinvested_usd=sum(r.amount_usd for r in self._reinvestments),
+        }
+
+    def get_mission_audit_trail(self, mission_id: str) -> List[dict]:
+        """Get the full state history for a mission."""
+        mission = self.get_mission(mission_id)
+        if mission is None:
+            return []
+        return mission.state_history
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _log_event(
+        self,
+        agent_id: str,
+        event_type: str,
+        amount: int,
+        mission_id: str = "",
+        details: str = "",
+    ) -> None:
+        """Record an economic event for audit purposes."""
+        self._conn.execute(
+            "INSERT INTO economic_events (agent_id, event_type, amount, mission_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                agent_id,
+                event_type,
+                amount,
+                mission_id,
+                details,
+                datetime.now(timezone.utc).isoformat(),
+            ),
         )
-
-    # -- Persistence -------------------------------------------------------
-
-    def _append(self, collection: str, obj: BaseModel) -> None:
-        path = self._dir / f"{collection}.jsonl"
-        try:
-            with open(path, "a") as f:
-                f.write(obj.model_dump_json() + "\n")
-        except OSError:
-            logger.warning("Failed to persist %s record", collection, exc_info=True)
-
-    def _load(self) -> None:
-        self._load_collection("targets", RevenueTarget, self._targets)
-        self._load_collection("offers", Offer, self._offers)
-        self._load_collection("outreach", OutreachDraft, self._outreach)
-        self._load_collection("engagements", Engagement, self._engagements)
-        self._load_list("reinvestments", ComputeReinvestment, self._reinvestments)
-
-    def _load_collection(
-        self,
-        name: str,
-        model_cls: type[BaseModel],
-        store: dict[str, Any],
-    ) -> None:
-        path = self._dir / f"{name}.jsonl"
-        if not path.exists():
-            return
-        try:
-            for line in path.read_text().splitlines():
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    obj = model_cls.model_validate_json(line)
-                    store[obj.id] = obj  # type: ignore[attr-defined]
-                except Exception:
-                    continue
-        except OSError:
-            pass
-
-    def _load_list(
-        self,
-        name: str,
-        model_cls: type[BaseModel],
-        store: list[Any],
-    ) -> None:
-        path = self._dir / f"{name}.jsonl"
-        if not path.exists():
-            return
-        try:
-            for line in path.read_text().splitlines():
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    store.append(model_cls.model_validate_json(line))
-                except Exception:
-                    continue
-        except OSError:
-            pass
+        self._conn.commit()

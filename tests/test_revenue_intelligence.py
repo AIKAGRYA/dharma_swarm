@@ -6,17 +6,17 @@ from pathlib import Path
 
 import pytest
 
-from dharma_swarm.revenue_intelligence import (
+from dharma_swarm.revenue.intel_parser import (
     ClaimType,
     CompetitorProfile,
     IntelDocument,
     IntelSource,
-    RevenueIntelligenceIngestor,
     RevenuePattern,
     build_competitor_profiles,
     identify_revenue_patterns,
     parse_claims,
 )
+from dharma_swarm.revenue.intelligence import RevenueIntelligenceIngestor
 
 
 SAMPLE_INTEL = """
@@ -124,7 +124,7 @@ class TestIngestor:
         assert len(summary["revenue_patterns"]) > 0
 
     def test_route_to_spine(self, ingestor: RevenueIntelligenceIngestor, tmp_path: Path) -> None:
-        from dharma_swarm.economic_spine import EconomicSpine
+        from dharma_swarm.revenue.spine import EconomicSpine
         spine = EconomicSpine(storage_dir=tmp_path / "spine")
         ingestor.ingest_text(SAMPLE_INTEL, title="Test")
         created = ingestor.route_to_spine(spine)

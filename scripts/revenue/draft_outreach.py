@@ -33,7 +33,7 @@ from pathlib import Path
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(_REPO_ROOT))
 
-from dharma_swarm.economic_spine import (
+from dharma_swarm.revenue.spine import (
     EconomicSpine,
     Offer,
     OutreachChannel,
@@ -82,7 +82,7 @@ PAIN_TO_HOOK: dict[str, str] = {
 
 def _build_subject(target: RevenueTarget) -> str:
     """Build email subject line."""
-    org_name = target.org or target.name.split("/")[0] if "/" in target.name else target.name
+    org_name = target.org or (target.name.split("/")[0] if "/" in target.name else target.name)
     return f"Code governance for {org_name}'s AI workflow"
 
 

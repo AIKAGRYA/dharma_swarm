@@ -91,6 +91,25 @@ def _run_system_map_populator(job: dict[str, Any]) -> CronJobExecutionResult:
     )
 
 
+def _run_revenue_scout(job: dict[str, Any]) -> CronJobExecutionResult:
+    """Run the revenue scout daemon cycle."""
+    try:
+        from dharma_swarm.revenue.scout_daemon import revenue_scout_handler
+        success, output, _error = revenue_scout_handler(job)
+        return CronJobExecutionResult(
+            status=CronJobRunStatus.COMPLETED if success else CronJobRunStatus.FAILED,
+            output=output,
+            error=None if success else output[:500],
+        )
+    except Exception as exc:
+        error = f"Revenue scout failed: {exc}"
+        return CronJobExecutionResult(
+            status=CronJobRunStatus.FAILED,
+            output=error,
+            error=error,
+        )
+
+
 def _run_tcs_heartbeat(job: dict[str, Any]) -> CronJobExecutionResult:
     """Sample IdentityMonitor.measure() and append identity history locally."""
 
@@ -670,6 +689,8 @@ def execute_cron_job(job: dict[str, Any]) -> CronJobExecutionResult:
         return _run_system_map_populator(job)
     if handler == "tcs_heartbeat":
         return _run_tcs_heartbeat(job)
+    if handler == "revenue_scout":
+        return _run_revenue_scout(job)
 
     error = f"Unsupported cron handler: {handler}"
     return CronJobExecutionResult(

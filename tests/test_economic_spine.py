@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from dharma_swarm.economic_spine import (
+from dharma_swarm.revenue.spine import (
     ComputeReinvestment,
     EconomicSpine,
     Engagement,
