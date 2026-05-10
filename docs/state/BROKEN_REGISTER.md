@@ -21,24 +21,11 @@
 
 ---
 
-## OPEN ITEMS (14 open after convergence pass 2026-05-07 18:08; 5 closed below)
+## OPEN ITEMS (10 open after PR #187 closure pass 2026-05-10; 9 closed below)
 
 > **Convergence pass executed 2026-05-07 18:00–18:10:** Plan at `~/.claude/plans/yes-write-a-plan-wobbly-cerf.md`. Closed items moved to CLOSED section: BR-001 (cron daemon plist fixed), BR-016 (SOVEREIGN_MANIFEST counts refreshed and now DocOps-verified), BR-017 (BUILD_SESSION_ENTRYPOINT.md present), BR-018 (MEGAFILE_INDEX referenced from CLAUDE.md + README), BR-019 (Coherence Delta CI validator installed). BR-015 was already CLOSED. Total CLOSED = 6; OPEN = 13.
 
-*(BR-001 moved to CLOSED ITEMS — see below)*
-
-### BR-002 — Central VentureCell loop is open
-- **first_observed:** 2026-05-07
-- **last_verified:** 2026-05-07
-- **age_days:** 0
-- **severity:** BLOCKER
-- **domain:** runtime
-- **root_cause:** Board → VentureCell → gates → dispatch → outcome → witness/algedonic → board feedback path is not closed. Outcomes do not feed back into opportunity_board.json.
-- **blast_radius:** Shakti always re-derives from raw signals; opportunity loop is forward-only; "later VentureCells more powerful than earlier" is aspiration, not mechanism.
-- **evidence:** `~/.dharma/audit/central_loop_trace_2026-05-07.md`; vision_maps `06_outward_organs.md`; survey synthesis Finding 2.
-- **status:** PARTIAL — 2026-05-07 partial closure across two writes:
-  1. **Read side (this branch):** `dharma_swarm/shakti_executive/inputs.py` reads TelicSeam `Outcome` / `ValueEvent` / `Contribution`, dispatcher health, campaign manifests, and Darwin sealed-packet archive rows as feedback signals.
-  2. **Write side (this commit):** `dharma_swarm/shakti_executive/feedback_writer.py` exposes `update_opportunity_outcome(opp_id, outcome)` that appends realized outcomes to `opportunity_board.json` and updates `learned_score_delta`. Atomic write, idempotent on duplicate `outcome_id`, capped per-outcome score delta. 8/8 tests pass under `tests/test_feedback_writer.py`. **Caller wiring (proposal_id → campaign manifest → opportunity_id resolution) is NOT yet in place** — the writer is a public-API library; the resolver is a follow-up. Full VentureCell polymorphism (BR-008) and full loop closure remain open.
+*(BR-001, BR-002, BR-007, and BR-008 moved to CLOSED ITEMS — see below)*
 
 ### BR-003 — Apply gate present but closed (self-evolution loop)
 - **first_observed:** 2026-05-07
@@ -83,28 +70,6 @@
 - **blast_radius:** Agents loading context get stale self-model. Recognition is recognition of yesterday's state.
 - **evidence:** `~/.dharma/audit/ten_megafiles_q6_2026-05-07.md`; vision_maps `04_recognition_self_model.md`. Post-fix verification: cron daemon PID 35207 running lf5-venv binary; recognition_seed mtime unchanged at May 1.
 - **status:** OPEN — needs SCOPED INVESTIGATION (where in the metabolic clock does recognition_seed regeneration happen? `meta_daemon.py:RecognitionEngine`? Is there a separate cron handler that should fire it? The `meta_daemon.py:272-285` hard-coded March 2026 thesis-timing logic — does that gate regeneration?). Not auto-resolved by cron daemon fix.
-
-### BR-007 — Two stores for one self (runtime.db ↔ ontology.db never synced)
-- **first_observed:** 2026-05-07
-- **last_verified:** 2026-05-07
-- **age_days:** 0
-- **severity:** BLOCKER (architectural)
-- **domain:** runtime / state
-- **root_cause:** `runtime.db` (live operational state) and `ontology.db` (typed self-model) are not continuously synchronized. Plus runtime.db itself has path drift: SwarmManager uses `state/runtime.db` for live orchestration but `_record_memory_fact()` writes `db/runtime.db`.
-- **blast_radius:** Every gate, audit, and recognition fires against a stale picture. Recognition is commentary instead of causal.
-- **evidence:** `~/.dharma/audit/repo_hot_items_scratchpad_2026-05-07.md` (item #2); ten_megafiles synthesis Finding 1.
-- **status:** OPEN.
-
-### BR-008 — VentureCell-as-ontology vs VentureCell-as-organ are not the same artifact
-- **first_observed:** 2026-05-07
-- **last_verified:** 2026-05-07
-- **age_days:** 0
-- **severity:** BLOCKER (architectural)
-- **domain:** runtime
-- **root_cause:** Registering a `VentureCell` in `ontology.py:1876` inherits invariants automatically. Creating a running organ (Ginko, Loomwork) re-derives loop, state file, and adapters bespoke. No polymorphism between the two definitions.
-- **blast_radius:** "Later VentureCells more powerful than earlier" is aspiration, not mechanism. 0 of named outward organs are full-spine-attached (8 surfaces).
-- **evidence:** vision_maps `06_outward_organs.md`; ten_megafiles synthesis Finding 2.
-- **status:** OPEN.
 
 ### BR-009 — Roadmap is contested (3 docs claim primacy)
 - **first_observed:** 2026-05-07
@@ -235,6 +200,18 @@
 ---
 
 ## CLOSED ITEMS
+
+### BR-002 (CLOSED 2026-05-10 via PR #187) — central VentureCell loop feedback
+- **Closing evidence:** `dharma_swarm/opportunity_refill.py:409-438` promotes canonical Shakti `opportunity_id` rows into `frontier_tasks_pending.jsonl` and marks those same board rows addressed. `dharma_swarm/orchestrate_live.py:75-122` drains the frontier queue into `TaskBoard` entries with `opportunity_id` metadata and typed `TaskPriority`. `dharma_swarm/telic_seam.py:338-358` feeds completed outcomes back through `update_opportunity_outcome()`. `cron_jobs.json` registers the enabled `frontier_refill` scheduler entry.
+- **Verification:** `tests/test_br_closures.py` covers canonical `opportunity_id`, malformed scores, queue drain into `TaskBoard`, and metadata preservation. Manual probe confirmed canonical board row `opp-canonical` round-trips to frontier metadata and `update_opportunity_outcome()` returns `True`.
+
+### BR-007 (CLOSED 2026-05-10 via PR #187) — runtime.db and ontology.db sync
+- **Closing evidence:** `dharma_swarm/swarm.py:3061` now writes `_record_memory_fact()` to `self.state_dir / "state" / "runtime.db"`, matching the live runtime path. `dharma_swarm/engine/store_sync.py` materializes ontology `Outcome` objects as runtime `artifact_records` with `artifact_id = f"ont-{outcome.id}"`; sync is idempotent through the runtime primary key and explicit existing-row check. `dharma_swarm/cron_runner.py:577-596` exposes the `store_sync` handler, `cron_jobs.json` registers the enabled `store_sync` interval job, and `dharma_swarm/orchestrate_live.py:1732-1738` runs sync from the room-health loop under a guard.
+- **Verification:** `tests/test_br_closures.py::TestStoreSync` covers missing ontology DB, materialization, and idempotent rerun.
+
+### BR-008 (CLOSED 2026-05-10 via PR #187) — VentureCell ontology/organ polymorphism
+- **Closing evidence:** `dharma_swarm/fractal/room_bridge.py:375-459` maps `VentureCellV1` rooms to deterministic ontology object IDs using the room ID, updates existing objects through `put_object()`, hydrates ontology objects back to `VentureCellV1`, and preserves original room lifecycle status in `room_status`. `dharma_swarm/orchestrate_live.py:1722-1730` syncs the room registry to ontology and persists the shared registry back to `ontology.db`.
+- **Verification:** `tests/test_br_closures.py::TestVentureCellPolymorphism` covers room→ontology, ontology→room, roundtrip, registry batch sync, existing-cell update without duplicates, and all `RoomStatus` values.
 
 ### BR-015 (CLOSED 2026-05-07 18:00) — `.FOCUS` reader
 - **Closing evidence:** `dharma_swarm/swarm.py:1514` ("Check .PAUSE, .FOCUS, .INJECT, EMERGENCY_HOLD files."); `:1533-1534` (text read); `:2114, :2122, :2125` (Wire 3 routing governance, GPR routing-bias, RM research-priority boost).

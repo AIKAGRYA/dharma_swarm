@@ -370,7 +370,7 @@ Stop the Go track and return to the operator if a Go PR does any of the followin
 | `dharma_swarm/assurance/` | 14 files | Automated quality assurance scanners (API, context, lifecycle, storage, routes, test gaps) |
 | `dharma_swarm/cascade_domains/` | 6 files | Domain-specific cascade scoring (code, skill, product, research, meta) |
 | `dharma_swarm/contracts/` | 12 files | Interface contracts (intelligence stack, runtime adapters, factory, evaluation, telemetry) |
-| `dharma_swarm/engine/` | 12+ files | Core engine (chunker, conversation memory, event memory, hybrid retriever, knowledge store, provenance, unified index) |
+| `dharma_swarm/engine/` | 12+ files | Core engine (chunker, conversation memory, event memory, hybrid retriever, knowledge store, provenance, store sync, unified index) |
 | `dharma_swarm/gateway/` | 4 files | External gateways (Telegram, base runner) |
 | `dharma_swarm/integrations/` | 5 files | Third-party integrations (data flywheel, KaizenOps, NVIDIA RAG, reciprocity commons) |
 | `dharma_swarm/skills/` | 9 .skill.md | Embedded skill definitions (archeologist, architect, builder, cartographer, etc.) |
