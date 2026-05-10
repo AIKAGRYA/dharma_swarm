@@ -45,7 +45,7 @@ _SKILL_ROLE_MAP = {
     "archeologist": AgentRole.ARCHEOLOGIST,
     "validator": AgentRole.VALIDATOR,
     "researcher": AgentRole.RESEARCHER,
-    "builder": AgentRole.GENERAL,
+    "builder": AgentRole.CODER,
 }
 
 _PROVIDER_MAP = {
@@ -73,6 +73,26 @@ def _has_ollama_key() -> bool:
     return bool(os.environ.get("OLLAMA_API_KEY", "").strip())
 
 
+def _has_nim_key() -> bool:
+    import os
+    return bool(os.environ.get("NVIDIA_NIM_API_KEY", "").strip())
+
+
+def _cyber_provider_model(
+    *,
+    ollama_model: str,
+    openrouter_free_model: str,
+    nim_model: str | None = None,
+) -> tuple[ProviderType, str]:
+    if nim_model and _has_nim_key():
+        return ProviderType.NVIDIA_NIM, nim_model
+    if _has_ollama_key():
+        return ProviderType.OLLAMA, ollama_model
+    if _has_openrouter_key():
+        return ProviderType.OPENROUTER_FREE, openrouter_free_model
+    return ProviderType.CLAUDE_CODE, "sonnet"
+
+
 def _resolve_default_crew() -> list[dict]:
     """Build crew preferring free providers.  Ollama Cloud > OpenRouter > Claude Code.
 
@@ -83,17 +103,27 @@ def _resolve_default_crew() -> list[dict]:
     if _has_ollama_key():
         # Ollama Cloud — diverse frontier models for error decorrelation
         from dharma_swarm.ollama_config import OLLAMA_CLOUD_FRONTIER_MODELS
-        _models = OLLAMA_CLOUD_FRONTIER_MODELS  # glm-5, deepseek-v3.2, kimi-k2.5, minimax-m2.7, qwen3-coder
-        return [
+        _models = OLLAMA_CLOUD_FRONTIER_MODELS  # glm-5, kimi-k2.5, minimax-m2.7, deepseek-v3.2, qwen3-coder
+        crew = [
             {"name": "cartographer", "role": AgentRole.CARTOGRAPHER,
              "thread": "mechanistic", "provider": ProviderType.OLLAMA, "model": _models[0]},  # glm-5
             {"name": "surgeon", "role": AgentRole.SURGEON,
-             "thread": "alignment", "provider": ProviderType.OLLAMA, "model": _models[2]},    # kimi-k2.5
+             "thread": "alignment", "provider": ProviderType.OLLAMA, "model": _models[1]},    # kimi-k2.5
             {"name": "architect", "role": AgentRole.ARCHITECT,
-             "thread": "architectural", "provider": ProviderType.OLLAMA, "model": _models[1]}, # deepseek-v3.2
-            {"name": "validator", "role": AgentRole.VALIDATOR,
-             "thread": "scaling", "provider": ProviderType.OLLAMA, "model": _models[4]},       # qwen3-coder
+             "thread": "architectural", "provider": ProviderType.OLLAMA, "model": _models[2]}, # minimax-m2.7
         ]
+        if _has_nim_key():
+            crew.append(
+                {"name": "validator", "role": AgentRole.VALIDATOR,
+                 "thread": "scaling", "provider": ProviderType.NVIDIA_NIM,
+                 "model": DEFAULT_MODELS[ProviderType.NVIDIA_NIM]}
+            )
+        else:
+            crew.append(
+                {"name": "validator", "role": AgentRole.VALIDATOR,
+                 "thread": "scaling", "provider": ProviderType.OLLAMA, "model": _models[3]}
+            )
+        return crew
 
     if _has_openrouter_key():
         # OpenRouter Free — diverse free models for error decorrelation
@@ -132,8 +162,14 @@ CYBERNETICS_CREW = [
         "name": "cyber-glm5",
         "role": AgentRole.RESEARCHER,
         "thread": "cybernetics",
-        "provider": ProviderType.OLLAMA,
-        "model": "glm-5:cloud",
+        "provider": _cyber_provider_model(
+            ollama_model="glm-5:cloud",
+            openrouter_free_model="meta-llama/llama-3.3-70b-instruct:free",
+        )[0],
+        "model": _cyber_provider_model(
+            ollama_model="glm-5:cloud",
+            openrouter_free_model="meta-llama/llama-3.3-70b-instruct:free",
+        )[1],
         "system_prompt": (
             "You are CYBER-GLM5, the Variety Cartographer of the Cybernetics Directive. "
             "Map S2/S3/S4/S5 wiring, identify where governance variety is attenuated, "
@@ -144,8 +180,14 @@ CYBERNETICS_CREW = [
         "name": "cyber-kimi25",
         "role": AgentRole.CARTOGRAPHER,
         "thread": "cybernetics",
-        "provider": ProviderType.OLLAMA,
-        "model": "kimi-k2.5:cloud",
+        "provider": _cyber_provider_model(
+            ollama_model="kimi-k2.5:cloud",
+            openrouter_free_model="qwen/qwen3-32b:free",
+        )[0],
+        "model": _cyber_provider_model(
+            ollama_model="kimi-k2.5:cloud",
+            openrouter_free_model="qwen/qwen3-32b:free",
+        )[1],
         "system_prompt": (
             "You are CYBER-KIMI25, the ecosystem mapper of the Cybernetics Directive. "
             "Trace cross-file, cross-module, and cross-ledger connections; make the "
@@ -156,8 +198,8 @@ CYBERNETICS_CREW = [
         "name": "cyber-codex",
         "role": AgentRole.SURGEON,
         "thread": "cybernetics",
-        "provider": ProviderType.OLLAMA,
-        "model": "qwen3-coder:480b-cloud",
+        "provider": ProviderType.CODEX,
+        "model": "gpt-5.4",
         "system_prompt": (
             "You are CYBER-CODEX, the execution and wiring seat of the Cybernetics Directive. "
             "Prefer the smallest hot-path control improvement over broad subsystem invention. "
@@ -168,8 +210,16 @@ CYBERNETICS_CREW = [
         "name": "cyber-opus",
         "role": AgentRole.ARCHITECT,
         "thread": "cybernetics",
-        "provider": ProviderType.OLLAMA,
-        "model": "deepseek-v3.2:cloud",
+        "provider": _cyber_provider_model(
+            ollama_model="minimax-m2.7:cloud",
+            openrouter_free_model="deepseek/deepseek-chat-v3-0324:free",
+            nim_model=DEFAULT_MODELS[ProviderType.NVIDIA_NIM],
+        )[0],
+        "model": _cyber_provider_model(
+            ollama_model="minimax-m2.7:cloud",
+            openrouter_free_model="deepseek/deepseek-chat-v3-0324:free",
+            nim_model=DEFAULT_MODELS[ProviderType.NVIDIA_NIM],
+        )[1],
         "system_prompt": (
             "You are CYBER-OPUS, the identity and architecture seat of the Cybernetics Directive. "
             "Hold telos, constitutional coherence, and the bounded mission shape. "
@@ -330,7 +380,7 @@ async def spawn_default_crew(swarm) -> list:
         logger.info("All agents already exist, skipping spawn")
         return []
 
-    spawn_ops = []
+    spawn_specs: list[tuple[dict, asyncio.Future]] = []
     for spec in specs_to_spawn:
         provider = spec.get("provider", ProviderType.CLAUDE_CODE)
         model = spec.get("model", "claude-code")
@@ -340,25 +390,46 @@ async def spawn_default_crew(swarm) -> list:
             if base_prompt
             else MEMORY_SURVIVAL_INSTINCT
         )
-        spawn_ops.append(
-            swarm.spawn_agent(
+        spawn_specs.append((
+            spec,
+            asyncio.create_task(swarm.spawn_agent(
                 name=spec["name"],
                 role=spec["role"],
                 thread=spec["thread"],
                 provider_type=provider,
                 model=model,
                 system_prompt=merged_prompt,
+            ))
+        ))
+
+    agents = []
+    for spec, spawn_op in spawn_specs:
+        try:
+            agent = await asyncio.wait_for(spawn_op, timeout=20.0)
+            agents.append(agent)
+            logger.info(
+                "Spawned %s (%s) on %s [%s]",
+                spec["name"],
+                spec["role"].value,
+                spec.get("provider", ProviderType.CLAUDE_CODE).value,
+                spec["thread"],
             )
-        )
+        except TimeoutError:
+            logger.warning(
+                "Timed out spawning %s on %s [%s]; continuing startup",
+                spec["name"],
+                spec.get("provider", ProviderType.CLAUDE_CODE).value,
+                spec["thread"],
+            )
+        except Exception as exc:
+            logger.warning(
+                "Failed to spawn %s on %s [%s]: %s",
+                spec["name"],
+                spec.get("provider", ProviderType.CLAUDE_CODE).value,
+                spec["thread"],
+                exc,
+            )
 
-    agents = await asyncio.gather(*spawn_ops)
-
-    # Log results
-    for spec in specs_to_spawn:
-        logger.info("Spawned %s (%s) on %s [%s]",
-                     spec["name"], spec["role"].value,
-                     spec.get("provider", ProviderType.CLAUDE_CODE).value,
-                     spec["thread"])
     return list(agents)
 
 
@@ -376,7 +447,7 @@ async def spawn_cybernetics_crew(swarm) -> list:
         logger.info("Cybernetics crew already exists, skipping spawn")
         return []
 
-    spawn_ops = []
+    spawn_specs: list[tuple[dict, asyncio.Future]] = []
     for spec in specs_to_spawn:
         base_prompt = str(spec.get("system_prompt", "") or "").strip()
         merged_prompt = (
@@ -384,27 +455,45 @@ async def spawn_cybernetics_crew(swarm) -> list:
             if base_prompt
             else MEMORY_SURVIVAL_INSTINCT
         )
-        spawn_ops.append(
-            swarm.spawn_agent(
+        spawn_specs.append((
+            spec,
+            asyncio.create_task(swarm.spawn_agent(
                 name=spec["name"],
                 role=spec["role"],
                 thread=spec["thread"],
                 provider_type=spec["provider"],
                 model=spec["model"],
                 system_prompt=merged_prompt,
+            ))
+        ))
+
+    agents = []
+    for spec, spawn_op in spawn_specs:
+        try:
+            agent = await asyncio.wait_for(spawn_op, timeout=20.0)
+            agents.append(agent)
+            logger.info(
+                "Spawned cybernetics seat %s (%s) on %s [%s]",
+                spec["name"],
+                spec["role"].value,
+                spec["provider"].value,
+                spec["thread"],
             )
-        )
-
-    agents = await asyncio.gather(*spawn_ops)
-
-    for spec in specs_to_spawn:
-        logger.info(
-            "Spawned cybernetics seat %s (%s) on %s [%s]",
-            spec["name"],
-            spec["role"].value,
-            spec["provider"].value,
-            spec["thread"],
-        )
+        except TimeoutError:
+            logger.warning(
+                "Timed out spawning cybernetics seat %s on %s [%s]; continuing startup",
+                spec["name"],
+                spec["provider"].value,
+                spec["thread"],
+            )
+        except Exception as exc:
+            logger.warning(
+                "Failed to spawn cybernetics seat %s on %s [%s]: %s",
+                spec["name"],
+                spec["provider"].value,
+                spec["thread"],
+                exc,
+            )
 
     return list(agents)
 
@@ -452,26 +541,20 @@ async def create_seed_tasks(swarm) -> list:
     """
     from dharma_swarm.models import TaskStatus
 
-    # Check if any of the SEED_TASK titles are currently active (PENDING or RUNNING).
-    # We look by title to avoid re-seeding tasks that are mid-flight.
-    # We do NOT check COMPLETED/FAILED — those are done and we should re-seed.
-    seed_titles = {spec["title"] for spec in SEED_TASKS}
-    active_seeds: list = []
+    # Any active work means startup should not flood the queue with seed tasks.
+    # A fresh empty board receives seeds; a live board keeps its operator focus.
+    active_tasks: list = []
     for status in (TaskStatus.PENDING, TaskStatus.RUNNING):
         try:
             active = await swarm.list_tasks(status=status)
-            active_seeds.extend(
-                t for t in active
-                if getattr(t, 'title', '') in seed_titles
-            )
+            active_tasks.extend(active)
         except Exception:
             pass
 
-    if active_seeds:
+    if active_tasks:
         logger.info(
-            "Seed tasks already active (%d in-flight), skipping re-seed: %s",
-            len(active_seeds),
-            [getattr(t, 'title', '')[:40] for t in active_seeds[:3]],
+            "Task queue already active (%d in-flight), skipping seed creation",
+            len(active_tasks),
         )
         return []
 
@@ -483,7 +566,10 @@ async def create_seed_tasks(swarm) -> list:
     task_specs = [
         {
             "title": spec["title"],
-            "description": spec["description"].replace("{date}", date_str),
+            "description": (
+                spec["description"].replace("{date}", date_str)
+                + f"\n\nSeed date: {date_str}"
+            ),
             "priority": spec["priority"],
             "created_by": "operator",
             "metadata": {

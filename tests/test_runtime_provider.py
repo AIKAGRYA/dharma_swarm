@@ -6,6 +6,7 @@ from dharma_swarm.model_hierarchy import DEFAULT_MODELS
 from dharma_swarm.models import LLMResponse, ProviderType
 from dharma_swarm.runtime_provider import (
     DEFAULT_GROQ_MODEL,
+    DEFAULT_PROVIDER_TIMEOUT_SECONDS,
     DEFAULT_SILICONFLOW_MODEL,
     DEFAULT_FIREWORKS_MODEL,
     DEFAULT_OPENROUTER_MODEL,
@@ -17,11 +18,14 @@ from dharma_swarm.runtime_provider import (
     SILICONFLOW_BASE_URL,
     TOGETHER_BASE_URL,
     RuntimeProviderConfig,
+    _apply_runtime_diversity_overlay,
+    _select_ollama_diversity_model,
     complete_via_preferred_runtime_providers,
     create_default_provider_map,
     preferred_runtime_provider_configs,
     resolve_runtime_provider_config,
 )
+from dharma_swarm.config import DEFAULT_CONFIG
 
 
 def test_resolve_runtime_provider_config_for_nim_uses_env_base_and_model(monkeypatch) -> None:
@@ -79,6 +83,11 @@ def test_resolve_runtime_provider_config_for_codex_uses_npm_global_fallback(
 
 def test_runtime_provider_openrouter_default_model_matches_canonical_hierarchy() -> None:
     assert DEFAULT_OPENROUTER_MODEL == DEFAULT_MODELS[ProviderType.OPENROUTER]
+
+
+def test_default_provider_timeout_matches_subprocess_config() -> None:
+    assert DEFAULT_PROVIDER_TIMEOUT_SECONDS == DEFAULT_CONFIG.agent.subprocess_timeout_seconds
+    assert DEFAULT_PROVIDER_TIMEOUT_SECONDS >= 900
 
 
 def test_resolve_runtime_provider_config_for_groq_uses_env_base_and_model(monkeypatch) -> None:
@@ -305,3 +314,120 @@ async def test_complete_via_preferred_runtime_providers_prefers_ollama_then_nim(
         ("ollama", "ollama-local"),
         ("nvidia_nim", "nim-local"),
     ]
+
+
+def test_select_ollama_diversity_model_prefers_synthesis_lane_for_pulse_metadata() -> None:
+    model = _select_ollama_diversity_model(
+        {
+            "source": "pulse",
+            "execution_mode": "headless_pulse_fallback",
+        }
+    )
+    assert model == "minimax-m2.7:cloud"
+
+
+def test_select_ollama_diversity_model_prefers_research_lane_for_context_metadata() -> None:
+    model = _select_ollama_diversity_model(
+        {
+            "source": "context_agent",
+            "execution_mode": "headless_context_agent",
+        }
+    )
+    assert model == "kimi-k2.5:cloud"
+
+
+def test_apply_runtime_diversity_overlay_demotes_ollama_and_rotates_its_model(monkeypatch) -> None:
+    class _FakeGovernor:
+        def reorder_providers(self, candidates, default_model_hints=None):
+            return (
+                [ProviderType.NVIDIA_NIM, ProviderType.OLLAMA, ProviderType.OPENROUTER],
+                ["diversity_demote_provider:ollama"],
+            )
+
+        def snapshot(self):
+            class _Snapshot:
+                model_monoculture = True
+                top_provider = ProviderType.OLLAMA.value
+                top_model = "glm-5:cloud"
+
+            return _Snapshot()
+
+    monkeypatch.setattr("dharma_swarm.runtime_provider.DiversityGovernor", _FakeGovernor)
+
+    provider_order, overrides = _apply_runtime_diversity_overlay(
+        (
+            ProviderType.OLLAMA,
+            ProviderType.NVIDIA_NIM,
+            ProviderType.OPENROUTER,
+        ),
+        metadata={
+            "source": "pulse",
+            "execution_mode": "headless_pulse_fallback",
+        },
+    )
+
+    assert provider_order[0] == ProviderType.NVIDIA_NIM
+    assert overrides[ProviderType.OLLAMA] == "minimax-m2.7:cloud"
+
+
+@pytest.mark.asyncio
+async def test_complete_via_preferred_runtime_providers_applies_runtime_diversity_overlay(
+    monkeypatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    class _FakeGovernor:
+        def reorder_providers(self, candidates, default_model_hints=None):
+            return ([ProviderType.NVIDIA_NIM, ProviderType.OLLAMA], ["diversity_demote_provider:ollama"])
+
+        def snapshot(self):
+            class _Snapshot:
+                model_monoculture = True
+                top_provider = ProviderType.OLLAMA.value
+                top_model = "glm-5:cloud"
+
+            return _Snapshot()
+
+    class _FakeProvider:
+        async def complete(self, request):
+            captured["request_model"] = request.model
+            return LLMResponse(content="ok", model=request.model)
+
+        async def close(self):
+            return None
+
+    def _fake_preferred_configs(**kwargs):
+        captured["provider_order"] = kwargs["provider_order"]
+        captured["model_overrides"] = kwargs["model_overrides"]
+        return [
+            RuntimeProviderConfig(
+                provider=ProviderType.NVIDIA_NIM,
+                available=True,
+                default_model="nim-local",
+            ),
+            RuntimeProviderConfig(
+                provider=ProviderType.OLLAMA,
+                available=True,
+                default_model=kwargs["model_overrides"].get(ProviderType.OLLAMA) or "glm-5:cloud",
+            ),
+        ]
+
+    monkeypatch.setattr("dharma_swarm.runtime_provider.DiversityGovernor", _FakeGovernor)
+    monkeypatch.setattr(
+        "dharma_swarm.runtime_provider.preferred_runtime_provider_configs",
+        _fake_preferred_configs,
+    )
+    monkeypatch.setattr(
+        "dharma_swarm.runtime_provider.create_runtime_provider",
+        lambda _config: _FakeProvider(),
+    )
+
+    response, config = await complete_via_preferred_runtime_providers(
+        messages=[{"role": "user", "content": "hello"}],
+        metadata={"source": "pulse", "execution_mode": "headless_pulse_fallback"},
+    )
+
+    assert response.content == "ok"
+    assert config.provider == ProviderType.NVIDIA_NIM
+    assert captured["provider_order"][0] == ProviderType.NVIDIA_NIM
+    assert captured["model_overrides"][ProviderType.OLLAMA] == "minimax-m2.7:cloud"

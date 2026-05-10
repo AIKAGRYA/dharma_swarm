@@ -94,6 +94,12 @@ Keep the hypnagogic voice — half-awake, generative, not yet engineering."""
             temperature=0.75,
             provider_order=PREFERRED_LOW_COST_WITH_ANTHROPIC_RUNTIME_PROVIDERS,
             timeout_seconds=180.0,
+            metadata={
+                "execution_mode": "hypnagogic_journal",
+                "source": "hypnagogic",
+                "task_title": "dream_journal",
+                "tier": "subconscious",
+            },
         )
         journal_text = response.content
     except Exception as exc:

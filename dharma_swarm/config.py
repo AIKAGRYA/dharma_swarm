@@ -14,6 +14,13 @@ import os
 from pydantic import BaseModel, Field
 
 
+def _env_int(name: str, default: int) -> int:
+    raw = os.environ.get(name)
+    if raw is None or not raw.strip():
+        return default
+    return int(raw)
+
+
 # ---------------------------------------------------------------------------
 # Orchestrator parameters
 # ---------------------------------------------------------------------------
@@ -84,7 +91,8 @@ class AgentConfig_(BaseModel):
         description="Seconds before an agent is considered silent",
     )
     subprocess_timeout_seconds: int = Field(
-        default=300, ge=30, le=3600,
+        default_factory=lambda: _env_int("DGC_SUBPROCESS_TIMEOUT_SECONDS", 900),
+        ge=30, le=7200,
         description="Default timeout for CLI subprocess providers",
     )
     max_output_chars: int = Field(
@@ -134,7 +142,12 @@ class LiveLoopConfig(BaseModel):
         description="Consolidation (sleep) cycle interval (default 24h)",
     )
     max_daily_tasks: int = Field(
-        default=int(os.environ.get("DGC_MAX_DAILY", "50")),
+        default_factory=lambda: int(
+            os.environ.get(
+                "DHARMA_PULSE_DAILY_LIMIT",
+                os.environ.get("DGC_MAX_DAILY", "500"),
+            )
+        ),
         ge=1, le=1000,
         description="Maximum tasks per day",
     )

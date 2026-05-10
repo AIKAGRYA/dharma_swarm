@@ -8,7 +8,6 @@ import uuid
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any, Iterable, Sequence
 
 from pydantic import BaseModel, Field
@@ -290,7 +289,7 @@ class EpistemicTelemetryStore:
     """Append-only JSONL store for epistemic incidents and provider probes."""
 
     def __init__(self, *, state_dir: str | Path | None = None) -> None:
-        base = Path(state_dir).expanduser() if state_dir is not None else (dharma_state_dir())
+        base = Path(state_dir).expanduser() if state_dir is not None else (Path.home() / ".dharma")
         self.base_dir = base / "logs" / "epistemic"
         self.incidents_path = self.base_dir / "incidents.jsonl"
         self.provider_probes_path = self.base_dir / "provider_probes.jsonl"

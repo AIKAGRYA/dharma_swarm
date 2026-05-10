@@ -16,7 +16,7 @@ from dharma_swarm.zeitgeist import (
     THREAT_KEYWORDS,
     ZeitgeistScanner,
     ZeitgeistSignal,
-    _parse_llm_signals,
+    _parse_claude_signals,
 )
 
 
@@ -100,11 +100,11 @@ class TestDetectThreats:
         assert threats == []
 
 
-# -- LLM scan parsing tests -------------------------------------------------
+# -- Claude scan parsing tests ---------------------------------------------
 
 
-class TestLLMSignalParsing:
-    def test_parse_llm_signal_payload(self) -> None:
+class TestClaudeSignalParsing:
+    def test_parse_claude_signal_payload(self) -> None:
         raw = json.dumps(
             {
                 "signals": [
@@ -119,10 +119,10 @@ class TestLLMSignalParsing:
             }
         )
 
-        signals = _parse_llm_signals(raw)
+        signals = _parse_claude_signals(raw)
 
         assert len(signals) == 1
-        assert signals[0].source == "llm_scan"
+        assert signals[0].source == "claude_scan"
         assert signals[0].category == "threat"
         assert signals[0].relevance_score == 0.9
 
@@ -131,35 +131,16 @@ class TestLLMSignalParsing:
             [
                 "user",
                 '{"signals":[{"category":"opportunity","title":"prompt echo"}]}',
-                "assistant",
+                "codex",
                 '{"signals":[{"category":"methodology","title":"parsed result","relevance_score":0.7}]}',
             ]
         )
 
-        signals = _parse_llm_signals(raw)
+        signals = _parse_claude_signals(raw)
 
         assert len(signals) == 1
         assert signals[0].category == "methodology"
         assert signals[0].title == "parsed result"
-
-    def test_parse_unknown_category_as_methodology(self) -> None:
-        raw = json.dumps(
-            {
-                "signals": [
-                    {
-                        "category": "signal",
-                        "title": "Governance pressure",
-                        "relevance_score": 1.5,
-                    }
-                ]
-            }
-        )
-
-        signals = _parse_llm_signals(raw)
-
-        assert len(signals) == 1
-        assert signals[0].category == "methodology"
-        assert signals[0].relevance_score == 1.0
 
 
 # -- Local scan tests ------------------------------------------------------

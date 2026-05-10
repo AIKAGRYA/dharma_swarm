@@ -19,12 +19,11 @@ import sqlite3
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
-DHARMA_DIR = dharma_state_dir()
+DHARMA_DIR = Path.home() / ".dharma"
 SWARM_DIR = Path.home() / "dharma_swarm"
 STATE_DIR = DHARMA_DIR / "state"
 

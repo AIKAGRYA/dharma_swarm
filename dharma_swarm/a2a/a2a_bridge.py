@@ -20,7 +20,6 @@ import logging
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 from dharma_swarm.a2a.agent_card import CardRegistry
@@ -35,7 +34,7 @@ from dharma_swarm.a2a.a2a_server import (
 
 logger = logging.getLogger(__name__)
 
-_DHARMA_HOME = dharma_state_dir("DHARMA_HOME")
+_DHARMA_HOME = Path(os.getenv("DHARMA_HOME", Path.home() / ".dharma"))
 
 # Signal types emitted onto the signal bus
 SIGNAL_A2A_TASK_SUBMITTED = "A2A_TASK_SUBMITTED"

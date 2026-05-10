@@ -13,8 +13,6 @@ Detects:
 
 from __future__ import annotations
 
-import base64
-import binascii
 import logging
 import re
 from dataclasses import dataclass, field
@@ -25,8 +23,7 @@ logger = logging.getLogger(__name__)
 
 _THREAT_PATTERNS: list[tuple[str, str]] = [
     # Prompt injection
-    (r"ignore\s+(?:all\s+)?(previous|above|prior)\s+instructions", "prompt_injection"),
-    (r"ignore\s+all\s+instructions", "prompt_injection"),
+    (r"ignore\s+(previous|all|above|prior)\s+instructions", "prompt_injection"),
     (r"disregard\s+(your|all|any)\s+(instructions|rules|guidelines)", "disregard_rules"),
     (r"system\s+prompt\s+override", "sys_prompt_override"),
     (r"you\s+are\s+now\s+(a|an)\s+(?!agent)", "identity_override"),
@@ -63,24 +60,6 @@ _INVISIBLE_CHARS: set[str] = {
     "\u202e",  # right-to-left override
 }
 
-_FUZZY_TARGETS = (
-    "ignore",
-    "previous",
-    "system",
-    "instructions",
-    "bypass",
-    "override",
-    "reveal",
-    "delete",
-)
-
-_BASE64_TOKEN_RE = re.compile(
-    r"(?<![A-Za-z0-9+/])([A-Za-z0-9+/]{16,}={0,2})(?![A-Za-z0-9+/=])"
-)
-_MAX_TYPOGLYCEMIA_WORDS = 20_000
-_MAX_BASE64_TOKENS = 64
-_MAX_BASE64_TOKEN_CHARS = 4_096
-
 
 @dataclass
 class ScanResult:
@@ -116,9 +95,6 @@ def scan_content(content: str, filename: str = "<unknown>") -> ScanResult:
         if re.search(pattern, content, re.IGNORECASE):
             findings.append(threat_id)
 
-    findings.extend(_typoglycemia_findings(content))
-    findings.extend(_encoded_payload_findings(content))
-
     if findings:
         logger.warning(
             "Context file %s blocked: %s",
@@ -151,58 +127,3 @@ def scan_and_sanitize(content: str, filename: str = "<unknown>") -> str:
     """
     result = scan_content(content, filename)
     return result.sanitized_content
-
-
-def _typoglycemia_findings(content: str) -> list[str]:
-    words = re.findall(r"\b[a-zA-Z]{4,}\b", content.lower())
-    findings: list[str] = []
-    if len(words) > _MAX_TYPOGLYCEMIA_WORDS:
-        findings.append("typoglycemia_scan_word_limit")
-    for word in words[:_MAX_TYPOGLYCEMIA_WORDS]:
-        for target in _FUZZY_TARGETS:
-            if _is_typoglycemia_variant(word, target):
-                finding = f"typoglycemia_{target}"
-                if finding not in findings:
-                    findings.append(finding)
-    return findings
-
-
-def _is_typoglycemia_variant(word: str, target: str) -> bool:
-    if word == target:
-        return False
-    if len(word) != len(target) or len(word) < 4:
-        return False
-    return (
-        word[0] == target[0]
-        and word[-1] == target[-1]
-        and sorted(word[1:-1]) == sorted(target[1:-1])
-    )
-
-
-def _encoded_payload_findings(content: str) -> list[str]:
-    findings: list[str] = []
-    for index, token in enumerate(_BASE64_TOKEN_RE.findall(content)):
-        if index >= _MAX_BASE64_TOKENS:
-            findings.append("base64_scan_token_limit")
-            break
-        if len(token) > _MAX_BASE64_TOKEN_CHARS:
-            finding = "base64_token_too_large"
-            if finding not in findings:
-                findings.append(finding)
-            continue
-        try:
-            decoded = base64.b64decode(token, validate=True)
-        except (binascii.Error, ValueError):
-            continue
-        if not decoded:
-            continue
-        try:
-            text = decoded.decode("utf-8", errors="strict")
-        except UnicodeDecodeError:
-            continue
-        for pattern, threat_id in _THREAT_PATTERNS:
-            if re.search(pattern, text, re.IGNORECASE):
-                finding = f"base64_{threat_id}"
-                if finding not in findings:
-                    findings.append(finding)
-    return findings

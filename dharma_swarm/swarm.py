@@ -42,7 +42,9 @@ from dharma_swarm.models import (
     TaskStatus,
     TopologyType,
 )
+from dharma_swarm.governance_signal import is_overlay_enabled, load_governance
 from dharma_swarm.providers import create_default_router
+from dharma_swarm.task_contract import carries_execution_contract
 
 if TYPE_CHECKING:
     from dharma_swarm.adaptive_autonomy import AdaptiveAutonomy
@@ -77,6 +79,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _T = TypeVar("_T")
+_BOOTSTRAP_TERMINAL_PHASES = frozenset({"bootstrap_complete", "bootstrap_failed"})
 
 
 class SubsystemNotReady(RuntimeError):
@@ -88,6 +91,30 @@ class SubsystemNotReady(RuntimeError):
 
 def _make_trace_id() -> str:
     return f"trc_{uuid4().hex}"
+
+
+def _task_counts_as_execution_pressure(
+    task: Task | Any,
+    *,
+    primary_campaign_id: str | None = None,
+) -> bool:
+    metadata = getattr(task, "metadata", None)
+    if getattr(task, "created_by", "") == "operator":
+        return True
+    if not isinstance(metadata, dict):
+        return False
+    if carries_execution_contract(metadata):
+        return True
+    created_via = str(metadata.get("created_via") or "").strip()
+    if created_via in {"manual_seed", "swarm.create_task"}:
+        return True
+    if str(metadata.get("task_source") or "").strip() == "campaign":
+        return True
+    if str(metadata.get("source") or "").strip() == "persistent_agent.campaign":
+        return True
+    if primary_campaign_id:
+        return str(metadata.get("campaign_id") or "").strip() == primary_campaign_id
+    return False
 
 
 class SwarmCoordinationState(BaseModel):
@@ -107,6 +134,37 @@ class SwarmCoordinationState(BaseModel):
     productive_disagreement_claim_keys: list[str] = Field(default_factory=list)
 
 
+class SwarmHotPathLiveness(BaseModel):
+    """Runtime truth for bootstrap and hot-path tick liveness."""
+
+    process_started_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    bootstrap_phase: str = "created"
+    bootstrap_started_at: str | None = None
+    bootstrap_completed_at: str | None = None
+    bootstrap_phase_history: list[dict[str, str]] = Field(default_factory=list)
+    last_tick_started_at: str | None = None
+    last_tick_completed_at: str | None = None
+    last_tick_duration_s: float | None = None
+    last_tick_number: int = 0
+    last_coordination_started_at: str | None = None
+    last_coordination_completed_at: str | None = None
+    last_coordination_duration_s: float | None = None
+    last_task_dispatch_at: str | None = None
+    last_task_completion_at: str | None = None
+    total_agents: int = 0
+    idle_agents: int = 0
+    tasks_pending: int = 0
+    tasks_assigned: int = 0
+    tasks_running: int = 0
+    tasks_completed: int = 0
+    tasks_failed: int = 0
+    stall_state: str = "none"
+    stall_reason: str = ""
+    stall_since: str | None = None
+    tick_interval_s: float | None = None
+    coordination_refresh_interval_s: float | None = None
+
+
 class SwarmManager:
     """Top-level swarm coordinator.
 
@@ -123,6 +181,7 @@ class SwarmManager:
         self._start_time = time.monotonic()
         self._running = False
         self._daemon = daemon_config or DaemonConfig()
+        self._liveness = SwarmHotPathLiveness()
 
         # ── Subsystem declarations (typed, not Any) ──
         # CRITICAL: must init or swarm cannot operate
@@ -167,6 +226,15 @@ class SwarmManager:
         # v0.5.0: Thinkodynamic Director (OPTIONAL)
         self._director: ThinkodynamicDirector | None = None
         self._tick_count: int = 0
+        self._last_director_pulse_tick: int | None = None
+
+        # Legacy Ginko fleet wiring compatibility
+        self._ginko_enabled: bool = False
+        self._ginko_fleet: Any = None
+        self._ginko_interval_ticks: int = 720
+        self._ginko_tick_counter: int = 0
+        self._ginko_last_result: dict[str, Any] | None = None
+        self._ginko_running: bool = False
 
         # v0.7.0: Organism brain — Gnani/Samvara wired into the heartbeat
         self._organism: OrganismRuntime | None = None
@@ -178,9 +246,6 @@ class SwarmManager:
 
         # v0.9.0: Decision Ontology — structured decision governance
         self._decision_log: Any = None  # DecisionLog
-
-        # v1.0: Fractal Room Registry — rooms govern work
-        self._room_registry: Any = None  # RoomRegistry
 
         # v0.9.3: AutoProposer — closes the autonomy loop
         self._auto_proposer: AutoProposer | None = None
@@ -202,6 +267,12 @@ class SwarmManager:
         self._initialized: set[str] = set()
         self._startup_background_task: asyncio.Task[None] | None = None
         self._fast_boot = str(os.environ.get("DHARMA_FAST_BOOT", "")).strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
+        self._sync_startup = str(os.environ.get("DHARMA_SYNC_STARTUP", "")).strip().lower() in {
             "1",
             "true",
             "yes",
@@ -236,6 +307,290 @@ class SwarmManager:
         self._stagnation_window: int = 60
         self._auto_evolution_enabled: bool = True
 
+    @staticmethod
+    def _utc_now_iso() -> str:
+        return datetime.now(timezone.utc).isoformat()
+
+    def _clear_liveness_stall(self) -> None:
+        self._liveness.stall_state = "none"
+        self._liveness.stall_reason = ""
+        self._liveness.stall_since = None
+
+    def _mark_liveness_stall(self, state: str, reason: str) -> None:
+        if not self._liveness.stall_since:
+            self._liveness.stall_since = self._utc_now_iso()
+        self._liveness.stall_state = str(state or "unknown").strip() or "unknown"
+        self._liveness.stall_reason = str(reason or "").strip()
+
+    def _record_bootstrap_phase(self, phase: str, *, reason: str | None = None) -> None:
+        phase_name = str(phase or "unknown").strip() or "unknown"
+        current_phase = str(self._liveness.bootstrap_phase or "created").strip() or "created"
+        if (
+            current_phase in _BOOTSTRAP_TERMINAL_PHASES
+            and phase_name != current_phase
+        ):
+            logger.debug(
+                "Ignoring bootstrap phase regression %s -> %s",
+                current_phase,
+                phase_name,
+            )
+            return
+        now = self._utc_now_iso()
+        if self._liveness.bootstrap_started_at is None:
+            self._liveness.bootstrap_started_at = now
+        if self._liveness.bootstrap_phase != phase_name:
+            entry: dict[str, str] = {"phase": phase_name, "entered_at": now}
+            if reason:
+                entry["reason"] = reason
+            self._liveness.bootstrap_phase_history.append(entry)
+        self._liveness.bootstrap_phase = phase_name
+        if phase_name == "bootstrap_complete":
+            self._liveness.bootstrap_completed_at = now
+            self._clear_liveness_stall()
+        elif (
+            phase_name != "bootstrap_failed"
+            and self._liveness.stall_state.startswith("bootstrap")
+        ):
+            self._clear_liveness_stall()
+
+    async def _transition_bootstrap_phase(
+        self,
+        phase: str,
+        *,
+        reason: str | None = None,
+        source: str = "swarm.init",
+    ) -> None:
+        self._record_bootstrap_phase(phase, reason=reason)
+        await self._publish_runtime_health_snapshot(source=source)
+
+    def _record_tick_started(self, *, tick_number: int, tick_interval_s: float | None) -> None:
+        self._liveness.last_tick_started_at = self._utc_now_iso()
+        self._liveness.last_tick_number = max(0, int(tick_number))
+        if tick_interval_s is not None:
+            self._liveness.tick_interval_s = max(0.0, float(tick_interval_s))
+        if self._orchestrator is not None:
+            try:
+                refresh = float(
+                    getattr(self._orchestrator, "_coordination_refresh_interval_s", 0.0)
+                )
+            except (TypeError, ValueError):
+                refresh = 0.0
+            if refresh > 0:
+                self._liveness.coordination_refresh_interval_s = refresh
+        if self._liveness.stall_state.startswith("tick"):
+            self._clear_liveness_stall()
+
+    def _record_tick_completed(
+        self,
+        *,
+        tick_number: int,
+        duration_s: float,
+        activity: dict[str, Any],
+    ) -> None:
+        now = self._utc_now_iso()
+        dispatched = int(activity.get("dispatched", 0) or 0)
+        settled = int(activity.get("settled", 0) or 0)
+        rescued = int(activity.get("rescued", 0) or 0)
+        self._liveness.last_tick_completed_at = now
+        self._liveness.last_tick_duration_s = max(0.0, float(duration_s))
+        self._liveness.last_tick_number = max(0, int(tick_number))
+        if dispatched > 0:
+            self._liveness.last_task_dispatch_at = now
+            if self._liveness.bootstrap_completed_at is None:
+                self._record_bootstrap_phase(
+                    "bootstrap_complete",
+                    reason="first_dispatch_completed",
+                )
+        elif self._liveness.bootstrap_completed_at is None:
+            self._record_bootstrap_phase(
+                "bootstrap_ready",
+                reason="first_tick_completed_no_dispatch",
+            )
+            self._mark_liveness_stall(
+                "bootstrap_waiting_for_dispatch",
+                "first tick completed without dispatch",
+            )
+        if settled > 0 or rescued > 0:
+            self._liveness.last_task_completion_at = now
+        if self._liveness.bootstrap_completed_at is not None:
+            self._clear_liveness_stall()
+
+    async def _sample_orchestrator_progress(self) -> dict[str, int]:
+        """Capture lightweight runtime counts that survive a timed-out tick.
+
+        ``orchestrator.tick()`` can time out after it has already assigned real
+        dispatches. When that happens, use observable runtime state rather than
+        discarding the tick as a no-op.
+        """
+        active_dispatches = 0
+        running_tasks = 0
+        assigned_tasks = 0
+        board_running_tasks = 0
+        completed_tasks = 0
+        if self._orchestrator is not None:
+            try:
+                active_dispatches = len(
+                    getattr(self._orchestrator, "_active_dispatches", {}) or {}
+                )
+            except Exception:
+                active_dispatches = 0
+            try:
+                running_tasks = len(
+                    getattr(self._orchestrator, "_running_tasks", {}) or {}
+                )
+            except Exception:
+                running_tasks = 0
+        if self._task_board is not None:
+            try:
+                stats = await asyncio.wait_for(self._task_board.stats(), timeout=2.0)
+            except asyncio.TimeoutError:
+                logger.warning(
+                    "Timed-out tick recovery: task board stats timed out after 2s"
+                )
+            except Exception as exc:
+                logger.debug(
+                    "Timed-out tick recovery: task board stats failed: %s", exc
+                )
+            else:
+                assigned_tasks = int(stats.get("assigned", 0) or 0)
+                board_running_tasks = int(stats.get("running", 0) or 0)
+                completed_tasks = int(stats.get("completed", 0) or 0)
+        return {
+            "active_dispatches": active_dispatches,
+            "running_tasks": running_tasks,
+            "assigned_tasks": assigned_tasks,
+            "board_running_tasks": board_running_tasks,
+            "completed_tasks": completed_tasks,
+        }
+
+    @staticmethod
+    def _infer_activity_from_orchestrator_timeout(
+        before: dict[str, int],
+        after: dict[str, int],
+    ) -> dict[str, int]:
+        """Recover dispatch/completion deltas after a timed-out orchestrator tick."""
+        dispatched = max(
+            0,
+            int(after.get("active_dispatches", 0) or 0)
+            - int(before.get("active_dispatches", 0) or 0),
+            int(after.get("running_tasks", 0) or 0)
+            - int(before.get("running_tasks", 0) or 0),
+            (
+                int(after.get("assigned_tasks", 0) or 0)
+                + int(after.get("board_running_tasks", 0) or 0)
+            )
+            - (
+                int(before.get("assigned_tasks", 0) or 0)
+                + int(before.get("board_running_tasks", 0) or 0)
+            ),
+        )
+        settled = max(
+            0,
+            int(after.get("completed_tasks", 0) or 0)
+            - int(before.get("completed_tasks", 0) or 0),
+        )
+        return {
+            "dispatched": dispatched,
+            "settled": settled,
+            "recovered": 0,
+        }
+
+    def _record_coordination_started(self) -> None:
+        self._liveness.last_coordination_started_at = self._utc_now_iso()
+        if self._orchestrator is not None:
+            try:
+                refresh = float(
+                    getattr(self._orchestrator, "_coordination_refresh_interval_s", 0.0)
+                )
+            except (TypeError, ValueError):
+                refresh = 0.0
+            if refresh > 0:
+                self._liveness.coordination_refresh_interval_s = refresh
+        if self._liveness.stall_state == "coordination_stale":
+            self._clear_liveness_stall()
+
+    def _record_coordination_completed(self, *, duration_s: float) -> None:
+        self._liveness.last_coordination_completed_at = self._utc_now_iso()
+        self._liveness.last_coordination_duration_s = max(0.0, float(duration_s))
+        if self._liveness.stall_state == "coordination_stale":
+            self._clear_liveness_stall()
+
+    async def _update_liveness_runtime_counts(self) -> tuple[int, int]:
+        total_agents = self._liveness.total_agents
+        idle_agents = self._liveness.idle_agents
+        tasks_pending = self._liveness.tasks_pending
+        tasks_assigned = self._liveness.tasks_assigned
+        tasks_running = self._liveness.tasks_running
+        tasks_completed = self._liveness.tasks_completed
+        tasks_failed = self._liveness.tasks_failed
+
+        if self._agent_pool is not None:
+            try:
+                agents = await asyncio.wait_for(self._agent_pool.list_agents(), timeout=2.0)
+                total_agents = len(agents)
+                idle_agents = sum(
+                    1 for agent in agents if getattr(agent, "status", None) == AgentStatus.IDLE
+                )
+            except asyncio.TimeoutError:
+                logger.warning("Runtime health snapshot: agent pool listing timed out after 2s")
+            except Exception as exc:
+                logger.debug("Runtime health snapshot: agent pool listing failed: %s", exc)
+
+        if self._task_board is not None:
+            try:
+                stats = await asyncio.wait_for(self._task_board.stats(), timeout=2.0)
+                tasks_pending = int(stats.get("pending", 0) or 0)
+                tasks_assigned = int(stats.get("assigned", 0) or 0)
+                tasks_running = int(stats.get("running", 0) or 0)
+                tasks_completed = int(stats.get("completed", 0) or 0)
+                tasks_failed = int(stats.get("failed", 0) or 0)
+            except asyncio.TimeoutError:
+                logger.warning("Runtime health snapshot: task board stats timed out after 2s")
+            except Exception as exc:
+                logger.debug("Runtime health snapshot: task board stats failed: %s", exc)
+
+        self._liveness.total_agents = total_agents
+        self._liveness.idle_agents = idle_agents
+        self._liveness.tasks_pending = tasks_pending
+        self._liveness.tasks_assigned = tasks_assigned
+        self._liveness.tasks_running = tasks_running
+        self._liveness.tasks_completed = tasks_completed
+        self._liveness.tasks_failed = tasks_failed
+
+        return total_agents, (
+            tasks_pending
+            + tasks_assigned
+            + tasks_running
+            + tasks_completed
+            + tasks_failed
+        )
+
+    async def _validate_bootstrap_floor(self) -> tuple[bool, str]:
+        if self._agent_pool is None or self._task_board is None or self._orchestrator is None:
+            return False, "core runtime missing control-plane dependencies"
+        try:
+            agents = await asyncio.wait_for(self._agent_pool.list_agents(), timeout=5.0)
+        except asyncio.TimeoutError:
+            return False, "agent pool inspection timed out during bootstrap"
+        except Exception as exc:
+            return False, f"agent pool inspection failed during bootstrap: {exc}"
+        if not agents:
+            return False, "deferred startup completed with zero registered agents"
+        return True, f"agents={len(agents)}"
+
+    def hot_path_liveness(self) -> dict[str, Any]:
+        payload = self._liveness.model_dump(mode="json")
+        if self._orchestrator is not None:
+            try:
+                refresh = float(
+                    getattr(self._orchestrator, "_coordination_refresh_interval_s", 0.0)
+                )
+            except (TypeError, ValueError):
+                refresh = 0.0
+            if refresh > 0:
+                payload["coordination_refresh_interval_s"] = refresh
+        return payload
+
     # ── Subsystem access helpers ──
 
     # Subsystems classified by criticality
@@ -266,6 +621,38 @@ class SwarmManager:
     def is_ready(self, subsystem_name: str) -> bool:
         """Check if a subsystem has been initialized."""
         return getattr(self, f"_{subsystem_name}", None) is not None
+
+    async def _run_ginko_cycle(self) -> None:
+        if not self._ginko_enabled or self._ginko_running or self._ginko_fleet is None:
+            return
+        self._ginko_running = True
+        try:
+            from dharma_swarm.ginko_orchestrator import action_full_cycle
+
+            self._ginko_last_result = await action_full_cycle()
+        except Exception:
+            logger.warning("Ginko cycle failed", exc_info=True)
+            self._ginko_last_result = None
+        finally:
+            self._ginko_running = False
+
+    def get_ginko_status(self) -> dict[str, Any]:
+        if not self._ginko_enabled:
+            return {"enabled": False}
+        fleet_size = 0
+        if self._ginko_fleet is not None:
+            list_agents = getattr(self._ginko_fleet, "list_agents", None)
+            if callable(list_agents):
+                try:
+                    fleet_size = len(list_agents())
+                except Exception:
+                    fleet_size = 0
+        return {
+            "enabled": True,
+            "fleet_size": fleet_size,
+            "running": self._ginko_running,
+            "last_result": self._ginko_last_result is not None,
+        }
 
     def _refresh_initialized_registry(self) -> None:
         """Refresh the initialized subsystem ledger from current attributes."""
@@ -396,16 +783,16 @@ class SwarmManager:
             from dharma_swarm.adaptive_autonomy import AdaptiveAutonomy
 
             self._skill_registry = SkillRegistry()
-            self._skill_registry.discover()
+            await self._skill_registry.discover_async()
 
             profiles_dir = self.state_dir / "profiles"
             self._profile_mgr = ProfileManager(profile_dir=profiles_dir)
-            self._profile_mgr.load_all()
+            await self._profile_mgr.load_all_async()
 
             self._intent_router = IntentRouter(registry=self._skill_registry)
 
             self._context_search = ContextSearchEngine()
-            self._context_search.build_index()
+            await self._context_search.build_index_async()
 
             self._autonomy = AdaptiveAutonomy(base_level="balanced")
 
@@ -517,42 +904,206 @@ class SwarmManager:
         # Closes Loops 9 (Memory→Metabolism) and 2 (Evolution→Agent Improvement).
         # These setters already exist but were never called.
         try:
-            from dharma_swarm.engine.knowledge_store import create_knowledge_store
-            _ks = create_knowledge_store(prefer_qdrant=False)
+            from dharma_swarm.knowledge_units import KnowledgeStore
+            knowledge_db = self.state_dir / "db" / "knowledge_store.db"
+            knowledge_db.parent.mkdir(parents=True, exist_ok=True)
+            _ks = KnowledgeStore(str(knowledge_db))
             if self._engine is not None:
                 self._engine.set_knowledge_store(_ks)
-            logger.info("KnowledgeStore wired to DarwinEngine")
+            if self._orchestrator is not None:
+                self._orchestrator.set_knowledge_store(_ks)
+            logger.info("KnowledgeStore wired to runtime: %s", knowledge_db)
         except Exception as e:
             logger.debug("KnowledgeStore wiring failed (non-fatal): %s", e)
 
         self._telos_substrate_seeded = False
         self._refresh_initialized_registry()
 
-    async def _complete_deferred_startup(self) -> None:
-        """Backfill the default crew and optional subsystems after fast boot."""
+    @staticmethod
+    def _read_bootstrap_budget_seconds() -> float:
+        """Read DHARMA_BOOTSTRAP_BUDGET_S (default 600s, floor 5s)."""
+        raw = os.environ.get("DHARMA_BOOTSTRAP_BUDGET_S", "").strip()
         try:
-            from dharma_swarm.startup_crew import spawn_default_crew
+            value = float(raw) if raw else 0.0
+        except ValueError:
+            value = 0.0
+        if value <= 0:
+            value = 600.0
+        return max(5.0, value)
 
-            crew = await spawn_default_crew(self)
-            if crew:
-                logger.info("Deferred startup spawned %d agents from default crew", len(crew))
-            await self._init_optional_subsystems()
-            if self._memory is not None:
-                await self._memory.remember(
-                    f"Swarm fast-boot backfill complete — {len(crew)} default agents added",
-                    layer=MemoryLayer.SESSION,
-                    source="swarm",
+    async def _complete_deferred_startup(self) -> None:
+        """Backfill noncritical startup work after core runtime is live.
+
+        Enforces an overall wall-clock budget: if the deferred startup body
+        has not reached a terminal phase within ``DHARMA_BOOTSTRAP_BUDGET_S``
+        seconds (default 600s), the hot path self-declares ``boot_stall`` and
+        transitions to ``bootstrap_failed`` so operator surfaces stop showing
+        a forever-"running" phase.
+        """
+        try:
+            await self._transition_bootstrap_phase(
+                "deferred_startup_running",
+                source="swarm.deferred_startup",
+            )
+            budget_s = self._read_bootstrap_budget_seconds()
+            try:
+                await asyncio.wait_for(
+                    self._execute_deferred_startup(), timeout=budget_s,
                 )
-            logger.info("Deferred startup bootstrap complete")
+            except asyncio.TimeoutError:
+                reason = (
+                    f"bootstrap exceeded wall-clock budget ({budget_s:.0f}s)"
+                )
+                self._mark_liveness_stall("boot_stall", reason)
+                await self._transition_bootstrap_phase(
+                    "bootstrap_failed",
+                    reason=reason,
+                    source="swarm.deferred_startup",
+                )
+                logger.error("Deferred startup exceeded budget: %s", reason)
         except asyncio.CancelledError:
             logger.info("Deferred startup bootstrap cancelled")
+            self._mark_liveness_stall("bootstrap_cancelled", "deferred startup cancelled")
+            await self._publish_runtime_health_snapshot(source="swarm.deferred_startup")
             raise
         except Exception as exc:
+            self._mark_liveness_stall("bootstrap_failed", str(exc))
+            await self._publish_runtime_health_snapshot(source="swarm.deferred_startup")
             logger.exception("Deferred startup bootstrap failed: %s", exc)
+
+    async def _execute_deferred_startup(self) -> None:
+        """Deferred-startup work body, wrapped in a wall-clock budget by caller."""
+        from dharma_swarm.startup_crew import (
+            create_seed_tasks,
+            spawn_cybernetics_crew,
+            spawn_default_crew,
+        )
+
+        cyber_crew = []
+        seeds = []
+        crew = []
+        try:
+            cyber_crew = await asyncio.wait_for(
+                spawn_cybernetics_crew(self), timeout=30.0,
+            )
+            if cyber_crew:
+                logger.info(
+                    "Deferred startup spawned %d agents for cybernetics crew",
+                    len(cyber_crew),
+                )
+        except (asyncio.TimeoutError, Exception) as exc:
+            logger.warning(
+                "Deferred cybernetics crew spawn timed out or failed (non-fatal): %s",
+                exc,
+            )
+
+        try:
+            seeds = await asyncio.wait_for(
+                create_seed_tasks(self), timeout=30.0,
+            )
+            if seeds:
+                logger.info("Deferred startup created %d seed tasks", len(seeds))
+        except (asyncio.TimeoutError, Exception) as exc:
+            logger.warning(
+                "Deferred seed task creation timed out or failed (non-fatal): %s",
+                exc,
+            )
+
+        try:
+            crew = await asyncio.wait_for(
+                spawn_default_crew(self), timeout=30.0,
+            )
+        except (asyncio.TimeoutError, Exception) as exc:
+            logger.warning(
+                "Deferred default crew spawn timed out or failed (non-fatal): %s",
+                exc,
+            )
+        if crew:
+            logger.info("Deferred startup spawned %d agents from default crew", len(crew))
+        if crew or cyber_crew:
+            await self._transition_bootstrap_phase(
+                "agents_spawned",
+                reason=f"default={len(crew)} cybernetics={len(cyber_crew)}",
+                source="swarm.deferred_startup",
+            )
+        try:
+            await asyncio.wait_for(
+                self._init_optional_subsystems(), timeout=120.0,
+            )
+        except asyncio.TimeoutError:
+            logger.warning(
+                "Deferred optional subsystem init timed out after 120s — continuing"
+            )
+            self._refresh_initialized_registry()
+        if self._liveness.bootstrap_completed_at is None:
+            await self._transition_bootstrap_phase(
+                "subsystems_initialized",
+                source="swarm.deferred_startup",
+            )
+        bootstrap_ok, bootstrap_reason = await self._validate_bootstrap_floor()
+        if not bootstrap_ok:
+            self._mark_liveness_stall("bootstrap_failed", bootstrap_reason)
+            await self._transition_bootstrap_phase(
+                "bootstrap_failed",
+                reason=bootstrap_reason,
+                source="swarm.deferred_startup",
+            )
+            logger.error("Deferred startup bootstrap failed validation: %s", bootstrap_reason)
+            return
+        if self._memory is not None:
+            await self._memory.remember(
+                "Swarm deferred startup complete — "
+                f"{len(crew)} default agents, "
+                f"{len(cyber_crew)} cybernetics agents, {len(seeds)} seed tasks",
+                layer=MemoryLayer.SESSION,
+                source="swarm",
+            )
+        if self._liveness.bootstrap_completed_at is not None:
+            await self._publish_runtime_health_snapshot(source="swarm.deferred_startup")
+            logger.info(
+                "Deferred startup completed after first dispatch: %s",
+                bootstrap_reason,
+            )
+            return
+        await self._transition_bootstrap_phase(
+            "bootstrap_ready",
+            reason=bootstrap_reason,
+            source="swarm.deferred_startup",
+        )
+        logger.info("Deferred startup bootstrap ready: %s", bootstrap_reason)
+
+    async def wait_until_bootstrap_ready(
+        self, timeout: float | None = None,
+    ) -> str:
+        """Await completion of the deferred startup task.
+
+        Returns the terminal ``bootstrap_phase`` reached (``bootstrap_ready``,
+        ``bootstrap_complete``, or ``bootstrap_failed``). If no background
+        startup task was scheduled (e.g. read-only boot), returns the current
+        phase immediately without blocking.
+
+        Callers that wrap runtime in long-lived loops (daemon main loop) do
+        **not** need this; the loop starts ticking as soon as core runtime is
+        up and the deferred body progresses in parallel. Tests and operator
+        surfaces that assume a ready swarm immediately after ``init()`` must
+        call this to make the readiness contract explicit.
+
+        ``asyncio.shield`` is used so that a caller-side timeout does not
+        cancel the still-running deferred startup task.
+        """
+        task = self._startup_background_task
+        if task is None or task.done():
+            return self._liveness.bootstrap_phase
+        if timeout is None:
+            await asyncio.shield(task)
+        else:
+            await asyncio.wait_for(asyncio.shield(task), timeout=timeout)
+        return self._liveness.bootstrap_phase
 
     async def init(self) -> None:
         """Initialize all subsystems."""
         self.state_dir.mkdir(parents=True, exist_ok=True)
+        await self._transition_bootstrap_phase("init_started", source="swarm.init")
 
         # Clear stale EMERGENCY_HOLD from previous crashed/cold-start sessions.
         # On a fresh system with no task history, the organism fires critical
@@ -571,6 +1122,7 @@ class SwarmManager:
         # This MUST run early. Without it ThinkodynamicDirector operates on
         # empty graphs and falls back to generic operational tasks.
         # The substrate is idempotent — skips already-seeded objectives.
+        await self._transition_bootstrap_phase("substrate_seeding", source="swarm.init")
         _telos_flag = self.state_dir / "meta" / "telos_seeded"
         if not _telos_flag.exists():
             try:
@@ -651,8 +1203,9 @@ class SwarmManager:
         self._thread_mgr = ThreadManager(self._daemon, self.state_dir)
 
         self._yoga = YogaScheduler(
-            quiet_hours=self._daemon.quiet_hours,
-            max_daily_tasks=self._daemon.max_daily_contributions * 5,
+            quiet_hours=[],
+            max_daily_tasks=0,
+            global_token_budget=0,
         )
         self._orchestrator = Orchestrator(
             task_board=self._task_board,
@@ -663,10 +1216,12 @@ class SwarmManager:
             event_memory=self._event_memory,
             yoga=self._yoga,
         )
-        if self._room_registry is not None:
-            self._orchestrator._room_registry = self._room_registry
 
         self._running = True
+        await self._transition_bootstrap_phase(
+            "core_runtime_initialized",
+            source="swarm.init",
+        )
 
         if self._read_only_boot:
             logger.info(
@@ -675,6 +1230,11 @@ class SwarmManager:
             )
             self._telos_substrate_seeded = False
             self._refresh_initialized_registry()
+            await self._transition_bootstrap_phase(
+                "bootstrap_complete",
+                reason="read_only_boot",
+                source="swarm.init",
+            )
             return
 
         # Load ecosystem awareness on every init
@@ -702,38 +1262,9 @@ class SwarmManager:
         except Exception as exc:
             logger.warning("Stale task reaper failed (non-fatal): %s", exc)
 
-        # Spawn default crew and seed tasks if this is a fresh start
-        from dharma_swarm.startup_crew import (
-            spawn_cybernetics_crew,
-            spawn_default_crew,
-            create_seed_tasks,
-        )
-        crew: list[AgentState] | list = []
-        _CREW_TIMEOUT = 30.0  # seconds — crew spawning should not block init
-        try:
-            cyber_crew = await asyncio.wait_for(
-                spawn_cybernetics_crew(self), timeout=_CREW_TIMEOUT,
-            )
-        except (asyncio.TimeoutError, Exception) as exc:
-            logger.warning("Cybernetics crew spawn timed out or failed (non-fatal): %s", exc)
-            cyber_crew = []
-        try:
-            seeds = await asyncio.wait_for(
-                create_seed_tasks(self), timeout=_CREW_TIMEOUT,
-            )
-        except (asyncio.TimeoutError, Exception) as exc:
-            logger.warning("Seed tasks creation timed out or failed (non-fatal): %s", exc)
-            seeds = []
-
-        if cyber_crew:
-            logger.info("Spawned %d agents for cybernetics crew", len(cyber_crew))
-        if seeds:
-            logger.info("Created %d seed tasks", len(seeds))
-
-        if self._fast_boot:
+        if self._fast_boot or not self._sync_startup:
             await self._memory.remember(
-                f"Swarm fast-boot initialized — 0 default agents, "
-                f"{len(cyber_crew)} cybernetics agents, {len(seeds)} seed tasks",
+                "Swarm live boot initialized — noncritical startup deferred",
                 layer=MemoryLayer.SESSION,
                 source="swarm",
             )
@@ -743,37 +1274,29 @@ class SwarmManager:
                 self._complete_deferred_startup()
             )
             logger.info(
-                "Fast boot enabled — deferred default crew and noncritical subsystems"
+                "Deferred startup enabled — crews, seeds, and noncritical subsystems "
+                "continue in background while main loop starts"
+            )
+            await self._transition_bootstrap_phase(
+                "bootstrap_deferred",
+                source="swarm.init",
             )
             return
 
-        try:
-            crew = await asyncio.wait_for(
-                spawn_default_crew(self), timeout=_CREW_TIMEOUT,
-            )
-        except (asyncio.TimeoutError, Exception) as exc:
-            logger.warning("Default crew spawn timed out or failed (non-fatal): %s", exc)
-            crew = []
-        if crew:
-            logger.info("Spawned %d agents from default crew", len(crew))
-
+        self._startup_background_task = asyncio.create_task(
+            self._complete_deferred_startup()
+        )
         await self._memory.remember(
-            f"Swarm initialized — {len(crew)} default agents, "
-            f"{len(cyber_crew)} cybernetics agents, {len(seeds)} seed tasks",
+            "Swarm sync startup requested — background startup task also scheduled",
             layer=MemoryLayer.SESSION,
             source="swarm",
         )
-
-        try:
-            await asyncio.wait_for(
-                self._init_optional_subsystems(), timeout=120.0,
-            )
-        except asyncio.TimeoutError:
-            logger.warning(
-                "Optional subsystem init timed out after 120s — "
-                "continuing with critical subsystems only"
-            )
-            self._refresh_initialized_registry()
+        logger.info("Synchronous startup requested via DHARMA_SYNC_STARTUP")
+        await self._transition_bootstrap_phase(
+            "bootstrap_deferred",
+            reason="sync_startup_background_task_scheduled",
+            source="swarm.init",
+        )
 
     # --- Agent Operations ---
 
@@ -1027,18 +1550,22 @@ class SwarmManager:
         return cls._dedupe_strings([item for item in values if item])
 
     @staticmethod
-    def _coordination_claim_key(metadata: dict[str, Any], title: str = "") -> str:
+    def _coordination_claim_key(
+        metadata: dict[str, Any],
+        title: str = "",
+        *,
+        allow_title_fallback: bool = False,
+    ) -> str:
         for key in (
             "coordination_claim_key",
             "claim_key",
             "coordination_topic",
             "topic",
-            "task_group",
         ):
             value = str(metadata.get(key, "")).strip()
             if value:
                 return value
-        return title.strip()
+        return title.strip() if allow_title_fallback else ""
 
     @staticmethod
     def _clamp_coordination_uncertainty(value: Any) -> float | None:
@@ -1112,6 +1639,9 @@ class SwarmManager:
         description: str = "",
         priority: TaskPriority = TaskPriority.NORMAL,
         metadata: dict[str, Any] | None = None,
+        *,
+        created_by: str = "system",
+        assigned_to: str | None = None,
     ) -> Task:
         """Create a new task on the board."""
         incoming = dict(metadata or {})
@@ -1143,6 +1673,8 @@ class SwarmManager:
                 title=title,
                 description=description,
                 priority=priority,
+                created_by=created_by,
+                assigned_to=assigned_to,
                 metadata=incoming,
             )
 
@@ -1364,12 +1896,42 @@ class SwarmManager:
             "Do not force a fake consensus. Preserve uncertainty explicitly when needed."
         )
 
+    @staticmethod
+    def _coordination_claim_state(metadata: dict[str, Any] | None) -> str:
+        if not isinstance(metadata, dict):
+            return ""
+        for key in (
+            "coordination_claim_state",
+            "coordination_resolution_state",
+        ):
+            value = str(metadata.get(key, "")).strip().lower()
+            if value:
+                return value
+        return ""
+
+    @staticmethod
+    def _coordination_attempt_in_cooldown(
+        task: Task,
+        *,
+        cooldown_seconds: float,
+    ) -> bool:
+        if cooldown_seconds <= 0:
+            return False
+        updated_at = getattr(task, "updated_at", None)
+        if not isinstance(updated_at, datetime):
+            return False
+        age_seconds = (
+            datetime.now(timezone.utc) - updated_at
+        ).total_seconds()
+        return age_seconds < cooldown_seconds
+
     async def spawn_coordination_tasks(
         self,
         *,
         coordination: SwarmCoordinationState | None = None,
         limit: int = 2,
         max_pending: int = 12,
+        completed_cooldown_seconds: float = 6 * 3600,
     ) -> list[Task]:
         """Spawn bounded synthesis tasks for active productive disagreements."""
         if self._task_board is None:
@@ -1398,15 +1960,71 @@ class SwarmManager:
             == "sheaf_disagreement"
             and str(task.metadata.get("coordination_claim_key", "")).strip()
         }
+        suppressed_claims: set[str] = set()
+        for task in existing:
+            if not isinstance(task.metadata, dict):
+                continue
+            if str(task.metadata.get("coordination_origin", "")).strip() != "sheaf_disagreement":
+                continue
+            claim_key = str(task.metadata.get("coordination_claim_key", "")).strip()
+            if not claim_key:
+                continue
+            claim_state = self._coordination_claim_state(task.metadata)
+            # Permanently suppress resolved/pluralism/noise claims.
+            if claim_state in {"resolved", "durable_pluralism", "dismissed_noise"}:
+                suppressed_claims.add(claim_key)
+                continue
+            # Any completed synthesis permanently suppresses the claim_key
+            # unless it has been explicitly reopened (claim_state == "open").
+            # This closes the re-synthesis loop: once synthesized, done.
+            if task.status == TaskStatus.COMPLETED:
+                if claim_state != "reopened":
+                    suppressed_claims.add(claim_key)
+                continue
+            # Failed/cancelled still use cooldown (might be worth retrying).
+            if (
+                task.status in {TaskStatus.FAILED, TaskStatus.CANCELLED}
+                and self._coordination_attempt_in_cooldown(
+                    task,
+                    cooldown_seconds=completed_cooldown_seconds,
+                )
+            ):
+                suppressed_claims.add(claim_key)
 
         task_specs: list[dict[str, Any]] = []
         capacity = max(0, max_pending - active)
         planned_limit = max(0, min(limit, capacity))
+
+        # Governance quarantine skip — avoid re-spawning synthesis on topics
+        # the executive has flagged as stuck in repeated loops. No-op unless
+        # DGC_GOVERNANCE_OVERLAY is on.
+        quarantine_topics: set[str] = set()
+        if is_overlay_enabled():
+            try:
+                snap = load_governance()
+                quarantine_topics = snap.quarantine_topics
+            except Exception as exc:
+                logger.debug("coordination: governance load failed (%s)", exc)
+
         for claim_key in state.productive_disagreement_claim_keys:
             if len(task_specs) >= planned_limit:
                 break
             if claim_key in active_claims:
                 continue
+            if claim_key in suppressed_claims:
+                continue
+            if quarantine_topics:
+                claim_lower = str(claim_key).lower()
+                hit = next(
+                    (t for t in quarantine_topics if t and t in claim_lower),
+                    None,
+                )
+                if hit:
+                    logger.info(
+                        "coordination: quarantine_skip topic=%s claim=%s",
+                        hit, claim_key[:60],
+                    )
+                    continue
             task_specs.append(
                 {
                     "title": self._coordination_synthesis_title(claim_key),
@@ -1418,6 +2036,7 @@ class SwarmManager:
                         "coordination_claim_key": claim_key,
                         "coordination_topic": claim_key,
                         "coordination_state": "uncertain",
+                        "coordination_claim_state": "open",
                         "coordination_uncertainty": 1.0,
                         "coordination_review_required": True,
                         "coordination_route": "synthesis_review",
@@ -1434,6 +2053,7 @@ class SwarmManager:
                         ],
                         "task_group": f"coordination:{claim_key}",
                         "coordination_triggered_at": state.observed_at,
+                        "coordination_cooldown_seconds": completed_cooldown_seconds,
                     },
                 }
             )
@@ -1566,7 +2186,7 @@ class SwarmManager:
 
     def _in_quiet_hours(self) -> bool:
         """Check if current hour is in quiet hours."""
-        return datetime.now().hour in self._daemon.quiet_hours
+        return False
 
     def _contribution_allowed(self) -> bool:
         """Check rate limits: daily max, min interval between contributions."""
@@ -1797,36 +2417,66 @@ class SwarmManager:
         now = datetime.now(timezone.utc)
         cutoff = now - timedelta(minutes=stale_minutes)
         reaped: list[Task] = []
+        now_epoch = now.timestamp()
 
         for status in (TaskStatus.ASSIGNED, TaskStatus.RUNNING):
             tasks = await self._task_board.list_tasks(status=status, limit=500)
             for task in tasks:
                 agent_id = task.assigned_to or ""
-                # Orphaned: agent not in current pool AND task is stale
+                claim_meta = (
+                    task.metadata.get("active_claim")
+                    if isinstance(task.metadata, dict)
+                    else None
+                )
+                claim_expires_at = None
+                if isinstance(claim_meta, dict):
+                    raw_expires_at = claim_meta.get("claim_expires_at_epoch")
+                    try:
+                        claim_expires_at = float(raw_expires_at)
+                    except (TypeError, ValueError):
+                        claim_expires_at = None
+                claim_expired = (
+                    claim_expires_at is not None and claim_expires_at <= now_epoch
+                )
+
+                # Orphaned: agent not in current pool AND either stale or carrying
+                # an already-expired claim that can never complete.
                 if agent_id in live_ids:
                     continue
-                if task.updated_at > cutoff:
+                if task.updated_at > cutoff and not claim_expired:
                     continue  # recently touched, give it time
 
                 meta = dict(task.metadata or {})
                 meta["orphan_reaped_at"] = now.isoformat()
                 meta["orphan_original_agent"] = agent_id
                 meta["orphan_original_status"] = status.value
+                meta["orphan_reap_reason"] = (
+                    "expired_claim" if claim_expired else "stale_assignment"
+                )
                 meta.pop("active_claim", None)
                 meta.pop("retry_not_before_epoch", None)
+                agent_label = agent_id[:12] if agent_id else "<unassigned>"
+                reason = (
+                    f"Orphan reaper: expired claim on missing agent {agent_label}"
+                    if claim_expired
+                    else f"Orphan reaper: agent {agent_label} no longer in pool"
+                )
 
                 try:
                     await self._task_board.requeue(
                         task.id,
-                        reason=f"Orphan reaper: agent {agent_id[:12]} no longer in pool",
+                        reason=reason,
                         metadata=meta,
                     )
                     refreshed = await self._task_board.get(task.id)
                     if refreshed is not None:
                         reaped.append(refreshed)
                         logger.info(
-                            "Reaped orphaned task %s (%s) from dead agent %s",
-                            task.id[:12], status.value, agent_id[:12],
+                            "Reaped orphaned task %s (%s) from dead agent %s (%s)",
+                            task.id[:12],
+                            status.value,
+                            agent_label,
+                            meta["orphan_reap_reason"],
                         )
                 except Exception as exc:
                     logger.debug("Failed to reap task %s: %s", task.id[:12], exc)
@@ -1925,8 +2575,46 @@ class SwarmManager:
             }
 
         stats = await self._task_board.stats()
-        ready_count = len(await self._task_board.get_ready_tasks())
         pending_count = int(stats.get("pending", 0))
+        ready_count = 0
+
+        pending_tasks = await self._task_board.list_tasks(
+            status=TaskStatus.PENDING,
+            limit=max(500, pending_count or 0),
+        )
+        now = datetime.now(timezone.utc)
+        for task in pending_tasks:
+            if not task.depends_on:
+                ready_count += 1
+                continue
+
+            is_ready = True
+            for dep_id in task.depends_on:
+                dep = await self._task_board.get(dep_id)
+                if dep is None:
+                    continue
+                if dep.status == TaskStatus.COMPLETED:
+                    continue
+                if dep.status == TaskStatus.RUNNING and (
+                    now - dep.updated_at > timedelta(minutes=15)
+                ):
+                    continue
+                if dep.status == TaskStatus.FAILED and self._failed_dependency_is_terminal(
+                    dep_meta=dict(dep.metadata or {}),
+                    dep_result=dep.result,
+                    dep_updated_at_raw=dep.updated_at.isoformat(),
+                    now=now,
+                ):
+                    is_ready = False
+                    break
+                if dep.status == TaskStatus.FAILED:
+                    continue
+                is_ready = False
+                break
+
+            if is_ready:
+                ready_count += 1
+
         return {
             "pending": pending_count,
             "ready": ready_count,
@@ -1980,16 +2668,22 @@ class SwarmManager:
                 continue
 
             source = self._derive_failure_source(task)
-            failure_class, retry_count, max_retries, backoff = (
-                self._orchestrator.retry_policy_for_failure(
-                    task=task,
-                    error=str(task.result or ""),
-                    source=source,
-                    meta=meta,
-                )
+            failure_class = self._orchestrator._classify_failure(
+                error=str(task.result or ""),
+                source=source,
+                task=task,
             )
             if failure_class not in {"connection_transient", "long_timeout"}:
                 continue
+
+            retry_count, max_retries, backoff = self._orchestrator._resolve_retry_policy(task)
+            max_retries, backoff = self._orchestrator._apply_failure_retry_defaults(
+                task=task,
+                meta=meta,
+                failure_class=failure_class,
+                max_retries=max_retries,
+                backoff=backoff,
+            )
 
             meta["retry_count"] = 0
             meta["max_retries"] = max_retries
@@ -2090,6 +2784,17 @@ class SwarmManager:
             logger.debug("Director pulse error: %s", exc)
             return []
 
+    def _director_pulse_due(self) -> bool:
+        """Return True when the next director pulse should be attempted.
+
+        Using absolute tick modulo can phase-lock the director behind
+        contribution cooldown windows. Track the interval relative to the last
+        director pulse attempt instead so the first eligible tick can fire.
+        """
+        if self._last_director_pulse_tick is None:
+            return True
+        return (self._tick_count - self._last_director_pulse_tick) >= self._director_interval_ticks
+
     async def tick(self) -> dict[str, Any]:
         """Execute one full swarm lifecycle tick.
 
@@ -2171,6 +2876,11 @@ class SwarmManager:
         # we suppress autonomous generation — no new busywork until
         # coherence recovers or Samvara completes its diagnostic cycle.
         self._tick_count += 1
+        self._record_tick_started(
+            tick_number=self._tick_count,
+            tick_interval_s=self._liveness.tick_interval_s or self._daemon.heartbeat_interval,
+        )
+        await self._publish_runtime_health_snapshot(source="swarm.tick_start")
         gnani_holds = False
         if (self._organism is not None
                 and self._tick_count % self._organism_interval_ticks == 0):
@@ -2312,16 +3022,32 @@ class SwarmManager:
         reopened: list[Any] = []
         # Suppress synthetic task generation when operator-created tasks are pending
         _has_real_tasks = False
+        primary_campaign_id = ""
         if self._task_board is not None:
             try:
+                try:
+                    from dharma_swarm.campaigns import active_primary
+
+                    primary_campaign = active_primary(self.state_dir / "meta")
+                    primary_campaign_id = str((primary_campaign or {}).get("campaign_id") or "").strip()
+                except Exception:
+                    primary_campaign_id = ""
                 _pending = await self._task_board.list_tasks(
                     status=TaskStatus.PENDING, limit=20
                 )
+                _assigned = await self._task_board.list_tasks(
+                    status=TaskStatus.ASSIGNED, limit=10
+                )
+                _running = await self._task_board.list_tasks(
+                    status=TaskStatus.RUNNING, limit=10
+                )
+                _live_tasks = [*_pending, *_assigned, *_running]
                 _has_real_tasks = any(
-                    isinstance(t.metadata, dict)
-                    and t.metadata.get("created_via") in ("manual_seed", "swarm.create_task")
-                    or t.created_by == "operator"
-                    for t in _pending
+                    _task_counts_as_execution_pressure(
+                        t,
+                        primary_campaign_id=primary_campaign_id or None,
+                    )
+                    for t in _live_tasks
                 )
             except Exception:
                 pass
@@ -2341,6 +3067,7 @@ class SwarmManager:
         # When Gnani holds, skip orchestrator dispatch — no new task execution
         activity: dict = {}
         _orch_t0 = _time.monotonic()
+        _orch_progress_before = await self._sample_orchestrator_progress()
         try:
             if not gnani_holds:
                 activity = await asyncio.wait_for(
@@ -2354,12 +3081,27 @@ class SwarmManager:
                     self._orchestrator.tick_settle_only(), timeout=45.0
                 )
         except asyncio.TimeoutError:
-            logger.warning("orchestrator.tick timed out after 45s")
+            _orch_progress_after = await self._sample_orchestrator_progress()
+            activity = self._infer_activity_from_orchestrator_timeout(
+                _orch_progress_before,
+                _orch_progress_after,
+            )
+            result["dispatched"] = activity.get("dispatched", 0)
+            result["settled"] = activity.get("settled", 0)
+            if activity.get("dispatched", 0) or activity.get("settled", 0):
+                logger.warning(
+                    "orchestrator.tick timed out after 45s; inferred dispatched=%d settled=%d from runtime state",
+                    activity.get("dispatched", 0),
+                    activity.get("settled", 0),
+                )
+            else:
+                logger.warning("orchestrator.tick timed out after 45s")
         _orch_dur = _time.monotonic() - _orch_t0
         if _orch_dur > 5.0:
             logger.warning("orchestrator.tick took %.1fs", _orch_dur)
 
         _coord_t0 = _time.monotonic()
+        self._record_coordination_started()
         try:
             coordination = await asyncio.wait_for(
                 self.coordination_status(refresh=False), timeout=10.0
@@ -2378,13 +3120,16 @@ class SwarmManager:
             logger.warning("coordination timed out")
         result["synthesized"] = len(synthesized)
         _coord_dur = _time.monotonic() - _coord_t0
+        self._record_coordination_completed(duration_s=_coord_dur)
         if _coord_dur > 5.0:
             logger.warning("coordination took %.1fs", _coord_dur)
 
         director_proposals: list[Task] = []
         if (allow_autonomous_generation and self._director is not None
-            and self._tick_count % self._director_interval_ticks == 0):
+            and self._director_pulse_due()
+            and not _has_real_tasks):
             _dir_t0 = _time.monotonic()
+            self._last_director_pulse_tick = self._tick_count
             try:
                 director_proposals = await asyncio.wait_for(
                     self._director_pulse(), timeout=20.0
@@ -2457,6 +3202,11 @@ class SwarmManager:
             result.get("organism_verdict", "-"),
             result.get("meta_fitness", "-"),
         )
+        self._record_tick_completed(
+            tick_number=self._tick_count,
+            duration_s=_tick_dur,
+            activity=result,
+        )
         did_work = (bool(reopened) or bool(rescued) or bool(synthesized)
                     or bool(director_proposals) or self._tick_did_work(activity))
         if did_work:
@@ -2474,6 +3224,14 @@ class SwarmManager:
         In interactive mode, uses the provided interval.
         """
         tick_interval = interval if interval is not None else self._daemon.heartbeat_interval
+        self._liveness.tick_interval_s = max(0.0, float(tick_interval))
+        if self._orchestrator is not None:
+            refresh_interval = min(
+                float(getattr(self._orchestrator, "_coordination_refresh_interval_s", tick_interval)),
+                float(tick_interval),
+            )
+            self._orchestrator.set_coordination_refresh_interval(refresh_interval)
+            self._liveness.coordination_refresh_interval_s = refresh_interval
 
         while self._running:
             try:
@@ -2486,6 +3244,8 @@ class SwarmManager:
                     await asyncio.sleep(min(tick_interval, 300))
                     continue
             except Exception as exc:
+                self._mark_liveness_stall("tick_error", str(exc))
+                await self._publish_runtime_health_snapshot(source="swarm.tick_error")
                 logger.exception("Tick failed: %s", exc)
                 tripped = self._daemon.circuit_breaker.record_failure()
                 if tripped:
@@ -2518,24 +3278,28 @@ class SwarmManager:
             state.organism = self._organism.status()
         return state
 
-    async def _publish_runtime_health_snapshot(self) -> None:
+    async def _publish_runtime_health_snapshot(self, *, source: str = "swarm.run") -> None:
         """Persist a best-effort control-plane snapshot for operator surfaces."""
-        from dharma_swarm.runtime_artifacts import write_dgc_health_snapshot
+        from dharma_swarm.runtime_artifacts import (
+            dgc_health_snapshot_summary,
+            write_dgc_health_snapshot,
+            write_swarm_liveness_snapshot,
+        )
 
         try:
-            state = await self.status()
+            agent_count, task_count = await self._update_liveness_runtime_counts()
             write_dgc_health_snapshot(
                 self.state_dir,
                 daemon_pid=os.getpid(),
-                agent_count=len(state.agents),
-                task_count=(
-                    state.tasks_pending
-                    + state.tasks_running
-                    + state.tasks_completed
-                    + state.tasks_failed
-                ),
+                agent_count=agent_count,
+                task_count=task_count,
                 anomaly_count=0,
-                source="swarm.run",
+                source=source,
+                liveness=self.hot_path_liveness(),
+            )
+            write_swarm_liveness_snapshot(
+                self.state_dir,
+                dgc_health_snapshot_summary(self.state_dir),
             )
         except Exception as exc:
             logger.debug("Runtime health snapshot publish failed: %s", exc)

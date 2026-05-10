@@ -27,6 +27,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from dharma_swarm.models import TaskPriority, TaskStatus
 from dharma_swarm.rea_runtime import (
     TemporalRunStore,
     WaitState,
@@ -34,6 +35,7 @@ from dharma_swarm.rea_runtime import (
     WaitStateStatus,
     get_run_profile,
 )
+from dharma_swarm.task_board_mirror import CanonicalTaskMirror, MirroredTaskSpec
 
 logger = logging.getLogger(__name__)
 
@@ -276,6 +278,7 @@ class OvernightDirector:
         self._profile = None
         self._temporal_store: TemporalRunStore | None = None
         self._wait_handoff: dict[str, Any] | None = None
+        self._task_mirror = CanonicalTaskMirror(STATE_DIR)
 
     def _init_temporal_runtime(self) -> None:
         """Initialize the REA-style temporal state for this run."""
@@ -322,6 +325,7 @@ class OvernightDirector:
         )
         tasks = stager.compile_queue()
         _log("director", f"Staged {len(tasks)} tasks")
+        await self._sync_staged_tasks(tasks)
 
         evaluator = OvernightEvaluator(
             date=self.date,
@@ -378,6 +382,7 @@ class OvernightDirector:
                 cycle_id, "executing",
                 f"Task: {task.task_id}\nGoal: {task.goal}\nTimeout: {task.timeout_seconds}s",
             )
+            await self._sync_task_to_board(task, status=TaskStatus.RUNNING)
 
             _log("director", f"[{cycle_id}] Task: {task.task_id} — {task.goal[:80]}")
 
@@ -445,6 +450,7 @@ class OvernightDirector:
             stager.record_result(task.task_id, outcome.status, outcome.error)
             self.outcomes.append(outcome)
             self._tokens_spent += outcome.tokens_spent
+            await self._sync_task_outcome(task, outcome)
 
             # Evaluator cycle tracking
             cycle_result = CycleResult(
@@ -739,6 +745,105 @@ class OvernightDirector:
              f"{summary['failed']} failed, {summary['dead_cycles']} dead — "
              f"VERDICT={verdict.value.upper()}")
         return summary
+
+    async def _sync_staged_tasks(self, tasks: list[Any]) -> None:
+        for task in tasks:
+            await self._sync_task_to_board(task, status=TaskStatus.PENDING)
+
+    async def _sync_task_to_board(self, task: Any, *, status: TaskStatus, result: str = "") -> None:
+        try:
+            await self._task_mirror.sync(self._mirror_task_spec(task, status=status, result=result))
+        except Exception:
+            logger.debug("overnight task board mirror failed", exc_info=True)
+
+    async def _sync_task_outcome(self, task: Any, outcome: CycleOutcome) -> None:
+        if outcome.status == "completed":
+            status = TaskStatus.COMPLETED
+        elif outcome.status == "waiting":
+            status = TaskStatus.PENDING
+        else:
+            status = TaskStatus.FAILED
+        try:
+            await self._task_mirror.sync(
+                self._mirror_task_spec(
+                    task,
+                    status=status,
+                    result=self._mirror_result_text(outcome),
+                    extra_metadata={
+                        "overnight_outcome_status": outcome.status,
+                        "acceptance_passed": outcome.acceptance_passed,
+                        "files_modified": list(outcome.files_modified),
+                        "tokens_spent": outcome.tokens_spent,
+                        "test_results": dict(outcome.test_results or {}),
+                        "error": outcome.error,
+                    },
+                )
+            )
+        except Exception:
+            logger.debug("overnight outcome mirror failed", exc_info=True)
+
+    def _mirror_task_spec(
+        self,
+        task: Any,
+        *,
+        status: TaskStatus,
+        result: str = "",
+        extra_metadata: dict[str, Any] | None = None,
+    ) -> MirroredTaskSpec:
+        metadata = dict(getattr(task, "metadata", {}) or {})
+        metadata.update({
+            "source": "overnight_director",
+            "task_kind": "overnight_stage",
+            "execution_substrate": "overnight_director",
+            "overnight_date": self.date,
+            "overnight_task_id": task.task_id,
+            "overnight_task_type": task.task_type,
+            "overnight_acceptance": getattr(task, "acceptance_criterion", ""),
+            "overnight_timeout_seconds": getattr(task, "timeout_seconds", self.config.cycle_timeout_seconds),
+            "overnight_run_profile": self.config.run_profile,
+            "overnight_run_dir": str(self.run_dir),
+        })
+        if extra_metadata:
+            metadata.update(extra_metadata)
+        return MirroredTaskSpec(
+            mirror_key=f"overnight:{self.date}:{task.task_id}",
+            title=task.goal[:240],
+            description=getattr(task, "acceptance_criterion", "")[:600],
+            priority=self._mirror_priority(task),
+            created_by="overnight_director",
+            assigned_to="overnight_director",
+            status=status,
+            result=result,
+            metadata=metadata,
+        )
+
+    @staticmethod
+    def _mirror_result_text(outcome: CycleOutcome) -> str:
+        if outcome.error:
+            return outcome.error[:400]
+        summary: list[str] = []
+        if outcome.acceptance_passed:
+            summary.append("acceptance passed")
+        if outcome.files_modified:
+            summary.append(f"files={len(outcome.files_modified)}")
+        if outcome.test_results:
+            passed = outcome.test_results.get("passed", 0)
+            failed = outcome.test_results.get("failed", 0)
+            summary.append(f"pytest {passed} passed / {failed} failed")
+        if not summary:
+            summary.append(outcome.status)
+        return " | ".join(summary)
+
+    @staticmethod
+    def _mirror_priority(task: Any) -> TaskPriority:
+        score = float(getattr(task, "priority", 0.0) or 0.0)
+        if score >= 8.0:
+            return TaskPriority.URGENT
+        if score >= 4.0:
+            return TaskPriority.HIGH
+        if score >= 1.0:
+            return TaskPriority.NORMAL
+        return TaskPriority.LOW
 
     def _has_pending_waits(self) -> bool:
         if self._temporal_store is None:

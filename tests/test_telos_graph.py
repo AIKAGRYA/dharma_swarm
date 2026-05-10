@@ -92,30 +92,20 @@ class TestCRUD:
         assert found.name == "dharma"
 
     @pytest.mark.asyncio
+    async def test_get_by_name_returns_highest_priority_exact_match(self, tmp_path):
+        tg = _make_graph(tmp_path)
+        await tg.add_objective(_obj("viveka", priority=3))
+        top = await tg.add_objective(_obj("viveka", priority=9))
+
+        found = await tg.get_by_name("viveka")
+
+        assert found is not None
+        assert found.id == top.id
+
+    @pytest.mark.asyncio
     async def test_get_objective_not_found(self, tmp_path):
         tg = _make_graph(tmp_path)
         assert await tg.get_objective("nonexistent") is None
-
-    @pytest.mark.asyncio
-    async def test_get_by_name(self, tmp_path):
-        """MM-18 pinning test: get_by_name must exist and find objectives."""
-        tg = _make_graph(tmp_path)
-        await tg.add_objective(_obj("revenue-growth"))
-        await tg.add_objective(_obj("cost-reduction"))
-        found = await tg.get_by_name("revenue-growth")
-        assert found is not None
-        assert found.name == "revenue-growth"
-        missing = await tg.get_by_name("nonexistent")
-        assert missing is None
-
-    @pytest.mark.asyncio
-    async def test_get_by_name_dedup(self, tmp_path):
-        """MM-18: gnani_lodestone uses get_by_name for deduplication."""
-        tg = _make_graph(tmp_path)
-        first = await tg.add_objective(_obj("unique-obj"))
-        found = await tg.get_by_name("unique-obj")
-        assert found is not None
-        assert found.id == first.id
 
     @pytest.mark.asyncio
     async def test_update_objective(self, tmp_path):

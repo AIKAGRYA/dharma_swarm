@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from types import SimpleNamespace
 from unittest.mock import patch
 
 from dharma_swarm.cron_job_runtime import CronJobRunStatus
@@ -369,79 +368,30 @@ def test_run_cron_job_dispatches_doctor_assurance():
     mock.assert_called_once()
 
 
-def test_run_cron_job_dispatches_system_map_populator(tmp_path):
-    script = tmp_path / "scripts" / "system_map_populator.py"
-    script.parent.mkdir()
-    script.write_text("print('ok')\n", encoding="utf-8")
-    with patch(
-        "subprocess.run",
-        return_value=SimpleNamespace(returncode=0, stdout="Wrote reports/system_map/latest.json", stderr=""),
-    ) as mock_run:
-        success, output, error = run_cron_job(
-            {
-                "handler": "system_map_populator",
-                "timeout_sec": 12,
-                "repo_root": str(tmp_path),
-                "audit_dir": "/tmp/audit",
-                "output": "/tmp/latest.json",
-            }
-        )
-
-    assert success is True
-    assert output == "Wrote reports/system_map/latest.json"
-    assert error is None
-    args = mock_run.call_args.args[0]
-    assert args[1] == str(script)
-    assert ["--audit-dir", "/tmp/audit"] == args[2:4]
-    assert ["--output", "/tmp/latest.json"] == args[4:6]
-    assert mock_run.call_args.kwargs["timeout"] == 12
-
-
-def test_run_cron_job_dispatches_tcs_heartbeat(tmp_path):
-    class FakeIdentityMonitor:
-        def __init__(self, state_dir):
-            self.state_dir = state_dir
-            self.saved_path = None
-
-        async def measure(self, *, threat_boost=False):
-            assert threat_boost is True
-            return SimpleNamespace(
-                tcs=0.8123,
-                gpr=0.7,
-                bsi=0.8,
-                rm=0.9,
-                regime="stable",
-            )
-
-        def save_history(self, path=None):
-            self.saved_path = path
-            target = path or (self.state_dir / "meta" / "identity_history.jsonl")
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text('{"tcs":0.8123}\n', encoding="utf-8")
-
-    history_path = tmp_path / "history" / "identity_history.jsonl"
-    with patch("dharma_swarm.identity.IdentityMonitor", FakeIdentityMonitor):
-        success, output, error = run_cron_job(
-            {
-                "handler": "tcs_heartbeat",
-                "state_dir": str(tmp_path),
-                "history_path": str(history_path),
-                "threat_boost": True,
-            }
-        )
-
-    assert success is True
-    assert error is None
-    assert "TCS heartbeat: tcs=0.8123 regime=stable" in output
-    assert history_path.exists()
-
-
 def test_run_cron_job_rejects_unknown_handler():
     success, output, error = run_cron_job({"handler": "mystery"})
 
     assert success is False
     assert "Unsupported cron handler" in output
     assert error == output
+
+
+def test_execute_cron_job_dispatches_opportunity_refill():
+    with patch(
+        "dharma_swarm.opportunity_refill.run_once",
+        return_value={"opportunities_seeded": 2, "rows_appended": 10},
+    ) as mock:
+        result = execute_cron_job(
+            {
+                "handler": "opportunity_refill",
+                "top_k": 2,
+                "min_telos_alignment": 0.9,
+            }
+        )
+
+    assert result.status is CronJobRunStatus.COMPLETED
+    assert "\"rows_appended\": 10" in result.output
+    mock.assert_called_once_with(top_k=2, min_telos_alignment=0.9)
 
 
 def test_execute_cron_job_maps_overnight_waiting_summary_to_waiting_external():

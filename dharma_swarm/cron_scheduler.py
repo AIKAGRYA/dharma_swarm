@@ -9,8 +9,7 @@ Jobs are stored in ~/.dharma/cron/jobs.json. Each job has:
   - delivery: where to send results ("local", "telegram:<chat_id>", etc.)
 
 ``tick()`` checks for due jobs, acquires a file lock, and executes them.
-Integrates with YogaScheduler quiet hours — jobs are deferred during
-quiet hours unless marked urgent.
+Runs jobs whenever due. Time-of-day quiet-hour deferral is disabled.
 """
 
 from __future__ import annotations
@@ -24,21 +23,20 @@ import tempfile
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
 # ── Configuration ────────────────────────────────────────────────────
 
-DHARMA_DIR = dharma_state_dir("DHARMA_HOME")
+DHARMA_DIR = Path(os.getenv("DHARMA_HOME", Path.home() / ".dharma"))
 CRON_DIR = DHARMA_DIR / "cron"
 JOBS_FILE = CRON_DIR / "jobs.json"
 OUTPUT_DIR = CRON_DIR / "output"
 LOCK_FILE = CRON_DIR / ".tick.lock"
 
-# Default quiet hours (2-4 AM local)
-DEFAULT_QUIET_HOURS: set[int] = {2, 3, 4}
+# Quiet-hour deferral disabled.
+DEFAULT_QUIET_HOURS: set[int] = set()
 
 
 def _utc_now() -> datetime:
@@ -345,16 +343,13 @@ def get_due_jobs(quiet_hours: set[int] | None = None) -> list[dict[str, Any]]:
 
     jobs = load_jobs()
     due: list[dict[str, Any]] = []
-    repaired = False
 
     for job in jobs:
         if not job.get("enabled", True):
             continue
         next_run = job.get("next_run_at")
         if not next_run:
-            job["next_run_at"] = now.isoformat()
-            next_run = job["next_run_at"]
-            repaired = True
+            continue
         next_dt = datetime.fromisoformat(next_run)
         if next_dt.tzinfo is None:
             next_dt = next_dt.replace(tzinfo=timezone.utc)
@@ -363,9 +358,6 @@ def get_due_jobs(quiet_hours: set[int] | None = None) -> list[dict[str, Any]]:
                 logger.debug("Job '%s' deferred (quiet hours)", job.get("name"))
                 continue
             due.append(job)
-
-    if repaired:
-        save_jobs(jobs)
 
     return due
 

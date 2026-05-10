@@ -23,20 +23,29 @@ Systems run concurrently:
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
 import logging
 import os
+import re
 import signal
+import subprocess
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
 from dharma_swarm.config import DEFAULT_CONFIG
+from dharma_swarm.models import TaskPriority, TaskStatus
 from dharma_swarm.pending_proposals import append_pending_proposals
 from dharma_swarm.runtime_artifacts import (
+    dgc_health_snapshot_summary,
     freshest_pulse_log_path,
+    parse_iso_datetime,
     write_dgc_health_snapshot,
 )
 
@@ -56,6 +65,12 @@ _RUNTIME_HEALTH_STATE: dict[str, int] = {
     "agent_count": 0,
     "task_count": 0,
 }
+SWARM_LIVENESS_PATH = STATE_DIR / "meta" / "swarm_liveness.json"
+STARTUP_SEED_TIMEOUT_S = max(5.0, min(float(SWARM_TICK), 30.0))
+CAMPAIGN_NURTURE_INTERVAL_S = max(300.0, min(1800.0, float(SWARM_TICK) * 5.0))
+CAMPAIGN_NURTURE_STALE_HOURS = 2.0
+CAMPAIGN_NURTURE_RECENT_HOURS = 12.0
+CAMPAIGN_NURTURE_MAX_SPECS = 3
 
 
 def _update_runtime_health_state(*, agent_count: int | None = None, task_count: int | None = None) -> None:
@@ -70,6 +85,84 @@ def _log(system: str, msg: str) -> None:
     line = f"[{ts}] [{system}] {msg}"
     print(line, flush=True)
     logger.info("[%s] %s", system, msg)
+
+
+async def _consume_event_backlog(
+    bus: Any,
+    event_type: str,
+    *,
+    batch_size: int = 500,
+    max_events: int = 1000,
+) -> list[Any]:
+    """Drain a bounded event backlog without starving the loop."""
+    events: list[Any] = []
+    while len(events) < max_events:
+        remaining = max_events - len(events)
+        limit = max(1, min(batch_size, remaining))
+        batch = await bus.consume_events(event_type, limit=limit)
+        if not batch:
+            break
+        events.extend(batch)
+        if len(batch) < limit:
+            break
+    return events
+
+
+def _swarm_liveness_watch_payload(snapshot: dict[str, Any]) -> dict[str, Any]:
+    payload = snapshot.get("payload") if isinstance(snapshot.get("payload"), dict) else {}
+    liveness = snapshot.get("liveness") if isinstance(snapshot.get("liveness"), dict) else {}
+    return {
+        "observed_at": datetime.now(timezone.utc).isoformat(),
+        "snapshot_status": snapshot.get("status", "missing"),
+        "snapshot_age_seconds": snapshot.get("age_seconds"),
+        "daemon_pid_mismatch": bool(snapshot.get("daemon_pid_mismatch")),
+        "source": payload.get("source"),
+        "agent_count": payload.get("agent_count"),
+        "task_count": payload.get("task_count"),
+        "liveness": liveness,
+    }
+
+
+def _write_swarm_liveness_watch(state_dir: Path, payload: dict[str, Any]) -> Path:
+    path = state_dir / "meta" / "swarm_liveness.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    return path
+
+
+def _swarm_liveness_transition_key(payload: dict[str, Any]) -> tuple[str, str, str]:
+    liveness = payload.get("liveness") if isinstance(payload.get("liveness"), dict) else {}
+    return (
+        str(liveness.get("status", "unknown") or "unknown"),
+        str(liveness.get("bootstrap_phase", "unknown") or "unknown"),
+        str(liveness.get("stall_state", "none") or "none"),
+    )
+
+
+def _log_swarm_liveness_transition(
+    previous_key: tuple[str, str, str] | None,
+    payload: dict[str, Any],
+) -> tuple[str, str, str]:
+    key = _swarm_liveness_transition_key(payload)
+    if key == previous_key:
+        return key
+
+    liveness = payload.get("liveness") if isinstance(payload.get("liveness"), dict) else {}
+    status, phase, stall_state = key
+    reason = str(liveness.get("stall_reason", "") or "").strip()
+
+    if status == "stalled":
+        detail = reason or stall_state.replace("_", " ")
+        _log("watchdog", f"Swarm hot path stalled at phase={phase}: {detail}")
+    elif status == "booting":
+        _log("watchdog", f"Swarm hot path booting: phase={phase}")
+    elif status == "degraded":
+        detail = reason or stall_state.replace("_", " ")
+        _log("watchdog", f"Swarm hot path degraded at phase={phase}: {detail}")
+    elif status == "healthy":
+        _log("watchdog", f"Swarm hot path healthy: phase={phase}")
+
+    return key
 
 
 def _enqueue_shakti_escalations(
@@ -120,11 +213,855 @@ async def _wait_or_shutdown(shutdown_event: asyncio.Event, delay: float) -> bool
         return shutdown_event.is_set()
 
 
+async def _wait_for_bootstrap_gate(
+    system: str,
+    bootstrap_ready_event: asyncio.Event | None,
+    shutdown_event: asyncio.Event,
+) -> bool:
+    """Block noncritical boot work until the swarm startup gate opens."""
+    if bootstrap_ready_event is None:
+        return not shutdown_event.is_set()
+    if bootstrap_ready_event.is_set():
+        return True
+    if shutdown_event.is_set():
+        return False
+
+    _log(system, "Waiting for swarm bootstrap gate")
+    gate_task = asyncio.create_task(bootstrap_ready_event.wait())
+    shutdown_task = asyncio.create_task(shutdown_event.wait())
+    done, pending = await asyncio.wait(
+        {gate_task, shutdown_task},
+        return_when=asyncio.FIRST_COMPLETED,
+    )
+    for pending_task in pending:
+        pending_task.cancel()
+    await asyncio.gather(*pending, return_exceptions=True)
+
+    if shutdown_task in done and shutdown_event.is_set() and not bootstrap_ready_event.is_set():
+        _log(system, "Startup gate wait cancelled by shutdown")
+        return False
+
+    _log(system, "Startup gate released")
+    return True
+
+
+async def _run_gated_loop(
+    system: str,
+    shutdown_event: asyncio.Event,
+    bootstrap_ready_event: asyncio.Event | None,
+    factory: Callable[[], Awaitable[None]],
+) -> None:
+    """Run a loop only after the swarm startup gate opens."""
+    if not await _wait_for_bootstrap_gate(system, bootstrap_ready_event, shutdown_event):
+        return
+    await factory()
+
+
+async def _publish_swarm_runtime_snapshot(
+    swarm: Any,
+    *,
+    source: str,
+) -> None:
+    """Best-effort runtime snapshot publish for the live orchestrator path."""
+    publisher = getattr(swarm, "_publish_runtime_health_snapshot", None)
+    if publisher is None:
+        return
+    try:
+        await publisher(source=source)
+    except Exception:
+        logger.debug("Swarm runtime snapshot publish failed (%s)", source, exc_info=True)
+
+
+async def _post_tick_runtime_bookkeeping(
+    swarm: Any,
+    *,
+    status_timeout_s: float = 5.0,
+    snapshot_timeout_s: float = 5.0,
+) -> None:
+    """Refresh operator-facing runtime state without blocking cadence.
+
+    ``run_swarm_loop`` should never stop ticking because a secondary status
+    read or snapshot write stalls. Time-bound both operations and fall back to
+    the in-process liveness view when richer status collection is unavailable.
+    """
+    bounded_status_timeout = max(0.1, float(status_timeout_s))
+    bounded_snapshot_timeout = max(0.1, float(snapshot_timeout_s))
+    try:
+        swarm_state = await asyncio.wait_for(
+            swarm.status(),
+            timeout=bounded_status_timeout,
+        )
+    except asyncio.TimeoutError:
+        _log(
+            "swarm",
+            f"status refresh exceeded {bounded_status_timeout:.1f}s; continuing",
+        )
+        liveness = swarm.hot_path_liveness() if hasattr(swarm, "hot_path_liveness") else {}
+        _update_runtime_health_state(
+            agent_count=int(liveness.get("total_agents", 0) or 0),
+            task_count=(
+                int(liveness.get("tasks_pending", 0) or 0)
+                + int(liveness.get("tasks_assigned", 0) or 0)
+                + int(liveness.get("tasks_running", 0) or 0)
+                + int(liveness.get("tasks_completed", 0) or 0)
+                + int(liveness.get("tasks_failed", 0) or 0)
+            ),
+        )
+    else:
+        _update_runtime_health_state(
+            agent_count=len(swarm_state.agents),
+            task_count=(
+                swarm_state.tasks_pending
+                + swarm_state.tasks_running
+                + swarm_state.tasks_completed
+                + swarm_state.tasks_failed
+            ),
+        )
+
+    try:
+        await asyncio.wait_for(
+            _publish_swarm_runtime_snapshot(
+                swarm,
+                source="swarm.tick_complete",
+            ),
+            timeout=bounded_snapshot_timeout,
+        )
+    except asyncio.TimeoutError:
+        _log(
+            "swarm",
+            f"runtime snapshot publish exceeded {bounded_snapshot_timeout:.1f}s; continuing",
+        )
+
+
+async def _release_startup_gate_after_first_tick(
+    swarm: Any,
+    bootstrap_ready_event: asyncio.Event | None,
+    *,
+    shutdown_event: asyncio.Event | None = None,
+    poll_interval_s: float = 0.1,
+) -> str:
+    """Open the startup gate only after the swarm reaches bootstrap complete.
+
+    A completed first tick is not strong enough when the orchestrator times out
+    after partial dispatch work; sibling boot tasks must stay blocked until the
+    swarm has actually recorded ``bootstrap_complete``.
+    """
+    phase = await swarm.wait_until_bootstrap_ready()
+    if phase in _BOOT_TERMINAL_PHASES:
+        return phase
+
+    wait_interval = max(0.01, float(poll_interval_s))
+    while True:
+        liveness = swarm.hot_path_liveness()
+        phase = str(liveness.get("bootstrap_phase", "") or "").strip()
+        if phase in _BOOT_TERMINAL_PHASES:
+            return phase
+        if phase == "bootstrap_complete":
+            await _publish_swarm_runtime_snapshot(
+                swarm,
+                source="swarm.startup_gate_release",
+            )
+            if bootstrap_ready_event is not None:
+                bootstrap_ready_event.set()
+            return phase
+        if shutdown_event is None:
+            await asyncio.sleep(wait_interval)
+            continue
+        if await _wait_or_shutdown(shutdown_event, wait_interval):
+            return phase
+
+
+_EXECUTION_BEARING_MODES = {"persistent_agent"}
+_EXECUTION_BEARING_SOURCES = {
+    "agent_runner",
+    "swarm.latent_gold",
+    "research_rtn",
+    "research_rtn_multi",
+    "research_rtn_review",
+    "research_rtn_synthesize",
+    "research_rtn_verify",
+}
+
+
+def _mission_campaign_id(mission_title: str) -> str:
+    norm = (mission_title or "").strip().lower()
+    digest = hashlib.sha1(norm.encode("utf-8")).hexdigest()[:10]
+    return f"mission_{digest}"
+
+
+def _artifact_slug(text: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "_", (text or "").strip().lower()).strip("_")
+    return slug[:48] or "artifact"
+
+
+def _campaign_artifact_path(campaign_id: str) -> str:
+    return f"~/.dharma/shared/campaigns/{campaign_id}.md"
+
+
+def _campaign_task_artifact_path(campaign_id: str, title: str) -> str:
+    return f"~/.dharma/shared/campaigns/{campaign_id}_{_artifact_slug(title)}.md"
+
+
+def _recent_worker_call_count() -> int:
+    try:
+        from dharma_swarm.cost_tracker import summarize_costs
+
+        rollup = summarize_costs(1.0)
+        by_mode = rollup.get("by_execution_mode", {}) or {}
+        by_source = rollup.get("by_source", {}) or {}
+        mode_calls = sum(
+            int((by_mode.get(mode) or {}).get("calls", 0))
+            for mode in _EXECUTION_BEARING_MODES
+        )
+        source_calls = sum(
+            int((by_source.get(source) or {}).get("calls", 0))
+            for source in _EXECUTION_BEARING_SOURCES
+        )
+        return max(mode_calls, source_calls)
+    except Exception:
+        return 0
+
+
+def _should_seed_startup_pressure(
+    *,
+    pending_count: int,
+    running_count: int,
+    primary_campaign_viable: bool,
+    worker_calls_last_hour: int,
+    has_mission_pressure: bool,
+) -> tuple[bool, str]:
+    in_flight = max(0, pending_count) + max(0, running_count)
+    if in_flight == 0:
+        return True, "empty_board"
+    if worker_calls_last_hour <= 0 and not primary_campaign_viable:
+        return True, "stagnation_dead_campaign"
+    if not has_mission_pressure and not primary_campaign_viable:
+        return True, "no_mission_pressure"
+    return False, "steady_state"
+
+
+def _campaign_has_board_presence(campaign: dict[str, Any] | None, tasks: list[Any]) -> bool:
+    if not campaign:
+        return False
+    campaign_id = str(campaign.get("campaign_id") or "").strip()
+    if not campaign_id:
+        return False
+    for task in tasks:
+        metadata = getattr(task, "metadata", None)
+        if isinstance(metadata, dict) and str(metadata.get("campaign_id") or "").strip() == campaign_id:
+            return True
+    return False
+
+
+def _campaign_has_open_human_blocker(campaign: dict[str, Any] | None) -> bool:
+    if not campaign:
+        return False
+    blockers = campaign.get("human_blocking")
+    if not isinstance(blockers, list):
+        return False
+    terminal_statuses = {
+        "abandoned",
+        "canceled",
+        "cancelled",
+        "completed",
+        "done",
+        "resolved",
+    }
+    for blocker in blockers:
+        if isinstance(blocker, str):
+            if blocker.strip():
+                return True
+            continue
+        if not isinstance(blocker, dict):
+            continue
+        status = str(blocker.get("status") or "").strip().lower()
+        if status in terminal_statuses:
+            continue
+        if blocker:
+            return True
+    return False
+
+
+def _task_matches_campaign(task: Any, campaign_id: str) -> bool:
+    metadata = getattr(task, "metadata", None)
+    if not isinstance(metadata, dict):
+        return False
+    return str(metadata.get("campaign_id") or "").strip() == campaign_id
+
+
+def _campaign_has_live_board_presence(campaign: dict[str, Any] | None, tasks: list[Any]) -> bool:
+    if not campaign:
+        return False
+    campaign_id = str(campaign.get("campaign_id") or "").strip()
+    if not campaign_id:
+        return False
+    live_statuses = {
+        TaskStatus.PENDING,
+        TaskStatus.ASSIGNED,
+        TaskStatus.RUNNING,
+    }
+    for task in tasks:
+        if not _task_matches_campaign(task, campaign_id):
+            continue
+        if getattr(task, "status", None) in live_statuses:
+            return True
+    return False
+
+
+def _task_is_recent(
+    task: Any,
+    *,
+    hours: float,
+    now: datetime | None = None,
+) -> bool:
+    ts = getattr(task, "updated_at", None) or getattr(task, "created_at", None)
+    if not isinstance(ts, datetime):
+        return False
+    current = _as_utc_datetime(now or datetime.now(timezone.utc))
+    ts = _as_utc_datetime(ts)
+    return (current - ts).total_seconds() <= max(0.0, hours) * 3600.0
+
+
+def _as_utc_datetime(value: datetime) -> datetime:
+    if value.tzinfo is None or value.tzinfo.utcoffset(value) is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def _campaign_has_recent_nurture_task(
+    campaign: dict[str, Any] | None,
+    tasks: list[Any],
+    *,
+    recent_hours: float = CAMPAIGN_NURTURE_RECENT_HOURS,
+) -> bool:
+    if not campaign:
+        return False
+    campaign_id = str(campaign.get("campaign_id") or "").strip()
+    if not campaign_id:
+        return False
+    for task in tasks:
+        if not _task_matches_campaign(task, campaign_id):
+            continue
+        metadata = getattr(task, "metadata", None)
+        if not isinstance(metadata, dict):
+            continue
+        if str(metadata.get("created_via") or "") != "campaign_nurture":
+            continue
+        if _task_is_recent(task, hours=recent_hours):
+            return True
+    return False
+
+
+def _task_has_mission_pressure(task: Any) -> bool:
+    metadata = getattr(task, "metadata", None)
+    if not isinstance(metadata, dict):
+        return False
+    if metadata.get("campaign_id") or metadata.get("artifact_required"):
+        return True
+    if metadata.get("seed_class") in {"startup_seed", "director_mission"}:
+        return True
+    if metadata.get("created_via") in {"manual_seed", "swarm.create_task"}:
+        return True
+    return False
+
+
+def _campaign_is_stale(campaign: dict[str, Any] | None, *, max_age_hours: float = 2.0) -> bool:
+    if not campaign:
+        return True
+    ts_raw = campaign.get("last_check_in") or campaign.get("created")
+    if not ts_raw:
+        return True
+    try:
+        ts = datetime.fromisoformat(str(ts_raw).replace("Z", "+00:00"))
+    except Exception:
+        return True
+    ts = _as_utc_datetime(ts)
+    age_hours = (datetime.now(timezone.utc) - ts).total_seconds() / 3600.0
+    return age_hours > max_age_hours
+
+
+def _campaign_nurture_reason(
+    campaign: dict[str, Any],
+    tasks: list[Any],
+    *,
+    stale_hours: float = CAMPAIGN_NURTURE_STALE_HOURS,
+) -> str:
+    is_primary = bool(campaign.get("primary"))
+    stale = _campaign_is_stale(campaign, max_age_hours=stale_hours)
+    live_presence = _campaign_has_live_board_presence(campaign, tasks)
+    if not live_presence and _campaign_has_open_human_blocker(campaign):
+        return ""
+    if not live_presence and stale:
+        return "stale_no_live_work"
+    if not live_presence and is_primary:
+        return "primary_no_live_work"
+    return ""
+
+
+def _build_campaign_nurture_specs(
+    *,
+    campaigns: list[dict[str, Any]],
+    tasks: list[Any],
+    stale_hours: float = CAMPAIGN_NURTURE_STALE_HOURS,
+    recent_hours: float = CAMPAIGN_NURTURE_RECENT_HOURS,
+    limit: int = CAMPAIGN_NURTURE_MAX_SPECS,
+) -> list[dict[str, Any]]:
+    specs: list[dict[str, Any]] = []
+    active_campaigns = [
+        campaign for campaign in campaigns
+        if isinstance(campaign, dict) and campaign.get("status", "active") == "active"
+    ]
+    primary_campaigns = [campaign for campaign in active_campaigns if campaign.get("primary")]
+    candidate_campaigns = primary_campaigns[:1] if primary_campaigns else active_campaigns
+    for campaign in candidate_campaigns:
+        if not isinstance(campaign, dict):
+            continue
+        campaign_id = str(campaign.get("campaign_id") or "").strip()
+        if not campaign_id:
+            continue
+        if _campaign_has_recent_nurture_task(
+            campaign,
+            tasks,
+            recent_hours=recent_hours,
+        ):
+            continue
+        reason = _campaign_nurture_reason(
+            campaign,
+            tasks,
+            stale_hours=stale_hours,
+        )
+        if not reason:
+            continue
+        title = f"Campaign nurture: {campaign.get('title') or campaign_id}"
+        artifact_path = str(campaign.get("artifact_path") or _campaign_artifact_path(campaign_id))
+        markers = list(campaign.get("progress_markers") or [])
+        last_marker = markers[-1] if markers else {}
+        last_note = str(last_marker.get("note") or "").strip()
+        description_lines = [
+            f"Campaign: {campaign_id}",
+            f"Title: {campaign.get('title') or campaign_id}",
+            f"Domain: {campaign.get('domain') or 'unknown'}",
+            f"Reason: {reason}.",
+            "",
+            "This active campaign has gone cold or lost live board pressure.",
+            f"Write or refresh the binding campaign artifact at {artifact_path}.",
+            "Include:",
+            "1. current state and strongest real evidence",
+            "2. blocking gap or decision that is preventing progress",
+            "3. one concrete next external action or deliverable",
+            "4. up to three bounded follow-on tasks if real branches emerge",
+        ]
+        if last_note:
+            description_lines.extend(["", f"Last marker: {last_note[:280]}"])
+        specs.append(
+            {
+                "title": title,
+                "description": "\n".join(description_lines),
+                "priority": TaskPriority.HIGH if campaign.get("primary") else TaskPriority.NORMAL,
+                "created_by": "campaign_garden",
+                "metadata": {
+                    "campaign_id": campaign_id,
+                    "campaign_support": True,
+                    "artifact_required": True,
+                    "seed_class": "campaign_nurture",
+                    "created_via": "campaign_nurture",
+                    "nurture_reason": reason,
+                    "domain": campaign.get("domain") or "",
+                    "target_artifact": artifact_path,
+                },
+            }
+        )
+        if len(specs) >= max(1, int(limit)):
+            break
+    return specs
+
+
+async def _refresh_campaign_pressure(swarm: Any) -> int:
+    """Keep durable campaigns warm by reseeding bounded board work when they cool off."""
+    try:
+        from dharma_swarm.campaigns import load_active
+
+        campaigns = load_active(STATE_DIR / "meta")
+        if not campaigns:
+            return 0
+        board = swarm._orchestrator._board
+        tasks = await board.list_tasks(limit=400)
+        specs = _build_campaign_nurture_specs(campaigns=campaigns, tasks=tasks)
+        if not specs:
+            return 0
+        created = await _enqueue_startup_specs(swarm, specs)
+        if created:
+            _log("swarm", f"Campaign nurture: queued {created} task(s)")
+        return created
+    except Exception as exc:
+        _log("swarm", f"Campaign nurture failed (non-fatal): {exc}")
+        return 0
+
+
+def _build_mission_seed_specs(
+    *,
+    mission_title: str,
+    task_titles: list[str],
+    existing_titles: set[str],
+    campaign_id: str,
+    domain: str,
+    limit: int = 10,
+) -> list[dict[str, Any]]:
+    specs: list[dict[str, Any]] = []
+    for title in task_titles[:limit]:
+        norm = (title or "").strip().lower()
+        if not norm or norm in existing_titles:
+            continue
+        artifact_path = _campaign_task_artifact_path(campaign_id, title)
+        specs.append(
+            {
+                "title": title,
+                "description": (
+                    f"Mission: {mission_title}.\n"
+                    f"Campaign: {campaign_id}.\n"
+                    f"Write the deliverable to {artifact_path}.\n"
+                    "Produce a durable artifact in ~/.dharma/shared/ or the repo. "
+                    "Prefer evidence-backed output over coordination churn."
+                ),
+                "priority": TaskPriority.HIGH,
+                "created_by": "director",
+                "metadata": {
+                    "campaign_id": campaign_id,
+                    "campaign_support": True,
+                    "domain": domain,
+                    "artifact_required": True,
+                    "mission_title": mission_title,
+                    "seed_class": "director_mission",
+                    "target_artifact": artifact_path,
+                },
+            }
+        )
+    return specs
+
+
+async def _enqueue_startup_specs(swarm: Any, specs: list[dict[str, Any]]) -> int:
+    """Create startup tasks through the swarm API when available.
+
+    The raw board path bypasses task enrichment used elsewhere in the daemon.
+    Startup pressure should flow through the same batch-creation seam as other
+    meaningful swarm work so metadata, trace IDs, and gate checks stay aligned.
+    """
+    if not specs:
+        return 0
+    create_task_batch = getattr(swarm, "create_task_batch", None)
+    if callable(create_task_batch):
+        created = await create_task_batch(specs)
+        return len(created or [])
+    board = swarm._orchestrator._board
+    created = await board.create_batch(specs)
+    return len(created or [])
+
+
+async def _seed_startup_pressure(swarm: Any) -> None:
+    """Assert mission-bearing pressure when the daemon boots into stagnation."""
+    try:
+        from dharma_swarm.campaigns import active_primary, create_campaign
+        from dharma_swarm.domain_classify import THEME_TO_DOMAIN, classify_text
+        from dharma_swarm.mission_contract import load_active_mission_state
+        from dharma_swarm.startup_crew import SEED_TASKS
+
+        board = swarm._orchestrator._board
+        board_stats = await board.stats()
+        pending = int(board_stats.get("pending", 0) or 0)
+        running = int(board_stats.get("running", 0) or 0)
+        existing_tasks = await board.list_tasks(limit=200)
+        primary_campaign = active_primary(STATE_DIR / "meta")
+        worker_calls_last_hour = _recent_worker_call_count()
+        has_mission_pressure = any(_task_has_mission_pressure(task) for task in existing_tasks)
+        primary_campaign_viable = (
+            primary_campaign is not None
+            and (
+                _campaign_has_open_human_blocker(primary_campaign)
+                or (
+                    not _campaign_is_stale(primary_campaign)
+                    and _campaign_has_board_presence(primary_campaign, existing_tasks)
+                )
+            )
+        )
+        _log(
+            "swarm",
+            "Startup seed check: "
+            f"pending={pending} running={running} existing={len(existing_tasks)} "
+            f"worker_calls_1h={worker_calls_last_hour} "
+            f"primary_campaign={'yes' if primary_campaign else 'no'} "
+            f"primary_viable={'yes' if primary_campaign_viable else 'no'} "
+            f"mission_pressure={'yes' if has_mission_pressure else 'no'}",
+        )
+        should_seed, reason = _should_seed_startup_pressure(
+            pending_count=pending,
+            running_count=running,
+            primary_campaign_viable=primary_campaign_viable,
+            worker_calls_last_hour=worker_calls_last_hour,
+            has_mission_pressure=has_mission_pressure,
+        )
+        if not should_seed:
+            _log("swarm", f"Startup seed check: steady, skip ({reason})")
+            return
+        _log("swarm", f"Startup seed check: seeding triggered ({reason})")
+
+        existing_titles = {
+            (task.title or "").strip().lower()
+            for task in existing_tasks
+            if (task.title or "").strip()
+        }
+
+        mission_artifact = load_active_mission_state(state_dir=STATE_DIR)
+        if mission_artifact and mission_artifact.state.task_titles:
+            mission = mission_artifact.state
+            campaign_id = _mission_campaign_id(mission.mission_title)
+            domain = THEME_TO_DOMAIN.get(
+                (mission.mission_theme or "").strip().lower(),
+                classify_text(f"{mission.mission_title}\n{mission.mission_thesis}"),
+            )
+            create_campaign(
+                campaign_id=campaign_id,
+                domain=domain,
+                pinned_agents=[],
+                title=mission.mission_title,
+                success_criteria=mission.mission_thesis,
+                source="director",
+                primary=True,
+                artifact_path=_campaign_artifact_path(campaign_id),
+                meta_dir=STATE_DIR / "meta",
+            )
+            specs = _build_mission_seed_specs(
+                mission_title=mission.mission_title,
+                task_titles=list(mission.task_titles),
+                existing_titles=existing_titles,
+                campaign_id=campaign_id,
+                domain=domain,
+            )
+            if specs:
+                created_count = await _enqueue_startup_specs(swarm, specs)
+                _log(
+                    "swarm",
+                    f"Startup seeding ({reason}): queued {created_count} director tasks for '{mission.mission_title}'",
+                )
+                return
+            _log(
+                "swarm",
+                f"Startup seeding ({reason}): director mission already represented on board",
+            )
+            return
+
+        fallback_campaign_id = "startup_world_facing"
+        create_campaign(
+            campaign_id=fallback_campaign_id,
+            domain="artifact_publication",
+            pinned_agents=[],
+            title="Startup World-Facing Pressure",
+            success_criteria="Convert daemon boot into durable world-facing artifacts.",
+            source="startup_seed",
+            primary=True,
+            artifact_path=_campaign_artifact_path(fallback_campaign_id),
+            meta_dir=STATE_DIR / "meta",
+        )
+
+        seed_specs: list[dict[str, Any]] = []
+        for spec in SEED_TASKS[:3]:
+            title = str(spec.get("title", "") or "").strip()
+            if not title or title.lower() in existing_titles:
+                continue
+            artifact_path = _campaign_task_artifact_path(fallback_campaign_id, title)
+            description = str(spec.get("description", "") or "").strip()
+            seed_specs.append(
+                {
+                    "title": title,
+                    "description": (
+                        f"{description}\n\n"
+                        f"Write the deliverable to {artifact_path} before marking the task complete."
+                    ).strip(),
+                    "priority": spec.get("priority", TaskPriority.HIGH),
+                    "created_by": "seed_task",
+                    "metadata": {
+                        "campaign_id": fallback_campaign_id,
+                        "campaign_support": True,
+                        "artifact_required": True,
+                        "seed_class": "startup_seed",
+                        "domain": "artifact_publication",
+                        "target_artifact": artifact_path,
+                    },
+                }
+            )
+        if seed_specs:
+            created_count = await _enqueue_startup_specs(swarm, seed_specs)
+            _log(
+                "swarm",
+                f"Startup seeding ({reason}): queued {created_count} fallback seed tasks",
+            )
+        else:
+            _log("swarm", f"Startup seeding ({reason}): no fallback seed specs survived dedupe")
+    except Exception as exc:
+        _log("swarm", f"Startup seeding failed (non-fatal): {exc}")
+
+
+async def _delayed_startup_reseed(
+    swarm: Any,
+    shutdown_event: asyncio.Event,
+    delay_seconds: float = 15.0,
+) -> None:
+    """Retry startup seeding after deferred startup settles."""
+    if await _wait_or_shutdown(shutdown_event, delay_seconds):
+        return
+    await _seed_startup_pressure(swarm)
+
+
+async def _safe_seed_startup_pressure(
+    swarm: Any,
+    *,
+    timeout_s: float | None = None,
+) -> bool:
+    timeout = max(1.0, float(timeout_s if timeout_s is not None else STARTUP_SEED_TIMEOUT_S))
+    try:
+        await asyncio.wait_for(_seed_startup_pressure(swarm), timeout=timeout)
+        return True
+    except asyncio.TimeoutError:
+        _log(
+            "swarm",
+            f"Startup seed check timed out after {timeout:.1f}s; continuing to first tick",
+        )
+        return False
+
+
+_BOOT_READY_PHASES = frozenset(
+    {"bootstrap_ready", "bootstrap_complete", "steady_state"}
+)
+_BOOT_TERMINAL_PHASES = frozenset({"bootstrap_failed"})
+BOOT_STALL_THRESHOLD_DEFAULT_S = max(120.0, float(SWARM_TICK) * 4.0)
+LIVENESS_WATCHDOG_INTERVAL_S = max(5.0, min(float(SWARM_TICK), 20.0))
+
+
+def _read_tick_budget_seconds() -> float:
+    """Read DHARMA_TICK_BUDGET_S env; fallback to min(180, 3*SWARM_TICK), floor 5s.
+
+    The tick budget is the outer wall-clock wrapper around ``swarm.tick()``;
+    a tick that exceeds it is cancelled so the event loop cannot silently pin
+    forever on a single bad tick.
+    """
+    raw = os.environ.get("DHARMA_TICK_BUDGET_S", "").strip()
+    try:
+        value = float(raw) if raw else 0.0
+    except ValueError:
+        value = 0.0
+    if value <= 0:
+        value = min(180.0, float(SWARM_TICK) * 3.0)
+    return max(5.0, value)
+
+
+async def _invoke_swarm_tick(swarm: Any, timeout_s: float) -> dict[str, Any]:
+    """Call ``swarm.tick()`` under a wall-clock budget.
+
+    Raises ``asyncio.TimeoutError`` if the tick exceeds ``timeout_s`` — the
+    caller's existing ``except Exception`` branch is expected to log and feed
+    the circuit breaker.
+    """
+    return await asyncio.wait_for(swarm.tick(), timeout=timeout_s)
+
+
+def _evaluate_boot_stall(
+    liveness: dict[str, Any],
+    *,
+    threshold_s: float,
+    now: datetime | None = None,
+) -> tuple[str, str]:
+    """Classify whether the hot path is boot-stalled.
+
+    Returns ``("boot_stall", reason)`` if the bootstrap has been running past
+    ``threshold_s`` without reaching a ready phase; returns ``("", "")``
+    otherwise. The hot path itself self-declares via this classifier so that
+    downstream observers do not need to reconstruct the stall from timestamps.
+    """
+    phase = str(liveness.get("bootstrap_phase", "") or "").strip()
+    if phase in _BOOT_READY_PHASES or phase in _BOOT_TERMINAL_PHASES:
+        return "", ""
+    started = parse_iso_datetime(liveness.get("bootstrap_started_at"))
+    if started is None:
+        return "", ""
+    current = now or datetime.now(timezone.utc)
+    elapsed = (current - started).total_seconds()
+    if elapsed < threshold_s:
+        return "", ""
+    return (
+        "boot_stall",
+        f"bootstrap phase '{phase or 'unknown'}' exceeded {threshold_s:.0f}s "
+        f"budget ({elapsed:.0f}s elapsed)",
+    )
+
+
+async def run_swarm_liveness_watchdog(
+    swarm: Any,
+    shutdown_event: asyncio.Event,
+    *,
+    interval_s: float = LIVENESS_WATCHDOG_INTERVAL_S,
+    boot_stall_threshold_s: float = BOOT_STALL_THRESHOLD_DEFAULT_S,
+) -> None:
+    """Hot-path liveness watchdog.
+
+    Runs in the same event loop as the tick loop so that if the loop wedges,
+    the watchdog cannot publish either — making staleness in
+    ``dgc_health.json`` / ``meta/swarm_liveness.json`` the truthful signal.
+
+    Does two things each iteration:
+
+    1. Evaluates whether the bootstrap has exceeded its budget and, if so,
+       marks ``boot_stall`` on the swarm's in-process liveness state.
+    2. Calls ``_publish_runtime_health_snapshot`` so both canonical operator
+       artifacts (``dgc_health.json`` and ``meta/swarm_liveness.json``) are
+       refreshed even when no tick has ever fired.
+    """
+    _log(
+        "watchdog",
+        f"Liveness watchdog starting (interval={interval_s:.0f}s, "
+        f"boot_budget={boot_stall_threshold_s:.0f}s)",
+    )
+    last_logged_state: str | None = None
+    while not shutdown_event.is_set():
+        try:
+            liveness = swarm.hot_path_liveness()
+            existing_stall = str(liveness.get("stall_state", "") or "none") or "none"
+            classified, reason = _evaluate_boot_stall(
+                liveness, threshold_s=boot_stall_threshold_s,
+            )
+            if classified == "boot_stall":
+                if existing_stall != "boot_stall":
+                    swarm._mark_liveness_stall("boot_stall", reason)
+                if last_logged_state != "boot_stall":
+                    _log("watchdog", f"BOOT STALL detected: {reason}")
+                    last_logged_state = "boot_stall"
+            elif existing_stall == "boot_stall":
+                swarm._clear_liveness_stall()
+                if last_logged_state != "cleared":
+                    _log("watchdog", "Boot stall cleared — bootstrap progressed")
+                    last_logged_state = "cleared"
+            else:
+                last_logged_state = existing_stall or "none"
+            try:
+                await swarm._publish_runtime_health_snapshot(
+                    source="swarm.liveness_watchdog",
+                )
+            except Exception:
+                logger.debug(
+                    "Liveness watchdog: snapshot publish failed", exc_info=True,
+                )
+        except Exception:
+            logger.debug("Liveness watchdog iteration failed", exc_info=True)
+        try:
+            await asyncio.wait_for(shutdown_event.wait(), timeout=interval_s)
+        except asyncio.TimeoutError:
+            pass
+    _log("watchdog", "Liveness watchdog shutting down")
+
+
 async def run_swarm_loop(
     shutdown_event: asyncio.Event,
     signal_bus: "Any | None" = None,
     supervisor: "Any | None" = None,
-    room_registry: "Any | None" = None,
+    bootstrap_ready_event: asyncio.Event | None = None,
 ) -> None:
     """Primary loop: SwarmManager.tick() -- the ONE control path.
 
@@ -141,72 +1078,52 @@ async def run_swarm_loop(
 
     swarm = SwarmManager(state_dir=str(STATE_DIR), daemon_config=cfg)
     await swarm.init()
-    if room_registry is not None:
-        swarm._room_registry = room_registry
-        if swarm._orchestrator is not None:
-            swarm._orchestrator._room_registry = room_registry
-        _log("swarm", f"Room registry attached: {len(room_registry.active_rooms())} active rooms")
-    try:
-        from dharma_swarm.startup_crew import spawn_cybernetics_crew
-
-        cyber_crew = await spawn_cybernetics_crew(swarm)
-        if cyber_crew:
-            _log("swarm", f"Cybernetics crew asserted: {len(cyber_crew)} seats")
-    except Exception as exc:
-        _log("swarm", f"Cybernetics crew assertion failed: {exc}")
+    max_tick_budget_s = _read_tick_budget_seconds()
+    _log(
+        "swarm",
+        f"Tick budget enforced at {max_tick_budget_s:.0f}s per tick",
+    )
+    watchdog_task = asyncio.create_task(
+        run_swarm_liveness_watchdog(swarm, shutdown_event),
+        name="swarm-liveness-watchdog",
+    )
 
     # MessageBus for instinct signal consumption
     from dharma_swarm.message_bus import MessageBus as _MBus
     _instinct_bus = _MBus(STATE_DIR / "db" / "messages.db")
     await _instinct_bus.init_db()
 
-    agents = await swarm.list_agents()
-    swarm_state = await swarm.status()
     _update_runtime_health_state(
-        agent_count=len(swarm_state.agents),
-        task_count=(
-            swarm_state.tasks_pending
-            + swarm_state.tasks_running
-            + swarm_state.tasks_completed
-            + swarm_state.tasks_failed
-        ),
+        agent_count=0,
+        task_count=0,
     )
-    _log("swarm", f"Ready: {len(agents)} agents, thread={swarm.current_thread}")
+    _log(
+        "swarm",
+        f"Ready: core runtime initialized, bootstrap_phase={swarm.hot_path_liveness().get('bootstrap_phase', 'unknown')}, "
+        f"thread={swarm.current_thread}",
+    )
 
-    # Auto-seed missions from ThinkodynamicDirector if task board is empty.
-    # The director derives missions from TelosGraph + recognition_seed + ecosystem.
-    # This replaces static SEED_TASKS with telos-derived, philosophically grounded work.
-    try:
-        _board = swarm._orchestrator._board
-        _board_stats = await _board.stats()
-        _pending = _board_stats.get("pending", 0) + _board_stats.get("running", 0)
-        if _pending == 0:
-            from dharma_swarm.mission_contract import load_latest_mission
-            from pathlib import Path
-            _handoff = STATE_DIR / "shared" / "thinkodynamic_director_handoff.md"
-            _contract_path = STATE_DIR / "logs" / "thinkodynamic_director" / "latest.json"
-            if _contract_path.exists():
-                try:
-                    mission = load_latest_mission(_contract_path)
-                    if mission and hasattr(mission, 'task_titles') and mission.task_titles:
-                        _log("swarm", f"Seeding {len(mission.task_titles)} tasks from director: '{mission.mission_title}'")
-                        for title in mission.task_titles[:10]:  # cap at 10 per mission
-                            await _board.create(
-                                title=title,
-                                description=(
-                                    f"Mission: {mission.mission_title}.\n"
-                                    f"Use web_search, fetch_url, read_file, and write_file "
-                                    f"to complete this task. Write results to "
-                                    f"~/.dharma/shared/ with a descriptive filename."
-                                ),
-                                priority="high",
-                            )
-                except Exception as e:
-                    _log("swarm", f"Director mission seeding failed (non-fatal): {e}")
+    startup_gate_task: asyncio.Task[Any] | None = None
+    if bootstrap_ready_event is not None:
+        async def _signal_bootstrap_ready() -> None:
+            phase = await _release_startup_gate_after_first_tick(
+                swarm,
+                bootstrap_ready_event,
+                shutdown_event=shutdown_event,
+            )
+            if bootstrap_ready_event.is_set():
+                _log("swarm", f"Startup gate released after first tick (phase={phase})")
             else:
-                _log("swarm", "No director mission found — using default SEED_TASKS")
-    except Exception as e:
-        _log("swarm", f"Mission auto-seed check failed (non-fatal): {e}")
+                _log("swarm", f"Startup gate blocked at phase={phase}")
+
+        startup_gate_task = asyncio.create_task(
+            _signal_bootstrap_ready(),
+            name="swarm-startup-gate",
+        )
+
+    await _safe_seed_startup_pressure(swarm)
+    asyncio.create_task(_delayed_startup_reseed(swarm, shutdown_event))
+    last_campaign_nurture_at = 0.0
 
     try:
         while not shutdown_event.is_set():
@@ -246,7 +1163,7 @@ async def run_swarm_loop(
                 except Exception:
                     logger.debug("Swarm: instinct drain failed", exc_info=True)
 
-                activity = await swarm.tick()
+                activity = await _invoke_swarm_tick(swarm, max_tick_budget_s)
 
                 # Liveness watchdog: record healthy tick + check all loops
                 if supervisor is not None:
@@ -256,16 +1173,24 @@ async def run_swarm_loop(
                         _log("watchdog", f"{alert.severity.upper()} [{alert.loop_name}]: "
                              f"{alert.message} → {alert.intervention}")
 
-                swarm_state = await swarm.status()
-                _update_runtime_health_state(
-                    agent_count=len(swarm_state.agents),
-                    task_count=(
-                        swarm_state.tasks_pending
-                        + swarm_state.tasks_running
-                        + swarm_state.tasks_completed
-                        + swarm_state.tasks_failed
-                    ),
-                )
+                await _post_tick_runtime_bookkeeping(swarm)
+
+                phase = str(
+                    swarm.hot_path_liveness().get("bootstrap_phase", "") or ""
+                ).strip()
+                now_monotonic = time.monotonic()
+                if (
+                    phase == "bootstrap_complete"
+                    and (now_monotonic - last_campaign_nurture_at) >= CAMPAIGN_NURTURE_INTERVAL_S
+                ):
+                    last_campaign_nurture_at = now_monotonic
+                    try:
+                        await asyncio.wait_for(
+                            _refresh_campaign_pressure(swarm),
+                            timeout=10.0,
+                        )
+                    except asyncio.TimeoutError:
+                        _log("swarm", "Campaign nurture exceeded 10.0s; continuing")
 
                 if activity.get("paused"):
                     _log("swarm", "Paused (.PAUSE file)")
@@ -284,12 +1209,29 @@ async def run_swarm_loop(
 
                 cfg.circuit_breaker.record_success()
 
+            except asyncio.TimeoutError:
+                _log(
+                    "swarm",
+                    f"tick exceeded {max_tick_budget_s:.0f}s budget — cancelled",
+                )
+                cfg.circuit_breaker.record_failure()
             except Exception as e:
                 _log("swarm", f"tick error: {e}")
                 cfg.circuit_breaker.record_failure()
 
             await asyncio.sleep(SWARM_TICK)
     finally:
+        if startup_gate_task is not None:
+            startup_gate_task.cancel()
+            try:
+                await startup_gate_task
+            except (asyncio.CancelledError, Exception):
+                pass
+        watchdog_task.cancel()
+        try:
+            await watchdog_task
+        except (asyncio.CancelledError, Exception):
+            pass
         await swarm.shutdown()
         _log("swarm", "Shutdown complete")
 
@@ -398,8 +1340,11 @@ async def run_evolution_loop(shutdown_event: asyncio.Event) -> None:
             # Drain lifecycle events — task completion throughput for fitness context
             completions = 0
             try:
-                lifecycle_events = await _bus.consume_events(
-                    "AGENT_LIFECYCLE_COMPLETED", limit=20,
+                lifecycle_events = await _consume_event_backlog(
+                    _bus,
+                    "AGENT_LIFECYCLE_COMPLETED",
+                    batch_size=500,
+                    max_events=5000,
                 )
                 completions = len(lifecycle_events)
                 if completions:
@@ -419,6 +1364,7 @@ async def run_evolution_loop(shutdown_event: asyncio.Event) -> None:
 
             # ── ACTIVE EVOLUTION: run cycle + meta-adaptation ──
             cycle_count += 1
+            meta_observation: CycleResult | None = None
 
             # Extract live fitness from AGENT_FITNESS event payloads and persist
             live_fitness_scores: list[float] = []
@@ -447,33 +1393,18 @@ async def run_evolution_loop(shutdown_event: asyncio.Event) -> None:
                      f"avg={sum(live_fitness_scores)/len(live_fitness_scores):.3f} "
                      f"max={max(live_fitness_scores):.3f}")
 
-            # Feed meta-evolution with observed fitness
-            # Prefer live agent fitness; fall back to historical archive average
+            # Stage one meta-evolution observation per loop cycle. Live fitness
+            # is useful context, but a real Darwin cycle result supersedes it.
             if avg_fitness > 0 or fitness_events:
                 if live_fitness_scores:
                     best_fitness = max(live_fitness_scores)
                 else:
                     best_fitness = avg_fitness if avg_fitness > 0 else 0.0
-                synthetic_result = CycleResult(
+                meta_observation = CycleResult(
                     cycle_id=f"orch-evo-{cycle_count}",
                     best_fitness=best_fitness,
                     proposals_submitted=len(fitness_events),
                 )
-                meta_result = meta_engine.observe_cycle_result(synthetic_result)
-                if meta_result is not None:
-                    if meta_result.evolved_parameters:
-                        _log(
-                            "evolution",
-                            f"Meta-evolution adapted parameters "
-                            f"(meta_fitness={meta_result.meta_fitness:.3f}, "
-                            f"applied={meta_result.applied_parameters})",
-                        )
-                    else:
-                        _log(
-                            "evolution",
-                            f"Meta-evolution: no adaptation needed "
-                            f"(meta_fitness={meta_result.meta_fitness:.3f})",
-                        )
 
             # Drain active inference prediction errors — bias evolution toward high-error areas
             try:
@@ -630,12 +1561,28 @@ async def run_evolution_loop(shutdown_event: asyncio.Event) -> None:
                                     )
                                 _log("evolution", f"Live cycle: {_committed} commits on {_branch}")
 
-                            # Feed result to meta-evolution
-                            meta_engine.observe_cycle_result(result)
+                            meta_observation = result
                     else:
                         _log("evolution", "Auto-evolve skipped: OPENROUTER_API_KEY not set")
                 except Exception as exc:
                     _log("evolution", f"Auto-evolve error: {exc}")
+
+            if meta_observation is not None:
+                meta_result = meta_engine.observe_cycle_result(meta_observation)
+                if meta_result is not None:
+                    if meta_result.evolved_parameters:
+                        _log(
+                            "evolution",
+                            f"Meta-evolution adapted parameters "
+                            f"(meta_fitness={meta_result.meta_fitness:.3f}, "
+                            f"applied={meta_result.applied_parameters})",
+                        )
+                    else:
+                        _log(
+                            "evolution",
+                            f"Meta-evolution: no adaptation needed "
+                            f"(meta_fitness={meta_result.meta_fitness:.3f})",
+                        )
 
             # Bus metrics for observability
             try:
@@ -668,6 +1615,7 @@ async def run_health_loop(shutdown_event: asyncio.Event) -> None:
     # Import signal bus for WITNESS_AUDIT drain
     from dharma_swarm.signal_bus import SignalBus
     signal_bus = SignalBus.get()
+    last_swarm_liveness_key: tuple[str, str, str] | None = None
 
     while not shutdown_event.is_set():
         try:
@@ -716,6 +1664,25 @@ async def run_health_loop(shutdown_event: asyncio.Event) -> None:
                     lines = pulse_log.read_text().split("--- PULSE @")
                     status_parts.append(f"pulses={len(lines)-1}")
                 _log("health", f"OK ({', '.join(status_parts) or 'nominal'})")
+
+            liveness_snapshot = dgc_health_snapshot_summary(STATE_DIR)
+            liveness_payload = _swarm_liveness_watch_payload(liveness_snapshot)
+            _write_swarm_liveness_watch(STATE_DIR, liveness_payload)
+            last_swarm_liveness_key = _log_swarm_liveness_transition(
+                last_swarm_liveness_key,
+                liveness_payload,
+            )
+            liveness_status = str(
+                (liveness_payload.get("liveness") or {}).get("status", "")
+            ).strip().lower()
+            if liveness_status in {"stalled", "degraded"}:
+                signal_bus.emit(
+                    {
+                        "type": "SWARM_LIVENESS",
+                        "status": liveness_status,
+                        "detail": (liveness_payload.get("liveness") or {}).get("stall_reason", ""),
+                    }
+                )
 
             write_dgc_health_snapshot(
                 STATE_DIR,
@@ -826,6 +1793,70 @@ async def run_living_layers(
         await asyncio.sleep(LIVING_INTERVAL)
 
 
+def _list_orchestrator_processes() -> list[tuple[int, str]]:
+    """Best-effort process scan for competing live orchestrators."""
+    try:
+        proc = subprocess.run(
+            ["ps", "-axo", "pid=,command="],
+            capture_output=True,
+            text=True,
+            timeout=1.0,
+            check=False,
+        )
+    except Exception:
+        return []
+
+    if proc.returncode != 0:
+        return []
+
+    current_pid = os.getpid()
+    matches: list[tuple[int, str]] = []
+    needles = (
+        "dharma_swarm.orchestrate_live",
+        "orchestrate_live.py",
+        "run_daemon.sh",
+        "dgc orchestrate-live",
+    )
+    skip_markers = (
+        "ps -axo",
+        "rg ",
+        "pytest",
+        "pre-commit",
+        "check-added-large-files",
+        "codex exec",
+        "claude --bare -p",
+    )
+
+    for raw in proc.stdout.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        parts = line.split(maxsplit=1)
+        if len(parts) != 2:
+            continue
+        try:
+            pid = int(parts[0])
+        except ValueError:
+            continue
+        command = parts[1]
+        if pid == current_pid:
+            continue
+        if not any(needle in command for needle in needles):
+            continue
+        if any(marker in command for marker in skip_markers):
+            continue
+        matches.append((pid, command))
+
+    return matches
+
+
+def _find_competing_orchestrator() -> tuple[int, str] | None:
+    matches = _list_orchestrator_processes()
+    if not matches:
+        return None
+    return matches[0]
+
+
 def _stop_old_daemon() -> None:
     """Stop existing daemon if running, to avoid DB conflicts."""
     pid_file = STATE_DIR / "daemon.pid"
@@ -870,6 +1901,8 @@ ZEITGEIST_INTERVAL = 600  # 10 minutes between S4 environmental scans
 REPLICATION_INTERVAL = 3600  # 1 hour between replication checks
 
 RECOGNITION_INTERVAL = 7200  # 2 hours between recognition synthesis
+
+EXECUTIVE_INTERVAL = 2700  # 45 minutes between strategic executive cycles
 
 
 async def _run_recognition_loop(shutdown_event: asyncio.Event) -> None:
@@ -1056,16 +2089,18 @@ _GRIND_INTERVAL_FAST = 60      # seconds — when hungry
 _GRIND_INTERVAL_SLOW = 300     # seconds — when satisfied
 _GRIND_STAGNATION_WINDOW = 10  # meta-archive entries to check for plateau
 
-# Free-tier providers only — zero cost, can run 24/7
-_FREE_PROVIDER_TYPES = ("ollama", "nvidia_nim", "openrouter_free", "groq", "siliconflow")
-
-# Free coding-capable models on OpenRouter for evolution proposals
-_FREE_CODING_MODELS = (
-    "qwen/qwen3-coder:free",
-    "qwen/qwen3-next-80b-a3b-instruct:free",
-    "qwen/qwen3-4b:free",
-    "meta-llama/llama-3.3-70b-instruct:free",
-    "deepseek/deepseek-chat-v3-0324:free",
+# Low-cost and free providers preferred for the continuous grind.
+_FREE_PROVIDER_TYPES = (
+    "ollama",
+    "nvidia_nim",
+    "siliconflow",
+    "together",
+    "fireworks",
+    "cerebras",
+    "sambanova",
+    "openrouter_free",
+    "groq",
+    "openrouter",
 )
 
 # Core Python modules to target for evolution — actual testable source
@@ -1147,11 +2182,11 @@ async def run_free_evolution_grind(shutdown_event: asyncio.Event) -> None:
 
     This is loop #13 in the orchestrator — the system's metabolic drive.
     """
-    await asyncio.sleep(90)  # Let swarm + evolution init first
-
     _log("grind", "Free Evolution Grind starting (loop #13)")
-    _log("grind", f"  Free providers: {_FREE_PROVIDER_TYPES}")
+    _log("grind", f"  Preferred providers: {_FREE_PROVIDER_TYPES}")
     _log("grind", f"  Interval range: {_GRIND_INTERVAL_FAST}s (hungry) → {_GRIND_INTERVAL_SLOW}s (satisfied)")
+    _log("grind", "  Warm-up delay: 90s before first cycle")
+    await asyncio.sleep(90)  # Let swarm + evolution init first
 
     # Init DarwinEngine (separate instance, reads same archive)
     from dharma_swarm.evolution import DarwinEngine, Proposal
@@ -1174,13 +2209,54 @@ async def run_free_evolution_grind(shutdown_event: asyncio.Event) -> None:
         n_object_cycles_per_meta=2,
         auto_apply=True,
     )
+    from dharma_swarm.message_bus import MessageBus as _MBus
+
+    _bus = _MBus(STATE_DIR / "db" / "messages.db")
+    await _bus.init_db()
 
     cycle_count = 0
     last_improvement_time = __import__("time").time()
     last_best_fitness = 0.0
+    recent_targets: list[str] = []
 
     while not shutdown_event.is_set():
         cycle_count += 1
+
+        try:
+            fitness_events = await _bus.consume_events("AGENT_FITNESS", limit=100)
+            lifecycle_events = await _consume_event_backlog(
+                _bus,
+                "AGENT_LIFECYCLE_COMPLETED",
+                batch_size=500,
+                max_events=5000,
+            )
+            if fitness_events:
+                scores: list[float] = []
+                for ev in fitness_events:
+                    payload = ev.get("payload") if isinstance(ev, dict) else {}
+                    if not isinstance(payload, dict):
+                        continue
+                    score = (
+                        payload.get("swabhaav_ratio")
+                        or payload.get("fitness_score")
+                        or payload.get("composite")
+                    )
+                    if isinstance(score, (int, float)) and score > 0:
+                        scores.append(float(score))
+                        await engine.record_fitness_observation(
+                            agent_name=payload.get("agent", "unknown"),
+                            fitness_score=float(score),
+                            task_id=payload.get("task_id"),
+                        )
+                if scores:
+                    _log(
+                        "grind",
+                        f"Bus fitness: {len(scores)} score(s), avg={sum(scores) / len(scores):.3f}",
+                    )
+            if lifecycle_events:
+                _log("grind", f"Lifecycle backlog drained: {len(lifecycle_events)} completion event(s)")
+        except Exception:
+            logger.debug("Free-grind bus drain failed", exc_info=True)
 
         # Compute hunger
         hunger = _compute_hunger(meta_archive_path, last_improvement_time)
@@ -1228,44 +2304,50 @@ async def run_free_evolution_grind(shutdown_event: asyncio.Event) -> None:
                 except Exception as exc:
                     _log("grind", f"Observation read error: {exc}")
 
-            # Phase 3: Always include a random core Python module target
-            # This ensures every cycle has at least one testable proposal
+            # Phase 3: Always include a rotating core Python module target.
             available_targets = [
                 t for t in _GRIND_EVOLUTION_TARGETS
                 if (_src_root / t).exists()
             ]
             if available_targets:
-                target = _grng.choice(available_targets)
+                novel_targets = [t for t in available_targets if t not in recent_targets]
+                target_pool = novel_targets or available_targets
+                target = _grng.choice(target_pool)
                 proposals.append(Proposal(
                     component=target,
                     change_type="mutation",
                     description=f"Grind probe: evolve {target} (hunger={hunger:.2f})",
                     spec_ref="grind_probe",
                 ))
+                recent_targets.append(target)
+                recent_targets = recent_targets[-6:]
 
             # Phase 4: Run evolution cycle via DarwinEngine.run_cycle
             # (takes proposals directly — no LLM needed for proposal gen)
             result = await engine.run_cycle(proposals)
 
-            # Phase 4b: LLM-powered evolution via Qwen3-coder:free (every 5th cycle)
-            # This uses auto_evolve with free coding models for deeper mutations
+            # Phase 4b: LLM-powered evolution with the multi-provider roster.
             if cycle_count % 5 == 0 and hunger > 0.4:
                 try:
-                    import os as _gos
-                    if _gos.environ.get("OPENROUTER_API_KEY"):
-                        from dharma_swarm.providers import OpenRouterProvider
-                        _free_provider = OpenRouterProvider()
-                        _llm_targets = _grng.sample(available_targets, min(2, len(available_targets)))
+                    if available_targets:
+                        from dharma_swarm.providers import OpenRouterProvider, create_default_router
+
+                        router = create_default_router()
+                        fallback_provider = OpenRouterProvider()
+                        llm_target_pool = [t for t in available_targets if t not in recent_targets]
+                        if len(llm_target_pool) < 2:
+                            llm_target_pool = available_targets
+                        _llm_targets = _grng.sample(llm_target_pool, min(3, len(llm_target_pool)))
                         _llm_files = [_src_root / t for t in _llm_targets]
-                        _model = _grng.choice(_FREE_CODING_MODELS)
-                        _log("grind", f"LLM evolve via {_model}: {_llm_targets}")
+                        _log("grind", f"LLM evolve via roster: {_llm_targets}")
                         llm_result = await engine.auto_evolve(
-                            provider=_free_provider,
+                            provider=fallback_provider,
                             source_files=_llm_files,
-                            model=_model,
+                            model="",
                             shadow=False,  # Real mode — apply diffs, run tests, roll back on failure
                             timeout=30.0,
                             context=f"Grind cycle {cycle_count}, hunger={hunger:.2f}",
+                            router=router,
                         )
                         if llm_result.best_fitness > result.best_fitness:
                             result = llm_result  # Use the better result
@@ -1335,10 +2417,8 @@ async def _run_replication_monitor_loop(shutdown_event: asyncio.Event) -> None:
 
     # Lazy imports to avoid circular deps and startup cost
     from dharma_swarm.replication_protocol import ReplicationProtocol
-    from dharma_swarm.providers import create_default_router
 
     protocol = ReplicationProtocol(state_dir=STATE_DIR)
-    replication_router = create_default_router()
 
     # Track spawned child tasks so we can cancel on shutdown
     child_tasks: list[asyncio.Task[None]] = []
@@ -1378,7 +2458,6 @@ async def _run_replication_monitor_loop(shutdown_event: asyncio.Event) -> None:
                                     outcome.child_spec.get("wake_interval", 3600)
                                 ),
                                 system_prompt=outcome.child_spec.get("system_prompt", ""),
-                                model_router=replication_router,
                             )
                             task = asyncio.create_task(
                                 child.run_loop(shutdown_event),
@@ -1469,12 +2548,13 @@ async def run_conductor_loop(shutdown_event: asyncio.Event) -> None:
 
     Each conductor has its own wake interval and restart logic.
     If one crashes, the other keeps running.
+
+    Conductors are also registered into the module-level ACTIVE_CONDUCTORS
+    registry in ``dharma_swarm.conductors`` so the directive watcher and
+    CLI (``dgc agent:direct``, ``dgc campaign:*``) can reach them by name.
     """
     from dharma_swarm.persistent_agent import PersistentAgent
-    from dharma_swarm.conductors import CONDUCTOR_CONFIGS
-    from dharma_swarm.providers import create_default_router
-
-    conductor_router = create_default_router()
+    from dharma_swarm.conductors import CONDUCTOR_CONFIGS, register, unregister
 
     _log("conductors", f"Initializing {len(CONDUCTOR_CONFIGS)} conductors...")
 
@@ -1489,13 +2569,18 @@ async def run_conductor_loop(shutdown_event: asyncio.Event) -> None:
             wake_interval_seconds=cfg["wake_interval_seconds"],
             system_prompt=cfg["system_prompt"],
             max_turns=cfg.get("max_turns", 25),
-            model_router=conductor_router,
         )
         conductors.append(agent)
-        _log("conductors", f"  {cfg['name']}: {cfg['model']} every {cfg['wake_interval_seconds']}s")
+        # Defer registry insertion to the runner so conductor boot cannot block here.
+        _log(
+            "conductors",
+            f"  {cfg['name']}: {cfg['model']} every {cfg['wake_interval_seconds']}s (registered)",
+        )
 
     async def _run_with_restart(conductor: PersistentAgent, delay: float) -> None:
         await asyncio.sleep(delay)
+        await register(conductor.name, conductor)
+        _log("conductors", f"{conductor.name} registered and starting")
         while not shutdown_event.is_set():
             try:
                 await conductor.run_loop(shutdown_event)
@@ -1507,45 +2592,17 @@ async def run_conductor_loop(shutdown_event: asyncio.Event) -> None:
                 except asyncio.TimeoutError:
                     pass
 
-    await asyncio.gather(
-        _run_with_restart(conductors[0], 10),   # Claude starts +10s
-        _run_with_restart(conductors[1], 30),   # Codex starts +30s
-    )
-
-
-async def _run_world_model_loop(shutdown_event: asyncio.Event) -> None:
-    """World Model: living Forrester-style world state, updated every 6h by research agents.
-
-    Seeded with 15 stocks (CO2, biodiversity, AI capability, institutional trust...),
-    8 flows, 6 feedback loops. Each cycle: update stocks via web_search, assess
-    telos pressure, emit algedonic signal if any stock crosses critical threshold.
-    """
     try:
-        from dharma_swarm.world_model import WorldModelAgent
-        agent = WorldModelAgent(state_dir=STATE_DIR)
-        # Seed on first boot
-        try:
-            await asyncio.wait_for(agent.initialize(), timeout=60.0)
-            _log("world-model", "World model initialized and seeded")
-        except Exception as exc:
-            _log("world-model", f"World model init failed (non-fatal): {exc}")
-        # Run update loop every 6 hours
-        while not shutdown_event.is_set():
+        await asyncio.gather(
+            _run_with_restart(conductors[0], 10),   # Claude starts +10s
+            _run_with_restart(conductors[1], 30),   # Codex starts +30s
+        )
+    finally:
+        for c in conductors:
             try:
-                await asyncio.wait_for(shutdown_event.wait(), timeout=21600)
-                break
-            except asyncio.TimeoutError:
+                await unregister(c.name)
+            except Exception:
                 pass
-            if shutdown_event.is_set():
-                break
-            try:
-                _wm_timeout = float(os.environ.get("DHARMA_WORLD_MODEL_TIMEOUT", "900"))
-                await asyncio.wait_for(agent.run_cycle(), timeout=_wm_timeout)
-                _log("world-model", "World model cycle complete")
-            except Exception as exc:
-                _log("world-model", f"World model cycle error: {exc}")
-    except Exception as exc:
-        _log("world-model", f"World model loop crashed: {exc}")
 
 
 async def _run_gauntlet_loop(shutdown_event: asyncio.Event) -> None:
@@ -1602,60 +2659,14 @@ async def _run_gauntlet_loop(shutdown_event: asyncio.Event) -> None:
 async def _run_health_api(shutdown_event: asyncio.Event) -> None:
     """Health API: serves http://localhost:7433/health|metrics|loops|providers|telos"""
     try:
+        _log("health-api", "Starting health API server")
         from dharma_swarm.swarm_health_api import run_health_api
         await run_health_api(shutdown_event)
     except Exception as exc:
         _log("health-api", f"Health API crashed: {exc}")
 
 
-async def _run_room_health_loop(
-    shutdown_event: asyncio.Event,
-    registry: Any,
-    bridge: Any,
-) -> None:
-    """Fractal room health monitor — evaluates kill/spinout conditions.
-
-    Runs every 30 minutes. Checks budget depletion, kill conditions,
-    and spinout readiness for all active venture cells. Emits signals
-    for any triggered conditions.
-    """
-    _log("room-health", "Starting room health loop (interval=1800s)")
-    from dharma_swarm.fractal.fractal_room import VentureCellV1
-    from dharma_swarm.fractal.room_health import room_runtime_kpis
-
-    while not shutdown_event.is_set():
-        try:
-            active = registry.active_rooms()
-            now = datetime.now(timezone.utc)
-            for room in active:
-                if not isinstance(room, VentureCellV1):
-                    continue
-                kpis = room_runtime_kpis(room, now=now)
-                report = bridge.evaluate_room_health(room.id, kpis)
-                if report.get("kill_triggered"):
-                    _log("room-health", f"KILL triggered for {room.id}: {report.get('kill_conditions_met', [])}")
-                if report.get("spinout_triggered"):
-                    _log("room-health", f"SPINOUT ready for {room.id}: {report.get('spinout_conditions_met', [])}")
-                remaining = room.remaining_budget()
-                if remaining <= 0:
-                    _log("room-health", f"Budget DEPLETED for {room.id}")
-                elif remaining < room.budget_tokens * 0.2:
-                    _log("room-health", f"Budget LOW for {room.id}: {remaining}/{room.budget_tokens}")
-            _log("room-health", f"Health check: {len(active)} active rooms evaluated")
-        except Exception as exc:
-            _log("room-health", f"Health check error: {exc}")
-
-        try:
-            await asyncio.wait_for(shutdown_event.wait(), timeout=1800)
-            break
-        except asyncio.TimeoutError:
-            pass
-
-
-async def _run_guardian_loop(
-    shutdown_event: asyncio.Event,
-    room_registry: Any | None = None,
-) -> None:
+async def _run_guardian_loop(shutdown_event: asyncio.Event) -> None:
     """Guardian Crew: continuous interface + loop + router health checking.
 
     Three specialist agents running every 4 hours:
@@ -1672,10 +2683,60 @@ async def _run_guardian_loop(
             state_dir=STATE_DIR,
             github_repo="AmitabhainArunachala/dharma_swarm",
             shutdown_event=shutdown_event,
-            room_registry=room_registry,
         )
     except Exception as exc:
         _log("guardian", f"Guardian loop crashed: {exc}")
+
+
+async def _run_cc_tool_marks_loop(shutdown_event: asyncio.Event) -> None:
+    """Sprint 1 Fix 3 consumer loop. Aggregates cc_tool_marks.jsonl every 5min.
+
+    Closes the Claude-Code → Dharma one-way bridge. Reads from a persistent
+    byte cursor, aggregates per-tool and per-file counts, writes a summary
+    to ~/.dharma/meta/cc_tool_marks_signals.json for downstream consumers.
+
+    Rollback: DHARMA_CC_TOOL_MARKS_CONSUMER=off disables consumption.
+    """
+    _log("cc-tool-marks", "Starting cc_tool_marks consumer loop (interval=300s)")
+    try:
+        await asyncio.sleep(10)  # small delay after boot
+        from dharma_swarm.cc_tool_marks_consumer import CcToolMarksConsumer
+        consumer = CcToolMarksConsumer()
+
+        # Run once immediately
+        try:
+            summary = await asyncio.wait_for(
+                asyncio.to_thread(consumer.run_once), timeout=30.0
+            )
+            _log(
+                "cc-tool-marks",
+                f"Boot consume: {summary.get('new_records', 0)} new records",
+            )
+        except Exception as exc:
+            _log("cc-tool-marks", f"Boot consume failed (non-fatal): {exc}")
+
+        while not shutdown_event.is_set():
+            try:
+                await asyncio.wait_for(shutdown_event.wait(), timeout=300)
+                break
+            except asyncio.TimeoutError:
+                pass
+            if shutdown_event.is_set():
+                break
+            try:
+                summary = await asyncio.wait_for(
+                    asyncio.to_thread(consumer.run_once), timeout=30.0
+                )
+                _log(
+                    "cc-tool-marks",
+                    f"Cycle: +{summary.get('new_records', 0)} records",
+                )
+            except asyncio.TimeoutError:
+                _log("cc-tool-marks", "Cycle timed out (30s) — continuing")
+            except Exception as exc:
+                _log("cc-tool-marks", f"Cycle failed (non-fatal): {exc}")
+    except Exception as exc:
+        _log("cc-tool-marks", f"Loop crashed: {exc}")
 
 
 async def _run_archaeology_loop(shutdown_event: asyncio.Event) -> None:
@@ -1688,12 +2749,24 @@ async def _run_archaeology_loop(shutdown_event: asyncio.Event) -> None:
     """
     _log("archaeology", "Starting archaeology ingestion loop (interval=1800s)")
     try:
-        from dharma_swarm.archaeology_ingestion import ArchaeologyIngestionDaemon
+        from dharma_swarm.archaeology_ingestion import (
+            ArchaeologyIngestionDaemon,
+            _archaeology_boot_delay_seconds,
+        )
+
+        def _run_cycle_sync(daemon: ArchaeologyIngestionDaemon) -> dict[str, int]:
+            return asyncio.run(daemon.run_once())
+
+        boot_delay_seconds = _archaeology_boot_delay_seconds(1800)
+        if boot_delay_seconds > 0:
+            _log("archaeology", f"Deferring boot ingestion for {boot_delay_seconds:.0f}s")
+            if await _wait_or_shutdown(shutdown_event, boot_delay_seconds):
+                return
         daemon = ArchaeologyIngestionDaemon(state_dir=STATE_DIR, interval_seconds=1800)
 
         # Run once immediately at boot
         try:
-            counts = await asyncio.wait_for(daemon.run_once(), timeout=120.0)
+            counts = await asyncio.wait_for(asyncio.to_thread(_run_cycle_sync, daemon), timeout=120.0)
             _log("archaeology", f"Boot ingestion complete: {counts}")
         except asyncio.TimeoutError:
             _log("archaeology", "Boot ingestion timed out (120s) — continuing")
@@ -1710,7 +2783,7 @@ async def _run_archaeology_loop(shutdown_event: asyncio.Event) -> None:
             if shutdown_event.is_set():
                 break
             try:
-                counts = await asyncio.wait_for(daemon.run_once(), timeout=120.0)
+                counts = await asyncio.wait_for(asyncio.to_thread(_run_cycle_sync, daemon), timeout=120.0)
                 _log("archaeology", f"Ingestion cycle complete: {counts}")
             except asyncio.TimeoutError:
                 _log("archaeology", "Ingestion cycle timed out (120s) — continuing")
@@ -1719,6 +2792,108 @@ async def _run_archaeology_loop(shutdown_event: asyncio.Event) -> None:
 
     except Exception as exc:
         _log("archaeology", f"Archaeology loop crashed: {exc}")
+
+
+RESEARCH_RTN_INTERVAL = 1800  # 30 minutes
+
+
+async def _run_research_rtn_loop(shutdown_event: asyncio.Event) -> None:
+    _log("research-rtn", f"Starting research RTN loop (interval={RESEARCH_RTN_INTERVAL}s)")
+    try:
+        await asyncio.sleep(5)  # let other systems boot first
+        from dharma_swarm.research_rtn import ResearchRTN
+        from dharma_swarm.research_tracks import ALL_TRACKS
+
+        # Try to use WebSearchBackend; fall back to NullSearchBackend
+        try:
+            from dharma_swarm.auto_research.backends import WebSearchBackend
+            backend = WebSearchBackend()
+        except Exception:
+            from dharma_swarm.auto_research.search import NullSearchBackend
+            backend = NullSearchBackend()
+
+        rtn = ResearchRTN(search_backend=backend)
+        track_cycle = 0
+
+        while not shutdown_event.is_set():
+            track = ALL_TRACKS[track_cycle % len(ALL_TRACKS)]
+            brief_idx = track_cycle // len(ALL_TRACKS)
+            brief = track.next_brief(index=brief_idx)
+            _log("research-rtn", f"Executing: track={track.slug}, topic={brief.topic}")
+
+            try:
+                result = await asyncio.to_thread(rtn.execute_brief, brief)
+                status = "PASSED" if result.passed_gates else "FAILED"
+                score = result.reward.grade_card.final_score if result.reward else 0.0
+                _log(
+                    "research-rtn",
+                    f"Result: {status} (score={score:.2f}, subs={len(result.sub_results)})",
+                )
+                if result.artifact:
+                    _log("research-rtn", f"Artifact published: {result.artifact.ref.artifact_id}")
+            except Exception as exc:
+                _log("research-rtn", f"RTN execution error: {exc}")
+
+            track_cycle += 1
+            try:
+                await asyncio.wait_for(
+                    shutdown_event.wait(), timeout=RESEARCH_RTN_INTERVAL
+                )
+                break
+            except asyncio.TimeoutError:
+                pass
+
+    except Exception as exc:
+        _log("research-rtn", f"Research RTN loop crashed: {exc}")
+
+
+async def _run_directives_loop(shutdown_event: asyncio.Event) -> None:
+    """Operator-facing directive watcher.
+
+    Boots 20s after daemon start so conductors have time to register
+    themselves into ACTIVE_CONDUCTORS. Thin wrapper around
+    ``agent_direct.watcher_loop`` for orchestrator supervision.
+    """
+    await asyncio.sleep(20)
+    from dharma_swarm.agent_direct import watcher_loop
+
+    _log("directives", "Directive watcher starting (poll=5s)")
+    try:
+        await watcher_loop(shutdown_event, poll_interval=5.0)
+    except Exception as exc:
+        _log("directives", f"Directive watcher crashed: {exc}")
+
+
+async def _run_executive_loop(shutdown_event: asyncio.Event) -> None:
+    """ShaktiZeitgeistExecutive — strategic sensing + opportunity scoring.
+
+    Phase 1: read-only.  Ingests signals from zeitgeist, mission, organism,
+    and algedonic sources.  Scores opportunities with a 12-factor model.
+    Emits executive artifacts under ``~/.dharma/meta/``.
+    """
+    await asyncio.sleep(120)  # let zeitgeist + organism boot first
+
+    from dharma_swarm.shakti_zeitgeist_executive import ShaktiZeitgeistExecutive
+    executive = ShaktiZeitgeistExecutive(state_dir=STATE_DIR)
+
+    while not shutdown_event.is_set():
+        try:
+            result = await executive.cycle()
+            n_opps = len(result.opportunities)
+            n_starved = len(result.starvation_alerts)
+            _log("executive", f"Cycle {result.cycle_id}: {result.signals_ingested} signals, "
+                 f"{n_opps} opportunities, {n_starved} starvation alerts "
+                 f"({result.duration_ms:.0f}ms)")
+        except Exception as e:
+            _log("executive", f"Executive cycle failed: {e}")
+
+        try:
+            await asyncio.wait_for(
+                shutdown_event.wait(), timeout=EXECUTIVE_INTERVAL
+            )
+            break
+        except asyncio.TimeoutError:
+            pass
 
 
 async def orchestrate(background: bool = False) -> None:
@@ -1741,6 +2916,15 @@ async def orchestrate(background: bool = False) -> None:
         _root.addHandler(_fh)
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+    competing = _find_competing_orchestrator()
+    if competing is not None:
+        pid, command = competing
+        _log(
+            "orchestrator",
+            f"Refusing duplicate startup; existing orchestrator PID {pid}: {command[:160]}",
+        )
+        return
 
     # Stop any existing daemon to avoid DB conflicts
     _stop_old_daemon()
@@ -1770,26 +2954,6 @@ async def orchestrate(background: bool = False) -> None:
     from dharma_swarm.signal_bus import SignalBus
     bus = SignalBus.get()
 
-    # Phase 2b: optional fractal room registry + bridge.
-    room_registry = None
-    room_bridge = None
-    rooms_enabled = os.environ.get("DHARMA_FRACTAL_ROOMS", "").lower() in {
-        "1", "true", "yes", "on",
-    }
-    if rooms_enabled:
-        try:
-            from dharma_swarm.fractal.room_configs import bootstrap_registry
-            from dharma_swarm.fractal.room_bridge import RoomBridge
-            room_registry = bootstrap_registry()
-            room_bridge = RoomBridge(room_registry, signal_bus=bus)
-            _log("orchestrator", f"Fractal rooms: {len(room_registry.all_rooms())} rooms bootstrapped")
-        except Exception as exc:
-            _log("orchestrator", f"Fractal rooms disabled: bootstrap failed: {exc}")
-            room_registry = None
-            room_bridge = None
-    else:
-        _log("orchestrator", "Fractal rooms: disabled (set DHARMA_FRACTAL_ROOMS=1 to enable)")
-
     _log("orchestrator", "=" * 60)
     _log("orchestrator", "DGC Live Orchestrator starting (Strange Loop v1)")
     _log("orchestrator", f"  PID: {os.getpid()}")
@@ -1798,10 +2962,6 @@ async def orchestrate(background: bool = False) -> None:
     _log("orchestrator", f"  Pulse interval: {PULSE_INTERVAL}s")
     _log("orchestrator", f"  Max daily: {MAX_DAILY}")
     _log("orchestrator", f"  Signal bus: active")
-    if room_registry is not None:
-        _log("orchestrator", f"  Fractal rooms: {len(room_registry.active_rooms())} active")
-    else:
-        _log("orchestrator", "  Fractal rooms: disabled")
     _log("orchestrator", "=" * 60)
 
     # Constitutional size check (Power Prompt Commandment #3)
@@ -1836,18 +2996,31 @@ async def orchestrate(background: bool = False) -> None:
         "consolidation": CONSOLIDATION_INTERVAL, "recognition": 7200,
         "replication": 3600, "self-improve": 3600, "free-grind": 600,
         "flywheel": 300, "conductors": 120, "context-agent": 60,
+        "research-rtn": RESEARCH_RTN_INTERVAL,
+        "executive": EXECUTIVE_INTERVAL,
     }
-    if room_registry is not None and room_bridge is not None:
-        _loop_intervals["room-health"] = 1800
     for loop_name, interval in _loop_intervals.items():
         _supervisor.register_loop(loop_name, expected_interval=float(interval))
 
+    startup_ready_gate = asyncio.Event()
     task_factories: dict[str, Any] = {
-        "swarm": lambda: run_swarm_loop(shutdown_event, signal_bus=bus, supervisor=_supervisor, room_registry=room_registry),
+        # ── Health API: curl http://localhost:7433/health ──
+        "health-api": lambda: _run_health_api(shutdown_event),
+        "swarm": lambda: run_swarm_loop(
+            shutdown_event,
+            signal_bus=bus,
+            supervisor=_supervisor,
+            bootstrap_ready_event=startup_ready_gate,
+        ),
         "pulse": lambda: run_pulse_loop(shutdown_event),
         "recognition": lambda: _run_recognition_loop(shutdown_event),
         "conductors": lambda: run_conductor_loop(shutdown_event),
-        "context-agent": lambda: run_context_agent_loop(shutdown_event, signal_bus=bus),
+        "context-agent": lambda: _run_gated_loop(
+            "context-agent",
+            shutdown_event,
+            startup_ready_gate,
+            lambda: run_context_agent_loop(shutdown_event, signal_bus=bus),
+        ),
         "zeitgeist": lambda: _run_zeitgeist_loop(shutdown_event),
         "witness": lambda: _run_witness_loop(shutdown_event),
         "consolidation": lambda: _run_consolidation_loop(shutdown_event),
@@ -1860,24 +3033,42 @@ async def orchestrate(background: bool = False) -> None:
         # Ingests evolution archive, shared research, stigmergy marks, task
         # completions into MemoryPalace every 30 minutes. Produces
         # lessons_learned.md at ~/.dharma/meta/ — the anti-amnesia mechanism.
-        "archaeology": lambda: _run_archaeology_loop(shutdown_event),
+        "archaeology": lambda: _run_gated_loop(
+            "archaeology",
+            shutdown_event,
+            startup_ready_gate,
+            lambda: _run_archaeology_loop(shutdown_event),
+        ),
+        # ── cc_tool_marks consumer (Sprint 1 Fix 3) ──
+        # Aggregates Claude Code tool-use observations every 5min. Closes the
+        # Claude-Code → Dharma bridge. Writes ~/.dharma/meta/cc_tool_marks_signals.json.
+        "cc-tool-marks": lambda: _run_gated_loop(
+            "cc-tool-marks",
+            shutdown_event,
+            startup_ready_gate,
+            lambda: _run_cc_tool_marks_loop(shutdown_event),
+        ),
         # ── Guardian Crew: continuous interface + loop + router health checks ──
         # Runs at boot + every 4 hours. Writes GUARDIAN_REPORT.md.
         # Creates GitHub issues for BLOCKER-severity findings.
-        "guardian": lambda: _run_guardian_loop(shutdown_event, room_registry=room_registry),
-        # ── Health API: curl http://localhost:7433/health ──
-        "health-api": lambda: _run_health_api(shutdown_event),
+        "guardian": lambda: _run_guardian_loop(shutdown_event),
         # ── Gauntlet: adversarial eval pressure + DGM feedback loop ──
         "gauntlet": lambda: _run_gauntlet_loop(shutdown_event),
-        # ── World Model: living Forrester-style world state updated by research ──
-        "world-model": lambda: _run_world_model_loop(shutdown_event),
+        # ── Research RTN: artifact-producing research pipeline ──
+        # Cycles through 3 tracks (swarm/NeurIPS/market) every 30 minutes.
+        # Produces graded research artifacts at ~/.dharma/artifacts/research/
+        "research-rtn": lambda: _run_research_rtn_loop(shutdown_event),
+        # ── ShaktiZeitgeistExecutive: strategic sensing + opportunity scoring ──
+        # Phase 1: read-only. Ingests signals, scores opportunities, emits
+        # executive artifacts at ~/.dharma/meta/ every 45 minutes.
+        "executive": lambda: _run_executive_loop(shutdown_event),
+        # ── Directive watcher: operator-facing injection socket ──
+        # Polls ~/.dharma/directives/ every 5s. For each JSON directive file,
+        # looks up the target conductor in ACTIVE_CONDUCTORS and calls
+        # accept_task(). Unmatched/malformed directives move to
+        # ~/.dharma/directives/_unmatched/ with a reason.
+        "directives": lambda: _run_directives_loop(shutdown_event),
     }
-    if room_registry is not None and room_bridge is not None:
-        task_factories["room-health"] = lambda: _run_room_health_loop(
-            shutdown_event,
-            room_registry,
-            room_bridge,
-        )
     optional_clean_exit = {"pulse"}
     tasks = {
         name: asyncio.create_task(factory(), name=name)
@@ -1885,6 +3076,7 @@ async def orchestrate(background: bool = False) -> None:
     }
 
     _log("orchestrator", f"All {len(tasks)} systems launched ({len(tasks)} loops incl. free-grind)")
+    await asyncio.sleep(0)
 
     try:
         # Resilient loop: restart failed tasks instead of dying on first error.

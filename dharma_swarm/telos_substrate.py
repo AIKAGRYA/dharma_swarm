@@ -34,7 +34,6 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 from dharma_swarm.models import _new_id, _utc_now  # noqa: F401
@@ -2789,7 +2788,7 @@ TELOS_OBJECTIVES: list[dict[str, Any]] = [
     },
     {
         "name": "Wire Ginko as metabolic proof-of-concept",
-        "perspective": "financial",
+        "perspective": "process",
         "priority": 10,
         "progress": 0.05,
         "description": (
@@ -4072,7 +4071,7 @@ class TelosSubstrate:
     """
 
     def __init__(self, state_dir: Path | None = None) -> None:
-        self._state_dir = state_dir or dharma_state_dir()
+        self._state_dir = state_dir or Path.home() / ".dharma"
 
     async def seed_all(self) -> dict[str, int]:
         """Seed both graphs and bridge edges.

@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import json
+import sys
 from unittest.mock import patch, MagicMock, AsyncMock
 
 import pytest
 
+import dharma_swarm.ecc_eval_harness as harness
 from dharma_swarm.ecc_eval_harness import (
     EvalResult,
     EvalReport,
@@ -131,6 +133,39 @@ class TestTestSuiteHealth:
             assert result.passed is True
             assert result.metrics["collected"] == 42
 
+    def test_prefers_uv_runner_when_available(self):
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "42 tests collected\n"
+        mock_result.stderr = ""
+        with (
+            patch("dharma_swarm.ecc_eval_harness.shutil.which", return_value="/tmp/uv"),
+            patch("dharma_swarm.ecc_eval_harness.subprocess.run", return_value=mock_result) as mock_run,
+        ):
+            result = eval_test_suite_health()
+
+        assert result.passed is True
+        args, kwargs = mock_run.call_args
+        assert args[0] == ["/tmp/uv", "run", "pytest", "tests/", "--co", "-q"]
+        assert kwargs["cwd"] == str(harness.REPO_ROOT)
+        assert result.metrics["command"] == ["/tmp/uv", "run", "pytest", "tests/", "--co", "-q"]
+        assert result.metrics["repo_root"] == str(harness.REPO_ROOT)
+
+    def test_falls_back_to_current_python_when_uv_missing(self):
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "42 tests collected\n"
+        mock_result.stderr = ""
+        with (
+            patch("dharma_swarm.ecc_eval_harness.shutil.which", return_value=None),
+            patch("dharma_swarm.ecc_eval_harness.subprocess.run", return_value=mock_result) as mock_run,
+        ):
+            result = eval_test_suite_health()
+
+        assert result.passed is True
+        args, _ = mock_run.call_args
+        assert args[0] == [sys.executable, "-m", "pytest", "tests/", "--co", "-q"]
+
     def test_failure_path(self):
         mock_result = MagicMock()
         mock_result.returncode = 1
@@ -155,12 +190,19 @@ async def test_task_roundtrip_mock():
     mock_board = AsyncMock()
     mock_board.create.return_value = mock_task
     mock_board.get.return_value = mock_task
+    mock_cancelled = MagicMock()
+    mock_cancelled.status.value = "cancelled"
+    mock_board.cancel.return_value = mock_cancelled
 
-    with patch("dharma_swarm.task_board.TaskBoard", return_value=mock_board):
+    with patch("dharma_swarm.task_board.TaskBoard", return_value=mock_board) as mock_board_cls:
         result = await eval_task_roundtrip()
         assert result.name == "task_roundtrip"
         # Will hit real import; test mainly verifies no crash
         assert isinstance(result.passed, bool)
+        assert mock_board_cls.call_args.args[0] == harness.EVALS_DIR / "probe_tasks.db"
+        assert result.metrics["db_path"] == str(harness.EVALS_DIR / "probe_tasks.db")
+        mock_board.cancel.assert_awaited_once()
+        assert result.metrics["cleanup_status"] == "cancelled"
 
 
 @pytest.mark.asyncio
@@ -270,6 +312,13 @@ class TestPassAtK:
             {"results": [{"name": "a", "passed": True}]},
         ]
         assert compute_pass_at_k(history, k=10) == 1.0
+
+    def test_duplicate_passes_across_runs_do_not_overcount(self):
+        history = [
+            {"results": [{"name": "a", "passed": True}, {"name": "b", "passed": True}]},
+            {"results": [{"name": "a", "passed": True}, {"name": "b", "passed": True}]},
+        ]
+        assert compute_pass_at_k(history, k=2) == 1.0
 
 
 # ---------------------------------------------------------------------------

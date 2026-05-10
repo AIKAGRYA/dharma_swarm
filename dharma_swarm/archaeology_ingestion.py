@@ -65,15 +65,17 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
+from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
 _DEFAULT_INGESTION_INTERVAL = 1800  # 30 minutes
+_DEFAULT_BOOT_DELAY_SECONDS = 300.0
 
 
 @dataclass
@@ -94,10 +96,105 @@ def _utc_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _create_memory_palace(state_dir: Path) -> Any:
+    """Construct MemoryPalace off the event loop."""
+    from dharma_swarm.memory_palace import MemoryPalace
+
+    return MemoryPalace(state_dir=state_dir)
+
+
+def _archaeology_boot_delay_seconds(interval_seconds: int) -> float:
+    raw = os.environ.get("DGC_ARCHAEOLOGY_BOOT_DELAY", "").strip()
+    default_delay = float(min(interval_seconds, int(_DEFAULT_BOOT_DELAY_SECONDS)))
+    if not raw:
+        return default_delay
+    try:
+        return max(0.0, float(raw))
+    except ValueError:
+        logger.warning(
+            "Invalid DGC_ARCHAEOLOGY_BOOT_DELAY=%r; using %.1fs",
+            raw,
+            default_delay,
+        )
+        return default_delay
+
+
 def _truncate(text: str, max_chars: int = 2000) -> str:
     if len(text) <= max_chars:
         return text
     return text[:max_chars] + f"... [truncated {len(text) - max_chars} chars]"
+
+
+def _tail_jsonl(path: Path, limit: int = 80) -> list[dict[str, Any]]:
+    try:
+        lines = [line for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    except Exception:
+        return []
+    entries: list[dict[str, Any]] = []
+    for line in lines[-limit:]:
+        try:
+            entries.append(json.loads(line))
+        except Exception:
+            continue
+    return entries
+
+
+def _build_runtime_lessons(state_dir: Path) -> list[str]:
+    sections: list[str] = []
+
+    archive_entries = _tail_jsonl(state_dir / "evolution" / "archive.jsonl", limit=120)
+    if archive_entries:
+        recent = archive_entries[-60:]
+        applied = [e for e in recent if str(e.get("status", "")).lower() == "applied"]
+        rolled_back = [
+            e for e in recent
+            if "rolled_back" in str(e.get("status", "")).lower()
+            or bool((e.get("test_results") or {}).get("rolled_back"))
+        ]
+        by_component = Counter(str(e.get("component") or "unknown") for e in recent)
+        if applied:
+            sections.append("## Runtime Evolution Snapshot\n")
+            sections.append(
+                f"- Recent archive activity: {len(recent)} entries, {len(applied)} applied, {len(rolled_back)} rolled back.\n"
+            )
+            for component, count in by_component.most_common(5):
+                sections.append(f"- Hot component: `{component}` appeared {count} times in recent evolution traffic.\n")
+
+    latest_delta = state_dir / "gauntlet" / "LATEST_DELTA.md"
+    if latest_delta.exists():
+        try:
+            delta_text = latest_delta.read_text(encoding="utf-8")
+        except Exception:
+            delta_text = ""
+        if "Tasks Passed | 11/11" in delta_text:
+            sections.append("\n## Current Baseline\n")
+            sections.append("- Latest gauntlet baseline is fully green at 11/11 tasks passed.\n")
+        elif "Tasks Passed |" in delta_text:
+            for line in delta_text.splitlines():
+                if "Tasks Passed |" in line:
+                    sections.append("\n## Current Baseline\n")
+                    sections.append(f"- {line.strip('| ').strip()}\n")
+                    break
+
+    log_path = state_dir / "logs" / "swarm.log"
+    if log_path.exists():
+        try:
+            log_lines = log_path.read_text(encoding="utf-8", errors="ignore").splitlines()[-400:]
+        except Exception:
+            log_lines = []
+        notable: list[str] = []
+        if any("runtime-fallback-failed" in line for line in log_lines):
+            notable.append("Pulse fallback still degrades to a failed backup lane in some cycles.")
+        if any("Event loop is closed" in line for line in log_lines):
+            notable.append("Async client shutdown noise is still present in swarm logs.")
+        if any("agent_silent severity=medium" in line for line in log_lines):
+            notable.append("Guardian still emits recurring agent_silent anomalies that may be low-signal.")
+        if notable:
+            sections.append("\n## Operational Friction\n")
+            for item in notable[:5]:
+                sections.append(f"- {item}\n")
+
+    return sections
 
 
 async def _ingest_into_palace(
@@ -484,6 +581,14 @@ async def synthesize_lessons_learned(
     except Exception as exc:
         logger.debug("Lessons query 5 failed: %s", exc)
 
+    if len(sections) <= 1:
+        sections.extend(_build_runtime_lessons(state_dir))
+    else:
+        runtime_sections = _build_runtime_lessons(state_dir)
+        if runtime_sections:
+            sections.append("\n## Runtime-Derived Notes\n")
+            sections.extend(runtime_sections)
+
     lessons_text = "\n".join(sections)
 
     # Save to disk
@@ -525,7 +630,7 @@ async def query_archaeology(
     Returns:
         List of MemoryHit ordered by relevance.
     """
-    state_dir = state_dir or dharma_state_dir()
+    state_dir = state_dir or Path.home() / ".dharma"
 
     try:
         from dharma_swarm.memory_palace import MemoryPalace, PalaceQuery
@@ -601,14 +706,13 @@ class ArchaeologyIngestionDaemon:
         state_dir: Path | None = None,
         interval_seconds: int = _DEFAULT_INGESTION_INTERVAL,
     ) -> None:
-        self._state_dir = state_dir or dharma_state_dir()
+        self._state_dir = state_dir or Path.home() / ".dharma"
         self._interval = interval_seconds
 
     async def run_once(self) -> dict[str, int]:
         """Run one full ingestion cycle. Returns counts per stream."""
         try:
-            from dharma_swarm.memory_palace import MemoryPalace, PalaceQuery
-            palace = MemoryPalace(state_dir=self._state_dir)
+            palace = await asyncio.to_thread(_create_memory_palace, self._state_dir)
         except Exception as exc:
             logger.error("ArchaeologyIngestionDaemon: MemoryPalace unavailable: %s", exc)
             return {}
@@ -627,11 +731,15 @@ class ArchaeologyIngestionDaemon:
         logger.info("Archaeology ingestion complete: %d documents total | %s", total, counts)
         return counts
 
-    async def run_forever(self) -> None:
+    async def run_forever(self, *, initial_delay_seconds: float = 0.0) -> None:
         """Run ingestion continuously on a fixed interval."""
         logger.info(
-            "ArchaeologyIngestionDaemon starting (interval=%ds)", self._interval
+            "ArchaeologyIngestionDaemon starting (interval=%ds initial_delay=%.1fs)",
+            self._interval,
+            initial_delay_seconds,
         )
+        if initial_delay_seconds > 0:
+            await asyncio.sleep(initial_delay_seconds)
         while True:
             try:
                 await self.run_once()
@@ -656,17 +764,13 @@ async def start_archaeology_loop(
     Returns the asyncio Task so it can be tracked and cancelled on shutdown.
     """
     daemon = ArchaeologyIngestionDaemon(state_dir=state_dir, interval_seconds=interval_seconds)
-
-    # Run once immediately at boot (before the interval timer)
-    try:
-        await asyncio.wait_for(daemon.run_once(), timeout=120.0)
-    except asyncio.TimeoutError:
-        logger.warning("Boot-time archaeology ingestion timed out (120s) — continuing")
-    except Exception as exc:
-        logger.warning("Boot-time archaeology ingestion failed (non-fatal): %s", exc)
+    boot_delay_seconds = _archaeology_boot_delay_seconds(interval_seconds)
 
     # Then schedule the recurring loop
-    task = asyncio.create_task(daemon.run_forever(), name="archaeology_ingestion")
+    task = asyncio.create_task(
+        daemon.run_forever(initial_delay_seconds=boot_delay_seconds),
+        name="archaeology_ingestion",
+    )
     return task
 
 

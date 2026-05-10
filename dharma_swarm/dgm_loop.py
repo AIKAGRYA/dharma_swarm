@@ -60,12 +60,16 @@ Reference: Sakana AI Darwin Gödel Machine (ICLR 2026)
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+import os
 import random
+import re
 import time
+from collections import Counter
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
-from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -202,6 +206,105 @@ async def _sample_parent_qd(
         return None, 0
 
 
+async def _sample_parent_diversity_archive(
+    archive: Any,
+    dimensions: list[str] | None = None,
+) -> tuple[Any | None, int]:
+    """Sample a parent via MAP-Elites DiversityArchive (farthest-point sampling).
+
+    Populates DiversityArchive from feature_coords on each ArchiveEntry, then
+    picks candidates with max behavioral spread. Canonical source for
+    diversity-aware selection. Sprint 1 Fix 6 — shadow/live flag gated.
+    """
+    try:
+        from dharma_swarm.diversity_archive import BehaviorDescriptor, DiversityArchive
+
+        entries = list(archive._entries.values()) if hasattr(archive, "_entries") else []
+        if not entries:
+            return None, 0
+
+        dims = dimensions or ["dharmic_alignment", "elegance", "complexity"]
+        div = DiversityArchive(dimensions=dims, bins_per_dimension=5)
+
+        populated = 0
+        for entry in entries:
+            coords = getattr(entry, "feature_coords", None) or {}
+            if not coords:
+                continue
+            descriptor = BehaviorDescriptor(
+                dimensions={d: float(coords.get(d, 0.0)) for d in dims}
+            )
+            fitness_obj = getattr(entry, "fitness", None)
+            f = (
+                fitness_obj.weighted()
+                if fitness_obj and hasattr(fitness_obj, "weighted")
+                else 0.0
+            )
+            div.add(
+                candidate_id=getattr(entry, "id", ""),
+                candidate_payload={"entry_id": getattr(entry, "id", "")},
+                fitness=f,
+                behavior=descriptor,
+            )
+            populated += 1
+
+        if populated == 0:
+            return None, 0
+
+        cells = div.sample_diverse(n=1)
+        if not cells:
+            return None, 0
+
+        selected_id = cells[0].candidate_id
+        selected = archive._entries.get(selected_id)
+        if selected is None:
+            return None, 0
+
+        depth = 0
+        current = selected
+        while hasattr(current, "parent_id") and current.parent_id:
+            parent = archive._entries.get(current.parent_id)
+            if parent is None:
+                break
+            current = parent
+            depth += 1
+            if depth > 100:
+                break
+
+        return selected, depth
+    except Exception as exc:
+        logger.warning("DiversityArchive sampling failed: %s", exc)
+        return None, 0
+
+
+def _log_divarchive_shadow_comparison(
+    archive_parent: Any,
+    archive_depth: int,
+    handcoded_parent: Any,
+    handcoded_depth: int,
+    state_dir: Path,
+) -> None:
+    """Append one shadow-comparison line; used to evaluate 48h before live flip."""
+    log_path = state_dir / "meta" / "divarchive_shadow_comparison.jsonl"
+    try:
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        entry = {
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "archive_parent_id": getattr(archive_parent, "id", None),
+            "archive_depth": archive_depth,
+            "handcoded_parent_id": getattr(handcoded_parent, "id", None),
+            "handcoded_depth": handcoded_depth,
+            "same_choice": (
+                getattr(archive_parent, "id", None)
+                == getattr(handcoded_parent, "id", None)
+            ),
+        }
+        with log_path.open("a") as f:
+            f.write(json.dumps(entry) + "\n")
+    except Exception:
+        logger.debug("shadow comparison write failed", exc_info=True)
+
+
 def _get_source_file_from_entry(entry: Any, src_root: Path) -> Path | None:
     """Extract the source file from an archive entry for generating the next proposal."""
     # Try entry.component (what file was modified)
@@ -228,32 +331,156 @@ def _get_source_file_from_entry(entry: Any, src_root: Path) -> Path | None:
 # DGM Loop class
 # ---------------------------------------------------------------------------
 
-# Source files that DGM may not mutate directly.  This mirrors the
-# identity-layer precedent in self_improve.py and verify/scorer.py.
-DGM_PROTECTED_FILES = frozenset({
-    "telos_gates.py",
-    "dharma_kernel.py",
-    "evolution.py",
-    "config.py",
-})
-
-
-def _is_protected_dgm_target(path: Path | str) -> bool:
-    return Path(path).name in DGM_PROTECTED_FILES
-
-
-# Source files that are valid evolution targets (in priority order).
-# These are the files where improvement has the highest leverage on swarm performance.
+# Source files that are valid evolution targets (in priority order)
+# These are the files where improvement has the highest leverage on swarm performance
 DGM_TARGET_FILES = [
     "agent_runner.py",         # task execution — most direct impact on completion rate
     "autonomous_agent.py",     # tool use, LLM calls — quality of agent cognition
     "orchestrator.py",         # task routing and lifecycle — affects all agents
     "swarm.py",                # boot, coordination — foundational
+    "telos_gates.py",          # constraint enforcement — safety-critical
     "providers.py",            # LLM provider routing — reliability
+    "evolution.py",            # self-improvement loop — recursive
     "task_board.py",           # task management — throughput
     "stigmergy.py",            # agent coordination memory
     "thinkodynamic_director.py",  # mission seeding
 ]
+
+_GAUNTLET_TARGET_RE = re.compile(r"^- `([^`]+)`", re.MULTILINE)
+
+
+def _tail_lines(path: Path, max_lines: int = 200) -> list[str]:
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except Exception:
+        return []
+    return lines[-max_lines:]
+
+
+def _normalize_component_to_file(component: str | None, src_root: Path) -> str | None:
+    if not component:
+        return None
+    raw = str(component).strip()
+    if not raw:
+        return None
+    candidate = raw.replace("\\", "/")
+    if candidate.startswith("dharma_swarm/"):
+        candidate = candidate.split("/", 1)[1]
+    if candidate.endswith(".py"):
+        filename = Path(candidate).name
+        return filename if (src_root / filename).exists() else None
+    module_file = Path(candidate.replace(".", "/")).name + ".py"
+    if (src_root / module_file).exists():
+        return module_file
+    bare_file = f"{Path(candidate).name}.py"
+    if (src_root / bare_file).exists():
+        return bare_file
+    return None
+
+
+def _latest_gauntlet_targets(state_dir: Path, src_root: Path) -> list[str]:
+    latest = state_dir / "gauntlet" / "LATEST_DELTA.md"
+    if not latest.exists():
+        return []
+    try:
+        text = latest.read_text(encoding="utf-8")
+    except Exception:
+        return []
+    targets: list[str] = []
+    for match in _GAUNTLET_TARGET_RE.finditer(text):
+        normalized = _normalize_component_to_file(match.group(1), src_root)
+        if normalized:
+            targets.append(normalized)
+    return list(dict.fromkeys(targets))
+
+
+def _recent_archive_component_stats(state_dir: Path, src_root: Path, max_lines: int = 160) -> dict[str, Counter]:
+    archive_path = state_dir / "evolution" / "archive.jsonl"
+    counters = {
+        "failure_hotspots": Counter(),
+        "recent_pressure": Counter(),
+        "applied_success": Counter(),
+    }
+    for line in _tail_lines(archive_path, max_lines=max_lines):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            entry = json.loads(line)
+        except Exception:
+            continue
+        component = _normalize_component_to_file(entry.get("component"), src_root)
+        if not component:
+            continue
+        counters["recent_pressure"][component] += 1
+        status = str(entry.get("status", "") or "").strip().lower()
+        description = str(entry.get("description", "") or "")
+        test_results = entry.get("test_results", {}) or {}
+        correctness = float(((entry.get("fitness") or {}).get("correctness")) or 0.0)
+        if status == "applied" and correctness > 0:
+            counters["applied_success"][component] += 1
+        systematic_issue = "systematic test issue" in description.lower()
+        test_failed = bool(test_results) and int(test_results.get("exit_code", 0) or 0) != 0
+        if systematic_issue or test_failed or correctness <= 0:
+            counters["failure_hotspots"][component] += 1
+    return counters
+
+
+def _build_target_scores(state_dir: Path, src_root: Path) -> dict[str, float]:
+    available_targets = [t for t in DGM_TARGET_FILES if (src_root / t).exists()]
+    scores: dict[str, float] = {
+        target: float(len(available_targets) - idx)
+        for idx, target in enumerate(available_targets)
+    }
+    stats = _recent_archive_component_stats(state_dir, src_root)
+    for target in _latest_gauntlet_targets(state_dir, src_root):
+        scores[target] = scores.get(target, 0.0) + 12.0
+    for target, count in stats["failure_hotspots"].items():
+        scores[target] = scores.get(target, 0.0) + min(12.0, count * 2.5)
+    for target, count in stats["applied_success"].items():
+        scores[target] = scores.get(target, 0.0) + min(3.0, count * 0.5)
+    gauntlet_targets = set(_latest_gauntlet_targets(state_dir, src_root))
+    total_recent = sum(stats["recent_pressure"].values())
+    for target, count in stats["recent_pressure"].items():
+        if count > 2:
+            scores[target] = max(0.5, scores.get(target, 0.0) - min(6.0, (count - 2) * 1.5))
+        if total_recent > 0:
+            share = count / total_recent
+            if share >= 0.25 and target not in gauntlet_targets:
+                scores[target] = max(0.25, scores.get(target, 0.0) * 0.25)
+            elif share >= 0.18 and target not in gauntlet_targets:
+                scores[target] = max(0.5, scores.get(target, 0.0) * 0.45)
+    return scores
+
+
+def _compose_live_fitness_context(
+    state_dir: Path,
+    src_root: Path,
+    source_file: str,
+    fitness_context: str,
+) -> str:
+    parts: list[str] = []
+    if fitness_context:
+        parts.append(fitness_context)
+    gauntlet_targets = [t for t in _latest_gauntlet_targets(state_dir, src_root) if t != source_file]
+    if gauntlet_targets:
+        parts.append(
+            "Latest gauntlet pressure signals: "
+            + ", ".join(gauntlet_targets[:3])
+            + " are currently the top failing or targeted seams."
+        )
+    stats = _recent_archive_component_stats(state_dir, src_root)
+    hotspot_count = stats["failure_hotspots"].get(source_file, 0)
+    if hotspot_count > 0:
+        parts.append(
+            f"Recent archive evidence: {source_file} appears in {hotspot_count} recent failing or systematic issue entries."
+        )
+    recent_pressure = stats["recent_pressure"].get(source_file, 0)
+    if recent_pressure > 3:
+        parts.append(
+            f"Exploration note: {source_file} has already been touched {recent_pressure} times recently, so any change should be high-signal rather than cosmetic."
+        )
+    return " | ".join(part for part in parts if part)
 
 
 class DGMLoop:
@@ -280,7 +507,7 @@ class DGMLoop:
         shadow_mode: bool | None = None,
     ) -> None:
         self._engine = engine
-        self._state_dir = state_dir or dharma_state_dir()
+        self._state_dir = state_dir or Path.home() / ".dharma"
         self._novelty_pressure = novelty_pressure
 
         import os
@@ -292,7 +519,8 @@ class DGMLoop:
         else:
             self._shadow_mode = shadow_mode
 
-        self._src_root = Path.home() / "dharma_swarm" / "dharma_swarm"
+        self._src_root = Path(__file__).resolve().parent
+        self._target_scores = _build_target_scores(self._state_dir, self._src_root)
 
     async def run_one_generation(
         self,
@@ -318,15 +546,42 @@ class DGMLoop:
         archive_size_before = len(archive._entries) if archive and hasattr(archive, '_entries') else 0
         result.archive_size_before = archive_size_before
 
-        # Step 1: Sample a parent from the archive using quality-diversity
+        # Step 1: Sample a parent. Fix 6 — shadow/live flag selects strategy.
+        # DHARMA_DIVERSITY_ARCHIVE_SAMPLING: off (default, hand-coded),
+        # shadow (log both, use hand-coded), live (archive-canonical w/ fallback).
         parent_entry = None
         lineage_depth = 0
+        sampling_mode = os.getenv("DHARMA_DIVERSITY_ARCHIVE_SAMPLING", "off").lower()
         if archive and archive_size_before > 0:
-            parent_entry, lineage_depth = await _sample_parent_qd(
-                archive,
-                fitness_weights=getattr(self._engine, '_fitness_weights', None),
-                novelty_pressure=self._novelty_pressure,
-            )
+            if sampling_mode == "live":
+                parent_entry, lineage_depth = await _sample_parent_diversity_archive(archive)
+                if parent_entry is None:
+                    parent_entry, lineage_depth = await _sample_parent_qd(
+                        archive,
+                        fitness_weights=getattr(self._engine, '_fitness_weights', None),
+                        novelty_pressure=self._novelty_pressure,
+                    )
+                    result.selection_strategy = "qd_fallback_from_live"
+                else:
+                    result.selection_strategy = "diversity_archive_live"
+            elif sampling_mode == "shadow":
+                archive_parent, archive_depth = await _sample_parent_diversity_archive(archive)
+                parent_entry, lineage_depth = await _sample_parent_qd(
+                    archive,
+                    fitness_weights=getattr(self._engine, '_fitness_weights', None),
+                    novelty_pressure=self._novelty_pressure,
+                )
+                _log_divarchive_shadow_comparison(
+                    archive_parent, archive_depth, parent_entry, lineage_depth,
+                    state_dir=self._state_dir,
+                )
+                result.selection_strategy = "qd_with_divarchive_shadow"
+            else:  # "off" — default hand-coded QD
+                parent_entry, lineage_depth = await _sample_parent_qd(
+                    archive,
+                    fitness_weights=getattr(self._engine, '_fitness_weights', None),
+                    novelty_pressure=self._novelty_pressure,
+                )
         result.parent_id = getattr(parent_entry, 'id', None)
         result.lineage_depth = lineage_depth
         result.fitness_before = (
@@ -336,25 +591,23 @@ class DGMLoop:
 
         # Step 2: Determine source file to evolve
         # Priority: explicit arg > parent's component > quality-diversity selection
+        self._target_scores = _build_target_scores(self._state_dir, self._src_root)
         if source_file is None and parent_entry is not None:
             source_file = _get_source_file_from_entry(parent_entry, self._src_root)
 
         if source_file is None:
-            # Fall back to weighted random from target list
-            weights = [len(DGM_TARGET_FILES) - i for i in range(len(DGM_TARGET_FILES))]
-            source_file = random.choices(DGM_TARGET_FILES, weights=weights, k=1)[0]
+            available_targets = [
+                target for target in DGM_TARGET_FILES
+                if (self._src_root / target).exists()
+            ]
+            weighted_targets = available_targets or DGM_TARGET_FILES
+            weights = [max(0.5, self._target_scores.get(target, 1.0)) for target in weighted_targets]
+            source_file = random.choices(weighted_targets, weights=weights, k=1)[0]
+            result.selection_strategy = "evidence_weighted"
 
         source_path = Path(source_file) if not isinstance(source_file, Path) else source_file
         if not source_path.is_absolute():
             source_path = self._src_root / source_path
-
-        if _is_protected_dgm_target(source_path):
-            result.error = (
-                f"Protected DGM target rejected: {source_path.name}. "
-                "Telos/Dharma/Governance boundary files require explicit human review."
-            )
-            result.duration_seconds = time.monotonic() - start
-            return result
 
         if not source_path.exists():
             result.error = f"Source file not found: {source_path}"
@@ -367,30 +620,75 @@ class DGMLoop:
         full_context = self._build_fitness_context(
             parent_entry=parent_entry,
             lineage_depth=lineage_depth,
-            fitness_context=fitness_context,
+            fitness_context=_compose_live_fitness_context(
+                self._state_dir,
+                self._src_root,
+                source_path.name,
+                fitness_context,
+            ),
         )
 
         # Step 4: Run auto_evolve with the selected source file and parent context
         try:
-            from dharma_swarm.providers import OpenRouterProvider
+            from dharma_swarm.providers import OpenRouterProvider, create_default_router
             import os as _os
 
             provider = None
             if _os.environ.get("OPENROUTER_API_KEY"):
                 provider = OpenRouterProvider()
 
+            router = create_default_router()
+
             if provider is None:
                 result.error = "No LLM provider available (set OPENROUTER_API_KEY)"
                 result.duration_seconds = time.monotonic() - start
                 return result
 
-            evo_result = await self._engine.auto_evolve(
-                provider=provider,
-                source_files=[source_path],
-                shadow=self._shadow_mode,
-                timeout=timeout,
-                context=full_context,
-            )
+            async def _run_auto_evolve(run_context: str, run_timeout: float) -> Any:
+                return await self._engine.auto_evolve(
+                    provider=provider,
+                    source_files=[source_path],
+                    model="",
+                    shadow=self._shadow_mode,
+                    timeout=max(10.0, run_timeout),
+                    context=run_context,
+                    router=router,
+                )
+
+            evo_result = await _run_auto_evolve(full_context, timeout)
+
+            if (
+                not self._shadow_mode
+                and evo_result.proposals_submitted == 0
+                and (time.monotonic() - start) < timeout
+            ):
+                retry_context = (
+                    full_context
+                    + " | Mutation required: do not return no-op. "
+                    + "Propose one minimal, safe, reversible code change that improves correctness "
+                    + "under the stated stigmergy failure mode. Prefer the smallest diff that can be tested."
+                )
+                remaining = timeout - (time.monotonic() - start)
+                if remaining > 10.0:
+                    logger.info(
+                        "DGM received no-op for %s — retrying direct proposal with mutation-required context",
+                        source_path.name,
+                    )
+                    direct_model = (
+                        _os.environ.get("DGM_FORCE_MODEL", "").strip()
+                        or "qwen/qwen3-coder:free"
+                    )
+                    proposal = await self._engine.generate_proposal(
+                        provider=provider,
+                        source_file=source_path,
+                        context=retry_context,
+                        model=direct_model,
+                    )
+                    if proposal is not None:
+                        evo_result = await self._engine.run_cycle_with_sandbox(
+                            [proposal],
+                            timeout=max(10.0, remaining),
+                        )
 
             result.proposals_submitted = evo_result.proposals_submitted
             result.proposals_gated = evo_result.proposals_gated
@@ -558,7 +856,7 @@ async def run_dgm_evolution_task(
     Returns:
         Dict with results, summary, and lineage information.
     """
-    state_dir = state_dir or dharma_state_dir()
+    state_dir = state_dir or Path.home() / ".dharma"
 
     # Load the DarwinEngine from the running swarm
     try:

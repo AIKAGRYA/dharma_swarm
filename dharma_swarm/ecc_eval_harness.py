@@ -13,13 +13,13 @@ from __future__ import annotations
 
 import importlib
 import json
+import shutil
 import subprocess
 import sys
 import time
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
 from pathlib import Path
-from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 # ---------------------------------------------------------------------------
@@ -60,11 +60,10 @@ class EvalReport:
 # State paths
 # ---------------------------------------------------------------------------
 
-STATE_DIR = dharma_state_dir()
+STATE_DIR = Path.home() / ".dharma"
 EVALS_DIR = STATE_DIR / "evals"
 HISTORY_FILE = EVALS_DIR / "history.jsonl"
-DHARMA_SWARM_DIR = Path.home() / "dharma_swarm"
-PACKAGE_DIR = DHARMA_SWARM_DIR / "dharma_swarm"
+REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
 # ---------------------------------------------------------------------------
@@ -72,13 +71,17 @@ PACKAGE_DIR = DHARMA_SWARM_DIR / "dharma_swarm"
 # ---------------------------------------------------------------------------
 
 async def eval_task_roundtrip() -> EvalResult:
-    """Create a task via TaskBoard, verify it persists and can be read back."""
+    """Create a task via TaskBoard, verify it persists and can be read back.
+
+    This uses an eval-owned probe DB so the harness does not enqueue live
+    `eval_probe_task` work into the shared swarm queue.
+    """
     t0 = time.monotonic()
     try:
         from dharma_swarm.models import TaskPriority
         from dharma_swarm.task_board import TaskBoard
 
-        db_path = STATE_DIR / "db" / "tasks.db"
+        db_path = EVALS_DIR / "probe_tasks.db"
         db_path.parent.mkdir(parents=True, exist_ok=True)
         board = TaskBoard(db_path)
         await board.init_db()
@@ -91,11 +94,22 @@ async def eval_task_roundtrip() -> EvalResult:
         )
         retrieved = await board.get(task.id)
         ok = retrieved is not None and retrieved.title == "eval_probe_task"
+        cleanup_status = "not_attempted"
+        if ok:
+            cleanup = await board.cancel(
+                task.id,
+                metadata={"eval_probe": True, "probe_cleanup": "task_roundtrip"},
+            )
+            cleanup_status = cleanup.status.value
         return EvalResult(
             name="task_roundtrip",
             passed=ok,
             duration_seconds=time.monotonic() - t0,
-            metrics={"task_id": task.id},
+            metrics={
+                "task_id": task.id,
+                "db_path": str(db_path),
+                "cleanup_status": cleanup_status,
+            },
         )
     except Exception as e:
         return EvalResult(
@@ -236,11 +250,12 @@ def eval_test_suite_health() -> EvalResult:
     """
     t0 = time.monotonic()
     try:
+        command = _pytest_collect_command()
         result = subprocess.run(
-            [sys.executable, "-m", "pytest", "tests/", "--co", "-q"],
+            command,
             capture_output=True,
             text=True,
-            cwd=str(DHARMA_SWARM_DIR),
+            cwd=str(REPO_ROOT),
             timeout=60,
         )
         # Parse "X tests collected"
@@ -268,6 +283,8 @@ def eval_test_suite_health() -> EvalResult:
             metrics={
                 "collected": collected,
                 "returncode": result.returncode,
+                "command": command,
+                "repo_root": str(REPO_ROOT),
             },
         )
     except subprocess.TimeoutExpired:
@@ -284,6 +301,14 @@ def eval_test_suite_health() -> EvalResult:
             duration_seconds=time.monotonic() - t0,
             error=str(e),
         )
+
+
+def _pytest_collect_command() -> list[str]:
+    """Prefer the repo's locked uv environment when it is available."""
+    uv_path = shutil.which("uv")
+    if uv_path and (REPO_ROOT / "uv.lock").exists():
+        return [uv_path, "run", "pytest", "tests/", "--co", "-q"]
+    return [sys.executable, "-m", "pytest", "tests/", "--co", "-q"]
 
 
 # ---------------------------------------------------------------------------
@@ -596,11 +621,13 @@ def compute_pass_at_k(history: list[dict], k: int = 3) -> float:
 
     passed_at_least_once = 0
     for name in all_names:
-        for run in recent:
-            for r in run.get("results", []):
-                if r["name"] == name and r.get("passed"):
-                    passed_at_least_once += 1
-                    break
+        name_passed = any(
+            r["name"] == name and r.get("passed")
+            for run in recent
+            for r in run.get("results", [])
+        )
+        if name_passed:
+            passed_at_least_once += 1
 
     return passed_at_least_once / len(all_names)
 

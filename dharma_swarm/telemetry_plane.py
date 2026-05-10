@@ -19,8 +19,6 @@ from uuid import uuid4
 
 import aiosqlite
 
-from dharma_swarm.correlation_context import get_correlation
-
 DEFAULT_TELEMETRY_DB = Path.home() / ".dharma" / "state" / "runtime.db"
 
 _AGENT_IDENTITY_DDL = """
@@ -107,8 +105,7 @@ CREATE TABLE IF NOT EXISTS routing_decisions (
     requires_human INTEGER NOT NULL DEFAULT 0,
     reasons_json TEXT NOT NULL DEFAULT '[]',
     metadata_json TEXT NOT NULL DEFAULT '{}',
-    created_at TEXT NOT NULL,
-    trace_id TEXT NOT NULL DEFAULT ''
+    created_at TEXT NOT NULL
 )"""
 
 _POLICY_DECISIONS_DDL = """
@@ -125,8 +122,7 @@ CREATE TABLE IF NOT EXISTS policy_decisions (
     reason TEXT NOT NULL DEFAULT '',
     evidence_json TEXT NOT NULL DEFAULT '[]',
     metadata_json TEXT NOT NULL DEFAULT '{}',
-    created_at TEXT NOT NULL,
-    trace_id TEXT NOT NULL DEFAULT ''
+    created_at TEXT NOT NULL
 )"""
 
 _INTERVENTION_OUTCOMES_DDL = """
@@ -156,8 +152,7 @@ CREATE TABLE IF NOT EXISTS economic_events (
     counterparty TEXT NOT NULL DEFAULT '',
     summary TEXT NOT NULL DEFAULT '',
     metadata_json TEXT NOT NULL DEFAULT '{}',
-    created_at TEXT NOT NULL,
-    trace_id TEXT NOT NULL DEFAULT ''
+    created_at TEXT NOT NULL
 )"""
 
 _EXTERNAL_OUTCOMES_DDL = """
@@ -263,7 +258,6 @@ def ensure_telemetry_schema_sync(db: sqlite3.Connection) -> None:
         _INTERVENTION_OUTCOMES_DDL,
         _ECONOMIC_EVENTS_DDL,
         _EXTERNAL_OUTCOMES_DDL,
-        _OVERNIGHT_METRICS_DDL,
     ):
         db.execute(ddl)
     for idx in _INDEXES:
@@ -289,14 +283,6 @@ async def ensure_telemetry_schema_async(db: aiosqlite.Connection) -> None:
         await db.execute(ddl)
     for idx in _INDEXES:
         await db.execute(idx)
-    # Migrate: add trace_id column to critical tables in existing databases
-    for tbl in ("routing_decisions", "policy_decisions", "economic_events"):
-        try:
-            await db.execute(
-                f"ALTER TABLE {tbl} ADD COLUMN trace_id TEXT NOT NULL DEFAULT ''"
-            )
-        except Exception:
-            pass  # column already exists
     await db.commit()
 
 
@@ -939,16 +925,12 @@ class TelemetryPlaneStore:
         record: RoutingDecisionRecord,
     ) -> RoutingDecisionRecord:
         await self.init_db()
-        corr = get_correlation()
-        if corr.cell_id:
-            record.metadata.setdefault("cell_id", corr.cell_id)
         async with self._open() as db:
             await db.execute(
                 "INSERT INTO routing_decisions (decision_id, session_id, task_id,"
                 " run_id, action_name, route_path, selected_provider,"
                 " selected_model_hint, confidence, requires_human, reasons_json,"
-                " metadata_json, created_at, trace_id)"
-                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                " metadata_json, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (
                     record.decision_id,
                     record.session_id,
@@ -963,7 +945,6 @@ class TelemetryPlaneStore:
                     _json_dump(record.reasons),
                     _json_dump(record.metadata),
                     record.created_at.isoformat(),
-                    corr.trace_id,
                 ),
             )
             await db.commit()
@@ -1002,16 +983,12 @@ class TelemetryPlaneStore:
         record: PolicyDecisionRecord,
     ) -> PolicyDecisionRecord:
         await self.init_db()
-        corr = get_correlation()
-        if corr.cell_id:
-            record.metadata.setdefault("cell_id", corr.cell_id)
         async with self._open() as db:
             await db.execute(
                 "INSERT INTO policy_decisions (decision_id, session_id, task_id,"
                 " run_id, policy_name, decision, status_before, status_after,"
-                " confidence, reason, evidence_json, metadata_json, created_at,"
-                " trace_id)"
-                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                " confidence, reason, evidence_json, metadata_json, created_at)"
+                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (
                     record.decision_id,
                     record.session_id,
@@ -1026,7 +1003,6 @@ class TelemetryPlaneStore:
                     _json_dump(record.evidence),
                     _json_dump(record.metadata),
                     record.created_at.isoformat(),
-                    corr.trace_id,
                 ),
             )
             await db.commit()
@@ -1120,14 +1096,11 @@ class TelemetryPlaneStore:
         record: EconomicEventRecord,
     ) -> EconomicEventRecord:
         await self.init_db()
-        corr = get_correlation()
-        if corr.cell_id:
-            record.metadata.setdefault("cell_id", corr.cell_id)
         async with self._open() as db:
             await db.execute(
                 "INSERT INTO economic_events (event_id, session_id, task_id, run_id,"
                 " event_kind, amount, currency, counterparty, summary, metadata_json,"
-                " created_at, trace_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                " created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                 (
                     record.event_id,
                     record.session_id,
@@ -1140,7 +1113,6 @@ class TelemetryPlaneStore:
                     record.summary,
                     _json_dump(record.metadata),
                     record.created_at.isoformat(),
-                    corr.trace_id,
                 ),
             )
             await db.commit()
@@ -1228,65 +1200,6 @@ class TelemetryPlaneStore:
             db.row_factory = aiosqlite.Row
             rows = await (await db.execute(query, params)).fetchall()
         return [_row_to_external_outcome(row) for row in rows]
-
-    # ── Sync helpers ──────────────────────────────────────────────────
-
-    def init_db_sync(self) -> None:
-        if self._initialized:
-            return
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        with sqlite3.connect(self.db_path) as db:
-            db.execute("PRAGMA journal_mode=WAL")
-            db.execute("PRAGMA busy_timeout=30000")
-            ensure_telemetry_schema_sync(db)
-        self._initialized = True
-
-    def record_economic_event_sync(
-        self,
-        *,
-        event_kind: str,
-        amount: float,
-        currency: str = "USD",
-        description: str = "",
-        session_id: str = "",
-        task_id: str = "",
-        run_id: str = "",
-        metadata: dict[str, Any] | None = None,
-    ) -> EconomicEventRecord:
-        """Synchronous convenience for recording an economic event."""
-        self.init_db_sync()
-        record = EconomicEventRecord(
-            event_id=_new_id("economic"),
-            event_kind=event_kind,
-            amount=amount,
-            currency=currency,
-            summary=description,
-            session_id=session_id,
-            task_id=task_id,
-            run_id=run_id,
-            metadata=metadata or {},
-        )
-        with sqlite3.connect(self.db_path) as db:
-            db.execute(
-                "INSERT INTO economic_events (event_id, session_id, task_id, run_id,"
-                " event_kind, amount, currency, counterparty, summary, metadata_json,"
-                " created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-                (
-                    record.event_id,
-                    record.session_id,
-                    record.task_id,
-                    record.run_id,
-                    record.event_kind,
-                    float(record.amount),
-                    record.currency,
-                    record.counterparty,
-                    record.summary,
-                    _json_dump(record.metadata),
-                    record.created_at.isoformat(),
-                ),
-            )
-            db.commit()
-        return record
 
     @staticmethod
     def new_agent_id() -> str:

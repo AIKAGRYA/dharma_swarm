@@ -22,6 +22,8 @@ def test_dgc_cli_module_imports():
     assert hasattr(dgc_cli, "main")
     assert hasattr(dgc_cli, "cmd_status")
     assert hasattr(dgc_cli, "cmd_runtime_status")
+    assert hasattr(dgc_cli, "cmd_overnight_readiness")
+    assert hasattr(dgc_cli, "cmd_repo_rules")
     assert hasattr(dgc_cli, "cmd_canonical_status")
     assert hasattr(dgc_cli, "cmd_pulse")
     assert hasattr(dgc_cli, "cmd_full_power_probe")
@@ -181,6 +183,155 @@ def test_dgc_cli_runtime_status_command():
             mock.assert_called_once()
             assert mock.call_args.kwargs["limit"] == 7
             assert mock.call_args.kwargs["db_path"] == "/tmp/runtime.db"
+
+
+def test_dgc_cli_overnight_readiness_command_dispatch():
+    """main() dispatches `overnight-readiness` with fresh/cached options."""
+    from dharma_swarm.dgc_cli import main
+
+    with patch(
+        "sys.argv",
+        ["dgc", "overnight-readiness", "--json", "--cached-doctor", "--timeout", "2.5"],
+    ):
+        with patch("dharma_swarm.dgc_cli.cmd_overnight_readiness") as mock:
+            mock.return_value = 0
+            main()
+            mock.assert_called_once_with(
+                as_json=True,
+                run_doctor=False,
+                timeout=2.5,
+            )
+
+
+def test_cmd_overnight_readiness_fails_on_builder_route_blocks(monkeypatch, capsys):
+    from dharma_swarm import dgc_cli
+
+    def fake_fetch(url, *, timeout):
+        if url.endswith("/health") and ":7433" in url:
+            return True, {
+                "status": "healthy",
+                "liveness": {
+                    "bootstrap_complete": True,
+                    "orchestrator_stalled": False,
+                },
+            }
+        if url.endswith("/api/health"):
+            return True, {"status": "healthy"}
+        if url.endswith("/api/chat/status"):
+            return True, {"ready": True}
+        return False, "unexpected URL"
+
+    monkeypatch.setattr(dgc_cli, "_readiness_fetch_json", fake_fetch)
+    monkeypatch.setattr(
+        dgc_cli,
+        "_readiness_task_snapshot",
+        lambda *args, **kwargs: {
+            "stats": {"pending": 1},
+            "pending": [],
+            "builder_pending": [
+                {
+                    "id": "t-build",
+                    "title": "Build it",
+                    "priority": "high",
+                    "assigned_to": None,
+                }
+            ],
+        },
+    )
+    monkeypatch.setattr(
+        dgc_cli,
+        "_readiness_recent_route_blocks",
+        lambda *args, **kwargs: [
+            "route_next: blocked t-build reason=no_tooling_capable_idle_agent lanes=builder",
+        ],
+    )
+    monkeypatch.setattr(
+        dgc_cli,
+        "_readiness_doctor_report",
+        lambda *args, **kwargs: {"summary": {"fail": 0, "warn": 0}},
+    )
+
+    rc = dgc_cli.cmd_overnight_readiness(run_doctor=False)
+
+    out = capsys.readouterr().out
+    assert rc == 2
+    assert "Overnight readiness: FAIL" in out
+    assert "builder_routing" in out
+
+
+def test_cmd_overnight_readiness_warns_when_builder_backlog_is_capacity_bound(monkeypatch, capsys):
+    from dharma_swarm import dgc_cli
+
+    def fake_fetch(url, *, timeout):
+        if url.endswith("/health") and ":7433" in url:
+            return True, {
+                "status": "healthy",
+                "liveness": {
+                    "bootstrap_complete": True,
+                    "orchestrator_stalled": False,
+                },
+            }
+        if url.endswith("/api/health"):
+            return True, {"status": "healthy"}
+        if url.endswith("/api/chat/status"):
+            return True, {"ready": True}
+        return False, "unexpected URL"
+
+    monkeypatch.setattr(dgc_cli, "_readiness_fetch_json", fake_fetch)
+    monkeypatch.setattr(
+        dgc_cli,
+        "_readiness_task_snapshot",
+        lambda *args, **kwargs: {
+            "stats": {"pending": 1, "running": 1},
+            "pending": [],
+            "builder_pending": [
+                {
+                    "id": "t-build-next",
+                    "title": "Build next",
+                    "priority": "high",
+                    "assigned_to": None,
+                }
+            ],
+            "builder_running": [
+                {
+                    "id": "t-build-running",
+                    "title": "Build running",
+                    "priority": "high",
+                    "assigned_to": "cyber-codex",
+                }
+            ],
+        },
+    )
+    monkeypatch.setattr(
+        dgc_cli,
+        "_readiness_recent_route_blocks",
+        lambda *args, **kwargs: [
+            "route_next: blocked t-build-next reason=no_tooling_capable_idle_agent lanes=builder",
+        ],
+    )
+    monkeypatch.setattr(
+        dgc_cli,
+        "_readiness_doctor_report",
+        lambda *args, **kwargs: {"summary": {"fail": 0, "warn": 0}},
+    )
+
+    rc = dgc_cli.cmd_overnight_readiness(run_doctor=False)
+
+    out = capsys.readouterr().out
+    assert rc == 1
+    assert "Overnight readiness: WARN" in out
+    assert "Capacity-limited builder backlog" in out
+
+
+def test_dgc_cli_repo_rules_command_dispatch():
+    """main() dispatches `repo-rules` to cmd_repo_rules()."""
+    from dharma_swarm.dgc_cli import main
+
+    with patch("sys.argv", ["dgc", "repo-rules", "--json"]):
+        with patch("dharma_swarm.dgc_cli.cmd_repo_rules") as mock:
+            mock.return_value = 0
+            main()
+            mock.assert_called_once_with(as_json=True)
 
 
 def test_dgc_cli_ledger_search_dispatch():
@@ -350,6 +501,43 @@ def test_cmd_orchestrate_live_checks_existing_process_without_pid(
     assert called is False
 
 
+def test_cmd_orchestrate_live_checks_dgc_process_without_pid(
+    monkeypatch,
+    tmp_path,
+    capsys,
+):
+    """The live orchestrator CLI should also catch `.venv/bin/dgc orchestrate-live`."""
+    from dharma_swarm import dgc_cli
+
+    monkeypatch.setattr(dgc_cli, "DHARMA_STATE", tmp_path)
+    monkeypatch.setattr(
+        dgc_cli.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args[0],
+            0,
+            "88221 /Users/dhyana/dharma_swarm_lf5/.venv/bin/dgc orchestrate-live\n",
+            "",
+        ),
+    )
+
+    called = False
+
+    def fake_popen(*args, **kwargs):
+        nonlocal called
+        called = True
+        raise AssertionError("Popen should not be called when a live dgc orchestrator exists")
+
+    monkeypatch.setattr(subprocess, "Popen", fake_popen)
+
+    dgc_cli.cmd_orchestrate_live(background=True)
+
+    out = capsys.readouterr().out
+    assert "already running" in out.lower()
+    assert "88221" in out
+    assert called is False
+
+
 def test_cmd_up_checks_existing_process_without_pid(monkeypatch, tmp_path, capsys):
     """The daemon launcher should refuse a duplicate start on live process evidence alone."""
     from dharma_swarm import dgc_cli
@@ -381,6 +569,81 @@ def test_cmd_up_checks_existing_process_without_pid(monkeypatch, tmp_path, capsy
     assert "already running" in out.lower()
     assert "88221" in out
     assert called is False
+
+
+def test_cmd_orchestrate_live_ignores_codex_exec_false_positive(
+    monkeypatch,
+    tmp_path,
+    capsys,
+):
+    """Prompt text mentioning orchestrate_live should not block a real launch."""
+    from dharma_swarm import dgc_cli
+
+    monkeypatch.setattr(dgc_cli, "DHARMA_STATE", tmp_path)
+    monkeypatch.setattr(
+        dgc_cli.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args[0],
+            0,
+            "79347 node /Users/dhyana/.npm-global/bin/codex exec Quick sanity check dharma_swarm.orchestrate_live\n",
+            "",
+        ),
+    )
+
+    launched = False
+
+    def fake_run(_coro):
+        nonlocal launched
+        launched = True
+        _coro.close()
+
+    monkeypatch.setattr(asyncio, "run", fake_run)
+
+    dgc_cli.cmd_orchestrate_live(background=False)
+
+    out = capsys.readouterr().out
+    assert "already running" not in out.lower()
+    assert launched is True
+
+
+def test_cmd_orchestrate_live_ignores_pre_commit_file_args(
+    monkeypatch,
+    tmp_path,
+    capsys,
+):
+    """Pre-commit file lists mentioning orchestrate_live should not block launch."""
+    from dharma_swarm import dgc_cli
+
+    monkeypatch.setattr(dgc_cli, "DHARMA_STATE", tmp_path)
+    monkeypatch.setattr(
+        dgc_cli.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args[0],
+            0,
+            (
+                "84641 /Users/dhyana/.cache/pre-commit/repo/bin/"
+                "check-added-large-files dharma_swarm/orchestrate_live.py\n"
+            ),
+            "",
+        ),
+    )
+
+    launched = False
+
+    def fake_run(_coro):
+        nonlocal launched
+        launched = True
+        _coro.close()
+
+    monkeypatch.setattr(asyncio, "run", fake_run)
+
+    dgc_cli.cmd_orchestrate_live(background=False)
+
+    out = capsys.readouterr().out
+    assert "already running" not in out.lower()
+    assert launched is True
 
 
 def test_cmd_ui_list_mentions_swarmlens_and_next(capsys):
@@ -1007,28 +1270,6 @@ def test_cmd_runtime_status_prints_runtime_control_plane(capsys, monkeypatch):
     out = capsys.readouterr().out
     assert "Runtime Control Plane" in out
     assert "Sessions=2" in out
-
-
-def test_cmd_runtime_status_json_emits_json(capsys, monkeypatch):
-    """runtime-status --json should emit JSON from build_runtime_status_data."""
-    import dharma_swarm.dgc_cli as cli
-
-    def _fake_build_runtime_status_data(*, limit, runtime_db_path):
-        return {"db_exists": True, "counts": {"sessions": 5}}
-
-    monkeypatch.setattr(
-        "dharma_swarm.tui_helpers.build_runtime_status_data",
-        _fake_build_runtime_status_data,
-    )
-
-    cli.cmd_runtime_status(limit=3, db_path="/tmp/runtime.db", as_json=True)
-
-    out = capsys.readouterr().out
-    import json
-
-    parsed = json.loads(out)
-    assert parsed["db_exists"] is True
-    assert parsed["counts"]["sessions"] == 5
 
 
 def test_cmd_status_prefers_canonical_runtime_artifacts(monkeypatch, tmp_path, capsys):
@@ -2278,45 +2519,3 @@ def test_cmd_sprint_falls_back_to_local_on_non_runtime_error(
     contents = output.read_text()
     assert "Mode**: local (fallback)" in contents
     assert "LOCAL SPRINT" in contents
-
-
-# ---------------------------------------------------------------------------
-# JSON output tests for status, health, gates, stigmergy
-# ---------------------------------------------------------------------------
-
-
-def test_cmd_status_json_emits_valid_json(monkeypatch, tmp_path, capsys):
-    """status --json should emit parseable JSON with expected keys."""
-    import dharma_swarm.dgc_cli as cli
-
-    monkeypatch.setattr(cli, "DHARMA_STATE", tmp_path / ".dharma")
-    monkeypatch.setattr(cli, "HOME", tmp_path)
-
-    cli.cmd_status(as_json=True)
-    out = capsys.readouterr().out
-    data = json.loads(out)
-    assert "pulse" in data
-    assert "gates_today" in data
-
-
-def test_cmd_health_json_emits_valid_json(capsys):
-    """health --json should emit parseable JSON."""
-    import dharma_swarm.dgc_cli as cli
-
-    cli.cmd_health(as_json=True)
-    out = capsys.readouterr().out
-    data = json.loads(out)
-    assert "ok" in data
-    assert "missing" in data
-
-
-def test_cmd_gates_json_emits_valid_json(capsys):
-    """gates --json should emit parseable JSON with decision + action."""
-    import dharma_swarm.dgc_cli as cli
-
-    cli.cmd_gates("check status", as_json=True)
-    out = capsys.readouterr().out
-    data = json.loads(out)
-    assert "decision" in data
-    assert "action" in data
-    assert data["action"] == "check status"

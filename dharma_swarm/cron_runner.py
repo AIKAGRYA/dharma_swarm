@@ -54,11 +54,11 @@ def _as_float(value: Any, default: float) -> float:
 
 
 def _run_system_map_populator(job: dict[str, Any]) -> CronJobExecutionResult:
-    """Refresh reports/system_map/latest.json from local read-only probes."""
+    """Refresh the canonical system map from the active source worktree."""
 
     import subprocess
 
-    repo_root = Path(str(job.get("repo_root") or Path(__file__).resolve().parent.parent))
+    repo_root = Path(str(job.get("repo_root") or "/Users/dhyana/dharma_swarm"))
     script = repo_root / "scripts" / "system_map_populator.py"
     if not script.exists():
         error = f"missing script: {script}"
@@ -89,48 +89,6 @@ def _run_system_map_populator(job: dict[str, Any]) -> CronJobExecutionResult:
         output=output_text or "(no output)",
         error=err if proc.returncode != 0 else "",
     )
-
-
-def _run_tcs_heartbeat(job: dict[str, Any]) -> CronJobExecutionResult:
-    """Sample IdentityMonitor.measure() and append identity history locally."""
-
-    try:
-        from dharma_swarm.identity import IdentityMonitor
-
-        state_dir = Path(str(job.get("state_dir") or Path.home() / ".dharma"))
-        monitor = IdentityMonitor(state_dir=state_dir)
-        state = asyncio.run(
-            monitor.measure(threat_boost=bool(job.get("threat_boost", False)))
-        )
-        raw_history_path = str(job.get("history_path") or "").strip()
-        history_path = Path(raw_history_path).expanduser() if raw_history_path else None
-        monitor.save_history(history_path)
-        written_path = history_path or (state_dir / "meta" / "identity_history.jsonl")
-        output = (
-            "TCS heartbeat: "
-            f"tcs={state.tcs:.4f} regime={state.regime} "
-            f"gpr={state.gpr:.4f} bsi={state.bsi:.4f} rm={state.rm:.4f} "
-            f"history={written_path}"
-        )
-        return CronJobExecutionResult(
-            status=CronJobRunStatus.COMPLETED,
-            output=output,
-            metadata={
-                "tcs": state.tcs,
-                "gpr": state.gpr,
-                "bsi": state.bsi,
-                "rm": state.rm,
-                "regime": state.regime,
-                "history_path": str(written_path),
-            },
-        )
-    except Exception as exc:
-        error = f"TCS heartbeat failed: {exc}"
-        return CronJobExecutionResult(
-            status=CronJobRunStatus.FAILED,
-            output=error,
-            error=error,
-        )
 
 
 def _run_overnight_director(job: dict[str, Any]) -> CronJobExecutionResult:
@@ -286,6 +244,20 @@ def _result_from_legacy(
     )
 
 
+def _run_opportunity_refill(job: dict[str, Any]) -> CronJobExecutionResult:
+    """Seed staged frontier rows from the durable opportunity board."""
+    from dharma_swarm.opportunity_refill import run_once
+
+    summary = run_once(
+        top_k=_as_int(job.get("top_k"), 10),
+        min_telos_alignment=_as_float(job.get("min_telos_alignment"), 0.8),
+    )
+    return CronJobExecutionResult(
+        status=CronJobRunStatus.COMPLETED,
+        output=json.dumps(summary, indent=2, sort_keys=True),
+    )
+
+
 def _portable_model_overrides(
     provider_order: tuple[ProviderType, ...],
     requested_model: str | None,
@@ -353,6 +325,13 @@ def _run_hosted_portable_prompt(
                 provider_order=profile.provider_order,
                 working_dir=str(job.get("working_dir", "")).strip() or None,
                 timeout_seconds=timeout_seconds,
+                metadata={
+                    "execution_mode": "headless_cron",
+                    "source": "cron_runner",
+                    "task_id": str(job.get("id", "") or ""),
+                    "task_title": str(job.get("name", job.get("id", "unnamed"))),
+                    "tier": "cron",
+                },
             )
         )
     except Exception as exc:
@@ -474,148 +453,6 @@ def _run_scout_synthesis(job: dict[str, Any]) -> CronJobExecutionResult:
         )
 
 
-def _run_shakti_executive(job: dict[str, Any]) -> CronJobExecutionResult:
-    """Run the Layer C executive that refreshes the opportunity board."""
-
-    try:
-        from dharma_swarm.shakti_executive import ShaktiExecutive
-
-        top_k = int(job.get("top_k", 12))
-        min_score = float(job.get("min_score", 45.0))
-        write = bool(job.get("write", False)) and not bool(job.get("dry_run", False))
-        state_dir = job.get("state_dir") or None
-        res = ShaktiExecutive(state_dir=state_dir).run(
-            write=write,
-            top_k=top_k,
-            min_score=min_score,
-        )
-        if res.errors:
-            return CronJobExecutionResult(
-                status=CronJobRunStatus.FAILED,
-                output=f"shakti_executive errors: {list(res.errors)}",
-                error="; ".join(res.errors)[:500],
-            )
-        output = (
-            f"shakti_executive: dry_run={res.dry_run} scanned={res.scanned_signals} "
-            f"selected={res.selected_candidates} board_before={res.board_count_before} "
-            f"board_after={res.board_count_after}"
-        )
-        return CronJobExecutionResult(
-            status=CronJobRunStatus.COMPLETED,
-            output=output,
-        )
-    except Exception as e:  # noqa: BLE001
-        return CronJobExecutionResult(
-            status=CronJobRunStatus.FAILED,
-            output=str(e),
-            error=str(e),
-        )
-
-
-def _run_frontier_dispatcher(job: dict[str, Any]) -> CronJobExecutionResult:
-    """Run a single dispatcher tick from opportunity board into task board."""
-
-    try:
-        from dharma_swarm.opportunity_dispatcher import main as dispatcher_main
-
-        argv: list[str] = []
-        if job.get("dry_run"):
-            argv.append("--dry-run")
-        max_promotions = job.get("max_promotions")
-        if max_promotions is not None:
-            argv.extend(["--max", str(int(max_promotions))])
-        rc = dispatcher_main(argv)
-        return CronJobExecutionResult(
-            status=CronJobRunStatus.COMPLETED if rc == 0 else CronJobRunStatus.FAILED,
-            output=f"opportunity_dispatcher exit_code={rc}",
-        )
-    except Exception as e:  # noqa: BLE001
-        return CronJobExecutionResult(
-            status=CronJobRunStatus.FAILED,
-            output=str(e),
-            error=str(e),
-        )
-
-
-def _run_frontier_refill(job: dict[str, Any]) -> CronJobExecutionResult:
-    """Run a single refill cycle for top pending opportunities."""
-
-    try:
-        from dharma_swarm.opportunity_refill import refill_frontier_tasks_pending
-
-        top_k = int(job.get("top_k", 3))
-        min_telos = float(job.get("min_telos_alignment", 0.5))
-        dry_run = bool(job.get("dry_run", False))
-        res = refill_frontier_tasks_pending(
-            top_k=top_k,
-            min_telos_alignment=min_telos,
-            dry_run=dry_run,
-        )
-        if res.error:
-            return CronJobExecutionResult(
-                status=CronJobRunStatus.FAILED,
-                output=f"frontier_refill error: {res.error}",
-                error=res.error,
-            )
-        output = (
-            f"frontier_refill: paused={res.paused} board={res.board_count} "
-            f"addressed={res.addressed_count} appended_rows={res.appended_rows} "
-            f"appended_ids={res.appended_opportunity_ids}"
-        )
-        return CronJobExecutionResult(
-            status=CronJobRunStatus.COMPLETED,
-            output=output,
-        )
-    except Exception as e:  # noqa: BLE001
-        return CronJobExecutionResult(
-            status=CronJobRunStatus.FAILED,
-            output=str(e),
-            error=str(e),
-        )
-
-
-def _run_operator_brief(job: dict[str, Any]) -> CronJobExecutionResult:
-    """Cron handler for the ontology-native Operator Brief seam (v0).
-
-    Default-disabled via ``DHARMA_OPERATOR_BRIEF_ENABLED``. When the
-    flag is off, the handler reports ``WAITING_EXTERNAL`` (meaning:
-    "ran but did nothing, awaiting flag flip") and performs no source
-    mutation. See ``docs/plans/ONTOLOGY_NATIVE_OPERATOR_BRIEF_MASTER_SPEC.md``.
-    """
-    try:
-        from dharma_swarm.operator_brief.insight_brief import cron_run
-        result = cron_run(job)
-        status = result.get("status", "unknown")
-        outcome = result.get("outcome", "")
-        if status == "disabled":
-            return CronJobExecutionResult(
-                status=CronJobRunStatus.WAITING_EXTERNAL,
-                output=f"operator_brief disabled: {result.get('reason', '')}",
-                metadata=result,
-            )
-        if outcome == "success":
-            return CronJobExecutionResult(
-                status=CronJobRunStatus.COMPLETED,
-                output=(
-                    f"operator_brief artifact={result.get('artifact_id')} "
-                    f"witnesses={len(result.get('witness_log_ids', []))}"
-                ),
-                metadata=result,
-            )
-        return CronJobExecutionResult(
-            status=CronJobRunStatus.FAILED,
-            output=f"operator_brief outcome={outcome}",
-            error=outcome,
-            metadata=result,
-        )
-    except Exception as e:
-        return CronJobExecutionResult(
-            status=CronJobRunStatus.FAILED,
-            output=str(e),
-            error=str(e),
-        )
-
-
 def execute_cron_job(job: dict[str, Any]) -> CronJobExecutionResult:
     """Dispatch a cron job to the configured runner with structured status.
 
@@ -626,11 +463,8 @@ def execute_cron_job(job: dict[str, Any]) -> CronJobExecutionResult:
         foreman          — foreman quality forge cycle
         custodians       — custodian maintenance fleet (no quality re-scan)
         custodians_forge — custodian fleet + foreman quality re-scan
-        shakti_executive — Layer C opportunity board refresh
-        frontier_dispatcher — promote opportunity rows into tasks
-        frontier_refill — bootstrap top opportunities into frontier queue
+        opportunity_refill — seed staged frontier rows from opportunity board
         system_map_populator — local system map refresh
-        tcs_heartbeat   — local IdentityMonitor time-series sample
     """
     handler = str(job.get("handler", "headless_prompt")).strip() or "headless_prompt"
 
@@ -653,23 +487,15 @@ def execute_cron_job(job: dict[str, Any]) -> CronJobExecutionResult:
     if handler == "custodians_forge":
         from dharma_swarm.foreman import custodians_forge_fn
         return _result_from_legacy(*custodians_forge_fn(job))
+    if handler == "opportunity_refill":
+        return _run_opportunity_refill(job)
+    if handler == "system_map_populator":
+        return _run_system_map_populator(job)
 
     if handler == "scout_sweep":
         return _run_scout_sweep(job)
     if handler == "scout_synthesis":
         return _run_scout_synthesis(job)
-    if handler == "shakti_executive":
-        return _run_shakti_executive(job)
-    if handler == "frontier_dispatcher":
-        return _run_frontier_dispatcher(job)
-    if handler == "frontier_refill":
-        return _run_frontier_refill(job)
-    if handler == "operator_brief":
-        return _run_operator_brief(job)
-    if handler == "system_map_populator":
-        return _run_system_map_populator(job)
-    if handler == "tcs_heartbeat":
-        return _run_tcs_heartbeat(job)
 
     error = f"Unsupported cron handler: {handler}"
     return CronJobExecutionResult(

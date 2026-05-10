@@ -324,6 +324,13 @@ def is_retryable_exception(exc: Exception) -> bool:
         "auth",
         "unauthorized",
         "forbidden",
+        "credit balance",
+        "requires more credits",
+        "payment required",
+        "not found for account",
+        "model_not_found",
+        "model not found",
+        "nvidia nim error 404",
         "not implemented",
     )
     return not any(term in lowered for term in non_retry_terms)

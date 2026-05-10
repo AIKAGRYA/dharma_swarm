@@ -22,7 +22,6 @@ from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any, Callable, Optional
 
 from dharma_swarm.amiros import AMIROSRegistry
@@ -112,7 +111,7 @@ class Organism:
     """The legacy organism integration layer."""
 
     def __init__(self, state_dir: Path | None = None) -> None:
-        self._state_dir = state_dir or (dharma_state_dir())
+        self._state_dir = state_dir or (Path.home() / ".dharma")
         self._cycle = 0
         self._running = False
         self._pulses: list[OrganismPulse] = []
@@ -163,7 +162,8 @@ class Organism:
         try:
             from dharma_swarm.sleep_time_agent import SleepTimeAgent
 
-            self.sleep_time_agent = SleepTimeAgent(tick_interval=5)
+            interval = int(os.getenv("DGC_SLEEP_TIME_TICK_INTERVAL", "12") or "12")
+            self.sleep_time_agent = SleepTimeAgent(tick_interval=max(3, interval))
         except Exception:
             self.sleep_time_agent = None
             logger.debug("SleepTimeAgent init failed (non-fatal)")
@@ -1045,7 +1045,7 @@ class OrganismRuntime:
         on_algedonic: Optional[Callable[[AlgedonicSignal], None]] = None,
         on_gnani: Optional[Callable[[GnaniVerdict], None]] = None,
     ) -> None:
-        self._state_dir = state_dir or (dharma_state_dir())
+        self._state_dir = state_dir or (Path.home() / ".dharma")
         self._identity = IdentityMonitor(self._state_dir)
         self._live_sensor = LiveCoherenceSensor(self._state_dir)
         self._samvara = SamvaraEngine(self._state_dir)

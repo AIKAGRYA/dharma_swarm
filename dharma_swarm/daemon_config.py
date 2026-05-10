@@ -8,22 +8,12 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
-
-
-def dharma_state_dir(*env_vars: str) -> Path:
-    """Return the canonical local Dharma state directory."""
-    for env_var in env_vars:
-        raw = os.getenv(env_var)
-        if raw is not None:
-            return Path(raw)
-    return Path.home() / ".dharma"
 
 
 @dataclass
@@ -77,7 +67,7 @@ class DaemonConfig:
     heartbeat_interval: float = 21600.0  # 6 hours in seconds
     max_daily_contributions: int = 40
     min_between_contributions: float = 1800.0  # 30 minutes
-    quiet_hours: list[int] = field(default_factory=list)  # No quiet hours — swarm runs 24/7
+    quiet_hours: list[int] = field(default_factory=list)
 
     # LLM defaults
     model: str = "anthropic/claude-sonnet-4"
@@ -192,7 +182,7 @@ Quality bar: Every contribution must connect to prior work, propose sources, sta
 
 
 # ---------------------------------------------------------------------------
-# Adaptive quiet hours — learn from actual activity patterns
+# Adaptive active hours — retained for observability, not enforcement
 # ---------------------------------------------------------------------------
 
 _ACTIVITY_WINDOW_DAYS = 14
@@ -200,18 +190,14 @@ _QUIET_HOUR_ACTIVITY_THRESHOLD = 3  # >= 3 active events in an hour → not quie
 
 
 class AdaptiveQuietHours:
-    """Learn which hours the user is actually active and avoid interrupting them.
+    """Learn which hours the user is actually active.
 
     Records pulse activity timestamps in a rolling 14-day window.  Derives
     adaptive quiet hours by finding hours that are consistently active
     (above threshold) and treating *those* as protected work time.
 
-    The logic is inverted from naive quiet-hours: instead of silencing the
-    daemon during low-activity hours, we silence it during hours that show
-    *high user activity*, because that's when interruption is most costly.
-
-    Default static quiet hours ([2, 3, 4, 5]) remain as a floor — they are
-    always included, regardless of observed patterns.
+    This is now an observability aid rather than a runtime throttle.
+    The swarm no longer blocks or defers work based on hour-of-day.
 
     Args:
         state_dir: Path to ``~/.dharma/`` or equivalent state directory.
@@ -227,7 +213,7 @@ class AdaptiveQuietHours:
         activity_threshold: int = _QUIET_HOUR_ACTIVITY_THRESHOLD,
         static_floor: list[int] | None = None,
     ) -> None:
-        self.state_dir = state_dir or dharma_state_dir()
+        self.state_dir = state_dir or Path.home() / ".dharma"
         self.window_days = max(1, int(window_days))
         self.activity_threshold = max(1, int(activity_threshold))
         self.static_floor: frozenset[int] = frozenset(

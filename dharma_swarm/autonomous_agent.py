@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import Any
 
 from dharma_swarm.agent_memory import AgentMemoryBank
-from dharma_swarm.models import LLMResponse, Message, MessagePriority, ProviderType
+from dharma_swarm.models import Message, MessagePriority
 from dharma_swarm.runtime_provider import (
     create_runtime_provider,
     preferred_runtime_provider_configs,
@@ -246,6 +246,183 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
             },
         },
     },
+    # ── World action tools (external manifestation layer) ─────────────────────
+    {
+        "name": "github_clone_repo",
+        "description": (
+            "Clone a GitHub repository into the local workspace. "
+            "Use to pull in open-source projects, competitor code, or external libraries. "
+            "Example: clone chauncygu/collection-claude-code-source-code to analyze its architecture."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "repo_url": {"type": "string", "description": "Full git/https URL of repo to clone"},
+                "dest_dir": {"type": "string", "description": "Absolute destination path"},
+            },
+            "required": ["repo_url", "dest_dir"],
+        },
+    },
+    {
+        "name": "github_commit_push",
+        "description": (
+            "Stage all changes, commit with a message, and push to origin. "
+            "Use to publish evolved code, research outputs, or world-artifact changes "
+            "from any local git repo (not just dharma_swarm itself)."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "repo_dir": {"type": "string", "description": "Absolute path of git repo directory"},
+                "commit_message": {"type": "string", "description": "Git commit message"},
+                "branch": {"type": "string", "description": "Branch name (creates if needed)"},
+            },
+            "required": ["repo_dir", "commit_message"],
+        },
+    },
+    {
+        "name": "github_create_issue",
+        "description": (
+            "Open a GitHub issue in any repo (requires gh CLI auth). "
+            "Use to contribute findings back to upstream projects, "
+            "report discovered bugs, or create tracked work items externally."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "repo": {"type": "string", "description": "OWNER/REPO format e.g. 'chauncygu/collection-claude-code-source-code'"},
+                "title": {"type": "string", "description": "Issue title"},
+                "body": {"type": "string", "description": "Issue body in markdown"},
+            },
+            "required": ["repo", "title", "body"],
+        },
+    },
+    {
+        "name": "github_create_pr",
+        "description": (
+            "Create a pull request from a branch in a local git repo. "
+            "Use after committing evolved changes to propose them upstream "
+            "or formalize a world-artifact for review."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "repo_dir": {"type": "string", "description": "Absolute path of git repo"},
+                "title": {"type": "string", "description": "PR title"},
+                "body": {"type": "string", "description": "PR description in markdown"},
+                "base": {"type": "string", "description": "Target branch (default: main)", "default": "main"},
+                "head": {"type": "string", "description": "Source branch (default: current)"},
+            },
+            "required": ["repo_dir", "title", "body"],
+        },
+    },
+    {
+        "name": "create_website_scaffold",
+        "description": (
+            "Generate a minimal public-facing website skeleton from swarm cognition. "
+            "Creates index.html + styles.css in the given directory. "
+            "Use to externalize research reports, mission outputs, or system capabilities "
+            "into a form that can be deployed or shared outside the swarm."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "output_dir": {"type": "string", "description": "Directory to write site files"},
+                "site_name": {"type": "string", "description": "Site title"},
+                "purpose": {"type": "string", "description": "One-paragraph description of what this site is for"},
+                "theme": {"type": "string", "description": "Visual theme hint: minimal, dark, research", "default": "minimal"},
+            },
+            "required": ["output_dir", "site_name", "purpose"],
+        },
+    },
+    {
+        "name": "publish_markdown_artifact",
+        "description": (
+            "Promote an internal markdown file to a public-artifact directory "
+            "with a manifest record. Use to formalize completed research, evolved specs, "
+            "or strategic documents into externalized artifacts that other systems can discover."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "source_path": {"type": "string", "description": "Absolute path of source .md file"},
+                "output_dir": {"type": "string", "description": "Artifact output directory"},
+                "artifact_name": {"type": "string", "description": "Output filename (optional, defaults to source name)"},
+            },
+            "required": ["source_path", "output_dir"],
+        },
+    },
+    {
+        "name": "query_archaeology",
+        "description": (
+            "Query the swarm's institutional archaeology memory. "
+            "Ask what the system has tried before, what worked, what failed, "
+            "what research has already been completed, or what the current "
+            "strategic constraints are. This prevents duplicating work and "
+            "allows agents to build on prior accomplishments. "
+            "Examples: 'What fixes have been tried for provider timeouts?', "
+            "'What research on Sakana AI has already been done?', "
+            "'What are the highest-fitness evolution entries for agent_runner.py?'"
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "question": {"type": "string", "description": "Natural language question about the swarm's history"},
+                "top_k": {"type": "integer", "description": "Max results to return (default: 5)", "default": 5},
+            },
+            "required": ["question"],
+        },
+    },
+    {
+        "name": "run_dgm_evolution",
+        "description": (
+            "Trigger a real Darwin Gödel Machine evolution cycle. "
+            "Samples a parent from the archive using quality-diversity selection "
+            "(open-ended, not hill-climbing — mirrors Sakana AI DGM architecture), "
+            "proposes a modification to the specified source file, applies it in a "
+            "sandbox, benchmarks against the swarm's fitness function, and archives "
+            "the result with full lineage. "
+            "Every proposed diff passes through the 11 Telos Gates before application. "
+            "Use when: you have identified a specific performance problem in a module "
+            "and want to evolve a fix autonomously. "
+            "Example: run_dgm_evolution with source_file='agent_runner.py', "
+            "fitness_context='provider timeouts causing 30% task failure rate'."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "source_file": {"type": "string", "description": "Python file to evolve (e.g. 'agent_runner.py'). None = auto-select from archive."},
+                "fitness_context": {"type": "string", "description": "What operational problem to solve (e.g. 'provider timeouts cause 30% failure rate')"},
+                "n_generations": {"type": "integer", "description": "How many generations to run (1=quick, 80=full DGM). Default: 1.", "default": 1},
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "spawn_sub_swarm_spec",
+        "description": (
+            "Materialize a new sub-swarm mission spec file on disk. "
+            "The spec is a machine-readable JSON that the swarm can ingest to "
+            "boot a focused sub-swarm on a new mission. "
+            "Use when research reveals a domain large enough to warrant its own swarm "
+            "(e.g. 'Spin up a welfare-ton MRV sub-swarm', "
+            "'Spawn a Sakana-style evolutionary architecture sub-swarm')."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "output_dir": {"type": "string", "description": "Directory to write spec (e.g. ~/.dharma/sub_swarms/)"},
+                "mission_name": {"type": "string", "description": "Name of the sub-swarm mission"},
+                "mission_thesis": {"type": "string", "description": "One-paragraph thesis for the sub-swarm"},
+                "roles": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Agent roles to instantiate (cartographer, architect, surgeon, validator)",
+                },
+            },
+            "required": ["output_dir", "mission_name", "mission_thesis"],
+        },
+    },
 ]
 
 
@@ -290,60 +467,13 @@ class AgentIdentity:
         "read_file", "write_file", "bash", "search_files", "search_content",
         "remember", "recall", "stigmergy_mark", "stigmergy_read", "web_search", "fetch_url",
         "ginko_signals", "ginko_regime",
+        # world action tools — external manifestation layer
+        "github_clone_repo", "github_commit_push", "github_create_issue",
+        "github_create_pr", "create_website_scaffold",
+        "publish_markdown_artifact", "spawn_sub_swarm_spec",
+            "query_archaeology", "run_dgm_evolution",
     ])
     working_directory: str = field(default_factory=lambda: str(Path.home()))
-
-
-def _providers_registered_on_router(
-    router: Any,
-    candidate_order: list[ProviderType],
-) -> list[ProviderType]:
-    """Keep cheap-first order; drop types the router did not instantiate."""
-    out: list[ProviderType] = []
-    for provider in candidate_order:
-        try:
-            router.get_provider(provider)
-        except KeyError:
-            continue
-        out.append(provider)
-    return out
-
-
-def _llm_response_to_react_shape(response: LLMResponse) -> dict[str, Any]:
-    """Normalize an LLMResponse into the dict _reason_and_act expects."""
-    text_parts = [response.content] if response.content else []
-    tool_uses: list[dict[str, Any]] = []
-    for tc in response.tool_calls or []:
-        parsed_input = tc.get("input")
-        if parsed_input is None and "arguments" in tc:
-            try:
-                parsed_input = json.loads(tc["arguments"])
-            except Exception:
-                parsed_input = tc.get("arguments")
-        tool_uses.append({
-            "id": tc.get("id"),
-            "name": tc.get("name"),
-            "input": parsed_input,
-        })
-    raw_content: list[dict[str, Any]] = []
-    if response.content:
-        raw_content.append({"type": "text", "text": response.content})
-    for tu in tool_uses:
-        raw_content.append({
-            "type": "tool_use",
-            "id": tu["id"],
-            "name": tu["name"],
-            "input": tu["input"],
-        })
-    usage = response.usage or {}
-    return {
-        "text": text_parts,
-        "tool_uses": tool_uses,
-        "raw_content": raw_content or (response.content or ""),
-        "stop_reason": response.stop_reason,
-        "tokens_in": int(usage.get("prompt_tokens", usage.get("input_tokens", 0)) or 0),
-        "tokens_out": int(usage.get("completion_tokens", usage.get("output_tokens", 0)) or 0),
-    }
 
 
 # ---------------------------------------------------------------------------
@@ -360,16 +490,6 @@ class AutonomousAgent:
     - Persistence: remembers across sessions via AgentMemoryBank
     - Communication: messages other agents, reads/writes stigmergy marks
 
-    When ``model_router`` is set, the ``openrouter`` lane uses
-    ``ModelRouter.complete_for_task`` for providers the router actually
-    registers (routing memory, breakers, telemetry). The ``codex`` lane
-    always calls ``create_runtime_provider`` with
-    ``working_dir=identity.working_directory`` because shared routers from
-    ``create_default_router()`` are not built per-agent cwd — routing Codex
-    through them would regress CLI working directory. Without an injected
-    router, ``openrouter`` uses the cheap-first runtime chain as before.
-    ``anthropic`` still uses the Anthropic SDK directly.
-
     Usage::
 
         agent = AutonomousAgent(AgentIdentity(
@@ -383,10 +503,9 @@ class AutonomousAgent:
         # Agent recalls from persistent memory
     """
 
-    def __init__(self, identity: AgentIdentity, *, model_router: Any | None = None) -> None:
+    def __init__(self, identity: AgentIdentity) -> None:
         self.identity = identity
         self.memory = AgentMemoryBank(identity.name)
-        self._model_router = model_router
         self._anthropic_client: Any = None
         self._openai_client: Any = None
         self._message_bus: Any = None
@@ -524,61 +643,6 @@ class AutonomousAgent:
             return await self._call_codex(system, messages, tools)
         raise ValueError(f"Unsupported provider: {self.identity.provider}")
 
-    def _build_autonomous_route_request(
-        self,
-        *,
-        has_tools: bool,
-        available_provider_types: list[ProviderType],
-    ) -> Any:
-        from dharma_swarm.provider_policy import ProviderRouteRequest
-
-        uncertainty = 0.42 if has_tools else 0.22
-        risk = 0.32 if has_tools else 0.14
-        ctx: dict[str, Any] = {
-            "language_code": "en",
-            "complexity_tier": "HIGH" if has_tools else "MEDIUM",
-            "context_tier": "LONG",
-            "requires_tooling": has_tools,
-            "session_id": f"autonomous:{self.identity.name}",
-            "agent_name": self.identity.name,
-            "agent_role": self.identity.role,
-            "preferred_model": self.identity.model,
-            "task_brief": "autonomous_react_loop",
-            "preserve_requested_model": len(available_provider_types) == 1,
-            "available_provider_types": [p.value for p in available_provider_types],
-        }
-        return ProviderRouteRequest(
-            action_name="autonomous_react",
-            risk_score=min(1.0, risk),
-            uncertainty=min(1.0, uncertainty),
-            novelty=0.15,
-            urgency=0.35,
-            expected_impact=0.38,
-            estimated_latency_ms=2400 if has_tools else 1000,
-            estimated_tokens=1600 if has_tools else 900,
-            preferred_low_cost=True,
-            requires_frontier_precision=False,
-            privileged_action=False,
-            requires_human_consent=False,
-            context=ctx,
-        )
-
-    @staticmethod
-    def _openapi_tools_payload(tools: list[dict]) -> list[dict[str, Any]] | None:
-        if not tools:
-            return None
-        return [
-            {
-                "type": "function",
-                "function": {
-                    "name": t["name"],
-                    "description": t["description"],
-                    "parameters": t["input_schema"],
-                },
-            }
-            for t in tools
-        ]
-
     async def _call_anthropic(
         self, system: str, messages: list[dict], tools: list[dict],
     ) -> dict[str, Any]:
@@ -619,8 +683,11 @@ class AutonomousAgent:
     async def _call_openrouter(
         self, system: str, messages: list[dict], tools: list[dict],
     ) -> dict[str, Any]:
-        from dharma_swarm.models import LLMRequest
+        from dharma_swarm.models import LLMRequest, ProviderType
 
+        # Prefer Ollama and NVIDIA NIM before any OpenRouter lane to avoid
+        # unnecessary paid routing. OpenRouter model hint only applies to the
+        # OpenRouter providers; local/NIM lanes use their configured defaults.
         configs = preferred_runtime_provider_configs(
             model_overrides={
                 ProviderType.OPENROUTER_FREE: self.identity.model,
@@ -632,53 +699,88 @@ class AutonomousAgent:
                 "No preferred providers available; configure Ollama, NVIDIA NIM, or OpenRouter"
             )
 
-        routed_order = (
-            _providers_registered_on_router(
-                self._model_router, [c.provider for c in configs]
-            )
-            if self._model_router is not None
-            else []
-        )
-        if self._model_router is not None and routed_order:
-            payload = AutonomousAgent._openapi_tools_payload(tools)
-            lm_args: dict[str, Any] = {
-                "model": self.identity.model,
-                "system": system,
-                "messages": messages,
-                "max_tokens": 4096,
-                "temperature": 0.0,
-            }
-            if payload is not None:
-                lm_args["tools"] = payload
-            llm_req = LLMRequest(**lm_args)
-            route_req = self._build_autonomous_route_request(
-                has_tools=bool(payload),
-                available_provider_types=routed_order,
-            )
-            _, response = await self._model_router.complete_for_task(
-                route_req,
-                llm_req,
-                available_provider_types=routed_order,
-            )
-            return _llm_response_to_react_shape(response)
-
         last_exc: Exception | None = None
         for config in configs:
             provider = create_runtime_provider(config)
             try:
-                payload = AutonomousAgent._openapi_tools_payload(tools)
-                request_kwargs = {
+                normalized_messages = self._to_openai_messages(messages)
+                request_kwargs: dict[str, Any] = {
                     "model": config.default_model or self.identity.model,
                     "system": system,
-                    "messages": messages,
+                    "messages": normalized_messages,
                     "max_tokens": 4096,
                     "temperature": 0.0,
+                    "metadata": {
+                        "execution_mode": "autonomous_agent",
+                        "source": "autonomous_agent",
+                        "agent_name": self.identity.name,
+                        "agent_role": self.identity.role,
+                    },
                 }
-                if payload is not None:
-                    request_kwargs["tools"] = payload
-                response = await provider.complete(LLMRequest(**request_kwargs))
+                if tools:
+                    request_kwargs["tools"] = [
+                        {
+                            "type": "function",
+                            "function": {
+                                "name": t["name"],
+                                "description": t["description"],
+                                "parameters": t["input_schema"],
+                            },
+                        }
+                        for t in tools
+                    ]
 
-                return _llm_response_to_react_shape(response)
+                response = await provider.complete(
+                    LLMRequest(**request_kwargs)
+                )
+
+                text_parts = [response.content] if response.content else []
+                tool_uses: list[dict[str, Any]] = []
+                for tc in response.tool_calls or []:
+                    parsed_input = None
+                    if isinstance(tc, dict):
+                        parsed_input = tc.get("parameters")
+                        if parsed_input is None:
+                            parsed_input = tc.get("input")
+                        if parsed_input is None and "arguments" in tc:
+                            parsed_input = tc.get("arguments")
+                        if parsed_input is None and isinstance(tc.get("function"), dict):
+                            parsed_input = tc["function"].get("arguments")
+                    else:
+                        parsed_input = getattr(tc, "parameters", None)
+                        if parsed_input is None:
+                            parsed_input = getattr(tc, "input", None)
+                        if parsed_input is None:
+                            parsed_input = getattr(tc, "arguments", None)
+                    tool_name = tc.get("name") if isinstance(tc, dict) else getattr(tc, "name", None)
+                    if not tool_name and isinstance(tc, dict) and isinstance(tc.get("function"), dict):
+                        tool_name = tc["function"].get("name")
+                    tool_uses.append({
+                        "id": tc.get("id") if isinstance(tc, dict) else getattr(tc, "id", None),
+                        "name": tool_name,
+                        "input": self._normalize_tool_inputs(parsed_input),
+                    })
+
+                raw_content: list[dict[str, Any]] = []
+                if response.content:
+                    raw_content.append({"type": "text", "text": response.content})
+                for tu in tool_uses:
+                    raw_content.append({
+                        "type": "tool_use",
+                        "id": tu["id"],
+                        "name": tu["name"],
+                        "input": tu["input"],
+                    })
+
+                usage = response.usage or {}
+                return {
+                    "text": text_parts,
+                    "tool_uses": tool_uses,
+                    "raw_content": raw_content or (response.content or ""),
+                    "stop_reason": response.stop_reason,
+                    "tokens_in": int(usage.get("prompt_tokens", usage.get("input_tokens", 0)) or 0),
+                    "tokens_out": int(usage.get("completion_tokens", usage.get("output_tokens", 0)) or 0),
+                }
             except Exception as exc:
                 last_exc = exc
                 logger.warning(
@@ -701,7 +803,7 @@ class AutonomousAgent:
     ) -> dict[str, Any]:
         del tools
 
-        from dharma_swarm.models import LLMRequest
+        from dharma_swarm.models import LLMRequest, ProviderType
 
         configs = preferred_runtime_provider_configs(
             provider_order=(ProviderType.CODEX,),
@@ -722,9 +824,27 @@ class AutonomousAgent:
                         messages=messages,
                         max_tokens=4096,
                         temperature=0.0,
+                        metadata={
+                            "execution_mode": "autonomous_agent_codex",
+                            "source": "autonomous_agent",
+                            "agent_name": self.identity.name,
+                            "agent_role": self.identity.role,
+                        },
                     )
                 )
-                return _llm_response_to_react_shape(response)
+                usage = response.usage or {}
+                return {
+                    "text": [response.content] if response.content else [],
+                    "tool_uses": [],
+                    "raw_content": response.content or "",
+                    "stop_reason": response.stop_reason,
+                    "tokens_in": int(
+                        usage.get("prompt_tokens", usage.get("input_tokens", 0)) or 0
+                    ),
+                    "tokens_out": int(
+                        usage.get("completion_tokens", usage.get("output_tokens", 0)) or 0
+                    ),
+                }
             except Exception as exc:
                 last_exc = exc
                 logger.warning(
@@ -792,17 +912,66 @@ class AutonomousAgent:
                                     "arguments": json.dumps(block["input"]),
                                 },
                             })
-                result: dict[str, Any] = {"role": "assistant", "content": text or None}
+                result: dict[str, Any] = {"role": "assistant", "content": text or ""}
                 if tool_calls:
                     result["tool_calls"] = tool_calls
                 return result
 
         return {"role": role, "content": str(content)}
 
+    @classmethod
+    def _to_openai_messages(cls, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Convert internal Anthropic-style transcript into OpenAI-compatible messages."""
+        converted: list[dict[str, Any]] = []
+        for msg in messages:
+            content = msg.get("content")
+            if (
+                isinstance(content, list)
+                and content
+                and all(
+                    isinstance(block, dict) and block.get("type") == "tool_result"
+                    for block in content
+                )
+            ):
+                for block in content:
+                    converted.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": block["tool_use_id"],
+                            "content": str(block.get("content", "")),
+                        }
+                    )
+                continue
+            converted.append(cls._to_openai_message(msg))
+        return converted
+
     # -- Tool execution ------------------------------------------------------
+
+    @staticmethod
+    def _normalize_tool_inputs(raw_inputs: Any) -> dict[str, Any]:
+        """Coerce provider/tool-call payloads into a dict for tool handlers."""
+        if raw_inputs is None:
+            return {}
+        if isinstance(raw_inputs, dict):
+            return raw_inputs
+        if hasattr(raw_inputs, "model_dump"):
+            dumped = raw_inputs.model_dump()
+            if isinstance(dumped, dict):
+                return dumped
+            return {"raw": dumped}
+        if isinstance(raw_inputs, str):
+            try:
+                parsed = json.loads(raw_inputs)
+            except Exception:
+                return {"raw": raw_inputs}
+            if isinstance(parsed, dict):
+                return parsed
+            return {"raw": parsed}
+        return {"raw": raw_inputs}
 
     async def _execute_tool(self, name: str, inputs: dict) -> str:
         """Execute a tool call. Returns result string."""
+        inputs = self._normalize_tool_inputs(inputs)
         if name not in self.identity.allowed_tools:
             return f"Error: tool '{name}' not allowed for agent '{self.identity.name}'"
 
@@ -834,6 +1003,17 @@ class AutonomousAgent:
             "fetch_url": self._tool_fetch_url,
             "ginko_signals": self._tool_ginko_signals,
             "ginko_regime": self._tool_ginko_regime,
+            # archaeology + DGM tools
+            "query_archaeology": self._tool_query_archaeology,
+            "run_dgm_evolution": self._tool_run_dgm_evolution,
+            # world action tools
+            "github_clone_repo": self._tool_github_clone_repo,
+            "github_commit_push": self._tool_github_commit_push,
+            "github_create_issue": self._tool_github_create_issue,
+            "github_create_pr": self._tool_github_create_pr,
+            "create_website_scaffold": self._tool_create_website_scaffold,
+            "publish_markdown_artifact": self._tool_publish_markdown_artifact,
+            "spawn_sub_swarm_spec": self._tool_spawn_sub_swarm_spec,
         }.get(name)
 
         if handler is None:
@@ -1066,6 +1246,144 @@ class AutonomousAgent:
         except Exception as e:
             return f"Ginko regime error: {e}"
 
+    # -- Archaeology + DGM tool handlers -------------------------------------
+
+    async def _tool_query_archaeology(self, inputs: dict) -> str:
+        from dharma_swarm.archaeology_ingestion import query_archaeology
+        question = inputs.get("question", "")
+        top_k = int(inputs.get("top_k", 5))
+        if not question:
+            return "No question provided to query_archaeology"
+        try:
+            hits = await query_archaeology(question=question, top_k=top_k)
+            if not hits:
+                return "No archaeology results found for that question."
+            lines = [f"[{i+1}] ({h.source}) {h.content[:300]}" for i, h in enumerate(hits)]
+            return "\n\n".join(lines)
+        except Exception as exc:
+            return f"query_archaeology error: {exc}"
+
+    async def _tool_run_dgm_evolution(self, inputs: dict) -> str:
+        import json as _json
+        from dharma_swarm.dgm_loop import run_dgm_evolution_task
+        source_file = inputs.get("source_file") or None
+        fitness_context = inputs.get("fitness_context", "")
+        n_generations = int(inputs.get("n_generations", 1))
+        try:
+            result = await run_dgm_evolution_task(
+                source_file=source_file,
+                fitness_context=fitness_context,
+                n_generations=n_generations,
+            )
+            return _json.dumps(result, indent=2, default=str)
+        except Exception as exc:
+            return f"run_dgm_evolution error: {exc}"
+
+    # -- World action tool handlers ------------------------------------------
+    # These give agents the ability to manifest world artifacts:
+    # repos, websites, PRs, sub-swarm specs.
+
+    async def _tool_github_clone_repo(self, inputs: dict) -> str:
+        import asyncio
+        from dharma_swarm.world_actions import github_clone_repo
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            None,
+            lambda: github_clone_repo(
+                inputs.get("repo_url", ""),
+                inputs.get("dest_dir", ""),
+            )
+        )
+        return result.to_json()
+
+    async def _tool_github_commit_push(self, inputs: dict) -> str:
+        import asyncio
+        from dharma_swarm.world_actions import github_commit_push
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            None,
+            lambda: github_commit_push(
+                inputs.get("repo_dir", ""),
+                inputs.get("commit_message", "swarm: world action commit"),
+                inputs.get("branch"),
+            )
+        )
+        return result.to_json()
+
+    async def _tool_github_create_issue(self, inputs: dict) -> str:
+        import asyncio
+        from dharma_swarm.world_actions import github_create_issue
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            None,
+            lambda: github_create_issue(
+                inputs.get("repo", ""),
+                inputs.get("title", ""),
+                inputs.get("body", ""),
+            )
+        )
+        return result.to_json()
+
+    async def _tool_github_create_pr(self, inputs: dict) -> str:
+        import asyncio
+        from dharma_swarm.world_actions import github_create_pr
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            None,
+            lambda: github_create_pr(
+                inputs.get("repo_dir", ""),
+                inputs.get("title", ""),
+                inputs.get("body", ""),
+                inputs.get("base", "main"),
+                inputs.get("head"),
+            )
+        )
+        return result.to_json()
+
+    async def _tool_create_website_scaffold(self, inputs: dict) -> str:
+        import asyncio
+        from dharma_swarm.world_actions import create_website_scaffold
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            None,
+            lambda: create_website_scaffold(
+                inputs.get("output_dir", ""),
+                inputs.get("site_name", "DHARMA SWARM"),
+                inputs.get("purpose", ""),
+                inputs.get("theme", "minimal"),
+            )
+        )
+        return result.to_json()
+
+    async def _tool_publish_markdown_artifact(self, inputs: dict) -> str:
+        import asyncio
+        from dharma_swarm.world_actions import publish_markdown_artifact
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            None,
+            lambda: publish_markdown_artifact(
+                inputs.get("source_path", ""),
+                inputs.get("output_dir", ""),
+                inputs.get("artifact_name"),
+            )
+        )
+        return result.to_json()
+
+    async def _tool_spawn_sub_swarm_spec(self, inputs: dict) -> str:
+        import asyncio
+        from dharma_swarm.world_actions import spawn_sub_swarm_spec
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            None,
+            lambda: spawn_sub_swarm_spec(
+                inputs.get("output_dir", str(Path.home() / ".dharma" / "sub_swarms")),
+                inputs.get("mission_name", ""),
+                inputs.get("mission_thesis", ""),
+                inputs.get("roles"),
+            )
+        )
+        return result.to_json()
+
     # -- System prompt -------------------------------------------------------
 
     def _build_system_prompt(self, memory_context: str, inbox: list[str]) -> str:
@@ -1160,13 +1478,12 @@ class AgentOrchestrator:
     The orchestrator decides who wakes up when and with what task.
     """
 
-    def __init__(self, *, model_router: Any | None = None) -> None:
+    def __init__(self) -> None:
         self.agents: dict[str, AutonomousAgent] = {}
         self._run_log: list[dict[str, Any]] = []
-        self._model_router = model_router
 
     def register(self, identity: AgentIdentity) -> AutonomousAgent:
-        agent = AutonomousAgent(identity, model_router=self._model_router)
+        agent = AutonomousAgent(identity)
         self.agents[identity.name] = agent
         return agent
 
@@ -1236,6 +1553,10 @@ PRESET_AGENTS: dict[str, AgentIdentity] = {
             "read_file", "write_file", "bash", "search_files", "search_content",
             "remember", "recall", "stigmergy_mark", "stigmergy_read", "web_search", "fetch_url",
             "ginko_signals", "ginko_regime",
+            "github_clone_repo", "github_commit_push", "github_create_issue",
+            "github_create_pr", "create_website_scaffold",
+            "publish_markdown_artifact", "spawn_sub_swarm_spec",
+            "query_archaeology", "run_dgm_evolution",
         ],
         working_directory=str(Path.home() / "dharma_swarm"),
     ),
@@ -1252,6 +1573,10 @@ PRESET_AGENTS: dict[str, AgentIdentity] = {
             "read_file", "write_file", "bash", "search_files", "search_content",
             "remember", "recall", "stigmergy_mark", "stigmergy_read", "web_search", "fetch_url",
             "ginko_signals", "ginko_regime",
+            "github_clone_repo", "github_commit_push", "github_create_issue",
+            "github_create_pr", "create_website_scaffold",
+            "publish_markdown_artifact", "spawn_sub_swarm_spec",
+            "query_archaeology", "run_dgm_evolution",
         ],
         working_directory=str(Path.home() / "jagat_kalyan"),
     ),
@@ -1298,14 +1623,7 @@ PRESET_AGENTS: dict[str, AgentIdentity] = {
 
 
 async def cli_wake(agent_name: str, task: str, model: str | None = None) -> None:
-    """CLI entry point: wake an agent with a task.
-
-    Accepted legacy behavior: constructs ``AutonomousAgent`` **without**
-    ``model_router``, so completions use direct runtime / SDK paths only (no
-    shared routing memory). Use ``PersistentAgent`` / conductors or pass
-    ``model_router=create_default_router()`` here if CLI should join the
-    router substrate.
-    """
+    """CLI entry point: wake an agent with a task."""
     if agent_name in PRESET_AGENTS:
         identity = PRESET_AGENTS[agent_name]
     else:

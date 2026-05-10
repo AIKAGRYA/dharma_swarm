@@ -27,7 +27,6 @@ import time
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 from dharma_swarm.models import LLMRequest, ProviderType
@@ -38,7 +37,7 @@ from dharma_swarm.runtime_provider import (
 
 logger = logging.getLogger(__name__)
 
-GINKO_DIR = dharma_state_dir("DHARMA_HOME") / "ginko"
+GINKO_DIR = Path(os.getenv("DHARMA_HOME", Path.home() / ".dharma")) / "ginko"
 AGENTS_DIR = GINKO_DIR / "agents"
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
@@ -550,8 +549,8 @@ async def _call_openrouter(
         No exceptions — errors are returned in the content field with
         tokens=0 for graceful downstream handling.
     """
-    from dharma_swarm.api_keys import get_llm_key
-    api_key = get_llm_key("openrouter") or ""
+    from dharma_swarm.api_keys import env_value, provider_api_key_env
+    api_key = env_value(provider_api_key_env("openrouter") or "") or ""
     if not api_key:
         return {
             "content": "ERROR: No LLM API key configured (need OPENROUTER_API_KEY or similar)",

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 from unittest.mock import AsyncMock
@@ -250,6 +251,39 @@ class TestContextAgent:
         data = json.loads(freshness_path.read_text())
         assert "health" in data
         assert "freshness" in data
+
+    @pytest.mark.asyncio
+    async def test_run_context_agent_loop_waits_for_boot_delay(self) -> None:
+        """The daemon loop should not run a cycle before the configured boot delay."""
+        import dharma_swarm.context_agent as mod
+
+        run_cycle = AsyncMock()
+
+        class _FakeAgent:
+            _cycle_count = 0
+
+            async def run_cycle(self) -> None:
+                await run_cycle()
+
+        monkeypatch = pytest.MonkeyPatch()
+        monkeypatch.setattr(mod, "ContextAgent", lambda signal_bus=None: _FakeAgent())
+        monkeypatch.setattr(mod, "_context_agent_boot_delay_seconds", lambda: 60.0)
+
+        shutdown_event = asyncio.Event()
+
+        async def _stop_soon() -> None:
+            await asyncio.sleep(0.01)
+            shutdown_event.set()
+
+        try:
+            await asyncio.gather(
+                mod.run_context_agent_loop(shutdown_event),
+                _stop_soon(),
+            )
+        finally:
+            monkeypatch.undo()
+
+        run_cycle.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_run_cycle_writes_packages(self, tmp_dharma: Path) -> None:

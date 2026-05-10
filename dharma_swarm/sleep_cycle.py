@@ -19,7 +19,6 @@ import logging
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -71,7 +70,7 @@ class SleepReport(BaseModel):
 # Sleep cycle
 # ---------------------------------------------------------------------------
 
-_REPORTS_DIR = dharma_state_dir() / "sleep_reports"
+_REPORTS_DIR = Path.home() / ".dharma" / "sleep_reports"
 
 
 class SleepCycle:
@@ -89,7 +88,7 @@ class SleepCycle:
         reports_dir: Path | None = None,
     ) -> None:
         self._memory_dir = agent_memory_dir or (
-            dharma_state_dir() / "agent_memory"
+            Path.home() / ".dharma" / "agent_memory"
         )
         self._stigmergy = stigmergy_store
         self._subconscious = subconscious_stream
@@ -297,7 +296,15 @@ class SleepCycle:
         from dharma_swarm.semantic_memory_bridge import run_semantic_sleep_phase
 
         state_root = self._memory_dir.parent
-        project_root = Path(__file__).resolve().parent.parent
+        project_root = state_root
+        default_project_root = Path(__file__).resolve().parent.parent
+        if not (project_root / "dharma_swarm").is_dir():
+            if state_root == Path.home() / ".dharma" and (
+                default_project_root / "dharma_swarm"
+            ).is_dir():
+                project_root = default_project_root
+            else:
+                return {"phase": "semantic", "skipped": True, "reason": "no_project_root"}
         try:
             result = await run_semantic_sleep_phase(
                 project_root=project_root,
@@ -334,7 +341,11 @@ class SleepCycle:
         try:
             from dharma_swarm.bridge_coordinator import BridgeCoordinator
 
-            coordinator = BridgeCoordinator(state_dir=self._memory_dir.parent)
+            state_root = self._memory_dir.parent
+            if not (state_root / "semantic" / "concept_graph.json").exists():
+                return {"bridges_discovered": 0, "errors": [], "skipped": True}
+
+            coordinator = BridgeCoordinator(state_dir=state_root)
             discovery = await coordinator.discover_all()
             result["bridges_discovered"] = discovery.discovered
             result["duration_seconds"] = discovery.duration_seconds
@@ -399,7 +410,7 @@ class SleepCycle:
         # Update bootstrap manifest so next instance is oriented
         manifest_path = ""
         state_root = self._memory_dir.parent
-        default_state_root = dharma_state_dir()
+        default_state_root = Path.home() / ".dharma"
         if state_root == default_state_root:
             try:
                 from dharma_swarm.bootstrap import NOW_PATH, generate_manifest

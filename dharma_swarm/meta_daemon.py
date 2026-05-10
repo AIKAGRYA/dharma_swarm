@@ -16,16 +16,16 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from datetime import datetime, timezone
 from pathlib import Path
-from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 from dharma_swarm.models import _utc_now
 
 logger = logging.getLogger(__name__)
 
-STATE_DIR = dharma_state_dir()
+STATE_DIR = Path.home() / ".dharma"
 META_DIR = STATE_DIR / "meta"
 HISTORY_DIR = META_DIR / "history"
 
@@ -92,6 +92,18 @@ class RecognitionEngine:
     ) -> dict[str, dict[str, Any]]:
         """Read signal sources. Graceful fallback for unavailable sources."""
         signals: dict[str, dict[str, Any]] = {}
+
+        # Fix 4: take a fresh R_V measurement before reading system_rv.json.
+        # Prior behavior left the file absent -> rv=1.0 (unknown) forever.
+        # Rollback: DHARMA_R_V_MEASURE=0 reverts to stale-read-only.
+        if os.getenv("DHARMA_R_V_MEASURE", "1") != "0":
+            try:
+                from dharma_swarm.system_rv import SystemRV
+                rv_engine = SystemRV(state_dir=self._state_dir)
+                await rv_engine.init()
+                await rv_engine.measure()
+            except Exception:
+                logger.warning("R_V measurement failed", exc_info=True)
 
         # 1. System R_V
         signals["system_rv"] = self._read_json(
@@ -202,7 +214,7 @@ class RecognitionEngine:
         witness_dir = self._state_dir / "witness"
         if witness_dir.exists():
             try:
-                result["witness_logs"] = len(list(witness_dir.glob("*.json")))
+                result["witness_logs"] = len(list(witness_dir.glob("*.jsonl")))
             except Exception:
                 logger.debug("Witness log count failed", exc_info=True)
 

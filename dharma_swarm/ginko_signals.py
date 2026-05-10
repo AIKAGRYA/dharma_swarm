@@ -19,12 +19,11 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
-GINKO_DIR = dharma_state_dir("DHARMA_HOME") / "ginko"
+GINKO_DIR = Path(os.getenv("DHARMA_HOME", Path.home() / ".dharma")) / "ginko"
 SIGNALS_DIR = GINKO_DIR / "signals"
 
 

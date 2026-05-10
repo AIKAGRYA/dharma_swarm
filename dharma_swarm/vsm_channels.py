@@ -28,7 +28,6 @@ import random
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any, Callable, Awaitable, Protocol
 
 from pydantic import BaseModel, Field
@@ -148,7 +147,7 @@ class GatePatternAggregator:
     """
 
     def __init__(self, state_dir: Path | None = None) -> None:
-        self._state_dir = state_dir or (dharma_state_dir())
+        self._state_dir = state_dir or (Path.home() / ".dharma")
         self._log_path = self._state_dir / "meta" / "gate_patterns.jsonl"
         self._gate_stats: dict[str, dict[str, int]] = {}
         self._recent_failures: list[dict[str, Any]] = []
@@ -271,7 +270,7 @@ class SporadicAuditor:
         state_dir: Path | None = None,
     ) -> None:
         self._probability = audit_probability
-        self._state_dir = state_dir or (dharma_state_dir())
+        self._state_dir = state_dir or (Path.home() / ".dharma")
         self._log_path = self._state_dir / "meta" / "sporadic_audits.jsonl"
         self._results: list[AuditResult] = []
 
@@ -392,7 +391,7 @@ class AlgedonicChannel:
     COST_SPIKE_MULTIPLIER = 5.0
 
     def __init__(self, state_dir: Path | None = None) -> None:
-        self._state_dir = state_dir or (dharma_state_dir())
+        self._state_dir = state_dir or (Path.home() / ".dharma")
         self._log_path = self._state_dir / "meta" / "algedonic.jsonl"
         self._active_path = self._state_dir / "meta" / "ALGEDONIC_ACTIVE.md"
         self._signals: list[AlgedonicSignal] = []
@@ -651,7 +650,7 @@ class VarietyExpansionProtocol:
     """
 
     def __init__(self, state_dir: Path | None = None) -> None:
-        self._state_dir = state_dir or (dharma_state_dir())
+        self._state_dir = state_dir or (Path.home() / ".dharma")
         self._proposals_path = self._state_dir / "meta" / "gate_proposals.jsonl"
         self._proposals: list[GateExpansionProposal] = []
 
@@ -740,7 +739,7 @@ class VSMCoordinator:
     """
 
     def __init__(self, state_dir: Path | None = None) -> None:
-        self._state_dir = state_dir or (dharma_state_dir())
+        self._state_dir = state_dir or (Path.home() / ".dharma")
 
         # Initialize all subsystems
         self.algedonic = AlgedonicChannel(self._state_dir)

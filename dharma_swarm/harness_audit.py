@@ -15,12 +15,11 @@ import time
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
 from pathlib import Path
-from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
-STATE_DIR = dharma_state_dir()
+STATE_DIR = Path.home() / ".dharma"
 AUDITS_DIR = STATE_DIR / "audits"
 AUDIT_HISTORY = AUDITS_DIR / "history.jsonl"
 DHARMA_SWARM_DIR = Path.home() / "dharma_swarm"

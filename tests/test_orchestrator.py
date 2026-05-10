@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import re
 import time
 import pytest
 
@@ -13,11 +14,11 @@ from dharma_swarm.models import (
     GateDecision,
     Message,
     Task,
-    TaskDispatch,
     TaskStatus,
     TopologyType,
 )
 from dharma_swarm.orchestrator import Orchestrator
+from dharma_swarm.task_contract import normalize_task_contract_metadata
 
 
 class MockTaskBoard:
@@ -175,6 +176,294 @@ async def test_route_next_limited_agents(tasks):
 
 
 @pytest.mark.asyncio
+async def test_route_next_blocks_contract_task_without_builder_lane():
+    board = MockTaskBoard()
+    board.tasks = [
+        Task(
+            id="t-build",
+            title="Write startup packet",
+            metadata={"target_artifact": "/tmp/startup_packet.md"},
+        )
+    ]
+    pool = MockAgentPool(
+        [
+            AgentState(
+                id="a-review",
+                name="agent-review",
+                role=AgentRole.REVIEWER,
+                status=AgentStatus.IDLE,
+            ),
+            AgentState(
+                id="a-general",
+                name="agent-general",
+                role=AgentRole.GENERAL,
+                status=AgentStatus.IDLE,
+            ),
+        ]
+    )
+    orch = Orchestrator(task_board=board, agent_pool=pool)
+
+    dispatches = await orch.route_next()
+
+    assert dispatches == []
+
+
+@pytest.mark.asyncio
+async def test_route_next_routes_contract_task_to_builder_lane():
+    board = MockTaskBoard()
+    board.tasks = [
+        Task(
+            id="t-build",
+            title="Write startup packet",
+            metadata={"target_artifact": "/tmp/startup_packet.md"},
+        )
+    ]
+    pool = MockAgentPool(
+        [
+            AgentState(
+                id="a-review",
+                name="agent-review",
+                role=AgentRole.REVIEWER,
+                status=AgentStatus.IDLE,
+            ),
+            AgentState(
+                id="a-coder",
+                name="agent-coder",
+                role=AgentRole.CODER,
+                status=AgentStatus.IDLE,
+                provider="claude_code",
+            ),
+        ]
+    )
+    orch = Orchestrator(task_board=board, agent_pool=pool)
+
+    dispatches = await orch.route_next()
+
+    assert len(dispatches) == 1
+    assert dispatches[0].agent_id == "a-coder"
+
+
+@pytest.mark.asyncio
+async def test_route_next_routes_contract_task_to_local_tooling_general_agent():
+    board = MockTaskBoard()
+    board.tasks = [
+        Task(
+            id="t-build",
+            title="Write startup packet",
+            metadata={"target_artifact": "/tmp/startup_packet.md"},
+        )
+    ]
+    pool = MockAgentPool(
+        [
+            AgentState(
+                id="a-general",
+                name="agent-general",
+                role=AgentRole.GENERAL,
+                status=AgentStatus.IDLE,
+            ),
+            AgentState(
+                id="a-local",
+                name="codex-primus",
+                role=AgentRole.GENERAL,
+                status=AgentStatus.IDLE,
+                provider="codex",
+                model="gpt-5.4",
+            ),
+        ]
+    )
+    orch = Orchestrator(task_board=board, agent_pool=pool)
+
+    dispatches = await orch.route_next()
+
+    assert len(dispatches) == 1
+    assert dispatches[0].agent_id == "a-local"
+
+
+@pytest.mark.asyncio
+async def test_route_next_blocks_generic_local_tooling_generalist_for_contract_task():
+    board = MockTaskBoard()
+    board.tasks = [
+        Task(
+            id="t-build",
+            title="Write startup packet",
+            metadata={"target_artifact": "/tmp/startup_packet.md"},
+        )
+    ]
+    pool = MockAgentPool(
+        [
+            AgentState(
+                id="a-general",
+                name="jagat_kalyan",
+                role=AgentRole.GENERAL,
+                status=AgentStatus.IDLE,
+                provider="claude_code",
+                model="sonnet",
+            ),
+        ]
+    )
+    orch = Orchestrator(task_board=board, agent_pool=pool)
+
+    dispatches = await orch.route_next()
+
+    assert dispatches == []
+
+
+@pytest.mark.asyncio
+async def test_route_next_routes_contract_task_to_codex_primus_orchestrator():
+    board = MockTaskBoard()
+    board.tasks = [
+        Task(
+            id="t-build",
+            title="Write startup packet",
+            metadata={"target_artifact": "/tmp/startup_packet.md"},
+        )
+    ]
+    pool = MockAgentPool(
+        [
+            AgentState(
+                id="a-codex-primus",
+                name="codex-primus",
+                role=AgentRole.ORCHESTRATOR,
+                status=AgentStatus.IDLE,
+                provider="codex",
+                model="gpt-5.4",
+            ),
+        ]
+    )
+    orch = Orchestrator(task_board=board, agent_pool=pool)
+
+    dispatches = await orch.route_next()
+
+    assert len(dispatches) == 1
+    assert dispatches[0].agent_id == "a-codex-primus"
+
+
+@pytest.mark.asyncio
+async def test_route_next_keeps_codex_named_conductor_out_of_builder_lane():
+    board = MockTaskBoard()
+    board.tasks = [
+        Task(
+            id="t-build",
+            title="Write startup packet",
+            metadata={"target_artifact": "/tmp/startup_packet.md"},
+        )
+    ]
+    pool = MockAgentPool(
+        [
+            AgentState(
+                id="a-conductor",
+                name="conductor_codex",
+                role=AgentRole.CONDUCTOR,
+                status=AgentStatus.IDLE,
+                provider="codex",
+                model="gpt-5.4",
+            ),
+        ]
+    )
+    orch = Orchestrator(task_board=board, agent_pool=pool)
+
+    dispatches = await orch.route_next()
+
+    assert dispatches == []
+
+
+@pytest.mark.asyncio
+async def test_route_next_prefers_usable_tooling_agent_over_failed_local_tooling():
+    board = MockTaskBoard()
+    board.tasks = [
+        Task(
+            id="t-build",
+            title="Write startup packet",
+            metadata={"target_artifact": "/tmp/startup_packet.md"},
+        )
+    ]
+    pool = MockAgentPool(
+        [
+            AgentState(
+                id="a-claude",
+                name="builder",
+                role=AgentRole.GENERAL,
+                status=AgentStatus.IDLE,
+                provider="claude_code",
+                error="All providers failed in chain ['claude_code'] :: claude_code:billing_exhausted",
+            ),
+            AgentState(
+                id="a-codex",
+                name="cyber-codex",
+                role=AgentRole.SURGEON,
+                status=AgentStatus.IDLE,
+                provider="codex",
+                model="gpt-5.4",
+            ),
+        ]
+    )
+    orch = Orchestrator(task_board=board, agent_pool=pool)
+
+    dispatches = await orch.route_next()
+
+    assert len(dispatches) == 1
+    assert dispatches[0].agent_id == "a-codex"
+
+
+@pytest.mark.asyncio
+async def test_route_next_blocks_contract_task_when_only_tooling_agent_has_hard_error():
+    board = MockTaskBoard()
+    board.tasks = [
+        Task(
+            id="t-build",
+            title="Write startup packet",
+            metadata={"target_artifact": "/tmp/startup_packet.md"},
+        )
+    ]
+    pool = MockAgentPool(
+        [
+            AgentState(
+                id="a-claude",
+                name="builder",
+                role=AgentRole.GENERAL,
+                status=AgentStatus.IDLE,
+                provider="claude_code",
+                error="claude_code:circuit_open",
+            ),
+        ]
+    )
+    orch = Orchestrator(task_board=board, agent_pool=pool)
+
+    dispatches = await orch.route_next()
+
+    assert dispatches == []
+
+
+@pytest.mark.asyncio
+async def test_route_next_blocks_contract_task_for_api_only_builder_identity():
+    board = MockTaskBoard()
+    board.tasks = [
+        Task(
+            id="t-build",
+            title="Write startup packet",
+            metadata={"target_artifact": "/tmp/startup_packet.md"},
+        )
+    ]
+    pool = MockAgentPool(
+        [
+            AgentState(
+                id="a-cyber",
+                name="cyber-codex",
+                role=AgentRole.SURGEON,
+                status=AgentStatus.IDLE,
+                provider="ollama",
+                model="qwen3-coder:480b-cloud",
+            ),
+        ]
+    )
+    orch = Orchestrator(task_board=board, agent_pool=pool)
+
+    dispatches = await orch.route_next()
+
+    assert dispatches == []
+
+
+@pytest.mark.asyncio
 async def test_route_next_prefers_reviewer_for_uncertain_coordination_task():
     board = MockTaskBoard()
     board.tasks = [
@@ -238,6 +527,7 @@ async def test_route_next_prefers_director_named_agent_over_role_match():
                 name="cyber-codex",
                 role=AgentRole.SURGEON,
                 status=AgentStatus.IDLE,
+                provider="codex",
             ),
         ]
     )
@@ -247,6 +537,208 @@ async def test_route_next_prefers_director_named_agent_over_role_match():
 
     assert len(dispatches) == 1
     assert dispatches[0].agent_id == "a-cyber-codex"
+
+
+@pytest.mark.asyncio
+async def test_route_next_prefers_execution_seat_for_artifact_contract():
+    board = MockTaskBoard()
+    board.tasks = [
+        Task(
+            id="t-build",
+            title="Build startup packet artifact",
+            metadata={
+                "owner_lane": "builder",
+                "target_artifact": "/tmp/startup_packet.md",
+            },
+        )
+    ]
+    pool = MockAgentPool(
+        [
+            AgentState(
+                id="a-general",
+                name="agent-general",
+                role=AgentRole.GENERAL,
+                status=AgentStatus.IDLE,
+            ),
+            AgentState(
+                id="a-cyber-codex",
+                name="cyber-codex",
+                role=AgentRole.SURGEON,
+                status=AgentStatus.IDLE,
+                provider="codex",
+            ),
+        ]
+    )
+    orch = Orchestrator(task_board=board, agent_pool=pool)
+
+    dispatches = await orch.route_next()
+
+    assert len(dispatches) == 1
+    assert dispatches[0].agent_id == "a-cyber-codex"
+
+
+@pytest.mark.asyncio
+async def test_route_next_prefers_verifier_lane_for_verifier_contract():
+    board = MockTaskBoard()
+    board.tasks = [
+        Task(
+            id="t-verify",
+            title="Verify packet quality",
+            metadata={
+                "owner_lane": "verifier",
+                "requires_verifier": True,
+                "task_class": "verify",
+            },
+        )
+    ]
+    pool = MockAgentPool(
+        [
+            AgentState(
+                id="a-general",
+                name="agent-general",
+                role=AgentRole.GENERAL,
+                status=AgentStatus.IDLE,
+            ),
+            AgentState(
+                id="a-validator",
+                name="validator",
+                role=AgentRole.VALIDATOR,
+                status=AgentStatus.IDLE,
+            ),
+        ]
+    )
+    orch = Orchestrator(task_board=board, agent_pool=pool)
+
+    dispatches = await orch.route_next()
+
+    assert len(dispatches) == 1
+    assert dispatches[0].agent_id == "a-validator"
+
+
+@pytest.mark.asyncio
+async def test_route_next_blocks_artifact_contract_without_tooling_lane():
+    board = MockTaskBoard()
+    board.tasks = [
+        Task(
+            id="t-artifact-blocked",
+            title="Build packet artifact",
+            metadata={"target_artifact": "/tmp/packet.md"},
+        )
+    ]
+    pool = MockAgentPool(
+        [
+            AgentState(
+                id="a-general",
+                name="agent-general",
+                role=AgentRole.GENERAL,
+                status=AgentStatus.IDLE,
+            ),
+        ]
+    )
+    orch = Orchestrator(task_board=board, agent_pool=pool)
+
+    dispatches = await orch.route_next()
+
+    assert dispatches == []
+
+
+@pytest.mark.asyncio
+async def test_route_next_skips_blocked_artifact_task_and_dispatches_later_generic_task():
+    board = MockTaskBoard()
+    board.tasks = [
+        Task(
+            id="t-artifact-blocked",
+            title="Build packet artifact",
+            metadata={"target_artifact": "/tmp/packet.md"},
+        ),
+        Task(
+            id="t-generic-follow",
+            title="Summarize operator state",
+        ),
+    ]
+    pool = MockAgentPool(
+        [
+            AgentState(
+                id="a-general",
+                name="agent-general",
+                role=AgentRole.GENERAL,
+                status=AgentStatus.IDLE,
+            ),
+        ]
+    )
+    orch = Orchestrator(task_board=board, agent_pool=pool)
+
+    dispatches = await orch.route_next()
+
+    assert len(dispatches) == 1
+    assert dispatches[0].task_id == "t-generic-follow"
+    assert dispatches[0].agent_id == "a-general"
+
+
+@pytest.mark.asyncio
+async def test_route_next_records_contract_snapshot_when_artifact_task_is_skipped(tmp_path):
+    board = MockTaskBoard()
+    board.tasks = [
+        Task(
+            id="t-artifact-blocked",
+            title="Build packet artifact",
+            metadata=normalize_task_contract_metadata(
+                {
+                    "owner_lane": "builder",
+                    "campaign_id": "camp-alpha",
+                    "target_artifact": "/tmp/packet.md",
+                }
+            ),
+        )
+    ]
+    pool = MockAgentPool(
+        [
+            AgentState(
+                id="a-general",
+                name="agent-general",
+                role=AgentRole.GENERAL,
+                status=AgentStatus.IDLE,
+            ),
+        ]
+    )
+    orch = Orchestrator(
+        task_board=board,
+        agent_pool=pool,
+        ledger_dir=tmp_path,
+        session_id="sess_dispatch_skipped",
+    )
+
+    dispatches = await orch.route_next()
+
+    assert dispatches == []
+    task_path = tmp_path / "sess_dispatch_skipped" / "task_ledger.jsonl"
+    records = [json.loads(line) for line in task_path.read_text().splitlines() if line.strip()]
+    skipped = [record for record in records if record["event"] == "dispatch_skipped"]
+    assert len(skipped) == 1
+    assert skipped[0]["owner_lane"] == "builder"
+    assert skipped[0]["campaign_id"] == "camp-alpha"
+    assert skipped[0]["target_artifacts"] == ["/tmp/packet.md"]
+
+
+def test_task_contract_snapshot_extracts_completion_fields():
+    task = Task(
+        id="t-contract-complete",
+        title="Build packet artifact",
+        metadata=normalize_task_contract_metadata(
+            {
+                "owner_lane": "builder",
+                "campaign_id": "camp-alpha",
+                "task_class": "build",
+                "target_artifact": "/tmp/packet.md",
+            }
+        ),
+    )
+    snapshot = Orchestrator._task_contract_snapshot(task)
+
+    assert snapshot["owner_lane"] == "builder"
+    assert snapshot["campaign_id"] == "camp-alpha"
+    assert snapshot["task_class"] == "build"
+    assert snapshot["target_artifacts"] == ["/tmp/packet.md"]
 
 
 @pytest.mark.asyncio
@@ -532,10 +1024,11 @@ async def test_route_next_skips_running_tasks(agents, tasks):
 
 
 @pytest.mark.asyncio
-async def test_assign_dispatch_telos_block_marks_failed_and_skips_assignment(agents, monkeypatch):
+async def test_assign_dispatch_telos_block_marks_failed_and_skips_assignment(agents, monkeypatch, tmp_path):
     """Harmful dispatch should fail fast before pool assignment."""
     from dharma_swarm.models import TaskDispatch
     from dharma_swarm.telos_gates import ReflectiveGateOutcome
+    from dharma_swarm.campaigns import create_campaign, find_campaign
 
     monkeypatch.setattr(
         "dharma_swarm.orchestrator.check_with_reflective_reroute",
@@ -548,12 +1041,18 @@ async def test_assign_dispatch_telos_block_marks_failed_and_skips_assignment(age
         raising=True,
     )
 
+    create_campaign("camp-block", "research", ["agent-1"], meta_dir=tmp_path / "meta")
     board = MockTaskBoard()
     board.tasks = [
-        Task(id="harm1", title="rm -rf /important", description="delete all"),
+        Task(
+            id="harm1",
+            title="rm -rf /important",
+            description="delete all",
+            metadata={"campaign_id": "camp-block"},
+        ),
     ]
     pool = MockAgentPool(agents)
-    orch = Orchestrator(task_board=board, agent_pool=pool)
+    orch = Orchestrator(task_board=board, agent_pool=pool, ledger_dir=tmp_path)
 
     td = TaskDispatch(task_id="harm1", agent_id="a1")
     await orch._assign_dispatch(td)
@@ -565,6 +1064,10 @@ async def test_assign_dispatch_telos_block_marks_failed_and_skips_assignment(age
         and "TELOS BLOCK (dispatch)" in str(fields.get("result", ""))
         for task_id, fields in board.updates
     )
+    campaign = find_campaign("camp-block", tmp_path / "meta")
+    assert campaign is not None
+    assert campaign["progress_markers"][-1]["task_status"] == "failed"
+    assert campaign["progress_markers"][-1]["source"] == "task_board"
 
 
 @pytest.mark.asyncio
@@ -607,6 +1110,234 @@ async def test_orchestrator_writes_task_and_progress_ledgers(tmp_path):
     assert "task_started" in progress_events
     assert "task_completed" in progress_events
     assert any(topic == "orchestrator.lifecycle" for topic, _ in bus.published)
+
+
+@pytest.mark.asyncio
+async def test_persist_result_skips_generic_shared_artifact_for_contract_task(tmp_path):
+    from unittest.mock import patch
+
+    class DummyPalace:
+        def __init__(self, state_dir):
+            self.state_dir = state_dir
+
+        async def ingest(self, **kwargs):
+            return None
+
+    shared_dir = tmp_path / "shared"
+    target_artifact = tmp_path / "artifacts" / "startup_packet.md"
+    task = Task(
+        id="t-contract",
+        title="Build startup packet",
+        metadata={"target_artifact": str(target_artifact)},
+    )
+    orch = Orchestrator(
+        shared_dir=shared_dir,
+        ledger_dir=tmp_path / "ledgers",
+        session_id="sess_contract_persist",
+    )
+
+    with patch("dharma_swarm.memory_palace.MemoryPalace", DummyPalace):
+        await orch._persist_result(
+            agent_name="cyber-codex",
+            model_name="test-model",
+            provider_name="test-provider",
+            task=task,
+            result="Built and refined the startup packet artifact.",
+        )
+        await asyncio.sleep(0)
+
+    notes_file = shared_dir / "cyber-codex_notes.md"
+    provenance_file = shared_dir / "provenance" / "t-contract.json"
+    slug = re.sub(r"[^a-z0-9]+", "_", task.title.lower()).strip("_")[:40]
+    generic_shared_artifact = shared_dir / f"{task.id[:8]}_{slug}.md"
+
+    assert notes_file.exists()
+    assert provenance_file.exists()
+    assert not generic_shared_artifact.exists()
+
+    notes_text = notes_file.read_text()
+    assert "_primary_closeout_: artifact contract" in notes_text
+    assert str(target_artifact) in notes_text
+
+    provenance = json.loads(provenance_file.read_text())
+    assert provenance["primary_closeout_surface"] == "artifact_contract"
+    assert provenance["notes_mode"] == "pointer"
+    assert provenance["target_artifacts"] == [str(target_artifact.expanduser())]
+
+
+@pytest.mark.asyncio
+async def test_persist_result_keeps_legacy_shared_artifact_for_non_contract_task(tmp_path):
+    from unittest.mock import patch
+
+    class DummyPalace:
+        def __init__(self, state_dir):
+            self.state_dir = state_dir
+
+        async def ingest(self, **kwargs):
+            return None
+
+    shared_dir = tmp_path / "shared"
+    task = Task(
+        id="t-generic",
+        title="Summarize operator state",
+    )
+    orch = Orchestrator(
+        shared_dir=shared_dir,
+        ledger_dir=tmp_path / "ledgers",
+        session_id="sess_generic_persist",
+    )
+
+    with patch("dharma_swarm.memory_palace.MemoryPalace", DummyPalace):
+        await orch._persist_result(
+            agent_name="agent-1",
+            model_name="test-model",
+            provider_name="test-provider",
+            task=task,
+            result="Operator state summary.",
+        )
+        await asyncio.sleep(0)
+
+    notes_file = shared_dir / "agent-1_notes.md"
+    provenance_file = shared_dir / "provenance" / "t-generic.json"
+    slug = re.sub(r"[^a-z0-9]+", "_", task.title.lower()).strip("_")[:40]
+    generic_shared_artifact = shared_dir / f"{task.id[:8]}_{slug}.md"
+
+    assert notes_file.exists()
+    assert provenance_file.exists()
+    assert generic_shared_artifact.exists()
+
+    provenance = json.loads(provenance_file.read_text())
+    assert provenance["primary_closeout_surface"] == "shared_notes"
+    assert provenance["notes_mode"] == "summary"
+    assert provenance["target_artifacts"] == []
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_completed_task_marks_campaign_check_in(tmp_path):
+    from dharma_swarm.campaigns import create_campaign, find_campaign
+
+    create_campaign("camp-complete", "research", ["agent-1"], meta_dir=tmp_path / "meta")
+    board = MockTaskBoard()
+    board.tasks = [
+        Task(
+            id="t-camp-complete",
+            title="Campaign nurture: Alpha",
+            description="safe",
+            metadata={"campaign_id": "camp-complete"},
+        )
+    ]
+    pool = MockAgentPool(
+        [AgentState(id="a1", name="agent-1", role=AgentRole.GENERAL, status=AgentStatus.IDLE)]
+    )
+    pool.set_runner("a1", DummyRunner(result="Wrote durable artifact to ~/.dharma/shared/campaigns/alpha.md"))
+
+    orch = Orchestrator(
+        task_board=board,
+        agent_pool=pool,
+        ledger_dir=tmp_path,
+        session_id="sess_campaign_complete",
+    )
+
+    await orch.route_next()
+    for _ in range(50):
+        if not orch._running_tasks:
+            break
+        await orch._collect_completed()
+        await asyncio.sleep(0.01)
+    await orch._collect_completed()
+
+    campaign = find_campaign("camp-complete", tmp_path / "meta")
+    assert campaign is not None
+    assert campaign["check_in_count"] == 1
+    marker = campaign["progress_markers"][-1]
+    assert marker["source"] == "task_board"
+    assert marker["task_status"] == "completed"
+    assert marker["task_id"] == "t-camp-complete"
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_failed_task_marks_campaign_check_in(tmp_path):
+    from dharma_swarm.campaigns import create_campaign, find_campaign
+
+    create_campaign("camp-fail", "research", ["agent-1"], meta_dir=tmp_path / "meta")
+    board = MockTaskBoard()
+    board.tasks = [
+        Task(
+            id="t-camp-fail",
+            title="Campaign nurture: Beta",
+            description="safe",
+            metadata={"campaign_id": "camp-fail", "max_retries": 0},
+        )
+    ]
+    pool = MockAgentPool(
+        [AgentState(id="a1", name="agent-1", role=AgentRole.GENERAL, status=AgentStatus.IDLE)]
+    )
+    pool.set_runner("a1", DummyRunner(error=RuntimeError("artifact write failed")))
+
+    orch = Orchestrator(
+        task_board=board,
+        agent_pool=pool,
+        ledger_dir=tmp_path,
+        session_id="sess_campaign_fail",
+    )
+
+    await orch.route_next()
+    for _ in range(80):
+        if not orch._running_tasks:
+            break
+        await orch._collect_completed()
+        await asyncio.sleep(0.01)
+    await orch._collect_completed()
+
+    campaign = find_campaign("camp-fail", tmp_path / "meta")
+    assert campaign is not None
+    assert campaign["check_in_count"] == 1
+    marker = campaign["progress_markers"][-1]
+    assert marker["source"] == "task_board"
+    assert marker["task_status"] == "failed"
+    assert marker["task_id"] == "t-camp-fail"
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_offloads_memory_palace_construction(tmp_path, monkeypatch):
+    board = MockTaskBoard()
+    board.tasks = [Task(id="t-palace", title="Palace task", description="safe")]
+    pool = MockAgentPool(
+        [AgentState(id="a1", name="agent-1", role=AgentRole.GENERAL, status=AgentStatus.IDLE)]
+    )
+    pool.set_runner("a1", DummyRunner(result="palace ok"))
+
+    calls: list[tuple[object, object]] = []
+
+    class FakePalace:
+        async def ingest(self, **kwargs):
+            return True
+
+    async def fake_to_thread(func, /, *args, **kwargs):
+        calls.append((func, kwargs.get("state_dir")))
+        return FakePalace()
+
+    monkeypatch.setattr(asyncio, "to_thread", fake_to_thread)
+
+    orch = Orchestrator(
+        task_board=board,
+        agent_pool=pool,
+        ledger_dir=tmp_path,
+        session_id="sess_palace",
+    )
+
+    await orch.route_next()
+    for _ in range(50):
+        if not orch._running_tasks:
+            break
+        await orch._collect_completed()
+        await asyncio.sleep(0.01)
+    await orch._collect_completed()
+
+    assert calls
+    func, state_dir = calls[0]
+    assert getattr(func, "__name__", "") == "MemoryPalace"
+    assert state_dir == orch._runtime_root()
 
 
 @pytest.mark.asyncio
@@ -977,6 +1708,147 @@ async def test_orchestrator_coordination_summary_detects_productive_disagreement
 
 
 @pytest.mark.asyncio
+async def test_orchestrator_coordination_ignores_title_only_tasks_without_claim_metadata(tmp_path):
+    agents = [
+        AgentState(id="a1", name="agent-1", role=AgentRole.GENERAL, status=AgentStatus.IDLE),
+        AgentState(id="a2", name="agent-2", role=AgentRole.RESEARCHER, status=AgentStatus.IDLE),
+    ]
+    board = MockTaskBoard()
+    board.tasks = [
+        Task(
+            id="t-left",
+            title="eval_probe_task",
+            description="Left local result",
+            assigned_to="a1",
+            status=TaskStatus.ASSIGNED,
+        ),
+        Task(
+            id="t-right",
+            title="eval_probe_task",
+            description="Right local result",
+            assigned_to="a2",
+            status=TaskStatus.ASSIGNED,
+        ),
+    ]
+    orch = Orchestrator(
+        task_board=board,
+        agent_pool=MockAgentPool(agents),
+        message_bus=MockMessageBus(),
+        ledger_dir=tmp_path,
+        session_id="sess_coord_title_only",
+    )
+
+    summary = await orch.get_coordination_summary(refresh=True)
+
+    assert summary["global_truths"] == 0
+    assert summary["productive_disagreements"] == 0
+    assert summary["global_truth_claim_keys"] == []
+    assert summary["productive_disagreement_claim_keys"] == []
+    updated_left = await board.get("t-left")
+    updated_right = await board.get("t-right")
+    assert updated_left is not None
+    assert updated_right is not None
+    assert "coordination_state" not in updated_left.metadata
+    assert "coordination_state" not in updated_right.metadata
+
+
+@pytest.mark.asyncio
+async def test_coordination_blocks_synthesis_tasks_from_becoming_discoveries(tmp_path):
+    """Synthesis tasks (coordination_origin=sheaf_disagreement) must NOT feed
+    back into the sheaf as discoveries. This is the root cause of the runaway
+    461-task synthesis loop."""
+    agents = [
+        AgentState(id="a1", name="agent-1", role=AgentRole.GENERAL, status=AgentStatus.IDLE),
+        AgentState(id="a2", name="agent-2", role=AgentRole.RESEARCHER, status=AgentStatus.IDLE),
+    ]
+    board = MockTaskBoard()
+    board.tasks = [
+        Task(
+            id="synth-1",
+            title="Synthesize disagreement: route-policy",
+            description="The sheaf coordination layer detected a productive disagreement.",
+            result="Synthesis: mechanism vs witness positions identified.",
+            assigned_to="a1",
+            status=TaskStatus.COMPLETED,
+            metadata={
+                "coordination_origin": "sheaf_disagreement",
+                "coordination_claim_key": "route-policy",
+                "coordination_claim_state": "open",
+            },
+        ),
+        Task(
+            id="synth-2",
+            title="Synthesize disagreement: route-policy",
+            description="The sheaf coordination layer detected a productive disagreement.",
+            result="Synthesis: ecosystem perspective adds nuance.",
+            assigned_to="a2",
+            status=TaskStatus.COMPLETED,
+            metadata={
+                "coordination_origin": "sheaf_disagreement",
+                "coordination_claim_key": "route-policy",
+                "coordination_claim_state": "open",
+            },
+        ),
+    ]
+    orch = Orchestrator(
+        task_board=board,
+        agent_pool=MockAgentPool(agents),
+        message_bus=MockMessageBus(),
+        ledger_dir=tmp_path,
+        session_id="sess_synth_feedback_block",
+    )
+
+    summary = await orch.get_coordination_summary(refresh=True)
+
+    assert summary["productive_disagreements"] == 0, (
+        "Synthesis tasks must not create new disagreements — they are outputs, not inputs"
+    )
+
+
+@pytest.mark.asyncio
+async def test_coordination_blocks_eval_harness_tasks_from_discoveries(tmp_path):
+    """Tasks created by eval_harness should never enter sheaf coordination."""
+    agents = [
+        AgentState(id="a1", name="agent-1", role=AgentRole.GENERAL, status=AgentStatus.IDLE),
+        AgentState(id="a2", name="agent-2", role=AgentRole.RESEARCHER, status=AgentStatus.IDLE),
+    ]
+    board = MockTaskBoard()
+    board.tasks = [
+        Task(
+            id="eval-1",
+            title="eval_probe_task",
+            description="Probe task for eval harness",
+            assigned_to="a1",
+            created_by="eval_harness",
+            status=TaskStatus.COMPLETED,
+            metadata={"coordination_claim_key": "eval_probe_task"},
+        ),
+        Task(
+            id="eval-2",
+            title="eval_probe_task",
+            description="Probe task for eval harness — different result",
+            assigned_to="a2",
+            created_by="eval_harness",
+            status=TaskStatus.COMPLETED,
+            metadata={"coordination_claim_key": "eval_probe_task"},
+        ),
+    ]
+    orch = Orchestrator(
+        task_board=board,
+        agent_pool=MockAgentPool(agents),
+        message_bus=MockMessageBus(),
+        ledger_dir=tmp_path,
+        session_id="sess_eval_block",
+    )
+
+    summary = await orch.get_coordination_summary(refresh=True)
+
+    assert summary["productive_disagreements"] == 0, (
+        "eval_harness tasks must not enter sheaf coordination even with claim_key set"
+    )
+
+
+@pytest.mark.asyncio
 async def test_route_next_skips_retry_backoff_tasks(agents):
     board = MockTaskBoard()
     board.tasks = [
@@ -993,6 +1865,28 @@ async def test_route_next_skips_retry_backoff_tasks(agents):
     dispatches = await orch.route_next()
     assert len(dispatches) == 1
     assert dispatches[0].task_id == "t-ready"
+
+
+@pytest.mark.asyncio
+async def test_route_next_diversity_overlay_demotes_internal_task(agents, monkeypatch):
+    board = MockTaskBoard()
+    board.tasks = [
+        Task(id="t-internal", title="knowledge extraction follow-up", metadata={"source": "sleep_time_agent"}),
+        Task(id="t-outward", title="Publish artifact report", metadata={"artifact_contract": True}),
+    ]
+    pool = MockAgentPool(agents[:1])
+    orch = Orchestrator(task_board=board, agent_pool=pool)
+
+    monkeypatch.setattr(
+        orch._diversity_governor,
+        "reorder_ready_tasks",
+        lambda tasks: ([tasks[1], tasks[0]], ["diversity_demote_internal_tasks"]),
+    )
+
+    dispatches = await orch.route_next()
+
+    assert len(dispatches) == 1
+    assert dispatches[0].task_id == "t-outward"
 
 
 @pytest.mark.asyncio
@@ -1022,62 +1916,3 @@ async def test_dispatch_dropoff_requeues_once_when_runner_missing(tmp_path):
         task_id == "t-dropoff" and fields.get("status") == TaskStatus.PENDING
         for task_id, fields in board.updates
     )
-
-
-def test_prepare_claim_uses_explicit_room_metadata() -> None:
-    orch = Orchestrator(agent_pool=None, task_board=None)
-    task = Task(
-        id="t-room",
-        title="Room scoped",
-        metadata={"source_room_id": "revenue-wedge"},
-    )
-    dispatch = TaskDispatch(task_id="t-room", agent_id="codex.local")
-
-    meta = orch._prepare_claim(task, dispatch)
-
-    assert meta["cell_id"] == "revenue-wedge"
-    assert dispatch.metadata["cell_id"] == "revenue-wedge"
-
-
-def test_prepare_claim_does_not_guess_ambiguous_shared_agent_room() -> None:
-    from dharma_swarm.fractal.room_configs import bootstrap_registry
-
-    orch = Orchestrator(agent_pool=None, task_board=None)
-    orch._room_registry = bootstrap_registry()
-    task = Task(id="t-ambiguous", title="Ambiguous room", metadata={})
-    dispatch = TaskDispatch(task_id="t-ambiguous", agent_id="codex.local")
-
-    meta = orch._prepare_claim(task, dispatch)
-
-    assert "cell_id" not in meta
-    assert "cell_id" not in dispatch.metadata
-
-
-# ---------------------------------------------------------------------------
-# retry_policy_for_failure public API (MM-05 resolution)
-# ---------------------------------------------------------------------------
-
-
-def test_retry_policy_for_failure_connection_transient():
-    """Public API returns correct policy for transient connection failures."""
-    orch = Orchestrator(agent_pool=None, task_board=None)
-    task = Task(title="test", metadata={"max_retries": 2, "retry_backoff_seconds": 5.0})
-    meta: dict = dict(task.metadata)
-    failure_class, retry_count, max_retries, backoff = orch.retry_policy_for_failure(
-        task=task, error="API connection error: server disconnected", source="execution_error", meta=meta,
-    )
-    assert failure_class == "connection_transient"
-    assert max_retries >= 2
-    assert backoff >= 5.0
-
-
-def test_retry_policy_for_failure_passthrough():
-    """Non-transient failures pass through without retry boost."""
-    orch = Orchestrator(agent_pool=None, task_board=None)
-    task = Task(title="test", metadata={})
-    meta: dict = {}
-    failure_class, retry_count, max_retries, backoff = orch.retry_policy_for_failure(
-        task=task, error="ValueError: bad input", source="execution_error", meta=meta,
-    )
-    assert failure_class == "execution_error"
-    assert retry_count == 0

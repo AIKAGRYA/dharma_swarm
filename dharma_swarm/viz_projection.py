@@ -20,7 +20,6 @@ from __future__ import annotations
 import logging
 import time
 from pathlib import Path
-from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any, Optional
 
 from pydantic import BaseModel, Field
@@ -100,7 +99,7 @@ class VizProjector:
     """
 
     def __init__(self, state_dir: Optional[Path] = None) -> None:
-        self._state_dir = state_dir or (dharma_state_dir())
+        self._state_dir = state_dir or (Path.home() / ".dharma")
 
     def build_snapshot(self, max_nodes: int = 200) -> GraphSnapshot:
         """Build a current-state snapshot from all available sources."""

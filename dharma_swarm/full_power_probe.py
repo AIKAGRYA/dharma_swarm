@@ -9,11 +9,10 @@ import time
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-STATE_DIR = dharma_state_dir()
+STATE_DIR = Path.home() / ".dharma"
 SHARED_DIR = STATE_DIR / "shared"
 REPORT_DIR = REPO_ROOT / "reports" / "verification"
 

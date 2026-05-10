@@ -147,3 +147,72 @@ def test_follow_up_task_marks_shard_reopened_then_implemented(tmp_path) -> None:
         ).fetchone()
     assert row is not None
     assert row[0] == "implemented"
+
+
+def test_follow_up_wrapper_does_not_reharvest_latent_control_text(tmp_path) -> None:
+    db_path = tmp_path / "memory_plane.db"
+    store = ConversationMemoryStore(db_path)
+    source_text = (
+        "Use web_search + fetch_url to deeply research Sakana AI's architecture: "
+        "fetch https://sakana.ai and compare the DGM loop to DHARMA SWARM."
+    )
+    store.record_turn(
+        session_id="sess-source",
+        task_id="task-source",
+        role="user",
+        content=source_text,
+        turn_index=1,
+    )
+    store.mark_task_outcome("task-source", outcome="success")
+    source_shard = store.latent_gold("Sakana AI architecture", limit=1)[0]
+    assert source_shard.text == source_text
+
+    follow_up_task_id = "task-follow"
+    reopened = store.record_follow_up_task(
+        shard_id=source_shard.shard_id,
+        follow_up_task_id=follow_up_task_id,
+        title="Follow up latent todo: Sakana architecture branch",
+    )
+    assert reopened is True
+
+    store.record_turn(
+        session_id="sess-follow",
+        task_id=follow_up_task_id,
+        role="user",
+        content=(
+            "## Task: Follow up latent todo: [idea:orphaned] todo | salience=1.00 | "
+            "2026-04-29 16:04Z | Use web_search + fetch_url to deeply research Sakana AI's architecture\n"
+            "This task was reopened automatically from a high-salience latent branch captured during prior conversation flow.\n"
+            "Original shard:\n"
+            "[idea:orphaned] todo | salience=1.00 | 2026-04-29 16:04Z | Use web_search + fetch_url to deeply research Sakana AI's architecture\n"
+            "Goal: decide whether this branch should be implemented, tested, archived, or explicitly rejected."
+        ),
+        turn_index=1,
+    )
+    store.record_turn(
+        session_id="sess-follow",
+        task_id=follow_up_task_id,
+        role="assistant",
+        content=(
+            "Originating latent branch `[idea:orphaned] todo | salience=1.00 | "
+            "2026-04-29 16:04Z | Use web_search + fetch_url to deeply research Sakana AI's architecture]` "
+            "should be archived as resolved."
+        ),
+        turn_index=2,
+    )
+    completed = store.record_follow_up_outcome(
+        shard_id=source_shard.shard_id,
+        follow_up_task_id=follow_up_task_id,
+        outcome="success",
+        evidence_text="Archived as resolved.",
+    )
+    assert completed is True
+
+    with sqlite3.connect(str(db_path)) as db:
+        unresolved = db.execute(
+            "SELECT COUNT(*) FROM idea_shards "
+            "WHERE task_id = ? AND state IN ('proposed', 'connected', 'orphaned', 'deferred', 'reopened')",
+            (follow_up_task_id,),
+        ).fetchone()
+    assert unresolved is not None
+    assert unresolved[0] == 0

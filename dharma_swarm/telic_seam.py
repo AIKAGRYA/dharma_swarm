@@ -34,18 +34,12 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from dharma_swarm.correlation_context import get_correlation
 from dharma_swarm.lineage import LineageEdge, LineageGraph
 from dharma_swarm.models import GateCheckResult, GateDecision, Task
 from dharma_swarm.ontology import OntologyRegistry
 from dharma_swarm.ontology_runtime import (
     get_shared_registry,
     persist_shared_registry,
-)
-from dharma_swarm.signal_bus import (
-    SIGNAL_OUTCOME_RECORDED,
-    SIGNAL_VALUE_EVENT_RECORDED,
-    SignalBus,
 )
 
 logger = logging.getLogger(__name__)
@@ -63,13 +57,11 @@ class TelicSeam:
         registry: OntologyRegistry | None = None,
         lineage: LineageGraph | None = None,
         path: str | Path | None = None,
-        signal_bus: SignalBus | None = None,
     ) -> None:
         self._path = path
         self._registry = registry or get_shared_registry(path)
         self._persist_registry = registry is None
         self._lineage = lineage or LineageGraph()
-        self._signal_bus = signal_bus
         self._proposal_map: dict[str, str] = {}  # task_id -> proposal obj_id
         self._duplicate_suppressions: dict[str, int] = {
             "execution_leases": 0,
@@ -107,8 +99,7 @@ class TelicSeam:
                     "task_id": task.id,
                     "agent_id": agent_id,
                     "action_type": topology if topology in (
-                        "dispatch", "fan_out", "pipeline", "evolution", "manual",
-                        "agent_runner",
+                        "dispatch", "fan_out", "pipeline", "evolution", "manual"
                     ) else "dispatch",
                     "title": task.title,
                     "description": task.description[:500] if task.description else "",
@@ -304,63 +295,18 @@ class TelicSeam:
                 input_artifacts.extend(task.depends_on)
             output_artifacts = [f"outcome:{obj.id}"]
 
-            corr = get_correlation()
             self._lineage.record(LineageEdge(
                 task_id=task.id,
                 input_artifacts=input_artifacts,
                 output_artifacts=output_artifacts,
                 agent=agent_id,
                 operation="task_execution",
-                trace_id=corr.trace_id,
                 metadata={
                     "success": success,
                     "proposal_id": proposal_id or "",
                     "outcome_id": obj.id,
                 },
             ))
-
-            # Emit canonical outcome signal for cross-store fanout
-            if self._signal_bus is not None:
-                self._signal_bus.emit({
-                    "type": SIGNAL_OUTCOME_RECORDED,
-                    "outcome_id": obj.id,
-                    "proposal_id": proposal_id or "",
-                    "task_id": task.id,
-                    "agent_id": agent_id,
-                    "success": success,
-                    "trace_id": corr.trace_id,
-                    "session_id": corr.session_id,
-                })
-
-            # BR-002 closure: feed realized outcomes back to opportunity_board.json
-            # so future Shakti scoring sees what already happened. Best-effort —
-            # failure here does NOT break the canonical Outcome write to ontology.db.
-            # Resolves opportunity_id from task.metadata, set by
-            # opportunity_dispatcher._create_task_board_row (line ~508).
-            opp_id = ""
-            try:
-                opp_id = str((task.metadata or {}).get("opportunity_id") or "")
-            except (AttributeError, TypeError):
-                opp_id = ""
-            if opp_id:
-                try:
-                    from dharma_swarm.shakti_executive.feedback_writer import (
-                        OutcomeRecord,
-                        update_opportunity_outcome,
-                    )
-                    update_opportunity_outcome(
-                        opp_id,
-                        OutcomeRecord(
-                            outcome_id=obj.id,
-                            proposal_id=proposal_id or "",
-                            success=success,
-                            fitness_score=fitness_score,
-                            duration_ms=duration_ms,
-                            result_summary=result_summary[:500] if result_summary else "",
-                        ),
-                    )
-                except Exception as exc:
-                    logger.debug("BR-002 board feedback failed: %s", exc)
 
             self._flush_registry()
             return obj.id
@@ -438,19 +384,6 @@ class TelicSeam:
                 target_id=obj.id,
                 created_by="telic_seam",
             )
-
-            # Emit canonical value event signal for cross-store fanout
-            if self._signal_bus is not None:
-                corr = get_correlation()
-                self._signal_bus.emit({
-                    "type": SIGNAL_VALUE_EVENT_RECORDED,
-                    "value_event_id": obj.id,
-                    "outcome_id": outcome_id,
-                    "agent_id": agent_id,
-                    "composite_value": composite_value,
-                    "trace_id": corr.trace_id,
-                    "session_id": corr.session_id,
-                })
 
             self._flush_registry()
             return obj.id
@@ -582,9 +515,7 @@ class TelicSeam:
         value_events = self._registry.get_objects_by_type("ValueEvent")
         contributions = self._registry.get_objects_by_type("Contribution")
 
-        report: dict[str, Any] = {
-            "empty_proposal_id_outcomes": [],
-            "unknown_proposal_id_outcomes": [],
+        report = {
             "proposal_outcome_agent_mismatches": [],
             "outcome_value_agent_mismatches": [],
             "orphan_outcomes": [],
@@ -592,19 +523,11 @@ class TelicSeam:
             "orphan_contributions": [],
             "duplicate_outcomes_per_proposal": [],
             "contribution_scope_mismatches": [],
-            "proposals_without_outcome": [],
         }
 
         outcomes_by_proposal: dict[str, list[str]] = {}
         for outcome in outcomes:
             proposal_id = str(outcome.properties.get("proposal_id") or "")
-            if not proposal_id:
-                report["empty_proposal_id_outcomes"].append(outcome.id)
-                continue
-            if proposal_id not in proposals:
-                report["unknown_proposal_id_outcomes"].append(
-                    {"outcome_id": outcome.id, "proposal_id": proposal_id}
-                )
             if proposal_id:
                 outcomes_by_proposal.setdefault(proposal_id, []).append(outcome.id)
                 proposal = proposals.get(proposal_id)
@@ -688,23 +611,7 @@ class TelicSeam:
                     }
                 )
 
-        # Detect proposals that were dispatched but never got an outcome
-        for proposal_id, proposal in proposals.items():
-            if proposal_id not in outcomes_by_proposal:
-                status = str(proposal.properties.get("status") or "proposed")
-                if status not in ("completed", "failed", "cancelled", "rejected"):
-                    report["proposals_without_outcome"].append(
-                        {
-                            "proposal_id": proposal_id,
-                            "task_id": str(proposal.properties.get("task_id") or ""),
-                            "agent_id": str(proposal.properties.get("agent_id") or ""),
-                            "status": status,
-                        }
-                    )
-
-        issue_count = sum(
-            len(items) for items in report.values() if isinstance(items, list)
-        )
+        issue_count = sum(len(items) for items in report.values())
         report["is_clean"] = issue_count == 0
         report["issue_count"] = issue_count
         return report
@@ -802,13 +709,10 @@ _SEAM: TelicSeam | None = None
 
 
 def get_seam(path: str | Path | None = None) -> TelicSeam:
-    """Get or create the module-level TelicSeam singleton.
-
-    Automatically wires the SignalBus singleton for outcome fanout.
-    """
+    """Get or create the module-level TelicSeam singleton."""
     global _SEAM
     if _SEAM is None or getattr(_SEAM, "_path", None) != path:
-        _SEAM = TelicSeam(path=path, signal_bus=SignalBus.get())
+        _SEAM = TelicSeam(path=path)
     return _SEAM
 
 

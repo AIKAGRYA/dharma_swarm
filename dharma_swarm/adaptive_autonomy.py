@@ -5,7 +5,6 @@ base autonomy level, then dynamically adjust based on:
   - Success/failure history (more failures → more cautious)
   - Risk assessment of the current action
   - Confidence of intent detection
-  - Time of day (quiet hours → more cautious)
   - Circuit breaker state
 
 The autonomy engine is the bridge between the telos gates (hard constraints)
@@ -90,7 +89,7 @@ class AdaptiveAutonomy:
     ):
         self._base = base_level
         self._history: deque[bool] = deque(maxlen=history_size)
-        self._quiet_hours = quiet_hours if quiet_hours is not None else {2, 3, 4}
+        self._quiet_hours = quiet_hours if quiet_hours is not None else set()
         self._consecutive_failures: int = 0
         self._total_decisions: int = 0
 
@@ -113,11 +112,6 @@ class AdaptiveAutonomy:
             return "cautious"
         if rate < 0.7 and self._base in ("aggressive", "full"):
             return "balanced"
-
-        # Quiet hours → more cautious
-        if time.localtime().tm_hour in self._quiet_hours:
-            if self._base in ("aggressive", "full"):
-                return "balanced"
 
         return self._base
 

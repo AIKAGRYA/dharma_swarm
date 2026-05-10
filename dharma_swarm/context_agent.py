@@ -33,11 +33,11 @@ import os
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 from dharma_swarm.signal_bus import SignalBus
 from dharma_swarm.stigmergy import StigmergicMark, StigmergyStore
+from dharma_swarm.ollama_config import get_ollama_cloud_frontier_chain, resolve_ollama_model
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 # Paths
 # ---------------------------------------------------------------------------
 
-_DHARMA = dharma_state_dir()
+_DHARMA = Path.home() / ".dharma"
 _CONTEXT_DIR = _DHARMA / "context"
 _PACKAGES_DIR = _CONTEXT_DIR / "packages"
 _DISTILLED_DIR = _CONTEXT_DIR / "distilled"
@@ -98,11 +98,21 @@ SEED_MAX_AGE_HOURS = 6
 QUIET_HOUR_START = 2  # 2 AM local
 QUIET_HOUR_END = 4  # 4 AM local
 
-# LLM config — uses Ollama Cloud when OLLAMA_API_KEY is set
-# Default: kimi-k2.5:cloud (Ollama Cloud frontier model)
-# Override: CONTEXT_AGENT_MODEL env var
-DISTILL_MODEL = os.environ.get("CONTEXT_AGENT_MODEL", "")  # empty = let provider auto-detect
 DISTILL_MAX_TOKENS = 2000
+
+
+def _preferred_context_model() -> str:
+    explicit = os.environ.get("CONTEXT_AGENT_MODEL", "").strip()
+    if explicit:
+        return explicit
+    frontier = list(get_ollama_cloud_frontier_chain())
+    preferred = [
+        model for model in frontier
+        if any(name in model for name in ("glm-5", "kimi-k2.5", "minimax-m2.7"))
+    ]
+    if preferred:
+        return preferred[0]
+    return resolve_ollama_model()
 
 
 # ---------------------------------------------------------------------------
@@ -337,7 +347,7 @@ class Intelligence:
         if self._provider is None:
             try:
                 from dharma_swarm.providers import OllamaProvider
-                self._provider = OllamaProvider(model=DISTILL_MODEL)
+                self._provider = OllamaProvider(model=_preferred_context_model())
             except Exception as e:
                 logger.warning("Could not init Ollama provider: %s", e)
                 return None
@@ -345,20 +355,42 @@ class Intelligence:
 
     async def _complete(self, system: str, prompt: str) -> str | None:
         """Make a single LLM completion call."""
-        provider = await self._get_provider()
-        if provider is None:
-            return None
-
         try:
-            from dharma_swarm.models import LLMRequest
-            request = LLMRequest(
-                model=DISTILL_MODEL or provider.default_model,
-                messages=[{"role": "user", "content": prompt}],
+            if self._provider is not None:
+                from dharma_swarm.models import LLMRequest
+                request = LLMRequest(
+                    model=_preferred_context_model(),
+                    messages=[{"role": "user", "content": prompt}],
+                    system=system,
+                    max_tokens=DISTILL_MAX_TOKENS,
+                    temperature=0.3,
+                    metadata={
+                        "execution_mode": "headless_context_agent",
+                        "source": "context_agent",
+                        "task_title": "context_distillation",
+                        "tier": "context",
+                    },
+                )
+                response = await self._provider.complete(request)
+                return response.content
+
+            from dharma_swarm.runtime_provider import (
+                PREFERRED_LOW_COST_WITH_ANTHROPIC_RUNTIME_PROVIDERS,
+                complete_via_preferred_runtime_providers,
+            )
+            response, _config = await complete_via_preferred_runtime_providers(
                 system=system,
+                messages=[{"role": "user", "content": prompt}],
                 max_tokens=DISTILL_MAX_TOKENS,
                 temperature=0.3,
+                provider_order=PREFERRED_LOW_COST_WITH_ANTHROPIC_RUNTIME_PROVIDERS,
+                metadata={
+                    "execution_mode": "headless_context_agent",
+                    "source": "context_agent",
+                    "task_title": "context_distillation",
+                    "tier": "context",
+                },
             )
-            response = await provider.complete(request)
             return response.content
         except Exception as e:
             logger.error("LLM completion failed: %s", e)
@@ -940,6 +972,21 @@ class ContextAgent:
 CONTEXT_AGENT_INTERVAL = int(os.environ.get("DGC_CONTEXT_AGENT_INTERVAL", "180"))
 
 
+def _context_agent_boot_delay_seconds() -> float:
+    raw = os.environ.get("DGC_CONTEXT_AGENT_BOOT_DELAY", "").strip()
+    if not raw:
+        return float(CONTEXT_AGENT_INTERVAL)
+    try:
+        return max(0.0, float(raw))
+    except ValueError:
+        logger.warning(
+            "Invalid DGC_CONTEXT_AGENT_BOOT_DELAY=%r; using %ss",
+            raw,
+            CONTEXT_AGENT_INTERVAL,
+        )
+        return float(CONTEXT_AGENT_INTERVAL)
+
+
 async def run_context_agent_loop(
     shutdown_event: asyncio.Event,
     signal_bus: SignalBus | None = None,
@@ -949,7 +996,23 @@ async def run_context_agent_loop(
     Designed to be added as 6th task in orchestrate_live.orchestrate().
     """
     agent = ContextAgent(signal_bus=signal_bus)
-    logger.info("Context agent started (interval=%ds)", CONTEXT_AGENT_INTERVAL)
+    boot_delay_seconds = _context_agent_boot_delay_seconds()
+    logger.info(
+        "Context agent started (interval=%ds boot_delay=%.1fs)",
+        CONTEXT_AGENT_INTERVAL,
+        boot_delay_seconds,
+    )
+
+    if boot_delay_seconds > 0:
+        try:
+            await asyncio.wait_for(
+                shutdown_event.wait(),
+                timeout=boot_delay_seconds,
+            )
+            logger.info("Context agent stopped before first cycle")
+            return
+        except asyncio.TimeoutError:
+            pass
 
     while not shutdown_event.is_set():
         try:

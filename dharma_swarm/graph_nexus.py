@@ -29,7 +29,6 @@ import inspect
 import logging
 from enum import Enum
 from pathlib import Path
-from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -115,7 +114,7 @@ class GraphNexus:
     """
 
     def __init__(self, state_dir: Path | None = None) -> None:
-        self._state_dir = state_dir or dharma_state_dir()
+        self._state_dir = state_dir or Path.home() / ".dharma"
         self._concept_graph: Any | None = None
         self._catalytic_graph: Any | None = None
         self._temporal_graph: Any | None = None

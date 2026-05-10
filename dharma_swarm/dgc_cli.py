@@ -11,6 +11,7 @@ Usage:
   dgc dashboard                 Launch interactive DGC dashboard (TUI)
   dgc status                    System status overview
   dgc runtime-status            Canonical runtime control-plane summary
+  dgc repo-rules                Show canonical repo rule entrypoints
   dgc mission-status            Mission-level readiness across core/accelerators
   dgc mission-brief             Show the active mission continuity state
   dgc campaign-brief            Show the active dual-engine campaign state
@@ -43,6 +44,7 @@ Usage:
   dgc ouroboros connections|record  Inspect or canonically bind behavioral observations
   dgc health-check              Monitor-based system health (v0.2.0)
   dgc doctor                    Deep runtime diagnostics + fix guidance
+  dgc overnight-readiness       Fresh preflight for multi-hour builds
   dgc spawn --name X --role Y   Spawn a new agent
   dgc task create "title"       Create a task
   dgc task list [--status S]    List tasks
@@ -75,12 +77,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from dharma_swarm.daemon_config import dharma_state_dir
-
 HOME = Path.home()
-DHARMA_STATE = dharma_state_dir()
+DHARMA_STATE = HOME / ".dharma"
 DHARMA_SWARM = HOME / "dharma_swarm"
 DGC_CORE = HOME / "dgc-core"
+REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SPRINT_LLM_TIMEOUT_SEC = 12.0
 
 # Keep mission-status aligned with the lanes the overnight cycle depends on:
@@ -328,8 +329,22 @@ def _list_daemon_like_processes() -> list[tuple[int, str]]:
 
     current_pid = os.getpid()
     matches: list[tuple[int, str]] = []
-    needles = ("dharma_swarm.orchestrate_live", "orchestrate_live.py", "run_daemon.sh")
-    skip_markers = ("dgc doctor", "ps -axo", "rg ", "pytest")
+    needles = (
+        "dharma_swarm.orchestrate_live",
+        "orchestrate_live.py",
+        "run_daemon.sh",
+        "dgc orchestrate-live",
+    )
+    skip_markers = (
+        "dgc doctor",
+        "ps -axo",
+        "rg ",
+        "pytest",
+        "pre-commit",
+        "check-added-large-files",
+        "codex exec",
+        "claude --bare -p",
+    )
 
     for raw in proc.stdout.splitlines():
         line = raw.strip()
@@ -562,13 +577,11 @@ def _accelerators_enabled() -> bool:
 # Commands — carried over from dgc-core
 # ---------------------------------------------------------------------------
 
-def _build_status_data() -> dict:
-    """Collect system status data as a JSON-ready dict."""
-    from typing import Any
+def cmd_status() -> None:
+    """System status overview."""
+    print("=== DGC CORE STATUS ===\n")
 
-    data: dict[str, Any] = {}
-
-    # Memory
+    # Memory — try dharma_swarm async memory, fall back to summary
     try:
         from dharma_swarm.memory import StrangeLoopMemory
 
@@ -579,97 +592,51 @@ def _build_status_data() -> dict:
             await mem.close()
             return len(entries)
 
-        data["memory_entries"] = _run(_mem_stats())
+        count = _run(_mem_stats())
+        print(f"Memory (async SQLite): {count} recent entries")
     except Exception as exc:
-        data["memory_error"] = str(exc)
+        print(f"Memory: unavailable ({exc})")
 
-    # Pulse
+    # Daemon state
     pulse_count, last_pulse, pulse_source = _canonical_pulse_summary()
-    data["pulse"] = {
-        "count": pulse_count,
-        "last": last_pulse,
-        "source": pulse_source,
-    }
+    if last_pulse:
+        source_note = f" via {pulse_source}" if pulse_source is not None else ""
+        print(f"Pulse: {pulse_count} logged{source_note}, last: {last_pulse}")
+    else:
+        print("Pulse: not yet run")
 
-    # Gates
-    data["gates_today"] = _canonical_gate_count()
+    # Gate witness log
+    print(f"Gates today: {_canonical_gate_count()} checks")
 
-    # Control plane
     snapshot = _control_plane_snapshot()
     if snapshot:
-        data["control_plane_snapshot"] = snapshot
+        print(f"Control plane snapshot: {snapshot}")
 
-    # AGNI
+    # AGNI sync
     agni = HOME / "agni-workspace"
     if agni.exists():
         working = agni / "WORKING.md"
         if working.exists():
-            age_min = (time.time() - working.stat().st_mtime) / 60
-            data["agni"] = {"synced": True, "working_md_age_min": round(age_min)}
+            age = (time.time() - working.stat().st_mtime) / 60
+            print(f"\nAGNI workspace: synced, WORKING.md updated {age:.0f} min ago")
         else:
-            data["agni"] = {"synced": True, "working_md": False}
+            print("\nAGNI workspace: synced but no WORKING.md")
     else:
-        data["agni"] = {"synced": False}
+        print("\nAGNI workspace: NOT SYNCED")
 
     # Trishula
     trishula = HOME / "trishula" / "inbox"
     if trishula.exists():
-        data["trishula_messages"] = len(list(trishula.glob("*.json")))
+        msgs = list(trishula.glob("*.json"))
+        print(f"Trishula inbox: {len(msgs)} messages")
 
     # Claude Code
     try:
         result = subprocess.run(
             ["claude", "--version"], capture_output=True, text=True, timeout=5,
         )
-        data["claude_code"] = result.stdout.strip()
+        print(f"\nClaude Code: {result.stdout.strip()}")
     except Exception:
-        data["claude_code"] = None
-
-    return data
-
-
-def cmd_status(*, as_json: bool = False) -> None:
-    """System status overview."""
-    data = _build_status_data()
-
-    if as_json:
-        print(json.dumps(data, indent=2, default=str))
-        return
-
-    print("=== DGC CORE STATUS ===\n")
-
-    if "memory_entries" in data:
-        print(f"Memory (async SQLite): {data['memory_entries']} recent entries")
-    else:
-        print(f"Memory: unavailable ({data.get('memory_error', 'unknown')})")
-
-    pulse = data["pulse"]
-    if pulse["last"]:
-        source_note = f" via {pulse['source']}" if pulse["source"] is not None else ""
-        print(f"Pulse: {pulse['count']} logged{source_note}, last: {pulse['last']}")
-    else:
-        print("Pulse: not yet run")
-
-    print(f"Gates today: {data['gates_today']} checks")
-
-    if "control_plane_snapshot" in data:
-        print(f"Control plane snapshot: {data['control_plane_snapshot']}")
-
-    agni = data.get("agni", {})
-    if agni.get("synced"):
-        if agni.get("working_md_age_min") is not None:
-            print(f"\nAGNI workspace: synced, WORKING.md updated {agni['working_md_age_min']} min ago")
-        else:
-            print("\nAGNI workspace: synced but no WORKING.md")
-    else:
-        print("\nAGNI workspace: NOT SYNCED")
-
-    if "trishula_messages" in data:
-        print(f"Trishula inbox: {data['trishula_messages']} messages")
-
-    if data.get("claude_code"):
-        print(f"\nClaude Code: {data['claude_code']}")
-    else:
         print("\nClaude Code: not found")
 
     print("\nMission spine: run `dgc mission-status` for full readiness lanes")
@@ -680,30 +647,60 @@ def cmd_runtime_status(
     *,
     limit: int = 5,
     db_path: str | None = None,
-    as_json: bool = False,
 ) -> None:
     """Show the canonical runtime control-plane summary."""
+    from dharma_swarm.tui_helpers import build_runtime_status_text
+
+    print(
+        build_runtime_status_text(
+            limit=limit,
+            runtime_db_path=Path(db_path) if db_path else None,
+        )
+    )
+
+
+def cmd_repo_rules(*, as_json: bool = False) -> int:
+    """Print the canonical repo-rules entrypoints."""
+    payload = {
+        "repo_root": str(REPO_ROOT),
+        "entrypoint": str(REPO_ROOT / "REPO_RULES.md"),
+        "read_order": [
+            "REPO_RULES.md",
+            "README.md",
+            "CLAUDE.md",
+            "AGENTS.md",
+            "INTERFACE_MISMATCH_MAP.md",
+            "MODEL_ROUTING_MAP.md",
+        ],
+        "build_governance": [
+            "dharma_swarm/build_authority.py",
+            "dharma_swarm/build_registry.py",
+            "scripts/build_registry_ctl.py",
+        ],
+        "skill": ".claude/skills/repo-rules/SKILL.md",
+        "usage_hint": (
+            "If told to 'follow the repo rules', start at REPO_RULES.md and then "
+            "follow the listed read order."
+        ),
+    }
     if as_json:
-        from dharma_swarm.tui_helpers import build_runtime_status_data
+        print(json.dumps(payload, ensure_ascii=True, indent=2, sort_keys=True))
+        return 0
 
-        print(
-            json.dumps(
-                build_runtime_status_data(
-                    limit=limit,
-                    runtime_db_path=Path(db_path) if db_path else None,
-                ),
-                indent=2,
-            )
-        )
-    else:
-        from dharma_swarm.tui_helpers import build_runtime_status_text
-
-        print(
-            build_runtime_status_text(
-                limit=limit,
-                runtime_db_path=Path(db_path) if db_path else None,
-            )
-        )
+    print("Repo rules entrypoint:")
+    print(f"  {payload['entrypoint']}")
+    print()
+    print("Read order:")
+    for item in payload["read_order"]:
+        print(f"  - {item}")
+    print()
+    print("Canonical build governance:")
+    for item in payload["build_governance"]:
+        print(f"  - {item}")
+    print()
+    print(f"Repo-local skill: {payload['skill']}")
+    print(f"Hint: {payload['usage_hint']}")
+    return 0
 
 
 def _read_openclaw_summary() -> dict[str, Any]:
@@ -1282,43 +1279,28 @@ def cmd_develop(what: str, evidence: str) -> None:
     _run(_develop())
 
 
-def cmd_gates(action: str, *, as_json: bool = False) -> None:
+def cmd_gates(action: str) -> None:
     """Run telos gates on an action."""
     from dharma_swarm.telos_gates import DEFAULT_GATEKEEPER
 
     result = DEFAULT_GATEKEEPER.check(action=action)
-
-    if as_json:
-        data = result.model_dump()
-        data["action"] = action
-        print(json.dumps(data, indent=2, default=str))
-        return
-
     print(f"Decision: {result.decision.value.upper()}")
     print(f"Reason: {result.reason}")
 
 
-def cmd_health(*, as_json: bool = False) -> None:
+def cmd_health() -> None:
     """Check ecosystem file health."""
     try:
         from dharma_swarm.ecosystem_map import check_health
 
         h = check_health()
-
-        if as_json:
-            print(json.dumps(h, indent=2, default=str))
-            return
-
         print(f"Ecosystem: {h['ok']} OK, {h['missing']} MISSING")
         if h["details"]:
             print("\nMissing paths:")
             for p, d in h["details"].items():
                 print(f"  {p} -- {d}")
     except ImportError:
-        if as_json:
-            print(json.dumps({"error": "ecosystem_map not available"}))
-        else:
-            print("ecosystem_map not available")
+        print("ecosystem_map not available")
 
 
 def cmd_cascade(
@@ -1617,6 +1599,393 @@ def cmd_doctor(
     return doctor_exit_code(report, strict=strict)
 
 
+def _readiness_fetch_json(url: str, *, timeout: float) -> tuple[bool, dict[str, Any] | str]:
+    from urllib import request
+
+    try:
+        with request.urlopen(url, timeout=max(0.5, timeout)) as response:
+            raw = response.read().decode("utf-8", errors="replace")
+    except Exception as exc:
+        return False, str(exc)
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        return False, f"invalid JSON: {exc}"
+    if not isinstance(payload, dict):
+        return False, "response was not a JSON object"
+    return True, payload
+
+
+def _readiness_doctor_report(*, run_doctor: bool, timeout: float) -> dict[str, Any] | None:
+    from dharma_swarm.doctor import (
+        load_latest_doctor_report,
+        run_doctor,
+        write_doctor_artifacts,
+    )
+
+    if not run_doctor:
+        return load_latest_doctor_report()
+    report = run_doctor(timeout_seconds=timeout, quick=True)
+    write_doctor_artifacts(report)
+    return report
+
+
+def _readiness_permission_blocked(detail: Any) -> bool:
+    return "Operation not permitted" in str(detail)
+
+
+def _readiness_swarm_snapshot() -> dict[str, Any]:
+    try:
+        from dharma_swarm.runtime_artifacts import dgc_health_snapshot_summary
+
+        return dgc_health_snapshot_summary(DHARMA_STATE, stale_after_seconds=300.0)
+    except Exception as exc:
+        return {"status": "unavailable", "error": str(exc), "liveness": {}}
+
+
+def _task_is_builder_claim(task: Any) -> bool:
+    from dharma_swarm.build_authority import BuildLane
+    from dharma_swarm.task_contract import allowed_claim_lanes
+
+    lanes = set(allowed_claim_lanes(getattr(task, "metadata", {}) or {}))
+    return bool(lanes.intersection({BuildLane.BUILDER, BuildLane.GATEWAY}))
+
+
+def _readiness_task_snapshot(*, limit: int = 20) -> dict[str, Any]:
+    async def _collect() -> dict[str, Any]:
+        from dharma_swarm.models import TaskStatus
+
+        tb = await _get_task_board(state_dir=str(DHARMA_STATE))
+        stats = await tb.stats()
+        pending = await tb.list_tasks(status=TaskStatus.PENDING, limit=limit)
+        running = await tb.list_tasks(status=TaskStatus.RUNNING, limit=limit)
+        builder_pending = [task for task in pending if _task_is_builder_claim(task)]
+        builder_running = [task for task in running if _task_is_builder_claim(task)]
+        return {
+            "stats": stats,
+            "pending": [
+                {
+                    "id": task.id,
+                    "title": task.title,
+                    "priority": task.priority.value,
+                    "assigned_to": task.assigned_to,
+                }
+                for task in pending
+            ],
+            "builder_pending": [
+                {
+                    "id": task.id,
+                    "title": task.title,
+                    "priority": task.priority.value,
+                    "assigned_to": task.assigned_to,
+                }
+                for task in builder_pending
+            ],
+            "builder_running": [
+                {
+                    "id": task.id,
+                    "title": task.title,
+                    "priority": task.priority.value,
+                    "assigned_to": task.assigned_to,
+                }
+                for task in builder_running
+            ],
+        }
+
+    try:
+        return _run(_collect())
+    except Exception as exc:
+        return {
+            "error": str(exc),
+            "stats": {},
+            "pending": [],
+            "builder_pending": [],
+            "builder_running": [],
+        }
+
+
+def _readiness_recent_route_blocks(*, lines: int = 600) -> list[str]:
+    log_text = _tail(DHARMA_STATE / "logs" / "swarm.log", lines=lines)
+    blocks = []
+    for raw_line in log_text.splitlines():
+        if "no_tooling_capable_idle_agent" not in raw_line:
+            continue
+        blocks.append(raw_line.strip())
+    return blocks[-10:]
+
+
+def _readiness_add(
+    checks: list[dict[str, Any]],
+    *,
+    name: str,
+    status: str,
+    summary: str,
+    detail: Any = None,
+    fix: str = "",
+) -> None:
+    checks.append(
+        {
+            "name": name,
+            "status": status,
+            "summary": summary,
+            "detail": detail,
+            "fix": fix,
+        }
+    )
+
+
+def _readiness_exit_code(checks: list[dict[str, Any]]) -> int:
+    statuses = {str(check.get("status", "")).upper() for check in checks}
+    if "FAIL" in statuses:
+        return 2
+    if "WARN" in statuses:
+        return 1
+    return 0
+
+
+def _readiness_overall(checks: list[dict[str, Any]]) -> str:
+    code = _readiness_exit_code(checks)
+    if code == 2:
+        return "FAIL"
+    if code == 1:
+        return "WARN"
+    return "PASS"
+
+
+def cmd_overnight_readiness(
+    *,
+    as_json: bool = False,
+    run_doctor: bool = True,
+    timeout: float = 1.5,
+) -> int:
+    """Fresh preflight for multi-hour autonomous builds."""
+    checks: list[dict[str, Any]] = []
+
+    ok, swarm_payload = _readiness_fetch_json(
+        "http://127.0.0.1:7433/health",
+        timeout=timeout,
+    )
+    if not ok:
+        snapshot = _readiness_swarm_snapshot() if _readiness_permission_blocked(swarm_payload) else {}
+        liveness = snapshot.get("liveness", {}) if isinstance(snapshot, dict) else {}
+        snapshot_fresh = snapshot.get("status") == "fresh" if isinstance(snapshot, dict) else False
+        snapshot_healthy = (
+            isinstance(liveness, dict)
+            and liveness.get("status") == "healthy"
+            and bool(liveness.get("tick_fresh", True))
+        )
+        if snapshot_fresh and snapshot_healthy:
+            _readiness_add(
+                checks,
+                name="swarm_health",
+                status="PASS",
+                summary="swarm endpoint blocked here, but fresh runtime snapshot is healthy",
+                detail={
+                    "endpoint_error": swarm_payload,
+                    "snapshot_status": snapshot.get("status"),
+                    "snapshot_age_seconds": snapshot.get("age_seconds"),
+                    "liveness": liveness,
+                },
+            )
+        else:
+            _readiness_add(
+                checks,
+                name="swarm_health",
+                status="FAIL",
+                summary="swarm health endpoint is unavailable",
+                detail=swarm_payload,
+                fix="Start or restart the live daemon before leaving an overnight build running.",
+            )
+    else:
+        health = str(swarm_payload.get("status", "unknown")).lower()
+        liveness = swarm_payload.get("liveness", {})
+        stalled = bool(isinstance(liveness, dict) and liveness.get("orchestrator_stalled"))
+        booted = bool(isinstance(liveness, dict) and liveness.get("bootstrap_complete", True))
+        live_status = str(liveness.get("status", "") if isinstance(liveness, dict) else "").lower()
+        if health in {"healthy", "ok"} and live_status in {"", "healthy"} and booted and not stalled:
+            _readiness_add(
+                checks,
+                name="swarm_health",
+                status="PASS",
+                summary="swarm daemon is healthy",
+                detail=swarm_payload.get("liveness", {}),
+            )
+        else:
+            _readiness_add(
+                checks,
+                name="swarm_health",
+                status="FAIL" if stalled or not booted else "WARN",
+                summary=f"swarm daemon reports {health}",
+                detail=swarm_payload.get("liveness", swarm_payload),
+                fix="Inspect daemon logs and restart if liveness is stale or bootstrap is incomplete.",
+            )
+
+    ok, dashboard_payload = _readiness_fetch_json(
+        "http://127.0.0.1:8420/api/health",
+        timeout=timeout,
+    )
+    if ok:
+        dashboard_status = str(dashboard_payload.get("status", "unknown")).lower()
+        _readiness_add(
+            checks,
+            name="dashboard_api",
+            status="PASS" if dashboard_status in {"healthy", "ok"} else "WARN",
+            summary=f"dashboard API reports {dashboard_status}",
+            detail=dashboard_payload,
+        )
+    else:
+        _readiness_add(
+            checks,
+            name="dashboard_api",
+            status="WARN",
+            summary="dashboard API endpoint is unavailable",
+            detail=dashboard_payload,
+            fix="Start the dashboard API if operator visibility is needed overnight.",
+        )
+
+    ok, chat_payload = _readiness_fetch_json(
+        "http://127.0.0.1:8420/api/chat/status",
+        timeout=timeout,
+    )
+    if ok:
+        ready = bool(chat_payload.get("ready", False))
+        _readiness_add(
+            checks,
+            name="chat_bridge",
+            status="PASS" if ready else "WARN",
+            summary="chat bridge is ready" if ready else "chat bridge is not ready",
+            detail=chat_payload,
+        )
+    else:
+        _readiness_add(
+            checks,
+            name="chat_bridge",
+            status="WARN",
+            summary="chat bridge status endpoint is unavailable",
+            detail=chat_payload,
+        )
+
+    task_snapshot = _readiness_task_snapshot()
+    builder_pending = task_snapshot.get("builder_pending", [])
+    builder_running = task_snapshot.get("builder_running", [])
+    route_blocks = _readiness_recent_route_blocks()
+    if task_snapshot.get("error"):
+        _readiness_add(
+            checks,
+            name="task_board",
+            status="WARN",
+            summary="task board snapshot failed",
+            detail=task_snapshot.get("error"),
+        )
+    elif builder_pending and route_blocks and builder_running:
+        _readiness_add(
+            checks,
+            name="builder_routing",
+            status="WARN",
+            summary=(
+                f"{len(builder_pending)} builder task(s) pending while "
+                f"{len(builder_running)} builder task(s) already run on local tooling"
+            ),
+            detail={
+                "builder_pending": builder_pending[:10],
+                "builder_running": builder_running[:10],
+                "recent_blocks": route_blocks,
+            },
+            fix="Capacity-limited builder backlog: leave Codex running or add another local tooling seat.",
+        )
+    elif builder_pending and route_blocks:
+        _readiness_add(
+            checks,
+            name="builder_routing",
+            status="FAIL",
+            summary=(
+                f"{len(builder_pending)} builder task(s) pending with recent "
+                "no-tooling-capable routing blocks"
+            ),
+            detail={"builder_pending": builder_pending[:10], "recent_blocks": route_blocks},
+            fix="Restart the daemon on the builder-routing fix, then confirm pending build tasks dispatch.",
+        )
+    elif builder_pending:
+        _readiness_add(
+            checks,
+            name="builder_routing",
+            status="WARN",
+            summary=f"{len(builder_pending)} builder task(s) pending; no recent routing block seen",
+            detail={"builder_pending": builder_pending[:10]},
+        )
+    else:
+        _readiness_add(
+            checks,
+            name="builder_routing",
+            status="PASS",
+            summary="no blocked builder backlog detected",
+            detail={"stats": task_snapshot.get("stats", {})},
+        )
+
+    doctor_report = _readiness_doctor_report(run_doctor=run_doctor, timeout=timeout)
+    if doctor_report is None:
+        _readiness_add(
+            checks,
+            name="doctor",
+            status="WARN",
+            summary="no Doctor report available",
+            fix="Run `dgc doctor --quick` to populate a fresh readiness baseline.",
+        )
+    else:
+        summary = doctor_report.get("summary", {})
+        fail_count = int(summary.get("fail", 0) or summary.get("failed", 0) or 0)
+        warn_count = int(summary.get("warn", 0) or summary.get("warnings", 0) or 0)
+        if fail_count:
+            status = "FAIL"
+        elif warn_count:
+            status = "WARN"
+        else:
+            status = "PASS"
+        _readiness_add(
+            checks,
+            name="doctor",
+            status=status,
+            summary=f"Doctor: {fail_count} fail, {warn_count} warn",
+            detail={"summary": summary, "generated_at": doctor_report.get("generated_at")},
+            fix=(
+                "Resolve Doctor hard failures before trusting multi-hour autonomous execution."
+                if fail_count
+                else "Review Doctor warnings before leaving a long unattended run."
+            ),
+        )
+
+    payload = {
+        "overall": _readiness_overall(checks),
+        "exit_code": _readiness_exit_code(checks),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "checks": checks,
+    }
+
+    if as_json:
+        print(json.dumps(payload, ensure_ascii=True, indent=2, sort_keys=True))
+        return payload["exit_code"]
+
+    print(f"Overnight readiness: {payload['overall']}")
+    print()
+    for check in checks:
+        print(f"{check['status']:>4}  {check['name']}: {check['summary']}")
+    fixes = [
+        str(check.get("fix", "")).strip()
+        for check in checks
+        if check.get("status") in {"FAIL", "WARN"} and str(check.get("fix", "")).strip()
+    ]
+    if fixes:
+        print()
+        print("Next actions:")
+        seen: set[str] = set()
+        for fix in fixes:
+            if fix in seen:
+                continue
+            seen.add(fix)
+            print(f"  - {fix}")
+    return payload["exit_code"]
+
+
 def cmd_pulse() -> None:
     """Run one heartbeat pulse."""
     from dharma_swarm.pulse import pulse
@@ -1678,7 +2047,7 @@ def cmd_invariants() -> None:
     from pathlib import Path
     import json
 
-    state_dir = dharma_state_dir()
+    state_dir = Path.home() / ".dharma"
 
     # 1. Catalytic graph → criticality + closure
     try:
@@ -2341,6 +2710,332 @@ def cmd_full_power_probe(
 # Commands from dharma_swarm Typer CLI
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Governance CLI — directed agents, campaigns, promises, status snapshots
+# ---------------------------------------------------------------------------
+
+
+def _governance_meta_dir() -> Path:
+    return Path.home() / ".dharma" / "meta"
+
+
+def _witness_dir() -> Path:
+    return Path.home() / ".dharma" / "witness"
+
+
+def _conductor_last_seen_s(name: str) -> float | None:
+    """Seconds since conductor last wrote to its witness log, or None."""
+    import time as _time
+    path = _witness_dir() / f"conductor_{name}.jsonl"
+    if not path.exists():
+        return None
+    try:
+        mtime = path.stat().st_mtime
+    except Exception:
+        return None
+    return max(0.0, _time.time() - mtime)
+
+
+def cmd_agent_direct(name: str, task: str, campaign_id: str | None = None) -> None:
+    """Enqueue a directive for a registered conductor via file drop."""
+    from dharma_swarm.agent_direct import write_directive
+    try:
+        path = write_directive(name, task, campaign_id=campaign_id)
+    except ValueError as exc:
+        print(f"error: {exc}")
+        sys.exit(2)
+    print(f"Directive queued: {path}")
+    print(f"  target: {name}")
+    if campaign_id:
+        print(f"  campaign: {campaign_id}")
+    print("  The daemon watcher will pick this up within ~5s.")
+
+
+def cmd_agent_active() -> None:
+    """Show seeded conductors, last-seen freshness, and pinned campaigns."""
+    from dharma_swarm.conductors import CONDUCTOR_CONFIGS
+    from dharma_swarm.campaigns import find_by_agent
+
+    meta = _governance_meta_dir()
+    print(f"{'conductor':<22} {'model':<28} {'last_seen':<14} {'pins':<30}")
+    print("-" * 96)
+    for cfg in CONDUCTOR_CONFIGS:
+        name = cfg["name"]
+        model = str(cfg.get("model", ""))[:28]
+        ls = _conductor_last_seen_s(name)
+        if ls is None:
+            seen = "never"
+        elif ls < 120:
+            seen = f"{int(ls)}s ago"
+        elif ls < 3600:
+            seen = f"{int(ls/60)}m ago"
+        elif ls < 86400:
+            seen = f"{int(ls/3600)}h ago"
+        else:
+            seen = f"{int(ls/86400)}d ago"
+        pins = find_by_agent(name, meta_dir=meta)
+        pin_str = ", ".join(c.get("campaign_id", "?") for c in pins) or "-"
+        print(f"{name:<22} {model:<28} {seen:<14} {pin_str[:30]:<30}")
+
+
+def cmd_campaign_new(
+    campaign_id: str,
+    agents: list[str],
+    domain: str,
+    *,
+    title: str | None = None,
+    deadline: str | None = None,
+    criteria: str = "",
+) -> None:
+    from dharma_swarm.campaigns import create_campaign
+    from dharma_swarm.shakti_zeitgeist_executive import DOMAINS
+    if domain not in DOMAINS:
+        print(f"error: invalid domain {domain!r}. choose one of: {', '.join(DOMAINS)}")
+        sys.exit(2)
+    record = create_campaign(
+        campaign_id, domain, agents,
+        title=title, deadline=deadline, success_criteria=criteria,
+        meta_dir=_governance_meta_dir(),
+    )
+    print(f"Campaign created: {record['campaign_id']}")
+    print(f"  domain: {record['domain']}")
+    print(f"  pinned_agents: {', '.join(record['pinned_agents'])}")
+    if record.get("deadline"):
+        print(f"  deadline: {record['deadline']}")
+    if record.get("success_criteria"):
+        print(f"  criteria: {record['success_criteria']}")
+
+
+def cmd_campaign_pin(campaign_id: str, agent: str) -> None:
+    from dharma_swarm.campaigns import find_campaign, save_active, load_active
+    meta = _governance_meta_dir()
+    existing = load_active(meta)
+    for c in existing:
+        if c.get("campaign_id") != campaign_id:
+            continue
+        pins = list(c.get("pinned_agents") or [])
+        if agent in pins:
+            print(f"agent {agent!r} already pinned to {campaign_id}")
+            return
+        pins.append(agent)
+        c["pinned_agents"] = pins
+        save_active(existing, meta)
+        print(f"Pinned {agent} to {campaign_id}. Pins: {', '.join(pins)}")
+        return
+    print(f"error: no active campaign with id {campaign_id!r}")
+    sys.exit(2)
+
+
+def cmd_campaign_release(campaign_id: str, agent: str | None = None) -> None:
+    from dharma_swarm.campaigns import release_campaign
+    out = release_campaign(campaign_id, agent, meta_dir=_governance_meta_dir())
+    if out is None:
+        print(f"error: no active campaign with id {campaign_id!r}")
+        sys.exit(2)
+    if out.get("status") == "abandoned":
+        print(f"Campaign {campaign_id} closed (status=abandoned).")
+    else:
+        print(f"Released {agent} from {campaign_id}. Remaining pins: {', '.join(out['pinned_agents'])}")
+
+
+def cmd_campaign_list(stale_only: bool = False) -> None:
+    from dharma_swarm.campaigns import list_stale, load_active
+    meta = _governance_meta_dir()
+    if stale_only:
+        rows = list_stale(meta_dir=meta)
+        if not rows:
+            print("(no stale campaigns)")
+            return
+    else:
+        rows = load_active(meta)
+        if not rows:
+            print("(no active campaigns)")
+            return
+    print(f"{'campaign_id':<24} {'domain':<24} {'agents':<30} {'check-ins':<10} {'status':<10}")
+    print("-" * 100)
+    for c in rows:
+        cid = str(c.get("campaign_id", "?"))[:24]
+        domain = str(c.get("domain", "?"))[:24]
+        agents = ", ".join(c.get("pinned_agents") or [])[:30]
+        cnt = str(c.get("check_in_count", 0))
+        status = str(c.get("status", "active"))
+        print(f"{cid:<24} {domain:<24} {agents:<30} {cnt:<10} {status:<10}")
+        if stale_only and "elapsed_seconds" in c:
+            print(f"  elapsed: {c['elapsed_seconds']}s since last check-in")
+
+
+def cmd_campaign_complete(campaign_id: str, outcome: str = "") -> None:
+    from dharma_swarm.campaigns import complete_campaign
+    out = complete_campaign(campaign_id, outcome=outcome, meta_dir=_governance_meta_dir())
+    if out is None:
+        print(f"error: no active campaign with id {campaign_id!r}")
+        sys.exit(2)
+    print(f"Campaign {campaign_id} completed. Migrated to campaign_history.jsonl.")
+    if outcome:
+        print(f"  outcome: {outcome}")
+
+
+def cmd_promise_pin(promise_id: str, agent: str) -> None:
+    """Pin a heartbeat promise to an agent, auto-creating a linked campaign."""
+    from dharma_swarm.campaigns import campaign_from_promise, find_campaign
+    meta = _governance_meta_dir()
+    promise_file = meta / "promise_pressure.json"
+    if not promise_file.exists():
+        print("error: promise_pressure.json not found. Has the executive run?")
+        sys.exit(2)
+    try:
+        data = json.loads(promise_file.read_text())
+    except Exception as exc:
+        print(f"error: could not parse promise_pressure.json ({exc})")
+        sys.exit(2)
+    promises = data.get("promises") or []
+    match = next((p for p in promises if p.get("id") == promise_id), None)
+    if match is None:
+        print(f"error: no promise with id {promise_id!r} in current snapshot")
+        print("available ids:")
+        for p in promises[:8]:
+            print(f"  {p.get('id')}  ({(p.get('text') or '')[:60]})")
+        sys.exit(2)
+    domain = match.get("domain_hint") or "internal_maintenance"
+    c = campaign_from_promise(
+        str(match.get("text") or promise_id), agent, domain, meta_dir=meta,
+    )
+    # Short-circuit if campaign already existed
+    existing = find_campaign(c["campaign_id"], meta)
+    print(f"Promise pinned: {promise_id} → {agent}")
+    print(f"  campaign_id: {c['campaign_id']}")
+    print(f"  domain: {c['domain']}")
+    if existing and agent not in (existing.get("pinned_agents") or []):
+        # Ensure agent is actually pinned
+        cmd_campaign_pin(c["campaign_id"], agent)
+
+
+def cmd_governance_status() -> None:
+    """Show current governance snapshot: overlay status + artifact summary."""
+    import os as _os
+    from dharma_swarm.governance_signal import is_overlay_enabled
+
+    meta = _governance_meta_dir()
+    raw = _os.environ.get("DGC_GOVERNANCE_OVERLAY", "").strip().lower()
+    if raw in {"1", "true", "yes", "on"}:
+        overlay_mode = "FORCED_ON"
+    elif raw in {"0", "false", "no", "off"}:
+        overlay_mode = "FORCED_OFF"
+    else:
+        overlay_mode = "AUTO"
+    overlay_on = is_overlay_enabled()
+    print(f"DGC_GOVERNANCE_OVERLAY = {'ON' if overlay_on else 'OFF'} ({overlay_mode})")
+    print()
+
+    gs_path = meta / "governance_signal.json"
+    if not gs_path.exists():
+        print("governance_signal.json not found — the executive has not yet emitted a Phase 2 bundle.")
+        return
+    try:
+        gs = json.loads(gs_path.read_text())
+    except Exception as exc:
+        print(f"could not parse governance_signal.json: {exc}")
+        return
+    print(f"Cycle: {gs.get('cycle_id', '?')}")
+    print(f"Generated: {gs.get('generated_at', '?')}")
+    print(f"Active campaigns: {gs.get('active_campaign_count', 0)}")
+    print(f"Promises in pressure list: {gs.get('promise_count', 0)}")
+    print(f"Quarantined topics: {gs.get('quarantine_count', 0)}")
+    print(f"Underexpressed roles: {gs.get('underexpressed_role_count', 0)}")
+    print(f"Nominal-only agents: {gs.get('nominal_only_agent_count', 0)}")
+
+    if gs.get("stale_campaign_ids"):
+        print()
+        print("Stale campaigns (no check-in in 2× interval):")
+        for cid in gs["stale_campaign_ids"]:
+            print(f"  - {cid}")
+
+    if gs.get("starvation_alerts"):
+        print()
+        print("Starvation alerts (first 8):")
+        for alert in gs["starvation_alerts"][:8]:
+            print(f"  - {alert}")
+
+    shares = gs.get("domain_shares") or {}
+    if shares:
+        print()
+        print("Domain signal shares:")
+        for dom, share in sorted(shares.items(), key=lambda kv: -float(kv[1])):
+            bar = "█" * int(float(share) * 40)
+            print(f"  {dom:<28} {float(share):.3f}  {bar}")
+
+
+def cmd_governance_promises() -> None:
+    path = _governance_meta_dir() / "promise_pressure.json"
+    if not path.exists():
+        print("promise_pressure.json not found — executive hasn't emitted Phase 2 bundle yet.")
+        return
+    try:
+        data = json.loads(path.read_text())
+    except Exception as exc:
+        print(f"parse error: {exc}")
+        return
+    promises = data.get("promises") or []
+    if not promises:
+        print("(no unresolved promises)")
+        return
+    print(f"{'id':<22} {'urgency':<8} {'domain':<26} text")
+    print("-" * 100)
+    for p in promises:
+        pid = str(p.get("id", ""))[:22]
+        urg = f"{float(p.get('urgency', 0)):.2f}"
+        dom = str(p.get("domain_hint", "?"))[:26]
+        text = (p.get("text") or "")[:50]
+        print(f"{pid:<22} {urg:<8} {dom:<26} {text}")
+
+
+def cmd_governance_domain_mix() -> None:
+    path = _governance_meta_dir() / "allocation_weights.json"
+    if not path.exists():
+        print("allocation_weights.json not found.")
+        return
+    try:
+        data = json.loads(path.read_text())
+    except Exception as exc:
+        print(f"parse error: {exc}")
+        return
+    per = data.get("per_domain") or {}
+    boosts = data.get("starvation_boosts") or {}
+    pens = data.get("churn_penalties") or {}
+    print(f"{'domain':<28} {'weight':<10} {'×neutral':<12} {'boost':<10} {'penalty':<10}")
+    print("-" * 80)
+    for dom, w in sorted(per.items(), key=lambda kv: -float(kv[1])):
+        x_neutral = float(w) * 8
+        boost = boosts.get(dom, 0.0)
+        pen = pens.get(dom, 0.0)
+        print(f"{dom:<28} {float(w):<10.4f} {x_neutral:<12.2f} {float(boost):<10.3f} {float(pen):<10.3f}")
+
+
+def cmd_directives_show() -> None:
+    from dharma_swarm.operator_directives import load_directives, seed_if_absent
+    seed_if_absent()
+    d = load_directives(force=True)
+    if not d.has_content:
+        print("(no directives — file exists but empty)")
+        return
+    print(d.raw_text)
+
+
+def cmd_directives_edit() -> None:
+    from dharma_swarm.operator_directives import seed_if_absent, _directives_path
+    path = seed_if_absent()
+    editor = os.environ.get("EDITOR", "vim")
+    os.execvp(editor, [editor, str(path)])
+
+
+def cmd_directives_seed() -> None:
+    from dharma_swarm.operator_directives import seed_if_absent, _directives_path
+    path = seed_if_absent()
+    print(f"Directives file: {path}")
+    if path.exists():
+        print(f"  ({path.stat().st_size} bytes)")
+
+
 def cmd_spawn(name: str, role: str, model: str) -> None:
     """Spawn a new agent."""
     async def _spawn():
@@ -2752,29 +3447,13 @@ def cmd_evolve_daemon(
     _run(_daemon())
 
 
-def cmd_stigmergy(file_path: str | None = None, *, as_json: bool = False) -> None:
+def cmd_stigmergy(file_path: str | None = None) -> None:
     """Show recent stigmergic marks, hot paths, and high salience marks."""
-    async def _stig() -> dict | None:
+    async def _stig() -> None:
         from dharma_swarm.stigmergy import StigmergyStore
 
         store = StigmergyStore(base_path=DHARMA_STATE / "stigmergy")
         density = store.density()
-
-        if as_json:
-            data: dict = {"density": density}
-            if file_path:
-                marks = await store.read_marks(file_path=file_path, limit=15)
-                data["marks"] = [m.model_dump() for m in marks]
-            else:
-                recent = await store.read_marks(limit=10)
-                data["recent"] = [m.model_dump() for m in recent]
-                hot = await store.hot_paths(window_hours=48, min_marks=2)
-                data["hot_paths"] = [{"path": p, "count": c} for p, c in hot]
-                high = await store.high_salience(threshold=0.7, limit=5)
-                data["high_salience"] = [m.model_dump() for m in high]
-            print(json.dumps(data, indent=2, default=str))
-            return None
-
         print(f"=== Stigmergy ({density} marks) ===\n")
 
         if file_path:
@@ -2789,6 +3468,7 @@ def cmd_stigmergy(file_path: str | None = None, *, as_json: bool = False) -> Non
                     if m.connections:
                         print(f"    connections: {', '.join(m.connections)}")
         else:
+            # Recent marks
             recent = await store.read_marks(limit=10)
             if recent:
                 print("Recent marks:")
@@ -2797,12 +3477,14 @@ def cmd_stigmergy(file_path: str | None = None, *, as_json: bool = False) -> Non
                     print(f"  [{ts}] {m.agent} -> {m.file_path}")
                     print(f"    {m.action}: {m.observation} [sal={m.salience:.1f}]")
 
+            # Hot paths
             hot = await store.hot_paths(window_hours=48, min_marks=2)
             if hot:
                 print("\nHot paths (last 48h):")
                 for path, count in hot:
                     print(f"  {path}: {count} marks")
 
+            # High salience
             high = await store.high_salience(threshold=0.7, limit=5)
             if high:
                 print("\nHigh salience marks (>= 0.7):")
@@ -2812,8 +3494,6 @@ def cmd_stigmergy(file_path: str | None = None, *, as_json: bool = False) -> Non
 
             if not recent and not hot and not high:
                 print("No stigmergic marks yet. The lattice is empty.")
-
-        return None
 
     _run(_stig())
 
@@ -3685,14 +4365,6 @@ def cmd_context_search(query: str, budget: int = 10_000) -> None:
         print()
 
 
-def cmd_intent_plan(prompt: str) -> None:
-    """Inspect the intent-to-work-packet pipeline for a prompt (non-executing)."""
-    from dharma_swarm.operator_core.intent_payloads import build_intent_plan
-
-    data = build_intent_plan(prompt)
-    print(json.dumps(data, indent=2, default=str))
-
-
 def cmd_compose(description: str) -> None:
     """Compose a task into a DAG execution plan."""
     async def _compose():
@@ -4067,7 +4739,7 @@ def cmd_ledger(
     limit_sessions: int | None = None,
 ) -> None:
     """Inspect orchestrator session ledgers."""
-    ledger_base = dharma_state_dir() / "ledgers"
+    ledger_base = Path.home() / ".dharma" / "ledgers"
 
     if ledger_cmd == "sessions" or ledger_cmd is None:
         if not ledger_base.exists():
@@ -4679,14 +5351,12 @@ def cmd_cron(
                 print("  No cron jobs.")
                 return
             for j in jobs:
-                status = j.get("last_status") or "UNKNOWN"
+                status = j.get("last_status", "-")
                 enabled = "✓" if j.get("enabled", True) else "✗"
                 completed = j.get("repeat", {}).get("completed", 0)
                 times = j.get("repeat", {}).get("times")
                 repeat_str = f"{completed}/{times}" if times else f"{completed}/∞"
-                job_id_display = str(j.get("id") or "(no-id)")
-                name_display = str(j.get("name") or j.get("handler") or j.get("prompt") or "(unnamed)")
-                print(f"  {enabled} {job_id_display}  {name_display[:40]:<40}  "
+                print(f"  {enabled} {j['id']}  {j['name'][:40]:<40}  "
                       f"{j.get('schedule_display', '?'):<20}  "
                       f"runs={repeat_str}  last={status}")
         case "remove":
@@ -4707,85 +5377,6 @@ def cmd_cron(
             print(f"  Cron daemon exited: {executed} job(s) executed")
         case _:
             print("Usage: dgc cron {add|list|remove|tick|daemon}")
-
-
-def cmd_system_map(
-    map_cmd: str,
-    *,
-    organ: str | None = None,
-    map_path: str | Path = "reports/system_map/latest.json",
-    json_output: bool = False,
-) -> int:
-    """Read reports/system_map/latest.json and answer OrganState queries."""
-
-    path = Path(map_path).expanduser()
-    if not path.exists():
-        print(f"System map not found: {path}", file=sys.stderr)
-        return 2
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as exc:
-        print(f"System map is invalid JSON: {path}: {exc}", file=sys.stderr)
-        return 2
-
-    organs = payload.get("organs")
-    if not isinstance(organs, list):
-        print(f"System map has no organs list: {path}", file=sys.stderr)
-        return 2
-
-    if map_cmd == "list":
-        rows = organs
-    elif map_cmd == "drifted":
-        rows = [
-            item
-            for item in organs
-            if str(item.get("coherence_state")) in {"drifted", "partial", "declared_only", "unknown"}
-        ]
-    elif map_cmd == "gaps":
-        rows = [
-            item
-            for item in organs
-            if item.get("next_bindable_gap") or item.get("next_packet_hint") or item.get("open_gap")
-        ]
-    elif map_cmd == "show":
-        rows = [item for item in organs if item.get("name") == organ]
-        if not rows:
-            print(f"Organ not found: {organ}", file=sys.stderr)
-            return 1
-    else:
-        print("Usage: dgc map {list|drifted|gaps|show}", file=sys.stderr)
-        return 2
-
-    if json_output:
-        print(json.dumps(rows, indent=2, sort_keys=True))
-        return 0
-
-    if map_cmd in {"list", "drifted"}:
-        for item in rows:
-            print(f"{item.get('name')}\t{item.get('coherence_state')}\t{item.get('owns')}")
-    elif map_cmd == "gaps":
-        for item in rows:
-            gap = item.get("next_bindable_gap") or item.get("next_packet_hint") or item.get("open_gap")
-            print(f"{item.get('name')}: {gap}")
-    elif map_cmd == "show":
-        item = rows[0]
-        for key in (
-            "name",
-            "owns",
-            "declared_state",
-            "observed_state",
-            "coherence_state",
-            "open_gap",
-            "next_bindable_gap",
-            "risk",
-        ):
-            print(f"{key}: {item.get(key)}")
-        refs = item.get("evidence_refs") or []
-        if refs:
-            print("evidence_refs:")
-            for ref in refs:
-                print(f"  - {ref}")
-    return 0
 
 
 def cmd_xray(
@@ -5386,24 +5977,9 @@ def _build_parser() -> argparse.ArgumentParser:
     p_map = sub.add_parser("map", help="Living map — all 8 layers, regenerated fresh from live sources")
     p_map.add_argument("--json", action="store_true", help="JSON output")
     p_map.add_argument("--layer", type=int, default=None, help="Single layer (0-7)")
-    map_sub = p_map.add_subparsers(dest="map_cmd")
-    p_map_list = map_sub.add_parser("list", help="List organs from reports/system_map/latest.json")
-    p_map_list.add_argument("--path", default="reports/system_map/latest.json")
-    p_map_list.add_argument("--json", dest="system_map_json_output", action="store_true")
-    p_map_drifted = map_sub.add_parser("drifted", help="List drifted/partial/unknown organs")
-    p_map_drifted.add_argument("--path", default="reports/system_map/latest.json")
-    p_map_drifted.add_argument("--json", dest="system_map_json_output", action="store_true")
-    p_map_gaps = map_sub.add_parser("gaps", help="List next bindable gaps")
-    p_map_gaps.add_argument("--path", default="reports/system_map/latest.json")
-    p_map_gaps.add_argument("--json", dest="system_map_json_output", action="store_true")
-    p_map_show = map_sub.add_parser("show", help="Show one organ from reports/system_map/latest.json")
-    p_map_show.add_argument("organ")
-    p_map_show.add_argument("--path", default="reports/system_map/latest.json")
-    p_map_show.add_argument("--json", dest="system_map_json_output", action="store_true")
 
     # -- status --
-    p_status = sub.add_parser("status", help="System status overview")
-    p_status.add_argument("--json", action="store_true", help="Emit JSON output")
+    sub.add_parser("status", help="System status overview")
     p_runtime = sub.add_parser("runtime-status", help="Canonical runtime control-plane summary")
     p_runtime.add_argument(
         "--limit",
@@ -5416,7 +5992,6 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Override runtime SQLite path (defaults to ~/.dharma/state/runtime.db)",
     )
-    p_runtime.add_argument("--json", action="store_true", help="Emit JSON output")
     p_mission = sub.add_parser("mission-status", help="Mission readiness lanes + gap report")
     p_mission.add_argument("--json", action="store_true", help="Emit JSON report")
     p_mission.add_argument(
@@ -5464,12 +6039,8 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p_canonical = sub.add_parser("canonical-status", help="Show canonical DGC/SAB repo topology")
     p_canonical.add_argument("--json", action="store_true", help="Emit JSON report")
-
-    # -- value-events --
-    p_ve = sub.add_parser("value-events", help="List operator_brief ValueEvents grouped by agent")
-    p_ve.add_argument("--since", required=True, help="Show events since date (YYYY-MM-DD or ISO-8601)")
-    p_ve.add_argument("--json", action="store_true", help="Emit JSON output")
-    p_ve.add_argument("--registry-path", default=None, help="Override ontology registry path")
+    p_repo_rules = sub.add_parser("repo-rules", help="Show canonical repo rules entrypoints")
+    p_repo_rules.add_argument("--json", action="store_true", help="Emit machine-readable JSON")
 
     # -- chat --
     p_chat = sub.add_parser("chat", help="Launch native Claude Code interactive UI")
@@ -5646,14 +6217,87 @@ def _build_parser() -> argparse.ArgumentParser:
     p_dev.add_argument("what", help="What was developed")
     p_dev.add_argument("evidence", nargs="+", help="Evidence")
 
+    # -- campaign (durable campaign memory) --
+    p_campaign = sub.add_parser(
+        "campaign",
+        help="Manage durable campaign memory (~/.dharma/meta/active_campaigns.json)",
+    )
+    campaign_sub = p_campaign.add_subparsers(dest="campaign_cmd")
+
+    p_camp_new = campaign_sub.add_parser("new", help="Create a new active campaign")
+    p_camp_new.add_argument("campaign_id")
+    p_camp_new.add_argument("--agents", nargs="+", required=True,
+                            help="One or more agent names to pin to the campaign")
+    p_camp_new.add_argument("--domain", required=True,
+                            help="One of the 8 operational domains")
+    p_camp_new.add_argument("--title", default=None)
+    p_camp_new.add_argument("--deadline", default=None, help="ISO timestamp")
+    p_camp_new.add_argument("--criteria", default="",
+                            help="Success criteria (free text)")
+
+    p_camp_pin = campaign_sub.add_parser("pin", help="Add an agent to an existing campaign")
+    p_camp_pin.add_argument("campaign_id")
+    p_camp_pin.add_argument("agent")
+
+    p_camp_release = campaign_sub.add_parser(
+        "release",
+        help="Remove an agent from a campaign, or close the campaign entirely",
+    )
+    p_camp_release.add_argument("campaign_id")
+    p_camp_release.add_argument("--agent", default=None,
+                                help="Release only this agent; omit to close campaign")
+
+    p_camp_list = campaign_sub.add_parser("list", help="List active campaigns")
+    p_camp_list.add_argument("--stale", action="store_true",
+                             help="Only campaigns with no check-in in 2× executive interval")
+
+    p_camp_done = campaign_sub.add_parser(
+        "complete", help="Mark campaign done and migrate to campaign_history.jsonl",
+    )
+    p_camp_done.add_argument("campaign_id")
+    p_camp_done.add_argument("--outcome", default="")
+
+    # -- promise (heartbeat promise → campaign shortcut) --
+    p_promise = sub.add_parser(
+        "promise",
+        help="Operate on heartbeat-derived promises (promise_pressure.json)",
+    )
+    promise_sub = p_promise.add_subparsers(dest="promise_cmd")
+
+    p_prom_pin = promise_sub.add_parser(
+        "pin",
+        help="Pin a heartbeat promise to an agent, auto-creating a linked campaign",
+    )
+    p_prom_pin.add_argument("promise_id",
+                            help="ID from `dgc governance promises` (promise_...)")
+    p_prom_pin.add_argument("agent")
+
+    # -- governance (status + inspection) --
+    # -- directives (operator air traffic controller) --
+    p_dir = sub.add_parser(
+        "directives",
+        help="Manage operator directives (~/.dharma/meta/OPERATOR_DIRECTIVES.md)",
+    )
+    dir_sub = p_dir.add_subparsers(dest="directives_cmd")
+    dir_sub.add_parser("show", help="Print current directives")
+    dir_sub.add_parser("edit", help="Open directives in $EDITOR")
+    dir_sub.add_parser("seed", help="Create seed directives file if absent")
+
+    p_gov = sub.add_parser(
+        "governance",
+        help="Inspect the executive governance bundle under ~/.dharma/meta/",
+    )
+    gov_sub = p_gov.add_subparsers(dest="governance_cmd")
+    gov_sub.add_parser("status", help="Show governance_signal summary")
+    gov_sub.add_parser("promises", help="Show promise_pressure list")
+    gov_sub.add_parser("domain-mix", help="Show allocation_weights per domain")
+
     # -- gates --
     p_gates = sub.add_parser("gates", help="Run telos gates on an action")
     p_gates.add_argument("action", nargs="+")
-    p_gates.add_argument("--json", action="store_true", help="Emit JSON output")
 
     # -- health --
-    p_health = sub.add_parser("health", help="Ecosystem file health")
-    p_health.add_argument("--json", action="store_true", help="Emit JSON output")
+    sub.add_parser("health", help="Ecosystem file health")
 
     # -- health-check (v0.2.0 monitor) --
     sub.add_parser("health-check", help="Monitor-based system health check")
@@ -5692,6 +6336,18 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Optional max iterations for `dgc doctor watch`",
     )
 
+    p_ready = sub.add_parser(
+        "overnight-readiness",
+        help="Fresh preflight for multi-hour autonomous builds",
+    )
+    p_ready.add_argument("--json", action="store_true", help="Emit machine-readable JSON")
+    p_ready.add_argument(
+        "--cached-doctor",
+        action="store_true",
+        help="Use the latest cached Doctor report instead of running a fresh quick Doctor pass",
+    )
+    p_ready.add_argument("--timeout", type=float, default=1.5, help="Probe timeout seconds")
+
     # -- setup --
     sub.add_parser("setup", help="Install dependencies")
 
@@ -5725,6 +6381,23 @@ def _build_parser() -> argparse.ArgumentParser:
     p_agent_list = agent_sub.add_parser("list", help="List available preset agents")
 
     p_agent_runs = agent_sub.add_parser("runs", help="Show recent agent run reports")
+
+    # Governance additions: directed injection + registry inspection.
+    p_agent_direct = agent_sub.add_parser(
+        "direct",
+        help="Inject a task into a registered conductor via file-drop",
+    )
+    p_agent_direct.add_argument("name", help="Conductor name (e.g. conductor_claude)")
+    p_agent_direct.add_argument("task", help="The task to inject")
+    p_agent_direct.add_argument(
+        "--campaign", default=None,
+        help="Optional campaign_id. Watcher will prefix the task with CAMPAIGN:",
+    )
+
+    p_agent_active = agent_sub.add_parser(
+        "active",
+        help="Show seeded conductors, last-seen witness freshness, and pinned campaigns",
+    )
 
     # -- task --
     p_task = sub.add_parser("task", help="Task management")
@@ -5795,7 +6468,6 @@ def _build_parser() -> argparse.ArgumentParser:
     # -- stigmergy --
     p_stig = sub.add_parser("stigmergy", help="Stigmergy marks and hot paths")
     p_stig.add_argument("--file", dest="stig_file", default=None)
-    p_stig.add_argument("--json", action="store_true", help="Emit JSON output")
 
     # -- hum --
     sub.add_parser("hum", help="Subconscious associations")
@@ -6065,14 +6737,6 @@ def _build_parser() -> argparse.ArgumentParser:
     p_cs = sub.add_parser("context-search", help="Search for task-relevant context (v0.4.0)")
     p_cs.add_argument("cs_query", nargs="+", help="Search query")
     p_cs.add_argument("--budget", type=int, default=10000)
-
-    # -- intent-plan --
-    p_ip = sub.add_parser(
-        "intent-plan",
-        help="Inspect the intent-to-work-packet pipeline for a prompt (non-executing)",
-    )
-    p_ip.add_argument("ip_prompt", nargs="+", help="Operator prompt to analyze")
-    p_ip.add_argument("--json", action="store_true", help="Emit JSON output (default)")
 
     # -- compose (v0.4.1) --
     p_comp = sub.add_parser("compose", help="Compose a task into DAG execution plan (v0.4.1)")
@@ -6402,7 +7066,7 @@ def _cmd_agent_list() -> None:
 
 def _cmd_agent_runs() -> None:
     """Show recent agent run reports."""
-    report_dir = dharma_state_dir() / "agent_runs"
+    report_dir = Path.home() / ".dharma" / "agent_runs"
     if not report_dir.exists():
         print("No agent runs yet.")
         return
@@ -6488,9 +7152,9 @@ def main() -> None:
         case "ui":
             cmd_ui(getattr(args, "surface", "list"))
         case "status":
-            cmd_status(as_json=args.json)
+            cmd_status()
         case "runtime-status":
-            cmd_runtime_status(limit=args.limit, db_path=args.db_path, as_json=args.json)
+            cmd_runtime_status(limit=args.limit, db_path=args.db_path)
         case "mission-status":
             rc = cmd_mission_status(
                 as_json=args.json,
@@ -6520,13 +7184,10 @@ def main() -> None:
             rc = cmd_canonical_status(as_json=args.json)
             if rc != 0:
                 raise SystemExit(rc)
-        case "value-events":
-            from dharma_swarm.operator_brief.value_events import run_value_events
-            print(run_value_events(
-                since=args.since,
-                as_json=args.json,
-                registry_path=args.registry_path,
-            ))
+        case "repo-rules":
+            rc = cmd_repo_rules(as_json=args.json)
+            if rc != 0:
+                raise SystemExit(rc)
         case "up":
             cmd_up(background=args.background)
         case "down":
@@ -6611,7 +7272,7 @@ def main() -> None:
         case "develop":
             cmd_develop(args.what, " ".join(args.evidence))
         case "gates":
-            cmd_gates(" ".join(args.action), as_json=args.json)
+            cmd_gates(" ".join(args.action))
         case "organism-pulse":
             cmd_organism_pulse(task=args.task, dry_run=args.dry_run)
         case "invariants":
@@ -6619,7 +7280,7 @@ def main() -> None:
         case "transcendence":
             cmd_transcendence()
         case "health":
-            cmd_health(as_json=args.json)
+            cmd_health()
         case "cascade":
             cmd_cascade(
                 domain=args.domain,
@@ -6659,6 +7320,14 @@ def main() -> None:
             )
             if rc != 0:
                 raise SystemExit(rc)
+        case "overnight-readiness":
+            rc = cmd_overnight_readiness(
+                as_json=args.json,
+                run_doctor=not args.cached_doctor,
+                timeout=args.timeout,
+            )
+            if rc != 0:
+                raise SystemExit(rc)
         case "setup":
             cmd_setup()
         case "migrate":
@@ -6677,8 +7346,56 @@ def main() -> None:
                     _cmd_agent_list()
                 case "runs":
                     _cmd_agent_runs()
+                case "direct":
+                    cmd_agent_direct(args.name, args.task, args.campaign)
+                case "active":
+                    cmd_agent_active()
                 case _:
                     parser.parse_args(["agent", "--help"])
+        case "campaign":
+            match args.campaign_cmd:
+                case "new":
+                    cmd_campaign_new(
+                        args.campaign_id, args.agents, args.domain,
+                        title=args.title, deadline=args.deadline,
+                        criteria=args.criteria,
+                    )
+                case "pin":
+                    cmd_campaign_pin(args.campaign_id, args.agent)
+                case "release":
+                    cmd_campaign_release(args.campaign_id, args.agent)
+                case "list":
+                    cmd_campaign_list(stale_only=args.stale)
+                case "complete":
+                    cmd_campaign_complete(args.campaign_id, outcome=args.outcome)
+                case _:
+                    parser.parse_args(["campaign", "--help"])
+        case "promise":
+            match args.promise_cmd:
+                case "pin":
+                    cmd_promise_pin(args.promise_id, args.agent)
+                case _:
+                    parser.parse_args(["promise", "--help"])
+        case "directives":
+            match args.directives_cmd:
+                case "show" | None:
+                    cmd_directives_show()
+                case "edit":
+                    cmd_directives_edit()
+                case "seed":
+                    cmd_directives_seed()
+                case _:
+                    parser.parse_args(["directives", "--help"])
+        case "governance":
+            match args.governance_cmd:
+                case "status" | None:
+                    cmd_governance_status()
+                case "promises":
+                    cmd_governance_promises()
+                case "domain-mix":
+                    cmd_governance_domain_mix()
+                case _:
+                    parser.parse_args(["governance", "--help"])
         case "task":
             match args.task_cmd:
                 case "create":
@@ -6872,7 +7589,7 @@ def main() -> None:
                 case _:
                     parser.parse_args(["dharma", "--help"])
         case "stigmergy":
-            cmd_stigmergy(args.stig_file, as_json=args.json)
+            cmd_stigmergy(args.stig_file)
         case "hum":
             cmd_hum()
         case "eval":
@@ -6902,7 +7619,7 @@ def main() -> None:
                     parser.parse_args(["eval", "--help"])
         case "log":
             import subprocess as _sp_log
-            checker = str(dharma_state_dir() / "conversation_log" / "promise_checker.py")
+            checker = str(Path.home() / ".dharma" / "conversation_log" / "promise_checker.py")
             match args.log_cmd:
                 case "promises":
                     _sp_log.run([sys.executable, checker, "--promises"])
@@ -6980,8 +7697,6 @@ def main() -> None:
             cmd_autonomy(" ".join(args.auto_action))
         case "context-search":
             cmd_context_search(" ".join(args.cs_query))
-        case "intent-plan":
-            cmd_intent_plan(" ".join(args.ip_prompt))
         case "compose":
             cmd_compose(" ".join(args.comp_desc))
         case "execute-compose":
@@ -7256,15 +7971,6 @@ def main() -> None:
                 run_immediately=getattr(args, "run_immediately", True),
             )
         case "map":
-            if getattr(args, "map_cmd", None):
-                raise SystemExit(
-                    cmd_system_map(
-                        map_cmd=args.map_cmd,
-                        organ=getattr(args, "organ", None),
-                        map_path=getattr(args, "path", "reports/system_map/latest.json"),
-                        json_output=getattr(args, "system_map_json_output", False),
-                    )
-                )
             from dharma_swarm.living_map import generate, generate_json
             if getattr(args, "json", False):
                 import json as _json

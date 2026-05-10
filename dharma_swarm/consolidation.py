@@ -28,7 +28,6 @@ import logging
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -504,6 +503,11 @@ class ContrarianDialogue:
             messages=[{"role": "user", "content": user_msg}],
             max_tokens=1500,
             temperature=0.7,
+            metadata={
+                "execution_mode": "headless_consolidation",
+                "source": "consolidation",
+                "task_title": "memory_consolidation",
+            },
         )
         response = await provider.complete(request)
         return response.content
@@ -806,7 +810,7 @@ class ConsolidationCycle:
         beta_model: str = DEFAULT_BETA_MODEL,
         debate_rounds: int = 5,
     ) -> None:
-        self._state_dir = state_dir or (dharma_state_dir())
+        self._state_dir = state_dir or (Path.home() / ".dharma")
         self._observer = SystemObserver(self._state_dir)
         self._dialogue = ContrarianDialogue(
             alpha_model=alpha_model,

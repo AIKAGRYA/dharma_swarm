@@ -26,7 +26,6 @@ import json
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
-from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 from dharma_swarm.pending_proposals import (
@@ -36,7 +35,7 @@ from dharma_swarm.pending_proposals import (
 
 logger = logging.getLogger(__name__)
 
-STATE_DIR = dharma_state_dir()
+STATE_DIR = Path.home() / ".dharma"
 INBOX_DIR = STATE_DIR / "skill_bridge"
 INBOX_FILE = INBOX_DIR / "inbox.jsonl"
 PROPOSALS_FILE = _DEFAULT_PENDING_PROPOSALS_FILE

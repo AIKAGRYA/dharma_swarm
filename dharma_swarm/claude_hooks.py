@@ -19,9 +19,8 @@ import asyncio
 import json
 import sys
 from pathlib import Path
-from dharma_swarm.daemon_config import dharma_state_dir
 
-STATE_DIR = dharma_state_dir()
+STATE_DIR = Path.home() / ".dharma"
 
 
 def stop_verify() -> dict:

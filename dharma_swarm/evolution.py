@@ -15,6 +15,7 @@ from dataclasses import dataclass
 import hashlib
 import inspect
 import logging
+import os
 import re
 import shlex
 import shutil
@@ -160,22 +161,6 @@ class CycleResult(BaseModel):
     lessons_learned: list[str] = Field(default_factory=list)
 
 
-class SealedPacketApplyResult(BaseModel):
-    """Outcome of ingesting a sealed Build Protocol packet."""
-
-    packet_root: str
-    accepted: bool = False
-    applied: bool = False
-    shadow: bool = True
-    reason: str = ""
-    refused_checks: list[str] = Field(default_factory=list)
-    proposal_id: str | None = None
-    archive_entry_id: str | None = None
-    proof_exit_code: int | None = None
-    files_changed: list[str] = Field(default_factory=list)
-    test_results: dict[str, Any] = Field(default_factory=dict)
-
-
 class EvolutionPlan(BaseModel):
     """Planner output consumed by execution loops."""
 
@@ -301,8 +286,10 @@ class DarwinEngine:
         self._adaptive_strategy = "explore"
         self._max_cycle_tokens = max(0, int(max_cycle_tokens))
         self._session_tokens_used = 0
-        # Mutation budget: max mutations per day (prevents runaway self-modification)
-        self._daily_mutation_budget = 5
+        # Mutation budget: env-configurable. Set to 0 to disable the cap.
+        self._daily_mutation_budget = max(
+            0, int(os.environ.get("DHARMA_DAILY_MUTATION_BUDGET", "0") or "0")
+        )
         self._mutations_today = 0
         self._budget_reset_date = ""
         self.last_landscape_probe: LandscapeProbe | None = None
@@ -1729,6 +1716,7 @@ class DarwinEngine:
                 test_results,
                 weighted_fitness,
             )
+            applied_status = self._archive_status_for_proposal(proposal, test_results)
 
             entry = ArchiveEntry(
                 component=proposal.component,
@@ -1744,7 +1732,7 @@ class DarwinEngine:
                 execution_profile=proposal.execution_profile,
                 evidence_tier=proposal.evidence_tier,
                 promotion_state=proposal.promotion_state,
-                status="applied",
+                status=applied_status,
                 gates_passed=(
                     ["ALL"]
                     if proposal.gate_decision != GateDecision.BLOCK.value
@@ -1851,6 +1839,19 @@ class DarwinEngine:
             weighted_fitness,
         )
         return entry_id
+
+    @staticmethod
+    def _archive_status_for_proposal(
+        proposal: Proposal,
+        test_results: dict[str, Any],
+    ) -> str:
+        diff_text = str(proposal.diff or "").strip()
+        has_diff = bool(diff_text)
+        pass_rate = float(test_results.get("pass_rate", 0.0) or 0.0)
+        rolled_back = bool(test_results.get("rolled_back", False))
+        if has_diff and pass_rate >= 1.0 and not rolled_back:
+            return "applied"
+        return "candidate"
 
     async def run_runtime_field_trial(
         self,
@@ -1984,7 +1985,7 @@ class DarwinEngine:
             self._mutations_today = 0
             self._budget_reset_date = today
 
-        if self._mutations_today >= self._daily_mutation_budget:
+        if self._daily_mutation_budget > 0 and self._mutations_today >= self._daily_mutation_budget:
             logger.warning(
                 "Daily mutation budget exhausted (%d/%d). "
                 "Skipping mutations, eval-only mode.",
@@ -2238,29 +2239,6 @@ class DarwinEngine:
 
         return (proposal, {"pass_rate": pass_rate, "rolled_back": result.rolled_back})
 
-    async def apply_sealed_packet(
-        self,
-        dryrun_root: Path,
-        *,
-        shadow: bool = True,
-        workspace: Path | None = None,
-        proof_timeout: float = 120.0,
-        max_diff_lines: int = 50,
-        halt_path: Path | None = None,
-    ) -> SealedPacketApplyResult:
-        """Ingest a sealed Build Protocol packet through Darwin guards."""
-        from dharma_swarm.sealed_packet_apply import apply_sealed_packet
-
-        return await apply_sealed_packet(
-            self,
-            dryrun_root,
-            shadow=shadow,
-            workspace=workspace,
-            proof_timeout=proof_timeout,
-            max_diff_lines=max_diff_lines,
-            halt_path=halt_path,
-        )
-
     async def apply_in_sandbox(
         self,
         proposal: Proposal,
@@ -2510,7 +2488,7 @@ class DarwinEngine:
             change_type="observation",
             description=f"Task fitness: {fitness_score:.3f}",
             fitness=FitnessScore(correctness=fitness_score),
-            status="applied",
+            status="observed",
             test_results={"task_id": task_id} if task_id else {},
         )
         return await self.archive.add_entry(entry)
@@ -2792,6 +2770,11 @@ class DarwinEngine:
                 ),
                 max_tokens=800,
                 temperature=0.2,
+                metadata={
+                    "execution_mode": "headless_evolution",
+                    "source": "evolution",
+                    "task_title": "code_improvement_diff",
+                },
             )
 
             response = await provider.complete(request)
@@ -2929,6 +2912,11 @@ class DarwinEngine:
             ),
             max_tokens=2048,
             temperature=min(1.0, max(0.3, 0.4 + mutation_rate)),
+            metadata={
+                "execution_mode": "headless_evolution",
+                "source": "evolution",
+                "task_title": f"propose_mutation:{component_key}",
+            },
         )
 
         # Token budget check

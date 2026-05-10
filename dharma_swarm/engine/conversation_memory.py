@@ -86,6 +86,27 @@ def _split_candidates(text: str) -> list[str]:
     ]
 
 
+def _is_latent_control_candidate(text: str) -> bool:
+    normalized = _normalize(text)
+    if not normalized:
+        return False
+    if normalized.startswith("[idea:"):
+        return True
+    control_prefixes = (
+        "## task: follow up latent todo:",
+        "this task was reopened automatically from a high-salience latent branch",
+        "original shard:",
+        "goal: decide whether this branch should be implemented",
+        "state:",
+        "kind:",
+        "salience:",
+        "source task:",
+    )
+    if any(normalized.startswith(prefix) for prefix in control_prefixes):
+        return True
+    return "originating latent branch" in normalized and "[idea:" in text
+
+
 def _classify_candidate(text: str) -> str:
     normalized = _normalize(text)
     if "?" in text or normalized.startswith(("what if", "why", "how")):
@@ -299,6 +320,8 @@ class ConversationMemoryStore:
         with sqlite3.connect(str(self.db_path)) as db:
             ensure_memory_plane_schema_sync(db)
             for candidate in candidates:
+                if _is_latent_control_candidate(candidate):
+                    continue
                 flow_score = float(turn.metadata.get("flow_score", _detect_flow_score(turn.content)))
                 salience = _salience_score(candidate, flow_score)
                 novelty = _novelty_score(candidate, prior_texts)

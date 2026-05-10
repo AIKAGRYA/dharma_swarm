@@ -433,22 +433,22 @@ _STRATEGY_PROFILES: dict[str, dict[str, Any]] = {
     "explore": {
         # Maximise diversity — spread across tiers and models
         "tier_weights": {
-            ModelTier.FRONTIER: 0.15,
-            ModelTier.STRONG: 0.35,
-            ModelTier.FAST: 0.15,
-            ModelTier.FREE: 0.20,
-            ModelTier.LOCAL: 0.15,
+            ModelTier.FRONTIER: 0.20,
+            ModelTier.STRONG: 0.38,
+            ModelTier.FAST: 0.20,
+            ModelTier.FREE: 0.17,
+            ModelTier.LOCAL: 0.05,
         },
         "strength_bonus": "code",
     },
     "restart": {
         # Escape local optima — cheap and fast, many attempts
         "tier_weights": {
-            ModelTier.FRONTIER: 0.05,
-            ModelTier.STRONG: 0.15,
-            ModelTier.FAST: 0.25,
-            ModelTier.FREE: 0.40,
-            ModelTier.LOCAL: 0.15,
+            ModelTier.FRONTIER: 0.08,
+            ModelTier.STRONG: 0.22,
+            ModelTier.FAST: 0.30,
+            ModelTier.FREE: 0.32,
+            ModelTier.LOCAL: 0.08,
         },
         "strength_bonus": "speed",
     },

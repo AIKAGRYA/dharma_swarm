@@ -11,6 +11,7 @@ from dharma_swarm.providers import (
     AnthropicProvider,
     ClaudeCodeProvider,
     CodexProvider,
+    DEFAULT_SUBPROCESS_TIMEOUT_SECONDS,
     FireworksProvider,
     GroqProvider,
     ModelRouter,
@@ -143,6 +144,8 @@ def test_claude_code_provider_init():
 def test_claude_code_provider_default_dir():
     p = ClaudeCodeProvider()
     assert "dharma_swarm" in p._working_dir
+    assert p._timeout == DEFAULT_SUBPROCESS_TIMEOUT_SECONDS
+    assert p._timeout >= 900
 
 
 @pytest.mark.asyncio
@@ -203,6 +206,69 @@ async def test_claude_code_provider_timeout():
 
     assert "TIMEOUT" in result.content
     assert result.model == "claude-code"
+
+
+@pytest.mark.asyncio
+async def test_subprocess_provider_honors_request_timeout_metadata():
+    """Task-level dispatch budgets must reach subprocess providers."""
+    captured: dict[str, float] = {}
+    exec_kwargs: dict[str, object] = {}
+
+    async def fake_exec(*args, **kwargs):
+        exec_kwargs.update(kwargs)
+        mock_proc = AsyncMock()
+        mock_proc.communicate = AsyncMock(return_value=(b"codex result", b""))
+        mock_proc.returncode = 0
+        mock_proc.terminate = AsyncMock()
+        return mock_proc
+
+    async def fake_wait_for(awaitable, *, timeout):
+        captured["timeout"] = timeout
+        return await awaitable
+
+    provider = CodexProvider(timeout=60)
+    with (
+        patch("dharma_swarm.providers.asyncio.create_subprocess_exec", side_effect=fake_exec),
+        patch("dharma_swarm.providers.asyncio.wait_for", side_effect=fake_wait_for),
+    ):
+        await provider.complete(
+            LLMRequest(
+                model="codex",
+                messages=[{"role": "user", "content": "test"}],
+                metadata={"timeout_seconds": 1800},
+            )
+        )
+
+    assert captured["timeout"] == 1800.0
+    assert exec_kwargs["start_new_session"] is True
+
+
+@pytest.mark.asyncio
+async def test_subprocess_provider_terminates_on_outer_cancellation():
+    """Orchestrator cancellation should not leave CLI child processes alive."""
+    captured: dict[str, AsyncMock] = {}
+
+    async def fake_exec(*args, **kwargs):
+        mock_proc = AsyncMock()
+        mock_proc.pid = None
+        mock_proc.communicate = AsyncMock(side_effect=asyncio.CancelledError)
+        mock_proc.terminate = AsyncMock()
+        mock_proc.wait = AsyncMock(return_value=0)
+        captured["proc"] = mock_proc
+        return mock_proc
+
+    provider = CodexProvider(timeout=60)
+    with patch("dharma_swarm.providers.asyncio.create_subprocess_exec", side_effect=fake_exec):
+        with pytest.raises(asyncio.CancelledError):
+            await provider.complete(
+                LLMRequest(
+                    model="codex",
+                    messages=[{"role": "user", "content": "test"}],
+                )
+            )
+
+    captured["proc"].terminate.assert_called_once()
+    captured["proc"].wait.assert_called_once()
 
 
 @pytest.mark.asyncio

@@ -11,8 +11,10 @@ from dataclasses import replace
 from datetime import datetime, timezone
 import inspect
 import json
+import logging
 import os
 import random
+import signal
 import shutil
 import time
 from abc import abstractmethod
@@ -41,7 +43,8 @@ from dharma_swarm.api_keys import (
 )
 from dharma_swarm.base_provider import BaseProvider, ProviderCapabilities
 from dharma_swarm.codex_cli import dgc_codex_exec_prefix
-from dharma_swarm.cost_tracker import _estimate_cost
+from dharma_swarm.config import DEFAULT_CONFIG as _SWARM_CFG
+from dharma_swarm.cost_tracker import _estimate_cost, log_cost
 from dharma_swarm.model_hierarchy import default_model as canonical_default_model
 from dharma_swarm.models import LLMRequest, LLMResponse, ProviderType
 from dharma_swarm.jikoku_instrumentation import jikoku_traced_provider  # type: ignore
@@ -82,6 +85,27 @@ from dharma_swarm.telemetry_plane import (
     RoutingDecisionRecord,
     TelemetryPlaneStore,
 )
+
+
+logger = logging.getLogger(__name__)
+
+DEFAULT_SUBPROCESS_TIMEOUT_SECONDS = _SWARM_CFG.agent.subprocess_timeout_seconds
+_SUBPROCESS_TIMEOUT_METADATA_KEYS = (
+    "provider_timeout_seconds",
+    "subprocess_timeout_seconds",
+    "timeout_seconds",
+    "run_timeout_seconds",
+    "task_timeout_seconds",
+    "dispatch_timeout_seconds",
+)
+
+
+def _coerce_subprocess_timeout(value: Any, fallback: float) -> float:
+    try:
+        timeout = float(value)
+    except (TypeError, ValueError):
+        timeout = float(fallback)
+    return max(0.01, min(timeout, 7200.0))
 
 
 class LLMProvider(BaseProvider):
@@ -215,6 +239,114 @@ def _openrouter_free_fallback_models() -> list[str]:
     return unique
 
 
+def _usage_token_counts(usage: dict[str, Any] | None) -> tuple[int, int]:
+    usage_dict = usage or {}
+    prompt_tokens = usage_dict.get("prompt_tokens", usage_dict.get("input_tokens", 0))
+    completion_tokens = usage_dict.get(
+        "completion_tokens",
+        usage_dict.get("output_tokens", 0),
+    )
+    try:
+        prompt = int(prompt_tokens or 0)
+    except (TypeError, ValueError):
+        prompt = 0
+    try:
+        completion = int(completion_tokens or 0)
+    except (TypeError, ValueError):
+        completion = 0
+    return prompt, completion
+
+
+def _infer_caller_source() -> str:
+    """Walk the call stack to find the nearest dharma_swarm module outside providers.
+
+    Uses ``sys._getframe`` (frame-object chain) instead of
+    ``traceback.extract_stack`` because the latter does NOT include the
+    await-chain in asyncio — after the first internal ``await``, the
+    caller's frame is dropped from the C stack.  ``sys._getframe`` walks
+    the live frame chain which *does* include awaiting coroutines at the
+    point they called us (before they suspended).
+    """
+    import sys as _sys
+
+    _SKIP = frozenset({
+        "providers", "cost_tracker", "runtime_provider",
+        "jikoku_instrumentation", "base_provider",
+    })
+    frame = _sys._getframe(1)  # start from caller of _infer_caller_source
+    while frame is not None:
+        filename = frame.f_code.co_filename
+        if "/dharma_swarm/" in filename:
+            basename = filename.rsplit("/", 1)[-1].removesuffix(".py")
+            if basename not in _SKIP:
+                return basename
+        frame = frame.f_back
+    return ""
+
+
+def _finalize_response(
+    provider: ProviderType,
+    request: LLMRequest | None,
+    response: LLMResponse,
+) -> LLMResponse:
+    response.provider = provider.value
+    prompt_tokens, completion_tokens = _usage_token_counts(response.usage)
+    metadata = dict(request.metadata or {}) if request is not None else {}
+
+    execution_mode = str(metadata.get("execution_mode", "") or "")
+    source = str(metadata.get("source", "") or "")
+
+    # Auto-infer source from call stack when metadata is absent
+    if not source:
+        source = _infer_caller_source()
+    if not execution_mode and source:
+        execution_mode = f"headless_{source}"
+
+    try:
+        log_cost(
+            provider=provider.value,
+            model=response.model,
+            input_tokens=prompt_tokens,
+            output_tokens=completion_tokens,
+            task_id=str(metadata.get("task_id", "") or ""),
+            agent_name=str(metadata.get("agent_name", "") or ""),
+            agent_id=str(metadata.get("agent_id", "") or ""),
+            agent_role=str(metadata.get("agent_role", "") or ""),
+            execution_mode=execution_mode,
+            source=source,
+            task_title=str(metadata.get("task_title", "") or ""),
+            tier=str(metadata.get("tier", "") or ""),
+        )
+    except Exception:
+        pass
+    return response
+
+
+def _build_costed_response(
+    provider: ProviderType,
+    request: LLMRequest | None,
+    *,
+    content: str,
+    model: str,
+    usage: dict[str, int] | None = None,
+    tool_calls: list[dict[str, Any]] | None = None,
+    stop_reason: str | None = None,
+    normalize_tools: bool = True,
+) -> LLMResponse:
+    return _finalize_response(
+        provider,
+        request,
+        BaseProvider.build_response(
+            content=content,
+            model=model,
+            usage=usage or {},
+            tool_calls=tool_calls or [],
+            stop_reason=stop_reason,
+            normalize_tools=normalize_tools,
+        ),
+    )
+
+
 class AnthropicProvider(LLMProvider):
     """Provider backed by the Anthropic Messages API."""
 
@@ -262,11 +394,15 @@ class AnthropicProvider(LLMProvider):
             {"id": b.id, "name": b.name, "input": b.input}
             for b in resp.content if b.type == "tool_use"
         ]
-        return LLMResponse(
-            content=content, model=resp.model,
+        return _build_costed_response(
+            ProviderType.ANTHROPIC,
+            request,
+            content=content,
+            model=resp.model,
             usage={"input_tokens": resp.usage.input_tokens,
                    "output_tokens": resp.usage.output_tokens},
-            tool_calls=tool_calls, stop_reason=resp.stop_reason,
+            tool_calls=tool_calls,
+            stop_reason=resp.stop_reason,
         )
 
     async def stream(self, request: LLMRequest) -> AsyncIterator[str]:
@@ -334,12 +470,16 @@ class OpenAIProvider(LLMProvider):
              "arguments": tc.function.arguments}
             for tc in (msg.tool_calls or [])
         ]
-        return LLMResponse(
-            content=_extract_openai_compatible_message_text(msg), model=resp.model,
+        return _build_costed_response(
+            ProviderType.OPENAI,
+            request,
+            content=_extract_openai_compatible_message_text(msg),
+            model=resp.model,
             usage={"prompt_tokens": resp.usage.prompt_tokens,
                    "completion_tokens": resp.usage.completion_tokens,
                    "total_tokens": resp.usage.total_tokens} if resp.usage else {},
-            tool_calls=tool_calls, stop_reason=choice.finish_reason,
+            tool_calls=tool_calls,
+            stop_reason=choice.finish_reason,
         )
 
     async def stream(self, request: LLMRequest) -> AsyncIterator[str]:
@@ -410,7 +550,9 @@ class OpenRouterProvider(LLMProvider):
             }
             for tc in (msg.tool_calls or [])
         ]
-        return BaseProvider.build_response(
+        return _build_costed_response(
+            ProviderType.OPENROUTER,
+            request,
             content=_extract_openrouter_message_text(msg),
             model=resp.model or request.model,
             usage={"prompt_tokens": resp.usage.prompt_tokens,
@@ -434,6 +576,17 @@ class OpenRouterProvider(LLMProvider):
             delta = chunk.choices[0].delta if chunk.choices else None
             if delta and delta.content:
                 yield delta.content
+
+    async def close(self) -> None:
+        """Close the persistent OpenRouter client."""
+        if self._client is not None:
+            try:
+                await self._client.close()
+            except RuntimeError:
+                pass
+            except Exception:
+                pass
+            self._client = None
 
 
 class NVIDIANIMProvider(LLMProvider):
@@ -485,7 +638,10 @@ class NVIDIANIMProvider(LLMProvider):
     async def close(self) -> None:
         """Close the persistent HTTP client."""
         if self._client is not None and not self._client.is_closed:
-            await self._client.aclose()
+            try:
+                await self._client.aclose()
+            except RuntimeError:
+                pass
             self._client = None
 
     @jikoku_traced_provider
@@ -535,7 +691,9 @@ class NVIDIANIMProvider(LLMProvider):
             )
 
         finish_reason = choices[0].get("finish_reason") if choices else None
-        return LLMResponse(
+        return _build_costed_response(
+            ProviderType.NVIDIA_NIM,
+            request,
             content=message.get("content") or "",
             model=str(data.get("model") or payload["model"]),
             usage=usage,
@@ -598,11 +756,22 @@ class _SubprocessProvider(LLMProvider):
                 return str(p)
         return name  # last resort — hope PATH has it
 
-    def __init__(self, timeout: int = 300, working_dir: str | None = None) -> None:
+    def __init__(
+        self,
+        timeout: int = DEFAULT_SUBPROCESS_TIMEOUT_SECONDS,
+        working_dir: str | None = None,
+    ) -> None:
         self._timeout = timeout
         self._working_dir = working_dir or str(Path.home() / "dharma_swarm")
         # Resolve once at init so subprocess calls always use an absolute path
         self._resolved_command = self._resolve_binary(self._cli_command)
+
+    def _effective_timeout(self, request: LLMRequest) -> float:
+        metadata = request.metadata if isinstance(request.metadata, dict) else {}
+        for key in _SUBPROCESS_TIMEOUT_METADATA_KEYS:
+            if metadata.get(key) is not None:
+                return _coerce_subprocess_timeout(metadata.get(key), self._timeout)
+        return _coerce_subprocess_timeout(None, self._timeout)
 
     def _build_prompt(self, request: LLMRequest) -> str:
         parts: list[str] = []
@@ -628,6 +797,43 @@ class _SubprocessProvider(LLMProvider):
         env.pop("CLAUDECODE", None)  # Allow nesting
         return env
 
+    async def _terminate_process_tree(self, proc: Any) -> None:
+        pid = getattr(proc, "pid", None)
+        if isinstance(pid, int) and hasattr(os, "killpg"):
+            try:
+                os.killpg(pid, signal.SIGTERM)
+            except ProcessLookupError:
+                return
+            except Exception:
+                terminate_result = proc.terminate()
+                if inspect.isawaitable(terminate_result):
+                    await terminate_result
+        else:
+            terminate_result = proc.terminate()
+            if inspect.isawaitable(terminate_result):
+                await terminate_result
+
+        try:
+            await asyncio.wait_for(proc.wait(), timeout=5.0)
+            return
+        except asyncio.TimeoutError:
+            pass
+
+        if isinstance(pid, int) and hasattr(os, "killpg"):
+            try:
+                os.killpg(pid, signal.SIGKILL)
+            except ProcessLookupError:
+                return
+            except Exception:
+                kill_result = proc.kill()
+                if inspect.isawaitable(kill_result):
+                    await kill_result
+        else:
+            kill_result = proc.kill()
+            if inspect.isawaitable(kill_result):
+                await kill_result
+        await proc.wait()
+
     @jikoku_traced_provider
     async def complete(self, request: LLMRequest) -> LLMResponse:
         shared = Path.home() / ".dharma" / "shared"
@@ -643,18 +849,23 @@ class _SubprocessProvider(LLMProvider):
             stderr=asyncio.subprocess.PIPE,
             cwd=self._working_dir,
             env=env,
+            start_new_session=True,
         )
 
         try:
             stdout, stderr = await asyncio.wait_for(
-                proc.communicate(), timeout=self._timeout
+                proc.communicate(), timeout=self._effective_timeout(request)
             )
         except asyncio.TimeoutError:
-            terminate_result = proc.terminate()
-            if inspect.isawaitable(terminate_result):
-                await terminate_result
-            await proc.wait()
+            await self._terminate_process_tree(proc)
             return LLMResponse(content="TIMEOUT: exceeded limit", model=self._cli_label)
+        except asyncio.CancelledError:
+            cleanup = asyncio.create_task(self._terminate_process_tree(proc))
+            try:
+                await asyncio.shield(cleanup)
+            except asyncio.CancelledError:
+                pass
+            raise
 
         content = stdout.decode()[:50_000] if stdout else ""
         if proc.returncode != 0 and not content:
@@ -846,13 +1057,16 @@ class OpenRouterFreeProvider(LLMProvider):
                 resp = await client.chat.completions.create(**kwargs)
                 choice = resp.choices[0]
                 msg = choice.message
-                return LLMResponse(
+                return _build_costed_response(
+                    ProviderType.OPENROUTER_FREE,
+                    request,
                     content=_extract_openrouter_message_text(msg),
                     model=resp.model or candidate,
                     usage={"prompt_tokens": resp.usage.prompt_tokens,
                            "completion_tokens": resp.usage.completion_tokens,
                            "total_tokens": resp.usage.total_tokens} if resp.usage else {},
-                    tool_calls=[], stop_reason=choice.finish_reason,
+                    tool_calls=[],
+                    stop_reason=choice.finish_reason,
                 )
             except Exception as exc:
                 last_exc = exc
@@ -885,6 +1099,17 @@ class OpenRouterFreeProvider(LLMProvider):
             delta = chunk.choices[0].delta if chunk.choices else None
             if delta and delta.content:
                 yield delta.content
+
+    async def close(self) -> None:
+        """Close the persistent OpenRouter-free client."""
+        if self._client is not None:
+            try:
+                await self._client.close()
+            except RuntimeError:
+                pass
+            except Exception:
+                pass
+            self._client = None
 
 
 class OllamaProvider(LLMProvider):
@@ -933,7 +1158,10 @@ class OllamaProvider(LLMProvider):
     async def close(self) -> None:
         """Close the persistent HTTP client."""
         if self._client is not None and not self._client.is_closed:
-            await self._client.aclose()
+            try:
+                await self._client.aclose()
+            except RuntimeError:
+                pass
             self._client = None
 
     @staticmethod
@@ -1015,7 +1243,9 @@ class OllamaProvider(LLMProvider):
                     "name": fn.get("name", ""),
                     "arguments": fn.get("arguments", "{}"),
                 })
-            return LLMResponse(
+            return _build_costed_response(
+                ProviderType.OLLAMA,
+                request,
                 content=content,
                 model=data.get("model") or candidate,
                 usage={
@@ -1095,7 +1325,9 @@ class OllamaProvider(LLMProvider):
                     "name": fn.get("name", ""),
                     "arguments": fn.get("arguments", "{}"),
                 })
-        return LLMResponse(
+        return _build_costed_response(
+            ProviderType.OLLAMA,
+            request,
             content=content,
             model=model,
             usage=usage,
@@ -1194,12 +1426,16 @@ class GroqProvider(LLMProvider):
              "arguments": tc.function.arguments}
             for tc in (msg.tool_calls or [])
         ]
-        return LLMResponse(
-            content=_extract_openai_compatible_message_text(msg), model=resp.model,
+        return _build_costed_response(
+            ProviderType.GROQ,
+            request,
+            content=_extract_openai_compatible_message_text(msg),
+            model=resp.model,
             usage={"prompt_tokens": resp.usage.prompt_tokens,
                    "completion_tokens": resp.usage.completion_tokens,
                    "total_tokens": resp.usage.total_tokens} if resp.usage else {},
-            tool_calls=tool_calls, stop_reason=choice.finish_reason,
+            tool_calls=tool_calls,
+            stop_reason=choice.finish_reason,
         )
 
     async def stream(self, request: LLMRequest) -> AsyncIterator[str]:
@@ -1268,12 +1504,16 @@ class CerebrasProvider(LLMProvider):
              "arguments": tc.function.arguments}
             for tc in (msg.tool_calls or [])
         ]
-        return LLMResponse(
-            content=_extract_openai_compatible_message_text(msg), model=resp.model,
+        return _build_costed_response(
+            ProviderType.CEREBRAS,
+            request,
+            content=_extract_openai_compatible_message_text(msg),
+            model=resp.model,
             usage={"prompt_tokens": resp.usage.prompt_tokens,
                    "completion_tokens": resp.usage.completion_tokens,
                    "total_tokens": resp.usage.total_tokens} if resp.usage else {},
-            tool_calls=tool_calls, stop_reason=choice.finish_reason,
+            tool_calls=tool_calls,
+            stop_reason=choice.finish_reason,
         )
 
     async def stream(self, request: LLMRequest) -> AsyncIterator[str]:
@@ -1342,12 +1582,16 @@ class SiliconFlowProvider(LLMProvider):
              "arguments": tc.function.arguments}
             for tc in (msg.tool_calls or [])
         ]
-        return LLMResponse(
-            content=msg.content or "", model=resp.model,
+        return _build_costed_response(
+            ProviderType.SILICONFLOW,
+            request,
+            content=msg.content or "",
+            model=resp.model,
             usage={"prompt_tokens": resp.usage.prompt_tokens,
                    "completion_tokens": resp.usage.completion_tokens,
                    "total_tokens": resp.usage.total_tokens} if resp.usage else {},
-            tool_calls=tool_calls, stop_reason=choice.finish_reason,
+            tool_calls=tool_calls,
+            stop_reason=choice.finish_reason,
         )
 
     async def stream(self, request: LLMRequest) -> AsyncIterator[str]:
@@ -1416,12 +1660,16 @@ class TogetherProvider(LLMProvider):
              "arguments": tc.function.arguments}
             for tc in (msg.tool_calls or [])
         ]
-        return LLMResponse(
-            content=msg.content or "", model=resp.model,
+        return _build_costed_response(
+            ProviderType.TOGETHER,
+            request,
+            content=msg.content or "",
+            model=resp.model,
             usage={"prompt_tokens": resp.usage.prompt_tokens,
                    "completion_tokens": resp.usage.completion_tokens,
                    "total_tokens": resp.usage.total_tokens} if resp.usage else {},
-            tool_calls=tool_calls, stop_reason=choice.finish_reason,
+            tool_calls=tool_calls,
+            stop_reason=choice.finish_reason,
         )
 
     async def stream(self, request: LLMRequest) -> AsyncIterator[str]:
@@ -1490,12 +1738,16 @@ class FireworksProvider(LLMProvider):
              "arguments": tc.function.arguments}
             for tc in (msg.tool_calls or [])
         ]
-        return LLMResponse(
-            content=msg.content or "", model=resp.model,
+        return _build_costed_response(
+            ProviderType.FIREWORKS,
+            request,
+            content=msg.content or "",
+            model=resp.model,
             usage={"prompt_tokens": resp.usage.prompt_tokens,
                    "completion_tokens": resp.usage.completion_tokens,
                    "total_tokens": resp.usage.total_tokens} if resp.usage else {},
-            tool_calls=tool_calls, stop_reason=choice.finish_reason,
+            tool_calls=tool_calls,
+            stop_reason=choice.finish_reason,
         )
 
     async def stream(self, request: LLMRequest) -> AsyncIterator[str]:
@@ -1564,12 +1816,16 @@ class GoogleAIProvider(LLMProvider):
              "arguments": tc.function.arguments}
             for tc in (msg.tool_calls or [])
         ]
-        return LLMResponse(
-            content=msg.content or "", model=resp.model,
+        return _build_costed_response(
+            ProviderType.GOOGLE_AI,
+            request,
+            content=msg.content or "",
+            model=resp.model,
             usage={"prompt_tokens": resp.usage.prompt_tokens,
                    "completion_tokens": resp.usage.completion_tokens,
                    "total_tokens": resp.usage.total_tokens} if resp.usage else {},
-            tool_calls=tool_calls, stop_reason=choice.finish_reason,
+            tool_calls=tool_calls,
+            stop_reason=choice.finish_reason,
         )
 
     async def stream(self, request: LLMRequest) -> AsyncIterator[str]:
@@ -1638,12 +1894,16 @@ class SambaNovaProvider(LLMProvider):
              "arguments": tc.function.arguments}
             for tc in (msg.tool_calls or [])
         ]
-        return LLMResponse(
-            content=msg.content or "", model=resp.model,
+        return _build_costed_response(
+            ProviderType.SAMBANOVA,
+            request,
+            content=msg.content or "",
+            model=resp.model,
             usage={"prompt_tokens": resp.usage.prompt_tokens,
                    "completion_tokens": resp.usage.completion_tokens,
                    "total_tokens": resp.usage.total_tokens} if resp.usage else {},
-            tool_calls=tool_calls, stop_reason=choice.finish_reason,
+            tool_calls=tool_calls,
+            stop_reason=choice.finish_reason,
         )
 
     async def stream(self, request: LLMRequest) -> AsyncIterator[str]:
@@ -1712,12 +1972,16 @@ class MistralProvider(LLMProvider):
              "arguments": tc.function.arguments}
             for tc in (msg.tool_calls or [])
         ]
-        return LLMResponse(
-            content=msg.content or "", model=resp.model,
+        return _build_costed_response(
+            ProviderType.MISTRAL,
+            request,
+            content=msg.content or "",
+            model=resp.model,
             usage={"prompt_tokens": resp.usage.prompt_tokens,
                    "completion_tokens": resp.usage.completion_tokens,
                    "total_tokens": resp.usage.total_tokens} if resp.usage else {},
-            tool_calls=tool_calls, stop_reason=choice.finish_reason,
+            tool_calls=tool_calls,
+            stop_reason=choice.finish_reason,
         )
 
     async def stream(self, request: LLMRequest) -> AsyncIterator[str]:
@@ -1779,12 +2043,16 @@ class ChutesProvider(LLMProvider):
         resp = await client.chat.completions.create(**kwargs)
         choice = resp.choices[0]
         msg = choice.message
-        return LLMResponse(
-            content=msg.content or "", model=resp.model,
+        return _build_costed_response(
+            ProviderType.CHUTES,
+            request,
+            content=msg.content or "",
+            model=resp.model,
             usage={"prompt_tokens": resp.usage.prompt_tokens,
                    "completion_tokens": resp.usage.completion_tokens,
                    "total_tokens": resp.usage.total_tokens} if resp.usage else {},
-            tool_calls=[], stop_reason=choice.finish_reason,
+            tool_calls=[],
+            stop_reason=choice.finish_reason,
         )
 
     async def stream(self, request: LLMRequest) -> AsyncIterator[str]:
@@ -1967,6 +2235,7 @@ class ModelRouter:
                 max_tokens=request.max_tokens,
                 temperature=request.temperature,
                 tools=request.tools,
+                metadata=request.metadata,
             )
         return request
 
@@ -2018,35 +2287,87 @@ class ModelRouter:
     @staticmethod
     def _response_indicates_failure(response: LLMResponse) -> str | None:
         body = response.content.strip().lower()
+        if len(body) < 300:
+            for marker in ModelRouter._BILLING_FAILURE_MARKERS:
+                if marker in body:
+                    return "billing_exhausted"
+            for marker in ModelRouter._ACCESS_DENIED_MARKERS:
+                if marker in body:
+                    return "access_denied"
+            for marker in ModelRouter._MODEL_UNAVAILABLE_MARKERS:
+                if marker in body:
+                    return "model_unavailable"
+            if "404" in body and "not found" in body:
+                return "model_unavailable"
         if body.startswith("timeout:"):
             return "provider_timeout"
         if body.startswith("error:") or body.startswith("error (rc="):
             return "provider_error"
-        # Detect billing/credit failures returned as content (not exceptions)
-        _BILLING_MARKERS = (
-            "credit balance is too low",
-            "credit balance",
-            "insufficient_quota",
-            "you exceeded your current quota",
-            "billing hard limit",
-            "rate_limit_exceeded",
-            "your api key has been disabled",
-        )
-        _ACCESS_DENIED_MARKERS = (
-            "access denied",
-            "please check your network settings",
-            "403",
-            "forbidden",
-            "unauthorized",
-        )
-        if len(body) < 300:
-            for marker in _BILLING_MARKERS:
-                if marker in body:
-                    return "billing_exhausted"
-            for marker in _ACCESS_DENIED_MARKERS:
-                if marker in body:
-                    return "access_denied"
         return None
+
+    _BILLING_FAILURE_MARKERS = (
+        "credit balance is too low",
+        "credit balance",
+        "requires more credits",
+        "insufficient_quota",
+        "you exceeded your current quota",
+        "billing hard limit",
+        "rate_limit_exceeded",
+        "your api key has been disabled",
+        "payment required",
+        "error code: 402",
+    )
+    _ACCESS_DENIED_MARKERS = (
+        "access denied",
+        "please check your network settings",
+        "403",
+        "forbidden",
+        "unauthorized",
+        "invalid api key",
+        "not authenticated",
+        "authentication failed",
+    )
+    _MODEL_UNAVAILABLE_MARKERS = (
+        "not found for account",
+        "model_not_found",
+        "model not found",
+        "model unavailable",
+        "function not found",
+    )
+
+    @classmethod
+    def _exception_indicates_failure(cls, exc: Exception) -> str | None:
+        body = str(exc).strip().lower()
+        if not body:
+            return "provider_error"
+        for marker in cls._BILLING_FAILURE_MARKERS:
+            if marker in body:
+                return "billing_exhausted"
+        for marker in cls._ACCESS_DENIED_MARKERS:
+            if marker in body:
+                return "access_denied"
+        for marker in cls._MODEL_UNAVAILABLE_MARKERS:
+            if marker in body:
+                return "model_unavailable"
+        if "404" in body and "not found" in body:
+            return "model_unavailable"
+        if "timeout" in body:
+            return "provider_timeout"
+        return None
+
+    @staticmethod
+    def _failure_is_permanent(error: str | None) -> bool:
+        return error in {
+            "billing_exhausted",
+            "access_denied",
+            "quota_exceeded",
+            "model_unavailable",
+        }
+
+    @staticmethod
+    def _fast_trip_breaker(breaker: Any) -> None:
+        for _ in range(breaker.config.min_samples):
+            breaker.record_failure()
 
     def _provider_chain(
         self,
@@ -2203,7 +2524,12 @@ class ModelRouter:
         if self._telemetry is None:
             return
         scope = self._telemetry_scope(route_request)
-        estimated_cost_usd = _estimate_cost(selected_model, prompt_tokens, completion_tokens)
+        estimated_cost_usd = _estimate_cost(
+            selected_model,
+            prompt_tokens,
+            completion_tokens,
+            provider=selected_provider.value,
+        )
         routing_record = RoutingDecisionRecord(
             decision_id=self._telemetry_id("route"),
             action_name=route_request.action_name,
@@ -2760,16 +3086,11 @@ class ModelRouter:
                 latency_ms = (time.monotonic() - attempt_started) * 1000.0
                 response_error = self._response_indicates_failure(response)
                 if response_error:
-                    # Fast-trip circuit for billing exhaustion and permanent 403s.
+                    # Fast-trip circuit for permanent provider-side failures.
                     # Don't waste 8 retries on a dead provider — trip immediately
                     # so the router falls through to the next working provider.
-                    _is_permanent = response_error in (
-                        "billing_exhausted", "access_denied", "quota_exceeded"
-                    )
-                    if _is_permanent:
-                        # Force circuit open by recording enough failures at once
-                        for _ in range(breaker._config.min_samples):
-                            breaker.record_failure()
+                    if self._failure_is_permanent(response_error):
+                        self._fast_trip_breaker(breaker)
                         logger.warning(
                             "Fast-tripped circuit breaker for %s: %s",
                             provider_type.value, response_error,
@@ -2914,6 +3235,13 @@ class ModelRouter:
                     if "attempt_started" in locals()
                     else 0.0
                 )
+                exception_error = self._exception_indicates_failure(exc) or "provider_error"
+                if self._failure_is_permanent(exception_error):
+                    self._fast_trip_breaker(breaker)
+                    logger.warning(
+                        "Fast-tripped circuit breaker for %s: %s",
+                        provider_type.value, exception_error,
+                    )
                 self._update_reward(provider_type, reward_model, -1.0)
                 self._record_routing_memory_outcome(
                     provider=provider_type,
@@ -2924,13 +3252,13 @@ class ModelRouter:
                     success=False,
                     latency_ms=latency_ms,
                     total_tokens=0,
-                    error=str(exc)[:120],
+                    error=exception_error,
                 )
                 failure_trace.append(
                     {
                         "provider": provider_type.value,
                         "model": request_for_provider.model,
-                        "error": str(exc)[:300],
+                        "error": exception_error,
                         "state": breaker.state.value,
                     }
                 )
@@ -2943,7 +3271,7 @@ class ModelRouter:
                     success=False,
                     latency_ms=latency_ms,
                     total_tokens=0,
-                    error=str(exc)[:120],
+                    error=exception_error,
                 )
 
         self._append_routing_audit(

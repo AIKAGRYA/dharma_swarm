@@ -15,6 +15,7 @@ Format: SKILL.md with YAML frontmatter (see skills/ directory for examples).
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 import time
@@ -200,6 +201,8 @@ class SkillRegistry:
         self._dirs = skill_dirs or _DEFAULT_SKILL_DIRS
         self._skills: dict[str, SkillDefinition] = {}
         self._mtimes: dict[str, float] = {}
+        self._path_to_skill: dict[str, str] = {}
+        self._parsed_by_path: dict[str, SkillDefinition | None] = {}
         self._last_scan: float = 0.0
         self._scan_interval: float = 5.0  # seconds between re-scans
 
@@ -209,21 +212,39 @@ class SkillRegistry:
         Returns dict of name -> SkillDefinition.
         """
         found: dict[str, SkillDefinition] = {}
+        current_paths: set[str] = set()
 
         for skill_dir in self._dirs:
             if not skill_dir.exists():
                 continue
             for path in sorted(skill_dir.glob("*.md")):
-                skill = parse_skill_file(path)
+                path_str = str(path)
+                current_paths.add(path_str)
+                current_mtime = path.stat().st_mtime
+                skill = self._parsed_by_path.get(path_str)
+                if self._mtimes.get(path_str) != current_mtime:
+                    skill = parse_skill_file(path)
+                    self._parsed_by_path[path_str] = skill
+                    self._mtimes[path_str] = current_mtime
                 if skill:
                     found[skill.name] = skill
-                    self._mtimes[str(path)] = path.stat().st_mtime
+                    self._path_to_skill[path_str] = skill.name
+
+        removed_paths = set(self._parsed_by_path) - current_paths
+        for path_str in removed_paths:
+            self._parsed_by_path.pop(path_str, None)
+            self._mtimes.pop(path_str, None)
+            self._path_to_skill.pop(path_str, None)
 
         self._skills = found
         self._last_scan = time.time()
         logger.info("Discovered %d skills from %d directories",
                      len(found), len(self._dirs))
         return found
+
+    async def discover_async(self) -> dict[str, SkillDefinition]:
+        """Run skill discovery off the event loop."""
+        return await asyncio.to_thread(self.discover)
 
     def get(self, name: str) -> SkillDefinition | None:
         """Get a skill by exact name. Auto-discovers if empty."""
@@ -243,22 +264,45 @@ class SkillRegistry:
         Returns list of skill names that were reloaded.
         """
         reloaded: list[str] = []
+        seen_paths: set[str] = set()
 
         for skill_dir in self._dirs:
             if not skill_dir.exists():
                 continue
             for path in skill_dir.glob("*.md"):
                 path_str = str(path)
+                seen_paths.add(path_str)
                 current_mtime = path.stat().st_mtime
-                if path_str in self._mtimes and current_mtime > self._mtimes[path_str]:
+                previous_mtime = self._mtimes.get(path_str)
+                if previous_mtime is None or current_mtime > previous_mtime:
                     skill = parse_skill_file(path)
+                    self._parsed_by_path[path_str] = skill
+                    self._mtimes[path_str] = current_mtime
+                    prior_name = self._path_to_skill.get(path_str)
+                    if prior_name and prior_name in self._skills:
+                        self._skills.pop(prior_name, None)
                     if skill:
                         self._skills[skill.name] = skill
-                        self._mtimes[path_str] = current_mtime
+                        self._path_to_skill[path_str] = skill.name
                         reloaded.append(skill.name)
                         logger.info("Hot-reloaded skill: %s", skill.name)
+                    else:
+                        self._path_to_skill.pop(path_str, None)
+
+        removed_paths = set(self._mtimes) - seen_paths
+        for path_str in removed_paths:
+            prior_name = self._path_to_skill.pop(path_str, None)
+            if prior_name:
+                self._skills.pop(prior_name, None)
+                reloaded.append(prior_name)
+            self._mtimes.pop(path_str, None)
+            self._parsed_by_path.pop(path_str, None)
 
         return reloaded
+
+    async def hot_reload_async(self) -> list[str]:
+        """Run hot reload off the event loop."""
+        return await asyncio.to_thread(self.hot_reload)
 
     def match(self, query: str, top_k: int = 3) -> list[SkillDefinition]:
         """Match skills to a natural language query.

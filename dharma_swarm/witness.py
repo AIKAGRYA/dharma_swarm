@@ -308,6 +308,11 @@ class WitnessAuditor:
             system="You are a telos alignment auditor. Respond only with valid JSON.",
             max_tokens=256,
             temperature=0.3,
+            metadata={
+                "execution_mode": "headless_witness",
+                "source": "witness",
+                "task_title": "telos_alignment_audit",
+            },
         )
 
         response = await self._provider.complete(request)

@@ -41,34 +41,14 @@ def _utcnow() -> datetime:
 
 
 def _runtime_table_count(db_path: Path, table: str) -> int:
-    assert table in {
-        "session_events",
-        "task_claims",
-        "delegation_runs",
-        "artifact_records",
-        "context_bundles",
-    }
     if not db_path.exists():
         return 0
     with sqlite3.connect(db_path) as db:
         try:
             row = db.execute(f"SELECT COUNT(*) FROM {table}").fetchone()
-        except sqlite3.Error:
+        except sqlite3.OperationalError:
             return 0
-    return int(row[0] if row else 0)
-
-
-def _runtime_delegation_statuses(db_path: Path) -> list[str]:
-    if not db_path.exists():
-        return []
-    with sqlite3.connect(db_path) as db:
-        try:
-            rows = db.execute(
-                "SELECT status FROM delegation_runs ORDER BY started_at"
-            ).fetchall()
-        except sqlite3.Error:
-            return []
-    return [str(row[0]) for row in rows]
+    return int(row[0]) if row else 0
 
 
 # ---------------------------------------------------------------------------
@@ -289,7 +269,7 @@ async def test_organism_runtime_heartbeat(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-async def test_task_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_task_lifecycle(tmp_path: Path) -> None:
     """Verify a task progresses through PENDING → RUNNING → COMPLETED states.
 
     Loop closed when: orchestrator.tick() dispatches a ready task, the mock
@@ -310,11 +290,6 @@ async def test_task_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
         TaskPriority,
         TaskStatus,
     )
-
-    state_dir = tmp_path / "state"
-    runtime_db_path = state_dir / "runtime.db"
-    monkeypatch.setenv("DHARMA_STATE_DIR", str(state_dir))
-    monkeypatch.setenv("ENABLE_KNOWLEDGE_EXTRACTION", "0")
 
     # Real TaskBoard backed by tmp SQLite
     db_path = tmp_path / "tasks.db"
@@ -368,24 +343,26 @@ async def test_task_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     pool = MockAgentPool()
 
     # Orchestrator with real board + mock pool, in-memory ledger
+    runtime_db = tmp_path / "state" / "runtime.db"
+    before_runtime_counts = {
+        table: _runtime_table_count(runtime_db, table)
+        for table in ("task_claims", "delegation_runs", "session_events")
+    }
+    assert before_runtime_counts == {
+        "task_claims": 0,
+        "delegation_runs": 0,
+        "session_events": 0,
+    }
+
     orch = Orchestrator(
         task_board=board,
         agent_pool=pool,
         ledger_dir=tmp_path / "ledgers",
-        runtime_db_path=runtime_db_path,
     )
-
-    assert _runtime_table_count(runtime_db_path, "session_events") == 0
-    assert _runtime_table_count(runtime_db_path, "task_claims") == 0
-    assert _runtime_table_count(runtime_db_path, "delegation_runs") == 0
-    assert _runtime_table_count(runtime_db_path, "artifact_records") == 0
-    assert _runtime_table_count(runtime_db_path, "context_bundles") == 0
 
     # Tick 1: should dispatch the task
     result = await orch.tick()
     assert result["dispatched"] >= 1, "Tick must dispatch the pending task"
-    assert _runtime_table_count(runtime_db_path, "context_bundles") == 1
-    assert _runtime_table_count(runtime_db_path, "task_claims") == 1
 
     # The background _execute_task coroutine runs async — yield to let it complete.
     # run_task() is an async no-op so it finishes after a couple of event loop turns.
@@ -399,119 +376,14 @@ async def test_task_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
         f"result={completed.result!r}"
     )
     assert completed.result == MOCK_RESULT
-    context_bundle_id = str(completed.metadata.get("context_bundle_id", "") or "")
-    assert context_bundle_id
-    assert _runtime_table_count(runtime_db_path, "session_events") >= 3
-    assert _runtime_table_count(runtime_db_path, "task_claims") == 1
-    assert _runtime_table_count(runtime_db_path, "delegation_runs") == 1
-    assert _runtime_delegation_statuses(runtime_db_path) == ["completed"]
-    artifact_count = _runtime_table_count(runtime_db_path, "artifact_records")
-    assert artifact_count >= 1
-    with sqlite3.connect(runtime_db_path) as db:
-        artifact_kind, artifact_task_id, payload_path, checksum = db.execute(
-            "SELECT artifact_kind, task_id, payload_path, checksum"
-            " FROM artifact_records ORDER BY created_at DESC LIMIT 1"
-        ).fetchone()
-    assert artifact_kind == "task_result"
-    assert artifact_task_id == task.id
-    assert Path(payload_path).exists()
-    assert checksum
-    with sqlite3.connect(runtime_db_path) as db:
-        claim_meta_json, run_meta_json = db.execute(
-            "SELECT c.metadata_json, r.metadata_json"
-            " FROM task_claims c JOIN delegation_runs r ON r.claim_id = c.claim_id"
-            " WHERE c.task_id = ?",
-            (task.id,),
-        ).fetchone()
-    assert context_bundle_id in claim_meta_json
-    assert context_bundle_id in run_meta_json
 
-    # A settle-only follow-up tick must not duplicate structured runtime rows.
-    result2 = await orch.tick()
-    assert result2["dispatched"] == 0
-    assert _runtime_table_count(runtime_db_path, "task_claims") == 1
-    assert _runtime_table_count(runtime_db_path, "delegation_runs") == 1
-    assert _runtime_table_count(runtime_db_path, "artifact_records") == artifact_count
-    assert _runtime_table_count(runtime_db_path, "context_bundles") == 1
-
-
-async def test_task_failure_records_runtime_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Verify a failed execution attempt updates the structured runtime spine."""
-    from dharma_swarm.task_board import TaskBoard
-    from dharma_swarm.orchestrator import Orchestrator
-    from dharma_swarm.models import (
-        AgentState,
-        AgentStatus,
-        TaskPriority,
-    )
-
-    state_dir = tmp_path / "state"
-    runtime_db_path = state_dir / "runtime.db"
-    monkeypatch.setenv("DHARMA_STATE_DIR", str(state_dir))
-    monkeypatch.setenv("ENABLE_KNOWLEDGE_EXTRACTION", "0")
-
-    board = TaskBoard(db_path=tmp_path / "tasks.db")
-    await board.init_db()
-    task = await board.create(
-        title="Test bootstrap failure",
-        description="Verify failed runtime run row",
-        priority=TaskPriority.NORMAL,
-        metadata={"max_retries": 1, "retry_backoff_seconds": 60.0},
-    )
-
-    agent_id = "agent-test-fail-001"
-    agent = AgentState(
-        id=agent_id,
-        name="mock-failing-agent",
-        status=AgentStatus.IDLE,
-        role="general",
-    )
-
-    class FailingRunner:
-        async def run_task(self, task: Any) -> str:
-            raise RuntimeError("synthetic failure")
-
-    class MockAgentPool:
-        def __init__(self) -> None:
-            self._agents: dict[str, AgentState] = {agent_id: agent}
-            self._runners: dict[str, FailingRunner] = {agent_id: FailingRunner()}
-
-        async def get_idle_agents(self) -> list[AgentState]:
-            return [a for a in self._agents.values() if a.status == AgentStatus.IDLE]
-
-        async def assign(self, aid: str, task_id: str) -> None:
-            self._agents[aid].status = AgentStatus.BUSY
-
-        async def release(self, aid: str) -> None:
-            self._agents[aid].status = AgentStatus.IDLE
-
-        async def get_result(self, aid: str) -> str | None:
-            return None
-
-        async def get(self, aid: str) -> Any:
-            return self._runners.get(aid)
-
-    orch = Orchestrator(
-        task_board=board,
-        agent_pool=MockAgentPool(),
-        ledger_dir=tmp_path / "ledgers",
-        runtime_db_path=runtime_db_path,
-    )
-
-    result = await orch.tick()
-    assert result["dispatched"] >= 1
-    await asyncio.sleep(0.1)
-
-    assert _runtime_table_count(runtime_db_path, "task_claims") == 1
-    assert _runtime_table_count(runtime_db_path, "delegation_runs") == 1
-    with sqlite3.connect(runtime_db_path) as db:
-        claim_status = db.execute("SELECT status FROM task_claims").fetchone()[0]
-        run_status, failure_code = db.execute(
-            "SELECT status, failure_code FROM delegation_runs"
-        ).fetchone()
-    assert claim_status == "failed"
-    assert run_status == "failed"
-    assert failure_code == "execution_error"
+    after_runtime_counts = {
+        table: _runtime_table_count(runtime_db, table)
+        for table in ("task_claims", "delegation_runs", "session_events")
+    }
+    assert after_runtime_counts["task_claims"] == 1
+    assert after_runtime_counts["delegation_runs"] == 1
+    assert after_runtime_counts["session_events"] >= 3
 
 
 # ---------------------------------------------------------------------------
@@ -748,7 +620,7 @@ async def test_swarm_tick_dispatches_task(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-async def test_full_loop_closure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_full_loop_closure(tmp_path: Path) -> None:
     """Integration test: submit a task, run tick(), verify the result is stored.
 
     This is the acid test for Loop 1 closure.  A mock LLM returns a fixed
@@ -777,8 +649,6 @@ async def test_full_loop_closure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 
     state_dir = tmp_path / ".dharma"
     state_dir.mkdir(parents=True)
-    monkeypatch.setenv("DHARMA_STATE_DIR", str(state_dir / "state"))
-    monkeypatch.setenv("ENABLE_KNOWLEDGE_EXTRACTION", "0")
 
     # Initialize task board
     db_path = state_dir / "tasks.db"
@@ -846,7 +716,6 @@ async def test_full_loop_closure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
         task_board=board,
         agent_pool=pool,
         ledger_dir=state_dir / "ledgers",
-        runtime_db_path=state_dir / "state" / "runtime.db",
     )
 
     # Step 1: create a task

@@ -12,8 +12,11 @@ from typing import Any
 
 import aiosqlite
 
-from dharma_swarm.correlation_context import get_correlation
 from dharma_swarm.models import Task, TaskPriority, TaskStatus, _new_id, _utc_now
+from dharma_swarm.task_contract import (
+    merge_task_contract_metadata,
+    normalize_task_contract_metadata,
+)
 from dharma_swarm.telos_gates import check_with_reflective_reroute
 
 _TRANSITIONS: dict[TaskStatus, set[TaskStatus]] = {
@@ -31,12 +34,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     status TEXT NOT NULL DEFAULT 'pending', priority TEXT NOT NULL DEFAULT 'normal',
     assigned_to TEXT, created_by TEXT NOT NULL DEFAULT 'system',
     created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
-    result TEXT, metadata TEXT NOT NULL DEFAULT '{}',
-    trace_id TEXT NOT NULL DEFAULT '')"""
-
-_MIGRATE_TRACE_ID = (
-    "ALTER TABLE tasks ADD COLUMN trace_id TEXT NOT NULL DEFAULT ''"
-)
+    result TEXT, metadata TEXT NOT NULL DEFAULT '{}')"""
 
 _CREATE_DEPS = """
 CREATE TABLE IF NOT EXISTS task_dependencies (
@@ -79,6 +77,7 @@ class TaskBoard:
 
     def _open(self) -> aiosqlite.Connection:
         """Open connection with busy_timeout to prevent 'database is locked'."""
+        self._db_path.parent.mkdir(parents=True, exist_ok=True)
         return aiosqlite.connect(self._db_path, timeout=self._BUSY_TIMEOUT_S)
 
     async def init_db(self) -> None:
@@ -89,11 +88,6 @@ class TaskBoard:
             await db.execute("PRAGMA synchronous=NORMAL")
             await db.execute(_CREATE_TASKS)
             await db.execute(_CREATE_DEPS)
-            # Migrate: add trace_id column if missing (existing databases)
-            try:
-                await db.execute(_MIGRATE_TRACE_ID)
-            except Exception:
-                pass  # column already exists
             await db.commit()
 
     # -- helpers ------------------------------------------------------------
@@ -118,6 +112,32 @@ class TaskBoard:
         )
         return [r[0] for r in await cur.fetchall()]
 
+    @staticmethod
+    async def _fetch_deps_map(
+        db: aiosqlite.Connection,
+        task_ids: list[str],
+    ) -> dict[str, list[str]]:
+        """Fetch dependency lists for many tasks in a single query."""
+        ids = [task_id for task_id in task_ids if task_id]
+        if not ids:
+            return {}
+
+        placeholders = ",".join("?" for _ in ids)
+        cur = await db.execute(
+            (
+                "SELECT task_id, depends_on_id "
+                "FROM task_dependencies "
+                f"WHERE task_id IN ({placeholders}) "
+                "ORDER BY rowid ASC"
+            ),
+            ids,
+        )
+
+        deps_by_task: dict[str, list[str]] = {task_id: [] for task_id in ids}
+        for task_id, depends_on_id in await cur.fetchall():
+            deps_by_task.setdefault(task_id, []).append(depends_on_id)
+        return deps_by_task
+
     _ALLOWED_COLUMNS = frozenset({
         "title", "description", "priority", "assigned_to",
         "created_by", "result", "metadata",
@@ -137,7 +157,10 @@ class TaskBoard:
     async def _set_status(self, task_id: str, new: TaskStatus, **fields: Any) -> Task:
         """Validate and apply a status transition with optional field updates."""
         async with self._open() as db:
-            cur = await db.execute("SELECT status FROM tasks WHERE id = ?", (task_id,))
+            cur = await db.execute(
+                "SELECT status, metadata, assigned_to FROM tasks WHERE id = ?",
+                (task_id,),
+            )
             row = await cur.fetchone()
             if row is None:
                 raise TaskBoardError(f"Task {task_id!r} not found")
@@ -146,9 +169,15 @@ class TaskBoard:
                 raise TaskBoardError(
                     f"Invalid transition: {current.value} -> {new.value}"
                 )
+            current_metadata = json.loads(row[1] or "{}")
             now = _utc_now().isoformat()
             sets = ["status = ?", "updated_at = ?"]
             params: list[Any] = [new.value, now]
+            fields["metadata"] = merge_task_contract_metadata(
+                current_metadata,
+                fields.get("metadata"),
+                status=new,
+            )
             for col, val in fields.items():
                 if col not in self._ALLOWED_COLUMNS:
                     raise TaskBoardError(f"Invalid column: {col!r}")
@@ -165,11 +194,13 @@ class TaskBoard:
             return self._row_to_task(updated, deps)  # type: ignore[arg-type]
 
     async def _load_rows(self, db: aiosqlite.Connection, rows: list[Any]) -> list[Task]:
-        tasks: list[Task] = []
-        for row in rows:
-            deps = await self._fetch_deps(db, row[0])
-            tasks.append(self._row_to_task(row, deps))
-        return tasks
+        task_ids = [str(row[0]) for row in rows if row is not None]
+        deps_by_task = await self._fetch_deps_map(db, task_ids)
+        return [
+            self._row_to_task(row, deps_by_task.get(str(row[0]), []))
+            for row in rows
+            if row is not None
+        ]
 
     async def _witness_transition(
         self,
@@ -200,6 +231,7 @@ class TaskBoard:
         description: str = "",
         priority: TaskPriority = TaskPriority.NORMAL,
         created_by: str = "system",
+        assigned_to: str | None = None,
         depends_on: list[str] | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> Task:
@@ -207,23 +239,13 @@ class TaskBoard:
         task_id = _new_id()
         now = _utc_now()
         dep_ids: list[str] = depends_on or []
-        meta = dict(metadata or {})
-        corr = get_correlation()
-        trace_id = corr.trace_id
-        if trace_id:
-            meta.setdefault("trace_id", trace_id)
-        if corr.cell_id:
-            meta.setdefault("cell_id", corr.cell_id)
+        meta = normalize_task_contract_metadata(metadata, status=TaskStatus.PENDING)
         async with self._open() as db:
             await db.execute(
-                "INSERT INTO tasks"
-                " (id, title, description, status, priority, assigned_to,"
-                "  created_by, created_at, updated_at, result, metadata, trace_id)"
-                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO tasks VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                 (task_id, title, description, TaskStatus.PENDING.value,
-                 priority.value, None, created_by, now.isoformat(),
-                 now.isoformat(), None, json.dumps(meta, ensure_ascii=True),
-                 trace_id),
+                 priority.value, assigned_to, created_by, now.isoformat(),
+                 now.isoformat(), None, json.dumps(meta, ensure_ascii=True)),
             )
             for dep_id in dep_ids:
                 await db.execute(
@@ -232,7 +254,7 @@ class TaskBoard:
             await db.commit()
         return Task(
             id=task_id, title=title, description=description,
-            priority=priority, created_by=created_by,
+            priority=priority, assigned_to=assigned_to, created_by=created_by,
             created_at=now, updated_at=now, depends_on=dep_ids,
             metadata=meta,
         )
@@ -259,9 +281,6 @@ class TaskBoard:
         now = _utc_now()
         created_tasks: list[Task] = []
 
-        corr = get_correlation()
-        trace_id = corr.trace_id
-
         async with self._open() as db:
             # Single transaction for all tasks
             for spec in tasks:
@@ -271,21 +290,16 @@ class TaskBoard:
                 priority = spec.get("priority", TaskPriority.NORMAL)
                 created_by = spec.get("created_by", "system")
                 dep_ids = spec.get("depends_on") or []
-                metadata = dict(spec.get("metadata") or {})
-                if trace_id:
-                    metadata.setdefault("trace_id", trace_id)
-                if corr.cell_id:
-                    metadata.setdefault("cell_id", corr.cell_id)
+                metadata = normalize_task_contract_metadata(
+                    spec.get("metadata"),
+                    status=TaskStatus.PENDING,
+                )
 
                 await db.execute(
-                    "INSERT INTO tasks"
-                    " (id, title, description, status, priority, assigned_to,"
-                    "  created_by, created_at, updated_at, result, metadata, trace_id)"
-                    " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                    "INSERT INTO tasks VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                     (task_id, title, description, TaskStatus.PENDING.value,
                      priority.value, None, created_by, now.isoformat(),
-                     now.isoformat(), None, json.dumps(metadata, ensure_ascii=True),
-                     trace_id),
+                     now.isoformat(), None, json.dumps(metadata, ensure_ascii=True)),
                 )
 
                 for dep_id in dep_ids:
@@ -317,10 +331,11 @@ class TaskBoard:
             return self._row_to_task(row, deps)
 
     async def get_by_title(self, title: str) -> Task | None:
-        """Retrieve the first task matching *title*, or ``None``."""
+        """Return the newest task with an exact title match, if any."""
         async with self._open() as db:
             cur = await db.execute(
-                "SELECT * FROM tasks WHERE title = ? LIMIT 1", (title,),
+                "SELECT * FROM tasks WHERE title = ? ORDER BY created_at DESC LIMIT 1",
+                (title,),
             )
             row = await cur.fetchone()
             if row is None:
@@ -391,11 +406,26 @@ class TaskBoard:
         elif fields:
             # Raw column update (no status change)
             async with self._open() as db:
+                current_metadata: dict[str, Any] | None = None
+                if "metadata" in fields:
+                    cur = await db.execute(
+                        "SELECT metadata FROM tasks WHERE id = ?",
+                        (task_id,),
+                    )
+                    row = await cur.fetchone()
+                    if row is None:
+                        raise TaskBoardError(f"Task {task_id!r} not found")
+                    try:
+                        current_metadata = json.loads(row[0] or "{}")
+                    except Exception:
+                        current_metadata = {}
                 sets = []
                 params: list[Any] = []
                 for col, val in fields.items():
                     if col not in self._ALLOWED_COLUMNS:
                         raise TaskBoardError(f"Invalid column: {col!r}")
+                    if col == "metadata":
+                        val = merge_task_contract_metadata(current_metadata, val)
                     sets.append(f"{col} = ?")
                     params.append(self._coerce_db_value(col, val))
                 params.append(task_id)

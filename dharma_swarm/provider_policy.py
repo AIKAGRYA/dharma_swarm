@@ -11,6 +11,7 @@ import time
 from typing import Any, Iterable
 
 from dharma_swarm.decision_router import DecisionInput, DecisionRouter, RoutePath
+from dharma_swarm.diversity_governor import DiversityGovernor
 from dharma_swarm.model_hierarchy import (
     CANONICAL_SEED_ORDER,
     DELIBERATIVE_EXECUTION_PRIORITY,
@@ -45,6 +46,13 @@ def _dedupe_keep_order(items: Iterable[ProviderType]) -> list[ProviderType]:
     return out
 
 
+def _prefer_codex_for_tooling(items: list[ProviderType]) -> list[ProviderType]:
+    """Promote CODEX to the front for tooling-heavy execution lanes."""
+    if ProviderType.CODEX not in items:
+        return items
+    return [ProviderType.CODEX] + [item for item in items if item != ProviderType.CODEX]
+
+
 @dataclass(frozen=True)
 class ProviderRouteRequest:
     action_name: str
@@ -59,6 +67,7 @@ class ProviderRouteRequest:
     requires_frontier_precision: bool = False
     privileged_action: bool = False
     requires_human_consent: bool = False
+    allow_free_fallback: bool = False
     context: dict[str, Any] = field(default_factory=dict)
 
 
@@ -142,6 +151,7 @@ class ProviderPolicyRouter:
                 else TelemetryPlaneStore()
             )
             self._telemetry_optimizer = TelemetryOptimizer(telemetry)
+        self._diversity_governor = DiversityGovernor()
 
     @staticmethod
     def _build_smart_router() -> SmartRouter:
@@ -195,6 +205,13 @@ class ProviderPolicyRouter:
         else:
             filtered = candidates
 
+        filtered, safety_reasons = self._apply_sensitive_free_tier_guard(
+            candidates=filtered,
+            path=path,
+            request=request,
+        )
+        reasons.extend(safety_reasons)
+
         # SmartRouter cost-aware re-ranking: promotes cheaper providers for
         # simple tasks without overriding escalation, frontier, or tooling requests.
         requires_tooling = bool(request.context.get("requires_tooling"))
@@ -219,6 +236,13 @@ class ProviderPolicyRouter:
             request=request,
         )
         reasons.extend(telemetry_reasons)
+        filtered, diversity_reasons = self._apply_diversity_overlay(
+            candidates=filtered,
+            path=path,
+            request=request,
+        )
+        reasons.extend(diversity_reasons)
+        filtered = self._apply_frontier_precision_bias(filtered, request)
 
         selected = filtered[0] if filtered else ProviderType.CLAUDE_CODE
         fallbacks = [item for item in filtered[1:] if item != selected]
@@ -360,6 +384,77 @@ class ProviderPolicyRouter:
             ],
         )
 
+    def _apply_diversity_overlay(
+        self,
+        *,
+        candidates: list[ProviderType],
+        path: RoutePath,
+        request: ProviderRouteRequest,
+    ) -> tuple[list[ProviderType], list[str]]:
+        if not candidates:
+            return (candidates, [])
+        if path == RoutePath.ESCALATE:
+            return (candidates, [])
+        if request.requires_frontier_precision or request.privileged_action or request.requires_human_consent:
+            return (candidates, [])
+        if bool(request.context.get("requires_tooling")):
+            return (candidates, [])
+        if str(request.context.get("session_id", "")).strip():
+            return (candidates, [])
+        return self._diversity_governor.reorder_providers(
+            candidates,
+            default_model_hints=self.config.default_model_hints,
+        )
+
+    @staticmethod
+    def _apply_frontier_precision_bias(
+        candidates: list[ProviderType],
+        request: ProviderRouteRequest,
+    ) -> list[ProviderType]:
+        if not request.requires_frontier_precision:
+            return candidates
+        frontier_priority = [
+            ProviderType.ANTHROPIC,
+            ProviderType.OPENAI,
+            ProviderType.OPENROUTER,
+            ProviderType.CLAUDE_CODE,
+            ProviderType.CODEX,
+        ]
+        preferred = [provider for provider in frontier_priority if provider in candidates]
+        if not preferred:
+            return candidates
+        return preferred + [provider for provider in candidates if provider not in preferred]
+
+    @staticmethod
+    def _is_free_provider(provider: ProviderType) -> bool:
+        return provider in TIER_FREE or provider == ProviderType.OPENROUTER_FREE
+
+    def _apply_sensitive_free_tier_guard(
+        self,
+        *,
+        candidates: list[ProviderType],
+        path: RoutePath,
+        request: ProviderRouteRequest,
+    ) -> tuple[list[ProviderType], list[str]]:
+        if not candidates:
+            return (candidates, [])
+        sensitive = (
+            path == RoutePath.ESCALATE
+            or request.requires_frontier_precision
+            or request.privileged_action
+            or request.requires_human_consent
+        )
+        if not sensitive:
+            return (candidates, [])
+        if request.allow_free_fallback or bool(request.context.get("allow_free_fallback")):
+            return (candidates, ["free_fallback_allowed"])
+        filtered = [item for item in candidates if not self._is_free_provider(item)]
+        if not filtered:
+            return (candidates, [])
+        if len(filtered) == len(candidates):
+            return (candidates, [])
+        return (filtered, ["free_fallback_blocked_for_sensitive_request"])
+
     @property
     def smart_router(self) -> SmartRouter:
         """Expose the SmartRouter instance for direct access / stats."""
@@ -432,7 +527,7 @@ class ProviderPolicyRouter:
                 if provider in candidates
             ]
             non_tooling = [provider for provider in candidates if provider not in tooling]
-            candidates = tooling + non_tooling
+            candidates = _prefer_codex_for_tooling(tooling) + non_tooling
 
         return _dedupe_keep_order(candidates)
 

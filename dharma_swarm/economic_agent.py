@@ -33,7 +33,6 @@ import time
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any, Optional
 
 from pydantic import BaseModel, Field
@@ -133,7 +132,7 @@ class EconomicLedger:
     """Append-only JSONL ledger tracking every task's economics."""
 
     def __init__(self, path: Path | None = None) -> None:
-        self._path = path or (dharma_state_dir() / "economic" / "ledger.jsonl")
+        self._path = path or (Path.home() / ".dharma" / "economic" / "ledger.jsonl")
         self._entries: list[LedgerEntry] = []
 
     def record(self, entry: LedgerEntry) -> None:
@@ -193,7 +192,7 @@ class InboxPoller:
     """Watches ~/.dharma/inbox/ for JSON task files."""
 
     def __init__(self, inbox_dir: Path | None = None) -> None:
-        self._inbox = inbox_dir or (dharma_state_dir() / "inbox")
+        self._inbox = inbox_dir or (Path.home() / ".dharma" / "inbox")
         self._processed = self._inbox / "processed"
 
     async def poll(self) -> list[EconomicTask]:
@@ -358,7 +357,7 @@ async def execute_task(task: EconomicTask) -> dict[str, Any]:
 
 async def deliver_task(task: EconomicTask, cascade_result: dict[str, Any]) -> Path:
     """Package task deliverables and leave a stigmergy mark."""
-    delivery_dir = dharma_state_dir() / "deliveries" / task.id
+    delivery_dir = Path.home() / ".dharma" / "deliveries" / task.id
     delivery_dir.mkdir(parents=True, exist_ok=True)
 
     # Write result summary
@@ -413,7 +412,7 @@ class EconomicAgent:
         state_dir: Path | None = None,
         poll_interval: float = 30.0,
     ) -> None:
-        self._state_dir = state_dir or (dharma_state_dir())
+        self._state_dir = state_dir or (Path.home() / ".dharma")
         self._poll_interval = poll_interval
         self._inbox = InboxPoller(self._state_dir / "inbox")
         self._ledger = EconomicLedger(self._state_dir / "economic" / "ledger.jsonl")

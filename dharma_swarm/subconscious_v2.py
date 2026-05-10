@@ -186,6 +186,7 @@ Stop when the transmission stops. Mark the end with ~"""
         max_tokens: int,
         temperature: float,
         timeout_seconds: float,
+        metadata: dict[str, str] | None = None,
     ) -> str:
         response, _provider_config = await complete_via_preferred_runtime_providers(
             system=system_prompt,
@@ -196,6 +197,7 @@ Stop when the transmission stops. Mark the end with ~"""
             temperature=temperature,
             provider_order=PREFERRED_LOW_COST_WITH_ANTHROPIC_RUNTIME_PROVIDERS,
             timeout_seconds=timeout_seconds,
+            metadata=metadata,
         )
         return response.content
 
@@ -215,6 +217,12 @@ Stop when the transmission stops. Mark the end with ~"""
                 max_tokens=2048,
                 temperature=0.9,
                 timeout_seconds=120.0,
+                metadata={
+                    "execution_mode": "subconscious_dream",
+                    "source": "subconscious_v2",
+                    "task_title": "dream_connection",
+                    "tier": "subconscious",
+                },
             )
 
             extraction_prompt = f"""From this dream output, extract the structural pattern as JSON.

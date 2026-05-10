@@ -63,7 +63,6 @@ import asyncio
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
-from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -391,7 +390,7 @@ class GnaniLodestone:
     """
 
     def __init__(self, state_dir: Path | None = None) -> None:
-        self._state_dir = state_dir or dharma_state_dir()
+        self._state_dir = state_dir or Path.home() / ".dharma"
 
     async def seed_all(self) -> dict[str, int]:
         """Seed all Gnani layer data. Returns counts of created entities."""
@@ -417,24 +416,16 @@ class GnaniLodestone:
         try:
             from dharma_swarm.stigmergy import StigmergyStore, StigmergicMark
 
-            store = StigmergyStore()
+            store = StigmergyStore(self._state_dir / "stigmergy")
             injected = 0
             now = datetime.now(timezone.utc).isoformat()
+            existing_marks = await store.read_marks(limit=max(100, len(_GNANI_MARKS) * 4))
+            existing_ids = {getattr(mark, "id", "") for mark in existing_marks}
 
             for mark_data in _GNANI_MARKS:
                 # Check for existing mark by id
-                try:
-                    existing = await store.query_relevant(
-                        query=mark_data["id"], limit=5
-                    )
-                    already_exists = any(
-                        getattr(m, "id", None) == mark_data["id"]
-                        for m in existing
-                    )
-                    if already_exists:
-                        continue
-                except Exception:
-                    pass  # If we can't check, just try to inject
+                if mark_data["id"] in existing_ids:
+                    continue
 
                 mark = StigmergicMark(
                     id=mark_data["id"],
@@ -442,13 +433,14 @@ class GnaniLodestone:
                     agent=mark_data["agent"],
                     file_path=mark_data["file_path"],
                     action=mark_data["action"],
-                    observation=mark_data["observation"],
+                    observation=mark_data["observation"][:200],
                     salience=mark_data["salience"],
                     connections=["GNANI_LODESTONE.md"],
                     access_count=0,
                     channel=mark_data["channel"],
                 )
                 await store.leave_mark(mark)
+                existing_ids.add(mark.id)
                 injected += 1
 
             return injected
@@ -459,36 +451,36 @@ class GnaniLodestone:
     async def _seed_concepts(self) -> int:
         """Add Gnani layer concept nodes to ConceptGraph."""
         try:
-            from dharma_swarm.graph_nexus import ConceptGraph, ConceptNode
+            from dharma_swarm.semantic_gravity import ConceptGraph, ConceptNode
 
-            telos_dir = self._state_dir / "telos"
-            cg = ConceptGraph(telos_dir=telos_dir)
-            try:
-                await cg.load()
-            except Exception:
-                pass  # Start fresh if needed
+            graph_path = self._state_dir / "meta" / "concept_graph.json"
+            cg = await ConceptGraph.load(graph_path)
 
             added = 0
             for concept_data in _GNANI_CONCEPTS:
                 # Check if already exists
-                existing = await cg.get_node(concept_data["id"])
+                existing = cg.get_node(concept_data["id"])
                 if existing is not None:
                     continue
 
                 node = ConceptNode(
                     id=concept_data["id"],
                     name=concept_data["name"],
-                    description=concept_data["description"],
+                    definition=concept_data["description"],
+                    source_file="dharma_swarm/gnani_lodestone.py",
+                    category="philosophical",
                     salience=concept_data["salience"],
-                    tags=concept_data.get("tags", []),
-                    metadata={"pillar": concept_data.get("pillar", "viveka"),
-                               "source": "gnani_lodestone"},
+                    metadata={
+                        "pillar": concept_data.get("pillar", "viveka"),
+                        "source": "gnani_lodestone",
+                        "tags": concept_data.get("tags", []),
+                    },
                 )
-                await cg.add_node(node)
+                cg.add_node(node)
                 added += 1
 
             if added > 0:
-                await cg.save()
+                await cg.save(graph_path)
 
             return added
         except Exception as exc:
@@ -548,13 +540,10 @@ class GnaniLodestone:
     async def _seed_tasks(self) -> int:
         """Inject Gnani self-knowledge tasks into TaskBoard if not present."""
         try:
-            from dharma_swarm.task_board import TaskBoard, Task, TaskStatus, TaskPriority
+            from dharma_swarm.task_board import TaskBoard, TaskPriority
 
-            board = TaskBoard(state_dir=self._state_dir)
-            try:
-                await board.load()
-            except Exception:
-                pass
+            board = TaskBoard(self._state_dir / "db" / "tasks.db")
+            await board.init_db()
 
             added = 0
             for task_data in _GNANI_TASK_SEEDS:
@@ -564,24 +553,26 @@ class GnaniLodestone:
                     continue
 
                 # Map priority
-                priority_map = {10: TaskPriority.CRITICAL, 9: TaskPriority.HIGH,
-                                8: TaskPriority.HIGH, 7: TaskPriority.MEDIUM,
-                                6: TaskPriority.LOW}
-                priority = priority_map.get(task_data["priority"], TaskPriority.MEDIUM)
+                priority_map = {
+                    10: TaskPriority.URGENT,
+                    9: TaskPriority.URGENT,
+                    8: TaskPriority.HIGH,
+                    7: TaskPriority.HIGH,
+                    6: TaskPriority.NORMAL,
+                }
+                priority = priority_map.get(task_data["priority"], TaskPriority.NORMAL)
 
-                task = Task(
+                await board.create(
                     title=task_data["title"],
                     description=task_data["description"],
-                    status=TaskStatus.PENDING,
                     priority=priority,
-                    tags=task_data.get("tags", []),
-                    metadata={"source": "gnani_lodestone", "layer": "gnani"},
+                    metadata={
+                        "source": "gnani_lodestone",
+                        "layer": "gnani",
+                        "tags": task_data.get("tags", []),
+                    },
                 )
-                await board.add_task(task)
                 added += 1
-
-            if added > 0:
-                await board.save()
 
             return added
         except Exception as exc:

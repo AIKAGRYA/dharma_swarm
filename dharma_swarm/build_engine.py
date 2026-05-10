@@ -202,12 +202,7 @@ def _git_diff_files(project_path: str) -> list[str]:
             capture_output=True, text=True, cwd=project_path, timeout=30,
         )
         staged = result2.stdout.strip().splitlines() if result2.stdout.strip() else []
-        result3 = subprocess.run(
-            ["git", "ls-files", "--others", "--exclude-standard"],
-            capture_output=True, text=True, cwd=project_path, timeout=30,
-        )
-        untracked = result3.stdout.strip().splitlines() if result3.stdout.strip() else []
-        return sorted(set(unstaged + staged + untracked))
+        return list(set(unstaged + staged))
     except (subprocess.TimeoutExpired, OSError):
         return []
 
@@ -228,13 +223,10 @@ def _git_reset_hard(project_path: str) -> None:
 
 
 def _git_commit(project_path: str, message: str) -> bool:
-    """Stage explicit changed paths and commit. Returns True on success."""
+    """Stage all changes and commit. Returns True on success."""
     try:
-        changed_paths = _git_diff_files(project_path)
-        if not changed_paths:
-            return False
         subprocess.run(
-            ["git", "add", "--", *changed_paths],
+            ["git", "add", "-A"],
             capture_output=True, text=True, cwd=project_path, timeout=30,
         )
         result = subprocess.run(
@@ -252,9 +244,12 @@ def _git_commit(project_path: str, message: str) -> bool:
 def validate_result(project_path: str, test_command: str | None = None) -> bool:
     """Run project tests. Returns True if they pass."""
     cmd = test_command or "python3 -m pytest"
+    args = cmd.split()
+    if len(args) >= 3 and args[1:3] == ["-m", "pytest"] and args[0] in {"python", "python3"}:
+        args[0] = sys.executable
     try:
         result = subprocess.run(
-            cmd.split(),
+            args,
             capture_output=True, text=True,
             cwd=project_path, timeout=300,
         )

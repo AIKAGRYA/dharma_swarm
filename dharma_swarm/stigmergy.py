@@ -15,6 +15,7 @@ import asyncio
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Literal
+import uuid
 
 import aiofiles
 from pydantic import BaseModel, Field
@@ -112,6 +113,9 @@ class StigmergyStore:
         self._marks_file: Path = self.base_path / "marks.jsonl"
         self._archive_file: Path = self.base_path / "archive.jsonl"
         self._write_lock: asyncio.Lock = asyncio.Lock()
+
+    def _rewrite_tmp_path(self) -> Path:
+        return self.base_path / f"marks.{uuid.uuid4().hex}.tmp"
 
     # -- write ---------------------------------------------------------------
 
@@ -257,7 +261,7 @@ class StigmergyStore:
 
     async def query_relevant(
         self,
-        task_keywords: list[str],
+        task_keywords: list[str] | str,
         limit: int = 10,
         channel: str | None = None,
     ) -> list[StigmergicMark]:
@@ -266,6 +270,8 @@ class StigmergyStore:
         When *channel* is specified, results are scoped to that channel
         (plus cross-channel high-salience marks).
         """
+        if isinstance(task_keywords, str):
+            task_keywords = [task_keywords]
         if not task_keywords:
             return await self.high_salience(limit=limit)
         marks = await self._load_marks()
@@ -279,7 +285,7 @@ class StigmergyStore:
         if not keywords_lower:
             return await self.high_salience(limit=limit)
         relevant = [m for m in marks if any(kw in (m.observation + " " + m.file_path).lower() for kw in keywords_lower)]
-        relevant.sort(key=lambda m: m.salience, reverse=True)
+        relevant.sort(key=lambda m: (m.salience, m.timestamp), reverse=True)
         result = relevant[:limit]
         await self._record_access(result)
         return result
@@ -304,7 +310,7 @@ class StigmergyStore:
                 return
 
             self.base_path.mkdir(parents=True, exist_ok=True)
-            tmp = self._marks_file.with_suffix(".tmp")
+            tmp = self._rewrite_tmp_path()
             async with aiofiles.open(tmp, "w") as f:
                 for mark in persisted:
                     await f.write(mark.model_dump_json() + "\n")
@@ -349,7 +355,7 @@ class StigmergyStore:
                     await f.write(m.model_dump_json() + "\n")
 
             # Atomic rewrite: temp file → rename
-            tmp = self._marks_file.with_suffix(".tmp")
+            tmp = self._rewrite_tmp_path()
             async with aiofiles.open(tmp, "w") as f:
                 for m in keep:
                     await f.write(m.model_dump_json() + "\n")
@@ -371,7 +377,7 @@ class StigmergyStore:
                     dead_count += 1
             self.base_path.mkdir(parents=True, exist_ok=True)
             # Atomic rewrite: temp file → rename
-            tmp = self._marks_file.with_suffix(".tmp")
+            tmp = self._rewrite_tmp_path()
             async with aiofiles.open(tmp, "w") as f:
                 for m in marks:
                     await f.write(m.model_dump_json() + "\n")

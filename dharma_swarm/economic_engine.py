@@ -154,20 +154,6 @@ class EconomicEngine:
     def transaction_count(self) -> int:
         return len(self._transactions)
 
-    @staticmethod
-    def _enrich_metadata(metadata: dict[str, Any] | None) -> dict[str, Any]:
-        meta = dict(metadata or {})
-        try:
-            from dharma_swarm.correlation_context import get_correlation
-            corr = get_correlation()
-            if corr.trace_id:
-                meta.setdefault("trace_id", corr.trace_id)
-            if corr.cell_id:
-                meta.setdefault("cell_id", corr.cell_id)
-        except Exception:
-            pass
-        return meta
-
     # -- Revenue -----------------------------------------------------------
 
     def record_revenue(
@@ -183,7 +169,7 @@ class EconomicEngine:
             amount_usd=amount_usd,
             source=source.value,
             description=description,
-            metadata=self._enrich_metadata(metadata),
+            metadata=metadata or {},
         )
         self._transactions.append(tx)
         self._persist_tx(tx)
@@ -229,7 +215,7 @@ class EconomicEngine:
             source=category.value,
             category=budget_source.value,
             description=description,
-            metadata=self._enrich_metadata(metadata),
+            metadata=metadata or {},
         )
         self._transactions.append(tx)
         self._persist_tx(tx)

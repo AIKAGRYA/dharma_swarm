@@ -22,7 +22,6 @@ import re
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 from dharma_swarm.a2a.agent_card import AgentCapability, AgentCard, CardRegistry
@@ -47,7 +46,7 @@ def _slug(value: str) -> str:
 
 
 def _dharma_home() -> Path:
-    return dharma_state_dir("DHARMA_HOME")
+    return Path(os.getenv("DHARMA_HOME", Path.home() / ".dharma"))
 
 
 def _json_dump(value: Any) -> str:

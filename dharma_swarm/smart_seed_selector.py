@@ -19,7 +19,6 @@ import logging
 import math
 import random
 from pathlib import Path
-from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -49,7 +48,7 @@ class SmartSeedSelector:
     """
 
     def __init__(self, state_dir: Path | None = None) -> None:
-        self._state_dir = state_dir or dharma_state_dir()
+        self._state_dir = state_dir or Path.home() / ".dharma"
 
     async def select(
         self,
@@ -97,9 +96,20 @@ class SmartSeedSelector:
 
         # Fallback: random selection from hardcoded dirs
         if not results:
-            return self._fallback_random(count, max_chars)
+            return self._enforce_max_chars(
+                self._fallback_random(count, max_chars),
+                max_chars,
+            )
 
-        return results
+        return self._enforce_max_chars(results, max_chars)
+
+    @staticmethod
+    def _enforce_max_chars(
+        results: list[tuple[str, str, float]],
+        max_chars: int,
+    ) -> list[tuple[str, str, float]]:
+        limit = max(0, int(max_chars))
+        return [(text[:limit], path, score) for text, path, score in results]
 
     # ── Context extraction ──────────────────────────────────────
 

@@ -6,7 +6,6 @@ import argparse
 import sys
 from datetime import datetime
 from pathlib import Path
-from dharma_swarm.daemon_config import dharma_state_dir
 
 from dharma_swarm.scout_audit import (
     HealthStatus,
@@ -18,7 +17,7 @@ from dharma_swarm.scout_audit import (
 
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Check scout pipeline health")
-    parser.add_argument("--state-dir", default=str(dharma_state_dir()))
+    parser.add_argument("--state-dir", default=str(Path.home() / ".dharma"))
     parser.add_argument("--expected-domain", action="append", default=[])
     parser.add_argument("--domain-max-age-hours", type=float, default=26.0)
     parser.add_argument("--synthesis-max-age-hours", type=float, default=26.0)

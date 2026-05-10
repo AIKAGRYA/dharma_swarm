@@ -27,9 +27,10 @@ not despite it.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import time
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
@@ -37,6 +38,8 @@ logger = logging.getLogger(__name__)
 
 HOME = Path.home()
 STATE_DIR = HOME / ".dharma"
+FLYWHEEL_STATE_PATH = STATE_DIR / "meta" / "training_flywheel_state.json"
+_STATE_CACHE: FlywheelState | None = None
 
 # Sub-cycle intervals (seconds)
 REINFORCE_INTERVAL = 1800    # 30 minutes
@@ -79,19 +82,70 @@ class FlywheelState:
     recommended_gpu: str = ""
     recommended_budget: float = 0.0
 
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> FlywheelState:
+        """Build a FlywheelState from a persisted payload."""
+        return cls(
+            reinforce_cycles=int(payload.get("reinforce_cycles", 0) or 0),
+            dataset_builds=int(payload.get("dataset_builds", 0) or 0),
+            readiness_checks=int(payload.get("readiness_checks", 0) or 0),
+            total_trajectories_scored=int(
+                payload.get("total_trajectories_scored", 0) or 0
+            ),
+            total_patterns_extracted=int(
+                payload.get("total_patterns_extracted", 0) or 0
+            ),
+            last_reinforce=float(payload.get("last_reinforce", 0.0) or 0.0),
+            last_dataset_build=float(payload.get("last_dataset_build", 0.0) or 0.0),
+            last_readiness_check=float(
+                payload.get("last_readiness_check", 0.0) or 0.0
+            ),
+            last_dataset_path=str(payload.get("last_dataset_path", "") or ""),
+            training_ready=bool(payload.get("training_ready", False)),
+            recommended_gpu=str(payload.get("recommended_gpu", "") or ""),
+            recommended_budget=float(payload.get("recommended_budget", 0.0) or 0.0),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return a JSON-serializable representation of the flywheel state."""
+        return asdict(self)
+
     def snapshot(self) -> dict[str, Any]:
         """Return a snapshot for logging / API."""
-        return {
-            "reinforce_cycles": self.reinforce_cycles,
-            "dataset_builds": self.dataset_builds,
-            "readiness_checks": self.readiness_checks,
-            "total_trajectories_scored": self.total_trajectories_scored,
-            "total_patterns_extracted": self.total_patterns_extracted,
-            "last_dataset_path": self.last_dataset_path,
-            "training_ready": self.training_ready,
-            "recommended_gpu": self.recommended_gpu,
-            "recommended_budget": self.recommended_budget,
-        }
+        return self.to_dict()
+
+
+def _cache_state(state: FlywheelState) -> FlywheelState:
+    """Keep an in-process copy without sharing mutable references."""
+    global _STATE_CACHE
+    _STATE_CACHE = FlywheelState.from_dict(state.to_dict())
+    return _STATE_CACHE
+
+
+def _load_state(path: Path | None = None) -> FlywheelState:
+    """Load the most recent persisted flywheel state."""
+    state_path = path or FLYWHEEL_STATE_PATH
+    if not state_path.exists():
+        return _cache_state(FlywheelState())
+    try:
+        payload = json.loads(state_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        logger.warning("Training flywheel state load failed: %s", exc)
+        return _cache_state(FlywheelState())
+    if not isinstance(payload, dict):
+        return _cache_state(FlywheelState())
+    return _cache_state(FlywheelState.from_dict(payload))
+
+
+def _persist_state(state: FlywheelState, path: Path | None = None) -> None:
+    """Persist the current flywheel state for operator surfaces."""
+    state_path = path or FLYWHEEL_STATE_PATH
+    cached = _cache_state(state)
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    state_path.write_text(
+        json.dumps(cached.to_dict(), indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -280,7 +334,8 @@ async def run_training_flywheel_loop(shutdown_event: asyncio.Event) -> None:
     _log("flywheel", f"  Dataset interval: {DATASET_INTERVAL}s")
     _log("flywheel", f"  Readiness interval: {READINESS_INTERVAL}s")
 
-    state = FlywheelState()
+    state = _load_state()
+    _persist_state(state)
     tick = 0
 
     while not shutdown_event.is_set():
@@ -361,6 +416,11 @@ async def run_training_flywheel_loop(shutdown_event: asyncio.Event) -> None:
         if tick % 10 == 0:
             _log("flywheel", f"Heartbeat: {state.snapshot()}")
 
+        try:
+            _persist_state(state)
+        except Exception as exc:
+            _log("flywheel", f"State persist error: {exc}")
+
         # Sleep until next check — use the shortest interval
         try:
             await asyncio.wait_for(
@@ -370,6 +430,10 @@ async def run_training_flywheel_loop(shutdown_event: asyncio.Event) -> None:
         except asyncio.TimeoutError:
             pass
 
+    try:
+        _persist_state(state)
+    except Exception as exc:
+        _log("flywheel", f"Final state persist error: {exc}")
     _log("flywheel", f"Training flywheel stopped (state: {state.snapshot()})")
 
 
@@ -380,9 +444,9 @@ async def run_training_flywheel_loop(shutdown_event: asyncio.Event) -> None:
 
 def get_flywheel_state() -> FlywheelState:
     """Get current flywheel state (for API / status endpoints)."""
-    # In production, this would read from shared state or the running loop.
-    # For now, return a fresh state that callers can populate.
-    return FlywheelState()
+    if _STATE_CACHE is not None:
+        return FlywheelState.from_dict(_STATE_CACHE.to_dict())
+    return _load_state()
 
 
 if __name__ == "__main__":

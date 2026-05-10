@@ -26,7 +26,6 @@ import subprocess
 import threading
 import time
 from pathlib import Path
-from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
@@ -37,7 +36,7 @@ logger = logging.getLogger(__name__)
 # Constants
 # ---------------------------------------------------------------------------
 
-STATE_DIR = dharma_state_dir()
+STATE_DIR = Path.home() / ".dharma"
 CODEBASE_INDEX_DB = STATE_DIR / "codebase_index.db"
 DHARMA_SWARM_ROOT = Path.home() / "dharma_swarm"
 

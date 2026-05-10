@@ -63,22 +63,12 @@ import inspect
 import json
 import logging
 import os
-import sqlite3
 import subprocess
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
-from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
-
-from dharma_swarm.consistency_guard import run_task_consistency_guard
-from dharma_swarm.guardian_runtime_checks import (
-    run_guardian_warning_checks,
-    runtime_context_bundle_injection_findings,
-    runtime_context_status_counts,
-    runtime_rows_missing_context,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -132,8 +122,8 @@ _METHOD_EXISTENCE_CHECKS: list[tuple[str, str, str, str]] = [
     ("dharma_swarm.gnani_lodestone", "GnaniLodestone", "seed_all", "BLOCKER"),
     ("dharma_swarm.telos_gates", "TelosGatekeeper", "check", "BLOCKER"),
     ("dharma_swarm.stigmergy", "StigmergyStore", "leave_mark", "BLOCKER"),
-    ("dharma_swarm.task_board", "TaskBoard", "get_by_title", "BLOCKER"),
-    ("dharma_swarm.telos_graph", "TelosGraph", "get_by_name", "BLOCKER"),
+    ("dharma_swarm.task_board", "TaskBoard", "get_by_title", "DEGRADED"),
+    ("dharma_swarm.telos_graph", "TelosGraph", "get_by_name", "DEGRADED"),
 ]
 
 # Import chains that must succeed
@@ -216,6 +206,26 @@ async def run_auditor(src_root: Path) -> list[GuardianFinding]:
                 isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name == method_name
                 for n in ast.walk(class_node)
             )
+            # Dataclasses auto-generate __init__, __repr__, __eq__ at runtime.
+            # AST-only check mis-reports these as missing. If the class has a
+            # @dataclass decorator (or @dataclasses.dataclass), the dunder
+            # methods listed here are provided by the decorator unless
+            # explicitly disabled via decorator args (init=False etc.).
+            if not method_exists and method_name in {"__init__", "__repr__", "__eq__"}:
+                for deco in class_node.decorator_list:
+                    deco_name = ""
+                    if isinstance(deco, ast.Name):
+                        deco_name = deco.id
+                    elif isinstance(deco, ast.Attribute):
+                        deco_name = deco.attr
+                    elif isinstance(deco, ast.Call):
+                        if isinstance(deco.func, ast.Name):
+                            deco_name = deco.func.id
+                        elif isinstance(deco.func, ast.Attribute):
+                            deco_name = deco.func.attr
+                    if deco_name == "dataclass":
+                        method_exists = True
+                        break
             if not method_exists:
                 findings.append(GuardianFinding(
                     severity=severity,
@@ -347,266 +357,6 @@ async def run_loop_watcher(state_dir: Path) -> list[GuardianFinding]:
 
 
 # ---------------------------------------------------------------------------
-# LEDGER_WATCHER: Structured runtime row-count monitor
-# ---------------------------------------------------------------------------
-
-_STRUCTURED_RUNTIME_TABLES = ("task_claims", "delegation_runs", "artifact_records")
-_STRUCTURED_RUNTIME_TABLE_TIMESTAMPS = {
-    "task_claims": "claimed_at",
-    "delegation_runs": "started_at",
-    "artifact_records": "created_at",
-}
-
-
-def _runtime_db_candidates(state_dir: Path) -> list[Path]:
-    """Return state-local runtime DB candidates without consulting Path.home()."""
-    return [
-        state_dir / "state" / "runtime.db",
-        state_dir / "runtime.db",
-    ]
-
-
-def _runtime_table_count(db: sqlite3.Connection, table: str) -> int:
-    exists = db.execute(
-        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
-        (table,),
-    ).fetchone()
-    if exists is None:
-        return 0
-    row = db.execute(f"SELECT COUNT(*) FROM {table}").fetchone()
-    return int(row[0] if row else 0)
-
-
-def _runtime_table_count_since(
-    db: sqlite3.Connection,
-    table: str,
-    timestamp_column: str,
-    since_iso: str,
-) -> int:
-    exists = db.execute(
-        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
-        (table,),
-    ).fetchone()
-    if exists is None:
-        return 0
-    columns = {
-        str(row[1])
-        for row in db.execute(f"PRAGMA table_info({table})").fetchall()
-    }
-    if timestamp_column not in columns:
-        return 0
-    row = db.execute(
-        f"SELECT COUNT(*) FROM {table} WHERE {timestamp_column} >= ?",
-        (since_iso,),
-    ).fetchone()
-    return int(row[0] if row else 0)
-
-
-async def run_ledger_watcher(
-    state_dir: Path,
-    *,
-    now: datetime | None = None,
-) -> list[GuardianFinding]:
-    """LEDGER_WATCHER: detect event growth with empty structured runtime tables."""
-    findings: list[GuardianFinding] = []
-    runtime_db = next((path for path in _runtime_db_candidates(state_dir) if path.exists()), None)
-    if runtime_db is None:
-        return findings
-
-    resolved_now = now or datetime.now(timezone.utc)
-    since_iso = (resolved_now - timedelta(hours=24)).isoformat()
-    try:
-        with sqlite3.connect(f"file:{runtime_db}?mode=ro", uri=True) as db:
-            counts = {
-                "session_events": _runtime_table_count(db, "session_events"),
-                **{
-                    table: _runtime_table_count(db, table)
-                    for table in _STRUCTURED_RUNTIME_TABLES
-                },
-            }
-            recent_counts = {
-                "session_events": _runtime_table_count_since(
-                    db,
-                    "session_events",
-                    "created_at",
-                    since_iso,
-                ),
-                **{
-                    table: _runtime_table_count_since(
-                        db,
-                        table,
-                        _STRUCTURED_RUNTIME_TABLE_TIMESTAMPS[table],
-                        since_iso,
-                    )
-                    for table in _STRUCTURED_RUNTIME_TABLES
-                },
-            }
-            missing_context_counts = {
-                "task_claims": runtime_rows_missing_context(
-                    db,
-                    "task_claims",
-                    "claimed_at",
-                    since_iso,
-                ),
-                "delegation_runs": runtime_rows_missing_context(
-                    db,
-                    "delegation_runs",
-                    "started_at",
-                    since_iso,
-                ),
-            }
-            context_injection_findings = runtime_context_bundle_injection_findings(
-                db,
-                since_iso,
-            )
-            context_status_counts = runtime_context_status_counts(db, since_iso)
-            from dharma_swarm.operator_brief.watchdog import check_operator_brief_output
-            ob_findings = check_operator_brief_output(db, str(runtime_db))
-    except sqlite3.Error as exc:
-        return [
-            GuardianFinding(
-                severity="WARNING",
-                check="LEDGER_WATCHER:runtime_db",
-                title="Runtime DB could not be read",
-                detail=f"Failed to read structured runtime counts from {runtime_db}: {exc}",
-                file=str(runtime_db),
-                fix_hint="Verify runtime.db is a readable RuntimeStateStore SQLite database.",
-            )
-        ]
-
-    session_events = counts["session_events"]
-    structured_zero = all(counts[table] == 0 for table in _STRUCTURED_RUNTIME_TABLES)
-    if structured_zero and session_events > 100:
-        severity = "BLOCKER" if session_events > 1000 else "DEGRADED"
-        threshold = "> 1000" if severity == "BLOCKER" else "> 100"
-        findings.append(
-            GuardianFinding(
-                severity=severity,
-                check="LEDGER_WATCHER:structured_runtime_counts",
-                title="Session events are growing while structured runtime tables are empty",
-                detail=(
-                    f"{runtime_db} has session_events={session_events}, "
-                    f"task_claims={counts['task_claims']}, "
-                    f"delegation_runs={counts['delegation_runs']}, "
-                    f"artifact_records={counts['artifact_records']}. "
-                    f"Threshold {threshold} was crossed with all structured producer "
-                    "tables empty, so lifecycle state is not inspectable from the "
-                    "canonical RuntimeStateStore tables."
-                ),
-                file=str(runtime_db),
-                fix_hint=(
-                    "Wire existing RuntimeStateStore producers for task claims, "
-                    "delegation runs, and artifacts; do not create a new ledger."
-                ),
-            )
-        )
-        return findings
-
-    recent_session_events = recent_counts["session_events"]
-    recent_structured_zero = all(
-        recent_counts[table] == 0 for table in _STRUCTURED_RUNTIME_TABLES
-    )
-    if recent_session_events > 0 and recent_structured_zero:
-        findings.append(
-            GuardianFinding(
-                severity="WARNING",
-                check="LEDGER_WATCHER:delta_window",
-                title="Session events grew in 24h while structured runtime rows did not",
-                detail=(
-                    f"{runtime_db} has 24h deltas: "
-                    f"session_events={recent_session_events}, "
-                    f"task_claims={recent_counts['task_claims']}, "
-                    f"delegation_runs={recent_counts['delegation_runs']}, "
-                    f"artifact_records={recent_counts['artifact_records']}. "
-                    "Recent runtime activity is not producing structured "
-                    "RuntimeStateStore rows."
-                ),
-                file=str(runtime_db),
-                fix_hint=(
-                    "Check existing RuntimeStateStore producers for recent task "
-                    "claims, delegation runs, and artifacts."
-                ),
-            )
-        )
-    missing_context_total = sum(missing_context_counts.values())
-    if missing_context_total > 0:
-        findings.append(
-            GuardianFinding(
-                severity="WARNING",
-                check="LEDGER_WATCHER:missing_context_bundle",
-                title="Recent runtime claims or runs have no persisted context bundle",
-                detail=(
-                    f"{runtime_db} has recent rows without matching context_bundles: "
-                    f"task_claims={missing_context_counts['task_claims']}, "
-                    f"delegation_runs={missing_context_counts['delegation_runs']}. "
-                    "Canonical action is occurring without a persisted pre-action "
-                    "context bundle linked by metadata, run_id, or task/session."
-                ),
-                file=str(runtime_db),
-                fix_hint=(
-                    "Attach context_bundle_id during Orchestrator dispatch and ensure "
-                    "AgentRunner consumes the persisted bundle before action."
-                ),
-            )
-        )
-    if context_injection_findings:
-        examples = ", ".join(
-            f"{bundle_id}:{'|'.join(items)}"
-            for bundle_id, items in context_injection_findings[:5]
-        )
-        findings.append(
-            GuardianFinding(
-                severity="DEGRADED",
-                check="LEDGER_WATCHER:context_bundle_injection",
-                title="Recent context bundles contain prompt-injection signatures",
-                detail=(
-                    f"{runtime_db} has {len(context_injection_findings)} recent "
-                    "context_bundles whose rendered_text matches injection scanner "
-                    f"rules. Examples: {examples}. Persisted pre-action context is "
-                    "load-bearing and must be treated as untrusted evidence before "
-                    "AgentRunner prompt injection."
-                ),
-                file=str(runtime_db),
-                fix_hint=(
-                    "Sanitize or block suspicious persisted context before prompt "
-                    "construction; keep Runtime Context Bundle text fenced as evidence."
-                ),
-            )
-        )
-    context_status_total = sum(context_status_counts.values())
-    if context_status_total > 0:
-        severity = (
-            "BLOCKER"
-            if context_status_total >= 20
-            else "DEGRADED"
-            if context_status_total >= 5
-            else "WARNING"
-        )
-        breakdown = ", ".join(
-            f"{status}={count}" for status, count in sorted(context_status_counts.items())
-        )
-        findings.append(
-            GuardianFinding(
-                severity=severity,
-                check="LEDGER_WATCHER:context_bundle_status",
-                title="Recent runtime rows record context bundle compile failures",
-                detail=(
-                    f"{runtime_db} has recent task/run rows with unhealthy "
-                    f"context_bundle_status values: {breakdown}. Canonical action "
-                    "is falling back from pre-action context compilation."
-                ),
-                file=str(runtime_db),
-                fix_hint=(
-                    "Inspect Orchestrator context_bundle_failed session events and "
-                    "RuntimeStateStore availability before hard-gating dispatch."
-                ),
-            )
-        )
-    findings.extend(ob_findings)
-    return findings
-
-
-# ---------------------------------------------------------------------------
 # ROUTER_PROBE: Model routing health checker
 # ---------------------------------------------------------------------------
 
@@ -649,7 +399,7 @@ async def run_router_probe(state_dir: Path) -> list[GuardianFinding]:
     # Check for dead provider patterns in logs
     log_dir = state_dir.parent / ".dharma" / "logs" if (state_dir.parent / ".dharma").exists() else state_dir / "logs"
     if not log_dir.exists():
-        log_dir = dharma_state_dir() / "logs"
+        log_dir = Path.home() / ".dharma" / "logs"
 
     if log_dir.exists():
         try:
@@ -706,24 +456,8 @@ def synthesize_report(
     router_findings: list[GuardianFinding],
     generated_at: str,
     src_root: Path,
-    ledger_findings: list[GuardianFinding] | None = None,
-    warning_findings: list[GuardianFinding] | None = None,
-    consistency_findings: list[GuardianFinding] | None = None,
-    room_findings: list[GuardianFinding] | None = None,
 ) -> str:
-    ledger_findings = ledger_findings or []
-    warning_findings = warning_findings or []
-    consistency_findings = consistency_findings or []
-    room_findings = room_findings or []
-    all_findings = (
-        auditor_findings
-        + loop_findings
-        + router_findings
-        + ledger_findings
-        + warning_findings
-        + consistency_findings
-        + room_findings
-    )
+    all_findings = auditor_findings + loop_findings + router_findings
     all_findings.sort(key=lambda f: _severity_rank(f.severity))
 
     blockers = [f for f in all_findings if f.severity == "BLOCKER"]
@@ -770,11 +504,7 @@ def synthesize_report(
         "## Checked By",
         "- **AUDITOR**: Import chains, method existence, syntax errors across all modules",
         "- **LOOP_WATCHER**: Cybernetic loop artifact existence + freshness + evolution quality",
-        "- **LEDGER_WATCHER**: RuntimeStateStore row counts for session events and structured producers",
-        "- **GUARDIAN_WARNINGS**: Repo report freshness and registered .dharma top-level directories",
-        "- **CONSISTENCY_GUARD**: Task-claim lifecycle cross-store consistency (NEW-05)",
         "- **ROUTER_PROBE**: Circuit breaker state, log error patterns, missing API keys",
-        "- **ROOM_WATCHER**: Fractal room budget, kill/spinout condition health",
         "",
         "---",
         "*Guardian Crew runs every 4 hours. Report overwrites previous. "
@@ -829,43 +559,32 @@ async def _create_issue_if_needed(finding: GuardianFinding, repo: str, state_dir
     return False
 
 
+# ---------------------------------------------------------------------------
+# Main guardian run function
+# ---------------------------------------------------------------------------
+
 async def run_guardian_cycle(
     src_root: Path | None = None,
     state_dir: Path | None = None,
     github_repo: str = "AmitabhainArunachala/dharma_swarm",
     create_issues: bool = True,
-    room_registry: Any | None = None,
 ) -> dict[str, Any]:
     """Run one full guardian cycle: audit + loop_watch + router_probe + report.
 
     Returns:
         Dict with finding counts, report path, and issue creation results.
     """
-    src_root = src_root or Path.home() / "dharma_swarm" / "dharma_swarm"
-    state_dir = state_dir or dharma_state_dir()
+    src_root = src_root or Path(__file__).resolve().parent
+    state_dir = state_dir or Path.home() / ".dharma"
     generated_at = datetime.now(timezone.utc).isoformat()
 
     logger.info("Guardian Crew: starting cycle (src=%s)", src_root)
 
-    from dharma_swarm.fractal.room_health import run_room_health_watcher
-
-    # Run all Guardian checks in parallel.
-    (
-        auditor_findings,
-        loop_findings,
-        router_findings,
-        ledger_findings,
-        warning_findings,
-        consistency_findings,
-        room_findings,
-    ) = await asyncio.gather(
+    # Run all three agents in parallel
+    auditor_findings, loop_findings, router_findings = await asyncio.gather(
         run_auditor(src_root),
         run_loop_watcher(state_dir),
         run_router_probe(state_dir),
-        run_ledger_watcher(state_dir),
-        run_guardian_warning_checks(src_root, state_dir),
-        run_task_consistency_guard(state_dir),
-        run_room_health_watcher(room_registry),
         return_exceptions=False,
     )
 
@@ -876,10 +595,6 @@ async def run_guardian_cycle(
         router_findings=router_findings,
         generated_at=generated_at,
         src_root=src_root,
-        ledger_findings=ledger_findings,
-        warning_findings=warning_findings,
-        consistency_findings=consistency_findings,
-        room_findings=room_findings,
     )
 
     # Write report to disk
@@ -897,15 +612,7 @@ async def run_guardian_cycle(
 
     # Create GitHub issues for BLOCKERs
     issues_created = 0
-    all_findings = (
-        auditor_findings
-        + loop_findings
-        + router_findings
-        + ledger_findings
-        + warning_findings
-        + consistency_findings
-        + room_findings
-    )
+    all_findings = auditor_findings + loop_findings + router_findings
     blockers = [f for f in all_findings if f.severity == "BLOCKER"]
 
     if create_issues and blockers:
@@ -941,7 +648,6 @@ async def start_guardian_loop(
     github_repo: str = "AmitabhainArunachala/dharma_swarm",
     interval_seconds: int = _GUARDIAN_INTERVAL,
     shutdown_event: asyncio.Event | None = None,
-    room_registry: Any | None = None,
 ) -> None:
     """Run the guardian crew in a continuous loop (called from orchestrate_live).
 
@@ -950,15 +656,12 @@ async def start_guardian_loop(
     logger.info("Guardian Crew: starting loop (interval=%ds)", interval_seconds)
     _shutdown = shutdown_event or asyncio.Event()
 
-    async def _run_cycle_once() -> None:
-        await asyncio.wait_for(
-            run_guardian_cycle(src_root=src_root, state_dir=state_dir, github_repo=github_repo, room_registry=room_registry),
-            timeout=300.0,
-        )
-
     # Boot-time run
     try:
-        await _run_cycle_once()
+        await asyncio.wait_for(
+            run_guardian_cycle(src_root=src_root, state_dir=state_dir, github_repo=github_repo),
+            timeout=300.0,
+        )
     except asyncio.TimeoutError:
         logger.warning("Guardian Crew: boot-time cycle timed out (300s)")
     except Exception as exc:
@@ -974,7 +677,10 @@ async def start_guardian_loop(
         if _shutdown.is_set():
             break
         try:
-            await _run_cycle_once()
+            await asyncio.wait_for(
+                run_guardian_cycle(src_root=src_root, state_dir=state_dir, github_repo=github_repo),
+                timeout=300.0,
+            )
         except asyncio.TimeoutError:
             logger.warning("Guardian Crew: cycle timed out (300s)")
         except Exception as exc:

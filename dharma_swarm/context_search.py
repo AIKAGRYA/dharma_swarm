@@ -11,6 +11,7 @@ context they need.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 import time
@@ -48,6 +49,8 @@ class ContextSearchEngine:
         self._index_path = index_path
         self._keyword_index: dict[str, list[str]] = {}
         self._path_meta: dict[str, dict] = {}
+        self._path_keywords: dict[str, list[str]] = {}
+        self._path_signatures: dict[str, tuple[bool, int, float, str]] = {}
         self._built = False
 
     def build_index(self, force: bool = False) -> int:
@@ -57,36 +60,57 @@ class ContextSearchEngine:
         Returns number of paths indexed.
         """
         if self._built and not force:
-            return len(self._keyword_index)
+            return len(self._path_meta)
 
-        # If no explicit paths, use ecosystem map + repo source
+        # If no explicit paths, use ecosystem map
         if not self._paths:
             self._paths = self._load_ecosystem_map()
-            self._paths.update(self._load_repo_source_paths())
 
         count = 0
+        keyword_index: dict[str, list[str]] = {}
+        path_meta: dict[str, dict] = {}
+        path_keywords: dict[str, list[str]] = {}
+        path_signatures: dict[str, tuple[bool, int, float, str]] = {}
         for path_str, meta in self._paths.items():
             path = Path(path_str).expanduser()
             if not path.exists():
                 continue
 
             category = meta.get("category", "unknown")
-            keywords = self._extract_keywords(path, category)
-
+            stat = path.stat()
+            signature = (
+                path.is_file(),
+                stat.st_size if path.is_file() else 0,
+                stat.st_mtime,
+                str(category),
+            )
+            keywords = self._path_keywords.get(path_str)
+            if self._path_signatures.get(path_str) != signature or keywords is None:
+                keywords = self._extract_keywords(path, str(category))
             for kw in keywords:
-                self._keyword_index.setdefault(kw, []).append(path_str)
+                keyword_index.setdefault(kw, []).append(path_str)
 
-            self._path_meta[path_str] = {
+            path_keywords[path_str] = keywords
+            path_signatures[path_str] = signature
+            path_meta[path_str] = {
                 "category": category,
-                "size": path.stat().st_size if path.is_file() else 0,
-                "mtime": path.stat().st_mtime,
+                "size": signature[1],
+                "mtime": signature[2],
             }
             count += 1
 
+        self._keyword_index = keyword_index
+        self._path_meta = path_meta
+        self._path_keywords = path_keywords
+        self._path_signatures = path_signatures
         self._built = True
         logger.info("Indexed %d paths with %d keywords",
-                     count, len(self._keyword_index))
+                     count, len(keyword_index))
         return count
+
+    async def build_index_async(self, force: bool = False) -> int:
+        """Build the index off the event loop."""
+        return await asyncio.to_thread(self.build_index, force)
 
     def search(
         self,
@@ -249,17 +273,3 @@ class ContextSearchEngine:
             return result
         except ImportError:
             return {}
-
-    def _load_repo_source_paths(self) -> dict[str, dict]:
-        """Index dharma_swarm/ source modules and docs/ for code-level search."""
-        repo_root = Path(__file__).resolve().parent.parent
-        result: dict[str, dict] = {}
-        for pattern, category in [
-            ("dharma_swarm/**/*.py", "source"),
-            ("docs/**/*.md", "docs"),
-        ]:
-            for p in repo_root.glob(pattern):
-                if "__pycache__" in str(p):
-                    continue
-                result[str(p)] = {"category": category}
-        return result

@@ -1,8 +1,8 @@
 """S4 Environmental Intelligence -- zeitgeist awareness.
 
 Beer's Viable System Model System 4: outside-and-future awareness.
-Scans local files for research-relevant signals and optionally uses a
-configured LLM subprocess for AI landscape scanning when enabled.
+Scans local files for research-relevant signals and optionally uses
+``claude -p`` subprocess for AI landscape scanning (when available).
 
 Output: ``~/.dharma/meta/zeitgeist.md`` + ``zeitgeist.jsonl``
 Orchestrated cadence: every 600 s (ZEITGEIST_INTERVAL in orchestrate_live).
@@ -19,7 +19,6 @@ import shlex
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
-from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -28,11 +27,11 @@ from dharma_swarm.models import _new_id, _utc_now
 
 logger = logging.getLogger(__name__)
 
-LLM_SCAN_ENABLED_ENV = "DHARMA_ZEITGEIST_LLM_SCAN"
+CLAUDE_SCAN_ENV = "DHARMA_ZEITGEIST_CLAUDE_SCAN"
 LLM_SCAN_CMD_ENV = "DHARMA_ZEITGEIST_LLM_CMD"
 LLM_SCAN_SOURCE_ENV = "DHARMA_ZEITGEIST_LLM_SOURCE"
 LLM_SCAN_TIMEOUT_ENV = "DHARMA_ZEITGEIST_LLM_TIMEOUT_S"
-LLM_SCAN_TIMEOUT_S = 45.0
+CLAUDE_SCAN_TIMEOUT_S = 45
 
 
 # ---------------------------------------------------------------------------
@@ -114,8 +113,7 @@ class ZeitgeistScanner:
     """S4 scanner that detects research-relevant environmental signals.
 
     The scanner inspects local state (shared notes, stigmergy density) and
-    optionally delegates to a configured LLM command for broader landscape
-    awareness.
+    optionally delegates to ``claude -p`` for broader landscape awareness.
     Results are persisted as a Markdown summary and a JSONL log.
 
     Args:
@@ -124,7 +122,7 @@ class ZeitgeistScanner:
     """
 
     def __init__(self, state_dir: Path | None = None) -> None:
-        self._state_dir = state_dir or (dharma_state_dir())
+        self._state_dir = state_dir or (Path.home() / ".dharma")
         self._meta_dir = self._state_dir / "meta"
         self._signals: list[ZeitgeistSignal] = []
         self._output_path = self._meta_dir / "zeitgeist.md"
@@ -144,14 +142,14 @@ class ZeitgeistScanner:
         local_signals = await self._scan_local()
         self._signals.extend(local_signals)
 
-        # Try an LLM scan only when explicitly enabled. S4 should be able to
-        # run unattended without surprise network/model calls.
-        if os.environ.get(LLM_SCAN_ENABLED_ENV) == "1":
+        # Try Claude scan only when explicitly enabled outside Claude Code,
+        # or when the opt-in env var deliberately forces a one-shot scan.
+        if os.environ.get(CLAUDE_SCAN_ENV) == "1" or not os.environ.get("CLAUDECODE"):
             try:
-                llm_signals = await self._scan_llm()
-                self._signals.extend(llm_signals)
+                claude_signals = await self._scan_claude()
+                self._signals.extend(claude_signals)
             except Exception as exc:
-                logger.debug("LLM scan unavailable: %s", exc)
+                logger.debug("Claude scan unavailable: %s", exc)
 
         # Persist
         self._save()
@@ -183,6 +181,68 @@ class ZeitgeistScanner:
     def latest_threats(self) -> list[ZeitgeistSignal]:
         """Return signals classified as ``threat``."""
         return [s for s in self._signals if s.category == "threat"]
+
+    @staticmethod
+    def _witness_entry_key(entry: dict[str, Any]) -> tuple[str, str]:
+        return (
+            str(entry.get("phase", "")).strip(),
+            str(entry.get("action", "")).strip(),
+        )
+
+    @staticmethod
+    def _is_recent_witness_entry(
+        entry: dict[str, Any],
+        *,
+        now: datetime,
+        max_age_seconds: float = 600.0,
+    ) -> bool:
+        """Keep witness pressure tied to the current scan window."""
+        raw_ts = entry.get("ts") or entry.get("timestamp")
+        if not raw_ts:
+            return True
+        try:
+            ts = datetime.fromisoformat(str(raw_ts))
+        except ValueError:
+            return True
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        age_seconds = (now - ts.astimezone(timezone.utc)).total_seconds()
+        return 0.0 <= age_seconds <= max_age_seconds
+
+    @classmethod
+    def _count_witness_outcomes(
+        cls,
+        entries: list[dict[str, Any]],
+    ) -> dict[str, int]:
+        """Collapse reflective reroute BLOCKED->PASS pairs into one PASS."""
+        outcomes = {"BLOCKED": 0, "WARN": 0, "PASS": 0}
+        idx = 0
+        total = len(entries)
+
+        while idx < total:
+            entry = entries[idx]
+            outcome = str(entry.get("outcome", "")).strip().upper()
+            if outcome not in outcomes:
+                idx += 1
+                continue
+
+            if outcome == "BLOCKED" and idx + 1 < total:
+                next_entry = entries[idx + 1]
+                next_outcome = str(next_entry.get("outcome", "")).strip().upper()
+                next_reflection = str(next_entry.get("reflection", ""))
+                if (
+                    next_outcome == "PASS"
+                    and cls._witness_entry_key(next_entry) == cls._witness_entry_key(entry)
+                    and "Reflective reroute attempt" in next_reflection
+                ):
+                    outcomes["PASS"] += 1
+                    idx += 2
+                    continue
+
+            outcomes[outcome] += 1
+            idx += 1
+
+        return outcomes
 
     # -- scan sources -------------------------------------------------------
 
@@ -236,19 +296,22 @@ class ZeitgeistScanner:
         witness_dir = self._state_dir / "witness"
         if witness_dir.exists():
             try:
+                scan_now = datetime.now(timezone.utc)
                 today = datetime.now(timezone.utc).strftime("%Y%m%d")
                 log_file = witness_dir / f"witness_{today}.jsonl"
                 if log_file.exists():
-                    lines = log_file.read_text().strip().split("\n")
-                    outcomes = {"BLOCKED": 0, "WARN": 0, "PASS": 0}
-                    for line in lines[-200:]:
+                    entries: list[dict[str, Any]] = []
+                    for line in log_file.read_text().strip().split("\n")[-200:]:
                         try:
-                            entry = json.loads(line)
-                            outcome = entry.get("outcome", "")
-                            if outcome in outcomes:
-                                outcomes[outcome] += 1
-                        except (json.JSONDecodeError, KeyError):
+                            parsed = json.loads(line)
+                        except json.JSONDecodeError:
                             continue
+                        if (
+                            isinstance(parsed, dict)
+                            and self._is_recent_witness_entry(parsed, now=scan_now)
+                        ):
+                            entries.append(parsed)
+                    outcomes = self._count_witness_outcomes(entries)
                     total = sum(outcomes.values())
                     block_count = outcomes["BLOCKED"]
                     if total > 0 and block_count >= 3:
@@ -298,12 +361,9 @@ class ZeitgeistScanner:
                     }), encoding="utf-8")
                     logger.info("S4→S3 gate pressure: external_strict (high block rate)")
                 elif pressure_path.exists():
-                    # Clear stale pressure if no gate threat
+                    # Clear pressure eagerly once the witness channel is clean.
                     try:
-                        data = json.loads(pressure_path.read_text())
-                        import time as _time
-                        if data.get("expires", 0) < _time.time():
-                            pressure_path.unlink(missing_ok=True)
+                        pressure_path.unlink(missing_ok=True)
                     except Exception:
                         logger.debug("Gate pressure cleanup failed", exc_info=True)
             except Exception:
@@ -331,17 +391,21 @@ class ZeitgeistScanner:
 
         return signals
 
-    async def _scan_llm(self) -> list[ZeitgeistSignal]:
-        """Use an opt-in LLM command for AI landscape scanning."""
+    async def _scan_claude(self) -> list[ZeitgeistSignal]:
+        """Use ``claude -p`` for an opt-in AI landscape scan."""
+        if os.environ.get(CLAUDE_SCAN_ENV) != "1":
+            return []
+
         prompt = (
             "Return only compact JSON for DHARMA SWARM S4. Produce 3 current "
             "frontier signals about agentic AI/autonomous coding agents, AI "
-            "governance, mechanistic interpretability, or self-improving tool "
-            "use. Schema: {\"signals\":[{\"category\":\"competing_research|"
-            "tool_release|methodology|threat|opportunity\",\"title\":\"...\","
+            "governance, mech interp, or self-improving tool use. Schema: "
+            "{\"signals\":[{\"category\":\"competing_research|tool_release|"
+            "methodology|threat|opportunity\",\"title\":\"...\","
             "\"relevance_score\":0.0,\"keywords\":[\"...\"],"
             "\"description\":\"...\"}]}"
         )
+
         cmd = shlex.split(os.environ.get(LLM_SCAN_CMD_ENV, "claude -p"))
         if "{prompt}" in cmd:
             cmd = [prompt if part == "{prompt}" else part for part in cmd]
@@ -349,9 +413,9 @@ class ZeitgeistScanner:
             cmd.append(prompt)
 
         try:
-            timeout_s = float(os.environ.get(LLM_SCAN_TIMEOUT_ENV, LLM_SCAN_TIMEOUT_S))
+            timeout_s = float(os.environ.get(LLM_SCAN_TIMEOUT_ENV, CLAUDE_SCAN_TIMEOUT_S))
         except ValueError:
-            timeout_s = LLM_SCAN_TIMEOUT_S
+            timeout_s = CLAUDE_SCAN_TIMEOUT_S
 
         def _run() -> subprocess.CompletedProcess[str]:
             return subprocess.run(
@@ -365,14 +429,14 @@ class ZeitgeistScanner:
         try:
             proc = await asyncio.to_thread(_run)
         except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
-            logger.debug("LLM zeitgeist scan unavailable: %s", exc)
+            logger.debug("Claude scan unavailable: %s", exc)
             return []
 
         if proc.returncode != 0:
-            logger.debug("LLM zeitgeist scan failed: %s", proc.stderr.strip())
+            logger.debug("Claude scan failed: %s", proc.stderr.strip())
             return []
 
-        return _parse_llm_signals(proc.stdout)
+        return _parse_claude_signals(proc.stdout)
 
     # -- persistence --------------------------------------------------------
 
@@ -422,8 +486,8 @@ class ZeitgeistScanner:
         self._signals = []
 
 
-def _parse_llm_signals(raw: str) -> list[ZeitgeistSignal]:
-    """Parse strict JSON, or a CLI transcript containing a final JSON payload."""
+def _parse_claude_signals(raw: str) -> list[ZeitgeistSignal]:
+    """Parse the opt-in Claude scanner JSON payload."""
     text = raw.strip()
     if not text:
         return []
@@ -431,10 +495,7 @@ def _parse_llm_signals(raw: str) -> list[ZeitgeistSignal]:
     if not text.startswith(("{", "[")):
         for line in reversed(text.splitlines()):
             candidate = line.strip()
-            if (
-                candidate.startswith(("{", "["))
-                and _loads_signal_payload(candidate) is not None
-            ):
+            if candidate.startswith(("{", "[")) and _loads_signal_payload(candidate) is not None:
                 text = candidate
                 break
         else:
@@ -473,14 +534,10 @@ def _parse_llm_signals(raw: str) -> list[ZeitgeistSignal]:
         except (TypeError, ValueError):
             relevance = 0.0
         keywords_raw = row.get("keywords", [])
-        keywords = (
-            [str(k).strip() for k in keywords_raw if str(k).strip()]
-            if isinstance(keywords_raw, list)
-            else []
-        )
+        keywords = [str(k).strip() for k in keywords_raw if str(k).strip()] if isinstance(keywords_raw, list) else []
         signals.append(
             ZeitgeistSignal(
-                source=os.environ.get(LLM_SCAN_SOURCE_ENV, "llm_scan"),
+                source=os.environ.get(LLM_SCAN_SOURCE_ENV, "claude_scan"),
                 category=category,
                 title=title[:140],
                 relevance_score=max(0.0, min(1.0, relevance)),
@@ -495,7 +552,7 @@ def _loads_signal_payload(text: str) -> Any | None:
     try:
         payload = json.loads(text)
     except json.JSONDecodeError as exc:
-        logger.debug("LLM zeitgeist JSON parse failed: %s", exc)
+        logger.debug("Claude scan JSON parse failed: %s", exc)
         return None
     if isinstance(payload, list):
         return payload

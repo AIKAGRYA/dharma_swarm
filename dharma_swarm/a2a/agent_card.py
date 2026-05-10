@@ -21,12 +21,11 @@ import os
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
-_DHARMA_HOME = dharma_state_dir("DHARMA_HOME")
+_DHARMA_HOME = Path(os.getenv("DHARMA_HOME", Path.home() / ".dharma"))
 _DEFAULT_CARDS_DIR = _DHARMA_HOME / "a2a" / "cards"
 
 

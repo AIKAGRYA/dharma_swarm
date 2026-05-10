@@ -13,7 +13,6 @@ from datetime import datetime, timezone
 from enum import Enum
 import json
 from pathlib import Path
-from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -26,7 +25,7 @@ except ImportError:  # pragma: no cover
     _YAML_AVAILABLE = False
 
 
-DEFAULT_STATE_DIR = dharma_state_dir()
+DEFAULT_STATE_DIR = Path.home() / ".dharma"
 DEFAULT_SCOUTS_DIR = DEFAULT_STATE_DIR / "scouts"
 DEFAULT_HEALTH_DIR = DEFAULT_SCOUTS_DIR / "health"
 DEFAULT_DOMAIN_MAX_AGE_SECONDS = 26 * 3600
