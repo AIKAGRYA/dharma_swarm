@@ -127,6 +127,16 @@ def test_curriculum_engine_derives_campaign_chain_from_opportunity_board() -> No
             "thesis": "wedge",
             "factor_scores": {"telos_alignment": 0.92},
             "final_score": 88.0,
+            "why_now": "External buyer signal exists.",
+            "evidence_signals": ["go_case:case-1", "primitive:agent_payment_rail"],
+            "source_inputs": [{"source": "go_intake", "evidence_ref": "case-1"}],
+            "metadata": {
+                "bounded_context": "go_intake",
+                "capability_boundary": "ingestion_only",
+                "mouth": "grant_call",
+                "requires_operator_approval": True,
+                "forbidden_actions": ["fund_movement", "outbound_outreach"],
+            },
         },
         {
             "opportunity_id": "opp_mid",
@@ -148,6 +158,25 @@ def test_curriculum_engine_derives_campaign_chain_from_opportunity_board() -> No
     assert len(tasks) == len(OPPORTUNITY_BOOTSTRAP_STAGES)
     assert [task.metadata["stage"] for task in tasks] == list(OPPORTUNITY_BOOTSTRAP_STAGES)
     assert {task.provenance["opportunity_id"] for task in tasks} == {"opp_high"}
+    assert all(task.provenance["telos_alignment"] == 0.92 for task in tasks)
+    assert all(task.provenance["why_now"] == "External buyer signal exists." for task in tasks)
+    assert all(
+        task.provenance["evidence_signals"] == ["go_case:case-1", "primitive:agent_payment_rail"]
+        for task in tasks
+    )
+    assert all(
+        task.provenance["source_inputs"] == [{"source": "go_intake", "evidence_ref": "case-1"}]
+        for task in tasks
+    )
+    assert all(
+        task.provenance["opportunity_metadata"]["bounded_context"] == "go_intake"
+        for task in tasks
+    )
+    assert all(task.metadata["source_bounded_context"] == "go_intake" for task in tasks)
+    assert all(task.metadata["source_capability_boundary"] == "ingestion_only" for task in tasks)
+    assert all(task.metadata["source_mouth"] == "grant_call" for task in tasks)
+    assert all(task.metadata["requires_operator_approval"] is True for task in tasks)
+    assert all("fund_movement" in task.metadata["forbidden_actions"] for task in tasks)
     assert all(task.metadata["seed_kind"] == "opportunity_bootstrap" for task in tasks)
     assert any(task.source == "opportunity:deep_research" for task in tasks)
 

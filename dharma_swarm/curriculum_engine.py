@@ -208,6 +208,9 @@ class CurriculumEngine:
         domain = str(opportunity.get("domain") or "unknown")
         thesis = str(opportunity.get("thesis") or "opportunity")
         scores = dict(opportunity.get("factor_scores") or {})
+        source_inputs = list(opportunity.get("source_inputs") or [])
+        evidence_signals = list(opportunity.get("evidence_signals") or [])
+        opportunity_metadata = dict(opportunity.get("metadata") or {})
         final_score = _as_float(opportunity.get("final_score"), default=0.0)
         return FrontierTask(
             title=f"{stage.replace('_', ' ').title()} for {title}",
@@ -222,12 +225,24 @@ class CurriculumEngine:
                 "thesis": thesis,
                 "final_score": final_score,
                 "factor_scores": scores,
+                "telos_alignment": _as_float(scores.get("telos_alignment"), default=0.0),
+                "why_now": str(opportunity.get("why_now") or ""),
+                "evidence_signals": evidence_signals,
+                "source_inputs": source_inputs,
+                "opportunity_metadata": opportunity_metadata,
                 "stage": stage,
             },
             metadata={
                 "seed_kind": "opportunity_bootstrap",
                 "stage": stage,
                 "opportunity_id": opp_id,
+                "source_bounded_context": opportunity_metadata.get("bounded_context", ""),
+                "source_capability_boundary": opportunity_metadata.get("capability_boundary", ""),
+                "source_mouth": opportunity_metadata.get("mouth", ""),
+                "requires_operator_approval": bool(
+                    opportunity_metadata.get("requires_operator_approval", False)
+                ),
+                "forbidden_actions": list(opportunity_metadata.get("forbidden_actions") or []),
             },
         )
 

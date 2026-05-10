@@ -1,0 +1,76 @@
+{
+  "agent_prompt": "# Governed Prompt Lane Work Packet\n\nPrompt hash: `07994bfc99f119e6e198ed4f`\nPack: `wize-ai-slop-cleanup-subagents-2026-05-09`\nLane: `dead_code_removal` - Subagent 3: Dead Code Removal\nTarget: `dharma_swarm/vector_store.py`\nBase ref: `origin/main`\nRisk: `critical`\n\n## Source Prompt\n\nUse tools like knip to find all unused exports, unreferenced functions, and orphaned files. Verify MANUALLY before removing. Check for dynamic imports, config references, framework conventions, and code generation that static analysis misses. Remove only what is CONFIRMED dead.\n\n## Objective\n\nFind dead code candidates and promote only confirmed deletions.\n\n## Required Detectors\n\n- `vulture`\n- `fallow`\n- `coverage`\n- `gitnexus_impact`\n\n## Required Gates Before Claiming Done\n\n- `make quality-fast`\n- `python scripts/governance/slop_verify.py`\n- `pytest targeted`\n\n## Allowed Actions\n\n- open deletion candidates as reviewed proposals\n- add whitelist entries for intentional dynamic entry points\n- remove confirmed dead code only after impact evidence\n\n## Forbidden Actions\n\n- do not auto-delete any code from static analysis alone\n- do not delete framework or dynamic entry points without runtime evidence\n- do not treat low coverage as proof of dead code\n\n## Global Constraints\n\n- `no_single_detector_blocks`\n- `no_auto_delete`\n- `no_auto_merge`\n- `blast_radius_before_edit`\n- `before_after_evidence_required`\n- `human_review_for_deletion_or_consolidation`\n- `tests_and_quality_gates_after_each_batch`\n\n## Execution Rules\n\n- Validate the prompt pack before starting.\n- Run impact analysis before editing any target symbol.\n- Make the smallest coherent batch of changes.\n- Preserve user and unrelated worktree changes.\n- Write before/after evidence.\n- Do not auto-delete, auto-merge, or silently bypass gates.\n- Route normalized findings through the slop governance surface.\n",
+  "authority": {
+    "authorizes_auto_merge": false,
+    "authorizes_deletion": false,
+    "authorizes_source_edits": false,
+    "note": "This packet authorizes investigation and bounded proposals only; source edits require normal repo discipline and gate evidence."
+  },
+  "created_utc": "2026-05-09T06:34:54+00:00",
+  "kind": "prompt_lane_work_packet",
+  "lane": {
+    "allowed_actions": [
+      "open deletion candidates as reviewed proposals",
+      "add whitelist entries for intentional dynamic entry points",
+      "remove confirmed dead code only after impact evidence"
+    ],
+    "forbidden_actions": [
+      "do not auto-delete any code from static analysis alone",
+      "do not delete framework or dynamic entry points without runtime evidence",
+      "do not treat low coverage as proof of dead code"
+    ],
+    "lane_id": "dead_code_removal",
+    "manual_review_required": true,
+    "objective": "Find dead code candidates and promote only confirmed deletions.",
+    "required_detectors": [
+      "vulture",
+      "fallow",
+      "coverage",
+      "gitnexus_impact"
+    ],
+    "required_gates": [
+      "make quality-fast",
+      "python scripts/governance/slop_verify.py",
+      "pytest targeted"
+    ],
+    "requires_blast_radius": true,
+    "risk_level": "critical",
+    "source_artifact": "IMG_3594.png",
+    "source_sha256": "3bf59baeaec7a775c12c1ab38c519914913eed2d283eb1cfb7678ce11ee73de4",
+    "title": "Subagent 3: Dead Code Removal",
+    "transcript": "Use tools like knip to find all unused exports, unreferenced functions, and orphaned files. Verify MANUALLY before removing. Check for dynamic imports, config references, framework conventions, and code generation that static analysis misses. Remove only what is CONFIRMED dead."
+  },
+  "pack": {
+    "known_missing_slides": [
+      1,
+      2,
+      3,
+      11
+    ],
+    "pack_id": "wize-ai-slop-cleanup-subagents-2026-05-09",
+    "path": "docs/governance/prompt_packs/slop_cleanup_subagents.json",
+    "source_completeness": "partial",
+    "status": "advisory"
+  },
+  "post_run_requirements": [
+    "run the lane required_gates",
+    "write before_after_evidence",
+    "route normalized findings through scripts/governance/slop_verify.py",
+    "never apply deletion or consolidation without human review"
+  ],
+  "preflight": {
+    "before_agent_run": [
+      "python scripts/governance/verify_prompt_pack.py docs/governance/prompt_packs/slop_cleanup_subagents.json",
+      "select exactly one lane_id",
+      "record source_artifact and prompt_hash in the work packet",
+      "run impact analysis before edits to any target symbol"
+    ],
+    "pack_validated": true
+  },
+  "prompt_hash": "07994bfc99f119e6e198ed4f",
+  "schema_version": 1,
+  "target": {
+    "base_ref": "origin/main",
+    "path": "dharma_swarm/vector_store.py"
+  }
+}
