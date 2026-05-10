@@ -438,6 +438,103 @@ async def run_router_probe(state_dir: Path) -> list[GuardianFinding]:
 
 
 # ---------------------------------------------------------------------------
+# CODE_HYGIENE: precomputed quality findings monitor
+# ---------------------------------------------------------------------------
+
+def _latest_hygiene_findings_path(state_dir: Path) -> Path | None:
+    audit_base = state_dir / "audit" / "quality"
+    candidates = sorted(audit_base.glob("*/findings.jsonl"), key=lambda p: str(p))
+    existing = [p for p in candidates if p.is_file()]
+    return existing[-1] if existing else None
+
+
+def _hygiene_status(row: dict[str, Any]) -> str:
+    value = row.get("status") or row.get("state") or row.get("suggested_action")
+    return str(value or "proposed").strip().lower() or "proposed"
+
+
+async def _check_code_hygiene(state_dir: Path) -> list[GuardianFinding]:
+    """Read precomputed quality findings; do not run quality tools."""
+    findings_path = _latest_hygiene_findings_path(state_dir)
+    if findings_path is None:
+        return [
+            GuardianFinding(
+                severity="WARNING",
+                check="CODE_HYGIENE:precomputed_findings",
+                title="No code hygiene findings file found",
+                detail=f"No findings.jsonl exists under {state_dir / 'audit' / 'quality'}",
+                fix_hint="Run the quality routing job to populate precomputed findings.",
+            )
+        ]
+
+    rows: list[dict[str, Any]] = []
+    invalid_rows = 0
+    try:
+        for line in findings_path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                invalid_rows += 1
+                continue
+            if isinstance(row, dict):
+                rows.append(row)
+            else:
+                invalid_rows += 1
+    except Exception as exc:
+        return [
+            GuardianFinding(
+                severity="DEGRADED",
+                check="CODE_HYGIENE:precomputed_findings",
+                title="Could not read code hygiene findings",
+                detail=f"Failed reading {findings_path}: {exc}",
+                file=str(findings_path),
+                fix_hint="Check permissions and regenerate the precomputed quality findings.",
+            )
+        ]
+
+    severity_counts: dict[str, int] = {}
+    status_counts: dict[str, int] = {}
+    for row in rows:
+        severity = str(row.get("severity") or "unknown").strip().lower() or "unknown"
+        status = _hygiene_status(row)
+        severity_counts[severity] = severity_counts.get(severity, 0) + 1
+        status_counts[status] = status_counts.get(status, 0) + 1
+
+    total = len(rows)
+    high = severity_counts.get("high", 0)
+    if invalid_rows or high:
+        guardian_severity = "DEGRADED"
+    elif total:
+        guardian_severity = "WARNING"
+    else:
+        return []
+
+    detail = (
+        f"{total} precomputed code hygiene finding(s) in {findings_path}. "
+        f"Severity counts: {dict(sorted(severity_counts.items()))}. "
+        f"Status counts: {dict(sorted(status_counts.items()))}."
+    )
+    if invalid_rows:
+        detail += f" Ignored {invalid_rows} invalid JSONL row(s)."
+
+    return [
+        GuardianFinding(
+            severity=guardian_severity,
+            check="CODE_HYGIENE:precomputed_findings",
+            title=f"Code hygiene findings: {total} total",
+            detail=detail,
+            file=str(findings_path),
+            fix_hint=(
+                "Triage high/medium findings from the quality audit proposals "
+                "before broad cleanup."
+            ),
+        )
+    ]
+
+
+# ---------------------------------------------------------------------------
 # Report synthesizer
 # ---------------------------------------------------------------------------
 
@@ -449,10 +546,11 @@ def synthesize_report(
     auditor_findings: list[GuardianFinding],
     loop_findings: list[GuardianFinding],
     router_findings: list[GuardianFinding],
+    hygiene_findings: list[GuardianFinding],
     generated_at: str,
     src_root: Path,
 ) -> str:
-    all_findings = auditor_findings + loop_findings + router_findings
+    all_findings = auditor_findings + loop_findings + router_findings + hygiene_findings
     all_findings.sort(key=lambda f: _severity_rank(f.severity))
 
     blockers = [f for f in all_findings if f.severity == "BLOCKER"]
@@ -500,6 +598,7 @@ def synthesize_report(
         "- **AUDITOR**: Import chains, method existence, syntax errors across all modules",
         "- **LOOP_WATCHER**: Cybernetic loop artifact existence + freshness + evolution quality",
         "- **ROUTER_PROBE**: Circuit breaker state, log error patterns, missing API keys",
+        "- **CODE_HYGIENE**: Precomputed quality findings severity/status counts",
         "",
         "---",
         "*Guardian Crew runs every 4 hours. Report overwrites previous. "
@@ -575,11 +674,12 @@ async def run_guardian_cycle(
 
     logger.info("Guardian Crew: starting cycle (src=%s)", src_root)
 
-    # Run all three agents in parallel
-    auditor_findings, loop_findings, router_findings = await asyncio.gather(
+    # Run all agents in parallel. Code hygiene reads precomputed findings only.
+    auditor_findings, loop_findings, router_findings, hygiene_findings = await asyncio.gather(
         run_auditor(src_root),
         run_loop_watcher(state_dir),
         run_router_probe(state_dir),
+        _check_code_hygiene(state_dir),
         return_exceptions=False,
     )
 
@@ -588,6 +688,7 @@ async def run_guardian_cycle(
         auditor_findings=auditor_findings,
         loop_findings=loop_findings,
         router_findings=router_findings,
+        hygiene_findings=hygiene_findings,
         generated_at=generated_at,
         src_root=src_root,
     )
@@ -607,7 +708,7 @@ async def run_guardian_cycle(
 
     # Create GitHub issues for BLOCKERs
     issues_created = 0
-    all_findings = auditor_findings + loop_findings + router_findings
+    all_findings = auditor_findings + loop_findings + router_findings + hygiene_findings
     blockers = [f for f in all_findings if f.severity == "BLOCKER"]
 
     if create_issues and blockers:
