@@ -31,8 +31,10 @@
 | NEW-09: orchestrator → TelicSeam registry_path kwarg | — | ✅ FIXED | `orchestrator.py:154` used `registry_path=` but TelicSeam accepts `path=`. TypeError at runtime. |
 | NEW-10: lineage edges lack delegation chain | — | ✅ FIXED | `LineageEdge.delegated_by` + `trace_id` fields added; `agent_runner.spawn_worker` records delegation lineage |
 | NEW-11: TelicSeam singleton missing signal_bus | — | ✅ FIXED | `get_seam()` now passes `signal_bus=SignalBus.get()` to singleton |
+| BR-007: runtime.db path drift + store split | BLOCKER | ✅ RESOLVED | `_record_memory_fact()` now writes `state/runtime.db`; `engine/store_sync.py` materializes ontology Outcomes into runtime ArtifactRecords; cron + room-health guards wired. |
+| BR-008: VentureCell room/ontology split | BLOCKER | ✅ RESOLVED | `fractal/room_bridge.py` uses deterministic room IDs for ontology objects, updates through `put_object()`, preserves `room_status`, and room-health persists ontology sync. |
 
-**Net change:** 11 resolved, 5 fixed prior sessions, 6 new entries (NEW-05 guarded, NEW-07/NEW-08 partially resolved, NEW-09/10/11 fixed), 0 open BLOCKERs, 4 structural degraded remain.
+**Net change:** 11 resolved, 5 fixed prior sessions, 6 new entries (NEW-05 guarded, NEW-07/NEW-08 partially resolved, NEW-09/10/11 fixed), plus BR-007/BR-008 closure notes from PR #187. 0 open BLOCKERs, 4 structural degraded remain.
 
 ---
 
