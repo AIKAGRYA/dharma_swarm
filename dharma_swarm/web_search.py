@@ -23,7 +23,7 @@ import os
 import re
 import time
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, ClassVar
 from urllib.parse import quote_plus
 
 logger = logging.getLogger(__name__)
@@ -319,13 +319,14 @@ class JinaSearchBackend(SearchBackend):
     API_KEY_ENV = "JINA_API_KEY"
     SEARCH_URL = "https://s.jina.ai/"
     READER_URL = "https://r.jina.ai/"
+    _process_auth_disabled: ClassVar[bool] = False
 
     def __init__(self) -> None:
-        self._auth_disabled = False
+        self._auth_disabled = self.__class__._process_auth_disabled
 
     @property
     def available(self) -> bool:
-        return not self._auth_disabled
+        return not self._auth_disabled and not self.__class__._process_auth_disabled
 
     def _headers(self) -> dict[str, str]:
         key = os.environ.get(self.API_KEY_ENV, "").strip()
@@ -337,18 +338,20 @@ class JinaSearchBackend(SearchBackend):
     def _disable_after_auth_failure(self, status_code: int, *, action: str) -> bool:
         if status_code not in {401, 403}:
             return False
-        if not self._auth_disabled:
+        already_disabled = self._auth_disabled or self.__class__._process_auth_disabled
+        if not already_disabled:
             logger.warning(
                 "Jina %s auth failed (%s); disabling Jina for this process",
                 action,
                 status_code,
             )
         self._auth_disabled = True
+        self.__class__._process_auth_disabled = True
         return True
 
     async def search(self, query: str, max_results: int = 5) -> list[SearchResult]:
         import httpx
-        if self._auth_disabled:
+        if not self.available:
             return []
         try:
             async with httpx.AsyncClient(timeout=20) as client:
@@ -383,7 +386,7 @@ class JinaSearchBackend(SearchBackend):
     async def fetch_content(self, url: str) -> str:
         """Fetch and return clean markdown from any URL."""
         import httpx
-        if self._auth_disabled:
+        if not self.available:
             return f"Error fetching {url}: Jina disabled after auth failure"
         try:
             async with httpx.AsyncClient(timeout=30) as client:

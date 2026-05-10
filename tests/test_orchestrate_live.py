@@ -240,6 +240,23 @@ def test_campaign_is_stale_when_old_or_missing():
     assert _campaign_is_stale(None) is True
 
 
+def test_campaign_freshness_accepts_naive_datetimes():
+    from datetime import datetime, timedelta, timezone
+    from dharma_swarm.orchestrate_live import _campaign_is_stale, _task_is_recent
+
+    now = datetime.now(timezone.utc)
+    naive_now = now.replace(tzinfo=None)
+    naive_old = (now - timedelta(hours=5)).replace(tzinfo=None)
+
+    assert _campaign_is_stale({"last_check_in": naive_now.isoformat()}) is False
+    assert _campaign_is_stale({"last_check_in": naive_old.isoformat()}) is True
+    assert _task_is_recent(
+        SimpleNamespace(updated_at=now),
+        hours=1.0,
+        now=naive_now,
+    ) is True
+
+
 def test_build_mission_seed_specs_attaches_campaign_and_artifact_contract():
     from dharma_swarm.models import TaskPriority
     from dharma_swarm.orchestrate_live import _build_mission_seed_specs

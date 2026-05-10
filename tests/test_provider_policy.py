@@ -603,6 +603,27 @@ class _OpenRouterCreditsProvider:
         yield "Error code: 402 - This request requires more credits, or fewer max_tokens."
 
 
+class _ModelUnavailableExceptionProvider:
+    async def complete(self, request: LLMRequest) -> LLMResponse:
+        raise RuntimeError(
+            "NVIDIA NIM error 404: Not Found. Function not found for account."
+        )
+
+    async def stream(self, request: LLMRequest):
+        yield ""
+
+
+class _ErrorPrefixedAuthProvider:
+    async def complete(self, request: LLMRequest) -> LLMResponse:
+        return LLMResponse(
+            content="ERROR (rc=1): unauthorized; invalid API key",
+            model="dummy",
+        )
+
+    async def stream(self, request: LLMRequest):
+        yield "ERROR (rc=1): unauthorized; invalid API key"
+
+
 @pytest.mark.asyncio
 async def test_model_router_complete_for_task_uses_policy_selection() -> None:
     router = ModelRouter(
@@ -774,6 +795,80 @@ async def test_model_router_openrouter_402_credit_phrase_maps_to_billing_exhaust
                 messages=[{"role": "user", "content": "summarize the incident"}],
             ),
             available_provider_types=[ProviderType.OPENROUTER],
+        )
+
+
+@pytest.mark.asyncio
+async def test_model_router_model_unavailable_exception_fast_trips_breaker() -> None:
+    router = ModelRouter(
+        {
+            ProviderType.CLAUDE_CODE: _ModelUnavailableExceptionProvider(),
+            ProviderType.CODEX: _DummyProvider("frontier"),
+        },
+        retry_policy=RetryPolicy(
+            max_attempts=1,
+            base_delay_seconds=0.0,
+            jitter_seconds=0.0,
+            max_delay_seconds=0.0,
+        ),
+    )
+
+    decision, response = await router.complete_for_task(
+        ProviderRouteRequest(
+            action_name="frontier_council",
+            risk_score=0.25,
+            uncertainty=0.25,
+            novelty=0.25,
+            urgency=0.8,
+            expected_impact=0.8,
+            requires_frontier_precision=True,
+        ),
+        LLMRequest(
+            model="claude-opus-4-6",
+            messages=[{"role": "user", "content": "diagnose the control plane"}],
+        ),
+        available_provider_types=[ProviderType.CLAUDE_CODE, ProviderType.CODEX],
+    )
+
+    breaker_snapshots = router._breaker_registry.snapshot_all()
+    claude_code_states = [
+        payload["state"]
+        for key, payload in breaker_snapshots.items()
+        if key.startswith("claude_code:")
+    ]
+    assert decision.selected_provider == ProviderType.CODEX
+    assert response.content == "frontier"
+    assert "open" in claude_code_states
+
+
+@pytest.mark.asyncio
+async def test_model_router_error_prefixed_auth_response_maps_to_access_denied() -> None:
+    router = ModelRouter(
+        {ProviderType.CODEX: _ErrorPrefixedAuthProvider()},
+        retry_policy=RetryPolicy(
+            max_attempts=1,
+            base_delay_seconds=0.0,
+            jitter_seconds=0.0,
+            max_delay_seconds=0.0,
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="access_denied"):
+        await router.complete_for_task(
+            ProviderRouteRequest(
+                action_name="apply_patch",
+                risk_score=0.25,
+                uncertainty=0.25,
+                novelty=0.25,
+                urgency=0.8,
+                expected_impact=0.8,
+                context={"requires_tooling": True},
+            ),
+            LLMRequest(
+                model="codex",
+                messages=[{"role": "user", "content": "diagnose the control plane"}],
+            ),
+            available_provider_types=[ProviderType.CODEX],
         )
 
 

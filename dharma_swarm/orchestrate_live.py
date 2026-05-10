@@ -517,10 +517,15 @@ def _task_is_recent(
     ts = getattr(task, "updated_at", None) or getattr(task, "created_at", None)
     if not isinstance(ts, datetime):
         return False
-    current = now or datetime.now(timezone.utc)
-    if ts.tzinfo is None:
-        ts = ts.replace(tzinfo=timezone.utc)
+    current = _as_utc_datetime(now or datetime.now(timezone.utc))
+    ts = _as_utc_datetime(ts)
     return (current - ts).total_seconds() <= max(0.0, hours) * 3600.0
+
+
+def _as_utc_datetime(value: datetime) -> datetime:
+    if value.tzinfo is None or value.tzinfo.utcoffset(value) is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
 
 
 def _campaign_has_recent_nurture_task(
@@ -570,6 +575,7 @@ def _campaign_is_stale(campaign: dict[str, Any] | None, *, max_age_hours: float 
         ts = datetime.fromisoformat(str(ts_raw).replace("Z", "+00:00"))
     except Exception:
         return True
+    ts = _as_utc_datetime(ts)
     age_hours = (datetime.now(timezone.utc) - ts).total_seconds() / 3600.0
     return age_hours > max_age_hours
 

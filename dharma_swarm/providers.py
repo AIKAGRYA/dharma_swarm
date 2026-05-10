@@ -2287,36 +2287,87 @@ class ModelRouter:
     @staticmethod
     def _response_indicates_failure(response: LLMResponse) -> str | None:
         body = response.content.strip().lower()
+        if len(body) < 300:
+            for marker in ModelRouter._BILLING_FAILURE_MARKERS:
+                if marker in body:
+                    return "billing_exhausted"
+            for marker in ModelRouter._ACCESS_DENIED_MARKERS:
+                if marker in body:
+                    return "access_denied"
+            for marker in ModelRouter._MODEL_UNAVAILABLE_MARKERS:
+                if marker in body:
+                    return "model_unavailable"
+            if "404" in body and "not found" in body:
+                return "model_unavailable"
         if body.startswith("timeout:"):
             return "provider_timeout"
         if body.startswith("error:") or body.startswith("error (rc="):
             return "provider_error"
-        # Detect billing/credit failures returned as content (not exceptions)
-        _BILLING_MARKERS = (
-            "credit balance is too low",
-            "credit balance",
-            "requires more credits",
-            "insufficient_quota",
-            "you exceeded your current quota",
-            "billing hard limit",
-            "rate_limit_exceeded",
-            "your api key has been disabled",
-        )
-        _ACCESS_DENIED_MARKERS = (
-            "access denied",
-            "please check your network settings",
-            "403",
-            "forbidden",
-            "unauthorized",
-        )
-        if len(body) < 300:
-            for marker in _BILLING_MARKERS:
-                if marker in body:
-                    return "billing_exhausted"
-            for marker in _ACCESS_DENIED_MARKERS:
-                if marker in body:
-                    return "access_denied"
         return None
+
+    _BILLING_FAILURE_MARKERS = (
+        "credit balance is too low",
+        "credit balance",
+        "requires more credits",
+        "insufficient_quota",
+        "you exceeded your current quota",
+        "billing hard limit",
+        "rate_limit_exceeded",
+        "your api key has been disabled",
+        "payment required",
+        "error code: 402",
+    )
+    _ACCESS_DENIED_MARKERS = (
+        "access denied",
+        "please check your network settings",
+        "403",
+        "forbidden",
+        "unauthorized",
+        "invalid api key",
+        "not authenticated",
+        "authentication failed",
+    )
+    _MODEL_UNAVAILABLE_MARKERS = (
+        "not found for account",
+        "model_not_found",
+        "model not found",
+        "model unavailable",
+        "function not found",
+    )
+
+    @classmethod
+    def _exception_indicates_failure(cls, exc: Exception) -> str | None:
+        body = str(exc).strip().lower()
+        if not body:
+            return "provider_error"
+        for marker in cls._BILLING_FAILURE_MARKERS:
+            if marker in body:
+                return "billing_exhausted"
+        for marker in cls._ACCESS_DENIED_MARKERS:
+            if marker in body:
+                return "access_denied"
+        for marker in cls._MODEL_UNAVAILABLE_MARKERS:
+            if marker in body:
+                return "model_unavailable"
+        if "404" in body and "not found" in body:
+            return "model_unavailable"
+        if "timeout" in body:
+            return "provider_timeout"
+        return None
+
+    @staticmethod
+    def _failure_is_permanent(error: str | None) -> bool:
+        return error in {
+            "billing_exhausted",
+            "access_denied",
+            "quota_exceeded",
+            "model_unavailable",
+        }
+
+    @staticmethod
+    def _fast_trip_breaker(breaker: Any) -> None:
+        for _ in range(breaker.config.min_samples):
+            breaker.record_failure()
 
     def _provider_chain(
         self,
@@ -3035,16 +3086,11 @@ class ModelRouter:
                 latency_ms = (time.monotonic() - attempt_started) * 1000.0
                 response_error = self._response_indicates_failure(response)
                 if response_error:
-                    # Fast-trip circuit for billing exhaustion and permanent 403s.
+                    # Fast-trip circuit for permanent provider-side failures.
                     # Don't waste 8 retries on a dead provider — trip immediately
                     # so the router falls through to the next working provider.
-                    _is_permanent = response_error in (
-                        "billing_exhausted", "access_denied", "quota_exceeded"
-                    )
-                    if _is_permanent:
-                        # Force circuit open by recording enough failures at once
-                        for _ in range(breaker.config.min_samples):
-                            breaker.record_failure()
+                    if self._failure_is_permanent(response_error):
+                        self._fast_trip_breaker(breaker)
                         logger.warning(
                             "Fast-tripped circuit breaker for %s: %s",
                             provider_type.value, response_error,
@@ -3189,6 +3235,13 @@ class ModelRouter:
                     if "attempt_started" in locals()
                     else 0.0
                 )
+                exception_error = self._exception_indicates_failure(exc) or "provider_error"
+                if self._failure_is_permanent(exception_error):
+                    self._fast_trip_breaker(breaker)
+                    logger.warning(
+                        "Fast-tripped circuit breaker for %s: %s",
+                        provider_type.value, exception_error,
+                    )
                 self._update_reward(provider_type, reward_model, -1.0)
                 self._record_routing_memory_outcome(
                     provider=provider_type,
@@ -3199,13 +3252,13 @@ class ModelRouter:
                     success=False,
                     latency_ms=latency_ms,
                     total_tokens=0,
-                    error=str(exc)[:120],
+                    error=exception_error,
                 )
                 failure_trace.append(
                     {
                         "provider": provider_type.value,
                         "model": request_for_provider.model,
-                        "error": str(exc)[:300],
+                        "error": exception_error,
                         "state": breaker.state.value,
                     }
                 )
@@ -3218,7 +3271,7 @@ class ModelRouter:
                     success=False,
                     latency_ms=latency_ms,
                     total_tokens=0,
-                    error=str(exc)[:120],
+                    error=exception_error,
                 )
 
         self._append_routing_audit(
