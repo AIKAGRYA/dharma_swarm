@@ -198,3 +198,54 @@ class OpportunityDispatcher:
                 break
 
         return results
+
+
+def main(argv: list[str] | None = None) -> int:
+    """CLI entrypoint for cron_runner's ``frontier_dispatcher`` handler.
+
+    Reads opportunity_board.json and dispatches top pending rows through
+    the stage pipeline via :class:`OpportunityDispatcher`.
+    """
+    import argparse
+    import json as _json
+
+    parser = argparse.ArgumentParser(description="Dispatch opportunities from board")
+    parser.add_argument("--dry-run", action="store_true", help="Preview only")
+    parser.add_argument("--max", type=int, default=3, help="Max promotions per run")
+    args = parser.parse_args(argv)
+
+    board_path = Path.home() / ".dharma" / "meta" / "opportunity_board.json"
+    if not board_path.exists():
+        logger.info("No opportunity board found at %s", board_path)
+        return 0
+
+    try:
+        board = _json.loads(board_path.read_text(encoding="utf-8"))
+    except (OSError, _json.JSONDecodeError) as exc:
+        logger.error("Failed to read board: %s", exc)
+        return 1
+
+    if not isinstance(board, list):
+        logger.error("Board is not a list")
+        return 1
+
+    pending = [r for r in board if not r.get("addressed")]
+    pending.sort(key=lambda r: float(r.get("final_score", 0) or 0), reverse=True)
+    pending = pending[:args.max]
+
+    if not pending:
+        logger.info("No pending opportunities to dispatch")
+        return 0
+
+    if args.dry_run:
+        for row in pending:
+            logger.info("[dry-run] Would dispatch: %s (%s)", row.get("title"), row.get("id"))
+        return 0
+
+    dispatcher = OpportunityDispatcher()
+    for row in pending:
+        results = dispatcher.dispatch_opportunity_sync(row)
+        for r in results:
+            logger.info("Dispatched %s/%s: success=%s", row.get("id"), r.stage, r.success)
+
+    return 0
