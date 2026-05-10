@@ -380,6 +380,15 @@ class WitnessAuditor:
         except Exception as exc:
             logger.debug("Witness: failed to emit signal: %s", exc)
 
+    def record_anomaly(self, event: dict[str, Any]) -> None:
+        """Record an anomaly signal as a witness observation."""
+        severity = event.get("severity", "info")
+        description = event.get("description", str(event))
+        self._total_findings += 1
+        if severity in ("warning", "critical"):
+            self._actionable_findings += 1
+        logger.info("Witness: anomaly recorded (severity=%s): %s", severity, description[:200])
+
     def get_stats(self) -> dict[str, Any]:
         """Return auditor statistics for health reporting."""
         return {
@@ -392,3 +401,28 @@ class WitnessAuditor:
                 self._actionable_findings / max(1, self._total_findings), 3
             ),
         }
+
+
+def record_anomaly_signal(event: dict[str, Any]) -> None:
+    """Signal bus receiver: ANOMALY_DETECTED → witness log.
+
+    Module-level function called by the signal bus subscriber in
+    orchestrate_live.py. Persists anomaly to the witness JSONL log.
+    """
+    try:
+        from pathlib import Path
+        witness_dir = Path.home() / ".dharma" / "witness"
+        witness_dir.mkdir(parents=True, exist_ok=True)
+        import json
+        record = {
+            "type": "anomaly_signal",
+            "severity": event.get("severity", "info"),
+            "description": event.get("description", str(event)),
+            "source": "signal_bus",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        with open(witness_dir / "anomaly_signals.jsonl", "a") as f:
+            f.write(json.dumps(record) + "\n")
+        logger.debug("Witness: persisted anomaly signal")
+    except Exception:
+        logger.debug("Witness: anomaly signal persist failed", exc_info=True)

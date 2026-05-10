@@ -376,8 +376,9 @@ class RevenueScoutDaemon:
         """Emit a signal bus event for other loops to respond to."""
         try:
             from dharma_swarm.signal_bus import SignalBus
-            bus = SignalBus()
-            bus.emit(SIGNAL_REVENUE_INTEL_INGESTED, {
+            bus = SignalBus.get()
+            bus.emit({
+                "type": SIGNAL_REVENUE_INTEL_INGESTED,
                 "targets_scouted": result.targets_scouted,
                 "claims_extracted": result.claims_extracted,
                 "patterns_identified": result.patterns_identified,

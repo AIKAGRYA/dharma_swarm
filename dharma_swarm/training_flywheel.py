@@ -385,6 +385,36 @@ def get_flywheel_state() -> FlywheelState:
     return FlywheelState()
 
 
+def record_trajectory_from_signal(event: dict[str, Any]) -> None:
+    """Signal bus receiver: OUTCOME_RECORDED → trajectory ingestion.
+
+    Called by the signal bus subscriber in orchestrate_live.py when an
+    agent completes a task. Writes the outcome as a trajectory record
+    for the flywheel to score and reinforce.
+    """
+    try:
+        task_id = event.get("task_id", "")
+        agent = event.get("agent", "")
+        outcome = event.get("outcome", "")
+        if not task_id:
+            return
+        trajectory_dir = STATE_DIR / "training" / "trajectories"
+        trajectory_dir.mkdir(parents=True, exist_ok=True)
+        import json
+        record = {
+            "task_id": task_id,
+            "agent": agent,
+            "outcome": outcome,
+            "source": "signal_bus",
+            "timestamp": time.time(),
+        }
+        with open(trajectory_dir / "signal_trajectories.jsonl", "a") as f:
+            f.write(json.dumps(record) + "\n")
+        logger.debug("Flywheel: recorded trajectory from signal for task %s", task_id)
+    except Exception:
+        logger.debug("Flywheel: signal trajectory record failed", exc_info=True)
+
+
 if __name__ == "__main__":
     logging.basicConfig(
         level=logging.INFO,
