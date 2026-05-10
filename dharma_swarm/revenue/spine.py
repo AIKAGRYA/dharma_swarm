@@ -87,7 +87,7 @@ class EconomicSpine:
     def add_target(self, target: RevenueTarget) -> RevenueTarget:
         self._targets[target.id] = target
         self._append("targets", target)
-        logger.info("Target added: %s (%s)", target.name, target.id)
+        logger.info("Target added: %s (%s)", target.name.replace('\n', ''), target.id)
         return target
 
     def qualify_target(
@@ -186,7 +186,7 @@ class EconomicSpine:
         target.updated_at = _utc_now_iso()
         self._append("outreach", draft)
         self._append("targets", target)
-        logger.info("Outreach drafted for %s: %s", target.name, draft.id)
+        logger.info("Outreach drafted for %s: %s", target.name.replace('\n', ''), draft.id)
         return draft
 
     def approve_outreach(self, outreach_id: str, approved_by: str) -> bool:
@@ -203,7 +203,7 @@ class EconomicSpine:
             target.updated_at = _utc_now_iso()
             self._append("targets", target)
         self._append("outreach", draft)
-        logger.info("Outreach %s approved by %s", outreach_id, approved_by)
+        logger.info("Outreach %s approved by %s", outreach_id.replace('\n', ''), approved_by.replace('\n', ''))
         return True
 
     def mark_outreach_sent(self, outreach_id: str) -> bool:
