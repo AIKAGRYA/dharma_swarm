@@ -24,7 +24,7 @@ declare why it is outside the routing plane.
 
 ## Current Inventory Snapshot
 
-Read-only scan of the active checkout found:
+The first read-only scan of the active dirty checkout found:
 
 - 590 Python modules under `dharma_swarm/`
 - 719 source Python modules under `dharma_swarm/`, `api/`, and `scripts/`
@@ -37,13 +37,30 @@ Read-only scan of the active checkout found:
 - 236 next-ring candidates
 - 143 Rust-shaped deterministic/data-plane candidates
 
+This clean PR workspace now has an executable scanner in
+`dharma_swarm/routing_fusion_inventory.py`. Its current generated manifest is
+`docs/plans/routing-fusion-inventory.json` and records:
+
+- 555 Python modules under `dharma_swarm/`
+- 670 source Python modules under `dharma_swarm/`, `api/`, and `scripts/`
+- 1,288 Python files total including tests
+- 11 current main-branch core routing substrate modules
+- 83 non-core modules directly importing routing substrate
+- 78 modules touching `ProviderType`, `LLMRequest`, or `LLMResponse`
+- 35 current direct provider-call suspects
+
+The count difference is expected: this PR branch starts from `origin/main` and
+does not include the unmerged Phase 1 `route_witness.py` work from the dirty
+local routing worktree.
+
 ## Hard Constraints
 
 - No magic router: no decorators, monkey patches, metaclasses, or hidden global
   reranking.
 - `ModelRouter` remains execution control plane.
 - `ProviderPolicyRouter` remains policy control plane.
-- `route_witness` remains emission/normalization only.
+- `route_witness` remains emission/normalization only once the Phase 1 witness
+  stack is merged into this branch.
 - `TelemetryPlaneStore` remains low-level persistence.
 - Resident degraded handoff means provider failure is visible and queued; it
   does not fabricate provider success.
@@ -58,7 +75,6 @@ collapsed into one file:
 
 - `dharma_swarm/providers.py`
 - `dharma_swarm/provider_policy.py`
-- `dharma_swarm/route_witness.py`
 - `dharma_swarm/telemetry_plane.py`
 - `dharma_swarm/runtime_provider.py`
 - `dharma_swarm/routing_memory.py`
@@ -195,12 +211,13 @@ No required Rust dependency until the Python behavior is fully tested.
 ## Milestones
 
 1. **Inventory Lock**
-   - Re-run module scan on this workspace.
-   - Save direct-bypass list as a machine-readable manifest.
-   - Add tests that fail when new raw provider calls appear without an allowlist.
+   - Done: `dharma_swarm/routing_fusion_inventory.py`.
+   - Done: generated manifest at `docs/plans/routing-fusion-inventory.json`.
+   - Done: guard test fails when a new raw provider call appears without an
+     allowlist update.
 
 2. **Routing Contract Facade**
-   - Add a small facade over `ModelRouter` and `runtime_provider`.
+   - Done: `dharma_swarm/routing_contract.py`.
    - Port one low-risk direct caller.
    - Prove witness, attempts, cost, and resident handoff still emit.
 
@@ -236,6 +253,6 @@ No required Rust dependency until the Python behavior is fully tested.
 
 ## Immediate Next Task
 
-Create `docs/plans/routing-fusion-inventory.json` from the scan and add an
-allowlisted guard test for direct provider calls. That creates a ratchet: new
-bypasses cannot sneak in while the fusion work proceeds.
+Port one low-risk caller to `dharma_swarm.routing_contract.complete_routed()`.
+Recommended first target: `api/routers/chat.py` or `dharma_swarm/context_agent.py`.
+After that, reduce the allowlist one file at a time as bypasses are fused.

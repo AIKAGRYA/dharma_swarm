@@ -114,7 +114,7 @@ def count_paths_containing(repo_root: Path, pattern: str, needle: str) -> int:
         for path in repo_root.glob(pattern)
         if path.is_file()
         and not is_ignored(path, repo_root)
-        and needle.lower() in path.as_posix().lower()
+        and needle.lower() in path.relative_to(repo_root).as_posix().lower()
     )
 
 

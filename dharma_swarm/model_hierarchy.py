@@ -79,8 +79,8 @@ TIER_CHEAP: tuple[ProviderType, ...] = (
 )
 
 TIER_SUBSCRIPTION: tuple[ProviderType, ...] = (
-    ProviderType.CLAUDE_CODE,    # Claude Max/Pro subscription (unlimited, via `claude -p`)
     ProviderType.CODEX,          # OpenAI subscription (via `codex exec`)
+    ProviderType.CLAUDE_CODE,    # Claude Max/Pro subscription (unlimited, via `claude -p`)
 )
 
 TIER_PAID_API: tuple[ProviderType, ...] = (
@@ -116,9 +116,8 @@ CANONICAL_SEED_ORDER: tuple[ProviderType, ...] = (
 # delegated search, challenge, and implementation work.
 
 PRIMARY_DRIVER_LANES: tuple[ProviderType, ...] = (
-    ProviderType.CLAUDE_CODE,    # Subscription-backed (unlimited)
     ProviderType.CODEX,          # Subscription-backed (unlimited)
-    ProviderType.OLLAMA,         # Free frontier (GLM-5, DeepSeek-v3.2)
+    ProviderType.CLAUDE_CODE,    # Subscription-backed (unlimited)
     ProviderType.ANTHROPIC,      # API credits (last resort)
 )
 
@@ -172,8 +171,8 @@ VALIDATOR_PRIORITY: tuple[ProviderType, ...] = (
 )
 
 PRIMARY_TOOLING_PRIORITY: tuple[ProviderType, ...] = (
-    ProviderType.CLAUDE_CODE,    # Subscription (unlimited)
     ProviderType.CODEX,          # Subscription (unlimited)
+    ProviderType.CLAUDE_CODE,    # Subscription (unlimited)
     ProviderType.OLLAMA,         # Free frontier
     ProviderType.CEREBRAS,       # Free (Qwen3 235B)
     ProviderType.ANTHROPIC,      # API credits (last resort)
@@ -182,11 +181,11 @@ PRIMARY_TOOLING_PRIORITY: tuple[ProviderType, ...] = (
 )
 
 PRIMARY_REASONING_PRIORITY: tuple[ProviderType, ...] = (
+    ProviderType.ANTHROPIC,      # API frontier reasoning (credit-limited)
     ProviderType.CLAUDE_CODE,    # Subscription (unlimited, Opus-class)
     ProviderType.OLLAMA,         # Free frontier (GLM-5 744B, DeepSeek-v3.2)
     ProviderType.CODEX,          # Subscription (unlimited)
     ProviderType.CEREBRAS,       # Free (Qwen3 235B)
-    ProviderType.ANTHROPIC,      # API credits (last resort)
     ProviderType.OPENAI,         # API credits (last resort)
     ProviderType.OPENROUTER,     # API credits (last resort)
 )
