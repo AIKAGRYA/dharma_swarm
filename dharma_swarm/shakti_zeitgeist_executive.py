@@ -77,6 +77,13 @@ THEME_TO_DOMAIN: dict[str, str] = {
     "sustainability_impact": "artifact_publication",
 }
 
+
+def _as_utc_datetime(value: datetime) -> datetime:
+    if value.tzinfo is None or value.tzinfo.utcoffset(value) is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
 SCORING_FACTORS: dict[str, float] = {
     "telos_alignment": 2.5,
     "world_value": 2.0,
@@ -298,6 +305,7 @@ class ShaktiZeitgeistExecutive:
             if ts_raw:
                 try:
                     ts = datetime.fromisoformat(str(ts_raw).replace("Z", "+00:00"))
+                    ts = _as_utc_datetime(ts)
                     if (now - ts).total_seconds() > 7200:
                         urgency = min(1.0, urgency + 0.05)
                 except Exception:
@@ -829,6 +837,7 @@ class ShaktiZeitgeistExecutive:
         for d in deadlines:
             try:
                 dt = datetime.fromisoformat(str(d.get("date", "")).replace("Z", "+00:00"))
+                dt = _as_utc_datetime(dt)
             except Exception:
                 continue
             days_remaining = (dt - now).total_seconds() / 86400.0
@@ -902,6 +911,7 @@ class ShaktiZeitgeistExecutive:
                 continue
             try:
                 ts = datetime.fromisoformat(str(ts_raw).replace("Z", "+00:00"))
+                ts = _as_utc_datetime(ts)
             except Exception:
                 continue
             if (now - ts).total_seconds() >= executive_interval_s * 2:

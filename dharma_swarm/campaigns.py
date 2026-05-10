@@ -37,6 +37,12 @@ def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _as_utc_datetime(value: datetime) -> datetime:
+    if value.tzinfo is None or value.tzinfo.utcoffset(value) is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
 def _meta_dir(meta_dir: Path | None = None) -> Path:
     return meta_dir or _DEFAULT_META_DIR
 
@@ -467,6 +473,7 @@ def list_stale(
             ts = datetime.fromisoformat(str(ts_raw).replace("Z", "+00:00"))
         except Exception:
             continue
+        ts = _as_utc_datetime(ts)
         elapsed = (now - ts).total_seconds()
         if elapsed >= executive_interval_s * staleness_factor:
             stale.append({**c, "elapsed_seconds": round(elapsed, 0)})

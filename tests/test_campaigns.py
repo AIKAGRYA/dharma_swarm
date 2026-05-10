@@ -163,6 +163,22 @@ def test_list_stale_filters_by_elapsed(meta_dir: Path) -> None:
     assert ids == {"stale"}
 
 
+def test_list_stale_accepts_naive_timestamps(meta_dir: Path) -> None:
+    create_campaign("stale", "research", ["a"], meta_dir=meta_dir)
+    active = load_active(meta_dir)
+    utc_now = datetime.now(timezone.utc).replace(tzinfo=None)
+    active[0]["last_check_in"] = (utc_now - timedelta(hours=10)).isoformat()
+    save_active(active, meta_dir)
+
+    stale = list_stale(
+        executive_interval_s=2700.0,
+        staleness_factor=2.0,
+        meta_dir=meta_dir,
+    )
+
+    assert [c["campaign_id"] for c in stale] == ["stale"]
+
+
 def test_promise_id_is_stable(tmp_path: Path) -> None:
     p1 = promise_id_from_text("Run R_V experiment (Mistral-7B)")
     p2 = promise_id_from_text("run r_v experiment (mistral-7b)   ")

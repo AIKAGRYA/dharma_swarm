@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -372,6 +372,46 @@ class TestFullCycle:
         assert result.operator_summary["mission"] == "Startup World-Facing Pressure"
         assert result.operator_summary["top_priority_title"] == "Startup World-Facing Pressure"
         assert result.operator_summary["top_priority_domain"] == "revenue_exploration"
+
+    @pytest.mark.asyncio
+    async def test_cycle_accepts_naive_campaign_and_deadline_datetimes(
+        self,
+        tmp_path: Path,
+    ):
+        state_dir = tmp_path / ".dharma"
+        state_dir.mkdir()
+        meta = state_dir / "meta"
+        meta.mkdir()
+
+        utc_now = datetime.now(timezone.utc).replace(tzinfo=None)
+        stale_check_in = utc_now - timedelta(hours=3)
+        deadline = utc_now + timedelta(days=2)
+        (meta / "active_campaigns.json").write_text(json.dumps([
+            {
+                "campaign_id": "naive_time_campaign",
+                "title": "Naive Time Campaign",
+                "domain": "reliability",
+                "primary": True,
+                "status": "active",
+                "last_check_in": stale_check_in.isoformat(),
+            }
+        ]))
+        (meta / "deadlines.json").write_text(json.dumps([
+            {
+                "name": "Naive Deadline",
+                "date": deadline.isoformat(),
+                "domain": "reliability",
+            }
+        ]))
+
+        exe = ShaktiZeitgeistExecutive(state_dir=state_dir)
+        result = await exe.cycle()
+
+        assert result.signals_by_source["campaign"] == 1
+        governance = json.loads((meta / "governance_signal.json").read_text())
+        assert governance["stale_campaign_ids"] == ["naive_time_campaign"]
+        challenge = json.loads((meta / "challenge_pressure.json").read_text())
+        assert challenge["active_deadlines"][0]["name"] == "Naive Deadline"
 
     @pytest.mark.asyncio
     async def test_artifacts_are_valid_json(self, tmp_path: Path):
