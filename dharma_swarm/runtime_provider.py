@@ -650,6 +650,65 @@ async def complete_via_preferred_runtime_providers(
     raise RuntimeError("Preferred provider chain exhausted without an explicit error")
 
 
+async def probe_runtime_provider(
+    config: RuntimeProviderConfig,
+    *,
+    timeout_seconds: float = 5.0,
+) -> tuple[bool, str]:
+    """Cheap reachability probe for an HTTP-backed runtime provider.
+
+    Returns ``(ok, reason)``. ``ok=True`` means the lane responded to a
+    minimal `GET /models` (or equivalent) within the timeout. Used by
+    direct-call sites that need to know "is this lane actually usable
+    right now?" before declaring success — distinct from
+    ``RuntimeProviderConfig.available`` which only checks the token.
+
+    Does not raise. CLI-backed providers return ``(available, "cli")`` —
+    the binary check already happened during resolve.
+    """
+
+    if config.provider in {ProviderType.CLAUDE_CODE, ProviderType.CODEX}:
+        return bool(config.available), "cli"
+    if config.provider == ProviderType.OLLAMA:
+        return bool(config.available), "ollama-local-or-cloud"
+    if not config.api_key:
+        return False, "no_api_key"
+    if not config.base_url:
+        return False, "no_base_url"
+
+    try:
+        import httpx
+    except ImportError:
+        return bool(config.available), "httpx_missing"
+
+    headers = {"Authorization": f"Bearer {config.api_key}"}
+    metadata = config.metadata or {}
+    extra = metadata.get("headers") if isinstance(metadata, dict) else None
+    if isinstance(extra, dict):
+        for key, value in extra.items():
+            if isinstance(value, str):
+                headers[key] = value
+    url = f"{config.base_url.rstrip('/')}/models"
+    try:
+        async with httpx.AsyncClient(timeout=timeout_seconds) as client:
+            resp = await client.get(url, headers=headers)
+    except httpx.TimeoutException:
+        return False, "timeout"
+    except httpx.HTTPError as exc:
+        return False, f"http_error: {type(exc).__name__}"
+
+    if resp.status_code == 200:
+        return True, "ok"
+    if resp.status_code in {401, 403}:
+        # Network/region/account block. Surface the status; do not echo body.
+        return False, f"http_{resp.status_code}"
+    if resp.status_code == 404:
+        # Some providers do not expose /models. Treat as inconclusive but
+        # keep available based on the resolve-time signal.
+        return bool(config.available), "no_models_endpoint"
+    return False, f"http_{resp.status_code}"
+
+
 __all__ = [
     "CEREBRAS_BASE_URL",
     "DEFAULT_CLAUDE_MODEL",
@@ -677,5 +736,6 @@ __all__ = [
     "create_default_provider_map",
     "create_runtime_provider",
     "preferred_runtime_provider_configs",
+    "probe_runtime_provider",
     "resolve_runtime_provider_config",
 ]

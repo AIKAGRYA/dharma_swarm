@@ -121,7 +121,8 @@ class AsyncFileLock:
         self._lock_dir = lock_dir or LOCK_DIR
 
         # Derive lock file paths from a hash of the target path.
-        file_hash = hashlib.md5(str(self.file_path).encode()).hexdigest()[:12]
+        # usedforsecurity=False — content addressing only, not a security primitive.
+        file_hash = hashlib.md5(str(self.file_path).encode(), usedforsecurity=False).hexdigest()[:12]
         self.lock_file = self._lock_dir / f"{file_hash}.lock"
         self.info_file = self._lock_dir / f"{file_hash}.info.json"
 
@@ -282,7 +283,8 @@ class AsyncFileLock:
             expires_at=expires.isoformat(),
             ttl_seconds=self.ttl_seconds,
             lock_id=hashlib.md5(
-                f"{self.file_path}{now.isoformat()}".encode()
+                f"{self.file_path}{now.isoformat()}".encode(),
+                usedforsecurity=False,  # identity tag, not security
             ).hexdigest()[:8],
         )
         with open(self.info_file, "w") as f:

@@ -201,7 +201,7 @@ class RecognitionEngine:
         witness_dir = self._state_dir / "witness"
         if witness_dir.exists():
             try:
-                result["witness_logs"] = len(list(witness_dir.glob("*.json")))
+                result["witness_logs"] = len(list(witness_dir.glob("*.jsonl")))
             except Exception:
                 logger.debug("Witness log count failed", exc_info=True)
 

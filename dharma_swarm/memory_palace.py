@@ -104,7 +104,7 @@ class _LanceDBAdapter:
                 "text": content[:8000],
                 "source": source or "",
                 "vector": vec,
-                "content_hash": hashlib.md5(content.encode("utf-8", errors="replace")).hexdigest(),
+                "content_hash": hashlib.md5(content.encode("utf-8", errors="replace"), usedforsecurity=False).hexdigest(),
                 "ingested_at": datetime.now(timezone.utc).isoformat(),
                 "metadata_str": str(metadata or {}),
             }

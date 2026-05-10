@@ -294,6 +294,25 @@ class TestVectorStoreDecay:
         assert doc["confidence"] < 1.0
         assert doc["confidence"] > 0.0
 
+    def test_decay_caps_effective_age(self, tmp_path):
+        pytest.importorskip("sqlite_vec", reason="sqlite_vec not installed")
+        from dharma_swarm.vector_store import VectorStore
+        store = VectorStore(state_dir=tmp_path, dim=32)
+        doc_id = store.upsert("Very old but retained knowledge", source="test")
+        import sqlite3
+        conn = sqlite3.connect(str(tmp_path / "vectors.db"))
+        old_time = (datetime.now(timezone.utc) - timedelta(days=60)).isoformat()
+        conn.execute("UPDATE vec_documents SET ingestion_time = ? WHERE id = ?", (old_time, doc_id))
+        conn.commit()
+        conn.close()
+
+        updated = store.decay_confidence(max_age_days=10, decay_rate=0.95)
+
+        assert updated >= 1
+        doc = store.get_document(doc_id)
+        assert doc is not None
+        assert 0.55 < doc["confidence"] < 0.65
+
     def test_decay_skips_invalidated(self, tmp_path):
         from dharma_swarm.vector_store import VectorStore
         store = VectorStore(state_dir=tmp_path, dim=32)

@@ -314,6 +314,7 @@ class LLMRequest(BaseModel):
     max_tokens: int = 4096
     temperature: float = 0.7
     tools: list[dict[str, Any]] = Field(default_factory=list)
+    reasoning_effort: Optional[str] = None
 
 
 class LLMResponse(BaseModel):

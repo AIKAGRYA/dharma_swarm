@@ -158,7 +158,12 @@ def _extract_openrouter_message_text(message: Any) -> str:
 def _openai_completion_kwargs(model: str | None, max_tokens: int) -> dict[str, int]:
     normalized = (model or "").strip().lower()
     if normalized.startswith("gpt-5"):
-        return {"max_completion_tokens": max(max_tokens, 256)}
+        # gpt-5 is a reasoning model: hidden reasoning tokens consume the
+        # completion budget before any visible text. A 256-token floor was
+        # large enough for tests but too small for real chews — observed empty
+        # content with stop_reason=length on inquiry_substrate_chew. Floor
+        # raised to 4096 so reasoning has room before visible output begins.
+        return {"max_completion_tokens": max(max_tokens, 4096)}
     return {"max_tokens": max_tokens}
 
 
@@ -167,6 +172,18 @@ def _openai_temperature_kwargs(model: str | None, temperature: float) -> dict[st
     if normalized.startswith("gpt-5"):
         return {}
     return {"temperature": temperature}
+
+
+def _openai_reasoning_effort_kwargs(model: str | None, effort: str | None) -> dict[str, str]:
+    if not effort:
+        return {}
+    normalized = (model or "").strip().lower()
+    if not normalized.startswith("gpt-5"):
+        return {}
+    level = effort.strip().lower()
+    if level not in {"minimal", "low", "medium", "high"}:
+        return {}
+    return {"reasoning_effort": level}
 
 
 def _ollama_cloud_wire_model(model: str) -> str:
@@ -324,6 +341,7 @@ class OpenAIProvider(LLMProvider):
         )
         kwargs.update(_openai_completion_kwargs(request.model, request.max_tokens))
         kwargs.update(_openai_temperature_kwargs(request.model, request.temperature))
+        kwargs.update(_openai_reasoning_effort_kwargs(request.model, request.reasoning_effort))
         if request.tools:
             kwargs["tools"] = request.tools
         resp = await client.chat.completions.create(**kwargs)
@@ -351,6 +369,7 @@ class OpenAIProvider(LLMProvider):
         }
         kwargs.update(_openai_completion_kwargs(request.model, request.max_tokens))
         kwargs.update(_openai_temperature_kwargs(request.model, request.temperature))
+        kwargs.update(_openai_reasoning_effort_kwargs(request.model, request.reasoning_effort))
         resp = await client.chat.completions.create(**kwargs)
         async for chunk in resp:
             delta = chunk.choices[0].delta if chunk.choices else None
@@ -613,8 +632,6 @@ class _SubprocessProvider(LLMProvider):
             content = msg.get("content", "")
             if role == "user":
                 parts.append(f"[User]\n{content}")
-            elif role == "assistant":
-                parts.append(f"[Assistant]\n{content}")
         prompt = "\n\n".join(parts)
         prompt += "\n\n## Communication\n"
         prompt += "- Write findings to ~/.dharma/shared/ (APPEND)\n"

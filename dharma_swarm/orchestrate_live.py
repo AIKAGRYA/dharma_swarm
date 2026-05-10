@@ -912,20 +912,6 @@ async def _run_recognition_loop(shutdown_event: asyncio.Event) -> None:
     return
 
 
-async def _run_recognition_loop_UNUSED(shutdown_event: asyncio.Event) -> None:
-    # Keep for reference — original simple loop
-    from dharma_swarm.meta_daemon import RecognitionEngine
-    engine = RecognitionEngine()
-
-    while not shutdown_event.is_set():
-        try:
-            seed = await engine.synthesize("light")
-            _log("recognition", f"Seed updated ({len(seed)} chars)")
-        except Exception as e:
-            _log("recognition", f"Synthesis failed: {e}")
-    return  # pragma: no cover
-
-
 async def _run_witness_loop(shutdown_event: asyncio.Event) -> None:
     """S3* Sporadic Audit — random direct audit of agent behavior.
 

@@ -114,6 +114,18 @@ async def test_autocatalytic_signal(engine, tmp_path):
     assert "2 nodes" in seed
 
 
+def test_identity_counts_jsonl_witness_logs(engine, tmp_path):
+    """Witness logs are JSONL in production and must count as identity data."""
+    witness = tmp_path / "witness"
+    witness.mkdir(parents=True, exist_ok=True)
+    (witness / "packet_provenance.jsonl").write_text('{"valid": true}\n')
+    (witness / "guardian.jsonl").write_text('{"status": "ok"}\n')
+
+    identity = engine._read_identity()
+
+    assert identity["witness_logs"] == 2
+
+
 @pytest.mark.asyncio
 async def test_strip_performative():
     engine = RecognitionEngine()

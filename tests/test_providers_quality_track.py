@@ -264,7 +264,9 @@ async def test_openai_provider_uses_max_completion_tokens_for_gpt5_models(monkey
 
     assert out.content == "OK"
     kwargs = client.chat.completions.create.await_args.kwargs
-    assert kwargs["max_completion_tokens"] == 256
+    # gpt-5 reasoning models need a larger floor so hidden reasoning tokens
+    # do not consume the entire visible-content budget. Floor raised to 4096.
+    assert kwargs["max_completion_tokens"] == 4096
     assert "max_tokens" not in kwargs
     assert "temperature" not in kwargs
 
@@ -312,7 +314,8 @@ async def test_openai_provider_stream_uses_max_completion_tokens_for_gpt5_models
 
     assert chunks == ["A", "B"]
     kwargs = client.chat.completions.create.await_args.kwargs
-    assert kwargs["max_completion_tokens"] == 256
+    # gpt-5 reasoning models: floor raised to 4096 (see complete() test).
+    assert kwargs["max_completion_tokens"] == 4096
     assert "max_tokens" not in kwargs
     assert "temperature" not in kwargs
 

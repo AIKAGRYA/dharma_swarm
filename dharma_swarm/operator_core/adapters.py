@@ -273,7 +273,7 @@ def permission_decision_from_tool_call(
 
     action_basis = f"{tool_name}:{arguments}".encode("utf-8", errors="ignore")
     return CanonicalPermissionDecision(
-        action_id=f"perm-{sha1(action_basis).hexdigest()[:12]}",
+        action_id=f"perm-{sha1(action_basis, usedforsecurity=False).hexdigest()[:12]}",
         tool_name=tool_name,
         risk=risk,
         decision=decision,

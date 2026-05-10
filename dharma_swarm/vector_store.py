@@ -20,10 +20,8 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import pickle
 import sqlite3
 import struct
-import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
@@ -59,6 +57,10 @@ class Embedder(Protocol):
 
     def embed(self, texts: list[str]) -> list[list[float]]:
         """Embed a list of texts into fixed-dimension dense vectors."""
+        ...
+
+    def fit_add(self, texts: list[str]) -> None:
+        """Expand the embedding corpus when the embedder supports fitting."""
         ...
 
     @property
@@ -175,12 +177,16 @@ class TFIDFEmbedder:
             # Bootstrap: if not fitted, use the texts themselves as initial corpus
             if not self._fitted or self._vectorizer is None:
                 self._fit(texts)
+            if self._vectorizer is None or self._svd is None:
+                return [[0.0] * self._dim for _ in texts]
 
             # Transform
             tfidf_matrix = self._vectorizer.transform(texts)
             if tfidf_matrix.shape[1] == 0:
                 # Empty vocabulary — refit with current texts
                 self._fit(texts)
+                if self._vectorizer is None or self._svd is None:
+                    return [[0.0] * self._dim for _ in texts]
                 tfidf_matrix = self._vectorizer.transform(texts)
 
             # Project to lower dimension via SVD
@@ -192,6 +198,8 @@ class TFIDFEmbedder:
             actual_dim = min(self._dim, n_features)
             if self._svd is None or self._svd.n_components != actual_dim:
                 self._fit(texts)
+                if self._vectorizer is None or self._svd is None:
+                    return [[0.0] * self._dim for _ in texts]
                 tfidf_matrix = self._vectorizer.transform(texts)
                 n_features = tfidf_matrix.shape[1]
                 actual_dim = min(self._dim, n_features)
@@ -263,7 +271,7 @@ class TFIDFEmbedder:
             # Update corpus and hash
             self._corpus = list(corpus)
             corpus_str = " ".join(sorted(corpus))
-            self._corpus_hash = hashlib.md5(corpus_str.encode()).hexdigest()[:16]
+            self._corpus_hash = hashlib.md5(corpus_str.encode(), usedforsecurity=False).hexdigest()[:16]
 
             self._save_state()
 
@@ -550,8 +558,10 @@ class VectorStore:
                     ingestion_ts = datetime.fromisoformat(row["ingestion_time"]).timestamp()
                     age_days = (now - ingestion_ts) / 86400.0
                     if age_days > 0:
-                        # decay^(age_days): exponential decay
-                        decayed = row["confidence"] * (decay_rate ** age_days)
+                        # decay^(age_days): exponential decay, capped so very
+                        # old retained records do not collapse in one sweep.
+                        effective_age_days = min(age_days, max_age_days)
+                        decayed = row["confidence"] * (decay_rate ** effective_age_days)
                         decayed = max(0.0, min(1.0, decayed))
                         if abs(decayed - row["confidence"]) > 1e-6:
                             conn.execute(
@@ -833,7 +843,7 @@ class VectorStore:
             scores: dict[int, dict[str, Any]] = {}
 
             # Vector results: distance [0, ∞) → similarity score [0, 1]
-            for rank, r in enumerate(vec_results):
+            for _rank, r in enumerate(vec_results):
                 doc_id = r["id"]
                 # Convert distance to similarity (closer = higher score)
                 dist = r.get("distance", 1.0)
@@ -843,7 +853,7 @@ class VectorStore:
                 scores[doc_id]["vec_score"] = vec_sim
 
             # FTS results: distance already normalized [0, 1]
-            for rank, r in enumerate(fts_results):
+            for _rank, r in enumerate(fts_results):
                 doc_id = r["id"]
                 fts_sim = max(0.0, 1.0 - r.get("distance", 1.0))
                 if doc_id not in scores:

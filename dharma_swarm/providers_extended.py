@@ -97,7 +97,7 @@ class OllamaProvider(LLMProvider):
         """Stream not implemented for Ollama yet."""
         # Could implement with stream=True, but not needed for subconscious
         raise NotImplementedError("Ollama streaming not implemented")
-        yield  # Make it a generator
+        yield  # noqa: B902 — required so this is an async generator (typing); unreachable by design
 
 
 class NVIDIANIMProvider(LLMProvider):
@@ -159,7 +159,7 @@ class NVIDIANIMProvider(LLMProvider):
     async def stream(self, request: LLMRequest) -> AsyncIterator[str]:
         """Stream not implemented yet."""
         raise NotImplementedError("NVIDIA NIM streaming not implemented")
-        yield  # Make it a generator
+        yield  # noqa: B902 — required so this is an async generator (typing); unreachable by design
 
 
 class MoonshotProvider(LLMProvider):
@@ -220,4 +220,4 @@ class MoonshotProvider(LLMProvider):
     async def stream(self, request: LLMRequest) -> AsyncIterator[str]:
         """Stream not implemented yet."""
         raise NotImplementedError("Moonshot streaming not implemented")
-        yield  # Make it a generator
+        yield  # noqa: B902 — required so this is an async generator (typing); unreachable by design
