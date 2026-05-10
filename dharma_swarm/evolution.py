@@ -334,6 +334,12 @@ class DarwinEngine:
         self._file_hashes: dict[str, str] = {}
         # Phase 4 velocity: pending background trace tasks
         self._trace_tasks: set[asyncio.Task[None]] = set()
+        # Catalytic-graph parent-selection bias (spine §9 closure):
+        # lazy-loaded set of node ids inside autocatalytic SCCs, refreshed
+        # via :meth:`refresh_autocatalytic_nodes`. ``None`` until first
+        # load attempt; empty set means "loaded but no autocatalytic
+        # structure detected".
+        self._autocatalytic_nodes: set[str] | None = None
 
     # -- Phase 4: fire-and-forget trace helper --------------------------------
 
@@ -1473,11 +1479,18 @@ class DarwinEngine:
             # P2 Kauffman: Check autocatalytic closure preservation.
             # If the proposal targets a module in an autocatalytic set,
             # warn (but don't block) if it might break the cycle.
+            #
+            # Note 2026-05-10: previous code passed a path argument to
+            # ``cg.load(...)`` but ``CatalyticGraph.load(self) -> bool``
+            # takes no arguments — silently TypeErrored and was caught by
+            # the broad ``except`` below, no-op-ing the whole check. Fixed
+            # to use the correct signature; the graph's persist_path
+            # default (~/.dharma/meta/catalytic_graph.json) is correct.
             if proposal.status == EvolutionStatus.GATED and proposal.component:
                 try:
                     from dharma_swarm.catalytic_graph import CatalyticGraph
                     cg = CatalyticGraph()
-                    cg.load(self._archive_path.parent / "catalytic_graph.json")
+                    cg.load()
                     sets = cg.detect_autocatalytic_sets()
                     for aset in sets:
                         if proposal.component in aset:
@@ -2894,17 +2907,59 @@ class DarwinEngine:
 
     # -- parent selection ----------------------------------------------------
 
+    def refresh_autocatalytic_nodes(self) -> set[str]:
+        """Reload autocatalytic-set node ids from the catalytic graph.
+
+        Closes spine §9 gap: "autocatalytic-closure scores do not feed
+        parent selection." The returned set is passed to ``select_parent``
+        as the ``autocatalytic_nodes`` kwarg, where entries whose
+        ``component`` is in the set receive a ``CATALYTIC_BOOST_FACTOR``
+        multiplicative boost (default 1.25×).
+
+        Best-effort: returns an empty set on any failure (graph file
+        missing, parse error, no autocatalytic structure). Result is
+        cached on ``self._autocatalytic_nodes``.
+
+        Returns:
+            Set of node ids inside autocatalytic SCCs.
+        """
+        try:
+            from dharma_swarm.catalytic_graph import CatalyticGraph
+
+            cg = CatalyticGraph()
+            if not cg.load():
+                self._autocatalytic_nodes = set()
+                return self._autocatalytic_nodes
+            nodes: set[str] = set()
+            for component in cg.detect_autocatalytic_sets():
+                for node in component:
+                    nodes.add(str(node))
+            self._autocatalytic_nodes = nodes
+            return nodes
+        except Exception:  # noqa: BLE001
+            self._autocatalytic_nodes = set()
+            return self._autocatalytic_nodes
+
+    def _get_autocatalytic_nodes(self) -> set[str]:
+        """Return cached autocatalytic node set, lazy-loading on first call."""
+        if self._autocatalytic_nodes is None:
+            return self.refresh_autocatalytic_nodes()
+        return self._autocatalytic_nodes
+
     async def select_next_parent(
         self, strategy: str = "tournament", **kwargs: Any
     ) -> ArchiveEntry | None:
         """Select a parent entry for the next evolution round.
 
         Delegates to the selector module's ``select_parent`` dispatch.
+        Forwards the autocatalytic node set so entries whose ``component``
+        lies inside an autocatalytic SCC receive a selection boost.
 
         Args:
             strategy: Selection strategy name (``"tournament"``,
                 ``"roulette"``, ``"rank"``, ``"elite"``, or ``"ucb"``).
-            **kwargs: Forwarded to the strategy function.
+            **kwargs: Forwarded to the strategy function. Caller can pass
+                ``autocatalytic_nodes=set()`` to override the cached set.
 
         Returns:
             An ``ArchiveEntry``, or ``None`` if the archive is empty.
@@ -2915,6 +2970,9 @@ class DarwinEngine:
                 weights=self._fitness_weights,
             )
         else:
+            kwargs.setdefault(
+                "autocatalytic_nodes", self._get_autocatalytic_nodes()
+            )
             selected = await select_parent(
                 self.archive,
                 strategy=strategy,

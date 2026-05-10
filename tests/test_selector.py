@@ -4,6 +4,7 @@ import pytest
 
 from dharma_swarm.archive import ArchiveEntry, EvolutionArchive, FitnessScore
 from dharma_swarm.selector import (
+    _catalytic_boost_factor,
     _count_children,
     _novelty_weight,
     elite_select,
@@ -418,3 +419,84 @@ async def test_count_children(tmp_path):
 
     counts = await _count_children(a)
     assert counts[parent.id] == 3
+
+
+# ---------------------------------------------------------------------------
+# Catalytic boost (spine §9 closure: autocatalytic-closure feeds selection)
+# ---------------------------------------------------------------------------
+
+
+def test_catalytic_boost_factor_env_handling(monkeypatch):
+    """``_catalytic_boost_factor`` reads the env, defaults to 1.25, floors at 1.0,
+    and fails safely on garbage input.
+
+    The boost is multiplicative — values < 1.0 would penalize autocatalytic
+    components, which inverts the intent. The fail-safe path (parse error or
+    sub-1.0 input) MUST return exactly 1.0 (no-op) so a misconfigured env never
+    silently degrades selection pressure on autocatalytic structure.
+    """
+    # Default — env unset
+    monkeypatch.delenv("CATALYTIC_BOOST_FACTOR", raising=False)
+    assert _catalytic_boost_factor() == pytest.approx(1.25)
+
+    # Explicit override above floor
+    monkeypatch.setenv("CATALYTIC_BOOST_FACTOR", "1.5")
+    assert _catalytic_boost_factor() == pytest.approx(1.5)
+
+    # Disabled (boost = 1.0 → no-op)
+    monkeypatch.setenv("CATALYTIC_BOOST_FACTOR", "1.0")
+    assert _catalytic_boost_factor() == pytest.approx(1.0)
+
+    # Sub-1.0 floored to 1.0 (cannot penalize autocatalytic via env)
+    monkeypatch.setenv("CATALYTIC_BOOST_FACTOR", "0.5")
+    assert _catalytic_boost_factor() == pytest.approx(1.0)
+
+    # Garbage falls back to 1.0 (fail-safe)
+    monkeypatch.setenv("CATALYTIC_BOOST_FACTOR", "not-a-number")
+    assert _catalytic_boost_factor() == pytest.approx(1.0)
+
+    # Whitespace tolerated
+    monkeypatch.setenv("CATALYTIC_BOOST_FACTOR", "  1.4  ")
+    assert _catalytic_boost_factor() == pytest.approx(1.4)
+
+
+def test_novelty_weight_applies_catalytic_boost(monkeypatch):
+    """``_novelty_weight`` multiplies by the catalytic boost iff the entry's
+    component is in ``autocatalytic_nodes``; otherwise it preserves legacy.
+
+    Five paths verified, each isolated by toggling the env-driven boost factor
+    so the assertions are independent of the 1.25 default:
+
+    1. ``autocatalytic_nodes=None``        → no boost (legacy callers)
+    2. ``autocatalytic_nodes=set()``       → no boost (empty set is falsy)
+    3. component IN the set                → weight × boost_factor
+    4. component NOT in the set            → weight unchanged
+    5. entry.component empty/None          → no boost even if set is non-empty
+    """
+    monkeypatch.setenv("CATALYTIC_BOOST_FACTOR", "2.0")
+
+    catalytic_entry = _entry(0.5, component="catalytic.py")
+    other_entry = _entry(0.5, component="other.py")
+    bare_entry = _entry(0.5)  # no component
+    nodes = {"catalytic.py"}
+
+    # Baseline path 1: None → unboosted (legacy behaviour)
+    base = _novelty_weight(catalytic_entry, {}, autocatalytic_nodes=None)
+
+    # Path 2: empty set → unboosted (truthy check, not membership)
+    empty = _novelty_weight(catalytic_entry, {}, autocatalytic_nodes=set())
+    assert empty == pytest.approx(base)
+
+    # Path 3: component IN set → exact 2× boost
+    boosted = _novelty_weight(catalytic_entry, {}, autocatalytic_nodes=nodes)
+    assert boosted == pytest.approx(base * 2.0)
+
+    # Path 4: component NOT in set → no boost (other entries unaffected)
+    not_in_set = _novelty_weight(other_entry, {}, autocatalytic_nodes=nodes)
+    other_base = _novelty_weight(other_entry, {}, autocatalytic_nodes=None)
+    assert not_in_set == pytest.approx(other_base)
+
+    # Path 5: entry without a component → no boost even if set is non-empty
+    bare_base = _novelty_weight(bare_entry, {}, autocatalytic_nodes=None)
+    bare_with_nodes = _novelty_weight(bare_entry, {}, autocatalytic_nodes=nodes)
+    assert bare_with_nodes == pytest.approx(bare_base)
