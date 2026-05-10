@@ -31,11 +31,21 @@ from dharma_swarm.ucb_selector import UCBConfig
 
 @pytest.fixture
 def engine_paths(tmp_path):
-    """Return archive, traces, and predictor paths under tmp_path."""
+    """Return archive, traces, predictor, and meta-archive paths under tmp_path.
+
+    `meta_archive_path` MUST be tmp-isolated. Without it the DarwinEngine falls
+    back to the host's ~/.dharma/evolution/meta_archive.jsonl, which can carry
+    entries from prior schema versions (e.g. fitness dimensions that have since
+    been removed from `archive.FITNESS_DIMENSIONS`). Such entries crash
+    `MetaEvolutionEngine._load_meta_archive` with a Pydantic ValidationError on
+    `meta_parameters.fitness_weights`. Per-test isolation here keeps the suite
+    reproducible regardless of host history.
+    """
     return {
         "archive_path": tmp_path / "archive.jsonl",
         "traces_path": tmp_path / "traces",
         "predictor_path": tmp_path / "predictor.jsonl",
+        "meta_archive_path": tmp_path / "meta_archive.jsonl",
     }
 
 
@@ -93,13 +103,23 @@ _THINK_NOTES_REVIEW = (
 
 
 def _safe_proposal(**kw) -> Proposal:
-    """Create a safe proposal that will pass all gates."""
+    """Create a safe proposal that will pass all gates.
+
+    NOTE: the description must be grounded enough to satisfy the SVABHAAVA
+    gate (semantic_anekanta). The previous fixture text named multiple frames
+    (mechanistic / phenomenological / systems) without anchoring any of them
+    to a concrete operational object, which the gate now classifies as
+    "padded" and downgrades to REVIEW. The current text anchors a single
+    mechanistic frame via `parse_signal()` and `module.py` (matches the
+    gate's `_MECHANISTIC_HARD_ANCHORS` regexes), producing a `grounded`
+    label and a PASS verdict. See dharma_swarm/semantic_anekanta.py.
+    """
     defaults = {
         "component": "module.py",
         "change_type": "mutation",
         "description": (
-            "Improve activation mechanism with consciousness witness "
-            "and ecosystem resilience feedback"
+            "Tighten parse_signal() in module.py: validate non-positive "
+            "thresholds before they reach the runtime."
         ),
         "diff": "- old_line\n+ new_line\n",
         "think_notes": _THINK_NOTES_SAFE,
