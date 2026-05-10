@@ -2563,7 +2563,7 @@ async def run_conductor_loop(shutdown_event: asyncio.Event) -> None:
             max_turns=cfg.get("max_turns", 25),
         )
         conductors.append(agent)
-        await register(cfg["name"], agent)
+        # Defer registry insertion to the runner so conductor boot cannot block here.
         _log(
             "conductors",
             f"  {cfg['name']}: {cfg['model']} every {cfg['wake_interval_seconds']}s (registered)",
@@ -2571,6 +2571,8 @@ async def run_conductor_loop(shutdown_event: asyncio.Event) -> None:
 
     async def _run_with_restart(conductor: PersistentAgent, delay: float) -> None:
         await asyncio.sleep(delay)
+        await register(conductor.name, conductor)
+        _log("conductors", f"{conductor.name} registered and starting")
         while not shutdown_event.is_set():
             try:
                 await conductor.run_loop(shutdown_event)
