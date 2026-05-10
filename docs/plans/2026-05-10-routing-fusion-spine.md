@@ -88,7 +88,7 @@ collapsed into one file:
 ## First Bypass Surfaces To Fuse
 
 These direct provider-call surfaces are the first hardening target. They should
-route through a shared routing contract or explicitly emit the canonical witness
+route through a shared routing contract or explicitly emit the shared route witness
 and resident handoff:
 
 - `api/routers/chat.py`
@@ -147,7 +147,8 @@ Rules:
 - Never instantiates raw providers at call sites unless the call is a provider
   smoke/probe and records a probe witness.
 - Sends terminal provider failure to resident handoff.
-- Emits canonical route witness for every decision and attempt.
+- Emits the shared route witness for every decision and attempt once the
+  Phase 1 witness stack is merged into this branch.
 
 ## Dynamic Model-Lane Requirements
 
@@ -165,12 +166,12 @@ New model lanes need one place to land:
 - structured-output support
 - safe fallback class
 
-`model_hierarchy.py` is the current catalog authority. If it becomes too large,
+`model_hierarchy.py` is the current catalog owner. If it becomes too large,
 split data from behavior:
 
 ```text
 model_hierarchy.py          public API + validation
-model_catalog.yaml/json     canonical lane data
+model_catalog.yaml/json     shared lane data
 runtime_provider.py         instantiation/probe
 provider_policy.py          candidate selection
 ```
@@ -246,7 +247,7 @@ No required Rust dependency until the Python behavior is fully tested.
   flows, or should it keep raising provider failure while resident handoff keeps
   the system awake?
 - Should cheap-first runtime chains be absorbed into `ModelRouter`, or remain a
-  separate intentional path with canonical witness?
+  separate intentional path with shared route witness?
 - Should pullable local models be managed by Ollama only at first?
 - What is the operator UI for selecting "model lane installed but disabled" vs
   "missing but pullable"?
