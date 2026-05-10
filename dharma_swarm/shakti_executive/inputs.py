@@ -416,7 +416,10 @@ def _outcome_signal(obj_id: str, props: dict[str, Any], raw: dict[str, Any]) -> 
     error = str(props.get("error") or "")
     outcome_kind = str(props.get("outcome_kind") or "task")
     is_revenue = outcome_kind == "revenue" or task_id.startswith("revenue-")
-    amount = props.get("economic_amount_usd") or 0.0
+    try:
+        amount = float(props.get("economic_amount_usd") or 0)
+    except (TypeError, ValueError):
+        amount = 0.0
     if is_revenue:
         title = f"Revenue {'payment' if success else 'failure'}"
         if amount:
@@ -457,11 +460,14 @@ def _value_event_signal(obj_id: str, props: dict[str, Any], raw: dict[str, Any])
     value_kind = str(props.get("value_kind") or "task")
     is_revenue = value_kind in ("paid_revenue", "contracted_revenue", "compute_reinvestment")
     task_type = str(props.get("task_type") or "")
-    usd = props.get("economic_value_usd") or 0.0
+    try:
+        usd = float(props.get("economic_value_usd") or 0)
+    except (TypeError, ValueError):
+        usd = 0.0
     low_value = composite < 0.45 and not is_revenue
     if is_revenue:
         title = f"Revenue ValueEvent: ${usd:.2f} ({value_kind})"
-        relevance = min(0.92, 0.72 + min(float(usd), 10000.0) / 50000.0)
+        relevance = min(0.92, 0.72 + min(usd, 10000.0) / 50000.0)
     else:
         title = f"ValueEvent composite score {composite:.2f}"
         relevance = max(0.45, 1.0 - composite) if low_value else 0.54
@@ -502,6 +508,13 @@ def _value_event_signal(obj_id: str, props: dict[str, Any], raw: dict[str, Any])
 def _contribution_signal(obj_id: str, props: dict[str, Any], raw: dict[str, Any]) -> ExecutiveSignal:
     attributed = _float(props.get("attributed_value"), default=0.5)
     agent_id = str(props.get("agent_id") or "unknown")
+    revenue_ref = str(props.get("revenue_ref") or "")
+    beneficiary_type = str(props.get("beneficiary_type") or "")
+    is_revenue = bool(revenue_ref) or beneficiary_type in ("compute", "training", "operations")
+    domain_hint = "external_revenue" if is_revenue else "runtime_feedback"
+    keywords = ["contribution", "credit", "telic", "feedback"]
+    if is_revenue:
+        keywords.append("revenue")
     return ExecutiveSignal(
         source="telic:Contribution",
         title=f"Contribution feedback for {agent_id}",
@@ -513,9 +526,9 @@ def _contribution_signal(obj_id: str, props: dict[str, Any], raw: dict[str, Any]
         ),
         relevance_score=max(0.4, min(0.85, 1.0 - attributed)),
         confidence=0.72,
-        domain_hint="runtime_feedback",
+        domain_hint=domain_hint,
         evidence_ref=f"ontology://Contribution/{obj_id}",
-        keywords=("contribution", "credit", "telic", "feedback"),
+        keywords=tuple(keywords),
         suggested_action="Use contribution feedback when assigning future work.",
         raw=raw,
     )

@@ -741,7 +741,10 @@ def _read_telic_value_summary() -> dict[str, Any]:
                 if isinstance(props, dict):
                     vk = props.get("value_kind", "")
                     if vk in ("paid_revenue", "contracted_revenue", "compute_reinvestment"):
-                        revenue_usd += float(props.get("economic_value_usd") or 0.0)
+                        try:
+                            revenue_usd += float(props.get("economic_value_usd") or 0)
+                        except (TypeError, ValueError):
+                            pass
         finally:
             conn.close()
     except Exception:
