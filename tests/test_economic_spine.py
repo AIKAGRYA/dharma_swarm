@@ -101,7 +101,26 @@ class TestOutreach:
         offer = spine.default_offer()
         draft = spine.draft_outreach(target.id, offer.id, subject="Hi", body="Test")
         assert draft is not None
+        ok = spine.mark_outreach_sent(draft.id, operator="dhyana")
+        assert not ok
+
+    def test_cannot_send_without_operator(self, spine: RevenueSpine, target: RevenueTarget) -> None:
+        spine.add_target(target)
+        offer = spine.default_offer()
+        draft = spine.draft_outreach(target.id, offer.id, subject="Hi", body="Test")
+        assert draft is not None
+        spine.approve_outreach(draft.id, "dhyana")
         ok = spine.mark_outreach_sent(draft.id)
+        assert not ok
+
+    def test_cannot_approve_with_empty_name(self, spine: RevenueSpine, target: RevenueTarget) -> None:
+        spine.add_target(target)
+        offer = spine.default_offer()
+        draft = spine.draft_outreach(target.id, offer.id, subject="Hi", body="Test")
+        assert draft is not None
+        ok = spine.approve_outreach(draft.id, "")
+        assert not ok
+        ok = spine.approve_outreach(draft.id, "  ")
         assert not ok
 
     def test_can_send_after_approval(self, spine: RevenueSpine, target: RevenueTarget) -> None:
@@ -110,8 +129,17 @@ class TestOutreach:
         draft = spine.draft_outreach(target.id, offer.id, subject="Hi", body="Test")
         assert draft is not None
         spine.approve_outreach(draft.id, "dhyana")
-        ok = spine.mark_outreach_sent(draft.id)
+        ok = spine.mark_outreach_sent(draft.id, operator="dhyana")
         assert ok
+
+    def test_send_is_idempotent(self, spine: RevenueSpine, target: RevenueTarget) -> None:
+        spine.add_target(target)
+        offer = spine.default_offer()
+        draft = spine.draft_outreach(target.id, offer.id, subject="Hi", body="Test")
+        assert draft is not None
+        spine.approve_outreach(draft.id, "dhyana")
+        assert spine.mark_outreach_sent(draft.id, operator="dhyana")
+        assert spine.mark_outreach_sent(draft.id, operator="dhyana")
 
     def test_pending_outreach(self, spine: RevenueSpine, target: RevenueTarget) -> None:
         spine.add_target(target)

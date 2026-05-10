@@ -10,10 +10,12 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import sqlite3
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
+from urllib.parse import quote
 
 
 HUMAN_YDS_SOURCES = {"human", "operator", "dhyana"}
@@ -710,14 +712,69 @@ def _command_spine_organ_state(boundary: OrganBoundary, bundle: OperatingFactBun
     )
 
 
+def _read_telic_value_summary() -> dict[str, Any]:
+    """Read-only projection of Outcome/ValueEvent/Contribution counts from ontology DB."""
+    db_path = Path.home() / ".dharma" / "ontology.db"
+    if not db_path.exists():
+        return {}
+    uri = "file:" + quote(str(db_path.resolve()), safe="/") + "?mode=ro"
+    try:
+        conn = sqlite3.connect(uri, uri=True)
+        try:
+            counts: dict[str, int] = {}
+            revenue_usd = 0.0
+            for type_name in ("Outcome", "ValueEvent", "Contribution"):
+                row = conn.execute(
+                    "SELECT COUNT(*) FROM objects WHERE type_name = ?",
+                    (type_name,),
+                ).fetchone()
+                counts[type_name] = int(row[0]) if row else 0
+            rows = conn.execute(
+                "SELECT properties FROM objects WHERE type_name = 'ValueEvent'"
+                " ORDER BY created_at DESC LIMIT 100",
+            ).fetchall()
+            for (raw_props,) in rows:
+                try:
+                    props = json.loads(raw_props or "{}")
+                except (json.JSONDecodeError, TypeError):
+                    continue
+                if isinstance(props, dict):
+                    vk = props.get("value_kind", "")
+                    if vk in ("paid_revenue", "contracted_revenue", "compute_reinvestment"):
+                        revenue_usd += float(props.get("economic_value_usd") or 0.0)
+        finally:
+            conn.close()
+    except Exception:
+        return {}
+    return {"counts": counts, "revenue_usd": round(revenue_usd, 2)}
+
+
 def _telic_value_organ_state(boundary: OrganBoundary, bundle: OperatingFactBundle) -> OrganStateFact:
+    summary = _read_telic_value_summary()
+    if not summary:
+        return _state(
+            boundary,
+            observed_state="ontology DB not present or empty; no telic value projected",
+            coherence_state="declared_only",
+            evidence_refs=(boundary.python_api,),
+            open_gap="Outcome/ValueEvent/Contribution objects not yet created",
+            next_packet_hint="run a revenue or task cycle that writes to TelicSeam",
+        )
+    counts = summary.get("counts", {})
+    total = sum(counts.values())
+    revenue_usd = summary.get("revenue_usd", 0.0)
+    parts = [f"{k}={v}" for k, v in counts.items() if v]
+    observed = f"{total} telic objects ({', '.join(parts)})"
+    if revenue_usd > 0:
+        observed += f"; revenue value ${revenue_usd:.2f}"
     return _state(
         boundary,
-        observed_state="no Telic value fact reader is present in operating_facts v0",
-        coherence_state="unknown",
-        evidence_refs=(boundary.python_api,),
-        open_gap="Outcome/ValueEvent/Contribution facts are declared but not projected here",
-        next_packet_hint="add a read-only Telic value fact adapter before using value as map authority",
+        observed_state=observed,
+        coherence_state="bound" if total > 0 else "declared_only",
+        evidence_refs=(str(Path.home() / ".dharma" / "ontology.db"),),
+        open_gap="" if total > 0 else "no telic objects found",
+        next_packet_hint="use telic value facts in operator synthesis" if total > 0
+        else "run a cycle that writes Outcome/ValueEvent/Contribution",
     )
 
 

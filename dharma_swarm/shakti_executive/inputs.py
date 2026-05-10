@@ -414,22 +414,39 @@ def _outcome_signal(obj_id: str, props: dict[str, Any], raw: dict[str, Any]) -> 
     task_id = str(props.get("task_id") or "")
     summary = str(props.get("result_summary") or "")
     error = str(props.get("error") or "")
-    title = f"{'Successful' if success else 'Failed'} task outcome"
+    outcome_kind = str(props.get("outcome_kind") or "task")
+    is_revenue = outcome_kind == "revenue" or task_id.startswith("revenue-")
+    amount = props.get("economic_amount_usd") or 0.0
+    if is_revenue:
+        title = f"Revenue {'payment' if success else 'failure'}"
+        if amount:
+            title = f"{title}: ${amount:.2f}"
+    else:
+        title = f"{'Successful' if success else 'Failed'} task outcome"
     if task_id:
         title = f"{title}: {task_id}"
+    domain_hint = "external_revenue" if is_revenue else "runtime_feedback"
+    relevance = 0.78 if is_revenue and success else (0.58 if success else 0.88)
+    keywords = ["outcome", "telic", "feedback"]
+    keywords.append("revenue" if is_revenue else ("success" if success else "failure"))
+    if is_revenue:
+        keywords.append("paid" if success else "failed_revenue")
     return ExecutiveSignal(
         source="telic:Outcome",
         title=title,
         category="runtime_outcome",
         description=(summary or error)[:700],
-        relevance_score=0.58 if success else 0.88,
+        relevance_score=relevance,
         confidence=0.82,
-        domain_hint="runtime_feedback",
+        domain_hint=domain_hint,
         evidence_ref=f"ontology://Outcome/{obj_id}",
-        keywords=("outcome", "success" if success else "failure", "telic", "feedback"),
+        keywords=tuple(keywords),
         suggested_action=(
-            "Harvest the successful outcome as a reusable pattern."
-            if success else "Investigate failed outcome before expanding this opportunity lane."
+            "Increase opportunity ranking for proven revenue patterns."
+            if is_revenue and success
+            else "Investigate failed outcome before expanding this opportunity lane."
+            if not success
+            else "Harvest the successful outcome as a reusable pattern."
         ),
         raw=raw,
     )
@@ -437,24 +454,46 @@ def _outcome_signal(obj_id: str, props: dict[str, Any], raw: dict[str, Any]) -> 
 
 def _value_event_signal(obj_id: str, props: dict[str, Any], raw: dict[str, Any]) -> ExecutiveSignal:
     composite = _float(props.get("composite_value"), default=0.5)
-    low_value = composite < 0.45
+    value_kind = str(props.get("value_kind") or "task")
+    is_revenue = value_kind in ("paid_revenue", "contracted_revenue", "compute_reinvestment")
+    task_type = str(props.get("task_type") or "")
+    usd = props.get("economic_value_usd") or 0.0
+    low_value = composite < 0.45 and not is_revenue
+    if is_revenue:
+        title = f"Revenue ValueEvent: ${usd:.2f} ({value_kind})"
+        relevance = min(0.92, 0.72 + min(float(usd), 10000.0) / 50000.0)
+    else:
+        title = f"ValueEvent composite score {composite:.2f}"
+        relevance = max(0.45, 1.0 - composite) if low_value else 0.54
+    domain_hint = "external_revenue" if is_revenue else "runtime_feedback"
+    keywords = ["value_event", "telic", "feedback"]
+    if is_revenue:
+        keywords.extend(["revenue", "paid", value_kind])
+    elif low_value:
+        keywords.append("low_value")
+    else:
+        keywords.append("value")
     return ExecutiveSignal(
         source="telic:ValueEvent",
-        title=f"ValueEvent composite score {composite:.2f}",
+        title=title,
         category="value_event_feedback",
         description=(
             f"task_id={props.get('task_id') or ''}; "
             f"agent_id={props.get('agent_id') or ''}; "
-            f"task_type={props.get('task_type') or ''}"
+            f"task_type={task_type}; "
+            f"value_kind={value_kind}; usd={usd}"
         ),
-        relevance_score=max(0.45, 1.0 - composite) if low_value else 0.54,
-        confidence=0.78,
-        domain_hint="runtime_feedback",
+        relevance_score=relevance,
+        confidence=0.82 if is_revenue else 0.78,
+        domain_hint=domain_hint,
         evidence_ref=f"ontology://ValueEvent/{obj_id}",
-        keywords=("value_event", "telic", "feedback", "low_value" if low_value else "value"),
+        keywords=tuple(keywords),
         suggested_action=(
-            "Review low-value execution before selecting similar work."
-            if low_value else "Prefer patterns that produced measurable value."
+            "Increase opportunity ranking for proven revenue patterns."
+            if is_revenue
+            else "Review low-value execution before selecting similar work."
+            if low_value
+            else "Prefer patterns that produced measurable value."
         ),
         raw=raw,
     )

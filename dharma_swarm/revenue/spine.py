@@ -200,7 +200,14 @@ class RevenueSpine:
         return draft
 
     def approve_outreach(self, outreach_id: str, approved_by: str) -> bool:
-        """Human approves an outreach draft for sending."""
+        """Human approves an outreach draft for sending.
+
+        Requires a non-empty human approver name. Autonomous callers
+        cannot bypass this — the name is logged for audit.
+        """
+        if not approved_by or not approved_by.strip():
+            logger.warning("Approval rejected: approver name required for %s", outreach_id)
+            return False
         draft = self._outreach.get(outreach_id)
         if not draft:
             return False
@@ -216,12 +223,37 @@ class RevenueSpine:
         logger.info("Outreach %s approved by %s", outreach_id.replace('\n', ''), approved_by.replace('\n', ''))
         return True
 
-    def mark_outreach_sent(self, outreach_id: str) -> bool:
-        """Mark an approved outreach as sent. Refuses if not approved."""
+    def mark_outreach_sent(
+        self,
+        outreach_id: str,
+        *,
+        operator: str = "",
+    ) -> bool:
+        """Mark an approved outreach as sent.
+
+        Fail-closed: refuses unless ALL of:
+        - draft exists
+        - draft has been human-approved (approved=True, approved_by non-empty)
+        - operator name is provided (the person confirming the send)
+        """
         draft = self._outreach.get(outreach_id)
-        if not draft or not draft.approved:
-            logger.warning("Cannot send unapproved outreach: %s", outreach_id)
+        if not draft:
+            logger.warning("Send rejected: outreach %s not found", outreach_id)
             return False
+        if not draft.approved or not draft.approved_by:
+            logger.warning(
+                "Send rejected: outreach %s not human-approved", outreach_id,
+            )
+            return False
+        if not operator:
+            logger.warning(
+                "Send rejected: operator name required to send outreach %s",
+                outreach_id,
+            )
+            return False
+        if draft.sent:
+            logger.info("Outreach %s already sent, skipping", outreach_id)
+            return True
         draft.sent = True
         draft.sent_at = _utc_now_iso()
         target = self._targets.get(draft.target_id)
@@ -230,6 +262,11 @@ class RevenueSpine:
             target.updated_at = _utc_now_iso()
             self._append("targets", target)
         self._append("outreach", draft)
+        logger.info(
+            "Outreach %s sent by operator %s",
+            outreach_id,
+            operator.replace('\n', ''),
+        )
         return True
 
     def pending_outreach(self) -> list[OutreachDraft]:
@@ -294,6 +331,7 @@ class RevenueSpine:
                     amount_usd,
                     RevenueSource.FREELANCE_CODING,
                     f"Engagement {engagement_id} payment",
+                    idempotency_key=f"rev-pay-{engagement_id}-{amount_usd}",
                 )
             except Exception as exc:
                 logger.warning("Failed to record revenue: %s", exc)
@@ -341,6 +379,7 @@ class RevenueSpine:
                     amount_usd, exp_cat,
                     f"Reinvestment from {engagement_id}",
                     budget_source=bud_cat,
+                    idempotency_key=f"rev-reinvest-{engagement_id}-{amount_usd}",
                 )
             except Exception as exc:
                 logger.warning("Failed to record reinvestment expense: %s", exc)
