@@ -4413,10 +4413,15 @@ class ThinkodynamicDirector:
             batch = pending[:max_concurrent]
             attempted_ids.update(task.id for task in batch)
             wave_results = await asyncio.gather(*[_execute_one(task) for task in batch])
+            any_blocked_or_failed = False
             for result, child_ids in wave_results:
                 results.append(result)
                 if allowed_ids is not None and child_ids:
                     allowed_ids.update(child_ids)
+                if result.get("blocked") or not result.get("success"):
+                    any_blocked_or_failed = True
+            if any_blocked_or_failed:
+                break
 
         if not results:
             logger.info("Worker loop: no pending tasks")

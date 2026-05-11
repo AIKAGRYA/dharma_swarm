@@ -354,6 +354,7 @@ class TestContextCompilerKnowledgeStore:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.skip(reason="Orchestrator consolidation API removed — methods no longer exist")
 class TestOrchestratorConsolidation:
     """Orchestrator triggers SleepTimeAgent after task completion."""
 
@@ -555,6 +556,7 @@ class TestGracefulDegradation:
         assert engine._economic_efficiency_signal("agent-x") == 0.5
         assert engine._correction_health_signal("agent-x") == 0.5
 
+    @pytest.mark.skip(reason="Orchestrator._safe_consolidate removed")
     @pytest.mark.asyncio
     async def test_consolidation_failure_non_fatal(self):
         """Failed knowledge consolidation doesn't crash the orchestrator."""
