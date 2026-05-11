@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -29,6 +30,14 @@ import httpx
 from dharma_swarm.daemon_config import dharma_state_dir
 
 logger = logging.getLogger(__name__)
+
+_LOG_SANITIZE_RE = re.compile(r"[\r\n\x00-\x1f\x7f]")
+
+
+def _sanitize(value: object) -> str:
+    """Strip control characters from a value before logging."""
+    return _LOG_SANITIZE_RE.sub("_", str(value))
+
 
 _STATE_DIR = dharma_state_dir("DHARMA_HOME")
 _NODES_PATH = _STATE_DIR / "a2a" / "nodes.json"
@@ -147,7 +156,7 @@ class NodeRegistry:
         """Register or update a node in the fleet."""
         self._nodes[node.node_id] = node
         self._persist()
-        logger.info("Registered fleet node: %s at %s", node.node_id, node.endpoint)
+        logger.info("Registered fleet node: %s at %s", _sanitize(node.node_id), _sanitize(node.endpoint))
 
     def unregister(self, node_id: str) -> bool:
         """Remove a node. Returns True if it existed."""
@@ -155,7 +164,7 @@ class NodeRegistry:
             return False
         del self._nodes[node_id]
         self._persist()
-        logger.info("Unregistered fleet node: %s", node_id)
+        logger.info("Unregistered fleet node: %s", _sanitize(node_id))
         return True
 
     # -- retrieval -----------------------------------------------------------
@@ -220,12 +229,12 @@ class NodeRegistry:
             node.capabilities = data.get("capabilities", node.capabilities)
             node.metadata["task_counts"] = data.get("task_counts", {})
             node.metadata.pop("last_error", None)
-            logger.info("Health check OK: %s (%s)", node_id, node.status)
+            logger.info("Health check OK: %s (%s)", _sanitize(node_id), _sanitize(node.status))
 
         except Exception as exc:
             node.metadata["last_error"] = str(exc)
             _mark_stale(node)
-            logger.warning("Health check failed for %s: %s", node_id, exc)
+            logger.warning("Health check failed for %s: %s", _sanitize(node_id), exc)
 
         self._persist()
         return node

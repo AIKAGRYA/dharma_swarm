@@ -13,6 +13,7 @@ All routes are under /api/fleet/ and require the standard dashboard auth.
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
@@ -25,6 +26,12 @@ from dharma_swarm.a2a.node_registry import (
 )
 
 logger = logging.getLogger(__name__)
+
+_LOG_SANITIZE_RE = re.compile(r"[\r\n\x00-\x1f\x7f]")
+
+
+def _sanitize(value: object) -> str:
+    return _LOG_SANITIZE_RE.sub("_", str(value))
 
 router = APIRouter(prefix="/api/fleet", tags=["fleet"])
 
@@ -158,7 +165,7 @@ async def dispatch_task(body: dict[str, Any]) -> JSONResponse:
         )
         return JSONResponse(content=result, status_code=201)
     except Exception as exc:
-        logger.error("Fleet dispatch to %s failed: %s", node_id, exc)
+        logger.error("Fleet dispatch to %s failed: %s", _sanitize(node_id), exc)
         raise HTTPException(
             status_code=502,
             detail=f"Dispatch to {node_id} failed: {exc}",
