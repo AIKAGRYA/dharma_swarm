@@ -623,6 +623,29 @@ async def assess_completion_semantics(
             reason="Semantic acceptance failed: provider returned an invalid completion",
         )
 
+    # Strip reasoning tags BEFORE gate evaluation so the gate scores clean content.
+    reasoning_tag_penalty = 1.0
+    lowered_pre = normalized.lower()
+    if any(marker in lowered_pre for marker in _REASONING_LEAK_MARKERS):
+        normalized = re.sub(
+            r"<(?:think|analysis)>.*?</(?:think|analysis)>",
+            "", normalized, flags=re.DOTALL | re.IGNORECASE,
+        )
+        normalized = re.sub(
+            r"</?(?:think|analysis)>",
+            "", normalized, flags=re.IGNORECASE,
+        ).strip()
+        reasoning_tag_penalty = 0.85  # 15% penalty, not rejection
+        # Short residual after stripping is almost certainly not real content
+        if len(normalized.split()) < 15:
+            reasoning_tag_penalty = 0.30
+        if not normalized:
+            return CompletionAssessment(
+                accepted=False,
+                quality_score=0.0,
+                reason="Semantic acceptance failed: response was entirely reasoning tags with no content",
+            )
+
     gate = ContentQualityGate(
         threshold=_semantic_quality_threshold(
             task,
@@ -648,25 +671,8 @@ async def assess_completion_semantics(
     if any(marker in lowered for marker in ("next actions:", "next steps:", "action items:", "\n- ", "\n1.")):
         quality_score = _clamp01(quality_score + 0.05)
 
-    # Strip reasoning tags instead of rejecting.
-    # Many models (GLM-5, DeepSeek, Qwen) include <think>...</think> blocks
-    # as part of their chain-of-thought. The content after stripping is
-    # usually valid. Penalize quality slightly but don't reject.
-    if any(marker in lowered for marker in _REASONING_LEAK_MARKERS):
-        import re
-        normalized = re.sub(
-            r"<(?:think|analysis)>.*?</(?:think|analysis)>",
-            "", normalized, flags=re.DOTALL | re.IGNORECASE,
-        ).strip()
-        lowered = normalized.lower()
-        quality_score = _clamp01(quality_score * 0.85)  # 15% penalty, not rejection
-        if not normalized:
-            # Nothing left after stripping — THEN reject
-            return CompletionAssessment(
-                accepted=False,
-                quality_score=0.0,
-                reason="Semantic acceptance failed: response was entirely reasoning tags with no content",
-            )
+    # Apply reasoning tag penalty (set earlier if tags were stripped)
+    quality_score = _clamp01(quality_score * reasoning_tag_penalty)
 
     if (
         normalized
@@ -691,7 +697,7 @@ async def assess_completion_semantics(
             ),
         )
 
-    if gate_result.passed or quality_score >= threshold_score:
+    if (gate_result.passed or quality_score >= threshold_score) and quality_score >= threshold_score * 0.5:
         return CompletionAssessment(
             accepted=True,
             quality_score=quality_score,

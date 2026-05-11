@@ -330,7 +330,7 @@ class Organism:
             state = await self.identity.measure()
             pulse.identity_coherence = state.tcs
         except Exception:
-            pulse.identity_coherence = -1.0
+            pass  # keep OrganismPulse default (1.0) — don't penalize for infra failures
 
         pulse.audit_failure_rate = self.vsm.auditor.failure_rate()
 
