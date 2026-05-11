@@ -1,6 +1,6 @@
 # Interface Mismatch Map — dharma_swarm
 
-**Last X-Ray:** 2026-05-04 (high-roi-fixes audit against HEAD `daa15b7`)
+**Last X-Ray:** 2026-05-04 (provenance-completion audit against HEAD `74d015c`)
 **Previous version:** 2026-04-08 (55 module pairs, 13 mismatches, 9 prioritized)
 **Maintainer:** Guardian Crew (`guardian_crew.py`) — auto-updates every 4 hours
 **How to read this:** Severity = BLOCKER (crashes at runtime), DEGRADED (silent failure / wrong behavior), WARNING (structural smell).
@@ -27,7 +27,7 @@
 | MM-18: gnani → TelosGraph.get_by_name | DEGRADED | ✅RESOLVED | `TelosGraph.get_by_name()` added — linear scan on name field |
 | NEW-04: agent_runner → telic_seam dispatch gap | DEGRADED | ✅RESOLVED | `record_dispatch` + `record_gate_decision` added at task start in agent_runner |
 | NEW-05: task_board ↔ runtime_state split lifecycle | — | ⚠️ GUARDED | `run_task_consistency_guard` added to guardian_crew — detects COMPLETED tasks with still-OPEN claims |
-| NEW-07: 54 stores lack common trace_id | — | ⚠️ PARTIAL+ | `trace_id` column added to task_board, runtime_state, telemetry_plane, stigmergy, traces, artifact_manifest, handoff. CorrelationContext auto-populates memory_palace.ingest() and economic_engine transactions. |
+| NEW-07: 54 stores lack common trace_id | — | ⚠️ PARTIAL+ | `trace_id` column added to task_board, runtime_state, telemetry_plane, stigmergy, traces, artifact_manifest, handoff. CorrelationContext auto-populates memory_palace.ingest(), economic_engine transactions, and ai_reciprocity_ledger entries. |
 | NEW-08: 12 independent record_outcome() | ⚠️ PARTIAL | ⚠️ PARTIAL+ | TelicSeam emits signals + SignalBus subscriber pattern added for automatic fanout |
 | NEW-09: orchestrator → TelicSeam registry_path kwarg | — | ✅ FIXED | `TelicSeam.__init__()` now accepts `registry_path=` as an alias for `path=`, and uses the same path for lineage persistence. |
 | NEW-10: lineage edges lack delegation chain | — | ✅ FIXED | `LineageEdge.delegated_by` + `trace_id` fields added; `agent_runner.spawn_worker` records delegation lineage |
