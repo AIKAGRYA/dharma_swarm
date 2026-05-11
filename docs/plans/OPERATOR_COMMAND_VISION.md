@@ -39,7 +39,7 @@ User (any surface)
                 ▼
 ┌─────────────────────────────────────────┐
 │         COMMAND ENGINE                  │
-│  Canonical typed commands               │
+│  Shared typed commands               │
 │  dharma_swarm/terminal_commands/*.py    │
 │  register() + dispatch() protocol       │
 │  One implementation, every surface      │
