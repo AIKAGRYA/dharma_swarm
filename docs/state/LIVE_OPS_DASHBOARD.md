@@ -15,6 +15,15 @@ This file is the morning briefing for agents.
 
 It is not a feature spec and not a final architecture document. It is the current operational truth: what is on `main`, what the live runtime is actually running, what was merged, and what remains unsafe or unfinished.
 
+This is related to, but not the same as, `ACTIVE_SURFACE_MANIFEST.yaml`:
+
+| File | Audience | Job |
+|---|---|---|
+| `ACTIVE_SURFACE_MANIFEST.yaml` | Code / dashboard / API | Machine-readable declared surface map. The Manifest Health API reads it and compares declaration vs reality. |
+| `docs/state/LIVE_OPS_DASHBOARD.md` | Human operators / next agents | Plain-language morning brief: what changed, what is live, what matters, and what to do next. |
+
+Short version: the active manifest is the dashboard's structured truth source; this dashboard is the operator handoff explaining the current situation.
+
 ## Biggest So What
 
 The repo and live runtime are no longer split across an old cutover branch and a pile of green-but-unmerged PRs.
