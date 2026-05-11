@@ -306,6 +306,11 @@ class DharmaAttractor:
                 r"\bignore principle\b", r"\bremove all constraints\b",
                 r"\bharm\b", r"\bdeceive\b", r"\bsteal\b",
                 r"\battack\b", r"\bexploit\b",
+                # Deceptive intent patterns (Codex audit finding)
+                r"\bmaximize engagement\b", r"\bhide uncertainty\b",
+                r"\bconceal error\b", r"\bfake confidence\b",
+                r"\bsuppress warning\b", r"\bhide risk\b",
+                r"\bmanipulate user\b", r"\bdark pattern\b",
             ]
             return not any(re.search(pat, proposal_lower) for pat in hard_violations)
 
@@ -319,6 +324,10 @@ class DharmaAttractor:
                 "delete all", "disable oversight", "remove safety",
                 "bypass constraint", "ignore principle",
                 "remove all constraints",
+                "maximize engagement", "hide uncertainty",
+                "conceal error", "fake confidence",
+                "suppress warning", "hide risk",
+                "manipulate user", "dark pattern",
             ]
             if any(phrase in proposal_lower for phrase in danger_phrases):
                 kernel_ok = False
@@ -419,9 +428,18 @@ class DharmaAttractor:
             "delete all", "disable oversight", "remove safety",
             "bypass constraint", "ignore principle", "remove all constraints",
         ]
+        deceptive_phrases = [
+            "maximize engagement", "hide uncertainty",
+            "conceal error", "fake confidence",
+            "suppress warning", "hide risk",
+            "manipulate user", "dark pattern",
+        ]
         for phrase in danger_phrases:
             if phrase in output_lower:
                 score -= 0.3
+        for phrase in deceptive_phrases:
+            if phrase in output_lower:
+                score -= 0.25
 
         # Length penalty: very short outputs may be low-effort
         if len(output.strip()) < 20:
