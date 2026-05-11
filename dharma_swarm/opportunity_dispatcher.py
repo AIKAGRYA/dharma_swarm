@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from dharma_swarm.daemon_config import dharma_state_dir
 from dharma_swarm.models import Task, TaskPriority, TaskStatus
 from dharma_swarm.runtime_state import (
     DelegationRun,
@@ -48,7 +49,7 @@ def _resolve_state_root() -> Path:
             return Path(cfg_root)
     except Exception:
         pass
-    return Path.home() / ".dharma" / "state"
+    return dharma_state_dir() / "state"
 
 
 OPPORTUNITY_STAGES = (
@@ -234,7 +235,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max", type=int, default=3, help="Max promotions per run")
     args = parser.parse_args(argv)
 
-    board_path = Path.home() / ".dharma" / "meta" / "opportunity_board.json"
+    board_path = dharma_state_dir() / "meta" / "opportunity_board.json"
     if not board_path.exists():
         logger.info("No opportunity board found at %s", board_path)
         return 0

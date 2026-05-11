@@ -54,6 +54,12 @@ def sample_task():
     )
 
 
+def test_registry_path_alias_constructs_seam(tmp_path):
+    seam = TelicSeam(registry_path=tmp_path / "ontology.db")
+    assert seam._path == tmp_path / "ontology.db"
+    assert seam.lineage.db_path == tmp_path / "ontology.db"
+
+
 @pytest.fixture
 def gate_allow():
     return GateCheckResult(

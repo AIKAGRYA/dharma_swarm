@@ -498,6 +498,8 @@ async def run_evolution_loop(shutdown_event: asyncio.Event) -> None:
 
             # ── ACTIVE EVOLUTION: run cycle + meta-adaptation ──
             cycle_count += 1
+            meta_cycle_result: CycleResult | None = None
+            meta_cycle_source = "observed fitness"
 
             # Extract live fitness from AGENT_FITNESS event payloads and persist
             live_fitness_scores: list[float] = []
@@ -538,21 +540,7 @@ async def run_evolution_loop(shutdown_event: asyncio.Event) -> None:
                     best_fitness=best_fitness,
                     proposals_submitted=len(fitness_events),
                 )
-                meta_result = meta_engine.observe_cycle_result(synthetic_result)
-                if meta_result is not None:
-                    if meta_result.evolved_parameters:
-                        _log(
-                            "evolution",
-                            f"Meta-evolution adapted parameters "
-                            f"(meta_fitness={meta_result.meta_fitness:.3f}, "
-                            f"applied={meta_result.applied_parameters})",
-                        )
-                    else:
-                        _log(
-                            "evolution",
-                            f"Meta-evolution: no adaptation needed "
-                            f"(meta_fitness={meta_result.meta_fitness:.3f})",
-                        )
+                meta_cycle_result = synthetic_result
 
             # Drain active inference prediction errors — bias evolution toward high-error areas
             try:
@@ -658,6 +646,8 @@ async def run_evolution_loop(shutdown_event: asyncio.Event) -> None:
                                 timeout=30.0,
                                 context=f"Fitness avg={avg_fitness:.3f}, completions={completions}",
                             )
+                            meta_cycle_result = result
+                            meta_cycle_source = "auto-evolve"
                             _log(
                                 "evolution",
                                 f"Auto-evolve result ({mode_label}): fitness={result.best_fitness:.3f}, "
@@ -708,13 +698,29 @@ async def run_evolution_loop(shutdown_event: asyncio.Event) -> None:
                                         stderr=asyncio.subprocess.PIPE,
                                     )
                                 _log("evolution", f"Live cycle: {_committed} commits on {_branch}")
-
-                            # Feed result to meta-evolution
-                            meta_engine.observe_cycle_result(result)
                     else:
                         _log("evolution", "Auto-evolve skipped: OPENROUTER_API_KEY not set")
                 except Exception as exc:
                     _log("evolution", f"Auto-evolve error: {exc}")
+
+            # Feed meta-evolution at most once per outer cycle. Prefer the real
+            # auto_evolve result when present; otherwise use observed fitness.
+            if meta_cycle_result is not None:
+                meta_result = meta_engine.observe_cycle_result(meta_cycle_result)
+                if meta_result is not None:
+                    if meta_result.evolved_parameters:
+                        _log(
+                            "evolution",
+                            f"Meta-evolution adapted parameters from {meta_cycle_source} "
+                            f"(meta_fitness={meta_result.meta_fitness:.3f}, "
+                            f"applied={meta_result.applied_parameters})",
+                        )
+                    else:
+                        _log(
+                            "evolution",
+                            f"Meta-evolution from {meta_cycle_source}: no adaptation needed "
+                            f"(meta_fitness={meta_result.meta_fitness:.3f})",
+                        )
 
             # Bus metrics for observability
             try:
@@ -1766,7 +1772,7 @@ async def _run_guardian_loop(
       LOOP_WATCHER   — cybernetic loop health, evolution archive freshness
       ROUTER_PROBE   — circuit breaker state, dead providers, missing keys
 
-    Writes GUARDIAN_REPORT.md to repo root and ~/.dharma/guardian/.
+    Writes GUARDIAN_REPORT.md to ~/.dharma/guardian/.
     Creates GitHub issues for BLOCKER-severity findings.
     """
     try:
@@ -1965,7 +1971,7 @@ async def orchestrate(background: bool = False) -> None:
         # lessons_learned.md at ~/.dharma/meta/ — the anti-amnesia mechanism.
         "archaeology": lambda: _run_archaeology_loop(shutdown_event),
         # ── Guardian Crew: continuous interface + loop + router health checks ──
-        # Runs at boot + every 4 hours. Writes GUARDIAN_REPORT.md.
+        # Runs at boot + every 4 hours. Writes state-local GUARDIAN_REPORT.md.
         # Creates GitHub issues for BLOCKER-severity findings.
         "guardian": lambda: _run_guardian_loop(shutdown_event, room_registry=room_registry),
         # ── Health API: curl http://localhost:7433/health ──
