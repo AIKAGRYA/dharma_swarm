@@ -192,6 +192,8 @@ def _factor_scores(
     world_value = 0.55
     if domain == "external_revenue":
         world_value = 0.82
+        if signal.domain_hint == "external_revenue" and "paid" in words:
+            world_value = 0.88
     elif domain == "research":
         world_value = 0.7
     elif domain == "internal_maintenance":
@@ -232,6 +234,9 @@ def _factor_scores(
     }
 
 
+_REVENUE_SCORE_CAP = 82.0
+
+
 def _weighted_score(scores: dict[str, float]) -> float:
     positive = (
         scores["telos_alignment"] * 18.0
@@ -248,7 +253,10 @@ def _weighted_score(scores: dict[str, float]) -> float:
         scores["internal_churn_penalty"] * 20.0
         + scores["repetition_penalty"] * 12.0
     )
-    return max(0.0, positive - penalty)
+    raw = max(0.0, positive - penalty)
+    if scores.get("domain_balance_bonus", 0.0) > 0.0:
+        raw = min(raw, _REVENUE_SCORE_CAP)
+    return raw
 
 
 def _title_for_signal(signal: ExecutiveSignal, *, domain: str) -> str:

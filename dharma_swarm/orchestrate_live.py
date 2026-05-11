@@ -1830,6 +1830,139 @@ async def _run_archaeology_loop(shutdown_event: asyncio.Event) -> None:
         _log("archaeology", f"Archaeology loop crashed: {exc}")
 
 
+# ---------------------------------------------------------------------------
+# Signal bus subscriber wiring — closes the feedback loops
+# ---------------------------------------------------------------------------
+
+REVENUE_SCOUT_INTERVAL = 6 * 3600  # 6 hours
+
+
+def _wire_signal_subscribers(bus: Any) -> None:
+    """Register signal bus subscribers to close inter-loop feedback.
+
+    Before this wiring, 15 signal types were emitted into the void with
+    only 2 subscribers. Each subscriber here closes a specific feedback loop.
+    """
+    from dharma_swarm.signal_bus import (
+        SIGNAL_AGENT_FITNESS,
+        SIGNAL_ANOMALY_DETECTED,
+        SIGNAL_OUTCOME_RECORDED,
+    )
+    sub_count = 0
+
+    # OUTCOME_RECORDED → training flywheel (trajectory ingestion)
+    def _on_outcome_recorded(event: dict) -> None:
+        try:
+            from dharma_swarm.training_flywheel import record_trajectory_from_signal
+            record_trajectory_from_signal(event)
+        except ImportError:
+            pass
+        except Exception:
+            logger.debug("Flywheel outcome handler error", exc_info=True)
+
+    bus.subscribe(SIGNAL_OUTCOME_RECORDED, _on_outcome_recorded)
+    sub_count += 1
+
+    # AGENT_FITNESS → population control (fitness-informed scaling)
+    def _on_agent_fitness(event: dict) -> None:
+        try:
+            from dharma_swarm.population_control import record_fitness_signal
+            record_fitness_signal(event)
+        except ImportError:
+            pass
+        except Exception:
+            logger.debug("Population fitness handler error", exc_info=True)
+
+    bus.subscribe(SIGNAL_AGENT_FITNESS, _on_agent_fitness)
+    sub_count += 1
+
+    # ANOMALY_DETECTED → witness log (anomaly archival)
+    def _on_anomaly_detected(event: dict) -> None:
+        try:
+            from dharma_swarm.witness import record_anomaly_signal
+            record_anomaly_signal(event)
+        except ImportError:
+            pass
+        except Exception:
+            logger.debug("Witness anomaly handler error", exc_info=True)
+
+    bus.subscribe(SIGNAL_ANOMALY_DETECTED, _on_anomaly_detected)
+    sub_count += 1
+
+    # REVENUE_INTEL_INGESTED → stigmergy mark (intel becomes discoverable)
+    def _on_revenue_intel(event: dict) -> None:
+        try:
+            from pathlib import Path
+            import json as _json
+            intel_dir = Path.home() / ".dharma" / "revenue_intel"
+            intel_dir.mkdir(parents=True, exist_ok=True)
+            record = {
+                "type": "revenue_intel_signal",
+                "targets_scouted": event.get("targets_scouted", 0),
+                "claims_extracted": event.get("claims_extracted", 0),
+                "patterns_identified": event.get("patterns_identified", 0),
+                "timestamp": event.get("timestamp", ""),
+            }
+            with open(intel_dir / "signal_log.jsonl", "a") as f:
+                f.write(_json.dumps(record) + "\n")
+        except Exception:
+            logger.debug("Revenue intel handler error", exc_info=True)
+
+    bus.subscribe("REVENUE_INTEL_INGESTED", _on_revenue_intel)
+    sub_count += 1
+
+    _log("signal-bus", f"Wired {sub_count} signal subscribers")
+
+
+async def _run_revenue_scout_loop(shutdown_event: asyncio.Event) -> None:
+    """Revenue scout loop — autonomous target scouting every 6 hours.
+
+    Also subscribes to REVENUE_SCOUT_TRIGGER on the signal bus so LLM
+    agents can kick off ad-hoc scouting when they spot opportunities.
+    """
+    _log("revenue-scout", "Starting revenue scout loop (interval=21600s)")
+    try:
+        from dharma_swarm.revenue.scout_daemon import RevenueScoutDaemon
+
+        daemon = RevenueScoutDaemon()
+
+        # Run once at boot (light cycle)
+        try:
+            result = daemon.run_cycle()
+            _log(
+                "revenue-scout",
+                f"Boot cycle: {result.targets_scouted} scouted, "
+                f"{result.claims_extracted} claims, "
+                f"{result.patterns_identified} patterns",
+            )
+        except Exception as exc:
+            _log("revenue-scout", f"Boot cycle failed (non-fatal): {exc}")
+
+        while not shutdown_event.is_set():
+            try:
+                await asyncio.wait_for(
+                    shutdown_event.wait(), timeout=REVENUE_SCOUT_INTERVAL,
+                )
+                break
+            except asyncio.TimeoutError:
+                pass
+            if shutdown_event.is_set():
+                break
+            try:
+                result = daemon.run_cycle()
+                _log(
+                    "revenue-scout",
+                    f"Cycle: {result.targets_scouted} scouted, "
+                    f"{result.targets_qualified} qualified, "
+                    f"{result.outreach_drafted} drafted",
+                )
+            except Exception as exc:
+                _log("revenue-scout", f"Cycle error: {exc}")
+
+    except Exception as exc:
+        _log("revenue-scout", f"Revenue scout loop crashed: {exc}")
+
+
 async def orchestrate(background: bool = False) -> None:
     """Main entry point — run all systems concurrently."""
     # Ensure Python logging is configured so module-level logger.info() calls
@@ -1878,6 +2011,9 @@ async def orchestrate(background: bool = False) -> None:
     # Phase 2: Create shared signal bus for inter-loop temporal coherence
     from dharma_swarm.signal_bus import SignalBus
     bus = SignalBus.get()
+
+    # Phase 2a: Wire signal bus subscribers — close the feedback loops.
+    _wire_signal_subscribers(bus)
 
     # Phase 2b: optional fractal room registry + bridge.
     room_registry = None
@@ -1945,6 +2081,7 @@ async def orchestrate(background: bool = False) -> None:
         "consolidation": CONSOLIDATION_INTERVAL, "recognition": 7200,
         "replication": 3600, "self-improve": 3600, "free-grind": 600,
         "flywheel": 300, "conductors": 120, "context-agent": 60,
+        "revenue-scout": REVENUE_SCOUT_INTERVAL,
     }
     if room_registry is not None and room_bridge is not None:
         _loop_intervals["room-health"] = 1800
@@ -1980,6 +2117,8 @@ async def orchestrate(background: bool = False) -> None:
         "gauntlet": lambda: _run_gauntlet_loop(shutdown_event),
         # ── World Model: living Forrester-style world state updated by research ──
         "world-model": lambda: _run_world_model_loop(shutdown_event),
+        # ── Revenue Scout: autonomous target scouting + intelligence ingestion ──
+        "revenue-scout": lambda: _run_revenue_scout_loop(shutdown_event),
     }
     if room_registry is not None and room_bridge is not None:
         task_factories["room-health"] = lambda: _run_room_health_loop(

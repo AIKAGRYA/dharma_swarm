@@ -95,7 +95,7 @@ def test_organ_state_facts_project_declared_vs_observed_state(tmp_path: Path) ->
 
     assert states["agentops"].coherence_state == "drifted"
     assert states["kaizen_review"].coherence_state == "declared_only"
-    assert states["telic_value"].coherence_state == "unknown"
+    assert states["telic_value"].coherence_state == "declared_only"
     assert payload["organ_states"][0]["name"] == "agentops"
 
 

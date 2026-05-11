@@ -78,6 +78,8 @@ class Transaction(BaseModel):
     category: str = ""  # BudgetCategory
     description: str = ""
     telos_approved: bool = True
+    idempotency_key: str = ""
+    correlation_id: str = ""
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -154,6 +156,22 @@ class EconomicEngine:
     def transaction_count(self) -> int:
         return len(self._transactions)
 
+    def _check_idempotency(self, key: str) -> Transaction | None:
+        if not key:
+            return None
+        for tx in reversed(self._transactions):
+            if tx.idempotency_key == key:
+                return tx
+        return None
+
+    @staticmethod
+    def _get_correlation_id() -> str:
+        try:
+            from dharma_swarm.correlation_context import get_correlation
+            return get_correlation().trace_id or ""
+        except Exception:
+            return ""
+
     @staticmethod
     def _enrich_metadata(metadata: dict[str, Any] | None) -> dict[str, Any]:
         meta = dict(metadata or {})
@@ -176,13 +194,20 @@ class EconomicEngine:
         source: RevenueSource,
         description: str = "",
         metadata: Optional[dict[str, Any]] = None,
+        idempotency_key: str = "",
     ) -> Transaction:
         """Record revenue earned by the system."""
+        existing = self._check_idempotency(idempotency_key)
+        if existing is not None:
+            logger.debug("Idempotent skip: revenue tx %s", idempotency_key)
+            return existing
         tx = Transaction(
             type=TransactionType.REVENUE,
             amount_usd=amount_usd,
             source=source.value,
             description=description,
+            idempotency_key=idempotency_key,
+            correlation_id=self._get_correlation_id(),
             metadata=self._enrich_metadata(metadata),
         )
         self._transactions.append(tx)
@@ -221,14 +246,21 @@ class EconomicEngine:
         description: str = "",
         budget_source: BudgetCategory = BudgetCategory.TRAINING,
         metadata: Optional[dict[str, Any]] = None,
+        idempotency_key: str = "",
     ) -> Transaction:
         """Record an expense. Deducts from the specified budget category."""
+        existing = self._check_idempotency(idempotency_key)
+        if existing is not None:
+            logger.debug("Idempotent skip: expense tx %s", idempotency_key)
+            return existing
         tx = Transaction(
             type=TransactionType.EXPENSE,
             amount_usd=amount_usd,
             source=category.value,
             category=budget_source.value,
             description=description,
+            idempotency_key=idempotency_key,
+            correlation_id=self._get_correlation_id(),
             metadata=self._enrich_metadata(metadata),
         )
         self._transactions.append(tx)
