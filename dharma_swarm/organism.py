@@ -134,7 +134,7 @@ class Organism:
             self.memory = OrganismMemory(state_dir=self._state_dir)
         except Exception:
             self.memory = None
-            logger.debug("OrganismMemory init failed (non-fatal)")
+            logger.warning("OrganismMemory init failed (non-fatal)")
 
         try:
             from dharma_swarm.algedonic_activation import AlgedonicActivation
@@ -142,7 +142,7 @@ class Organism:
             self.algedonic_activation = AlgedonicActivation(self)
         except Exception:
             self.algedonic_activation = None
-            logger.debug("AlgedonicActivation init failed (non-fatal)")
+            logger.warning("AlgedonicActivation init failed (non-fatal)")
 
         try:
             from dharma_swarm.dharma_attractor import DharmaAttractor
@@ -150,7 +150,7 @@ class Organism:
             self.attractor = DharmaAttractor(state_dir=self._state_dir)
         except Exception:
             self.attractor = None
-            logger.debug("DharmaAttractor init failed (non-fatal)")
+            logger.warning("DharmaAttractor init failed (non-fatal)")
 
         try:
             from dharma_swarm.strange_loop import StrangeLoop
@@ -158,7 +158,7 @@ class Organism:
             self.strange_loop = StrangeLoop(self)
         except Exception:
             self.strange_loop = None
-            logger.debug("StrangeLoop init failed (non-fatal)")
+            logger.warning("StrangeLoop init failed (non-fatal)")
 
         try:
             from dharma_swarm.sleep_time_agent import SleepTimeAgent
@@ -166,7 +166,7 @@ class Organism:
             self.sleep_time_agent = SleepTimeAgent(tick_interval=5)
         except Exception:
             self.sleep_time_agent = None
-            logger.debug("SleepTimeAgent init failed (non-fatal)")
+            logger.warning("SleepTimeAgent init failed (non-fatal)")
 
         # ── Phase 7b: Semantic Graph integration ──────────────────────
         self.graph_store = None
@@ -187,7 +187,7 @@ class Organism:
             self.graph_store = SQLiteGraphStore(str(db_path))
             logger.info("GraphStore initialized: %s", db_path)
         except Exception as exc:
-            logger.debug("GraphStore init failed (non-fatal): %s", exc)
+            logger.warning("GraphStore init failed (non-fatal): %s", exc)
 
         try:
             from dharma_swarm.concept_parser import (
@@ -206,7 +206,7 @@ class Organism:
                 self._concept_indexer.index_concepts()
         except Exception as exc:
             self._concept_parser = None
-            logger.debug("ConceptParser init failed (non-fatal): %s", exc)
+            logger.warning("ConceptParser init failed (non-fatal): %s", exc)
 
         # ── Sprint 3: Economic Spine + Dynamic Correction ────────────
         self.economic_spine = None
@@ -230,7 +230,7 @@ class Organism:
                 self.economic_spine = EconomicSpine(econ_db)
                 logger.info("EconomicSpine initialized: %s", econ_db)
         except Exception as exc:
-            logger.debug("EconomicSpine init failed (non-fatal): %s", exc)
+            logger.warning("EconomicSpine init failed (non-fatal): %s", exc)
 
         try:
             from dharma_swarm.dynamic_correction import (
@@ -251,7 +251,27 @@ class Organism:
                 )
                 logger.info("DynamicCorrectionEngine initialized")
         except Exception as exc:
-            logger.debug("DynamicCorrectionEngine init failed (non-fatal): %s", exc)
+            logger.warning("DynamicCorrectionEngine init failed (non-fatal): %s", exc)
+
+        # ── Revenue pipeline (EconomicSpine for external revenue) ─────
+        self.revenue_spine = None
+        self.economic_engine = None
+        try:
+            from dharma_swarm.economic_engine import EconomicEngine
+            self.economic_engine = EconomicEngine()
+            logger.info("EconomicEngine initialized")
+        except Exception as exc:
+            logger.warning("EconomicEngine init failed: %s", exc)
+
+        try:
+            from dharma_swarm.revenue.spine import RevenueSpine
+            from dharma_swarm.revenue.telic_bridge import RevenueTelicBridge
+            from dharma_swarm.telic_seam import get_seam
+            bridge = RevenueTelicBridge(get_seam())
+            self.revenue_spine = RevenueSpine(telic_bridge=bridge)
+            logger.info("Revenue pipeline initialized (ontology-native)")
+        except Exception as exc:
+            logger.warning("Revenue pipeline init failed: %s", exc)
 
         self.vsm.algedonic.register_callback(self._on_algedonic)
 
