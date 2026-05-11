@@ -34,7 +34,7 @@ STATE_DIR = dharma_state_dir()
 OVERNIGHT_DIR = STATE_DIR / "overnight"
 LOG_FILE = OVERNIGHT_DIR / "gate_coverage.jsonl"
 
-DHARMA_SWARM_ROOT = Path.home() / "dharma_swarm"
+DHARMA_SWARM_ROOT = Path(__file__).resolve().parents[2]
 TESTS_DIR = DHARMA_SWARM_ROOT / "tests"
 
 # The 11 core gates from dharma_swarm.telos_gates.TelosGatekeeper.CORE_GATES
@@ -256,8 +256,9 @@ def run_test_file(test_path: Path, timeout: float = 60.0) -> tuple[bool, str]:
         Tuple of (passed: bool, output: str).
     """
     try:
+        python = sys.executable
         result = subprocess.run(
-            ["python3", "-m", "pytest", str(test_path), "-v", "--tb=short", "-q"],
+            [python, "-m", "pytest", str(test_path), "-v", "--tb=short", "-q"],
             capture_output=True,
             text=True,
             timeout=timeout,
