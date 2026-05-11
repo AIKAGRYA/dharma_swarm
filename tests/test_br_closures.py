@@ -52,7 +52,7 @@ class TestFrontierRefill:
             top_k=2, board_path=board_path, frontier_path=frontier_path,
         )
         assert result.board_count == 4
-        assert result.addressed_count == 2
+        assert result.queued_count == 2
         assert result.appended_rows == 2 * len(OPPORTUNITY_STAGES)
         assert set(result.appended_opportunity_ids) == {"opp-1", "opp-2"}
 
@@ -86,9 +86,24 @@ class TestFrontierRefill:
         result = refill_frontier_tasks_pending(
             board_path=board_path, frontier_path=frontier_path,
         )
-        assert result.addressed_count == 1
+        assert result.queued_count == 1
         assert "opp-2" in result.appended_opportunity_ids
         assert "opp-1" not in result.appended_opportunity_ids
+
+    def test_refill_skips_already_queued(self, tmp_path: Path) -> None:
+        from dharma_swarm.opportunity_refill import refill_frontier_tasks_pending
+
+        board_path = tmp_path / "board.json"
+        frontier_path = tmp_path / "frontier.jsonl"
+        self._write_board(board_path, [
+            {"id": "opp-1", "title": "Queued", "final_score": 90, "queued": True},
+            {"id": "opp-2", "title": "Pending", "final_score": 80},
+        ])
+        result = refill_frontier_tasks_pending(
+            board_path=board_path, frontier_path=frontier_path,
+        )
+        assert result.queued_count == 1
+        assert result.appended_opportunity_ids == ["opp-2"]
 
     def test_refill_dry_run(self, tmp_path: Path) -> None:
         from dharma_swarm.opportunity_refill import refill_frontier_tasks_pending
@@ -104,7 +119,7 @@ class TestFrontierRefill:
         assert result.appended_rows > 0
         assert not frontier_path.exists()
 
-    def test_refill_marks_addressed(self, tmp_path: Path) -> None:
+    def test_refill_marks_queued_until_outcome_feedback(self, tmp_path: Path) -> None:
         from dharma_swarm.opportunity_refill import refill_frontier_tasks_pending
 
         board_path = tmp_path / "board.json"
@@ -116,7 +131,9 @@ class TestFrontierRefill:
             board_path=board_path, frontier_path=frontier_path,
         )
         updated_board = json.loads(board_path.read_text())
-        assert updated_board[0]["addressed"] is True
+        assert updated_board[0]["queued"] is True
+        assert "queued_at" in updated_board[0]
+        assert "addressed" not in updated_board[0]
 
     def test_refill_respects_min_telos(self, tmp_path: Path) -> None:
         from dharma_swarm.opportunity_refill import refill_frontier_tasks_pending
@@ -132,7 +149,7 @@ class TestFrontierRefill:
             board_path=board_path,
             frontier_path=frontier_path,
         )
-        assert result.addressed_count == 1
+        assert result.queued_count == 1
         assert "opp-2" in result.appended_opportunity_ids
 
     def test_refill_ignores_malformed_scores(self, tmp_path: Path) -> None:
@@ -148,7 +165,7 @@ class TestFrontierRefill:
             board_path=board_path,
             frontier_path=frontier_path,
         )
-        assert result.addressed_count == 1
+        assert result.queued_count == 1
         assert result.appended_opportunity_ids == ["good"]
 
     async def test_drain_frontier_queue_creates_taskboard_entries(

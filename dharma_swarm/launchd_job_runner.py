@@ -21,6 +21,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+from dharma_swarm.daemon_config import dharma_state_dir
 from dharma_swarm.cron_job_runtime import (
     CronJobExecutionResult,
     CronJobRun,
@@ -38,6 +39,10 @@ def _output_preview(text: str, *, limit: int = 240) -> str:
     if len(collapsed) <= limit:
         return collapsed
     return collapsed[: limit - 3] + "..."
+
+
+def _state_dir() -> Path:
+    return dharma_state_dir("DHARMA_STATE_DIR", "DHARMA_HOME")
 
 
 def _write_last_run(
@@ -112,7 +117,7 @@ def main() -> int:
         return 1
 
     # Ensure output directories exist
-    output_dir = Path.home() / ".dharma" / "cron"
+    output_dir = _state_dir() / "cron"
     last_run_dir = output_dir / "last_run"
     runtime_store = CronJobRuntimeStore(output_dir / "state")
     output_dir.mkdir(parents=True, exist_ok=True)

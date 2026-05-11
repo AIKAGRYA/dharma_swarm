@@ -108,17 +108,22 @@ jobs:
           import ast
           from pathlib import Path
           errors = []
-          for f in sorted(Path('dharma_swarm').glob('*.py')):
+          excluded = {'__pycache__', '.git', '.mypy_cache', '.pytest_cache', '.ruff_cache', '.tox', '.venv', 'build', 'dist', 'node_modules'}
+          files = [
+              f for f in sorted(Path('dharma_swarm').rglob('*.py'))
+              if not any(part in excluded for part in f.parts)
+          ]
+          for f in files:
               try:
                   ast.parse(f.read_text())
               except SyntaxError as e:
-                  errors.append(f'{f.name}:{e.lineno}: {e.msg}')
+                  errors.append(f'{f}:{e.lineno}: {e.msg}')
           if errors:
               print('SYNTAX ERRORS:')
               for e in errors:
                   print(f'  {e}')
               raise SystemExit(1)
-          print(f'OK: {len(list(Path(\"dharma_swarm\").glob(\"*.py\")))} files, 0 syntax errors')
+          print(f'OK: {len(files)} files, 0 syntax errors')
           "
 
       - name: Check critical module imports

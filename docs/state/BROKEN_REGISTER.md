@@ -21,11 +21,11 @@
 
 ---
 
-## OPEN ITEMS (10 open after PR #187 closure pass 2026-05-10; 9 closed below)
+## OPEN ITEMS (9 open/partial after 2026-05-11 truth pass; 10 closed below)
 
 > **Convergence pass executed 2026-05-07 18:00–18:10:** Plan at `~/.claude/plans/yes-write-a-plan-wobbly-cerf.md`. Closed items moved to CLOSED section: BR-001 (cron daemon plist fixed), BR-016 (SOVEREIGN_MANIFEST counts refreshed and now DocOps-verified), BR-017 (BUILD_SESSION_ENTRYPOINT.md present), BR-018 (MEGAFILE_INDEX referenced from CLAUDE.md + README), BR-019 (Coherence Delta CI validator installed). BR-015 was already CLOSED. Total CLOSED = 6; OPEN = 13.
 
-*(BR-001, BR-002, BR-007, and BR-008 moved to CLOSED ITEMS — see below)*
+*(BR-001, BR-002, BR-006, BR-007, and BR-008 moved to CLOSED ITEMS — see below)*
 
 ### BR-003 — Apply gate present but closed (self-evolution loop)
 - **first_observed:** 2026-05-07
@@ -44,10 +44,10 @@
 - **age_days:** 1+
 - **severity:** DEGRADED
 - **domain:** cron / docs
-- **root_cause:** Repo `dharma_swarm/cron_jobs.json` has 17 jobs (schema A); live `~/.dharma/cron/jobs.json` has 484 lines (schema B); 1 shared id; 16 orphaned. `scripts/cron_unify.py:5-9` documents the split. No doc declares which is canonical.
-- **blast_radius:** Operator-loop documentation (Slot 8) cannot be written until canonical declared.
-- **evidence:** `~/.dharma/audit/cron_split_brain_*.json` (3 snapshots, latest 2026-05-06 22:30); `ten_megafiles_q5_2026-05-07.md`.
-- **status:** OPEN.
+- **root_cause:** Repo `dharma_swarm/cron_jobs.json` and live `~/.dharma/cron/jobs.json` still use different schemas and job populations. The original sub-claim "No doc declares which is canonical" is now stale.
+- **blast_radius:** Job-level health can still diverge between repo intent and launchd reality, but the scheduler state authority is no longer ambiguous.
+- **evidence:** `docs/governance/METABOLIC_CLOCK.md` declares `~/.dharma/cron/jobs.json` as scheduler state authority and says to fix failed jobs as separate scoped work packets. `scripts/cron_unify.py` remains the non-mutating unification helper.
+- **status:** PARTIAL — canonical authority declared; actual repo/live job reconciliation remains a scoped follow-up.
 
 ### BR-005 — Algedonic stream in degenerate steady-state
 - **first_observed:** ~2026-05-02 (5 days prior to audit)
@@ -55,21 +55,10 @@
 - **age_days:** ~5
 - **severity:** DEGRADED
 - **domain:** runtime
-- **root_cause:** Current last-200 algedonic rows contain only `omega_divergence medium rebalance_priorities`: 116 rows at `0.683`, 84 rows at `0.6527`. Not literally one identical value, but still a low-information steady-state. Consumer side likely dead or under-wired. **POST-BR-001 VERIFICATION**: 2 hours after the cron-daemon plist fix landed (PID 35207 running lf5-venv binary), `tail -50 ~/.dharma/algedonic_signals.jsonl | jq '.value' | sort -u` returns ONLY `0.683` (1 distinct value). Conclusion: BR-005 root cause is NOT the cron daemon path/version drift. Independent issue.
-- **blast_radius:** No rich causal feedback into the swarm. EMERGENCY_HOLD never escalates. Algedonic channel is structurally present (`vsm_channels.py:373`, `organism.py:968` — note duplicate types) but operationally inert.
-- **evidence:** `tail -200 ~/.dharma/algedonic_signals.jsonl | jq '[.kind,.severity,.action,.value]'` summary on 2026-05-07; `~/.dharma/audit/ten_megafiles_q3_2026-05-07.md`; `vsm_channels.py:373`; `organism.py:968`. Post-fix verification: `launchctl print gui/501/com.dharma.cron-daemon` shows running PID 35207 with lf5-venv binary; algedonic stream still emits one value.
-- **status:** OPEN — needs SCOPED INVESTIGATION (likely consumer-side: where does `algedonic_signals.jsonl` get read, and does that reader emit anything OTHER than the one stuck signal?). Not auto-resolved by cron daemon fix.
-
-### BR-006 — Recognition seed stale
-- **first_observed:** ~2026-05-01 (6 days prior to audit)
-- **last_verified:** 2026-05-07 20:30 (post-BR-001-fix verification)
-- **age_days:** 6
-- **severity:** DEGRADED
-- **domain:** runtime / agent
-- **root_cause:** `~/.dharma/meta/recognition_seed.md` is 6 days old despite metabolic-clock doctrine claiming nightly regeneration. Correlates with BR-001 cron LaunchAgent drift; direct causality is not proven because launchd reports the daemon process still running. **POST-BR-001 VERIFICATION**: 2 hours after cron-daemon plist fix landed, `stat -f "%Sm" ~/.dharma/meta/recognition_seed.md` returns `May 1 08:58:32 2026` — seed mtime is UNCHANGED. Conclusion: BR-006 is NOT downstream of BR-001. The cron daemon firing more reliably does not by itself trigger recognition_seed regeneration. Independent issue.
-- **blast_radius:** Agents loading context get stale self-model. Recognition is recognition of yesterday's state.
-- **evidence:** `~/.dharma/audit/ten_megafiles_q6_2026-05-07.md`; vision_maps `04_recognition_self_model.md`. Post-fix verification: cron daemon PID 35207 running lf5-venv binary; recognition_seed mtime unchanged at May 1.
-- **status:** OPEN — needs SCOPED INVESTIGATION (where in the metabolic clock does recognition_seed regeneration happen? `meta_daemon.py:RecognitionEngine`? Is there a separate cron handler that should fire it? The `meta_daemon.py:272-285` hard-coded March 2026 thesis-timing logic — does that gate regeneration?). Not auto-resolved by cron daemon fix.
+- **root_cause:** The original "last-200 rows are only omega_divergence" finding is now stale. The live stream contains chronic `omega_divergence` plus many `task_retries_exhausted` dead-letter warning signals. The remaining gap is consumer/action coherence: some actions emitted by `algedonic_activation.py` are unsupported or only partially consumed by `Organism`/VSM paths.
+- **blast_radius:** Sensing is richer than actuation. Signals exist, but not every signal class has an explicit consumer policy: log-only, prompt-context, scheduling bias, review, hold, or dispatch stop.
+- **evidence:** 2026-05-11 live tail of `~/.dharma/algedonic_signals.jsonl`; `dharma_swarm/algedonic_activation.py` defines `rebalance_priorities`, `enforce_glossary`, and `recalibrate_from_metrics`; `dharma_swarm/organism.py` concretely handles only a subset of algedonic actions.
+- **status:** PARTIAL — degenerate steady-state claim corrected; causal consumption/action coverage remains open.
 
 ### BR-009 — Roadmap is contested (3 docs claim primacy)
 - **first_observed:** 2026-05-07
@@ -135,7 +124,7 @@
 - **root_cause:** `dharma_swarm/telos_gates.py:512-513` literal hard-pass. The Gnani check defined to be most central is structurally inert.
 - **blast_radius:** Recognition layer's hardest gate is a no-op. Witness emits but doesn't gate.
 - **evidence:** vision_maps `01_gnani_prakruti.md`; `telos_gates.py:512-513`.
-- **status:** OPEN.
+- **status:** OPEN — direct edits to `telos_gates.py` are governance-forbidden by `CLAUDE.md`; closure must go through `GateRegistry.propose()` / gate pressure policy rather than a hard-coded gate mutation.
 
 ### BR-015 — `.FOCUS` writer with stale claim "no reader"
 - **first_observed:** 2026-05-07
@@ -201,9 +190,13 @@
 
 ## CLOSED ITEMS
 
+### BR-006 (CLOSED 2026-05-11) — Recognition seed stale
+- **Closing evidence:** Live `~/.dharma/meta/recognition_seed.md` was refreshed on 2026-05-10 and now reports current recognition context (`R_V=0.998 static`, archive entries, witness logs, DGC agents, recent cascade loops). `dharma_swarm/meta_daemon.py` owns recognition synthesis and `dharma_swarm/context.py` injects the seed into agent context.
+- **Verification:** 2026-05-11 live stat showed `May 10 21:25:11 2026` mtime, replacing the stale May 1 observation. Residual work is not freshness but making recognition more directly causal in routing/gates.
+
 ### BR-002 (CLOSED 2026-05-10 via PR #187) — central VentureCell loop feedback
-- **Closing evidence:** `dharma_swarm/opportunity_refill.py:409-438` promotes canonical Shakti `opportunity_id` rows into `frontier_tasks_pending.jsonl` and marks those same board rows addressed. `dharma_swarm/orchestrate_live.py:75-122` drains the frontier queue into `TaskBoard` entries with `opportunity_id` metadata and typed `TaskPriority`. `dharma_swarm/telic_seam.py:338-358` feeds completed outcomes back through `update_opportunity_outcome()`. `cron_jobs.json` registers the enabled `frontier_refill` scheduler entry.
-- **Verification:** `tests/test_br_closures.py` covers canonical `opportunity_id`, malformed scores, queue drain into `TaskBoard`, and metadata preservation. Manual probe confirmed canonical board row `opp-canonical` round-trips to frontier metadata and `update_opportunity_outcome()` returns `True`.
+- **Closing evidence:** `dharma_swarm/opportunity_refill.py` promotes canonical Shakti `opportunity_id` rows into `frontier_tasks_pending.jsonl` and now marks board rows `queued`, not falsely `addressed`. `dharma_swarm/orchestrate_live.py` drains the frontier queue into `TaskBoard` entries with `opportunity_id` metadata and typed `TaskPriority`. `dharma_swarm/telic_seam.py` feeds completed outcomes back through `update_opportunity_outcome()`, and `feedback_writer.py` marks successful outcomes as `addressed`.
+- **Verification:** `tests/test_br_closures.py` covers canonical `opportunity_id`, malformed scores, queued-not-addressed refill behavior, queue drain into `TaskBoard`, and metadata preservation. `tests/test_feedback_writer.py` verifies successful outcomes clear `queued` and set `addressed`, while failed outcomes clear `queued` without marking addressed.
 
 ### BR-007 (CLOSED 2026-05-10 via PR #187) — runtime.db and ontology.db sync
 - **Closing evidence:** `dharma_swarm/swarm.py:3061` now writes `_record_memory_fact()` to `self.state_dir / "state" / "runtime.db"`, matching the live runtime path. `dharma_swarm/engine/store_sync.py` materializes ontology `Outcome` objects as runtime `artifact_records` with `artifact_id = f"ont-{outcome.id}"`; sync is idempotent through the runtime primary key and explicit existing-row check. `dharma_swarm/cron_runner.py:577-596` exposes the `store_sync` handler, `cron_jobs.json` registers the enabled `store_sync` interval job, and `dharma_swarm/orchestrate_live.py:1732-1738` runs sync from the room-health loop under a guard.
@@ -230,7 +223,7 @@
 - **Closing evidence:** Backed up plist to `~/.dharma/audit/_backup_com.dharma.cron-daemon.plist.2026-05-07`. Used `plutil -replace ProgramArguments` to update `~/Library/LaunchAgents/com.dharma.cron-daemon.plist` from `/opt/homebrew/bin/dgc cron daemon` to `/Users/dhyana/dharma_swarm_lf5/.venv/bin/dgc cron daemon`. `launchctl bootout gui/501/com.dharma.cron-daemon && launchctl bootstrap gui/501 ~/Library/LaunchAgents/com.dharma.cron-daemon.plist` reloaded the daemon. Verified: old PID 10579 gone; new PID 14989 running with `/Users/dhyana/dharma_swarm_lf5/.venv/bin/dgc cron daemon`; `launchctl print gui/501/com.dharma.cron-daemon` reports state=running, `last exit code = (never exited)`, program = lf5-venv binary.
 - **Verified `dgc cron daemon` is valid on lf5-venv:** `dgc cron --help` lists `{add,list,remove,tick,daemon}` subcommands.
 - **Dependency note:** metabolic clock now pinned to `dharma_swarm_lf5` worktree. If lf5 is deleted, the daemon breaks. This dependency is intentional per user decision (smallest change, least risk path).
-- **Likely auto-resolves:** BR-006 (recognition_seed stale) within 24-48h once metabolic clock fires regeneration. May also un-stick BR-005 (algedonic degenerate steady-state) if consumer was waiting on the daemon.
+- **Follow-up verification:** BR-006 did later close after recognition seed regeneration; BR-005 narrowed but did not fully close because signal consumption remains uneven.
 - **Convergence pass action 7.**
 
 ### BR-019 (CLOSED 2026-05-07) — Coherence Delta gate enforced honor-system only
