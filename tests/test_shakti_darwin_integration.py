@@ -14,12 +14,11 @@ async def test_shakti_perception_routes_to_darwin():
 
     # Create a high-salience perception
     perception = ShaktiPerception(
-        energy="kriya",  # Action energy
+        energy="mahakali",  # Action energy
         observation="Critical system mutation detected",
-        file_path="dharma_swarm/core.py",
-        impact="system",  # High impact
+        connection="dharma_swarm/core.py",
+        impact_level="system",  # High impact
         salience=0.85,  # High salience
-        connections=[],
     )
 
     # Mock Darwin Engine
@@ -36,12 +35,12 @@ async def test_shakti_perception_routes_to_darwin():
             await darwin.init()
 
             for p in high:
-                if p.impact in ("module", "system"):
+                if p.impact_level in ("module", "system"):
                     await darwin.propose(
-                        component=p.file_path or "system",
+                        component=p.connection or "system",
                         change_type="mutation",
                         description=f"Shakti {p.energy} perception: {p.observation}",
-                        think_notes=f"Impact: {p.impact}, Salience: {p.salience:.2f}",
+                        think_notes=f"Impact: {p.impact_level}, Salience: {p.salience:.2f}",
                     )
 
         # Verify Darwin was called
@@ -52,7 +51,7 @@ async def test_shakti_perception_routes_to_darwin():
         call_args = mock_darwin.propose.call_args
         assert call_args.kwargs["component"] == "dharma_swarm/core.py"
         assert call_args.kwargs["change_type"] == "mutation"
-        assert "kriya" in call_args.kwargs["description"]
+        assert "MAHAKALI" in call_args.kwargs["description"]
         assert "Critical system mutation" in call_args.kwargs["description"]
 
 
@@ -64,12 +63,11 @@ async def test_low_salience_perceptions_not_routed_to_darwin():
 
     # Create a low-salience perception
     perception = ShaktiPerception(
-        energy="jnana",
+        energy="mahasaraswati",
         observation="Minor observation",
-        file_path="test.py",
-        impact="token",
+        connection="test.py",
+        impact_level="local",
         salience=0.3,  # Low salience
-        connections=[],
     )
 
     # Mock Darwin Engine
@@ -95,12 +93,11 @@ async def test_module_impact_but_low_salience_not_routed():
     from dharma_swarm.evolution import DarwinEngine
 
     perception = ShaktiPerception(
-        energy="kriya",
+        energy="mahakali",
         observation="Something happened",
-        file_path="module.py",
-        impact="module",  # High impact
+        connection="module.py",
+        impact_level="module",  # High impact
         salience=0.5,  # But low salience
-        connections=[],
     )
 
     with patch("dharma_swarm.evolution.DarwinEngine") as MockDarwin:
@@ -118,12 +115,11 @@ async def test_high_salience_but_token_impact_not_routed():
     from dharma_swarm.evolution import DarwinEngine
 
     perception = ShaktiPerception(
-        energy="jnana",
+        energy="mahasaraswati",
         observation="Interesting observation",
-        file_path="test.py",
-        impact="token",  # Low impact
+        connection="test.py",
+        impact_level="local",  # Low impact
         salience=0.9,  # High salience
-        connections=[],
     )
 
     with patch("dharma_swarm.evolution.DarwinEngine") as MockDarwin:
@@ -137,12 +133,12 @@ async def test_high_salience_but_token_impact_not_routed():
         # High salience, so filtered
         assert len(high) == 1
 
-        # But should NOT route to Darwin (impact is "token", not "module" or "system")
+        # But should NOT route to Darwin (impact_level is "local", not "module" or "system")
         darwin = MockDarwin()
         await darwin.init()
 
         for p in high:
-            if p.impact in ("module", "system"):
+            if p.impact_level in ("module", "system"):
                 await darwin.propose(component="test", change_type="mutation", description="test")
 
         # propose should NOT be called
@@ -156,9 +152,9 @@ async def test_multiple_high_salience_perceptions_all_routed():
     from dharma_swarm.evolution import DarwinEngine
 
     perceptions = [
-        ShaktiPerception("kriya", "Mutation 1", "file1.py", "system", 0.8, []),
-        ShaktiPerception("iccha", "Mutation 2", "file2.py", "module", 0.9, []),
-        ShaktiPerception("jnana", "Low salience", "file3.py", "token", 0.5, []),
+        ShaktiPerception(observation="Mutation 1", connection="file1.py", energy="mahakali", impact_level="system", salience=0.8),
+        ShaktiPerception(observation="Mutation 2", connection="file2.py", energy="maheshwari", impact_level="module", salience=0.9),
+        ShaktiPerception(observation="Low salience", connection="file3.py", energy="mahasaraswati", impact_level="local", salience=0.5),
     ]
 
     with patch("dharma_swarm.evolution.DarwinEngine") as MockDarwin:
@@ -171,9 +167,9 @@ async def test_multiple_high_salience_perceptions_all_routed():
         await darwin.init()
 
         for p in high:
-            if p.impact in ("module", "system"):
+            if p.impact_level in ("module", "system"):
                 await darwin.propose(
-                    component=p.file_path,
+                    component=p.connection,
                     change_type="mutation",
                     description=f"Shakti {p.energy} perception: {p.observation}",
                 )

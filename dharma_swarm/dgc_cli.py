@@ -5031,7 +5031,11 @@ def cmd_cross(
     dry_run: bool = False,
 ) -> None:
     """YATAGARASU cross-pollination engine commands."""
-    from dharma_swarm.cross_pollination import CrossPollinationEngine
+    try:
+        from dharma_swarm.cross_pollination import CrossPollinationEngine
+    except ImportError:
+        print("  cross_pollination module not yet implemented.")
+        return
 
     engine = CrossPollinationEngine()
 

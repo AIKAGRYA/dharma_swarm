@@ -97,9 +97,10 @@ class SmartSeedSelector:
 
         # Fallback: random selection from hardcoded dirs
         if not results:
-            return self._fallback_random(count, max_chars)
+            results = self._fallback_random(count, max_chars)
 
-        return results
+        # Enforce max_chars on every seed (upstream sources may not truncate)
+        return [(text[:max_chars], path, score) for text, path, score in results]
 
     # ── Context extraction ──────────────────────────────────────
 

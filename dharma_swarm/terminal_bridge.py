@@ -39,8 +39,12 @@ from dharma_swarm.provider_matrix import build_default_matrix_targets
 from dharma_swarm.runtime_state import DEFAULT_RUNTIME_DB, OperatorAction, RuntimeStateStore, SessionEventRecord
 from dharma_swarm.models import ProviderType
 from dharma_swarm.tui import model_routing
-from dharma_swarm.terminal_commands import system_commands as system_commands_module
-from dharma_swarm.terminal_commands.system_commands import SystemCommandHandler
+try:
+    from dharma_swarm.terminal_commands import system_commands as system_commands_module
+    from dharma_swarm.terminal_commands.system_commands import SystemCommandHandler
+except ImportError:
+    system_commands_module = None  # type: ignore[assignment]
+    SystemCommandHandler = None  # type: ignore[assignment,misc]
 from dharma_swarm.tui_helpers import build_runtime_status_text
 from dharma_swarm.workspace_topology import build_workspace_topology
 from dharma_swarm.operator_core import build_session_catalog, build_session_detail
@@ -49,14 +53,12 @@ from dharma_swarm.terminal_control import load_terminal_control_state
 from dharma_swarm.terminal_engine.events import ToolCallComplete
 from dharma_swarm.terminal_engine.events import PermissionDecisionEvent, PermissionOutcomeEvent, PermissionResolutionEvent
 
-
 def _json_default(value: object) -> object:
     if is_dataclass(value):
         return asdict(value)
     if isinstance(value, set):
         return sorted(value)
     return str(value)
-
 
 def _bridge_provider_id(provider: ProviderType) -> str | None:
     if provider == ProviderType.CODEX:
@@ -67,12 +69,10 @@ def _bridge_provider_id(provider: ProviderType) -> str | None:
         return "openrouter"
     return None
 
-
 def _target_alias(model: str) -> str:
     normalized = model.split("/")[-1].split(":")[0].strip().lower()
     normalized = re.sub(r"[^a-z0-9.+-]+", "-", normalized)
     return normalized.strip("-") or "model"
-
 
 class TerminalBridge:
     """Minimal stdio protocol server for a terminal frontend."""
