@@ -56,6 +56,7 @@ class StigmergicMark(BaseModel):
     connections: list[str] = Field(default_factory=list)
     access_count: int = 0
     channel: str = "general"  # Stigmergy channel for scoped visibility
+    trace_id: str = ""  # CorrelationContext trace_id for cross-store correlation
 
 
 # ---------------------------------------------------------------------------
@@ -128,6 +129,16 @@ class StigmergyStore:
         - Marks with connections: +0.05 per connection (cap +0.2)
         """
         updates: dict[str, object] = {}
+
+        # Auto-populate trace_id from CorrelationContext if not set
+        if not mark.trace_id:
+            try:
+                from dharma_swarm.correlation_context import get_correlation
+                corr = get_correlation()
+                if corr.trace_id:
+                    updates["trace_id"] = corr.trace_id
+            except Exception:
+                pass
 
         # Channel derivation
         if mark.channel == "general" and mark.agent:

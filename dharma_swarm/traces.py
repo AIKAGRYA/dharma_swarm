@@ -65,6 +65,7 @@ class TraceEntry(BaseModel):
     fitness: Optional[FitnessScore] = None
     files_changed: list[str] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
+    trace_id: str = ""  # CorrelationContext trace_id for cross-store correlation
 
 
 # ---------------------------------------------------------------------------
@@ -98,6 +99,15 @@ class TraceStore:
 
     async def log_entry(self, entry: TraceEntry) -> str:
         """Persist *entry* to ``history/{entry.id}.json`` and return the id."""
+        # Auto-populate trace_id from CorrelationContext if not set
+        if not entry.trace_id:
+            try:
+                from dharma_swarm.correlation_context import get_correlation
+                corr = get_correlation()
+                if corr.trace_id:
+                    entry = entry.model_copy(update={"trace_id": corr.trace_id})
+            except Exception:
+                pass
         dest = self.history_path / f"{entry.id}.json"
         data = json.loads(entry.model_dump_json())
         await asyncio.to_thread(atomic_write_json, dest, data)
