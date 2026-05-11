@@ -49,9 +49,18 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from dharma_swarm.daemon_config import dharma_state_dir
+
 logger = logging.getLogger(__name__)
 
-DEFAULT_BOARD_PATH = Path.home() / ".dharma" / "meta" / "opportunity_board.json"
+_FALLBACK_BOARD_PATH = Path("~/.dharma/meta/opportunity_board.json")
+DEFAULT_BOARD_PATH = _FALLBACK_BOARD_PATH
+
+
+def _default_board_path() -> Path:
+    if DEFAULT_BOARD_PATH != _FALLBACK_BOARD_PATH:
+        return Path(DEFAULT_BOARD_PATH)
+    return dharma_state_dir() / "meta" / "opportunity_board.json"
 
 
 @dataclass(frozen=True)
@@ -120,7 +129,7 @@ def update_opportunity_outcome(
     no matching opportunity is found, or the outcome was already recorded
     (idempotent). Writes atomically via tmp+rename.
     """
-    path = (board_path or DEFAULT_BOARD_PATH).expanduser()
+    path = (board_path or _default_board_path()).expanduser()
     if not path.exists():
         logger.debug("opportunity_board.json missing at %s; skipping", path)
         return False
@@ -172,6 +181,15 @@ def update_opportunity_outcome(
         row["learned_score_delta"] = (
             float(row.get("learned_score_delta", 0.0)) + _learned_score_delta(outcome)
         )
+        row["queued"] = False
+        recorded_ts = outcome.recorded_at or time.time()
+        recorded_at_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(recorded_ts))
+        row["last_outcome_at"] = recorded_at_iso
+        if outcome.success:
+            row["addressed"] = True
+            row["addressed_at"] = recorded_at_iso
+        else:
+            row["last_failed_outcome_at"] = recorded_at_iso
         break
 
     if not matched:

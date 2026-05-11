@@ -19,6 +19,7 @@
 | MM-09: samvara.current_power None chain | DEGRADED | ✅ RESOLVED | Double guard present at `swarm.py:2182-2184` |
 | MM-10: AutoProposer stigmergy guard | DEGRADED | ✅ RESOLVED | `auto_proposer.py:297` has `if self._stigmergy is None: return` |
 | MM-11: WitnessAuditor ModelRouter provider | DEGRADED | ✅ RESOLVED | `swarm.py:456-457` now uses `OpenRouterFreeProvider()` |
+| MM-07: MetaEvolutionEngine cadence mismatch | DEGRADED | ✅ RESOLVED | `run_evolution_loop()` now feeds `observe_cycle_result()` at most once per outer cycle, preferring real `auto_evolve()` results over synthetic observed-fitness estimates. |
 | NEW-01: archaeology_ingestion palace.query | BLOCKER | ✅ FIXED THIS SESSION | Replaced with `palace.recall(PalaceQuery(...))` + correct `max_results=` |
 | NEW-02: dgm_loop _provider attr | DEGRADED | ✅ FIXED THIS SESSION | Removed nonexistent `hasattr(engine, '_provider')` check |
 
@@ -28,13 +29,13 @@
 | NEW-05: task_board ↔ runtime_state split lifecycle | — | ⚠️ GUARDED | `run_task_consistency_guard` added to guardian_crew — detects COMPLETED tasks with still-OPEN claims |
 | NEW-07: 54 stores lack common trace_id | — | ⚠️ PARTIAL+ | `trace_id` column added to task_board, runtime_state, telemetry_plane, stigmergy, traces, artifact_manifest, handoff. CorrelationContext auto-populates memory_palace.ingest() and economic_engine transactions. |
 | NEW-08: 12 independent record_outcome() | ⚠️ PARTIAL | ⚠️ PARTIAL+ | TelicSeam emits signals + SignalBus subscriber pattern added for automatic fanout |
-| NEW-09: orchestrator → TelicSeam registry_path kwarg | — | ✅ FIXED | `orchestrator.py:154` used `registry_path=` but TelicSeam accepts `path=`. TypeError at runtime. |
+| NEW-09: orchestrator → TelicSeam registry_path kwarg | — | ✅ FIXED | `TelicSeam.__init__()` now accepts `registry_path=` as an alias for `path=`, and uses the same path for lineage persistence. |
 | NEW-10: lineage edges lack delegation chain | — | ✅ FIXED | `LineageEdge.delegated_by` + `trace_id` fields added; `agent_runner.spawn_worker` records delegation lineage |
 | NEW-11: TelicSeam singleton missing signal_bus | — | ✅ FIXED | `get_seam()` now passes `signal_bus=SignalBus.get()` to singleton |
 | BR-007: runtime.db path drift + store split | BLOCKER | ✅ RESOLVED | `_record_memory_fact()` now writes `state/runtime.db`; `engine/store_sync.py` materializes ontology Outcomes into runtime ArtifactRecords; cron + room-health guards wired. |
 | BR-008: VentureCell room/ontology split | BLOCKER | ✅ RESOLVED | `fractal/room_bridge.py` uses deterministic room IDs for ontology objects, updates through `put_object()`, preserves `room_status`, and room-health persists ontology sync. |
 
-**Net change:** 11 resolved, 5 fixed prior sessions, 6 new entries (NEW-05 guarded, NEW-07/NEW-08 partially resolved, NEW-09/10/11 fixed), plus BR-007/BR-008 closure notes from PR #187. 0 open BLOCKERs, 4 structural degraded remain.
+**Net change:** 12 resolved, 5 fixed prior sessions, 6 new entries (NEW-05 guarded, NEW-07/NEW-08 partially resolved, NEW-09/10/11 fixed), plus BR-007/BR-008 closure notes from PR #187. 0 open BLOCKERs, 3 structural degraded remain.
 
 ---
 
@@ -54,12 +55,10 @@
 
 ---
 
-### MM-07 — DEGRADED: MetaEvolutionEngine cadence mismatch
+### MM-07 — RESOLVED: MetaEvolutionEngine cadence mismatch
 
-**File:** `orchestrate_live.py:399,407`
-**What's wrong:** `observe_cycle_result()` is called twice per cycle number (once with synthetic fitness, once with `auto_evolve` result). `n_object_cycles_per_meta=2` fires after 2 total calls — so meta-adaptation can trigger within a single evolution cycle, not after 2 separate cycles as intended.
-
-**Fix:** Only call `observe_cycle_result` once per cycle — with the actual `CycleResult` from `auto_evolve`, not the synthetic fitness estimate.
+**File:** `orchestrate_live.py`
+**Status:** ✅ RESOLVED — `run_evolution_loop()` now stores a single per-cycle meta input and calls `observe_cycle_result()` once after the auto-evolve branch. Real `auto_evolve()` output wins when present; synthetic observed-fitness output is only the fallback.
 
 ---
 
@@ -140,14 +139,14 @@ ROUTER_PROBE   — Reads circuit_breakers.json for open providers
 | 3 | `swarm` → `orchestrator._classify_failure` (private) | ⚠️ DEGRADED |
 | 4 | `swarm` → `agent_runner.AgentPool` | ✅ |
 | 5 | `swarm` → `evolution.DarwinEngine` | ✅ |
-| 6 | `swarm` → `meta_evolution.MetaEvolutionEngine` | ⚠️ DEGRADED (cadence) |
+| 6 | `swarm` → `meta_evolution.MetaEvolutionEngine` | ✅ |
 | 7 | `swarm` → `auto_proposer.AutoProposer` (stigmergy) | ✅ |
 | 8 | `swarm` → `organism.OrganismRuntime.samvara` | ✅ |
 | 9 | `swarm` → `witness.WitnessAuditor` | ✅ |
 | 10 | `swarm` → `stigmergy.StigmergyStore` | ✅ |
-| 11 | `orchestrate_live` → `persistent_agent.PersistentAgent` (replication) | ⚠️ BLOCKER |
+| 11 | `orchestrate_live` → `persistent_agent.PersistentAgent` (replication) | ✅ |
 | 12 | `orchestrate_live` → `message_bus.receive()` semantics | ⚠️ DEGRADED |
-| 13 | `orchestrate_live` → `meta_evolution.observe_cycle_result` cadence | ⚠️ DEGRADED |
+| 13 | `orchestrate_live` → `meta_evolution.observe_cycle_result` cadence | ✅ |
 | 14 | `orchestrate_live` → `living_layers` (dual StigmergyStore) | ✅ |
 | 15 | `archaeology_ingestion` → `memory_palace.recall()` | ✅ (fixed this session) |
 | 16 | `dgm_loop` → `evolution.DarwinEngine.auto_evolve()` | ✅ (fixed this session) |

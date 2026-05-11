@@ -137,6 +137,27 @@ class Proposal(BaseModel):
         return v
 
 
+def _paths_from_unified_diff(diff_text: str) -> list[str]:
+    """Extract explicit repo-relative paths from unified diff headers."""
+    paths: list[str] = []
+    seen: set[str] = set()
+    for line in diff_text.splitlines():
+        if not (line.startswith("--- ") or line.startswith("+++ ")):
+            continue
+        raw = line[4:].strip().split("\t", 1)[0]
+        if raw == "/dev/null":
+            continue
+        if raw.startswith("a/") or raw.startswith("b/"):
+            raw = raw[2:]
+        path = Path(raw)
+        if path.is_absolute() or ".." in path.parts:
+            continue
+        if raw and raw not in seen:
+            seen.add(raw)
+            paths.append(raw)
+    return paths
+
+
 class CycleResult(BaseModel):
     """Summary of a single evolution cycle run."""
 
@@ -3236,9 +3257,13 @@ class DarwinEngine:
             f"Proposal: {proposal.id}\n"
             f"Change-type: {proposal.change_type}"
         )
+        changed_paths = _paths_from_unified_diff(proposal.diff)
+        if not changed_paths:
+            logger.warning("Refusing to auto-commit proposal %s with no explicit diff paths", proposal.id)
+            return None
 
         proc = await asyncio.create_subprocess_exec(
-            "git", "add", "-A",
+            "git", "add", "--", *changed_paths,
             cwd=str(ws),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
