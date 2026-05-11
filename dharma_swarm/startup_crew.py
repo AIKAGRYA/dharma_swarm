@@ -452,28 +452,20 @@ async def create_seed_tasks(swarm) -> list:
     """
     from dharma_swarm.models import TaskStatus
 
-    # Check if any of the SEED_TASK titles are currently active (PENDING or RUNNING).
-    # We look by title to avoid re-seeding tasks that are mid-flight.
-    # We do NOT check COMPLETED/FAILED — those are done and we should re-seed.
-    seed_titles = {spec["title"] for spec in SEED_TASKS}
-    active_seeds: list = []
+    # Skip when the board already has pending or running tasks — avoids
+    # re-seeding while work is still in-flight.
     for status in (TaskStatus.PENDING, TaskStatus.RUNNING):
         try:
             active = await swarm.list_tasks(status=status)
-            active_seeds.extend(
-                t for t in active
-                if getattr(t, 'title', '') in seed_titles
-            )
+            if active:
+                logger.info(
+                    "Board has %d %s tasks, skipping seed creation",
+                    len(active),
+                    status.value if hasattr(status, 'value') else status,
+                )
+                return []
         except Exception:
             pass
-
-    if active_seeds:
-        logger.info(
-            "Seed tasks already active (%d in-flight), skipping re-seed: %s",
-            len(active_seeds),
-            [getattr(t, 'title', '')[:40] for t in active_seeds[:3]],
-        )
-        return []
 
     date_str = datetime.now(timezone.utc).strftime("%Y%m%d")
 
