@@ -35,7 +35,7 @@
 | BR-007: runtime.db path drift + store split | BLOCKER | ✅ RESOLVED | `_record_memory_fact()` now writes `state/runtime.db`; `engine/store_sync.py` materializes ontology Outcomes into runtime ArtifactRecords; cron + room-health guards wired. |
 | BR-008: VentureCell room/ontology split | BLOCKER | ✅ RESOLVED | `fractal/room_bridge.py` uses deterministic room IDs for ontology objects, updates through `put_object()`, preserves `room_status`, and room-health persists ontology sync. |
 
-**Net change:** 12 resolved, 5 fixed prior sessions, 6 new entries (NEW-05 guarded, NEW-07/NEW-08 partially resolved, NEW-09/10/11 fixed), plus BR-007/BR-008 closure notes from PR #187. 0 open BLOCKERs, 3 structural degraded remain.
+**Net change:** 12 resolved, 5 fixed prior sessions, 6 new entries (NEW-05 guarded, NEW-07/NEW-08 partially resolved, NEW-09/10/11 fixed), plus BR-007/BR-008 closure notes from PR #187. 0 open BLOCKERs, 1 structural degraded remains (message_bus semantics).
 
 ---
 
@@ -58,7 +58,7 @@
 ### MM-07 — RESOLVED: MetaEvolutionEngine cadence mismatch
 
 **File:** `orchestrate_live.py`
-**Status:** ✅ RESOLVED — `run_evolution_loop()` now stores a single per-cycle meta input and calls `observe_cycle_result()` once after the auto-evolve branch. Real `auto_evolve()` output wins when present; synthetic observed-fitness output is only the fallback.
+**Status:** ✅ RESOLVED — `run_evolution_loop()` now stores a single per-cycle meta input and calls `observe_cycle_result()` once after the auto-evolve branch. Real `auto_evolve()` output wins when present; synthetic observed-fitness output is only the fallback. Additionally guarded: synthetic result only fires on non-auto_evolve cycles.
 
 ---
 
@@ -136,7 +136,7 @@ ROUTER_PROBE   — Reads circuit_breakers.json for open providers
 |---|-------------|--------|
 | 1 | `orchestrate_live` → `swarm.SwarmManager` | ✅ |
 | 2 | `swarm` → `orchestrator.Orchestrator` (public API) | ✅ |
-| 3 | `swarm` → `orchestrator._classify_failure` (private) | ⚠️ DEGRADED |
+| 3 | `swarm` → `orchestrator.retry_policy_for_failure` (public) | ✅ |
 | 4 | `swarm` → `agent_runner.AgentPool` | ✅ |
 | 5 | `swarm` → `evolution.DarwinEngine` | ✅ |
 | 6 | `swarm` → `meta_evolution.MetaEvolutionEngine` | ✅ |
