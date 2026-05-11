@@ -655,3 +655,30 @@ class PopulationController:
         except (json.JSONDecodeError, OSError) as exc:
             logger.warning("Failed to read apoptosis log: %s", exc)
         return results
+
+
+def record_fitness_signal(event: dict[str, Any]) -> None:
+    """Signal bus receiver: AGENT_FITNESS → population control.
+
+    Called by the signal bus subscriber in orchestrate_live.py when an
+    agent emits a fitness score. Appends to the fitness log for use by
+    culling and apoptosis decisions.
+    """
+    try:
+        agent = event.get("agent", "")
+        fitness = event.get("fitness", 0.0)
+        if not agent:
+            return
+        log_dir = dharma_state_dir() / "population"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        record = {
+            "agent": agent,
+            "fitness": fitness,
+            "source": "signal_bus",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        with open(log_dir / "fitness_signals.jsonl", "a") as f:
+            f.write(json.dumps(record) + "\n")
+        logger.debug("PopControl: recorded fitness signal for %s (%.3f)", agent, fitness)
+    except Exception:
+        logger.debug("PopControl: fitness signal record failed", exc_info=True)

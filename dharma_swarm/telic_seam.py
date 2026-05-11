@@ -111,7 +111,7 @@ class TelicSeam:
                     "agent_id": agent_id,
                     "action_type": topology if topology in (
                         "dispatch", "fan_out", "pipeline", "evolution", "manual",
-                        "agent_runner",
+                        "agent_runner", "revenue",
                     ) else "dispatch",
                     "title": task.title,
                     "description": task.description[:500] if task.description else "",

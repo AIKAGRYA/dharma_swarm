@@ -15,6 +15,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
+from dharma_swarm.operator_core.telic_value_reader import read_telic_value_summary
+
 
 HUMAN_YDS_SOURCES = {"human", "operator", "dhyana"}
 YDS_RE = re.compile(r"^5\.(?:6|7|8|9|10|11|12|13|14|15)(?:[abcd])?$")
@@ -711,13 +713,31 @@ def _command_spine_organ_state(boundary: OrganBoundary, bundle: OperatingFactBun
 
 
 def _telic_value_organ_state(boundary: OrganBoundary, bundle: OperatingFactBundle) -> OrganStateFact:
+    summary = read_telic_value_summary()
+    if not summary:
+        return _state(
+            boundary,
+            observed_state="ontology DB not present or empty; no telic value projected",
+            coherence_state="declared_only",
+            evidence_refs=(boundary.python_api,),
+            open_gap="Outcome/ValueEvent/Contribution objects not yet created",
+            next_packet_hint="run a revenue or task cycle that writes to TelicSeam",
+        )
+    counts = summary.get("counts", {})
+    total = sum(counts.values())
+    revenue_usd = summary.get("revenue_usd", 0.0)
+    parts = [f"{k}={v}" for k, v in counts.items() if v]
+    observed = f"{total} telic objects ({', '.join(parts)})"
+    if revenue_usd > 0:
+        observed += f"; revenue value ${revenue_usd:.2f}"
     return _state(
         boundary,
-        observed_state="no Telic value fact reader is present in operating_facts v0",
-        coherence_state="unknown",
-        evidence_refs=(boundary.python_api,),
-        open_gap="Outcome/ValueEvent/Contribution facts are declared but not projected here",
-        next_packet_hint="add a read-only Telic value fact adapter before using value as map authority",
+        observed_state=observed,
+        coherence_state="bound" if total > 0 else "declared_only",
+        evidence_refs=(str(Path.home() / ".dharma" / "ontology.db"),),
+        open_gap="" if total > 0 else "no telic objects found",
+        next_packet_hint="use telic value facts in operator synthesis" if total > 0
+        else "run a cycle that writes Outcome/ValueEvent/Contribution",
     )
 
 
