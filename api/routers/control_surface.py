@@ -66,5 +66,5 @@ async def control_surface_row(row_id: str) -> ApiResponse:
     except HTTPException:
         raise
     except Exception as e:
-        logger.exception("control-surface/rows/%s failed", row_id)
+        logger.exception("control-surface/rows/<id> failed")
         return ApiResponse(data=None, error=str(e))
