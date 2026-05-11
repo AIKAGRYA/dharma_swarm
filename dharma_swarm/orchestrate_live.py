@@ -528,9 +528,15 @@ async def run_evolution_loop(shutdown_event: asyncio.Event) -> None:
                      f"avg={sum(live_fitness_scores)/len(live_fitness_scores):.3f} "
                      f"max={max(live_fitness_scores):.3f}")
 
-            # Feed meta-evolution with observed fitness
-            # Prefer live agent fitness; fall back to historical archive average
-            if avg_fitness > 0 or fitness_events:
+            # Feed meta-evolution with observed fitness.
+            # Only submit a synthetic result on cycles where auto_evolve
+            # does NOT run (every 3rd cycle calls auto_evolve which feeds
+            # its own result to meta_engine — see line ~628).  Double-firing
+            # observe_cycle_result in the same cycle caused MM-07 cadence
+            # mismatch where meta-adaptation triggered within one evolution
+            # cycle instead of after two separate cycles.
+            _auto_evolve_will_run = (cycle_count % 3 == 0) and _evo_allowed
+            if (avg_fitness > 0 or fitness_events) and not _auto_evolve_will_run:
                 if live_fitness_scores:
                     best_fitness = max(live_fitness_scores)
                 else:
