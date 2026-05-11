@@ -336,11 +336,18 @@ def _observe_api_router(row: ControlSurfaceRow, repo_root: Path) -> None:
     main_py = repo_root / "api" / "main.py"
     if main_py.exists():
         main_text = main_py.read_text(errors="ignore")
-        prefix = row.raw.get("prefix", "")
-        if prefix and prefix in main_text:
-            row.evidence.append(f"registered in api/main.py")
+        module_leaf = module_dotted.rsplit(".", 1)[-1] if module_dotted else ""
+        registered = False
+        if module_leaf:
+            registered = f"{module_leaf}" in main_text
+        if not registered:
+            prefix = row.raw.get("prefix", "")
+            if prefix:
+                registered = prefix in main_text
+        if registered:
+            row.evidence.append("registered in api/main.py")
         else:
-            row.evidence.append(f"NOT registered in api/main.py")
+            row.evidence.append("NOT registered in api/main.py")
             row.gap_codes.append("router_not_registered")
 
     if row.gap_codes:

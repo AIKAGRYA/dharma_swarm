@@ -4,9 +4,10 @@
 # registered API routers (api/main.py), STATE_DIR ownership, and Semgrep Rule 1.
 # Any edit to hot-path modules requires ACK/warrant path documented here.
 #
-# This manifest is the SINGLE SOURCE OF TRUTH for the control plane.
-# The dashboard reads it. Agents read it. Health checks run against it.
-# Your workflow: Declare → Dispatch → Verify.
+# This manifest declares INTENT for the control plane.
+# Observed reality comes from runtime, code, and evidence adapters.
+# The dashboard reads it. Agents read it. Projectors reconcile it against reality.
+# Your workflow: Declare → Observe → Reconcile → Dispatch → Verify.
 
 schema_version: 2
 last_updated: "2026-05-11"
@@ -75,6 +76,7 @@ dashboard_nav_sections:
   - label: COMMAND
     items:
       - Overview
+      - Control Surface
       - Command Post
       - Qwen Surgeon
       - Observatory
