@@ -818,8 +818,15 @@ def bind(
     observation metadata whenever the morphism does not supply a replacement.
     The additive depth/introspection merge keeps the monad laws associative
     for the lightweight property tests in this repo.
+
+    Right-unit law: bind(m, pure) == m.  When the morphism is ``pure``
+    (observation_depth == 0), all upstream metadata — including
+    ``timestamp`` — is preserved so the law holds.
     """
     result = morphism(observed.state)
+    # Preserve upstream timestamp when the morphism added no observation
+    # (i.e. it came from ``pure``).  This satisfies the right-unit law.
+    ts = observed.timestamp if result.observation_depth == 0 else result.timestamp
     return ObservedState(
         state=result.state,
         rv_reading=result.rv_reading if result.rv_reading is not None else observed.rv_reading,
@@ -830,5 +837,5 @@ def bind(
         pr_late=result.pr_late if result.pr_late is not None else observed.pr_late,
         observation_depth=observed.observation_depth + result.observation_depth,
         introspection={**observed.introspection, **result.introspection},
-        timestamp=result.timestamp,
+        timestamp=ts,
     )
