@@ -5,7 +5,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-pytestmark = pytest.mark.skip(reason="Ginko fleet wiring API not yet implemented on SwarmManager")
+# QUARANTINE: These tests target a planned Ginko fleet wiring API on SwarmManager
+# that has not been implemented yet. Attributes tested (_ginko_enabled, _ginko_fleet,
+# _ginko_interval_ticks, _run_ginko_cycle, etc.) do not exist on SwarmManager.
+# Remove this marker and enable tests when the API is implemented.
+pytestmark = pytest.mark.skip(reason="QUARANTINE: Ginko fleet wiring API not yet implemented on SwarmManager — tracked for future implementation")
 
 from dharma_swarm.swarm import SwarmManager
 

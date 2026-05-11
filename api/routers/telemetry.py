@@ -240,3 +240,38 @@ async def telemetry_donor_targets(
 async def telemetry_project_runtime(force: bool = Query(True, description="Force a runtime-to-telemetry projection")) -> ApiResponse:
     result = await _project_runtime_telemetry_if_stale(force=force)
     return ApiResponse(data=result)
+
+
+@router.get("/artifacts")
+async def telemetry_artifacts(
+    session_id: str | None = Query(None, description="Filter by session ID"),
+    task_id: str | None = Query(None, description="Filter by task ID"),
+    run_id: str | None = Query(None, description="Filter by run ID"),
+    promotion_state: str | None = Query(None, description="Filter by promotion state"),
+    limit: int = Query(50, ge=1, le=500, description="Maximum artifacts to return"),
+) -> ApiResponse:
+    """Read artifact records from RuntimeStateStore (substrate TODO item 8)."""
+    from dharma_swarm.runtime_state import RuntimeStateStore
+
+    store = _get_telemetry_store()
+    rs = RuntimeStateStore(store.db_path)
+    records = await rs.list_artifacts(
+        session_id=session_id,
+        task_id=task_id,
+        run_id=run_id,
+        promotion_state=promotion_state,
+        limit=limit,
+    )
+    return ApiResponse(data=[_as_dict(item) for item in records])
+
+
+@router.get("/trace-attractor/{trace_id}")
+async def telemetry_trace_attractor(trace_id: str) -> ApiResponse:
+    """Project a trace_id into an AttractorPacket."""
+    from dharma_swarm.trace_attractor.cli import _collect_events
+    from dharma_swarm.trace_attractor.projector import TraceAttractorProjector
+
+    events = await _collect_events(trace_id, None, None, None)
+    projector = TraceAttractorProjector()
+    packet = projector.build_packet(trace_id, events)
+    return ApiResponse(data=packet.to_dict())

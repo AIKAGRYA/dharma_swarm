@@ -76,6 +76,7 @@ class Handoff(BaseModel):
     status: str = "pending"  # pending, delivered, acknowledged, rejected
     reject_reason: str = ""
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    trace_id: str = ""  # CorrelationContext trace_id for cross-store correlation
 
     def summary(self) -> str:
         """One-line summary of this handoff."""
@@ -130,6 +131,15 @@ class HandoffProtocol:
         Returns:
             The created Handoff with a generated ID.
         """
+        # Auto-populate trace_id from CorrelationContext
+        _trace_id = ""
+        try:
+            from dharma_swarm.correlation_context import get_correlation
+            corr = get_correlation()
+            _trace_id = corr.trace_id
+        except Exception:
+            pass
+
         handoff = Handoff(
             id=self._generate_id(),
             from_agent=from_agent,
@@ -139,6 +149,7 @@ class HandoffProtocol:
             priority=priority,
             requires_ack=requires_ack,
             status="pending",
+            trace_id=_trace_id,
         )
         self._pending[handoff.id] = handoff
         self._history.append(handoff)
