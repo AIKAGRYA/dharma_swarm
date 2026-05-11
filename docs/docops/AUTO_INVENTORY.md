@@ -7,7 +7,7 @@ Do not hand-edit the generated block.
 | Metric | Value |
 |---|---:|
 | Dharma Python modules | 567 |
-| Top-level Dharma Python modules | 386 |
+| Top-level Dharma Python modules | 385 |
 | Dharma Python LOC | 254,199 |
 | Test files | 571 |
 | Test function occurrences | 10,104 |
