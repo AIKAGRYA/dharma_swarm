@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 # ── Configuration ────────────────────────────────────────────────────
 
-DHARMA_DIR = dharma_state_dir("DHARMA_HOME")
+DHARMA_DIR = dharma_state_dir("DHARMA_STATE_DIR", "DHARMA_HOME")
 CRON_DIR = DHARMA_DIR / "cron"
 JOBS_FILE = CRON_DIR / "jobs.json"
 OUTPUT_DIR = CRON_DIR / "output"

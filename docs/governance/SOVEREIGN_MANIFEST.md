@@ -64,13 +64,13 @@ These are the ground-truth metrics. All other documents citing different numbers
 |--------|-------|-------------|
 | Total Python modules | **563** | find dharma_swarm -name "*.py" -type f |
 | Top-level (flat) modules | **386 (69.5%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
-| Total Python LOC | **252,636** | wc -l across dharma_swarm Python modules |
+| Total Python LOC | **252,798** | wc -l across dharma_swarm Python modules |
 | Test files | **566** | find tests -name "*.py" -type f |
-| Test functions | **10,045 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Test functions | **10,052 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
 | Markdown files | **686** | find . -name "*.md" -type f |
-| Markdown total lines | **175,125** | wc -l across all .md |
+| Markdown total lines | **175,117** | wc -l across all .md |
 | Bridge files | **20** | find dharma_swarm -name "*bridge*.py" |
 | Adapter files | **14 across 7 locations** | find dharma_swarm -type f \| rg -i "adapter" |
 | Orchestrator files | **4** (6,034 LOC total) | find dharma_swarm -name "*orchestrat*" |

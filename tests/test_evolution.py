@@ -15,6 +15,7 @@ from dharma_swarm.evolution import (
     EvolutionPlan,
     EvolutionStatus,
     Proposal,
+    _paths_from_unified_diff,
 )
 from dharma_swarm.landscape import BasinType, LandscapeProbe
 from dharma_swarm.meta_evolution import MetaParameters
@@ -83,6 +84,25 @@ _THINK_NOTES_HARMFUL = (
     "Alternatives: selective cleanup. "
     "Expected: free disk space."
 )
+
+
+def test_paths_from_unified_diff_filters_to_explicit_repo_paths() -> None:
+    diff = """diff --git a/dharma_swarm/a.py b/dharma_swarm/a.py
+--- a/dharma_swarm/a.py
++++ b/dharma_swarm/a.py
+@@ -1 +1 @@
+-old
++new
+--- /dev/null
++++ b/tests/test_a.py
+--- a/../secret.txt
++++ b/../secret.txt
+"""
+
+    assert _paths_from_unified_diff(diff) == [
+        "dharma_swarm/a.py",
+        "tests/test_a.py",
+    ]
 
 _THINK_NOTES_REVIEW = (
     "Risk: moderate — force override bypasses normal flow. "
