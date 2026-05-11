@@ -60,12 +60,20 @@ def cmd_cron(
                 print("  No cron jobs.")
                 return
             for j in jobs:
-                status = j.get("last_status", "-")
+                status = j.get("last_status") or "UNKNOWN"
                 enabled = "✓" if j.get("enabled", True) else "✗"
-                completed = j.get("repeat", {}).get("completed", 0)
-                times = j.get("repeat", {}).get("times")
+                repeat = j.get("repeat") or {}
+                completed = repeat.get("completed", 0)
+                times = repeat.get("times")
                 repeat_str = f"{completed}/{times}" if times else f"{completed}/∞"
-                print(f"  {enabled} {j['id']}  {j['name'][:40]:<40}  "
+                job_id = str(j.get("id") or "-")
+                job_name = str(
+                    j.get("name")
+                    or j.get("handler")
+                    or j.get("prompt")
+                    or job_id
+                )
+                print(f"  {enabled} {job_id}  {job_name[:40]:<40}  "
                       f"{j.get('schedule_display', '?'):<20}  "
                       f"runs={repeat_str}  last={status}")
         case "remove":
