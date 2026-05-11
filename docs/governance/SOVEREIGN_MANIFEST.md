@@ -17,7 +17,7 @@
 These are immutable engineering laws for this repository. Violation = architectural regression.
 
 ### A1: NO FLAT-PACKAGE GROWTH
-The `dharma_swarm/` package currently has **386 files at its top level (65.9% of 586 total Python modules)** (V). No new .py file may be added to the top level. New modules must go into an appropriate subdirectory. Existing top-level files will be organized over time.
+The `dharma_swarm/` package currently has **386 files at its top level (65.8% of 587 total Python modules)** (V). No new .py file may be added to the top level. New modules must go into an appropriate subdirectory. Existing top-level files will be organized over time.
 
 ### A2: NO DUPLICATE IMPLEMENTATIONS
 Before creating a new file for routing, bridging, adapting, or orchestrating, check if one already exists. The repo currently has **20 bridge files** (V), **3 model_routing copies** (2 are identical, 1 is different) (V), **4 orchestrators** (V), **14 adapter files across 7 locations** (V), and **13 router files** (V). Do not add more without deprecating an existing one.
@@ -52,7 +52,7 @@ The repo has **9 verified circular dependency chains** (V). The worst:
 All 9 cycles were independently confirmed with exact import lines. Most are mitigated by lazy imports but remain architectural debt. **New code must not create circular imports.**
 
 ### A8: FRONTMATTER DISCIPLINE
-Do not inject machine-readable YAML frontmatter into governance or architecture docs unless explicitly requested. Current state: **214 of 688 Markdown files start with YAML frontmatter; 15 of 21 docs/architecture Markdown files do so** (V). Long frontmatter remains an authority/noise risk even when the prose is useful.
+Do not inject machine-readable YAML frontmatter into governance or architecture docs unless explicitly requested. Current state: **214 of 685 Markdown files start with YAML frontmatter; 15 of 21 docs/architecture Markdown files do so** (V). Long frontmatter remains an authority/noise risk even when the prose is useful.
 
 ---
 
@@ -62,11 +62,11 @@ These are the ground-truth metrics. All other documents citing different numbers
 
 | Metric | Value | Verification |
 |--------|-------|-------------|
-| Total Python modules | **586** | find dharma_swarm -name "*.py" -type f |
-| Top-level (flat) modules | **386 (65.9%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
-| Total Python LOC | **254,822** | wc -l across dharma_swarm Python modules |
-| Test files | **572** | find tests -name "*.py" -type f |
-| Test functions | **10,125 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Total Python modules | **587** | find dharma_swarm -name "*.py" -type f |
+| Top-level (flat) modules | **386 (65.8%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
+| Total Python LOC | **255,140** | wc -l across dharma_swarm Python modules |
+| Test files | **573** | find tests -name "*.py" -type f |
+| Test functions | **10,134 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
 | Markdown files | **690** | find . -name "*.md" -type f |
