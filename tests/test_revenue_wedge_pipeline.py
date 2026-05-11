@@ -23,7 +23,7 @@ _temp_dir = tempfile.mkdtemp(prefix="revenue_wedge_test_")
 os.environ.setdefault("DHARMA_HOME", _temp_dir)
 
 from dharma_swarm.ginko_data import CryptoPrice, MarketDataPull
-from dharma_swarm.revenue_wedge_pipeline import (
+from dharma_swarm.revenue.wedge_pipeline import (
     PipelineResult,
     _emit_room_signal,
     _generate_report,

@@ -1,7 +1,7 @@
 """dharma_swarm.revenue — Revenue pipeline sub-package.
 
 Contains the economic spine (revenue ledger), intelligence ingestor,
-and scout daemon for autonomous target scouting.
+scout daemon, and intelligence-report wedge pipeline.
 """
 
 from dharma_swarm.revenue.spine import (
