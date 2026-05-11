@@ -67,6 +67,9 @@ api_routers:
   - id: manifest
     prefix: /api/manifest
     module: api.routers.manifest
+  - id: control_surface
+    prefix: /api/control-surface
+    module: api.routers.control_surface
 
 dashboard_nav_sections:
   - label: COMMAND
@@ -162,6 +165,15 @@ health_check_registry:
 # Every dashboard page: desired state, observed-state checks, gap info.
 
 dashboard_surfaces:
+  - id: control_surface
+    label: "Control Surface"
+    route: /dashboard/control-surface
+    api_dependencies: [/api/control-surface/summary, /api/control-surface/rows]
+    status: live
+    health_check_ids: [dashboard_route_exists, api_router_registered]
+    priority: p0
+    next_action: null
+
   - id: overview
     label: "System Overview"
     route: /dashboard
