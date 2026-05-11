@@ -9,9 +9,8 @@ Core components:
     - A2AServer: receives task delegations, dispatches to orchestrator
     - A2AClient: discovers agents, delegates tasks, monitors completion
     - A2ABridge: backward-compatible bridge to TRISHULA and signal_bus
-
-Current scope: local-only (in-process function calls between agents).
-HTTP transport for inter-VPS communication is a future milestone.
+    - NodeGateway: HTTP transport layer (FastAPI router per node)
+    - NodeRegistry: central directory of fleet nodes with health monitoring
 """
 
 from dharma_swarm.a2a.agent_card import (
@@ -22,6 +21,7 @@ from dharma_swarm.a2a.agent_card import (
 from dharma_swarm.a2a.a2a_server import A2AServer
 from dharma_swarm.a2a.a2a_client import A2AClient
 from dharma_swarm.a2a.a2a_bridge import A2ABridge
+from dharma_swarm.a2a.node_registry import NodeRegistry, RemoteNode
 
 __all__ = [
     "AgentCard",
@@ -30,4 +30,6 @@ __all__ = [
     "A2AServer",
     "A2AClient",
     "A2ABridge",
+    "NodeRegistry",
+    "RemoteNode",
 ]
