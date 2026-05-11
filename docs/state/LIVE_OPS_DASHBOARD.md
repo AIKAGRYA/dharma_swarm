@@ -1,152 +1,234 @@
-# LIVE OPS DASHBOARD — Slot 6 of MEGAFILE_INDEX
-**Path:** `dharma_swarm/docs/state/LIVE_OPS_DASHBOARD.md`
-**Status:** SEEDED — 2026-05-07 inaugural snapshot
-**Refresh cadence:** daily target. Currently manual. Auto-refresh is not wired; BR-001 fixed cron-daemon restart safety, but no job owns this file yet.
-**Mode:** Today's truth — what's running, what fired, what crashed, what's stale. Aggregates fresh audit substrate into one read.
+# LIVE OPS DASHBOARD — Morning Brief
+
+**Path:** `docs/state/LIVE_OPS_DASHBOARD.md`  
+**Snapshot date:** 2026-05-11  
+**Status:** CURRENT — convergence checkpoint after merge train + runtime realignment  
+**Read first if tired:** this is the place to learn what shipped, where the live swarm is running, and what not to rediscover tomorrow.
+
+The previous 2026-05-07 dashboard was archived to `docs/state/_archive/LIVE_OPS_DASHBOARD_2026-05-07.md`.
 
 ---
 
-## How To Use
+## What This Is
 
-This file is **the morning briefing for the swarm.** A new agent reading it should know within 60 seconds what is alive today.
+This file is the morning briefing for agents.
 
-Each section answers one question:
-1. **Processes** — what daemons are running right now?
-2. **Cron / launchd** — what fired in the last 24h, what errored?
-3. **Loops** — which cybernetic loops are closed today?
-4. **Branches / PRs** — what shipped, what's pending, what's stuck?
-5. **Stores** — what databases / files were last touched, what's stale?
-6. **Top blockers today** — pulled from BROKEN_REGISTER.md
+It is not a feature spec and not a final architecture document. It is the current operational truth: what is on `main`, what the live runtime is actually running, what was merged, and what remains unsafe or unfinished.
 
-When refreshing, replace each section's date and content. **Snapshot the previous version to `_archive/LIVE_OPS_DASHBOARD_<YYYY-MM-DD>.md` before overwriting.**
+## Biggest So What
+
+The repo and live runtime are no longer split across an old cutover branch and a pile of green-but-unmerged PRs.
+
+As of this snapshot:
+
+- GitHub `main` is green at `f2e5fe5`.
+- The live launchd runtime is running that same `main` commit from `/Users/dhyana/dharma_swarm_main_cutover`.
+- The clean local `main` worktree is `/Users/dhyana/dharma_swarm_tcs_heartbeat`.
+- The largest safe merge train has landed.
+- Remaining local worktrees are real dirty branches that need deliberate triage, not blind deletion or blind merge.
+
+If you are a new agent tomorrow morning, start from `main` at `f2e5fe5`. Do not restart from the old lf5/cutover worldview.
 
 ---
 
-## Snapshot Date: 2026-05-07
+## 1. Live Runtime
 
-### 1. Processes
+**Current live code path:**
 
-**Live Python daemons (per `~/.dharma/audit/system_inventory_2026-05-07.md`):**
-- `orchestrate_live` PID 90494 in `dharma_swarm_lf5` worktree, since 2026-04-30 (running ~7 days)
-- `com.dharma.cron-daemon` — path/version drift fixed in BR-001; verify current PID with `launchctl print gui/501/com.dharma.cron-daemon`
-- 731 live `claude|codex` processes (per inventory section 4B)
-- 9 active git worktrees (direct `git worktree list` check, 2026-05-07)
+| Surface | Current value |
+|---|---|
+| Live runtime worktree | `/Users/dhyana/dharma_swarm_main_cutover` |
+| Live branch | `runtime/main-live-20260511` |
+| Live commit | `f2e5fe5` |
+| Clean main worktree | `/Users/dhyana/dharma_swarm_tcs_heartbeat` |
+| Clean main commit | `f2e5fe5` |
+| GitHub branch | `origin/main` |
 
-**Dashboard surfaces:**
-- `com.dharma.dashboard-api` — log fresh today (per launchd)
-- `com.dharma.dashboard-web` — log fresh today (per launchd)
+**Launchd status at refresh:**
 
-**Chetana plist set:** continuous, deep_sleep, rem, wake, heartbeat — all loaded; logs fresh today.
+| Job | PID at snapshot | Notes |
+|---|---:|---|
+| `com.dharma.swarm` | `49233` | Live orchestrator launched from `dharma_swarm_main_cutover` |
+| `com.dharma.cron-daemon` | `49234` | Cron daemon launched from same worktree |
 
-### 2. Cron / launchd Last 24h
+**Fresh runtime evidence:**
 
-**From `~/.dharma/cron/jobs.json` last_status fields** (direct check, 2026-05-07). `algedonic_triage` is launchd/log evidence, not a `jobs.json` row:
+- `dgc --help` works after CLI extraction.
+- Manifest health report imports and builds from live checkout.
+- Latest swarm log shows `All 19 systems launched (19 loops incl. free-grind)`.
+- Known warning still present: `lancedb not installed`; do not treat this as a new regression from the convergence pass.
 
-| Job | Last Status | Notes |
+---
+
+## 2. Main / CI
+
+**Current main:** `f2e5fe5`  
+**Latest main CI:** green
+
+| Workflow | Result |
+|---|---|
+| tests | success |
+| semgrep | success |
+| CodeQL | success |
+| gitleaks | success |
+
+Do not merge additional PRs until checking this dashboard plus the current PR queue.
+
+---
+
+## 3. What Shipped In The Convergence Pass
+
+Merged into `main` during this pass:
+
+- `#198` — high-ROI truth / guardian work
+- `#68`, `#76`, `#116`, `#104`, `#133`, `#197`
+- `#196` — fleet control plane
+- `#186` — ontology-native revenue package
+- `#201` — DharmaAttractor / MM-07 / mismatch-map hardening
+- `#112` — `dgc_cli` extracted into `dharma_swarm/terminal_commands/`
+- `#192` — revenue wedge pipeline, reconciled into `dharma_swarm/revenue/wedge_pipeline.py`
+- `#202` — Manifest Health API, declared-vs-observed comparison engine
+
+Closed as superseded:
+
+- `#184` — superseded by `#186`
+
+Two important fixes happened before merge:
+
+- `#112`: local review caught a real `dgc cron list` crash on scheduler records without `name`; fixed before merge.
+- `#192`: avoided a new top-level `dharma_swarm/revenue_wedge_pipeline.py`; moved it under the existing revenue organ before merge.
+
+---
+
+## 4. Where The New Pieces Fit
+
+**CLI extraction (`#112`)**
+
+- Old shape: one huge `dharma_swarm/dgc_cli.py`.
+- New shape: thin dispatcher in `dgc_cli.py`, command bodies in `dharma_swarm/terminal_commands/`.
+- Why it matters: the launchd entrypoint stayed stable, but command logic is now decomposed enough for future agents to work safely.
+
+**Revenue wedge (`#192`)**
+
+- Lives at `dharma_swarm/revenue/wedge_pipeline.py`.
+- Belongs to the revenue organ created by `#186`.
+- Why it matters: this is not a parallel top-level experiment; it is now inside the canonical revenue package.
+
+**Manifest Health API (`#202`)**
+
+- Core engine: `dharma_swarm/manifest_health.py`.
+- API router: `api/routers/manifest.py`.
+- Registered in: `api/main.py`.
+- Declared truth source: `ACTIVE_SURFACE_MANIFEST.yaml`.
+- Why it matters: the dashboard now has a truth layer that compares declared state against observed reality.
+
+---
+
+## 5. Open PR Queue After Convergence
+
+No obvious green merge-train item remains.
+
+Open PRs are mostly draft, stale, conflicting, failing, or based on non-main branches. Treat them as triage, not merge queue.
+
+Examples:
+
+- `#191` KnowledgeOps seed — draft, needs re-evaluation after current main.
+- `#190` routing fusion — draft/stale.
+- `#183` Go GitHub evidence ingestor — previously green but now needs fresh mergeability review.
+- `#182` slop verification — based on `feat/board-feedback-edge`, failing.
+- `#181` telos doctrine — based on `feat/board-feedback-edge`, not main.
+- `#168`, `#161`, `#158`, `#152`, `#151`, `#149`, `#145`, `#142`, `#131`, `#117` — stale/conflicting/failing; do not blindly merge.
+
+If you want a safe next merge, first re-list PRs and check current `mergeable` + checks:
+
+```bash
+gh pr list --repo AmitabhainArunachala/dharma_swarm --state open --limit 100
+```
+
+---
+
+## 6. Worktrees
+
+Worktrees were reduced from 24 to 12. Removed dirty state was archived before removal.
+
+Archive root:
+
+```text
+/Users/dhyana/worktree_cleanup_archives/2026-05-11/
+```
+
+Important archived slices include:
+
+- `dharma_swarm_cutover_integration/`
+- `dharma_swarm_doc_convergence/`
+- `dharma_swarm_rollup/`
+- `dharma_swarm_lf5/`
+- `dharma_swarm_closure_v0/`
+- `tcs_heartbeat/system_map/latest.json`
+
+Remaining dirty worktrees are not trash. They are unresolved work packets:
+
+| Worktree | Branch | Morning stance |
 |---|---|---|
-| `ontology_insight_brief` | **ok** | Daily 20:30 ontology brief — succeeded last night |
-| `algedonic_triage` | ok (via launchd) | Logs fresh 2026-05-07 06:51 |
-| `yatagarasu-flight` | **error** | API key issue per `--bare` mode |
-| `planetary-reciprocity-pulse` | **error** | API key |
-| `planetary-reciprocity-cultivation` | **error** | API key |
-| `telos-mission-scout` | **error** | API key |
-| `doctor_assurance` | **error** | FAIL |
-| `tcs_heartbeat` | **NO_STATUS** | Enabled job has no recorded `last_status` yet |
+| `/Users/dhyana/dharma_swarm` | `cleanup/mixed-quality-recovery-2026-05-10` | huge mixed recovery bundle; needs decomposition |
+| `/Users/dhyana/dharma_swarm_action_authority_spec` | `chore/action-authority-gate-spec` | large authority-gate branch; likely high value but old and conflicty |
+| `/Users/dhyana/dharma_swarm_budget_fix` | `chore/opportunity-dispatcher-budget-fix` | small dispatcher split; candidate for focused review |
+| `/Users/dhyana/dharma_swarm_runtime_projector` | `feat/runtime-result-projector` | substantial runtime projection work; high risk/high value |
+| `/Users/dhyana/dharma_swarm_truth_spine` | `chore/agent-truth-spine` | truth-spine / operating-facts work; likely overlaps merged manifest health |
+| `/Users/dhyana/dharma_swarm_go_g06_local_model_inventory` | `feat/go-local-model-runtime-inventory` | Go inventory bridge; likely related to `#183` |
 
-**5 of 7 enabled live `jobs.json` jobs have error status; 1 is ok; 1 has no recorded status.** Pattern: jobs that need ANTHROPIC_API_KEY in `--bare` mode are failing. Doctor assurance fails for a different reason (not API-key).
-
-**Phase 1 perception surfaces now present:**
-
-| Surface | Path / command | Role |
-|---|---|---|
-| System map report | `reports/system_map/latest.json` | OrganState perception output |
-| System map CLI | `dgc map list`, `dgc map drifted`, `dgc map gaps` | Read-only organ queries |
-| Coherence Delta gate | `.github/workflows/coherence-delta.yml` | PR-body map reread discipline |
-| DocOps gate | `make docops-integrity` | Documentation authority and count checks |
-
-**Crontab (3 active rules):**
-- `mech-interp tick` every 30 min (separate repo)
-- `dharma_swarm_rollup_brake_matrix` daily 7:10 (until 2026-06-01)
-- `dharma_swarm_rollup_status` 9:30 + 21:30 (until 2026-06-01)
-
-**14 LaunchAgents** (9 com.dharma.* + 5 com.dhyana.chetana.*) loaded. BR-001 fixed the cron-daemon executable mismatch by pinning the plist to the lf5 virtualenv `dgc`; individual failing jobs remain separate triage items.
-
-### 3. Loops
-
-**From `~/.dharma/audit/central_loop_trace_2026-05-07.md` + `self_evolution_trace_2026-05-07.md`:**
-
-| Loop | Status | Evidence |
-|---|---|---|
-| Recognition seed → context injection | OPEN-but-stale | Code path SUPPORTED (`meta_daemon.py` → `context.py:1202-1217`); seed itself 6 days old (BR-006) |
-| Shakti → Darwin proposals | CLOSED | `orchestrate_live.py:76-110, :797-814` → `evolution.py:3477-3503` |
-| Apply gate (Build Protocol → Darwin) | **CLOSED-BLOCKED** | BR-003: 0 import edges; direct disk check found 9 current dryrun dirs, 4 proof packets, 0 applied markers |
-| Central VentureCell loop (board → cell → outcome → board) | **OPEN** | BR-002: outcomes don't feed back |
-| Algedonic feedback | **DEGENERATE** | BR-005: last 200 rows all `omega_divergence medium rebalance_priorities` at only two values |
-| Sediment-to-crystallization (marks → gates) | OPEN | Kernel + telos_gates static 6+ weeks |
-| Diversity archive read-path | OPEN | `diversity_archive.json` absent on disk; zero in-package importers |
-| Strange-loop persistence | OPEN | `mutations.jsonl` absent — in-memory only |
-
-### 4. Branches / PRs
-
-**From `~/.dharma/audit/48h_status_2026-05-07.md`:**
-- 53 active branches with commits in last 48h
-- 11 merged (PRs #135–#141)
-- 4 PRs open (#142, #143, #144, #145)
-- 38+ branches with commits but no fetched PR detail (gh creds 401)
-- 18 branches in merge conflict vs origin/main
-- **~25 branches (47%) have no anchor in any plan doc** (per BR-009)
-- Current HEAD: `feat/brief-to-spec-seam-2026-05-07` — itself orphan to LOOMWORK
-
-### 5. Stores Touched Today
-
-**SQLite + JSONL with mtime today (2026-05-07):**
-- `~/.dharma/vectors.db` — touched today
-- `~/.dharma/ontology.db` + WAL — touched today
-- `~/.dharma/identity_history.jsonl` — touched today
-- `~/.dharma/algedonic_signals.jsonl` — touched today (but degenerate; BR-005)
-- `~/.dharma/cleanup_loop.jsonl` — touched today
-- `~/.dharma/witness/` recent activity (per inventory)
-- `~/.dharma/stigmergy/marks.jsonl` — touched today
-- `~/.dharma/cron_logs/` — heartbeat + algedonic + neurips-evolve logs fresh
-
-**Stale stores (despite "should be fresh"):**
-- `~/.dharma/meta/recognition_seed.md` — **6 days stale** (BR-006)
-- `~/.dharma/runtime.db` — last touched 2026-04-27 (10 days ago) — likely superseded by `state/runtime.db` + `db/runtime.db` split (BR-007)
-
-### 6. Top Blockers Today (from BROKEN_REGISTER)
-
-| ID | Item | Severity |
-|---|---|---|
-| BR-002 | Central VentureCell loop is open | **BLOCKER** |
-| BR-003 | Apply gate present but closed | **BLOCKER** |
-| BR-007 | Two stores for one self (runtime ↔ ontology) | **BLOCKER** (architectural) |
-| BR-008 | VentureCell-as-ontology vs VentureCell-as-organ | **BLOCKER** (architectural) |
-| BR-004 | Cron split-brain (repo vs live) | DEGRADED |
-| BR-005 | Algedonic in degenerate steady-state | DEGRADED |
-| BR-009 | Roadmap is contested (3 docs) | DEGRADED |
-
-See `BROKEN_REGISTER.md` for full register.
+Do not delete these without archiving patches and naming the reason.
 
 ---
 
-## Health Verdict (one paragraph)
+## 7. What To Do Tomorrow Morning
 
-The swarm is structurally alive but operationally degraded. Substrate (orchestrate_live, dashboard, chetana plist set, kaizen db, ontology db, identity history) is fresh today. BR-001 fixed cron-daemon restart safety, but **5 of 7 enabled cron jobs are still erroring** — most blocked on missing ANTHROPIC_API_KEY in `--bare` mode; one enabled job has no recorded status. Recognition seed remains stale after the cron fix, so BR-006 is independent of the daemon path issue. Central VentureCell loop and apply gate are both architecturally present but operationally closed — sediment is not crystallizing into new gates / skills / organs. 47% of in-flight branches have no plan-doc anchor. **Strategy is ~10x ahead of code.** The highest-leverage next fixes are scoped investigations of BR-005 and BR-006 plus one consumer of the new OrganState perception surface.
+Recommended order:
+
+1. Verify the live runtime is still on `f2e5fe5` or newer:
+
+```bash
+git -C /Users/dhyana/dharma_swarm_main_cutover status --short --branch
+launchctl list com.dharma.swarm
+launchctl list com.dharma.cron-daemon
+tail -n 80 /Users/dhyana/.dharma/logs/swarm.log
+```
+
+2. Read this file, then list PRs. Do not trust memory of yesterday's queue.
+
+3. Pick one dirty worktree and decide: merge, split, archive, or abandon. Highest ROI candidates are probably:
+   - `dharma_swarm_budget_fix`
+   - `dharma_swarm_truth_spine`
+   - `dharma_swarm_runtime_projector`
+
+4. Use the manifest health API as the new truth surface:
+
+```bash
+PYTHONPATH=/Users/dhyana/dharma_swarm_tcs_heartbeat \
+  /Users/dhyana/dharma_swarm/.venv/bin/python -c \
+  "from dharma_swarm.manifest_health import build_health_report; print(build_health_report().get('summary'))"
+```
+
+At the 2026-05-11 refresh, it reported:
+
+```text
+{'total': 35, 'live': 24, 'degraded': 0, 'broken': 1, 'stub': 8, 'unknown': 2}
+```
+
+That is the next dashboard truth seam.
 
 ---
 
-## Next Refresh
+## 8. Do Not Forget
 
-Recommend daily refresh, rolling old snapshot to `_archive/LIVE_OPS_DASHBOARD_2026-05-07.md`. Until a job explicitly owns this dashboard, refresh is manual.
-
-**Refresh procedure (target):**
-1. Re-run `~/.dharma/audit/48h_status` generation
-2. Re-run `~/.dharma/audit/system_inventory` if branches changed materially
-3. Pull `~/.dharma/cron/jobs.json` last_status fields
-4. Update Loops section against `central_loop_trace`
-5. Re-pull BROKEN_REGISTER top items
-6. Update Health Verdict paragraph
+- The system is more converged than it was, but not finished.
+- Live runtime alignment is the big win.
+- The merge train is done for now.
+- Remaining work is no longer “merge all green things”; it is triage of stale/draft/conflicting branches and dirty local worktrees.
+- If you are tired: do not start a new architecture. Read the manifest health summary and pick one small convergence action.
 
 ---
 
-*This dashboard is one read of today. Tomorrow, write tomorrow's. The shape persists; the contents change.*
+## One-Line Verdict
+
+`main` is green, live runtime is on `main`, and the next work is not invention; it is careful cleanup of the remaining dirty worktrees and stale PRs.
