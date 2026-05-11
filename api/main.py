@@ -158,6 +158,8 @@ _PUBLIC_ROUTES: set[tuple[str, str]] = {
     ("GET", "/openapi.json"),
     ("GET", "/redoc"),
     ("POST", "/api/verify/webhook"),
+    ("GET", "/a2a/health"),
+    ("GET", "/.well-known/agent-card.json"),
 }
 
 _AUTH_FAILURE_RESPONSE = {
@@ -276,9 +278,13 @@ def _register_routers(api_app: FastAPI) -> None:
     api_app.include_router(opportunities_router)
 
     from api.routers.chat import router as chat_router, ws_router as chat_ws_router
+    from api.routers.fleet import router as fleet_router
+    from dharma_swarm.a2a.node_gateway import router as gateway_router
 
     api_app.include_router(chat_router)
     api_app.include_router(chat_ws_router)
+    api_app.include_router(fleet_router)
+    api_app.include_router(gateway_router)
 
 
 _register_routers(app)
