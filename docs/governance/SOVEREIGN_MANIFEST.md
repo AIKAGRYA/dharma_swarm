@@ -2,11 +2,11 @@
 
 **Purpose**: This document is the absolute ground truth for the dharma_swarm repository. All AI agents, regardless of model or tab, MUST ingest, comprehend, and adhere to this context before outputting a single line of code.
 
-**Generated**: 2026-04-04 | Count refresh: 2026-05-07 filesystem verification
+**Generated**: 2026-04-04 | Count refresh: 2026-05-10 filesystem verification
 **Prior audit**: 2026-04-04 | 5-model convergent audit (Claude, DeepSeek, GPT-OSS, Codex, RUFLO)
 **Authority**: This file + `CLAUDE.md` are the two canonical governance surfaces. When they conflict, `CLAUDE.md` wins on behavioral rules; this file wins on architectural truth.
 
-**Verification method**: Count-sensitive claims below were refreshed against the filesystem on 2026-05-07. Architecture prose still reflects the 2026-04-04 audit unless specifically marked otherwise. Recheck counts before citing them in future work.
+**Verification method**: Count-sensitive claims below were refreshed against the filesystem on 2026-05-10. Architecture prose still reflects the 2026-04-04 audit unless specifically marked otherwise. Recheck counts before citing them in future work.
 
 **Substrate-nativeness status**: The current runtime is ~10–15% ontology-native; ~85–90% of runtime work bypasses substrate. The current build track is the ontology-native Operator Brief seam ([`docs/plans/ONTOLOGY_NATIVE_OPERATOR_BRIEF_MASTER_SPEC.md`](../plans/ONTOLOGY_NATIVE_OPERATOR_BRIEF_MASTER_SPEC.md)). Do not open additional tracks until that seam ships. See [`reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md`](../../reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md) for the audit that established this estimate.
 
@@ -17,7 +17,7 @@
 These are immutable engineering laws for this repository. Violation = architectural regression.
 
 ### A1: NO FLAT-PACKAGE GROWTH
-The `dharma_swarm/` package currently has **386 files at its top level (69.5% of 555 total Python modules)** (V). No new .py file may be added to the top level. New modules must go into an appropriate subdirectory. Existing top-level files will be organized over time.
+The `dharma_swarm/` package currently has **386 files at its top level (69.3% of 560 total Python modules)** (V). No new .py file may be added to the top level. New modules must go into an appropriate subdirectory. Existing top-level files will be organized over time.
 
 ### A2: NO DUPLICATE IMPLEMENTATIONS
 Before creating a new file for routing, bridging, adapting, or orchestrating, check if one already exists. The repo currently has **19 bridge files** (V), **3 model_routing copies** (2 are identical, 1 is different) (V), **4 orchestrators** (V), **14 adapter files across 7 locations** (V), and **13 router files** (V). Do not add more without deprecating an existing one.
@@ -52,18 +52,18 @@ The repo has **9 verified circular dependency chains** (V). The worst:
 All 9 cycles were independently confirmed with exact import lines. Most are mitigated by lazy imports but remain architectural debt. **New code must not create circular imports.**
 
 ### A8: FRONTMATTER DISCIPLINE
-Do not inject machine-readable YAML frontmatter into governance or architecture docs unless explicitly requested. Current state: **214 of 685 Markdown files start with YAML frontmatter; 15 of 21 docs/architecture Markdown files do so** (V). Long frontmatter remains an authority/noise risk even when the prose is useful.
+Do not inject machine-readable YAML frontmatter into governance or architecture docs unless explicitly requested. Current state: **214 of 686 Markdown files start with YAML frontmatter; 15 of 21 docs/architecture Markdown files do so** (V). Long frontmatter remains an authority/noise risk even when the prose is useful.
 
 ---
 
-## VERIFIED NUMBERS (2026-05-07 COUNT REFRESH)
+## VERIFIED NUMBERS (2026-05-10 COUNT REFRESH)
 
 These are the ground-truth metrics. All other documents citing different numbers are stale.
 
 | Metric | Value | Verification |
 |--------|-------|-------------|
 | Total Python modules | **560** | find dharma_swarm -name "*.py" -type f |
-| Top-level (flat) modules | **386 (69.5%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
+| Top-level (flat) modules | **386 (69.3%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
 | Total Python LOC | **250,784** | wc -l across dharma_swarm Python modules |
 | Test files | **565** | find tests -name "*.py" -type f |
 | Test functions | **10,047 `def test_` occurrences under tests/** | rg "def test_" tests |
