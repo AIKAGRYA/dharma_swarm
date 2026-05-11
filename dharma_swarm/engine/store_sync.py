@@ -28,6 +28,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from dharma_swarm.daemon_config import dharma_state_dir
+
 logger = logging.getLogger(__name__)
 
 
@@ -42,12 +44,12 @@ class SyncResult:
 
 
 def _resolve_runtime_db(state_dir: Path | None = None) -> Path:
-    root = state_dir or (Path.home() / ".dharma")
+    root = state_dir or dharma_state_dir()
     return root / "state" / "runtime.db"
 
 
 def _resolve_ontology_db(state_dir: Path | None = None) -> Path:
-    root = state_dir or (Path.home() / ".dharma")
+    root = state_dir or dharma_state_dir()
     return root / "ontology.db"
 
 

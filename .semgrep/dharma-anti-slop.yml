@@ -92,6 +92,10 @@ rules:
           $RUN("git add -A", ...)
       - pattern: |
           $RUN("git add .", ...)
+      - pattern: |
+          asyncio.create_subprocess_exec("git", "add", "-A", ...)
+      - pattern: |
+          asyncio.create_subprocess_exec("git", "add", ".", ...)
 
   # ===========================================================================
   # Rule 6: dharma.providers-canonical

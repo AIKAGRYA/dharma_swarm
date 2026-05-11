@@ -39,7 +39,7 @@ def _outcome(**kwargs) -> OutcomeRecord:
 def test_appends_outcome_to_matching_opportunity(tmp_path: Path):
     board = _board(
         tmp_path,
-        {"opportunity_id": "opp-A", "title": "Reforest"},
+        {"opportunity_id": "opp-A", "title": "Reforest", "queued": True},
         {"opportunity_id": "opp-B", "title": "Compost"},
     )
     out = _outcome(outcome_id="out-1", success=True, fitness_score=0.9)
@@ -55,12 +55,15 @@ def test_appends_outcome_to_matching_opportunity(tmp_path: Path):
     assert a["realized_outcomes"][0]["outcome_id"] == "out-1"
     assert a["realized_outcomes"][0]["success"] is True
     assert a["learned_score_delta"] == 0.9
+    assert a["queued"] is False
+    assert a["addressed"] is True
+    assert a["addressed_at"] == "2023-11-14T22:13:20Z"
     assert "realized_outcomes" not in b
     assert "learned_score_delta" not in b
 
 
 def test_failure_outcome_decreases_score(tmp_path: Path):
-    board = _board(tmp_path, {"opportunity_id": "opp-A"})
+    board = _board(tmp_path, {"opportunity_id": "opp-A", "queued": True})
     out = _outcome(outcome_id="out-fail", success=False, fitness_score=0.0)
 
     ok = update_opportunity_outcome("opp-A", out, board_path=board)
@@ -69,6 +72,9 @@ def test_failure_outcome_decreases_score(tmp_path: Path):
     rows = json.loads(board.read_text())
     assert rows[0]["learned_score_delta"] == -0.5
     assert rows[0]["realized_outcomes"][0]["success"] is False
+    assert rows[0]["queued"] is False
+    assert "addressed" not in rows[0]
+    assert rows[0]["last_failed_outcome_at"] == "2023-11-14T22:13:20Z"
 
 
 def test_idempotent_on_duplicate_outcome_id(tmp_path: Path):
