@@ -30,6 +30,7 @@ rules:
         - "dharma_swarm/review_cycle.py"
         - "dharma_swarm/ginko_backtest.py"
         - "dharma_swarm/ginko_evolution.py"
+        - "dharma_swarm/engine/store_sync.py"
     pattern: Path.home() / ".dharma"
 
   # ===========================================================================
@@ -91,6 +92,10 @@ rules:
           $RUN("git add -A", ...)
       - pattern: |
           $RUN("git add .", ...)
+      - pattern: |
+          asyncio.create_subprocess_exec("git", "add", "-A", ...)
+      - pattern: |
+          asyncio.create_subprocess_exec("git", "add", ".", ...)
 
   # ===========================================================================
   # Rule 6: dharma.providers-canonical

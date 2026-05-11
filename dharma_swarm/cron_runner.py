@@ -91,6 +91,25 @@ def _run_system_map_populator(job: dict[str, Any]) -> CronJobExecutionResult:
     )
 
 
+def _run_revenue_scout(job: dict[str, Any]) -> CronJobExecutionResult:
+    """Run the revenue scout daemon cycle."""
+    try:
+        from dharma_swarm.revenue.scout_daemon import revenue_scout_handler
+        success, output, _error = revenue_scout_handler(job)
+        return CronJobExecutionResult(
+            status=CronJobRunStatus.COMPLETED if success else CronJobRunStatus.FAILED,
+            output=output,
+            error=None if success else output[:500],
+        )
+    except Exception as exc:
+        error = f"Revenue scout failed: {exc}"
+        return CronJobExecutionResult(
+            status=CronJobRunStatus.FAILED,
+            output=error,
+            error=error,
+        )
+
+
 def _run_tcs_heartbeat(job: dict[str, Any]) -> CronJobExecutionResult:
     """Sample IdentityMonitor.measure() and append identity history locally."""
 
@@ -574,6 +593,28 @@ def _run_frontier_refill(job: dict[str, Any]) -> CronJobExecutionResult:
         )
 
 
+def _run_store_sync(job: dict[str, Any]) -> CronJobExecutionResult:
+    """BR-007: sync ontology.db outcomes → runtime.db artifact_records."""
+    try:
+        from dharma_swarm.engine.store_sync import sync_all
+        res = sync_all()
+        return CronJobExecutionResult(
+            status=CronJobRunStatus.COMPLETED,
+            output=(
+                f"store_sync: scanned={res.outcomes_scanned} "
+                f"created={res.artifacts_created} "
+                f"skipped={res.skipped_existing} "
+                f"errors={res.errors}"
+            ),
+        )
+    except Exception as e:
+        return CronJobExecutionResult(
+            status=CronJobRunStatus.FAILED,
+            output=str(e),
+            error=str(e),
+        )
+
+
 def _run_operator_brief(job: dict[str, Any]) -> CronJobExecutionResult:
     """Cron handler for the ontology-native Operator Brief seam (v0).
 
@@ -631,6 +672,7 @@ def execute_cron_job(job: dict[str, Any]) -> CronJobExecutionResult:
         frontier_refill — bootstrap top opportunities into frontier queue
         system_map_populator — local system map refresh
         tcs_heartbeat   — local IdentityMonitor time-series sample
+        store_sync      — materialize ontology outcomes into runtime artifacts
     """
     handler = str(job.get("handler", "headless_prompt")).strip() or "headless_prompt"
 
@@ -670,6 +712,10 @@ def execute_cron_job(job: dict[str, Any]) -> CronJobExecutionResult:
         return _run_system_map_populator(job)
     if handler == "tcs_heartbeat":
         return _run_tcs_heartbeat(job)
+    if handler == "revenue_scout":
+        return _run_revenue_scout(job)
+    if handler == "store_sync":
+        return _run_store_sync(job)
 
     error = f"Unsupported cron handler: {handler}"
     return CronJobExecutionResult(

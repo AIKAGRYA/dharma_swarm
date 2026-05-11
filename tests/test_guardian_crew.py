@@ -7,7 +7,13 @@ from pathlib import Path
 
 import pytest
 
-from dharma_swarm.guardian_crew import run_guardian_warning_checks, run_ledger_watcher
+from dharma_swarm import guardian_crew
+from dharma_swarm.guardian_crew import (
+    run_auditor,
+    run_guardian_cycle,
+    run_guardian_warning_checks,
+    run_ledger_watcher,
+)
 from dharma_swarm.runtime_state import RuntimeStateStore
 
 
@@ -136,6 +142,77 @@ def _repo_src_root(tmp_path: Path) -> Path:
     src_root.mkdir(parents=True)
     (src_root / "__init__.py").write_text("", encoding="utf-8")
     return src_root
+
+
+def test_github_issue_remote_dedupe_detects_open_issue(monkeypatch: pytest.MonkeyPatch) -> None:
+    class Proc:
+        returncode = 0
+        stdout = '[{"number": 194}]'
+
+    monkeypatch.setattr(guardian_crew.subprocess, "run", lambda *args, **kwargs: Proc())
+
+    assert guardian_crew._github_issue_already_open(
+        "AmitabhainArunachala/dharma_swarm",
+        "[GUARDIAN] File not found for dharma_swarm.evolution",
+    )
+
+
+@pytest.mark.asyncio
+async def test_auditor_resolves_importable_modules_when_src_root_is_stale(tmp_path: Path) -> None:
+    stale_src_root = tmp_path / "missing" / "dharma_swarm"
+
+    findings = await run_auditor(stale_src_root)
+
+    stale_file_titles = {
+        finding.title
+        for finding in findings
+        if finding.check == "AUDITOR:method_exists"
+        and finding.title.startswith("File not found for")
+    }
+    assert "File not found for dharma_swarm.memory_palace" not in stale_file_titles
+    assert "File not found for dharma_swarm.evolution" not in stale_file_titles
+
+
+@pytest.mark.asyncio
+async def test_auditor_scans_nested_python_sources(tmp_path: Path) -> None:
+    src_root = _repo_src_root(tmp_path)
+    nested = src_root / "nested"
+    nested.mkdir()
+    (nested / "__init__.py").write_text("", encoding="utf-8")
+    (nested / "broken.py").write_text("def broken(:\n", encoding="utf-8")
+
+    findings = await run_auditor(src_root)
+
+    syntax_titles = [finding.title for finding in findings if finding.check == "AUDITOR:syntax"]
+    assert "Syntax error: dharma_swarm/nested/broken.py" in syntax_titles
+
+
+@pytest.mark.asyncio
+async def test_guardian_cycle_writes_state_report_not_repo_root(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    src_root = _repo_src_root(tmp_path)
+    state_dir = tmp_path / ".dharma"
+
+    async def _empty_findings(*args: object, **kwargs: object) -> list[object]:
+        return []
+
+    monkeypatch.setattr(guardian_crew, "run_auditor", _empty_findings)
+    monkeypatch.setattr(guardian_crew, "run_loop_watcher", _empty_findings)
+    monkeypatch.setattr(guardian_crew, "run_router_probe", _empty_findings)
+    monkeypatch.setattr(guardian_crew, "run_ledger_watcher", _empty_findings)
+    monkeypatch.setattr(guardian_crew, "run_guardian_warning_checks", _empty_findings)
+    monkeypatch.setattr(guardian_crew, "run_task_consistency_guard", _empty_findings)
+
+    from dharma_swarm.fractal import room_health
+
+    monkeypatch.setattr(room_health, "run_room_health_watcher", _empty_findings)
+
+    result = await run_guardian_cycle(src_root=src_root, state_dir=state_dir, create_issues=False)
+
+    assert Path(result["report_path"]).exists()
+    assert not (src_root.parent / "GUARDIAN_REPORT.md").exists()
 
 
 @pytest.mark.asyncio

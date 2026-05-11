@@ -27,6 +27,7 @@ from typing import Any
 
 from dharma_swarm.fractal.fractal_room import (
     FractalRoom,
+    RoomKind,
     RoomRegistry,
     RoomStatus,
     SIGNAL_ROOM_ARCHIVED,
@@ -360,3 +361,130 @@ class RoomBridge:
             "total_agents": total_agents,
             "rooms": self.all_room_briefs(),
         }
+
+
+# ---------------------------------------------------------------------------
+#  BR-008 closure: VentureCell ontology ↔ fractal room polymorphism
+#
+#  When you register a VentureCell, you get the room container AND the
+#  ontology type AND the loop wiring. When you read from ontology, you
+#  get a running organ, not just a schema row.
+# ---------------------------------------------------------------------------
+
+
+def venture_cell_to_ontology(
+    cell: VentureCellV1,
+    registry: Any,
+    *,
+    created_by: str = "system",
+) -> tuple[Any | None, list[str]]:
+    """Materialize a fractal VentureCellV1 as an ontology VentureCell object.
+
+    Returns (obj, errors). If the cell already exists in ontology (by id),
+    updates its properties instead of creating a duplicate.
+    """
+    properties = {
+        "name": cell.id,
+        "description": cell.purpose,
+        "domain": "economic" if cell.value_proposition else "governance",
+        "autonomy_stage": cell.autonomy_stage,
+        "status": _room_status_to_ontology(cell.status),
+        "room_status": cell.status.value,
+        "value_proposition": cell.value_proposition,
+        "customer_or_beneficiary": cell.customer_or_beneficiary,
+        "budget_tokens": cell.budget_tokens,
+        "kpis": {
+            "current_burn": cell.current_burn,
+            "welfare_tons": cell.welfare_tons_produced,
+            "agent_count": len(cell.agents),
+        },
+    }
+    try:
+        from dharma_swarm.ontology import OntologyObj
+
+        return registry.put_object(
+            OntologyObj(
+                id=cell.id,
+                type_name="VentureCell",
+                properties=properties,
+                created_by=created_by,
+            ),
+            updated_by=created_by,
+        )
+    except AttributeError:
+        existing = registry.get_object(cell.id)
+        if existing is not None and existing.type_name == "VentureCell":
+            obj, errors = registry.update_object(cell.id, properties, updated_by=created_by)
+            return obj, errors
+        obj, errors = registry.create_object(
+            "VentureCell", properties=properties, created_by=created_by,
+        )
+        return obj, errors
+
+
+def ontology_to_venture_cell(
+    obj: Any,
+) -> VentureCellV1 | None:
+    """Hydrate a fractal VentureCellV1 from an ontology VentureCell object.
+
+    Returns None if the object is not a VentureCell type.
+    """
+    if obj.type_name != "VentureCell":
+        return None
+    props = obj.properties
+    return VentureCellV1(
+        id=obj.id,
+        purpose=str(props.get("description", "")),
+        kind=RoomKind.VENTURE_CELL,
+        status=_ontology_status_to_room(
+            str(props.get("room_status") or props.get("status", "incubating"))
+        ),
+        budget_tokens=int(props.get("budget_tokens", 0) or 0),
+        autonomy_stage=int(props.get("autonomy_stage", 1) or 1),
+        value_proposition=str(props.get("value_proposition", "")),
+        customer_or_beneficiary=str(props.get("customer_or_beneficiary", "")),
+    )
+
+
+def sync_registry_to_ontology(
+    room_registry: RoomRegistry,
+    ontology_registry: Any,
+    *,
+    created_by: str = "system",
+) -> dict[str, list[str]]:
+    """Sync all VentureCells from the room registry into ontology.
+
+    Returns a dict of {cell_id: errors} for any that failed.
+    """
+    result: dict[str, list[str]] = {}
+    for cell in room_registry.venture_cells():
+        _, errors = venture_cell_to_ontology(cell, ontology_registry, created_by=created_by)
+        if errors:
+            result[cell.id] = errors
+    return result
+
+
+def _room_status_to_ontology(status: RoomStatus) -> str:
+    mapping = {
+        RoomStatus.PROPOSED: "incubating",
+        RoomStatus.INCUBATING: "incubating",
+        RoomStatus.ACTIVE: "active",
+        RoomStatus.GRADUATING: "mature",
+        RoomStatus.ARCHIVED: "archived",
+        RoomStatus.SPUN_OUT: "divesting",
+    }
+    return mapping.get(status, "active")
+
+
+def _ontology_status_to_room(status: str) -> RoomStatus:
+    mapping = {
+        "proposed": RoomStatus.PROPOSED,
+        "incubating": RoomStatus.INCUBATING,
+        "active": RoomStatus.ACTIVE,
+        "graduating": RoomStatus.GRADUATING,
+        "mature": RoomStatus.GRADUATING,
+        "spun_out": RoomStatus.SPUN_OUT,
+        "divesting": RoomStatus.SPUN_OUT,
+        "archived": RoomStatus.ARCHIVED,
+    }
+    return mapping.get(status, RoomStatus.ACTIVE)

@@ -32,6 +32,7 @@ from dharma_swarm.opportunity_dispatcher import (
     DispatchResult,
     OpportunityDispatcher,
 )
+from dharma_swarm.daemon_config import dharma_state_dir
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +102,7 @@ class OpportunityRefill:
             telic_seam=telic_seam,
             economic_engine=economic_engine,
         )
-        self._output_dir = output_dir or (Path.home() / ".dharma" / "revenue_packets")
+        self._output_dir = output_dir or (dharma_state_dir() / "revenue_packets")
         self._output_dir.mkdir(parents=True, exist_ok=True)
 
     def refill(self, row: OpportunityRow) -> RefillResult:
@@ -285,3 +286,183 @@ class OpportunityRefill:
         packet_path.write_text("\n".join(lines), encoding="utf-8")
         logger.info("Revenue packet written to %s", packet_path)
         return packet_path
+
+
+# ---------------------------------------------------------------------------
+#  BR-002 closure: refill_frontier_tasks_pending
+#
+#  This is the missing bridge between opportunity_board.json and the swarm
+#  TaskBoard. The cron_runner (handler="frontier_refill") calls this function.
+#
+#  Canonical path (from CONTEMPLATIVE_SPINE §1):
+#    ShaktiExecutive → opportunity_board.json → refill_frontier_tasks_pending
+#    → frontier_tasks_pending.jsonl → opportunity_dispatcher → TaskBoard
+#    → TelicSeam → Outcome / ValueEvent / Contribution → ShaktiExecutive feedback
+# ---------------------------------------------------------------------------
+
+
+class FrontierRefillResult(BaseModel):
+    """Result of a frontier refill cycle."""
+
+    paused: bool = False
+    board_count: int = 0
+    queued_count: int = 0
+    addressed_count: int = 0
+    appended_rows: int = 0
+    appended_opportunity_ids: list[str] = Field(default_factory=list)
+    error: str = ""
+
+
+def _read_board(board_path: Path | None = None) -> list[dict[str, Any]]:
+    """Read the opportunity board, returning an empty list on any failure."""
+    path = (board_path or dharma_state_dir() / "meta" / "opportunity_board.json").expanduser()
+    if not path.exists():
+        return []
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return data if isinstance(data, list) else []
+    except (OSError, json.JSONDecodeError):
+        return []
+
+
+def _safe_float(value: Any, default: float = 0.0) -> float:
+    """Coerce numeric board fields without letting malformed rows crash refill."""
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _opportunity_id(row: dict[str, Any]) -> str:
+    """Return the canonical board identifier, accepting legacy ``id`` rows."""
+    raw = row.get("opportunity_id") or row.get("id")
+    if raw:
+        return str(raw)
+    generated = uuid4().hex[:12]
+    row["opportunity_id"] = generated
+    return generated
+
+
+def _select_pending(
+    board: list[dict[str, Any]],
+    *,
+    top_k: int = 3,
+    min_telos_alignment: float = 0.5,
+) -> list[dict[str, Any]]:
+    """Pick the top-k board entries that are neither addressed nor queued."""
+    pending = []
+    for row in board:
+        if row.get("addressed") or row.get("queued"):
+            continue
+        telos = _safe_float(row.get("telos_alignment", row.get("final_score", 0)))
+        if telos < min_telos_alignment:
+            continue
+        pending.append(row)
+    pending.sort(key=lambda r: _safe_float(r.get("final_score", 0)), reverse=True)
+    return pending[:top_k]
+
+
+def _append_frontier_rows(
+    rows: list[dict[str, Any]],
+    frontier_path: Path | None = None,
+) -> int:
+    """Append opportunity-sourced task rows to frontier_tasks_pending.jsonl."""
+    path = (frontier_path or dharma_state_dir() / "meta" / "frontier_tasks_pending.jsonl").expanduser()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    count = 0
+    with open(path, "a", encoding="utf-8") as f:
+        for row in rows:
+            f.write(json.dumps(row, ensure_ascii=True) + "\n")
+            count += 1
+    return count
+
+
+def _mark_queued(
+    board: list[dict[str, Any]],
+    opp_ids: set[str],
+    board_path: Path | None = None,
+) -> None:
+    """Mark queued opportunities so refill does not duplicate pending work."""
+    path = (board_path or dharma_state_dir() / "meta" / "opportunity_board.json").expanduser()
+    queued_at = datetime.now(timezone.utc).isoformat()
+    for row in board:
+        if _opportunity_id(row) in opp_ids:
+            row["queued"] = True
+            row["queued_at"] = queued_at
+    tmp = path.with_suffix(path.suffix + f".tmp.{int(time.time() * 1000)}")
+    tmp.write_text(json.dumps(board, indent=2, sort_keys=True), encoding="utf-8")
+    tmp.replace(path)
+
+
+def refill_frontier_tasks_pending(
+    *,
+    top_k: int = 3,
+    min_telos_alignment: float = 0.5,
+    dry_run: bool = False,
+    board_path: Path | None = None,
+    frontier_path: Path | None = None,
+) -> FrontierRefillResult:
+    """Promote top pending opportunities from the board into the frontier queue.
+
+    This closes the BR-002 gap: opportunities selected by ShaktiExecutive
+    become frontier task rows carrying ``opportunity_id`` in metadata. When the
+    swarm dispatches these tasks and agents complete them, telic_seam.record_outcome
+    reads ``opportunity_id`` from task.metadata and calls feedback_writer to
+    update the board. The loop closes.
+
+    Called by cron_runner handler ``frontier_refill``.
+    """
+    pause_file = dharma_state_dir() / ".PAUSE"
+    if pause_file.exists():
+        return FrontierRefillResult(paused=True)
+
+    board = _read_board(board_path)
+    if not board:
+        return FrontierRefillResult(board_count=0)
+
+    selected = _select_pending(board, top_k=top_k, min_telos_alignment=min_telos_alignment)
+    if not selected:
+        return FrontierRefillResult(board_count=len(board))
+
+    frontier_rows: list[dict[str, Any]] = []
+    queued_ids: set[str] = set()
+
+    for opp in selected:
+        opp_id = _opportunity_id(opp)
+        opp_title = str(opp.get("title", "Untitled opportunity"))
+        opp_type = str(opp.get("type") or opp.get("domain") or "external_revenue")
+        queued_ids.add(opp_id)
+
+        for stage in OPPORTUNITY_STAGES:
+            frontier_rows.append({
+                "title": f"[{opp_type}] {opp_title} — {stage}",
+                "description": f"Stage '{stage}' for opportunity {opp_id}",
+                "priority": "high",
+                "created_by": "frontier_refill",
+                "metadata": {
+                    "opportunity_id": opp_id,
+                    "opportunity_type": opp_type,
+                    "stage": stage,
+                    "source": "frontier_refill",
+                },
+            })
+
+    if dry_run:
+        return FrontierRefillResult(
+            board_count=len(board),
+            queued_count=len(selected),
+            addressed_count=0,
+            appended_rows=len(frontier_rows),
+            appended_opportunity_ids=sorted(queued_ids),
+        )
+
+    appended = _append_frontier_rows(frontier_rows, frontier_path)
+    _mark_queued(board, queued_ids, board_path)
+
+    return FrontierRefillResult(
+        board_count=len(board),
+        queued_count=len(selected),
+        addressed_count=0,
+        appended_rows=appended,
+        appended_opportunity_ids=sorted(queued_ids),
+    )

@@ -350,103 +350,11 @@ class TestContextCompilerKnowledgeStore:
 
 
 # ---------------------------------------------------------------------------
-# TestOrchestratorConsolidation — SleepTimeAgent auto-trigger
+# TestOrchestratorConsolidation — REMOVED
+# The consolidation API (_get_sleep_time_agent, _build_consolidation_context,
+# _safe_consolidate, set_organism, set_knowledge_store) was removed from
+# Orchestrator. Tests deleted (not skipped) since the API no longer exists.
 # ---------------------------------------------------------------------------
-
-
-class TestOrchestratorConsolidation:
-    """Orchestrator triggers SleepTimeAgent after task completion."""
-
-    def test_get_sleep_time_agent_direct(self):
-        """Orchestrator can retrieve SleepTimeAgent from direct attribute."""
-        from dharma_swarm.orchestrator import Orchestrator
-
-        orch = Orchestrator()
-        mock_sta = MagicMock()
-        orch._sleep_time_agent = mock_sta
-
-        assert orch._get_sleep_time_agent() is mock_sta
-
-    def test_get_sleep_time_agent_via_organism(self):
-        """Orchestrator can retrieve SleepTimeAgent from organism."""
-        from dharma_swarm.orchestrator import Orchestrator
-
-        orch = Orchestrator()
-        mock_organism = MagicMock()
-        mock_sta = MagicMock()
-        mock_organism.sleep_time_agent = mock_sta
-        orch._organism = mock_organism
-
-        assert orch._get_sleep_time_agent() is mock_sta
-
-    def test_get_sleep_time_agent_none(self):
-        """Returns None when no SleepTimeAgent available."""
-        from dharma_swarm.orchestrator import Orchestrator
-
-        orch = Orchestrator()
-        assert orch._get_sleep_time_agent() is None
-
-    def test_build_consolidation_context(self):
-        """Build context string from task data."""
-        from dharma_swarm.orchestrator import Orchestrator
-
-        orch = Orchestrator()
-        task = MagicMock()
-        task.title = "Implement feature X"
-        task.description = "Build the widget"
-        td = MagicMock()
-        td.agent_id = "agent-123"
-        td.status = "completed"
-
-        context = orch._build_consolidation_context(task, td, "Result text here")
-        assert "Implement feature X" in context
-        assert "agent-123" in context
-        assert "Result text here" in context
-
-    @pytest.mark.asyncio
-    async def test_safe_consolidate_success(self):
-        """_safe_consolidate calls sleep_agent.consolidate_knowledge."""
-        from dharma_swarm.orchestrator import Orchestrator
-
-        orch = Orchestrator()
-        mock_sta = AsyncMock()
-        mock_sta.consolidate_knowledge.return_value = {
-            "propositions": 3,
-            "prescriptions": 1,
-        }
-
-        await orch._safe_consolidate(mock_sta, "task context", {"success": True})
-        mock_sta.consolidate_knowledge.assert_awaited_once()
-
-    @pytest.mark.asyncio
-    async def test_safe_consolidate_failure_non_fatal(self):
-        """_safe_consolidate does not raise on failure."""
-        from dharma_swarm.orchestrator import Orchestrator
-
-        orch = Orchestrator()
-        mock_sta = AsyncMock()
-        mock_sta.consolidate_knowledge.side_effect = RuntimeError("boom")
-
-        # Should not raise
-        await orch._safe_consolidate(mock_sta, "task context", {"success": True})
-
-    def test_set_organism(self):
-        """set_organism attaches organism reference."""
-        from dharma_swarm.orchestrator import Orchestrator
-
-        orch = Orchestrator()
-        mock_org = MagicMock()
-        orch.set_organism(mock_org)
-        assert orch._organism is mock_org
-
-    def test_set_knowledge_store(self):
-        """set_knowledge_store attaches store for pass-through."""
-        from dharma_swarm.orchestrator import Orchestrator
-
-        orch = Orchestrator()
-        mock_store = MagicMock()
-        orch.set_knowledge_store(mock_store)
-        assert orch._knowledge_store is mock_store
 
 
 # ---------------------------------------------------------------------------
@@ -555,6 +463,7 @@ class TestGracefulDegradation:
         assert engine._economic_efficiency_signal("agent-x") == 0.5
         assert engine._correction_health_signal("agent-x") == 0.5
 
+    @pytest.mark.skip(reason="Orchestrator._safe_consolidate removed")
     @pytest.mark.asyncio
     async def test_consolidation_failure_non_fatal(self):
         """Failed knowledge consolidation doesn't crash the orchestrator."""
