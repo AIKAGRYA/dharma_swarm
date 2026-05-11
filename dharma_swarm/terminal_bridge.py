@@ -78,7 +78,7 @@ class TerminalBridge:
     """Minimal stdio protocol server for a terminal frontend."""
 
     def __init__(self) -> None:
-        self._commands = SystemCommandHandler()
+        self._commands = SystemCommandHandler() if SystemCommandHandler is not None else None
         self._adapters: dict[str, Any] = {}
         self._adapter_boot_error: str | None = None
         self._completion_request_cls: Any | None = None
@@ -468,6 +468,9 @@ class TerminalBridge:
         raw_command = str(request.get("command", "") or "").strip()
         if raw_command.startswith("/"):
             raw_command = raw_command[1:]
+        if self._commands is None:
+            self._emit({"type": "command.result", "request_id": request_id, "output": "System commands unavailable (terminal_commands not installed)", "ok": False})
+            return
         output, action = self._commands.handle(raw_command)
         if not str(output).strip() and isinstance(action, str) and action.startswith("model:"):
             output = self._materialize_model_command(raw_command, action)
@@ -2030,7 +2033,10 @@ class TerminalBridge:
                 "reason": "explicit slash command",
             }
 
-        bare_command, note = self._commands.resolve_bare_command(text)
+        if self._commands is not None:
+            bare_command, note = self._commands.resolve_bare_command(text)
+        else:
+            bare_command, note = None, None
         if bare_command:
             return {
                 "kind": "command",
@@ -2371,6 +2377,8 @@ class TerminalBridge:
             raw_command = str(request.get("command", "") or "").strip()
             if raw_command.startswith("/"):
                 raw_command = raw_command[1:]
+            if self._commands is None:
+                return {"ok": False, "summary": "System commands unavailable", "output": "terminal_commands not installed"}
             output, action = self._commands.handle(raw_command)
             if not str(output).strip() and isinstance(action, str) and action.startswith("async:"):
                 output = self._materialize_async_command(raw_command, action)

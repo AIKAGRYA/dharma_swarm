@@ -7,10 +7,10 @@ Do not hand-edit the generated block.
 | Metric | Value |
 |---|---:|
 | Dharma Python modules | 555 |
-| Top-level Dharma Python modules | 386 |
-| Dharma Python LOC | 249,790 |
+| Top-level Dharma Python modules | 385 |
+| Dharma Python LOC | 249,799 |
 | Test files | 564 |
-| Test function occurrences | 10,040 |
+| Test function occurrences | 10,032 |
 | Markdown files | 685 |
 | Markdown total lines | 175,016 |
 | Bridge files | 19 |
