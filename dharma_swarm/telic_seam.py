@@ -63,12 +63,15 @@ class TelicSeam:
         registry: OntologyRegistry | None = None,
         lineage: LineageGraph | None = None,
         path: str | Path | None = None,
+        registry_path: str | Path | None = None,
         signal_bus: SignalBus | None = None,
     ) -> None:
+        if path is None and registry_path is not None:
+            path = registry_path
         self._path = path
         self._registry = registry or get_shared_registry(path)
         self._persist_registry = registry is None
-        self._lineage = lineage or LineageGraph()
+        self._lineage = lineage or LineageGraph(path)
         self._signal_bus = signal_bus
         self._proposal_map: dict[str, str] = {}  # task_id -> proposal obj_id
         self._duplicate_suppressions: dict[str, int] = {

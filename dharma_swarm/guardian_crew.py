@@ -28,7 +28,7 @@ The crew has three specialist agents:
         - Identifies dead providers before they waste agent budgets
         - Writes findings to ~/.dharma/guardian/router_health.md
 
-Combined output → ~/.dharma/guardian/GUARDIAN_REPORT.md (overwritten each cycle)
+Combined output -> ~/.dharma/guardian/GUARDIAN_REPORT.md (overwritten each cycle)
 GitHub issue created when severity >= BLOCKER and no open issue exists for that mismatch.
 
 Cycle: every 4 hours (configurable via GUARDIAN_INTERVAL_SECONDS env var).
@@ -151,6 +151,65 @@ _IMPORT_CHECKS: list[tuple[str, str]] = [
 ]
 
 
+_SYNTAX_SCAN_EXCLUDE_DIRS = frozenset(
+    {
+        "__pycache__",
+        ".git",
+        ".mypy_cache",
+        ".pytest_cache",
+        ".ruff_cache",
+        ".tox",
+        ".venv",
+        "build",
+        "dist",
+        "node_modules",
+    }
+)
+
+
+def _iter_python_sources(src_root: Path) -> list[Path]:
+    """Return package Python sources, including nested subpackages."""
+    if not src_root.exists():
+        return []
+    sources: list[Path] = []
+    for py_file in src_root.rglob("*.py"):
+        if any(part in _SYNTAX_SCAN_EXCLUDE_DIRS for part in py_file.parts):
+            continue
+        sources.append(py_file)
+    return sorted(sources)
+
+
+def _module_source_candidates(module_name: str, src_root: Path) -> list[Path]:
+    """Return source-file candidates for a package module.
+
+    Guardian usually receives ``src_root`` as the repo's ``dharma_swarm/``
+    directory, but live daemons have historically run from stale worktree paths.
+    Resolve through importlib as a fallback so a bad root does not create false
+    BLOCKER issues for modules that are importable in the active environment.
+    """
+    module_path = module_name.replace(".", "/")
+    candidates = [
+        src_root / (module_path.replace("dharma_swarm/", "") + ".py"),
+        src_root / (module_path + ".py"),
+    ]
+    try:
+        spec = importlib.util.find_spec(module_name)
+    except Exception:
+        spec = None
+    origin = getattr(spec, "origin", None) if spec is not None else None
+    if origin and origin not in {"built-in", "namespace"}:
+        candidates.append(Path(origin))
+
+    unique: list[Path] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        key = str(candidate)
+        if key not in seen:
+            seen.add(key)
+            unique.append(candidate)
+    return unique
+
+
 async def run_auditor(src_root: Path) -> list[GuardianFinding]:
     """AUDITOR: Check import chains, method existence, and known contract violations."""
     findings: list[GuardianFinding] = []
@@ -179,12 +238,7 @@ async def run_auditor(src_root: Path) -> list[GuardianFinding]:
 
     # 2. Method existence checks (parse AST, don't import)
     for module_name, class_name, method_name, severity in _METHOD_EXISTENCE_CHECKS:
-        module_path = module_name.replace('.', '/')
-        # Try both dharma_swarm/ prefix styles
-        candidates = [
-            src_root / (module_path.replace('dharma_swarm/', '') + '.py'),
-            src_root / (module_path + '.py'),
-        ]
+        candidates = _module_source_candidates(module_name, src_root)
         found_file = next((p for p in candidates if p.exists()), None)
         if found_file is None:
             findings.append(GuardianFinding(
@@ -236,17 +290,21 @@ async def run_auditor(src_root: Path) -> list[GuardianFinding]:
                 fix_hint=f"Fix syntax at line {exc.lineno}",
             ))
 
-    # 3. Scan all Python files for syntax errors (catches regressions)
-    for py_file in sorted(src_root.glob("*.py")):
+    # 3. Scan all Python files for syntax errors (catches nested-package regressions)
+    for py_file in _iter_python_sources(src_root):
+        try:
+            relative_file = str(py_file.relative_to(src_root.parent))
+        except ValueError:
+            relative_file = str(py_file)
         try:
             ast.parse(py_file.read_text(encoding="utf-8"))
         except SyntaxError as exc:
             findings.append(GuardianFinding(
                 severity="BLOCKER",
                 check="AUDITOR:syntax",
-                title=f"Syntax error: {py_file.name}",
+                title=f"Syntax error: {relative_file}",
                 detail=f"Line {exc.lineno}: {exc.msg}",
-                file=py_file.name,
+                file=relative_file,
                 line=exc.lineno or 0,
                 fix_hint=f"Fix syntax error at line {exc.lineno}",
             ))
@@ -787,6 +845,45 @@ def synthesize_report(
 # GitHub issue creation for BLOCKERs
 # ---------------------------------------------------------------------------
 
+def _github_issue_already_open(repo: str, title: str) -> bool:
+    """Best-effort remote dedupe for Guardian issues.
+
+    The local ``issues_created.json`` file is host-local. When Guardian runs from
+    another machine or a rebuilt state dir, it can otherwise reopen the same
+    BLOCKER every cycle.
+    """
+    try:
+        proc = subprocess.run(
+            [
+                "gh",
+                "issue",
+                "list",
+                "--repo",
+                repo,
+                "--state",
+                "open",
+                "--search",
+                f"{title} in:title",
+                "--json",
+                "number",
+                "--limit",
+                "1",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+    except Exception:
+        return False
+    if proc.returncode != 0:
+        return False
+    try:
+        return bool(json.loads(proc.stdout or "[]"))
+    except json.JSONDecodeError:
+        return False
+
+
 async def _create_issue_if_needed(finding: GuardianFinding, repo: str, state_dir: Path) -> bool:
     """Create a GitHub issue for a BLOCKER finding if one doesn't already exist."""
     # Check dedup registry
@@ -804,6 +901,13 @@ async def _create_issue_if_needed(finding: GuardianFinding, repo: str, state_dir
         logger.debug("Issue already created for: %s", issue_key)
         return False
 
+    remote_title = f"[GUARDIAN] {finding.title}"
+    if _github_issue_already_open(repo, remote_title):
+        existing[issue_key] = "remote-open"
+        issues_log.write_text(json.dumps(existing, indent=2), encoding="utf-8")
+        logger.debug("Open GitHub issue already exists for: %s", remote_title)
+        return False
+
     try:
         from dharma_swarm.world_actions import github_create_issue
 
@@ -815,7 +919,7 @@ async def _create_issue_if_needed(finding: GuardianFinding, repo: str, state_dir
             f"**Suggested Fix:**\n{finding.fix_hint or 'See detail above.'}\n\n"
             f"---\n*Auto-generated by Guardian Crew at {datetime.now(timezone.utc).isoformat()}*"
         )
-        result = github_create_issue(repo=repo, title=f"[GUARDIAN] {finding.title}", body=body)
+        result = github_create_issue(repo=repo, title=remote_title, body=body)
         if result.success:
             existing[issue_key] = result.url or "created"
             issues_log.write_text(json.dumps(existing, indent=2), encoding="utf-8")
@@ -887,13 +991,6 @@ async def run_guardian_cycle(
     report_dir.mkdir(parents=True, exist_ok=True)
     report_path = report_dir / "GUARDIAN_REPORT.md"
     report_path.write_text(report, encoding="utf-8")
-
-    # Also write to repo root (version-controlled visibility)
-    try:
-        repo_report_path = src_root.parent / "GUARDIAN_REPORT.md"
-        repo_report_path.write_text(report, encoding="utf-8")
-    except Exception:
-        pass
 
     # Create GitHub issues for BLOCKERs
     issues_created = 0

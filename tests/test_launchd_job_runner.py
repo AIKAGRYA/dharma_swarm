@@ -17,7 +17,7 @@ def _configure_runner_paths(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> 
     package_dir = repo_root / "dharma_swarm"
     package_dir.mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr(runner, "__file__", str(package_dir / "launchd_job_runner.py"))
-    monkeypatch.setattr(runner.Path, "home", lambda: tmp_path)
+    monkeypatch.setenv("DHARMA_STATE_DIR", str(tmp_path / ".dharma"))
     return repo_root
 
 
