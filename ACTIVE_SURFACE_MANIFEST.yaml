@@ -3,9 +3,13 @@
 # This file MUST agree with: dashboardNav.ts, controlPlaneRouteDeck.js,
 # registered API routers (api/main.py), STATE_DIR ownership, and Semgrep Rule 1.
 # Any edit to hot-path modules requires ACK/warrant path documented here.
+#
+# This manifest is the SINGLE SOURCE OF TRUTH for the control plane.
+# The dashboard reads it. Agents read it. Health checks run against it.
+# Your workflow: Declare → Dispatch → Verify.
 
-schema_version: 1
-last_updated: "2026-05-04"
+schema_version: 2
+last_updated: "2026-05-11"
 
 state_dir:
   canonical: "~/.dharma"
@@ -60,6 +64,9 @@ api_routers:
   - id: chat
     prefix: /api/chat
     module: api.routers.chat
+  - id: manifest
+    prefix: /api/manifest
+    module: api.routers.manifest
 
 dashboard_nav_sections:
   - label: COMMAND
@@ -123,3 +130,367 @@ opportunity_stages:
   - capability
   - mvp
   - first_artifact
+
+# ── Health Check Registry ─────────────────────────────────────────
+# Safe, named checks. The manifest declares check IDs; the backend
+# runs them from a hardcoded registry. No arbitrary shell commands.
+
+health_check_registry:
+  api_router_registered:
+    description: "Verify the API router prefix is registered in api/main.py"
+    type: api_probe
+  dashboard_route_exists:
+    description: "Verify the dashboard page directory exists under dashboard/src/app/dashboard/"
+    type: file_exists
+  module_file_exists:
+    description: "Verify the Python module file exists on disk"
+    type: file_exists
+  runtime_db_present:
+    description: "Verify ~/.dharma/state/runtime.db exists"
+    type: file_exists
+  ontology_db_present:
+    description: "Verify ~/.dharma/ontology.db exists"
+    type: file_exists
+  test_file_exists:
+    description: "Verify a corresponding test file exists in tests/"
+    type: file_exists
+  api_health_responds:
+    description: "Verify /api/health returns 200"
+    type: api_probe
+
+# ── Dashboard Surfaces ────────────────────────────────────────────
+# Every dashboard page: desired state, observed-state checks, gap info.
+
+dashboard_surfaces:
+  - id: overview
+    label: "System Overview"
+    route: /dashboard
+    api_dependencies: [/api/overview, /api/agents, /api/health]
+    status: live
+    health_check_ids: [dashboard_route_exists, api_health_responds]
+    priority: p0
+    next_action: null
+
+  - id: command_post
+    label: "Command Post"
+    route: /dashboard/command-post
+    api_dependencies: [/api/chat]
+    status: live
+    health_check_ids: [dashboard_route_exists, api_router_registered]
+    priority: p0
+    next_action: null
+
+  - id: qwen_surgeon
+    label: "Qwen Surgeon"
+    route: /dashboard/qwen35
+    api_dependencies: [/api/chat]
+    status: live
+    health_check_ids: [dashboard_route_exists, api_router_registered]
+    priority: p1
+    next_action: null
+
+  - id: observatory
+    label: "Observatory"
+    route: /dashboard/observatory
+    api_dependencies: []
+    status: stub
+    health_check_ids: [dashboard_route_exists]
+    priority: p2
+    next_action: "Wire observatory to live telemetry data"
+
+  - id: runtime
+    label: "Runtime"
+    route: /dashboard/runtime
+    api_dependencies: [/api/health]
+    status: degraded
+    health_check_ids: [dashboard_route_exists, api_health_responds]
+    priority: p1
+    next_action: "Connect runtime view to OperatorBridge live state"
+
+  - id: agents
+    label: "Agents"
+    route: /dashboard/agents
+    api_dependencies: [/api/agents]
+    status: live
+    health_check_ids: [dashboard_route_exists, api_router_registered]
+    priority: p0
+    next_action: null
+
+  - id: tasks
+    label: "Tasks"
+    route: /dashboard/tasks
+    api_dependencies: [/api/commands/tasks]
+    status: live
+    health_check_ids: [dashboard_route_exists, api_router_registered]
+    priority: p0
+    next_action: null
+
+  - id: evolution
+    label: "Evolution"
+    route: /dashboard/evolution
+    api_dependencies: [/api/evolution]
+    status: degraded
+    health_check_ids: [dashboard_route_exists, api_router_registered]
+    priority: p1
+    next_action: "Wire DarwinEngine to apply diffs in sandbox"
+
+  - id: gates
+    label: "Telos Gates"
+    route: /dashboard/gates
+    api_dependencies: []
+    status: stub
+    health_check_ids: [dashboard_route_exists]
+    priority: p2
+    next_action: "Wire gate status to live telos_gates.py state"
+
+  - id: ontology
+    label: "Ontology"
+    route: /dashboard/ontology
+    api_dependencies: [/api/ontology]
+    status: degraded
+    health_check_ids: [dashboard_route_exists, api_router_registered, ontology_db_present]
+    priority: p0
+    next_action: "Complete ontology-native operator brief seam"
+
+  - id: lineage
+    label: "Lineage"
+    route: /dashboard/lineage
+    api_dependencies: [/api/lineage]
+    status: degraded
+    health_check_ids: [dashboard_route_exists, api_router_registered]
+    priority: p2
+    next_action: "Wire lineage graph to live provenance data"
+
+  - id: stigmergy
+    label: "Stigmergy"
+    route: /dashboard/stigmergy
+    api_dependencies: [/api/stigmergy]
+    status: live
+    health_check_ids: [dashboard_route_exists, api_router_registered]
+    priority: p1
+    next_action: null
+
+  - id: eval_harness
+    label: "Eval Harness"
+    route: /dashboard/eval
+    api_dependencies: [/api/eval/latest, /api/eval/trend]
+    status: degraded
+    health_check_ids: [dashboard_route_exists]
+    priority: p2
+    next_action: "Wire eval harness to gauntlet results"
+
+  - id: audit
+    label: "System Audit"
+    route: /dashboard/audit
+    api_dependencies: [/api/health]
+    status: degraded
+    health_check_ids: [dashboard_route_exists]
+    priority: p2
+    next_action: "Wire audit view to witness log entries"
+
+  - id: telemetry
+    label: "Telemetry"
+    route: /dashboard/telemetry
+    api_dependencies: [/api/telemetry]
+    status: degraded
+    health_check_ids: [dashboard_route_exists, api_router_registered]
+    priority: p1
+    next_action: "Wire telemetry panels to live operator brief data"
+
+  - id: ecosystem
+    label: "Ecosystem Map"
+    route: /dashboard/ecosystem
+    api_dependencies: []
+    status: stub
+    health_check_ids: [dashboard_route_exists]
+    priority: p2
+    next_action: "Wire ecosystem to live module dependency graph"
+
+  - id: synthesizer
+    label: "Synthesizer"
+    route: /dashboard/synthesizer
+    api_dependencies: []
+    status: stub
+    health_check_ids: [dashboard_route_exists]
+    priority: p2
+    next_action: "Wire synthesizer to memory palace retrieval"
+
+  - id: workflows
+    label: "Workflows"
+    route: /dashboard/workflows
+    api_dependencies: []
+    status: stub
+    health_check_ids: [dashboard_route_exists]
+    priority: p2
+    next_action: "Design and wire workflow composition engine"
+
+  - id: blocks
+    label: "Blocks"
+    route: /dashboard/blocks
+    api_dependencies: []
+    status: stub
+    health_check_ids: [dashboard_route_exists]
+    priority: p2
+    next_action: "Wire block library to reusable agent patterns"
+
+# ── Core Agents / Subsystems ──────────────────────────────────────
+# Key subsystems that the manifest tracks for health and wiring.
+
+agents:
+  - id: darwin_engine
+    label: "Darwin Engine"
+    module: dharma_swarm/evolution.py
+    status: degraded
+    health_check_ids: [module_file_exists, test_file_exists]
+    wired_to: [evolution]
+    priority: p1
+    next_action: "Wire evolution diffs through OntologyRegistry and apply in sandbox"
+
+  - id: swarm_manager
+    label: "Swarm Manager"
+    module: dharma_swarm/swarm.py
+    status: live
+    health_check_ids: [module_file_exists, test_file_exists]
+    wired_to: [overview, agents, tasks]
+    priority: p0
+    next_action: null
+
+  - id: telos_gatekeeper
+    label: "Telos Gatekeeper"
+    module: dharma_swarm/telos_gates.py
+    status: degraded
+    health_check_ids: [module_file_exists, test_file_exists]
+    wired_to: [gates]
+    priority: p1
+    next_action: "Wire inline gate checks to live task execution"
+
+  - id: stigmergy_store
+    label: "Stigmergy Store"
+    module: dharma_swarm/stigmergy.py
+    status: live
+    health_check_ids: [module_file_exists, test_file_exists]
+    wired_to: [stigmergy]
+    priority: p1
+    next_action: null
+
+  - id: strange_loop
+    label: "Strange Loop"
+    module: dharma_swarm/strange_loop.py
+    status: stub
+    health_check_ids: [module_file_exists]
+    wired_to: []
+    priority: p2
+    next_action: "Wire inline witness and integrate with organism"
+
+  - id: ontology_registry
+    label: "Ontology Registry"
+    module: dharma_swarm/ontology_runtime.py
+    status: degraded
+    health_check_ids: [module_file_exists, ontology_db_present]
+    wired_to: [ontology]
+    priority: p0
+    next_action: "Complete ontology-native operator brief seam end-to-end"
+
+  - id: agent_runner
+    label: "Agent Runner"
+    module: dharma_swarm/agent_runner.py
+    status: live
+    health_check_ids: [module_file_exists, test_file_exists]
+    wired_to: [agents]
+    priority: p0
+    next_action: null
+
+  - id: dharma_kernel
+    label: "Dharma Kernel"
+    module: dharma_swarm/dharma_kernel.py
+    status: live
+    health_check_ids: [module_file_exists, test_file_exists]
+    wired_to: []
+    priority: p0
+    next_action: null
+
+# ── Integrations ──────────────────────────────────────────────────
+# External services and APIs the system depends on.
+
+integrations:
+  - id: anthropic_api
+    label: "Anthropic API"
+    type: llm_provider
+    env_var: ANTHROPIC_API_KEY
+    status: live
+    used_by: [agent_runner, command_post, qwen_surgeon]
+
+  - id: openrouter_api
+    label: "OpenRouter API"
+    type: llm_provider
+    env_var: OPENROUTER_API_KEY
+    status: live
+    used_by: [agent_runner]
+
+  - id: runtime_db
+    label: "Runtime SQLite"
+    type: database
+    path: "~/.dharma/state/runtime.db"
+    status: live
+    health_check_ids: [runtime_db_present]
+    used_by: [swarm_manager, telemetry]
+
+  - id: ontology_db
+    label: "Ontology SQLite"
+    type: database
+    path: "~/.dharma/ontology.db"
+    status: live
+    health_check_ids: [ontology_db_present]
+    used_by: [ontology_registry, ontology]
+
+# ── Feedback Loops ────────────────────────────────────────────────
+# The cybernetic loops declared in CYBERNETIC_LOOP_MAP.md.
+
+loops:
+  - id: strange_loop_cycle
+    label: "Strange Loop"
+    sense: "organism self-model"
+    act: "mutation proposal"
+    evaluate: "witness audit"
+    adapt: "archive or discard"
+    module: dharma_swarm/strange_loop.py
+    status: stub
+    health_check_ids: [module_file_exists]
+    priority: p2
+    next_action: "Wire inline witness (Gap 2 from WHAT_IT_WANTS_TO_BECOME.md)"
+
+  - id: darwin_evolution_cycle
+    label: "Darwin Evolution"
+    sense: "fitness landscape scan"
+    act: "diff generation"
+    evaluate: "benchmark against fitness function"
+    adapt: "archive or apply mutation"
+    module: dharma_swarm/evolution.py
+    status: degraded
+    health_check_ids: [module_file_exists, test_file_exists]
+    priority: p1
+    next_action: "Apply diffs to running code in sandbox and benchmark"
+
+  - id: shakti_perception
+    label: "Shakti Perception"
+    sense: "environment observation"
+    act: "escalate to evolution engines"
+    evaluate: "salience scoring"
+    adapt: "adjust perception thresholds"
+    module: dharma_swarm/shakti_loop.py
+    status: stub
+    health_check_ids: [module_file_exists]
+    priority: p2
+    next_action: "Wire shakti observations to evolution pipeline"
+
+  - id: stigmergy_coordination
+    label: "Stigmergy Coordination"
+    sense: "read pheromone marks"
+    act: "deposit/decay marks"
+    evaluate: "salience threshold"
+    adapt: "adjust decay rates"
+    module: dharma_swarm/stigmergy.py
+    status: live
+    health_check_ids: [module_file_exists, test_file_exists]
+    priority: p1
+    next_action: null
