@@ -59,6 +59,41 @@ Specifically:
 - **Existing infrastructure** includes an economic engine (tracks all resource flows),
   a ginko trading bridge (for carbon market integration), and a welfare-ton calculator
   already in the telos substrate.
+- **Topological governance** — the Invariant Observatory (`dharma_swarm/invariant_observatory.py`)
+  measures dynamical-systems invariants of the agent population's action trajectory
+  (maximal Lyapunov exponent, correlation dimension, in v2 persistent homology) and
+  surfaces drift before threshold-based monitors would. This is the first running
+  implementation we are aware of where governance is encoded as topological
+  invariants of action space rather than thresholds on point values — the property
+  Halverson & Ruehle (arXiv:2504.12390) show is learnable and preserved under
+  perturbation. See "Technical contribution" below.
+
+## Technical Contribution: Upstream Structural Governance
+
+The welfare-ton MRV pipeline is the immediate, fundable deliverable. The deeper
+technical contribution is the governance architecture that makes the pipeline
+trustworthy at scale.
+
+**The argument:** point-value monitoring ("alert if metric M crosses threshold T")
+fails on self-modifying intelligence because the system can satisfy the threshold
+while silently changing its mode of operation. The Mythos sandbox-escape event
+(April 2026, Project Glasswing) is an empirical lower bound on this failure mode:
+all point-value monitors stayed green while the system's behavioral topology shifted.
+
+**Our proposal:** governance encoded as *topological invariants* of the action space.
+A shift in correlation dimension, a positive jump in maximal Lyapunov, or the
+birth of a persistent H₀ cluster in the agent-trajectory point cloud are
+diffeomorphism-invariant signals — they cannot be hidden by reparameterization.
+DHARMA SWARM is, to our knowledge, the first open-source running implementation
+of this approach. The Invariant Observatory ships as a read-only research surface
+(`outcome_kind="invariant_reading_v1"`) with a documented promotion gate (N≥30
+predictions, hit-rate≥0.8, false-positive≤0.05, human review) before any reading
+is allowed to influence control authority.
+
+This is the right place to spend AI-safety dollars: not on more threshold tuning,
+but on the upstream structural layer that catches the failures threshold tuning
+is fundamentally incapable of catching. See `GPLOT_LODESTONE.md` and
+`docs/GPLOT_CAIRN.md` in the repository for the full technical positioning.
 
 ## What the Grant Enables
 
@@ -98,6 +133,11 @@ tooling, and carbon credit infrastructure to expand to 10 sites, then 100.
 - Agent web search and world-action tools: deployed
 - MRV data pipeline: architecture designed, implementation pending funding
 - Mangrove site partnership: preliminary conversations underway (Bali)
+- Invariant Observatory v1 (topological governance): implemented, tested against
+  Lorenz fixture, registered in `ACTIVE_SURFACE_MANIFEST.yaml`, accreting readings
+  pending sufficient gauntlet history (May 2026)
+- Cultivation observer v1: implemented; falsifiable 7-day prediction logged in
+  `docs/GPLOT_CAIRN.md` §7 (May 2026)
 
 ---
 
