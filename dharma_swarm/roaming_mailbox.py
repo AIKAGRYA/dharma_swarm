@@ -183,6 +183,7 @@ class RoamingMailbox:
         responder: str,
         summary: str,
         body: str,
+        status: str = "responded",
         metadata: dict[str, Any] | None = None,
     ) -> MailboxResponse:
         response = MailboxResponse(
@@ -190,6 +191,7 @@ class RoamingMailbox:
             responder=responder,
             summary=summary,
             body=body,
+            status=status,
             metadata=dict(metadata or {}),
         )
         response_path = self.response_path(task_id, responder)
@@ -199,7 +201,7 @@ class RoamingMailbox:
         updated = MailboxTask(
             **{
                 **task.to_dict(),
-                "status": "responded",
+                "status": status,
                 "responded_at": response.created_at,
                 "response_ref": str(response_path),
             }
