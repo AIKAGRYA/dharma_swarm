@@ -1,0 +1,12 @@
+{
+  "correlation_id": "corr_v0_test_001",
+  "source": "github_release",
+  "source_url": "https://github.com/AmitabhainArunachala/dharma_swarm/releases/tag/v0.0.0-go-receipt-sdk",
+  "observed_at": "2026-05-09T00:00:00Z",
+  "payload": {
+    "tag_name": "v0.0.0-go-receipt-sdk",
+    "name": "Receipt SDK v0",
+    "draft": false,
+    "prerelease": true
+  }
+}

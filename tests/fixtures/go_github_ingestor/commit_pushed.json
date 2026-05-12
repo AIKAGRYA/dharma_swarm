@@ -1,0 +1,11 @@
+{
+  "correlation_id": "corr_v0_test_001",
+  "source": "github_commit",
+  "source_url": "https://github.com/AmitabhainArunachala/dharma_swarm/commit/0bd9c22",
+  "observed_at": "2026-05-09T00:00:00Z",
+  "payload": {
+    "sha": "0bd9c22",
+    "author": "Dhyana",
+    "message": "feat(go): add receipt SDK for sense organs"
+  }
+}

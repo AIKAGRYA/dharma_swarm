@@ -1,0 +1,12 @@
+{
+  "correlation_id": "corr_v0_test_001",
+  "source": "github_check_run",
+  "source_url": "https://github.com/AmitabhainArunachala/dharma_swarm/runs/75141272343",
+  "observed_at": "2026-05-09T00:00:00Z",
+  "payload": {
+    "id": 75141272343,
+    "name": "go-evidence-ingestor",
+    "status": "completed",
+    "conclusion": "success"
+  }
+}

@@ -62,8 +62,8 @@ def _run_go_ingestor(input_name: str, output_path: Path, source_url: str) -> Non
     if shutil.which("go") is None:
         pytest.skip("Go toolchain is not installed")
     env = dict(os.environ)
-    env.setdefault("GOCACHE", "/tmp/dharma-swarm-go-build")
-    env.setdefault("GOMODCACHE", "/tmp/dharma-swarm-go-mod")
+    env["GOCACHE"] = "/tmp/dharma-swarm-go-build"
+    env["GOMODCACHE"] = "/tmp/dharma-swarm-go-mod"
     subprocess.run(
         [
             "go", "run", ".",

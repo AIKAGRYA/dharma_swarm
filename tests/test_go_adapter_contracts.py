@@ -16,6 +16,8 @@ def test_go_adapter_contracts_pass_without_network() -> None:
     env = os.environ.copy()
     env.update(
         {
+            "GOCACHE": "/tmp/dharma-swarm-go-build",
+            "GOMODCACHE": "/tmp/dharma-swarm-go-mod",
             "GOPROXY": "off",
             "GOSUMDB": "off",
             "GOFLAGS": "-mod=readonly",
