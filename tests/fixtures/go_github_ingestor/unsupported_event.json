@@ -1,0 +1,9 @@
+{
+  "correlation_id": "corr_v0_test_001",
+  "source": "github_workflow_dispatch",
+  "source_url": "https://example.invalid/workflow",
+  "observed_at": "2026-05-09T00:00:00Z",
+  "payload": {
+    "ref": "main"
+  }
+}

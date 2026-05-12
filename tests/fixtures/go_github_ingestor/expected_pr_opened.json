@@ -1,0 +1,18 @@
+{
+  "receipt_id": "goev_eb6f05f7e0b0fe28d84bd7fb",
+  "correlation_id": "corr_v0_test_001",
+  "source": "github_pull_request",
+  "source_url": "https://github.com/AmitabhainArunachala/dharma_swarm/pull/180",
+  "observed_at": "2026-05-09T00:00:00Z",
+  "content_hash": "sha256:ea3e0162d3920ab8c8c7a62ecdc4762b4865e2d3fa964ee760f3bd5a0ac9826f",
+  "event_uid": "evt_d363fed5dbbb29b5e0b5fa8f",
+  "schema_version": "go_evidence_receipt.v0",
+  "status": "accepted",
+  "payload": {
+    "number": 180,
+    "state": "merged",
+    "head_sha": "0bd9c22",
+    "base_sha": "b95708d",
+    "title": "feat(go): add receipt SDK for sense organs"
+  }
+}

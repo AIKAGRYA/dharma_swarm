@@ -11,7 +11,8 @@ SWARM_PLIST := $(HOME)/Library/LaunchAgents/com.dharma.swarm.plist
 STATE_DIR    := $(HOME)/.dharma
 GO_EVIDENCE_MODULE := tools/evidence_ingestor_go
 GO_SDK_MODULE := tools/go_sdk
-GO_MODULES := $(GO_SDK_MODULE) $(GO_EVIDENCE_MODULE)
+GO_GITHUB_INGESTOR_MODULE := tools/github_ingestor_go
+GO_MODULES := $(GO_SDK_MODULE) $(GO_EVIDENCE_MODULE) $(GO_GITHUB_INGESTOR_MODULE)
 GO_CACHE_DIR ?= /tmp/dharma-swarm-go-build
 GO_MOD_CACHE_DIR ?= /tmp/dharma-swarm-go-mod
 
