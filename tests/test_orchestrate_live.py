@@ -316,6 +316,7 @@ async def test_orchestrate_restarts_failed_task(monkeypatch, tmp_path):
     monkeypatch.setattr(mod, "_run_recognition_loop", sleeper)
     monkeypatch.setattr(mod, "run_conductor_loop", sleeper)
     monkeypatch.setattr(mod, "_run_zeitgeist_loop", sleeper)
+    monkeypatch.setattr(mod, "_run_internal_pressure_loop", sleeper)
     monkeypatch.setattr(mod, "_run_witness_loop", sleeper)
     monkeypatch.setattr(mod, "_run_consolidation_loop", sleeper)
     monkeypatch.setattr(mod, "_run_replication_monitor_loop", sleeper)

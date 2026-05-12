@@ -1,7 +1,7 @@
-"""Tests for dharma_swarm.zeitgeist -- S4 environmental intelligence.
+"""Tests for dharma_swarm.zeitgeist -- S4 external world intelligence.
 
 Tests the ZeitgeistSignal model, keyword relevance scoring,
-threat detection, local scanning, and persistence.
+threat detection, world-feed scanning, and persistence.
 """
 
 from __future__ import annotations
@@ -18,6 +18,7 @@ from dharma_swarm.zeitgeist import (
     ZeitgeistSignal,
     _parse_llm_signals,
 )
+from dharma_swarm.internal_pressure import InternalPressureScanner
 
 
 # -- Model tests -----------------------------------------------------------
@@ -41,7 +42,7 @@ class TestZeitgeistSignalModel:
 
     def test_signal_serialization_roundtrip(self) -> None:
         sig = ZeitgeistSignal(
-            source="local_scan",
+            source="world_feed",
             category="threat",
             title="Preprint detected",
             relevance_score=0.8,
@@ -122,7 +123,7 @@ class TestLLMSignalParsing:
         signals = _parse_llm_signals(raw)
 
         assert len(signals) == 1
-        assert signals[0].source == "llm_scan"
+        assert signals[0].source == "world_llm_scan"
         assert signals[0].category == "threat"
         assert signals[0].relevance_score == 0.9
 
@@ -158,16 +159,16 @@ class TestLLMSignalParsing:
         signals = _parse_llm_signals(raw)
 
         assert len(signals) == 1
-        assert signals[0].category == "methodology"
+        assert signals[0].category == "opportunity"
         assert signals[0].relevance_score == 1.0
 
 
-# -- Local scan tests ------------------------------------------------------
+# -- World feed scan tests ------------------------------------------------
 
 
-class TestScanLocal:
+class TestScanWorldFeeds:
     @pytest.mark.asyncio
-    async def test_scan_local_no_data(self, tmp_path: Path) -> None:
+    async def test_scan_no_world_data(self, tmp_path: Path) -> None:
         state_dir = tmp_path / ".dharma"
         state_dir.mkdir()
         scanner = ZeitgeistScanner(state_dir=state_dir)
@@ -175,12 +176,11 @@ class TestScanLocal:
         assert signals == []
 
     @pytest.mark.asyncio
-    async def test_scan_local_with_notes(self, tmp_path: Path) -> None:
+    async def test_internal_notes_are_not_zeitgeist(self, tmp_path: Path) -> None:
         state_dir = tmp_path / ".dharma"
         shared_dir = state_dir / "shared"
         shared_dir.mkdir(parents=True)
 
-        # Write a note with research keywords
         (shared_dir / "research_notes.md").write_text(
             "Found interesting results on mechanistic interpretability "
             "and participation ratio in self-reference experiments."
@@ -189,47 +189,50 @@ class TestScanLocal:
         scanner = ZeitgeistScanner(state_dir=state_dir)
         signals = await scanner.scan()
 
-        assert len(signals) >= 1
-        sig = signals[0]
-        assert sig.source == "local_scan"
-        assert sig.category == "methodology"
-        assert sig.relevance_score > 0.0
-        assert len(sig.keywords) > 0
+        assert signals == []
 
     @pytest.mark.asyncio
-    async def test_scan_local_with_threats(self, tmp_path: Path) -> None:
+    async def test_scan_world_feed_with_product_signal(self, tmp_path: Path) -> None:
         state_dir = tmp_path / ".dharma"
-        shared_dir = state_dir / "shared"
-        shared_dir.mkdir(parents=True)
-
-        (shared_dir / "alert.md").write_text(
-            "A preprint on arxiv shows mechanistic interpretability "
-            "results on participation ratio that could be competing."
+        feed_dir = state_dir / "world_feeds"
+        feed_dir.mkdir(parents=True)
+        (feed_dir / "ai_products.jsonl").write_text(
+            json.dumps(
+                {
+                    "source": "instagram",
+                    "source_url": "https://subq.ai/",
+                    "category": "model_release",
+                    "title": "SubQ announces subquadratic long-context model",
+                    "relevance_score": 0.92,
+                    "keywords": ["subquadratic", "long context", "coding agents"],
+                    "description": "External product signal.",
+                }
+            )
+            + "\n",
+            encoding="utf-8",
         )
 
         scanner = ZeitgeistScanner(state_dir=state_dir)
         signals = await scanner.scan()
 
-        assert len(signals) >= 1
-        threat_signals = [s for s in signals if s.category == "threat"]
-        assert len(threat_signals) >= 1
+        assert len(signals) == 1
+        assert signals[0].source == "instagram"
+        assert signals[0].category == "model_release"
+        assert signals[0].metadata["source_url"] == "https://subq.ai/"
 
     @pytest.mark.asyncio
-    async def test_scan_local_high_stigmergy(self, tmp_path: Path) -> None:
+    async def test_internal_stigmergy_is_not_zeitgeist(self, tmp_path: Path) -> None:
         state_dir = tmp_path / ".dharma"
         stig_dir = state_dir / "stigmergy"
         stig_dir.mkdir(parents=True)
 
-        # Write > 1000 marks
         lines = [json.dumps({"mark": i}) for i in range(1100)]
         (stig_dir / "marks.jsonl").write_text("\n".join(lines))
 
         scanner = ZeitgeistScanner(state_dir=state_dir)
         signals = await scanner.scan()
 
-        opportunity = [s for s in signals if s.category == "opportunity"]
-        assert len(opportunity) == 1
-        assert "stigmergy" in opportunity[0].title.lower()
+        assert signals == []
 
 
 # -- Persistence tests -----------------------------------------------------
@@ -321,11 +324,11 @@ class TestLatestThreats:
 
 
 class TestGatePressureFeedback:
-    """Test the S4→S3 bidirectional feedback: zeitgeist gate pressure → telos gates."""
+    """Test internal pressure gate feedback."""
 
     @pytest.mark.asyncio
     async def test_high_block_rate_writes_gate_pressure(self, tmp_path: Path) -> None:
-        """When witness logs show >=3 BLOCKEDs, zeitgeist writes gate_pressure.json."""
+        """When witness logs show >=3 BLOCKEDs, internal pressure writes gate_pressure.json."""
         state_dir = tmp_path / ".dharma"
         witness_dir = state_dir / "witness"
         witness_dir.mkdir(parents=True)
@@ -342,7 +345,7 @@ class TestGatePressureFeedback:
             lines.append(json.dumps({"outcome": "PASS", "phase": f"p{i}"}))
         log_file.write_text("\n".join(lines))
 
-        scanner = ZeitgeistScanner(state_dir=state_dir)
+        scanner = InternalPressureScanner(state_dir=state_dir)
         signals = await scanner.scan()
 
         # Should have generated a gate_block threat signal
@@ -372,7 +375,7 @@ class TestGatePressureFeedback:
         lines = [json.dumps({"outcome": "PASS"}) for _ in range(10)]
         log_file.write_text("\n".join(lines))
 
-        scanner = ZeitgeistScanner(state_dir=state_dir)
+        scanner = InternalPressureScanner(state_dir=state_dir)
         await scanner.scan()
 
         pressure_file = state_dir / "meta" / "gate_pressure.json"

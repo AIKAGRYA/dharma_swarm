@@ -355,15 +355,15 @@ class TelosGatekeeper:
         "before_pivot",
     }
 
-    # ── S4→S3 feedback: read zeitgeist gate pressure ──
+    # ── Internal pressure feedback: read gate pressure ──
     _GATE_PRESSURE_PATH = Path.home() / ".dharma" / "meta" / "gate_pressure.json"
 
     def _apply_gate_pressure(self, current_mode: str) -> str:
         """Read S4 gate pressure signal and potentially tighten trust mode.
 
-        Zeitgeist writes gate_pressure.json when it detects high gate block
-        rates. This method reads it and overrides to external_strict if
-        the signal is still valid (not expired).
+        InternalPressureScanner writes gate_pressure.json when it detects high
+        gate block rates. This method tightens trust mode while the signal is
+        still valid.
         """
         import time as _time
         try:

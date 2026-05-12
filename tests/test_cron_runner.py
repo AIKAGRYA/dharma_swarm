@@ -44,6 +44,35 @@ def test_run_cron_job_surfaces_headless_failures():
     assert error == "ERROR: boom"
 
 
+def test_execute_cron_job_world_scout_waits_for_fetch_flag(monkeypatch):
+    monkeypatch.delenv("DHARMA_WORLD_SCOUT_FETCH", raising=False)
+
+    result = execute_cron_job({"id": "world_scout", "handler": "world_scout"})
+
+    assert result.status == CronJobRunStatus.WAITING_EXTERNAL
+    assert "DHARMA_WORLD_SCOUT_FETCH=1" in result.output
+
+
+def test_execute_cron_job_world_scout_runs_when_enabled(monkeypatch):
+    monkeypatch.setenv("DHARMA_WORLD_SCOUT_FETCH", "1")
+    fake = SimpleNamespace(
+        success=True,
+        scout_rows=7,
+        emitted_rows=3,
+        board_path="/tmp/world_signal_board.json",
+        brief_path="/tmp/world_signal_brief.md",
+        health_path="/tmp/world_scout_health.json",
+        error="",
+    )
+    with patch("dharma_swarm.world_radar_go_bridge.run_world_radar_go_once", return_value=fake) as mock:
+        result = execute_cron_job({"id": "world_scout", "handler": "world_scout"})
+
+    assert result.status == CronJobRunStatus.COMPLETED
+    assert "scout_rows=7" in result.output
+    assert result.metadata["signals"] == 3
+    mock.assert_called_once()
+
+
 def test_run_cron_job_keeps_default_headless_jobs_claude_locked_without_explicit_portable_surface():
     with patch("dharma_swarm.pulse.run_claude_headless", return_value="Mission pulse ok") as mock_claude:
         with patch("dharma_swarm.cron_runner.complete_via_preferred_runtime_providers") as mock_runtime:

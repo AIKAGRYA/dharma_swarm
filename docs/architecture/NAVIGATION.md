@@ -136,6 +136,14 @@ Base rule: Go collects, normalizes, hashes, spools, observes, and transports evi
 
 Go receipts are evidence inputs, not verdicts. Python bridges may ingest Go receipts, re-read them against the current map, and use them as one signal in governed decision flows. No Go process may become a second control plane or an authority over closure, gates, ontology state, or dispatch.
 
+### World Zeitgeist Radar
+
+External zeitgeist is documented in [`WORLD_ZEITGEIST.md`](WORLD_ZEITGEIST.md).
+The live path is `world_scout_go` → `world_signal_ingestor_go` →
+`dharma_swarm/world_radar_go_bridge.py` → `ZeitgeistScanner` → Shakti
+`ecosystem_scan`. Internal witness, gate, and stigmergy pressure belongs to
+`InternalPressureScanner`, not zeitgeist.
+
 ### Go Kill Criteria
 
 Stop the Go track and return to the operator if a Go PR does any of the following:

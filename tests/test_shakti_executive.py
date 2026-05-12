@@ -71,6 +71,33 @@ def test_shakti_executive_preview_uses_recognition_and_directives(tmp_path: Path
     assert any(row["thesis"] == "operator_directive" for row in preview)
 
 
+def test_world_zeitgeist_signal_feeds_strategic_vision(tmp_path: Path) -> None:
+    state = tmp_path / "dharma"
+    _write_zeitgeist(
+        state,
+        {
+            "id": "world-subq",
+            "source": "world_radar_go",
+            "category": "model_release",
+            "title": "SubQ claims subquadratic long-context LLM for coding agents",
+            "relevance_score": 0.94,
+            "keywords": ["SubQ", "subquadratic attention", "coding agents"],
+            "description": "External model launch signal.",
+            "metadata": {"source_url": "https://subq.ai/"},
+        },
+    )
+
+    preview = ShaktiExecutive(state).preview(top_k=3, min_score=0.0)
+
+    row = preview[0]
+    assert row["domain"] == "ecosystem_scan"
+    assert row["thesis"] == "model_release"
+    assert row["strategic_vision"]["orientation"] == "external_signal_to_strategic_growth"
+    assert row["strategic_vision"]["source_url"] == "https://subq.ai/"
+    assert len(row["strategic_vision"]["first_principles_questions"]) == 10
+    assert len(row["strategic_vision"]["iteration_steps"]) == 10
+
+
 def test_shakti_executive_reads_feedback_surfaces(tmp_path: Path) -> None:
     state = tmp_path / "dharma"
     _write_ontology_feedback(state)

@@ -271,6 +271,18 @@
     "prompt": "Promote top opportunity_board.json rows into frontier_tasks_pending.jsonl for the live swarm loop to drain."
   },
   {
+    "id": "world_scout",
+    "name": "World Scout — External Zeitgeist Radar",
+    "trigger": "interval",
+    "interval_seconds": 3600,
+    "handler": "world_scout",
+    "min_score": 0.45,
+    "timeout_sec": 45,
+    "enabled": true,
+    "env_flag": "DHARMA_WORLD_SCOUT_FETCH",
+    "prompt": "Gated public-source world scout. No live fetch unless DHARMA_WORLD_SCOUT_FETCH=1. Writes world_scout_health.json, world_signal_board.json, and world_signal_brief.md."
+  },
+  {
     "id": "store_sync",
     "name": "Ontology Runtime Store Sync",
     "trigger": "interval",
