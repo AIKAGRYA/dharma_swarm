@@ -13,6 +13,7 @@ from dharma_swarm.models import (
     ProviderType,
 )
 from dharma_swarm.ontology import OntologyRegistry
+from dharma_swarm.runtime_provider import RuntimeProviderConfig
 from dharma_swarm.telic_seam import TelicSeam
 from dharma_swarm.inquiry_substrate_chew import (
     ChewConfig,
@@ -185,6 +186,66 @@ async def test_run_chew_records_full_metabolic_chain(
     assert witness_row["success"] is True
     assert witness_row["proposal_id"] == result.proposal_id
     assert witness_row["artifact_sha256"] == result.artifact_sha256
+
+
+@pytest.mark.asyncio
+async def test_run_chew_route_witness_uses_resolved_provider(
+    tmp_path: Path,
+    seed_files: tuple[Path, Path],
+    seam: TelicSeam,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seed, inlet = seed_files
+    fake_provider = FakeProvider()
+    emitted: dict[str, object] = {}
+
+    def fake_preferred_configs(**kwargs: object) -> list[RuntimeProviderConfig]:
+        return [
+            RuntimeProviderConfig(
+                provider=ProviderType.NVIDIA_NIM,
+                available=True,
+                default_model="nim-model",
+            )
+        ]
+
+    async def fake_emit_routing_decision(**kwargs: object) -> None:
+        emitted.update(kwargs)
+
+    monkeypatch.setattr(
+        "dharma_swarm.inquiry_substrate_chew.preferred_runtime_provider_configs",
+        fake_preferred_configs,
+    )
+    monkeypatch.setattr(
+        "dharma_swarm.inquiry_substrate_chew.create_runtime_provider",
+        lambda _config: fake_provider,
+    )
+    monkeypatch.setattr(
+        "dharma_swarm.route_witness.emit_routing_decision",
+        fake_emit_routing_decision,
+    )
+
+    config = ChewConfig(
+        seed_path=seed,
+        inlet_path=inlet,
+        output_dir=tmp_path / "chews",
+        witness_path=tmp_path / "witness.jsonl",
+    )
+
+    result = await run_chew(
+        config,
+        seam=seam,
+        gatekeeper=FakeGatekeeper(),
+    )
+
+    assert result.success is True
+    assert emitted["caller"] == "inquiry_substrate_chew"
+    assert emitted["selected_provider"] == ProviderType.NVIDIA_NIM
+    assert emitted["selected_model"] == "nim-model"
+    assert emitted["candidate_chain"] == [ProviderType.NVIDIA_NIM]
+    assert emitted["decision_class"] == "widened"
+    attempts = emitted["attempts"]
+    assert len(attempts) == 1
+    assert attempts[0].provider == ProviderType.NVIDIA_NIM.value
 
 
 @pytest.mark.asyncio
