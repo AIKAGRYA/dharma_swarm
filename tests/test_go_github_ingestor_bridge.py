@@ -57,8 +57,8 @@ def _run_ingestor(
     payload_path.write_text(json.dumps(fixture_raw["payload"]), encoding="utf-8")
 
     env = dict(os.environ)
-    env.setdefault("GOCACHE", "/tmp/dharma-swarm-go-build")
-    env.setdefault("GOMODCACHE", "/tmp/dharma-swarm-go-mod")
+    env["GOCACHE"] = "/tmp/dharma-swarm-go-build"
+    env["GOMODCACHE"] = "/tmp/dharma-swarm-go-mod"
     args = [
         "go", "run", ".",
         "--input", str(payload_path),

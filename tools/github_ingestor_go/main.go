@@ -36,7 +36,6 @@ type Options struct {
 	SourceURL     string
 	CorrelationID string
 	ObservedAt    string
-	SchemaVersion string
 }
 
 func main() {
@@ -56,7 +55,6 @@ func parseFlags() Options {
 	flag.StringVar(&opts.SourceURL, "source-url", "", "stable source URL or file URI")
 	flag.StringVar(&opts.CorrelationID, "correlation-id", "", "mandatory closure correlation id")
 	flag.StringVar(&opts.ObservedAt, "observed-at", "", "RFC3339 timestamp; defaults to now UTC")
-	flag.StringVar(&opts.SchemaVersion, "schema-version", receipt.DefaultSchemaVersion, "receipt schema version")
 	flag.Parse()
 	return opts
 }
