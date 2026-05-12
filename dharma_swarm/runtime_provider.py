@@ -597,8 +597,24 @@ async def complete_via_preferred_runtime_providers(
     working_dir: str | None = None,
     timeout_seconds: float | None = None,
     env: Mapping[str, str] | None = None,
+    caller: str = "complete_via_preferred",
+    action_name: str = "preferred_runtime_chain",
+    task_type: str = "unknown",
+    task_signature: str = "",
+    session_id: str = "",
+    task_id: str = "",
+    run_id: str = "",
 ) -> tuple[LLMResponse, RuntimeProviderConfig]:
-    """Complete an LLM request via the canonical cheap-first runtime stack."""
+    """Complete an LLM request via the canonical cheap-first runtime stack.
+
+    Phase 1 (2026-05-10): emits one canonical RoutingDecisionRecord +
+    N ProviderAttemptRecord rows via ``route_witness``. Best-effort,
+    never raises through emission failures. See
+    docs/plans/2026-05-10-phase1-routing-witness.md.
+    """
+
+    import time as _time
+    import uuid as _uuid
 
     overrides: dict[ProviderType, str | None] = {
         ProviderType.OPENROUTER_FREE: openrouter_model,
@@ -619,9 +635,18 @@ async def complete_via_preferred_runtime_providers(
             "No preferred providers available; configure Ollama, NVIDIA NIM, OpenRouter, or Anthropic"
         )
 
+    decision_id = _uuid.uuid4().hex
+    chain_started = _time.monotonic()
+    attempt_records: list[Any] = []  # ProviderAttemptRecord; deferred import for cycle safety
+
     last_exc: Exception | None = None
-    for config in configs:
+    chosen_response: LLMResponse | None = None
+    chosen_config: RuntimeProviderConfig | None = None
+    for attempt_idx, config in enumerate(configs):
+        attempt_started = _time.monotonic()
         provider = create_runtime_provider(config)
+        attempt_response: LLMResponse | None = None
+        attempt_error: BaseException | None = None
         try:
             request = LLMRequest(
                 model=config.default_model or anthropic_model or openrouter_model or DEFAULT_NIM_MODEL,
@@ -631,19 +656,89 @@ async def complete_via_preferred_runtime_providers(
                 temperature=temperature,
             )
             if timeout_seconds is not None:
-                response = await asyncio.wait_for(
+                attempt_response = await asyncio.wait_for(
                     provider.complete(request),
                     timeout=timeout_seconds,
                 )
             else:
-                response = await provider.complete(request)
-            return response, config
+                attempt_response = await provider.complete(request)
+            chosen_response = attempt_response
+            chosen_config = config
         except Exception as exc:
+            attempt_error = exc
             last_exc = exc
         finally:
             close = getattr(provider, "close", None)
             if callable(close):
                 await close()
+
+        # Build attempt record (best-effort import; emission helper itself
+        # tolerates absent records and is also best-effort).
+        try:
+            from dharma_swarm.route_witness import build_provider_attempt as _bpa
+            attempt_records.append(
+                _bpa(
+                    decision_id=decision_id,
+                    attempt_idx=attempt_idx,
+                    provider=config.provider,
+                    model=config.default_model or "",
+                    success=attempt_error is None and attempt_response is not None,
+                    duration_ms=(_time.monotonic() - attempt_started) * 1000.0,
+                    error=attempt_error,
+                    stop_reason=getattr(attempt_response, "stop_reason", None) if attempt_response is not None else None,
+                    usage=dict(getattr(attempt_response, "usage", {}) or {}) if attempt_response is not None else None,
+                )
+            )
+        except Exception:
+            pass
+
+        if chosen_response is not None:
+            break
+
+    duration_ms = (_time.monotonic() - chain_started) * 1000.0
+
+    # Emit canonical route witness for the chain (best-effort).
+    try:
+        from dharma_swarm.route_witness import emit_routing_decision as _emit
+        chain_providers = [c.provider for c in configs]
+        if chosen_config is not None:
+            selected_provider = chosen_config.provider
+            selected_model = chosen_config.default_model or ""
+            outcome = "success"
+            decision_class = "fallback" if len([a for a in attempt_records if not a.success]) > 0 else "pinned"
+            widened_from = chain_providers[0] if chain_providers and chain_providers[0] != selected_provider else None
+        else:
+            selected_provider = ""
+            selected_model = ""
+            outcome = "all_failed"
+            decision_class = "fallback"
+            widened_from = chain_providers[0] if chain_providers else None
+        await _emit(
+            decision_id=decision_id,
+            action_name=action_name,
+            route_path="cheap_first_chain",
+            selected_provider=selected_provider,
+            selected_model=selected_model,
+            candidate_chain=chain_providers,
+            decision_class=decision_class,
+            caller=caller,
+            duration_ms=duration_ms,
+            attempts=attempt_records,
+            task_type=task_type,
+            task_signature=task_signature or "preferred_runtime_chain",
+            confidence=0.6 if chosen_response is not None else 0.0,
+            reasons=["preferred_low_cost_first"],
+            widened_from=widened_from,
+            session_id=session_id,
+            task_id=task_id,
+            run_id=run_id,
+            outcome=outcome,
+        )
+    except Exception:
+        pass
+
+    if chosen_response is not None and chosen_config is not None:
+        return chosen_response, chosen_config
 
     if last_exc is not None:
         raise last_exc

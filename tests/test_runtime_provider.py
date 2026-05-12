@@ -245,6 +245,7 @@ async def test_complete_via_preferred_runtime_providers_prefers_ollama_then_nim(
     monkeypatch,
 ) -> None:
     calls: list[tuple[str, str]] = []
+    emitted: dict[str, object] = {}
 
     class _FakeProvider:
         def __init__(self, label: str, *, fail: bool = False):
@@ -285,6 +286,9 @@ async def test_complete_via_preferred_runtime_providers_prefers_ollama_then_nim(
             fail=config.provider == ProviderType.OLLAMA,
         )
 
+    async def _fake_emit_routing_decision(**kwargs: object) -> None:
+        emitted.update(kwargs)
+
     monkeypatch.setattr(
         "dharma_swarm.runtime_provider.preferred_runtime_provider_configs",
         _fake_preferred_configs,
@@ -293,10 +297,17 @@ async def test_complete_via_preferred_runtime_providers_prefers_ollama_then_nim(
         "dharma_swarm.runtime_provider.create_runtime_provider",
         _fake_create_provider,
     )
+    monkeypatch.setattr(
+        "dharma_swarm.route_witness.emit_routing_decision",
+        _fake_emit_routing_decision,
+    )
 
     response, config = await complete_via_preferred_runtime_providers(
         messages=[{"role": "user", "content": "hello"}],
         openrouter_model="meta-llama/llama-3.3-70b-instruct:free",
+        caller="test_runtime_provider",
+        task_type="smoke",
+        task_signature="runtime_provider:test",
     )
 
     assert response.content == "nvidia_nim ok"
@@ -305,3 +316,21 @@ async def test_complete_via_preferred_runtime_providers_prefers_ollama_then_nim(
         ("ollama", "ollama-local"),
         ("nvidia_nim", "nim-local"),
     ]
+    assert emitted["caller"] == "test_runtime_provider"
+    assert emitted["task_type"] == "smoke"
+    assert emitted["task_signature"] == "runtime_provider:test"
+    assert emitted["selected_provider"] == ProviderType.NVIDIA_NIM
+    assert emitted["selected_model"] == "nim-local"
+    assert emitted["candidate_chain"] == [
+        ProviderType.OLLAMA,
+        ProviderType.NVIDIA_NIM,
+        ProviderType.OPENROUTER,
+    ]
+    assert emitted["decision_class"] == "fallback"
+    assert emitted["widened_from"] == ProviderType.OLLAMA
+    attempts = emitted["attempts"]
+    assert len(attempts) == 2
+    assert attempts[0].provider == ProviderType.OLLAMA.value
+    assert attempts[0].success is False
+    assert attempts[1].provider == ProviderType.NVIDIA_NIM.value
+    assert attempts[1].success is True
