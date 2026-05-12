@@ -26,10 +26,15 @@ connected_relevant_files:
 - specs/TaskBoardCoordination.tla
 - specs/TaskBoardCoordination.cfg
 - specs/KERNEL_CORE_SPEC.md
+- specs/Dharma_Constitution_v0.md
+- specs/Dharma_Corpus_Schema.md
+- specs/GODEL_CLAW_V1_SPEC.md
 - specs/DGC_TERMINAL_ARCHITECTURE.md
 - specs/DGC_TERMINAL_ARCHITECTURE_v1.1.md
 - specs/ONTOLOGY_PHASE2_SQLITE_UNIFICATION_SPEC_2026-03-19.md
 - specs/ONTOLOGY_PHASE2_SQLITE_UNIFICATION_TODO_2026-03-19.md
+- specs/SOVEREIGN_BUILD_PHASE_MASTER_SPEC_2026-03-19.md
+- specs/STIGMERGY_11_LAYER_SPEC_2026-03-23.md
 - specs/research/README.md
 - docs/archive/specs_research_living_layers/README.md
 - spec-forge/README.md
@@ -57,7 +62,7 @@ stigmergy:
   coordination_comment: Use this file to decide whether a document belongs in `specs/` or somewhere else.
   trace_role: coordination_trace
 curation:
-  last_frontmatter_refresh: '2026-05-10T02:33:00+08:00'
+  last_frontmatter_refresh: '2026-05-11T02:31:00+08:00'
   curated_by_model: Codex (GPT-5)
   schema_version: pkm-phd-stigmergy-v1
 ---
@@ -86,6 +91,21 @@ Current high-signal specs in this directory:
 - [ONTOLOGY_PHASE2_SQLITE_UNIFICATION_SPEC_2026-03-19.md](/Users/dhyana/dharma_swarm/specs/ONTOLOGY_PHASE2_SQLITE_UNIFICATION_SPEC_2026-03-19.md): active ontology runtime spec
 - [ONTOLOGY_PHASE2_SQLITE_UNIFICATION_TODO_2026-03-19.md](/Users/dhyana/dharma_swarm/specs/ONTOLOGY_PHASE2_SQLITE_UNIFICATION_TODO_2026-03-19.md): execution companion checklist for that ontology pass
 - [STIGMERGY_11_LAYER_SPEC_2026-03-23.md](/Users/dhyana/dharma_swarm/specs/STIGMERGY_11_LAYER_SPEC_2026-03-23.md): structured subsystem spec
+
+## Current Occupant Classification
+
+Tracked top-level occupants are currently classified this way:
+
+| Class | Files | Authority posture |
+|---|---|---|
+| Formal verification model | [TaskBoardCoordination.tla](/Users/dhyana/dharma_swarm/specs/TaskBoardCoordination.tla), [TaskBoardCoordination.cfg](/Users/dhyana/dharma_swarm/specs/TaskBoardCoordination.cfg) | Normative model-checking truth for the task-board coordination protocol. |
+| Kernel and constitutional specs | [KERNEL_CORE_SPEC.md](/Users/dhyana/dharma_swarm/specs/KERNEL_CORE_SPEC.md), [Dharma_Constitution_v0.md](/Users/dhyana/dharma_swarm/specs/Dharma_Constitution_v0.md), [Dharma_Corpus_Schema.md](/Users/dhyana/dharma_swarm/specs/Dharma_Corpus_Schema.md) | Foundational contract material; keep in `specs/` unless a later governance owner supersedes it explicitly. |
+| Active runtime protocol specs | [ONTOLOGY_PHASE2_SQLITE_UNIFICATION_SPEC_2026-03-19.md](/Users/dhyana/dharma_swarm/specs/ONTOLOGY_PHASE2_SQLITE_UNIFICATION_SPEC_2026-03-19.md), [STIGMERGY_11_LAYER_SPEC_2026-03-23.md](/Users/dhyana/dharma_swarm/specs/STIGMERGY_11_LAYER_SPEC_2026-03-23.md) | Normative or near-normative subsystem contract truth; keep indexed here. |
+| Companion checklist | [ONTOLOGY_PHASE2_SQLITE_UNIFICATION_TODO_2026-03-19.md](/Users/dhyana/dharma_swarm/specs/ONTOLOGY_PHASE2_SQLITE_UNIFICATION_TODO_2026-03-19.md) | Subordinate execution tracking for the ontology Phase 2 spec, not standalone canonical truth. |
+| Architecture and roadmap spec | [GODEL_CLAW_V1_SPEC.md](/Users/dhyana/dharma_swarm/specs/GODEL_CLAW_V1_SPEC.md) | Architecture specification with roadmap content; keep as cited system-implementation reference, but do not treat roadmap sections as current task authority. |
+| Build doctrine candidate | [SOVEREIGN_BUILD_PHASE_MASTER_SPEC_2026-03-19.md](/Users/dhyana/dharma_swarm/specs/SOVEREIGN_BUILD_PHASE_MASTER_SPEC_2026-03-19.md) | Operational build doctrine with active prompt coupling; defer relocation until prompt and governance references are reviewed together. |
+| TUI-adjacent terminal specs | [DGC_TERMINAL_ARCHITECTURE_v1.1.md](/Users/dhyana/dharma_swarm/specs/DGC_TERMINAL_ARCHITECTURE_v1.1.md), [DGC_TERMINAL_ARCHITECTURE.md](/Users/dhyana/dharma_swarm/specs/DGC_TERMINAL_ARCHITECTURE.md) | Excluded from overnight non-TUI cleanup beyond index-level precedence notes. |
+| Active research companion subtree | [research/README.md](/Users/dhyana/dharma_swarm/specs/research/README.md) | Active companion evidence and interpretation layer; not duplicate residue. |
 
 ## Version And Companion Precedence
 

@@ -75,14 +75,14 @@
 
 ### BR-006 — Recognition seed stale
 - **first_observed:** ~2026-05-01 (6 days prior to audit)
-- **last_verified:** 2026-05-07 20:30 (post-BR-001-fix verification)
+- **last_verified:** 2026-05-09 (partial recognition-counter fix + manual synthesis)
 - **age_days:** 6
 - **severity:** DEGRADED
 - **domain:** runtime / agent
 - **root_cause:** `~/.dharma/meta/recognition_seed.md` is 6 days old despite metabolic-clock doctrine claiming nightly regeneration. Correlates with BR-001 cron LaunchAgent drift; direct causality is not proven because launchd reports the daemon process still running. **POST-BR-001 VERIFICATION**: 2 hours after cron-daemon plist fix landed, `stat -f "%Sm" ~/.dharma/meta/recognition_seed.md` returns `May 1 08:58:32 2026` — seed mtime is UNCHANGED. Conclusion: BR-006 is NOT downstream of BR-001. The cron daemon firing more reliably does not by itself trigger recognition_seed regeneration. Independent issue.
 - **blast_radius:** Agents loading context get stale self-model. Recognition is recognition of yesterday's state.
 - **evidence:** `~/.dharma/audit/ten_megafiles_q6_2026-05-07.md`; vision_maps `04_recognition_self_model.md`. Post-fix verification: cron daemon PID 35207 running lf5-venv binary; recognition_seed mtime unchanged at May 1.
-- **status:** OPEN — needs SCOPED INVESTIGATION (where in the metabolic clock does recognition_seed regeneration happen? `meta_daemon.py:RecognitionEngine`? Is there a separate cron handler that should fire it? The `meta_daemon.py:272-285` hard-coded March 2026 thesis-timing logic — does that gate regeneration?). Not auto-resolved by cron daemon fix.
+- **status:** PARTIAL — 2026-05-09 fixed `RecognitionEngine._read_identity()` to count production `.jsonl` witness logs instead of `.json`, with regression coverage. Live check now sees 46 witness logs rather than 0, and manual synthesis regenerated `~/.dharma/meta/recognition_seed.md` with `## Identity: 46 witness logs, DGC alive (21 agents)`. Still OPEN for the larger issue: prove `recognition_seed.md` regeneration fires on the metabolic clock and that fresh recognition reaches agent context without manual intervention.
 
 ### BR-007 — Two stores for one self (runtime.db ↔ ontology.db never synced)
 - **first_observed:** 2026-05-07

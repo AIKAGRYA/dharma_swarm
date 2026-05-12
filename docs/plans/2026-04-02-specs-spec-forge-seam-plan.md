@@ -55,7 +55,7 @@ stigmergy:
   coordination_comment: Use this file to choose one bounded specs cleanup tranche without widening into broad repo churn.
   trace_role: coordination_trace
 curation:
-  last_frontmatter_refresh: '2026-05-10T02:33:00+08:00'
+  last_frontmatter_refresh: '2026-05-11T02:31:00+08:00'
   curated_by_model: Codex (GPT-5)
   schema_version: pkm-phd-stigmergy-v1
 ---
@@ -142,6 +142,23 @@ Authority now splits cleanly:
 
 - current research companion truth stays under `specs/research/`
 - historical duplicate living-layers inputs stay under `docs/archive/specs_research_living_layers/`
+
+### Non-Hot Occupant Classification
+
+The third bounded tranche classified the remaining tracked `specs/` occupants in
+[`specs/README.md`](/Users/dhyana/dharma_swarm/specs/README.md) without moving
+files or touching TUI-adjacent terminal spec bodies.
+
+The classification preserves:
+
+- formal verification truth under the task-board TLA+ pair
+- foundational kernel, constitution, and corpus schema material under `specs/`
+- active ontology and stigmergy runtime contract material under `specs/`
+- the ontology TODO as a subordinate companion checklist
+- `GODEL_CLAW_V1_SPEC.md` as architecture specification plus roadmap evidence, not current task authority
+- `SOVEREIGN_BUILD_PHASE_MASTER_SPEC_2026-03-19.md` as deferred build-doctrine material because prompt and governance references still couple to it
+- the DGC terminal pair as excluded from overnight non-TUI cleanup beyond index-level precedence notes
+- `specs/research/` as active companion evidence, not duplicate residue
 
 ## Working Rule
 
