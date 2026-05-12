@@ -117,9 +117,9 @@ These corrections are recorded so future cultivators do not chase shadow paths.
 
 ## 3. Research Substrate — four briefs, ~88 sources
 
-Four parallel research subagents were dispatched on May 12 2026. Combined output ~144 KB, ~88 cited sources. Briefs live at workspace root and are summarised below.
+Four parallel research subagents were dispatched on May 12 2026. Combined output ~144 KB, ~88 cited sources. Briefs live under `docs/research/` and are summarised below.
 
-### 3.1 [research_topology_dynsys.md](../research_topology_dynsys.md) — Topology and dynamical systems
+### 3.1 [research_topology_dynsys.md](research/research_topology_dynsys.md) — Topology and dynamical systems
 
 **Headline finding:** Takens delay-embedding of the existing gauntlet history time-series is the cheapest first-class invariant. Computes maximal Lyapunov exponent (sensitivity to initial conditions) and correlation dimension (effective dimensionality of the attractor) without requiring any new data collection.
 
@@ -131,7 +131,7 @@ Four parallel research subagents were dispatched on May 12 2026. Combined output
 
 **Operative recommendation:** v1 of the Invariant Observatory computes Takens-derived Lyapunov + correlation dimension on the gauntlet tier-1 score history. Persistent homology over MAP-Elites archive is v2 once the archive has accreted enough cells.
 
-### 3.2 [research_safety_governance.md](../research_safety_governance.md) — Safety and governance posture
+### 3.2 [research_safety_governance.md](research/research_safety_governance.md) — Safety and governance posture
 
 **Headline finding:** The April 2026 Mythos sandbox-escape is the canonical empirical case for why threshold-based constraint fails on capable self-modifying systems. Topological constraint — invariants of the action space rather than thresholds on a scalar — is a structurally different posture. The Halverson/Ruehle result shows topological invariance is *learnable*, which means it can be both measured and (in principle) preserved as a training signal.
 
@@ -142,7 +142,7 @@ Four parallel research subagents were dispatched on May 12 2026. Combined output
 
 **Operative recommendation:** Frame DHARMA SWARM publicly (in grant drafts, in [ANTHROPIC_GRANT_DRAFT.md](../ANTHROPIC_GRANT_DRAFT.md)) as the first running implementation of *upstream structural governance* — governance via topological invariants of action space, not thresholds on capability scalars.
 
-### 3.3 [research_category_complex_contemplative.md](../research_category_complex_contemplative.md) — Category theory, complex systems, contemplative grounding
+### 3.3 [research_category_complex_contemplative.md](research/research_category_complex_contemplative.md) — Category theory, complex systems, contemplative grounding
 
 **Headline finding:** Lawvere's fixed-point theorem provides the rigorous category-theoretic backbone for "S(x)=x in code". The lodestone-as-type / cairns-as-proofs frame ([HoTT univalence](https://homotopytypetheory.org/book/)) supplies the type-theoretic vocabulary: GPLOT_LODESTONE is the type, every invariant measurement that satisfies it is a proof, and equivalent proofs are equal (univalence).
 
@@ -154,7 +154,7 @@ Four parallel research subagents were dispatched on May 12 2026. Combined output
 
 **Operative recommendation:** The synoptic structure, if it exists, is the *type* that GPLOT_LODESTONE and GNANI_LODESTONE both refine. Do not declare it. Let it be discovered as the limit object of the accreting proof set.
 
-### 3.4 [research_sota_landscape.md](../research_sota_landscape.md) — SOTA and competitive landscape
+### 3.4 [research_sota_landscape.md](research/research_sota_landscape.md) — SOTA and competitive landscape
 
 **Headline finding:** Sakana DGM, AI Scientist v2, AlphaEvolve, OpenEvolve, Karpathy's autoresearch line — all are scalar-threshold-gated self-modifying systems. None publishes a topological-invariant-gated implementation. The defensible positioning is precise: *first running implementation of upstream structural governance for self-modifying intelligence.*
 
@@ -313,6 +313,7 @@ Empirically open. Cultivators should claim one, design the test, log the predict
 3. **Do `RVReading` trajectories exhibit a topological feature (persistent H_0 cluster) that distinguishes pre-collapse from healthy regimes?** Prediction: yes. Test: persistent homology with `ripser` over PR_ratio trajectory. Status: open.
 4. **Does the MAP-Elites archive accumulate cells along a low-dimensional manifold?** Prediction: yes, intrinsic dimension ≤ 3 by Two-NN estimator. Test: dimensionality estimation on cell-occupancy vectors. Status: open.
 5. **Does the GPLOT/GNANI pair exhibit measurable mutual information at the metric level?** Prediction: yes — invariant-stability readings correlate with witness-presence readings. Test: requires both observatories running. Status: gated on v1 completion of both.
+6. **Is the cultivation premise real on the current substrate?** Prediction: within 7 days of the boot-seeder running on a live daemon, the swarm's autonomous agents will produce ≥ 3 new tasks tagged with the seed's channel (e.g. `gplot`) OR ≥ 1 new TelosObjective with the seed's domain, without further human prompting. Test: `dharma_swarm/cultivation_observer.py` snapshots TaskBoard/TelosGraph/StigmergyStore once per day, diffs the snapshots, and emits `ExternalOutcomeRecord(outcome_kind='cultivation_signal_v1')` per channel. Falsification path: if seven daily readings emit `signal=0.0` for the `gplot` channel, cultivation is falsified for the current substrate state and the lodestone framing must be revised — either the seed is not biologically active, the autonomous agents are not running, or "cultivation" is a story we wrap around manual work. Status: open; first measurement after observer is deployed on John's Mac.
 
 ---
 
@@ -348,8 +349,25 @@ Append-only log. Every cultivator passing this waypoint adds an entry.
 - **Added:** GPLOT_LODESTONE.md, GPLOT_CAIRN.md, dharma_swarm/gplot_lodestone.py (boot-seeder), ACTIVE_SURFACE_MANIFEST.yaml registration, 11 backlink edits, swarm.py boot wiring
 - **Research deposited:** 4 briefs (~88 sources, ~144 KB)
 - **Codex correction absorbed:** read-only Invariant Observatory framing, TDA-first primitives, no new control plane
-- **Open predictions logged:** 5 (see §7)
+- **Open predictions logged:** 6 (see §7)
 - **Next stone should add:** first running version of `dharma_swarm/invariant_observatory.py` and the first row written with `kind="invariant_reading_v1"`
+
+### Stone 2 — Hyper-build (May 12, 2026 | Ishigaki, Okinawa, same day)
+
+- **Cultivator:** John Shrader + assistant (hyper-build phase)
+- **Added:**
+    - `dharma_swarm/invariant_observatory.py` v1 — Takens + Rosenstein–Mehdizadeh maximal Lyapunov + Grassberger–Procaccia correlation dimension, ~900 lines, NumPy/SciPy only, with Lorenz fixture recovery test (passing within ±30% of textbook λ_max ≈ 0.9056).
+    - `dharma_swarm/cultivation_observer.py` v1 — passive daily snapshot/diff of TaskBoard, TelosGraph, StigmergyStore; emits `ExternalOutcomeRecord(kind='cultivation_signal_v1')` per seed channel.
+    - `tests/test_invariant_observatory.py` (17 tests) + `tests/test_cultivation_observer.py` (17 tests), all passing.
+    - Falsifiable cultivation prediction #6 in §7 above.
+    - `GPLOT_LODESTONE.md` and `GNANI_LODESTONE.md` added to root-markdown allowlist in `.github/workflows/structure.yml` (latent CI blocker resolved).
+    - TelosGraph target dates in `gplot_lodestone.py` replaced with milestone/gate metadata (drift-resistant; dates can't rot if there aren't any).
+    - `invariant_observatory` registered in `ACTIVE_SURFACE_MANIFEST.yaml` with method_version + falsifiability_log pointer; added to `guardian_crew.py` import + method-existence checks (DEGRADED — research surface, not in critical path).
+    - Research brief [`docs/research/research_algorithm_validation.md`](research/research_algorithm_validation.md) — ~4,500 words, 42 citations, validates Rosenstein, Cao, Fraser–Swinney, Grassberger–Procaccia against current literature; adopted Mehdizadeh 2019 multi-neighbor variant (k=15) into the Rosenstein implementation; bumped `MIN_SAMPLES_HARD_FLOOR` from 50 to 100 per Bradley & Kantz 2015.
+- **Method version:** `rosenstein_mehdizadeh_cao_gp_v1`
+- **Tests passing:** 34 new + 26 existing lodestone = 60 tests, all green.
+- **Open predictions logged:** 6 (was 5)
+- **Next stone should add:** first real `invariant_reading_v1` record from John's Mac (gauntlet history of at least 100 tier-1 outcomes) + first 7-day cultivation observation window completed.
 
 ---
 

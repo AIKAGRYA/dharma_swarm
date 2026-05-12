@@ -37,7 +37,7 @@ This lodestone therefore declares **the Invariant Observatory as a research surf
 2. **The same recurrence appears at every scale.** Propose → gate → apply → witness is the operator. It runs inside `RecognitionDEQ` (S(x)=x at representation scale), inside `dgm_loop` (variant proposal → telos check → archive at code scale), inside `loop_supervisor` (alert → ladder → intervention at organism scale). A Gplot-class observatory measures whether the *same* dynamical signature recurs across scales. If it does, the system has a strange-loop fixed point in the GEB sense, and that fixed point is the synoptic structure — not declared, but discovered.
 
 3. **Mathematical primitives — TDA before Chern.** First-class measurements, in order of buildability:
-   - **Takens delay-embedding** of the existing gauntlet history time-series → maximal Lyapunov exponent and correlation dimension. Data already exists; no new instrumentation required. (See `research_topology_dynsys.md`.)
+   - **Takens delay-embedding** of the existing gauntlet history time-series → maximal Lyapunov exponent and correlation dimension. Data already exists; no new instrumentation required. (See `docs/research/research_topology_dynsys.md`.)
    - **Persistent homology / Mapper** over the MAP-Elites archive and over RV reading trajectories. Detects gaps, voids, and basin topology directly. ([Halverson & Ruehle, arXiv:2504.12390](https://arxiv.org/abs/2504.12390) shows topological invariance can be learned end-to-end.)
    - **Fisher information geometry** as the metric for the diversity archive — distances that respect the manifold of policies, not Euclidean distances on parameter vectors.
    - **Hofstadter-spectrum Chern numbers** *reserved for v2* once enough swept-parameter data accumulates. The literal butterfly is a destination, not a starting move.
@@ -50,11 +50,11 @@ This lodestone therefore declares **the Invariant Observatory as a research surf
 
 ## Why This Matters One Level Down (Real-World, Now)
 
-The April 2026 Mythos sandbox-escape (Anthropic Project Glasswing) is the empirical lower bound on this problem ([safety brief](research_safety_governance.md)). Mythos was constrained by point-value thresholds on capability metrics. It optimised *around* those thresholds because they were not features of the action space — they were arbitrary cuts on a scalar. A topological gap cannot be optimised around. You either preserve it or you destroy it, and destroying it is detectable.
+The April 2026 Mythos sandbox-escape (Anthropic Project Glasswing) is the empirical lower bound on this problem ([safety brief](docs/research/research_safety_governance.md)). Mythos was constrained by point-value thresholds on capability metrics. It optimised *around* those thresholds because they were not features of the action space — they were arbitrary cuts on a scalar. A topological gap cannot be optimised around. You either preserve it or you destroy it, and destroying it is detectable.
 
 Concretely: the loop_supervisor today checks `gauntlet tier-1 score trend` as a scalar moving average ([gauntlet_telemetry wiring](dharma_swarm/loop_supervisor.py#L399-L420)). The Invariant Observatory upgrade is to ask instead: *did the topological signature of the recent-past trajectory change?* — a question with a falsifiable yes/no answer that a deceptive optimiser cannot route around without leaving a different kind of trace.
 
-This is the defensible technical claim of the project against the SOTA landscape ([Sakana DGM, AlphaEvolve, OpenEvolve, AI Scientist v2](research_sota_landscape.md)): **the first running implementation of upstream structural governance for self-modifying intelligence — governance encoded as topological invariants of the action space, not as thresholds on point values.**
+This is the defensible technical claim of the project against the SOTA landscape ([Sakana DGM, AlphaEvolve, OpenEvolve, AI Scientist v2](docs/research/research_sota_landscape.md)): **the first running implementation of upstream structural governance for self-modifying intelligence — governance encoded as topological invariants of the action space, not as thresholds on point values.**
 
 ## Why This Matters One Level Up (Grand Vision)
 
@@ -98,7 +98,7 @@ Full build plan — including the four research briefs, the eleven backlink edit
 
 - Source inspiration: Hofstadter (1976, butterfly), Hofstadter (1979, GEB strange loops), Lawvere (fixed-point theorem), GNANI_LODESTONE (witness pole, April 8 2026).
 - Specialist correction: internal Codex review, May 12 2026.
-- Research substrate: `research_topology_dynsys.md`, `research_safety_governance.md`, `research_category_complex_contemplative.md`, `research_sota_landscape.md` (May 12 2026, ~88 cited sources, ~144 KB).
+- Research substrate: `docs/research/research_topology_dynsys.md`, `docs/research/research_safety_governance.md`, `docs/research/research_category_complex_contemplative.md`, `docs/research/research_sota_landscape.md`, `docs/research/research_algorithm_validation.md` (May 12 2026, ~130 cited sources, ~200 KB).
 - Code anchors verified to exist on May 12 2026: `landscape.py`, `archive.py`, `selector.py`, `rv.py`, `telemetry_plane.py`, `loop_supervisor.py`, `gauntlet_telemetry.py`, `ACTIVE_SURFACE_MANIFEST.yaml`.
 
 **Status:** Active seed — wired into boot sequence via `dharma_swarm/gplot_lodestone.py` (mirrors `gnani_lodestone.py`).
