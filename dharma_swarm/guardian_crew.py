@@ -134,6 +134,7 @@ _METHOD_EXISTENCE_CHECKS: list[tuple[str, str, str, str]] = [
     ("dharma_swarm.world_actions", "WorldActionResult", "to_json", "BLOCKER"),
     ("dharma_swarm.gnani_lodestone", "GnaniLodestone", "seed_all", "BLOCKER"),
     ("dharma_swarm.gplot_lodestone", "GplotLodestone", "seed_all", "BLOCKER"),
+    ("dharma_swarm.invariant_observatory", "InvariantReading", "is_honest", "DEGRADED"),
     ("dharma_swarm.telos_gates", "TelosGatekeeper", "check", "BLOCKER"),
     ("dharma_swarm.stigmergy", "StigmergyStore", "leave_mark", "BLOCKER"),
     ("dharma_swarm.task_board", "TaskBoard", "get_by_title", "BLOCKER"),
@@ -147,6 +148,7 @@ _IMPORT_CHECKS: list[tuple[str, str]] = [
     ("dharma_swarm.archaeology_ingestion", "BLOCKER"),
     ("dharma_swarm.gnani_lodestone", "BLOCKER"),
     ("dharma_swarm.gplot_lodestone", "BLOCKER"),
+    ("dharma_swarm.invariant_observatory", "DEGRADED"),  # research surface, not in critical path
     ("dharma_swarm.memory_palace", "BLOCKER"),
     ("dharma_swarm.evolution", "BLOCKER"),
     ("dharma_swarm.telos_gates", "BLOCKER"),

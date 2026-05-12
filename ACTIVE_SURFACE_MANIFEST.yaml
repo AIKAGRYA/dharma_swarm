@@ -515,8 +515,8 @@ research_surfaces:
     lodestone: GPLOT_LODESTONE.md
     cairn: docs/GPLOT_CAIRN.md
     boot_seeder: dharma_swarm/gplot_lodestone.py
-    primary_artifact: dharma_swarm/invariant_observatory.py  # not yet implemented (v1 build target)
-    status: seeded
+    primary_artifact: dharma_swarm/invariant_observatory.py
+    status: v1_implemented
     class: read_only_measurement
     reads_from:
       - benchmarks/gauntlet.py
@@ -540,7 +540,9 @@ research_surfaces:
       false_positive_max: 0.05
       requires_human_review: true
     priority: p1
-    next_action: "Implement dharma_swarm/invariant_observatory.py v1 (Takens on gauntlet history)"
+    method_version: rosenstein_mehdizadeh_cao_gp_v1
+    falsifiability_log: docs/GPLOT_CAIRN.md  # section 7
+    next_action: "Accrete first 30 readings, then prepare promotion-review packet"
 
 # ---------------------------------------------------------------------------
 # Lodestones — directional poles (peer to one another, NOT control surfaces)
