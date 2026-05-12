@@ -214,7 +214,9 @@ Stop the Go track and return to the operator if a Go PR does any of the followin
 | `context_compiler.py` | 537 | Compiles context from multiple sources into agent prompts | Adding context sources |
 | `context_agent.py` | 968 | Agent that manages context for other agents | Modifying context management behavior |
 | `context_search.py` | 250 | Semantic search over context | Improving context retrieval |
-| `zeitgeist.py` | 377 | S4 environmental scanning. Reads field state, competitive landscape. | Adding environment signals |
+| `zeitgeist.py` | 479 | S4 external-world scanning. Reads world-feed inboxes and optional external LLM scan; no repo/runtime health. | Adding world signals |
+| `internal_pressure.py` | 222 | Internal witness/gate/stigmergy pressure scanner. Feeds internal pressure artifacts and gate pressure. | Adding internal health signals |
+| `world_radar_go_bridge.py` | 109 | Runs the Go world-radar prototype against raw observations before S4 ingestion. | Wiring Go scouts into live zeitgeist |
 | `active_inference.py` | 495 | Friston free energy minimization applied to agent decisions | Modifying inference strategies |
 | `decision_ontology.py` | 537 | First-class decisions with quality scoring | Adding decision types |
 | `decision_router.py` | 323 | Routes decisions to appropriate evaluators | Modifying routing logic |

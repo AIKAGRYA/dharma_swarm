@@ -71,6 +71,75 @@ def test_shakti_executive_preview_uses_recognition_and_directives(tmp_path: Path
     assert any(row["thesis"] == "operator_directive" for row in preview)
 
 
+def test_world_zeitgeist_signal_feeds_strategic_vision(tmp_path: Path) -> None:
+    state = tmp_path / "dharma"
+    _write_zeitgeist(
+        state,
+        {
+            "id": "world-subq",
+            "source": "operator_ig_to_web_triage",
+            "category": "model_release",
+            "title": "SubQ claims subquadratic long-context LLM for coding agents",
+            "relevance_score": 0.94,
+            "keywords": ["SubQ", "subquadratic attention", "coding agents"],
+            "description": "External model launch signal.",
+            "metadata": {"source_url": "https://subq.ai/"},
+        },
+    )
+
+    preview = ShaktiExecutive(state).preview(top_k=3, min_score=0.0)
+
+    row = preview[0]
+    assert row["domain"] == "ecosystem_scan"
+    assert row["thesis"] == "model_release"
+    assert row["strategic_vision"]["orientation"] == "external_signal_to_strategic_growth"
+    assert row["strategic_vision"]["source_url"] == "https://subq.ai/"
+    assert len(row["strategic_vision"]["first_principles_questions"]) == 10
+    assert len(row["strategic_vision"]["iteration_steps"]) == 10
+    dimensions = {
+        item["dimension"]
+        for item in row["strategic_vision"]["fractal_dimensions"]
+    }
+    assert {"research", "adjacent_landscape", "reverse_engineering", "build_iteration"} <= dimensions
+
+
+def test_shakti_executive_drops_legacy_internal_zeitgeist_board_rows(tmp_path: Path) -> None:
+    state = tmp_path / "dharma"
+    meta = state / "meta"
+    meta.mkdir(parents=True)
+    (meta / "opportunity_board.json").write_text(
+        json.dumps(
+            [
+                {
+                    "opportunity_id": "old-gate",
+                    "title": "Repair: High gate block rate (S3→S4 channel)",
+                    "domain": "internal_maintenance",
+                    "final_score": 65.0,
+                    "evidence_signals": ["zeitgeist:threat:sig - High gate block rate"],
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    _write_zeitgeist(
+        state,
+        {
+            "id": "world-subq",
+            "source": "operator_ig_to_web_triage",
+            "category": "model_release",
+            "title": "SubQ claims subquadratic long-context LLM for coding agents",
+            "relevance_score": 0.94,
+            "keywords": ["SubQ", "subquadratic attention", "coding agents"],
+        },
+    )
+
+    ShaktiExecutive(state).run(write=True, top_k=3, min_score=0.0)
+
+    board = json.loads((meta / "opportunity_board.json").read_text())
+    assert all("gate block rate" not in row["title"].lower() for row in board)
+    assert any("SubQ" in row["title"] for row in board)
+
+
 def test_shakti_executive_reads_feedback_surfaces(tmp_path: Path) -> None:
     state = tmp_path / "dharma"
     _write_ontology_feedback(state)
@@ -121,7 +190,7 @@ def test_shakti_executive_reads_feedback_surfaces(tmp_path: Path) -> None:
 
 def _write_zeitgeist(state: Path, row: dict[str, object]) -> None:
     meta = state / "meta"
-    meta.mkdir(parents=True)
+    meta.mkdir(parents=True, exist_ok=True)
     (meta / "zeitgeist.jsonl").write_text(json.dumps(row) + "\n", encoding="utf-8")
 
 

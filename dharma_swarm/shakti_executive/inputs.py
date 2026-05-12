@@ -40,6 +40,8 @@ def read_zeitgeist_history(state_dir: Path, *, max_lines: int = 80) -> list[Exec
         title = str(row.get("title") or "").strip()
         if not title:
             continue
+        if _is_legacy_internal_zeitgeist_row(row):
+            continue
         category = str(row.get("category") or "zeitgeist").strip() or "zeitgeist"
         keywords = tuple(str(k) for k in list(row.get("keywords") or [])[:8])
         signals.append(
@@ -56,6 +58,18 @@ def read_zeitgeist_history(state_dir: Path, *, max_lines: int = 80) -> list[Exec
             )
         )
     return signals
+
+
+def _is_legacy_internal_zeitgeist_row(row: dict[str, Any]) -> bool:
+    """Filter pre-split internal health rows out of the external S4 reader."""
+    if str(row.get("source") or "") == "local_scan":
+        return True
+    title = str(row.get("title") or "").lower()
+    keywords = {str(k).lower() for k in list(row.get("keywords") or [])}
+    internal_keywords = {"gate_block", "gate_warn", "witness", "telos_gates"}
+    if keywords & internal_keywords:
+        return True
+    return title.startswith("keywords in ") or "gate block rate" in title
 
 
 def read_latest_scout_reports(state_dir: Path) -> list[ExecutiveSignal]:

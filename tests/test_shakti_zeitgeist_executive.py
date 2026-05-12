@@ -29,7 +29,7 @@ def _write_zeitgeist(state_dir: Path, rows: list[dict[str, object]]) -> None:
         for row in rows:
             payload = {
                 "id": row.get("id", "sig"),
-                "source": row.get("source", "local_scan"),
+                "source": row.get("source", "world_feed"),
                 "category": row.get("category", "opportunity"),
                 "title": row.get("title", "Signal"),
                 "relevance_score": row.get("relevance_score", 0.5),
@@ -57,9 +57,9 @@ async def test_cycle_consumes_zeitgeist_and_emits_artifacts(tmp_path: Path) -> N
             {
                 "id": "zg-threat",
                 "category": "threat",
-                "title": "High gate block rate from S3",
+                "title": "New long-context coding model threatens context strategy",
                 "relevance_score": 0.9,
-                "keywords": ["gate", "witness"],
+                "keywords": ["model", "coding", "long-context"],
             },
             {
                 "id": "zg-tool",

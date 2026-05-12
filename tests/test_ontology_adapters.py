@@ -73,7 +73,7 @@ def dharma_tree(tmp_path: Path) -> Path:
     signals = [
         {
             "id": "sig001",
-            "source": "local_scan",
+            "source": "world_feed",
             "category": "methodology",
             "title": "Keywords in shared_note.md",
             "relevance_score": 0.6,

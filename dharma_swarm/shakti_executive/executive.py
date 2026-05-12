@@ -104,7 +104,11 @@ def _read_board(path: Path, *, errors: list[str]) -> list[dict[str, Any]]:
     if not isinstance(raw, list):
         errors.append("malformed_board: root is not a list")
         return []
-    return [entry for entry in raw if isinstance(entry, dict)]
+    return [
+        entry
+        for entry in raw
+        if isinstance(entry, dict) and not _is_legacy_internal_board_entry(entry)
+    ]
 
 
 def _merge_board(
@@ -169,6 +173,17 @@ def _entry_key(entry: dict[str, Any]) -> str:
     title = str(entry.get("title") or "").lower().strip()
     domain = str(entry.get("domain") or "").lower().strip()
     return f"title:{domain}:{title}"
+
+
+def _is_legacy_internal_board_entry(entry: dict[str, Any]) -> bool:
+    """Drop pre-split internal rows that were incorrectly stored as zeitgeist."""
+    title = str(entry.get("title") or "").lower()
+    if title.startswith("keywords in ") or title.startswith("repair: high gate block rate"):
+        return True
+    if title == "high stigmergy density":
+        return True
+    evidence = " ".join(str(item).lower() for item in entry.get("evidence_signals") or [])
+    return "gate block rate" in evidence or "source: local_scan" in evidence
 
 
 def _combine_entry(old: dict[str, Any], new: dict[str, Any]) -> dict[str, Any]:

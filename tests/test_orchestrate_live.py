@@ -251,18 +251,18 @@ def test_zeitgeist_registered_in_task_factories():
 
 
 def test_gate_pressure_paths_match():
-    """Write path (zeitgeist) and read path (telos_gates) for gate_pressure.json must agree.
+    """Write path (internal pressure) and read path for gate_pressure.json must agree.
 
-    Audit assertion: S4→S3 feedback channel is wired correctly end-to-end.
+    Audit assertion: internal pressure → gate channel is wired correctly end-to-end.
     """
     from dharma_swarm.orchestrate_live import STATE_DIR
     from dharma_swarm.telos_gates import TelosGatekeeper
 
-    zeitgeist_write_path = STATE_DIR / "meta" / "gate_pressure.json"
+    internal_pressure_write_path = STATE_DIR / "meta" / "gate_pressure.json"
     telos_read_path = TelosGatekeeper._GATE_PRESSURE_PATH
 
-    assert zeitgeist_write_path == telos_read_path, (
-        f"Path mismatch: zeitgeist writes to {zeitgeist_write_path}, "
+    assert internal_pressure_write_path == telos_read_path, (
+        f"Path mismatch: internal pressure writes to {internal_pressure_write_path}, "
         f"but telos_gates reads from {telos_read_path}"
     )
 
@@ -306,6 +306,10 @@ async def test_orchestrate_restarts_failed_task(monkeypatch, tmp_path):
         await asyncio.sleep(0.05)
         shutdown_event.set()
 
+    class DummyBus:
+        def subscribe(self, *args, **kwargs):
+            return None
+
     monkeypatch.setattr(mod, "STATE_DIR", tmp_path)
     monkeypatch.setattr(mod, "LOG_DIR", tmp_path / "logs")
     monkeypatch.setattr(mod, "_stop_old_daemon", lambda: None)
@@ -316,12 +320,13 @@ async def test_orchestrate_restarts_failed_task(monkeypatch, tmp_path):
     monkeypatch.setattr(mod, "_run_recognition_loop", sleeper)
     monkeypatch.setattr(mod, "run_conductor_loop", sleeper)
     monkeypatch.setattr(mod, "_run_zeitgeist_loop", sleeper)
+    monkeypatch.setattr(mod, "_run_internal_pressure_loop", sleeper)
     monkeypatch.setattr(mod, "_run_witness_loop", sleeper)
     monkeypatch.setattr(mod, "_run_consolidation_loop", sleeper)
     monkeypatch.setattr(mod, "_run_replication_monitor_loop", sleeper)
     monkeypatch.setattr(mod, "run_health_loop", sleeper)
     monkeypatch.setattr(mod, "run_free_evolution_grind", sleeper)
-    monkeypatch.setattr("dharma_swarm.signal_bus.SignalBus.get", lambda: object())
+    monkeypatch.setattr("dharma_swarm.signal_bus.SignalBus.get", lambda: DummyBus())
     monkeypatch.setattr("dharma_swarm.context_agent.run_context_agent_loop", sleeper)
     monkeypatch.setattr("dharma_swarm.training_flywheel.run_training_flywheel_loop", sleeper)
     monkeypatch.setattr("dharma_swarm.self_improve.run_self_improvement_loop", sleeper)

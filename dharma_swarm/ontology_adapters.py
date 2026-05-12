@@ -101,7 +101,7 @@ _ZEITGEIST_SIGNAL_TYPE = ObjectType(
         "source": PropertyDef(
             name="source",
             property_type=PropertyType.STRING,
-            description="Signal origin: local_scan, claude_scan, gate_pattern, manual",
+            description="Signal origin: world_feed, world_llm_scan, manual, or adapter name",
         ),
         "category": PropertyDef(
             name="category",

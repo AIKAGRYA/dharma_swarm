@@ -1,9 +1,9 @@
-"""Read-only S4 executive consumer.
+"""Read-only external S4 executive consumer.
 
 Stage 2 keeps the executive intentionally narrow: it consumes persisted
-ZeitgeistScanner signals, ranks strategic pressure, and emits warrant-pressure
-artifacts. It does not dispatch work, rewrite campaign memory, or own action
-authority.
+ZeitgeistScanner world signals, ranks strategic pressure, and emits
+warrant-pressure artifacts. It does not dispatch work, rewrite campaign
+memory, or own action authority.
 """
 
 from __future__ import annotations
