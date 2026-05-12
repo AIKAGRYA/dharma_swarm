@@ -1,5 +1,7 @@
 # DHARMA SWARM — What It Actually Wants to Become
 
+> **Directional poles:** [GNANI_LODESTONE](GNANI_LODESTONE.md) (witness upstream of capability) · [GPLOT_LODESTONE](GPLOT_LODESTONE.md) (telos as topological invariant of the action space — see also the accreting [GPLOT_CAIRN](docs/GPLOT_CAIRN.md))
+
 **A retrospective from 2036, written April 8, 2026**
 
 *This document is an honest structural analysis of what the DHARMA SWARM repository was becoming in April 2026, what it needed to become, and what stood between those two states. It is written in the voice of a system looking backward across a decade at a codebase that declared enormous ambitions while running on three VPS nodes and zero paying users.*

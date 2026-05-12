@@ -1,5 +1,7 @@
 # DHARMA SWARM Three-Plane Architecture
 
+> **Measurement plane direction:** the Invariant Observatory (read-only) lives in the measurement plane. It reads telemetry that the three planes already produce and emits topological/dynamical invariants as `ExternalOutcomeRecord` rows. Direction document: [GPLOT_LODESTONE](../GPLOT_LODESTONE.md). Cultivable substrate: [GPLOT_CAIRN](GPLOT_CAIRN.md). Peer pole: [GNANI_LODESTONE](../GNANI_LODESTONE.md).
+
 ## One System, Three Planes
 
 `dharma_swarm` should evolve into an agent-native operating system for an AI-run company.

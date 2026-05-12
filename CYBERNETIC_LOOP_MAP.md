@@ -5,6 +5,8 @@
 **Purpose:** Document every feedback loop's sense→act→evaluate→adapt path.
 Each loop is "closed" only when its output feeds back as input to a future cycle.
 
+> **New measurement loop seeded (May 12, 2026):** the Invariant Observatory — see [GPLOT_LODESTONE](GPLOT_LODESTONE.md) and [docs/GPLOT_CAIRN.md](docs/GPLOT_CAIRN.md). Read-only: senses existing telemetry, computes topological/dynamical invariants, evaluates against falsifiable predictions, adapts by promotion gate (not by autonomous threshold cross). Boot-seeded via `dharma_swarm/gplot_lodestone.py`.
+
 ---
 
 ## What Changed Since April 4

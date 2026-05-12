@@ -1,5 +1,12 @@
 """DGM Loop — Real Darwin Gödel Machine evolution for DHARMA SWARM.
 
+Direction (May 2026):
+    The propose → gate → apply → witness recurrence implemented in this loop
+    is exactly the operator the Invariant Observatory measures. Gap-as-
+    topological-invariant gating is the v2/v3 destination; today the loop
+    is scalar-gated. See GPLOT_LODESTONE.md and docs/GPLOT_CAIRN.md for
+    the direction and the build plan. Peer pole: GNANI_LODESTONE.md.
+
 This module closes the gap identified in WHAT_IT_WANTS_TO_BECOME.md:
     "The Darwin Engine produces diffs. Those diffs are stored in an
     evolution archive. But they are never applied to a running agent

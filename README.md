@@ -96,6 +96,8 @@ curation:
 ---
 # DHARMA SWARM
 
+> **Directional lodestones:** [GNANI_LODESTONE](GNANI_LODESTONE.md) (witness-upstream pole) · [GPLOT_LODESTONE](GPLOT_LODESTONE.md) (invariant-geometry pole, cairn at [docs/GPLOT_CAIRN.md](docs/GPLOT_CAIRN.md))
+
 DHARMA SWARM is the operator-facing swarm runtime and control-plane codebase behind DHARMA COMMAND.
 It combines a Python orchestration core, a FastAPI backend, a Next.js dashboard, and a large research/spec layer that informs the runtime.
 

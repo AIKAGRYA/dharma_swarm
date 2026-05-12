@@ -9,7 +9,7 @@
 # Your workflow: Declare → Dispatch → Verify.
 
 schema_version: 2
-last_updated: "2026-05-11"
+last_updated: "2026-05-12"  # gplot_lodestone + invariant_observatory research surface registered
 
 state_dir:
   canonical: "~/.dharma"
@@ -494,3 +494,76 @@ loops:
     health_check_ids: [module_file_exists, test_file_exists]
     priority: p1
     next_action: null
+
+# ---------------------------------------------------------------------------
+# Research surfaces (read-only; NOT control authorities)
+# ---------------------------------------------------------------------------
+# A research surface measures the system. It writes ExternalOutcomeRecord rows
+# into the existing telemetry substrate. It is consumed by loop_supervisor
+# via the same poll path that already consumes gauntlet_telemetry. It cannot
+# add an alert handler to the supervisor without an explicit promotion review
+# documented in this manifest's changelog.
+#
+# Schema additions are non-breaking: dashboard, agents, and health checks
+# ignore unknown keys. This block exists to make declared research surfaces
+# discoverable to the cultivation agents (shakti_zeitgeist, seed_harvester,
+# garden_daemon, smart_seed_selector).
+
+research_surfaces:
+  - id: invariant_observatory
+    label: "Invariant Observatory"
+    lodestone: GPLOT_LODESTONE.md
+    cairn: docs/GPLOT_CAIRN.md
+    boot_seeder: dharma_swarm/gplot_lodestone.py
+    primary_artifact: dharma_swarm/invariant_observatory.py  # not yet implemented (v1 build target)
+    status: seeded
+    class: read_only_measurement
+    reads_from:
+      - benchmarks/gauntlet.py
+      - dharma_swarm/gauntlet_telemetry.py
+      - dharma_swarm/landscape.py
+      - dharma_swarm/archive.py
+      - dharma_swarm/selector.py
+      - dharma_swarm/rv.py
+      - dharma_swarm/telemetry_plane.py
+    writes_to:
+      substrate: ExternalOutcomeRecord
+      kind: invariant_reading_v1
+    consumed_by: dharma_swarm/loop_supervisor.py  # via existing poll path
+    math_primitives:
+      v1: ["takens_delay_embedding", "maximal_lyapunov", "correlation_dimension"]
+      v2: ["persistent_homology", "mapper"]
+      v3: ["hofstadter_spectrum_reconstruction", "chern_number"]
+    promotion_gate:
+      predictions_required: 30
+      hit_rate_required: 0.80
+      false_positive_max: 0.05
+      requires_human_review: true
+    priority: p1
+    next_action: "Implement dharma_swarm/invariant_observatory.py v1 (Takens on gauntlet history)"
+
+# ---------------------------------------------------------------------------
+# Lodestones — directional poles (peer to one another, NOT control surfaces)
+# ---------------------------------------------------------------------------
+# Lodestones are compact directional documents. They orient cultivation
+# agents toward a direction without claiming authority. Each lodestone has
+# a boot-seeder (Python module that injects stigmergy marks, concept nodes,
+# telos objectives, and task seeds into the existing substrates) and an
+# optional cairn (accreting waypoint document).
+
+lodestones:
+  - id: gnani_lodestone
+    label: "GNANI Lodestone — Witness Upstream"
+    document: GNANI_LODESTONE.md
+    boot_seeder: dharma_swarm/gnani_lodestone.py
+    channel: gnani
+    pillar: viveka
+    status: live
+  - id: gplot_lodestone
+    label: "GPLOT Lodestone — Invariant Geometry"
+    document: GPLOT_LODESTONE.md
+    cairn: docs/GPLOT_CAIRN.md
+    boot_seeder: dharma_swarm/gplot_lodestone.py
+    channel: gplot
+    pillar: invariance
+    status: live

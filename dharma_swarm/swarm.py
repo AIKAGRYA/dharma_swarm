@@ -616,6 +616,34 @@ class SwarmManager:
         else:
             logger.info("GnaniLodestone already seeded (flag: %s)", _gnani_flag)
 
+        # ── Gplot Lodestone: seed invariant-geometry direction (Invariant Observatory) ──
+        # Runs after GnaniLodestone. Idempotent via separate flag.
+        # Seeds: stigmergy marks (gplot channel), ConceptGraph nodes for TDA /
+        # persistent homology / Takens / Hofstadter primitives, TelosGraph
+        # objectives for v1/v2/v3 build progression of the read-only Invariant
+        # Observatory, and TaskBoard research / build seeds.
+        # Non-blocking — all exceptions are caught inside GplotLodestone.
+        # Companion documents: GPLOT_LODESTONE.md (directional) + docs/GPLOT_CAIRN.md (cultivable substrate).
+        _gplot_flag = self.state_dir / "meta" / "gplot_seeded"
+        if not _gplot_flag.exists():
+            try:
+                from dharma_swarm.gplot_lodestone import GplotLodestone
+                _gplot = GplotLodestone(state_dir=self.state_dir)
+                _gplot_result = await asyncio.wait_for(
+                    _gplot.seed_all(), timeout=60.0
+                )
+                _gplot_flag.parent.mkdir(parents=True, exist_ok=True)
+                _gplot_flag.write_text(
+                    f"seeded: {_gplot_result}\n", encoding="utf-8"
+                )
+                logger.info("GplotLodestone seeded on init: %s", _gplot_result)
+            except asyncio.TimeoutError:
+                logger.warning("GplotLodestone seeding timed out (60s) — continuing")
+            except Exception as exc:
+                logger.warning("GplotLodestone seeding failed (non-fatal): %s", exc)
+        else:
+            logger.info("GplotLodestone already seeded (flag: %s)", _gplot_flag)
+
         from dharma_swarm.agent_constitution import bootstrap_dynamic_roster
 
         from dharma_swarm.agent_runner import AgentPool

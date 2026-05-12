@@ -4,6 +4,8 @@
 **Dependencies**: `DARWIN_ENGINE_PERPETUAL_EVOLUTION_RESEARCH.md`
 **Status**: Ready for implementation
 
+> **Telos-gating direction (May 2026):** Darwin engine variants should eventually be telos-gated by topological invariants of the action space, not by scalar thresholds on fitness. The measurement substrate for those invariants is the read-only Invariant Observatory — see [GPLOT_LODESTONE](../GPLOT_LODESTONE.md) and [GPLOT_CAIRN](GPLOT_CAIRN.md). Promotion of invariant-gated rules is itself gated by documented empirical fit. Peer pole: [GNANI_LODESTONE](../GNANI_LODESTONE.md).
+
 ---
 
 ## Overview

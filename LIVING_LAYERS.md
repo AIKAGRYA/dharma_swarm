@@ -1,5 +1,7 @@
 # Living Layers Architecture
 
+> **Cross-layer measurement direction:** the Invariant Observatory ([GPLOT_LODESTONE](GPLOT_LODESTONE.md) · [docs/GPLOT_CAIRN.md](docs/GPLOT_CAIRN.md)) is the read-only measurement layer that reads across these living layers and emits topological/dynamical invariant readings. Peer to [GNANI_LODESTONE](GNANI_LODESTONE.md). Boot-seeded via `dharma_swarm/gplot_lodestone.py`.
+
 **Source files:**
 - `~/dharma_swarm/dharma_swarm/stigmergy.py` (220 lines)
 - `~/dharma_swarm/dharma_swarm/shakti.py` (201 lines)

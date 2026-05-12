@@ -4,6 +4,15 @@ Detects stalls, retry storms, and eval degradation without human monitoring.
 Pure Python — no LLM calls.  Cheap enough to call at the top of every swarm tick.
 
 Intervention ladder: LOG_WARNING → PAUSE_LOOP → REDUCE_SCOPE → ALERT_DHYANA
+
+Direction (May 2026):
+    The Invariant Observatory (read-only research surface, seeded via
+    dharma_swarm/gplot_lodestone.py) writes ExternalOutcomeRecord rows of
+    kind='invariant_reading_v1' into the same substrate this supervisor
+    already polls for gauntlet_telemetry trend. A new alert handler for
+    invariant readings is added ONLY after the promotion gate is satisfied
+    (>=30 predictions, hit-rate >=0.8, FP-rate <=0.05, human review).
+    See GPLOT_LODESTONE.md and docs/GPLOT_CAIRN.md §4.7.
 """
 
 from __future__ import annotations
