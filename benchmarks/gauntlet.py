@@ -765,12 +765,30 @@ async def _main() -> None:
     p.add_argument("--all", action="store_true", help="Run all tiers (full gauntlet)")
     p.add_argument("--continuous", action="store_true", help="Run continuously, feeding into DGM")
     p.add_argument("--interval", type=int, default=3600, help="Continuous interval in seconds")
+    p.add_argument(
+        "--record-external",
+        action="store_true",
+        help=(
+            "Persist each run as ExternalOutcomeRecord(s) in the telemetry plane "
+            "so DGM fitness and loop_supervisor trend checks see ground-truth signals."
+        ),
+    )
     args = p.parse_args()
+
+    async def _persist(rep: GauntletReport) -> None:
+        if not args.record_external:
+            return
+        try:
+            from dharma_swarm.gauntlet_telemetry import record_gauntlet_outcome
+            await record_gauntlet_outcome(rep)
+        except Exception:
+            logger.exception("record_gauntlet_outcome failed (run_id=%s)", rep.run_id)
 
     if args.continuous:
         logger.info("Continuous gauntlet mode (interval=%ds)", args.interval)
         while True:
-            await run_gauntlet(tiers=[1,2,3,4,5])
+            rep = await run_gauntlet(tiers=[1,2,3,4,5])
+            await _persist(rep)
             await asyncio.sleep(args.interval)
     elif args.all:
         report = await run_gauntlet(tiers=[1,2,3,4,5])
@@ -779,6 +797,7 @@ async def _main() -> None:
     else:
         report = await run_gauntlet(tiers=[1,2])  # quick default
 
+    await _persist(report)
     print(f"\nGauntlet score: {report.gauntlet_score:.3f} (Δ{report.delta:+.3f})")
     print(f"Report: {GAUNTLET_DIR}/LATEST_DELTA.md")
 

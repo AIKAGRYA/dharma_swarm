@@ -361,6 +361,11 @@ class LoopSupervisor:
         if eval_alert:
             alerts.append(eval_alert)
 
+        # Check externally-grounded gauntlet trend (tier-1 ground truth)
+        gauntlet_alert = self._check_gauntlet_trend()
+        if gauntlet_alert:
+            alerts.append(gauntlet_alert)
+
         # Persist alerts
         if alerts:
             self._alerts.extend(alerts)
@@ -389,6 +394,39 @@ class LoopSupervisor:
                 )
         except Exception:
             logger.debug("Loop supervisor alert failed", exc_info=True)
+        return None
+
+    def _check_gauntlet_trend(self) -> SupervisorAlert | None:
+        """Check externally-grounded gauntlet tier-1 score trend.
+
+        Uses the wired ``gauntlet_telemetry`` module (Karpathy-style direct
+        metric comparison — no statistical tests). Only triggers when at
+        least ``min_samples`` recent nightly runs exist and the slope
+        breaches the regression threshold.
+        """
+        try:
+            from dharma_swarm.gauntlet_telemetry import (
+                OUTCOME_KIND_GAUNTLET_TIER1,
+                check_gauntlet_trend_sync,
+            )
+            result = check_gauntlet_trend_sync(
+                kind=OUTCOME_KIND_GAUNTLET_TIER1,
+            )
+            if result.is_regressing:
+                return SupervisorAlert(
+                    alert_type="GAUNTLET_TIER1_REGRESSION",
+                    loop_name="gauntlet",
+                    severity="critical",
+                    message=(
+                        f"Tier-1 ground-truth regression: "
+                        f"slope={result.slope_per_day:+.4f}/day over "
+                        f"{result.n_samples} runs, latest={result.latest_value:.3f}"
+                    ),
+                    intervention="ALERT_DHYANA",
+                    timestamp=datetime.now(timezone.utc).isoformat(),
+                )
+        except Exception:
+            logger.debug("Gauntlet trend check failed", exc_info=True)
         return None
 
     def _write_alert_file(self, alerts: list[SupervisorAlert]) -> None:
