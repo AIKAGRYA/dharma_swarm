@@ -1,0 +1,46 @@
+{
+  "created_by": "pilot-00",
+  "description": "Run Agentic Era Immune System as a whole-organism tracer through lodestones, telos, ThinkodynamicDirector, Shakti, Viveka, MemoryKernel, Kalyan, Agora/SABP, and guarded Evolution without collapsing the organism into one report.",
+  "metadata": {
+    "approval_signature": "sha256:f6969fb760970cb077b6f154213e67f14beb4abe5c85bc8e35f87c66f27dd9fb",
+    "child_task_ids": [
+      "wp_001"
+    ],
+    "created_at": "2026-05-12T13:51:07.898874+00:00",
+    "forbidden_domains": [
+      "Operator Brief",
+      "Daily Insight",
+      "ontology refactor",
+      "memory consolidation",
+      "dashboard",
+      "API",
+      "provider or routing migration",
+      "broad cleanup"
+    ],
+    "forbidden_files": [
+      "dharma_swarm/orchestrate_live.py",
+      "dharma_swarm/swarm.py",
+      "dharma_swarm/frontier_council.py",
+      "dharma_swarm/agent_runner.py",
+      "dharma_swarm/guardian_crew.py",
+      "dharma_swarm/insight_brief.py",
+      "api/**",
+      "dashboard/**"
+    ],
+    "gates_required": [
+      "telos",
+      "scoped_tests",
+      "scope_check"
+    ],
+    "hot_files": [],
+    "human_approver": "dhyana",
+    "kind": "build_packet",
+    "max_iterations": 2,
+    "proof_command": "pytest tests/test_proof_artifact_to_spec.py tests/test_build_protocol_cli.py -q",
+    "protocol_version": "v0",
+    "spec_path": "/Users/dhyana/dharma_swarm/reports/agentic_immune_system_packet_20260511/generated_specs/2026-05-12-proof-artifact-agentic-era-immune-system-closure.md",
+    "telos_statement": "Run Agentic Era Immune System as a whole-organism tracer through lodestones, telos, ThinkodynamicDirector, Shakti, Viveka, MemoryKernel, Kalyan, Agora/SABP, and guarded Evolution without collapsing the organism into one report."
+  },
+  "status": "pending",
+  "title": "proof_artifact_2026_05_12_proof_artifact_agentic_era_immune_system_closure"
+}

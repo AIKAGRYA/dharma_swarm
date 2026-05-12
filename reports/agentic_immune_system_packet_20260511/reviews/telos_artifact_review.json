@@ -1,0 +1,82 @@
+{
+  "artifact_path": "reports/agentic_immune_system_packet_20260511/agentic_era_immune_system_dossier.md",
+  "artifact_sha256": "83870bb2c8fe54e49b2dfe9844e46175b7e3b8096599a4760f2821b2bcc92699",
+  "contribution_id": "102169b12e0f47d1",
+  "gate_decision": "allow",
+  "gate_decision_id": "60cff4edc8d140d0",
+  "gate_reason": "All gates passed",
+  "gate_results": {
+    "AHIMSA": {
+      "reason": "",
+      "result": "PASS"
+    },
+    "ANEKANTA": {
+      "reason": "label=grounded; grounded=mechanistic,phenomenological,systems; tokenistic=none",
+      "result": "PASS"
+    },
+    "BHED_GNAN": {
+      "reason": "No cheap Bhed Gnan register/substance risk detected",
+      "result": "PASS"
+    },
+    "CONSENT": {
+      "reason": "Permission system active",
+      "result": "PASS"
+    },
+    "DOGMA_DRIFT": {
+      "reason": "No dogma drift detected",
+      "result": "PASS"
+    },
+    "REVERSIBILITY": {
+      "reason": "",
+      "result": "PASS"
+    },
+    "SATYA": {
+      "reason": "",
+      "result": "PASS"
+    },
+    "SPEC_INVARIANTS": {
+      "reason": "",
+      "result": "PASS"
+    },
+    "STEELMAN": {
+      "reason": "No proposal context for steelman check",
+      "result": "PASS"
+    },
+    "SVABHAAVA": {
+      "reason": "Epistemological diversity confirmed",
+      "result": "PASS"
+    },
+    "VYAVASTHIT": {
+      "reason": "",
+      "result": "PASS"
+    },
+    "WITNESS": {
+      "reason": "Think-point satisfied (before_complete)",
+      "result": "PASS"
+    }
+  },
+  "ontology_path": "reports/agentic_immune_system_packet_20260511/state/ontology.db",
+  "outcome_id": "d3298214c8394004",
+  "proposal_id": "ee2e9ab76779482c",
+  "stats": {
+    "contributions": 2,
+    "duplicate_suppressions": {
+      "contributions": 0,
+      "execution_leases": 0,
+      "outcomes": 0,
+      "value_events": 0
+    },
+    "duplicate_suppressions_total": 0,
+    "execution_leases": 0,
+    "gate_decisions": 2,
+    "lineage_edges": 6088,
+    "outcomes": 2,
+    "proposals": 2,
+    "registered_types": 29,
+    "total_ontology_objects": 10,
+    "value_events": 2,
+    "venture_cells": 0
+  },
+  "task_id": "69ceae9df1954b9e",
+  "value_event_id": "ab8ecf6bc81444ca"
+}

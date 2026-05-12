@@ -1,0 +1,22 @@
+{
+  "agents_spawned": false,
+  "dry_run": true,
+  "required_outputs": [
+    "build_packet.json",
+    "dispatch_plan.md",
+    "gates_required.txt",
+    "pre_flight_answers.md",
+    "proof_command.txt",
+    "rejected_paths.txt",
+    "source_spec_copy.md",
+    "work_packets"
+  ],
+  "root": "reports/agentic_immune_system_packet_20260511/dryruns/proof-artifact-closure-20260512",
+  "run_id": "proof-artifact-closure-20260512",
+  "source_edits": false,
+  "sqlite_writes": false,
+  "work_packets": [
+    "wp_001.json"
+  ],
+  "worktrees_created": false
+}

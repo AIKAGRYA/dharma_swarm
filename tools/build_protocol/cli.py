@@ -59,6 +59,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     opportunity_spec.add_argument("--output-dir", type=Path, default=None)
     opportunity_spec.add_argument("--print", action="store_true")
 
+    proof_artifact_spec = subcommands.add_parser(
+        "proof-artifact-to-spec",
+        help="emit a Pilot-00 spec from a ProofArtifact closure contract",
+    )
+    proof_artifact_spec.add_argument("contract_path", type=Path)
+    proof_artifact_spec.add_argument("--repo-root", type=Path, default=None)
+    proof_artifact_spec.add_argument("--output-dir", type=Path, default=None)
+    proof_artifact_spec.add_argument("--report-path", type=Path, default=None)
+    proof_artifact_spec.add_argument("--print", action="store_true")
+    proof_artifact_spec.add_argument("--print-report", action="store_true")
+
     args = parser.parse_args(argv)
     if args.command == "plan":
         result = run_dryrun(
@@ -97,6 +108,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return asyncio.run(_run_shadow_apply(args))
     if args.command == "opportunity-to-spec":
         return _run_opportunity_to_spec(args)
+    if args.command == "proof-artifact-to-spec":
+        return _run_proof_artifact_to_spec(args)
     return 2
 
 
@@ -170,6 +183,38 @@ def _run_opportunity_to_spec(args: argparse.Namespace) -> int:
     return 2 if spec_needs_operator_completion(spec_text) else 0
 
 
+def _run_proof_artifact_to_spec(args: argparse.Namespace) -> int:
+    from tools.build_protocol.proof_artifact_to_spec import (
+        _default_report_path,
+        load_contract,
+        render_spec,
+        run_closure_preflight,
+        write_report,
+        write_spec,
+    )
+
+    selection = load_contract(args.contract_path, repo_root=args.repo_root)
+    report_path = args.report_path or _default_report_path(selection)
+    report = run_closure_preflight(selection, report_path=report_path)
+    spec_text = render_spec(selection, report)
+
+    if args.print_report:
+        print(json.dumps(report, indent=2, sort_keys=True))
+        return 0 if report["decision"]["status"] != "blocked" else 2
+    if args.print:
+        print(spec_text, end="")
+        return 0 if report["decision"]["status"] != "blocked" else 2
+
+    write_report(report, report_path)
+    out = write_spec(
+        spec_text,
+        output_dir=args.output_dir,
+        title_slug=_slug_for_proof_artifact(selection.title),
+    )
+    print(out)
+    return 0 if report["decision"]["status"] != "blocked" else 2
+
+
 def _slug_for_opportunity(opportunity_id: str, title: str) -> str:
     import re
 
@@ -179,6 +224,17 @@ def _slug_for_opportunity(opportunity_id: str, title: str) -> str:
         f"opportunity-{opportunity_id}-{title}".strip().lower(),
     ).strip("-")
     return slug[:64] or "opportunity"
+
+
+def _slug_for_proof_artifact(title: str) -> str:
+    import re
+
+    slug = re.sub(
+        r"[^a-zA-Z0-9]+",
+        "-",
+        f"proof-artifact-{title}-closure".strip().lower(),
+    ).strip("-")
+    return slug[:72] or "proof-artifact-closure"
 
 
 if __name__ == "__main__":

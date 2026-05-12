@@ -1,0 +1,63 @@
+{
+  "constraints": [
+    "no_merge",
+    "no_push",
+    "no_shell_exec",
+    "scope_locked"
+  ],
+  "id": "wp_001",
+  "metadata": {
+    "dry_run": true
+  },
+  "output": [
+    "diff",
+    "test_output",
+    "checkpoint_ref"
+  ],
+  "payload": {
+    "allowed_paths": [
+      "reports/agentic_immune_system_packet_20260511/proof_artifact_contract.json",
+      "reports/agentic_immune_system_packet_20260511/closure_run_report.json",
+      "docs/plans/2026-05-11-global-proof-engine-scratchmap.md",
+      "reports/agentic_immune_system_packet_20260511/claims_register.md",
+      "reports/agentic_immune_system_packet_20260511/human_operator_brief.md",
+      "reports/agentic_immune_system_packet_20260511/organ_wiring_matrix.md",
+      "reports/agentic_immune_system_packet_20260511/next_build_spec.md",
+      "reports/agentic_immune_system_packet_20260511/agentic_era_immune_system_dossier.md"
+    ],
+    "builder_agent": "unassigned",
+    "checkpoint_ids": [],
+    "forbidden_paths": [
+      "dharma_swarm/orchestrate_live.py",
+      "dharma_swarm/swarm.py",
+      "dharma_swarm/frontier_council.py",
+      "dharma_swarm/agent_runner.py",
+      "dharma_swarm/guardian_crew.py",
+      "dharma_swarm/insight_brief.py",
+      "api/**",
+      "dashboard/**"
+    ],
+    "kind": "work_packet",
+    "lead_agent": "pilot-00",
+    "max_diff_lines": 50,
+    "parent_build_packet_id": "proof_artifact_2026_05_11_proof_artifact_agentic_era_immune_system_closure",
+    "protocol_version": "v0",
+    "scoped_tests": [
+      "pytest tests/test_proof_artifact_to_spec.py tests/test_build_protocol_cli.py -q"
+    ],
+    "worktree_path": ""
+  },
+  "scope": [
+    "reports/agentic_immune_system_packet_20260511/proof_artifact_contract.json",
+    "reports/agentic_immune_system_packet_20260511/closure_run_report.json",
+    "docs/plans/2026-05-11-global-proof-engine-scratchmap.md",
+    "reports/agentic_immune_system_packet_20260511/claims_register.md",
+    "reports/agentic_immune_system_packet_20260511/human_operator_brief.md",
+    "reports/agentic_immune_system_packet_20260511/organ_wiring_matrix.md",
+    "reports/agentic_immune_system_packet_20260511/next_build_spec.md",
+    "reports/agentic_immune_system_packet_20260511/agentic_era_immune_system_dossier.md"
+  ],
+  "sender": "pilot-00",
+  "status": "queued",
+  "task": "Run Agentic Era Immune System as a whole-organism tracer through lodestones, telos, ThinkodynamicDirector, Shakti, Viveka, MemoryKernel, Kalyan, Agora/SABP, and guarded Evolution without collapsing the organism into one report."
+}

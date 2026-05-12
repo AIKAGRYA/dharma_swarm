@@ -1,0 +1,8 @@
+Command:
+pytest tests/test_proof_artifact_to_spec.py tests/test_build_protocol_cli.py -q
+
+Result:
+9 passed, 1 warning in 0.35s
+
+Warning:
+PytestConfigWarning: Unknown config option: timeout

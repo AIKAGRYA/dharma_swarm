@@ -1,0 +1,39 @@
+{
+  "artifact_refs": [
+    "reports/agentic_immune_system_packet_20260511/no_source_diff.patch",
+    "reports/agentic_immune_system_packet_20260511/test_output_proof_artifact_closure_20260512.txt"
+  ],
+  "checkpoint_id": "review_wp_001",
+  "metadata": {
+    "builder_agent": "codex",
+    "decision": "pass",
+    "diff_ref": "reports/agentic_immune_system_packet_20260511/no_source_diff.patch",
+    "findings": [],
+    "gate_results": {
+      "scope_check": {
+        "evidence": "scope_check=pass",
+        "reason": "pass",
+        "result": "pass"
+      },
+      "scoped_tests": {
+        "evidence": "scoped_tests=pass",
+        "reason": "pass",
+        "result": "pass"
+      },
+      "telos": {
+        "evidence": "telos=pass",
+        "reason": "pass",
+        "result": "pass"
+      }
+    },
+    "kind": "review_packet",
+    "protocol_version": "v0",
+    "reviewer_agent": "codex-reviewer",
+    "work_packet_id": "wp_001"
+  },
+  "run_id": "",
+  "session_id": "proof-artifact-closure-20260512",
+  "status": "approved",
+  "summary": "ProofArtifact closure packet passed focused tests and whole-organism closure preflight; no source diff is applied in shadow mode.",
+  "task_id": "wp_001"
+}
