@@ -9,6 +9,7 @@ import json
 import re
 import sys
 import time
+import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -329,6 +330,101 @@ def _resolve_reasoning_effort(model: str | None, configured: str | None) -> str 
     return None
 
 
+# --- Phase 1 route witness (2026-05-10) ---------------------------------
+# See docs/plans/2026-05-10-phase1-routing-witness.md.
+
+_FAILURE_CLASS_TO_OUTCOME = {
+    FAILURE_CLASS_OK: "success",
+    FAILURE_CLASS_GATE_BLOCK: "gate_block",
+    FAILURE_CLASS_GATE_REVIEW: "gate_block",
+    FAILURE_CLASS_PROBE_FAILED: "no_route",
+    FAILURE_CLASS_PROVIDER_EXCEPTION: "all_failed",
+    FAILURE_CLASS_TIMEOUT: "timeout",
+    FAILURE_CLASS_EMPTY_CONTENT: "empty_content",
+}
+
+
+async def _emit_chew_route_witness(
+    *,
+    decision_id: str,
+    config: ChewConfig,
+    provider_type: ProviderType | None,
+    model: str,
+    failure_class: str,
+    duration_ms: float,
+    response_obj: Any | None = None,
+    error_detail: str = "",
+    task_id: str = "",
+) -> None:
+    """Best-effort canonical route witness for one chew run.
+
+    Emits exactly one RoutingDecisionRecord. For the provider-call branch,
+    emits one ProviderAttemptRecord. For gate-block / probe-fail branches,
+    emits no attempts (no provider was called).
+    """
+    try:
+        from dharma_swarm.route_witness import (
+            build_provider_attempt,
+            emit_routing_decision,
+        )
+    except Exception:  # noqa: BLE001
+        return
+
+    outcome = _FAILURE_CLASS_TO_OUTCOME.get(failure_class, "unknown")
+    success = failure_class == FAILURE_CLASS_OK
+    chain = [provider_type] if provider_type is not None else []
+
+    attempts = []
+    if failure_class in {
+        FAILURE_CLASS_OK,
+        FAILURE_CLASS_PROVIDER_EXCEPTION,
+        FAILURE_CLASS_TIMEOUT,
+        FAILURE_CLASS_EMPTY_CONTENT,
+    } and provider_type is not None:
+        usage = {}
+        stop_reason = ""
+        if response_obj is not None:
+            usage = dict(getattr(response_obj, "usage", {}) or {})
+            stop_reason = getattr(response_obj, "stop_reason", "") or ""
+        attempts.append(
+            build_provider_attempt(
+                decision_id=decision_id,
+                attempt_idx=0,
+                provider=provider_type,
+                model=model,
+                success=success,
+                duration_ms=duration_ms,
+                error=error_detail or None,
+                stop_reason=stop_reason or None,
+                usage=usage or None,
+            )
+        )
+
+    decision_class = "pinned" if config.provider_type is not None else "widened"
+
+    try:
+        await emit_routing_decision(
+            decision_id=decision_id,
+            action_name="inquiry_chew",
+            route_path="deliberative",
+            selected_provider=provider_type or "",
+            selected_model=model or "",
+            candidate_chain=chain,
+            decision_class=decision_class,
+            caller="inquiry_substrate_chew",
+            duration_ms=duration_ms,
+            attempts=attempts,
+            task_type="chew",
+            task_signature=f"inquiry_chew:{config.prompt_class}",
+            confidence=0.7 if success else 0.2,
+            reasons=[f"failure_class={failure_class}"],
+            task_id=task_id,
+            outcome=outcome,
+        )
+    except Exception:  # noqa: BLE001
+        pass
+
+
 async def _call_provider(
     provider: ProviderLike,
     *,
@@ -485,6 +581,10 @@ async def run_chew(
     if config.dry_run:
         return ChewResult(True, False, "dry-run", None, None, None, None, None, None, None, "not_run", "dry run", task.id)
 
+    # Phase 1 route witness: stable per-chew decision id, emitted in every
+    # exit branch so the routing chain is auditable end-to-end.
+    decision_id = uuid.uuid4().hex
+
     seam = seam or TelicSeam(path=config.ontology_path)
     gatekeeper = gatekeeper or TelosGatekeeper()
     resolved_provider = None
@@ -524,6 +624,11 @@ async def run_chew(
     blocked = gate_result.decision == GateDecision.BLOCK or (
         config.block_on_review and gate_result.decision == GateDecision.REVIEW
     )
+    route_provider_type = (
+        provider_config.provider
+        if provider_config is not None
+        else config.provider_type
+    )
     model = config.model or getattr(provider_config, "default_model", None) or "default"
     if blocked:
         failure_class = (
@@ -559,6 +664,16 @@ async def run_chew(
             chunk_size=config.chunk_size,
             chunk_index=config.chunk_index,
             chunk_label=chunk_label,
+        )
+        await _emit_chew_route_witness(
+            decision_id=decision_id,
+            config=config,
+            provider_type=route_provider_type,
+            model=model,
+            failure_class=failure_class,
+            duration_ms=0.0,
+            error_detail=gate_result.reason,
+            task_id=task.id,
         )
         return result
 
@@ -610,6 +725,16 @@ async def run_chew(
                 chunk_size=config.chunk_size,
                 chunk_index=config.chunk_index,
                 chunk_label=chunk_label,
+            )
+            await _emit_chew_route_witness(
+                decision_id=decision_id,
+                config=config,
+                provider_type=route_provider_type,
+                model=model,
+                failure_class=FAILURE_CLASS_PROBE_FAILED,
+                duration_ms=0.0,
+                error_detail=f"probe_failed: {probe_reason}",
+                task_id=task.id,
             )
             return result
 
@@ -738,5 +863,16 @@ async def run_chew(
         chunk_size=config.chunk_size,
         chunk_index=config.chunk_index,
         chunk_label=chunk_label,
+    )
+    await _emit_chew_route_witness(
+        decision_id=decision_id,
+        config=config,
+        provider_type=route_provider_type,
+        model=response_model or model,
+        failure_class=failure_class,
+        duration_ms=duration_ms,
+        response_obj=response_obj,
+        error_detail=error,
+        task_id=task.id,
     )
     return result

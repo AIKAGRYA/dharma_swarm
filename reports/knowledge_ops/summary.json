@@ -1,0 +1,19 @@
+{
+  "edge_count": 448,
+  "edge_count_by_kind": {
+    "derived_from": 5,
+    "extracts_concept": 249,
+    "observes": 15,
+    "references": 159,
+    "tracks_brokenness_of": 20
+  },
+  "node_count": 417,
+  "node_count_by_kind": {
+    "broken_register_item": 20,
+    "code_surface": 115,
+    "concept": 249,
+    "doc": 12,
+    "evidence": 6,
+    "runtime_fact": 15
+  }
+}

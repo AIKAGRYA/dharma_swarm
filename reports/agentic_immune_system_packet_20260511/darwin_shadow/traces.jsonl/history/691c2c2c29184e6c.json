@@ -1,0 +1,22 @@
+{
+  "id": "691c2c2c29184e6c",
+  "timestamp": "2026-05-12T13:54:02.803159Z",
+  "agent": "darwin_engine",
+  "action": "archive_result",
+  "state": "archived",
+  "parent_id": null,
+  "fitness": null,
+  "files_changed": [],
+  "metadata": {
+    "proposal_id": "243090fc5a30417a",
+    "entry_id": "04b43501544d416d",
+    "experiment_id": "d225974fccec4ea2",
+    "weighted_fitness": 0.669,
+    "promotion_state": "local_pass",
+    "evidence_tier": "local",
+    "spec_ref": "/Users/dhyana/dharma_swarm/reports/agentic_immune_system_packet_20260511/generated_specs/2026-05-12-proof-artifact-agentic-era-immune-system-closure.md",
+    "requirement_refs": [
+      "proof_artifact_2026_05_12_proof_artifact_agentic_era_immune_system_closure"
+    ]
+  }
+}

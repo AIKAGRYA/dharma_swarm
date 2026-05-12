@@ -1,0 +1,128 @@
+{
+  "candidate": {
+    "artifact_refs": [
+      "dharma_swarm/reports/agentic_immune_system_packet_20260511/agentic_era_immune_system_dossier.md",
+      "dharma_swarm/reports/agentic_immune_system_packet_20260511/reviews/telos_artifact_review.json",
+      "dharma_swarm/reports/agentic_immune_system_packet_20260511/audits/audit_agentic_era_immune_system_dossier_53c49559e07ae2b6.json",
+      "dharma_swarm/reports/agentic_immune_system_packet_20260511/reviews/semantic_anekanta_dossier.json"
+    ],
+    "boundary": "semi_public_agora",
+    "scan_paths": [
+      "/Users/dhyana/dharmic-agora/nodes/anchors/anchor-04-complex-systems-cybernetics/claims/claim-a04-complex-systems-cybernetics-agentic-immune-xray-internally-gated-proof-20260512-v1.json",
+      "/Users/dhyana/dharmic-agora/nodes/anchors/anchor-04-complex-systems-cybernetics/claims/redteam/claim-a04-complex-systems-cybernetics-agentic-immune-xray-internally-gated-proof-20260512-v1-angle-1.md",
+      "/Users/dhyana/dharmic-agora/nodes/anchors/anchor-04-complex-systems-cybernetics/claims/redteam/claim-a04-complex-systems-cybernetics-agentic-immune-xray-internally-gated-proof-20260512-v1-angle-2.md",
+      "/Users/dhyana/dharmic-agora/nodes/anchors/anchor-04-complex-systems-cybernetics/claims/reviews/claim-a04-complex-systems-cybernetics-agentic-immune-xray-internally-gated-proof-20260512-v1-human-review-1.md",
+      "/Users/dhyana/dharmic-agora/nodes/anchors/anchor-01-math-formal/witness/wit-claim-a04-complex-systems-cybernetics-agentic-immune-xray-internally-gated-proof-20260512-v1-from-anchor-01-math-formal.json",
+      "/Users/dhyana/dharmic-agora/nodes/anchors/anchor-05-ecology-earth-systems/witness/wit-claim-a04-complex-systems-cybernetics-agentic-immune-xray-internally-gated-proof-20260512-v1-from-anchor-05-ecology-earth-systems.json"
+    ],
+    "stage": "venture_proposal",
+    "summary_sha256": "9ff8bb7a98c540dba0bf2776921549cbafda211b5f0ab605ff2f84409e92c749",
+    "title": "Agentic Immune X-Ray: internally gated proof artifact"
+  },
+  "checked_red_lines": [
+    "no raw private transcripts",
+    "no secrets, API keys, credentials, or local private paths in outbound refs",
+    "no customer names or unevidenced customer/revenue traction claims",
+    "no unsupported consciousness/sentience claims",
+    "no autonomous live self-modification safety claim",
+    "no production-readiness claim",
+    "no broad solved-agent-governance claim",
+    "semi-public SABP boundary only; no public marketing launch"
+  ],
+  "generated_at": "2026-05-12T13:52:36.959488+00:00",
+  "kind": "sabp_claim_redline_preflight",
+  "pass_count": 3,
+  "passed": true,
+  "passes": [
+    {
+      "evidence": {
+        "outbound_chars": 947,
+        "scanned_artifact_chars": 4946,
+        "scanned_artifact_count": 6
+      },
+      "name": "literal_sensitive_pattern_scan",
+      "pass_index": 1,
+      "status": "pass",
+      "violations": []
+    },
+    {
+      "evidence": {
+        "approved_boundaries": [
+          "semi_public_agora",
+          "semi_public_sabp"
+        ],
+        "approved_stages": [
+          "venture_proposal"
+        ],
+        "artifact_ref_count": 4,
+        "scan_path_count": 6
+      },
+      "name": "boundary_and_reference_policy_scan",
+      "pass_index": 2,
+      "status": "pass",
+      "violations": []
+    },
+    {
+      "evidence": {
+        "decision": "review",
+        "gate_results": {
+          "AHIMSA": {
+            "reason": "",
+            "result": "PASS"
+          },
+          "ANEKANTA": {
+            "reason": "label=mixed; grounded=mechanistic; tokenistic=phenomenological",
+            "result": "WARN"
+          },
+          "BHED_GNAN": {
+            "reason": "No cheap Bhed Gnan register/substance risk detected",
+            "result": "PASS"
+          },
+          "CONSENT": {
+            "reason": "Permission system active",
+            "result": "PASS"
+          },
+          "DOGMA_DRIFT": {
+            "reason": "No dogma drift detected",
+            "result": "PASS"
+          },
+          "REVERSIBILITY": {
+            "reason": "",
+            "result": "PASS"
+          },
+          "SATYA": {
+            "reason": "",
+            "result": "PASS"
+          },
+          "SPEC_INVARIANTS": {
+            "reason": "",
+            "result": "PASS"
+          },
+          "STEELMAN": {
+            "reason": "No proposal context for steelman check",
+            "result": "PASS"
+          },
+          "SVABHAAVA": {
+            "reason": "Partial diversity: label=mixed; grounded=mechanistic; tokenistic=phenomenological",
+            "result": "WARN"
+          },
+          "VYAVASTHIT": {
+            "reason": "",
+            "result": "PASS"
+          },
+          "WITNESS": {
+            "reason": "Think-point satisfied (before_complete)",
+            "result": "PASS"
+          }
+        },
+        "reason": "Advisory: Partial diversity: label=mixed; grounded=mechanistic; tokenistic=phenomenological; label=mixed; grounded=mechanistic; tokenistic=phenomenological"
+      },
+      "name": "telos_gate_redline_scan",
+      "pass_index": 3,
+      "status": "pass",
+      "violations": []
+    }
+  ],
+  "version": "0.1.0",
+  "violations": []
+}

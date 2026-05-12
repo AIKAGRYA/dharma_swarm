@@ -57,7 +57,7 @@ stigmergy:
   coordination_comment: Start here for any overnight autonomous repo-hygiene run that must stay out of the TUI hot lane.
   trace_role: coordination_trace
 curation:
-  last_frontmatter_refresh: '2026-05-10T02:33:00+08:00'
+  last_frontmatter_refresh: '2026-05-12T02:31:47+08:00'
   curated_by_model: Codex (GPT-5)
   future_model_handoffs:
   - GPT-5 Codex
@@ -135,6 +135,8 @@ Each cycle should do exactly one bounded seam:
 
 - 2026-05-08, run `20260402T163603Z`: completed the `specs/` prompt-and-completion residue tranche by removing the stale tracked copies of `PARALLEL_BUILD_AGENT_PROMPTS_2026-03-19.md`, `SOVEREIGN_BUILD_PHASE_MASTER_PROMPT_2026-03-19.md`, and `VERIFICATION_COMPLETE.md` from `specs/`. The authoritative prompt and archive copies remain under `docs/prompts/` and `docs/archive/`.
 - 2026-05-10, run `20260402T163603Z`: completed the `specs/` living-layers research duplicate tranche by removing the stale tracked `specs/research_living_layers/` copies. Active research companion truth remains under `specs/research/`; historical duplicate authority remains under `docs/archive/specs_research_living_layers/`.
+- 2026-05-11, run `20260402T163603Z`: completed the `specs/` non-hot occupant classification tranche by updating `specs/README.md` with authority classes for every remaining tracked occupant. No files were moved, and the DGC terminal architecture spec bodies remained untouched as TUI-adjacent material.
+- 2026-05-12, run `20260402T163603Z`: completed a root-control frontmatter discipline tranche by repairing malformed YAML in `docs/plans/2026-04-02-root-state-reconciliation.md`. No root files were moved, and no code, TUI, dashboard, or product hot-path files were touched.
 
 ## Required Output Per Cycle
 

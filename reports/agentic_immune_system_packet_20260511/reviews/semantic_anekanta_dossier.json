@@ -1,0 +1,37 @@
+{
+  "artifact_path": "reports/agentic_immune_system_packet_20260511/agentic_era_immune_system_dossier.md",
+  "artifact_sha256": "83870bb2c8fe54e49b2dfe9844e46175b7e3b8096599a4760f2821b2bcc92699",
+  "frames": {
+    "mechanistic": {
+      "evidence": "hard_anchor=TelicSeam",
+      "grounded": true,
+      "named": true
+    },
+    "phenomenological": {
+      "evidence": "anchor=I notice",
+      "grounded": true,
+      "named": true
+    },
+    "systems": {
+      "evidence": "anchor=M0; keyword_hits=4",
+      "grounded": true,
+      "named": true
+    }
+  },
+  "gate_result": "PASS",
+  "grounded_frames": [
+    "mechanistic",
+    "phenomenological",
+    "systems"
+  ],
+  "label": "grounded",
+  "named_frames": [
+    "mechanistic",
+    "phenomenological",
+    "systems"
+  ],
+  "reason": "label=grounded; grounded=mechanistic,phenomenological,systems; tokenistic=none",
+  "reviewed_at": "2026-05-12T13:42:37.064807+00:00",
+  "reviewer": "semantic_anekanta_v0",
+  "tokenistic_frames": []
+}

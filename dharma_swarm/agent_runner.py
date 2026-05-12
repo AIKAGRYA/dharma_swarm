@@ -931,21 +931,121 @@ def _build_self_state_block(agent_name: str) -> str:
     return "\n".join(lines)
 
 
+_IDENTITY_ANCHOR_CACHE: str | None = None
+_IDENTITY_ANCHOR_PATH: Path | None = None
+
+
+def _load_identity_anchor() -> str:
+    """Render the machine-readable identity anchor for system-prompt injection.
+
+    Reads ``IDENTITY.yaml`` at repo root and returns a compact (~250 token)
+    block declaring `kind`, the closed-loop edge list, role pointers, and
+    the explicit `not_a` anti-priors. This is the highest-leverage
+    anti-collapse signal — without it, inbound agents reach for the
+    nearest prior in their training (orchestration runtime, agent
+    framework, research repo) and miss the developmental-organism kind.
+
+    Best-effort: returns empty string on any failure (file missing, parse
+    error, no PyYAML). Cached after first load.
+    """
+    global _IDENTITY_ANCHOR_CACHE, _IDENTITY_ANCHOR_PATH
+    if _IDENTITY_ANCHOR_CACHE is not None:
+        return _IDENTITY_ANCHOR_CACHE
+
+    # Repo root is two levels up from this file (dharma_swarm/dharma_swarm/agent_runner.py)
+    repo_root = Path(__file__).resolve().parent.parent
+    candidates = [
+        repo_root / "IDENTITY.yaml",
+        Path.home() / "dharma_swarm" / "IDENTITY.yaml",
+    ]
+    for candidate in candidates:
+        if not candidate.exists():
+            continue
+        try:
+            import yaml  # type: ignore[import-not-found]
+        except ImportError:
+            try:
+                _IDENTITY_ANCHOR_CACHE = candidate.read_text(encoding="utf-8")[:4000]
+                _IDENTITY_ANCHOR_PATH = candidate
+                return _IDENTITY_ANCHOR_CACHE
+            except OSError:
+                continue
+        try:
+            data = yaml.safe_load(candidate.read_text(encoding="utf-8"))
+        except Exception:  # noqa: BLE001
+            continue
+        if not isinstance(data, dict):
+            continue
+        rendered = _render_identity_anchor(data)
+        if rendered:
+            _IDENTITY_ANCHOR_CACHE = rendered
+            _IDENTITY_ANCHOR_PATH = candidate
+            return rendered
+
+    _IDENTITY_ANCHOR_CACHE = ""
+    return ""
+
+
+def _render_identity_anchor(data: dict[str, Any]) -> str:
+    """Render parsed IDENTITY.yaml dict into a compact agent-prompt block."""
+    lines: list[str] = ["## DHARMA SWARM — Machine-Readable Identity"]
+
+    kind = str(data.get("kind") or "").strip()
+    purpose = str(data.get("purpose") or "").strip()
+    if kind:
+        lines.append(f"kind: {kind}")
+    if purpose:
+        lines.append(f"purpose: {purpose}")
+
+    not_a = data.get("not_a") or []
+    if isinstance(not_a, list) and not_a:
+        lines.append("not_a: " + ", ".join(str(x) for x in not_a))
+
+    loop = data.get("loop") or []
+    if isinstance(loop, list) and loop:
+        lines.append("closed_loop:")
+        for edge in loop:
+            lines.append(f"  {edge}")
+
+    roles = data.get("roles") or {}
+    if isinstance(roles, dict) and roles:
+        lines.append("identity_pointers:")
+        for key, value in roles.items():
+            lines.append(f"  {key}: {value}")
+
+    rules = data.get("agent_rule") or []
+    if isinstance(rules, list) and rules:
+        lines.append("agent_rule (ask before any change):")
+        for rule in rules:
+            lines.append(f"  - {rule}")
+
+    if len(lines) <= 1:
+        return ""
+    return "\n".join(lines)
+
+
 def _build_system_prompt(config: AgentConfig) -> str:
     """Build the system prompt from config, v7 rules, role briefings, and live context."""
     from dharma_swarm.models import ProviderType
 
-    # For non-CLAUDE_CODE providers, explicit system_prompt is final
+    identity_anchor = _load_identity_anchor()
+
+    # For non-CLAUDE_CODE providers, explicit system_prompt is final — but we
+    # still prepend the identity anchor so inbound agents never lose the
+    # developmental-organism framing to category collapse (lens-3 / lens-6
+    # audit 2026-05-09).
     if config.system_prompt and config.provider != ProviderType.CLAUDE_CODE:
+        if identity_anchor:
+            return f"{identity_anchor}\n\n{config.system_prompt}"
         return config.system_prompt
 
     from dharma_swarm.daemon_config import V7_BASE_RULES, ROLE_BRIEFINGS
 
     if config.system_prompt:
         # CLAUDE_CODE with explicit prompt: use it as base, append context
-        parts = [config.system_prompt]
+        parts = [identity_anchor, config.system_prompt] if identity_anchor else [config.system_prompt]
     else:
-        parts = [V7_BASE_RULES]
+        parts = [identity_anchor, V7_BASE_RULES] if identity_anchor else [V7_BASE_RULES]
         role_briefing = ROLE_BRIEFINGS.get(config.role.value)
         if role_briefing:
             parts.append(role_briefing)

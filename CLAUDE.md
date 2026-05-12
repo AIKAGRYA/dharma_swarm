@@ -124,6 +124,31 @@ npm --prefix dashboard run dev
 bash run_operator.sh
 ```
 
+## Code Quality Gates (Tier-A, added 2026-05-09)
+
+Beyond the existing dharma-specific gates (kernel signature, telos, shakti warrant, hot-path ack, mismatch map), the codebase runs a Tier-A language-hygiene stack. Both Python and dashboard TypeScript are scanned. **All gates are warn-only initially** — promote to error after baseline stabilizes.
+
+| Tool | What it catches | Run | Pre-commit |
+|---|---|---|---|
+| **vulture** | Python dead code, unused vars, unreachable | `make vulture` | warn-only |
+| **radon cc** | Cyclomatic complexity (D/E/F functions) | `make radon-cc` | warn-only |
+| **radon mi** | Maintainability index <65 modules | `make radon-mi` | — |
+| **bandit** | Security issues (subprocess shell, eval, etc.) | `make bandit` | warn-only |
+| **mypy** | Python type errors | `make mypy` | warn-only |
+| **pyright** | Strict type errors | `make pyright` | — |
+| **pytest --cov** | Coverage report | `make cov-threshold` | — |
+| **fallow** | Dashboard TS dead code, duplication, complexity | `cd dashboard && npm run quality` | warn-only |
+
+**Composite:** `make quality` runs all + routes high-severity findings via `scripts/governance/route_quality_findings.py` to `~/.dharma/audit/quality/<date>/proposals/broken_register_proposals.md` for human triage.
+
+**CI:** `.github/workflows/quality.yml` (advisory; uploads `quality-reports/` artifacts).
+
+**Tool config lives in:** `pyproject.toml` `[tool.vulture|coverage|mypy|bandit]`, `pyrightconfig.json`, `.vulture_whitelist.py`, `dashboard/package.json` scripts.
+
+**fallow MCP** is wired at `~/.claude/.mcp.json` as `fallow-dashboard` — agents can query dashboard quality findings directly via the MCP surface.
+
+**Discipline rule:** when adding code, also add to whitelist (vulture) or fix (radon/bandit/mypy). The "I'll leave a TODO" failure mode is what these gates exist to prevent — see Syntax podcast 2026-05 framing: "agents.md is a sign that says don't, you can walk past."
+
 ## Security Rules
 
 - NEVER hardcode API keys, secrets, or credentials in source files

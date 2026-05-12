@@ -254,8 +254,12 @@ def _research_report() -> tuple[ResearchReport, list[SourceDocument]]:
         "[source-jagat-kalyan] However, the strongest counterargument is that revenue pressure "
         "could pull a welfare-governance system back into extraction; the mitigation is an "
         "audited council trace, provenance, and a MIROFISH adversarial pass. The mechanism is "
-        "a typed ontology architecture, the phenomenological guard is witness awareness, and "
-        "the systems frame is feedback across the market ecosystem. Recommended next step: "
+        "a typed ontology architecture: ActionProposal, GateDecisionRecord, Outcome, "
+        "ValueEvent, and Contribution records are written through TelicSeam. The "
+        "phenomenological guard records first-person uncertainty before publication: "
+        "right now, I notice the claim could overreach without external buyer evidence. "
+        "The systems frame is feedback from buyer signal to revenue validation to "
+        "council review. Recommended next step: "
         "publish the page, then attach one external buyer signal before revenue validation."
     )
     report = ResearchReport(

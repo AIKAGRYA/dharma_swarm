@@ -1,0 +1,49 @@
+{
+  "agent_id": "codex-reviewer",
+  "checksum": "0a8cb088ffe02b2f8794c206c75646dd209870edc8fb868e3e06e693f176b0b2",
+  "contract_version": "1.0.0",
+  "emitted_at": "2026-05-12T13:53:32.317450+00:00",
+  "event_id": "evt_02b30658258043b19dc7dabcdf30bb61",
+  "event_type": "audit.event",
+  "payload": {
+    "build_packet_id": "bld-proof-artifact-closure-20260512",
+    "child_checkpoint_ids": [
+      "review_wp_001"
+    ],
+    "diff_summary": {
+      "added": 0,
+      "files": 0,
+      "removed": 0
+    },
+    "gate": "proof_seal",
+    "gate_results_aggregate": {
+      "scope_check": {
+        "fail_count": 0,
+        "hold_count": 0,
+        "pass_count": 1
+      },
+      "scoped_tests": {
+        "fail_count": 0,
+        "hold_count": 0,
+        "pass_count": 1
+      },
+      "telos": {
+        "fail_count": 0,
+        "hold_count": 0,
+        "pass_count": 1
+      }
+    },
+    "merge_decision": "seal",
+    "reason": "ProofArtifact closure packet passed focused tests and whole-organism closure preflight; no source diff is applied in shadow mode.",
+    "result": "pass",
+    "signed_by": [
+      "codex-reviewer"
+    ],
+    "test_outputs_ref": "reports/agentic_immune_system_packet_20260511/test_output_proof_artifact_closure_20260512.txt",
+    "witness_log_ref": "",
+    "work_packet_id": "wp_001"
+  },
+  "session_id": "proof-artifact-closure-20260512",
+  "source": "sovereign-build-packet-protocol-v0",
+  "trace_id": "trc_a39aded4b8b34cc98e17fa5dfe9f338e"
+}

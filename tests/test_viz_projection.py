@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import time
 import tempfile
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
 
+from dharma_swarm.telemetry_plane import ExternalOutcomeRecord, TelemetryPlaneStore
 from dharma_swarm.viz_projection import (
     GraphEdge,
     GraphEvent,
@@ -193,3 +195,32 @@ class TestVizProjector:
             assert "stuck_count" in snapshot.summary
             assert "total_nodes" in snapshot.summary
             assert "total_edges" in snapshot.summary
+
+    @pytest.mark.asyncio
+    async def test_build_snapshot_projects_invariant_measurements(self, tmp_path: Path):
+        db_path = tmp_path / "state" / "runtime.db"
+        store = TelemetryPlaneStore(db_path)
+        await store.init_db()
+        base = datetime(2026, 5, 1, tzinfo=timezone.utc)
+        for idx, value in enumerate([0.60, 0.61, 0.62]):
+            await store.record_external_outcome(
+                ExternalOutcomeRecord(
+                    outcome_id=f"outcome-{idx}",
+                    outcome_kind="gauntlet.tier1.correctness",
+                    value=value,
+                    created_at=base + timedelta(days=idx),
+                )
+            )
+
+        projector = VizProjector(state_dir=tmp_path)
+        snapshot = projector.build_snapshot()
+        measurement_nodes = [
+            node for node in snapshot.nodes
+            if node.node_type == "measurement"
+        ]
+
+        assert snapshot.summary["invariant_measurements"] >= 1
+        assert any(
+            node.id == "invariant:external_outcome.gauntlet_tier1_correctness.slope"
+            for node in measurement_nodes
+        )

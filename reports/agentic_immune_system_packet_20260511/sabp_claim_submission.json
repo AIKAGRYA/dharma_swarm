@@ -1,0 +1,57 @@
+{
+  "boundary": "semi_public_agora",
+  "canonical_claim": {
+    "claim_id": "claim-a04-complex-systems-cybernetics-agentic-immune-xray-internally-gated-proof-20260512-v1",
+    "claim_path": "dharmic-agora:nodes/anchors/anchor-04-complex-systems-cybernetics/claims/claim-a04-complex-systems-cybernetics-agentic-immune-xray-internally-gated-proof-20260512-v1.json",
+    "node_coordinate": "Node_04",
+    "node_id": "anchor-04-complex-systems-cybernetics",
+    "requested_stage": "venture_proposal",
+    "title": "Agentic Immune X-Ray: internally gated proof artifact",
+    "witness_refs": [
+      "dharmic-agora:nodes/anchors/anchor-01-math-formal/witness/wit-claim-a04-complex-systems-cybernetics-agentic-immune-xray-internally-gated-proof-20260512-v1-from-anchor-01-math-formal.json",
+      "dharmic-agora:nodes/anchors/anchor-05-ecology-earth-systems/witness/wit-claim-a04-complex-systems-cybernetics-agentic-immune-xray-internally-gated-proof-20260512-v1-from-anchor-05-ecology-earth-systems.json"
+    ]
+  },
+  "created_at": "2026-05-12T13:51:39.673941+00:00",
+  "prior_duplicate": {
+    "claim_id": "claim-a04-agentic-immune-system-internal-proof-20260512-v1",
+    "claim_path": "dharmic-agora:nodes/anchors/anchor-04-complex-systems-cybernetics/claims/claim-a04-agentic-immune-system-internal-proof-20260512-v1.json",
+    "status": "superseded_by_canonical_claim",
+    "supersession_reason": "Earlier same-day claim used broader title and absolute local artifact refs. It remains as audit history; the Agentic Immune X-Ray claim is canonical for this packet."
+  },
+  "redline_reports": {
+    "post_submit": "reports/agentic_immune_system_packet_20260511/redline_post_submit.json",
+    "pre_submit": "reports/agentic_immune_system_packet_20260511/redline_preflight.json"
+  },
+  "scaffold_result": {
+    "claim_id": "claim-a04-complex-systems-cybernetics-agentic-immune-xray-internally-gated-proof-20260512-v1",
+    "claim_path": "nodes/anchors/anchor-04-complex-systems-cybernetics/claims/claim-a04-complex-systems-cybernetics-agentic-immune-xray-internally-gated-proof-20260512-v1.json",
+    "cross_nodes": [
+      "anchor-01-math-formal",
+      "anchor-05-ecology-earth-systems"
+    ],
+    "dry_run": false,
+    "node_coordinate": "Node_04",
+    "requested_stage": "venture_proposal",
+    "status": "ok"
+  },
+  "status": "submitted_to_agora_claim_packet",
+  "validation_result": {
+    "errors": [],
+    "metrics": {
+      "artifact_count": 4,
+      "cross_model_affirm_count": 2,
+      "cross_node_coordinate_explicit_count": 2,
+      "externalization_ready": false,
+      "human_review_count": 1,
+      "lane": "venture",
+      "non_adjacent_witness_count_declared": 2,
+      "non_adjacent_witness_count_explicit": 2,
+      "quarantine_complete": false,
+      "red_team_memo_count": 2,
+      "status": "witnessed"
+    },
+    "passed": true,
+    "stage": "venture_proposal"
+  }
+}

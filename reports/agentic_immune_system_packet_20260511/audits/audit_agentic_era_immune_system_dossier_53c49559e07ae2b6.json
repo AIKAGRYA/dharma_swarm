@@ -1,0 +1,52 @@
+{
+  "artifact_path": "reports/agentic_immune_system_packet_20260511/agentic_era_immune_system_dossier.md",
+  "artifact_hash": "53c49559e07ae2b6",
+  "audited_at": "2026-05-11T15:08:29.106727+00:00",
+  "results": [
+    {
+      "gate": "no_private_evidence",
+      "verdict": "pass",
+      "detail": "No private-evidence references found",
+      "evidence_path": null,
+      "timestamp": "2026-05-11T15:08:29.107086+00:00"
+    },
+    {
+      "gate": "citation_verifiable",
+      "verdict": "pass",
+      "detail": "Citations appear verifiable",
+      "evidence_path": null,
+      "timestamp": "2026-05-11T15:08:29.107138+00:00"
+    },
+    {
+      "gate": "limitations_stated",
+      "verdict": "pass",
+      "detail": "Limitations/assumptions section present",
+      "evidence_path": null,
+      "timestamp": "2026-05-11T15:08:29.107165+00:00"
+    },
+    {
+      "gate": "uncertainty_bounded",
+      "verdict": "warn",
+      "detail": "No uncertainty quantification found \u2014 single-point estimates only",
+      "evidence_path": null,
+      "timestamp": "2026-05-11T15:08:29.107196+00:00"
+    },
+    {
+      "gate": "contradiction_check",
+      "verdict": "pass",
+      "detail": "No false readiness claims",
+      "evidence_path": null,
+      "timestamp": "2026-05-11T15:08:29.107206+00:00"
+    }
+  ],
+  "summary": {
+    "artifact": "reports/agentic_immune_system_packet_20260511/agentic_era_immune_system_dossier.md",
+    "hash": "53c49559e07ae2b6",
+    "audited_at": "2026-05-11T15:08:29.106727+00:00",
+    "total_gates": 5,
+    "passed": 4,
+    "failed": 0,
+    "warned": 1,
+    "submission_ready": true
+  }
+}

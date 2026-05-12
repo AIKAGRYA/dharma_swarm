@@ -5,7 +5,8 @@ DASHBOARD_DIR ?= dashboard
 
 .PHONY: help xray xray-json compile test-smoke test-all ci-local dashboard-lint dashboard-build \
         semgrep gitleaks precommit-install precommit-run governance-baseline \
-        prompt-governance prompt-lane-run packet-provenance packet-provenance-summary
+        prompt-governance prompt-lane-run packet-provenance packet-provenance-summary \
+        agent-online-check
 
 help:
 	@printf "Available targets:\n"
@@ -26,6 +27,7 @@ help:
 	@printf "  make prompt-lane-run LANE=... TARGET=... # create governed prompt work packet\n"
 	@printf "  make packet-provenance COMMIT_MSG=... # check Packet-Id coverage\n"
 	@printf "  make packet-provenance-summary # summarize Packet-Id bypass/rejection evidence\n"
+	@printf "  make agent-online-check # validate AGENT_ONLINE node integrity\n"
 
 xray:
 	$(PYTHON) scripts/repo_xray.py
@@ -117,6 +119,9 @@ packet-provenance:
 
 packet-provenance-summary:
 	$(PYTHON) scripts/governance/packet_provenance_summary.py
+
+agent-online-check:
+	$(PYTHON) scripts/governance/check_agent_online.py
 
 governance-all: semgrep gitleaks mismatch-check test-hygiene module-budget prompt-governance
 

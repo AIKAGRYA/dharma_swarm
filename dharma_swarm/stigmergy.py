@@ -37,6 +37,8 @@ STIGMERGY_CHANNELS: list[str] = [
     "strategy",     # Business, grants, partnerships
     "governance",   # Telos alignment, audit findings
     "memory",       # Consolidation, retrieval, knowledge graph
+    "review",       # Recognition→action queue: gaps awaiting consumer/operator review
+    "action_queue", # Marks promoted from review into a concrete next-action surface
 ]
 
 # Marks above this salience are visible across all channels

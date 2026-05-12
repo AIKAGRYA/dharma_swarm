@@ -1,0 +1,131 @@
+[
+  {
+    "cadence": "daily 04:30",
+    "inputs": [
+      "live_ops_dashboard",
+      "broken_register",
+      "active_tasks"
+    ],
+    "may_mutate_authority": false,
+    "mode": "wake",
+    "outputs": [
+      "morning_context_bundle"
+    ]
+  },
+  {
+    "cadence": "hourly",
+    "inputs": [
+      "repo_changes",
+      "wiki_changes",
+      "runtime_events",
+      "external_feeds"
+    ],
+    "may_mutate_authority": false,
+    "mode": "sense",
+    "outputs": [
+      "episode_candidates"
+    ]
+  },
+  {
+    "cadence": "after work packet",
+    "inputs": [
+      "tests",
+      "reviews",
+      "outcomes",
+      "agentops"
+    ],
+    "may_mutate_authority": false,
+    "mode": "learning",
+    "outputs": [
+      "lesson_candidates",
+      "procedure_candidates"
+    ]
+  },
+  {
+    "cadence": "daily",
+    "inputs": [
+      "episodes",
+      "claims",
+      "evidence",
+      "outcomes"
+    ],
+    "may_mutate_authority": false,
+    "mode": "reflection",
+    "outputs": [
+      "claim_candidates",
+      "contradiction_candidates"
+    ]
+  },
+  {
+    "cadence": "nightly",
+    "inputs": [
+      "nodes",
+      "edges",
+      "retrieval_logs",
+      "wiki_atoms"
+    ],
+    "may_mutate_authority": false,
+    "mode": "sleep",
+    "outputs": [
+      "dedupe_report",
+      "stale_report",
+      "graph_refresh"
+    ]
+  },
+  {
+    "cadence": "weekly",
+    "inputs": [
+      "distant_concepts",
+      "open_questions",
+      "low_connected_subgraphs"
+    ],
+    "may_mutate_authority": false,
+    "mode": "dream",
+    "outputs": [
+      "synthesis_candidates"
+    ],
+    "promotion_rule": "candidate_only_until_evidence_review"
+  },
+  {
+    "cadence": "daily",
+    "inputs": [
+      "authority_docs",
+      "docops_findings",
+      "broken_links"
+    ],
+    "may_mutate_authority": false,
+    "mode": "immune",
+    "outputs": [
+      "duplicate_authority_findings",
+      "unsupported_claim_findings"
+    ]
+  },
+  {
+    "cadence": "manual or reviewed PR",
+    "inputs": [
+      "trusted_candidates",
+      "evidence",
+      "owner_approval"
+    ],
+    "may_mutate_authority": true,
+    "mode": "promotion",
+    "outputs": [
+      "promotion_pr"
+    ],
+    "requires_human_review": true
+  },
+  {
+    "cadence": "weekly reviewed PR",
+    "inputs": [
+      "stale_docs",
+      "superseded_cards",
+      "archive_candidates"
+    ],
+    "may_mutate_authority": true,
+    "mode": "forgetting",
+    "outputs": [
+      "archive_pr_with_tombstones"
+    ],
+    "requires_human_review": true
+  }
+]

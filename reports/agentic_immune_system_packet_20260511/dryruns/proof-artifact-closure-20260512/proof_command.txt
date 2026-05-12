@@ -1,0 +1,1 @@
+pytest tests/test_proof_artifact_to_spec.py tests/test_build_protocol_cli.py -q

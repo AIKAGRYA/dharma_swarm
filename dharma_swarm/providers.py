@@ -79,7 +79,6 @@ from dharma_swarm.telemetry_plane import (
     EconomicEventRecord,
     ExternalOutcomeRecord,
     PolicyDecisionRecord,
-    RoutingDecisionRecord,
     TelemetryPlaneStore,
 )
 
@@ -2307,39 +2306,28 @@ class ModelRouter:
         initial_provider: ProviderType,
         initial_model: str,
         response_model: str | None = None,
+        route_metadata: dict[str, Any] | None = None,
     ) -> None:
         if self._telemetry is None:
             return
         scope = self._telemetry_scope(route_request)
         estimated_cost_usd = _estimate_cost(selected_model, prompt_tokens, completion_tokens)
-        routing_record = RoutingDecisionRecord(
-            decision_id=self._telemetry_id("route"),
-            action_name=route_request.action_name,
-            route_path=decision.path.value,
-            selected_provider=selected_provider.value,
-            selected_model_hint=selected_model,
-            confidence=decision.confidence,
-            requires_human=decision.requires_human,
-            session_id=scope["session_id"],
-            task_id=scope["task_id"],
-            run_id=scope["run_id"],
-            reasons=list(decision.reasons),
-            metadata={
-                "result": result,
-                "task_signature": task_signature,
-                "candidate_chain": [provider.value for provider in chain],
-                "initial_selected_provider": initial_provider.value,
-                "initial_selected_model": initial_model,
-                "fallback_selected": selected_provider != initial_provider,
-                "latency_ms": round(float(latency_ms), 3),
-                "prompt_tokens": int(prompt_tokens),
-                "completion_tokens": int(completion_tokens),
-                "total_tokens": int(total_tokens),
-                "estimated_cost_usd": estimated_cost_usd,
-                "response_model": response_model or "",
-                "failure_trace": list(failure_trace),
-            },
-        )
+        metadata = {
+            "result": result,
+            "task_signature": task_signature,
+            "candidate_chain": [provider.value for provider in chain],
+            "initial_selected_provider": initial_provider.value,
+            "initial_selected_model": initial_model,
+            "fallback_selected": selected_provider != initial_provider,
+            "latency_ms": round(float(latency_ms), 3),
+            "prompt_tokens": int(prompt_tokens),
+            "completion_tokens": int(completion_tokens),
+            "total_tokens": int(total_tokens),
+            "estimated_cost_usd": estimated_cost_usd,
+            "response_model": response_model or "",
+            "failure_trace": list(failure_trace),
+        }
+        metadata.update(route_metadata or {})
         completion_outcome = ExternalOutcomeRecord(
             outcome_id=self._telemetry_id("outcome"),
             outcome_kind="provider_completion",
@@ -2363,8 +2351,92 @@ class ModelRouter:
                 "response_model": response_model or "",
             },
         )
+        decision_id = self._telemetry_id("route")
+        attempt_records = []
         try:
-            await self._telemetry.record_routing_decision(routing_record)
+            from dharma_swarm.route_witness import (
+                build_provider_attempt,
+                emit_routing_decision,
+            )
+
+            for item in failure_trace:
+                provider_name = str(item.get("provider") or "")
+                provider_arg: ProviderType | str = (
+                    self._parse_provider_type(provider_name) or provider_name
+                )
+                attempt_records.append(
+                    build_provider_attempt(
+                        decision_id=decision_id,
+                        attempt_idx=len(attempt_records),
+                        provider=provider_arg,
+                        model=str(item.get("model") or ""),
+                        success=False,
+                        duration_ms=float(item.get("latency_ms") or 0.0),
+                        error=str(item.get("error") or "") or None,
+                        circuit_state=str(item.get("state") or "closed"),
+                    )
+                )
+            if result == "success":
+                attempt_records.append(
+                    build_provider_attempt(
+                        decision_id=decision_id,
+                        attempt_idx=len(attempt_records),
+                        provider=selected_provider,
+                        model=selected_model,
+                        success=True,
+                        duration_ms=float(latency_ms),
+                        usage={
+                            "prompt_tokens": int(prompt_tokens),
+                            "completion_tokens": int(completion_tokens),
+                            "total_tokens": int(total_tokens),
+                        },
+                        cost_estimate_usd=estimated_cost_usd,
+                    )
+                )
+            if "canary_applied" in decision.reasons:
+                decision_class = "canary"
+            elif selected_provider != initial_provider:
+                decision_class = "fallback"
+            elif result != "success" and len(chain) > 1:
+                decision_class = "fallback"
+            else:
+                decision_class = "pinned"
+            await emit_routing_decision(
+                decision_id=decision_id,
+                action_name=route_request.action_name,
+                route_path=decision.path.value,
+                selected_provider=selected_provider,
+                selected_model=selected_model,
+                candidate_chain=chain,
+                decision_class=decision_class,
+                caller="providers.ModelRouter.complete_for_task",
+                duration_ms=float(latency_ms),
+                attempts=attempt_records,
+                task_type=str(route_request.context.get("task_type") or "unknown"),
+                task_signature=task_signature,
+                confidence=decision.confidence,
+                requires_human=decision.requires_human,
+                reasons=list(decision.reasons),
+                widened_from=(
+                    initial_provider if selected_provider != initial_provider else None
+                ),
+                session_id=scope["session_id"],
+                task_id=scope["task_id"],
+                run_id=scope["run_id"],
+                total_tokens=int(total_tokens),
+                cost_estimate_usd=estimated_cost_usd,
+                outcome="success" if result == "success" else "all_failed",
+                metadata=metadata,
+                telemetry=self._telemetry,
+                audit_log_path=self._routing_audit_path,
+                telemetry_enabled=True,
+                audit_enabled=self._routing_audit_enabled,
+            )
+        except Exception:
+            # Route witness is observational. Preserve completion/outcome/cost
+            # telemetry even if canonical witness construction fails.
+            pass
+        try:
             await self._telemetry.record_external_outcome(completion_outcome)
             if total_tokens > 0 or estimated_cost_usd > 0.0:
                 await self._telemetry.record_economic_event(
@@ -2391,6 +2463,164 @@ class ModelRouter:
                 )
         except Exception:
             return
+
+    async def _record_resident_degraded_handoff(
+        self,
+        *,
+        route_request: ProviderRouteRequest,
+        decision: ProviderRouteDecision,
+        chain: list[ProviderType],
+        task_signature: str,
+        reason: str,
+        outcome: str,
+        failure_trace: list[dict[str, Any]] | None = None,
+    ) -> None:
+        """Record that provider routing failed but the resident agent stayed awake.
+
+        This is not routing policy and it does not choose a provider. It creates
+        an observable control-plane handoff so "no provider available" never
+        becomes "no agent aware of the task."
+        """
+        scope = self._telemetry_scope(route_request)
+        failure_trace = list(failure_trace or [])
+        decision_id = self._telemetry_id("resident")
+
+        try:
+            from dharma_swarm.route_witness import (
+                build_provider_attempt,
+                emit_routing_decision,
+                redact_error_detail,
+            )
+        except Exception:
+            build_provider_attempt = None  # type: ignore[assignment]
+            emit_routing_decision = None  # type: ignore[assignment]
+
+            def redact_error_detail(value: str) -> str:  # type: ignore[no-redef]
+                return str(value or "")[:200]
+
+        safe_failures: list[dict[str, Any]] = []
+        attempt_records = []
+        for item in failure_trace:
+            provider_name = str(item.get("provider") or "")
+            model_name = str(item.get("model") or "")
+            error = redact_error_detail(str(item.get("error") or ""))
+            safe_failures.append(
+                {
+                    "provider": provider_name,
+                    "model": model_name,
+                    "error": error,
+                    "state": str(item.get("state") or ""),
+                    "latency_ms": float(item.get("latency_ms") or 0.0),
+                }
+            )
+            if build_provider_attempt is None or not provider_name:
+                continue
+            provider_arg: ProviderType | str = (
+                self._parse_provider_type(provider_name) or provider_name
+            )
+            try:
+                attempt_records.append(
+                    build_provider_attempt(
+                        decision_id=decision_id,
+                        attempt_idx=len(attempt_records),
+                        provider=provider_arg,
+                        model=model_name,
+                        success=False,
+                        duration_ms=float(item.get("latency_ms") or 0.0),
+                        error=error or None,
+                        circuit_state=str(item.get("state") or "closed"),
+                    )
+                )
+            except Exception:
+                continue
+
+        chain_values = [provider.value for provider in chain]
+        metadata = {
+            "result": "resident_degraded_handoff",
+            "resident_fallback": True,
+            "resident_agent": "resident_control_plane",
+            "handoff_reason": reason,
+            "task_signature": task_signature,
+            "candidate_chain": chain_values,
+            "failure_trace": safe_failures,
+            "next_action": "operator_or_resident_agent_retry_when_provider_available",
+        }
+        reasons = [*decision.reasons, f"resident_degraded_handoff:{reason}"]
+
+        if emit_routing_decision is not None:
+            try:
+                await emit_routing_decision(
+                    decision_id=decision_id,
+                    action_name=route_request.action_name,
+                    route_path=decision.path.value,
+                    selected_provider="",
+                    selected_model="resident-control-plane",
+                    candidate_chain=chain,
+                    decision_class="no_route",
+                    caller="providers.ModelRouter.resident_degraded_handoff",
+                    duration_ms=0.0,
+                    attempts=attempt_records,
+                    task_type=str(route_request.context.get("task_type") or "unknown"),
+                    task_signature=task_signature,
+                    confidence=0.0,
+                    requires_human=True,
+                    reasons=reasons,
+                    session_id=scope["session_id"],
+                    task_id=scope["task_id"],
+                    run_id=scope["run_id"],
+                    total_tokens=0,
+                    cost_estimate_usd=0.0,
+                    outcome=outcome,
+                    metadata=metadata,
+                    telemetry=self._telemetry,
+                    audit_log_path=self._routing_audit_path,
+                    telemetry_enabled=self._telemetry is not None,
+                    audit_enabled=self._routing_audit_enabled,
+                )
+            except Exception:
+                pass
+
+        if self._telemetry is not None:
+            try:
+                await self._telemetry.record_external_outcome(
+                    ExternalOutcomeRecord(
+                        outcome_id=self._telemetry_id("outcome"),
+                        outcome_kind="resident_degraded_handoff",
+                        value=1.0,
+                        unit="handoff",
+                        confidence=1.0,
+                        status="queued",
+                        subject_id="resident_control_plane",
+                        summary=(
+                            f"{route_request.action_name} handed to resident "
+                            f"control plane: {reason}"
+                        ),
+                        session_id=scope["session_id"],
+                        task_id=scope["task_id"],
+                        run_id=scope["run_id"],
+                        metadata=metadata,
+                    )
+                )
+            except Exception:
+                pass
+
+        try:
+            from dharma_swarm.stigmergy import leave_stigmergic_mark
+
+            await leave_stigmergic_mark(
+                agent="resident_control_plane",
+                file_path="dharma_swarm/providers.py",
+                observation=(
+                    f"Provider route unavailable for {route_request.action_name}: "
+                    f"{reason}; resident handoff queued."
+                )[:200],
+                salience=0.95,
+                connections=[task_signature, *chain_values],
+                action="connect",
+                channel="action_queue",
+            )
+        except Exception:
+            pass
 
     def _apply_session_affinity(
         self,
@@ -2701,6 +2931,10 @@ class ModelRouter:
             enriched_request,
             available_provider_types=available_provider_types,
         )
+        task_signature = build_task_signature(
+            action_name=enriched_request.action_name,
+            context=enriched_request.context,
+        )
         chain = self._provider_chain(
             decision,
             available_provider_types=available_provider_types,
@@ -2710,11 +2944,16 @@ class ModelRouter:
             fallback_set = set(available_provider_types or self._providers.keys())
             chain = [p for p in self._providers if p in fallback_set]
         if not chain:
+            await self._record_resident_degraded_handoff(
+                route_request=enriched_request,
+                decision=decision,
+                chain=[],
+                task_signature=task_signature,
+                reason="no_available_providers_after_routing_filter",
+                outcome="no_route",
+                failure_trace=[],
+            )
             raise RuntimeError("No available providers after routing filter")
-        task_signature = build_task_signature(
-            action_name=enriched_request.action_name,
-            context=enriched_request.context,
-        )
         preserve_requested_model = bool(
             enriched_request.context.get("preserve_requested_model")
         )
@@ -2902,6 +3141,7 @@ class ModelRouter:
                             "model": request_for_provider.model,
                             "error": response_error,
                             "state": breaker.state.value,
+                            "latency_ms": round(float(latency_ms), 3),
                         }
                     )
                     await self._record_provider_attempt_outcome(
@@ -2968,33 +3208,6 @@ class ModelRouter:
                         ],
                         reasons=[*decision.reasons, "fallback_provider_selected"],
                     )
-                self._append_routing_audit(
-                    {
-                        "timestamp": started_at.isoformat(),
-                        "action": enriched_request.action_name,
-                        "path": decision.path.value,
-                        "provider_selected": routed_decision.selected_provider.value,
-                        "model_selected": selected_model,
-                        "chain": [item.value for item in chain],
-                        "reward_scores": {
-                            item.value: self._reward_for(
-                                item, model_hints.get(item) or ""
-                            )
-                            for item in chain
-                        },
-                        "routing_memory_scores": routing_memory_scores,
-                        "task_signature": task_signature,
-                        "reasons": routed_decision.reasons,
-                        "signals": {
-                            "language_code": signals.language_code,
-                            "complexity_tier": signals.complexity_tier,
-                            "complexity_score": signals.complexity_score,
-                            "token_estimate": signals.token_estimate,
-                        },
-                        "failures": failure_trace,
-                        "result": "success",
-                    }
-                )
                 await self._record_route_execution_telemetry(
                     route_request=enriched_request,
                     decision=routed_decision,
@@ -3011,6 +3224,22 @@ class ModelRouter:
                     initial_provider=planned_provider,
                     initial_model=planned_model,
                     response_model=response.model,
+                    route_metadata={
+                        "started_at": started_at.isoformat(),
+                        "reward_scores": {
+                            item.value: self._reward_for(
+                                item, model_hints.get(item) or ""
+                            )
+                            for item in chain
+                        },
+                        "routing_memory_scores": routing_memory_scores,
+                        "signals": {
+                            "language_code": signals.language_code,
+                            "complexity_tier": signals.complexity_tier,
+                            "complexity_score": signals.complexity_score,
+                            "token_estimate": signals.token_estimate,
+                        },
+                    },
                 )
                 # Enrich response with provider info for trajectory capture
                 if not response.provider:
@@ -3040,6 +3269,7 @@ class ModelRouter:
                         "model": request_for_provider.model,
                         "error": str(exc)[:300],
                         "state": breaker.state.value,
+                        "latency_ms": round(float(latency_ms), 3),
                     }
                 )
                 await self._record_provider_attempt_outcome(
@@ -3054,31 +3284,6 @@ class ModelRouter:
                     error=str(exc)[:120],
                 )
 
-        self._append_routing_audit(
-            {
-                "timestamp": started_at.isoformat(),
-                "action": enriched_request.action_name,
-                "path": decision.path.value,
-                "provider_selected": decision.selected_provider.value,
-                "model_selected": selected_model,
-                "chain": [item.value for item in chain],
-                "reward_scores": {
-                    item.value: self._reward_for(item, model_hints.get(item) or "")
-                    for item in chain
-                },
-                "routing_memory_scores": routing_memory_scores,
-                "task_signature": task_signature,
-                "reasons": decision.reasons,
-                "signals": {
-                    "language_code": signals.language_code,
-                    "complexity_tier": signals.complexity_tier,
-                    "complexity_score": signals.complexity_score,
-                    "token_estimate": signals.token_estimate,
-                },
-                "failures": failure_trace,
-                "result": "failed",
-            }
-        )
         await self._record_route_execution_telemetry(
             route_request=enriched_request,
             decision=decision,
@@ -3094,6 +3299,29 @@ class ModelRouter:
             failure_trace=failure_trace,
             initial_provider=planned_provider,
             initial_model=planned_model,
+            route_metadata={
+                "started_at": started_at.isoformat(),
+                "reward_scores": {
+                    item.value: self._reward_for(item, model_hints.get(item) or "")
+                    for item in chain
+                },
+                "routing_memory_scores": routing_memory_scores,
+                "signals": {
+                    "language_code": signals.language_code,
+                    "complexity_tier": signals.complexity_tier,
+                    "complexity_score": signals.complexity_score,
+                    "token_estimate": signals.token_estimate,
+                },
+            },
+        )
+        await self._record_resident_degraded_handoff(
+            route_request=enriched_request,
+            decision=decision,
+            chain=chain,
+            task_signature=task_signature,
+            reason="all_providers_failed",
+            outcome="all_failed",
+            failure_trace=failure_trace,
         )
         trace_preview = "; ".join(
             f"{item.get('provider')}:{item.get('error')}" for item in failure_trace[-6:]

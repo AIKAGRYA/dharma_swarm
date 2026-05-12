@@ -26,9 +26,9 @@ inspiration:
 - repo_topology
 - canonical_truth
 connected_relevant_files:
-  - docs/plans/2026-04-02-cleanup-control-center.md
-  - docs/plans/ROOT_DRAIN_PASS_2026-04-01_WAVE2.md
-  - docs/plans/ROOT_DRAIN_PASS_2026-04-01_WAVE4.md
+- docs/plans/2026-04-02-cleanup-control-center.md
+- docs/plans/ROOT_DRAIN_PASS_2026-04-01_WAVE2.md
+- docs/plans/ROOT_DRAIN_PASS_2026-04-01_WAVE4.md
 - docs/plans/2026-04-02-root-residue-classification.md
 - docs/plans/2026-04-02-root-next-tranche-plan.md
 - docs/architecture/GENOME_WIRING.md
@@ -61,7 +61,7 @@ stigmergy:
   coordination_comment: Use this file when older wave notes disagree with the current root classification docs.
   trace_role: coordination_trace
 curation:
-  last_frontmatter_refresh: '2026-04-02T23:59:00+09:00'
+  last_frontmatter_refresh: '2026-05-12T02:31:47+08:00'
   curated_by_model: Codex (GPT-5)
   future_model_handoffs:
   - GPT-5 Codex

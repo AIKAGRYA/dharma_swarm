@@ -68,6 +68,14 @@ fi
 export DGC_ROUTER_TELEMETRY_ENABLE="${DGC_ROUTER_TELEMETRY_ENABLE:-1}"
 export DGC_ROUTER_TELEMETRY_DB="${DGC_ROUTER_TELEMETRY_DB:-${STATE_DIR}/state/runtime.db}"
 
+# Close the action→learning edge: orchestrator._fitness_biased_pick
+# (orchestrator.py:965-1004) consults TelicSeam.query_agent_fitness when
+# this flag is set. Falls back to FIFO when no scores yet, so harmless
+# even with sparse data — flipping now means routing auto-biases as
+# Outcome/ValueEvent/Contribution rows accumulate. Override per-shell
+# with `ENABLE_FITNESS_ROUTING=0 bash run_operator.sh` if needed.
+export ENABLE_FITNESS_ROUTING="${ENABLE_FITNESS_ROUTING:-1}"
+
 if [[ -z "${OPENROUTER_API_KEY:-}" ]]; then
     echo "WARNING: OPENROUTER_API_KEY not set. Chat providers may run degraded." >&2
 fi

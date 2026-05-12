@@ -1,0 +1,23 @@
+{
+  "accepted": true,
+  "applied": false,
+  "archive_entry_id": "04b43501544d416d",
+  "files_changed": [],
+  "packet_root": "/Users/dhyana/dharma_swarm/reports/agentic_immune_system_packet_20260511/dryruns/proof-artifact-closure-20260512",
+  "proof_exit_code": 0,
+  "proposal_id": "243090fc5a30417a",
+  "reason": "sealed packet archived in shadow mode",
+  "refused_checks": [],
+  "shadow": true,
+  "test_results": {
+    "exit_code": 0,
+    "pass_rate": 1.0,
+    "sealed_packet": {
+      "diff_lines": 0,
+      "diff_missing": true,
+      "files_changed": [],
+      "proof_command": "pytest tests/test_proof_artifact_to_spec.py tests/test_build_protocol_cli.py -q",
+      "shadow": true
+    }
+  }
+}
