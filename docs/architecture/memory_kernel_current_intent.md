@@ -34,6 +34,7 @@ The active work should stay within these limits:
 - M2B: KnowledgeOps read-only evidence intake
 - M2C: conflict and projection review
 - M2D: read-only promotion proposal queue
+- M2E: read-only promotion decision ledger
 
 Do not add prompt-context admission, canon writes, Chetana mutations, vector
 rebuilds, migrations, or write-through gates until the read-only layers are

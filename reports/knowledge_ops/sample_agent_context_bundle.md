@@ -1,8 +1,8 @@
 # Agent Context Bundle: knowledgeops.v0.sample
 
 Role: knowledge-ops-reviewer
-Generated: 2026-05-12T14:22:43.669516+00:00
-Expires: 2026-05-13T02:22:43.669516+00:00
+Generated: 2026-05-12T15:10:39.303211+00:00
+Expires: 2026-05-13T03:10:39.303211+00:00
 Token budget: 12000
 
 Objective:

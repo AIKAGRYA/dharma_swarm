@@ -1,0 +1,124 @@
+{
+  "candidate": {
+    "artifact_refs": [
+      "reports/immune_mission_xray_2026-05-12_dharma_swarm_surface_consolidation/immune_mission_xray_report.md",
+      "reports/immune_mission_xray_2026-05-12_dharma_swarm_surface_consolidation/claims_register.md",
+      "reports/immune_mission_xray_2026-05-12_dharma_swarm_surface_consolidation/organ_wiring_matrix.md"
+    ],
+    "boundary": "semi_public_agora",
+    "scan_paths": [
+      "/Users/dhyana/dharma_swarm/reports/immune_mission_xray_2026-05-12_dharma_swarm_surface_consolidation/immune_mission_xray_report.md",
+      "/Users/dhyana/dharma_swarm/reports/immune_mission_xray_2026-05-12_dharma_swarm_surface_consolidation/claims_register.md",
+      "/Users/dhyana/dharma_swarm/reports/immune_mission_xray_2026-05-12_dharma_swarm_surface_consolidation/organ_wiring_matrix.md"
+    ],
+    "stage": "venture_proposal",
+    "summary_sha256": "3818d4e14fb86aabd2e816ebf7548548cf9d502f158183ba11d278952aeeee8e",
+    "title": "Immune Mission X-Ray: Dharma Swarm Surface Consolidation"
+  },
+  "checked_red_lines": [
+    "no raw private transcripts",
+    "no secrets, API keys, credentials, or local private paths in outbound refs",
+    "no customer names or unevidenced customer/revenue traction claims",
+    "no unsupported consciousness/sentience claims",
+    "no autonomous live self-modification safety claim",
+    "no production-readiness claim",
+    "no broad solved-agent-governance claim",
+    "semi-public SABP boundary only; no public marketing launch"
+  ],
+  "generated_at": "2026-05-12T15:03:06.092449+00:00",
+  "kind": "sabp_claim_redline_preflight",
+  "pass_count": 3,
+  "passed": true,
+  "passes": [
+    {
+      "evidence": {
+        "outbound_chars": 816,
+        "scanned_artifact_chars": 4499,
+        "scanned_artifact_count": 3
+      },
+      "name": "literal_sensitive_pattern_scan",
+      "pass_index": 1,
+      "status": "pass",
+      "violations": []
+    },
+    {
+      "evidence": {
+        "approved_boundaries": [
+          "semi_public_agora",
+          "semi_public_sabp"
+        ],
+        "approved_stages": [
+          "venture_proposal"
+        ],
+        "artifact_ref_count": 3,
+        "scan_path_count": 3
+      },
+      "name": "boundary_and_reference_policy_scan",
+      "pass_index": 2,
+      "status": "pass",
+      "violations": []
+    },
+    {
+      "evidence": {
+        "decision": "allow",
+        "gate_results": {
+          "AHIMSA": {
+            "reason": "",
+            "result": "PASS"
+          },
+          "ANEKANTA": {
+            "reason": "label=grounded; grounded=mechanistic; tokenistic=none",
+            "result": "PASS"
+          },
+          "BHED_GNAN": {
+            "reason": "No cheap Bhed Gnan register/substance risk detected",
+            "result": "PASS"
+          },
+          "CONSENT": {
+            "reason": "Permission system active",
+            "result": "PASS"
+          },
+          "DOGMA_DRIFT": {
+            "reason": "No dogma drift detected",
+            "result": "PASS"
+          },
+          "REVERSIBILITY": {
+            "reason": "",
+            "result": "PASS"
+          },
+          "SATYA": {
+            "reason": "",
+            "result": "PASS"
+          },
+          "SPEC_INVARIANTS": {
+            "reason": "",
+            "result": "PASS"
+          },
+          "STEELMAN": {
+            "reason": "No proposal context for steelman check",
+            "result": "PASS"
+          },
+          "SVABHAAVA": {
+            "reason": "Epistemological diversity confirmed",
+            "result": "PASS"
+          },
+          "VYAVASTHIT": {
+            "reason": "",
+            "result": "PASS"
+          },
+          "WITNESS": {
+            "reason": "Think-point satisfied (before_complete)",
+            "result": "PASS"
+          }
+        },
+        "reason": "All gates passed"
+      },
+      "name": "telos_gate_redline_scan",
+      "pass_index": 3,
+      "status": "pass",
+      "violations": []
+    }
+  ],
+  "version": "0.1.0",
+  "violations": []
+}

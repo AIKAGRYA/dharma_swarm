@@ -101,7 +101,7 @@ proposals without stronger gates.
 
 ## Next Move
 
-The next cut should still avoid prompt wiring:
+M2E now covers the decision ledger:
 
 ```text
 M2D proposal queue
@@ -109,6 +109,8 @@ M2D proposal queue
   -> explicit accept/reject/defer decisions
   -> then ContextCompiler admission policy
 ```
+
+See `docs/architecture/memory_kernel_m2e_decision_ledger.md`.
 
 Do not let the queue itself become authority.  It is a review inbox for
 KnowledgeOps, not canon.

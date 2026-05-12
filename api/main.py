@@ -261,6 +261,7 @@ def _register_routers(api_app: FastAPI) -> None:
     from api.routers.verify import router as verify_router
     from api.routers.hypernodes import router as hypernodes_router
     from api.routers.viz import router as viz_router
+    from api.routers.control_surface import router as control_surface_router
 
     api_app.include_router(health_router)
     api_app.include_router(agents_router)
@@ -277,6 +278,7 @@ def _register_routers(api_app: FastAPI) -> None:
     api_app.include_router(verify_router)
     api_app.include_router(hypernodes_router)
     api_app.include_router(viz_router)
+    api_app.include_router(control_surface_router)
 
     from api.routers.chat import router as chat_router, ws_router as chat_ws_router
 

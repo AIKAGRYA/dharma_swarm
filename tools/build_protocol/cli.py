@@ -70,6 +70,42 @@ def main(argv: Sequence[str] | None = None) -> int:
     proof_artifact_spec.add_argument("--print", action="store_true")
     proof_artifact_spec.add_argument("--print-report", action="store_true")
 
+    immune_xray = subcommands.add_parser(
+        "immune-mission-xray",
+        help="generate a red-line checked Immune Mission X-Ray proof packet",
+    )
+    immune_xray.add_argument("target_root", type=Path)
+    immune_xray.add_argument("--title", required=True)
+    immune_xray.add_argument("--summary", required=True)
+    immune_xray.add_argument("--output-dir", type=Path, default=None)
+    immune_xray.add_argument("--boundary", default="semi_public_agora")
+    immune_xray.add_argument("--stage", default="venture_proposal")
+    immune_xray.add_argument("--buyer", default="AI-native founder, lab, or agentic-system operator")
+    immune_xray.add_argument("--skip-repo-xray", action="store_true")
+    immune_xray.add_argument("--json", action="store_true")
+
+    immune_xray_v1 = subcommands.add_parser(
+        "immune-xray",
+        help="generate a repeatable Agentic Immune X-Ray proof packet",
+    )
+    immune_xray_v1.add_argument("--target-root", type=Path, required=True)
+    immune_xray_v1.add_argument("--output-dir", type=Path, default=None)
+    immune_xray_v1.add_argument("--title", default="Agentic Immune X-Ray")
+    immune_xray_v1.add_argument(
+        "--summary",
+        default=(
+            "Generate a bounded Agentic Immune X-Ray packet that maps evidence, "
+            "memory authority, witness gaps, rollback, and next proof work."
+        ),
+    )
+    immune_xray_v1.add_argument(
+        "--boundary",
+        choices=("semi_public", "private_internal", "public_launch"),
+        default="semi_public",
+    )
+    immune_xray_v1.add_argument("--claim-id", default=None)
+    immune_xray_v1.add_argument("--print-summary", action="store_true")
+
     args = parser.parse_args(argv)
     if args.command == "plan":
         result = run_dryrun(
@@ -110,6 +146,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _run_opportunity_to_spec(args)
     if args.command == "proof-artifact-to-spec":
         return _run_proof_artifact_to_spec(args)
+    if args.command == "immune-mission-xray":
+        return _run_immune_mission_xray(args)
+    if args.command == "immune-xray":
+        return _run_immune_xray(args)
     return 2
 
 
@@ -213,6 +253,69 @@ def _run_proof_artifact_to_spec(args: argparse.Namespace) -> int:
     )
     print(out)
     return 0 if report["decision"]["status"] != "blocked" else 2
+
+
+def _run_immune_mission_xray(args: argparse.Namespace) -> int:
+    from dharma_swarm.immune_mission_xray import (
+        ImmuneMissionXRayInputs,
+        run_immune_mission_xray,
+    )
+
+    result = run_immune_mission_xray(
+        ImmuneMissionXRayInputs(
+            target_root=args.target_root,
+            title=args.title,
+            summary=args.summary,
+            output_dir=args.output_dir,
+            boundary=args.boundary,
+            stage=args.stage,
+            buyer=args.buyer,
+            include_repo_xray=not args.skip_repo_xray,
+        )
+    )
+    if args.json:
+        print(json.dumps(result.to_dict(), indent=2, sort_keys=True))
+    else:
+        print(result.output_dir)
+    if not result.redline_passed:
+        return 2
+    if result.closure_decision == "blocked":
+        return 2
+    return 0
+
+
+def _run_immune_xray(args: argparse.Namespace) -> int:
+    from dharma_swarm.immune_mission_xray import (
+        ImmuneMissionXRayInputs,
+        run_immune_mission_xray,
+    )
+
+    boundary_map = {
+        "semi_public": "semi_public_sabp",
+        "private_internal": "semi_public_agora",
+        "public_launch": "semi_public_sabp",
+    }
+    result = run_immune_mission_xray(
+        ImmuneMissionXRayInputs(
+            target_root=args.target_root,
+            title=args.title,
+            summary=args.summary,
+            output_dir=args.output_dir,
+            boundary=boundary_map[args.boundary],
+            stage="venture_proposal",
+            buyer="AI-native founder, lab, or agentic-system operator",
+            claim_id=args.claim_id,
+        )
+    )
+    if args.print_summary:
+        print(json.dumps(result.to_dict(), indent=2, sort_keys=True))
+    else:
+        print(result.output_dir)
+    if not result.redline_passed:
+        return 2
+    if result.closure_decision == "blocked":
+        return 2
+    return 0
 
 
 def _slug_for_opportunity(opportunity_id: str, title: str) -> str:

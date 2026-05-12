@@ -1,0 +1,743 @@
+{
+  "repo_name": "dharma_swarm",
+  "repo_path": "/Users/dhyana/dharma_swarm",
+  "generated_at": "2026-05-12T15:03:06.080311+00:00",
+  "total_files": 807,
+  "total_lines": 235015,
+  "total_non_blank_lines": 198154,
+  "language_breakdown": {
+    "docs": 792,
+    "config": 401,
+    "python": 633,
+    "javascript": 6,
+    "typescript": 168
+  },
+  "language_lines": {
+    "python": 170265,
+    "javascript": 741,
+    "typescript": 64009
+  },
+  "top_modules": [
+    {
+      "name": "tests",
+      "files": 571,
+      "lines": 154383,
+      "classes": 1675,
+      "functions": 11110,
+      "description": "Contains 3 classes, 28 functions"
+    },
+    {
+      "name": "terminal",
+      "files": 44,
+      "lines": 33772,
+      "classes": 0,
+      "functions": 0,
+      "description": ""
+    },
+    {
+      "name": "dashboard",
+      "files": 125,
+      "lines": 30272,
+      "classes": 0,
+      "functions": 0,
+      "description": ""
+    },
+    {
+      "name": "tools",
+      "files": 24,
+      "lines": 7704,
+      "classes": 30,
+      "functions": 256,
+      "description": "Contains 2 classes, 14 functions"
+    },
+    {
+      "name": "experiments",
+      "files": 16,
+      "lines": 3154,
+      "classes": 23,
+      "functions": 111,
+      "description": "Contains 2 classes, 8 functions"
+    },
+    {
+      "name": "results",
+      "files": 8,
+      "lines": 3074,
+      "classes": 4,
+      "functions": 107,
+      "description": "Contains 1 classes, 26 functions"
+    },
+    {
+      "name": "(root)",
+      "files": 5,
+      "lines": 1291,
+      "classes": 0,
+      "functions": 19,
+      "description": "Contains 0 classes, 1 functions"
+    },
+    {
+      "name": ".claude",
+      "files": 5,
+      "lines": 706,
+      "classes": 0,
+      "functions": 0,
+      "description": ""
+    },
+    {
+      "name": "analysis",
+      "files": 1,
+      "lines": 442,
+      "classes": 0,
+      "functions": 9,
+      "description": "Contains 0 classes, 9 functions"
+    },
+    {
+      "name": ".semgrep",
+      "files": 6,
+      "lines": 141,
+      "classes": 0,
+      "functions": 25,
+      "description": ""
+    },
+    {
+      "name": "codex_skills",
+      "files": 2,
+      "lines": 76,
+      "classes": 0,
+      "functions": 4,
+      "description": ""
+    }
+  ],
+  "module_connections": [
+    {
+      "from": "(root)",
+      "to": "dharma_swarm"
+    },
+    {
+      "from": "tools",
+      "to": "dharma_swarm"
+    },
+    {
+      "from": "codex_skills",
+      "to": "dharma_swarm"
+    },
+    {
+      "from": "analysis",
+      "to": "dharma_swarm"
+    },
+    {
+      "from": "tests",
+      "to": "dharma_swarm"
+    },
+    {
+      "from": "tests",
+      "to": "tools"
+    },
+    {
+      "from": "tests",
+      "to": "api"
+    },
+    {
+      "from": "tests",
+      "to": "scripts"
+    },
+    {
+      "from": ".semgrep",
+      "to": "dharma_swarm"
+    }
+  ],
+  "test_file_count": 599,
+  "test_ratio": 2.88,
+  "avg_docstring_ratio": 0.208,
+  "avg_naming_score": 1.0,
+  "avg_complexity": 44.3,
+  "type_annotation_rate": 0.861,
+  "complexity_hotspots": [
+    {
+      "name": "test_model_router_total_failure_writes_failed_completion_telemetry",
+      "file": "tests/test_model_router_telemetry.py",
+      "line": 223,
+      "complexity": 44,
+      "lines": 108
+    },
+    {
+      "name": "test_chat_status_reports_runtime_settings",
+      "file": "tests/test_dashboard_chat_router.py",
+      "line": 18,
+      "complexity": 40,
+      "lines": 54
+    },
+    {
+      "name": "summarize",
+      "file": "results/experiment_gemma_scope_m5_20260507/run_gemma_scope_identity.py",
+      "line": 166,
+      "complexity": 37,
+      "lines": 122
+    },
+    {
+      "name": "test_model_router_success_writes_telemetry_records",
+      "file": "tests/test_model_router_telemetry.py",
+      "line": 54,
+      "complexity": 35,
+      "lines": 88
+    },
+    {
+      "name": "run_experiment",
+      "file": "experiments/live_pulse_v4.py",
+      "line": 246,
+      "complexity": 34,
+      "lines": 262
+    },
+    {
+      "name": "test_codex_stream_surfaces_progress_and_command_execution",
+      "file": "tests/tui/test_codex_adapter.py",
+      "line": 227,
+      "complexity": 32,
+      "lines": 102
+    },
+    {
+      "name": "_witness_mandala_checks",
+      "file": "tools/build_protocol/proof_artifact_to_spec.py",
+      "line": 381,
+      "complexity": 30,
+      "lines": 104
+    },
+    {
+      "name": "test_curriculum_engine_derives_campaign_chain_from_opportunity_board",
+      "file": "tests/test_curriculum_engine.py",
+      "line": 108,
+      "complexity": 30,
+      "lines": 74
+    },
+    {
+      "name": "test_memory_kernel_iterates_normalized_atoms_with_authority_labels",
+      "file": "tests/test_memory_kernel_adapters.py",
+      "line": 101,
+      "complexity": 30,
+      "lines": 29
+    },
+    {
+      "name": "test_model_router_fallback_success_marks_fallback_in_telemetry",
+      "file": "tests/test_model_router_telemetry.py",
+      "line": 145,
+      "complexity": 29,
+      "lines": 75
+    }
+  ],
+  "largest_files": [
+    {
+      "path": "terminal/src/protocol.ts",
+      "lines": 3886,
+      "complexity": 0
+    },
+    {
+      "path": "terminal/tests/sidebar.test.ts",
+      "lines": 3069,
+      "complexity": 0
+    },
+    {
+      "path": "terminal/tests/protocol.test.ts",
+      "lines": 2993,
+      "complexity": 0
+    },
+    {
+      "path": "terminal/src/app.tsx",
+      "lines": 2973,
+      "complexity": 0
+    },
+    {
+      "path": "terminal/src/components/Sidebar.tsx",
+      "lines": 2439,
+      "complexity": 0
+    },
+    {
+      "path": "terminal/tests/repoPane.test.ts",
+      "lines": 2353,
+      "complexity": 0
+    },
+    {
+      "path": "dashboard/src/app/dashboard/qwen35/page.tsx",
+      "lines": 2209,
+      "complexity": 0
+    },
+    {
+      "path": "terminal/src/components/RepoPane.tsx",
+      "lines": 2198,
+      "complexity": 0
+    },
+    {
+      "path": "terminal/tests/persistence.test.ts",
+      "lines": 2101,
+      "complexity": 0
+    },
+    {
+      "path": "tests/test_evolution.py",
+      "lines": 2059,
+      "complexity": 375
+    }
+  ],
+  "external_deps": [
+    "../freshness",
+    "../layout",
+    "../repoControlPreview",
+    "../routePolicy",
+    "../src/components/OperatorSummaryBand",
+    "../src/components/RepoPane",
+    "../src/components/Sidebar",
+    "../src/protocol",
+    "../src/state",
+    "../src/transcriptFormatting",
+    "../src/types",
+    "../theme",
+    "../transcriptFormatting",
+    "../types",
+    "../verification",
+    "./ChatInterface",
+    "./ChatOverlay",
+    "./HealthBadge",
+    "./RepoPane",
+    "./api",
+    "./app.tsx",
+    "./auth",
+    "./auth.ts",
+    "./bridge.ts",
+    "./components/ActivityPane.tsx",
+    "./components/AgentsPane.tsx",
+    "./components/ApprovalsPane.tsx",
+    "./components/Composer.tsx",
+    "./components/ControlPane.tsx",
+    "./components/ModelPicker.tsx",
+    "./components/OperatorSummaryBand.tsx",
+    "./components/PaneSwitcher.tsx",
+    "./components/RepoPane.tsx",
+    "./components/ScenicStrip.tsx",
+    "./components/SessionsPane.tsx",
+    "./components/ShellHeader.tsx",
+    "./components/Sidebar.tsx",
+    "./components/StatusFooter.tsx",
+    "./components/TabBar.tsx",
+    "./components/TranscriptPane.tsx",
+    "./controlPlanePageMeta.ts",
+    "./controlPlaneRouteDeck",
+    "./controlPlaneShell.ts",
+    "./controlPlaneSurfaces",
+    "./controlPlaneSurfaces.ts",
+    "./dashboardNav.ts",
+    "./dashboardPath.js",
+    "./executionLog",
+    "./executionLog.ts",
+    "./freshness",
+    "./freshness.ts",
+    "./layout",
+    "./mockContent",
+    "./providers",
+    "./repoControlPreview",
+    "./routePolicy",
+    "./routePolicy.ts",
+    "./runtimeControlPlane.ts",
+    "./runtimeOperatorHandbook.ts",
+    "./shellControls.ts",
+    "./state.ts",
+    "./types",
+    "./types.ts",
+    "./useVizEvents",
+    "./useVizSnapshot",
+    "./verification",
+    "@/components/agent-workspace/shared",
+    "@/components/chat/ChatInterface",
+    "@/components/chat/ChatOverlayWrapper",
+    "@/components/chat/ChatPanel",
+    "@/components/chat/CommandPostWorkspace",
+    "@/components/dashboard/ActivityTable",
+    "@/components/dashboard/AgentCard",
+    "@/components/dashboard/ControlPlanePageSummary",
+    "@/components/dashboard/ControlPlaneStrip",
+    "@/components/dashboard/ControlPlaneSurfaceGrid",
+    "@/components/dashboard/FitnessTrend",
+    "@/components/dashboard/HealthBadge",
+    "@/components/dashboard/MetricCard",
+    "@/components/game/HPBar",
+    "@/components/game/XPBar",
+    "@/components/layout/AmbientParticles",
+    "@/components/layout/Header",
+    "@/components/layout/OperatorMicrographics",
+    "@/components/layout/ScanLines",
+    "@/components/layout/Sidebar",
+    "@/components/timeline/TimelineControls",
+    "@/components/ui/ErrorBanner",
+    "@/components/ui/KeyboardNav",
+    "@/hooks/useAgent",
+    "@/hooks/useAgentChat",
+    "@/hooks/useAgents",
+    "@/hooks/useChat",
+    "@/hooks/useChatWorkspace",
+    "@/hooks/useEmptyQuadrantHypernode",
+    "@/hooks/useEvolution",
+    "@/hooks/useGates",
+    "@/hooks/useHealth",
+    "@/hooks/useInterop",
+    "@/hooks/useLevel",
+    "@/hooks/useLineage",
+    "@/hooks/useModules",
+    "@/hooks/useOntology",
+    "@/hooks/useOverview",
+    "@/hooks/useRuntimeControlPlane",
+    "@/hooks/useTasks",
+    "@/hooks/useTelemetry",
+    "@/hooks/useTimeline",
+    "@/hooks/useTraces",
+    "@/hooks/useVizSnapshot",
+    "@/hooks/useWebSocket",
+    "@/lib/api",
+    "@/lib/auth",
+    "@/lib/chatProfiles",
+    "@/lib/chatSessionContract",
+    "@/lib/controlPlanePageMeta",
+    "@/lib/controlPlaneShell",
+    "@/lib/controlPlaneSurfaces",
+    "@/lib/glmTransparency",
+    "@/lib/runtimeControlPlane",
+    "@/lib/runtimeOperatorHandbook",
+    "@/lib/theme",
+    "@/lib/types",
+    "@/lib/utils",
+    "@/lib/ws",
+    "@playwright/test",
+    "@react-three/fiber",
+    "@react-three/postprocessing",
+    "@tanstack/react-query",
+    "@visx/heatmap",
+    "@visx/scale",
+    "anthropic",
+    "bun:test",
+    "child_process",
+    "clsx",
+    "codex_skills",
+    "config",
+    "consolidator",
+    "crypto",
+    "dataset",
+    "datasets",
+    "dna",
+    "fastapi",
+    "framer-motion",
+    "fs",
+    "harness",
+    "hmmlearn",
+    "httpx",
+    "hypothesis",
+    "ink",
+    "llm_client",
+    "lucide-react",
+    "mcp",
+    "models",
+    "next",
+    "next/dynamic",
+    "next/font/google",
+    "next/link",
+    "next/navigation",
+    "node:assert/strict",
+    "node:child_process",
+    "node:fs",
+    "node:os",
+    "node:path",
+    "node:readline",
+    "node:test",
+    "node:url",
+    "numpy",
+    "ollama",
+    "openai",
+    "path",
+    "postprocessing",
+    "progress_protocol",
+    "pydantic",
+    "pytest",
+    "pytest_asyncio",
+    "react",
+    "rich",
+    "run",
+    "run_alignment_benchmark",
+    "sae_lens",
+    "scipy",
+    "sklearn",
+    "sqlite_vec",
+    "src",
+    "tailwind-merge",
+    "textual",
+    "three",
+    "torch",
+    "transformers",
+    "typer",
+    "worker",
+    "zustand",
+    "zustand/middleware"
+  ],
+  "internal_coupling": [
+    {
+      "file": "tests/test_godel_claw_e2e.py",
+      "internal_imports": 14,
+      "imports": [
+        "dharma_swarm.evolution",
+        "dharma_swarm.policy_compiler",
+        "dharma_swarm.monitor",
+        "dharma_swarm.shakti",
+        "dharma_swarm.archive",
+        "dharma_swarm.dharma_corpus",
+        "dharma_swarm.models",
+        "dharma_swarm.stigmergy",
+        "dharma_swarm.telos_gates",
+        "dharma_swarm.dharma_kernel",
+        "dharma_swarm.subconscious",
+        "dharma_swarm.traces",
+        "dharma_swarm.dogma_gate",
+        "dharma_swarm.canary"
+      ]
+    },
+    {
+      "file": "tests/test_strange_loop_integration.py",
+      "internal_imports": 13,
+      "imports": [
+        "dharma_swarm.evolution",
+        "dharma_swarm.auditor",
+        "dharma_swarm.identity",
+        "dharma_swarm.meta_daemon",
+        "dharma_swarm.cascade",
+        "dharma_swarm.thermodynamic",
+        "dharma_swarm.pramana",
+        "dharma_swarm.archive",
+        "dharma_swarm.catalytic_graph",
+        "dharma_swarm.models",
+        "dharma_swarm.quality_forge",
+        "dharma_swarm.damper",
+        "dharma_swarm.system_rv"
+      ]
+    },
+    {
+      "file": "tests/test_integration.py",
+      "internal_imports": 13,
+      "imports": [
+        "dharma_swarm.metrics",
+        "dharma_swarm.elegance",
+        "dharma_swarm.models",
+        "dharma_swarm.fitness_predictor",
+        "dharma_swarm.monitor",
+        "dharma_swarm.telos_gates",
+        "dharma_swarm.evolution",
+        "dharma_swarm.bridge",
+        "dharma_swarm.traces",
+        "dharma_swarm.file_lock",
+        "dharma_swarm.selector",
+        "dharma_swarm.archive",
+        "dharma_swarm.rv"
+      ]
+    },
+    {
+      "file": "tests/test_operator_core_adapters.py",
+      "internal_imports": 11,
+      "imports": [
+        "dharma_swarm.operator_core.routing_payloads",
+        "dharma_swarm.tui.engine.events",
+        "dharma_swarm.operator_core.workspace_payloads",
+        "dharma_swarm.operator_core.runtime_payloads",
+        "dharma_swarm.operator_core.contracts",
+        "dharma_swarm.operator_core.adapters",
+        "dharma_swarm.operator_core.command_payloads",
+        "dharma_swarm.operator_core.permission_payloads",
+        "dharma_swarm.operator_core.permissions",
+        "dharma_swarm.operator_core.routing_manifest_payloads",
+        "dharma_swarm.operator_core.session_store"
+      ]
+    },
+    {
+      "file": "tests/test_command_center.py",
+      "internal_imports": 11,
+      "imports": [
+        "dharma_swarm.tui.widgets",
+        "dharma_swarm.tui.widgets.lineage_explorer",
+        "dharma_swarm.tui.widgets.ontology_browser",
+        "dharma_swarm.tui.commands.palette",
+        "dharma_swarm.tui.screens.command_center",
+        "dharma_swarm.tui.widgets.agent_table",
+        "dharma_swarm.tui.widgets.evolution_panel",
+        "dharma_swarm.tui.widgets.health_panel",
+        "dharma_swarm.tui.screens",
+        "dharma_swarm.tui.commands.system_commands",
+        "dharma_swarm.tui.app"
+      ]
+    },
+    {
+      "file": "tests/test_strange_loop.py",
+      "internal_imports": 11,
+      "imports": [
+        "dharma_swarm.signal_bus",
+        "dharma_swarm.orchestrate_live",
+        "dharma_swarm.engine.events",
+        "dharma_swarm.fitness_predictor",
+        "dharma_swarm.monitor",
+        "dharma_swarm.archive",
+        "dharma_swarm.models",
+        "dharma_swarm.stigmergy",
+        "dharma_swarm.telos_gates",
+        "dharma_swarm.traces",
+        "dharma_swarm.swarm"
+      ]
+    },
+    {
+      "file": "tests/test_bootstrap_loops.py",
+      "internal_imports": 10,
+      "imports": [
+        "dharma_swarm.signal_bus",
+        "dharma_swarm.evolution",
+        "dharma_swarm.economic_spine",
+        "dharma_swarm.task_board",
+        "dharma_swarm.stigmergy",
+        "dharma_swarm.organism",
+        "dharma_swarm.models",
+        "dharma_swarm.dynamic_correction",
+        "dharma_swarm.orchestrator",
+        "dharma_swarm.swarm"
+      ]
+    },
+    {
+      "file": "tests/test_knowledge_ops.py",
+      "internal_imports": 9,
+      "imports": [
+        "dharma_swarm.knowledge_ops.memory_conflict_review",
+        "dharma_swarm.memory_kernel.census",
+        "dharma_swarm.knowledge_ops.projections",
+        "dharma_swarm.knowledge_ops.cli",
+        "dharma_swarm.knowledge_ops.extractor",
+        "dharma_swarm.knowledge_ops.memory_promotion_queue",
+        "dharma_swarm.knowledge_ops.memory_intake",
+        "dharma_swarm.memory_kernel",
+        "dharma_swarm.knowledge_ops.schema"
+      ]
+    },
+    {
+      "file": "tests/test_swarm.py",
+      "internal_imports": 9,
+      "imports": [
+        "dharma_swarm.startup_crew",
+        "dharma_swarm.agent_constitution",
+        "dharma_swarm.message_bus",
+        "dharma_swarm.telemetry_plane",
+        "dharma_swarm.runtime_artifacts",
+        "dharma_swarm.engine.conversation_memory",
+        "dharma_swarm.models",
+        "dharma_swarm.ecosystem_bridge",
+        "dharma_swarm.swarm"
+      ]
+    },
+    {
+      "file": "tests/test_auto_research_workflow.py",
+      "internal_imports": 9,
+      "imports": [
+        "dharma_swarm.auto_research.models",
+        "dharma_swarm.agent_registry",
+        "dharma_swarm.auto_research.engine",
+        "dharma_swarm.lineage",
+        "dharma_swarm.models",
+        "dharma_swarm.traces",
+        "dharma_swarm.agent_runner",
+        "dharma_swarm.runtime_fields",
+        "dharma_swarm.auto_grade.engine"
+      ]
+    }
+  ],
+  "risk_flags": [
+    {
+      "severity": "warning",
+      "category": "size",
+      "message": "Large file (647 lines). Consider splitting.",
+      "file": "tools/build_protocol/immune_xray.py"
+    },
+    {
+      "severity": "warning",
+      "category": "size",
+      "message": "Large file (802 lines). Consider splitting.",
+      "file": "tools/build_protocol/proof_artifact_to_spec.py"
+    },
+    {
+      "severity": "warning",
+      "category": "size",
+      "message": "Large file (539 lines). Consider splitting.",
+      "file": "tests/test_provider_matrix.py"
+    },
+    {
+      "severity": "warning",
+      "category": "size",
+      "message": "Large file (596 lines). Consider splitting.",
+      "file": "tests/test_monitor.py"
+    },
+    {
+      "severity": "warning",
+      "category": "size",
+      "message": "Large file (575 lines). Consider splitting.",
+      "file": "tests/test_vault_bridge.py"
+    },
+    {
+      "severity": "warning",
+      "category": "size",
+      "message": "Large file (606 lines). Consider splitting.",
+      "file": "tests/test_neural_consolidator.py"
+    },
+    {
+      "severity": "warning",
+      "category": "size",
+      "message": "Large file (528 lines). Consider splitting.",
+      "file": "tests/test_quality_gates.py"
+    },
+    {
+      "severity": "warning",
+      "category": "size",
+      "message": "Large file (605 lines). Consider splitting.",
+      "file": "tests/test_providers_quality_track.py"
+    },
+    {
+      "severity": "warning",
+      "category": "size",
+      "message": "Large file (509 lines). Consider splitting.",
+      "file": "tests/test_ontology_registry.py"
+    },
+    {
+      "severity": "warning",
+      "category": "size",
+      "message": "Large file (523 lines). Consider splitting.",
+      "file": "tests/test_semantic_evolution.py"
+    },
+    {
+      "severity": "warning",
+      "category": "size",
+      "message": "Large file (580 lines). Consider splitting.",
+      "file": "tests/test_bootstrap_loops.py"
+    },
+    {
+      "severity": "warning",
+      "category": "size",
+      "message": "Large file (1161 lines). Consider splitting.",
+      "file": "tests/test_thinkodynamic_director.py"
+    },
+    {
+      "severity": "warning",
+      "category": "size",
+      "message": "Large file (550 lines). Consider splitting.",
+      "file": "tests/test_autonomous_agent.py"
+    },
+    {
+      "severity": "warning",
+      "category": "size",
+      "message": "Large file (530 lines). Consider splitting.",
+      "file": "tests/test_logic_layer.py"
+    },
+    {
+      "severity": "warning",
+      "category": "size",
+      "message": "Large file (675 lines). Consider splitting.",
+      "file": "tests/test_a2a.py"
+    }
+  ],
+  "recommendations": [
+    "Improve documentation. Add docstrings to public functions and classes.",
+    "Refactor `test_model_router_total_failure_writes_failed_completion_telemetry` in `tests/test_model_router_telemetry.py` (complexity=44). Extract helper functions.",
+    "Split large files: tools/build_protocol/immune_xray.py, tools/build_protocol/proof_artifact_to_spec.py, tests/test_provider_matrix.py (647+ lines each)."
+  ]
+}

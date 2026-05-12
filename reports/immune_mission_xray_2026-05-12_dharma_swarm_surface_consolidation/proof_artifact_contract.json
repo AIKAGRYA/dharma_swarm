@@ -1,0 +1,116 @@
+{
+  "artifact_id": "proof_artifact_immune_mission_xray_dharma-swarm-surface-consolidation_20260512",
+  "claim_tiers": {
+    "blocked": [
+      "No production-readiness, customer traction, consciousness, or autonomous live self-modification claim is allowed from this packet."
+    ],
+    "hypothesis": [
+      "This target needs an Immune Mission X-Ray before broader agentic scaling."
+    ],
+    "partial_runtime": [
+      "ProofArtifact can render into Build Protocol and Darwin shadow paths."
+    ],
+    "proven_in_code": [
+      "Repo X-Ray static analysis can produce inspectable code-risk evidence.",
+      "Red-line preflight checks the outbound claim three times before witness use."
+    ]
+  },
+  "contract_version": "0.1.0",
+  "created_at": "2026-05-12",
+  "evidence_surfaces": {
+    "existing_dharma_surfaces": [
+      "dharma_swarm/xray.py",
+      "dharma_swarm/insight_brief.py",
+      "dharma_swarm/daily_operating_brief.py",
+      "dharma_swarm/artifact_surfaces.py",
+      "tools/build_protocol/proof_artifact_to_spec.py",
+      "scripts/check_claim_redlines.py"
+    ],
+    "packet": [
+      "reports/immune_mission_xray_2026-05-12_dharma_swarm_surface_consolidation/immune_mission_xray_report.md",
+      "reports/immune_mission_xray_2026-05-12_dharma_swarm_surface_consolidation/claims_register.md",
+      "reports/immune_mission_xray_2026-05-12_dharma_swarm_surface_consolidation/organ_wiring_matrix.md",
+      "reports/immune_mission_xray_2026-05-12_dharma_swarm_surface_consolidation/redline_preflight.json"
+    ],
+    "repo_xray": [
+      "reports/immune_mission_xray_2026-05-12_dharma_swarm_surface_consolidation/repo_xray_evidence.md",
+      "reports/immune_mission_xray_2026-05-12_dharma_swarm_surface_consolidation/repo_xray_evidence.json"
+    ]
+  },
+  "gates": {
+    "darwin_shadow_apply": "not_run_by_xray_generator",
+    "human_red_line_check": "pass",
+    "proof_artifact_closure_preflight": "pending_until_contract_rendered",
+    "redline_pass_count": 3
+  },
+  "human_decisions_required": [
+    {
+      "decision": "Approve or reject any SABP/public use of this packet.",
+      "default": "internal_only_until_reviewed",
+      "id": "outbound_use"
+    }
+  ],
+  "internal_wedge": "Immune Mission X-Ray",
+  "kill_conditions": [
+    "red-line preflight fails",
+    "central claim cannot be tied to evidence",
+    "the packet starts replacing the canonical Daily Insight Brief",
+    "the next step requires live self-modification instead of shadow evolution"
+  ],
+  "minimum_viable_artifact": {
+    "must_include": [
+      "unsupported claim register",
+      "evidence tier map",
+      "memory authority map",
+      "witness/correction gap map",
+      "tool/permission risk map",
+      "rollback/intervention map",
+      "product/trust-risk summary",
+      "next proof packet recommendation"
+    ],
+    "path": "reports/immune_mission_xray_2026-05-12_dharma_swarm_surface_consolidation/immune_mission_xray_report.md",
+    "type": "immune_mission_xray_report"
+  },
+  "next_state": "ready_for_human_review_and_build_protocol_shadow_packet",
+  "parent_venture_cell": {
+    "proof_role": "repeatable_diagnostic",
+    "proposed_name": "Agentic Immune X-Ray",
+    "status": "packet_local_incubating",
+    "venture_kind": "agentic_governance_and_mission_intelligence"
+  },
+  "promotion_conditions": [
+    "red-line preflight passes",
+    "human reviews claim register",
+    "closure preflight emits no failures",
+    "next Build Protocol packet is bounded and shadow-only"
+  ],
+  "spine_bindings": {
+    "build_spec": "reports/immune_mission_xray_2026-05-12_dharma_swarm_surface_consolidation/next_build_spec.md",
+    "claim_register": "reports/immune_mission_xray_2026-05-12_dharma_swarm_surface_consolidation/claims_register.md",
+    "closure_run_report": "reports/immune_mission_xray_2026-05-12_dharma_swarm_surface_consolidation/closure_run_report.json",
+    "contribution_ids": [],
+    "generated_build_spec": "reports/immune_mission_xray_2026-05-12_dharma_swarm_surface_consolidation/generated_specs/2026-05-12-immune-mission-xray-dharma-swarm-surface-consolidation-closure.md",
+    "human_operator_brief": "reports/immune_mission_xray_2026-05-12_dharma_swarm_surface_consolidation/human_operator_brief.md",
+    "opportunity_id": "pending",
+    "organ_wiring_matrix": "reports/immune_mission_xray_2026-05-12_dharma_swarm_surface_consolidation/organ_wiring_matrix.md",
+    "outcome_id": "pending",
+    "redline_preflight": "reports/immune_mission_xray_2026-05-12_dharma_swarm_surface_consolidation/redline_preflight.json",
+    "reuse_audit": "reports/immune_mission_xray_2026-05-12_dharma_swarm_surface_consolidation/reuse_audit.md",
+    "sABP_submission": "pending",
+    "source_synthesis": "reports/immune_mission_xray_2026-05-12_dharma_swarm_surface_consolidation/immune_mission_xray_report.md",
+    "value_event_id": "pending",
+    "witness_link_id": "pending"
+  },
+  "status": "xray_preflight_packet",
+  "telos": {
+    "absolute_telos": "truthful, witnessed, self-correcting agentic systems in service of welfare",
+    "anti_collapse_rule": "do not reduce this to a dashboard, generic brief, generic repo audit, or mystical manifesto",
+    "commercial_telos": "AI-native founder, lab, or agentic-system operator"
+  },
+  "title": "Immune Mission X-Ray: Dharma Swarm Surface Consolidation",
+  "witness_mandala": {
+    "intention": "Run SABP witness only after human boundary review.",
+    "required": false,
+    "status": "not_requested_for_local_packet"
+  }
+}

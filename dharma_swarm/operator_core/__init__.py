@@ -59,6 +59,17 @@ from .workspace_payloads import build_workspace_snapshot_payload
 from .session_payloads import build_session_catalog_payload, build_session_detail_payload
 from .session_store import SessionStore, cwd_matches
 from .session_views import build_session_catalog, build_session_detail
+from .control_surface import (
+    ControlSurfacePage,
+    ControlSurfaceQuery,
+    ControlSurfaceRow,
+    EvidenceRef,
+    build_control_surface_page,
+    build_control_surface_rows,
+    build_control_surface_summary,
+    find_control_surface_row,
+    find_evidence_ref,
+)
 from .contracts import (
     CanonicalEntity,
     CanonicalEventEnvelope,
@@ -93,8 +104,12 @@ __all__ = [
     "CanonicalRuntimeSnapshot",
     "CanonicalSession",
     "CanonicalWorkflowState",
+    "ControlSurfacePage",
+    "ControlSurfaceQuery",
+    "ControlSurfaceRow",
     "EntityBadge",
     "EntityRef",
+    "EvidenceRef",
     "EventAudience",
     "EventSource",
     "EventTransport",
@@ -112,6 +127,9 @@ __all__ = [
     "build_permission_resolution_payload",
     "build_command_graph_summary",
     "build_command_registry_payload",
+    "build_control_surface_page",
+    "build_control_surface_rows",
+    "build_control_surface_summary",
     "build_agent_routes_payload",
     "build_model_policy_summary",
     "build_routing_decision_payload",
@@ -134,6 +152,8 @@ __all__ = [
     "coherence_map_to_dict",
     "cwd_matches",
     "event_envelope_from_legacy_event",
+    "find_control_surface_row",
+    "find_evidence_ref",
     "permission_decision_from_tool_call",
     "permission_decision_payload_from_decision",
     "permission_outcome_payload_from_outcome",

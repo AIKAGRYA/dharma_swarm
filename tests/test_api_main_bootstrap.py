@@ -25,3 +25,5 @@ def test_api_main_imports_without_api_keys(monkeypatch) -> None:
     assert "/api/viz/snapshot" in route_paths
     assert "/api/viz/events" in route_paths
     assert "/api/viz/timeline" in route_paths
+    assert "/api/control-surface/summary" in route_paths
+    assert "/api/control-surface/rows" in route_paths

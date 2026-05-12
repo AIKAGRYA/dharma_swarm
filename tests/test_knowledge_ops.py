@@ -16,6 +16,13 @@ from dharma_swarm.knowledge_ops.memory_intake import (
     render_memory_evidence_review_markdown,
     review_memory_atoms,
 )
+from dharma_swarm.knowledge_ops.memory_decision_ledger import (
+    MemoryPromotionDecision,
+    MemoryPromotionDecisionKind,
+    build_memory_decision_ledger,
+    load_memory_promotion_decisions,
+    render_memory_decision_ledger_markdown,
+)
 from dharma_swarm.knowledge_ops.memory_promotion_queue import (
     build_memory_promotion_queue,
     render_memory_promotion_queue_markdown,
@@ -381,6 +388,79 @@ def test_memory_promotion_queue_is_read_only_gated_and_redacted(
     assert "does not promote" in markdown
 
 
+def test_memory_decision_ledger_validates_required_accept_gates(tmp_path: Path) -> None:
+    surfaces = {
+        surface.surface_id: surface
+        for surface in MemorySurfaceCensus(
+            CensusConfig(repo_root=tmp_path / "repo", home=tmp_path / "home")
+        ).run()
+    }
+    atom = MemoryAtom.build(
+        surface=surfaces["home.runtime_state"],
+        atom_type=MemoryAtomType.RUNTIME_EVENT,
+        content_ref="/private/runtime/session/1",
+        adapter_name="test_adapter",
+        read_mode=ReadMode.READ_ONLY,
+        truth_state=TruthState.OBSERVED,
+        promotion_allowed=True,
+    )
+    queue = build_memory_promotion_queue((atom,))
+    proposal = queue.proposals[0]
+    invalid = MemoryPromotionDecision.build(
+        proposal,
+        decision=MemoryPromotionDecisionKind.ACCEPT,
+        reviewer="reviewer",
+        rationale="looks right",
+        approved_gates=proposal.required_gates[:1],
+    )
+    valid = MemoryPromotionDecision.build(
+        proposal,
+        decision=MemoryPromotionDecisionKind.DEFER,
+        reviewer="reviewer",
+        rationale="needs human synthesis",
+    )
+
+    invalid_ledger = build_memory_decision_ledger(queue, decisions=(invalid,))
+    valid_ledger = build_memory_decision_ledger(queue, decisions=(valid,))
+    markdown = render_memory_decision_ledger_markdown(valid_ledger)
+
+    assert invalid_ledger.invalid_decision_count == 1
+    assert invalid_ledger.missing_required_gate_count == len(proposal.required_gates) - 1
+    assert invalid_ledger.undecided_count == 1
+    assert valid_ledger.valid_decision_count == 1
+    assert valid_ledger.deferred_count == 1
+    assert valid_ledger.undecided_count == 0
+    assert "private" not in json.dumps(valid_ledger.to_json())
+    assert "/private" not in json.dumps(valid_ledger.to_json())
+    assert "does not promote" in markdown
+
+
+def test_memory_decision_loader_accepts_json_list(tmp_path: Path) -> None:
+    path = tmp_path / "decisions.json"
+    path.write_text(
+        json.dumps(
+            [
+                {
+                    "proposal_id": "proposal:1",
+                    "atom_id": "atom:1",
+                    "surface_id": "home.runtime_state",
+                    "decision": "reject",
+                    "reviewer": "reviewer",
+                    "rationale": "not durable",
+                    "approved_gates": [],
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    decisions = load_memory_promotion_decisions(path)
+
+    assert len(decisions) == 1
+    assert decisions[0].decision is MemoryPromotionDecisionKind.REJECT
+    assert decisions[0].decision_id.startswith("memory_decision:")
+
+
 def test_memory_kernel_intake_applies_query_budget_and_surface_filter(tmp_path: Path) -> None:
     surfaces = {
         surface.surface_id: surface
@@ -433,6 +513,8 @@ def test_cli_writes_memory_evidence_review_reports(tmp_path: Path, capsys) -> No
     conflict_md = tmp_path / "memory_conflict_review.md"
     queue_json = tmp_path / "memory_promotion_queue.json"
     queue_md = tmp_path / "memory_promotion_queue.md"
+    ledger_json = tmp_path / "memory_decision_ledger.json"
+    ledger_md = tmp_path / "memory_decision_ledger.md"
 
     assert (
         main(
@@ -464,6 +546,10 @@ def test_cli_writes_memory_evidence_review_reports(tmp_path: Path, capsys) -> No
                 str(queue_json),
                 "--memory-promotion-queue-md-out",
                 str(queue_md),
+                "--memory-decision-ledger-out",
+                str(ledger_json),
+                "--memory-decision-ledger-md-out",
+                str(ledger_md),
             ]
         )
         == 0
@@ -475,28 +561,37 @@ def test_cli_writes_memory_evidence_review_reports(tmp_path: Path, capsys) -> No
     conflict_markdown = conflict_md.read_text(encoding="utf-8")
     queue_payload = json.loads(queue_json.read_text(encoding="utf-8"))
     queue_markdown = queue_md.read_text(encoding="utf-8")
+    ledger_payload = json.loads(ledger_json.read_text(encoding="utf-8"))
+    ledger_markdown = ledger_md.read_text(encoding="utf-8")
 
     assert "memory_review" in cli_output
     assert "memory_conflict_review" in cli_output
     assert "memory_promotion_queue" in cli_output
+    assert "memory_decision_ledger" in cli_output
     assert payload["total_atoms"] >= 1
     assert payload["query"]["surface_ids"] == ["home.conversation_log"]
     assert conflict_payload["total_atoms"] >= 1
     assert "promotion_blockers_by_reason" in conflict_payload
     assert queue_payload["total_atoms"] >= 1
     assert "blockers_by_reason" in queue_payload
+    assert "decision_reviews" in ledger_payload
     assert "MemoryKernel Evidence Review" in markdown
     assert "MemoryKernel Conflict Projection Review" in conflict_markdown
     assert "MemoryKernel Promotion Proposal Queue" in queue_markdown
+    assert "MemoryKernel Promotion Decision Ledger" in ledger_markdown
     assert "private" not in json.dumps(payload)
     assert "/private" not in json.dumps(payload)
     assert "private" not in json.dumps(conflict_payload)
     assert "/private" not in json.dumps(conflict_payload)
     assert "private" not in json.dumps(queue_payload)
     assert "/private" not in json.dumps(queue_payload)
+    assert "private" not in json.dumps(ledger_payload)
+    assert "/private" not in json.dumps(ledger_payload)
     assert "private" not in markdown
     assert "/private" not in markdown
     assert "private" not in conflict_markdown
     assert "/private" not in conflict_markdown
     assert "private" not in queue_markdown
     assert "/private" not in queue_markdown
+    assert "private" not in ledger_markdown
+    assert "/private" not in ledger_markdown

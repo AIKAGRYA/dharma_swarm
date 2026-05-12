@@ -1,0 +1,284 @@
+{
+  "artifact_id": "proof_artifact_immune_mission_xray_dharma-swarm-surface-consolidation_20260512",
+  "checks": [
+    {
+      "detail": "Contract field present.",
+      "evidence": [],
+      "name": "contract.artifact_id",
+      "organ": "HumanOperator",
+      "status": "pass"
+    },
+    {
+      "detail": "Contract field present.",
+      "evidence": [],
+      "name": "contract.title",
+      "organ": "HumanOperator",
+      "status": "pass"
+    },
+    {
+      "detail": "Contract field present.",
+      "evidence": [],
+      "name": "contract.telos",
+      "organ": "HumanOperator",
+      "status": "pass"
+    },
+    {
+      "detail": "Contract field present.",
+      "evidence": [],
+      "name": "contract.minimum_viable_artifact",
+      "organ": "HumanOperator",
+      "status": "pass"
+    },
+    {
+      "detail": "Contract field present.",
+      "evidence": [],
+      "name": "contract.spine_bindings",
+      "organ": "HumanOperator",
+      "status": "pass"
+    },
+    {
+      "detail": "Minimum viable artifact exists.",
+      "evidence": [
+        "reports/immune_mission_xray_2026-05-12_dharma_swarm_surface_consolidation/immune_mission_xray_report.md"
+      ],
+      "name": "minimum_viable_artifact.path",
+      "organ": "ProofArtifact",
+      "status": "pass"
+    },
+    {
+      "detail": "Binding path exists.",
+      "evidence": [
+        "reports/immune_mission_xray_2026-05-12_dharma_swarm_surface_consolidation/immune_mission_xray_report.md"
+      ],
+      "name": "spine_bindings.source_synthesis",
+      "organ": "Lodestones",
+      "status": "pass"
+    },
+    {
+      "detail": "Binding path exists.",
+      "evidence": [
+        "reports/immune_mission_xray_2026-05-12_dharma_swarm_surface_consolidation/claims_register.md"
+      ],
+      "name": "spine_bindings.claim_register",
+      "organ": "Viveka",
+      "status": "pass"
+    },
+    {
+      "detail": "Binding path exists.",
+      "evidence": [
+        "reports/immune_mission_xray_2026-05-12_dharma_swarm_surface_consolidation/human_operator_brief.md"
+      ],
+      "name": "spine_bindings.human_operator_brief",
+      "organ": "HumanOperator",
+      "status": "pass"
+    },
+    {
+      "detail": "Binding path exists.",
+      "evidence": [
+        "reports/immune_mission_xray_2026-05-12_dharma_swarm_surface_consolidation/organ_wiring_matrix.md"
+      ],
+      "name": "spine_bindings.organ_wiring_matrix",
+      "organ": "ThinkodynamicDirector",
+      "status": "pass"
+    },
+    {
+      "detail": "Binding path exists.",
+      "evidence": [
+        "reports/immune_mission_xray_2026-05-12_dharma_swarm_surface_consolidation/next_build_spec.md"
+      ],
+      "name": "spine_bindings.build_spec",
+      "organ": "Evolution",
+      "status": "pass"
+    },
+    {
+      "detail": "Runtime binding is not present yet; this is a required future wire.",
+      "evidence": [],
+      "name": "spine_bindings.sABP_submission",
+      "organ": "Agora/SABP",
+      "status": "pending"
+    },
+    {
+      "detail": "Runtime binding is not present yet; this is a required future wire.",
+      "evidence": [],
+      "name": "spine_bindings.witness_link_id",
+      "organ": "Agora/SABP",
+      "status": "pending"
+    },
+    {
+      "detail": "Runtime binding is not present yet; this is a required future wire.",
+      "evidence": [],
+      "name": "spine_bindings.outcome_id",
+      "organ": "Kalyan",
+      "status": "pending"
+    },
+    {
+      "detail": "Runtime binding is not present yet; this is a required future wire.",
+      "evidence": [],
+      "name": "spine_bindings.value_event_id",
+      "organ": "Kalyan",
+      "status": "pending"
+    },
+    {
+      "detail": "Runtime binding is not present yet; this is a required future wire.",
+      "evidence": [],
+      "name": "spine_bindings.opportunity_id",
+      "organ": "Shakti",
+      "status": "pending"
+    },
+    {
+      "detail": "No contribution IDs recorded yet.",
+      "evidence": [],
+      "name": "spine_bindings.contribution_ids",
+      "organ": "Kalyan",
+      "status": "pending"
+    },
+    {
+      "detail": "6 inspectable path reference(s); non-path references are treated as external claims.",
+      "evidence": [
+        "dharma_swarm/xray.py",
+        "dharma_swarm/insight_brief.py",
+        "dharma_swarm/daily_operating_brief.py",
+        "dharma_swarm/artifact_surfaces.py",
+        "tools/build_protocol/proof_artifact_to_spec.py",
+        "scripts/check_claim_redlines.py"
+      ],
+      "name": "evidence_surfaces.existing_dharma_surfaces",
+      "organ": "MemoryKernel",
+      "status": "pass"
+    },
+    {
+      "detail": "4 inspectable path reference(s); non-path references are treated as external claims.",
+      "evidence": [
+        "reports/immune_mission_xray_2026-05-12_dharma_swarm_surface_consolidation/immune_mission_xray_report.md",
+        "reports/immune_mission_xray_2026-05-12_dharma_swarm_surface_consolidation/claims_register.md",
+        "reports/immune_mission_xray_2026-05-12_dharma_swarm_surface_consolidation/organ_wiring_matrix.md",
+        "reports/immune_mission_xray_2026-05-12_dharma_swarm_surface_consolidation/redline_preflight.json"
+      ],
+      "name": "evidence_surfaces.packet",
+      "organ": "MemoryKernel",
+      "status": "pass"
+    },
+    {
+      "detail": "2 inspectable path reference(s); non-path references are treated as external claims.",
+      "evidence": [
+        "reports/immune_mission_xray_2026-05-12_dharma_swarm_surface_consolidation/repo_xray_evidence.md",
+        "reports/immune_mission_xray_2026-05-12_dharma_swarm_surface_consolidation/repo_xray_evidence.json"
+      ],
+      "name": "evidence_surfaces.repo_xray",
+      "organ": "MemoryKernel",
+      "status": "pass"
+    },
+    {
+      "detail": "Runtime and evidence source-of-truth labels are present.",
+      "evidence": [
+        "home.memory_plane: raw_events, conversation_turns, idea_shards",
+        "home.runtime_state: runtime_sessions, routing_decisions, context_bundles"
+      ],
+      "name": "memory_authority_labels",
+      "organ": "MemoryKernel",
+      "status": "pass"
+    },
+    {
+      "detail": "review: Advisory: Partial diversity: label=mixed; grounded=mechanistic; tokenistic=phenomenological; label=mixed; grounded=mechanistic; tokenistic=phenomenological",
+      "evidence": [
+        "AHIMSA=PASS",
+        "SATYA=PASS",
+        "CONSENT=PASS",
+        "VYAVASTHIT=PASS",
+        "REVERSIBILITY=PASS",
+        "SVABHAAVA=WARN",
+        "BHED_GNAN=PASS",
+        "WITNESS=PASS",
+        "ANEKANTA=WARN",
+        "DOGMA_DRIFT=PASS",
+        "STEELMAN=PASS"
+      ],
+      "name": "telos_gatekeeper",
+      "organ": "Telos",
+      "status": "warn"
+    },
+    {
+      "detail": "submission_ready=True; failed=0; warned=1",
+      "evidence": [
+        "no_private_evidence=pass",
+        "citation_verifiable=pass",
+        "limitations_stated=pass",
+        "uncertainty_bounded=warn",
+        "contradiction_check=pass"
+      ],
+      "name": "credibility_audit",
+      "organ": "Viveka",
+      "status": "pass"
+    },
+    {
+      "detail": "packet_local_incubating",
+      "evidence": [],
+      "name": "parent_venture_cell.status",
+      "organ": "Shakti",
+      "status": "pass"
+    },
+    {
+      "detail": "1 human boundary decision(s) still require confirmation.",
+      "evidence": [
+        "outbound_use"
+      ],
+      "name": "human_decisions_required",
+      "organ": "HumanOperator",
+      "status": "pending"
+    },
+    {
+      "detail": "ready_for_human_review_and_build_protocol_shadow_packet",
+      "evidence": [],
+      "name": "next_state",
+      "organ": "Evolution",
+      "status": "pass"
+    },
+    {
+      "detail": "Next build spec names the ProofArtifact adapter.",
+      "evidence": [
+        "reports/immune_mission_xray_2026-05-12_dharma_swarm_surface_consolidation/next_build_spec.md"
+      ],
+      "name": "build_protocol_adapter_named",
+      "organ": "Evolution",
+      "status": "pass"
+    }
+  ],
+  "contract_path": "reports/immune_mission_xray_2026-05-12_dharma_swarm_surface_consolidation/proof_artifact_contract.json",
+  "contract_status": "xray_preflight_packet",
+  "core_organs": [
+    "Lodestones",
+    "Telos",
+    "ThinkodynamicDirector",
+    "Shakti",
+    "Viveka",
+    "MemoryKernel",
+    "Kalyan",
+    "Agora/SABP",
+    "Evolution",
+    "HumanOperator"
+  ],
+  "decision": {
+    "reason": "The tracer can enter Build Protocol, but runtime, witness, or value bindings remain open.",
+    "status": "preflight_ready_with_open_wires"
+  },
+  "generated_at": "2026-05-12T15:03:06.124323+00:00",
+  "kind": "whole_organism_closure_run",
+  "next_required_wires": [
+    "Agora/SABP: spine_bindings.sABP_submission - Runtime binding is not present yet; this is a required future wire.",
+    "Agora/SABP: spine_bindings.witness_link_id - Runtime binding is not present yet; this is a required future wire.",
+    "Kalyan: spine_bindings.outcome_id - Runtime binding is not present yet; this is a required future wire.",
+    "Kalyan: spine_bindings.value_event_id - Runtime binding is not present yet; this is a required future wire.",
+    "Shakti: spine_bindings.opportunity_id - Runtime binding is not present yet; this is a required future wire.",
+    "Kalyan: spine_bindings.contribution_ids - No contribution IDs recorded yet.",
+    "Telos: telos_gatekeeper - review: Advisory: Partial diversity: label=mixed; grounded=mechanistic; tokenistic=phenomenological; label=mixed; grounded=mechanistic; tokenistic=phenomenological",
+    "HumanOperator: human_decisions_required - 1 human boundary decision(s) still require confirmation."
+  ],
+  "summary": {
+    "fail": 0,
+    "pass": 19,
+    "pending": 7,
+    "warn": 1
+  },
+  "title": "Immune Mission X-Ray: Dharma Swarm Surface Consolidation",
+  "version": "0.1.0"
+}

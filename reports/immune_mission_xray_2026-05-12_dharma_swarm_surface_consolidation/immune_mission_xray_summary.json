@@ -1,0 +1,94 @@
+{
+  "boundary": "semi_public_agora",
+  "evolution_mode": "build_protocol_shadow_only",
+  "generated_at": "2026-05-12T15:03:06.092713+00:00",
+  "kind": "immune_mission_xray_summary",
+  "live_self_modification": false,
+  "next_build_spec": "reports/immune_mission_xray_2026-05-12_dharma_swarm_surface_consolidation/next_build_spec.md",
+  "proof_artifact_contract": "reports/immune_mission_xray_2026-05-12_dharma_swarm_surface_consolidation/proof_artifact_contract.json",
+  "redline_pass_count": 3,
+  "redline_passed": true,
+  "repo_xray_summary": {
+    "avg_complexity": 44.3,
+    "complexity_hotspots": [
+      {
+        "complexity": 44,
+        "file": "tests/test_model_router_telemetry.py",
+        "line": 223,
+        "lines": 108,
+        "name": "test_model_router_total_failure_writes_failed_completion_telemetry"
+      },
+      {
+        "complexity": 40,
+        "file": "tests/test_dashboard_chat_router.py",
+        "line": 18,
+        "lines": 54,
+        "name": "test_chat_status_reports_runtime_settings"
+      },
+      {
+        "complexity": 37,
+        "file": "results/experiment_gemma_scope_m5_20260507/run_gemma_scope_identity.py",
+        "line": 166,
+        "lines": 122,
+        "name": "summarize"
+      },
+      {
+        "complexity": 35,
+        "file": "tests/test_model_router_telemetry.py",
+        "line": 54,
+        "lines": 88,
+        "name": "test_model_router_success_writes_telemetry_records"
+      },
+      {
+        "complexity": 34,
+        "file": "experiments/live_pulse_v4.py",
+        "line": 246,
+        "lines": 262,
+        "name": "run_experiment"
+      }
+    ],
+    "largest_files": [
+      {
+        "complexity": 0,
+        "lines": 3886,
+        "path": "terminal/src/protocol.ts"
+      },
+      {
+        "complexity": 0,
+        "lines": 3069,
+        "path": "terminal/tests/sidebar.test.ts"
+      },
+      {
+        "complexity": 0,
+        "lines": 2993,
+        "path": "terminal/tests/protocol.test.ts"
+      },
+      {
+        "complexity": 0,
+        "lines": 2973,
+        "path": "terminal/src/app.tsx"
+      },
+      {
+        "complexity": 0,
+        "lines": 2439,
+        "path": "terminal/src/components/Sidebar.tsx"
+      }
+    ],
+    "repo_name": "dharma_swarm",
+    "risk_flag_count": 15,
+    "test_file_count": 599,
+    "test_ratio": 2.88,
+    "total_files": 807,
+    "total_non_blank_lines": 198154
+  },
+  "stage": "venture_proposal",
+  "surfaces_reused": [
+    "repo_xray",
+    "check_claim_redlines",
+    "proof_artifact_to_spec",
+    "artifact_surface_registry"
+  ],
+  "target_root_sha256": "dac7b90492970a30f53379717381967ac66f4e307024db495e889ed5c57d11e9",
+  "title": "Dharma Swarm Surface Consolidation",
+  "version": "0.1.0"
+}
