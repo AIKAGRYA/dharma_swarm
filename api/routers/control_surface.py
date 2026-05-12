@@ -41,7 +41,7 @@ async def control_surface_summary() -> ApiResponse:
         return ApiResponse(data=summary)
     except Exception as e:
         logger.exception("control-surface/summary failed")
-        return ApiResponse(data=None, error=str(e))
+        return ApiResponse(status="error", data=None, error=str(e))
 
 
 @router.get("/rows")
@@ -51,7 +51,7 @@ async def control_surface_rows() -> ApiResponse:
         return ApiResponse(data=_build_rows())
     except Exception as e:
         logger.exception("control-surface/rows failed")
-        return ApiResponse(data=None, error=str(e))
+        return ApiResponse(status="error", data=None, error=str(e))
 
 
 @router.get("/rows/{row_id:path}")
@@ -67,4 +67,4 @@ async def control_surface_row(row_id: str) -> ApiResponse:
         raise
     except Exception as e:
         logger.exception("control-surface/rows/<id> failed")
-        return ApiResponse(data=None, error=str(e))
+        return ApiResponse(status="error", data=None, error=str(e))
