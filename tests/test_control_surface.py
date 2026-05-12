@@ -12,6 +12,8 @@ from typing import Any
 
 import pytest
 import yaml
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 from dharma_swarm.operator_core.control_surface import (
     COHERENCE_STATES,
@@ -364,3 +366,115 @@ class TestFullBuild:
         rows = build_control_surface_rows(repo_root=tmp_repo)
         human = [r for r in rows if r.human_decision_required]
         assert len(human) > 0, "expected at least one human_decision_required row"
+
+
+# ---------------------------------------------------------------------------
+# API endpoint tests
+# ---------------------------------------------------------------------------
+
+
+def _control_surface_client() -> TestClient:
+    from api.routers.control_surface import router
+    app = FastAPI()
+    app.include_router(router)
+    return TestClient(app)
+
+
+class TestControlSurfaceAPI:
+    """Tests for /api/control-surface/* endpoints."""
+
+    def test_summary_returns_ok_with_counts(self) -> None:
+        client = _control_surface_client()
+        resp = client.get("/api/control-surface/summary")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["status"] == "ok"
+        data = body["data"]
+        assert data["total"] > 0
+        state_sum = (
+            data["bound"] + data["partial"] + data["drifted"]
+            + data["declared_only"] + data["unknown"]
+        )
+        assert state_sum == data["total"]
+        assert "sources_consulted" in data
+
+    def test_rows_returns_list(self) -> None:
+        client = _control_surface_client()
+        resp = client.get("/api/control-surface/rows")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["status"] == "ok"
+        rows = body["data"]
+        assert isinstance(rows, list)
+        assert len(rows) > 0
+        first = rows[0]
+        assert "id" in first
+        assert "coherence_state" in first
+        assert "declared_state" in first
+        assert "observed_state" in first
+
+    def test_row_by_id_returns_single(self) -> None:
+        client = _control_surface_client()
+        rows_resp = client.get("/api/control-surface/rows")
+        first_id = rows_resp.json()["data"][0]["id"]
+        resp = client.get(f"/api/control-surface/rows/{first_id}")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["data"]["id"] == first_id
+
+    def test_row_not_found_returns_404(self) -> None:
+        client = _control_surface_client()
+        resp = client.get("/api/control-surface/rows/nonexistent_row_id")
+        assert resp.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Dashboard page existence
+# ---------------------------------------------------------------------------
+
+
+class TestDashboardControlSurfacePage:
+    """Verify /dashboard/control-surface route file exists."""
+
+    def test_control_surface_page_file_exists(self) -> None:
+        repo_root = Path(__file__).resolve().parent.parent
+        page = repo_root / "dashboard" / "src" / "app" / "dashboard" / "control-surface" / "page.tsx"
+        assert page.exists(), f"control-surface page missing: {page}"
+
+    def test_control_surface_in_manifest_nav(self) -> None:
+        repo_root = Path(__file__).resolve().parent.parent
+        manifest = load_active_surface_manifest(repo_root)
+        nav_sections = manifest.get("dashboard_nav_sections", [])
+        all_items: list[str] = []
+        for section in nav_sections:
+            all_items.extend(section.get("items", []))
+        assert "Control Surface" in all_items, (
+            "Control Surface not in manifest dashboard_nav_sections"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Doctrine: manifest = declared intent, not observed truth
+# ---------------------------------------------------------------------------
+
+
+class TestManifestDoctrine:
+    """Manifest rows carry declared_state only; observed_state is computed."""
+
+    def test_manifest_rows_have_empty_observed_state(self, tmp_repo: Path) -> None:
+        manifest = load_active_surface_manifest(tmp_repo)
+        rows = _manifest_api_router_rows(manifest)
+        for row in rows:
+            assert row.observed_state == "", (
+                f"row {row.id} has observed_state set before observation"
+            )
+
+    def test_declared_live_but_missing_is_never_green(self, tmp_repo: Path) -> None:
+        manifest = load_active_surface_manifest(tmp_repo)
+        rows = _manifest_api_router_rows(manifest)
+        missing = [r for r in rows if r.id == "api.missing"][0]
+        _observe_api_router(missing, tmp_repo)
+        assert missing.coherence_state != "bound", (
+            "missing module must not be marked bound"
+        )
+        assert missing.coherence_state in ("drifted", "partial")
