@@ -107,9 +107,65 @@ CREATE TABLE IF NOT EXISTS routing_decisions (
     requires_human INTEGER NOT NULL DEFAULT 0,
     reasons_json TEXT NOT NULL DEFAULT '[]',
     metadata_json TEXT NOT NULL DEFAULT '{}',
+    schema_version TEXT NOT NULL DEFAULT 'v1',
+    task_signature TEXT NOT NULL DEFAULT '',
+    task_type TEXT NOT NULL DEFAULT 'unknown',
+    caller TEXT NOT NULL DEFAULT 'unknown',
+    decision_class TEXT NOT NULL DEFAULT 'pinned',
+    selected_tier TEXT NOT NULL DEFAULT 'unknown',
+    widened_from TEXT NOT NULL DEFAULT '',
+    candidate_chain_json TEXT NOT NULL DEFAULT '[]',
+    n_attempts INTEGER NOT NULL DEFAULT 0,
+    outcome TEXT NOT NULL DEFAULT 'unknown',
+    duration_ms REAL NOT NULL DEFAULT 0.0,
+    total_tokens INTEGER NOT NULL DEFAULT 0,
+    cost_estimate_usd REAL NOT NULL DEFAULT 0.0,
     created_at TEXT NOT NULL,
     trace_id TEXT NOT NULL DEFAULT ''
 )"""
+
+# Phase 1 (2026-05-10): typed attempt rows linked to routing_decisions
+# via decision_id. See docs/plans/2026-05-10-phase1-routing-witness.md.
+_PROVIDER_ATTEMPTS_DDL = """
+CREATE TABLE IF NOT EXISTS provider_attempts (
+    decision_id TEXT NOT NULL,
+    attempt_idx INTEGER NOT NULL,
+    provider TEXT NOT NULL,
+    model TEXT NOT NULL DEFAULT '',
+    tier TEXT NOT NULL DEFAULT 'unknown',
+    success INTEGER NOT NULL DEFAULT 0,
+    outcome TEXT NOT NULL DEFAULT 'unknown',
+    error_class TEXT NOT NULL DEFAULT '',
+    error_detail TEXT NOT NULL DEFAULT '',
+    duration_ms REAL NOT NULL DEFAULT 0.0,
+    stop_reason TEXT NOT NULL DEFAULT '',
+    usage_json TEXT NOT NULL DEFAULT '{}',
+    cost_estimate_usd REAL NOT NULL DEFAULT 0.0,
+    circuit_state TEXT NOT NULL DEFAULT 'closed',
+    schema_version TEXT NOT NULL DEFAULT 'v1',
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (decision_id, attempt_idx)
+)"""
+
+# Additive ALTER TABLE migrations — run AFTER CREATE TABLE IF NOT EXISTS
+# so that pre-Phase-1 databases gain the new columns idempotently.
+# Each tuple: (table, column, sql_decl).
+_ROUTING_DECISIONS_PHASE1_COLUMNS: tuple[tuple[str, str, str], ...] = (
+    ("routing_decisions", "schema_version", "TEXT NOT NULL DEFAULT 'v1'"),
+    ("routing_decisions", "task_signature", "TEXT NOT NULL DEFAULT ''"),
+    ("routing_decisions", "task_type", "TEXT NOT NULL DEFAULT 'unknown'"),
+    ("routing_decisions", "caller", "TEXT NOT NULL DEFAULT 'unknown'"),
+    ("routing_decisions", "decision_class", "TEXT NOT NULL DEFAULT 'pinned'"),
+    ("routing_decisions", "selected_tier", "TEXT NOT NULL DEFAULT 'unknown'"),
+    ("routing_decisions", "widened_from", "TEXT NOT NULL DEFAULT ''"),
+    ("routing_decisions", "candidate_chain_json", "TEXT NOT NULL DEFAULT '[]'"),
+    ("routing_decisions", "n_attempts", "INTEGER NOT NULL DEFAULT 0"),
+    ("routing_decisions", "outcome", "TEXT NOT NULL DEFAULT 'unknown'"),
+    ("routing_decisions", "duration_ms", "REAL NOT NULL DEFAULT 0.0"),
+    ("routing_decisions", "total_tokens", "INTEGER NOT NULL DEFAULT 0"),
+    ("routing_decisions", "cost_estimate_usd", "REAL NOT NULL DEFAULT 0.0"),
+    ("routing_decisions", "trace_id", "TEXT NOT NULL DEFAULT ''"),
+)
 
 _POLICY_DECISIONS_DDL = """
 CREATE TABLE IF NOT EXISTS policy_decisions (
@@ -201,6 +257,13 @@ _INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_economic_kind_created ON economic_events(event_kind, created_at)",
     "CREATE INDEX IF NOT EXISTS idx_external_kind_created ON external_outcomes(outcome_kind, created_at)",
     "CREATE INDEX IF NOT EXISTS idx_overnight_date_metric ON overnight_metrics(date, metric_name)",
+    # Phase 1 (2026-05-10) routing witness indexes
+    "CREATE INDEX IF NOT EXISTS idx_routing_caller_created ON routing_decisions(caller, created_at)",
+    "CREATE INDEX IF NOT EXISTS idx_routing_task_type_created ON routing_decisions(task_type, created_at)",
+    "CREATE INDEX IF NOT EXISTS idx_routing_outcome_created ON routing_decisions(outcome, created_at)",
+    "CREATE INDEX IF NOT EXISTS idx_provider_attempts_decision ON provider_attempts(decision_id)",
+    "CREATE INDEX IF NOT EXISTS idx_provider_attempts_provider_created ON provider_attempts(provider, created_at)",
+    "CREATE INDEX IF NOT EXISTS idx_provider_attempts_error_class ON provider_attempts(error_class, created_at)",
 ]
 
 
@@ -250,6 +313,34 @@ async def _apply_connection_pragmas_async(db: aiosqlite.Connection) -> None:
     await db.execute("PRAGMA synchronous=NORMAL")
 
 
+def _existing_columns_sync(db: sqlite3.Connection, table: str) -> set[str]:
+    rows = db.execute(f"PRAGMA table_info({table})").fetchall()
+    return {row[1] for row in rows}
+
+
+async def _existing_columns_async(db: aiosqlite.Connection, table: str) -> set[str]:
+    cur = await db.execute(f"PRAGMA table_info({table})")
+    rows = await cur.fetchall()
+    await cur.close()
+    return {row[1] for row in rows}
+
+
+def _apply_phase1_routing_migration_sync(db: sqlite3.Connection) -> None:
+    """Idempotently add Phase 1 columns to existing routing_decisions table."""
+    existing = _existing_columns_sync(db, "routing_decisions")
+    for table, column, decl in _ROUTING_DECISIONS_PHASE1_COLUMNS:
+        if column not in existing:
+            db.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
+
+
+async def _apply_phase1_routing_migration_async(db: aiosqlite.Connection) -> None:
+    """Idempotently add Phase 1 columns to existing routing_decisions table."""
+    existing = await _existing_columns_async(db, "routing_decisions")
+    for table, column, decl in _ROUTING_DECISIONS_PHASE1_COLUMNS:
+        if column not in existing:
+            await db.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
+
+
 def ensure_telemetry_schema_sync(db: sqlite3.Connection) -> None:
     _apply_connection_pragmas_sync(db)
     for ddl in (
@@ -259,6 +350,7 @@ def ensure_telemetry_schema_sync(db: sqlite3.Connection) -> None:
         _TEAM_ROSTER_DDL,
         _WORKFLOW_SCORES_DDL,
         _ROUTING_DECISIONS_DDL,
+        _PROVIDER_ATTEMPTS_DDL,
         _POLICY_DECISIONS_DDL,
         _INTERVENTION_OUTCOMES_DDL,
         _ECONOMIC_EVENTS_DDL,
@@ -266,6 +358,7 @@ def ensure_telemetry_schema_sync(db: sqlite3.Connection) -> None:
         _OVERNIGHT_METRICS_DDL,
     ):
         db.execute(ddl)
+    _apply_phase1_routing_migration_sync(db)
     for idx in _INDEXES:
         db.execute(idx)
     db.commit()
@@ -280,6 +373,7 @@ async def ensure_telemetry_schema_async(db: aiosqlite.Connection) -> None:
         _TEAM_ROSTER_DDL,
         _WORKFLOW_SCORES_DDL,
         _ROUTING_DECISIONS_DDL,
+        _PROVIDER_ATTEMPTS_DDL,
         _POLICY_DECISIONS_DDL,
         _INTERVENTION_OUTCOMES_DDL,
         _ECONOMIC_EVENTS_DDL,
@@ -287,6 +381,7 @@ async def ensure_telemetry_schema_async(db: aiosqlite.Connection) -> None:
         _OVERNIGHT_METRICS_DDL,
     ):
         await db.execute(ddl)
+    await _apply_phase1_routing_migration_async(db)
     for idx in _INDEXES:
         await db.execute(idx)
     # Migrate: add trace_id column to critical tables in existing databases
@@ -384,6 +479,51 @@ class RoutingDecisionRecord:
     run_id: str = ""
     reasons: list[str] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
+    created_at: datetime = field(default_factory=_utc_now)
+
+    # --- Phase 1 dashboard-ready additions (2026-05-10) ---
+    # All nullable/defaulted so existing rows stay readable.
+    # See docs/plans/2026-05-10-phase1-routing-witness.md.
+    schema_version: str = "v1"
+    task_signature: str = ""
+    task_type: str = "unknown"
+    caller: str = "unknown"
+    decision_class: str = "pinned"
+    selected_tier: str = "unknown"
+    widened_from: str = ""
+    candidate_chain: list[str] = field(default_factory=list)
+    n_attempts: int = 0
+    outcome: str = "unknown"
+    duration_ms: float = 0.0
+    total_tokens: int = 0
+    cost_estimate_usd: float = 0.0
+
+
+@dataclass(frozen=True)
+class ProviderAttemptRecord:
+    """One provider attempt within a routing decision (Phase 1, 2026-05-10).
+
+    Multiple ProviderAttemptRecord rows may share a `decision_id` to
+    represent a fallback chain (e.g. claude_code -> openai -> ollama).
+    Linked to RoutingDecisionRecord via decision_id (not enforced as FK in
+    SQLite; join at query time).
+    """
+
+    decision_id: str
+    attempt_idx: int
+    provider: str
+    model: str
+    tier: str = "unknown"
+    success: bool = False
+    outcome: str = "unknown"
+    error_class: str = ""
+    error_detail: str = ""
+    duration_ms: float = 0.0
+    stop_reason: str = ""
+    usage: dict[str, int] = field(default_factory=dict)
+    cost_estimate_usd: float = 0.0
+    circuit_state: str = "closed"
+    schema_version: str = "v1"
     created_at: datetime = field(default_factory=_utc_now)
 
 
@@ -528,8 +668,23 @@ def _row_to_workflow_score(row: sqlite3.Row | aiosqlite.Row) -> WorkflowScoreRec
     )
 
 
+def _row_value(row: sqlite3.Row | aiosqlite.Row, name: str, default: Any) -> Any:
+    """Read a column from a Row that may pre-date the column being added."""
+    try:
+        value = row[name]
+    except (IndexError, KeyError):
+        return default
+    return value if value is not None else default
+
+
 def _row_to_routing_decision(row: sqlite3.Row | aiosqlite.Row) -> RoutingDecisionRecord:
     reasons = _json_load(row["reasons_json"], [])
+    candidate_chain_raw = _json_load(_row_value(row, "candidate_chain_json", "[]"), [])
+    candidate_chain = (
+        [str(item) for item in candidate_chain_raw]
+        if isinstance(candidate_chain_raw, list)
+        else []
+    )
     return RoutingDecisionRecord(
         decision_id=str(row["decision_id"]),
         action_name=str(row["action_name"]),
@@ -544,6 +699,42 @@ def _row_to_routing_decision(row: sqlite3.Row | aiosqlite.Row) -> RoutingDecisio
         reasons=[str(item) for item in reasons] if isinstance(reasons, list) else [],
         metadata=_json_load(row["metadata_json"], {}),
         created_at=_parse_dt(row["created_at"]) or _utc_now(),
+        # Phase 1 dashboard-ready additions
+        schema_version=str(_row_value(row, "schema_version", "v1") or "v1"),
+        task_signature=str(_row_value(row, "task_signature", "") or ""),
+        task_type=str(_row_value(row, "task_type", "unknown") or "unknown"),
+        caller=str(_row_value(row, "caller", "unknown") or "unknown"),
+        decision_class=str(_row_value(row, "decision_class", "pinned") or "pinned"),
+        selected_tier=str(_row_value(row, "selected_tier", "unknown") or "unknown"),
+        widened_from=str(_row_value(row, "widened_from", "") or ""),
+        candidate_chain=candidate_chain,
+        n_attempts=int(_row_value(row, "n_attempts", 0) or 0),
+        outcome=str(_row_value(row, "outcome", "unknown") or "unknown"),
+        duration_ms=float(_row_value(row, "duration_ms", 0.0) or 0.0),
+        total_tokens=int(_row_value(row, "total_tokens", 0) or 0),
+        cost_estimate_usd=float(_row_value(row, "cost_estimate_usd", 0.0) or 0.0),
+    )
+
+
+def _row_to_provider_attempt(row: sqlite3.Row | aiosqlite.Row) -> ProviderAttemptRecord:
+    usage = _json_load(_row_value(row, "usage_json", "{}"), {})
+    return ProviderAttemptRecord(
+        decision_id=str(row["decision_id"]),
+        attempt_idx=int(row["attempt_idx"]),
+        provider=str(row["provider"]),
+        model=str(_row_value(row, "model", "") or ""),
+        tier=str(_row_value(row, "tier", "unknown") or "unknown"),
+        success=bool(_row_value(row, "success", 0)),
+        outcome=str(_row_value(row, "outcome", "unknown") or "unknown"),
+        error_class=str(_row_value(row, "error_class", "") or ""),
+        error_detail=str(_row_value(row, "error_detail", "") or ""),
+        duration_ms=float(_row_value(row, "duration_ms", 0.0) or 0.0),
+        stop_reason=str(_row_value(row, "stop_reason", "") or ""),
+        usage={str(k): int(v) for k, v in (usage or {}).items() if isinstance(v, (int, float))} if isinstance(usage, dict) else {},
+        cost_estimate_usd=float(_row_value(row, "cost_estimate_usd", 0.0) or 0.0),
+        circuit_state=str(_row_value(row, "circuit_state", "closed") or "closed"),
+        schema_version=str(_row_value(row, "schema_version", "v1") or "v1"),
+        created_at=_parse_dt(_row_value(row, "created_at", None)) or _utc_now(),
     )
 
 
@@ -947,8 +1138,11 @@ class TelemetryPlaneStore:
                 "INSERT INTO routing_decisions (decision_id, session_id, task_id,"
                 " run_id, action_name, route_path, selected_provider,"
                 " selected_model_hint, confidence, requires_human, reasons_json,"
-                " metadata_json, created_at, trace_id)"
-                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                " metadata_json, schema_version, task_signature, task_type, caller,"
+                " decision_class, selected_tier, widened_from, candidate_chain_json,"
+                " n_attempts, outcome, duration_ms, total_tokens, cost_estimate_usd,"
+                " created_at, trace_id)"
+                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (
                     record.decision_id,
                     record.session_id,
@@ -962,8 +1156,56 @@ class TelemetryPlaneStore:
                     1 if record.requires_human else 0,
                     _json_dump(record.reasons),
                     _json_dump(record.metadata),
+                    record.schema_version,
+                    record.task_signature,
+                    record.task_type,
+                    record.caller,
+                    record.decision_class,
+                    record.selected_tier,
+                    record.widened_from,
+                    _json_dump(list(record.candidate_chain)),
+                    int(record.n_attempts),
+                    record.outcome,
+                    float(record.duration_ms),
+                    int(record.total_tokens),
+                    float(record.cost_estimate_usd),
                     record.created_at.isoformat(),
                     corr.trace_id,
+                ),
+            )
+            await db.commit()
+        return record
+
+    async def record_provider_attempt(
+        self,
+        record: ProviderAttemptRecord,
+    ) -> ProviderAttemptRecord:
+        """Insert one ProviderAttemptRecord. Idempotent on (decision_id, attempt_idx)."""
+        await self.init_db()
+        async with self._open() as db:
+            await db.execute(
+                "INSERT OR REPLACE INTO provider_attempts (decision_id, attempt_idx,"
+                " provider, model, tier, success, outcome, error_class, error_detail,"
+                " duration_ms, stop_reason, usage_json, cost_estimate_usd,"
+                " circuit_state, schema_version, created_at)"
+                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (
+                    record.decision_id,
+                    int(record.attempt_idx),
+                    record.provider,
+                    record.model,
+                    record.tier,
+                    1 if record.success else 0,
+                    record.outcome,
+                    record.error_class,
+                    record.error_detail,
+                    float(record.duration_ms),
+                    record.stop_reason,
+                    _json_dump(record.usage),
+                    float(record.cost_estimate_usd),
+                    record.circuit_state,
+                    record.schema_version,
+                    record.created_at.isoformat(),
                 ),
             )
             await db.commit()
@@ -977,12 +1219,8 @@ class TelemetryPlaneStore:
         limit: int = 100,
     ) -> list[RoutingDecisionRecord]:
         await self.init_db()
-        query = (
-            "SELECT decision_id, session_id, task_id, run_id, action_name,"
-            " route_path, selected_provider, selected_model_hint, confidence,"
-            " requires_human, reasons_json, metadata_json, created_at"
-            " FROM routing_decisions WHERE 1=1"
-        )
+        # SELECT * — _row_to_routing_decision tolerates missing columns via _row_value.
+        query = "SELECT * FROM routing_decisions WHERE 1=1"
         params: list[Any] = []
         if task_id is not None:
             query += " AND task_id = ?"
@@ -996,6 +1234,33 @@ class TelemetryPlaneStore:
             db.row_factory = aiosqlite.Row
             rows = await (await db.execute(query, params)).fetchall()
         return [_row_to_routing_decision(row) for row in rows]
+
+    async def list_provider_attempts(
+        self,
+        *,
+        decision_id: str | None = None,
+        provider: str | None = None,
+        error_class: str | None = None,
+        limit: int = 200,
+    ) -> list[ProviderAttemptRecord]:
+        await self.init_db()
+        query = "SELECT * FROM provider_attempts WHERE 1=1"
+        params: list[Any] = []
+        if decision_id is not None:
+            query += " AND decision_id = ?"
+            params.append(decision_id)
+        if provider is not None:
+            query += " AND provider = ?"
+            params.append(provider)
+        if error_class is not None:
+            query += " AND error_class = ?"
+            params.append(error_class)
+        query += " ORDER BY created_at DESC, attempt_idx ASC LIMIT ?"
+        params.append(limit)
+        async with self._open() as db:
+            db.row_factory = aiosqlite.Row
+            rows = await (await db.execute(query, params)).fetchall()
+        return [_row_to_provider_attempt(row) for row in rows]
 
     async def record_policy_decision(
         self,
