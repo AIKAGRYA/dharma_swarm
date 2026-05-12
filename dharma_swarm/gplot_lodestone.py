@@ -361,8 +361,13 @@ _GPLOT_TELOS_OBJECTIVES: list[dict[str, Any]] = [
             "within tolerance. No new control plane; no new DB; no new "
             "dashboard surface. See docs/GPLOT_CAIRN.md §5."
         ),
-        "target_date": "2026-05-26",
-        "metadata": {"domain": "gplot", "pillar": "invariance"},
+        "target_date": None,
+        "metadata": {
+            "domain": "gplot",
+            "pillar": "invariance",
+            "milestone": "v1",
+            "gate": "Lorenz fixture test passes; one ExternalOutcomeRecord written",
+        },
     },
     {
         "name": "GPLOT v1.1 — First Falsifiable Prediction Logged",
@@ -378,8 +383,14 @@ _GPLOT_TELOS_OBJECTIVES: list[dict[str, Any]] = [
             "added to the falsifiability log that gates promotion to "
             "control authority."
         ),
-        "target_date": "2026-06-15",
-        "metadata": {"domain": "gplot", "pillar": "invariance"},
+        "target_date": None,
+        "metadata": {
+            "domain": "gplot",
+            "pillar": "invariance",
+            "milestone": "v1.1",
+            "gate": "After >=1 v1 reading written, log a falsifiable prediction",
+            "depends_on_milestone": "v1",
+        },
     },
     {
         "name": "GPLOT v2 — Persistent Homology on MAP-Elites + RV trajectory",
@@ -395,8 +406,14 @@ _GPLOT_TELOS_OBJECTIVES: list[dict[str, Any]] = [
             "as static artifacts to ~/.dharma/observatory/; not a new "
             "dashboard surface."
         ),
-        "target_date": "2026-07-15",
-        "metadata": {"domain": "gplot", "pillar": "invariance"},
+        "target_date": None,
+        "metadata": {
+            "domain": "gplot",
+            "pillar": "invariance",
+            "milestone": "v2",
+            "gate": "ripser available; persistence diagrams computed on accreted MAP-Elites + RV data",
+            "depends_on_milestone": "v1.1",
+        },
     },
     {
         "name": "GPLOT v3 — Hofstadter-Class Spectrum Reconstruction",
@@ -412,8 +429,14 @@ _GPLOT_TELOS_OBJECTIVES: list[dict[str, Any]] = [
             "probably ~3 months minimum. Asking sooner is asking the "
             "wrong question of the available data."
         ),
-        "target_date": "2026-10-01",
-        "metadata": {"domain": "gplot", "pillar": "invariance"},
+        "target_date": None,
+        "metadata": {
+            "domain": "gplot",
+            "pillar": "invariance",
+            "milestone": "v3",
+            "gate": "Sufficient accreted sweep data (selector × landscape grid populated); asking sooner is asking the wrong question of the data",
+            "depends_on_milestone": "v2",
+        },
     },
     {
         "name": "GPLOT Promotion Review — Research Surface → Control Rule",
@@ -428,8 +451,14 @@ _GPLOT_TELOS_OBJECTIVES: list[dict[str, Any]] = [
             "ACTIVE_SURFACE_MANIFEST.yaml changelog. Promotion is the "
             "exception, not the default path. See GPLOT_CAIRN §4.7."
         ),
-        "target_date": "2026-09-01",
-        "metadata": {"domain": "gplot", "pillar": "invariance"},
+        "target_date": None,
+        "metadata": {
+            "domain": "gplot",
+            "pillar": "invariance",
+            "milestone": "promotion_review",
+            "gate": "N>=30 documented predictions, hit-rate>=0.8, FP-rate<=0.05, human review",
+            "depends_on_milestone": "v1.1",
+        },
     },
     {
         "name": "GPLOT × GNANI Cross-Pollination Study",
@@ -445,8 +474,14 @@ _GPLOT_TELOS_OBJECTIVES: list[dict[str, Any]] = [
             "Negative result is evidence the two poles are independent, "
             "which is also valuable information."
         ),
-        "target_date": "2026-08-15",
-        "metadata": {"domain": "gplot", "pillar": "invariance"},
+        "target_date": None,
+        "metadata": {
+            "domain": "gplot",
+            "pillar": "invariance",
+            "milestone": "cross_pollination",
+            "gate": "v1 of both GPLOT and GNANI observatories must be running with accreted readings",
+            "depends_on_milestone": "v1.1",
+        },
     },
 ]
 
