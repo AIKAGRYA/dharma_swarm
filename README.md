@@ -166,17 +166,21 @@ If you want a human or agent to orient quickly, do not rely on the phrase `REPO 
 Use this instead:
 
 ```text
-Read docs/governance/README.md, then CLAUDE.md, before touching code.
+Read docs/governance/AGENT_ONLINE.md, then CLAUDE.md, before touching code.
 ```
 
 That sends the reader to:
 
-- `docs/governance/README.md` for the active governance hub and read order
+- `docs/governance/AGENT_ONLINE.md` for the single onboarding node
+- `docs/governance/AGENT_ONLINE.yaml` for machine-readable policy
 - `CLAUDE.md` for behavioral rules and repo-wide engineering constraints
 - the touched code files after that, rather than broad doc wandering
 
 ## Before Writing Any Code
 
+- **Read [`docs/governance/AGENT_ONLINE.md`](docs/governance/AGENT_ONLINE.md) FIRST** — canonical single-node onboarding for any agent. It maps governance, anti-slop, review policy, hard-fail surfaces, and required verification commands in one place.
+- **Machine surface:** [`docs/governance/AGENT_ONLINE.yaml`](docs/governance/AGENT_ONLINE.yaml) — same contract in machine-readable form.
+- **Read [`docs/foundations/CONTEMPLATIVE_SPINE.md`](docs/foundations/CONTEMPLATIVE_SPINE.md) FIRST** — the Grand Vision Boot Packet (Slot 10). Shortest faithful path into what dharma_swarm IS: the loop, the witness/actor/recognition layers, the four named broken seams, fast 15-min and 60-min assimilation paths. Hand any agent (any model) this single file before anything else.
 - **Read [`CLAUDE.md`](CLAUDE.md)** — system genome, key abstractions, behavioral rules, the Transcendence Principle.
 - **Read [`docs/MEGAFILE_INDEX.md`](docs/MEGAFILE_INDEX.md)** — the canonical onboarding index. Reserves 10 onboarding slots (vision, doctrine, roadmap, limbs, wiring, live ops, broken register, runbook, agent contract, contemplative spine). Reading order 1→10. Points to all existing substrate.
 - **Read [`docs/governance/README.md`](docs/governance/README.md)** — the active governance hub and recommended orientation order for humans and agents.

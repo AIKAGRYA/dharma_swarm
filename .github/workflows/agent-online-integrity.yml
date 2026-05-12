@@ -1,0 +1,28 @@
+name: agent-online-integrity
+
+on:
+  pull_request:
+    branches: [main, "promote/**", "governance/**"]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  check-agent-online:
+    name: Check AGENT_ONLINE contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Validate AGENT_ONLINE
+        run: |
+          python3 scripts/governance/check_agent_online.py

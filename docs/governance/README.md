@@ -6,6 +6,11 @@ This directory is the easiest single place to orient any human or agent before w
 
 ## Read Order
 
+0. [AGENT_ONLINE.md](/Users/dhyana/dharma_swarm/docs/governance/AGENT_ONLINE.md)
+   Single onboarding node for any agent. Includes mandatory read order,
+   hard-fail hygiene surfaces, required verification commands, and machine
+   contract (`AGENT_ONLINE.yaml`).
+
 1. [CLAUDE.md](/Users/dhyana/dharma_swarm/CLAUDE.md)
    Repo-wide working contract and behavioral rules.
 

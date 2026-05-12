@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "updated_at": "2026-05-11",
+  "canonical_markdown": "docs/governance/AGENT_ONLINE.md",
+  "precedence": [
+    "CLAUDE.md",
+    "docs/governance/SOVEREIGN_MANIFEST.md",
+    "docs/governance/AGENT_ONLINE.md"
+  ],
+  "mandatory_read_order": [
+    {"path": "CLAUDE.md", "purpose": "behavioral contract"},
+    {"path": "docs/governance/SOVEREIGN_MANIFEST.md", "purpose": "repo authority"},
+    {"path": "docs/governance/QUALITY_GATES.md", "purpose": "quality gate policy"},
+    {"path": "docs/governance/ANTI_SLOP_RULES.md", "purpose": "anti-slop rules"},
+    {"path": "docs/governance/PRE_COMMIT.md", "purpose": "local guard chain"},
+    {"path": "docs/governance/CI_GATES.md", "purpose": "CI security gates"},
+    {"path": "docs/governance/PR_REVIEW.md", "purpose": "review SaaS policy"},
+    {"path": "docs/governance/PROMPT_GOVERNANCE.md", "purpose": "prompt pack governance"},
+    {"path": "INTERFACE_MISMATCH_MAP.md", "purpose": "interface failure map"}
+  ],
+  "coverage_map": {
+    "governance": "docs/governance/SOVEREIGN_MANIFEST.md",
+    "quality_gates": "docs/governance/QUALITY_GATES.md",
+    "anti_slop": "docs/governance/ANTI_SLOP_RULES.md",
+    "pre_commit": "docs/governance/PRE_COMMIT.md",
+    "ci_security": "docs/governance/CI_GATES.md",
+    "code_review": "docs/governance/PR_REVIEW.md",
+    "prompt_governance": "docs/governance/PROMPT_GOVERNANCE.md",
+    "interface_integrity": "INTERFACE_MISMATCH_MAP.md"
+  },
+  "hard_fail_surfaces": [
+    ".github/workflows/semgrep.yml",
+    ".github/workflows/structure.yml",
+    ".github/workflows/module-budget.yml",
+    ".github/workflows/gitleaks.yml",
+    ".semgrep/dharma-anti-slop.yml"
+  ],
+  "required_commands": [
+    "python3 scripts/governance/check_agent_online.py",
+    "make precommit-run",
+    "make quality",
+    "python3 scripts/governance/route_quality_findings.py --all"
+  ],
+  "minimum_commands": [
+    "python3 scripts/governance/check_test_hygiene.py",
+    "python3 scripts/governance/check_module_budget.py --base-ref origin/main --head-ref HEAD"
+  ],
+  "exemption_surfaces": [
+    "docs/governance/ANTI_SLOP_RULES.md",
+    ".gitleaks.toml",
+    ".github/workflows/*.yml"
+  ]
+}
