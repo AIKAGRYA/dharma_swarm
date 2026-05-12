@@ -21,3 +21,7 @@ def test_api_main_imports_without_api_keys(monkeypatch) -> None:
     module = importlib.import_module("api.main")
 
     assert module.app.title == "DHARMA COMMAND"
+    route_paths = {getattr(route, "path", "") for route in module.app.routes}
+    assert "/api/viz/snapshot" in route_paths
+    assert "/api/viz/events" in route_paths
+    assert "/api/viz/timeline" in route_paths

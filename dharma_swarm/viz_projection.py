@@ -130,6 +130,11 @@ class VizProjector:
         econ_summary = self._project_economics()
         summary.update(econ_summary)
 
+        # 6. Invariant measurement plane
+        invariant_nodes, invariant_summary = self._project_invariants()
+        nodes.extend(invariant_nodes[:max_nodes // 5])
+        summary.update(invariant_summary)
+
         # Compute aggregate summary
         alive = sum(1 for n in nodes if n.status == "alive")
         stuck = sum(1 for n in nodes if n.status == "stuck")
@@ -316,6 +321,49 @@ class VizProjector:
             logger.debug("Economics projection failed", exc_info=True)
         return summary
 
+    def _project_invariants(self) -> tuple[list[GraphNode], dict[str, Any]]:
+        """Project read-only invariant measurements."""
+        nodes: list[GraphNode] = []
+        summary: dict[str, Any] = {
+            "invariant_measurements": 0,
+            "invariant_regressions": 0,
+        }
+        try:
+            from dharma_swarm.operator_core.invariant_measurements import (
+                build_invariant_measurements_from_db,
+            )
+
+            db_path = self._state_dir / "state" / "runtime.db"
+            measurements = build_invariant_measurements_from_db(db_path)
+            summary["invariant_measurements"] = len(measurements)
+            summary["invariant_regressions"] = sum(
+                1 for item in measurements if item.status == "regression"
+            )
+            summary["invariant_gap_codes"] = [
+                code
+                for item in measurements
+                for code in item.gap_codes
+            ][:20]
+            for measurement in measurements:
+                status = _measurement_status_to_node_status(measurement.status)
+                nodes.append(GraphNode(
+                    id=f"invariant:{measurement.measurement_id}",
+                    label=measurement.name,
+                    node_type="measurement",
+                    status=status,
+                    metrics={"value": float(measurement.value)},
+                    metadata={
+                        "family": measurement.family,
+                        "unit": measurement.unit,
+                        "status": measurement.status,
+                        "window": measurement.window,
+                        "gap_codes": list(measurement.gap_codes),
+                    },
+                ))
+        except Exception:
+            logger.debug("Invariant projection failed", exc_info=True)
+        return nodes, summary
+
     # -- Event projectors --------------------------------------------------
 
     def _stigmergy_events(self, since: float, limit: int) -> list[GraphEvent]:
@@ -413,3 +461,14 @@ def _parse_timestamp(value: Any) -> Optional[float]:
         except (ValueError, AttributeError):
             pass
     return None
+
+
+def _measurement_status_to_node_status(status: str) -> str:
+    """Map invariant-plane status labels onto GraphNode status labels."""
+    if status == "healthy":
+        return "alive"
+    if status in ("degraded", "insufficient_data"):
+        return "idle"
+    if status == "regression":
+        return "stuck"
+    return "unknown"
