@@ -96,7 +96,7 @@ python -m dharma_swarm.knowledge_ops.cli \
 
 ## Next Move
 
-The next cut should be context admission policy, still off the hot path:
+The next cut is context admission policy, still off the hot path:
 
 ```text
 M2E decision ledger

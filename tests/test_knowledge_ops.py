@@ -515,6 +515,8 @@ def test_cli_writes_memory_evidence_review_reports(tmp_path: Path, capsys) -> No
     queue_md = tmp_path / "memory_promotion_queue.md"
     ledger_json = tmp_path / "memory_decision_ledger.json"
     ledger_md = tmp_path / "memory_decision_ledger.md"
+    context_json = tmp_path / "memory_context_pack.json"
+    context_md = tmp_path / "memory_context_pack.md"
 
     assert (
         main(
@@ -550,6 +552,10 @@ def test_cli_writes_memory_evidence_review_reports(tmp_path: Path, capsys) -> No
                 str(ledger_json),
                 "--memory-decision-ledger-md-out",
                 str(ledger_md),
+                "--memory-context-pack-out",
+                str(context_json),
+                "--memory-context-pack-md-out",
+                str(context_md),
             ]
         )
         == 0
@@ -563,11 +569,14 @@ def test_cli_writes_memory_evidence_review_reports(tmp_path: Path, capsys) -> No
     queue_markdown = queue_md.read_text(encoding="utf-8")
     ledger_payload = json.loads(ledger_json.read_text(encoding="utf-8"))
     ledger_markdown = ledger_md.read_text(encoding="utf-8")
+    context_payload = json.loads(context_json.read_text(encoding="utf-8"))
+    context_markdown = context_md.read_text(encoding="utf-8")
 
     assert "memory_review" in cli_output
     assert "memory_conflict_review" in cli_output
     assert "memory_promotion_queue" in cli_output
     assert "memory_decision_ledger" in cli_output
+    assert "memory_context_pack" in cli_output
     assert payload["total_atoms"] >= 1
     assert payload["query"]["surface_ids"] == ["home.conversation_log"]
     assert conflict_payload["total_atoms"] >= 1
@@ -575,10 +584,13 @@ def test_cli_writes_memory_evidence_review_reports(tmp_path: Path, capsys) -> No
     assert queue_payload["total_atoms"] >= 1
     assert "blockers_by_reason" in queue_payload
     assert "decision_reviews" in ledger_payload
+    assert context_payload["candidate_count"] >= 1
+    assert context_payload["admitted_count"] == 0
     assert "MemoryKernel Evidence Review" in markdown
     assert "MemoryKernel Conflict Projection Review" in conflict_markdown
     assert "MemoryKernel Promotion Proposal Queue" in queue_markdown
     assert "MemoryKernel Promotion Decision Ledger" in ledger_markdown
+    assert "Memory Context Pack Preview" in context_markdown
     assert "private" not in json.dumps(payload)
     assert "/private" not in json.dumps(payload)
     assert "private" not in json.dumps(conflict_payload)
@@ -587,6 +599,8 @@ def test_cli_writes_memory_evidence_review_reports(tmp_path: Path, capsys) -> No
     assert "/private" not in json.dumps(queue_payload)
     assert "private" not in json.dumps(ledger_payload)
     assert "/private" not in json.dumps(ledger_payload)
+    assert "private" not in json.dumps(context_payload)
+    assert "/private" not in json.dumps(context_payload)
     assert "private" not in markdown
     assert "/private" not in markdown
     assert "private" not in conflict_markdown
@@ -595,3 +609,5 @@ def test_cli_writes_memory_evidence_review_reports(tmp_path: Path, capsys) -> No
     assert "/private" not in queue_markdown
     assert "private" not in ledger_markdown
     assert "/private" not in ledger_markdown
+    assert "private" not in context_markdown
+    assert "/private" not in context_markdown

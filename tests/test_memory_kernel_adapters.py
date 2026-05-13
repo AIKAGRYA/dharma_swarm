@@ -6,6 +6,7 @@ from pathlib import Path
 
 from dharma_swarm.memory_kernel import (
     CensusConfig,
+    MemoryContextBudget,
     MemoryAtomType,
     MemoryKernel,
     MemoryKernelConfig,
@@ -441,3 +442,23 @@ def test_wal_snapshot_warning_is_carried_on_atoms(tmp_path: Path) -> None:
 
     assert atoms
     assert "immutable_probe_may_ignore_live_wal" in atoms[0].metadata["snapshot_warnings"]
+
+
+def test_memory_kernel_preview_memory_pack_is_read_only_and_conservative(tmp_path: Path) -> None:
+    home, repo = _fixture_memory_home(tmp_path)
+    kernel = MemoryKernel(
+        MemoryKernelConfig(
+            census=CensusConfig(repo_root=repo, home=home),
+            adapter=ReadOnlyAdapterConfig(default_limit=10),
+        )
+    )
+
+    pack = kernel.preview_memory_pack(
+        surface_ids=("home.memory_plane",),
+        budget=MemoryContextBudget(max_candidate_atoms=3, max_admitted_atoms=2),
+    )
+
+    assert pack.candidate_count == 3
+    assert pack.admitted_count == 0
+    assert "no_atoms_admitted_by_policy" in pack.warnings
+    assert all("atom_not_context_admissible" in item.omission_reasons for item in pack.items)

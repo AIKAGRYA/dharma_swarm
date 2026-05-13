@@ -27,6 +27,13 @@ from dharma_swarm.memory_kernel.atoms import (
     WriteMode,
 )
 from dharma_swarm.memory_kernel.census import CensusConfig, CensusResult, MemorySurfaceCensus
+from dharma_swarm.memory_kernel.context_admission import (
+    MemoryContextBudget,
+    MemoryContextPack,
+    MemoryContextPackItem,
+    preview_memory_pack,
+    render_memory_context_pack_markdown,
+)
 from dharma_swarm.memory_kernel.facade import MemoryKernel, MemoryKernelConfig
 from dharma_swarm.memory_kernel.surfaces import SurfaceSpec, default_surface_specs
 from dharma_swarm.memory_kernel.writers import (
@@ -53,6 +60,9 @@ __all__ = [
     "DiscoveryTriageCategory",
     "MemoryAtom",
     "MemoryAtomType",
+    "MemoryContextBudget",
+    "MemoryContextPack",
+    "MemoryContextPackItem",
     "MemoryLane",
     "MemoryOrder",
     "MemoryQuery",
@@ -80,4 +90,6 @@ __all__ = [
     "WriterStatus",
     "default_surface_specs",
     "default_writer_specs",
+    "preview_memory_pack",
+    "render_memory_context_pack_markdown",
 ]

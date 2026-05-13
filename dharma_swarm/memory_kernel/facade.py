@@ -22,6 +22,11 @@ from dharma_swarm.memory_kernel.adapters.read_only import (
 )
 from dharma_swarm.memory_kernel.atoms import MemoryAtom, MemoryAtomType, MemoryQuery, MemorySurface
 from dharma_swarm.memory_kernel.census import CensusConfig, CensusResult, MemorySurfaceCensus
+from dharma_swarm.memory_kernel.context_admission import (
+    MemoryContextBudget,
+    MemoryContextPack,
+    preview_memory_pack,
+)
 
 
 AdapterFactory = Callable[[MemorySurface], MemorySurfaceAdapter]
@@ -172,6 +177,33 @@ class MemoryKernel:
             atom_types={MemoryAtomType.EXTERNAL_MEMORY},
             query=query,
             limit_per_surface=limit_per_surface,
+        )
+
+    def preview_memory_pack(
+        self,
+        *,
+        surface_ids: Iterable[str] | None = None,
+        atom_types: set[MemoryAtomType] | None = None,
+        query: MemoryQuery | None = None,
+        budget: MemoryContextBudget | None = None,
+    ) -> MemoryContextPack:
+        resolved_budget = budget or MemoryContextBudget()
+        resolved_query = (
+            MemoryQuery(
+                limit_total=resolved_budget.max_candidate_atoms,
+                limit_per_surface=resolved_budget.max_candidate_atoms,
+                include_content=resolved_budget.include_content,
+            )
+            if query is None
+            else replace(query, include_content=query.include_content or resolved_budget.include_content)
+        )
+        return preview_memory_pack(
+            self.iter_memory_atoms(
+                surface_ids=surface_ids,
+                atom_types=atom_types,
+                query=resolved_query,
+            ),
+            budget=resolved_budget,
         )
 
     def _resolve_query(

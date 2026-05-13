@@ -35,10 +35,13 @@ The active work should stay within these limits:
 - M2C: conflict and projection review
 - M2D: read-only promotion proposal queue
 - M2E: read-only promotion decision ledger
+- M3: read-only context admission preview
 
-Do not add prompt-context admission, canon writes, Chetana mutations, vector
+Do not add runtime prompt injection, canon writes, Chetana mutations, vector
 rebuilds, migrations, or write-through gates until the read-only layers are
-merged and reviewed.
+merged and reviewed. M3 may preview context admission as an artifact, but it
+must not wire MemoryKernel atoms into `context.py`, `AgentRunner`, or prompt
+construction.
 
 ## Reconciliation Rule
 

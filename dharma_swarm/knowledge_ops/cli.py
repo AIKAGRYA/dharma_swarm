@@ -37,7 +37,15 @@ from dharma_swarm.knowledge_ops.projections import (
     render_agent_context_bundle,
     render_concept_card,
 )
-from dharma_swarm.memory_kernel import CensusConfig, MemoryKernel, MemoryKernelConfig
+from dharma_swarm.memory_kernel import (
+    CensusConfig,
+    MemoryContextBudget,
+    MemoryContextPack,
+    MemoryKernel,
+    MemoryKernelConfig,
+    preview_memory_pack,
+    render_memory_context_pack_markdown,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -76,6 +84,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--memory-decision-in", type=Path)
     parser.add_argument("--memory-decision-ledger-out", type=Path)
     parser.add_argument("--memory-decision-ledger-md-out", type=Path)
+    parser.add_argument("--memory-context-pack-out", type=Path)
+    parser.add_argument("--memory-context-pack-md-out", type=Path)
+    parser.add_argument("--memory-context-max-candidates", type=int, default=50)
+    parser.add_argument("--memory-context-max-admitted", type=int, default=8)
     parser.add_argument("--dry-run", action="store_true")
     return parser
 
@@ -92,6 +104,7 @@ def main(argv: list[str] | None = None) -> int:
     memory_conflict_review: MemoryConflictProjectionReview | None = None
     memory_promotion_queue: MemoryPromotionProposalQueue | None = None
     memory_decision_ledger: MemoryPromotionDecisionLedger | None = None
+    memory_context_pack: MemoryContextPack | None = None
     if args.include_memory_kernel:
         census_kwargs: dict[str, object] = {
             "repo_root": args.repo_root,
@@ -139,6 +152,13 @@ def main(argv: list[str] | None = None) -> int:
         memory_decision_ledger = build_memory_decision_ledger(
             memory_promotion_queue,
             decisions=memory_decisions,
+        )
+        memory_context_pack = preview_memory_pack(
+            memory_atoms,
+            budget=MemoryContextBudget(
+                max_candidate_atoms=args.memory_context_max_candidates,
+                max_admitted_atoms=args.memory_context_max_admitted,
+            ),
         )
         snapshot = merge_snapshots(snapshot, memory_snapshot)
     summary = {
@@ -195,6 +215,15 @@ def main(argv: list[str] | None = None) -> int:
             "deferred_count": memory_decision_ledger.deferred_count,
             "undecided_count": memory_decision_ledger.undecided_count,
             "warning_count": len(memory_decision_ledger.warnings),
+        }
+    if memory_context_pack is not None:
+        summary["memory_context_pack"] = {
+            "candidate_count": memory_context_pack.candidate_count,
+            "admitted_count": memory_context_pack.admitted_count,
+            "omitted_count": memory_context_pack.omitted_count,
+            "candidate_truncated": memory_context_pack.candidate_truncated,
+            "total_selected_chars": memory_context_pack.total_selected_chars,
+            "warning_count": len(memory_context_pack.warnings),
         }
     print(json.dumps(summary, indent=2, sort_keys=True))
     if args.dry_run:
@@ -291,6 +320,23 @@ def main(argv: list[str] | None = None) -> int:
             ledger_md_path.parent.mkdir(parents=True, exist_ok=True)
             ledger_md_path.write_text(
                 render_memory_decision_ledger_markdown(memory_decision_ledger),
+                encoding="utf-8",
+            )
+        if args.memory_context_pack_out:
+            context_path = _resolve_output_path(args.repo_root, args.memory_context_pack_out)
+            context_path.parent.mkdir(parents=True, exist_ok=True)
+            context_path.write_text(
+                json.dumps(memory_context_pack.to_json(), indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+        if args.memory_context_pack_md_out:
+            context_md_path = _resolve_output_path(
+                args.repo_root,
+                args.memory_context_pack_md_out,
+            )
+            context_md_path.parent.mkdir(parents=True, exist_ok=True)
+            context_md_path.write_text(
+                render_memory_context_pack_markdown(memory_context_pack),
                 encoding="utf-8",
             )
     return 0
