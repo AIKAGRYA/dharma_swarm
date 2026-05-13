@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import asyncio
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -615,6 +616,55 @@ def _run_store_sync(job: dict[str, Any]) -> CronJobExecutionResult:
         )
 
 
+def _run_world_scout(job: dict[str, Any]) -> CronJobExecutionResult:
+    """Run the gated external-world scout, board refresh, and incubator."""
+    enabled = bool(job.get("fetch")) or os.environ.get("DHARMA_WORLD_SCOUT_FETCH") == "1"
+    if not enabled:
+        return CronJobExecutionResult(
+            status=CronJobRunStatus.WAITING_EXTERNAL,
+            output=(
+                "world_scout disabled: set DHARMA_WORLD_SCOUT_FETCH=1 "
+                "or job.fetch=true to allow live public-source fetches"
+            ),
+        )
+    try:
+        from dharma_swarm.world_radar_go_bridge import run_world_radar_go_once
+
+        result = run_world_radar_go_once(
+            scout_fetch=True,
+            min_score=float(job.get("min_score", 0.45)),
+            timeout_s=int(job.get("timeout_sec", 45)),
+        )
+        status = CronJobRunStatus.COMPLETED if result.ok else CronJobRunStatus.FAILED
+        output = (
+            f"world_scout: raw={result.raw_observations} "
+            f"signals={result.emitted_signals} promotion_ready={result.promotion_ready} "
+            f"incubations={result.incubations_written} brief={result.brief_path}"
+        )
+        if result.errors:
+            output += f" errors={list(result.errors)[:3]}"
+        return CronJobExecutionResult(
+            status=status,
+            output=output,
+            error="; ".join(result.errors) if result.errors else "",
+            metadata={
+                "board_path": str(result.board_path),
+                "brief_path": str(result.brief_path),
+                "health_path": str(result.health_path),
+                "promotion_ready": result.promotion_ready,
+                "incubations_written": result.incubations_written,
+                "emitted_signals": result.emitted_signals,
+                "raw_observations": result.raw_observations,
+            },
+        )
+    except Exception as e:
+        return CronJobExecutionResult(
+            status=CronJobRunStatus.FAILED,
+            output=str(e),
+            error=str(e),
+        )
+
+
 def _run_operator_brief(job: dict[str, Any]) -> CronJobExecutionResult:
     """Cron handler for the ontology-native Operator Brief seam (v0).
 
@@ -672,6 +722,7 @@ def execute_cron_job(job: dict[str, Any]) -> CronJobExecutionResult:
         frontier_refill — bootstrap top opportunities into frontier queue
         system_map_populator — local system map refresh
         tcs_heartbeat   — local IdentityMonitor time-series sample
+        world_scout     — gated external zeitgeist radar + incubator
         store_sync      — materialize ontology outcomes into runtime artifacts
     """
     handler = str(job.get("handler", "headless_prompt")).strip() or "headless_prompt"
@@ -714,6 +765,8 @@ def execute_cron_job(job: dict[str, Any]) -> CronJobExecutionResult:
         return _run_tcs_heartbeat(job)
     if handler == "revenue_scout":
         return _run_revenue_scout(job)
+    if handler == "world_scout":
+        return _run_world_scout(job)
     if handler == "store_sync":
         return _run_store_sync(job)
 
