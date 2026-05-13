@@ -10,7 +10,7 @@
 # Your workflow: Declare → Observe → Reconcile → Dispatch → Verify.
 
 schema_version: 2
-last_updated: "2026-05-11"
+last_updated: "2026-05-13"
 
 state_dir:
   canonical: "~/.dharma"
@@ -20,6 +20,7 @@ state_dir:
   sessions: "~/.dharma/sessions"
   economics: "~/.dharma/economics"
   revenue_packets: "~/.dharma/revenue_packets"
+  go_world_receipts: "~/.dharma/go_receipts/world"
   env_override: "DHARMA_STATE_DIR"
 
 api_routers:
@@ -162,6 +163,9 @@ health_check_registry:
   api_health_responds:
     description: "Verify /api/health returns 200"
     type: api_probe
+  go_world_receipts_present:
+    description: "Verify canonical Go world-radar receipts exist under ~/.dharma/go_receipts/world"
+    type: file_exists
 
 # ── Dashboard Surfaces ────────────────────────────────────────────
 # Every dashboard page: desired state, observed-state checks, gap info.
@@ -457,6 +461,14 @@ integrations:
     health_check_ids: [ontology_db_present]
     used_by: [ontology_registry, ontology]
 
+  - id: go_world_signal_receipts
+    label: "Go World Signal Receipts"
+    type: evidence_receipts
+    path: "~/.dharma/go_receipts/world"
+    status: incubating
+    health_check_ids: [go_world_receipts_present]
+    used_by: [control_surface, world_radar_receipt_projection]
+
 # ── Feedback Loops ────────────────────────────────────────────────
 # The cybernetic loops declared in CYBERNETIC_LOOP_MAP.md.
 
@@ -496,6 +508,18 @@ loops:
     health_check_ids: [module_file_exists]
     priority: p2
     next_action: "Wire shakti observations to evolution pipeline"
+
+  - id: world_radar_receipt_projection
+    label: "World Radar Receipt Projection"
+    sense: "canonical Go world receipts"
+    act: "project world_signal receipts into Zeitgeist/Shakti surfaces"
+    evaluate: "receipt freshness, accepted count, rejected reasons"
+    adapt: "tighten scout/ingestor wiring and source weighting"
+    module: dharma_swarm/operator_core/world_radar/receipt_bridge.py
+    status: degraded
+    health_check_ids: [module_file_exists, go_world_receipts_present]
+    priority: p1
+    next_action: "Wire projected receipt rows into Zeitgeist/Shakti after G14 receipt flow is producing live receipts"
 
   - id: stigmergy_coordination
     label: "Stigmergy Coordination"

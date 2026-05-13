@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -11,6 +12,9 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/AmitabhainArunachala/dharma_swarm/tools/go_sdk/adaptercontract"
+	"github.com/AmitabhainArunachala/dharma_swarm/tools/go_sdk/receipt"
 )
 
 type Observation struct {
@@ -43,11 +47,28 @@ func main() {
 	input := flag.String("input", "", "raw observation JSONL path")
 	output := flag.String("output", "", "normalized signal JSONL path")
 	minScore := flag.Float64("min-score", 0.45, "minimum relevance score")
+	eventType := flag.String("event-type", "", "receipt mode event type")
+	sourceURL := flag.String("source-url", "", "receipt mode source URL")
+	correlationID := flag.String("correlation-id", "", "receipt mode correlation ID")
+	observedAt := flag.String("observed-at", "", "receipt mode observed-at timestamp")
 	flag.Parse()
+
 	if *input == "" || *output == "" {
 		fmt.Fprintln(os.Stderr, "--input and --output are required")
 		os.Exit(2)
 	}
+	if *eventType != "" {
+		if *sourceURL == "" || *correlationID == "" {
+			fmt.Fprintln(os.Stderr, "--source-url and --correlation-id are required in receipt mode")
+			os.Exit(2)
+		}
+		if err := writeReceipt(*input, *output, *eventType, *sourceURL, *correlationID, *observedAt); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	observations, err := readObservations(*input)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -64,6 +85,28 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+}
+
+func writeReceipt(inputPath, outputPath, eventType, sourceURL, correlationID, observedAt string) error {
+	payload, err := os.ReadFile(inputPath)
+	if err != nil {
+		return err
+	}
+	fixture := adaptercontract.Fixture{
+		CorrelationID: correlationID,
+		Source:        eventType,
+		SourceURL:     sourceURL,
+		ObservedAt:    observedAt,
+		Payload:       json.RawMessage(payload),
+	}
+	r, adaptErr := Adapter{}.Adapt(context.Background(), fixture)
+	if adaptErr != nil && r.ReceiptID == "" {
+		return adaptErr
+	}
+	if err := receipt.Write(outputPath, r); err != nil {
+		return err
+	}
+	return adaptErr
 }
 
 func SignalFromObservation(obs Observation) Signal {
