@@ -80,7 +80,7 @@ using phrases such as "source of truth", "canonical", "authoritative", or
 | `docs/architecture/NAVIGATION.md` | Module map, after count refresh |
 | `docs/architecture/MODEL_ROUTING_CANON.md` | Provider/model routing, after merge with root routing map |
 | `docs/architecture/WIRING_AND_LOOPS.md` | Build Protocol and feedback-loop wiring map |
-| `docs/MEGAFILE_INDEX.md` | Onboarding megafile slot index and convergence map |
+| `docs/plans/2026-05-10-phase1-routing-witness.md` | Routing witness plan and route-telemetry promotion record |
 | `docs/state/BROKEN_REGISTER.md` | Persistent broken/degraded surface register |
 | `docs/vision_maps/MASTER_2026-05-07_attractor_closure.md` | Attractor-closure synthesis source map |
 | `docs/vision_maps/MASTER_2026-05-07_attractor_closure_synthesis.md` | Attractor-closure synthesis entry point |
