@@ -11,8 +11,8 @@ Do not hand-edit the generated block.
 | Dharma Python LOC | 257,112 |
 | Test files | 576 |
 | Test function occurrences | 10,209 |
-| Markdown files | 691 |
-| Markdown total lines | 176,029 |
+| Markdown files | 692 |
+| Markdown total lines | 176,073 |
 | Bridge files | 22 |
 | Adapter files | 14 |
 | Orchestrator files | 4 |

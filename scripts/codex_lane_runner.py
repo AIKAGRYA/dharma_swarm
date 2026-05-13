@@ -177,7 +177,14 @@ NEXT: <next bounded action>
 """
 
 
-def codex_cmd(args: argparse.Namespace, *, worktree: Path, lane_dir: Path, output: Path) -> list[str]:
+def codex_cmd(
+    args: argparse.Namespace,
+    *,
+    worktree: Path,
+    lane_dir: Path,
+    output: Path,
+    prompt: str,
+) -> list[str]:
     cmd = ["codex", "exec"]
     if args.model:
         cmd.extend(["-m", args.model])
@@ -185,7 +192,7 @@ def codex_cmd(args: argparse.Namespace, *, worktree: Path, lane_dir: Path, outpu
         cmd.append("--dangerously-bypass-approvals-and-sandbox")
     else:
         cmd.extend(["-s", "workspace-write"])
-    cmd.extend(["-C", str(worktree), "--add-dir", str(lane_dir), "-o", str(output), "-"])
+    cmd.extend(["-C", str(worktree), "--add-dir", str(lane_dir), "-o", str(output), prompt])
     return cmd
 
 
@@ -230,9 +237,14 @@ def run_cycle(
     timed_out = False
     try:
         proc = run_cmd(
-            codex_cmd(args, worktree=worktree, lane_dir=lane_dir, output=output_file),
+            codex_cmd(
+                args,
+                worktree=worktree,
+                lane_dir=lane_dir,
+                output=output_file,
+                prompt=prompt,
+            ),
             cwd=worktree,
-            input_text=prompt,
             timeout=args.cycle_timeout,
         )
         rc = proc.returncode
