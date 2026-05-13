@@ -1,0 +1,14 @@
+{
+  "correlation_id": "world_corr_health_001",
+  "source": "world_scout_health",
+  "source_url": "file://world-scout-health",
+  "observed_at": "2026-05-12T00:00:00Z",
+  "payload": {
+    "source_count": 19,
+    "reachable_count": 17,
+    "item_count": 83,
+    "timeout_ms": 750,
+    "max_body_bytes": 1048576,
+    "fetch_enabled": false
+  }
+}

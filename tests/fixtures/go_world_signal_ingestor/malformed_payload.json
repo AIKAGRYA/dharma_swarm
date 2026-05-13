@@ -1,0 +1,7 @@
+{
+  "correlation_id": "world_corr_malformed_001",
+  "source": "world_signal",
+  "source_url": "https://example.com/malformed",
+  "observed_at": "2026-05-12T00:00:00Z",
+  "payload_text": "{\"title\":\"bad\","
+}
