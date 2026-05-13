@@ -13,7 +13,6 @@ runtime/code/evidence adapters.
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import json
 import logging
 from typing import Any
@@ -63,12 +62,12 @@ async def control_surface_summary() -> ApiResponse:
 async def control_surface_stream():
     """SSE stream pushing updated rows when the projection changes."""
     async def event_generator():  # noqa: ANN202
-        last_hash: str | None = None
+        last_hash: int | None = None
         while True:
             try:
                 row_dicts = _build_rows()
                 payload = json.dumps(row_dicts, sort_keys=True)
-                current_hash = hashlib.md5(payload.encode()).hexdigest()  # noqa: S324
+                current_hash = hash(payload)
                 if current_hash != last_hash:
                     yield f"data: {payload}\n\n"
                     last_hash = current_hash
