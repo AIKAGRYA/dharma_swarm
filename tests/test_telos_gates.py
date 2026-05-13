@@ -366,7 +366,7 @@ def test_reflective_reroute_budget_exhausted_stays_blocked():
 # ---------------------------------------------------------------------------
 
 class TestGatePressureFeedback:
-    """Test the S4→S3 feedback loop: zeitgeist writes gate_pressure.json,
+    """Test the internal pressure loop: scanner writes gate_pressure.json,
     TelosGatekeeper reads it and overrides trust_mode."""
 
     def test_no_pressure_file_returns_current_mode(self, tmp_path):

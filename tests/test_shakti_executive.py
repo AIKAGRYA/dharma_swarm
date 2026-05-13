@@ -71,6 +71,40 @@ def test_shakti_executive_preview_uses_recognition_and_directives(tmp_path: Path
     assert any(row["thesis"] == "operator_directive" for row in preview)
 
 
+def test_shakti_executive_turns_world_signal_into_strategic_opportunity(tmp_path: Path) -> None:
+    state = tmp_path / "dharma"
+    _write_zeitgeist(
+        state,
+        {
+            "id": "world-subq",
+            "source": "world_zeitgeist",
+            "category": "company",
+            "title": "SubQ agent infrastructure startup",
+            "relevance_score": 0.91,
+            "keywords": ["agentic", "startup", "benchmark"],
+            "description": "External market signal for agent infrastructure.",
+            "metadata": {
+                "raw_source": "operator_drop",
+                "promotion_status": "promotion_ready",
+                "url": "https://subq.ai/",
+                "first_principles_questions": ["What primitive does SubQ reveal?"],
+                "iteration_steps": [f"step {idx}" for idx in range(10)],
+                "adjacent_searches": ["SubQ alternatives"],
+                "strategic_moves": ["verify", "prototype"],
+                "incubation_path": "/tmp/incubation.md",
+            },
+        },
+    )
+
+    preview = ShaktiExecutive(state).preview(top_k=5, min_score=30.0)
+
+    row = preview[0]
+    assert row["domain"] == "ecosystem_scan"
+    assert row["thesis"] == "ecosystem_signal"
+    assert row["strategic_vision"]["iteration_steps"][0] == "step 0"
+    assert row["source_inputs"][0]["raw_source"] == "operator_drop"
+
+
 def test_shakti_executive_reads_feedback_surfaces(tmp_path: Path) -> None:
     state = tmp_path / "dharma"
     _write_ontology_feedback(state)

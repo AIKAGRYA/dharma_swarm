@@ -238,7 +238,7 @@ def test_witness_and_zeitgeist_intervals():
 
 
 def test_zeitgeist_registered_in_task_factories():
-    """'zeitgeist' must be a key in the task_factories dict inside orchestrate().
+    """External zeitgeist and internal pressure loops are registered.
 
     Audit assertion: confirms the loop IS reached during startup (Step 2 wiring).
     """
@@ -248,21 +248,24 @@ def test_zeitgeist_registered_in_task_factories():
     assert '"zeitgeist"' in src, (
         "zeitgeist loop must be registered in task_factories inside orchestrate()"
     )
+    assert '"internal-pressure"' in src, (
+        "internal pressure loop must be registered separately from zeitgeist"
+    )
 
 
 def test_gate_pressure_paths_match():
-    """Write path (zeitgeist) and read path (telos_gates) for gate_pressure.json must agree.
+    """Write path (internal pressure) and read path (telos_gates) must agree.
 
     Audit assertion: S4→S3 feedback channel is wired correctly end-to-end.
     """
     from dharma_swarm.orchestrate_live import STATE_DIR
     from dharma_swarm.telos_gates import TelosGatekeeper
 
-    zeitgeist_write_path = STATE_DIR / "meta" / "gate_pressure.json"
+    internal_pressure_write_path = STATE_DIR / "meta" / "gate_pressure.json"
     telos_read_path = TelosGatekeeper._GATE_PRESSURE_PATH
 
-    assert zeitgeist_write_path == telos_read_path, (
-        f"Path mismatch: zeitgeist writes to {zeitgeist_write_path}, "
+    assert internal_pressure_write_path == telos_read_path, (
+        f"Path mismatch: internal pressure writes to {internal_pressure_write_path}, "
         f"but telos_gates reads from {telos_read_path}"
     )
 
@@ -316,6 +319,7 @@ async def test_orchestrate_restarts_failed_task(monkeypatch, tmp_path):
     monkeypatch.setattr(mod, "_run_recognition_loop", sleeper)
     monkeypatch.setattr(mod, "run_conductor_loop", sleeper)
     monkeypatch.setattr(mod, "_run_zeitgeist_loop", sleeper)
+    monkeypatch.setattr(mod, "_run_internal_pressure_loop", sleeper)
     monkeypatch.setattr(mod, "_run_witness_loop", sleeper)
     monkeypatch.setattr(mod, "_run_consolidation_loop", sleeper)
     monkeypatch.setattr(mod, "_run_replication_monitor_loop", sleeper)
