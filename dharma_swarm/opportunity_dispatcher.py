@@ -90,7 +90,7 @@ import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 from dharma_swarm import opportunity_dispatcher_observer as _observer
 from dharma_swarm._campaign_manifest import (
@@ -102,6 +102,8 @@ from dharma_swarm._campaign_manifest import (
     update_stage,
     write_manifest,
 )
+from dharma_swarm.operator_action_gateway import OperatorActionGateway
+from dharma_swarm.runtime_state import RuntimeStateStore
 
 logger = logging.getLogger(__name__)
 
@@ -430,6 +432,38 @@ def _write_review_warn(opp_id: str, stage: str, action: str, reason: str) -> Non
         logger.debug("witness review_warn write failed", exc_info=True)
 
 
+def _record_review_operator_action(opp_id: str, stage: str, action: str, reason: str) -> None:
+    """Record REVIEW decisions in the canonical operator action queue.
+
+    The dispatcher still preserves the existing v3 REVIEW->ALLOW+WARN
+    semantics. This adds the missing operator-visible queue entry without
+    changing promotion behavior in this PR.
+    """
+    try:
+        runtime_state = RuntimeStateStore(DHARMA_HOME / "state" / "runtime.db")
+        gateway = OperatorActionGateway(runtime_state)
+        gateway.submit_proposal_sync(
+            action_name="opportunity_dispatcher.review_required",
+            actor="opportunity_dispatcher",
+            reason=reason,
+            payload={
+                "opportunity_id": opp_id,
+                "stage": stage,
+                "action": action,
+                "legacy_policy": "v3_review_to_allow",
+            },
+            source="opportunity_dispatcher",
+            target="operator_approval_queue",
+            risk="medium",
+            approval_required=True,
+            telos_check=False,
+            correlation_id=f"opportunity_review:{opp_id}:{stage}",
+            idempotency_key=f"opportunity_review:{opp_id}:{stage}",
+        )
+    except Exception:
+        logger.debug("operator action review queue write failed", exc_info=True)
+
+
 # --------------------------------------------------------------------------
 # Budget gate
 # --------------------------------------------------------------------------
@@ -634,6 +668,7 @@ async def _promote_one_opportunity(
         manifest["review_logged"] = True
         if not dry_run:
             _write_review_warn(opp_id, stage, action, gate.reason)
+            _record_review_operator_action(opp_id, stage, action, gate.reason)
 
     # 4a. Throttle gate (PR4): cap deep_research promotions per 24h window.
     if stage == "deep_research":

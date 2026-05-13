@@ -26,6 +26,7 @@ from typing import Any
 from dharma_swarm.context import build_orientation_packet
 from dharma_swarm.cascade import get_registered_domains
 from dharma_swarm.operator_views import OperatorViews
+from dharma_swarm.operator_action_gateway import OperatorActionGateway
 from dharma_swarm import terminal_bridge_context
 from dharma_swarm import terminal_bridge_renderers
 from dharma_swarm.operator_core import (
@@ -46,7 +47,7 @@ from dharma_swarm.operator_core import (
 )
 from dharma_swarm.orientation_packet import DirectiveSummary, RuntimeStateSummary
 from dharma_swarm.provider_matrix import build_default_matrix_targets
-from dharma_swarm.runtime_state import DEFAULT_RUNTIME_DB, OperatorAction, RuntimeStateStore, SessionEventRecord
+from dharma_swarm.runtime_state import DEFAULT_RUNTIME_DB, RuntimeStateStore
 from dharma_swarm.models import ProviderType
 from dharma_swarm.tui import model_routing
 from dharma_swarm.terminal_commands import system_commands as system_commands_module
@@ -392,12 +393,6 @@ class TerminalBridge:
             topology=topology,
             summary=summary,
         )
-        content = await asyncio.to_thread(
-            self._build_workspace_snapshot_from_parts,
-            summary,
-            git_summary,
-            topology,
-        )
         self._emit_payload_result(
             "workspace.snapshot.result",
             request_id=request_id,
@@ -422,7 +417,6 @@ class TerminalBridge:
             bridge_status="connected",
             supervisor_preview=load_terminal_control_state(self._repo_root),
         )
-        content = await asyncio.to_thread(self._build_runtime_snapshot)
         self._emit_payload_result(
             "runtime.snapshot.result",
             request_id=request_id,
@@ -505,45 +499,17 @@ class TerminalBridge:
             return {"enforcement_state": "recorded_only"}
         try:
             runtime_state = RuntimeStateStore(db_path=DEFAULT_RUNTIME_DB)
-            action = await runtime_state.record_operator_action(
-                OperatorAction(
-                    action_id=f"approval_{action_id}",
-                    action_name="approval.resolve",
-                    actor=str(payload.get("actor", "") or "operator"),
-                    session_id=str(metadata_record.get("session_id", "") or ""),
-                    task_id=str(metadata_record.get("task_id", "") or ""),
-                    run_id=str(metadata_record.get("run_id", "") or ""),
-                    reason=str(payload.get("summary", "") or f"approval resolution {action_id}"),
-                    payload=dict(payload),
-                )
+            gateway = OperatorActionGateway(runtime_state)
+            return await gateway.record_approval_resolution(
+                action_id,
+                resolution=resolution,
+                actor=str(payload.get("actor", "") or "operator"),
+                summary=str(payload.get("summary", "") or f"approval resolution {action_id}"),
+                session_id=str(metadata_record.get("session_id", "") or ""),
+                task_id=str(metadata_record.get("task_id", "") or ""),
+                run_id=str(metadata_record.get("run_id", "") or ""),
+                payload=dict(payload),
             )
-            runtime_outcome = self._classify_runtime_approval_outcome(resolution)
-            runtime_event = await runtime_state.record_session_event(
-                SessionEventRecord(
-                    event_id=f"evt_{uuid.uuid4().hex[:16]}",
-                    session_id=str(metadata_record.get("session_id", "") or ""),
-                    ledger_kind="operator_control",
-                    event_name=f"approval.resolve.{runtime_outcome}",
-                    task_id=str(metadata_record.get("task_id", "") or ""),
-                    run_id=str(metadata_record.get("run_id", "") or ""),
-                    agent_id=str(payload.get("actor", "") or "operator"),
-                    summary=str(payload.get("summary", "") or f"approval resolution {action_id}"),
-                    event_text=str(payload.get("summary", "") or f"approval resolution {action_id}"),
-                    payload={
-                        "action_id": action_id,
-                        "resolution": resolution,
-                        "enforcement_state": "runtime_recorded",
-                        "runtime_action_id": action.action_id,
-                        "outcome": runtime_outcome,
-                    },
-                )
-            )
-            return {
-                "enforcement_state": "runtime_recorded",
-                "outcome": runtime_outcome,
-                "runtime_action_id": action.action_id,
-                "runtime_event_id": runtime_event.event_id,
-            }
         except Exception:
             return {"enforcement_state": "recorded_only", "outcome": "runtime_record_failed"}
 
@@ -1429,6 +1395,7 @@ class TerminalBridge:
             overview = await views.runtime_overview()
             runs = await views.active_runs(limit=8)
             actions = await views.recent_operator_actions(limit=8)
+            pending_actions = await views.pending_operator_actions(limit=8)
         except Exception as exc:
             return {
                 "runtime_db": str(DEFAULT_RUNTIME_DB),
@@ -1436,6 +1403,7 @@ class TerminalBridge:
                 "overview": {},
                 "runs": [],
                 "actions": [],
+                "pending_actions": [],
             }
         return {
             "runtime_db": str(runtime_state.db_path),
@@ -1450,6 +1418,7 @@ class TerminalBridge:
                 "promoted_facts": overview.promoted_facts,
                 "context_bundles": overview.context_bundles,
                 "operator_actions": overview.operator_actions,
+                "pending_operator_actions": len(pending_actions),
             },
             "runs": [
                 {
@@ -1464,6 +1433,7 @@ class TerminalBridge:
                 for run in runs
             ],
             "actions": actions,
+            "pending_actions": pending_actions,
         }
 
     def _build_model_policy_summary(self, *, selected_provider: str, selected_model: str, strategy: str) -> dict[str, Any]:

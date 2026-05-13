@@ -5,14 +5,23 @@ Requires the `mcp` optional dependency: pip install dharma-swarm[mcp]
 
 from __future__ import annotations
 
-import asyncio
 import json
+from pathlib import Path
 from typing import Any
 
 from dharma_swarm.models import AgentRole, TaskPriority
+from dharma_swarm.operator_action_gateway import OperatorActionGateway
+from dharma_swarm.operator_views import OperatorViews
+from dharma_swarm.runtime_state import RuntimeStateStore
 
 
-def create_mcp_server(state_dir: str = ".dharma"):
+def _runtime_db_for_state_dir(state_dir: str, runtime_db_path: str | Path | None = None) -> Path:
+    if runtime_db_path is not None:
+        return Path(runtime_db_path).expanduser()
+    return Path(state_dir).expanduser() / "state" / "runtime.db"
+
+
+def create_mcp_server(state_dir: str = ".dharma", runtime_db_path: str | Path | None = None):
     """Create an MCP server with swarm tools.
 
     Returns the server instance. Call server.run() to start.
@@ -29,6 +38,8 @@ def create_mcp_server(state_dir: str = ".dharma"):
 
     server = Server("dharma-swarm")
     _swarm = None
+    runtime_state = RuntimeStateStore(_runtime_db_for_state_dir(state_dir, runtime_db_path))
+    action_gateway = OperatorActionGateway(runtime_state)
 
     async def _get_swarm():
         nonlocal _swarm
@@ -132,6 +143,50 @@ def create_mcp_server(state_dir: str = ".dharma"):
                 description="Show strategic objectives, key results, and progress",
                 inputSchema={"type": "object", "properties": {}},
             ),
+            Tool(
+                name="operator_runtime_overview",
+                description="Read the canonical runtime/operator state overview",
+                inputSchema={"type": "object", "properties": {}},
+            ),
+            Tool(
+                name="operator_recent_actions",
+                description="Read recent governed operator actions",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "limit": {"type": "integer", "default": 20},
+                    },
+                },
+            ),
+            Tool(
+                name="operator_pending_actions",
+                description="Read pending operator actions waiting for approval",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "limit": {"type": "integer", "default": 20},
+                    },
+                },
+            ),
+            Tool(
+                name="propose_operator_action",
+                description="Create a governed action proposal without executing it",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "action_name": {"type": "string"},
+                        "reason": {"type": "string", "default": ""},
+                        "target": {"type": "string", "default": ""},
+                        "risk": {
+                            "type": "string",
+                            "enum": ["low", "medium", "high", "critical"],
+                            "default": "medium",
+                        },
+                        "payload": {"type": "object", "default": {}},
+                    },
+                    "required": ["action_name"],
+                },
+            ),
         ]
 
     @server.call_tool()
@@ -144,8 +199,23 @@ def create_mcp_server(state_dir: str = ".dharma"):
 
         elif name == "spawn_agent":
             role = AgentRole(arguments.get("role", "general"))
+            proposal = await action_gateway.submit_proposal(
+                action_name="mcp.spawn_agent",
+                actor="mcp",
+                reason=f"spawn agent {arguments['name']}",
+                payload={"tool": name, "arguments": dict(arguments)},
+                source="mcp_server",
+                target="swarm.spawn_agent",
+                risk="medium",
+                approval_required=False,
+            )
             agent = await swarm.spawn_agent(
                 name=arguments["name"], role=role
+            )
+            await action_gateway.record_outcome(
+                proposal.action.action_id,
+                status="executed",
+                outcome={"agent_id": agent.id, "agent_name": agent.name, "status": agent.status.value},
             )
             return [TextContent(
                 type="text",
@@ -154,10 +224,25 @@ def create_mcp_server(state_dir: str = ".dharma"):
 
         elif name == "create_task":
             priority = TaskPriority(arguments.get("priority", "normal"))
+            proposal = await action_gateway.submit_proposal(
+                action_name="mcp.create_task",
+                actor="mcp",
+                reason=str(arguments.get("title", "") or "create task"),
+                payload={"tool": name, "arguments": dict(arguments)},
+                source="mcp_server",
+                target="swarm.create_task",
+                risk="medium",
+                approval_required=False,
+            )
             task = await swarm.create_task(
                 title=arguments["title"],
                 description=arguments.get("description", ""),
                 priority=priority,
+            )
+            await action_gateway.record_outcome(
+                proposal.action.action_id,
+                status="executed",
+                outcome={"task_id": task.id, "title": task.title, "status": task.status.value},
             )
             return [TextContent(
                 type="text",
@@ -196,6 +281,63 @@ def create_mcp_server(state_dir: str = ".dharma"):
             await telos.load()
             summary = telos.strategy_map_summary()
             return [TextContent(type="text", text=json.dumps(summary, indent=2, default=str))]
+
+        elif name == "operator_runtime_overview":
+            views = OperatorViews(runtime_state)
+            overview = await views.runtime_overview()
+            pending = await views.pending_operator_actions(limit=50)
+            data = {
+                "sessions": overview.sessions,
+                "claims": overview.claims,
+                "active_claims": overview.active_claims,
+                "acknowledged_claims": overview.acknowledged_claims,
+                "runs": overview.runs,
+                "active_runs": overview.active_runs,
+                "artifacts": overview.artifacts,
+                "promoted_facts": overview.promoted_facts,
+                "context_bundles": overview.context_bundles,
+                "operator_actions": overview.operator_actions,
+                "pending_operator_actions": len(pending),
+            }
+            return [TextContent(type="text", text=json.dumps(data, indent=2))]
+
+        elif name == "operator_recent_actions":
+            views = OperatorViews(runtime_state)
+            actions = await views.recent_operator_actions(limit=int(arguments.get("limit", 20) or 20))
+            return [TextContent(type="text", text=json.dumps(actions, indent=2, default=str))]
+
+        elif name == "operator_pending_actions":
+            views = OperatorViews(runtime_state)
+            actions = await views.pending_operator_actions(limit=int(arguments.get("limit", 20) or 20))
+            return [TextContent(type="text", text=json.dumps(actions, indent=2, default=str))]
+
+        elif name == "propose_operator_action":
+            proposal = await action_gateway.submit_proposal(
+                action_name=str(arguments["action_name"]),
+                actor="mcp",
+                reason=str(arguments.get("reason", "") or ""),
+                payload=dict(arguments.get("payload") or {}),
+                source="mcp_server",
+                target=str(arguments.get("target", "") or ""),
+                risk=str(arguments.get("risk", "medium") or "medium"),
+                approval_required=True,
+                telos_check=True,
+            )
+            return [
+                TextContent(
+                    type="text",
+                    text=json.dumps(
+                        {
+                            "action_id": proposal.action.action_id,
+                            "status": proposal.action.payload["lifecycle"]["status"],
+                            "warrant": proposal.action.payload["warrant"],
+                            "gate": proposal.action.payload["gate"],
+                        },
+                        indent=2,
+                        default=str,
+                    ),
+                )
+            ]
 
         return [TextContent(type="text", text=f"Unknown tool: {name}")]
 

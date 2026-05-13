@@ -7,6 +7,7 @@ import tempfile
 from pathlib import Path
 
 import pytest
+from dharma_swarm.runtime_state import RuntimeStateStore
 
 _temp_dir = tempfile.mkdtemp()
 os.environ.setdefault("DHARMA_HOME", _temp_dir)
@@ -337,6 +338,22 @@ class TestPersistence:
         data = json.loads(json_path.read_text(encoding="utf-8"))
         assert data["date"] == "2026-03-17"
         assert data["regime"] == "bull"
+
+    def test_save_report_records_operator_action(self):
+        """Saving a Substack-ready report leaves an operator-action trail."""
+        r = _make_report()
+        save_report(r)
+
+        actions = RuntimeStateStore(
+            Path(os.environ["DHARMA_HOME"]) / "state" / "runtime.db"
+        ).list_operator_actions_sync(limit=20)
+
+        assert any(
+            action.action_name == "ginko_substack_report_saved"
+            and action.payload["date"] == "2026-03-17"
+            and action.payload["publish_channel"] == "substack"
+            for action in actions
+        )
 
     def test_load_report_round_trip(self):
         """Save then load a report and verify all fields match."""

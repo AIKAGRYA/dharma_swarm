@@ -516,11 +516,11 @@ class Orchestrator:
 
     # -- internals ---------------------------------------------------------
 
-    def _record_task_event(self, event: str, **payload: Any) -> None:
-        self._ledger.task_event(event, **payload)
+    def _record_task_event(self, event: str, **payload: Any) -> str | None:
+        return self._ledger.task_event(event, **payload)
 
-    def _record_progress_event(self, event: str, **payload: Any) -> None:
-        self._ledger.progress_event(event, **payload)
+    def _record_progress_event(self, event: str, **payload: Any) -> str | None:
+        return self._ledger.progress_event(event, **payload)
 
     async def _emit_lifecycle_event(
         self,
@@ -2339,21 +2339,15 @@ class Orchestrator:
             f"_provenance_: `{provenance_path}`\n\n"
             f"{summary}\n"
         )
+        result_event_id: str | None = None
+        notes_persisted = False
         try:
             with open(notes_file, "a") as f:
                 f.write(entry)
             with open(provenance_path, "w") as f:
                 f.write(json.dumps(provenance_record, ensure_ascii=True, sort_keys=True, indent=2) + "\n")
             logger.info("Wrote notes for %s -> %s", agent_name, notes_file.name)
-            self._record_task_event(
-                "result_persisted",
-                task_id=task.id,
-                agent_id=agent_name,
-                notes_file=str(notes_file),
-                provenance_file=str(provenance_path),
-                trace_id=trace_id,
-                result_chars=len(result or ""),
-            )
+            notes_persisted = True
         except Exception as exc:
             logger.warning("Failed to write notes for %s: %s", agent_name, exc)
             self._record_progress_event(
@@ -2365,6 +2359,8 @@ class Orchestrator:
             )
 
         # Write a shared artifact with task-specific path so dependent tasks can find it
+        shared_artifact: Path | None = None
+        shared_artifact_checksum = ""
         try:
             # Create a slug from task title for predictable cross-task path
             slug = re.sub(r'[^a-z0-9]+', '_', (task.title or 'task').lower()).strip('_')[:40]
@@ -2378,9 +2374,39 @@ class Orchestrator:
                 f"{result}",
                 encoding="utf-8",
             )
+            shared_artifact_checksum = hashlib.sha256(shared_artifact.read_bytes()).hexdigest()
             logger.debug("Shared artifact written: %s", shared_artifact.name)
         except Exception as exc:
             logger.debug("Shared artifact write failed (non-fatal): %s", exc)
+        result_payload_path = shared_artifact or (notes_file if notes_persisted else None)
+        if result_payload_path is not None:
+            result_event_id = self._record_task_event(
+                "result_persisted",
+                task_id=task.id,
+                agent_id=agent_name,
+                notes_file=str(notes_file),
+                provenance_file=str(provenance_path),
+                artifact_path=str(result_payload_path),
+                artifact_checksum=shared_artifact_checksum,
+                trace_id=trace_id,
+                model=model_name,
+                provider=provider_name,
+                result_chars=len(result or ""),
+                result_sha256=result_hash,
+            )
+            await self._project_result_to_runtime_state(
+                task=task,
+                result=result,
+                result_hash=result_hash,
+                agent_name=agent_name,
+                model_name=model_name,
+                provider_name=provider_name,
+                trace_id=trace_id,
+                notes_file=notes_file,
+                provenance_path=provenance_path,
+                artifact_path=result_payload_path,
+                result_event_id=result_event_id,
+            )
 
         # Fix 2: Feed result into MemoryPalace for cross-session semantic recall.
         # Even with TF-IDF only (sqlite-vec not installed), this builds the corpus
@@ -2425,6 +2451,75 @@ class Orchestrator:
             logger.info("Stigmergy mark left by %s", agent_name)
         except Exception as exc:
             logger.debug("Stigmergy mark failed (non-critical): %s", exc)
+
+    async def _project_result_to_runtime_state(
+        self,
+        *,
+        task: Task,
+        result: str,
+        result_hash: str,
+        agent_name: str,
+        model_name: str,
+        provider_name: str,
+        trace_id: str,
+        notes_file: Path,
+        provenance_path: Path,
+        artifact_path: Path,
+        result_event_id: str | None,
+    ) -> None:
+        """Project persisted task results into canonical runtime state.
+
+        The shared files remain the payloads. This method only records the
+        structured artifact/fact rows that let the rest of the organism see
+        completed work through the runtime spine.
+        """
+        try:
+            from dharma_swarm.runtime_state import (
+                ArtifactRecord,
+                result_artifact_id_for_event,
+            )
+
+            artifact_bytes = artifact_path.read_bytes()
+            artifact_checksum = hashlib.sha256(artifact_bytes).hexdigest()
+            artifact_id = result_artifact_id_for_event(
+                result_event_id or "",
+                task_id=task.id,
+                result_sha256=result_hash,
+            )
+            runtime_state = self._ledger.runtime_state
+            metadata = {
+                "source": "orchestrator._persist_result",
+                "trace_id": trace_id,
+                "task_title": task.title,
+                "agent": agent_name,
+                "model": model_name,
+                "provider": provider_name,
+                "result_sha256": result_hash,
+                "result_chars": len(result or ""),
+                "notes_file": str(notes_file),
+                "provenance_file": str(provenance_path),
+                "artifact_path": str(artifact_path),
+                "source_event_id": result_event_id or "",
+            }
+            artifact = await runtime_state.record_artifact(
+                ArtifactRecord(
+                    artifact_id=artifact_id,
+                    session_id=self._ledger.session_id,
+                    task_id=task.id,
+                    artifact_kind="task_result",
+                    payload_path=str(artifact_path),
+                    checksum=artifact_checksum,
+                    promotion_state="candidate",
+                    metadata=metadata,
+                )
+            )
+
+            await runtime_state.project_artifact_to_memory_fact(
+                artifact,
+                source_text=result,
+            )
+        except Exception as exc:
+            logger.debug("Runtime result projection failed (non-fatal): %s", exc)
 
     async def _collect_completed(self) -> tuple[int, int]:
         """Clean up finished background tasks and stale dispatches."""

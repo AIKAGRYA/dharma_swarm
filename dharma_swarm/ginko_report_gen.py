@@ -26,6 +26,11 @@ from dharma_swarm.ginko_brier import BrierDashboard, build_dashboard
 from dharma_swarm.ginko_data import load_latest_pull
 from dharma_swarm.ginko_regime import load_regime_history
 from dharma_swarm.ginko_signals import load_latest_report
+from dharma_swarm.runtime_state import (
+    OperatorAction,
+    RuntimeStateStore,
+    operator_action_id_for_payload,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +56,47 @@ def _utc_now() -> datetime:
 
 def _ensure_dirs() -> None:
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _record_report_operator_action(
+    report: "DailyReport",
+    *,
+    md_path: Path,
+    html_path: Path,
+    json_path: Path,
+) -> None:
+    """Record the operator-visible Substack report artifact generation."""
+    payload = {
+        "date": report.date,
+        "regime": report.regime,
+        "risk_level": report.risk_level,
+        "markdown_path": str(md_path),
+        "html_path": str(html_path),
+        "json_path": str(json_path),
+        "email_subject": format_report_email_subject(report),
+        "publish_channel": "substack",
+        "brier_scorecard": dict(report.brier_scorecard or {}),
+    }
+    action_name = "ginko_substack_report_saved"
+    actor = "ginko_report_gen"
+    reason = "Substack-ready report artifacts generated"
+    runtime_db = Path(os.getenv("DHARMA_HOME", Path.home() / ".dharma")) / "state" / "runtime.db"
+    action = OperatorAction(
+        action_id=operator_action_id_for_payload(
+            action_name=action_name,
+            actor=actor,
+            reason=reason,
+            payload=payload,
+        ),
+        action_name=action_name,
+        actor=actor,
+        reason=reason,
+        payload=payload,
+    )
+    try:
+        RuntimeStateStore(runtime_db).record_operator_action_sync(action)
+    except Exception:
+        logger.debug("Failed to record Ginko report operator action", exc_info=True)
 
 
 # ---------------------------------------------------------------------------
@@ -810,6 +856,12 @@ def save_report(report: DailyReport) -> Path:
     except Exception as exc:
         logger.error("Failed to save JSON report: %s", exc)
 
+    _record_report_operator_action(
+        report,
+        md_path=md_path,
+        html_path=html_path,
+        json_path=json_path,
+    )
     return md_path
 
 

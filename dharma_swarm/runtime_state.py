@@ -458,6 +458,30 @@ class OperatorAction:
     created_at: datetime = field(default_factory=_utc_now)
 
 
+def operator_action_id_for_payload(
+    *,
+    action_name: str,
+    actor: str,
+    session_id: str = "",
+    task_id: str = "",
+    run_id: str = "",
+    reason: str = "",
+    payload: dict[str, Any] | None = None,
+) -> str:
+    """Return a stable operator action id for idempotent decision recording."""
+    canonical = {
+        "action_name": str(action_name or ""),
+        "actor": str(actor or ""),
+        "session_id": str(session_id or ""),
+        "task_id": str(task_id or ""),
+        "run_id": str(run_id or ""),
+        "reason": str(reason or ""),
+        "payload": payload or {},
+    }
+    digest = hashlib.sha256(_json_dump(canonical).encode("utf-8")).hexdigest()[:16]
+    return f"act_{digest}"
+
+
 @dataclass(frozen=True)
 class SessionEventRecord:
     event_id: str
@@ -668,6 +692,126 @@ def _ledger_record_event_id(session_id: str, ledger_kind: str, record: dict[str,
     return f"sevt_{digest}"
 
 
+def result_artifact_id_for_event(
+    event_id: str,
+    *,
+    task_id: str = "",
+    result_sha256: str = "",
+) -> str:
+    """Return the canonical artifact id for a persisted task result event."""
+    task_id = str(task_id or "").strip()
+    result_sha256 = str(result_sha256 or "").strip()
+    if task_id and result_sha256:
+        digest = hashlib.sha256(f"{task_id}:{result_sha256}".encode("utf-8")).hexdigest()[:16]
+        return f"artifact_result_{digest}"
+    safe_event_id = re.sub(r"[^A-Za-z0-9_]+", "_", str(event_id or "").strip())[:64]
+    if safe_event_id:
+        return f"artifact_result_{safe_event_id}"
+    digest = hashlib.sha256(str(event_id or "").encode("utf-8")).hexdigest()[:16]
+    return f"artifact_result_{digest}"
+
+
+def memory_fact_id_for_artifact(artifact_id: str) -> str:
+    """Return the canonical memory fact id for an artifact projection."""
+    artifact_id = str(artifact_id or "").strip()
+    if artifact_id.startswith("artifact_"):
+        return artifact_id.replace("artifact_", "fact_", 1)
+    safe_artifact_id = re.sub(r"[^A-Za-z0-9_]+", "_", artifact_id)[:64]
+    if safe_artifact_id:
+        return f"fact_artifact_{safe_artifact_id}"
+    digest = hashlib.sha256(artifact_id.encode("utf-8")).hexdigest()[:16]
+    return f"fact_artifact_{digest}"
+
+
+def _artifact_memory_confidence(artifact: ArtifactRecord) -> float:
+    for key in ("memory_confidence", "confidence"):
+        raw = artifact.metadata.get(key)
+        if raw is None:
+            continue
+        try:
+            return max(0.0, min(1.0, float(raw)))
+        except (TypeError, ValueError):
+            continue
+    if artifact.promotion_state == "promoted":
+        return 0.9
+    if artifact.promotion_state == "candidate":
+        return 0.75
+    return 0.4
+
+
+def _artifact_result_text(artifact: ArtifactRecord, source_text: str | None = None) -> str:
+    if source_text is not None:
+        return source_text.strip()
+    if not artifact.payload_path:
+        return ""
+    try:
+        path = Path(artifact.payload_path)
+        if not path.exists() or not path.is_file():
+            return ""
+        text = path.read_text(encoding="utf-8", errors="ignore")
+    except Exception:
+        return ""
+    marker = "\n---\n\n"
+    if marker in text:
+        text = text.split(marker, 1)[1].strip()
+    else:
+        text = text.strip()
+    return text
+
+
+def build_memory_fact_from_artifact(
+    artifact: ArtifactRecord,
+    *,
+    source_text: str | None = None,
+    min_confidence: float = 0.5,
+    max_chars: int = 1200,
+) -> MemoryFact | None:
+    """Build the canonical candidate memory fact for a runtime artifact."""
+    if artifact.artifact_kind != "task_result":
+        return None
+    confidence = _artifact_memory_confidence(artifact)
+    if confidence < min_confidence:
+        return None
+    text = _artifact_result_text(artifact, source_text=source_text)
+    if not text:
+        return None
+    metadata = {
+        **artifact.metadata,
+        "source": "runtime_state.artifact_memory_projector",
+        "artifact_kind": artifact.artifact_kind,
+        "artifact_checksum": artifact.checksum,
+        "payload_path": artifact.payload_path,
+    }
+    source_event_id = str(artifact.metadata.get("source_event_id", "") or "")
+    provenance = {
+        "source": "runtime_state.artifact_memory_projector",
+        "artifact_id": artifact.artifact_id,
+        "artifact_kind": artifact.artifact_kind,
+        "payload_path": artifact.payload_path,
+        "manifest_path": artifact.manifest_path,
+        "checksum": artifact.checksum,
+    }
+    for key in ("trace_id", "result_sha256", "provenance_file", "notes_file"):
+        value = artifact.metadata.get(key)
+        if value:
+            provenance[key] = value
+    return MemoryFact(
+        fact_id=memory_fact_id_for_artifact(artifact.artifact_id),
+        session_id=artifact.session_id,
+        task_id=artifact.task_id,
+        fact_kind="task_result",
+        truth_state="candidate",
+        text=text[: max(1, max_chars)],
+        confidence=confidence,
+        valid_from=artifact.created_at,
+        source_event_id=source_event_id,
+        source_artifact_id=artifact.artifact_id,
+        provenance=provenance,
+        metadata=metadata,
+        created_at=artifact.created_at,
+    )
+
+
 def build_session_event_from_ledger_record(
     *,
     session_id: str,
@@ -791,6 +935,138 @@ class RuntimeStateStore:
         )
 
     @classmethod
+    def _insert_memory_fact_sync_db(
+        cls,
+        db: sqlite3.Connection,
+        fact: MemoryFact,
+    ) -> None:
+        db.execute(
+            "INSERT INTO memory_facts (fact_id, session_id, task_id, fact_kind,"
+            " truth_state, text, confidence, valid_from, valid_to, source_event_id,"
+            " source_artifact_id, provenance_json, metadata_json, created_at, updated_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            " ON CONFLICT(fact_id) DO UPDATE SET"
+            " session_id = excluded.session_id,"
+            " task_id = excluded.task_id,"
+            " fact_kind = excluded.fact_kind,"
+            " truth_state = excluded.truth_state,"
+            " text = excluded.text,"
+            " confidence = excluded.confidence,"
+            " valid_from = excluded.valid_from,"
+            " valid_to = excluded.valid_to,"
+            " source_event_id = excluded.source_event_id,"
+            " source_artifact_id = excluded.source_artifact_id,"
+            " provenance_json = excluded.provenance_json,"
+            " metadata_json = excluded.metadata_json,"
+            " created_at = excluded.created_at,"
+            " updated_at = excluded.updated_at",
+            (
+                fact.fact_id,
+                fact.session_id,
+                fact.task_id,
+                fact.fact_kind,
+                fact.truth_state,
+                fact.text,
+                float(fact.confidence),
+                fact.valid_from.isoformat() if fact.valid_from else None,
+                fact.valid_to.isoformat() if fact.valid_to else None,
+                fact.source_event_id,
+                fact.source_artifact_id,
+                _json_dump(fact.provenance),
+                _json_dump(fact.metadata),
+                fact.created_at.isoformat(),
+                fact.updated_at.isoformat(),
+            ),
+        )
+
+    @classmethod
+    async def _insert_memory_fact_async_db(
+        cls,
+        db: aiosqlite.Connection,
+        fact: MemoryFact,
+    ) -> None:
+        await db.execute(
+            "INSERT INTO memory_facts (fact_id, session_id, task_id, fact_kind,"
+            " truth_state, text, confidence, valid_from, valid_to, source_event_id,"
+            " source_artifact_id, provenance_json, metadata_json, created_at, updated_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            " ON CONFLICT(fact_id) DO UPDATE SET"
+            " session_id = excluded.session_id,"
+            " task_id = excluded.task_id,"
+            " fact_kind = excluded.fact_kind,"
+            " truth_state = excluded.truth_state,"
+            " text = excluded.text,"
+            " confidence = excluded.confidence,"
+            " valid_from = excluded.valid_from,"
+            " valid_to = excluded.valid_to,"
+            " source_event_id = excluded.source_event_id,"
+            " source_artifact_id = excluded.source_artifact_id,"
+            " provenance_json = excluded.provenance_json,"
+            " metadata_json = excluded.metadata_json,"
+            " created_at = excluded.created_at,"
+            " updated_at = excluded.updated_at",
+            (
+                fact.fact_id,
+                fact.session_id,
+                fact.task_id,
+                fact.fact_kind,
+                fact.truth_state,
+                fact.text,
+                float(fact.confidence),
+                fact.valid_from.isoformat() if fact.valid_from else None,
+                fact.valid_to.isoformat() if fact.valid_to else None,
+                fact.source_event_id,
+                fact.source_artifact_id,
+                _json_dump(fact.provenance),
+                _json_dump(fact.metadata),
+                fact.created_at.isoformat(),
+                fact.updated_at.isoformat(),
+            ),
+        )
+
+    @classmethod
+    def _project_artifact_memory_fact_sync_db(
+        cls,
+        db: sqlite3.Connection,
+        artifact: ArtifactRecord,
+        *,
+        source_text: str | None = None,
+        min_confidence: float = 0.5,
+        max_chars: int = 1200,
+    ) -> MemoryFact | None:
+        fact = build_memory_fact_from_artifact(
+            artifact,
+            source_text=source_text,
+            min_confidence=min_confidence,
+            max_chars=max_chars,
+        )
+        if fact is None:
+            return None
+        cls._insert_memory_fact_sync_db(db, fact)
+        return fact
+
+    @classmethod
+    async def _project_artifact_memory_fact_async_db(
+        cls,
+        db: aiosqlite.Connection,
+        artifact: ArtifactRecord,
+        *,
+        source_text: str | None = None,
+        min_confidence: float = 0.5,
+        max_chars: int = 1200,
+    ) -> MemoryFact | None:
+        fact = build_memory_fact_from_artifact(
+            artifact,
+            source_text=source_text,
+            min_confidence=min_confidence,
+            max_chars=max_chars,
+        )
+        if fact is None:
+            return None
+        await cls._insert_memory_fact_async_db(db, fact)
+        return fact
+
+    @classmethod
     def _record_session_event_sync_db(
         cls,
         db: sqlite3.Connection,
@@ -833,6 +1109,7 @@ class RuntimeStateStore:
                 event.created_at.isoformat(),
             ),
         )
+        cls._project_result_artifact_sync_db(db, event)
 
     @classmethod
     async def _record_session_event_async_db(
@@ -877,6 +1154,142 @@ class RuntimeStateStore:
                 event.created_at.isoformat(),
             ),
         )
+        await cls._project_result_artifact_async_db(db, event)
+
+    @staticmethod
+    def _result_artifact_from_event(event: SessionEventRecord) -> ArtifactRecord | None:
+        if event.event_name != "result_persisted":
+            return None
+        payload = dict(event.payload or {})
+        payload_path = str(
+            payload.get("artifact_path")
+            or payload.get("payload_path")
+            or payload.get("notes_file")
+            or ""
+        )
+        manifest_path = str(
+            payload.get("manifest_path")
+            or payload.get("provenance_file")
+            or ""
+        )
+        checksum = str(
+            payload.get("artifact_checksum")
+            or payload.get("checksum")
+            or payload.get("result_sha256")
+            or ""
+        )
+        metadata = {
+            key: value
+            for key, value in payload.items()
+            if key not in {"artifact_path", "payload_path", "manifest_path", "task_id", "run_id"}
+        }
+        if event.agent_id:
+            metadata.setdefault("agent_id", event.agent_id)
+        metadata["source_event_id"] = event.event_id
+        metadata["projection_source"] = "runtime_state.result_persisted"
+        return ArtifactRecord(
+            artifact_id=result_artifact_id_for_event(
+                event.event_id,
+                task_id=event.task_id,
+                result_sha256=str(payload.get("result_sha256") or ""),
+            ),
+            session_id=event.session_id,
+            task_id=event.task_id,
+            run_id=event.run_id,
+            artifact_kind="task_result",
+            manifest_path=manifest_path,
+            payload_path=payload_path,
+            checksum=checksum,
+            promotion_state="candidate",
+            created_at=event.created_at,
+            metadata=metadata,
+        )
+
+    @classmethod
+    def _project_result_artifact_sync_db(
+        cls,
+        db: sqlite3.Connection,
+        event: SessionEventRecord,
+    ) -> None:
+        artifact = cls._result_artifact_from_event(event)
+        if artifact is None:
+            return
+        db.execute(
+            "INSERT INTO artifact_records (artifact_id, session_id, task_id, run_id,"
+            " artifact_kind, manifest_path, payload_path, checksum,"
+            " parent_artifact_id, promotion_state, created_at, metadata_json)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            " ON CONFLICT(artifact_id) DO UPDATE SET"
+            " session_id = excluded.session_id,"
+            " task_id = excluded.task_id,"
+            " run_id = excluded.run_id,"
+            " artifact_kind = excluded.artifact_kind,"
+            " manifest_path = excluded.manifest_path,"
+            " payload_path = excluded.payload_path,"
+            " checksum = excluded.checksum,"
+            " parent_artifact_id = excluded.parent_artifact_id,"
+            " promotion_state = excluded.promotion_state,"
+            " created_at = excluded.created_at,"
+            " metadata_json = excluded.metadata_json",
+            (
+                artifact.artifact_id,
+                artifact.session_id,
+                artifact.task_id,
+                artifact.run_id,
+                artifact.artifact_kind,
+                artifact.manifest_path,
+                artifact.payload_path,
+                artifact.checksum,
+                artifact.parent_artifact_id,
+                artifact.promotion_state,
+                artifact.created_at.isoformat(),
+                _json_dump(artifact.metadata),
+            ),
+        )
+        cls._project_artifact_memory_fact_sync_db(db, artifact)
+
+    @classmethod
+    async def _project_result_artifact_async_db(
+        cls,
+        db: aiosqlite.Connection,
+        event: SessionEventRecord,
+    ) -> None:
+        artifact = cls._result_artifact_from_event(event)
+        if artifact is None:
+            return
+        await db.execute(
+            "INSERT INTO artifact_records (artifact_id, session_id, task_id, run_id,"
+            " artifact_kind, manifest_path, payload_path, checksum,"
+            " parent_artifact_id, promotion_state, created_at, metadata_json)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            " ON CONFLICT(artifact_id) DO UPDATE SET"
+            " session_id = excluded.session_id,"
+            " task_id = excluded.task_id,"
+            " run_id = excluded.run_id,"
+            " artifact_kind = excluded.artifact_kind,"
+            " manifest_path = excluded.manifest_path,"
+            " payload_path = excluded.payload_path,"
+            " checksum = excluded.checksum,"
+            " parent_artifact_id = excluded.parent_artifact_id,"
+            " promotion_state = excluded.promotion_state,"
+            " created_at = excluded.created_at,"
+            " metadata_json = excluded.metadata_json",
+            (
+                artifact.artifact_id,
+                artifact.session_id,
+                artifact.task_id,
+                artifact.run_id,
+                artifact.artifact_kind,
+                artifact.manifest_path,
+                artifact.payload_path,
+                artifact.checksum,
+                artifact.parent_artifact_id,
+                artifact.promotion_state,
+                artifact.created_at.isoformat(),
+                _json_dump(artifact.metadata),
+            ),
+        )
+        await cls._project_artifact_memory_fact_async_db(db, artifact)
 
     async def upsert_session(self, session: SessionState) -> SessionState:
         await self.init_db()
@@ -1469,6 +1882,7 @@ class RuntimeStateStore:
                     _json_dump(artifact.metadata),
                 ),
             )
+            await self._project_artifact_memory_fact_async_db(db, artifact)
             await db.commit()
         loaded = await self.get_artifact(artifact.artifact_id)
         assert loaded is not None
@@ -1495,6 +1909,7 @@ class RuntimeStateStore:
         session_id: str | None = None,
         task_id: str | None = None,
         run_id: str | None = None,
+        artifact_kind: str | None = None,
         promotion_state: str | None = None,
         limit: int = 20,
     ) -> list[ArtifactRecord]:
@@ -1515,6 +1930,9 @@ class RuntimeStateStore:
         if run_id is not None:
             query += " AND run_id = ?"
             params.append(run_id)
+        if artifact_kind is not None:
+            query += " AND artifact_kind = ?"
+            params.append(artifact_kind)
         if promotion_state is not None:
             query += " AND promotion_state = ?"
             params.append(promotion_state)
@@ -1525,47 +1943,74 @@ class RuntimeStateStore:
             rows = await (await db.execute(query, params)).fetchall()
         return [_row_to_artifact(row) for row in rows]
 
+    async def project_artifact_to_memory_fact(
+        self,
+        artifact: ArtifactRecord,
+        *,
+        source_text: str | None = None,
+        min_confidence: float = 0.5,
+        max_chars: int = 1200,
+    ) -> MemoryFact | None:
+        """Project one artifact into its canonical memory fact, if eligible."""
+        await self.init_db()
+        async with aiosqlite.connect(self.db_path) as db:
+            fact = await self._project_artifact_memory_fact_async_db(
+                db,
+                artifact,
+                source_text=source_text,
+                min_confidence=min_confidence,
+                max_chars=max_chars,
+            )
+            await db.commit()
+        return fact
+
+    async def project_artifacts_to_memory_facts(
+        self,
+        *,
+        session_id: str | None = None,
+        task_id: str | None = None,
+        artifact_kind: str = "task_result",
+        min_confidence: float = 0.5,
+        max_chars: int = 1200,
+        limit: int = 500,
+    ) -> list[MemoryFact]:
+        """Backfill memory facts from eligible artifact records."""
+        await self.init_db()
+        query = (
+            "SELECT artifact_id, session_id, task_id, run_id, artifact_kind,"
+            " manifest_path, payload_path, checksum, parent_artifact_id,"
+            " promotion_state, created_at, metadata_json"
+            " FROM artifact_records WHERE artifact_kind = ?"
+        )
+        params: list[Any] = [artifact_kind]
+        if session_id is not None:
+            query += " AND session_id = ?"
+            params.append(session_id)
+        if task_id is not None:
+            query += " AND task_id = ?"
+            params.append(task_id)
+        query += " ORDER BY created_at DESC LIMIT ?"
+        params.append(max(1, limit))
+        projected: list[MemoryFact] = []
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            rows = await (await db.execute(query, params)).fetchall()
+            for row in rows:
+                fact = await self._project_artifact_memory_fact_async_db(
+                    db,
+                    _row_to_artifact(row),
+                    min_confidence=min_confidence,
+                    max_chars=max_chars,
+                )
+                if fact is not None:
+                    projected.append(fact)
+            await db.commit()
+        return projected
+
     async def record_memory_fact(self, fact: MemoryFact) -> MemoryFact:
         await self.init_db()
         async with aiosqlite.connect(self.db_path) as db:
-            await db.execute(
-                "INSERT INTO memory_facts (fact_id, session_id, task_id, fact_kind,"
-                " truth_state, text, confidence, valid_from, valid_to, source_event_id,"
-                " source_artifact_id, provenance_json, metadata_json, created_at, updated_at)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-                " ON CONFLICT(fact_id) DO UPDATE SET"
-                " session_id = excluded.session_id,"
-                " task_id = excluded.task_id,"
-                " fact_kind = excluded.fact_kind,"
-                " truth_state = excluded.truth_state,"
-                " text = excluded.text,"
-                " confidence = excluded.confidence,"
-                " valid_from = excluded.valid_from,"
-                " valid_to = excluded.valid_to,"
-                " source_event_id = excluded.source_event_id,"
-                " source_artifact_id = excluded.source_artifact_id,"
-                " provenance_json = excluded.provenance_json,"
-                " metadata_json = excluded.metadata_json,"
-                " created_at = excluded.created_at,"
-                " updated_at = excluded.updated_at",
-                (
-                    fact.fact_id,
-                    fact.session_id,
-                    fact.task_id,
-                    fact.fact_kind,
-                    fact.truth_state,
-                    fact.text,
-                    float(fact.confidence),
-                    fact.valid_from.isoformat() if fact.valid_from else None,
-                    fact.valid_to.isoformat() if fact.valid_to else None,
-                    fact.source_event_id,
-                    fact.source_artifact_id,
-                    _json_dump(fact.provenance),
-                    _json_dump(fact.metadata),
-                    fact.created_at.isoformat(),
-                    fact.updated_at.isoformat(),
-                ),
-            )
+            await self._insert_memory_fact_async_db(db, fact)
             await db.commit()
         loaded = await self.get_memory_fact(fact.fact_id)
         assert loaded is not None
@@ -1741,25 +2186,76 @@ class RuntimeStateStore:
             rows = await (await db.execute(query, params)).fetchall()
         return [_row_to_context_bundle(row) for row in rows]
 
+    @staticmethod
+    def _insert_operator_action_sync_db(
+        db: sqlite3.Connection,
+        action: OperatorAction,
+    ) -> None:
+        db.execute(
+            "INSERT OR REPLACE INTO operator_actions (action_id, session_id, task_id,"
+            " run_id, action_name, actor, reason, payload_json, created_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                action.action_id,
+                action.session_id,
+                action.task_id,
+                action.run_id,
+                action.action_name,
+                action.actor,
+                action.reason,
+                _json_dump(action.payload),
+                action.created_at.isoformat(),
+            ),
+        )
+
+    @staticmethod
+    async def _insert_operator_action_async_db(
+        db: aiosqlite.Connection,
+        action: OperatorAction,
+    ) -> None:
+        await db.execute(
+            "INSERT OR REPLACE INTO operator_actions (action_id, session_id, task_id,"
+            " run_id, action_name, actor, reason, payload_json, created_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                action.action_id,
+                action.session_id,
+                action.task_id,
+                action.run_id,
+                action.action_name,
+                action.actor,
+                action.reason,
+                _json_dump(action.payload),
+                action.created_at.isoformat(),
+            ),
+        )
+
+    def record_operator_action_sync(self, action: OperatorAction) -> OperatorAction:
+        self.init_db_sync()
+        with sqlite3.connect(self.db_path) as db:
+            _apply_connection_pragmas_sync(db)
+            self._insert_operator_action_sync_db(db, action)
+            db.commit()
+        loaded = self.get_operator_action_sync(action.action_id)
+        assert loaded is not None
+        return loaded
+
+    def get_operator_action_sync(self, action_id: str) -> OperatorAction | None:
+        self.init_db_sync()
+        with sqlite3.connect(self.db_path) as db:
+            db.row_factory = sqlite3.Row
+            row = db.execute(
+                "SELECT action_id, session_id, task_id, run_id, action_name, actor,"
+                " reason, payload_json, created_at FROM operator_actions"
+                " WHERE action_id = ?",
+                (action_id,),
+            ).fetchone()
+        return _row_to_operator_action(row) if row is not None else None
+
     async def record_operator_action(self, action: OperatorAction) -> OperatorAction:
         await self.init_db()
         async with aiosqlite.connect(self.db_path) as db:
-            await db.execute(
-                "INSERT OR REPLACE INTO operator_actions (action_id, session_id, task_id,"
-                " run_id, action_name, actor, reason, payload_json, created_at)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (
-                    action.action_id,
-                    action.session_id,
-                    action.task_id,
-                    action.run_id,
-                    action.action_name,
-                    action.actor,
-                    action.reason,
-                    _json_dump(action.payload),
-                    action.created_at.isoformat(),
-                ),
-            )
+            await self._insert_operator_action_async_db(db, action)
             await db.commit()
         loaded = await self.get_operator_action(action.action_id)
         assert loaded is not None
@@ -1803,6 +2299,32 @@ class RuntimeStateStore:
         async with aiosqlite.connect(self.db_path) as db:
             db.row_factory = aiosqlite.Row
             rows = await (await db.execute(query, params)).fetchall()
+        return [_row_to_operator_action(row) for row in rows]
+
+    def list_operator_actions_sync(
+        self,
+        *,
+        session_id: str | None = None,
+        task_id: str | None = None,
+        limit: int = 20,
+    ) -> list[OperatorAction]:
+        self.init_db_sync()
+        query = (
+            "SELECT action_id, session_id, task_id, run_id, action_name, actor,"
+            " reason, payload_json, created_at FROM operator_actions WHERE 1=1"
+        )
+        params: list[Any] = []
+        if session_id is not None:
+            query += " AND session_id = ?"
+            params.append(session_id)
+        if task_id is not None:
+            query += " AND task_id = ?"
+            params.append(task_id)
+        query += " ORDER BY created_at DESC LIMIT ?"
+        params.append(max(1, limit))
+        with sqlite3.connect(self.db_path) as db:
+            db.row_factory = sqlite3.Row
+            rows = db.execute(query, params).fetchall()
         return [_row_to_operator_action(row) for row in rows]
 
     @staticmethod

@@ -151,6 +151,47 @@ class OperatorViews:
             for action in actions
         ]
 
+    async def pending_operator_actions(
+        self,
+        *,
+        session_id: str | None = None,
+        task_id: str | None = None,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        """Return action proposals currently waiting on operator approval."""
+        actions = await self.runtime_state.list_operator_actions(
+            session_id=session_id,
+            task_id=task_id,
+            limit=max(1, limit) * 4,
+        )
+        pending: list[dict[str, Any]] = []
+        for action in actions:
+            payload = action.payload if isinstance(action.payload, dict) else {}
+            lifecycle = payload.get("lifecycle") if isinstance(payload.get("lifecycle"), dict) else {}
+            warrant = payload.get("warrant") if isinstance(payload.get("warrant"), dict) else {}
+            if lifecycle.get("status") != "waiting_approval" and warrant.get("state") != "pending_approval":
+                continue
+            pending.append(
+                {
+                    "action_id": action.action_id,
+                    "action_name": action.action_name,
+                    "actor": action.actor,
+                    "task_id": action.task_id,
+                    "run_id": action.run_id,
+                    "reason": action.reason,
+                    "risk": payload.get("risk", ""),
+                    "source": payload.get("source", ""),
+                    "target": payload.get("target", ""),
+                    "lifecycle": lifecycle,
+                    "warrant": warrant,
+                    "gate": payload.get("gate", {}),
+                    "created_at": action.created_at.isoformat(),
+                }
+            )
+            if len(pending) >= max(1, limit):
+                break
+        return pending
+
     async def bridge_queue(
         self,
         *,

@@ -68,6 +68,8 @@
     "handler": "insight_brief",
     "ontology_path": "/Users/dhyana/.dharma/ontology.db",
     "output_dir": "/Users/dhyana/dharma_briefs",
+    "capture_dir": "/Users/dhyana/.dharma/sessions/captures/daily",
+    "runtime_db": "/Users/dhyana/.dharma/state/runtime.db",
     "enabled": true,
     "prompt": "Build the Daily Insight Brief via dharma_swarm.insight_brief. Every claim must cite a persisted Outcome row; ontology failures are fatal."
   },

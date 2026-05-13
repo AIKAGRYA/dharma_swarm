@@ -48,11 +48,16 @@ class SessionLedger:
         self.progress_path = self.session_dir / "progress_ledger.jsonl"
         self._runtime_state = RuntimeStateStore(runtime_db_path)
 
-    def task_event(self, event: str, **payload: Any) -> None:
-        self._append(self.task_path, "task", event, payload)
+    @property
+    def runtime_state(self) -> RuntimeStateStore:
+        """Canonical runtime-state store used to index this ledger."""
+        return self._runtime_state
 
-    def progress_event(self, event: str, **payload: Any) -> None:
-        self._append(self.progress_path, "progress", event, payload)
+    def task_event(self, event: str, **payload: Any) -> str | None:
+        return self._append(self.task_path, "task", event, payload)
+
+    def progress_event(self, event: str, **payload: Any) -> str | None:
+        return self._append(self.progress_path, "progress", event, payload)
 
     def _append(
         self,
@@ -60,7 +65,7 @@ class SessionLedger:
         ledger_kind: str,
         event: str,
         payload: dict[str, Any],
-    ) -> None:
+    ) -> str | None:
         record = {
             "ts_utc": _utc_ts(),
             "session_id": self.session_id,
@@ -79,8 +84,9 @@ class SessionLedger:
             with open(path, "a") as f:
                 f.write(json.dumps(record, ensure_ascii=True) + "\n")
         except Exception:
-            return
+            return None
         try:
             self._runtime_state.record_session_event_sync(indexed)
         except Exception:
-            return
+            return indexed.event_id
+        return indexed.event_id

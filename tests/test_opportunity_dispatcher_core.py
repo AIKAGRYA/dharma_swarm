@@ -16,16 +16,15 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-from unittest.mock import patch
 
 import pytest
 
 from dharma_swarm import _campaign_manifest, opportunity_dispatcher
 from dharma_swarm.models import GateCheckResult, GateDecision
+from dharma_swarm.runtime_state import RuntimeStateStore
 
 
 # --------------------------------------------------------------------------
@@ -376,6 +375,10 @@ def test_telos_review_promotes_with_warn_log(
     assert entry["opportunity_id"] == "opp_demo_001"
     assert entry["stage"] == "scope"
     assert entry["policy"] == "v3_review_to_allow"
+    actions = RuntimeStateStore(tmp_dharma / "state" / "runtime.db").list_operator_actions_sync(limit=10)
+    assert actions[0].action_name == "opportunity_dispatcher.review_required"
+    assert actions[0].payload["lifecycle"]["status"] == "waiting_approval"
+    assert actions[0].payload["request"]["opportunity_id"] == "opp_demo_001"
 
 
 def test_budget_exceeded_skips_and_marks_manifest(

@@ -8,7 +8,11 @@ import pytest
 
 from dharma_swarm.cron_job_runtime import CronJobRunStatus
 from dharma_swarm.cron_runner import execute_cron_job
-from dharma_swarm.insight_brief import InsightBriefBuilder, WITA
+from dharma_swarm.insight_brief import (
+    InsightBriefBuilder,
+    WITA,
+    build_and_publish_daily_brief,
+)
 from dharma_swarm.models import GateCheckResult, GateDecision, GateResult
 from dharma_swarm.ontology import OntologyRegistry
 from dharma_swarm.ontology_action_gateway import (
@@ -20,6 +24,7 @@ from dharma_swarm.ontology_runtime import (
     persist_shared_registry,
     reset_shared_registry,
 )
+from dharma_swarm.runtime_state import RuntimeStateStore
 
 
 class RecordingGatekeeper:
@@ -316,6 +321,35 @@ def test_publish_action_passes_gates(
         "DOGMA_DRIFT",
         "CONSENT",
     }
+
+
+def test_daily_brief_writes_operator_capture_sink(
+    registry: OntologyRegistry,
+    gateway: OntologyActionGateway,
+    tmp_path,
+) -> None:
+    _outcome(registry)
+    runtime_db = tmp_path / "runtime.db"
+
+    primary = build_and_publish_daily_brief(
+        gateway=gateway,
+        output_dir=tmp_path / "briefs",
+        capture_dir=tmp_path / "captures",
+        runtime_db=runtime_db,
+        now_fn=_now,
+    )
+
+    capture = tmp_path / "captures" / "2026-05-08" / "operator_brief.md"
+    assert primary.exists()
+    assert capture.exists()
+    assert capture.read_text(encoding="utf-8") == primary.read_text(encoding="utf-8")
+
+    actions = RuntimeStateStore(runtime_db).list_operator_actions_sync(limit=10)
+    assert any(
+        action.action_name == "operator_brief_captured"
+        and action.payload["capture_path"] == str(capture)
+        for action in actions
+    )
 
 
 def test_brief_bypass_attempt_fails(

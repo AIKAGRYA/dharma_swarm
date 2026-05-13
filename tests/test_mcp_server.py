@@ -214,5 +214,16 @@ def test_expected_tool_names():
     import inspect
 
     source = inspect.getsource(_mod_ref)
-    for name in ["swarm_status", "spawn_agent", "create_task", "list_tasks", "store_memory", "recall_memory"]:
+    for name in [
+        "swarm_status",
+        "spawn_agent",
+        "create_task",
+        "list_tasks",
+        "store_memory",
+        "recall_memory",
+        "operator_runtime_overview",
+        "operator_recent_actions",
+        "operator_pending_actions",
+        "propose_operator_action",
+    ]:
         assert name in source, f"Tool {name} not found in create_mcp_server source"

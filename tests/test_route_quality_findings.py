@@ -6,6 +6,7 @@ import json
 import sys
 from pathlib import Path
 
+from dharma_swarm.runtime_state import RuntimeStateStore
 from dharma_swarm.slop import SlopFinding
 from scripts.governance import route_quality_findings as rqf
 
@@ -196,3 +197,40 @@ def test_all_with_missing_reports_and_invalid_json_do_not_crash(
 
     assert rqf.main() == 0
     assert (out_dir / "findings.jsonl").exists()
+
+
+def test_records_broken_register_triage_operator_actions(tmp_path: Path) -> None:
+    proposals = tmp_path / "proposals" / "broken_register_proposals.md"
+    proposals.parent.mkdir(parents=True)
+    proposals.write_text(
+        "# Proposed BR rows\n\n"
+        "### BR-Q0509-01 — bandit flag at `dharma_swarm/a.py:7`\n\n"
+        "- **status:** ACCEPTED — runtime blocker\n\n"
+        "### BR-Q0509-02 — vulture flag at `dharma_swarm/b.py:9`\n\n"
+        "- **status:** REJECTED — false positive\n\n"
+        "### BR-Q0509-03 — mypy flag at `dharma_swarm/c.py:11`\n\n"
+        "- **status:** PROPOSED — reviewer must triage\n",
+        encoding="utf-8",
+    )
+    db_path = tmp_path / "runtime.db"
+
+    first = rqf.record_broken_register_triage_actions(
+        proposals,
+        runtime_db_path=db_path,
+        actor="dhyana",
+    )
+    second = rqf.record_broken_register_triage_actions(
+        proposals,
+        runtime_db_path=db_path,
+        actor="dhyana",
+    )
+    actions = RuntimeStateStore(db_path).list_operator_actions_sync(limit=10)
+
+    assert first == 2
+    assert second == 2
+    assert len(actions) == 2
+    assert {action.action_name for action in actions} == {
+        "broken_register_proposal_accepted",
+        "broken_register_proposal_rejected",
+    }
+    assert {action.actor for action in actions} == {"dhyana"}

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass
 from datetime import datetime
@@ -15,9 +16,17 @@ from dharma_swarm.ontology_action_gateway import (
     OntologyActionGateway,
     OntologyGatewayError,
 )
+from dharma_swarm.runtime_state import (
+    DEFAULT_RUNTIME_DB,
+    OperatorAction,
+    RuntimeStateStore,
+    operator_action_id_for_payload,
+)
 
 WITA = ZoneInfo("Asia/Makassar")
 DEFAULT_ONTOLOGY_DB = Path.home() / ".dharma" / "ontology.db"
+DEFAULT_DAILY_CAPTURE_DIR = Path.home() / ".dharma" / "sessions" / "captures" / "daily"
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -368,11 +377,81 @@ def build_and_publish_daily_brief(
     gateway: OntologyActionGateway | None = None,
     output_dir: str | Path | None = None,
     ontology_path: str | Path | None = None,
+    capture_dir: str | Path | None = None,
+    runtime_db: str | Path | None = None,
+    now_fn: Callable[[], datetime] | None = None,
 ) -> Path:
     gw = gateway or OntologyActionGateway(path=ontology_path or DEFAULT_ONTOLOGY_DB)
-    builder = InsightBriefBuilder(gw, output_dir=output_dir)
+    builder = InsightBriefBuilder(gw, output_dir=output_dir, now_fn=now_fn)
     brief = builder.compose(builder.propose())
-    return builder.publish(brief)
+    path = builder.publish(brief)
+    if capture_dir is not None:
+        capture_path = capture_daily_operator_brief(
+            path,
+            capture_dir=capture_dir,
+            date_str=builder.now_fn().date().isoformat(),
+        )
+        _record_operator_brief_capture(
+            brief,
+            primary_path=path,
+            capture_path=capture_path,
+            runtime_db=Path(runtime_db) if runtime_db is not None else DEFAULT_RUNTIME_DB,
+        )
+    return path
+
+
+def capture_daily_operator_brief(
+    brief_path: str | Path,
+    *,
+    capture_dir: str | Path = DEFAULT_DAILY_CAPTURE_DIR,
+    date_str: str | None = None,
+) -> Path:
+    """Copy the gated ontology brief into the daily operator capture sink."""
+    source = Path(brief_path)
+    if not source.exists():
+        raise FileNotFoundError(f"brief path does not exist: {source}")
+    if date_str is None:
+        date_str = datetime.now(WITA).date().isoformat()
+    target_dir = Path(capture_dir) / date_str
+    target_dir.mkdir(parents=True, exist_ok=True)
+    target = target_dir / "operator_brief.md"
+    target.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+    return target
+
+
+def _record_operator_brief_capture(
+    brief_obj: OntologyObj,
+    *,
+    primary_path: Path,
+    capture_path: Path,
+    runtime_db: Path,
+) -> None:
+    payload = {
+        "artifact_id": brief_obj.id,
+        "title": str(brief_obj.properties.get("title") or ""),
+        "primary_path": str(primary_path),
+        "capture_path": str(capture_path),
+        "publish_channel": "daily_operator_capture",
+    }
+    action_name = "operator_brief_captured"
+    actor = "insight_brief"
+    reason = "Ontology-native daily brief copied to operator capture sink"
+    action = OperatorAction(
+        action_id=operator_action_id_for_payload(
+            action_name=action_name,
+            actor=actor,
+            reason=reason,
+            payload=payload,
+        ),
+        action_name=action_name,
+        actor=actor,
+        reason=reason,
+        payload=payload,
+    )
+    try:
+        RuntimeStateStore(runtime_db).record_operator_action_sync(action)
+    except Exception:
+        logger.debug("Failed to record operator brief capture action", exc_info=True)
 
 
 def main() -> None:

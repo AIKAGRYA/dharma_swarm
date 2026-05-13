@@ -35,6 +35,11 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from dharma_swarm.runtime_state import (
+    OperatorAction,
+    RuntimeStateStore,
+    operator_action_id_for_payload,
+)
 from dharma_swarm.slop.models import DetectorFamily, SlopFinding, SlopSeverity
 
 QUALITY_REPORTS = REPO_ROOT / "quality-reports"
@@ -699,6 +704,59 @@ def proposal_for_br(findings: list[JsonDict]) -> str:
     return "\n".join(lines)
 
 
+def record_broken_register_triage_actions(
+    proposals_path: Path,
+    *,
+    runtime_db_path: Path | None = None,
+    actor: str = "operator",
+) -> int:
+    """Record reviewed BROKEN_REGISTER proposal rows in runtime operator_actions."""
+    if not proposals_path.exists():
+        return 0
+    runtime = RuntimeStateStore(runtime_db_path)
+    current: JsonDict = {}
+    count = 0
+    for raw in proposals_path.read_text(encoding="utf-8", errors="ignore").splitlines():
+        header = re.match(r"^###\s+(?P<br_id>BR-[^ ]+)\s+—\s+(?P<title>.+)$", raw)
+        if header:
+            current = {
+                "br_id": header.group("br_id").strip(),
+                "title": header.group("title").strip(),
+            }
+            continue
+        status_line = re.match(
+            r"^-\s+\*\*status:\*\*\s+(?P<status>[A-Za-z_ -]+?)(?:\s+—\s+(?P<reason>.*))?$",
+            raw,
+        )
+        if not status_line or not current:
+            continue
+        status = status_line.group("status").strip().lower().replace(" ", "_")
+        if status == "proposed":
+            continue
+        reason = (status_line.group("reason") or "").strip()
+        action_name = f"broken_register_proposal_{status}"
+        payload = {
+            **current,
+            "status": status,
+            "proposals_path": str(proposals_path),
+        }
+        action = OperatorAction(
+            action_id=operator_action_id_for_payload(
+                action_name=action_name,
+                actor=actor,
+                reason=reason,
+                payload=payload,
+            ),
+            action_name=action_name,
+            actor=actor,
+            reason=reason,
+            payload=payload,
+        )
+        runtime.record_operator_action_sync(action)
+        count += 1
+    return count
+
+
 def main() -> int:
     p = argparse.ArgumentParser()
     parser_by_tool = {
@@ -722,6 +780,22 @@ def main() -> int:
         "--since-last-run",
         action="store_true",
         help="only emit findings whose stable key was absent from the previous findings.jsonl",
+    )
+    p.add_argument(
+        "--record-triage-actions",
+        action="store_true",
+        help="record reviewed broken_register_proposals.md rows into runtime operator_actions",
+    )
+    p.add_argument(
+        "--runtime-db",
+        type=Path,
+        default=None,
+        help="runtime.db path for --record-triage-actions",
+    )
+    p.add_argument(
+        "--operator-id",
+        default="operator",
+        help="actor name for recorded triage actions",
     )
     args = p.parse_args()
 
@@ -777,6 +851,12 @@ def main() -> int:
     proposal = proposal_for_br(findings)
     if proposal:
         (out_dir / "proposals" / "broken_register_proposals.md").write_text(proposal)
+    if args.record_triage_actions:
+        record_broken_register_triage_actions(
+            out_dir / "proposals" / "broken_register_proposals.md",
+            runtime_db_path=args.runtime_db,
+            actor=args.operator_id,
+        )
 
     print(f"Routed {len(findings)} findings → {out_dir}")
     print(

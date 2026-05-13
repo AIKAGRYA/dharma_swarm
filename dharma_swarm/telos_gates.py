@@ -23,6 +23,11 @@ from typing import Any
 
 from dharma_swarm.anekanta_gate import evaluate_anekanta
 from dharma_swarm.bhed_gnan_gate import evaluate_bhed_gnan
+from dharma_swarm.runtime_state import (
+    OperatorAction,
+    RuntimeStateStore,
+    operator_action_id_for_payload,
+)
 
 logger = logging.getLogger(__name__)
 from dharma_swarm.models import (
@@ -99,8 +104,19 @@ class GateRegistry:
     3. load_approved() — returns approved custom gates for runtime use
     """
 
-    def __init__(self, proposals_file: Path | None = None) -> None:
+    def __init__(
+        self,
+        proposals_file: Path | None = None,
+        *,
+        runtime_state: RuntimeStateStore | None = None,
+        runtime_db_path: Path | None = None,
+        operator_id: str | None = None,
+    ) -> None:
         self._proposals_file = proposals_file or _GATE_PROPOSALS_FILE
+        self._operator_id = operator_id or os.getenv("DHARMA_OPERATOR_ID", "operator")
+        self._runtime_state = runtime_state
+        if self._runtime_state is None and (runtime_db_path is not None or proposals_file is None):
+            self._runtime_state = RuntimeStateStore(runtime_db_path)
 
     def propose(self, proposal: GateProposal) -> str:
         """Submit a gate proposal. Returns the proposal name.
@@ -165,8 +181,42 @@ class GateRegistry:
         target.review_note = note
 
         self._rewrite_all(proposals)
+        self._record_review_action(target)
         logger.info("Gate %s: %s (note: %s)", status, name, note or "none")
         return target
+
+    def _record_review_action(self, proposal: GateProposal) -> None:
+        if self._runtime_state is None:
+            return
+        payload = {
+            "proposal": proposal.to_dict(),
+            "proposal_name": proposal.name,
+            "status": proposal.status,
+            "reviewed_at": proposal.reviewed_at,
+            "proposals_file": str(self._proposals_file),
+        }
+        action_name = f"gate_proposal_{proposal.status}"
+        action = OperatorAction(
+            action_id=operator_action_id_for_payload(
+                action_name=action_name,
+                actor=self._operator_id,
+                reason=proposal.review_note,
+                payload=payload,
+            ),
+            action_name=action_name,
+            actor=self._operator_id,
+            reason=proposal.review_note,
+            payload=payload,
+            created_at=(
+                datetime.fromisoformat(proposal.reviewed_at)
+                if proposal.reviewed_at
+                else datetime.now(timezone.utc)
+            ),
+        )
+        try:
+            self._runtime_state.record_operator_action_sync(action)
+        except Exception:
+            logger.debug("Failed to record gate proposal operator action", exc_info=True)
 
     def _load_all(self) -> list[GateProposal]:
         """Load all proposals from disk."""

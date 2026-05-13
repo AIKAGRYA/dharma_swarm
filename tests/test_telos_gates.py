@@ -557,6 +557,32 @@ class TestGateRegistry:
         # load_approved does NOT return it
         assert registry.load_approved() == []
 
+    def test_gate_review_records_operator_action(self, tmp_path):
+        from dharma_swarm.runtime_state import RuntimeStateStore
+
+        runtime_db = tmp_path / "runtime.db"
+        registry = GateRegistry(
+            proposals_file=tmp_path / "proposals.jsonl",
+            runtime_db_path=runtime_db,
+            operator_id="dhyana",
+        )
+        registry.propose(GateProposal(
+            name="REVIEWED_GATE",
+            tier="C",
+            justification="Test review action",
+            trigger_patterns=["review me"],
+        ))
+
+        approved = registry.approve("REVIEWED_GATE", note="Approved for runtime")
+        actions = RuntimeStateStore(runtime_db).list_operator_actions_sync(limit=10)
+
+        assert approved.status == "approved"
+        assert len(actions) == 1
+        assert actions[0].action_name == "gate_proposal_approved"
+        assert actions[0].actor == "dhyana"
+        assert actions[0].reason == "Approved for runtime"
+        assert actions[0].payload["proposal_name"] == "REVIEWED_GATE"
+
     def test_approve_nonexistent_raises(self, registry):
         with pytest.raises(ValueError, match="No proposal"):
             registry.approve("GHOST_GATE")

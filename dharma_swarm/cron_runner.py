@@ -280,6 +280,8 @@ def _run_insight_brief(job: dict[str, Any]) -> CronJobExecutionResult:
         path = build_and_publish_daily_brief(
             ontology_path=job.get("ontology_path") or None,
             output_dir=job.get("output_dir") or None,
+            capture_dir=job.get("capture_dir") or None,
+            runtime_db=job.get("runtime_db") or None,
         )
         return CronJobExecutionResult(
             status=CronJobRunStatus.COMPLETED,

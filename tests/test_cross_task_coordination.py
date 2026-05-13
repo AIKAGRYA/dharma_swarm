@@ -286,6 +286,111 @@ async def test_notes_file_and_artifact_both_created(tmp_orchestrator):
     assert len(artifact.read_text()) > 0
 
 
+@pytest.mark.asyncio
+async def test_persist_result_records_runtime_artifact_and_memory_fact(tmp_orchestrator):
+    """Persisted results must be visible through canonical runtime state."""
+    orch = tmp_orchestrator
+    task = Task(
+        id="feedface00001111",
+        title="Summarize runtime loop closure",
+        description="Make task output causal.",
+        metadata={"trace_id": "trace-runtime-projection"},
+    )
+    result_text = "Runtime projector writes artifact_records and memory_facts."
+
+    await orch._persist_result(
+        agent_name="integrator-1",
+        model_name="claude-sonnet",
+        provider_name="anthropic",
+        task=task,
+        result=result_text,
+    )
+
+    artifacts = await orch._ledger.runtime_state.list_artifacts(
+        task_id=task.id,
+        limit=10,
+    )
+    facts = await orch._ledger.runtime_state.list_memory_facts(
+        task_id=task.id,
+        limit=10,
+    )
+
+    assert len(artifacts) == 1
+    assert artifacts[0].artifact_kind == "task_result"
+    assert artifacts[0].promotion_state == "candidate"
+    assert artifacts[0].metadata["trace_id"] == "trace-runtime-projection"
+    assert artifacts[0].metadata["result_sha256"]
+    assert Path(artifacts[0].payload_path).exists()
+
+    assert len(facts) == 1
+    assert facts[0].fact_kind == "task_result"
+    assert facts[0].truth_state == "candidate"
+    assert facts[0].source_artifact_id == artifacts[0].artifact_id
+    assert facts[0].source_event_id
+    assert "artifact_records and memory_facts" in facts[0].text
+    assert facts[0].provenance["trace_id"] == "trace-runtime-projection"
+
+
+@pytest.mark.asyncio
+async def test_persist_result_runtime_projection_is_idempotent(tmp_orchestrator):
+    """Replaying the same task result must update, not duplicate, runtime rows."""
+    orch = tmp_orchestrator
+    task = Task(
+        id="c0ffee0000001111",
+        title="Replay runtime projection",
+        description="Make projection deterministic.",
+    )
+    result_text = "Same task and result should keep one artifact and one fact."
+
+    for _ in range(2):
+        await orch._persist_result(
+            agent_name="integrator-1",
+            model_name="claude-sonnet",
+            provider_name="anthropic",
+            task=task,
+            result=result_text,
+        )
+
+    artifacts = await orch._ledger.runtime_state.list_artifacts(
+        task_id=task.id,
+        limit=10,
+    )
+    facts = await orch._ledger.runtime_state.list_memory_facts(
+        task_id=task.id,
+        limit=10,
+    )
+
+    assert len(artifacts) == 1
+    assert len(facts) == 1
+
+
+@pytest.mark.asyncio
+async def test_blank_result_records_artifact_but_not_memory_fact(tmp_orchestrator):
+    """Blank output may be an artifact, but it must not become a memory fact."""
+    orch = tmp_orchestrator
+    task = Task(id="blank000000001111", title="Blank task")
+
+    await orch._persist_result(
+        agent_name="agent-x",
+        model_name="claude-sonnet",
+        provider_name="anthropic",
+        task=task,
+        result="   ",
+    )
+
+    artifacts = await orch._ledger.runtime_state.list_artifacts(
+        task_id=task.id,
+        limit=10,
+    )
+    facts = await orch._ledger.runtime_state.list_memory_facts(
+        task_id=task.id,
+        limit=10,
+    )
+
+    assert len(artifacts) == 1
+    assert facts == []
+
+
 # ---------- PART 6: None result skips everything ----------
 
 @pytest.mark.asyncio
