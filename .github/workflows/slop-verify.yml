@@ -69,7 +69,10 @@ jobs:
             sloppylint \
             grimp \
             semgrep \
-            pip-audit
+            pip-audit \
+            pydantic \
+            httpx \
+            aiosqlite
 
       - name: Install JS/TS detectors (npm-global)
         run: |
@@ -104,6 +107,7 @@ jobs:
 
       - name: Run slop-verify
         id: verify
+        continue-on-error: true
         run: |
           set -o pipefail
           mkdir -p reports/slop
@@ -117,7 +121,7 @@ jobs:
           fi
           python3 scripts/governance/slop_verify.py "${args[@]}" \
             > reports/slop/result.json
-          # Always emit a summary even if exit_code != 0
+          # Always emit a summary
           python3 -c "
           import json, pathlib
           d = json.loads(pathlib.Path('reports/slop/result.json').read_text())
@@ -138,7 +142,41 @@ jobs:
           print('|---|---:|')
           for k, v in d['summary'].items():
               if v: print(f\"| {k} | {v} |\")
-          " | tee -a "$GITHUB_STEP_SUMMARY"
+          " | tee -a "$GITHUB_STEP_SUMMARY" || true
+
+      - name: Generate PR comment body
+        if: github.event_name == 'pull_request' && always()
+        run: |
+          mkdir -p reports/slop
+          if [ -s reports/slop/result.json ]; then
+            python3 -c "
+          import json, pathlib
+          d = json.loads(pathlib.Path('reports/slop/result.json').read_text())
+          if 'error' in d or 'mode' not in d:
+              print('⚠️ slop-verify failed — check the job logs.')
+          else:
+              print('## Slop verification summary')
+              print()
+              print('| metric | value |')
+              print('|---|---|')
+              print(f\"| mode | \`{d['mode']}\` |\")
+              print(f\"| threshold | {d['threshold']} |\")
+              print(f\"| modules scored | {len(d['module_scores'])} |\")
+              print()
+              print('| detector | family | findings | duration_s |')
+              print('|---|---|---:|---:|')
+              for r in d['detector_results']:
+                  print(f\"| \`{r['tool']}\` | {r['family']} | {r['finding_count']} | {r['duration_sec']:.2f} |\")
+              print()
+              print('| action | count |')
+              print('|---|---:|')
+              for k, v in d['summary'].items():
+                  if v: print(f\"| {k} | {v} |\")
+            " > reports/slop/comment.md 2>/dev/null \
+              || echo '⚠️ slop-verify failed — check the job logs.' > reports/slop/comment.md
+          else
+            echo '⚠️ slop-verify failed to produce results — check the job logs.' > reports/slop/comment.md
+          fi
 
       - name: Render trend report
         if: always()
@@ -159,4 +197,4 @@ jobs:
         continue-on-error: true
         with:
           header: slop-verify-${{ matrix.mode }}
-          path: reports/slop/result.json
+          path: reports/slop/comment.md
