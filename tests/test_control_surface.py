@@ -17,8 +17,14 @@ from fastapi.testclient import TestClient
 
 from dharma_swarm.operator_core.control_surface import (
     COHERENCE_STATES,
+    AgentHandoffPrompt,
     ControlSurfaceRow,
+    EvidenceItem,
+    HumanDecisionContext,
+    SourceRef,
+    VerificationEvent,
     _broken_register_rows,
+    _build_human_decision_context,
     _manifest_api_router_rows,
     _manifest_dashboard_page_rows,
     _needs_human_decision,
@@ -26,6 +32,7 @@ from dharma_swarm.operator_core.control_surface import (
     _observe_dashboard_page,
     build_control_surface_rows,
     build_control_surface_summary,
+    generate_handoff_prompt,
     load_active_surface_manifest,
 )
 
@@ -478,3 +485,353 @@ class TestManifestDoctrine:
             "missing module must not be marked bound"
         )
         assert missing.coherence_state in ("drifted", "partial")
+
+
+# ---------------------------------------------------------------------------
+# EvidenceItem model tests
+# ---------------------------------------------------------------------------
+
+
+class TestEvidenceItem:
+    def test_evidence_item_creation(self) -> None:
+        item = EvidenceItem(
+            kind="file",
+            source="dharma_swarm/swarm.py",
+            observed_at="2026-05-13T00:00:00+00:00",
+            status="present",
+            provenance_chain=["manifest api_routers", "file_exists_check"],
+        )
+        assert item.kind == "file"
+        assert item.source == "dharma_swarm/swarm.py"
+        assert item.status == "present"
+        assert len(item.provenance_chain) == 2
+
+    def test_evidence_item_serialization(self) -> None:
+        item = EvidenceItem(
+            kind="api_route",
+            source="/api/health",
+            status="present",
+        )
+        d = item.model_dump()
+        assert d["kind"] == "api_route"
+        assert d["source"] == "/api/health"
+        assert d["line_range"] is None
+
+    def test_evidence_item_with_line_range(self) -> None:
+        item = EvidenceItem(
+            kind="file",
+            source="some/file.py",
+            line_range=(10, 20),
+        )
+        assert item.line_range == (10, 20)
+
+    def test_evidence_item_raw_content_truncation(self) -> None:
+        row = ControlSurfaceRow(id="test", kind="api_router", label="test")
+        row.add_evidence("file", "test.py", raw_content="x" * 1000)
+        assert len(row.evidence[0].raw_content) == 500  # type: ignore[arg-type]
+
+
+# ---------------------------------------------------------------------------
+# SourceRef model tests
+# ---------------------------------------------------------------------------
+
+
+class TestSourceRef:
+    def test_source_ref_creation(self) -> None:
+        ref = SourceRef(kind="file", path="dharma_swarm/swarm.py", exists=True)
+        assert ref.kind == "file"
+        assert ref.exists is True
+
+    def test_source_ref_serialization(self) -> None:
+        ref = SourceRef(kind="api_route", path="/api/health", exists=False)
+        d = ref.model_dump()
+        assert d["kind"] == "api_route"
+        assert d["exists"] is False
+
+
+# ---------------------------------------------------------------------------
+# VerificationEvent model tests
+# ---------------------------------------------------------------------------
+
+
+class TestVerificationEvent:
+    def test_verification_event_creation(self) -> None:
+        ev = VerificationEvent(
+            timestamp="2026-05-13T00:00:00+00:00",
+            event_type="observed",
+            detail="First observation",
+        )
+        assert ev.event_type == "observed"
+        assert ev.agent_id is None
+
+    def test_verification_event_with_agent(self) -> None:
+        ev = VerificationEvent(
+            timestamp="2026-05-13T00:00:00+00:00",
+            event_type="fix_attempted",
+            detail="Applied patch",
+            agent_id="agent-123",
+        )
+        assert ev.agent_id == "agent-123"
+
+
+# ---------------------------------------------------------------------------
+# Structured evidence in rows
+# ---------------------------------------------------------------------------
+
+
+class TestStructuredEvidenceInRows:
+    def test_add_evidence_helper(self) -> None:
+        row = ControlSurfaceRow(id="test", kind="api_router", label="test")
+        row.add_evidence("file", "some/file.py", status="present")
+        assert len(row.evidence) == 1
+        assert isinstance(row.evidence[0], EvidenceItem)
+        assert row.evidence[0].source == "some/file.py"
+        assert row.evidence_labels == ["some/file.py"]
+
+    def test_add_source_ref_helper(self) -> None:
+        row = ControlSurfaceRow(id="test", kind="api_router", label="test")
+        row.add_source_ref("file", "some/file.py", exists=True)
+        assert len(row.source_refs) == 1
+        assert isinstance(row.source_refs[0], SourceRef)
+        assert row.source_ref_labels == ["some/file.py"]
+
+    def test_to_dict_serializes_structured_evidence(self) -> None:
+        row = ControlSurfaceRow(id="test", kind="api_router", label="test")
+        row.add_evidence("file", "a.py", status="present")
+        row.add_source_ref("file", "a.py", exists=True)
+        d = row.to_dict()
+        assert isinstance(d["evidence"], list)
+        assert isinstance(d["evidence"][0], dict)
+        assert d["evidence"][0]["kind"] == "file"
+        assert isinstance(d["source_refs"], list)
+        assert isinstance(d["source_refs"][0], dict)
+
+    def test_observed_rows_have_structured_evidence(self, tmp_repo: Path) -> None:
+        manifest = load_active_surface_manifest(tmp_repo)
+        rows = _manifest_api_router_rows(manifest)
+        health_row = [r for r in rows if r.id == "api.health"][0]
+        _observe_api_router(health_row, tmp_repo)
+        assert len(health_row.evidence) > 0
+        assert all(isinstance(e, EvidenceItem) for e in health_row.evidence)
+
+    def test_full_build_rows_have_structured_evidence(self, tmp_repo: Path) -> None:
+        rows = build_control_surface_rows(repo_root=tmp_repo)
+        for row in rows:
+            for e in row.evidence:
+                assert isinstance(e, EvidenceItem), (
+                    f"row {row.id} has non-EvidenceItem: {type(e)}"
+                )
+
+    def test_full_build_rows_have_structured_source_refs(self, tmp_repo: Path) -> None:
+        rows = build_control_surface_rows(repo_root=tmp_repo)
+        for row in rows:
+            for ref in row.source_refs:
+                assert isinstance(ref, SourceRef), (
+                    f"row {row.id} has non-SourceRef: {type(ref)}"
+                )
+
+    def test_evidence_labels_backward_compat(self, tmp_repo: Path) -> None:
+        rows = build_control_surface_rows(repo_root=tmp_repo)
+        for row in rows:
+            assert len(row.evidence_labels) == len(row.evidence)
+
+
+# ---------------------------------------------------------------------------
+# HumanDecisionContext tests
+# ---------------------------------------------------------------------------
+
+
+class TestHumanDecisionContext:
+    def test_p0_drifted_gets_context(self) -> None:
+        row = ControlSurfaceRow(
+            id="test",
+            kind="api_router",
+            label="test",
+            priority="p0",
+            coherence_state="drifted",
+        )
+        ctx = _build_human_decision_context(row)
+        assert ctx.required is True
+        assert "drifted" in ctx.why_now.lower()
+        assert ctx.recommended_action != ""
+
+    def test_broken_register_open_gets_context(self) -> None:
+        row = ControlSurfaceRow(
+            id="br.br_099",
+            kind="broken_register",
+            label="BR-099: test",
+            declared_state="OPEN",
+        )
+        ctx = _build_human_decision_context(row)
+        assert ctx.required is True
+        assert "broken register" in ctx.why_now.lower()
+
+    def test_bound_p1_no_decision(self) -> None:
+        row = ControlSurfaceRow(
+            id="test",
+            kind="api_router",
+            label="test",
+            priority="p1",
+            coherence_state="bound",
+        )
+        ctx = _build_human_decision_context(row)
+        assert ctx.required is False
+
+    def test_full_build_populates_human_decision(self, tmp_repo: Path) -> None:
+        rows = build_control_surface_rows(repo_root=tmp_repo)
+        for row in rows:
+            assert row.human_decision is not None
+            assert isinstance(row.human_decision, HumanDecisionContext)
+            assert row.human_decision.required == row.human_decision_required
+
+    def test_human_decision_in_to_dict(self) -> None:
+        row = ControlSurfaceRow(
+            id="test",
+            kind="api_router",
+            label="test",
+            priority="p0",
+            coherence_state="drifted",
+        )
+        row.human_decision = _build_human_decision_context(row)
+        row.human_decision_required = row.human_decision.required
+        d = row.to_dict()
+        assert "human_decision" in d
+        assert d["human_decision"]["required"] is True
+
+
+# ---------------------------------------------------------------------------
+# AgentHandoffPrompt tests
+# ---------------------------------------------------------------------------
+
+
+class TestAgentHandoffPrompt:
+    def test_generate_prompt_for_drifted_row(self, tmp_repo: Path) -> None:
+        manifest = load_active_surface_manifest(tmp_repo)
+        rows = _manifest_api_router_rows(manifest)
+        missing = [r for r in rows if r.id == "api.missing"][0]
+        _observe_api_router(missing, tmp_repo)
+
+        prompt = generate_handoff_prompt(missing, repo_root=tmp_repo)
+        assert isinstance(prompt, AgentHandoffPrompt)
+        assert prompt.row_id == "api.missing"
+        assert "api.missing" in prompt.prompt_text
+        assert len(prompt.context_files) > 0
+        assert len(prompt.expected_tests) > 0
+        assert prompt.invariant != ""
+        assert prompt.generated_at != ""
+
+    def test_generate_prompt_for_agent_row(self, tmp_repo: Path) -> None:
+        rows = build_control_surface_rows(repo_root=tmp_repo)
+        agent_rows = [r for r in rows if r.kind == "agent_subsystem"]
+        if agent_rows:
+            prompt = generate_handoff_prompt(agent_rows[0], repo_root=tmp_repo)
+            assert "agent_subsystem" in prompt.prompt_text or "agent" in prompt.prompt_text.lower()
+
+    def test_prompt_contains_anti_slop_gates(self, tmp_repo: Path) -> None:
+        rows = build_control_surface_rows(repo_root=tmp_repo)
+        prompt = generate_handoff_prompt(rows[0], repo_root=tmp_repo)
+        assert "Anti-slop" in prompt.prompt_text
+        assert "impact-checked" in prompt.prompt_text
+
+
+# ---------------------------------------------------------------------------
+# API endpoint: handoff prompt
+# ---------------------------------------------------------------------------
+
+
+class TestHandoffPromptAPI:
+    def test_handoff_prompt_returns_ok(self) -> None:
+        client = _control_surface_client()
+        rows_resp = client.get("/api/control-surface/rows")
+        first_id = rows_resp.json()["data"][0]["id"]
+        resp = client.post(f"/api/control-surface/rows/{first_id}/handoff-prompt")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["status"] == "ok"
+        data = body["data"]
+        assert data["row_id"] == first_id
+        assert "prompt_text" in data
+        assert "context_files" in data
+        assert "expected_tests" in data
+
+    def test_handoff_prompt_404(self) -> None:
+        client = _control_surface_client()
+        resp = client.post("/api/control-surface/rows/nonexistent/handoff-prompt")
+        assert resp.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# API endpoint: SSE stream
+# ---------------------------------------------------------------------------
+
+
+class TestSSEStream:
+    def test_stream_route_registered(self) -> None:
+        """Verify the /stream route is registered in the router."""
+        from api.routers.control_surface import router as cs_router
+        stream_routes = [
+            r for r in cs_router.routes
+            if hasattr(r, "path") and "/stream" in r.path  # type: ignore[union-attr]
+        ]
+        assert len(stream_routes) == 1
+
+
+# ---------------------------------------------------------------------------
+# VerificationTimeline in rows
+# ---------------------------------------------------------------------------
+
+
+class TestVerificationTimeline:
+    def test_row_has_empty_timeline_by_default(self) -> None:
+        row = ControlSurfaceRow(id="test", kind="api_router", label="test")
+        assert row.verification_timeline == []
+
+    def test_timeline_serialization(self) -> None:
+        row = ControlSurfaceRow(id="test", kind="api_router", label="test")
+        row.verification_timeline.append(
+            VerificationEvent(
+                timestamp="2026-05-13T00:00:00+00:00",
+                event_type="observed",
+                detail="First observation",
+            )
+        )
+        d = row.to_dict()
+        assert len(d["verification_timeline"]) == 1
+        assert d["verification_timeline"][0]["event_type"] == "observed"
+
+    def test_full_build_includes_timeline(self, tmp_repo: Path) -> None:
+        rows = build_control_surface_rows(repo_root=tmp_repo)
+        for row in rows:
+            assert isinstance(row.verification_timeline, list)
+
+
+# ---------------------------------------------------------------------------
+# Backward compatibility: row contract still intact
+# ---------------------------------------------------------------------------
+
+
+class TestBackwardCompatibility:
+    def test_row_dict_has_all_original_fields(self, tmp_repo: Path) -> None:
+        rows = build_control_surface_rows(repo_root=tmp_repo)
+        original_fields = {
+            "id", "kind", "label", "authority_role", "declared_state",
+            "desired_state", "observed_state", "coherence_state", "priority",
+            "owner_module", "truth_owner", "evidence", "freshness",
+            "gap_codes", "next_action", "human_decision_required", "source_refs",
+            "raw",
+        }
+        for row in rows:
+            d = row.to_dict()
+            for field in original_fields:
+                assert field in d, f"row {row.id} missing original field: {field}"
+
+    def test_row_dict_has_new_fields(self, tmp_repo: Path) -> None:
+        rows = build_control_surface_rows(repo_root=tmp_repo)
+        new_fields = {
+            "evidence_labels", "source_ref_labels",
+            "human_decision", "verification_timeline",
+        }
+        for row in rows:
+            d = row.to_dict()
+            for field in new_fields:
+                assert field in d, f"row {row.id} missing new field: {field}"
