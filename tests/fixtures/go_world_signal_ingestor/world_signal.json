@@ -1,0 +1,30 @@
+{
+  "correlation_id": "world_corr_signal_001",
+  "source": "world_signal",
+  "source_url": "https://example.com/subq",
+  "observed_at": "2026-05-12T00:00:00Z",
+  "payload": {
+    "raw_observation_event_uid": "evt_raw_subq",
+    "title": "SubQ claims subquadratic long-context LLM for coding agents",
+    "category": "model_release",
+    "relevance_score": 0.91,
+    "matched_terms": ["subquadratic", "long context", "coding agent"],
+    "keywords": ["subquadratic", "long context", "coding agents"],
+    "first_principles_questions": [
+      "What capability curve is moving?",
+      "What can be verified independently within one day?"
+    ],
+    "iteration_steps": [
+      "Capture source and provenance.",
+      "Verify claims against primary evidence."
+    ],
+    "adjacent_search_queries": [
+      "SubQ competitors alternatives",
+      "subquadratic long context papers"
+    ],
+    "strategic_moves": ["claim_verification", "teardown"],
+    "human_review_required": true,
+    "raw_signal_not_final_judgment": true,
+    "radar_version": "world_radar_go.v0"
+  }
+}
