@@ -233,10 +233,9 @@ def _validate_args(args: argparse.Namespace) -> str:
         return "--memory-surface requires explicit --memory-home"
     if args.memory_home is not None and not args.memory_surface:
         return "--memory-home requires at least one --memory-surface"
-    if not args.allow_memory_surface_output:
-        for output_path in (args.output_json, args.output_md):
-            if output_path and _is_memory_surface_output(output_path, args):
-                return "output paths under memory surfaces require --allow-memory-surface-output"
+    for output_path in (args.output_json, args.output_md):
+        if output_path and _is_memory_surface_output(output_path, args):
+            return "output paths under memory surfaces are not allowed"
     return ""
 
 
