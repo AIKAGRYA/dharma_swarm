@@ -213,6 +213,8 @@ def _needs_human_decision(row: ControlSurfaceRow) -> bool:
         return True
     if row.kind == "broken_register" and "OPEN" in row.declared_state.upper():
         return True
+    if "go_world_receipt_rejections" in row.gap_codes:
+        return True
     label_lower = row.label.lower()
     for kw in _HUMAN_DECISION_KEYWORDS:
         if kw in label_lower or kw in row.owner_module.lower():

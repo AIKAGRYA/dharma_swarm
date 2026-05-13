@@ -26,6 +26,10 @@ import yaml
 from dharma_swarm.operator_core.control_surface_handoff import (  # noqa: F401
     generate_handoff_prompt,
 )
+from dharma_swarm.operator_core.control_surface_go import (  # noqa: F401
+    _go_receipt_rows,
+    _go_world_receipt_summary_rows,
+)
 from dharma_swarm.operator_core.control_surface_models import (
     AUTHORITY_ROLES,
     COHERENCE_STATES,
@@ -85,7 +89,6 @@ def _module_importable(dotted: str) -> bool:
         return True
     except Exception:
         return False
-
 
 
 # ---------------------------------------------------------------------------
@@ -769,92 +772,6 @@ def _runtime_state_row(repo_root: Path | None = None) -> ControlSurfaceRow | Non
         )
 
     return row
-
-
-# ---------------------------------------------------------------------------
-# K) Go receipt adapter (optional)
-# ---------------------------------------------------------------------------
-
-def _go_receipt_rows(repo_root: Path | None = None) -> list[ControlSurfaceRow]:
-    root = repo_root or _repo_root()
-    rows: list[ControlSurfaceRow] = []
-
-    def _append_file_row(
-        *,
-        row_id: str,
-        label: str,
-        authority_role: str,
-        owner_module: str,
-        evidence_label: str,
-    ) -> None:
-        path = root / owner_module
-        if not path.exists():
-            return
-        row = ControlSurfaceRow(
-            id=row_id,
-            kind="go_receipt",
-            label=label,
-            authority_role=authority_role,
-            declared_state="incubating",
-            desired_state="live",
-            observed_state="file present",
-            coherence_state="partial",
-            priority="p2",
-            owner_module=owner_module,
-            truth_owner="go_sdk",
-        )
-        row.add_evidence(
-            "go_receipt", str(path.relative_to(root)),
-            status="present",
-            provenance_chain=["go_sdk", "file_check"],
-        )
-        row.add_source_ref("go_module", owner_module, exists=True)
-        rows.append(row)
-
-    _append_file_row(
-        row_id="go.evidence_bridge",
-        label="Go Evidence Bridge",
-        authority_role="adapter",
-        owner_module="dharma_swarm/operator_core/go_evidence_bridge.py",
-        evidence_label="bridge file exists",
-    )
-    _append_file_row(
-        row_id="go.github_bridge",
-        label="Go GitHub Bridge",
-        authority_role="adapter",
-        owner_module="dharma_swarm/operator_core/go_github_bridge.py",
-        evidence_label="bridge file exists",
-    )
-    _append_file_row(
-        row_id="go.receipt_sdk",
-        label="Go Receipt SDK",
-        authority_role="evidence",
-        owner_module="tools/go_sdk/receipt/receipt.go",
-        evidence_label="receipt.go exists",
-    )
-    _append_file_row(
-        row_id="go.adapter_contract",
-        label="Go Adapter Contract",
-        authority_role="adapter",
-        owner_module="tools/go_sdk/adaptercontract/contract.go",
-        evidence_label="contract.go exists",
-    )
-    _append_file_row(
-        row_id="go.evidence_ingestor",
-        label="Go Evidence Ingestor",
-        authority_role="adapter",
-        owner_module="tools/evidence_ingestor_go/main.go",
-        evidence_label="ingestor exists",
-    )
-    _append_file_row(
-        row_id="go.github_ingestor",
-        label="Go GitHub Ingestor",
-        authority_role="adapter",
-        owner_module="tools/github_ingestor_go/adapter.go",
-        evidence_label="ingestor exists",
-    )
-
-    return rows
 
 
 # ---------------------------------------------------------------------------
