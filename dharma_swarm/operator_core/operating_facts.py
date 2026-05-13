@@ -10,10 +10,12 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import sqlite3
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
+from urllib.parse import quote
 
 
 HUMAN_YDS_SOURCES = {"human", "operator", "dhyana"}
@@ -214,12 +216,25 @@ class RevenueSignalFact:
 
 
 @dataclass(frozen=True)
+class TelicValueFact:
+    source_path: str
+    outcome_count: int
+    value_event_count: int
+    contribution_count: int
+    linked_chains: int
+    orphan_value_events: tuple[str, ...] = ()
+    orphan_contributions: tuple[str, ...] = ()
+    latest_created_at: str = ""
+
+
+@dataclass(frozen=True)
 class OperatingFactInputs:
     agentops_reports_dir: Path | None = None
     kaizen_reports_dir: Path | None = None
     yds_ratings_path: Path | None = None
     burn_report_path: Path | None = None
     revenue_notes_path: Path | None = None
+    telic_ontology_db_path: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -229,6 +244,7 @@ class OperatingFactBundle:
     human_yds: tuple[HumanQualityRatingFact, ...] = ()
     burn: tuple[BurnReportFact, ...] = ()
     revenue: tuple[RevenueSignalFact, ...] = ()
+    telic_value: tuple[TelicValueFact, ...] = ()
     missing_sources: tuple[str, ...] = ()
 
 
@@ -265,12 +281,16 @@ def build_operating_fact_bundle(inputs: OperatingFactInputs) -> OperatingFactBun
     revenue = load_revenue_signal_facts(inputs.revenue_notes_path)
     if inputs.revenue_notes_path is None or not revenue:
         missing.append("Revenue notes")
+    telic_value = load_telic_value_facts(inputs.telic_ontology_db_path)
+    if inputs.telic_ontology_db_path is not None and not telic_value:
+        missing.append("Telic value facts")
     return OperatingFactBundle(
         agentops=tuple(agentops),
         kaizen=tuple(kaizen),
         human_yds=tuple(human_yds),
         burn=tuple(burn),
         revenue=tuple(revenue),
+        telic_value=tuple(telic_value),
         missing_sources=tuple(missing),
     )
 
@@ -343,6 +363,57 @@ def load_revenue_signal_facts(path: Path | None) -> list[RevenueSignalFact]:
                 )
             )
     return facts
+
+
+def load_telic_value_facts(path: Path | None) -> list[TelicValueFact]:
+    """Read Outcome -> ValueEvent -> Contribution shape from an ontology DB."""
+
+    if path is None:
+        return []
+    resolved = path.expanduser()
+    if not resolved.exists():
+        return []
+
+    rows = _read_telic_objects(resolved)
+    outcomes = {row["id"]: row for row in rows if row.get("type_name") == "Outcome"}
+    value_events = {row["id"]: row for row in rows if row.get("type_name") == "ValueEvent"}
+    contributions = {row["id"]: row for row in rows if row.get("type_name") == "Contribution"}
+    if not outcomes and not value_events and not contributions:
+        return []
+
+    valid_value_events: set[str] = set()
+    orphan_value_events: list[str] = []
+    for value_event_id, row in value_events.items():
+        props = dict(row.get("properties") or {})
+        outcome_id = str(props.get("outcome_id") or "")
+        if outcome_id in outcomes:
+            valid_value_events.add(value_event_id)
+        else:
+            orphan_value_events.append(value_event_id)
+
+    linked_chains = 0
+    orphan_contributions: list[str] = []
+    for contribution_id, row in contributions.items():
+        props = dict(row.get("properties") or {})
+        value_event_id = str(props.get("value_event_id") or "")
+        if value_event_id in valid_value_events:
+            linked_chains += 1
+        else:
+            orphan_contributions.append(contribution_id)
+
+    latest_created_at = max((str(row.get("created_at") or "") for row in rows), default="")
+    return [
+        TelicValueFact(
+            source_path=resolved.as_posix(),
+            outcome_count=len(outcomes),
+            value_event_count=len(value_events),
+            contribution_count=len(contributions),
+            linked_chains=linked_chains,
+            orphan_value_events=tuple(sorted(orphan_value_events)),
+            orphan_contributions=tuple(sorted(orphan_contributions)),
+            latest_created_at=latest_created_at,
+        )
+    ]
 
 
 def append_human_yds_rating(
@@ -418,6 +489,7 @@ def bundle_to_dict(bundle: OperatingFactBundle) -> dict[str, Any]:
         "human_yds": [fact_to_dict(fact) for fact in bundle.human_yds],
         "burn": [fact_to_dict(fact) for fact in bundle.burn],
         "revenue": [fact_to_dict(fact) for fact in bundle.revenue],
+        "telic_value": [fact_to_dict(fact) for fact in bundle.telic_value],
         "organ_states": [fact_to_dict(fact) for fact in organ_state_facts(bundle)],
         "missing_sources": list(bundle.missing_sources),
     }
@@ -711,13 +783,38 @@ def _command_spine_organ_state(boundary: OrganBoundary, bundle: OperatingFactBun
 
 
 def _telic_value_organ_state(boundary: OrganBoundary, bundle: OperatingFactBundle) -> OrganStateFact:
+    if not bundle.telic_value:
+        return _state(
+            boundary,
+            observed_state="no Telic value facts loaded",
+            coherence_state="unknown",
+            open_gap="Outcome/ValueEvent/Contribution facts are declared but not projected here",
+            next_packet_hint="add a read-only Telic value fact adapter before using value as map authority",
+        )
+    evidence = tuple(fact.source_path for fact in bundle.telic_value)
+    if any(fact.orphan_value_events or fact.orphan_contributions for fact in bundle.telic_value):
+        return _state(
+            boundary,
+            observed_state="Telic value facts loaded with orphan ValueEvent or Contribution rows",
+            coherence_state="partial",
+            evidence_refs=evidence,
+            open_gap="loaded Telic rows do not form a complete Outcome -> ValueEvent -> Contribution chain",
+            next_packet_hint="repair or regenerate Telic value rows before treating value as bound",
+        )
+    if any(fact.linked_chains > 0 for fact in bundle.telic_value):
+        return _state(
+            boundary,
+            observed_state="Outcome -> ValueEvent -> Contribution chain loaded",
+            coherence_state="bound",
+            evidence_refs=evidence,
+        )
     return _state(
         boundary,
-        observed_state="no Telic value fact reader is present in operating_facts v0",
-        coherence_state="unknown",
-        evidence_refs=(boundary.python_api,),
-        open_gap="Outcome/ValueEvent/Contribution facts are declared but not projected here",
-        next_packet_hint="add a read-only Telic value fact adapter before using value as map authority",
+        observed_state="Telic value facts loaded without a complete value chain",
+        coherence_state="partial",
+        evidence_refs=evidence,
+        open_gap="loaded Telic rows do not yet include a linked contribution chain",
+        next_packet_hint="record Contribution rows linked to ValueEvent rows",
     )
 
 
@@ -779,6 +876,47 @@ def _gate_fact(gate: Any, index: int) -> GateFact:
         passed=passed,
         exit_code=exit_code if isinstance(exit_code, int) else None,
     )
+
+
+def _read_telic_objects(path: Path) -> list[dict[str, Any]]:
+    uri = "file:" + quote(str(path.resolve()), safe="/") + "?mode=ro"
+    try:
+        conn = sqlite3.connect(uri, uri=True)
+        conn.row_factory = sqlite3.Row
+        try:
+            table = conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'objects'"
+            ).fetchone()
+            if table is None:
+                return []
+            rows = conn.execute(
+                """
+                SELECT id, type_name, properties, created_at
+                FROM objects
+                WHERE type_name IN ('Outcome', 'ValueEvent', 'Contribution')
+                ORDER BY created_at DESC
+                """
+            ).fetchall()
+        finally:
+            conn.close()
+    except sqlite3.Error:
+        return []
+
+    objects: list[dict[str, Any]] = []
+    for row in rows:
+        try:
+            properties = json.loads(row["properties"] or "{}")
+        except json.JSONDecodeError:
+            properties = {}
+        objects.append(
+            {
+                "id": str(row["id"] or ""),
+                "type_name": str(row["type_name"] or ""),
+                "properties": properties if isinstance(properties, dict) else {},
+                "created_at": str(row["created_at"] or ""),
+            }
+        )
+    return objects
 
 
 def _yds_fact(source_path: str, record: dict[str, Any]) -> HumanQualityRatingFact | None:

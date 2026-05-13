@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 from pathlib import Path
 
 from dharma_swarm.operator_core.operating_facts import (
@@ -11,6 +12,7 @@ from dharma_swarm.operator_core.operating_facts import (
     bundle_to_dict,
     load_agentops_run_facts,
     load_human_yds_rating_facts,
+    load_telic_value_facts,
     organ_boundary_map,
     organ_state_facts,
     rust_membrane_candidates,
@@ -20,6 +22,29 @@ from dharma_swarm.operator_core.operating_facts import (
 def _write_json(path: Path, payload: object) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload), encoding="utf-8")
+
+
+def _write_telic_db(path: Path, rows: list[tuple[str, str, dict[str, object], str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(path)
+    try:
+        conn.execute(
+            """
+            CREATE TABLE objects (
+                id TEXT PRIMARY KEY,
+                type_name TEXT NOT NULL,
+                properties TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.executemany(
+            "INSERT INTO objects (id, type_name, properties, created_at) VALUES (?, ?, ?, ?)",
+            [(obj_id, type_name, json.dumps(props), created_at) for obj_id, type_name, props, created_at in rows],
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def test_organ_boundaries_keep_distinct_truth_owners() -> None:
@@ -142,6 +167,15 @@ def test_operating_fact_bundle_reads_all_organs_without_mutating(tmp_path: Path)
     )
     revenue = tmp_path / "revenue.md"
     revenue.write_text("- pricing wedge: Campaign X-Ray diagnostic\n", encoding="utf-8")
+    telic_db = tmp_path / "ontology.db"
+    _write_telic_db(
+        telic_db,
+        [
+            ("out_1", "Outcome", {"proposal_id": "prop_1", "success": True}, "2026-05-09T00:00:00Z"),
+            ("ve_1", "ValueEvent", {"outcome_id": "out_1", "composite_value": 0.9}, "2026-05-09T00:01:00Z"),
+            ("contrib_1", "Contribution", {"value_event_id": "ve_1", "attributed_value": 0.9}, "2026-05-09T00:02:00Z"),
+        ],
+    )
 
     bundle = build_operating_fact_bundle(
         OperatingFactInputs(
@@ -150,6 +184,7 @@ def test_operating_fact_bundle_reads_all_organs_without_mutating(tmp_path: Path)
             yds_ratings_path=yds,
             burn_report_path=burn,
             revenue_notes_path=revenue,
+            telic_ontology_db_path=telic_db,
         )
     )
 
@@ -159,6 +194,47 @@ def test_operating_fact_bundle_reads_all_organs_without_mutating(tmp_path: Path)
     assert bundle.human_yds[0].authoritative is True
     assert bundle.burn[0].total_cost_usd == 0.03
     assert bundle.revenue[0].keywords == ("wedge", "pricing")
+    assert bundle.telic_value[0].linked_chains == 1
+
+
+def test_telic_value_facts_bind_complete_value_chain(tmp_path: Path) -> None:
+    telic_db = tmp_path / "ontology.db"
+    _write_telic_db(
+        telic_db,
+        [
+            ("out_1", "Outcome", {"proposal_id": "prop_1", "success": True}, "2026-05-09T00:00:00Z"),
+            ("ve_1", "ValueEvent", {"outcome_id": "out_1", "composite_value": 0.8}, "2026-05-09T00:01:00Z"),
+            ("contrib_1", "Contribution", {"value_event_id": "ve_1", "attributed_value": 0.8}, "2026-05-09T00:02:00Z"),
+        ],
+    )
+
+    facts = load_telic_value_facts(telic_db)
+    states = {fact.name: fact for fact in organ_state_facts(OperatingFactBundle(telic_value=tuple(facts)))}
+
+    assert facts[0].outcome_count == 1
+    assert facts[0].value_event_count == 1
+    assert facts[0].contribution_count == 1
+    assert facts[0].linked_chains == 1
+    assert states["telic_value"].coherence_state == "bound"
+
+
+def test_telic_value_facts_keep_orphan_rows_partial(tmp_path: Path) -> None:
+    telic_db = tmp_path / "ontology.db"
+    _write_telic_db(
+        telic_db,
+        [
+            ("out_1", "Outcome", {"proposal_id": "prop_1", "success": True}, "2026-05-09T00:00:00Z"),
+            ("ve_1", "ValueEvent", {"outcome_id": "missing_outcome"}, "2026-05-09T00:01:00Z"),
+            ("contrib_1", "Contribution", {"value_event_id": "ve_1"}, "2026-05-09T00:02:00Z"),
+        ],
+    )
+
+    facts = load_telic_value_facts(telic_db)
+    states = {fact.name: fact for fact in organ_state_facts(OperatingFactBundle(telic_value=tuple(facts)))}
+
+    assert facts[0].orphan_value_events == ("ve_1",)
+    assert facts[0].orphan_contributions == ("contrib_1",)
+    assert states["telic_value"].coherence_state == "partial"
 
 
 def test_non_human_yds_records_are_advisory_only(tmp_path: Path) -> None:

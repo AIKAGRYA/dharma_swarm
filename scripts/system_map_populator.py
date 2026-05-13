@@ -19,6 +19,10 @@ from typing import Iterable
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_AUDIT_DIR = Path.home() / ".dharma" / "audit"
 DEFAULT_OUTPUT = REPO_ROOT / "reports" / "system_map" / "latest.json"
+DEFAULT_YDS_RATINGS = Path.home() / ".dharma" / "human_yds_ratings.jsonl"
+DEFAULT_BURN_REPORT = Path.home() / ".dharma" / "audit" / "burn_report_latest.jsonl"
+DEFAULT_REVENUE_NOTES = Path.home() / ".dharma" / "audit" / "revenue_notes.md"
+DEFAULT_TELIC_ONTOLOGY_DB = Path.home() / ".dharma" / "ontology.db"
 
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
@@ -96,12 +100,20 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--audit-dir", type=Path, default=DEFAULT_AUDIT_DIR)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--repo-root", type=Path, default=REPO_ROOT)
+    parser.add_argument("--yds-ratings-path", type=Path, default=DEFAULT_YDS_RATINGS)
+    parser.add_argument("--burn-report-path", type=Path, default=DEFAULT_BURN_REPORT)
+    parser.add_argument("--revenue-notes-path", type=Path, default=DEFAULT_REVENUE_NOTES)
+    parser.add_argument("--telic-ontology-db-path", type=Path, default=DEFAULT_TELIC_ONTOLOGY_DB)
     parser.add_argument("--json", action="store_true", help="also print the generated payload")
     args = parser.parse_args(argv)
 
     payload = build_system_map(
         repo_root=args.repo_root.expanduser().resolve(),
         audit_dir=args.audit_dir.expanduser(),
+        yds_ratings_path=args.yds_ratings_path.expanduser(),
+        burn_report_path=args.burn_report_path.expanduser(),
+        revenue_notes_path=args.revenue_notes_path.expanduser(),
+        telic_ontology_db_path=args.telic_ontology_db_path.expanduser(),
     )
     output = args.output.expanduser()
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -113,12 +125,28 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
-def build_system_map(*, repo_root: Path = REPO_ROOT, audit_dir: Path = DEFAULT_AUDIT_DIR) -> dict[str, object]:
+def build_system_map(
+    *,
+    repo_root: Path = REPO_ROOT,
+    audit_dir: Path = DEFAULT_AUDIT_DIR,
+    yds_ratings_path: Path | None = DEFAULT_YDS_RATINGS,
+    burn_report_path: Path | None = DEFAULT_BURN_REPORT,
+    revenue_notes_path: Path | None = DEFAULT_REVENUE_NOTES,
+    telic_ontology_db_path: Path | None = DEFAULT_TELIC_ONTOLOGY_DB,
+) -> dict[str, object]:
     now = datetime.now(timezone.utc).isoformat()
     audit_sources = list(_audit_sources(audit_dir))
-    operating_facts = list(_operating_fact_organs(repo_root))
+    operating_facts = list(
+        _operating_fact_organs(
+            repo_root,
+            yds_ratings_path=yds_ratings_path,
+            burn_report_path=burn_report_path,
+            revenue_notes_path=revenue_notes_path,
+            telic_ontology_db_path=telic_ontology_db_path,
+        )
+    )
     audit_facts = list(_audit_fact_organs(audit_sources, now))
-    organs = _merge_organs(operating_facts + audit_facts)
+    organs = _merge_organs(operating_facts + [_core_circuit_organ(operating_facts, now)] + audit_facts)
     return {
         "schema_version": "system_map.v0",
         "generated_at": now,
@@ -133,18 +161,84 @@ def _audit_sources(audit_dir: Path) -> Iterable[Path]:
     return tuple(sorted(path for path in audit_dir.glob("*.md") if path.is_file()))
 
 
-def _operating_fact_organs(repo_root: Path) -> tuple[OrganStateFact, ...]:
+def _operating_fact_organs(
+    repo_root: Path,
+    *,
+    yds_ratings_path: Path | None,
+    burn_report_path: Path | None,
+    revenue_notes_path: Path | None,
+    telic_ontology_db_path: Path | None,
+) -> tuple[OrganStateFact, ...]:
     reports_dir = repo_root / "reports"
     bundle = build_operating_fact_bundle(
         OperatingFactInputs(
             agentops_reports_dir=reports_dir / "agentops",
             kaizen_reports_dir=reports_dir / "kaizen",
-            yds_ratings_path=Path.home() / ".dharma" / "human_yds_ratings.jsonl",
-            burn_report_path=Path.home() / ".dharma" / "audit" / "burn_report_latest.jsonl",
-            revenue_notes_path=Path.home() / ".dharma" / "audit" / "revenue_notes.md",
+            yds_ratings_path=yds_ratings_path,
+            burn_report_path=burn_report_path,
+            revenue_notes_path=revenue_notes_path,
+            telic_ontology_db_path=telic_ontology_db_path,
         )
     )
     return organ_state_facts(bundle)
+
+
+def _core_circuit_organ(operating_facts: Iterable[OrganStateFact], observed_at: str) -> OrganStateFact:
+    state_by_name = {fact.name: fact for fact in operating_facts}
+    required = ("agentops", "kaizen_review", "daily_operating_brief", "telic_value")
+    required_facts = tuple(state_by_name.get(name) for name in required)
+    evidence_refs = tuple(
+        dict.fromkeys(ref for fact in required_facts if fact is not None for ref in fact.evidence_refs)
+    )
+    missing = tuple(name for name, fact in zip(required, required_facts) if fact is None)
+    not_bound = tuple(
+        fact.name
+        for fact in required_facts
+        if fact is not None and fact.coherence_state != "bound"
+    )
+    drifted = tuple(
+        fact.name
+        for fact in required_facts
+        if fact is not None and fact.coherence_state == "drifted"
+    )
+    if drifted:
+        coherence = "drifted"
+        observed = "core circuit has drifted leg(s): " + ", ".join(drifted)
+        open_gap = "fix red or scope-violating circuit leg(s) before calling the loop closed"
+        next_gap = "rerun the first drifted leg under AgentOps and reload operating facts"
+    elif not missing and not not_bound:
+        coherence = "bound"
+        observed = "AgentOps -> KaizenReview -> Telic value -> Daily Brief circuit loaded"
+        open_gap = ""
+        next_gap = "replay the circuit against a live operator-selected packet"
+    else:
+        coherence = "partial"
+        unresolved = tuple(dict.fromkeys((*missing, *not_bound)))
+        observed = "core circuit is missing bound leg(s): " + ", ".join(unresolved)
+        open_gap = "one or more core circuit legs is not backed by loaded evidence"
+        next_gap = "bind " + ", ".join(unresolved)
+
+    return OrganStateFact(
+        name="central_loop",
+        owns="proposal to execution to value feedback loop",
+        declared_state="AgentOps, KaizenReview, Telic value, and Daily Brief close one operating circuit",
+        observed_state=observed,
+        coherence_state=coherence,
+        evidence_refs=evidence_refs,
+        open_gap=open_gap,
+        next_packet_hint=next_gap,
+        declared_primitive="core operating circuit",
+        actual_runtime_primitive=observed,
+        source_stores=required,
+        sink_stores=("reports/system_map/latest.json",),
+        gates_declared=("AgentOps scope gate", "KaizenReview report gate", "Telic value chain gate"),
+        gates_enforced=tuple(name for name in required if state_by_name.get(name, None) is not None),
+        witness_writes=evidence_refs,
+        last_observed=observed_at,
+        drift=open_gap,
+        next_bindable_gap=next_gap,
+        risk="high" if coherence != "bound" else "bound",
+    )
 
 
 def _audit_fact_organs(sources: Iterable[Path], observed_at: str) -> tuple[OrganStateFact, ...]:
@@ -217,35 +311,40 @@ def _merge_organs(facts: Iterable[OrganStateFact]) -> tuple[OrganStateFact, ...]
             by_name[fact.name] = fact
             continue
         prior = by_name[fact.name]
+        preferred = _preferred_fact(prior, fact)
         refs = tuple(dict.fromkeys((*prior.evidence_refs, *fact.evidence_refs)))
         by_name[fact.name] = OrganStateFact(
             name=fact.name,
-            owns=fact.owns or prior.owns,
-            declared_state=fact.declared_state or prior.declared_state,
-            observed_state=fact.observed_state or prior.observed_state,
-            coherence_state=_stronger_state(prior.coherence_state, fact.coherence_state),
+            owns=preferred.owns,
+            declared_state=preferred.declared_state,
+            observed_state=preferred.observed_state,
+            coherence_state=preferred.coherence_state,
             evidence_refs=refs,
-            open_gap=fact.open_gap or prior.open_gap,
-            next_packet_hint=fact.next_packet_hint or prior.next_packet_hint,
-            declared_primitive=fact.declared_primitive or prior.declared_primitive,
-            actual_runtime_primitive=fact.actual_runtime_primitive or prior.actual_runtime_primitive,
+            open_gap=preferred.open_gap,
+            next_packet_hint=preferred.next_packet_hint,
+            declared_primitive=preferred.declared_primitive,
+            actual_runtime_primitive=preferred.actual_runtime_primitive,
             source_stores=tuple(dict.fromkeys((*prior.source_stores, *fact.source_stores))),
             sink_stores=tuple(dict.fromkeys((*prior.sink_stores, *fact.sink_stores))),
             gates_declared=tuple(dict.fromkeys((*prior.gates_declared, *fact.gates_declared))),
             gates_enforced=tuple(dict.fromkeys((*prior.gates_enforced, *fact.gates_enforced))),
             witness_writes=tuple(dict.fromkeys((*prior.witness_writes, *fact.witness_writes))),
-            scheduled=fact.scheduled if fact.scheduled != "UNKNOWN" else prior.scheduled,
-            merged_to_main=fact.merged_to_main if fact.merged_to_main != "UNKNOWN" else prior.merged_to_main,
-            last_observed=fact.last_observed or prior.last_observed,
-            drift=fact.drift or prior.drift,
-            next_bindable_gap=fact.next_bindable_gap or prior.next_bindable_gap,
-            risk=fact.risk if fact.risk != "UNKNOWN" else prior.risk,
+            scheduled=preferred.scheduled,
+            merged_to_main=preferred.merged_to_main,
+            last_observed=preferred.last_observed,
+            drift=preferred.drift,
+            next_bindable_gap=preferred.next_bindable_gap,
+            risk=preferred.risk,
         )
     return tuple(by_name.values())
 
 
+def _preferred_fact(left: OrganStateFact, right: OrganStateFact) -> OrganStateFact:
+    return left if _stronger_state(left.coherence_state, right.coherence_state) == left.coherence_state else right
+
+
 def _stronger_state(left: str, right: str) -> str:
-    rank = {"drifted": 4, "partial": 3, "declared_only": 2, "unknown": 1, "bound": 0}
+    rank = {"unknown": 0, "declared_only": 1, "partial": 2, "bound": 3, "drifted": 4}
     return left if rank.get(left, 0) >= rank.get(right, 0) else right
 
 
