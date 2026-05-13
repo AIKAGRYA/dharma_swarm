@@ -19,6 +19,7 @@ from dharma_swarm.operator_core.control_surface import (
     COHERENCE_STATES,
     AgentHandoffPrompt,
     ControlSurfaceRow,
+    DisplayHints,
     EvidenceItem,
     HumanDecisionContext,
     SourceRef,
@@ -35,6 +36,11 @@ from dharma_swarm.operator_core.control_surface import (
     build_control_surface_summary,
     generate_handoff_prompt,
     load_active_surface_manifest,
+)
+from dharma_swarm.operator_core.control_surface_models import (
+    ControlSurfaceEnvelope,
+    SourceError,
+    _compute_display_hints,
 )
 
 
@@ -447,12 +453,15 @@ def _control_surface_client() -> TestClient:
 class TestControlSurfaceAPI:
     """Tests for /api/control-surface/* endpoints."""
 
-    def test_summary_returns_ok_with_counts(self) -> None:
+    def test_summary_returns_envelope_with_counts(self) -> None:
         client = _control_surface_client()
         resp = client.get("/api/control-surface/summary")
         assert resp.status_code == 200
         body = resp.json()
-        assert body["status"] == "ok"
+        assert body["schema_version"] == "0.2.0"
+        assert body["request_id"]
+        assert body["generated_at"]
+        assert isinstance(body["source_errors"], list)
         data = body["data"]
         assert data["total"] > 0
         state_sum = (
@@ -462,12 +471,14 @@ class TestControlSurfaceAPI:
         assert state_sum == data["total"]
         assert "sources_consulted" in data
 
-    def test_rows_returns_list(self) -> None:
+    def test_rows_returns_envelope_with_list(self) -> None:
         client = _control_surface_client()
         resp = client.get("/api/control-surface/rows")
         assert resp.status_code == 200
         body = resp.json()
-        assert body["status"] == "ok"
+        assert body["schema_version"] == "0.2.0"
+        assert body["request_id"]
+        assert body["generated_at"]
         rows = body["data"]
         assert isinstance(rows, list)
         assert len(rows) > 0
@@ -477,19 +488,26 @@ class TestControlSurfaceAPI:
         assert "declared_state" in first
         assert "observed_state" in first
 
-    def test_row_by_id_returns_single(self) -> None:
+    def test_row_by_id_returns_envelope(self) -> None:
         client = _control_surface_client()
         rows_resp = client.get("/api/control-surface/rows")
         first_id = rows_resp.json()["data"][0]["id"]
         resp = client.get(f"/api/control-surface/rows/{first_id}")
         assert resp.status_code == 200
         body = resp.json()
+        assert body["schema_version"] == "0.2.0"
         assert body["data"]["id"] == first_id
 
     def test_row_not_found_returns_404(self) -> None:
         client = _control_surface_client()
         resp = client.get("/api/control-surface/rows/nonexistent_row_id")
         assert resp.status_code == 404
+
+    def test_unique_request_ids(self) -> None:
+        client = _control_surface_client()
+        resp1 = client.get("/api/control-surface/rows")
+        resp2 = client.get("/api/control-surface/rows")
+        assert resp1.json()["request_id"] != resp2.json()["request_id"]
 
 
 # ---------------------------------------------------------------------------
@@ -887,8 +905,182 @@ class TestBackwardCompatibility:
         new_fields = {
             "evidence_labels", "source_ref_labels",
             "human_decision", "verification_timeline",
+            "display_hints",
         }
         for row in rows:
             d = row.to_dict()
             for field in new_fields:
                 assert field in d, f"row {row.id} missing new field: {field}"
+
+
+# ---------------------------------------------------------------------------
+# Display hints
+# ---------------------------------------------------------------------------
+
+
+class TestDisplayHints:
+    def test_display_hints_model_creation(self) -> None:
+        hints = DisplayHints(severity_rank=1, tone="critical", icon_key="server", group="api")
+        assert hints.severity_rank == 1
+        assert hints.tone == "critical"
+        assert hints.freshness_state == "unknown"
+        assert hints.available_actions == []
+
+    def test_display_hints_serialization(self) -> None:
+        hints = DisplayHints(
+            severity_rank=2,
+            tone="warning",
+            icon_key="alert-triangle",
+            group="issues",
+            freshness_state="stale",
+            available_actions=["investigate", "handoff"],
+        )
+        d = hints.model_dump()
+        assert d["severity_rank"] == 2
+        assert d["tone"] == "warning"
+        assert d["available_actions"] == ["investigate", "handoff"]
+
+    def test_drifted_p0_gets_critical_tone(self) -> None:
+        row = ControlSurfaceRow(
+            id="test", kind="api_router", label="test",
+            coherence_state="drifted", priority="p0",
+        )
+        hints = _compute_display_hints(row)
+        assert hints.tone == "critical"
+        assert hints.severity_rank == 0
+        assert "investigate" in hints.available_actions
+        assert "handoff" in hints.available_actions
+
+    def test_bound_p1_gets_ok_tone(self) -> None:
+        row = ControlSurfaceRow(
+            id="test", kind="organ", label="test",
+            coherence_state="bound", priority="p1",
+        )
+        hints = _compute_display_hints(row)
+        assert hints.tone == "ok"
+        assert hints.severity_rank == 11
+        assert "investigate" not in hints.available_actions
+        assert "handoff" not in hints.available_actions
+
+    def test_partial_gets_warning_tone(self) -> None:
+        row = ControlSurfaceRow(
+            id="test", kind="dashboard_page", label="test",
+            coherence_state="partial", priority="p1",
+        )
+        hints = _compute_display_hints(row)
+        assert hints.tone == "warning"
+        assert hints.group == "dashboard"
+        assert hints.icon_key == "layout-dashboard"
+
+    def test_broken_register_gets_close_br_action(self) -> None:
+        row = ControlSurfaceRow(
+            id="br.001", kind="broken_register", label="BR-001",
+            coherence_state="drifted", priority="p0",
+            human_decision_required=True,
+        )
+        hints = _compute_display_hints(row)
+        assert "close_br" in hints.available_actions
+        assert "decide" in hints.available_actions
+        assert hints.group == "issues"
+        assert hints.icon_key == "alert-triangle"
+
+    def test_kind_group_mapping(self) -> None:
+        for kind, expected_group in [
+            ("api_router", "api"),
+            ("dashboard_page", "dashboard"),
+            ("runtime_store", "runtime"),
+            ("agent_subsystem", "agents"),
+            ("go_receipt", "go_sdk"),
+            ("feedback_loop", "loops"),
+            ("cron_job", "cron"),
+        ]:
+            row = ControlSurfaceRow(id="t", kind=kind, label="t")
+            hints = _compute_display_hints(row)
+            assert hints.group == expected_group, f"{kind} → {hints.group}, expected {expected_group}"
+
+    def test_full_build_populates_display_hints(self, tmp_repo: Path) -> None:
+        rows = build_control_surface_rows(repo_root=tmp_repo)
+        for row in rows:
+            assert row.display_hints is not None, f"row {row.id} has no display_hints"
+            assert row.display_hints.tone in ("critical", "warning", "info", "ok")
+            assert isinstance(row.display_hints.severity_rank, int)
+            assert isinstance(row.display_hints.available_actions, list)
+
+    def test_display_hints_in_to_dict(self) -> None:
+        row = ControlSurfaceRow(
+            id="test", kind="api_router", label="test",
+            coherence_state="drifted", priority="p0",
+        )
+        row.display_hints = _compute_display_hints(row)
+        d = row.to_dict()
+        assert "display_hints" in d
+        assert d["display_hints"]["tone"] == "critical"
+        assert d["display_hints"]["icon_key"] == "server"
+
+
+# ---------------------------------------------------------------------------
+# Envelope
+# ---------------------------------------------------------------------------
+
+
+class TestControlSurfaceEnvelope:
+    def test_envelope_model_creation(self) -> None:
+        envelope = ControlSurfaceEnvelope(
+            schema_version="0.2.0",
+            request_id="abc-123",
+            generated_at="2026-05-11T12:00:00+00:00",
+            data={"total": 42},
+        )
+        assert envelope.schema_version == "0.2.0"
+        assert envelope.request_id == "abc-123"
+        assert envelope.data == {"total": 42}
+        assert envelope.source_errors == []
+
+    def test_envelope_with_source_errors(self) -> None:
+        err = SourceError(source="operating_facts", error="import failed")
+        envelope = ControlSurfaceEnvelope(
+            schema_version="0.2.0",
+            request_id="abc-123",
+            generated_at="2026-05-11T12:00:00+00:00",
+            source_errors=[err],
+            data=None,
+        )
+        d = envelope.model_dump()
+        assert len(d["source_errors"]) == 1
+        assert d["source_errors"][0]["source"] == "operating_facts"
+
+    def test_envelope_serialization(self) -> None:
+        envelope = ControlSurfaceEnvelope(
+            schema_version="0.2.0",
+            request_id="test-id",
+            generated_at="2026-05-11T12:00:00+00:00",
+            freshness_window="5s",
+            data=[{"id": "test"}],
+        )
+        d = envelope.model_dump()
+        assert d["schema_version"] == "0.2.0"
+        assert d["freshness_window"] == "5s"
+        assert d["data"] == [{"id": "test"}]
+
+    def test_api_rows_envelope_fields(self) -> None:
+        client = _control_surface_client()
+        resp = client.get("/api/control-surface/rows")
+        body = resp.json()
+        assert "schema_version" in body
+        assert "request_id" in body
+        assert "generated_at" in body
+        assert "source_errors" in body
+        assert "data" in body
+
+    def test_api_rows_contain_display_hints(self) -> None:
+        client = _control_surface_client()
+        resp = client.get("/api/control-surface/rows")
+        rows = resp.json()["data"]
+        for row in rows:
+            assert "display_hints" in row
+            hints = row["display_hints"]
+            assert "tone" in hints
+            assert "severity_rank" in hints
+            assert "icon_key" in hints
+            assert "group" in hints
+            assert "available_actions" in hints
