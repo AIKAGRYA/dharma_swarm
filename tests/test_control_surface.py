@@ -384,7 +384,12 @@ class TestFullBuild:
 class TestGoReceiptRows:
     """Existing G-track files should project through their real repo paths."""
 
-    def test_go_receipt_rows_use_operator_core_bridge_paths(self, tmp_repo: Path) -> None:
+    def test_go_receipt_rows_use_operator_core_bridge_paths(
+        self,
+        tmp_repo: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setenv("DHARMA_STATE_DIR", str(tmp_repo / ".dharma"))
         paths = [
             "dharma_swarm/operator_core/go_evidence_bridge.py",
             "dharma_swarm/operator_core/go_github_bridge.py",
@@ -392,6 +397,7 @@ class TestGoReceiptRows:
             "tools/go_sdk/adaptercontract/contract.go",
             "tools/evidence_ingestor_go/main.go",
             "tools/github_ingestor_go/adapter.go",
+            "tools/world_signal_ingestor_go/adapter.go",
         ]
         for rel in paths:
             path = tmp_repo / rel
@@ -408,6 +414,8 @@ class TestGoReceiptRows:
             "go.adapter_contract",
             "go.evidence_ingestor",
             "go.github_ingestor",
+            "go.world_signal_ingestor",
+            "go.world_signal_receipts",
         }
         assert (
             by_id["go.evidence_bridge"].owner_module
@@ -421,6 +429,7 @@ class TestGoReceiptRows:
             row.owner_module == "dharma_swarm/go_evidence_bridge.py"
             for row in rows
         )
+        assert by_id["go.world_signal_receipts"].coherence_state == "declared_only"
 
 
 # ---------------------------------------------------------------------------
