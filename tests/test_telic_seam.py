@@ -318,6 +318,20 @@ class TestRecordGateDecision:
         assert len(links) == 1
         assert links[0].target_id == gate_id
 
+    def test_gate_decision_has_witness_log(self, seam, sample_task, gate_allow):
+        proposal_id = seam.record_dispatch(sample_task, "agent_alpha")
+        gate_id = seam.record_gate_decision(proposal_id, gate_allow)
+
+        obj = seam.registry.get_object(gate_id)
+        assert obj is not None
+        witness_id = obj.properties["witness_log_id"]
+        witness = seam.registry.get_object(witness_id)
+        assert witness is not None
+        assert witness.type_name == "WitnessLog"
+        links = seam.registry.get_links(source_id=gate_id, link_name="has_witness_log")
+        assert len(links) == 1
+        assert links[0].target_id == witness_id
+
     def test_updates_proposal_status_allow(self, seam, sample_task, gate_allow):
         proposal_id = seam.record_dispatch(sample_task, "agent_alpha")
         seam.record_gate_decision(proposal_id, gate_allow)

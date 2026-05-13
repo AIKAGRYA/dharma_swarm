@@ -44,6 +44,40 @@ class ApplyTestResult(BaseModel):
     error: str = ""
 
 
+def _authority_error(
+    action: str,
+    *,
+    diff_text: str = "",
+    target_paths: tuple[str, ...] = (),
+    command: str | None = None,
+) -> str | None:
+    try:
+        from dharma_swarm.action_authority import (
+            AuthoritySurface,
+            authority_block_message,
+            check_action_authority,
+        )
+
+        decision = check_action_authority(
+            title=f"diff applier {action}",
+            surface=AuthoritySurface.DIFF_SELF_IMPROVE,
+            action_type=action,
+            content=diff_text[:1000],
+            target_paths=target_paths,
+            requested_tools=("diff_applier", action),
+            command=command,
+            metadata={"mutates_repo": True, "writes_code": True},
+            actor_id="diff_applier",
+            actor_type="system",
+            runtime_type="diff_applier",
+        )
+        if decision.blocked:
+            return authority_block_message(decision)
+    except Exception:
+        logger.debug("Action authority check failed for diff action %s", action, exc_info=True)
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Internal diff representation
 # ---------------------------------------------------------------------------
@@ -212,6 +246,14 @@ class DiffApplier:
         if not patches:
             return ApplyResult(success=True)
 
+        patch_paths = tuple(patch.target_path for patch in patches)
+        if error := _authority_error(
+            "apply",
+            diff_text=stripped,
+            target_paths=patch_paths,
+        ):
+            return ApplyResult(success=False, error=error)
+
         files_changed: list[str] = []
         backup_paths: dict[str, str] = {}
 
@@ -291,6 +333,13 @@ class DiffApplier:
         Returns:
             An ``ApplyTestResult`` describing the outcome.
         """
+        if error := _authority_error(
+            "apply_and_test",
+            diff_text=diff_text,
+            command=test_command,
+        ):
+            return ApplyTestResult(applied=False, tests_passed=False, error=error)
+
         apply_result = await self.apply(diff_text)
         if not apply_result.success:
             return ApplyTestResult(

@@ -28,6 +28,23 @@ def test_run_cron_job_dispatches_headless_prompt():
     mock.assert_called_once_with(prompt="say hi", timeout=30, model="haiku")
 
 
+def test_run_cron_job_blocked_by_action_authority_in_enforce(monkeypatch):
+    monkeypatch.setenv("DHARMA_ACTION_AUTHORITY_GATE", "enforce")
+
+    success, output, error = run_cron_job(
+        {
+            "id": "job-1",
+            "name": "pulse",
+            "handler": "headless_prompt",
+            "prompt": "say hi",
+        }
+    )
+
+    assert success is False
+    assert "ACTION AUTHORITY BLOCK" in output
+    assert "ACTION AUTHORITY BLOCK" in error
+
+
 def test_run_cron_job_surfaces_headless_failures():
     with patch("dharma_swarm.pulse.run_claude_headless", return_value="ERROR: boom"):
         success, output, error = run_cron_job(

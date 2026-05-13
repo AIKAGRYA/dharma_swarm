@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime, timezone
 import json
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -37,6 +38,8 @@ from .common import (
 RUNTIME_SNAPSHOT_FORMAT = "runtime_snapshot_v1"
 OPERATOR_BRIDGE_QUEUE_FORMAT = "operator_bridge_queue_v1"
 A2A_TASK_PACKET_FORMAT = "a2a_task_packet_v1"
+
+logger = logging.getLogger(__name__)
 
 _DEFAULT_CHANNEL = "direct"
 _CHECKPOINT_PAYLOAD_KIND = "dharma_swarm.checkpoint_record.v1"
@@ -680,6 +683,45 @@ class LocalSandboxProviderAdapter:
     async def execute(self, request: ExecutionRequest) -> ExecutionResult:
         workdir = Path(request.workdir) if request.workdir else self._default_workdir
         sandbox = LocalSandbox(workdir=workdir) if workdir is not None else LocalSandbox()
+        try:
+            from dharma_swarm.action_authority import (
+                AuthoritySurface,
+                authority_block_message,
+                check_action_authority,
+            )
+
+            decision = check_action_authority(
+                title=f"runtime sandbox execute: {request.command[:120]}",
+                surface=AuthoritySurface.SANDBOX_RUNTIME,
+                action_type="sandbox_execute",
+                command=request.command,
+                requested_tools=("sandbox_execute",),
+                metadata={"execution_authority": True, **dict(request.metadata)},
+                actor_id="runtime_adapter",
+                actor_type="system",
+                runtime_type="local_sandbox_adapter",
+            )
+            if decision.blocked:
+                metadata = dict(request.metadata)
+                metadata.update(
+                    {
+                        "backend": "local",
+                        "rejected": True,
+                        "source_module": "dharma_swarm.action_authority",
+                        "action_authority_decision_id": decision.decision_id,
+                    }
+                )
+                if workdir is not None:
+                    metadata["workdir"] = str(workdir)
+                return ExecutionResult(
+                    exit_code=-1,
+                    stderr=authority_block_message(decision),
+                    timed_out=False,
+                    duration_seconds=0.0,
+                    metadata=metadata,
+                )
+        except Exception:
+            logger.debug("Action authority check failed for sandbox execution", exc_info=True)
         try:
             result = await sandbox.execute(
                 request.command,

@@ -172,6 +172,24 @@ class TestOntologyObjects:
         assert data["properties"]["name"] == "test_exp"
         assert "id" in data
 
+    def test_create_object_blocked_by_action_authority(
+        self,
+        registry,
+        lineage,
+        monkeypatch,
+    ):
+        monkeypatch.setenv("DHARMA_ACTION_AUTHORITY_GATE", "enforce")
+        gated_client = TestClient(create_app(registry=registry, lineage_graph=lineage))
+
+        resp = gated_client.post("/api/ontology/objects", json={
+            "type_name": "Experiment",
+            "properties": {"name": "blocked_exp", "hypothesis": "test"},
+            "created_by": "tester",
+        })
+
+        assert resp.status_code == 403
+        assert "ACTION AUTHORITY BLOCK" in resp.json()["detail"]
+
     def test_create_object_invalid_type(self, client):
         resp = client.post("/api/ontology/objects", json={
             "type_name": "FakeType",

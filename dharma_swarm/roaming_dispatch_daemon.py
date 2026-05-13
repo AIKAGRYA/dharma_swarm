@@ -21,6 +21,33 @@ from dharma_swarm.roaming_mailbox import RoamingMailbox
 from dharma_swarm.roaming_operator_bridge import RoamingOperatorBridge, _build_bridge
 
 
+def _authority_error(action: str, *, command: str = "", content: str = "") -> str | None:
+    try:
+        from dharma_swarm.action_authority import (
+            AuthoritySurface,
+            authority_block_message,
+            check_action_authority,
+        )
+
+        decision = check_action_authority(
+            title=f"roaming dispatch daemon {action}",
+            surface=AuthoritySurface.EXTERNAL_BRIDGE,
+            action_type=action,
+            content=content,
+            command=command or None,
+            requested_tools=(action,),
+            metadata={"cross_agent_authority": True, "external_tool_use": True},
+            actor_id="roaming_dispatch_daemon",
+            actor_type="daemon",
+            runtime_type="roaming_dispatch_daemon",
+        )
+        if decision.blocked:
+            return authority_block_message(decision)
+    except Exception:
+        pass
+    return None
+
+
 @dataclass(frozen=True)
 class DaemonCycleResult:
     collected_bridge_task_ids: list[str] = field(default_factory=list)
@@ -33,6 +60,9 @@ class MailboxRepoSync:
         self.branch = branch
 
     def _run(self, *args: str) -> subprocess.CompletedProcess[str]:
+        command = "git -C " + str(self.repo_root) + " " + " ".join(args)
+        if error := _authority_error("git_sync", command=command):
+            raise RuntimeError(error)
         return subprocess.run(
             ["git", "-C", str(self.repo_root), *args],
             check=True,
@@ -107,6 +137,11 @@ class RoamingDispatchDaemon:
     async def dispatch_available(self) -> list[str]:
         dispatched: list[str] = []
         for _ in range(self.dispatch_limit):
+            if error := _authority_error(
+                "dispatch_next",
+                content=f"recipient={self.recipient}",
+            ):
+                raise RuntimeError(error)
             task = await self.adapter.dispatch_next(recipient=self.recipient)
             if task is None:
                 break

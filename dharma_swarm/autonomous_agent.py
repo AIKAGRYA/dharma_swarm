@@ -905,9 +905,60 @@ class AutonomousAgent:
         if name not in self.identity.allowed_tools:
             return f"Error: tool '{name}' not allowed for agent '{self.identity.name}'"
 
-        # S3 telos gate — check side-effect tools before execution
-        _SIDE_EFFECT_TOOLS = {"bash", "write_file", "search_content", "message_agent"}
+        # S3/AAG gates — check side-effect tools before execution
+        _WORLD_ACTION_TOOLS = {
+            "github_clone_repo",
+            "github_commit_push",
+            "github_create_issue",
+            "github_create_pr",
+            "create_website_scaffold",
+            "publish_markdown_artifact",
+            "spawn_sub_swarm_spec",
+        }
+        _SIDE_EFFECT_TOOLS = {
+            "bash",
+            "write_file",
+            "search_content",
+            "message_agent",
+            "run_dgm_evolution",
+            *_WORLD_ACTION_TOOLS,
+        }
         if name in _SIDE_EFFECT_TOOLS:
+            try:
+                from dharma_swarm.action_authority import (
+                    AuthoritySurface,
+                    authority_block_message,
+                    check_action_authority,
+                )
+
+                target_paths = tuple(
+                    str(inputs[key])
+                    for key in ("path", "repo_dir", "dest_dir", "output_dir")
+                    if inputs.get(key)
+                )
+                command = str(inputs.get("command", "")) if name == "bash" else None
+                decision = check_action_authority(
+                    title=f"autonomous agent tool {name}",
+                    surface=AuthoritySurface.AUTONOMOUS_TOOL,
+                    action_type=name,
+                    content=str(inputs)[:500],
+                    target_paths=target_paths,
+                    requested_tools=(name,),
+                    command=command,
+                    metadata={
+                        "mutates_repo": name in {"write_file", "github_commit_push"},
+                        "writes_code": name in {"write_file", "create_website_scaffold"},
+                        "external_tool_use": name in _WORLD_ACTION_TOOLS,
+                        "cross_agent_authority": name in {"message_agent", "spawn_sub_swarm_spec"},
+                    },
+                    actor_id=self.identity.name,
+                    actor_type="autonomous_agent",
+                    runtime_type="autonomous_agent",
+                )
+                if decision.blocked:
+                    return authority_block_message(decision)
+            except Exception:
+                logger.debug("Action authority check failed for autonomous tool", exc_info=True)
             try:
                 from dharma_swarm.telos_gates import check_action
                 from dharma_swarm.models import GateDecision

@@ -143,6 +143,21 @@ async def test_gateway_and_sandbox_adapters_preserve_delivery_audit(tmp_path) ->
 
 
 @pytest.mark.asyncio
+async def test_sandbox_adapter_blocked_by_action_authority_in_enforce(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("DHARMA_ACTION_AUTHORITY_GATE", "enforce")
+    sandbox = LocalSandboxProviderAdapter(default_workdir=tmp_path)
+
+    result = await sandbox.execute(
+        ExecutionRequest(command="pwd", workdir=str(tmp_path), timeout_seconds=5)
+    )
+
+    assert result.exit_code == -1
+    assert result.metadata["rejected"] is True
+    assert result.metadata["source_module"] == "dharma_swarm.action_authority"
+    assert "ACTION AUTHORITY BLOCK" in result.stderr
+
+
+@pytest.mark.asyncio
 async def test_checkpoint_store_adapter_resolves_and_filters(tmp_path) -> None:
     adapter = FilesystemCheckpointStoreAdapter(
         LoopCheckpointStore(base_dir=tmp_path / "checkpoints")

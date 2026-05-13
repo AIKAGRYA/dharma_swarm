@@ -2,8 +2,23 @@ from __future__ import annotations
 
 import pytest
 
-from api.chat_tools import exec_stigmergy_query
+from api.chat_tools import exec_stigmergy_query, exec_write_file
 from dharma_swarm.stigmergy import StigmergicMark
+
+
+@pytest.mark.asyncio
+async def test_exec_write_file_blocked_by_action_authority(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("DHARMA_ACTION_AUTHORITY_GATE", "enforce")
+    monkeypatch.setattr("api.chat_tools.PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr("api.chat_tools.ALLOWED_ROOTS", [tmp_path])
+
+    result = await exec_write_file({"path": "blocked.txt", "content": "blocked"})
+
+    assert "ACTION AUTHORITY BLOCK" in result
+    assert not (tmp_path / "blocked.txt").exists()
 
 
 @pytest.mark.asyncio

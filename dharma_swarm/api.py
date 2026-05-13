@@ -131,6 +131,38 @@ def create_app(
                 _state["lineage"] = LineageGraph()
         return _state["lineage"]
 
+    def _check_api_authority(
+        *,
+        title: str,
+        action_type: str,
+        content: str = "",
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        try:
+            from dharma_swarm.action_authority import (
+                AuthoritySurface,
+                authority_block_message,
+                check_action_authority,
+            )
+
+            decision = check_action_authority(
+                title=title,
+                surface=AuthoritySurface.API_TOOL,
+                action_type=action_type,
+                content=content,
+                requested_tools=(action_type,),
+                metadata=metadata,
+                actor_id="api",
+                actor_type="api",
+                runtime_type="fastapi",
+            )
+            if decision.blocked:
+                raise HTTPException(403, authority_block_message(decision))
+        except HTTPException:
+            raise
+        except Exception:
+            logger.debug("Action authority check failed for API action", exc_info=True)
+
     # ── Health ────────────────────────────────────────────────────────
 
     @app.get("/api/health")
@@ -195,6 +227,12 @@ def create_app(
 
     @app.post("/api/ontology/objects")
     async def create_object(req: CreateObjectRequest) -> ApiResponse:
+        _check_api_authority(
+            title=f"api create ontology object {req.type_name}",
+            action_type="ontology_create_object",
+            content=str(req.properties)[:500],
+            metadata={"ontology_mutation": True, "governance_impact": True},
+        )
         reg = _get_registry()
         obj, errors = reg.create_object(
             type_name=req.type_name,
@@ -227,6 +265,12 @@ def create_app(
 
     @app.post("/api/ontology/actions")
     async def execute_action(req: ExecuteActionRequest) -> ApiResponse:
+        _check_api_authority(
+            title=f"api execute ontology action {req.object_type}.{req.action_name}",
+            action_type="ontology_execute_action",
+            content=str(req.params)[:500],
+            metadata={"ontology_mutation": True, "governance_impact": True},
+        )
         reg = _get_registry()
         execution = reg.execute_action(
             object_type=req.object_type,
@@ -333,6 +377,12 @@ def create_app(
 
     @app.post("/api/workflows/{name}")
     async def execute_workflow(name: str, req: WorkflowExecuteRequest) -> ApiResponse:
+        _check_api_authority(
+            title=f"api execute workflow {name}",
+            action_type="workflow_execute",
+            content=str(req.context)[:500],
+            metadata={"execution_authority": True},
+        )
         from dharma_swarm.workflow import compile_workflow
         try:
             compiled = compile_workflow(name)

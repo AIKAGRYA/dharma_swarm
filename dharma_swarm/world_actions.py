@@ -102,6 +102,47 @@ class WorldActionResult:
         return json.dumps(asdict(self), ensure_ascii=False, indent=2)
 
 
+def _authority_block(
+    action: str,
+    *,
+    target_paths: tuple[str, ...] = (),
+    command: str | None = None,
+    metadata: dict[str, Any] | None = None,
+) -> WorldActionResult | None:
+    try:
+        from dharma_swarm.action_authority import (
+            AuthoritySurface,
+            authority_block_message,
+            check_action_authority,
+        )
+
+        decision = check_action_authority(
+            title=f"world action {action}",
+            surface=AuthoritySurface.AUTONOMOUS_TOOL,
+            action_type=action,
+            target_paths=target_paths,
+            requested_tools=(action,),
+            command=command,
+            metadata={
+                "external_tool_use": True,
+                **(metadata or {}),
+            },
+            actor_id="world_actions",
+            actor_type="system",
+            runtime_type="world_actions",
+        )
+        if decision.blocked:
+            return WorldActionResult(
+                success=False,
+                action=action,
+                message=authority_block_message(decision),
+                path=target_paths[0] if target_paths else "",
+            )
+    except Exception:
+        logger.debug("Action authority check failed for world action %s", action, exc_info=True)
+    return None
+
+
 # ---------------------------------------------------------------------------
 # GitHub primitives
 # ---------------------------------------------------------------------------
@@ -109,6 +150,13 @@ class WorldActionResult:
 
 def github_clone_repo(repo_url: str, dest_dir: str) -> WorldActionResult:
     dest = Path(dest_dir).expanduser().resolve()
+    if block := _authority_block(
+        "github_clone_repo",
+        target_paths=(str(dest),),
+        command=f"git clone {repo_url} {dest}",
+        metadata={"network_access": True},
+    ):
+        return block
     dest.parent.mkdir(parents=True, exist_ok=True)
 
     if dest.exists() and any(dest.iterdir()):
@@ -139,6 +187,13 @@ def github_clone_repo(repo_url: str, dest_dir: str) -> WorldActionResult:
 
 def github_commit_push(repo_dir: str, commit_message: str, branch: str | None = None) -> WorldActionResult:
     repo = Path(repo_dir).expanduser().resolve()
+    if block := _authority_block(
+        "github_commit_push",
+        target_paths=(str(repo),),
+        command=f"git commit && git push {branch or ''}".strip(),
+        metadata={"mutates_repo": True, "main_branch": branch in {"main", "master"}},
+    ):
+        return block
     if not (repo / ".git").exists():
         return WorldActionResult(
             success=False,
@@ -179,6 +234,12 @@ def github_commit_push(repo_dir: str, commit_message: str, branch: str | None = 
 
 
 def github_create_issue(repo: str, title: str, body: str) -> WorldActionResult:
+    if block := _authority_block(
+        "github_create_issue",
+        command=f"gh issue create --repo {repo}",
+        metadata={"network_access": True},
+    ):
+        return block
     code, out, err = _run(["gh", "issue", "create", "--repo", repo, "--title", title, "--body", body], timeout=120)
     if code != 0:
         return WorldActionResult(False, "github_create_issue", err or out or "gh issue create failed")
@@ -187,6 +248,13 @@ def github_create_issue(repo: str, title: str, body: str) -> WorldActionResult:
 
 def github_create_pr(repo_dir: str, title: str, body: str, base: str = "main", head: str | None = None) -> WorldActionResult:
     repo = Path(repo_dir).expanduser().resolve()
+    if block := _authority_block(
+        "github_create_pr",
+        target_paths=(str(repo),),
+        command=f"gh pr create --base {base}",
+        metadata={"network_access": True, "main_branch": base in {"main", "master"}},
+    ):
+        return block
     if not (repo / ".git").exists():
         return WorldActionResult(False, "github_create_pr", f"Not a git repo: {repo}", path=str(repo))
 
@@ -210,6 +278,12 @@ def github_create_pr(repo_dir: str, title: str, body: str, base: str = "main", h
 
 def create_website_scaffold(output_dir: str, site_name: str, purpose: str, theme: str = "minimal") -> WorldActionResult:
     root = Path(output_dir).expanduser().resolve()
+    if block := _authority_block(
+        "create_website_scaffold",
+        target_paths=(str(root),),
+        metadata={"writes_code": True, "mutates_repo": True},
+    ):
+        return block
     root.mkdir(parents=True, exist_ok=True)
 
     title = site_name.strip() or "DHARMA SWARM Site"
@@ -277,6 +351,12 @@ code { color: var(--accent); }
 def publish_markdown_artifact(source_path: str, output_dir: str, artifact_name: str | None = None) -> WorldActionResult:
     src = Path(source_path).expanduser().resolve()
     out_dir = Path(output_dir).expanduser().resolve()
+    if block := _authority_block(
+        "publish_markdown_artifact",
+        target_paths=(str(src), str(out_dir)),
+        metadata={"local_side_effect": True},
+    ):
+        return block
     out_dir.mkdir(parents=True, exist_ok=True)
 
     if not src.exists():
@@ -305,6 +385,12 @@ def publish_markdown_artifact(source_path: str, output_dir: str, artifact_name: 
 
 def spawn_sub_swarm_spec(output_dir: str, mission_name: str, mission_thesis: str, roles: list[str] | None = None) -> WorldActionResult:
     out_dir = Path(output_dir).expanduser().resolve()
+    if block := _authority_block(
+        "spawn_sub_swarm_spec",
+        target_paths=(str(out_dir),),
+        metadata={"cross_agent_authority": True, "mutates_repo": True},
+    ):
+        return block
     out_dir.mkdir(parents=True, exist_ok=True)
 
     slug = _slug(mission_name)

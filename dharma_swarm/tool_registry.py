@@ -136,6 +136,36 @@ class ToolRegistry:
         if not entry:
             return json.dumps({"error": f"Unknown tool: {name}"})
         try:
+            try:
+                from dharma_swarm.action_authority import (
+                    AuthoritySurface,
+                    authority_block_message,
+                    check_action_authority,
+                )
+
+                target_paths = tuple(
+                    str(args[key])
+                    for key in ("path", "repo_dir", "dest_dir", "output_dir")
+                    if isinstance(args, dict) and args.get(key)
+                )
+                command = str(args.get("command", "")) if isinstance(args, dict) and args.get("command") else None
+                decision = check_action_authority(
+                    title=f"tool registry dispatch {name}",
+                    surface=AuthoritySurface.TOOL_REGISTRY,
+                    action_type=name,
+                    content=json.dumps(args, default=str)[:500],
+                    target_paths=target_paths,
+                    requested_tools=(name,),
+                    command=command,
+                    metadata={"local_side_effect": True},
+                    actor_id="tool_registry",
+                    actor_type="system",
+                    runtime_type="tool_registry",
+                )
+                if decision.blocked:
+                    return json.dumps({"error": authority_block_message(decision)})
+            except Exception:
+                logger.debug("Action authority check failed for tool %s", name, exc_info=True)
             if entry.is_async:
                 loop: asyncio.AbstractEventLoop | None = None
                 try:

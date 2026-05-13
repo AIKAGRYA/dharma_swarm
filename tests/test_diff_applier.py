@@ -57,6 +57,21 @@ async def test_apply_simple_diff(tmp_path: Path):
     assert "old_value = 1" not in content
 
 
+@pytest.mark.asyncio
+async def test_apply_blocked_by_action_authority_in_enforce(tmp_path: Path, monkeypatch):
+    target = tmp_path / "hello.py"
+    original = "# header\nold_value = 1\n# footer\n"
+    target.write_text(original)
+    monkeypatch.setenv("DHARMA_ACTION_AUTHORITY_GATE", "enforce")
+
+    applier = DiffApplier(workspace=tmp_path)
+    result = await applier.apply(_make_simple_diff())
+
+    assert result.success is False
+    assert "ACTION AUTHORITY BLOCK" in result.error
+    assert target.read_text() == original
+
+
 # ---------------------------------------------------------------------------
 # 2. Apply multi-file diff
 # ---------------------------------------------------------------------------

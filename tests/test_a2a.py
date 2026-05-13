@@ -361,6 +361,26 @@ class TestA2AServer:
         assert result.status == A2ATaskStatus.FAILED
         assert "No handler" in result.error
 
+    def test_submit_blocked_by_action_authority_in_enforce(self, server: A2AServer, monkeypatch):
+        monkeypatch.setenv("DHARMA_ACTION_AUTHORITY_GATE", "enforce")
+
+        def fallback(task: A2ATask) -> A2ATask:
+            task.result = "should not run"
+            return task
+
+        server.set_default_handler(fallback)
+        task = A2ATask(
+            from_agent="orchestrator",
+            to_agent="worker",
+            capability="code_generation",
+            messages=[A2AMessage.text("Write and dispatch code")],
+        )
+
+        result = server.submit(task)
+
+        assert result.status == A2ATaskStatus.FAILED
+        assert "ACTION AUTHORITY BLOCK" in result.error
+
     def test_default_handler(self, server: A2AServer):
         def fallback(task: A2ATask) -> A2ATask:
             task.result = "handled by default"

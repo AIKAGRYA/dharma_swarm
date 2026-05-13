@@ -9,6 +9,7 @@ from dharma_swarm.action_authority import (
     build_action_authority_request,
     classify_authority_tier,
     evaluate_action_authority,
+    min_evidence_files_for_tier,
 )
 from dharma_swarm.fourfold_action_warrant import (
     ActionWarrantRequest,
@@ -86,6 +87,15 @@ def test_classifier_identifies_read_only_repo_and_governance_tiers() -> None:
         )
         is AuthorityTier.GOVERNANCE_MUTATION
     )
+
+
+def test_fourfold_evidence_threshold_is_tier_scoped() -> None:
+    assert min_evidence_files_for_tier(AuthorityTier.REPO_MUTATION) == 8
+    assert min_evidence_files_for_tier(AuthorityTier.EXECUTION) == 8
+    assert min_evidence_files_for_tier(AuthorityTier.EXTERNAL_SIDE_EFFECT) == 12
+    assert min_evidence_files_for_tier(AuthorityTier.CROSS_AGENT_DISPATCH) == 12
+    assert min_evidence_files_for_tier(AuthorityTier.GOVERNANCE_MUTATION) == 50
+    assert min_evidence_files_for_tier(AuthorityTier.RELEASE_OR_MAIN) == 50
 
 
 def test_shadow_missing_warrant_would_block_but_effectively_allows() -> None:

@@ -577,6 +577,37 @@ async def test_runner_auto_executes_tool_loop_for_api_provider_shell_task(
 
 
 @pytest.mark.asyncio
+async def test_runner_local_tool_blocked_by_action_authority(
+    config,
+    tmp_path: Path,
+    monkeypatch,
+):
+    monkeypatch.setenv("DHARMA_ACTION_AUTHORITY_GATE", "enforce")
+    isolated_config = _with_state_dir(
+        config.model_copy(
+            update={
+                "metadata": {
+                    **config.metadata,
+                    "working_dir": str(tmp_path),
+                },
+            }
+        ),
+        tmp_path,
+    )
+    runner = AgentRunner(isolated_config, ontology_path=_ontology_path(tmp_path))
+    await runner.start()
+
+    result = await runner._execute_local_tool(
+        "write_file",
+        {"path": "blocked.txt", "content": "blocked"},
+        task=Task(title="Write artifact"),
+    )
+
+    assert "ACTION AUTHORITY BLOCK" in result
+    assert not (tmp_path / "blocked.txt").exists()
+
+
+@pytest.mark.asyncio
 async def test_runner_requires_declared_artifact_before_completion(
     config,
     fast_gate,

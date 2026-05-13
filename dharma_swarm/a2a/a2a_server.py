@@ -211,6 +211,40 @@ class A2AServer:
 
     def _dispatch(self, task: A2ATask) -> A2ATask:
         """Route task to appropriate handler and execute."""
+        try:
+            from dharma_swarm.action_authority import (
+                AuthoritySurface,
+                authority_block_message,
+                check_action_authority,
+            )
+
+            content = "\n".join(
+                part.content
+                for message in task.messages
+                for part in message.parts
+                if part.type == A2APartType.TEXT
+            )
+            decision = check_action_authority(
+                title=f"a2a dispatch {task.capability or task.to_agent}",
+                surface=AuthoritySurface.EXTERNAL_BRIDGE,
+                action_type="a2a_dispatch",
+                content=content[:1000],
+                requested_tools=(task.capability or "a2a_dispatch",),
+                metadata={"cross_agent_authority": True, **dict(task.metadata)},
+                actor_id=task.from_agent,
+                actor_type="a2a_agent",
+                runtime_type="a2a_server",
+                task_id=task.dharma_task_id or task.id,
+            )
+            if decision.blocked:
+                task.status = A2ATaskStatus.FAILED
+                task.error = authority_block_message(decision)
+                task.updated_at = datetime.now(timezone.utc).isoformat()
+                logger.warning("A2A task %s blocked by action authority", task.id)
+                return task
+        except Exception:
+            logger.debug("Action authority check failed for A2A dispatch", exc_info=True)
+
         handler = self._handlers.get(task.capability)
         if handler is None:
             handler = self._default_handler

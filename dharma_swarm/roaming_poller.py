@@ -24,6 +24,33 @@ from typing import Any, Sequence
 from dharma_swarm.roaming_mailbox import MailboxResponse, MailboxTask, RoamingMailbox
 
 
+def _authority_error(action: str, *, command: str = "", content: str = "") -> str | None:
+    try:
+        from dharma_swarm.action_authority import (
+            AuthoritySurface,
+            authority_block_message,
+            check_action_authority,
+        )
+
+        decision = check_action_authority(
+            title=f"roaming poller {action}",
+            surface=AuthoritySurface.EXTERNAL_BRIDGE,
+            action_type=action,
+            content=content,
+            command=command or None,
+            requested_tools=(action,),
+            metadata={"cross_agent_authority": True, "external_tool_use": True},
+            actor_id="roaming_poller",
+            actor_type="daemon",
+            runtime_type="roaming_poller",
+        )
+        if decision.blocked:
+            return authority_block_message(decision)
+    except Exception:
+        pass
+    return None
+
+
 @dataclass(frozen=True)
 class PollerResult:
     task_id: str
@@ -40,6 +67,9 @@ class GitMailboxSync:
         self.branch = branch
 
     def _run(self, *args: str) -> subprocess.CompletedProcess[str]:
+        command = "git -C " + str(self.repo_root) + " " + " ".join(args)
+        if error := _authority_error("git_sync", command=command):
+            raise RuntimeError(error)
         return subprocess.run(
             ["git", "-C", str(self.repo_root), *args],
             check=True,
@@ -123,6 +153,13 @@ class RoamingPoller:
         if task is None:
             return None
 
+        command = " ".join(self.command)
+        if error := _authority_error(
+            "responder_command",
+            command=command,
+            content=task.body[:1000],
+        ):
+            raise RuntimeError(error)
         proc = subprocess.run(
             self.command,
             check=False,

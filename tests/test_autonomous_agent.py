@@ -194,6 +194,21 @@ class TestToolFileOperations:
         assert target.read_text() == "data"
 
     @pytest.mark.asyncio
+    async def test_execute_write_file_blocked_by_action_authority(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("DHARMA_ACTION_AUTHORITY_GATE", "enforce")
+        target = tmp_path / "sub" / "out.txt"
+        ident = AgentIdentity(name="t", role="r", system_prompt="s")
+        agent = AutonomousAgent(ident)
+
+        result = await agent._execute_tool(
+            "write_file",
+            {"path": str(target), "content": "data"},
+        )
+
+        assert "ACTION AUTHORITY BLOCK" in result
+        assert not target.exists()
+
+    @pytest.mark.asyncio
     async def test_search_files(self, tmp_path):
         (tmp_path / "a.py").touch()
         (tmp_path / "b.py").touch()

@@ -16,6 +16,16 @@ async def test_execute_echo():
 
 
 @pytest.mark.asyncio
+async def test_execute_blocked_by_action_authority_in_enforce(monkeypatch):
+    monkeypatch.setenv("DHARMA_ACTION_AUTHORITY_GATE", "enforce")
+    sb = LocalSandbox()
+    result = await sb.execute("echo hello")
+    assert result.exit_code == -1
+    assert "ACTION AUTHORITY BLOCK" in result.stderr
+    await sb.cleanup()
+
+
+@pytest.mark.asyncio
 async def test_execute_python():
     sb = LocalSandbox()
     result = await sb.execute_python("print(2 + 2)")

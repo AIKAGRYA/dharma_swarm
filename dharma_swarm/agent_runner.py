@@ -1804,6 +1804,28 @@ class AgentRunner:
 
         if tool_name == "write_file":
             path = _resolve_local_tool_path(str(parameters.get("path", "")), workdir=workdir)
+            try:
+                from dharma_swarm.action_authority import (
+                    AuthoritySurface,
+                    authority_block_message,
+                    check_action_authority,
+                )
+
+                decision = check_action_authority(
+                    title=f"agent local tool write_file: {path}",
+                    surface=AuthoritySurface.AGENT_TOOL,
+                    action_type="write_file",
+                    target_paths=(str(path),),
+                    requested_tools=("write_file",),
+                    metadata={"mutates_repo": True, "writes_code": True},
+                    actor_id=str(getattr(task, "assigned_to", "") or ""),
+                    task_id=task.id,
+                    runtime_type="agent_runner",
+                )
+                if decision.blocked:
+                    return f"ERROR: {authority_block_message(decision)}"
+            except Exception:
+                logger.debug("Action authority check failed for write_file", exc_info=True)
             content = str(parameters.get("content", ""))
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(content, encoding="utf-8")
@@ -1813,6 +1835,28 @@ class AgentRunner:
             path = _resolve_local_tool_path(str(parameters.get("path", "")), workdir=workdir)
             if not path.exists():
                 return f"ERROR: File not found: {path}"
+            try:
+                from dharma_swarm.action_authority import (
+                    AuthoritySurface,
+                    authority_block_message,
+                    check_action_authority,
+                )
+
+                decision = check_action_authority(
+                    title=f"agent local tool edit_file: {path}",
+                    surface=AuthoritySurface.AGENT_TOOL,
+                    action_type="edit_file",
+                    target_paths=(str(path),),
+                    requested_tools=("edit_file",),
+                    metadata={"mutates_repo": True, "writes_code": True},
+                    actor_id=str(getattr(task, "assigned_to", "") or ""),
+                    task_id=task.id,
+                    runtime_type="agent_runner",
+                )
+                if decision.blocked:
+                    return f"ERROR: {authority_block_message(decision)}"
+            except Exception:
+                logger.debug("Action authority check failed for edit_file", exc_info=True)
             old = str(parameters.get("old_string", ""))
             new = str(parameters.get("new_string", ""))
             content = path.read_text(encoding="utf-8", errors="replace")
@@ -1828,6 +1872,28 @@ class AgentRunner:
             if self._sandbox is None:
                 raise RuntimeError("Local tool sandbox unavailable")
             command = str(parameters.get("command", "")).strip()
+            try:
+                from dharma_swarm.action_authority import (
+                    AuthoritySurface,
+                    authority_block_message,
+                    check_action_authority,
+                )
+
+                decision = check_action_authority(
+                    title=f"agent local tool {tool_name}: {command[:120]}",
+                    surface=AuthoritySurface.AGENT_TOOL,
+                    action_type=tool_name,
+                    command=command,
+                    requested_tools=(tool_name,),
+                    metadata={"execution_authority": True},
+                    actor_id=str(getattr(task, "assigned_to", "") or ""),
+                    task_id=task.id,
+                    runtime_type="agent_runner",
+                )
+                if decision.blocked:
+                    return f"ERROR: {authority_block_message(decision)}"
+            except Exception:
+                logger.debug("Action authority check failed for shell tool", exc_info=True)
             try:
                 timeout = float(parameters.get("timeout", 30) or 30)
             except (TypeError, ValueError):

@@ -39,6 +39,41 @@ def _path_allowed(path_str: str) -> bool:
         return False
 
 
+def _authority_error(
+    action: str,
+    *,
+    target_paths: tuple[str, ...] = (),
+    command: str | None = None,
+    content: str = "",
+    metadata: dict | None = None,
+) -> str | None:
+    try:
+        from dharma_swarm.action_authority import (
+            AuthoritySurface,
+            authority_block_message,
+            check_action_authority,
+        )
+
+        decision = check_action_authority(
+            title=f"chat tool {action}",
+            surface=AuthoritySurface.API_TOOL,
+            action_type=action,
+            content=content,
+            target_paths=target_paths,
+            requested_tools=(action,),
+            command=command,
+            metadata=metadata,
+            actor_id="dashboard_chat",
+            actor_type="api_chat",
+            runtime_type="dashboard_chat",
+        )
+        if decision.blocked:
+            return f"ERROR: {authority_block_message(decision)}"
+    except Exception:
+        logger.debug("Action authority check failed for chat tool %s", action, exc_info=True)
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Tool definitions (OpenAI function-calling format for OpenRouter)
 # ---------------------------------------------------------------------------
@@ -398,6 +433,13 @@ async def exec_write_file(args: dict) -> str:
     path = _resolve_path(args["path"])
     if not _path_allowed(str(path)):
         return f"ERROR: Path {path} is outside allowed scope"
+    if error := _authority_error(
+        "write_file",
+        target_paths=(str(path),),
+        content=str(args.get("content", ""))[:500],
+        metadata={"mutates_repo": True, "writes_code": True},
+    ):
+        return error
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(args["content"])
@@ -412,6 +454,13 @@ async def exec_edit_file(args: dict) -> str:
         return f"ERROR: Path {path} is outside allowed scope"
     if not path.exists():
         return f"ERROR: File not found: {path}"
+    if error := _authority_error(
+        "edit_file",
+        target_paths=(str(path),),
+        content=str(args)[:500],
+        metadata={"mutates_repo": True, "writes_code": True},
+    ):
+        return error
 
     try:
         content = path.read_text()
@@ -447,6 +496,13 @@ _DANGEROUS_PATTERNS = [
 async def exec_shell(args: dict) -> str:
     command = args["command"]
     timeout = min(60, args.get("timeout", 30))
+    if error := _authority_error(
+        "shell_exec",
+        command=command,
+        content=command,
+        metadata={"execution_authority": True},
+    ):
+        return error
 
     # Gate check (S3 control — telos gates evaluate before execution)
     try:
@@ -783,6 +839,12 @@ async def exec_trace_query(args: dict) -> str:
 
 async def exec_agent_control(args: dict) -> str:
     action = args["action"]
+    if error := _authority_error(
+        f"agent_control.{action}",
+        content=str(args)[:500],
+        metadata={"cross_agent_authority": action in {"spawn", "stop"}},
+    ):
+        return error
     try:
         from api.main import get_swarm
         swarm = get_swarm()

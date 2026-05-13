@@ -140,6 +140,22 @@ class TelicSeam:
                     "result": result.value if hasattr(result, "value") else str(result),
                     "reason": reason,
                 }
+            witness_id = ""
+            witness_obj, witness_errors = self._registry.create_object(
+                "WitnessLog",
+                properties={
+                    "observation": f"Gate decision {gate_result.decision.value}: {gate_result.reason}",
+                    "observer": "telic_seam",
+                    "context": f"ActionProposal:{proposal_id}",
+                    "witness_quality": 0.7,
+                    "contraction_level": "L2",
+                },
+                created_by="telic_seam",
+            )
+            if witness_obj is not None:
+                witness_id = witness_obj.id
+            elif witness_errors:
+                logger.debug("WitnessLog creation failed: %s", witness_errors)
 
             obj, errors = self._registry.create_object(
                 "GateDecisionRecord",
@@ -149,6 +165,7 @@ class TelicSeam:
                     "reason": gate_result.reason,
                     "gate_results": serialized_gates,
                     "witness_reroutes": witness_reroutes,
+                    "witness_log_id": witness_id,
                 },
                 created_by="telos_gatekeeper",
             )
@@ -163,6 +180,13 @@ class TelicSeam:
                 target_id=obj.id,
                 created_by="telic_seam",
             )
+            if witness_id:
+                self._registry.create_link(
+                    "has_witness_log",
+                    source_id=obj.id,
+                    target_id=witness_id,
+                    created_by="telic_seam",
+                )
 
             # Update proposal status based on decision
             new_status = {

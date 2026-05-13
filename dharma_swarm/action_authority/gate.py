@@ -163,6 +163,26 @@ HIGH_AUTHORITY_TIERS = frozenset(
     }
 )
 
+MIN_EVIDENCE_FILES_BY_TIER: dict[AuthorityTier, int] = {
+    AuthorityTier.READ_ONLY: 0,
+    AuthorityTier.LOCAL_SIDE_EFFECT: 0,
+    AuthorityTier.REPO_MUTATION: 8,
+    AuthorityTier.EXECUTION: 8,
+    AuthorityTier.EXTERNAL_SIDE_EFFECT: 12,
+    AuthorityTier.CROSS_AGENT_DISPATCH: 12,
+    AuthorityTier.GOVERNANCE_MUTATION: 50,
+    AuthorityTier.RELEASE_OR_MAIN: 50,
+}
+
+
+def min_evidence_files_for_tier(tier: AuthorityTier | str) -> int:
+    """Return the Fourfold evidence floor for an authority tier."""
+
+    resolved = _coerce_tier(tier) if isinstance(tier, str) else tier
+    if not isinstance(resolved, AuthorityTier):
+        return 0
+    return MIN_EVIDENCE_FILES_BY_TIER[resolved]
+
 
 def build_action_authority_request(
     *,
@@ -239,7 +259,11 @@ def classify_authority_tier(
         text, ("merge", "release", "deploy", "git push", "push main")
     ):
         return AuthorityTier.RELEASE_OR_MAIN
-    if bool(metadata.get("governance_impact")) or _is_governance_text(text):
+    if (
+        bool(metadata.get("governance_impact"))
+        or bool(metadata.get("ontology_mutation"))
+        or _is_governance_text(text)
+    ):
         return AuthorityTier.GOVERNANCE_MUTATION
     if surface in {AuthoritySurface.DISPATCH, AuthoritySurface.EXTERNAL_BRIDGE}:
         return AuthorityTier.CROSS_AGENT_DISPATCH
@@ -251,6 +275,8 @@ def classify_authority_tier(
         return AuthorityTier.EXTERNAL_SIDE_EFFECT
     if tools & {"github", "web_search", "fetch_url", "publish", "mcp"}:
         return AuthorityTier.EXTERNAL_SIDE_EFFECT
+    if bool(metadata.get("execution_authority")):
+        return AuthorityTier.EXECUTION
     if command or surface in {
         AuthoritySurface.CRON_DAEMON,
         AuthoritySurface.SANDBOX_RUNTIME,

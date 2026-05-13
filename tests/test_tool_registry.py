@@ -110,6 +110,21 @@ class TestToolDispatch:
         result = json.loads(reg.dispatch("echo", {"msg": "hello"}))
         assert result == {"echo": "hello"}
 
+    def test_dispatch_blocked_by_action_authority_in_enforce(self, monkeypatch):
+        monkeypatch.setenv("DHARMA_ACTION_AUTHORITY_GATE", "enforce")
+        reg = ToolRegistry()
+        reg.register(
+            name="write_file",
+            toolset="core",
+            schema={"name": "write_file"},
+            handler=lambda args, **kw: json.dumps({"wrote": args.get("path")}),
+        )
+
+        result = json.loads(reg.dispatch("write_file", {"path": "x.py"}))
+
+        assert "error" in result
+        assert "ACTION AUTHORITY BLOCK" in result["error"]
+
     def test_dispatch_unknown_tool(self):
         reg = ToolRegistry()
         result = json.loads(reg.dispatch("nonexistent", {}))

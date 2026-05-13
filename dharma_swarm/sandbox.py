@@ -8,6 +8,7 @@ production usage should delegate safety checks to telos gates.
 from __future__ import annotations
 
 import asyncio
+import logging
 import re
 import tempfile
 import time
@@ -16,6 +17,8 @@ from pathlib import Path
 from typing import Optional
 
 from dharma_swarm.models import SandboxResult
+
+logger = logging.getLogger(__name__)
 
 # Patterns that are always rejected before execution.
 # Intentionally conservative -- telos gates handle nuanced policy.
@@ -90,6 +93,34 @@ class LocalSandbox(Sandbox):
     async def execute(
         self, command: str, timeout: float = 30.0
     ) -> SandboxResult:
+        try:
+            from dharma_swarm.action_authority import (
+                AuthoritySurface,
+                authority_block_message,
+                check_action_authority,
+            )
+
+            decision = check_action_authority(
+                title=f"local sandbox execute: {command[:120]}",
+                surface=AuthoritySurface.SANDBOX_RUNTIME,
+                action_type="sandbox_execute",
+                command=command,
+                requested_tools=("sandbox_execute",),
+                metadata={"execution_authority": True},
+                actor_id="local_sandbox",
+                actor_type="system",
+                runtime_type="local_sandbox",
+            )
+            if decision.blocked:
+                return SandboxResult(
+                    exit_code=-1,
+                    stdout="",
+                    stderr=authority_block_message(decision),
+                    duration_seconds=0.0,
+                    timed_out=False,
+                )
+        except Exception:
+            logger.debug("Action authority check failed for LocalSandbox.execute", exc_info=True)
         self._check_safety(command)
         start = time.monotonic()
         proc = await asyncio.create_subprocess_shell(
@@ -122,6 +153,35 @@ class LocalSandbox(Sandbox):
     async def execute_python(
         self, code: str, timeout: float = 30.0
     ) -> SandboxResult:
+        try:
+            from dharma_swarm.action_authority import (
+                AuthoritySurface,
+                authority_block_message,
+                check_action_authority,
+            )
+
+            decision = check_action_authority(
+                title="local sandbox execute python",
+                surface=AuthoritySurface.SANDBOX_RUNTIME,
+                action_type="sandbox_execute_python",
+                content=code[:1000],
+                target_paths=(str(self._workdir / "_dharma_run.py"),),
+                requested_tools=("sandbox_execute_python",),
+                metadata={"execution_authority": True, "writes_code": True},
+                actor_id="local_sandbox",
+                actor_type="system",
+                runtime_type="local_sandbox",
+            )
+            if decision.blocked:
+                return SandboxResult(
+                    exit_code=-1,
+                    stdout="",
+                    stderr=authority_block_message(decision),
+                    duration_seconds=0.0,
+                    timed_out=False,
+                )
+        except Exception:
+            logger.debug("Action authority check failed for LocalSandbox.execute_python", exc_info=True)
         script = self._workdir / "_dharma_run.py"
         script.write_text(code, encoding="utf-8")
         try:

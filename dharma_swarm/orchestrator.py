@@ -1854,6 +1854,83 @@ class Orchestrator:
             else f"dispatch task {td.task_id} -> {td.agent_id}"
         )
         content_ref = task_for_gate.description if task_for_gate else ""
+        authority_decision = None
+        try:
+            from dharma_swarm.action_authority import (
+                ActionAuthorityMode,
+                AuthoritySurface,
+                authority_block_message,
+                check_action_authority,
+                decision_to_gate_check,
+                merge_authority_gate_result,
+            )
+
+            authority_decision = check_action_authority(
+                title=action_ref,
+                surface=AuthoritySurface.DISPATCH,
+                action_type="dispatch",
+                content=content_ref,
+                requested_tools=("orchestrator_dispatch",),
+                metadata={
+                    "cross_agent_authority": True,
+                    "dispatch_authority": True,
+                    "task_id": td.task_id,
+                    "agent_id": td.agent_id,
+                    "topology": td.topology.value if td.topology else "dispatch",
+                },
+                task_id=td.task_id,
+                actor_id=td.agent_id,
+                actor_type="agent",
+                runtime_type="orchestrator",
+                think_phase="before_write",
+            )
+            if authority_decision.mode is not ActionAuthorityMode.OFF:
+                td.metadata["action_authority_decision_id"] = authority_decision.decision_id
+                td.metadata["action_authority_raw_decision"] = authority_decision.raw_decision.value
+                td.metadata["action_authority_effective_decision"] = authority_decision.effective_decision.value
+            if authority_decision.blocked:
+                if proposal_id is not None and self._telic_seam is not None:
+                    self._telic_seam.record_gate_decision(
+                        proposal_id,
+                        decision_to_gate_check(authority_decision),
+                        witness_reroutes=0,
+                    )
+                block_message = authority_block_message(authority_decision)
+                await self._safe_update_task(
+                    td.task_id,
+                    status=TaskStatus.FAILED,
+                    result=block_message,
+                )
+                self._record_task_event(
+                    "dispatch_blocked",
+                    task_id=td.task_id,
+                    agent_id=td.agent_id,
+                    topology=td.topology.value,
+                    reason=block_message,
+                )
+                self._record_progress_event(
+                    "task_blocked",
+                    task_id=td.task_id,
+                    agent_id=td.agent_id,
+                    failure_signature=self._failure_signature(block_message),
+                    source="action_authority_gate",
+                )
+                await self._emit_lifecycle_event(
+                    "dispatch_blocked",
+                    task_id=td.task_id,
+                    agent_id=td.agent_id,
+                    extra={"reason": block_message},
+                )
+                logger.warning(
+                    "Dispatch blocked by action authority for task %s -> %s: %s",
+                    td.task_id,
+                    td.agent_id,
+                    authority_decision.reason,
+                )
+                return
+        except Exception:
+            logger.debug("Action authority dispatch check failed", exc_info=True)
+
         _gate_t0 = _adt.monotonic()
         gate = check_with_reflective_reroute(
             action=action_ref,
@@ -1871,6 +1948,16 @@ class Orchestrator:
 
         # Yield after sync gate check so other coroutines can progress
         await asyncio.sleep(0)
+        recorded_gate_result = gate.result
+        if authority_decision is not None:
+            try:
+                if authority_decision.mode is not ActionAuthorityMode.OFF:
+                    recorded_gate_result = merge_authority_gate_result(
+                        gate.result,
+                        authority_decision,
+                    )
+            except Exception:
+                logger.debug("Failed to merge action authority gate result", exc_info=True)
 
         # ── Telic Seam: record GateDecision in ontology ──
         if proposal_id is not None:
@@ -1878,43 +1965,43 @@ class Orchestrator:
                 if self._telic_seam is not None:
                     self._telic_seam.record_gate_decision(
                         proposal_id,
-                        gate.result,
+                        recorded_gate_result,
                         witness_reroutes=gate.attempts,
                     )
             except Exception:
                 logger.debug("Telic seam gate decision recording failed", exc_info=True)
 
-        if gate.result.decision.value == "block":
+        if recorded_gate_result.decision.value == "block":
             await self._safe_update_task(
                 td.task_id,
                 status=TaskStatus.FAILED,
-                result=f"TELOS BLOCK (dispatch): {gate.result.reason}",
+                result=f"TELOS BLOCK (dispatch): {recorded_gate_result.reason}",
             )
             self._record_task_event(
                 "dispatch_blocked",
                 task_id=td.task_id,
                 agent_id=td.agent_id,
                 topology=td.topology.value,
-                reason=gate.result.reason,
+                reason=recorded_gate_result.reason,
             )
             self._record_progress_event(
                 "task_blocked",
                 task_id=td.task_id,
                 agent_id=td.agent_id,
-                failure_signature=self._failure_signature(gate.result.reason),
+                failure_signature=self._failure_signature(recorded_gate_result.reason),
                 source="telos_gate",
             )
             await self._emit_lifecycle_event(
                 "dispatch_blocked",
                 task_id=td.task_id,
                 agent_id=td.agent_id,
-                extra={"reason": gate.result.reason},
+                extra={"reason": recorded_gate_result.reason},
             )
             logger.warning(
                 "Dispatch blocked for task %s -> %s: %s",
                 td.task_id,
                 td.agent_id,
-                gate.result.reason,
+                recorded_gate_result.reason,
             )
             return
 

@@ -53,6 +53,38 @@ def _as_float(value: Any, default: float) -> float:
     return parsed if parsed > 0 else default
 
 
+def _authority_block_for_job(job: dict[str, Any], handler: str) -> str | None:
+    try:
+        from dharma_swarm.action_authority import (
+            AuthoritySurface,
+            authority_block_message,
+            check_action_authority,
+        )
+
+        decision = check_action_authority(
+            title=f"cron job {handler}",
+            surface=AuthoritySurface.CRON_DAEMON,
+            action_type=handler,
+            content=str(job)[:1000],
+            requested_tools=(handler,),
+            metadata={"execution_authority": True, "cron_job_id": str(job.get("id", ""))},
+            actor_id="cron_runner",
+            actor_type="cron",
+            runtime_type="cron_runner",
+        )
+        if decision.blocked:
+            return authority_block_message(decision)
+    except Exception:
+        import logging
+
+        logging.getLogger(__name__).debug(
+            "Action authority check failed for cron job %s",
+            handler,
+            exc_info=True,
+        )
+    return None
+
+
 def _run_overnight_director(job: dict[str, Any]) -> CronJobExecutionResult:
     """Launch the overnight director as a long-running process."""
     import asyncio
@@ -448,6 +480,12 @@ def execute_cron_job(job: dict[str, Any]) -> CronJobExecutionResult:
         custodians_forge — custodian fleet + foreman quality re-scan
     """
     handler = str(job.get("handler", "headless_prompt")).strip() or "headless_prompt"
+    if error := _authority_block_for_job(job, handler):
+        return CronJobExecutionResult(
+            status=CronJobRunStatus.FAILED,
+            output=error,
+            error=error,
+        )
 
     if handler == "headless_prompt":
         return _result_from_legacy(*_run_headless_prompt(job))
