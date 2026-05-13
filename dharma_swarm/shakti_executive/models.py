@@ -45,10 +45,11 @@ class OpportunityCandidate:
     why_now: str
     timestamp: str
     source_inputs: list[dict[str, Any]] = field(default_factory=list)
+    strategic_vision: dict[str, Any] | None = None
 
     def to_board_entry(self) -> dict[str, Any]:
         """Return JSON-serializable opportunity_board shape."""
-        return {
+        row = {
             "opportunity_id": self.opportunity_id,
             "title": self.title,
             "domain": self.domain,
@@ -60,6 +61,9 @@ class OpportunityCandidate:
             "timestamp": self.timestamp,
             "source_inputs": self.source_inputs,
         }
+        if self.strategic_vision:
+            row["strategic_vision"] = self.strategic_vision
+        return row
 
 
 @dataclass(frozen=True)

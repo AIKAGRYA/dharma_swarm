@@ -355,14 +355,14 @@ class TelosGatekeeper:
         "before_pivot",
     }
 
-    # ── S4→S3 feedback: read zeitgeist gate pressure ──
+    # ── S4→S3 feedback: read internal pressure gate override ──
     _GATE_PRESSURE_PATH = Path.home() / ".dharma" / "meta" / "gate_pressure.json"
 
     def _apply_gate_pressure(self, current_mode: str) -> str:
         """Read S4 gate pressure signal and potentially tighten trust mode.
 
-        Zeitgeist writes gate_pressure.json when it detects high gate block
-        rates. This method reads it and overrides to external_strict if
+        InternalPressureScanner writes gate_pressure.json when it detects high
+        gate block rates. This method reads it and overrides to external_strict if
         the signal is still valid (not expired).
         """
         import time as _time
@@ -411,7 +411,7 @@ class TelosGatekeeper:
             .strip()
             .lower()
         )
-        # ── S4→S3 feedback: zeitgeist gate pressure override ──
+        # ── S4→S3 feedback: internal pressure gate override ──
         resolved_mode = self._apply_gate_pressure(resolved_mode)
         action_lower = action.lower()
         content_lower = content.lower()
@@ -665,7 +665,7 @@ class TelosGatekeeper:
             )
 
         # Tier C failures produce review, not block — UNLESS S4→S3 sensitivity
-        # boost has been applied by zeitgeist threat signals.
+        # boost has been applied by internal pressure threat signals.
         tier_c_fail_gates = [
             g
             for g in self.GATES
