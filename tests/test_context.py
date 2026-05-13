@@ -199,6 +199,62 @@ def test_read_memory_context_with_data(tmp_path):
     assert "Test memory" in result
 
 
+def test_read_memory_context_shadow_disabled_by_default(tmp_path):
+    db_dir = tmp_path / "db"
+    db_dir.mkdir()
+    db_path = db_dir / "memory.db"
+    conn = sqlite3.connect(str(db_path))
+    conn.execute(
+        "CREATE TABLE memories (content TEXT, layer TEXT, timestamp TEXT)"
+    )
+    conn.execute(
+        "INSERT INTO memories VALUES (?, ?, ?)",
+        ("Test memory entry", "witness", "2026-01-01T00:00:00"),
+    )
+    conn.commit()
+    conn.close()
+    reports = []
+
+    result = read_memory_context(
+        state_dir=tmp_path,
+        memory_kernel_shadow_callback=reports.append,
+    )
+
+    assert "Test memory" in result
+    assert reports == []
+
+
+def test_read_memory_context_shadow_preserves_legacy_result(tmp_path):
+    db_dir = tmp_path / "db"
+    db_dir.mkdir()
+    db_path = db_dir / "memory.db"
+    conn = sqlite3.connect(str(db_path))
+    conn.execute(
+        "CREATE TABLE memories (content TEXT, layer TEXT, timestamp TEXT)"
+    )
+    conn.execute(
+        "INSERT INTO memories VALUES (?, ?, ?)",
+        ("Test memory entry", "witness", "2026-01-01T00:00:00"),
+    )
+    conn.commit()
+    conn.close()
+    reports = []
+
+    result = read_memory_context(
+        state_dir=tmp_path,
+        query="test memory",
+        allow_semantic_search=False,
+        memory_kernel_shadow=True,
+        memory_kernel_shadow_callback=reports.append,
+    )
+
+    assert "Test memory" in result
+    assert len(reports) == 1
+    assert reports[0].legacy_report is not None
+    assert reports[0].memory_report is not None
+    assert reports[0].memory_report.atom_count == 0
+
+
 def test_read_memory_context_can_skip_semantic_query(tmp_path):
     from dharma_swarm.engine.unified_index import UnifiedIndex
 
@@ -522,7 +578,7 @@ def test_read_recognition_seed_truncation(tmp_path):
     """L9 truncates very long seeds to approximately max_chars."""
     meta = tmp_path / "meta"
     meta.mkdir()
-    (meta / "recognition_seed.md").write_text("x" * 5000)
+    (meta / "recognition_seed.md").write_text("recognition seed line\n" * 300)
     result = _read_recognition_seed(state_dir=tmp_path, max_chars=500)
     # May slightly exceed max_chars due to header + truncation marker
     assert len(result) < 600
