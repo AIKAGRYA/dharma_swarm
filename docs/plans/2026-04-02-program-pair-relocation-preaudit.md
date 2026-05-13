@@ -54,7 +54,7 @@ stigmergy:
   coordination_comment: Use this before relocating program.md and program_ecosystem.md.
   trace_role: coordination_trace
 curation:
-  last_frontmatter_refresh: '2026-04-02T22:25:00+09:00'
+  last_frontmatter_refresh: '2026-05-13T02:33:05+08:00'
   curated_by_model: Codex (GPT-5)
   schema_version: pkm-phd-stigmergy-v1
 ---
@@ -105,6 +105,17 @@ There is still explicit code/test coupling to `program.md` at repo root:
 - `tests/test_long_context_sidecar_eval.py` writes and expects `program.md` at repo root
 
 That makes the relocation a later code-aware tranche, not a prose-only cleanup pass.
+
+## Validation Snapshot 2026-05-13
+
+Run `20260402T163603Z` rechecked this seam without moving files.
+
+- path truth: `program.md` and `program_ecosystem.md` still exist at repo root
+- tracking truth: both root runbooks, `dharma_swarm/long_context_sidecar_eval.py`, `tests/test_long_context_sidecar_eval.py`, and this preaudit are tracked
+- authority truth: the active root cleanup controls and `docs/README.md` already point future relocation work back to this preaudit
+- hard blocker truth: outside docs, the live `program.md` path assumptions remain limited to `dharma_swarm/long_context_sidecar_eval.py` and `tests/test_long_context_sidecar_eval.py`
+
+Current conclusion: do not take the relocation as an overnight prose cleanup tranche. Keep it deferred until a code-aware path-repair tranche is explicitly allowed.
 
 ## Safe Later Move
 
