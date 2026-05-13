@@ -53,14 +53,17 @@ def run_cmd(
     timeout: int = 60,
     input_text: str | None = None,
 ) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        list(cmd),
-        cwd=str(cwd),
-        input=input_text,
-        text=True,
-        capture_output=True,
-        timeout=timeout,
-    )
+    kwargs: dict[str, Any] = {
+        "cwd": str(cwd),
+        "text": True,
+        "capture_output": True,
+        "timeout": timeout,
+    }
+    if input_text is None:
+        kwargs["stdin"] = subprocess.DEVNULL
+    else:
+        kwargs["input"] = input_text
+    return subprocess.run(list(cmd), **kwargs)
 
 
 def write_json(path: Path, payload: dict[str, Any]) -> None:
