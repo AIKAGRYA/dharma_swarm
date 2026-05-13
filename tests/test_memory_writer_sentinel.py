@@ -203,6 +203,17 @@ def test_writer_sentinel_cli_action_required_gate_passes_for_triaged_repo(capsys
     assert '"action_required_count": 0' in out
 
 
+def test_writer_sentinel_cli_ci_profile_runs_discovery_and_gates(capsys) -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+
+    assert writer_sentinel_cli_main(["--repo-root", str(repo_root), "--ci"]) == 0
+    out = capsys.readouterr().out
+
+    assert '"discovery_summary"' in out
+    assert '"action_required_count": 0' in out
+    assert '"unregistered_surface_count": 0' in out
+
+
 def test_writer_sentinel_cli_writes_markdown_report(tmp_path: Path, capsys) -> None:
     repo_root = Path(__file__).resolve().parents[1]
     report_path = tmp_path / "writer_report.md"

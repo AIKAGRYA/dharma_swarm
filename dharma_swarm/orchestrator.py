@@ -530,10 +530,12 @@ class Orchestrator:
         agent_id: str,
         extra: dict[str, Any] | None = None,
     ) -> None:
-        """Fire-and-forget lifecycle event — non-blocking to avoid stalling dispatch."""
-        asyncio.create_task(
-            self._emit_lifecycle_event_impl(event, task_id=task_id, agent_id=agent_id, extra=extra),
-            name=f"lifecycle-{event}-{task_id[:8]}",
+        """Emit a non-fatal lifecycle event to bus and event memory."""
+        await self._emit_lifecycle_event_impl(
+            event,
+            task_id=task_id,
+            agent_id=agent_id,
+            extra=extra,
         )
 
     async def _emit_lifecycle_event_impl(
@@ -1891,10 +1893,20 @@ class Orchestrator:
         pool_get = getattr(self._pool, "get", None)
         runner = await pool_get(td.agent_id) if pool_get else None
         task = task_for_gate or await self._safe_get_task(td.task_id)
+        pool_agents_preview = []
+        pool_list_agents = getattr(self._pool, "list_agents", None) if self._pool else None
+        if callable(pool_list_agents):
+            try:
+                pool_agents = pool_list_agents()
+                if hasattr(pool_agents, "__await__"):
+                    pool_agents = await pool_agents
+                pool_agents_preview = list(pool_agents or [])[:3]
+            except Exception:
+                logger.debug("Agent pool list_agents failed during dispatch logging", exc_info=True)
         logger.info(
             "_assign_dispatch(%s): runner=%s task=%s pool_agents=%s",
             td.task_id[:8], bool(runner), bool(task),
-            list((await self._pool.list_agents()) if self._pool else [])[:3],
+            pool_agents_preview,
         )
         if runner and task:
             run_meta = self._task_meta(task)

@@ -25,6 +25,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Run the AST discovery pass for likely memory-like writes.",
     )
     parser.add_argument(
+        "--ci",
+        action="store_true",
+        help=(
+            "Run the CI safety profile: registered writer checks, bounded discovery, "
+            "and action-required discovery failure gates."
+        ),
+    )
+    parser.add_argument(
         "--discovery-details",
         action="store_true",
         help="Include per-call write discovery observations.",
@@ -68,6 +76,11 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.ci:
+        args.discover = True
+        args.fail_on_unregistered = True
+        args.fail_on_missing = True
+        args.fail_on_action_required_discovery = True
     sentinel = MemoryWriterSentinel(repo_root=args.repo_root)
     observations = sentinel.run()
     summary = sentinel.summarize(observations)

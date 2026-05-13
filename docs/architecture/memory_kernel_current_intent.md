@@ -38,12 +38,15 @@ The active work should stay within these limits:
 - M3: read-only context admission preview
 - M3B: read-only context safety eval harness
 - M3C: read-only context parity harness and 60->80 roadmap
+- M3D: disabled-by-default `read_memory_context()` shadow wrapper
 
 Do not add runtime prompt injection, canon writes, Chetana mutations, vector
 rebuilds, migrations, or write-through gates until the read-only layers are
 merged and reviewed. M3/M3B/M3C may preview, evaluate, and compare context
-admission as shadow artifacts, but they must not wire MemoryKernel atoms into
-`context.py`, `ContextCompiler`, `AgentRunner`, or prompt construction.
+admission as shadow artifacts. M3D may observe `read_memory_context()` returns
+behind an explicit shadow flag, but it must not change returned prompt context
+or wire MemoryKernel atoms into `ContextCompiler`, `AgentRunner`, or prompt
+construction.
 
 ## Reconciliation Rule
 

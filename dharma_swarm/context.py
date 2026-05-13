@@ -16,12 +16,13 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import sqlite3
 import time
 from dataclasses import dataclass
 from datetime import timezone
 from pathlib import Path
-from typing import Literal
+from typing import Callable, Literal
 
 logger = logging.getLogger(__name__)
 
@@ -605,11 +606,29 @@ def read_memory_context(
     consumer: str = "context.read_memory_context",
     task_id: str | None = None,
     allow_semantic_search: bool = True,
+    memory_kernel_shadow: bool = False,
+    memory_kernel_shadow_home: Path | None = None,
+    memory_kernel_shadow_surfaces: tuple[str, ...] = (),
+    memory_kernel_shadow_callback: Callable[[object], None] | None = None,
 ) -> str:
     """Get recent or query-specific memory from dharma_swarm state."""
     base_dir = state_dir or STATE_DIR
     db_path = base_dir / "db" / "memory.db"
     plane_path = base_dir / "db" / "memory_plane.db"
+
+    def finish(result: str) -> str:
+        _run_memory_kernel_context_shadow(
+            result,
+            state_dir=state_dir,
+            query=query,
+            limit=limit,
+            enabled=memory_kernel_shadow,
+            home=memory_kernel_shadow_home,
+            surface_ids=memory_kernel_shadow_surfaces,
+            callback=memory_kernel_shadow_callback,
+        )
+        return result
+
     if query and plane_path.exists():
         try:
             plane_result = _read_memory_plane_context(
@@ -621,9 +640,9 @@ def read_memory_context(
                 allow_semantic_search=allow_semantic_search,
             )
             if plane_result:
-                return plane_result
+                return finish(plane_result)
         except Exception as e:
-            return f"Memory plane unavailable: {e}"
+            return finish(f"Memory plane unavailable: {e}")
 
     if not db_path.exists():
         if plane_path.exists():
@@ -637,10 +656,10 @@ def read_memory_context(
                     allow_semantic_search=allow_semantic_search,
                 )
                 if plane_result:
-                    return plane_result
+                    return finish(plane_result)
             except Exception as e:
-                return f"Memory plane unavailable: {e}"
-        return "No memory database yet."
+                return finish(f"Memory plane unavailable: {e}")
+        return finish("No memory database yet.")
     try:
         conn = sqlite3.connect(str(db_path))
         try:
@@ -663,10 +682,10 @@ def read_memory_context(
                         allow_semantic_search=allow_semantic_search,
                     )
                     if plane_result:
-                        return plane_result
+                        return finish(plane_result)
                 except Exception:
                     logger.debug("Memory plane recall failed", exc_info=True)
-            return "No memories stored yet."
+            return finish("No memories stored yet.")
         sections = ["\n".join(f"  [{r['layer']}] {r['content'][:100]}" for r in rows)]
 
         # B3/B4 fix: Also query KnowledgeStore and MemoryPalace if available
@@ -700,9 +719,87 @@ def read_memory_context(
             except Exception:
                 logger.debug("MemoryPalace query failed in read_memory_context", exc_info=True)
 
-        return "\n".join(sections)
+        return finish("\n".join(sections))
     except Exception as e:
-        return f"Memory unavailable: {e}"
+        return finish(f"Memory unavailable: {e}")
+
+
+def _run_memory_kernel_context_shadow(
+    legacy_text: str,
+    *,
+    state_dir: Path | None,
+    query: str | None,
+    limit: int,
+    enabled: bool,
+    home: Path | None,
+    surface_ids: tuple[str, ...],
+    callback: Callable[[object], None] | None,
+) -> None:
+    """Run MemoryKernel parity in shadow mode without changing context output."""
+
+    env_enabled = _truthy_env("DHARMA_MEMORY_KERNEL_CONTEXT_SHADOW")
+    if not enabled and not env_enabled:
+        return
+    try:
+        from dharma_swarm.memory_kernel import (
+            CensusConfig,
+            MemoryContextBudget,
+            MemoryKernel,
+            MemoryKernelConfig,
+            run_context_parity_eval,
+        )
+
+        resolved_surfaces = surface_ids or _csv_env("DHARMA_MEMORY_KERNEL_CONTEXT_SURFACES")
+        resolved_home = home or _path_env("DHARMA_MEMORY_KERNEL_HOME")
+        kernel = None
+        if resolved_home is not None and resolved_surfaces:
+            kernel = MemoryKernel(
+                MemoryKernelConfig(
+                    census=CensusConfig(
+                        repo_root=Path.cwd(),
+                        home=resolved_home,
+                        include_discovered=False,
+                    )
+                )
+            )
+        report = run_context_parity_eval(
+            query=query,
+            current_context_text=legacy_text,
+            state_dir=None,
+            memory_kernel=kernel,
+            memory_surface_ids=resolved_surfaces,
+            budget=MemoryContextBudget(
+                max_candidate_atoms=max(1, limit),
+                max_admitted_atoms=max(1, min(limit, 8)),
+                include_content=False,
+            ),
+            allow_current_semantic_search=False,
+        )
+        if callback:
+            callback(report)
+        logger.debug(
+            "MemoryKernel context shadow parity: hard_failures=%s warnings=%s metrics=%s state_dir=%s",
+            report.hard_failure_count,
+            report.warning_count,
+            report.metric_count,
+            state_dir,
+        )
+    except Exception:
+        logger.debug("MemoryKernel context shadow failed", exc_info=True)
+
+
+def _truthy_env(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _csv_env(name: str) -> tuple[str, ...]:
+    value = os.environ.get(name, "")
+    return tuple(item.strip() for item in value.split(",") if item.strip())
+
+
+def _path_env(name: str) -> Path | None:
+    value = os.environ.get(name, "").strip()
+    return Path(value).expanduser() if value else None
 
 
 def read_latent_gold_context(
