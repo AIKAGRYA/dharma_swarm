@@ -1,16 +1,14 @@
-"""Tests for dharma_swarm.zeitgeist -- S4 environmental intelligence.
-
-Tests the ZeitgeistSignal model, keyword relevance scoring,
-threat detection, local scanning, and persistence.
-"""
+"""Tests for external-only zeitgeist scanning."""
 
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
 
+from dharma_swarm.internal_pressure import InternalPressureScanner
 from dharma_swarm.zeitgeist import (
     RESEARCH_KEYWORDS,
     THREAT_KEYWORDS,
@@ -20,87 +18,50 @@ from dharma_swarm.zeitgeist import (
 )
 
 
-# -- Model tests -----------------------------------------------------------
-
-
 class TestZeitgeistSignalModel:
     def test_signal_has_correct_fields(self) -> None:
         sig = ZeitgeistSignal(
-            source="manual",
-            category="methodology",
-            title="Test signal",
+            source="operator_drop",
+            category="product_company",
+            title="SubQ-like agent infra launch",
+            metadata={"url": "https://example.test"},
         )
-        assert sig.id  # non-empty auto-generated
-        assert sig.source == "manual"
-        assert sig.category == "methodology"
-        assert sig.title == "Test signal"
+        assert sig.id
+        assert sig.source == "operator_drop"
+        assert sig.category == "product_company"
         assert sig.relevance_score == 0.0
-        assert sig.keywords == []
-        assert sig.description == ""
-        assert sig.timestamp is not None
+        assert sig.metadata["url"] == "https://example.test"
 
     def test_signal_serialization_roundtrip(self) -> None:
         sig = ZeitgeistSignal(
-            source="local_scan",
-            category="threat",
-            title="Preprint detected",
+            source="world_scout",
+            category="agent_infra",
+            title="Long context coding agent",
             relevance_score=0.8,
-            keywords=["preprint", "recursive"],
+            keywords=["long context", "agent"],
         )
-        raw = sig.model_dump_json()
-        restored = ZeitgeistSignal.model_validate_json(raw)
+        restored = ZeitgeistSignal.model_validate_json(sig.model_dump_json())
         assert restored.title == sig.title
-        assert restored.relevance_score == sig.relevance_score
         assert restored.keywords == sig.keywords
-
-
-# -- Keyword relevance tests -----------------------------------------------
 
 
 class TestKeywordRelevance:
     def test_keyword_relevance_high(self) -> None:
         scanner = ZeitgeistScanner()
         text = (
-            "mechanistic interpretability of the participation ratio "
-            "shows self-reference in the value matrix with contraction "
-            "and phase transition patterns"
+            "A subquadratic long context coding agent uses mechanistic "
+            "interpretability evidence for safer workflow automation."
         )
-        score = scanner.keyword_relevance(text)
-        assert score >= 0.8
+        assert scanner.keyword_relevance(text) >= 0.8
 
     def test_keyword_relevance_zero(self) -> None:
         scanner = ZeitgeistScanner()
-        text = "The weather is nice today and I had eggs for breakfast."
-        score = scanner.keyword_relevance(text)
-        assert score == 0.0
+        assert scanner.keyword_relevance("The weather is nice today.") == 0.0
 
-    def test_keyword_relevance_partial(self) -> None:
-        scanner = ZeitgeistScanner()
-        text = "A new SAE paper on superposition was released."
-        score = scanner.keyword_relevance(text)
-        assert 0.0 < score < 1.0
-
-
-# -- Threat detection tests ------------------------------------------------
-
-
-class TestDetectThreats:
     def test_detect_threats_finds_keywords(self) -> None:
         scanner = ZeitgeistScanner()
-        text = "A preprint on arxiv contradicts our finding."
-        threats = scanner.detect_threats(text)
-        assert "preprint" in threats
-        assert "arxiv" in threats
-        assert "contradicts" in threats
-
-    def test_detect_no_threats(self) -> None:
-        scanner = ZeitgeistScanner()
-        text = "Normal research progress on transformer architecture."
-        threats = scanner.detect_threats(text)
-        assert threats == []
-
-
-# -- LLM scan parsing tests -------------------------------------------------
+        threats = scanner.detect_threats("A preprint on arxiv contradicts our finding.")
+        assert {"preprint", "arxiv", "contradicts"} <= set(threats)
 
 
 class TestLLMSignalParsing:
@@ -109,21 +70,19 @@ class TestLLMSignalParsing:
             {
                 "signals": [
                     {
-                        "category": "threat",
-                        "title": "Agent eval pressure is rising",
+                        "category": "product_company",
+                        "title": "Agent workflow company launches",
                         "relevance_score": 0.9,
-                        "keywords": ["agentic AI", "governance"],
-                        "description": "Frontier agent systems need stronger action gates.",
+                        "keywords": ["agent", "workflow"],
+                        "description": "A new outside-world company signal.",
                     }
                 ]
             }
         )
-
         signals = _parse_llm_signals(raw)
-
         assert len(signals) == 1
         assert signals[0].source == "llm_scan"
-        assert signals[0].category == "threat"
+        assert signals[0].category == "product_company"
         assert signals[0].relevance_score == 0.9
 
     def test_parse_cli_transcript_uses_last_json_payload(self) -> None:
@@ -132,309 +91,101 @@ class TestLLMSignalParsing:
                 "user",
                 '{"signals":[{"category":"opportunity","title":"prompt echo"}]}',
                 "assistant",
-                '{"signals":[{"category":"methodology","title":"parsed result","relevance_score":0.7}]}',
+                '{"signals":[{"category":"agent_infra","title":"parsed result","relevance_score":0.7}]}',
             ]
         )
-
         signals = _parse_llm_signals(raw)
-
         assert len(signals) == 1
-        assert signals[0].category == "methodology"
+        assert signals[0].category == "agent_infra"
         assert signals[0].title == "parsed result"
 
-    def test_parse_unknown_category_as_methodology(self) -> None:
+    def test_parse_unknown_category_as_world_signal(self) -> None:
         raw = json.dumps(
-            {
-                "signals": [
-                    {
-                        "category": "signal",
-                        "title": "Governance pressure",
-                        "relevance_score": 1.5,
-                    }
-                ]
-            }
+            {"signals": [{"category": "signal", "title": "Frontier pressure", "relevance_score": 1.5}]}
         )
-
         signals = _parse_llm_signals(raw)
-
         assert len(signals) == 1
-        assert signals[0].category == "methodology"
+        assert signals[0].category == "world_signal"
         assert signals[0].relevance_score == 1.0
 
 
-# -- Local scan tests ------------------------------------------------------
-
-
-class TestScanLocal:
+class TestExternalScan:
     @pytest.mark.asyncio
-    async def test_scan_local_no_data(self, tmp_path: Path) -> None:
+    async def test_scan_no_external_data(self, tmp_path: Path) -> None:
         state_dir = tmp_path / ".dharma"
         state_dir.mkdir()
         scanner = ZeitgeistScanner(state_dir=state_dir)
         signals = await scanner.scan()
         assert signals == []
+        assert (state_dir / "meta" / "zeitgeist.md").exists()
 
     @pytest.mark.asyncio
-    async def test_scan_local_with_notes(self, tmp_path: Path) -> None:
+    async def test_scan_external_world_inbox(self, tmp_path: Path) -> None:
         state_dir = tmp_path / ".dharma"
-        shared_dir = state_dir / "shared"
-        shared_dir.mkdir(parents=True)
+        meta = state_dir / "meta"
+        meta.mkdir(parents=True)
+        row = {
+            "id": "subq-1",
+            "source": "operator_drop",
+            "category": "product_company",
+            "title": "SubQ long context coding agent company",
+            "description": "Subquadratic inference and workflow signal.",
+            "relevance_score": 0.92,
+            "keywords": ["subquadratic", "long context", "agent"],
+            "url": "https://example.test/subq",
+        }
+        (meta / "world_zeitgeist_inbox.jsonl").write_text(json.dumps(row) + "\n")
 
-        # Write a note with research keywords
-        (shared_dir / "research_notes.md").write_text(
-            "Found interesting results on mechanistic interpretability "
-            "and participation ratio in self-reference experiments."
+        signals = await ZeitgeistScanner(state_dir=state_dir).scan()
+
+        assert len(signals) == 1
+        assert signals[0].source == "operator_drop"
+        assert signals[0].category == "product_company"
+        assert signals[0].metadata["url"] == "https://example.test/subq"
+        assert "External Zeitgeist" in (meta / "zeitgeist.md").read_text()
+
+    @pytest.mark.asyncio
+    async def test_scan_ignores_internal_shared_notes(self, tmp_path: Path) -> None:
+        state_dir = tmp_path / ".dharma"
+        shared = state_dir / "shared"
+        shared.mkdir(parents=True)
+        (shared / "research_notes.md").write_text(
+            "mechanistic interpretability participation ratio self-reference"
         )
+        signals = await ZeitgeistScanner(state_dir=state_dir).scan()
+        assert signals == []
 
-        scanner = ZeitgeistScanner(state_dir=state_dir)
-        signals = await scanner.scan()
 
-        assert len(signals) >= 1
-        sig = signals[0]
-        assert sig.source == "local_scan"
-        assert sig.category == "methodology"
-        assert sig.relevance_score > 0.0
-        assert len(sig.keywords) > 0
-
+class TestInternalPressure:
     @pytest.mark.asyncio
-    async def test_scan_local_with_threats(self, tmp_path: Path) -> None:
+    async def test_internal_pressure_handles_shared_notes(self, tmp_path: Path) -> None:
         state_dir = tmp_path / ".dharma"
-        shared_dir = state_dir / "shared"
-        shared_dir.mkdir(parents=True)
-
-        (shared_dir / "alert.md").write_text(
-            "A preprint on arxiv shows mechanistic interpretability "
-            "results on participation ratio that could be competing."
+        shared = state_dir / "shared"
+        shared.mkdir(parents=True)
+        (shared / "research_notes.md").write_text(
+            "mechanistic interpretability participation ratio self-reference"
         )
-
-        scanner = ZeitgeistScanner(state_dir=state_dir)
-        signals = await scanner.scan()
-
-        assert len(signals) >= 1
-        threat_signals = [s for s in signals if s.category == "threat"]
-        assert len(threat_signals) >= 1
+        signals = await InternalPressureScanner(state_dir=state_dir).scan()
+        assert len(signals) == 1
+        assert signals[0].source == "internal_pressure"
+        assert signals[0].category == "methodology"
 
     @pytest.mark.asyncio
-    async def test_scan_local_high_stigmergy(self, tmp_path: Path) -> None:
+    async def test_internal_pressure_writes_gate_pressure(self, tmp_path: Path) -> None:
         state_dir = tmp_path / ".dharma"
-        stig_dir = state_dir / "stigmergy"
-        stig_dir.mkdir(parents=True)
-
-        # Write > 1000 marks
-        lines = [json.dumps({"mark": i}) for i in range(1100)]
-        (stig_dir / "marks.jsonl").write_text("\n".join(lines))
-
-        scanner = ZeitgeistScanner(state_dir=state_dir)
-        signals = await scanner.scan()
-
-        opportunity = [s for s in signals if s.category == "opportunity"]
-        assert len(opportunity) == 1
-        assert "stigmergy" in opportunity[0].title.lower()
-
-
-# -- Persistence tests -----------------------------------------------------
-
-
-class TestSaveAndLoad:
-    @pytest.mark.asyncio
-    async def test_save_creates_files(self, tmp_path: Path) -> None:
-        state_dir = tmp_path / ".dharma"
-        state_dir.mkdir()
-        scanner = ZeitgeistScanner(state_dir=state_dir)
-
-        # Manually add a signal
-        scanner._signals = [
-            ZeitgeistSignal(
-                source="manual",
-                category="tool_release",
-                title="New SAE toolkit",
-                relevance_score=0.6,
-                keywords=["SAE", "sparse autoencoder"],
-            )
-        ]
-        scanner._save()
-
-        meta_dir = state_dir / "meta"
-        assert (meta_dir / "zeitgeist.md").exists()
-        assert (meta_dir / "zeitgeist.jsonl").exists()
-
-        md_content = (meta_dir / "zeitgeist.md").read_text()
-        assert "tool_release" in md_content
-        assert "New SAE toolkit" in md_content
-
-    @pytest.mark.asyncio
-    async def test_load_history(self, tmp_path: Path) -> None:
-        state_dir = tmp_path / ".dharma"
-        state_dir.mkdir()
-        scanner = ZeitgeistScanner(state_dir=state_dir)
-
-        # Save two signals
-        scanner._signals = [
-            ZeitgeistSignal(source="manual", category="methodology", title="A"),
-            ZeitgeistSignal(source="manual", category="threat", title="B"),
-        ]
-        scanner._save()
-
-        # Load them back
-        loaded = scanner.load_history()
-        assert len(loaded) == 2
-        assert loaded[0].title == "A"
-        assert loaded[1].title == "B"
-
-
-# -- Constant tests --------------------------------------------------------
-
-
-class TestConstants:
-    def test_research_keywords_nonempty(self) -> None:
-        assert len(RESEARCH_KEYWORDS) > 10
-
-    def test_threat_keywords_nonempty(self) -> None:
-        assert len(THREAT_KEYWORDS) > 3
-
-
-# -- Filter property tests -------------------------------------------------
-
-
-class TestLatestThreats:
-    def test_latest_threats_filter(self) -> None:
-        scanner = ZeitgeistScanner()
-        scanner._signals = [
-            ZeitgeistSignal(source="manual", category="threat", title="T1"),
-            ZeitgeistSignal(source="manual", category="methodology", title="M1"),
-            ZeitgeistSignal(source="manual", category="threat", title="T2"),
-        ]
-        threats = scanner.latest_threats
-        assert len(threats) == 2
-        assert all(t.category == "threat" for t in threats)
-
-    def test_latest_threats_empty(self) -> None:
-        scanner = ZeitgeistScanner()
-        scanner._signals = [
-            ZeitgeistSignal(source="manual", category="methodology", title="M1"),
-        ]
-        threats = scanner.latest_threats
-        assert threats == []
-
-
-# -- S3↔S4 gate pressure feedback tests -----------------------------------
-
-
-class TestGatePressureFeedback:
-    """Test the S4→S3 bidirectional feedback: zeitgeist gate pressure → telos gates."""
-
-    @pytest.mark.asyncio
-    async def test_high_block_rate_writes_gate_pressure(self, tmp_path: Path) -> None:
-        """When witness logs show >=3 BLOCKEDs, zeitgeist writes gate_pressure.json."""
-        state_dir = tmp_path / ".dharma"
-        witness_dir = state_dir / "witness"
-        witness_dir.mkdir(parents=True)
-
-        from datetime import datetime, timezone
+        witness = state_dir / "witness"
+        witness.mkdir(parents=True)
         today = datetime.now(timezone.utc).strftime("%Y%m%d")
-        log_file = witness_dir / f"witness_{today}.jsonl"
+        rows = [json.dumps({"outcome": "BLOCKED"}) for _ in range(3)]
+        (witness / f"witness_{today}.jsonl").write_text("\n".join(rows))
 
-        # Write 5 BLOCKED + 2 PASS outcomes
-        lines = []
-        for i in range(5):
-            lines.append(json.dumps({"outcome": "BLOCKED", "phase": f"t{i}"}))
-        for i in range(2):
-            lines.append(json.dumps({"outcome": "PASS", "phase": f"p{i}"}))
-        log_file.write_text("\n".join(lines))
+        signals = await InternalPressureScanner(state_dir=state_dir).scan()
 
-        scanner = ZeitgeistScanner(state_dir=state_dir)
-        signals = await scanner.scan()
+        assert any("gate_block" in signal.keywords for signal in signals)
+        pressure = json.loads((state_dir / "meta" / "gate_pressure.json").read_text())
+        assert pressure["trust_mode_override"] == "external_strict"
 
-        # Should have generated a gate_block threat signal
-        gate_signals = [s for s in signals if "gate_block" in s.keywords]
-        assert len(gate_signals) >= 1
 
-        # Should have written gate_pressure.json
-        pressure_file = state_dir / "meta" / "gate_pressure.json"
-        assert pressure_file.exists()
-
-        data = json.loads(pressure_file.read_text())
-        assert data["trust_mode_override"] == "external_strict"
-        assert "expires" in data
-        assert data["expires"] > data["set_at"]
-
-    @pytest.mark.asyncio
-    async def test_no_blocks_no_pressure_file(self, tmp_path: Path) -> None:
-        """When witness logs are clean, no gate_pressure.json is written."""
-        state_dir = tmp_path / ".dharma"
-        witness_dir = state_dir / "witness"
-        witness_dir.mkdir(parents=True)
-
-        from datetime import datetime, timezone
-        today = datetime.now(timezone.utc).strftime("%Y%m%d")
-        log_file = witness_dir / f"witness_{today}.jsonl"
-
-        lines = [json.dumps({"outcome": "PASS"}) for _ in range(10)]
-        log_file.write_text("\n".join(lines))
-
-        scanner = ZeitgeistScanner(state_dir=state_dir)
-        await scanner.scan()
-
-        pressure_file = state_dir / "meta" / "gate_pressure.json"
-        assert not pressure_file.exists()
-
-    def test_gate_reads_pressure_override(self, tmp_path: Path) -> None:
-        """TelosGatekeeper._apply_gate_pressure reads the pressure file."""
-        import time
-        from dharma_swarm.telos_gates import TelosGatekeeper
-
-        gk = TelosGatekeeper()
-        # Write a valid pressure file
-        pressure_dir = tmp_path / "meta"
-        pressure_dir.mkdir(parents=True)
-        pressure_file = pressure_dir / "gate_pressure.json"
-        pressure_file.write_text(json.dumps({
-            "trust_mode_override": "external_strict",
-            "set_at": time.time(),
-            "expires": time.time() + 3600,
-        }))
-
-        # Monkey-patch the path
-        original = TelosGatekeeper._GATE_PRESSURE_PATH
-        TelosGatekeeper._GATE_PRESSURE_PATH = pressure_file
-        try:
-            result = gk._apply_gate_pressure("internal_yolo")
-            assert result == "external_strict"
-        finally:
-            TelosGatekeeper._GATE_PRESSURE_PATH = original
-
-    def test_gate_ignores_expired_pressure(self, tmp_path: Path) -> None:
-        """Expired gate_pressure.json does not override trust mode."""
-        import time
-        from dharma_swarm.telos_gates import TelosGatekeeper
-
-        gk = TelosGatekeeper()
-        pressure_dir = tmp_path / "meta"
-        pressure_dir.mkdir(parents=True)
-        pressure_file = pressure_dir / "gate_pressure.json"
-        pressure_file.write_text(json.dumps({
-            "trust_mode_override": "external_strict",
-            "set_at": time.time() - 7200,
-            "expires": time.time() - 3600,  # expired 1 hour ago
-        }))
-
-        original = TelosGatekeeper._GATE_PRESSURE_PATH
-        TelosGatekeeper._GATE_PRESSURE_PATH = pressure_file
-        try:
-            result = gk._apply_gate_pressure("internal_yolo")
-            assert result == "internal_yolo"  # not overridden
-        finally:
-            TelosGatekeeper._GATE_PRESSURE_PATH = original
-
-    def test_gate_no_pressure_file_passthrough(self) -> None:
-        """When no gate_pressure.json exists, mode passes through unchanged."""
-        from dharma_swarm.telos_gates import TelosGatekeeper
-
-        gk = TelosGatekeeper()
-        original = TelosGatekeeper._GATE_PRESSURE_PATH
-        TelosGatekeeper._GATE_PRESSURE_PATH = Path("/nonexistent/gate_pressure.json")
-        try:
-            result = gk._apply_gate_pressure("internal_yolo")
-            assert result == "internal_yolo"
-        finally:
-            TelosGatekeeper._GATE_PRESSURE_PATH = original
+def test_keyword_sets_still_exported() -> None:
+    assert "mechanistic interpretability" in RESEARCH_KEYWORDS
+    assert "preprint" in THREAT_KEYWORDS

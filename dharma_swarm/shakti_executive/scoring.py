@@ -52,6 +52,24 @@ _RESEARCH_WORDS = frozenset({
     "evidence",
     "replicated",
 })
+_ECOSYSTEM_WORDS = frozenset({
+    "agent",
+    "agents",
+    "startup",
+    "product",
+    "company",
+    "competitor",
+    "market",
+    "github",
+    "repo",
+    "framework",
+    "workflow",
+    "inference",
+    "subquadratic",
+    "context",
+    "benchmark",
+    "launch",
+})
 _URGENCY_WORDS = frozenset({
     "critical",
     "high",
@@ -118,7 +136,9 @@ def _candidate_from_signal(
             "evidence_ref": signal.evidence_ref,
             "confidence": signal.confidence,
             "relevance_score": signal.relevance_score,
+            "raw_source": str(signal.raw.get("source") or signal.raw.get("raw_source") or ""),
         }],
+        strategic_vision=_strategic_vision_for_signal(signal, domain),
     )
     return candidate
 
@@ -132,10 +152,16 @@ def _domain_for_signal(signal: ExecutiveSignal, words: set[str]) -> str:
             return "internal_maintenance"
         if hint in {"external", "market", "revenue", "external_revenue"}:
             return "external_revenue"
+        if hint in {"ecosystem", "external_ecosystem", "zeitgeist", "world_signal"}:
+            return "ecosystem_scan"
         if hint in {"research", "strategic_vision", "operator_priority"}:
             return hint
+    if _is_world_zeitgeist(signal):
+        return "ecosystem_scan"
     if words & _REVENUE_WORDS:
         return "external_revenue"
+    if words & _ECOSYSTEM_WORDS:
+        return "ecosystem_scan"
     if words & _RESEARCH_WORDS:
         return "research"
     if words & _INTERNAL_WORDS:
@@ -158,6 +184,15 @@ def _thesis_for_signal(signal: ExecutiveSignal, words: set[str]) -> str:
         return category
     if words & _REVENUE_WORDS:
         return "revenue_wedge"
+    if category in {
+        "world_signal",
+        "market_movement",
+        "product_company",
+        "agent_infra",
+        "security_regulatory",
+        "practitioner_signal",
+    }:
+        return "ecosystem_signal"
     if "actionable" in category or signal.suggested_action:
         return "actionable_improvement"
     if words & _RESEARCH_WORDS:
@@ -180,7 +215,7 @@ def _factor_scores(
     artifact_potential = 0.35
     if signal.suggested_action:
         artifact_potential = 0.85
-    elif domain in {"internal_maintenance", "external_revenue"}:
+    elif domain in {"internal_maintenance", "external_revenue", "ecosystem_scan"}:
         artifact_potential = 0.7
 
     telos_alignment = 0.62
@@ -188,6 +223,8 @@ def _factor_scores(
         telos_alignment = 0.88
     if domain == "external_revenue" and "welfare" not in words:
         telos_alignment = 0.66
+    if domain == "ecosystem_scan":
+        telos_alignment = max(telos_alignment, 0.72)
 
     world_value = 0.55
     if domain == "external_revenue":
@@ -196,6 +233,8 @@ def _factor_scores(
             world_value = 0.88
     elif domain == "research":
         world_value = 0.7
+    elif domain == "ecosystem_scan":
+        world_value = 0.84
     elif domain == "internal_maintenance":
         world_value = 0.62
 
@@ -207,10 +246,14 @@ def _factor_scores(
         capability_fit = 0.78
     if signal.source.startswith("scout:"):
         capability_fit = max(capability_fit, 0.72)
+    if domain == "ecosystem_scan":
+        capability_fit = max(capability_fit, 0.74)
 
     strategic_compounding = 0.35
-    if domain in {"strategic_vision", "operator_priority", "external_revenue"}:
+    if domain in {"strategic_vision", "operator_priority", "external_revenue", "ecosystem_scan"}:
         strategic_compounding = 0.72
+    if domain == "ecosystem_scan" and words & {"subquadratic", "agent", "workflow", "startup"}:
+        strategic_compounding = 0.84
     if "recognition" in signal.source:
         strategic_compounding = max(strategic_compounding, 0.82)
 
@@ -226,7 +269,10 @@ def _factor_scores(
         "novelty": round(0.55 if "recognition" in signal.source else 0.35, 3),
         "urgency": round(urgency, 3),
         "capability_fit": round(capability_fit, 3),
-        "domain_balance_bonus": round(0.12 if domain == "external_revenue" else 0.0, 3),
+        "domain_balance_bonus": round(
+            0.12 if domain in {"external_revenue", "ecosystem_scan"} else 0.0,
+            3,
+        ),
         "artifact_potential": round(artifact_potential, 3),
         "strategic_compounding": round(strategic_compounding, 3),
         "internal_churn_penalty": round(internal_churn_penalty, 3),
@@ -263,6 +309,8 @@ def _title_for_signal(signal: ExecutiveSignal, *, domain: str) -> str:
     title = signal.title.strip().rstrip(".")
     if domain == "external_revenue" and "revenue" not in title.lower():
         return f"Revenue wedge: {title}"
+    if domain == "ecosystem_scan" and "ecosystem" not in title.lower():
+        return f"Ecosystem signal: {title}"
     if domain == "internal_maintenance" and not title.lower().startswith("repair"):
         return f"Repair: {title}"
     return title
@@ -276,7 +324,53 @@ def _why_now(signal: ExecutiveSignal, scores: dict[str, float]) -> str:
         return "operator directive is active"
     if signal.category == "threat":
         return f"threat signal with urgency={urgency:.2f}"
+    if _is_world_zeitgeist(signal):
+        return f"external world signal with urgency={urgency:.2f}"
     return f"{signal.source} signal with score pressure {urgency:.2f}"
+
+
+def _is_world_zeitgeist(signal: ExecutiveSignal) -> bool:
+    if signal.source != "zeitgeist":
+        return False
+    raw_source = str(signal.raw.get("source") or "")
+    metadata = signal.raw.get("metadata")
+    metadata = metadata if isinstance(metadata, dict) else {}
+    feed_path = str(metadata.get("feed_path") or "")
+    return (
+        signal.category
+        in {
+            "world_signal",
+            "market_movement",
+            "product_company",
+            "agent_infra",
+            "security_regulatory",
+            "practitioner_signal",
+            "tool_release",
+            "competing_research",
+        }
+        or "world_" in raw_source
+        or "world_feeds" in feed_path
+    )
+
+
+def _strategic_vision_for_signal(
+    signal: ExecutiveSignal,
+    domain: str,
+) -> dict[str, object] | None:
+    if domain != "ecosystem_scan":
+        return None
+    metadata_raw = signal.raw.get("metadata")
+    metadata = metadata_raw if isinstance(metadata_raw, dict) else {}
+    raw = {
+        "first_principles_questions": metadata.get("first_principles_questions"),
+        "iteration_steps": metadata.get("iteration_steps"),
+        "adjacent_searches": metadata.get("adjacent_searches"),
+        "strategic_moves": metadata.get("strategic_moves"),
+        "dimensions": metadata.get("dimensions"),
+        "uncertainty": metadata.get("uncertainty"),
+        "url": metadata.get("url") or signal.raw.get("url"),
+    }
+    return {key: value for key, value in raw.items() if value}
 
 
 def _stable_id(*parts: str) -> str:

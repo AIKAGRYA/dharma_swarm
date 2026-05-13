@@ -1,11 +1,9 @@
-"""S4 Environmental Intelligence -- zeitgeist awareness.
+"""External-world zeitgeist awareness.
 
-Beer's Viable System Model System 4: outside-and-future awareness.
-Scans local files for research-relevant signals and optionally uses a
-configured LLM subprocess for AI landscape scanning when enabled.
+Zeitgeist means outside-world sensing: public web, feeds, operator drops, and
+scout outputs. Internal repo/runtime pressure lives in ``internal_pressure``.
 
 Output: ``~/.dharma/meta/zeitgeist.md`` + ``zeitgeist.jsonl``
-Orchestrated cadence: every 600 s (ZEITGEIST_INTERVAL in orchestrate_live).
 """
 
 from __future__ import annotations
@@ -17,13 +15,13 @@ import os
 import re
 import shlex
 import subprocess
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
-from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 from pydantic import BaseModel, Field
 
+from dharma_swarm.daemon_config import dharma_state_dir
 from dharma_swarm.models import _new_id, _utc_now
 
 logger = logging.getLogger(__name__)
@@ -34,41 +32,24 @@ LLM_SCAN_SOURCE_ENV = "DHARMA_ZEITGEIST_LLM_SOURCE"
 LLM_SCAN_TIMEOUT_ENV = "DHARMA_ZEITGEIST_LLM_TIMEOUT_S"
 LLM_SCAN_TIMEOUT_S = 45.0
 
-
-# ---------------------------------------------------------------------------
-# Data model
-# ---------------------------------------------------------------------------
+WORLD_INBOX_NAME = "world_zeitgeist_inbox.jsonl"
+WORLD_FEED_NAME = "world_signal_feed.jsonl"
 
 
 class ZeitgeistSignal(BaseModel):
-    """A detected environmental signal.
-
-    Attributes:
-        id: Unique signal identifier.
-        source: Origin of the signal (local_scan, claude_scan, manual).
-        category: Signal classification bucket.
-        title: Human-readable summary.
-        relevance_score: Relevance to active research, 0.0--1.0.
-        keywords: Matched keywords that triggered the signal.
-        description: Extended explanation.
-        timestamp: UTC timestamp of detection.
-    """
+    """A detected external-world signal."""
 
     id: str = Field(default_factory=_new_id)
-    source: str  # "local_scan", "claude_scan", "manual"
-    category: str  # "competing_research", "tool_release", "methodology", "threat", "opportunity"
+    source: str
+    category: str
     title: str
     relevance_score: float = 0.0
     keywords: list[str] = Field(default_factory=list)
     description: str = ""
     timestamp: datetime = Field(default_factory=_utc_now)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
-# ---------------------------------------------------------------------------
-# Keyword dictionaries
-# ---------------------------------------------------------------------------
-
-# Keywords relevant to the two active research tracks (R_V + URA).
 RESEARCH_KEYWORDS: set[str] = {
     "mechanistic interpretability",
     "participation ratio",
@@ -82,17 +63,24 @@ RESEARCH_KEYWORDS: set[str] = {
     "consciousness",
     "self-model",
     "strange loop",
-    "GEB",
+    "geb",
     "fixed point",
     "transformer geometry",
     "representation collapse",
-    "SAE",
+    "sae",
     "sparse autoencoder",
     "circuit",
     "superposition",
+    "agent",
+    "agents",
+    "coding agent",
+    "ai engineer",
+    "long context",
+    "subquadratic",
+    "inference",
+    "scaffolding",
 }
 
-# Keywords that indicate competitive or contradictory external work.
 THREAT_KEYWORDS: set[str] = {
     "scooped",
     "preprint",
@@ -104,243 +92,139 @@ THREAT_KEYWORDS: set[str] = {
     "contradicts",
 }
 
-
-# ---------------------------------------------------------------------------
-# Scanner
-# ---------------------------------------------------------------------------
+WORLD_SIGNAL_CATEGORIES: set[str] = {
+    "competing_research",
+    "tool_release",
+    "methodology",
+    "threat",
+    "opportunity",
+    "market_movement",
+    "product_company",
+    "agent_infra",
+    "security_regulatory",
+    "practitioner_signal",
+    "world_signal",
+}
 
 
 class ZeitgeistScanner:
-    """S4 scanner that detects research-relevant environmental signals.
-
-    The scanner inspects local state (shared notes, stigmergy density) and
-    optionally delegates to a configured LLM command for broader landscape
-    awareness.
-    Results are persisted as a Markdown summary and a JSONL log.
-
-    Args:
-        state_dir: Root of the ``.dharma`` state tree.  Defaults to
-            ``~/.dharma``.
-    """
+    """Scan external-world inboxes and optional LLM scout output."""
 
     def __init__(self, state_dir: Path | None = None) -> None:
-        self._state_dir = state_dir or (dharma_state_dir())
+        self._state_dir = state_dir or dharma_state_dir()
         self._meta_dir = self._state_dir / "meta"
+        self._world_feed_dir = self._state_dir / "world_feeds"
         self._signals: list[ZeitgeistSignal] = []
         self._output_path = self._meta_dir / "zeitgeist.md"
         self._log_path = self._meta_dir / "zeitgeist.jsonl"
 
-    # -- public API ---------------------------------------------------------
-
     async def scan(self) -> list[ZeitgeistSignal]:
-        """Run all available scan sources and persist results.
-
-        Returns:
-            List of newly detected signals.
-        """
+        """Run all external scan sources and persist newly observed signals."""
         self._signals = []
+        self._signals.extend(await self._scan_external_feeds())
 
-        # Always do local scan
-        local_signals = await self._scan_local()
-        self._signals.extend(local_signals)
-
-        # Try an LLM scan only when explicitly enabled. S4 should be able to
-        # run unattended without surprise network/model calls.
         if os.environ.get(LLM_SCAN_ENABLED_ENV) == "1":
             try:
-                llm_signals = await self._scan_llm()
-                self._signals.extend(llm_signals)
+                self._signals.extend(await self._scan_llm())
             except Exception as exc:
-                logger.debug("LLM scan unavailable: %s", exc)
+                logger.debug("LLM zeitgeist scan unavailable: %s", exc)
 
-        # Persist
         self._save()
-
-        return self._signals
+        return self.signals
 
     def keyword_relevance(self, text: str) -> float:
-        """Score *text* relevance against ``RESEARCH_KEYWORDS``.
-
-        Returns:
-            Float in [0.0, 1.0].  One point per keyword match, capped
-            at 5 (= 1.0).
-        """
         text_lower = text.lower()
         matches = sum(1 for kw in RESEARCH_KEYWORDS if kw.lower() in text_lower)
         return min(1.0, matches / 5.0)
 
     def detect_threats(self, text: str) -> list[str]:
-        """Return threat keywords found in *text*."""
         text_lower = text.lower()
         return [kw for kw in THREAT_KEYWORDS if kw.lower() in text_lower]
 
     @property
     def signals(self) -> list[ZeitgeistSignal]:
-        """Return a copy of the most-recently scanned signals."""
         return list(self._signals)
 
     @property
     def latest_threats(self) -> list[ZeitgeistSignal]:
-        """Return signals classified as ``threat``."""
-        return [s for s in self._signals if s.category == "threat"]
+        return [signal for signal in self._signals if signal.category == "threat"]
 
-    # -- scan sources -------------------------------------------------------
+    async def _scan_external_feeds(self) -> list[ZeitgeistSignal]:
+        paths: list[Path] = [
+            self._meta_dir / WORLD_INBOX_NAME,
+            self._meta_dir / WORLD_FEED_NAME,
+        ]
+        if self._world_feed_dir.exists():
+            paths.extend(sorted(self._world_feed_dir.glob("*.jsonl")))
 
-    async def _scan_local(self) -> list[ZeitgeistSignal]:
-        """Scan local state files for research-relevant signals."""
         signals: list[ZeitgeistSignal] = []
-
-        # Check shared notes for mentions of external work
-        shared_dir = self._state_dir / "shared"
-        if shared_dir.exists():
-            note_paths = sorted(
-                shared_dir.glob("*.md"),
-                key=lambda p: p.stat().st_mtime,
-                reverse=True,
-            )[:10]
-            for note_path in note_paths:
-                try:
-                    text = note_path.read_text()
-                    text_lower = text.lower()
-                    matched_kw = [
-                        kw for kw in RESEARCH_KEYWORDS if kw.lower() in text_lower
-                    ]
-                    threat_kw = [
-                        kw for kw in THREAT_KEYWORDS if kw.lower() in text_lower
-                    ]
-
-                    if matched_kw:
-                        relevance = min(1.0, len(matched_kw) / 5.0)
-                        category = "threat" if threat_kw else "methodology"
-                        signals.append(
-                            ZeitgeistSignal(
-                                source="local_scan",
-                                category=category,
-                                title=f"Keywords in {note_path.name}",
-                                relevance_score=round(relevance, 2),
-                                keywords=matched_kw[:5],
-                                description=(
-                                    f"Found {len(matched_kw)} research keywords"
-                                    + (
-                                        f", {len(threat_kw)} threat keywords"
-                                        if threat_kw
-                                        else ""
-                                    )
-                                ),
-                            )
-                        )
-                except Exception:
+        seen: set[str] = set()
+        for path in paths:
+            if not path.exists():
+                continue
+            for row in _read_jsonl_tail(path, max_lines=300):
+                signal = self._row_to_signal(row, path=path)
+                if signal is None:
                     continue
+                dedupe_key = str(
+                    row.get("id")
+                    or row.get("url")
+                    or f"{signal.source}:{signal.category}:{signal.title}"
+                )
+                if dedupe_key in seen:
+                    continue
+                seen.add(dedupe_key)
+                signals.append(signal)
+        signals.sort(key=lambda signal: signal.relevance_score, reverse=True)
+        return signals[:80]
 
-        # S3→S4 channel: scan witness logs for gate failure patterns
-        witness_dir = self._state_dir / "witness"
-        if witness_dir.exists():
-            try:
-                today = datetime.now(timezone.utc).strftime("%Y%m%d")
-                log_file = witness_dir / f"witness_{today}.jsonl"
-                if log_file.exists():
-                    lines = log_file.read_text().strip().split("\n")
-                    outcomes = {"BLOCKED": 0, "WARN": 0, "PASS": 0}
-                    for line in lines[-200:]:
-                        try:
-                            entry = json.loads(line)
-                            outcome = entry.get("outcome", "")
-                            if outcome in outcomes:
-                                outcomes[outcome] += 1
-                        except (json.JSONDecodeError, KeyError):
-                            continue
-                    total = sum(outcomes.values())
-                    block_count = outcomes["BLOCKED"]
-                    if total > 0 and block_count >= 3:
-                        signals.append(
-                            ZeitgeistSignal(
-                                source="local_scan",
-                                category="threat",
-                                title="High gate block rate (S3→S4 channel)",
-                                relevance_score=min(1.0, block_count / 10.0),
-                                keywords=["gate_block", "witness", "telos_gates"],
-                                description=(
-                                    f"{block_count}/{total} gate checks blocked today. "
-                                    f"Indicates governance pressure or agent drift."
-                                ),
-                            )
-                        )
-                    elif total > 10 and outcomes["WARN"] > total * 0.3:
-                        signals.append(
-                            ZeitgeistSignal(
-                                source="local_scan",
-                                category="opportunity",
-                                title="Elevated gate warnings (S3→S4 channel)",
-                                relevance_score=0.4,
-                                keywords=["gate_warn", "witness"],
-                                description=(
-                                    f"{outcomes['WARN']}/{total} gate checks warned today."
-                                ),
-                            )
-                        )
-            except Exception:
-                logger.debug("Witness log scan failed", exc_info=True)
-
-            # ── S4→S3 feedback: write gate pressure signal ──
-            # When threat signals detected, advise gates to tighten.
-            # TelosGatekeeper reads this file to adjust trust_mode.
-            try:
-                pressure_path = self._state_dir / "meta" / "gate_pressure.json"
-                pressure_path.parent.mkdir(parents=True, exist_ok=True)
-                gate_signals = [s for s in signals if "gate_block" in s.keywords]
-                if gate_signals:
-                    import time as _time
-                    pressure_path.write_text(json.dumps({
-                        "trust_mode_override": "external_strict",
-                        "reason": gate_signals[0].description,
-                        "set_at": _time.time(),
-                        "expires": _time.time() + 3600,  # 1 hour
-                    }), encoding="utf-8")
-                    logger.info("S4→S3 gate pressure: external_strict (high block rate)")
-                elif pressure_path.exists():
-                    # Clear stale pressure if no gate threat
-                    try:
-                        data = json.loads(pressure_path.read_text())
-                        import time as _time
-                        if data.get("expires", 0) < _time.time():
-                            pressure_path.unlink(missing_ok=True)
-                    except Exception:
-                        logger.debug("Gate pressure cleanup failed", exc_info=True)
-            except Exception:
-                logger.debug("Gate pressure write failed", exc_info=True)
-
-        # Check stigmergy marks for density signals
-        marks_path = self._state_dir / "stigmergy" / "marks.jsonl"
-        if marks_path.exists():
-            try:
-                content = marks_path.read_text().strip()
-                if content:
-                    lines = content.split("\n")
-                    if len(lines) > 1000:
-                        signals.append(
-                            ZeitgeistSignal(
-                                source="local_scan",
-                                category="opportunity",
-                                title="High stigmergy density",
-                                relevance_score=0.3,
-                                description=f"{len(lines)} marks indicate active colony intelligence",
-                            )
-                        )
-            except Exception:
-                logger.debug("Stigmergy density scan failed", exc_info=True)
-
-        return signals
+    def _row_to_signal(self, row: dict[str, Any], *, path: Path) -> ZeitgeistSignal | None:
+        title = str(row.get("title") or row.get("name") or "").strip()
+        if not title:
+            return None
+        description = str(
+            row.get("description") or row.get("summary") or row.get("body") or ""
+        ).strip()
+        raw_category = str(row.get("category") or row.get("signal_type") or "world_signal")
+        category = raw_category if raw_category in WORLD_SIGNAL_CATEGORIES else "world_signal"
+        source = str(row.get("source") or row.get("publisher") or path.stem or "world_feed")
+        score = _score(row, default=self.keyword_relevance(f"{title} {description}"))
+        keywords = _keywords(row, f"{title} {description}")
+        metadata = dict(row.get("metadata") or {})
+        for key in (
+            "url",
+            "source_url",
+            "publisher",
+            "raw_source",
+            "first_principles_questions",
+            "iteration_steps",
+            "adjacent_searches",
+            "strategic_moves",
+            "uncertainty",
+        ):
+            if key in row and key not in metadata:
+                metadata[key] = row[key]
+        metadata.setdefault("feed_path", str(path))
+        return ZeitgeistSignal(
+            id=str(row.get("id") or _new_id()),
+            source=source,
+            category=category,
+            title=title[:180],
+            relevance_score=round(max(0.0, min(1.0, score)), 3),
+            keywords=keywords[:12],
+            description=description[:1200],
+            metadata=metadata,
+        )
 
     async def _scan_llm(self) -> list[ZeitgeistSignal]:
-        """Use an opt-in LLM command for AI landscape scanning."""
         prompt = (
-            "Return only compact JSON for DHARMA SWARM S4. Produce 3 current "
-            "frontier signals about agentic AI/autonomous coding agents, AI "
-            "governance, mechanistic interpretability, or self-improving tool "
-            "use. Schema: {\"signals\":[{\"category\":\"competing_research|"
-            "tool_release|methodology|threat|opportunity\",\"title\":\"...\","
-            "\"relevance_score\":0.0,\"keywords\":[\"...\"],"
-            "\"description\":\"...\"}]}"
+            "Return compact JSON only. Produce 3 current outside-world frontier "
+            "signals about AI agents, autonomous coding, AI infrastructure, AI "
+            "governance, interpretability, or related startups. Schema: "
+            "{\"signals\":[{\"category\":\"competing_research|tool_release|"
+            "methodology|threat|opportunity|product_company|agent_infra\","
+            "\"title\":\"...\",\"relevance_score\":0.0,\"keywords\":[\"...\"],"
+            "\"description\":\"...\",\"metadata\":{\"url\":\"...\"}}]}"
         )
         cmd = shlex.split(os.environ.get(LLM_SCAN_CMD_ENV, "claude -p"))
         if "{prompt}" in cmd:
@@ -367,74 +251,53 @@ class ZeitgeistScanner:
         except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
             logger.debug("LLM zeitgeist scan unavailable: %s", exc)
             return []
-
         if proc.returncode != 0:
             logger.debug("LLM zeitgeist scan failed: %s", proc.stderr.strip())
             return []
-
         return _parse_llm_signals(proc.stdout)
 
-    # -- persistence --------------------------------------------------------
-
     def _save(self) -> None:
-        """Persist signals to disk as JSONL log and Markdown summary."""
         self._meta_dir.mkdir(parents=True, exist_ok=True)
+        with open(self._log_path, "a", encoding="utf-8") as fh:
+            for signal in self._signals:
+                fh.write(signal.model_dump_json() + "\n")
 
-        # Append to JSONL log
-        with open(self._log_path, "a") as fh:
-            for sig in self._signals:
-                fh.write(sig.model_dump_json() + "\n")
-
-        # Write summary markdown
         now_str = _utc_now().strftime("%Y-%m-%d %H:%M UTC")
-        lines: list[str] = [f"# Zeitgeist -- {now_str}\n"]
-        for sig in self._signals:
-            lines.append(
-                f"- [{sig.category}] {sig.title} (relevance={sig.relevance_score})"
-            )
-            if sig.keywords:
-                lines.append(f"  Keywords: {', '.join(sig.keywords)}")
+        lines = [f"# External Zeitgeist -- {now_str}", ""]
         if not self._signals:
-            lines.append("No signals detected.")
-        self._output_path.write_text("\n".join(lines) + "\n")
-
-    # -- loading historical signals -----------------------------------------
+            lines.append("No external signals detected.")
+        for signal in self._signals:
+            lines.append(
+                f"- [{signal.category}] {signal.title} "
+                f"(relevance={signal.relevance_score})"
+            )
+            if signal.keywords:
+                lines.append(f"  Keywords: {', '.join(signal.keywords)}")
+        self._output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     def load_history(self) -> list[ZeitgeistSignal]:
-        """Load all previously logged signals from the JSONL file.
-
-        Returns:
-            List of ``ZeitgeistSignal`` instances, oldest first.
-        """
         signals: list[ZeitgeistSignal] = []
         if not self._log_path.exists():
             return signals
-        try:
-            for line in self._log_path.read_text().strip().split("\n"):
-                if line.strip():
-                    signals.append(ZeitgeistSignal.model_validate_json(line))
-        except Exception as exc:
-            logger.warning("Failed to load zeitgeist history: %s", exc)
+        for row in _read_jsonl_tail(self._log_path, max_lines=10_000):
+            try:
+                signals.append(ZeitgeistSignal.model_validate(row))
+            except Exception as exc:
+                logger.debug("Skipping malformed zeitgeist history row: %s", exc)
         return signals
 
     def clear(self) -> None:
-        """Reset in-memory signal list (does not delete persisted files)."""
         self._signals = []
 
 
 def _parse_llm_signals(raw: str) -> list[ZeitgeistSignal]:
-    """Parse strict JSON, or a CLI transcript containing a final JSON payload."""
     text = raw.strip()
     if not text:
         return []
-
     if not text.startswith(("{", "[")):
         for line in reversed(text.splitlines()):
             candidate = line.strip()
-            if (
-                candidate.startswith(("{", "["))
-                and _loads_signal_payload(candidate) is not None
-            ):
+            if candidate.startswith(("{", "[")) and _loads_signal_payload(candidate) is not None:
                 text = candidate
                 break
         else:
@@ -446,46 +309,29 @@ def _parse_llm_signals(raw: str) -> list[ZeitgeistSignal]:
     payload = _loads_signal_payload(text)
     if payload is None:
         return []
-
     rows = payload.get("signals", payload) if isinstance(payload, dict) else payload
     if not isinstance(rows, list):
         return []
 
     signals: list[ZeitgeistSignal] = []
-    allowed_categories = {
-        "competing_research",
-        "tool_release",
-        "methodology",
-        "threat",
-        "opportunity",
-    }
     for row in rows[:5]:
         if not isinstance(row, dict):
             continue
-        category = str(row.get("category") or "methodology").strip()
-        if category not in allowed_categories:
-            category = "methodology"
         title = str(row.get("title") or "").strip()
         if not title:
             continue
-        try:
-            relevance = float(row.get("relevance_score", 0.0))
-        except (TypeError, ValueError):
-            relevance = 0.0
-        keywords_raw = row.get("keywords", [])
-        keywords = (
-            [str(k).strip() for k in keywords_raw if str(k).strip()]
-            if isinstance(keywords_raw, list)
-            else []
-        )
+        category = str(row.get("category") or "world_signal").strip()
+        if category not in WORLD_SIGNAL_CATEGORIES:
+            category = "world_signal"
         signals.append(
             ZeitgeistSignal(
                 source=os.environ.get(LLM_SCAN_SOURCE_ENV, "llm_scan"),
                 category=category,
-                title=title[:140],
-                relevance_score=max(0.0, min(1.0, relevance)),
-                keywords=keywords[:8],
-                description=str(row.get("description") or "").strip()[:800],
+                title=title[:180],
+                relevance_score=_score(row, default=0.0),
+                keywords=_keywords(row, f"{title} {row.get('description') or ''}")[:12],
+                description=str(row.get("description") or "").strip()[:1200],
+                metadata=dict(row.get("metadata") or {}),
             )
         )
     return signals
@@ -495,10 +341,45 @@ def _loads_signal_payload(text: str) -> Any | None:
     try:
         payload = json.loads(text)
     except json.JSONDecodeError as exc:
-        logger.debug("LLM zeitgeist JSON parse failed: %s", exc)
+        logger.debug("Zeitgeist JSON parse failed: %s", exc)
         return None
     if isinstance(payload, list):
         return payload
     if isinstance(payload, dict) and "signals" in payload:
         return payload
     return None
+
+
+def _read_jsonl_tail(path: Path, *, max_lines: int) -> list[dict[str, Any]]:
+    try:
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return []
+    rows: list[dict[str, Any]] = []
+    for line in lines[-max_lines:]:
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(row, dict):
+            rows.append(row)
+    return rows
+
+
+def _score(row: dict[str, Any], *, default: float) -> float:
+    for key in ("relevance_score", "score", "final_score", "confidence"):
+        try:
+            return max(0.0, min(1.0, float(row[key])))
+        except (KeyError, TypeError, ValueError):
+            continue
+    return max(0.0, min(1.0, default))
+
+
+def _keywords(row: dict[str, Any], text: str) -> list[str]:
+    raw = row.get("keywords")
+    if isinstance(raw, list):
+        return [str(item).strip() for item in raw if str(item).strip()]
+    text_lower = text.lower()
+    return [kw for kw in sorted(RESEARCH_KEYWORDS) if kw.lower() in text_lower]

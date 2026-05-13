@@ -232,6 +232,39 @@ def test_run_cron_job_portable_headless_reports_honest_failure_when_no_compatibl
     assert error == "No preferred providers available"
 
 
+def test_execute_cron_job_world_scout_waits_for_fetch_flag(monkeypatch):
+    monkeypatch.delenv("DHARMA_WORLD_SCOUT_FETCH", raising=False)
+
+    result = execute_cron_job({"handler": "world_scout"})
+
+    assert result.status == CronJobRunStatus.WAITING_EXTERNAL
+    assert "DHARMA_WORLD_SCOUT_FETCH=1" in result.output
+
+
+def test_execute_cron_job_world_scout_runs_when_enabled(monkeypatch):
+    monkeypatch.setenv("DHARMA_WORLD_SCOUT_FETCH", "1")
+
+    fake = SimpleNamespace(
+        ok=True,
+        raw_observations=2,
+        emitted_signals=1,
+        board_path="/tmp/world_signal_board.json",
+        brief_path="/tmp/world_signal_brief.md",
+        health_path="/tmp/world_scout_health.json",
+        errors=(),
+    )
+    monkeypatch.setattr(
+        "dharma_swarm.world_radar_go_bridge.run_world_radar_go_once",
+        lambda **kwargs: fake,
+    )
+
+    result = execute_cron_job({"handler": "world_scout", "timeout_sec": 3})
+
+    assert result.status == CronJobRunStatus.COMPLETED
+    assert "signals=1" in result.output
+    assert result.metadata["brief_path"] == "/tmp/world_signal_brief.md"
+
+
 def test_run_cron_job_uses_local_pulse_fallback_when_claude_credit_is_exhausted(
     monkeypatch,
 ):

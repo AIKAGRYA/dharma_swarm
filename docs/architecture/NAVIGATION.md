@@ -151,6 +151,16 @@ Stop the Go track and return to the operator if a Go PR does any of the followin
 - makes CI depend on live network access
 - changes Python decision policy to trust Go verdicts directly
 
+## World Zeitgeist Radar
+
+See [`docs/architecture/WORLD_ZEITGEIST.md`](WORLD_ZEITGEIST.md).
+
+The external zeitgeist path is:
+
+`tools/world_scout_go` → `tools/world_signal_ingestor_go` → `dharma_swarm/world_radar_go_bridge.py` → `~/.dharma/world_feeds/world_signal_feed.jsonl` → `dharma_swarm/zeitgeist.py` → `ShaktiExecutive` ecosystem opportunities.
+
+Live public-source fetches are gated by `DHARMA_WORLD_SCOUT_FETCH=1`. Internal repo/runtime pressure is intentionally separate in `dharma_swarm/internal_pressure.py`.
+
 ---
 
 ## Core Architecture (dharma_swarm/dharma_swarm/)
