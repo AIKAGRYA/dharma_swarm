@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from dharma_swarm import world_radar_go_bridge as bridge
+from dharma_swarm.world_radar import go_bridge as bridge
 
 
 def test_world_radar_promotes_operator_drop_with_fake_ingestor(

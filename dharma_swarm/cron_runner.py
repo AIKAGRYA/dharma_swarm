@@ -649,7 +649,7 @@ def _run_world_scout(job: dict[str, Any]) -> CronJobExecutionResult:
         )
 
     try:
-        from dharma_swarm.world_radar_go_bridge import run_world_radar_go_once
+        from dharma_swarm.world_radar.go_bridge import run_world_radar_go_once
         from dharma_swarm.zeitgeist import ZeitgeistScanner
 
         state_dir = job.get("state_dir") or None

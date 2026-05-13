@@ -475,7 +475,7 @@ def test_world_scout_runs_when_env_enabled(monkeypatch, tmp_path):
     )
     monkeypatch.setenv("DHARMA_WORLD_SCOUT_FETCH", "1")
     monkeypatch.setattr(
-        "dharma_swarm.world_radar_go_bridge.run_world_radar_go_once",
+        "dharma_swarm.world_radar.go_bridge.run_world_radar_go_once",
         lambda **kwargs: fake,
     )
 
@@ -509,7 +509,7 @@ def test_world_scout_job_fetch_runs_without_env(monkeypatch, tmp_path):
         return fake
 
     monkeypatch.setattr(
-        "dharma_swarm.world_radar_go_bridge.run_world_radar_go_once",
+        "dharma_swarm.world_radar.go_bridge.run_world_radar_go_once",
         fake_run,
     )
 

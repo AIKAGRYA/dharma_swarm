@@ -13,7 +13,7 @@ from dharma_swarm.daemon_config import dharma_state_dir
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="python -m dharma_swarm.world_radar_cli")
+    parser = argparse.ArgumentParser(prog="python -m dharma_swarm.world_radar.cli")
     sub = parser.add_subparsers(dest="cmd", required=True)
     drop = sub.add_parser("drop", help="append an operator world-signal drop")
     drop.add_argument("--title", required=True)

@@ -215,11 +215,11 @@ Stop the Go track and return to the operator if a Go PR does any of the followin
 | `context_agent.py` | 968 | Agent that manages context for other agents | Modifying context management behavior |
 | `context_search.py` | 250 | Semantic search over context | Improving context retrieval |
 | `zeitgeist.py` | var | External-world zeitgeist normalization. Reads public-signal feeds and writes canonical `meta/zeitgeist.jsonl`. Does not scan internal repo health. | Adding external signal feed normalization |
-| `world_radar_go_bridge.py` | var | Python bridge for Go world scout and ingestor. Publishes world board, brief, health, promotion inbox, incubations, and source weights. | Wiring or scheduling external radar scans |
-| `world_signal_analysis.py` | var | Movement clustering, source weighting, promotion thresholds, strategic vision, and brief rendering for world signals. | Changing promotion or incubation rules |
-| `world_signal_rnd.py` | var | Deterministic verify/connect/evolve artifacts for incubating external movements. | Changing world-signal R&D workups |
-| `world_radar_cli.py` | var | Operator CLI for adding public-world drops into the radar feed. | Adding operator-supplied external signals |
-| `internal_pressure.py` | var | Local witness/shared/stigmergy pressure scanner. Owns `gate_pressure.json`; separate from zeitgeist. | Modifying local pressure or gate-pressure feedback |
+| `world_radar/go_bridge.py` | var | Python bridge for Go world scout and ingestor. Publishes world board, brief, health, promotion inbox, incubations, and source weights. | Wiring or scheduling external radar scans |
+| `world_radar/analysis.py` | var | Movement clustering, source weighting, promotion thresholds, strategic vision, and brief rendering for world signals. | Changing promotion or incubation rules |
+| `world_radar/rnd.py` | var | Deterministic verify/connect/evolve artifacts for incubating external movements. | Changing world-signal R&D workups |
+| `world_radar/cli.py` | var | Operator CLI for adding public-world drops into the radar feed. | Adding operator-supplied external signals |
+| `s4/internal_pressure.py` | var | Local witness/shared/stigmergy pressure scanner. Owns `gate_pressure.json`; separate from zeitgeist. | Modifying local pressure or gate-pressure feedback |
 | `active_inference.py` | 495 | Friston free energy minimization applied to agent decisions | Modifying inference strategies |
 | `decision_ontology.py` | 537 | First-class decisions with quality scoring | Adding decision types |
 | `decision_router.py` | 323 | Routes decisions to appropriate evaluators | Modifying routing logic |

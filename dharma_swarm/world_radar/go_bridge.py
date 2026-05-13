@@ -13,7 +13,7 @@ import time
 from typing import Any
 
 from dharma_swarm.daemon_config import dharma_state_dir
-from dharma_swarm.world_signal_analysis import (
+from dharma_swarm.world_radar.analysis import (
     build_world_signal_board,
     incubating_movements,
     load_source_feedback_ledger,
@@ -24,7 +24,7 @@ from dharma_swarm.world_signal_analysis import (
     save_source_weights,
     update_source_weights_from_opportunities,
 )
-from dharma_swarm.world_signal_rnd import write_rnd_artifacts
+from dharma_swarm.world_radar.rnd import write_rnd_artifacts
 
 
 @dataclass(frozen=True)
@@ -454,4 +454,4 @@ def _release_lock(handle: Any) -> None:
 
 
 def _repo_root() -> Path:
-    return Path(__file__).resolve().parent.parent
+    return Path(__file__).resolve().parents[2]

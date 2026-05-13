@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dharma_swarm.world_signal_analysis import (
+from dharma_swarm.world_radar.analysis import (
     build_world_signal_board,
     load_source_feedback_ledger,
     load_source_weights,

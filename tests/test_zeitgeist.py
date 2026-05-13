@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from dharma_swarm.internal_pressure import InternalPressureScanner
+from dharma_swarm.s4.internal_pressure import InternalPressureScanner
 from dharma_swarm.zeitgeist import (
     RESEARCH_KEYWORDS,
     THREAT_KEYWORDS,

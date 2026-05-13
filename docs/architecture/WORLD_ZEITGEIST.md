@@ -9,11 +9,11 @@ The loop is:
 
 1. `world_scout_go` fetches public sources when live fetch is explicitly enabled.
 2. `world_signal_ingestor_go` normalizes raw receipts into scored world signals.
-3. `world_signal_analysis.py` groups signals into movements, applies source weights,
+3. `world_radar/analysis.py` groups signals into movements, applies source weights,
    and decides whether each movement is watchlist, incubating, or promotion-ready.
-4. `world_signal_rnd.py` writes deterministic verify/connect/evolve artifacts for
+4. `world_radar/rnd.py` writes deterministic verify/connect/evolve artifacts for
    incubating movements.
-5. `world_radar_go_bridge.py` publishes the board, brief, health, and promotion inbox.
+5. `world_radar/go_bridge.py` publishes the board, brief, health, and promotion inbox.
 6. `zeitgeist.py` reads only external world feeds and writes canonical
    `meta/zeitgeist.jsonl`.
 7. `ShaktiExecutive` reads those promoted world signals and turns them into
@@ -80,7 +80,7 @@ arXiv Atom feeds, Reddit JSON endpoints, and configured URLs from
 Operators can add a public signal directly:
 
 ```bash
-python -m dharma_swarm.world_radar_cli drop \
+python -m dharma_swarm.world_radar.cli drop \
   --title "SubQ managed agent runtime" \
   --url "https://example.com/subq" \
   --note "Operator saw this public launch" \

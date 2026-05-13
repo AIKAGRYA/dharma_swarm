@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from dharma_swarm.world_radar_cli import append_operator_drop, main
+from dharma_swarm.world_radar.cli import append_operator_drop, main
 
 
 def test_append_operator_drop_writes_world_feed(tmp_path: Path) -> None:

@@ -1536,7 +1536,7 @@ async def _run_zeitgeist_loop(shutdown_event: asyncio.Event) -> None:
     await asyncio.sleep(30)
 
     from dharma_swarm.zeitgeist import ZeitgeistScanner
-    from dharma_swarm.world_radar_go_bridge import run_world_radar_go_once
+    from dharma_swarm.world_radar.go_bridge import run_world_radar_go_once
     scanner = ZeitgeistScanner(state_dir=STATE_DIR)
 
     while not shutdown_event.is_set():
@@ -1573,7 +1573,7 @@ async def _run_internal_pressure_loop(shutdown_event: asyncio.Event) -> None:
 
     await asyncio.sleep(30)
 
-    from dharma_swarm.internal_pressure import InternalPressureScanner
+    from dharma_swarm.s4.internal_pressure import InternalPressureScanner
     scanner = InternalPressureScanner(state_dir=STATE_DIR)
 
     while not shutdown_event.is_set():
