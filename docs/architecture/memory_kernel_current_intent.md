@@ -35,10 +35,14 @@ The active work should stay within these limits:
 - M2C: conflict and projection review
 - M2D: read-only promotion proposal queue
 - M2E: read-only promotion decision ledger
+- M3: read-only context admission preview
+- M3B: read-only context safety eval harness
 
-Do not add prompt-context admission, canon writes, Chetana mutations, vector
+Do not add runtime prompt injection, canon writes, Chetana mutations, vector
 rebuilds, migrations, or write-through gates until the read-only layers are
-merged and reviewed.
+merged and reviewed. M3/M3B may preview and evaluate context admission as
+shadow artifacts, but they must not wire MemoryKernel atoms into `context.py`,
+`ContextCompiler`, `AgentRunner`, or prompt construction.
 
 ## Reconciliation Rule
 
@@ -67,3 +71,5 @@ deliberate divergence explicitly.
   explicitly classified otherwise.
 - Review artifacts must not expose raw content or local path refs.
 - Promotion proposals are review inbox items, not accepted knowledge.
+- Context admission evals are shadow-mode only until they preserve safety and
+  prove parity against current context behavior.

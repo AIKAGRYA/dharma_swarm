@@ -27,6 +27,33 @@ from dharma_swarm.memory_kernel.atoms import (
     WriteMode,
 )
 from dharma_swarm.memory_kernel.census import CensusConfig, CensusResult, MemorySurfaceCensus
+from dharma_swarm.memory_kernel.context_admission import (
+    MemoryContextBudget,
+    MemoryContextPack,
+    MemoryContextPackItem,
+    preview_memory_pack,
+    render_memory_context_pack_markdown,
+)
+from dharma_swarm.memory_kernel.context_eval import (
+    ContextEvalConfig,
+    ContextEvalLane,
+    ContextEvalReport,
+    ContextEvalSeverity,
+    ContextSafetyFinding,
+    CurrentContextLaneReport,
+    MemoryKernelContextLaneReport,
+    evaluate_current_context_text,
+    evaluate_memory_kernel_context,
+    run_context_eval,
+)
+from dharma_swarm.memory_kernel.context_eval_cases import (
+    ContextEvalCase,
+    ContextEvalCaseResult,
+    default_context_eval_cases,
+    run_context_eval_case,
+    run_default_context_eval_cases,
+)
+from dharma_swarm.memory_kernel.context_eval_render import render_context_eval_markdown
 from dharma_swarm.memory_kernel.facade import MemoryKernel, MemoryKernelConfig
 from dharma_swarm.memory_kernel.surfaces import SurfaceSpec, default_surface_specs
 from dharma_swarm.memory_kernel.writers import (
@@ -53,6 +80,17 @@ __all__ = [
     "DiscoveryTriageCategory",
     "MemoryAtom",
     "MemoryAtomType",
+    "MemoryContextBudget",
+    "MemoryContextPack",
+    "MemoryContextPackItem",
+    "ContextEvalConfig",
+    "ContextEvalLane",
+    "ContextEvalReport",
+    "ContextEvalCase",
+    "ContextEvalCaseResult",
+    "ContextEvalSeverity",
+    "ContextSafetyFinding",
+    "CurrentContextLaneReport",
     "MemoryLane",
     "MemoryOrder",
     "MemoryQuery",
@@ -63,6 +101,7 @@ __all__ = [
     "MemorySurfaceCensus",
     "MemorySurfaceHealth",
     "MemorySurfaceRole",
+    "MemoryKernelContextLaneReport",
     "MemoryWriterObservation",
     "MemoryWriterSentinel",
     "MemoryWriterSpec",
@@ -80,4 +119,13 @@ __all__ = [
     "WriterStatus",
     "default_surface_specs",
     "default_writer_specs",
+    "default_context_eval_cases",
+    "evaluate_current_context_text",
+    "evaluate_memory_kernel_context",
+    "preview_memory_pack",
+    "render_context_eval_markdown",
+    "render_memory_context_pack_markdown",
+    "run_context_eval_case",
+    "run_default_context_eval_cases",
+    "run_context_eval",
 ]

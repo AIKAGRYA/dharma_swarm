@@ -18,9 +18,12 @@ DEFAULT_WATCH_PATHS = (
     "dharma_swarm/memory_kernel",
     "dharma_swarm/knowledge_ops",
     "scripts/memory_surface_census.py",
+    "scripts/memory_context_eval.py",
     "scripts/memory_writer_sentinel.py",
     "scripts/memory_kernel_plan_observer.py",
     "tests/test_memory_kernel_adapters.py",
+    "tests/test_memory_context_eval.py",
+    "tests/test_memory_context_eval_cli.py",
     "tests/test_memory_surface_census.py",
     "tests/test_memory_writer_sentinel.py",
     "tests/test_knowledge_ops.py",
@@ -31,6 +34,8 @@ DEFAULT_WATCH_PATHS = (
     "docs/architecture/memory_kernel_m2b_knowledgeops_intake.md",
     "docs/architecture/memory_kernel_m2c_conflict_projection_review.md",
     "docs/architecture/memory_kernel_m2d_promotion_proposal_queue.md",
+    "docs/architecture/memory_kernel_m2e_decision_ledger.md",
+    "docs/architecture/memory_kernel_m3b_context_eval.md",
     "docs/architecture/memory_surfaces_census_v3.md",
 )
 
