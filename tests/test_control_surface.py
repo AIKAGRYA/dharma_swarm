@@ -25,6 +25,7 @@ from dharma_swarm.operator_core.control_surface import (
     VerificationEvent,
     _broken_register_rows,
     _build_human_decision_context,
+    _go_receipt_rows,
     _manifest_api_router_rows,
     _manifest_dashboard_page_rows,
     _needs_human_decision,
@@ -373,6 +374,53 @@ class TestFullBuild:
         rows = build_control_surface_rows(repo_root=tmp_repo)
         human = [r for r in rows if r.human_decision_required]
         assert len(human) > 0, "expected at least one human_decision_required row"
+
+
+# ---------------------------------------------------------------------------
+# Go receipt lane adapter
+# ---------------------------------------------------------------------------
+
+
+class TestGoReceiptRows:
+    """Existing G-track files should project through their real repo paths."""
+
+    def test_go_receipt_rows_use_operator_core_bridge_paths(self, tmp_repo: Path) -> None:
+        paths = [
+            "dharma_swarm/operator_core/go_evidence_bridge.py",
+            "dharma_swarm/operator_core/go_github_bridge.py",
+            "tools/go_sdk/receipt/receipt.go",
+            "tools/go_sdk/adaptercontract/contract.go",
+            "tools/evidence_ingestor_go/main.go",
+            "tools/github_ingestor_go/adapter.go",
+        ]
+        for rel in paths:
+            path = tmp_repo / rel
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("// test\n", encoding="utf-8")
+
+        rows = _go_receipt_rows(tmp_repo)
+        by_id = {row.id: row for row in rows}
+
+        assert set(by_id) == {
+            "go.evidence_bridge",
+            "go.github_bridge",
+            "go.receipt_sdk",
+            "go.adapter_contract",
+            "go.evidence_ingestor",
+            "go.github_ingestor",
+        }
+        assert (
+            by_id["go.evidence_bridge"].owner_module
+            == "dharma_swarm/operator_core/go_evidence_bridge.py"
+        )
+        assert (
+            by_id["go.github_bridge"].owner_module
+            == "dharma_swarm/operator_core/go_github_bridge.py"
+        )
+        assert not any(
+            row.owner_module == "dharma_swarm/go_evidence_bridge.py"
+            for row in rows
+        )
 
 
 # ---------------------------------------------------------------------------

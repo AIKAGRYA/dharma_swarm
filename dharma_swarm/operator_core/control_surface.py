@@ -779,51 +779,80 @@ def _go_receipt_rows(repo_root: Path | None = None) -> list[ControlSurfaceRow]:
     root = repo_root or _repo_root()
     rows: list[ControlSurfaceRow] = []
 
-    bridge_path = root / "dharma_swarm" / "go_evidence_bridge.py"
-    if bridge_path.exists():
+    def _append_file_row(
+        *,
+        row_id: str,
+        label: str,
+        authority_role: str,
+        owner_module: str,
+        evidence_label: str,
+    ) -> None:
+        path = root / owner_module
+        if not path.exists():
+            return
         row = ControlSurfaceRow(
-            id="go.evidence_bridge",
+            id=row_id,
             kind="go_receipt",
-            label="Go Evidence Bridge",
-            authority_role="adapter",
+            label=label,
+            authority_role=authority_role,
             declared_state="incubating",
             desired_state="live",
             observed_state="file present",
             coherence_state="partial",
             priority="p2",
-            owner_module="dharma_swarm/go_evidence_bridge.py",
+            owner_module=owner_module,
             truth_owner="go_sdk",
         )
         row.add_evidence(
-            "go_receipt", str(bridge_path.relative_to(root)),
+            "go_receipt", str(path.relative_to(root)),
             status="present",
-            provenance_chain=["go_sdk", "bridge_file_check"],
+            provenance_chain=["go_sdk", "file_check"],
         )
-        row.add_source_ref("go_module", "dharma_swarm/go_evidence_bridge.py", exists=True)
+        row.add_source_ref("go_module", owner_module, exists=True)
         rows.append(row)
 
-    receipt_go = root / "tools" / "go_sdk" / "receipt" / "receipt.go"
-    if receipt_go.exists():
-        row = ControlSurfaceRow(
-            id="go.receipt_sdk",
-            kind="go_receipt",
-            label="Go Receipt SDK",
-            authority_role="evidence",
-            declared_state="incubating",
-            desired_state="live",
-            observed_state="file present",
-            coherence_state="partial",
-            priority="p2",
-            owner_module="tools/go_sdk/receipt/receipt.go",
-            truth_owner="go_sdk",
-        )
-        row.add_evidence(
-            "go_receipt", str(receipt_go.relative_to(root)),
-            status="present",
-            provenance_chain=["go_sdk", "receipt_file_check"],
-        )
-        row.add_source_ref("go_module", "tools/go_sdk/receipt/receipt.go", exists=True)
-        rows.append(row)
+    _append_file_row(
+        row_id="go.evidence_bridge",
+        label="Go Evidence Bridge",
+        authority_role="adapter",
+        owner_module="dharma_swarm/operator_core/go_evidence_bridge.py",
+        evidence_label="bridge file exists",
+    )
+    _append_file_row(
+        row_id="go.github_bridge",
+        label="Go GitHub Bridge",
+        authority_role="adapter",
+        owner_module="dharma_swarm/operator_core/go_github_bridge.py",
+        evidence_label="bridge file exists",
+    )
+    _append_file_row(
+        row_id="go.receipt_sdk",
+        label="Go Receipt SDK",
+        authority_role="evidence",
+        owner_module="tools/go_sdk/receipt/receipt.go",
+        evidence_label="receipt.go exists",
+    )
+    _append_file_row(
+        row_id="go.adapter_contract",
+        label="Go Adapter Contract",
+        authority_role="adapter",
+        owner_module="tools/go_sdk/adaptercontract/contract.go",
+        evidence_label="contract.go exists",
+    )
+    _append_file_row(
+        row_id="go.evidence_ingestor",
+        label="Go Evidence Ingestor",
+        authority_role="adapter",
+        owner_module="tools/evidence_ingestor_go/main.go",
+        evidence_label="ingestor exists",
+    )
+    _append_file_row(
+        row_id="go.github_ingestor",
+        label="Go GitHub Ingestor",
+        authority_role="adapter",
+        owner_module="tools/github_ingestor_go/adapter.go",
+        evidence_label="ingestor exists",
+    )
 
     return rows
 
@@ -945,6 +974,7 @@ def build_control_surface_summary(
         "module_truth",
         "BROKEN_REGISTER.md",
         "runtime_state",
+        "go_sdk",
         "code/filesystem",
     ]
 
