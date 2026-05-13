@@ -62,11 +62,11 @@ These are the ground-truth metrics. All other documents citing different numbers
 
 | Metric | Value | Verification |
 |--------|-------|-------------|
-| Total Python modules | **589** | find dharma_swarm -name "*.py" -type f |
+| Total Python modules | **591** | find dharma_swarm -name "*.py" -type f |
 | Top-level (flat) modules | **386 (65.6%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
-| Total Python LOC | **256,262** | wc -l across dharma_swarm Python modules |
+| Total Python LOC | **256,707** | wc -l across dharma_swarm Python modules |
 | Test files | **575** | find tests -name "*.py" -type f |
-| Test functions | **10,174 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Test functions | **10,205 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
 | Markdown files | **691** | find . -name "*.md" -type f |
