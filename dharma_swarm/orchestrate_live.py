@@ -1526,25 +1526,66 @@ async def _run_replication_monitor_loop(shutdown_event: asyncio.Event) -> None:
 
 
 async def _run_zeitgeist_loop(shutdown_event: asyncio.Event) -> None:
-    """S4 Environmental Intelligence — periodic zeitgeist scanning.
+    """S4 external-world intelligence — normalize public signal receipts.
 
-    Scans witness logs, shared notes, and external signals. When high gate
-    block rates are detected, writes gate_pressure.json to tighten S3 trust
-    mode. This closes VSM Gap #1: S3<->S4 bidirectional feedback.
+    The live network scout is cron-gated. The orchestrator pass only drains
+    receipts already present under the Dharma state directory, then publishes
+    world_signal_board, world_signal_brief, and the canonical zeitgeist feed.
     """
     # Initial delay to let other systems boot first
     await asyncio.sleep(30)
 
     from dharma_swarm.zeitgeist import ZeitgeistScanner
+    from dharma_swarm.world_radar_go_bridge import run_world_radar_go_once
     scanner = ZeitgeistScanner(state_dir=STATE_DIR)
 
     while not shutdown_event.is_set():
+        try:
+            radar = run_world_radar_go_once(
+                state_dir=STATE_DIR,
+                scout_fetch=False,
+                min_score=0.45,
+                timeout_s=30,
+            )
+            if radar.errors:
+                _log("zeitgeist", f"World radar degraded: {list(radar.errors)}")
+        except Exception as e:
+            _log("zeitgeist", f"World radar pass failed: {e}")
+
         try:
             signals = await scanner.scan()
             threats = [s for s in signals if s.category == "threat"]
             _log("zeitgeist", f"S4 scan: {len(signals)} signals, {len(threats)} threats")
         except Exception as e:
             _log("zeitgeist", f"S4 scan failed: {e}")
+
+        try:
+            await asyncio.wait_for(
+                shutdown_event.wait(), timeout=ZEITGEIST_INTERVAL
+            )
+            break
+        except asyncio.TimeoutError:
+            pass
+
+
+async def _run_internal_pressure_loop(shutdown_event: asyncio.Event) -> None:
+    """S4/S3 internal pressure monitor for witness, shared notes, and stigmergy."""
+
+    await asyncio.sleep(30)
+
+    from dharma_swarm.internal_pressure import InternalPressureScanner
+    scanner = InternalPressureScanner(state_dir=STATE_DIR)
+
+    while not shutdown_event.is_set():
+        try:
+            signals = await scanner.scan()
+            threats = [signal for signal in signals if signal.category == "threat"]
+            _log(
+                "internal-pressure",
+                f"S4 pressure scan: {len(signals)} signals, {len(threats)} threats",
+            )
+        except Exception as e:
+            _log("internal-pressure", f"S4 pressure scan failed: {e}")
 
         try:
             await asyncio.wait_for(
@@ -1854,6 +1895,10 @@ def _wire_signal_subscribers(bus: Any) -> None:
         SIGNAL_ANOMALY_DETECTED,
         SIGNAL_OUTCOME_RECORDED,
     )
+    if not hasattr(bus, "subscribe"):
+        _log("signal-bus", "Signal bus has no subscribe() method; subscriber wiring skipped")
+        return
+
     sub_count = 0
 
     # OUTCOME_RECORDED → training flywheel (trajectory ingestion)
@@ -2083,7 +2128,8 @@ async def orchestrate(background: bool = False) -> None:
     _supervisor = LoopSupervisor()
     _loop_intervals = {
         "swarm": SWARM_TICK, "pulse": PULSE_INTERVAL, "health": 120,
-        "zeitgeist": ZEITGEIST_INTERVAL, "witness": WITNESS_INTERVAL,
+        "zeitgeist": ZEITGEIST_INTERVAL, "internal-pressure": ZEITGEIST_INTERVAL,
+        "witness": WITNESS_INTERVAL,
         "consolidation": CONSOLIDATION_INTERVAL, "recognition": 7200,
         "replication": 3600, "self-improve": 3600, "free-grind": 600,
         "flywheel": 300, "conductors": 120, "context-agent": 60,
@@ -2101,6 +2147,7 @@ async def orchestrate(background: bool = False) -> None:
         "conductors": lambda: run_conductor_loop(shutdown_event),
         "context-agent": lambda: run_context_agent_loop(shutdown_event, signal_bus=bus),
         "zeitgeist": lambda: _run_zeitgeist_loop(shutdown_event),
+        "internal-pressure": lambda: _run_internal_pressure_loop(shutdown_event),
         "witness": lambda: _run_witness_loop(shutdown_event),
         "consolidation": lambda: _run_consolidation_loop(shutdown_event),
         "replication": lambda: _run_replication_monitor_loop(shutdown_event),

@@ -444,6 +444,89 @@ def test_run_cron_job_rejects_unknown_handler():
     assert error == output
 
 
+def test_world_scout_waits_when_fetch_not_enabled(monkeypatch):
+    monkeypatch.delenv("DHARMA_WORLD_SCOUT_FETCH", raising=False)
+
+    result = execute_cron_job({"handler": "world_scout", "fetch": False})
+
+    assert result.status is CronJobRunStatus.WAITING_EXTERNAL
+    assert result.metadata["fetch_enabled"] is False
+
+
+def test_world_scout_waits_when_fetch_string_false(monkeypatch):
+    monkeypatch.delenv("DHARMA_WORLD_SCOUT_FETCH", raising=False)
+
+    result = execute_cron_job({"handler": "world_scout", "fetch": "false"})
+
+    assert result.status is CronJobRunStatus.WAITING_EXTERNAL
+
+
+def test_world_scout_runs_when_env_enabled(monkeypatch, tmp_path):
+    fake = SimpleNamespace(
+        ok=True,
+        raw_observations=3,
+        emitted_signals=2,
+        promotion_ready=1,
+        incubations_written=4,
+        board_path="/tmp/board.json",
+        brief_path="/tmp/brief.md",
+        health_path="/tmp/health.json",
+        errors=(),
+    )
+    monkeypatch.setenv("DHARMA_WORLD_SCOUT_FETCH", "1")
+    monkeypatch.setattr(
+        "dharma_swarm.world_radar_go_bridge.run_world_radar_go_once",
+        lambda **kwargs: fake,
+    )
+
+    result = execute_cron_job(
+        {"handler": "world_scout", "fetch": False, "state_dir": str(tmp_path)}
+    )
+
+    assert result.status is CronJobRunStatus.COMPLETED
+    assert result.metadata["promotion_ready"] == 1
+    assert result.metadata["canonical_zeitgeist_signals"] == 0
+    assert "brief=/tmp/brief.md" in result.output
+
+
+def test_world_scout_job_fetch_runs_without_env(monkeypatch, tmp_path):
+    fake = SimpleNamespace(
+        ok=True,
+        raw_observations=1,
+        emitted_signals=1,
+        promotion_ready=0,
+        incubations_written=0,
+        board_path="/tmp/board.json",
+        brief_path="/tmp/brief.md",
+        health_path="/tmp/health.json",
+        errors=(),
+    )
+    seen: dict[str, object] = {}
+    monkeypatch.delenv("DHARMA_WORLD_SCOUT_FETCH", raising=False)
+
+    def fake_run(**kwargs):
+        seen.update(kwargs)
+        return fake
+
+    monkeypatch.setattr(
+        "dharma_swarm.world_radar_go_bridge.run_world_radar_go_once",
+        fake_run,
+    )
+
+    result = execute_cron_job(
+        {
+            "handler": "world_scout",
+            "fetch": True,
+            "timeout_sec": 7,
+            "state_dir": str(tmp_path),
+        }
+    )
+
+    assert result.status is CronJobRunStatus.COMPLETED
+    assert seen["scout_fetch"] is True
+    assert seen["timeout_s"] == 7
+
+
 def test_execute_cron_job_maps_overnight_waiting_summary_to_waiting_external():
     async def _fake_run_overnight(**kwargs):
         assert kwargs["external_wait_handoff"] is True

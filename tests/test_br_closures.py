@@ -152,6 +152,66 @@ class TestFrontierRefill:
         assert result.queued_count == 1
         assert "opp-2" in result.appended_opportunity_ids
 
+    def test_refill_normalizes_shakti_scores_and_preserves_strategy(self, tmp_path: Path) -> None:
+        from dharma_swarm.opportunity_refill import refill_frontier_tasks_pending
+
+        board_path = tmp_path / "board.json"
+        frontier_path = tmp_path / "frontier.jsonl"
+        self._write_board(board_path, [
+            {
+                "opportunity_id": "world-1",
+                "title": "World signal: SubQ managed agent runtime",
+                "domain": "ecosystem_scan",
+                "final_score": 84.0,
+                "why_now": "external world signal cleared radar pressure",
+                "thesis": "ecosystem_signal",
+                "evidence_signals": ["zeitgeist:company:world-1 - SubQ"],
+                "source_inputs": [{"source": "zeitgeist", "raw_source": "github"}],
+                "strategic_vision": {
+                    "first_principles_questions": ["What primitive is proven?"],
+                    "incubation_status": "promotion_ready",
+                    "url": "https://example.com/subq",
+                },
+            }
+        ])
+
+        result = refill_frontier_tasks_pending(
+            board_path=board_path,
+            frontier_path=frontier_path,
+        )
+
+        assert result.queued_count == 1
+        first_row = json.loads(frontier_path.read_text().splitlines()[0])
+        metadata = first_row["metadata"]
+        assert metadata["final_score"] == 84.0
+        assert metadata["strategic_vision"]["first_principles_questions"] == ["What primitive is proven?"]
+        assert metadata["source_inputs"][0]["raw_source"] == "github"
+
+    def test_refill_keeps_incubating_world_signals_out_of_frontier(self, tmp_path: Path) -> None:
+        from dharma_swarm.opportunity_refill import refill_frontier_tasks_pending
+
+        board_path = tmp_path / "board.json"
+        frontier_path = tmp_path / "frontier.jsonl"
+        self._write_board(board_path, [
+            {
+                "opportunity_id": "world-incubating",
+                "title": "World signal: single-source movement",
+                "domain": "ecosystem_scan",
+                "final_score": 91.0,
+                "evidence_signals": ["zeitgeist:company:world-incubating - Single source"],
+                "source_inputs": [{"source": "zeitgeist", "raw_source": "hacker_news"}],
+                "strategic_vision": {"incubation_status": "incubating"},
+            }
+        ])
+
+        result = refill_frontier_tasks_pending(
+            board_path=board_path,
+            frontier_path=frontier_path,
+        )
+
+        assert result.queued_count == 0
+        assert not frontier_path.exists()
+
     def test_refill_ignores_malformed_scores(self, tmp_path: Path) -> None:
         from dharma_swarm.opportunity_refill import refill_frontier_tasks_pending
 
