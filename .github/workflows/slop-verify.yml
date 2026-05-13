@@ -107,6 +107,8 @@ jobs:
 
       - name: Run slop-verify
         id: verify
+        # continue-on-error so the upload/comment steps always run regardless
+        # of whether slop detects issues (exit 1) or an internal error occurs (exit 2).
         continue-on-error: true
         run: |
           set -o pipefail
@@ -172,7 +174,7 @@ jobs:
               print('|---|---:|')
               for k, v in d['summary'].items():
                   if v: print(f\"| {k} | {v} |\")
-            " > reports/slop/comment.md 2>/dev/null \
+            " > reports/slop/comment.md \
               || echo '⚠️ slop-verify failed — check the job logs.' > reports/slop/comment.md
           else
             echo '⚠️ slop-verify failed to produce results — check the job logs.' > reports/slop/comment.md
