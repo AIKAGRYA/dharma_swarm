@@ -66,6 +66,20 @@ _URGENCY_WORDS = frozenset({
     "operator",
     "now",
 })
+_ECOSYSTEM_WORDS = frozenset({
+    "agent",
+    "agentic",
+    "benchmark",
+    "company",
+    "competitor",
+    "ecosystem",
+    "frontier",
+    "github",
+    "market",
+    "research",
+    "startup",
+    "tool",
+})
 
 
 def candidates_from_signals(
@@ -102,6 +116,7 @@ def _candidate_from_signal(
     evidence = [signal.evidence_line]
     if signal.suggested_action:
         evidence.append(f"suggested_action - {signal.suggested_action}")
+    strategic_vision = _strategic_vision_for_signal(signal)
     candidate = OpportunityCandidate(
         opportunity_id=_stable_id(domain, title, signal.evidence_line),
         title=title,
@@ -118,12 +133,16 @@ def _candidate_from_signal(
             "evidence_ref": signal.evidence_ref,
             "confidence": signal.confidence,
             "relevance_score": signal.relevance_score,
+            "raw_source": _raw_source_for_signal(signal),
         }],
+        strategic_vision=strategic_vision,
     )
     return candidate
 
 
 def _domain_for_signal(signal: ExecutiveSignal, words: set[str]) -> str:
+    if _is_world_zeitgeist(signal):
+        return "ecosystem_scan"
     if signal.domain_hint:
         hint = signal.domain_hint.lower().strip()
         if hint in {"runtime_feedback", "dispatcher_health", "campaign_feedback", "sealed_packet"}:
@@ -145,6 +164,8 @@ def _domain_for_signal(signal: ExecutiveSignal, words: set[str]) -> str:
 
 def _thesis_for_signal(signal: ExecutiveSignal, words: set[str]) -> str:
     category = signal.category.lower()
+    if _is_world_zeitgeist(signal):
+        return "ecosystem_signal"
     if category in {
         "runtime_outcome",
         "value_event_feedback",
@@ -178,7 +199,9 @@ def _factor_scores(
         urgency = max(urgency, 0.82)
 
     artifact_potential = 0.35
-    if signal.suggested_action:
+    if _is_world_zeitgeist(signal):
+        artifact_potential = 0.78
+    elif signal.suggested_action:
         artifact_potential = 0.85
     elif domain in {"internal_maintenance", "external_revenue"}:
         artifact_potential = 0.7
@@ -190,7 +213,9 @@ def _factor_scores(
         telos_alignment = 0.66
 
     world_value = 0.55
-    if domain == "external_revenue":
+    if domain == "ecosystem_scan":
+        world_value = 0.84
+    elif domain == "external_revenue":
         world_value = 0.82
         if signal.domain_hint == "external_revenue" and "paid" in words:
             world_value = 0.88
@@ -201,6 +226,8 @@ def _factor_scores(
 
     leverage = _clamp(0.35 + signal.confidence * 0.35 + signal.relevance_score * 0.3)
     capability_fit = 0.58
+    if _is_world_zeitgeist(signal):
+        capability_fit = 0.74
     if signal.evidence_ref and (
         signal.evidence_ref.endswith(".py") or ".py:" in signal.evidence_ref
     ):
@@ -209,7 +236,9 @@ def _factor_scores(
         capability_fit = max(capability_fit, 0.72)
 
     strategic_compounding = 0.35
-    if domain in {"strategic_vision", "operator_priority", "external_revenue"}:
+    if domain == "ecosystem_scan":
+        strategic_compounding = 0.86
+    elif domain in {"strategic_vision", "operator_priority", "external_revenue"}:
         strategic_compounding = 0.72
     if "recognition" in signal.source:
         strategic_compounding = max(strategic_compounding, 0.82)
@@ -226,7 +255,10 @@ def _factor_scores(
         "novelty": round(0.55 if "recognition" in signal.source else 0.35, 3),
         "urgency": round(urgency, 3),
         "capability_fit": round(capability_fit, 3),
-        "domain_balance_bonus": round(0.12 if domain == "external_revenue" else 0.0, 3),
+        "domain_balance_bonus": round(
+            0.12 if domain == "external_revenue" else 0.1 if domain == "ecosystem_scan" else 0.0,
+            3,
+        ),
         "artifact_potential": round(artifact_potential, 3),
         "strategic_compounding": round(strategic_compounding, 3),
         "internal_churn_penalty": round(internal_churn_penalty, 3),
@@ -261,6 +293,8 @@ def _weighted_score(scores: dict[str, float]) -> float:
 
 def _title_for_signal(signal: ExecutiveSignal, *, domain: str) -> str:
     title = signal.title.strip().rstrip(".")
+    if domain == "ecosystem_scan" and not title.lower().startswith("world signal"):
+        return f"World signal: {title}"
     if domain == "external_revenue" and "revenue" not in title.lower():
         return f"Revenue wedge: {title}"
     if domain == "internal_maintenance" and not title.lower().startswith("repair"):
@@ -270,6 +304,8 @@ def _title_for_signal(signal: ExecutiveSignal, *, domain: str) -> str:
 
 def _why_now(signal: ExecutiveSignal, scores: dict[str, float]) -> str:
     urgency = scores["urgency"]
+    if _is_world_zeitgeist(signal):
+        return f"external world signal cleared radar pressure with urgency={urgency:.2f}"
     if signal.suggested_action:
         return f"actionable signal with urgency={urgency:.2f}"
     if signal.category == "operator_directive":
@@ -289,3 +325,49 @@ def _stable_id(*parts: str) -> str:
 
 def _clamp(value: float) -> float:
     return max(0.0, min(1.0, float(value)))
+
+
+def _is_world_zeitgeist(signal: ExecutiveSignal) -> bool:
+    if signal.source != "zeitgeist":
+        return False
+    raw_source = _raw_source_for_signal(signal)
+    category = signal.category.lower()
+    return (
+        raw_source in {"world_zeitgeist", "world_scout", "operator_drop", "github", "arxiv", "hacker_news", "reddit"}
+        or category in {"company", "benchmark", "tool_release", "governance", "ecosystem_signal"}
+        or bool(set(signal.keywords) & _ECOSYSTEM_WORDS)
+    )
+
+
+def _raw_source_for_signal(signal: ExecutiveSignal) -> str:
+    metadata = signal.raw.get("metadata") if isinstance(signal.raw, dict) else None
+    if isinstance(metadata, dict):
+        raw = metadata.get("raw_source") or metadata.get("source")
+        if raw:
+            return str(raw)
+    return str(signal.raw.get("source") or signal.source) if isinstance(signal.raw, dict) else signal.source
+
+
+def _strategic_vision_for_signal(signal: ExecutiveSignal) -> dict[str, object] | None:
+    if not _is_world_zeitgeist(signal) or not isinstance(signal.raw, dict):
+        return None
+    metadata = signal.raw.get("metadata")
+    if not isinstance(metadata, dict):
+        return None
+    fields = {
+        key: metadata[key]
+        for key in (
+            "first_principles_questions",
+            "iteration_steps",
+            "adjacent_searches",
+            "strategic_moves",
+            "dimensions",
+            "uncertainty",
+            "incubation_path",
+            "url",
+            "promotion_status",
+            "promotion_reason",
+        )
+        if key in metadata
+    }
+    return fields or None
