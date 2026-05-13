@@ -278,5 +278,16 @@
     "handler": "store_sync",
     "enabled": true,
     "prompt": "Materialize ontology Outcome objects into runtime ArtifactRecords."
+  },
+  {
+    "id": "world_scout",
+    "name": "World Scout — External Zeitgeist Radar",
+    "trigger": "interval",
+    "interval_seconds": 3600,
+    "handler": "world_scout",
+    "min_score": 0.45,
+    "timeout_sec": 90,
+    "enabled": true,
+    "prompt": "Scan public external-world AI/agent/research/company signals, normalize receipts, update world_signal_board.json and world_signal_brief.md, incubate weak signals, and promote verified signals into zeitgeist/Shakti."
   }
 ]
