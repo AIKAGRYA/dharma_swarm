@@ -1,12 +1,13 @@
 # ACTIVE_SURFACE_MANIFEST.yaml
-# Canonical truth about what surfaces, routes, state dirs, and rules are active.
+# Declared intent for what surfaces, routes, state dirs, and rules should be active.
 # This file MUST agree with: dashboardNav.ts, controlPlaneRouteDeck.js,
 # registered API routers (api/main.py), STATE_DIR ownership, and Semgrep Rule 1.
 # Any edit to hot-path modules requires ACK/warrant path documented here.
 #
-# This manifest is the SINGLE SOURCE OF TRUTH for the control plane.
-# The dashboard reads it. Agents read it. Health checks run against it.
-# Your workflow: Declare → Dispatch → Verify.
+# This manifest declares INTENT for the control plane.
+# Observed reality comes from runtime, code, and evidence adapters.
+# The dashboard reads it. Agents read it. Projectors reconcile it against reality.
+# Your workflow: Declare → Observe → Reconcile → Dispatch → Verify.
 
 schema_version: 2
 last_updated: "2026-05-11"
@@ -67,11 +68,15 @@ api_routers:
   - id: manifest
     prefix: /api/manifest
     module: api.routers.manifest
+  - id: control_surface
+    prefix: /api/control-surface
+    module: api.routers.control_surface
 
 dashboard_nav_sections:
   - label: COMMAND
     items:
       - Overview
+      - Control Surface
       - Command Post
       - Qwen Surgeon
       - Observatory
@@ -162,6 +167,15 @@ health_check_registry:
 # Every dashboard page: desired state, observed-state checks, gap info.
 
 dashboard_surfaces:
+  - id: control_surface
+    label: "Control Surface"
+    route: /dashboard/control-surface
+    api_dependencies: [/api/control-surface/summary, /api/control-surface/rows]
+    status: live
+    health_check_ids: [dashboard_route_exists, api_router_registered]
+    priority: p0
+    next_action: null
+
   - id: overview
     label: "System Overview"
     route: /dashboard
