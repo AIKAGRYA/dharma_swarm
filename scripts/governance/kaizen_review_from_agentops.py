@@ -16,6 +16,21 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+try:
+    from scripts.governance.record_human_yds_rating import (
+        latest_rating_for_artifact,
+        normalize_artifact_uri,
+        public_rating,
+        read_ratings,
+    )
+except ModuleNotFoundError:  # pragma: no cover - direct script execution fallback
+    from record_human_yds_rating import (  # type: ignore[no-redef]
+        latest_rating_for_artifact,
+        normalize_artifact_uri,
+        public_rating,
+        read_ratings,
+    )
+
 
 class KaizenReviewError(RuntimeError):
     """Raised when inputs cannot produce a useful KaizenReview."""
@@ -394,11 +409,74 @@ def review_to_dict(review: ReportReview) -> dict[str, Any]:
     }
 
 
-def build_kaizen_review(report_paths: list[Path], *, generated_at: str | None = None) -> dict[str, Any]:
+def _rating_targets(report_path: Path, report_review: ReportReview) -> list[str]:
+    targets = [
+        report_path.as_posix(),
+        report_path.resolve().as_posix(),
+    ]
+    try:
+        targets.append(report_path.resolve().relative_to(Path.cwd().resolve()).as_posix())
+    except ValueError:
+        pass
+    try:
+        targets.append(normalize_artifact_uri(report_path.as_posix()))
+    except Exception:
+        pass
+    if report_review.job_id and report_review.job_id != "unknown":
+        parent = report_path.parent.name
+        targets.append(f"agentops://{report_review.job_id}/{parent}")
+    if report_review.commit_hash:
+        targets.append(f"git://commit/{report_review.commit_hash}")
+    return list(dict.fromkeys(targets))
+
+
+def _human_rating_for_report(
+    report_path: Path,
+    report_review: ReportReview,
+    ratings: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    for target in _rating_targets(report_path, report_review):
+        try:
+            match = latest_rating_for_artifact(ratings, target)
+        except Exception:
+            match = None
+        if match is not None:
+            return public_rating(match)
+    return None
+
+
+def _summarize_human_yds(
+    report_pairs: list[tuple[Path, ReportReview]],
+    *,
+    yds_ledger: Path | None = None,
+) -> dict[str, Any] | None:
+    if yds_ledger is None:
+        return None
+    ratings = read_ratings(yds_ledger)
+    matches = [
+        _human_rating_for_report(path, review, ratings)
+        for path, review in report_pairs
+    ]
+    active_matches = [match for match in matches if match is not None]
+    if not active_matches:
+        return None
+    return {
+        "rating_count": len(active_matches),
+        "ratings": active_matches,
+    }
+
+
+def build_kaizen_review(
+    report_paths: list[Path],
+    *,
+    generated_at: str | None = None,
+    yds_ledger: Path | None = None,
+) -> dict[str, Any]:
     reviews = [
         classify_report(path, load_report(path))
         for path in report_paths
     ]
+    report_pairs = list(zip(report_paths, reviews))
     waste_patterns = collect_waste_patterns(reviews)
     return {
         "source_reports": [review_to_dict(review) for review in reviews],
@@ -414,7 +492,7 @@ def build_kaizen_review(report_paths: list[Path], *, generated_at: str | None = 
         "stop_doing_items": build_stop_doing_items(waste_patterns),
         "playbook_update_candidates": build_playbook_candidates(waste_patterns, reviews),
         "next_work_packet_recommendation": choose_next_recommendation(reviews),
-        "human_yds_rating": None,
+        "human_yds_rating": _summarize_human_yds(report_pairs, yds_ledger=yds_ledger),
         "yds_prompt_for_human": YDS_PROMPT,
     }
 
@@ -506,6 +584,12 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help="Output directory for kaizen_review.json and kaizen_review.md",
     )
+    parser.add_argument(
+        "--yds-ledger",
+        type=Path,
+        default=None,
+        help="Optional read-only Human YDS Ledger JSONL file",
+    )
     return parser
 
 
@@ -515,7 +599,7 @@ def main(argv: list[str] | None = None) -> int:
     inputs = [path for group in args.input for path in group]
     try:
         report_paths = find_report_paths(inputs)
-        review = build_kaizen_review(report_paths)
+        review = build_kaizen_review(report_paths, yds_ledger=args.yds_ledger)
         json_path, md_path = write_review(review, args.output)
     except KaizenReviewError as exc:
         print(f"KaizenReview error: {exc}")

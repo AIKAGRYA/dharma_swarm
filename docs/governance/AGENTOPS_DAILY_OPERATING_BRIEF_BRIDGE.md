@@ -31,3 +31,8 @@ the human explicitly rates an artifact, which artifact was rated, and the
 timestamp of that rating.
 
 No YDS ledger is implemented in AgentOps v0.
+
+The next implementation step is
+`docs/governance/HUMAN_YDS_LEDGER_MASTER_SPEC_2026-05-05.md`, which defines a
+local append-only ledger for `HumanQualityRating` records and the read-only
+KaizenReview lookup path.

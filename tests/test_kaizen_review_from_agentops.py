@@ -171,6 +171,69 @@ def test_human_yds_rating_is_null(tmp_path: Path) -> None:
     assert "Human-only" in review["yds_prompt_for_human"]
 
 
+def test_human_yds_rating_ignores_report_embedded_values(tmp_path: Path) -> None:
+    report = sample_report(human_yds_rating={"rating_value": "5.15"})
+
+    review = build_review(tmp_path, report)
+
+    assert review["human_yds_rating"] is None
+
+
+def test_reads_matching_human_yds_rating_from_supplied_ledger(tmp_path: Path) -> None:
+    report_path = write_agentops_report(tmp_path, sample_report())
+    ledger = tmp_path / "human_quality_ratings.jsonl"
+    rating = {
+        "schema_version": "human_yds_rating.v1",
+        "rating_id": "yds_20260505T000000Z_ab12cd34",
+        "created_at": "2026-05-05T00:00:00Z",
+        "operator_id": "dhyana",
+        "rating_scale": "YDS",
+        "rating_value": "5.12",
+        "artifact": {
+            "kind": "agentops_report",
+            "uri": "external://" + report_path.as_posix(),
+            "title": "AgentOps report",
+        },
+        "human_note": "Clean scoped packet.",
+        "evidence_refs": [],
+        "context": {"source": "operator_cli"},
+        "supersedes_rating_id": None,
+    }
+    ledger.write_text(json.dumps(rating) + "\n", encoding="utf-8")
+
+    review = kaizen.build_kaizen_review([report_path], yds_ledger=ledger)
+
+    assert review["human_yds_rating"]["rating_count"] == 1
+    assert review["human_yds_rating"]["ratings"][0]["rating_value"] == "5.12"
+
+
+def test_supplied_ledger_without_match_keeps_human_yds_null(tmp_path: Path) -> None:
+    report_path = write_agentops_report(tmp_path, sample_report())
+    ledger = tmp_path / "human_quality_ratings.jsonl"
+    rating = {
+        "schema_version": "human_yds_rating.v1",
+        "rating_id": "yds_20260505T000000Z_ab12cd34",
+        "created_at": "2026-05-05T00:00:00Z",
+        "operator_id": "dhyana",
+        "rating_scale": "YDS",
+        "rating_value": "5.12",
+        "artifact": {
+            "kind": "agentops_report",
+            "uri": "repo://some/other/report.json",
+            "title": "Other report",
+        },
+        "human_note": "Different artifact.",
+        "evidence_refs": [],
+        "context": {"source": "operator_cli"},
+        "supersedes_rating_id": None,
+    }
+    ledger.write_text(json.dumps(rating) + "\n", encoding="utf-8")
+
+    review = kaizen.build_kaizen_review([report_path], yds_ledger=ledger)
+
+    assert review["human_yds_rating"] is None
+
+
 def test_exactly_one_next_work_packet_recommendation(tmp_path: Path) -> None:
     review = build_review(tmp_path, sample_report())
 

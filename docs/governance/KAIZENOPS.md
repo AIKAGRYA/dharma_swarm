@@ -57,3 +57,9 @@ YDS / Yosemite Decimal System ratings are human-authoritative only.
 KaizenReview leaves `human_yds_rating` as `null` and may only emit a prompt for
 the operator to rate the artifact. AI quality scores, including ForgeScore, are
 advisory and must not be treated as authoritative YDS.
+
+The implementation path is defined in
+`docs/governance/HUMAN_YDS_LEDGER_MASTER_SPEC_2026-05-05.md`.
+The v0 ledger is local and append-only under
+`~/.dharma/yds/human_quality_ratings.jsonl`; KaizenReview may read it when the
+operator supplies `--yds-ledger`, but it still must not create ratings.
