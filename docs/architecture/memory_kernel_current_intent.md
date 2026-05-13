@@ -37,12 +37,13 @@ The active work should stay within these limits:
 - M2E: read-only promotion decision ledger
 - M3: read-only context admission preview
 - M3B: read-only context safety eval harness
+- M3C: read-only context parity harness and 60->80 roadmap
 
 Do not add runtime prompt injection, canon writes, Chetana mutations, vector
 rebuilds, migrations, or write-through gates until the read-only layers are
-merged and reviewed. M3/M3B may preview and evaluate context admission as
-shadow artifacts, but they must not wire MemoryKernel atoms into `context.py`,
-`ContextCompiler`, `AgentRunner`, or prompt construction.
+merged and reviewed. M3/M3B/M3C may preview, evaluate, and compare context
+admission as shadow artifacts, but they must not wire MemoryKernel atoms into
+`context.py`, `ContextCompiler`, `AgentRunner`, or prompt construction.
 
 ## Reconciliation Rule
 

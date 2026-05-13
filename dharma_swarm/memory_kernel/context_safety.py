@@ -48,12 +48,18 @@ def detect_text_safety_issues(text: str) -> tuple[TextSafetyIssue, ...]:
             )
         )
     lower = text.lower()
-    if any(marker.lower() in lower for marker in _SECRET_MARKERS):
+    redacted = redact_context_text(text)
+    secret_count = max(
+        0,
+        redacted.count("<secret_like_redacted>")
+        - text.count("<secret_like_redacted>"),
+    )
+    if secret_count or any(marker.lower() in lower for marker in _SECRET_MARKERS):
         issues.append(
             TextSafetyIssue(
                 kind="secret_like_text_detected",
                 reason="context text contains secret-like markers",
-                occurrence_count=1,
+                occurrence_count=max(1, secret_count),
                 sample_redacted="<secret_like_redacted>",
                 sample_hash=short_hash("secret_like_marker"),
             )

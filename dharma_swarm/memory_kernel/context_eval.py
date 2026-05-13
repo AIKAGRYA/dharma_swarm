@@ -119,7 +119,7 @@ class ContextEvalConfig:
     memory_surface_ids: tuple[str, ...] = ()
     memory_limit_total: int = 50
     memory_limit_per_surface: int = 25
-    include_current_context: bool = True
+    include_current_context: bool = False
     include_memory_kernel: bool = True
     allow_current_semantic_search: bool = False
     budget: MemoryContextBudget = field(default_factory=MemoryContextBudget)
@@ -174,10 +174,12 @@ def run_context_eval(
 
     resolved = config or ContextEvalConfig()
     warnings: list[str] = ["shadow_mode_no_prompt_injection", "no_new_feedback_writes"]
+    if resolved.allow_current_semantic_search:
+        warnings.append("current_semantic_search_forced_off_for_eval")
     current_report: CurrentContextLaneReport | None = None
     memory_report: MemoryKernelContextLaneReport | None = None
 
-    if resolved.include_current_context:
+    if resolved.include_current_context or current_context_text is not None:
         text = current_context_text
         source = "provided_text"
         if text is None:
@@ -277,7 +279,7 @@ def _read_current_context_text(config: ContextEvalConfig, *, state_dir: Path | N
         query=config.query,
         limit=config.limit,
         consumer="memory_kernel.context_eval.shadow",
-        allow_semantic_search=config.allow_current_semantic_search,
+        allow_semantic_search=False,
     )
 
 
@@ -415,7 +417,7 @@ def _output_artifact_findings(
             json.dumps(payload, sort_keys=True, default=str),
             lane=ContextEvalLane.OUTPUT_ARTIFACT,
         )
-        if finding.kind == "sensitive_path_detected"
+        if finding.kind in {"sensitive_path_detected", "secret_like_text_detected"}
     )
 
 

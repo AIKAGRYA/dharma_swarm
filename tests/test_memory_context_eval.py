@@ -206,7 +206,11 @@ def test_context_eval_current_reader_disables_semantic_feedback(monkeypatch, tmp
     monkeypatch.setattr("dharma_swarm.context.read_memory_context", fake_read_memory_context)
 
     report = run_context_eval(
-        config=ContextEvalConfig(query="memory kernel"),
+        config=ContextEvalConfig(
+            query="memory kernel",
+            include_current_context=True,
+            allow_current_semantic_search=True,
+        ),
         state_dir=tmp_path,
     )
 
@@ -215,6 +219,40 @@ def test_context_eval_current_reader_disables_semantic_feedback(monkeypatch, tmp
     assert calls[0]["consumer"] == "memory_kernel.context_eval.shadow"
     assert report.current_context is not None
     assert report.hard_failure_count == 0
+    assert "current_semantic_search_forced_off_for_eval" in report.warnings
+
+
+def test_context_eval_bare_call_does_not_read_live_current_context(monkeypatch) -> None:
+    def fail_read_memory_context(**kwargs):
+        raise AssertionError("read_memory_context should not be called")
+
+    monkeypatch.setattr("dharma_swarm.context.read_memory_context", fail_read_memory_context)
+
+    report = run_context_eval()
+
+    assert report.current_context is None
+    assert report.hard_failure_count == 0
+
+
+def test_context_eval_redacts_common_token_shapes() -> None:
+    secret_text = (
+        "OPENAI_API_KEY=sk-proj_1234567890abcdef "
+        "Authorization: Bearer abcdefghijklmnopqrstuvwxyz"
+    )
+    report = run_context_eval(
+        config=ContextEvalConfig(include_current_context=True, include_memory_kernel=False),
+        current_context_text=secret_text,
+    )
+    payload = json.dumps(report.to_json(), sort_keys=True)
+    markdown = render_context_eval_markdown(report)
+
+    assert report.current_context is not None
+    assert report.current_context.finding_count == 1
+    assert "<secret_like_redacted>" in payload
+    assert "sk-proj_1234567890abcdef" not in payload
+    assert "abcdefghijklmnopqrstuvwxyz" not in payload
+    assert "sk-proj_1234567890abcdef" not in markdown
+    assert "abcdefghijklmnopqrstuvwxyz" not in markdown
 
 
 def test_context_eval_warning_count_includes_lane_warnings() -> None:
@@ -244,11 +282,60 @@ def test_context_eval_report_markdown_and_json_do_not_leak_paths() -> None:
 
 def test_default_context_eval_cases_pass_without_leaking_sensitive_literals() -> None:
     results = run_default_context_eval_cases()
+    by_id = {result.case.case_id: result for result in results}
     payload = json.dumps([result.to_json() for result in results], sort_keys=True)
 
     assert results
     assert all(result.passed for result in results)
-    assert "current_context_redaction" in payload
-    assert "projection_omitted_by_default" in payload
+    assert {
+        "current_context_redaction",
+        "observed_runtime_admitted",
+        "projection_omitted_by_default",
+        "rejected_omitted_by_default",
+        "superseded_omitted_by_default",
+        "high_risk_omitted_by_default",
+        "projection_override_marked",
+        "high_risk_override_explicit",
+        "bounded_content_redacted",
+        "content_budget_truncation_redacted",
+        "atom_cap_candidate_limit_warning",
+    } <= set(by_id)
     assert "/Users/dhyana" not in payload
+    assert "/fixture/" not in payload
     assert "abc123" not in payload
+
+    superseded_pack = by_id["superseded_omitted_by_default"].report.memory_kernel.pack
+    assert superseded_pack.admitted_count == 0
+    assert superseded_pack.items[0].omission_reasons == ("truth_state_superseded",)
+
+    projection_pack = by_id["projection_override_marked"].report.memory_kernel.pack
+    projection_item = projection_pack.items[0]
+    assert projection_item.admitted is True
+    assert projection_item.to_json()["surface_category"] == "projection"
+    assert projection_item.to_json()["memory_lane"] == "projection"
+    assert projection_item.projection_of == ("fixture.runtime_state",)
+
+    high_risk_default = by_id["high_risk_omitted_by_default"].report.memory_kernel.pack
+    high_risk_override = by_id["high_risk_override_explicit"].report.memory_kernel.pack
+    assert "high_risk_blocked" in high_risk_default.items[0].omission_reasons
+    assert high_risk_override.admitted_count == 1
+    assert high_risk_override.items[0].admitted is True
+
+    truncated_pack = by_id["content_budget_truncation_redacted"].report.memory_kernel.pack
+    truncated_snippet = truncated_pack.items[0].content_snippet
+    assert truncated_snippet is not None
+    assert truncated_snippet.endswith("...<truncated>")
+    assert "<local_path_redacted>" in truncated_snippet
+    assert "<secret_like_redacted>" in truncated_snippet
+    assert "/Users/dhyana" not in truncated_snippet
+    assert "abc123" not in truncated_snippet
+
+    capped_pack = by_id["atom_cap_candidate_limit_warning"].report.memory_kernel.pack
+    assert capped_pack.candidate_count == 3
+    assert capped_pack.candidate_truncated is True
+    assert "candidate_atom_limit_reached" in capped_pack.warnings
+    assert capped_pack.admitted_count == 1
+    assert any(
+        "admitted_atom_cap_reached" in item.omission_reasons
+        for item in capped_pack.items
+    )

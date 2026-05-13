@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the MemoryKernel M3B context safety eval harness."""
+"""Run the MemoryKernel M3B/M3C context safety eval harness."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import argparse
 import json
 from pathlib import Path
 
+from dharma_swarm.memory_kernel.context_admission import redact_context_text
 from dharma_swarm.memory_kernel import (
     CensusConfig,
     ContextEvalConfig,
@@ -28,6 +29,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--state-dir", type=Path)
     parser.add_argument("--list-cases", action="store_true")
     parser.add_argument("--run-default-cases", action="store_true")
+    parser.add_argument("--run-parity-eval", action="store_true")
     parser.add_argument("--include-current-context", action="store_true")
     parser.add_argument("--current-context-text")
     parser.add_argument("--current-context-file", type=Path)
@@ -77,28 +79,18 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.run_default_cases:
         return _run_default_cases(args)
+    if args.run_parity_eval:
+        return _run_parity_eval(args)
 
     current_context_text = _current_context_text(args)
     include_current = bool(
         args.include_current_context or current_context_text is not None
     )
     memory_kernel = _memory_kernel(args)
-    config = ContextEvalConfig(
-        query=args.query,
-        limit=args.limit,
-        memory_surface_ids=tuple(args.memory_surface),
-        memory_limit_total=args.memory_limit_total,
-        memory_limit_per_surface=args.memory_limit_per_surface,
-        include_current_context=include_current,
+    config = _context_eval_config(
+        args,
+        include_current=include_current,
         include_memory_kernel=memory_kernel is not None,
-        allow_current_semantic_search=args.allow_current_semantic_search,
-        budget=MemoryContextBudget(
-            max_candidate_atoms=args.max_candidate_atoms,
-            max_admitted_atoms=args.max_admitted_atoms,
-            include_content=args.include_content,
-            allow_projections=args.allow_projections,
-            allow_high_risk=args.allow_high_risk,
-        ),
     )
     report = run_context_eval(
         config=config,
@@ -107,20 +99,82 @@ def main(argv: list[str] | None = None) -> int:
         memory_kernel=memory_kernel,
     )
     payload = report.to_json()
-    print(json.dumps(payload, indent=2, sort_keys=True))
+    payload_text = _safe_json_text(payload)
+    print(payload_text)
 
     if not args.dry_run:
         if args.output_json:
             output_json = _resolve_output(args.output_json, args.repo_root)
             output_json.parent.mkdir(parents=True, exist_ok=True)
-            output_json.write_text(
-                json.dumps(payload, indent=2, sort_keys=True) + "\n",
-                encoding="utf-8",
-            )
+            output_json.write_text(payload_text + "\n", encoding="utf-8")
         if args.output_md:
             output_md = _resolve_output(args.output_md, args.repo_root)
             output_md.parent.mkdir(parents=True, exist_ok=True)
-            output_md.write_text(render_context_eval_markdown(report), encoding="utf-8")
+            output_md.write_text(
+                _safe_text(render_context_eval_markdown(report)),
+                encoding="utf-8",
+            )
+
+    if args.fail_on_hard_failure and report.hard_failure_count > 0:
+        return 6
+    return 0
+
+
+def _run_parity_eval(args: argparse.Namespace) -> int:
+    try:
+        (
+            run_context_parity_eval,
+            render_context_parity_markdown,
+        ) = _load_context_parity_api()
+    except ModuleNotFoundError as exc:
+        if exc.name != "dharma_swarm.memory_kernel.context_parity":
+            raise
+        print(
+            json.dumps(
+                {
+                    "error": (
+                        "dharma_swarm.memory_kernel.context_parity is not available"
+                    )
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
+        return 2
+
+    current_context_text = _current_context_text(args)
+    memory_kernel = _memory_kernel(args)
+    report = run_context_parity_eval(
+        query=args.query,
+        current_context_text=current_context_text,
+        state_dir=args.state_dir,
+        memory_kernel=memory_kernel,
+        memory_surface_ids=tuple(args.memory_surface),
+        budget=MemoryContextBudget(
+            max_candidate_atoms=args.max_candidate_atoms,
+            max_admitted_atoms=args.max_admitted_atoms,
+            include_content=args.include_content,
+            allow_projections=args.allow_projections,
+            allow_high_risk=args.allow_high_risk,
+        ),
+        allow_current_semantic_search=args.allow_current_semantic_search,
+    )
+    payload = report.to_json()
+    payload_text = _safe_json_text(payload)
+    print(payload_text)
+
+    if not args.dry_run:
+        if args.output_json:
+            output_json = _resolve_output(args.output_json, args.repo_root)
+            output_json.parent.mkdir(parents=True, exist_ok=True)
+            output_json.write_text(payload_text + "\n", encoding="utf-8")
+        if args.output_md:
+            output_md = _resolve_output(args.output_md, args.repo_root)
+            output_md.parent.mkdir(parents=True, exist_ok=True)
+            output_md.write_text(
+                _safe_text(render_context_parity_markdown(report)),
+                encoding="utf-8",
+            )
 
     if args.fail_on_hard_failure and report.hard_failure_count > 0:
         return 6
@@ -139,32 +193,41 @@ def _run_default_cases(args: argparse.Namespace) -> int:
         "warning_count": sum(result.report.warning_count for result in results),
         "cases": [result.to_json() for result in results],
     }
-    print(json.dumps(payload, indent=2, sort_keys=True))
+    payload_text = _safe_json_text(payload)
+    print(payload_text)
     if not args.dry_run:
         if args.output_json:
             output_json = _resolve_output(args.output_json, args.repo_root)
             output_json.parent.mkdir(parents=True, exist_ok=True)
-            output_json.write_text(
-                json.dumps(payload, indent=2, sort_keys=True) + "\n",
-                encoding="utf-8",
-            )
+            output_json.write_text(payload_text + "\n", encoding="utf-8")
         if args.output_md:
             output_md = _resolve_output(args.output_md, args.repo_root)
             output_md.parent.mkdir(parents=True, exist_ok=True)
-            output_md.write_text(_render_case_results_markdown(results), encoding="utf-8")
-    if args.fail_on_hard_failure and not payload["passed"]:
+            output_md.write_text(
+                _safe_text(_render_case_results_markdown(results)),
+                encoding="utf-8",
+            )
+    if args.fail_on_hard_failure and (
+        not payload["passed"] or payload["hard_failure_count"] > 0
+    ):
         return 6
     return 0
 
 
 def _validate_args(args: argparse.Namespace) -> str:
+    if args.run_default_cases and args.run_parity_eval:
+        return "use either --run-default-cases or --run-parity-eval, not both"
     if args.current_context_file and args.current_context_text:
         return "use either --current-context-file or --current-context-text, not both"
     if args.include_current_context and not (
         args.state_dir or args.current_context_file or args.current_context_text
     ):
         return "--include-current-context requires --state-dir or explicit context text"
-    if args.allow_current_semantic_search and not args.include_current_context:
+    if (
+        args.allow_current_semantic_search
+        and not args.include_current_context
+        and not args.run_parity_eval
+    ):
         return "--allow-current-semantic-search requires --include-current-context"
     if args.memory_surface and args.memory_home is None:
         return "--memory-surface requires explicit --memory-home"
@@ -175,6 +238,31 @@ def _validate_args(args: argparse.Namespace) -> str:
             if output_path and _is_memory_surface_output(output_path, args):
                 return "output paths under memory surfaces require --allow-memory-surface-output"
     return ""
+
+
+def _context_eval_config(
+    args: argparse.Namespace,
+    *,
+    include_current: bool,
+    include_memory_kernel: bool,
+) -> ContextEvalConfig:
+    return ContextEvalConfig(
+        query=args.query,
+        limit=args.limit,
+        memory_surface_ids=tuple(args.memory_surface),
+        memory_limit_total=args.memory_limit_total,
+        memory_limit_per_surface=args.memory_limit_per_surface,
+        include_current_context=include_current,
+        include_memory_kernel=include_memory_kernel,
+        allow_current_semantic_search=args.allow_current_semantic_search,
+        budget=MemoryContextBudget(
+            max_candidate_atoms=args.max_candidate_atoms,
+            max_admitted_atoms=args.max_admitted_atoms,
+            include_content=args.include_content,
+            allow_projections=args.allow_projections,
+            allow_high_risk=args.allow_high_risk,
+        ),
+    )
 
 
 def _current_context_text(args: argparse.Namespace) -> str | None:
@@ -199,8 +287,25 @@ def _memory_kernel(args: argparse.Namespace) -> MemoryKernel | None:
     )
 
 
+def _load_context_parity_api():
+    from dharma_swarm.memory_kernel.context_parity import (  # noqa: PLC0415
+        render_context_parity_markdown,
+        run_context_parity_eval,
+    )
+
+    return run_context_parity_eval, render_context_parity_markdown
+
+
 def _resolve_output(path: Path, repo_root: Path) -> Path:
     return path if path.is_absolute() else repo_root / path
+
+
+def _safe_json_text(payload: object) -> str:
+    return _safe_text(json.dumps(payload, indent=2, sort_keys=True))
+
+
+def _safe_text(text: str) -> str:
+    return redact_context_text(text)
 
 
 def _render_case_results_markdown(results) -> str:

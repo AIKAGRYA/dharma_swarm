@@ -54,6 +54,12 @@ from dharma_swarm.memory_kernel.context_eval_cases import (
     run_default_context_eval_cases,
 )
 from dharma_swarm.memory_kernel.context_eval_render import render_context_eval_markdown
+from dharma_swarm.memory_kernel.context_parity import (
+    ContextParityMetric,
+    ContextParityReport,
+    render_context_parity_markdown,
+    run_context_parity_eval,
+)
 from dharma_swarm.memory_kernel.facade import MemoryKernel, MemoryKernelConfig
 from dharma_swarm.memory_kernel.surfaces import SurfaceSpec, default_surface_specs
 from dharma_swarm.memory_kernel.writers import (
@@ -90,6 +96,8 @@ __all__ = [
     "ContextEvalCaseResult",
     "ContextEvalSeverity",
     "ContextSafetyFinding",
+    "ContextParityMetric",
+    "ContextParityReport",
     "CurrentContextLaneReport",
     "MemoryLane",
     "MemoryOrder",
@@ -124,8 +132,10 @@ __all__ = [
     "evaluate_memory_kernel_context",
     "preview_memory_pack",
     "render_context_eval_markdown",
+    "render_context_parity_markdown",
     "render_memory_context_pack_markdown",
     "run_context_eval_case",
     "run_default_context_eval_cases",
+    "run_context_parity_eval",
     "run_context_eval",
 ]

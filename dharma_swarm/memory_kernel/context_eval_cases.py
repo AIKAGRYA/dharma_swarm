@@ -95,6 +95,13 @@ def default_context_eval_cases() -> tuple[ContextEvalCase, ...]:
         truth_state=TruthState.REJECTED,
         context_admissible=True,
     )
+    superseded = _atom(
+        surface=_runtime_surface(),
+        atom_type=MemoryAtomType.RUNTIME_EVENT,
+        content_ref="runtime_event:superseded-1",
+        truth_state=TruthState.SUPERSEDED,
+        context_admissible=True,
+    )
     high_risk = _atom(
         surface=_runtime_surface(canon_risk=RiskLevel.HIGH, pii_risk=RiskLevel.HIGH),
         atom_type=MemoryAtomType.RUNTIME_EVENT,
@@ -109,6 +116,27 @@ def default_context_eval_cases() -> tuple[ContextEvalCase, ...]:
         content="Evidence from /Users/dhyana/.dharma/state/runtime.db secret_token=abc123",
         truth_state=TruthState.OBSERVED,
         context_admissible=True,
+    )
+    truncated_content = _atom(
+        surface=_runtime_surface(),
+        atom_type=MemoryAtomType.RUNTIME_EVENT,
+        content_ref="runtime_event:truncated-content-1",
+        content=(
+            "Evidence from /Users/dhyana/.dharma/state/runtime.db "
+            "secret_token=abc123 " + "verified " * 24
+        ),
+        truth_state=TruthState.OBSERVED,
+        context_admissible=True,
+    )
+    capped_atoms = tuple(
+        _atom(
+            surface=_runtime_surface(),
+            atom_type=MemoryAtomType.RUNTIME_EVENT,
+            content_ref=f"runtime_event:cap-candidate-{index}",
+            truth_state=TruthState.OBSERVED,
+            context_admissible=True,
+        )
+        for index in range(4)
     )
     return (
         ContextEvalCase(
@@ -150,6 +178,15 @@ def default_context_eval_cases() -> tuple[ContextEvalCase, ...]:
             expected_admitted_atoms=0,
         ),
         ContextEvalCase(
+            case_id="superseded_omitted_by_default",
+            title="Superseded Memory Omitted By Default",
+            description="Superseded atoms are omitted even when they are marked context-admissible.",
+            config=ContextEvalConfig(include_current_context=False),
+            atoms=(superseded,),
+            expected_hard_failures=0,
+            expected_admitted_atoms=0,
+        ),
+        ContextEvalCase(
             case_id="high_risk_omitted_by_default",
             title="High-Risk Memory Omitted By Default",
             description="High-risk atoms are omitted unless the budget explicitly allows high-risk memory.",
@@ -157,6 +194,33 @@ def default_context_eval_cases() -> tuple[ContextEvalCase, ...]:
             atoms=(high_risk,),
             expected_hard_failures=0,
             expected_admitted_atoms=0,
+        ),
+        ContextEvalCase(
+            case_id="projection_override_marked",
+            title="Projection Override Remains Marked",
+            description="A projection override admits derived projection memory while preserving projection labels.",
+            config=ContextEvalConfig(
+                include_current_context=False,
+                budget=MemoryContextBudget(
+                    allow_projections=True,
+                    allowed_truth_states=(TruthState.DERIVED,),
+                ),
+            ),
+            atoms=(projection,),
+            expected_hard_failures=0,
+            expected_admitted_atoms=1,
+        ),
+        ContextEvalCase(
+            case_id="high_risk_override_explicit",
+            title="High-Risk Override Explicit",
+            description="High-risk memory is admitted only when the budget explicitly allows it.",
+            config=ContextEvalConfig(
+                include_current_context=False,
+                budget=MemoryContextBudget(allow_high_risk=True),
+            ),
+            atoms=(high_risk,),
+            expected_hard_failures=0,
+            expected_admitted_atoms=1,
         ),
         ContextEvalCase(
             case_id="bounded_content_redacted",
@@ -169,6 +233,31 @@ def default_context_eval_cases() -> tuple[ContextEvalCase, ...]:
             atoms=(content_atom,),
             expected_hard_failures=0,
             expected_admitted_atoms=1,
+        ),
+        ContextEvalCase(
+            case_id="content_budget_truncation_redacted",
+            title="Content Budget Truncation Redacted",
+            description="Included content is truncated by budget after local paths and secret-like text are redacted.",
+            config=ContextEvalConfig(
+                include_current_context=False,
+                budget=MemoryContextBudget(include_content=True, max_atom_chars=80),
+            ),
+            atoms=(truncated_content,),
+            expected_hard_failures=0,
+            expected_admitted_atoms=1,
+        ),
+        ContextEvalCase(
+            case_id="atom_cap_candidate_limit_warning",
+            title="Atom Cap Candidate Limit Warning",
+            description="Candidate truncation emits a warning and the admitted-atom cap omits excess candidates.",
+            config=ContextEvalConfig(
+                include_current_context=False,
+                budget=MemoryContextBudget(max_candidate_atoms=3, max_admitted_atoms=1),
+            ),
+            atoms=capped_atoms,
+            expected_hard_failures=0,
+            expected_admitted_atoms=1,
+            expected_min_warnings=5,
         ),
     )
 

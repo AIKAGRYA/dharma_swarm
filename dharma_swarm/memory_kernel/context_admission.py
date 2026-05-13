@@ -24,8 +24,21 @@ from dharma_swarm.memory_kernel.atoms import (
 
 
 _HIGH_RISKS = {RiskLevel.HIGH, RiskLevel.CRITICAL}
+_PRIVATE_KEY_RE = re.compile(
+    r"-----BEGIN [A-Z ]*PRIVATE KEY-----.*?-----END [A-Z ]*PRIVATE KEY-----",
+    re.DOTALL,
+)
 _SECRETISH_RE = re.compile(
-    r"(?i)\b(api[_-]?key|password|private[_-]?key|secret[_-]?token|token)\b\s*[:=]\s*[^\s]+"
+    r"(?ix)"
+    r"("
+    r"\b(?:[A-Z0-9_]*API[_-]?KEY|PASSWORD|PRIVATE[_-]?KEY|"
+    r"SECRET[_-]?TOKEN|ACCESS[_-]?TOKEN|REFRESH[_-]?TOKEN|TOKEN)"
+    r"\b\s*[:=]\s*[\"']?[^\s,\"'`]+"
+    r"|\bAuthorization\s*:\s*Bearer\s+[^\s,\"'`]+"
+    r"|\bBearer\s+[A-Za-z0-9._~+/=-]{16,}"
+    r"|\bsk-[A-Za-z0-9_-]{8,}"
+    r"|\bgh[pousr]_[A-Za-z0-9_]{8,}"
+    r")"
 )
 _DEFAULT_ALLOWED_TRUTH_STATES = (
     TruthState.OBSERVED,
@@ -372,7 +385,8 @@ def _safe_ref(value: str) -> str:
 def _redact_local_paths(value: str) -> str:
     parts = value.split()
     redacted = ["<local_path_redacted>" if _is_local_path(part) else part for part in parts]
-    return _SECRETISH_RE.sub("<secret_like_redacted>", " ".join(redacted))
+    text = _PRIVATE_KEY_RE.sub("<secret_like_redacted>", " ".join(redacted))
+    return _SECRETISH_RE.sub("<secret_like_redacted>", text)
 
 
 def _is_local_path(value: str) -> bool:
