@@ -1,0 +1,9 @@
+{
+  "correlation_id": "world_corr_unsupported_001",
+  "source": "world_strategy_decision",
+  "source_url": "https://example.com/unsupported",
+  "observed_at": "2026-05-12T00:00:00Z",
+  "payload": {
+    "title": "Unsupported decision payload"
+  }
+}

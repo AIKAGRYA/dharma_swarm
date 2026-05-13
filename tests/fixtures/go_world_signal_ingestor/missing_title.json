@@ -1,0 +1,10 @@
+{
+  "correlation_id": "world_corr_missing_title_001",
+  "source": "world_signal",
+  "source_url": "https://example.com/missing-title",
+  "observed_at": "2026-05-12T00:00:00Z",
+  "payload": {
+    "category": "model_release",
+    "relevance_score": 0.42
+  }
+}

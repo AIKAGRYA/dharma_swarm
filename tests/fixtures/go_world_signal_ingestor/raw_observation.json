@@ -1,0 +1,16 @@
+{
+  "correlation_id": "world_corr_raw_001",
+  "source": "world_raw_observation",
+  "source_url": "https://example.com/subq",
+  "observed_at": "2026-05-12T00:00:00Z",
+  "payload": {
+    "source_id": "operator_drop",
+    "source_family": "manual",
+    "publisher": "Operator",
+    "title": "SubQ claims subquadratic long-context LLM for coding agents",
+    "description": "SubQ announces a million-token model release with coding-agent positioning.",
+    "published_at": "2026-05-11T20:00:00Z",
+    "keywords": ["subquadratic", "long context", "coding agents"],
+    "scout_version": "world_scout_go.v0"
+  }
+}

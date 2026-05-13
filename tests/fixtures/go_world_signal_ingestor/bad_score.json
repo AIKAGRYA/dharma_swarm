@@ -1,0 +1,11 @@
+{
+  "correlation_id": "world_corr_bad_score_001",
+  "source": "world_signal",
+  "source_url": "https://example.com/bad-score",
+  "observed_at": "2026-05-12T00:00:00Z",
+  "payload": {
+    "title": "Bad score signal",
+    "category": "model_release",
+    "relevance_score": "high"
+  }
+}
