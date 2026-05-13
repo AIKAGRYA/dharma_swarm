@@ -88,6 +88,73 @@ func TestBuildDefaultsObservedAtToNow(t *testing.T) {
 	}
 }
 
+func TestBuildCarriesTrustEnvelope(t *testing.T) {
+	spec := okSpec()
+	spec.TrustEnvelope = &TrustEnvelope{
+		OriginAttestation:      "signed",
+		CorroborationCount:     2,
+		FreshnessWindow:        "24h",
+		LicenseCompatibility:   "review_required",
+		HallucinationRiskClass: "raw_data",
+		RoutingClass:           "review",
+		HumanReviewRequired:    true,
+	}
+	r, err := Build(spec, []byte(`{"ok":true}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.TrustEnvelope == nil {
+		t.Fatal("trust envelope was not carried on receipt")
+	}
+	if r.TrustEnvelope.CorroborationCount != 2 || r.TrustEnvelope.RoutingClass != "review" {
+		t.Fatalf("unexpected trust envelope: %+v", r.TrustEnvelope)
+	}
+
+	spec.TrustEnvelope.RoutingClass = "auto"
+	if r.TrustEnvelope.RoutingClass != "review" {
+		t.Fatal("receipt must copy trust envelope instead of aliasing caller data")
+	}
+}
+
+func TestTrustEnvelopeDoesNotChangeReceiptIdentity(t *testing.T) {
+	payload := []byte(`{"ok":true}`)
+	plain, err := Build(okSpec(), payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	spec := okSpec()
+	spec.TrustEnvelope = &TrustEnvelope{
+		OriginAttestation:      "unsigned",
+		CorroborationCount:     1,
+		FreshnessWindow:        "24h",
+		LicenseCompatibility:   "unknown",
+		HallucinationRiskClass: "raw_data",
+		RoutingClass:           "human_only",
+	}
+	withTrust, err := Build(spec, payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plain.ContentHash != withTrust.ContentHash || plain.EventUID != withTrust.EventUID || plain.ReceiptID != withTrust.ReceiptID {
+		t.Fatalf("trust envelope must not alter receipt identity: plain=%+v trusted=%+v", plain, withTrust)
+	}
+}
+
+func TestBuildRejectsInvalidTrustEnvelope(t *testing.T) {
+	spec := okSpec()
+	spec.TrustEnvelope = &TrustEnvelope{
+		OriginAttestation:      "unsigned",
+		CorroborationCount:     -1,
+		FreshnessWindow:        "24h",
+		LicenseCompatibility:   "unknown",
+		HallucinationRiskClass: "raw_data",
+		RoutingClass:           "review",
+	}
+	if _, err := Build(spec, []byte(`{"ok":true}`)); err == nil {
+		t.Fatal("expected invalid trust envelope to be rejected")
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Hashing / determinism
 // ---------------------------------------------------------------------------

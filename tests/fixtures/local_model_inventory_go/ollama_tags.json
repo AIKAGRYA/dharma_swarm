@@ -1,0 +1,10 @@
+{
+  "models": [
+    {
+      "name": "llama3.2:latest"
+    },
+    {
+      "model": "mistral:latest"
+    }
+  ]
+}

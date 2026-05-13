@@ -1,0 +1,11 @@
+{
+  "object": "list",
+  "data": [
+    {
+      "id": "qwen2.5-coder-7b"
+    },
+    {
+      "id": "text-embedding-nomic"
+    }
+  ]
+}

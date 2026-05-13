@@ -136,6 +136,19 @@ Base rule: Go collects, normalizes, hashes, spools, observes, and transports evi
 
 Go receipts are evidence inputs, not verdicts. Python bridges may ingest Go receipts, re-read them against the current map, and use them as one signal in governed decision flows. No Go process may become a second control plane or an authority over closure, gates, ontology state, or dispatch.
 
+Current Go receipt surfaces:
+
+| Surface | Entry Point | Boundary |
+|---------|-------------|----------|
+| Generic evidence sidecar | `tools/evidence_ingestor_go`, `dharma_swarm/operator_core/go_evidence_bridge.py` | File-native receipt projection into Python-owned closure evidence |
+| Receipt SDK trust envelope | `tools/go_sdk/receipt` | Additive G2.1 provenance / freshness / routing-class metadata; identity hashes remain payload-derived |
+| GitHub event ingestor | `tools/github_ingestor_go`, `dharma_swarm/operator_core/go_github_bridge.py` | Fixture-driven repository event receipts only; no live API calls in CI |
+| Local model inventory | `tools/local_model_inventory_go`, `dharma_swarm/operator_core/go_model_inventory_bridge.py` | Loopback-only runtime probes, binary/env presence, and exposure metadata; no routing or state writes |
+| Security advisory inventory | `tools/security_advisory_ingestor_go`, `dharma_swarm/operator_core/go_source_inventory_bridge.py` | Code-reviewed advisory sources only; bounded body hashing, no dependency verdicts |
+| AI frontier inventory | `tools/ai_frontier_ingestor_go`, `dharma_swarm/operator_core/go_source_inventory_bridge.py` | Research/vendor source metadata only; hash-only payload handling, no summarization |
+| Agent infrastructure inventory | `tools/agent_infra_ingestor_go`, `dharma_swarm/operator_core/go_source_inventory_bridge.py` | Registry/docs observation only; never executes registry commands or grants tools |
+| Practitioner signal inventory | `tools/practitioner_signal_ingestor_go`, `dharma_swarm/operator_core/go_source_inventory_bridge.py` | Social/commentary sources marked human-only; no routing decisions |
+
 ### Go Kill Criteria
 
 Stop the Go track and return to the operator if a Go PR does any of the following:

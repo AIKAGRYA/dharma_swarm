@@ -12,7 +12,12 @@ STATE_DIR    := $(HOME)/.dharma
 GO_EVIDENCE_MODULE := tools/evidence_ingestor_go
 GO_SDK_MODULE := tools/go_sdk
 GO_GITHUB_INGESTOR_MODULE := tools/github_ingestor_go
-GO_MODULES := $(GO_SDK_MODULE) $(GO_EVIDENCE_MODULE) $(GO_GITHUB_INGESTOR_MODULE)
+GO_LOCAL_MODEL_INVENTORY_MODULE := tools/local_model_inventory_go
+GO_SECURITY_ADVISORY_MODULE := tools/security_advisory_ingestor_go
+GO_AI_FRONTIER_MODULE := tools/ai_frontier_ingestor_go
+GO_AGENT_INFRA_MODULE := tools/agent_infra_ingestor_go
+GO_PRACTITIONER_SIGNAL_MODULE := tools/practitioner_signal_ingestor_go
+GO_MODULES := $(GO_SDK_MODULE) $(GO_EVIDENCE_MODULE) $(GO_GITHUB_INGESTOR_MODULE) $(GO_LOCAL_MODEL_INVENTORY_MODULE) $(GO_SECURITY_ADVISORY_MODULE) $(GO_AI_FRONTIER_MODULE) $(GO_AGENT_INFRA_MODULE) $(GO_PRACTITIONER_SIGNAL_MODULE)
 GO_CACHE_DIR ?= /tmp/dharma-swarm-go-build
 GO_MOD_CACHE_DIR ?= /tmp/dharma-swarm-go-mod
 

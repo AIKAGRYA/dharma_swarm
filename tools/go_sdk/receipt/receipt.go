@@ -52,7 +52,23 @@ type Receipt struct {
 	SchemaVersion  string          `json:"schema_version"`
 	Status         string          `json:"status"`
 	RejectedReason string          `json:"rejected_reason,omitempty"`
+	TrustEnvelope  *TrustEnvelope  `json:"trust_envelope,omitempty"`
 	Payload        json.RawMessage `json:"payload"`
+}
+
+// TrustEnvelope is the G2.1 risk membrane carried by a receipt. It is
+// additive metadata: receipt identity still derives from source, source_url,
+// correlation_id, and payload bytes so existing G0/G2 receipts remain stable.
+type TrustEnvelope struct {
+	OriginAttestation      string `json:"origin_attestation"`
+	CorroborationCount     int    `json:"corroboration_count"`
+	FreshnessWindow        string `json:"freshness_window"`
+	LicenseCompatibility   string `json:"license_compatibility"`
+	HallucinationRiskClass string `json:"hallucination_risk_class"`
+	RoutingClass           string `json:"routing_class"`
+	ClaimsSelfReported     bool   `json:"claims_self_reported,omitempty"`
+	SocialRaw              bool   `json:"social_raw,omitempty"`
+	HumanReviewRequired    bool   `json:"human_review_required,omitempty"`
 }
 
 // BuildSpec carries the metadata needed to build a Receipt. It is pure data;
@@ -65,6 +81,7 @@ type BuildSpec struct {
 	CorrelationID string
 	ObservedAt    string // RFC3339; if empty, Build defaults to time.Now().UTC()
 	SchemaVersion string // if empty, Build uses DefaultSchemaVersion
+	TrustEnvelope *TrustEnvelope
 }
 
 // Build validates spec, normalizes payload, computes identity hashes, and
@@ -76,6 +93,9 @@ func Build(spec BuildSpec, payload []byte) (Receipt, error) {
 	}
 	if spec.SourceURL == "" {
 		return Receipt{}, errors.New("source_url is required")
+	}
+	if err := validateTrustEnvelope(spec.TrustEnvelope); err != nil {
+		return Receipt{}, err
 	}
 
 	normalized, err := Normalize(payload)
@@ -107,6 +127,7 @@ func Build(spec BuildSpec, payload []byte) (Receipt, error) {
 		EventUID:      eventUID,
 		SchemaVersion: schemaVersion,
 		Status:        StatusAccepted,
+		TrustEnvelope: copyTrustEnvelope(spec.TrustEnvelope),
 		Payload:       normalized,
 	}, nil
 }
@@ -126,6 +147,9 @@ func Reject(spec BuildSpec, payload []byte, reason string) (Receipt, error) {
 	}
 	if spec.SourceURL == "" {
 		return Receipt{}, errors.New("source_url is required")
+	}
+	if err := validateTrustEnvelope(spec.TrustEnvelope); err != nil {
+		return Receipt{}, err
 	}
 
 	observedAt, err := resolveObservedAt(spec.ObservedAt)
@@ -158,6 +182,7 @@ func Reject(spec BuildSpec, payload []byte, reason string) (Receipt, error) {
 		SchemaVersion:  schemaVersion,
 		Status:         StatusRejected,
 		RejectedReason: reason,
+		TrustEnvelope:  copyTrustEnvelope(spec.TrustEnvelope),
 		Payload:        normalized,
 	}, nil
 }
@@ -240,6 +265,39 @@ func validateSpec(spec BuildSpec) error {
 		return errors.New("source is required")
 	}
 	return nil
+}
+
+func validateTrustEnvelope(envelope *TrustEnvelope) error {
+	if envelope == nil {
+		return nil
+	}
+	if envelope.OriginAttestation == "" {
+		return errors.New("trust_envelope.origin_attestation is required")
+	}
+	if envelope.CorroborationCount < 0 {
+		return errors.New("trust_envelope.corroboration_count must be non-negative")
+	}
+	if envelope.FreshnessWindow == "" {
+		return errors.New("trust_envelope.freshness_window is required")
+	}
+	if envelope.LicenseCompatibility == "" {
+		return errors.New("trust_envelope.license_compatibility is required")
+	}
+	if envelope.HallucinationRiskClass == "" {
+		return errors.New("trust_envelope.hallucination_risk_class is required")
+	}
+	if envelope.RoutingClass == "" {
+		return errors.New("trust_envelope.routing_class is required")
+	}
+	return nil
+}
+
+func copyTrustEnvelope(envelope *TrustEnvelope) *TrustEnvelope {
+	if envelope == nil {
+		return nil
+	}
+	copied := *envelope
+	return &copied
 }
 
 func resolveObservedAt(observedAt string) (string, error) {
