@@ -149,6 +149,78 @@ def test_dry_run_does_not_mutate(tmp_path: Path) -> None:
     assert not worktree.exists()
 
 
+def test_worktree_budget_blocks_eleventh_new_worktree(tmp_path: Path) -> None:
+    repo = init_repo(tmp_path)
+    for index in range(agentops.DEFAULT_WORKTREE_BUDGET - 1):
+        assert run(
+            [
+                "git",
+                "worktree",
+                "add",
+                "-b",
+                f"existing-{index}",
+                str(tmp_path / f"existing-{index}"),
+                "HEAD",
+            ],
+            cwd=repo,
+        ).returncode == 0
+    payload = minimal_packet(
+        tmp_path,
+        repo,
+        branch="chore/over-budget",
+        worktree=str(tmp_path / "new-over-budget"),
+    )
+    packet = agentops.parse_work_packet(payload)
+
+    state = agentops.worktree_budget_state(repo, packet.worktree)
+
+    assert state.current_count == agentops.DEFAULT_WORKTREE_BUDGET
+    assert state.would_create_worktree is True
+    assert state.passed is False
+    try:
+        agentops.prepare_worktree(repo, packet)
+    except agentops.AgentOpsError as exc:
+        assert "worktree budget exceeded" in str(exc)
+    else:  # pragma: no cover
+        raise AssertionError("expected worktree budget rejection")
+
+
+def test_worktree_budget_allows_existing_worktree_reuse(tmp_path: Path) -> None:
+    repo = init_repo(tmp_path)
+    target = tmp_path / "existing-target"
+    assert run(
+        ["git", "worktree", "add", "-b", "chore/reuse-existing", str(target), "HEAD"],
+        cwd=repo,
+    ).returncode == 0
+    for index in range(agentops.DEFAULT_WORKTREE_BUDGET - 2):
+        assert run(
+            [
+                "git",
+                "worktree",
+                "add",
+                "-b",
+                f"existing-{index}",
+                str(tmp_path / f"existing-{index}"),
+                "HEAD",
+            ],
+            cwd=repo,
+        ).returncode == 0
+    payload = minimal_packet(
+        tmp_path,
+        repo,
+        branch="chore/reuse-existing",
+        worktree=str(target),
+    )
+    packet = agentops.parse_work_packet(payload)
+
+    state = agentops.worktree_budget_state(repo, packet.worktree)
+
+    assert state.current_count == agentops.DEFAULT_WORKTREE_BUDGET
+    assert state.would_create_worktree is False
+    assert state.passed is True
+    assert agentops.prepare_worktree(repo, packet) == target.resolve()
+
+
 def test_commit_policy_refuses_when_gates_fail(tmp_path: Path) -> None:
     repo = init_repo(tmp_path)
     payload = minimal_packet(

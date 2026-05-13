@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from dharma_swarm.intent_router import IntentRouter
+from dharma_swarm.operator_core.operating_facts import append_human_yds_rating
 
 
 DEFAULT_FORBIDDEN_FILES = [
@@ -33,7 +34,7 @@ DEFAULT_GATE_COMMANDS = [
     {"name": "diff-check", "command": "git diff --check"},
 ]
 HUMAN_YDS_SOURCES = {"human", "operator", "dhyana"}
-YDS_RE = re.compile(r"^5\.(?:[0-9]|1[0-5])(?:[abcd])?$")
+YDS_RE = re.compile(r"^5\.(?:6|7|8|9|10|11|12|13|14|15)(?:[abcd])?$")
 
 
 def _default_gate_commands() -> list[dict[str, str]]:
@@ -95,6 +96,17 @@ class WorkPacketDraft:
 
 
 @dataclass(frozen=True)
+class CoherenceDelta:
+    """Advisory declared-vs-actual delta attached to an operator plan."""
+
+    organ_touched: str
+    gap_closed: str
+    proof_read: str
+    new_drift_risk: str
+    human_approval_needed: bool = True
+
+
+@dataclass(frozen=True)
 class MissionAttachment:
     found: bool
     source_kind: str = ""
@@ -115,6 +127,7 @@ class OperatorCommandPlan:
     prescriptions: list[dict[str, Any]]
     mission: MissionAttachment
     work_packet: WorkPacketDraft
+    coherence_delta: CoherenceDelta
     warnings: list[str]
     next_step: str
 
@@ -246,6 +259,7 @@ def plan_operator_command(request: OperatorCommandRequest) -> OperatorCommandPla
         prescriptions=prescriptions,
         mission=mission,
         work_packet=packet,
+        coherence_delta=_coherence_delta_for(prompt, allowed_files, requires_human_scope),
         warnings=warnings,
         next_step=_next_plan_step(packet, warnings),
     )
@@ -304,23 +318,26 @@ def record_human_yds_rating(
     if not artifact_value:
         raise ValueError("artifact must not be empty")
     if not YDS_RE.match(rating_value):
-        raise ValueError("rating must be a Yosemite-style value from 5.0 through 5.15")
+        raise ValueError("rating must be a Yosemite-style value from 5.6 through 5.15")
     if source_value not in HUMAN_YDS_SOURCES:
         raise ValueError("authoritative YDS source must be human/operator/dhyana")
 
-    record = HumanYDSRating(
-        timestamp=timestamp or utc_now_iso(),
-        artifact=artifact_value,
+    fact = append_human_yds_rating(
+        Path(ledger_path).expanduser(),
+        artifact_uri=artifact_value,
         rating=rating_value,
-        source=source_value,
-        human_comment=human_comment.strip(),
+        human_note=human_comment.strip() or "human rating recorded",
+        operator_id=source_value,
+        created_at=timestamp,
+    )
+    return HumanYDSRating(
+        timestamp=fact.created_at or timestamp or utc_now_iso(),
+        artifact=fact.artifact_uri,
+        rating=fact.rating,
+        source=fact.source,
+        human_comment=fact.human_note,
         context=dict(context or {}),
     )
-    path = Path(ledger_path).expanduser()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(asdict(record), sort_keys=True) + "\n")
-    return record
 
 
 def evaluate_rust_readiness(signal: RustReadinessSignal) -> RustReadinessDecision:
@@ -439,6 +456,48 @@ def _next_plan_step(packet: WorkPacketDraft, warnings: list[str]) -> str:
     if warnings:
         return "resolve plan warnings, then run AgentOps dry-run inspection"
     return "write the packet JSON and run AgentOps dry-run inspection"
+
+
+def _coherence_delta_for(
+    prompt: str,
+    allowed_files: list[str],
+    requires_human_scope: bool,
+) -> CoherenceDelta:
+    organ = _infer_organ_touched(prompt, allowed_files)
+    if organ == "unknown":
+        gap_closed = "operator must name the organ and declared-vs-actual gap before execution"
+        drift = "unmapped organ can add drift because no OrganStateFact owns the change"
+    elif requires_human_scope:
+        gap_closed = f"candidate work for {organ}; scope is inferred and must be tightened"
+        drift = "inferred allowed_files can widen the patch beyond the named organ"
+    else:
+        gap_closed = f"candidate work should close a named coherence gap for {organ}"
+        drift = "low if changed files remain inside allowed_files and AgentOps reports clean"
+    return CoherenceDelta(
+        organ_touched=organ,
+        gap_closed=gap_closed,
+        proof_read="review AgentOps report, rebuild operating fact bundle, and read OrganStateFact",
+        new_drift_risk=drift,
+        human_approval_needed=True,
+    )
+
+
+def _infer_organ_touched(prompt: str, allowed_files: list[str]) -> str:
+    haystack = " ".join([prompt, *allowed_files]).lower()
+    organ_terms = (
+        ("agentops", ("agentops", "agent ops", "run_agent_work_packet")),
+        ("kaizen_review", ("kaizen", "review_agentops")),
+        ("human_yds", ("yds", "human rating", "human_quality")),
+        ("burn_cost", ("burn", "cost", "pricing", "spend")),
+        ("revenue", ("revenue", "wedge", "customer", "pricing")),
+        ("daily_operating_brief", ("daily_operating_brief", "daily brief", "operating brief")),
+        ("command_spine", ("command_spine", "command spine", "operator_core", "operator core")),
+        ("telic_value", ("telic", "valueevent", "contribution", "outcome")),
+    )
+    for organ, terms in organ_terms:
+        if any(term in haystack for term in terms):
+            return organ
+    return "unknown"
 
 
 def _packet_id(prompt: str) -> str:
@@ -568,6 +627,7 @@ def _recommend_from_reports(summaries: list[AgentOpsReportSummary]) -> str:
 __all__ = [
     "AgentOpsReportSummary",
     "AgentOpsReview",
+    "CoherenceDelta",
     "HumanYDSRating",
     "MissionAttachment",
     "OperatorCommandPlan",

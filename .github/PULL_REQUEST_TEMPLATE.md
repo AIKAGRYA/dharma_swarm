@@ -37,6 +37,14 @@ and any `swarm.py` / `orchestrator.py` / `runtime_state.py` change.
 - [ ] Existing mismatch resolved — `INTERFACE_MISMATCH_MAP.md` updated
 - [ ] Net-new mismatch documented in the map (transitional)
 
+## Coherence Delta
+
+- Organ touched:
+- Gap closed:
+- Evidence / proof read:
+- New drift introduced:
+- Human approval needed:
+
 ## Verification
 
 How was the change verified end-to-end? Check all that apply.

@@ -24,6 +24,7 @@ from typing import Any
 
 
 REPORT_ROOT = Path("reports") / "agentops"
+DEFAULT_WORKTREE_BUDGET = 10
 DEFAULT_GATE_TIMEOUT_SECONDS = 900
 DEFAULT_MAX_OUTPUT_CHARS = 30_000
 
@@ -74,6 +75,19 @@ class CommitPolicy:
 class ApprovalPolicy:
     before_commit: bool
     before_merge: bool
+
+
+@dataclass(frozen=True)
+class WorktreeBudgetState:
+    limit: int
+    current_count: int
+    would_create_worktree: bool
+    target_path: str
+    registered_paths: list[str]
+
+    @property
+    def passed(self) -> bool:
+        return not self.would_create_worktree or self.current_count < self.limit
 
 
 @dataclass(frozen=True)
@@ -338,6 +352,43 @@ def git_status(repo_root: Path) -> str:
     return run_git(["status", "--short"], cwd=repo_root).stdout
 
 
+def registered_worktree_paths(source_root: Path) -> list[str]:
+    output = run_git(["worktree", "list", "--porcelain"], cwd=source_root).stdout
+    paths: list[str] = []
+    for line in output.splitlines():
+        if line.startswith("worktree "):
+            paths.append(str(Path(line.removeprefix("worktree ")).expanduser().resolve()))
+    return paths
+
+
+def worktree_budget_state(
+    source_root: Path,
+    target_worktree: Path,
+    *,
+    limit: int = DEFAULT_WORKTREE_BUDGET,
+) -> WorktreeBudgetState:
+    paths = registered_worktree_paths(source_root)
+    target = str(target_worktree.expanduser().resolve())
+    return WorktreeBudgetState(
+        limit=limit,
+        current_count=len(paths),
+        would_create_worktree=target not in paths,
+        target_path=target,
+        registered_paths=paths,
+    )
+
+
+def enforce_worktree_budget(source_root: Path, packet: WorkPacket) -> WorktreeBudgetState:
+    state = worktree_budget_state(source_root, packet.worktree)
+    if not state.passed:
+        raise AgentOpsError(
+            "worktree budget exceeded: "
+            f"{state.current_count}/{state.limit} registered worktrees; "
+            f"remove or reuse an existing worktree before creating {packet.worktree}"
+        )
+    return state
+
+
 def inspect_scope(repo_root: Path, packet: WorkPacket) -> ScopeState:
     tracked = sorted(set(git_lines(repo_root, ["diff", "--name-only"])))
     staged = sorted(set(git_lines(repo_root, ["diff", "--name-only", "--cached"])))
@@ -402,6 +453,7 @@ def prepare_worktree(source_root: Path, packet: WorkPacket) -> Path:
         verify_base_is_ancestor(target_root, base_hash)
         return target_root
 
+    enforce_worktree_budget(source_root, packet)
     packet.worktree.parent.mkdir(parents=True, exist_ok=True)
     result = run_git(
         ["worktree", "add", "-b", packet.branch, str(packet.worktree), packet.base_ref],
@@ -596,6 +648,7 @@ def execute_packet(
     packet = load_work_packet(packet_path)
 
     if dry_run:
+        budget = worktree_budget_state(source, packet.worktree)
         summary = {
             "job_id": packet.id,
             "base_ref": packet.base_ref,
@@ -612,6 +665,13 @@ def execute_packet(
             },
             "dry_run": True,
             "would_create_worktree": not packet.worktree.exists(),
+            "would_block_worktree_budget": not budget.passed,
+            "worktree_budget": {
+                "limit": budget.limit,
+                "current_count": budget.current_count,
+                "would_create_worktree": budget.would_create_worktree,
+                "target_path": budget.target_path,
+            },
             "would_run_gates": False,
             "would_commit": False,
         }

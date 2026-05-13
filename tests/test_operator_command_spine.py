@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from dharma_swarm.operator_core.command_spine import (
+    CoherenceDelta,
     OperatorCommandRequest,
     RustReadinessSignal,
     evaluate_rust_readiness,
@@ -34,12 +35,16 @@ def test_plan_operator_command_drafts_agentops_packet_without_execution() -> Non
 
     assert plan.primary_skill in {"architect", "builder", "validator"}
     assert plan.work_packet.requires_human_scope is False
+    assert isinstance(plan.coherence_delta, CoherenceDelta)
+    assert plan.coherence_delta.organ_touched == "command_spine"
+    assert "OrganStateFact" in plan.coherence_delta.proof_read
     assert packet["branch"] == "chore/operator-command-spine"
     assert packet["worktree"] == "/tmp/dharma_swarm_command_spine"
     assert packet["commit"]["allowed"] is False
     assert packet["approval"]["before_commit"] is True
     assert "dharma_swarm/operator_core/**" in packet["allowed_files"]
     assert "api/**" in packet["forbidden_files"]
+    assert "coherence_delta" not in packet
 
 
 def test_plan_operator_command_marks_inferred_scope_for_human_approval() -> None:
@@ -49,6 +54,8 @@ def test_plan_operator_command_marks_inferred_scope_for_human_approval() -> None
 
     assert plan.work_packet.requires_human_scope is True
     assert plan.work_packet.scope_confidence == "inferred-low"
+    assert plan.coherence_delta.organ_touched == "agentops"
+    assert "inferred" in plan.coherence_delta.new_drift_risk
     assert any("human scope approval" in warning for warning in plan.warnings)
     assert plan.next_step.startswith("tighten allowed_files")
 
@@ -119,9 +126,9 @@ def test_record_human_yds_rating_appends_authoritative_jsonl(tmp_path: Path) -> 
     rows = ledger.read_text(encoding="utf-8").splitlines()
     assert len(rows) == 1
     payload = json.loads(rows[0])
-    assert payload["artifact"] == "artifact://operator-command-spine"
-    assert payload["rating"] == "5.12a"
-    assert payload["source"] == "dhyana"
+    assert payload["artifact"]["uri"] == "artifact://operator-command-spine"
+    assert payload["rating_value"] == "5.12a"
+    assert payload["operator_id"] == "dhyana"
 
 
 def test_record_human_yds_rating_rejects_ai_source(tmp_path: Path) -> None:

@@ -1,0 +1,108 @@
+{
+  "allowed_files": [
+    ".github/PULL_REQUEST_TEMPLATE.md",
+    "dharma_swarm/operator_core/**",
+    "dharma_swarm/daily_operating_brief.py",
+    "dharma_swarm/fractal/**",
+    "docs/governance/**",
+    "tests/**"
+  ],
+  "approval": {
+    "before_commit": true,
+    "before_merge": true
+  },
+  "base_ref": "HEAD",
+  "branch": "chore/agent-truth-spine",
+  "commit_decision": "commit.allowed is false",
+  "commit_hash": null,
+  "dry_run": false,
+  "final_git_status": " M .github/PULL_REQUEST_TEMPLATE.md\n M dharma_swarm/operator_core/__init__.py\n M dharma_swarm/operator_core/command_spine.py\n M docs/governance/AGENTOPS_DAILY_OPERATING_BRIEF_BRIDGE.md\n M tests/test_operator_command_spine.py\n?? dharma_swarm/daily_operating_brief.py\n?? dharma_swarm/fractal/\n?? dharma_swarm/operator_core/operating_facts.py\n?? docs/governance/FRACTAL_ROOM_MEMBRANE.md\n?? docs/governance/ORGAN_ENCAPSULATION.md\n?? tests/test_fractal_room.py\n?? tests/test_operating_facts_and_daily_brief.py\n",
+  "forbidden_files": [
+    "api/**",
+    "dashboard/**",
+    ".github/workflows/**",
+    ".pre-commit-config.yaml",
+    "dharma_swarm/dharma_kernel.py",
+    "dharma_swarm/telos_gates.py"
+  ],
+  "gates": [
+    {
+      "command": "python -m py_compile dharma_swarm/operator_core/operating_facts.py dharma_swarm/operator_core/command_spine.py dharma_swarm/daily_operating_brief.py tests/test_operating_facts_and_daily_brief.py tests/test_operator_command_spine.py",
+      "duration_seconds": 0.056,
+      "exit_code": 0,
+      "name": "compile-coherence-seam",
+      "output": "",
+      "passed": true,
+      "timed_out": false
+    },
+    {
+      "command": "pytest -q tests/test_operating_facts_and_daily_brief.py tests/test_operator_command_spine.py",
+      "duration_seconds": 2.001,
+      "exit_code": 0,
+      "name": "focused-coherence-tests",
+      "output": "...............                                                          [100%]\n=============================== warnings summary ===============================\n../../../opt/homebrew/Caskroom/miniforge/base/lib/python3.13/site-packages/_pytest/config/__init__.py:1428\n  /opt/homebrew/Caskroom/miniforge/base/lib/python3.13/site-packages/_pytest/config/__init__.py:1428: PytestConfigWarning: Unknown config option: timeout\n  \n    self._warn_or_fail_if_strict(f\"Unknown config option: {key}\\n\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n15 passed, 1 warning in 0.57s\n",
+      "passed": true,
+      "timed_out": false
+    },
+    {
+      "command": "pytest -q tests/test_operator_core_contracts.py tests/test_operator_core_adapters.py",
+      "duration_seconds": 0.708,
+      "exit_code": 0,
+      "name": "operator-core-regression-tests",
+      "output": ".......................                                                  [100%]\n=============================== warnings summary ===============================\n../../../opt/homebrew/Caskroom/miniforge/base/lib/python3.13/site-packages/_pytest/config/__init__.py:1428\n  /opt/homebrew/Caskroom/miniforge/base/lib/python3.13/site-packages/_pytest/config/__init__.py:1428: PytestConfigWarning: Unknown config option: timeout\n  \n    self._warn_or_fail_if_strict(f\"Unknown config option: {key}\\n\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n23 passed, 1 warning in 0.39s\n",
+      "passed": true,
+      "timed_out": false
+    },
+    {
+      "command": "git diff --check",
+      "duration_seconds": 0.025,
+      "exit_code": 0,
+      "name": "diff-check",
+      "output": "",
+      "passed": true,
+      "timed_out": false
+    }
+  ],
+  "intent": "Validate the OrganState coherence seam as a bounded operating-facts/command-spine change.",
+  "job_id": "agentops:organstate-coherence-seam",
+  "scope": {
+    "changed_files": [
+      ".github/PULL_REQUEST_TEMPLATE.md",
+      "dharma_swarm/daily_operating_brief.py",
+      "dharma_swarm/fractal/__init__.py",
+      "dharma_swarm/fractal/fractal_room.py",
+      "dharma_swarm/operator_core/__init__.py",
+      "dharma_swarm/operator_core/command_spine.py",
+      "dharma_swarm/operator_core/operating_facts.py",
+      "docs/governance/AGENTOPS_DAILY_OPERATING_BRIEF_BRIDGE.md",
+      "docs/governance/FRACTAL_ROOM_MEMBRANE.md",
+      "docs/governance/ORGAN_ENCAPSULATION.md",
+      "tests/test_fractal_room.py",
+      "tests/test_operating_facts_and_daily_brief.py",
+      "tests/test_operator_command_spine.py"
+    ],
+    "passed": true,
+    "staged_files": [],
+    "tracked_changed_files": [
+      ".github/PULL_REQUEST_TEMPLATE.md",
+      "dharma_swarm/operator_core/__init__.py",
+      "dharma_swarm/operator_core/command_spine.py",
+      "docs/governance/AGENTOPS_DAILY_OPERATING_BRIEF_BRIDGE.md",
+      "tests/test_operator_command_spine.py"
+    ],
+    "untracked_files": [
+      "dharma_swarm/daily_operating_brief.py",
+      "dharma_swarm/fractal/__init__.py",
+      "dharma_swarm/fractal/fractal_room.py",
+      "dharma_swarm/operator_core/operating_facts.py",
+      "docs/governance/FRACTAL_ROOM_MEMBRANE.md",
+      "docs/governance/ORGAN_ENCAPSULATION.md",
+      "tests/test_fractal_room.py",
+      "tests/test_operating_facts_and_daily_brief.py"
+    ],
+    "violations": []
+  },
+  "status": "passed",
+  "target_head": "fdd97f4bf54584dcb05432c67f48514352d1f3ac",
+  "worktree": "/Users/dhyana/dharma_swarm_truth_spine"
+}

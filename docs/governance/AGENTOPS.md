@@ -63,13 +63,16 @@ allowed scope.
 
 The runner creates the declared worktree from `base_ref` and `branch`, or
 attaches to an existing worktree when the path, branch, and base ancestry match.
+AgentOps refuses to create a new worktree when the source repo already has 10
+registered worktrees. Reusing an existing matching worktree is still allowed.
 By default it refuses an already-dirty target worktree before gates run. For a
 human-reviewed post-agent verification run, `--allow-existing-changes` permits
 existing changes while still enforcing the scope gate.
 
 Dry-run mode is available with `--dry-run` or `--inspect`. It reads and validates
 the packet, prints intended actions, and does not create a worktree, run gates,
-write reports, or commit.
+write reports, or commit. Dry-run output includes the current worktree budget
+state and whether the packet would be blocked by the budget.
 
 ## Reports
 

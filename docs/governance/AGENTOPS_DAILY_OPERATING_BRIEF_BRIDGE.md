@@ -20,6 +20,11 @@ Those fields are enough for a future brief generator to summarize what shipped,
 what was blocked, what needs review, what consumed time, and what should happen
 next.
 
+The current code membrane for these first-class objects is
+`dharma_swarm.operator_core.operating_facts`. The Daily Operating Brief should
+consume that membrane instead of parsing every upstream organ's private
+implementation details directly.
+
 ## YDS Authority
 
 YDS / Yosemite Decimal System ratings are human-authoritative only.
