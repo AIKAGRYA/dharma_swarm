@@ -707,7 +707,16 @@ def _handle_map(args: argparse.Namespace) -> int:
     )
 
 
-def main(argv: list[str] | None = None) -> int:
+def _not_implemented(args: argparse.Namespace) -> int:  # pragma: no cover
+    print(f"Command not yet implemented: {vars(args)}")
+    return 1
+
+
+def _build_parser() -> argparse.ArgumentParser:
+    """Return the top-level ArgumentParser for the dgc CLI.
+
+    Extracted so tests can inspect the parser without calling ``main()``.
+    """
     parser = argparse.ArgumentParser(prog="dgc", description="DGC command line interface")
     subparsers = parser.add_subparsers(dest="command")
 
@@ -752,6 +761,48 @@ def main(argv: list[str] | None = None) -> int:
     map_show_parser.add_argument("organ")
     map_show_parser.set_defaults(func=_handle_map)
 
+    # dharma subcommand — kernel status, corpus review, claim review
+    dharma_parser = subparsers.add_parser("dharma", help="Dharma kernel commands")
+    dharma_subparsers = dharma_parser.add_subparsers(dest="dharma_cmd")
+    dharma_status_parser = dharma_subparsers.add_parser("status", help="Kernel integrity status")
+    dharma_status_parser.set_defaults(func=_not_implemented)
+    dharma_corpus_parser = dharma_subparsers.add_parser("corpus", help="Browse dharma corpus")
+    dharma_corpus_parser.add_argument("--status", dest="corpus_status", default=None)
+    dharma_corpus_parser.add_argument("--category", dest="corpus_category", default=None)
+    dharma_corpus_parser.set_defaults(func=_not_implemented)
+    dharma_review_parser = dharma_subparsers.add_parser("review", help="Review a dharma claim")
+    dharma_review_parser.add_argument("claim_id")
+    dharma_review_parser.set_defaults(func=_not_implemented)
+
+    # evolve subcommand — apply / promote / rollback mutations
+    evolve_parser = subparsers.add_parser("evolve", help="Evolution pipeline commands")
+    evolve_subparsers = evolve_parser.add_subparsers(dest="evolve_cmd")
+    evolve_apply_parser = evolve_subparsers.add_parser("apply", help="Run evolution pipeline on a component")
+    evolve_apply_parser.add_argument("component")
+    evolve_apply_parser.add_argument("description", nargs="?", default="")
+    evolve_apply_parser.set_defaults(func=_not_implemented)
+    evolve_promote_parser = evolve_subparsers.add_parser("promote", help="Promote an evolution entry")
+    evolve_promote_parser.add_argument("entry_id")
+    evolve_promote_parser.set_defaults(func=_not_implemented)
+    evolve_rollback_parser = evolve_subparsers.add_parser("rollback", help="Rollback an evolution entry")
+    evolve_rollback_parser.add_argument("entry_id")
+    evolve_rollback_parser.add_argument("--reason", default="")
+    evolve_rollback_parser.set_defaults(func=_not_implemented)
+
+    # stigmergy subcommand — read pheromone trail marks
+    stigmergy_parser = subparsers.add_parser("stigmergy", help="Read stigmergy marks")
+    stigmergy_parser.add_argument("--file", dest="stig_file", default=None)
+    stigmergy_parser.set_defaults(func=_not_implemented)
+
+    # hum subcommand — subconscious dreams / attractor hum
+    hum_parser = subparsers.add_parser("hum", help="Subconscious attractor hum")
+    hum_parser.set_defaults(func=_not_implemented)
+
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = _build_parser()
     args = parser.parse_args(argv)
     if not hasattr(args, "func"):
         parser.print_help()
