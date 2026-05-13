@@ -40,6 +40,7 @@ The active work should stay within these limits:
 - M3C: read-only context parity harness and 60->80 roadmap
 - M3D: disabled-by-default `read_memory_context()` shadow wrapper
 - M3E: disabled-by-default `ContextCompiler.compile_bundle()` shadow wrapper
+- M4A: read-only representative context shadow report sweep
 
 Do not add runtime prompt injection, canon writes, Chetana mutations, vector
 rebuilds, migrations, or write-through gates until the read-only layers are
@@ -49,7 +50,10 @@ behind an explicit shadow flag, but it must not change returned prompt context
 or wire MemoryKernel atoms into `AgentRunner` or prompt construction. M3E may
 observe rendered `ContextCompiler` bundles behind an explicit shadow flag, but
 it must not change bundle text, add MemoryKernel sections, or persist parity
-reports into memory surfaces.
+reports into memory surfaces. M4A may collect representative shadow reports
+under explicit output paths, but must reject outputs under memory surfaces and
+must not read live home memory without explicit `--memory-home` and
+`--memory-surface` arguments.
 
 ## Reconciliation Rule
 
