@@ -41,7 +41,7 @@ dharma_swarm/knowledge_ops/cli.py
 The queue is an artifact, not a memory store.  It does not:
 
 - write to MemoryKernel, Chetana, wiki, ontology, runtime state, vectors, or logs
-- mark anything canonical
+- mark anything promoted
 - mutate source atoms
 - infer semantic truth from content
 - expose raw content or local paths

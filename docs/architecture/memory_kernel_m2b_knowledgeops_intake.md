@@ -80,7 +80,7 @@ correlation without exposing local filesystem paths.
 Lifecycle status remains conservative:
 
 ```text
-raw/claimed/observed/derived/curated/canonical atoms -> staged KnowledgeOps nodes
+raw/claimed/observed/derived/curated/promoted atoms -> staged KnowledgeOps nodes
 superseded atoms -> superseded KnowledgeOps nodes
 rejected atoms -> contested KnowledgeOps nodes
 ```

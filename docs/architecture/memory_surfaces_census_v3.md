@@ -287,7 +287,7 @@ That function should become a compatibility wrapper over:
 MemoryKernel.retrieve_context(...)
 ```
 
-M1 should not introduce canonical writes.  Write gates and runtime bypass
+M1 should not introduce promoted writes.  Write gates and runtime bypass
 sentinels belong in later milestones.
 
 The narrow M1 read facade is documented in
