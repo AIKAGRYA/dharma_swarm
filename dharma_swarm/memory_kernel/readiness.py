@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from collections import Counter
 from collections.abc import Callable, Iterable
 from dataclasses import asdict, dataclass
@@ -10,6 +9,10 @@ from pathlib import Path
 from typing import Any
 
 from dharma_swarm.memory_kernel.adapters.base import MemorySurfaceAdapter
+from dharma_swarm.memory_kernel.adapters.read_only import (
+    jsonl_surface_read_warnings,
+    sqlite_surface_read_warnings,
+)
 from dharma_swarm.memory_kernel.atoms import (
     AdapterMode,
     MemoryAtomType,
@@ -21,6 +24,32 @@ from dharma_swarm.memory_kernel.atoms import (
 
 READINESS_SCHEMA_VERSION = "memory_kernel_readiness.v1"
 AdapterFactory = Callable[[MemorySurface], MemorySurfaceAdapter]
+DEFAULT_REQUIRED_SURFACE_IDS = (
+    "home.memory_plane",
+    "home.runtime_state",
+    "home.smriti",
+    "home.witness",
+    "home.knowledge_wiki",
+    "home.codex_memory",
+    "home.conversation_log",
+)
+OPTIONAL_LIFECYCLE_STATUSES = {
+    "disabled",
+    "dormant",
+    "expected_unavailable",
+    "external",
+    "retired",
+    "snapshot",
+    "unsafe_disabled",
+}
+REQUIRED_FAILURE_STATUSES = {
+    "degraded",
+    "missing_adapter",
+    "unavailable",
+    "uncovered",
+    *OPTIONAL_LIFECYCLE_STATUSES,
+}
+REQUIRED_UNAVAILABLE_STATUSES = REQUIRED_FAILURE_STATUSES - {"degraded"}
 
 
 @dataclass(frozen=True)
@@ -68,22 +97,76 @@ def build_adapter_readiness_report(
     adapter_factories: dict[str, AdapterFactory],
     required_surface_ids: Iterable[str] | None = None,
 ) -> AdapterReadinessReport:
-    required = set(required_surface_ids or adapter_factories)
-    rows = tuple(
+    required = set(required_surface_ids or DEFAULT_REQUIRED_SURFACE_IDS)
+    surface_rows = tuple(
         _surface_readiness(surface, adapter_factories, required)
         for surface in sorted(surfaces, key=lambda item: item.surface_id)
     )
+    observed_surface_ids = {row.surface_id for row in surface_rows}
+    missing_required_rows = tuple(
+        _missing_required_surface_readiness(surface_id)
+        for surface_id in sorted(required - observed_surface_ids)
+    )
+    rows = tuple(
+        sorted(
+            (*surface_rows, *missing_required_rows),
+            key=lambda row: row.surface_id,
+        )
+    )
     counts = Counter(row.status for row in rows)
+    required_rows = tuple(row for row in rows if row.required)
+    optional_rows = tuple(row for row in rows if not row.required)
+    required_counts = Counter(row.status for row in required_rows)
+    optional_counts = Counter(row.status for row in optional_rows)
+    required_adapter_registered_count = sum(
+        1 for row in required_rows if row.adapter_registered
+    )
     summary = {
         "surface_count": len(rows),
-        "required_surface_count": sum(1 for row in rows if row.required),
+        "observed_surface_count": len(surface_rows),
+        "missing_required_surface_count": len(missing_required_rows),
+        "required_surface_count": len(required_rows),
+        "required_ready_count": required_counts["ready"],
+        "required_failure_count": len(required_rows) - required_counts["ready"],
+        "expected_adapter_surface_count": len(required_rows),
+        "expected_adapter_registered_count": required_adapter_registered_count,
+        "required_adapter_registered_count": required_adapter_registered_count,
+        "optional_surface_count": len(optional_rows),
+        "accounted_surface_count": sum(1 for row in rows if row.status != "uncovered"),
+        "accounted_optional_count": sum(
+            1 for row in optional_rows if row.status != "uncovered"
+        ),
+        "accounted_optional_absent_count": sum(
+            1
+            for row in optional_rows
+            if row.status in OPTIONAL_LIFECYCLE_STATUSES and not row.surface_exists
+        ),
+        "accounted_optional_lifecycle_count": sum(
+            1 for row in optional_rows if row.status in OPTIONAL_LIFECYCLE_STATUSES
+        ),
         "adapter_registered_count": sum(1 for row in rows if row.adapter_registered),
-        "ready_count": counts["ready"],
-        "degraded_count": counts["degraded"],
-        "unavailable_count": counts["unavailable"],
-        "missing_adapter_count": counts["missing_adapter"],
-        "uncovered_count": counts["uncovered"],
-        "warning_count": sum(len(row.warnings) for row in rows),
+        "ready_count": required_counts["ready"],
+        "degraded_count": required_counts["degraded"],
+        "unavailable_count": required_counts["unavailable"],
+        "missing_adapter_count": required_counts["missing_adapter"],
+        "uncovered_count": required_counts["uncovered"],
+        "optional_missing_adapter_count": optional_counts["missing_adapter"],
+        "optional_uncovered_count": optional_counts["uncovered"],
+        "expected_unavailable_count": counts["expected_unavailable"],
+        "retired_count": counts["retired"],
+        "disabled_count": counts["disabled"],
+        "unsafe_disabled_count": counts["unsafe_disabled"],
+        "snapshot_count": counts["snapshot"],
+        "dormant_count": counts["dormant"],
+        "external_count": counts["external"],
+        "total_ready_count": counts["ready"],
+        "total_degraded_count": counts["degraded"],
+        "total_unavailable_count": counts["unavailable"],
+        "total_missing_adapter_count": counts["missing_adapter"],
+        "total_uncovered_count": counts["uncovered"],
+        "warning_count": sum(len(row.warnings) for row in required_rows),
+        "optional_warning_count": sum(len(row.warnings) for row in optional_rows),
+        "total_warning_count": sum(len(row.warnings) for row in rows),
     }
     report_warnings = _report_warnings(rows)
     return AdapterReadinessReport(
@@ -107,9 +190,14 @@ def _surface_readiness(
     adapter_version: str | None = None
     read_mode: str | None = None
     atom_types: tuple[str, ...] = ()
+    is_required = surface.surface_id in required
+    optional_lifecycle_status = _optional_lifecycle_status(
+        surface,
+        required=is_required,
+    )
 
     if factory is None:
-        if _expects_adapter(surface):
+        if optional_lifecycle_status is None and _expects_adapter(surface):
             warnings.append("adapter_not_registered")
     else:
         try:
@@ -127,17 +215,23 @@ def _surface_readiness(
             )
             atom_types = _adapter_atom_types(adapter)
 
-    if not surface.health.exists:
+    if not surface.health.exists and optional_lifecycle_status is None:
         warnings.append("surface_missing")
     if surface.health.probe_error:
         warnings.append("surface_probe_error")
-    warnings.extend(_surface_read_warnings(surface))
+    if optional_lifecycle_status is None:
+        warnings.extend(_surface_read_warnings(surface))
 
     normalized_warnings = tuple(sorted(dict.fromkeys(warnings)))
     return AdapterSurfaceReadiness(
         surface_id=surface.surface_id,
-        status=_surface_status(surface, factory, normalized_warnings),
-        required=surface.surface_id in required,
+        status=_surface_status(
+            surface,
+            factory,
+            normalized_warnings,
+            required=is_required,
+        ),
+        required=is_required,
         adapter_registered=factory is not None,
         adapter_name=adapter_name,
         adapter_version=adapter_version,
@@ -152,11 +246,38 @@ def _surface_readiness(
     )
 
 
+def _missing_required_surface_readiness(surface_id: str) -> AdapterSurfaceReadiness:
+    return AdapterSurfaceReadiness(
+        surface_id=surface_id,
+        status="uncovered",
+        required=True,
+        adapter_registered=False,
+        adapter_name=None,
+        adapter_version=None,
+        read_mode=None,
+        surface_exists=False,
+        active_status=SurfaceStatus.MISSING.value,
+        adapter_mode="unknown",
+        path_type="missing",
+        atom_types=(),
+        warnings=("required_surface_not_found",),
+        record_count=None,
+    )
+
+
 def _surface_status(
     surface: MemorySurface,
     factory: AdapterFactory | None,
     warnings: tuple[str, ...],
+    *,
+    required: bool,
 ) -> str:
+    optional_lifecycle_status = _optional_lifecycle_status(
+        surface,
+        required=required,
+    )
+    if optional_lifecycle_status is not None:
+        return optional_lifecycle_status
     if factory is None:
         return "missing_adapter" if _expects_adapter(surface) else "uncovered"
     if not surface.health.exists or surface.active_status == SurfaceStatus.MISSING:
@@ -172,6 +293,32 @@ def _expects_adapter(surface: MemorySurface) -> bool:
         AdapterMode.STREAMING,
         AdapterMode.METADATA_ONLY,
     }
+
+
+def _optional_lifecycle_status(
+    surface: MemorySurface,
+    *,
+    required: bool,
+) -> str | None:
+    if required:
+        return None
+    active_status = surface.active_status.value
+    adapter_mode = surface.adapter_mode.value
+    if active_status == "expected_unavailable":
+        return "expected_unavailable" if not surface.health.exists else None
+    if active_status == "retired":
+        return "retired"
+    if active_status == "disabled" or adapter_mode == AdapterMode.DISABLED.value:
+        return "disabled"
+    if surface.active_status == SurfaceStatus.UNSAFE:
+        return "unsafe_disabled"
+    if surface.active_status == SurfaceStatus.SNAPSHOT:
+        return "snapshot"
+    if surface.active_status == SurfaceStatus.DORMANT:
+        return "dormant"
+    if surface.active_status == SurfaceStatus.EXTERNAL:
+        return "external"
+    return None
 
 
 def _adapter_atom_types(adapter: MemorySurfaceAdapter) -> tuple[str, ...]:
@@ -201,44 +348,10 @@ def _surface_read_warnings(surface: MemorySurface) -> tuple[str, ...]:
     path = Path(surface.path).expanduser()
     warnings: list[str] = []
     if _looks_like_sqlite(path):
-        wal_path = path.with_name(path.name + "-wal")
-        if wal_path.exists():
-            warnings.append("immutable_probe_may_ignore_live_wal")
+        warnings.extend(sqlite_surface_read_warnings(path))
     if _looks_like_jsonl_surface(path, surface):
-        warnings.extend(_jsonl_append_warnings(path))
+        warnings.extend(jsonl_surface_read_warnings(path, max_files=100))
     return tuple(sorted(dict.fromkeys(warnings)))
-
-
-def _jsonl_append_warnings(path: Path) -> tuple[str, ...]:
-    warnings: list[str] = []
-    for file_path in _jsonl_files(path, max_files=100):
-        try:
-            if file_path.stat().st_size == 0:
-                continue
-            with file_path.open("rb") as handle:
-                handle.seek(-1, os.SEEK_END)
-                if handle.read(1) != b"\n":
-                    warnings.append("jsonl_trailing_partial_line_skipped")
-                    break
-        except OSError:
-            warnings.append("jsonl_read_error")
-    return tuple(sorted(dict.fromkeys(warnings)))
-
-
-def _jsonl_files(path: Path, max_files: int) -> tuple[Path, ...]:
-    if path.is_file() and path.suffix == ".jsonl":
-        return (path,)
-    if not path.is_dir():
-        return ()
-    files: list[Path] = []
-    for current, dirs, filenames in os.walk(path):
-        dirs[:] = sorted(name for name in dirs if name not in {".git", "__pycache__"})
-        for filename in sorted(filenames):
-            if filename.endswith(".jsonl"):
-                files.append(Path(current) / filename)
-                if len(files) >= max_files:
-                    return tuple(files)
-    return tuple(files)
 
 
 def _looks_like_sqlite(path: Path) -> bool:
@@ -251,7 +364,7 @@ def _looks_like_jsonl_surface(path: Path, surface: MemorySurface) -> bool:
 
 def _report_status(rows: tuple[AdapterSurfaceReadiness, ...]) -> str:
     required_rows = [row for row in rows if row.required]
-    if any(row.status in {"unavailable", "missing_adapter"} for row in required_rows):
+    if any(row.status in REQUIRED_UNAVAILABLE_STATUSES for row in required_rows):
         return "unavailable"
     if any(row.status == "degraded" for row in required_rows):
         return "degraded"

@@ -401,6 +401,7 @@ class TestMemoryKernelOperatorRows:
         assert {
             "memory.census",
             "memory.adapter_coverage",
+            "memory.readiness",
             "memory.writer_sentinel",
             "memory.context_shadow",
             "memory.context_canary",
@@ -423,6 +424,9 @@ class TestMemoryKernelOperatorRows:
         assert gate.observed_state == "off"
         assert tuple(gate.raw["allowed_states"]) == ROLLOUT_STATES
         assert gate.raw["default_state"] == "off"
+        assert gate.raw["burn_in_safety_state"] == "safe"
+        assert gate.raw["burn_in_safe"] is True
+        assert gate.raw["burn_in_blockers"] == ()
 
     def test_invalid_rollout_state_resolves_to_off(
         self,
@@ -436,6 +440,41 @@ class TestMemoryKernelOperatorRows:
 
         assert gate.observed_state == "off"
         assert "memory_kernel_rollout_invalid_state" in gate.gap_codes
+        assert gate.raw["burn_in_safety_state"] == "blocked"
+        assert "rollout_state_valid" in gate.raw["burn_in_blockers"]
+
+    def test_readiness_row_projects_strict_accounting_fields(
+        self,
+        tmp_repo: Path,
+    ) -> None:
+        rows = memory_kernel_control_rows(tmp_repo)
+        readiness = [row for row in rows if row.id == "memory.readiness"][0]
+
+        assert readiness.raw["schema_version"] == "memory_kernel_readiness.v1"
+        assert readiness.raw["strict_readiness_state"] in {
+            "strict_ready",
+            "strict_blocked",
+        }
+        assert "accounted_surface_count" in readiness.raw
+        assert "accounted_surface_total" in readiness.raw
+        assert "required_accounted_surface_count" in readiness.raw
+        assert "required_surface_count" in readiness.raw
+
+    def test_preview_rollout_is_blocked_without_strict_readiness(
+        self,
+        tmp_repo: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setenv(ROLLOUT_ENV_VAR, "preview")
+        monkeypatch.setenv("DHARMA_MEMORY_KERNEL_HOME", str(tmp_repo / "empty-home"))
+
+        rows = memory_kernel_control_rows(tmp_repo)
+        gate = [row for row in rows if row.id == "memory.rollout_gate"][0]
+
+        assert gate.observed_state == "preview"
+        assert gate.raw["burn_in_safety_state"] == "blocked"
+        assert gate.raw["burn_in_safe"] is False
+        assert "memory_kernel_burn_in_blocked" in gate.gap_codes
 
     def test_context_canary_projects_failures(self) -> None:
         report = project_context_canary_report()

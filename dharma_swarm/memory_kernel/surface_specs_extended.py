@@ -166,12 +166,16 @@ def extended_surface_specs() -> tuple[SurfaceSpec, ...]:
             AuthorityLevel.LOW,
             WriteMode.PROJECTION_WRITE,
             AdapterMode.METADATA_ONLY,
+            active_status=SurfaceStatus.DISABLED,
             feeds=("distilled_conversation_metadata",),
             projection_of=("conversation_logs",),
             canon_risk=RiskLevel.HIGH,
             pii_secrets_risk=RiskLevel.HIGH,
             migration_status=MigrationStatus.DO_NOT_MIGRATE,
             do_not_migrate_reason="Distilled outputs are summaries/projections until reviewed.",
+            metadata={
+                "lifecycle_reason": "Optional projection output; absence is expected unless conversation distillation is enabled.",
+            },
         ),
         SurfaceSpec(
             "home.shared",
@@ -197,11 +201,15 @@ def extended_surface_specs() -> tuple[SurfaceSpec, ...]:
             AuthorityLevel.LOW,
             WriteMode.PROJECTION_WRITE,
             AdapterMode.METADATA_ONLY,
+            active_status=SurfaceStatus.DISABLED,
             feeds=("citation_index_metadata",),
             projection_of=("source_documents", "generated_reports"),
             canon_risk=RiskLevel.HIGH,
             migration_status=MigrationStatus.DO_NOT_MIGRATE,
             do_not_migrate_reason="Citation indexes are projections over sources.",
+            metadata={
+                "lifecycle_reason": "Optional citation projection; source documents remain authoritative when it is absent.",
+            },
         ),
         SurfaceSpec(
             "home.subconscious",
@@ -266,10 +274,14 @@ def extended_surface_specs() -> tuple[SurfaceSpec, ...]:
             AuthorityLevel.LOW,
             WriteMode.READ_WRITE,
             AdapterMode.METADATA_ONLY,
+            active_status=SurfaceStatus.EXPECTED_UNAVAILABLE,
             feeds=("gaia_ledger_metadata",),
             canon_risk=RiskLevel.HIGH,
             pii_secrets_risk=RiskLevel.MEDIUM,
             migration_status=MigrationStatus.ADAPTER_NEEDED,
+            metadata={
+                "lifecycle_reason": "Optional Gaia ledger surface; absence is expected when the Gaia loop is not active.",
+            },
         ),
         SurfaceSpec(
             "home.gaia_platform",
@@ -280,10 +292,14 @@ def extended_surface_specs() -> tuple[SurfaceSpec, ...]:
             AuthorityLevel.LOW,
             WriteMode.READ_WRITE,
             AdapterMode.METADATA_ONLY,
+            active_status=SurfaceStatus.EXPECTED_UNAVAILABLE,
             feeds=("gaia_platform_state_metadata",),
             canon_risk=RiskLevel.HIGH,
             pii_secrets_risk=RiskLevel.MEDIUM,
             migration_status=MigrationStatus.ADAPTER_NEEDED,
+            metadata={
+                "lifecycle_reason": "Optional Gaia platform state; absence is expected when the Gaia loop is not active.",
+            },
         ),
         SurfaceSpec(
             "home.control",
@@ -322,10 +338,14 @@ def extended_surface_specs() -> tuple[SurfaceSpec, ...]:
             AuthorityLevel.LOW,
             WriteMode.APPEND_ONLY,
             AdapterMode.METADATA_ONLY,
+            active_status=SurfaceStatus.EXPECTED_UNAVAILABLE,
             feeds=("alert_metadata",),
             canon_risk=RiskLevel.HIGH,
             pii_secrets_risk=RiskLevel.MEDIUM,
             migration_status=MigrationStatus.ADAPTER_NEEDED,
+            metadata={
+                "lifecycle_reason": "Optional alerting surface; absence is expected when monitoring alerts are not configured.",
+            },
         ),
         SurfaceSpec(
             "home.custodians",
@@ -336,10 +356,14 @@ def extended_surface_specs() -> tuple[SurfaceSpec, ...]:
             AuthorityLevel.LOW,
             WriteMode.READ_WRITE,
             AdapterMode.METADATA_ONLY,
+            active_status=SurfaceStatus.EXPECTED_UNAVAILABLE,
             feeds=("custodian_state_metadata",),
             canon_risk=RiskLevel.HIGH,
             pii_secrets_risk=RiskLevel.MEDIUM,
             migration_status=MigrationStatus.ADAPTER_NEEDED,
+            metadata={
+                "lifecycle_reason": "Optional custodian coordination state; absence is expected until custodians run.",
+            },
         ),
         SurfaceSpec(
             "home.jikoku",

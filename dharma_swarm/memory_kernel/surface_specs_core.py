@@ -139,6 +139,7 @@ def core_surface_specs() -> tuple[SurfaceSpec, ...]:
             AuthorityLevel.NONE,
             WriteMode.PROJECTION_WRITE,
             AdapterMode.METADATA_ONLY,
+            active_status=SurfaceStatus.DISABLED,
             known_writers=("ecosystem_index.py",),
             feeds=("ecosystem_search_pointers",),
             projection_of=("workspace_files", "external_docs"),
@@ -148,6 +149,9 @@ def core_surface_specs() -> tuple[SurfaceSpec, ...]:
             migration_status=MigrationStatus.DO_NOT_MIGRATE,
             do_not_migrate_reason="Full-text index over files; source files remain authority.",
             sqlite_count_tables=("doc_meta",),
+            metadata={
+                "lifecycle_reason": "Optional derived index; absence is expected unless ecosystem indexing is enabled.",
+            },
         ),
         SurfaceSpec(
             "home.router_audit_log",
@@ -177,6 +181,7 @@ def core_surface_specs() -> tuple[SurfaceSpec, ...]:
             AuthorityLevel.LOW,
             WriteMode.READ_WRITE,
             AdapterMode.READ_ONLY,
+            active_status=SurfaceStatus.RETIRED,
             provenance_quality="medium",
             known_writers=("routing_memory.py",),
             known_readers=("smart_router.py", "agent_runner.py"),
@@ -187,6 +192,9 @@ def core_surface_specs() -> tuple[SurfaceSpec, ...]:
             latency_risk=RiskLevel.LOW,
             migration_status=MigrationStatus.ADAPTER_NEEDED,
             sqlite_count_tables=("routing_stats", "routing_events"),
+            metadata={
+                "lifecycle_reason": "Legacy router-learning store; current readiness should not require it unless explicitly requested.",
+            },
         ),
         SurfaceSpec(
             "home.hibernation",
@@ -197,6 +205,7 @@ def core_surface_specs() -> tuple[SurfaceSpec, ...]:
             AuthorityLevel.MEDIUM,
             WriteMode.READ_WRITE,
             AdapterMode.READ_ONLY,
+            active_status=SurfaceStatus.EXPECTED_UNAVAILABLE,
             provenance_quality="medium",
             known_writers=("hibernation.py",),
             feeds=("hibernation_jobs", "wake_conditions"),
@@ -206,6 +215,9 @@ def core_surface_specs() -> tuple[SurfaceSpec, ...]:
             latency_risk=RiskLevel.LOW,
             migration_status=MigrationStatus.ADAPTER_NEEDED,
             sqlite_count_tables=("hibernation_jobs",),
+            metadata={
+                "lifecycle_reason": "Optional hibernation subsystem state; absence is expected when hibernation is not active.",
+            },
         ),
         SurfaceSpec(
             "home.algedonic_signals",

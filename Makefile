@@ -1,7 +1,7 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts uplift-guards module-budget docops-integrity docops-report memory-kernel-readiness operator-prod-smoke governance-all onboard go-fmt-check go-test go-vet go-ci
+.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts uplift-guards module-budget docops-integrity docops-report memory-kernel-readiness memory-kernel-readiness-strict operator-prod-smoke governance-all onboard go-fmt-check go-test go-vet go-ci
 
 PYTHON ?= python3
 GO ?= go
@@ -45,6 +45,7 @@ help:
 	@echo "  make docops-integrity Run machine-verifiable documentation checks"
 	@echo "  make docops-report Generate local DocOps JSON/Markdown reports"
 	@echo "  make memory-kernel-readiness Run read-only MemoryKernel readiness gates"
+	@echo "  make memory-kernel-readiness-strict Require 100% strict MemoryKernel readiness"
 	@echo "  make operator-prod-smoke Run fast read-only operator production smoke"
 	@echo "  make onboard      Render current operating reality (active track, live ops, broken register, axioms)"
 	@echo "  make go-ci        Run Go evidence sense-organ fmt/vet/test gates"
@@ -205,6 +206,12 @@ docops-report:
 
 memory-kernel-readiness:
 	$(PYTHON) scripts/memory_kernel_readiness.py --repo-root . --dry-run
+	$(PYTHON) scripts/memory_writer_sentinel.py --repo-root . --ci
+	$(PYTHON) scripts/memory_context_eval.py --repo-root . --run-default-cases --fail-on-hard-failure --dry-run
+	$(PYTHON) scripts/memory_context_shadow_sweep.py --repo-root . --fail-on-hard-failure --dry-run
+
+memory-kernel-readiness-strict:
+	$(PYTHON) scripts/memory_kernel_readiness.py --repo-root . --dry-run --strict --fail-on-missing-adapter
 	$(PYTHON) scripts/memory_writer_sentinel.py --repo-root . --ci
 	$(PYTHON) scripts/memory_context_eval.py --repo-root . --run-default-cases --fail-on-hard-failure --dry-run
 	$(PYTHON) scripts/memory_context_shadow_sweep.py --repo-root . --fail-on-hard-failure --dry-run

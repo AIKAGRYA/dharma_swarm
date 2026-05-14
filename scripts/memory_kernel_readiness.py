@@ -24,6 +24,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-lines-per-file", type=int, default=100)
     parser.add_argument("--strict", action="store_true")
     parser.add_argument("--fail-on-missing-adapter", action="store_true")
+    parser.add_argument("--summary-only", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     return parser
 
@@ -48,22 +49,46 @@ def main(argv: list[str] | None = None) -> int:
     report = kernel.adapter_readiness_report(
         required_surface_ids=tuple(args.require_surface) or None
     )
-    payload_text = json.dumps(report.to_json(), indent=2, sort_keys=True)
+    full_payload = report.to_json()
+    payload = full_payload
+    if args.summary_only:
+        payload = {
+            "schema_version": payload["schema_version"],
+            "status": payload["status"],
+            "summary": payload["summary"],
+            "warnings": payload["warnings"],
+        }
+    payload_text = json.dumps(payload, indent=2, sort_keys=True)
     print(payload_text)
 
     if not args.dry_run and args.output_json:
         output_json = _resolve_output(args.output_json, args.repo_root)
         output_json.parent.mkdir(parents=True, exist_ok=True)
-        output_json.write_text(payload_text + "\n", encoding="utf-8")
+        output_json.write_text(
+            json.dumps(full_payload, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
 
-    if args.strict and report.status != "ready":
+    if args.strict and _strict_gate_failed(report):
         return 5
     if (
         args.fail_on_missing_adapter
-        and report.summary.get("missing_adapter_count", 0) > 0
+        and report.summary.get("total_missing_adapter_count", 0) > 0
     ):
         return 5
     return 0
+
+
+def _strict_gate_failed(report) -> bool:
+    summary = report.summary
+    return (
+        report.status != "ready"
+        or summary.get("required_ready_count", 0)
+        != summary.get("required_surface_count", 0)
+        or summary.get("degraded_count", 0) != 0
+        or summary.get("missing_adapter_count", 0) != 0
+        or summary.get("uncovered_count", 0) != 0
+    )
 
 
 def _resolve_output(path: Path, repo_root: Path) -> Path:

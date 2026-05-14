@@ -10,6 +10,7 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass, replace
 
 from dharma_swarm.memory_kernel.adapters.base import MemorySurfaceAdapter
+from dharma_swarm.memory_kernel.adapters.generic import GenericSurfaceMetadataAdapter
 from dharma_swarm.memory_kernel.adapters.read_only import (
     CodexMemoryAdapter,
     ConversationLogMetadataAdapter,
@@ -21,6 +22,7 @@ from dharma_swarm.memory_kernel.adapters.read_only import (
     WitnessJsonlAdapter,
 )
 from dharma_swarm.memory_kernel.atoms import (
+    AdapterMode,
     MemoryAtom,
     MemoryAtomType,
     MemoryQuery,
@@ -33,9 +35,19 @@ from dharma_swarm.memory_kernel.context_admission import (
     MemoryContextPack,
     preview_memory_pack,
 )
+from dharma_swarm.memory_kernel.surfaces import default_surface_specs
 
 
 AdapterFactory = Callable[[MemorySurface], MemorySurfaceAdapter]
+DEFAULT_REQUIRED_ADAPTER_SURFACE_IDS = (
+    "home.codex_memory",
+    "home.conversation_log",
+    "home.knowledge_wiki",
+    "home.memory_plane",
+    "home.runtime_state",
+    "home.smriti",
+    "home.witness",
+)
 
 
 @dataclass(frozen=True)
@@ -231,10 +243,15 @@ class MemoryKernel:
             build_adapter_readiness_report,
         )
 
+        resolved_required_surface_ids = (
+            tuple(required_surface_ids)
+            if required_surface_ids is not None
+            else DEFAULT_REQUIRED_ADAPTER_SURFACE_IDS
+        )
         return build_adapter_readiness_report(
             surfaces=self.list_surfaces(),
             adapter_factories=self._adapter_factories,
-            required_surface_ids=required_surface_ids,
+            required_surface_ids=resolved_required_surface_ids,
         )
 
     def _resolve_query(
@@ -302,7 +319,7 @@ def default_adapter_factories(
 ) -> dict[str, AdapterFactory]:
     adapter_config = config or ReadOnlyAdapterConfig()
 
-    return {
+    factories: dict[str, AdapterFactory] = {
         "home.memory_plane": lambda surface: MemoryPlaneAdapter(surface, config=adapter_config),
         "home.runtime_state": lambda surface: RuntimeStateAdapter(surface, config=adapter_config),
         "home.smriti": lambda surface: SmritiAdapter(surface, config=adapter_config),
@@ -314,3 +331,18 @@ def default_adapter_factories(
             config=adapter_config,
         ),
     }
+    for spec in default_surface_specs():
+        if spec.surface_id in factories:
+            continue
+        if spec.adapter_mode not in {
+            AdapterMode.READ_ONLY,
+            AdapterMode.STREAMING,
+            AdapterMode.METADATA_ONLY,
+        }:
+            continue
+        factories[spec.surface_id] = _generic_metadata_factory(adapter_config)
+    return factories
+
+
+def _generic_metadata_factory(config: ReadOnlyAdapterConfig) -> AdapterFactory:
+    return lambda surface: GenericSurfaceMetadataAdapter(surface, config=config)
