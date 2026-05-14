@@ -1,0 +1,8 @@
+cache/
+results/
+figures/
+*.log
+.venv/
+__pycache__/
+*.pyc
+inference_smoke*.log

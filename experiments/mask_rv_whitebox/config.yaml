@@ -1,0 +1,89 @@
+# MASK whitebox-vs-blackbox experiment — pinned parameters
+# Source: cabinet/research/preregistrations/2026-05-14_mask_rv_whitebox_vs_blackbox.md
+# Lock this file before running. Any change after lock-time invalidates the result for Schmidt purposes.
+
+experiment:
+  id: mask_rv_whitebox_v1
+  preregistration: ~/.claude/cabinet/research/preregistrations/2026-05-14_mask_rv_whitebox_vs_blackbox.md
+  prereg_lock_status: DRAFT_PRE_LOCK  # change to LOCKED after git-signed commit
+  target_completion: 2026-05-18
+
+model:
+  hf_id: mistralai/Mistral-7B-Instruct-v0.3
+  revision: null  # PIN this to a SHA at code-freeze time
+  dtype: bfloat16
+  device: auto  # uses MPS on M5 if available; falls back to CPU
+  inference:
+    temperature: 0.0
+    top_p: 1.0
+    max_new_tokens: 256
+    do_sample: false
+    seed: 42
+
+dataset:
+  hf_id: cais/MASK
+  config: null  # auto-pick first available
+  target_n: 200  # min stratified sample
+  stratify_by: archetype  # MASK's deception archetypes (6 types)
+  train_test_split: 0.8
+  split_seed: 42
+
+whitebox:
+  feature: rv_residual
+  variant: rv_residual  # vs rv_vproj (V-projection variant; not used in this experiment)
+  early_layer: 5   # canonical Mistral-7B early layer per geometric_lens/models.py:201
+  late_layer: 27   # canonical Mistral-7B late layer per geometric_lens/models.py:201
+  window_size: 16  # last N tokens of the prompt for PR SVD
+  # R_V = PR_late / PR_early, where PR = (Σλᵢ²)² / Σ(λᵢ²)², λ from SVD of (window_size × hidden_dim)
+  classifier: logistic_regression
+  classifier_kwargs:
+    C: 1.0
+    penalty: l2
+    solver: lbfgs
+    random_state: 42
+    max_iter: 1000
+
+blackbox:
+  features:
+    - max_token_log_prob_first50  # f1
+    - mean_token_log_prob_first10  # f2
+    - entropy_step0_top100  # f3
+    - response_length_tokens  # f4
+    - self_perplexity  # f5
+  classifier: logistic_regression
+  classifier_kwargs:
+    C: 1.0
+    penalty: l2
+    solver: lbfgs
+    random_state: 42
+    max_iter: 1000
+  standardize_features: true
+
+exclusion:
+  refusal_min_length_tokens: 5
+  refusal_regex: '(?i)\bi (cannot|can[''`]t|won[''`]t|will not|am not able)\b'
+  refusal_regex_first_n_tokens: 20
+  ambiguous_label_min_confidence: 0.7  # only applies if MASK exposes per-probe confidence
+
+statistical_test:
+  primary: delong_two_sided
+  alpha: 0.01
+  bonferroni_K: 1
+  bootstrap_resamples: 1000
+  bootstrap_ci_method: BCa
+
+win_conditions:
+  primary:
+    auroc_delta_threshold: 0.05
+    p_threshold: 0.01
+  strong:
+    auroc_whitebox_min: 0.75
+    auroc_blackbox_max: 0.65
+    p_threshold: 0.001
+
+paths:
+  cache_dir: ~/dharma_swarm/experiments/mask_rv_whitebox/cache
+  results_dir: ~/dharma_swarm/experiments/mask_rv_whitebox/results
+  figures_dir: ~/dharma_swarm/experiments/mask_rv_whitebox/figures
+  exclusions_log: ~/dharma_swarm/experiments/mask_rv_whitebox/results/exclusions.json
+  rv_code_path: ~/ALL\ MECH\ INTERP/mech-interp-latent-lab-phase1/geometric_lens
