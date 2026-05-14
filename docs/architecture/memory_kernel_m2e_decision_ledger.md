@@ -43,7 +43,7 @@ dharma_swarm/knowledge_ops/cli.py
 
 The ledger is still an artifact, not an authority store.  It does not:
 
-- mark anything canonical
+- mark anything promoted
 - write to Chetana, wiki, ontology, runtime state, vectors, memory plane, or logs
 - change source atoms or proposals
 - infer semantic truth from payload text

@@ -111,7 +111,7 @@ Defaults are conservative:
 ```text
 promotion_allowed = false
 context_admissible = false
-truth_state != canonical
+truth_state remains non-promoted
 include_content = false
 include_metadata_payloads = false
 ```
@@ -161,7 +161,7 @@ iter_external_memory_atoms(...)
 ```
 
 These methods are read-only.  They are intended for KnowledgeOps and future
-context integration, not for canonical promotion.
+context integration, not for direct promotion.
 
 ## Safety Rules
 

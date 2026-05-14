@@ -39,10 +39,10 @@ M3C Parity Harness
   warnings unless a future gate explicitly changes the contract.
 - MemoryKernel atoms are evaluated as candidate structured context; unsafe
   admissions are hard failures.
-- Reports may compare the two lanes, but they must not merge, canonicalize, or
+- Reports may compare the two lanes, but they must not merge, promote, or
   write back from either lane.
 - MemoryKernel atoms remain evidence with provenance and risk labels, not canon.
-- Projection stores remain projections.  They cannot become authoritative just
+- Projection stores remain projections.  They cannot become higher-authority just
   because a parity report includes them.
 
 ## Safety Contract
