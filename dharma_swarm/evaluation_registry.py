@@ -587,6 +587,172 @@ class EvaluationRegistry:
             },
         )
 
+    async def record_recursive_discovery_receipt(
+        self,
+        receipt_payload: dict[str, Any],
+        *,
+        run_id: str = "",
+        session_id: str = "",
+        task_id: str = "",
+        trace_id: str | None = None,
+        created_by: str = "evaluation.registry",
+        promotion_state: str = "candidate",
+    ) -> EvaluationRegistrationResult:
+        """Record a recursive discovery shadow receipt into canonical eval truth."""
+        from dharma_swarm.recursive_discovery import EVENT_STREAM, RecursiveReceipt
+
+        await self.runtime_state.init_db()
+        await self.memory_lattice.init_db()
+
+        resolved_run = await self._resolve_run(run_id)
+        resolved_session_id = session_id or (resolved_run.session_id if resolved_run else "")
+        resolved_task_id = task_id or (resolved_run.task_id if resolved_run else "")
+        if not resolved_session_id:
+            raise ValueError("session_id or run_id is required to record evaluation outputs canonically")
+
+        receipt = RecursiveReceipt.model_validate(receipt_payload)
+        raw_payload = receipt.model_dump(mode="json")
+        resolved_trace_id = trace_id or self._resolve_trace_id(raw_payload, resolved_run)
+        if not resolved_trace_id:
+            resolved_trace_id = receipt.parent_id or receipt.receipt_id
+
+        stored = await self.artifact_store.create_text_artifact_async(
+            session_id=resolved_session_id,
+            artifact_type="evaluations",
+            artifact_kind="recursive_discovery_receipt",
+            content=self._render_job_payload(raw_payload),
+            created_by=created_by,
+            extension="json",
+            task_id=resolved_task_id,
+            run_id=run_id,
+            trace_id=resolved_trace_id,
+            promotion_state=promotion_state,
+            provenance={
+                "source": "recursive_discovery_shadow",
+                "receipt_id": receipt.receipt_id,
+                "receipt_type": receipt.receipt_type,
+                "parent_id": receipt.parent_id or "",
+                "candidate_id": receipt.candidate_id or "",
+            },
+            metadata={
+                "source": "recursive_discovery_shadow",
+                "receipt_id": receipt.receipt_id,
+                "receipt_type": receipt.receipt_type,
+                "parent_id": receipt.parent_id or "",
+                "candidate_id": receipt.candidate_id or "",
+                "eval_ids": list(receipt.eval_ids),
+                "status": receipt.status,
+            },
+        )
+        artifact = stored.record
+
+        facts: list[MemoryFact] = []
+        facts.append(
+            await self.memory_lattice.record_fact(
+                (
+                    f"Recursive discovery receipt {receipt.receipt_id} "
+                    f"recorded {receipt.receipt_type}: {receipt.summary}"
+                ).strip(),
+                fact_kind="recursive_discovery_receipt",
+                truth_state="candidate",
+                confidence=1.0,
+                session_id=resolved_session_id,
+                task_id=resolved_task_id,
+                source_artifact_id=artifact.artifact_id,
+                metadata={
+                    "receipt_id": receipt.receipt_id,
+                    "receipt_type": receipt.receipt_type,
+                    "status": receipt.status,
+                },
+                provenance={
+                    "artifact_id": artifact.artifact_id,
+                    "source": "recursive_discovery_shadow",
+                },
+            )
+        )
+        if receipt.receipt_type in {"generated_eval", "candidate_diff", "experiment_result"}:
+            facts.append(
+                await self.memory_lattice.record_fact(
+                    (
+                        f"Recursive discovery {receipt.receipt_type} "
+                        f"binds evals {', '.join(receipt.eval_ids) or 'none'} "
+                        f"to candidate {receipt.candidate_id or 'none'}."
+                    ),
+                    fact_kind=f"recursive_{receipt.receipt_type}",
+                    truth_state="candidate",
+                    confidence=0.9,
+                    session_id=resolved_session_id,
+                    task_id=resolved_task_id,
+                    source_artifact_id=artifact.artifact_id,
+                    metadata={
+                        "receipt_id": receipt.receipt_id,
+                        "eval_ids": list(receipt.eval_ids),
+                        "candidate_id": receipt.candidate_id or "",
+                    },
+                    provenance={
+                        "artifact_id": artifact.artifact_id,
+                        "source": "recursive_discovery_shadow",
+                    },
+                )
+            )
+
+        self.provenance.append(
+            ProvenanceEntry(
+                event="recursive_discovery_receipt_recorded",
+                artifact_id=artifact.artifact_id,
+                agent=created_by,
+                session_id=resolved_session_id,
+                inputs=[receipt.parent_id or receipt.receipt_id],
+                outputs=[artifact.artifact_id, *[fact.fact_id for fact in facts]],
+                confidence=1.0,
+                metadata={
+                    "receipt_id": receipt.receipt_id,
+                    "receipt_type": receipt.receipt_type,
+                    "run_id": run_id,
+                    "task_id": resolved_task_id,
+                    "candidate_id": receipt.candidate_id or "",
+                },
+            )
+        )
+
+        event = self.event_log.append_envelope(
+            RuntimeEnvelope.create(
+                event_type=RuntimeEventType.ACTION_EVENT,
+                source="evaluation.registry",
+                agent_id=created_by,
+                session_id=resolved_session_id,
+                trace_id=resolved_trace_id,
+                payload={
+                    "action_name": "record_recursive_discovery_receipt",
+                    "decision": "recorded",
+                    "confidence": 1.0,
+                    "receipt_id": receipt.receipt_id,
+                    "receipt_type": receipt.receipt_type,
+                    "artifact_id": artifact.artifact_id,
+                    "candidate_id": receipt.candidate_id or "",
+                    "eval_ids": list(receipt.eval_ids),
+                    "status": receipt.status,
+                },
+            ),
+            stream=EVENT_STREAM,
+        )
+        return EvaluationRegistrationResult(
+            artifact=artifact,
+            manifest_path=stored.manifest_path,
+            facts=facts,
+            receipt=event,
+            summary={
+                "receipt_id": receipt.receipt_id,
+                "receipt_type": receipt.receipt_type,
+                "artifact_id": artifact.artifact_id,
+                "fact_ids": [fact.fact_id for fact in facts],
+                "receipt_event_id": str(event.get("event_id", "")),
+                "candidate_id": receipt.candidate_id or "",
+                "eval_ids": list(receipt.eval_ids),
+                "status": receipt.status,
+            },
+        )
+
     async def record_ouroboros_observation(
         self,
         observation_payload: dict[str, Any],

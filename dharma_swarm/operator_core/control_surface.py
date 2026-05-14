@@ -269,6 +269,29 @@ def _manifest_state_writer_rows(manifest: dict[str, Any]) -> list[ControlSurface
     return rows
 
 
+def _manifest_recursive_discovery_rows(manifest: dict[str, Any]) -> list[ControlSurfaceRow]:
+    rows: list[ControlSurfaceRow] = []
+    for entry in manifest.get("recursive_discovery_surfaces", []):
+        rid = f"recursive.{entry['id']}"
+        row = ControlSurfaceRow(
+            id=rid,
+            kind="recursive_discovery",
+            label=entry.get("label", entry["id"]),
+            authority_role="incubating",
+            declared_state=entry.get("status", "unknown"),
+            desired_state="shadow",
+            priority=entry.get("priority", "p1"),
+            next_action=entry.get("next_action", "") or "",
+            owner_module=entry.get("owner_module", "dharma_swarm/recursive_discovery.py"),
+            truth_owner="ACTIVE_SURFACE_MANIFEST.yaml",
+            raw=entry,
+        )
+        row.source_refs.append(_manifest_source_ref())
+        row.source_ref_labels.append("ACTIVE_SURFACE_MANIFEST.yaml")
+        rows.append(row)
+    return rows
+
+
 # ---------------------------------------------------------------------------
 # B) API / router reality adapter
 # ---------------------------------------------------------------------------
@@ -517,7 +540,54 @@ def _observe_feedback_loop(row: ControlSurfaceRow, repo_root: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# G) Operating facts adapter
+# G) Recursive discovery shadow adapter
+# ---------------------------------------------------------------------------
+
+def _observe_recursive_discovery_shadow(row: ControlSurfaceRow, repo_root: Path) -> None:
+    try:
+        from dharma_swarm.recursive_discovery import (
+            receipt_counts_by_type,
+            shadow_fixture_receipts,
+        )
+    except Exception as exc:
+        row.observed_state = "adapter_error"
+        row.coherence_state = "drifted"
+        row.gap_codes.append("recursive_discovery_adapter_error")
+        row.add_evidence(
+            "process",
+            f"recursive discovery adapter failed: {exc}",
+            status="error",
+            provenance_chain=["recursive_discovery", "adapter_import"],
+        )
+        return
+
+    receipts = shadow_fixture_receipts()
+    counts = receipt_counts_by_type(receipts)
+    receipt_type = row.raw.get("receipt_type", "")
+    count = counts.get(receipt_type, 0)
+    row.add_source_ref("file", "dharma_swarm/recursive_discovery.py", exists=True)
+    row.add_evidence(
+        "recursive_receipt",
+        f"{receipt_type}: fixture_count={count}",
+        status="present" if count else "missing",
+        provenance_chain=["recursive_discovery", "shadow_fixture"],
+    )
+    row.freshness = _file_freshness(repo_root / "dharma_swarm" / "recursive_discovery.py")
+
+    if count:
+        row.observed_state = f"shadow_fixture:{count}"
+        row.coherence_state = "partial"
+        row.gap_codes.append("shadow_only")
+        if receipt_type in {"candidate_diff", "promotion_decision"}:
+            row.gap_codes.append("human_promotion_required")
+    else:
+        row.observed_state = "missing_fixture"
+        row.coherence_state = "declared_only"
+        row.gap_codes.append("fixture_missing")
+
+
+# ---------------------------------------------------------------------------
+# H) Operating facts adapter
 # ---------------------------------------------------------------------------
 
 def _operating_facts_rows() -> list[ControlSurfaceRow]:
@@ -562,7 +632,7 @@ def _operating_facts_rows() -> list[ControlSurfaceRow]:
 
 
 # ---------------------------------------------------------------------------
-# H) Module truth adapter
+# I) Module truth adapter
 # ---------------------------------------------------------------------------
 
 def _module_truth_rows() -> list[ControlSurfaceRow]:
@@ -600,7 +670,7 @@ def _module_truth_rows() -> list[ControlSurfaceRow]:
 
 
 # ---------------------------------------------------------------------------
-# I) Broken Register adapter
+# J) Broken Register adapter
 # ---------------------------------------------------------------------------
 
 _BR_PATTERN = re.compile(
@@ -696,7 +766,7 @@ def _broken_register_rows(repo_root: Path | None = None) -> list[ControlSurfaceR
 
 
 # ---------------------------------------------------------------------------
-# J) Runtime state adapter
+# K) Runtime state adapter
 # ---------------------------------------------------------------------------
 
 def _runtime_state_row(repo_root: Path | None = None) -> ControlSurfaceRow | None:
@@ -801,6 +871,7 @@ def build_control_surface_rows(
     loop_rows = _manifest_loop_rows(manifest)
     cron_rows = _manifest_cron_rows(manifest)
     state_rows = _manifest_state_writer_rows(manifest)
+    recursive_rows = _manifest_recursive_discovery_rows(manifest)
 
     # B) Observe API router reality
     for row in api_rows:
@@ -838,16 +909,21 @@ def build_control_surface_rows(
         row.coherence_state = "declared_only"
     rows.extend(state_rows)
 
-    # G) Operating facts (organ-level observed reality)
+    # G) Recursive discovery shadow receipts (fixture-backed only)
+    for row in recursive_rows:
+        _observe_recursive_discovery_shadow(row, root)
+    rows.extend(recursive_rows)
+
+    # H) Operating facts (organ-level observed reality)
     rows.extend(_operating_facts_rows())
 
-    # H) Module truth (observed evidence for major modules)
+    # I) Module truth (observed evidence for major modules)
     rows.extend(_module_truth_rows())
 
-    # I) Broken register (known structural gaps)
+    # J) Broken register (known structural gaps)
     rows.extend(_broken_register_rows(root))
 
-    # J) Runtime state DB (observed)
+    # K) Runtime state DB (observed)
     rt_row = _runtime_state_row(root)
     if rt_row is not None:
         rows.append(rt_row)
@@ -892,6 +968,7 @@ def build_control_surface_summary(
         "BROKEN_REGISTER.md",
         "runtime_state",
         "go_sdk",
+        "recursive_discovery_shadow",
         "code/filesystem",
     ]
 
