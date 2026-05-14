@@ -30,6 +30,7 @@ from dharma_swarm.operator_core.control_surface_go import (  # noqa: F401
     _go_receipt_rows,
     _go_world_receipt_summary_rows,
 )
+from dharma_swarm.operator_core.control_surface_memory import memory_kernel_control_rows
 from dharma_swarm.operator_core.control_surface_models import (
     AUTHORITY_ROLES,
     COHERENCE_STATES,
@@ -928,7 +929,10 @@ def build_control_surface_rows(
     if rt_row is not None:
         rows.append(rt_row)
 
-    # K) Go receipts (optional)
+    # L) MemoryKernel operator controls
+    rows.extend(memory_kernel_control_rows(root))
+
+    # M) Go receipts (optional)
     rows.extend(_go_receipt_rows(root))
 
     # Apply human-decision policy with structured context
@@ -969,6 +973,8 @@ def build_control_surface_summary(
         "runtime_state",
         "go_sdk",
         "recursive_discovery_shadow",
+        "MemoryKernel",
+        "operator_prod_smoke",
         "code/filesystem",
     ]
 

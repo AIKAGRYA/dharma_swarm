@@ -36,6 +36,12 @@ from dharma_swarm.operator_core.control_surface import (
     generate_handoff_prompt,
     load_active_surface_manifest,
 )
+from dharma_swarm.operator_core.control_surface_memory import (
+    ROLLOUT_ENV_VAR,
+    ROLLOUT_STATES,
+    memory_kernel_control_rows,
+    project_context_canary_report,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -377,6 +383,63 @@ class TestFullBuild:
 
 
 # ---------------------------------------------------------------------------
+# MemoryKernel operator controls
+# ---------------------------------------------------------------------------
+
+
+class TestMemoryKernelOperatorRows:
+    def test_projects_required_memory_kernel_rows(self, tmp_repo: Path) -> None:
+        rows = memory_kernel_control_rows(tmp_repo)
+        ids = {row.id for row in rows}
+
+        assert {
+            "memory.census",
+            "memory.adapter_coverage",
+            "memory.writer_sentinel",
+            "memory.context_shadow",
+            "memory.context_canary",
+            "memory.knowledgeops_intake",
+            "memory.promotion_queue",
+            "memory.rollout_gate",
+            "memory.rollback_switch",
+        }.issubset(ids)
+
+    def test_rollout_gate_defaults_safe_off(
+        self,
+        tmp_repo: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.delenv(ROLLOUT_ENV_VAR, raising=False)
+
+        rows = memory_kernel_control_rows(tmp_repo)
+        gate = [row for row in rows if row.id == "memory.rollout_gate"][0]
+
+        assert gate.observed_state == "off"
+        assert tuple(gate.raw["allowed_states"]) == ROLLOUT_STATES
+        assert gate.raw["default_state"] == "off"
+
+    def test_invalid_rollout_state_resolves_to_off(
+        self,
+        tmp_repo: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setenv(ROLLOUT_ENV_VAR, "unsafe-now")
+
+        rows = memory_kernel_control_rows(tmp_repo)
+        gate = [row for row in rows if row.id == "memory.rollout_gate"][0]
+
+        assert gate.observed_state == "off"
+        assert "memory_kernel_rollout_invalid_state" in gate.gap_codes
+
+    def test_context_canary_projects_failures(self) -> None:
+        report = project_context_canary_report()
+
+        assert report["projection_kind"] == "synthetic_canary"
+        assert report["persistence"] == "projected_not_persisted"
+        assert report["hard_failure_count"] >= 1
+
+
+# ---------------------------------------------------------------------------
 # Go receipt lane adapter
 # ---------------------------------------------------------------------------
 
@@ -476,6 +539,18 @@ class TestControlSurfaceAPI:
         assert "coherence_state" in first
         assert "declared_state" in first
         assert "observed_state" in first
+
+    def test_rows_keep_evidence_and_source_refs_structured(self) -> None:
+        client = _control_surface_client()
+        resp = client.get("/api/control-surface/rows")
+        assert resp.status_code == 200
+        rows = resp.json()["data"]
+        memory_row = [row for row in rows if row["id"] == "memory.census"][0]
+
+        assert isinstance(memory_row["evidence"][0], dict)
+        assert "source" in memory_row["evidence"][0]
+        assert isinstance(memory_row["source_refs"][0], dict)
+        assert "path" in memory_row["source_refs"][0]
 
     def test_row_by_id_returns_single(self) -> None:
         client = _control_surface_client()

@@ -6,7 +6,7 @@ write retrieval feedback, promote facts, or mutate any memory surface.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Iterable
@@ -62,6 +62,7 @@ class ContextParityReport:
     hard_failure_count: int
     metrics: tuple[ContextParityMetric, ...]
     warnings: tuple[str, ...]
+    metadata: dict[str, object] = field(default_factory=dict)
 
     def to_json(self) -> dict[str, object]:
         return {
@@ -78,6 +79,7 @@ class ContextParityReport:
             "hard_failure_count": self.hard_failure_count,
             "metrics": tuple(metric.to_json() for metric in self.metrics),
             "warnings": self.warnings,
+            "metadata": self.metadata,
         }
 
 
@@ -91,6 +93,7 @@ def run_context_parity_eval(
     memory_surface_ids: tuple[str, ...] = (),
     budget: MemoryContextBudget | None = None,
     allow_current_semantic_search: bool = False,
+    metadata: dict[str, object] | None = None,
 ) -> ContextParityReport:
     """Compare legacy current-context output to a MemoryKernel context lane."""
 
@@ -135,6 +138,7 @@ def run_context_parity_eval(
         hard_failure_count=sum(1 for metric in metrics if metric.status == _STATUS_FAIL),
         metrics=metrics,
         warnings=tuple(dict.fromkeys(warnings)),
+        metadata=dict(metadata or {}),
     )
 
 

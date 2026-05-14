@@ -2,12 +2,60 @@
 
 from __future__ import annotations
 
+import sqlite3
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from dharma_swarm.context_compiler import ContextCompiler
 from dharma_swarm.runtime_state import ContextBundleRecord
+
+
+def _write_runtime_state_context_bundle(home):
+    runtime_dir = home / ".dharma" / "state"
+    runtime_dir.mkdir(parents=True)
+    conn = sqlite3.connect(str(runtime_dir / "runtime.db"))
+    conn.execute(
+        """
+        CREATE TABLE context_bundles (
+            bundle_id TEXT PRIMARY KEY,
+            session_id TEXT NOT NULL DEFAULT '',
+            task_id TEXT NOT NULL DEFAULT '',
+            run_id TEXT NOT NULL DEFAULT '',
+            token_budget INTEGER NOT NULL,
+            rendered_text TEXT NOT NULL,
+            sections_json TEXT NOT NULL DEFAULT '[]',
+            source_refs_json TEXT NOT NULL DEFAULT '[]',
+            checksum TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            metadata_json TEXT NOT NULL DEFAULT '{}'
+        )
+        """
+    )
+    conn.execute(
+        """
+        INSERT INTO context_bundles (
+            bundle_id, session_id, task_id, run_id, token_budget,
+            rendered_text, sections_json, source_refs_json, checksum,
+            created_at, metadata_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            "bnd_fixture",
+            "sess_fixture",
+            "task_fixture",
+            "run_fixture",
+            1200,
+            "Safe runtime bundle",
+            "[]",
+            "[]",
+            "checksum",
+            "2026-05-13T00:00:00Z",
+            "{}",
+        ),
+    )
+    conn.commit()
+    conn.close()
 
 
 @pytest.fixture
