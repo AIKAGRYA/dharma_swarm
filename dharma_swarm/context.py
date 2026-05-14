@@ -607,6 +607,7 @@ def read_memory_context(
     task_id: str | None = None,
     allow_semantic_search: bool = True,
     memory_kernel_shadow: bool = False,
+    memory_kernel_context_mode: str | None = None,
     memory_kernel_shadow_home: Path | None = None,
     memory_kernel_shadow_surfaces: tuple[str, ...] = (),
     memory_kernel_shadow_callback: Callable[[object], None] | None = None,
@@ -617,17 +618,17 @@ def read_memory_context(
     plane_path = base_dir / "db" / "memory_plane.db"
 
     def finish(result: str) -> str:
-        _run_memory_kernel_context_shadow(
+        return _run_memory_kernel_context_shadow(
             result,
             state_dir=state_dir,
             query=query,
             limit=limit,
             enabled=memory_kernel_shadow,
+            requested_mode=memory_kernel_context_mode,
             home=memory_kernel_shadow_home,
             surface_ids=memory_kernel_shadow_surfaces,
             callback=memory_kernel_shadow_callback,
         )
-        return result
 
     if query and plane_path.exists():
         try:
@@ -698,61 +699,42 @@ def _run_memory_kernel_context_shadow(
     query: str | None,
     limit: int,
     enabled: bool,
+    requested_mode: str | None,
     home: Path | None,
     surface_ids: tuple[str, ...],
     callback: Callable[[object], None] | None,
-) -> None:
-    """Run MemoryKernel parity in shadow mode without changing context output."""
+) -> str:
+    """Run the MemoryKernel canary while failing closed to legacy text."""
 
-    env_enabled = _truthy_env("DHARMA_MEMORY_KERNEL_CONTEXT_SHADOW")
-    if not enabled and not env_enabled:
-        return
     try:
-        from dharma_swarm.memory_kernel import (
-            CensusConfig,
-            MemoryContextBudget,
-            MemoryKernel,
-            MemoryKernelConfig,
-            run_context_parity_eval,
+        from dharma_swarm.memory_kernel.context_compiler_shadow import (
+            run_memory_kernel_context_canary,
         )
 
-        resolved_surfaces = surface_ids or _csv_env("DHARMA_MEMORY_KERNEL_CONTEXT_SURFACES")
-        resolved_home = home or _path_env("DHARMA_MEMORY_KERNEL_HOME")
-        kernel = None
-        if resolved_home is not None and resolved_surfaces:
-            kernel = MemoryKernel(
-                MemoryKernelConfig(
-                    census=CensusConfig(
-                        repo_root=Path.cwd(),
-                        home=resolved_home,
-                        include_discovered=False,
-                    )
-                )
-            )
-        report = run_context_parity_eval(
+        result = run_memory_kernel_context_canary(
+            legacy_text,
             query=query,
-            current_context_text=legacy_text,
-            state_dir=None,
-            memory_kernel=kernel,
-            memory_surface_ids=resolved_surfaces,
-            budget=MemoryContextBudget(
-                max_candidate_atoms=max(1, limit),
-                max_admitted_atoms=max(1, min(limit, 8)),
-                include_content=False,
-            ),
-            allow_current_semantic_search=False,
+            limit=limit,
+            enabled=enabled,
+            requested_mode=requested_mode,
+            home=home,
+            surface_ids=surface_ids,
+            legacy_shadow_env_names=("DHARMA_MEMORY_KERNEL_CONTEXT_SHADOW",),
         )
-        if callback:
-            callback(report)
+        if callback and result.report is not None:
+            callback(result.report)
         logger.debug(
-            "MemoryKernel context shadow parity: hard_failures=%s warnings=%s metrics=%s state_dir=%s",
-            report.hard_failure_count,
-            report.warning_count,
-            report.metric_count,
+            "MemoryKernel context canary: mode=%s appended=%s fallback=%s metadata=%s state_dir=%s",
+            result.mode,
+            result.appended,
+            result.fallback_reason,
+            result.metadata,
             state_dir,
         )
+        return result.rendered_text
     except Exception:
-        logger.debug("MemoryKernel context shadow failed", exc_info=True)
+        logger.debug("MemoryKernel context canary failed", exc_info=True)
+        return legacy_text
 
 
 def _truthy_env(name: str) -> bool:

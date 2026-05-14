@@ -1,7 +1,7 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts uplift-guards module-budget docops-integrity docops-report governance-all onboard go-fmt-check go-test go-vet go-ci
+.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts uplift-guards module-budget docops-integrity docops-report memory-kernel-readiness operator-prod-smoke governance-all onboard go-fmt-check go-test go-vet go-ci
 
 PYTHON ?= python3
 GO ?= go
@@ -44,6 +44,8 @@ help:
 	@echo "  make uplift-guards Run uplift pre-commit guards"
 	@echo "  make docops-integrity Run machine-verifiable documentation checks"
 	@echo "  make docops-report Generate local DocOps JSON/Markdown reports"
+	@echo "  make memory-kernel-readiness Run read-only MemoryKernel readiness gates"
+	@echo "  make operator-prod-smoke Run fast read-only operator production smoke"
 	@echo "  make onboard      Render current operating reality (active track, live ops, broken register, axioms)"
 	@echo "  make go-ci        Run Go evidence sense-organ fmt/vet/test gates"
 	@echo ""
@@ -200,6 +202,15 @@ docops-report:
 		--report-json reports/docops/check.json \
 		--inventory-json reports/docops/corpus_inventory.json \
 		--inventory-markdown reports/docops/corpus_inventory.md
+
+memory-kernel-readiness:
+	$(PYTHON) scripts/memory_kernel_readiness.py --repo-root . --dry-run
+	$(PYTHON) scripts/memory_writer_sentinel.py --repo-root . --ci
+	$(PYTHON) scripts/memory_context_eval.py --repo-root . --run-default-cases --fail-on-hard-failure --dry-run
+	$(PYTHON) scripts/memory_context_shadow_sweep.py --repo-root . --fail-on-hard-failure --dry-run
+
+operator-prod-smoke:
+	$(PYTHON) scripts/operator_prod_smoke.py --repo-root .
 
 governance-all: semgrep gitleaks test-hygiene test-contracts uplift-guards module-budget docops-integrity
 

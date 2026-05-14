@@ -7,7 +7,11 @@
  */
 
 import { X, FileText, Code, AlertCircle, Link as LinkIcon } from "lucide-react";
-import type { ControlSurfaceRow } from "@/lib/types";
+import type {
+  ControlSurfaceEvidenceItem,
+  ControlSurfaceRow,
+  ControlSurfaceSourceRef,
+} from "@/lib/types";
 import { colors } from "@/lib/theme";
 
 interface EvidenceDrawerProps {
@@ -29,14 +33,30 @@ function coherenceColor(state: string): string {
   return COHERENCE_COLORS[state as CoherenceState] ?? colors.sumi[600];
 }
 
-function guessRefKind(ref: string): "file" | "api" | "manifest" | "unknown" {
-  if (ref.startsWith("/") || ref.includes(".py") || ref.includes(".ts") || ref.includes(".yaml")) {
+function evidenceTitle(evidence: ControlSurfaceEvidenceItem): string {
+  const status = evidence.status ? ` (${evidence.status})` : "";
+  return `${evidence.kind}: ${evidence.source}${status}`;
+}
+
+function evidenceDetail(evidence: ControlSurfaceEvidenceItem): string {
+  const chain = evidence.provenance_chain ?? [];
+  return chain.length > 0 ? chain.join(" -> ") : evidence.observed_at ?? "";
+}
+
+function sourceRefLabel(ref: ControlSurfaceSourceRef): string {
+  const exists = ref.exists === false ? " missing" : "";
+  return `${ref.kind}: ${ref.path}${exists}`;
+}
+
+function guessRefKind(ref: ControlSurfaceSourceRef): "file" | "api" | "manifest" | "unknown" {
+  const path = ref.path;
+  if (path.startsWith("/") || path.includes(".py") || path.includes(".ts") || path.includes(".yaml")) {
     return "file";
   }
-  if (ref.startsWith("/api/") || ref.includes("http")) {
+  if (path.startsWith("/api/") || path.includes("http")) {
     return "api";
   }
-  if (ref.toLowerCase().includes("manifest") || ref.toLowerCase().includes("sovereign")) {
+  if (path.toLowerCase().includes("manifest") || path.toLowerCase().includes("sovereign")) {
     return "manifest";
   }
   return "unknown";
@@ -190,7 +210,14 @@ export function EvidenceDrawer({ row, onClose }: EvidenceDrawerProps) {
                   className="flex items-start gap-2 rounded-md bg-sumi-900/50 px-3 py-2 text-xs text-sumi-300"
                 >
                   <AlertCircle size={12} className="mt-0.5 shrink-0 text-kinpaku" />
-                  <span className="break-all">{e}</span>
+                  <span className="min-w-0">
+                    <span className="block break-all">{evidenceTitle(e)}</span>
+                    {evidenceDetail(e) && (
+                      <span className="mt-0.5 block break-all text-[10px] text-sumi-500">
+                        {evidenceDetail(e)}
+                      </span>
+                    )}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -212,7 +239,9 @@ export function EvidenceDrawer({ row, onClose }: EvidenceDrawerProps) {
                     className="flex items-center gap-2 rounded-md bg-sumi-900/50 px-3 py-2"
                   >
                     <RefIcon kind={kind} />
-                    <code className="break-all text-[10px] text-sumi-300">{ref}</code>
+                    <code className="break-all text-[10px] text-sumi-300">
+                      {sourceRefLabel(ref)}
+                    </code>
                   </li>
                 );
               })}

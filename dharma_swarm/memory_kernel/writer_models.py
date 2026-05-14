@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from enum import StrEnum
 
 from dharma_swarm.memory_kernel.atoms import RiskLevel, WriteMode
@@ -72,6 +72,7 @@ class DiscoveredMemoryWrite:
     triage_category: DiscoveryTriageCategory
     triage_reason: str
     matched_writer_ids: tuple[str, ...] = ()
+    write_decision: dict[str, object] | None = None
 
     def to_json(self) -> dict[str, object]:
         payload = asdict(self)
@@ -128,6 +129,9 @@ class WriterDiscoverySummary:
     by_operation: dict[str, int]
     by_status: dict[str, int]
     by_triage: dict[str, int]
+    by_decision: dict[str, int] = field(default_factory=dict)
+    policy_denied_count: int = 0
+    unreviewed_discovery_count: int = 0
 
     def to_json(self) -> dict[str, object]:
         return asdict(self)

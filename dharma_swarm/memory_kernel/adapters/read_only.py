@@ -25,6 +25,7 @@ from dharma_swarm.memory_kernel.atoms import (
     MemorySurface,
     MemorySurfaceHealth,
     ReadMode,
+    stable_digest,
 )
 
 
@@ -65,6 +66,7 @@ STRUCTURAL_METADATA_KEYS = {
     "path",
     "probe_error",
     "read_error",
+    "read_warnings",
     "reason",
     "size_bytes",
     "snapshot_warnings",
@@ -82,8 +84,16 @@ class ReadOnlyAdapterConfig:
     max_cursor_scan_atoms: int = 1000
 
 
+@dataclass(frozen=True)
+class JsonlReadRecord:
+    line_number: int
+    payload: dict[str, Any]
+    warnings: tuple[str, ...] = ()
+
+
 class BaseReadOnlyAdapter:
     adapter_name = "base_read_only"
+    adapter_version = "read_only.v2"
     read_mode = ReadMode.READ_ONLY
 
     def __init__(
@@ -133,6 +143,11 @@ class BaseReadOnlyAdapter:
         timestamp: str | None = None,
         source_path: str | None = None,
         metadata: dict[str, Any] | None = None,
+        source_digest: str | None = None,
+        payload_digest: str | None = None,
+        source_row_key: str | None = None,
+        source_last_modified: str | None = None,
+        read_warnings: tuple[str, ...] = (),
     ) -> MemoryAtom:
         safe_metadata = _safe_metadata(
             metadata or {},
@@ -142,6 +157,8 @@ class BaseReadOnlyAdapter:
         snapshot_warnings = _snapshot_warnings(self.surface)
         if snapshot_warnings:
             safe_metadata["snapshot_warnings"] = snapshot_warnings
+        if read_warnings:
+            safe_metadata["read_warnings"] = tuple(dict.fromkeys(read_warnings))
         if content is not None and not query.include_content:
             safe_metadata["content_status"] = "omitted_by_query"
         bounded_content = _truncate(content, self.config.max_content_chars) if query.include_content else None
@@ -155,6 +172,11 @@ class BaseReadOnlyAdapter:
             adapter_name=self.adapter_name,
             read_mode=self.read_mode,
             metadata=safe_metadata,
+            source_digest=source_digest,
+            payload_digest=payload_digest,
+            source_row_key=source_row_key,
+            adapter_version=self.adapter_version,
+            source_last_modified=source_last_modified,
         )
 
 
@@ -217,6 +239,16 @@ class SQLiteReadOnlyAdapter(BaseReadOnlyAdapter):
                                 content=_row_content(row_data),
                                 timestamp=timestamp,
                                 metadata=metadata,
+                                source_digest=stable_digest(
+                                    {
+                                        "path": self.path.as_posix(),
+                                        "table": table,
+                                        "row": content_ref,
+                                        "last_modified": self.surface.health.last_modified,
+                                    }
+                                ),
+                                payload_digest=stable_digest(row_data),
+                                source_row_key=content_ref,
                             )
                         )
             for atom in _after_cursor(_ordered_atoms(atoms, resolved_query.order_by), resolved_query.cursor)[
@@ -232,6 +264,14 @@ class SQLiteReadOnlyAdapter(BaseReadOnlyAdapter):
                 content_ref=f"{self.surface_id}:sqlite_probe_error",
                 content=None,
                 metadata={"probe_error": str(exc), "path": self.path.as_posix()},
+                source_digest=stable_digest(
+                    {
+                        "path": self.path.as_posix(),
+                        "probe_error": str(exc),
+                    }
+                ),
+                source_row_key=f"{self.surface_id}:sqlite_probe_error",
+                read_warnings=("sqlite_probe_error",),
             )
 
 
@@ -279,24 +319,57 @@ class JsonlReadOnlyAdapter(BaseReadOnlyAdapter):
         surface_limit = self._surface_limit(resolved_query)
         if surface_limit <= 0 or not self.path.exists():
             return
-        if not resolved_query.allows_atom_type(self.atom_type):
+        wants_payload_atoms = resolved_query.allows_atom_type(self.atom_type)
+        wants_metadata = resolved_query.allows_atom_type(MemoryAtomType.METADATA)
+        if not wants_payload_atoms and not wants_metadata:
             return
         scan_limit = self._scan_limit(resolved_query, surface_limit)
         atoms: list[MemoryAtom] = []
         for file_path in _jsonl_files(self.path, self.config.max_files):
-            for line_number, payload in _iter_jsonl(file_path, self.config.max_lines_per_file):
+            source_last_modified = _file_last_modified(file_path)
+            for record in _iter_jsonl(file_path, self.config.max_lines_per_file):
+                if record.line_number <= 0:
+                    if wants_metadata:
+                        atoms.append(
+                            self._atom(
+                                MemoryAtomType.METADATA,
+                                query=resolved_query,
+                                content_ref=f"{file_path.as_posix()}:read_warning",
+                                content=None,
+                                timestamp=source_last_modified,
+                                source_path=file_path.as_posix(),
+                                metadata={
+                                    "path": file_path.as_posix(),
+                                    "metadata_only": True,
+                                },
+                                source_digest=_file_snapshot_digest(file_path),
+                                source_row_key=f"{file_path.as_posix()}:read_warning",
+                                source_last_modified=source_last_modified,
+                                read_warnings=record.warnings,
+                            )
+                        )
+                    continue
+                if not wants_payload_atoms:
+                    continue
+                payload = record.payload
                 timestamp = _payload_timestamp(payload)
                 if not _passes_since(timestamp, resolved_query.since):
                     continue
+                content_ref = f"{file_path.as_posix()}:{record.line_number}"
                 atoms.append(
                     self._atom(
                         self.atom_type,
                         query=resolved_query,
-                        content_ref=f"{file_path.as_posix()}:{line_number}",
+                        content_ref=content_ref,
                         content=_payload_content(payload),
                         timestamp=timestamp,
                         source_path=file_path.as_posix(),
-                        metadata={"line": line_number, "payload": payload},
+                        metadata={"line": record.line_number, "payload": payload},
+                        source_digest=_file_snapshot_digest(file_path),
+                        payload_digest=stable_digest(payload),
+                        source_row_key=content_ref,
+                        source_last_modified=source_last_modified,
+                        read_warnings=record.warnings,
                     )
                 )
                 if resolved_query.order_by == MemoryOrder.STABLE_ID and len(atoms) >= scan_limit:
@@ -368,6 +441,10 @@ class KnowledgeWikiAdapter(BaseReadOnlyAdapter):
                     timestamp=_format_mtime(stat.st_mtime),
                     source_path=file_path.as_posix(),
                     metadata={"size_bytes": stat.st_size},
+                    source_digest=_file_snapshot_digest(file_path, stat=stat),
+                    payload_digest=stable_digest(content) if content is not None else None,
+                    source_row_key=file_path.as_posix(),
+                    source_last_modified=_format_mtime(stat.st_mtime),
                 )
             )
         for atom in _after_cursor(_ordered_atoms(atoms, resolved_query.order_by), resolved_query.cursor)[
@@ -409,6 +486,9 @@ class ConversationLogMetadataAdapter(BaseReadOnlyAdapter):
                         "metadata_only": True,
                         "reason": "conversation logs are streamed later; M1 exposes file pointers only",
                     },
+                    source_digest=_file_snapshot_digest(file_path, stat=stat),
+                    source_row_key=file_path.as_posix(),
+                    source_last_modified=_format_mtime(stat.st_mtime),
                 )
             )
         for atom in _after_cursor(_ordered_atoms(atoms, resolved_query.order_by), resolved_query.cursor)[
@@ -551,24 +631,38 @@ def _markdown_files(path: Path, max_files: int) -> tuple[Path, ...]:
     return tuple(files)
 
 
-def _iter_jsonl(path: Path, max_lines: int) -> Iterable[tuple[int, dict[str, Any]]]:
+def _iter_jsonl(path: Path, max_lines: int) -> Iterable[JsonlReadRecord]:
     try:
-        with path.open("r", encoding="utf-8", errors="replace") as handle:
-            for line_number, line in enumerate(handle, start=1):
+        with path.open("rb") as handle:
+            for line_number, raw_line in enumerate(handle, start=1):
                 if line_number > max_lines:
                     break
+                if raw_line and not raw_line.endswith(b"\n"):
+                    yield JsonlReadRecord(
+                        line_number=0,
+                        payload={},
+                        warnings=("jsonl_trailing_partial_line_skipped",),
+                    )
+                    break
+                line = raw_line.decode("utf-8", errors="replace")
                 stripped = line.strip()
                 if not stripped:
                     continue
+                warnings: tuple[str, ...] = ()
                 try:
                     payload = json.loads(stripped)
                 except json.JSONDecodeError:
                     payload = {"raw": stripped, "parse_error": True}
+                    warnings = ("jsonl_parse_error",)
                 if not isinstance(payload, dict):
                     payload = {"value": payload}
-                yield line_number, payload
+                yield JsonlReadRecord(line_number=line_number, payload=payload, warnings=warnings)
     except OSError as exc:
-        yield 0, {"read_error": str(exc)}
+        yield JsonlReadRecord(
+            line_number=0,
+            payload={"read_error": str(exc)},
+            warnings=("jsonl_read_error",),
+        )
 
 
 def _payload_content(payload: dict[str, Any]) -> str:
@@ -714,6 +808,27 @@ def _path_mtime(path: Path) -> float:
         return path.stat().st_mtime
     except OSError:
         return 0.0
+
+
+def _file_last_modified(path: Path) -> str | None:
+    try:
+        return _format_mtime(path.stat().st_mtime)
+    except OSError:
+        return None
+
+
+def _file_snapshot_digest(path: Path, *, stat: os.stat_result | None = None) -> str:
+    try:
+        resolved_stat = stat or path.stat()
+        return stable_digest(
+            {
+                "path": path.as_posix(),
+                "size_bytes": resolved_stat.st_size,
+                "last_modified": _format_mtime(resolved_stat.st_mtime),
+            }
+        )
+    except OSError as exc:
+        return stable_digest({"path": path.as_posix(), "stat_error": str(exc)})
 
 
 def _snapshot_warnings(surface: MemorySurface) -> tuple[str, ...]:

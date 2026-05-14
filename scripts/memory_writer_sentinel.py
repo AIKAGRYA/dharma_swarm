@@ -174,14 +174,24 @@ def render_markdown_report(observations, discoveries) -> str:
             item for item in discoveries if item.status.value == "unregistered"
         ]
         registered = [item for item in discoveries if item.status.value == "registered"]
+        denied = [
+            item
+            for item in discoveries
+            if _write_decision_value(item) == "deny"
+        ]
         lines.extend(["## Static Discovery", ""])
         lines.append(f"- Discovered likely memory-like writes: `{len(discoveries)}`")
         lines.append(f"- Matched registered writer specs: `{len(registered)}`")
         lines.append(f"- Discovered but unregistered: `{len(unregistered)}`")
+        lines.append(f"- Denied by write policy: `{len(denied)}`")
         lines.append("")
         lines.extend(["## Discovery Triage", ""])
         for category, count in _category_counts(discoveries):
             lines.append(f"- `{category}`: `{count}`")
+        lines.append("")
+        lines.extend(["## Write Policy", ""])
+        for decision, count in _decision_counts(discoveries):
+            lines.append(f"- `{decision}`: `{count}`")
         lines.append("")
         lines.extend(["## Top Unregistered Sources", ""])
         for source_path, count in _top_sources(unregistered):
@@ -189,9 +199,12 @@ def render_markdown_report(observations, discoveries) -> str:
         lines.append("")
         lines.extend(["## First Unregistered Discoveries", ""])
         for item in unregistered[:30]:
+            surface_id = _write_decision_surface(item) or "unresolved"
+            decision = _write_decision_value(item) or "unknown"
             lines.append(
                 f"- `{item.source_path}:{item.line}` `{item.symbol}` "
-                f"`{item.operation}` `{item.triage_category.value}`"
+                f"`{item.operation}` `{item.triage_category.value}` "
+                f"`{decision}` `{surface_id}`"
             )
         lines.append("")
 
@@ -200,9 +213,9 @@ def render_markdown_report(observations, discoveries) -> str:
             "## Gate Guidance",
             "",
             "- Registered-writer fail gates can run when registered issues are zero.",
-            "- Action-required discovery gates can run once MEMORY_WRITER_NEEDS_SPEC and SURFACE_NEEDS_REGISTRY are zero.",
+            "- Action-required discovery gates also fail unreviewed write-policy denials.",
             "- Strict unregistered discovery gates should stay opt-in; generated artifacts and operational state may be intentionally unregistered.",
-            "- Do not treat discovery hits as proof of semantic memory mutation; classify them first.",
+            "- Heuristic-only triage is not enough for new memory-like writes; add a writer spec or an explicit reviewed baseline entry.",
             "",
         ]
     )
@@ -221,6 +234,29 @@ def _category_counts(discoveries) -> list[tuple[str, int]]:
     for item in discoveries:
         counts[item.triage_category.value] = counts.get(item.triage_category.value, 0) + 1
     return sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+
+
+def _decision_counts(discoveries) -> list[tuple[str, int]]:
+    counts: dict[str, int] = {}
+    for item in discoveries:
+        decision = _write_decision_value(item)
+        if decision:
+            counts[decision] = counts.get(decision, 0) + 1
+    return sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+
+
+def _write_decision_value(item) -> str:
+    if not item.write_decision:
+        return ""
+    value = item.write_decision.get("decision")
+    return value if isinstance(value, str) else ""
+
+
+def _write_decision_surface(item) -> str:
+    if not item.write_decision:
+        return ""
+    value = item.write_decision.get("resolved_surface_id")
+    return value if isinstance(value, str) else ""
 
 
 if __name__ == "__main__":
