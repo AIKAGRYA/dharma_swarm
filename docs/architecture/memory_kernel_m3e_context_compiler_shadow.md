@@ -6,7 +6,7 @@ Status: disabled-by-default `ContextCompiler` shadow wrapper
 ## Purpose
 
 M3E extends MemoryKernel observation from `read_memory_context()` into the
-canonical runtime `ContextCompiler.compile_bundle()` seam.  The compiler still
+primary runtime `ContextCompiler.compile_bundle()` seam.  The compiler still
 builds and persists the legacy context bundle exactly as before.  When shadow
 mode is enabled, MemoryKernel evaluates the rendered bundle text against the
 MemoryKernel context lane and reports parity/safety findings through a callback
@@ -66,7 +66,7 @@ useful for safety accounting, not retrieval parity.
 ## 80% Implication
 
 MemoryKernel can now shadow both the lightweight legacy memory reader and the
-canonical runtime context compiler.  The remaining step before live context
+primary runtime context compiler.  The remaining step before live context
 admission is representative report collection: run task, review, KnowledgeOps,
 route/witness, and secret-contaminated scenarios and inspect whether the
 MemoryKernel lane is safer, smaller, and sufficiently grounded.
