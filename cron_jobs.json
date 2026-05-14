@@ -54,7 +54,7 @@
       "openrouter_free",
       "openrouter"
     ],
-    "prompt": "Generate a morning briefing for Dhyana (4:30 AM WITA). Check:\n1. AGNI state (~/agni-workspace/WORKING.md)\n2. Trishula inbox count and any non-ack messages\n3. DGC memory developments from overnight\n4. R_V paper status (~/mech-interp-latent-lab-phase1/R_V_PAPER/)\n5. Any blocked items anywhere in the system\n6. DREAM JOURNAL: read ~/.dharma/subconscious/journal/LATEST_JOURNAL.md — if it exists, include the HOT-temperature ideas from last night's subconscious layer as a section called 'From the Subconscious'. Flag any publishable-relevant or experiment-relevant seeds.\n7. JAGAT KALYAN: Read ~/.dharma/shared/jk_pulse.md for momentum status. Read ~/.dharma/shared/jk_alert.md if it exists — include any HIGH URGENCY items (grant deadlines, partner moves). Check ~/jagat_kalyan/EVOLUTION_LOG.md for overnight codebase changes. Include a 'Jagat Kalyan' section in the brief.\n\nWrite brief, actionable summary to ~/dgc-core/daemon/morning_brief.md",
+    "prompt": "Generate a morning briefing for Dhyana (4:30 AM WITA). Check:\n1. AGNI state (~/agni-workspace/WORKING.md)\n2. Trishula inbox count and any non-ack messages\n3. DGC memory developments from overnight\n4. R_V paper status (~/mech-interp-latent-lab-phase1/R_V_PAPER/)\n5. Any blocked items anywhere in the system\n6. DREAM JOURNAL: read ~/.dharma/subconscious/journal/LATEST_JOURNAL.md — if it exists, include the HOT-temperature ideas from last night's subconscious layer as a section called 'From the Subconscious'. Flag any publishable-relevant or experiment-relevant seeds.\n7. JAGAT KALYAN: Read ~/.dharma/shared/jk_pulse.md for momentum status. Read ~/.dharma/shared/jk_alert.md if it exists — include any HIGH URGENCY items (grant deadlines, partner moves). Check ~/jagat_kalyan/EVOLUTION_LOG.md for overnight codebase changes. Include a 'Jagat Kalyan' section in the brief.\n8. WORLD ZEITGEIST: Read ~/.dharma/meta/world_signal_brief.md and ~/.dharma/meta/world_radar/world_radar_health.md. Include promotion-ready external signals, incubating movements, failed sources, and the concrete next move.\n\nWrite brief, actionable summary to ~/dgc-core/daemon/morning_brief.md",
     "enabled": true
   },
   {
@@ -257,12 +257,39 @@
     "prompt": "Revenue scout cycle — execution handled by revenue_scout handler. Scouts GitHub for repos with AI governance gaps, ingests competitive intelligence from ~/.dharma/revenue_intel/inbox/, parses claims and patterns, routes qualified targets to the RevenueSpine, and drafts outreach (human approval required before send). Results logged to ~/.dharma/revenue_scout/cycle_log.jsonl. Stigmergy marks left on strategy channel."
   },
   {
+    "id": "world_scout",
+    "name": "World Scout — External Zeitgeist Radar",
+    "trigger": "interval",
+    "interval_seconds": 3600,
+    "handler": "world_scout",
+    "min_score": 0.45,
+    "timeout_sec": 90,
+    "fetch": true,
+    "enabled": true,
+    "prompt": "Fetch configured public world sources, normalize signals, build ~/.dharma/meta/world_signal_board.json and ~/.dharma/meta/world_signal_brief.md, incubate weak movements, and promote independently verified world signals into the Shakti zeitgeist inbox."
+  },
+  {
+    "id": "shakti_executive",
+    "name": "Shakti Executive — Opportunity Board Refresh",
+    "trigger": "cron",
+    "schedule": {
+      "hour": 4,
+      "minute": 35
+    },
+    "handler": "shakti_executive",
+    "top_k": 12,
+    "min_score": 45.0,
+    "write": true,
+    "enabled": true,
+    "prompt": "Read canonical zeitgeist, feedback, scout, and operator signal surfaces, then refresh opportunity_board.json without dispatching work."
+  },
+  {
     "id": "frontier_refill",
     "name": "Opportunity Frontier Refill",
     "trigger": "cron",
     "schedule": {
       "hour": 4,
-      "minute": 30
+      "minute": 40
     },
     "handler": "frontier_refill",
     "top_k": 3,

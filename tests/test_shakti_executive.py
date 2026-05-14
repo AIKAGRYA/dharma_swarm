@@ -119,6 +119,40 @@ def test_shakti_executive_reads_feedback_surfaces(tmp_path: Path) -> None:
     )
 
 
+def test_shakti_executive_turns_world_signal_into_strategic_opportunity(tmp_path: Path) -> None:
+    state = tmp_path / "dharma"
+    _write_zeitgeist(
+        state,
+        {
+            "id": "world-subq",
+            "source": "world_zeitgeist",
+            "category": "company",
+            "title": "SubQ managed agent runtime",
+            "description": "Public world signal about managed agent execution infrastructure.",
+            "relevance_score": 0.84,
+            "keywords": ["agentic", "startup", "runtime"],
+            "metadata": {
+                "raw_source": "github",
+                "url": "https://example.com/subq",
+                "promotion_status": "promotion_ready",
+                "first_principles_questions": ["What primitive is being proven?"],
+                "iteration_steps": ["Verify public sources."],
+                "strategic_moves": ["research", "prototype_smallest_governed_version"],
+            },
+        },
+    )
+
+    preview = ShaktiExecutive(state).preview(top_k=5, min_score=45.0)
+
+    assert preview
+    row = preview[0]
+    assert row["domain"] == "ecosystem_scan"
+    assert row["thesis"] == "ecosystem_signal"
+    assert row["title"].startswith("World signal:")
+    assert row["source_inputs"][0]["raw_source"] == "github"
+    assert row["strategic_vision"]["first_principles_questions"] == ["What primitive is being proven?"]
+
+
 def _write_zeitgeist(state: Path, row: dict[str, object]) -> None:
     meta = state / "meta"
     meta.mkdir(parents=True)

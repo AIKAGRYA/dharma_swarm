@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import asyncio
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -51,6 +52,21 @@ def _as_float(value: Any, default: float) -> float:
     except (TypeError, ValueError):
         return default
     return parsed if parsed > 0 else default
+
+
+def _as_bool(value: Any, default: bool = False) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return default
+    if isinstance(value, (int, float)):
+        return value != 0
+    text = str(value).strip().lower()
+    if text in {"1", "true", "yes", "y", "on"}:
+        return True
+    if text in {"0", "false", "no", "n", "off", ""}:
+        return False
+    return default
 
 
 def _run_system_map_populator(job: dict[str, Any]) -> CronJobExecutionResult:
@@ -119,7 +135,7 @@ def _run_tcs_heartbeat(job: dict[str, Any]) -> CronJobExecutionResult:
         state_dir = Path(str(job.get("state_dir") or Path.home() / ".dharma"))
         monitor = IdentityMonitor(state_dir=state_dir)
         state = asyncio.run(
-            monitor.measure(threat_boost=bool(job.get("threat_boost", False)))
+            monitor.measure(threat_boost=_as_bool(job.get("threat_boost"), False))
         )
         raw_history_path = str(job.get("history_path") or "").strip()
         history_path = Path(raw_history_path).expanduser() if raw_history_path else None
@@ -164,7 +180,7 @@ def _run_overnight_director(job: dict[str, Any]) -> CronJobExecutionResult:
         hours = float(job.get("hours", 8.0))
         autonomy = int(job.get("autonomy", 1))
         max_tokens = int(job.get("max_tokens", 500_000))
-        external_wait_handoff = bool(job.get("external_wait_handoff", False))
+        external_wait_handoff = _as_bool(job.get("external_wait_handoff"), False)
         raw_resume_state = job.get("_resume_state")
         resume_state = raw_resume_state if isinstance(raw_resume_state, dict) else {}
         resume_metadata = resume_state.get("metadata", {}) if isinstance(resume_state.get("metadata", {}), dict) else {}
@@ -501,7 +517,7 @@ def _run_shakti_executive(job: dict[str, Any]) -> CronJobExecutionResult:
 
         top_k = int(job.get("top_k", 12))
         min_score = float(job.get("min_score", 45.0))
-        write = bool(job.get("write", False)) and not bool(job.get("dry_run", False))
+        write = _as_bool(job.get("write"), False) and not _as_bool(job.get("dry_run"), False)
         state_dir = job.get("state_dir") or None
         res = ShaktiExecutive(state_dir=state_dir).run(
             write=write,
@@ -564,7 +580,7 @@ def _run_frontier_refill(job: dict[str, Any]) -> CronJobExecutionResult:
 
         top_k = int(job.get("top_k", 3))
         min_telos = float(job.get("min_telos_alignment", 0.5))
-        dry_run = bool(job.get("dry_run", False))
+        dry_run = _as_bool(job.get("dry_run"), False)
         res = refill_frontier_tasks_pending(
             top_k=top_k,
             min_telos_alignment=min_telos,
@@ -608,6 +624,73 @@ def _run_store_sync(job: dict[str, Any]) -> CronJobExecutionResult:
             ),
         )
     except Exception as e:
+        return CronJobExecutionResult(
+            status=CronJobRunStatus.FAILED,
+            output=str(e),
+            error=str(e),
+        )
+
+
+def _run_world_scout(job: dict[str, Any]) -> CronJobExecutionResult:
+    """Run the external world radar and canonicalize promoted signals."""
+
+    fetch_enabled = _as_bool(job.get("fetch"), False) or _as_bool(
+        os.environ.get("DHARMA_WORLD_SCOUT_FETCH"),
+        False,
+    )
+    if not fetch_enabled:
+        return CronJobExecutionResult(
+            status=CronJobRunStatus.WAITING_EXTERNAL,
+            output=(
+                "world_scout fetch disabled; set job.fetch=true or "
+                "DHARMA_WORLD_SCOUT_FETCH=1 to scan live public sources"
+            ),
+            metadata={"fetch_enabled": False},
+        )
+
+    try:
+        from dharma_swarm.world_radar.go_bridge import run_world_radar_go_once
+        from dharma_swarm.zeitgeist import ZeitgeistScanner
+
+        state_dir = job.get("state_dir") or None
+        result = run_world_radar_go_once(
+            state_dir=state_dir,
+            scout_fetch=True,
+            min_score=_as_float(job.get("min_score"), 0.45),
+            timeout_s=_as_int(job.get("timeout_sec"), 60),
+        )
+        canonical_signals = asyncio.run(
+            ZeitgeistScanner(
+                state_dir=Path(str(state_dir)).expanduser() if state_dir else None
+            ).scan()
+        )
+        output = (
+            "world_scout: "
+            f"raw={result.raw_observations} signals={result.emitted_signals} "
+            f"promotion_ready={result.promotion_ready} "
+            f"incubations={result.incubations_written} "
+            f"zeitgeist={len(canonical_signals)} "
+            f"brief={result.brief_path} health={result.health_path}"
+        )
+        if result.errors:
+            output = f"{output} errors={list(result.errors)}"
+        return CronJobExecutionResult(
+            status=CronJobRunStatus.COMPLETED if result.ok else CronJobRunStatus.FAILED,
+            output=output,
+            error="; ".join(result.errors)[:500] if result.errors else "",
+            metadata={
+                "fetch_enabled": True,
+                "raw_observations": result.raw_observations,
+                "emitted_signals": result.emitted_signals,
+                "promotion_ready": result.promotion_ready,
+                "incubations_written": result.incubations_written,
+                "canonical_zeitgeist_signals": len(canonical_signals),
+                "board_path": result.board_path,
+                "brief_path": result.brief_path,
+                "health_path": result.health_path,
+            },
+        )
+    except Exception as e:  # noqa: BLE001
         return CronJobExecutionResult(
             status=CronJobRunStatus.FAILED,
             output=str(e),
@@ -672,6 +755,7 @@ def execute_cron_job(job: dict[str, Any]) -> CronJobExecutionResult:
         frontier_refill — bootstrap top opportunities into frontier queue
         system_map_populator — local system map refresh
         tcs_heartbeat   — local IdentityMonitor time-series sample
+        world_scout     — external zeitgeist radar and scout cascade
         store_sync      — materialize ontology outcomes into runtime artifacts
     """
     handler = str(job.get("handler", "headless_prompt")).strip() or "headless_prompt"
@@ -714,6 +798,8 @@ def execute_cron_job(job: dict[str, Any]) -> CronJobExecutionResult:
         return _run_tcs_heartbeat(job)
     if handler == "revenue_scout":
         return _run_revenue_scout(job)
+    if handler == "world_scout":
+        return _run_world_scout(job)
     if handler == "store_sync":
         return _run_store_sync(job)
 

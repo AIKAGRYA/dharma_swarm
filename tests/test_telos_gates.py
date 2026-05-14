@@ -73,13 +73,11 @@ def test_irreversible_review():
     assert result.decision == GateDecision.REVIEW
 
 
-def test_all_gates_present():
-    gk = TelosGatekeeper()
+def test_all_gates_present(tmp_path):
+    gk = TelosGatekeeper(registry=GateRegistry(tmp_path / "gate_proposals.jsonl"))
     result = gk.check("echo test")
     assert len(result.gate_results) == 11
-    expected = {"AHIMSA", "SATYA", "CONSENT", "VYAVASTHIT",
-                "REVERSIBILITY", "SVABHAAVA", "BHED_GNAN", "WITNESS",
-                "ANEKANTA", "DOGMA_DRIFT", "STEELMAN"}
+    expected = set(TelosGatekeeper.CORE_GATES)
     assert set(result.gate_results.keys()) == expected
 
 
@@ -366,7 +364,7 @@ def test_reflective_reroute_budget_exhausted_stays_blocked():
 # ---------------------------------------------------------------------------
 
 class TestGatePressureFeedback:
-    """Test the S4→S3 feedback loop: zeitgeist writes gate_pressure.json,
+    """Test the S4→S3 feedback loop: internal pressure writes gate_pressure.json,
     TelosGatekeeper reads it and overrides trust_mode."""
 
     def test_no_pressure_file_returns_current_mode(self, tmp_path):
