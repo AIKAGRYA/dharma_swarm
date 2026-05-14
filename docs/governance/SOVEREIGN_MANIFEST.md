@@ -17,7 +17,7 @@
 These are immutable engineering laws for this repository. Violation = architectural regression.
 
 ### A1: NO FLAT-PACKAGE GROWTH
-The `dharma_swarm/` package currently has **386 files at its top level (64.2% of 601 total Python modules)** (V). No new .py file may be added to the top level. New modules must go into an appropriate subdirectory. Existing top-level files will be organized over time.
+The `dharma_swarm/` package currently has **387 files at its top level (64.3% of 602 total Python modules)** (V). No new .py file may be added to the top level. New modules must go into an appropriate subdirectory. Existing top-level files will be organized over time.
 
 ### A2: NO DUPLICATE IMPLEMENTATIONS
 Before creating a new file for routing, bridging, adapting, or orchestrating, check if one already exists. The repo currently has **23 bridge files** (V), **3 model_routing copies** (2 are identical, 1 is different) (V), **4 orchestrators** (V), **14 adapter files across 7 locations** (V), and **13 router files** (V). Do not add more without deprecating an existing one.
@@ -62,11 +62,11 @@ These are the ground-truth metrics. All other documents citing different numbers
 
 | Metric | Value | Verification |
 |--------|-------|-------------|
-| Total Python modules | **601** | find dharma_swarm -name "*.py" -type f |
-| Top-level (flat) modules | **386 (64.2%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
-| Total Python LOC | **258,592** | wc -l across dharma_swarm Python modules |
-| Test files | **579** | find tests -name "*.py" -type f |
-| Test functions | **10,212 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Total Python modules | **602** | find dharma_swarm -name "*.py" -type f |
+| Top-level (flat) modules | **387 (64.3%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
+| Total Python LOC | **259,170** | wc -l across dharma_swarm Python modules |
+| Test files | **580** | find tests -name "*.py" -type f |
+| Test functions | **10,217 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
 | Markdown files | **692** | find . -name "*.md" -type f |

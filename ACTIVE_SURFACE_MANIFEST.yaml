@@ -166,6 +166,9 @@ health_check_registry:
   go_world_receipts_present:
     description: "Verify canonical Go world-radar receipts exist under ~/.dharma/go_receipts/world"
     type: file_exists
+  recursive_discovery_module_exists:
+    description: "Verify the recursive discovery shadow receipt module exists"
+    type: file_exists
 
 # ── Dashboard Surfaces ────────────────────────────────────────────
 # Every dashboard page: desired state, observed-state checks, gap info.
@@ -427,6 +430,15 @@ agents:
     priority: p0
     next_action: null
 
+  - id: recursive_discovery_shadow
+    label: "Recursive Discovery Shadow"
+    module: dharma_swarm/recursive_discovery.py
+    status: shadow
+    health_check_ids: [recursive_discovery_module_exists, test_file_exists]
+    wired_to: [control_surface, eval_harness, audit, lineage, evolution]
+    priority: p0
+    next_action: "Keep shadow-only: record receipts and recommend PRs without autonomous apply"
+
 # ── Integrations ──────────────────────────────────────────────────
 # External services and APIs the system depends on.
 
@@ -469,6 +481,67 @@ integrations:
     health_check_ids: [go_world_receipts_present]
     used_by: [control_surface, world_radar_receipt_projection]
 
+  - id: recursive_discovery_receipts
+    label: "Recursive Discovery Receipts"
+    type: evidence_receipts
+    path: "~/.dharma/events/recursive_discovery.jsonl"
+    status: shadow
+    health_check_ids: [recursive_discovery_module_exists]
+    used_by: [control_surface, eval_harness, audit, lineage, darwin_engine]
+
+# ── Recursive Discovery Shadow Surfaces ──────────────────────────
+# Fixture-backed control-surface rows only. These declare the minimum
+# self-improvement loop without allowing autonomous apply.
+
+recursive_discovery_surfaces:
+  - id: limitations
+    label: "Recursive Limitations"
+    receipt_type: limitation
+    status: shadow
+    owner_module: dharma_swarm/recursive_discovery.py
+    priority: p0
+    next_action: "Record one bounded limitation before generating evals"
+
+  - id: generated_evals
+    label: "Recursive Generated Evals"
+    receipt_type: generated_eval
+    status: shadow
+    owner_module: dharma_swarm/recursive_discovery.py
+    priority: p0
+    next_action: "Bind generated eval receipts into EventLog and eval registry"
+
+  - id: candidate_diffs
+    label: "Recursive Candidate Diffs"
+    receipt_type: candidate_diff
+    status: shadow
+    owner_module: dharma_swarm/recursive_discovery.py
+    priority: p0
+    next_action: "Keep candidate diffs in sandbox artifacts until human promotion"
+
+  - id: experiment_receipts
+    label: "Recursive Experiment Receipts"
+    receipt_type: experiment_result
+    status: shadow
+    owner_module: dharma_swarm/recursive_discovery.py
+    priority: p0
+    next_action: "Attach command exits, eval ids, sandbox path, cost, and rollback pointer"
+
+  - id: archive
+    label: "Recursive Archive"
+    receipt_type: witness_verdict
+    status: shadow
+    owner_module: dharma_swarm/recursive_discovery.py
+    priority: p1
+    next_action: "Archive only after witness phases are recorded"
+
+  - id: promotion_queue
+    label: "Recursive Promotion Queue"
+    receipt_type: promotion_decision
+    status: shadow
+    owner_module: dharma_swarm/recursive_discovery.py
+    priority: p0
+    next_action: "Human PR review is required before promotion"
+
 # ── Feedback Loops ────────────────────────────────────────────────
 # The cybernetic loops declared in CYBERNETIC_LOOP_MAP.md.
 
@@ -496,6 +569,18 @@ loops:
     health_check_ids: [module_file_exists, test_file_exists]
     priority: p1
     next_action: "Apply diffs to running code in sandbox and benchmark"
+
+  - id: recursive_discovery_shadow
+    label: "Recursive Discovery Shadow"
+    sense: "bounded limitation receipt"
+    act: "generate eval and candidate diff receipts"
+    evaluate: "sandbox command receipts and witness verdicts"
+    adapt: "archive lineage or hold for human PR promotion"
+    module: dharma_swarm/recursive_discovery.py
+    status: shadow
+    health_check_ids: [recursive_discovery_module_exists, test_file_exists]
+    priority: p0
+    next_action: "Wire receipts through EventLog and Control Surface before any autonomous apply"
 
   - id: shakti_perception
     label: "Shakti Perception"

@@ -23,7 +23,7 @@ class EvidenceItem(BaseModel):
 
     kind: Literal[
         "file", "manifest_row", "api_route", "db_probe",
-        "go_receipt", "broken_register", "process", "test",
+        "go_receipt", "recursive_receipt", "broken_register", "process", "test",
     ]
     source: str
     line_range: tuple[int, int] | None = None
@@ -102,6 +102,7 @@ ROW_KINDS = (
     "memory_surface",
     "broken_register",
     "go_receipt",
+    "recursive_discovery",
     "doc_surface",
     "integration",
     "feedback_loop",
@@ -215,6 +216,8 @@ def _needs_human_decision(row: ControlSurfaceRow) -> bool:
         return True
     if "go_world_receipt_rejections" in row.gap_codes:
         return True
+    if row.kind == "recursive_discovery" and "human_promotion_required" in row.gap_codes:
+        return True
     label_lower = row.label.lower()
     for kw in _HUMAN_DECISION_KEYWORDS:
         if kw in label_lower or kw in row.owner_module.lower():
@@ -249,6 +252,9 @@ def _build_human_decision_context(row: ControlSurfaceRow) -> HumanDecisionContex
     elif row.kind == "broken_register" and "OPEN" in row.declared_state.upper():
         why_now = f"Open broken register entry: {row.label}"
         recommended_action = f"Fix root cause and close {row.id.replace('br.', 'BR-').replace('_', '-')}"
+    elif row.kind == "recursive_discovery" and "human_promotion_required" in row.gap_codes:
+        why_now = "Recursive discovery shadow has a candidate/promotion receipt"
+        recommended_action = "Review the receipt and promote only through a human PR"
     else:
         for kw in _HUMAN_DECISION_KEYWORDS:
             if kw in row.label.lower() or kw in row.owner_module.lower():
