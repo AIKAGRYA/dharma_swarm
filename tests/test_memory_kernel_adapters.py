@@ -108,7 +108,20 @@ def test_memory_kernel_iterates_normalized_atoms_with_authority_labels(tmp_path:
         )
     )
 
-    atoms = list(kernel.iter_memory_atoms(limit_per_surface=10))
+    atoms = list(
+        kernel.iter_memory_atoms(
+            surface_ids=(
+                "home.memory_plane",
+                "home.runtime_state",
+                "home.smriti",
+                "home.witness",
+                "home.knowledge_wiki",
+                "home.codex_memory",
+                "home.conversation_log",
+            ),
+            limit_per_surface=10,
+        )
+    )
     atom_types = {atom.atom_type for atom in atoms}
 
     assert MemoryAtomType.EPISODE in atom_types
@@ -191,6 +204,102 @@ def test_jsonl_adapters_are_bounded(tmp_path: Path) -> None:
     atoms = list(kernel.iter_witness_events())
 
     assert len(atoms) == 2
+
+
+def test_codex_memory_reads_complete_tail_without_newline(tmp_path: Path) -> None:
+    home, repo = _fixture_memory_home(tmp_path)
+    _write(
+        home / ".codex/memories/mcp-memory.jsonl",
+        '{"text": "first", "timestamp": "2026-05-11T05:00:00Z"}\n'
+        '{"text": "complete tail", "timestamp": "2026-05-11T05:01:00Z"}',
+    )
+    kernel = MemoryKernel(
+        MemoryKernelConfig(
+            census=CensusConfig(repo_root=repo, home=home),
+            adapter=ReadOnlyAdapterConfig(default_limit=10),
+        )
+    )
+
+    atoms = list(
+        kernel.iter_memory_atoms(
+            surface_ids=("home.codex_memory",),
+            atom_types={MemoryAtomType.EXTERNAL_MEMORY},
+            query=MemoryQuery(
+                limit_total=None,
+                limit_per_surface=10,
+                order_by=MemoryOrder.OLDEST,
+                include_content=True,
+            ),
+        )
+    )
+    metadata = list(
+        kernel.iter_memory_atoms(
+            surface_ids=("home.codex_memory",),
+            atom_types={MemoryAtomType.METADATA},
+            query=MemoryQuery(limit_total=None, limit_per_surface=10),
+        )
+    )
+
+    assert [atom.content for atom in atoms] == ["first", "complete tail"]
+    assert metadata == []
+
+
+def test_jsonl_adapter_skips_live_tail_without_warning(tmp_path: Path) -> None:
+    home, repo = _fixture_memory_home(tmp_path)
+    _write(
+        home / ".codex/memories/mcp-memory.jsonl",
+        '{"text": "complete", "timestamp": "2026-05-11T05:00:00Z"}\n{"text": ',
+    )
+    kernel = MemoryKernel(
+        MemoryKernelConfig(
+            census=CensusConfig(repo_root=repo, home=home),
+            adapter=ReadOnlyAdapterConfig(default_limit=10),
+        )
+    )
+
+    atoms = list(
+        kernel.iter_memory_atoms(
+            surface_ids=("home.codex_memory",),
+            atom_types={MemoryAtomType.EXTERNAL_MEMORY},
+            query=MemoryQuery(limit_total=None, limit_per_surface=10, include_content=True),
+        )
+    )
+    metadata = list(
+        kernel.iter_memory_atoms(
+            surface_ids=("home.codex_memory",),
+            atom_types={MemoryAtomType.METADATA},
+            query=MemoryQuery(limit_total=None, limit_per_surface=10),
+        )
+    )
+
+    assert [atom.content for atom in atoms] == ["complete"]
+    assert metadata == []
+
+
+def test_jsonl_adapter_reports_malformed_non_tail_line(tmp_path: Path) -> None:
+    home, repo = _fixture_memory_home(tmp_path)
+    _write(
+        home / ".codex/memories/mcp-memory.jsonl",
+        '{"text": "complete"}\n{"text": \n{"text": "after"}\n',
+    )
+    kernel = MemoryKernel(
+        MemoryKernelConfig(
+            census=CensusConfig(repo_root=repo, home=home),
+            adapter=ReadOnlyAdapterConfig(default_limit=10),
+        )
+    )
+
+    atoms = list(
+        kernel.iter_memory_atoms(
+            surface_ids=("home.codex_memory",),
+            atom_types={MemoryAtomType.EXTERNAL_MEMORY},
+            query=MemoryQuery(limit_total=None, limit_per_surface=10, include_content=True),
+        )
+    )
+
+    assert {atom.content for atom in atoms} == {"complete", '{"text":', "after"}
+    malformed = next(atom for atom in atoms if atom.content == '{"text":')
+    assert malformed.metadata["read_warnings"] == ("jsonl_parse_error",)
 
 
 def test_memory_query_limits_total_across_surfaces(tmp_path: Path) -> None:
@@ -423,7 +532,7 @@ def test_query_cursor_returns_atoms_after_cursor(tmp_path: Path) -> None:
     assert [atom.content for atom in second_page] == ["turn three"]
 
 
-def test_wal_snapshot_warning_is_carried_on_atoms(tmp_path: Path) -> None:
+def test_empty_wal_snapshot_sidecar_does_not_warn(tmp_path: Path) -> None:
     home, repo = _fixture_memory_home(tmp_path)
     _write(home / ".dharma/db/memory_plane.db-wal", "")
     kernel = MemoryKernel(
@@ -441,7 +550,80 @@ def test_wal_snapshot_warning_is_carried_on_atoms(tmp_path: Path) -> None:
     )
 
     assert atoms
-    assert "immutable_probe_may_ignore_live_wal" in atoms[0].metadata["snapshot_warnings"]
+    assert "snapshot_warnings" not in atoms[0].metadata
+
+
+def test_sqlite_adapter_reads_live_wal_without_snapshot_warning(tmp_path: Path) -> None:
+    home, repo = _fixture_memory_home(tmp_path)
+    runtime_db = home / ".dharma/state/runtime.db"
+    live_conn = sqlite3.connect(runtime_db)
+    try:
+        live_conn.execute("PRAGMA journal_mode=WAL")
+        live_conn.execute("PRAGMA wal_autocheckpoint=0")
+        live_conn.execute(
+            "INSERT INTO memory_facts(fact, created_at) VALUES ('live wal fact', '2026-05-11T02:02:00Z')"
+        )
+        live_conn.commit()
+        assert runtime_db.with_name(runtime_db.name + "-wal").stat().st_size > 0
+
+        kernel = MemoryKernel(
+            MemoryKernelConfig(
+                census=CensusConfig(repo_root=repo, home=home),
+                adapter=ReadOnlyAdapterConfig(default_limit=10),
+            )
+        )
+        atoms = list(
+            kernel.iter_memory_atoms(
+                surface_ids=("home.runtime_state",),
+                atom_types={MemoryAtomType.FACT},
+                query=MemoryQuery(
+                    limit_total=None,
+                    limit_per_surface=10,
+                    include_content=True,
+                ),
+            )
+        )
+    finally:
+        live_conn.close()
+
+    assert "live wal fact" in {atom.content for atom in atoms}
+    live_atom = next(atom for atom in atoms if atom.content == "live wal fact")
+    assert live_atom.read_mode is ReadMode.READ_ONLY
+    assert "snapshot_warnings" not in live_atom.metadata
+
+
+def test_sqlite_adapter_reports_live_wal_read_error(tmp_path: Path, monkeypatch) -> None:
+    home, repo = _fixture_memory_home(tmp_path)
+    runtime_db = home / ".dharma/state/runtime.db"
+    _write(runtime_db.with_name(runtime_db.name + "-wal"), "live wal frames")
+
+    def fail_readonly(_path: Path) -> sqlite3.Connection:
+        raise sqlite3.OperationalError("wal read blocked")
+
+    monkeypatch.setattr(
+        "dharma_swarm.memory_kernel.adapters.read_only._connect_sqlite_readonly",
+        fail_readonly,
+    )
+    kernel = MemoryKernel(
+        MemoryKernelConfig(
+            census=CensusConfig(repo_root=repo, home=home),
+            adapter=ReadOnlyAdapterConfig(default_limit=10),
+        )
+    )
+
+    atoms = list(
+        kernel.iter_memory_atoms(
+            surface_ids=("home.runtime_state",),
+            atom_types={MemoryAtomType.METADATA},
+            query=MemoryQuery(limit_total=None, limit_per_surface=10),
+        )
+    )
+
+    assert len(atoms) == 1
+    assert atoms[0].metadata["read_warnings"] == (
+        "sqlite_probe_error",
+        "sqlite_live_wal_read_error",
+    )
 
 
 def test_memory_kernel_preview_memory_pack_is_read_only_and_conservative(tmp_path: Path) -> None:

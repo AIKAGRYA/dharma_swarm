@@ -14,6 +14,7 @@ from typing import Any
 REQUIRED_MEMORY_ROW_IDS = {
     "memory.census",
     "memory.adapter_coverage",
+    "memory.readiness",
     "memory.writer_sentinel",
     "memory.context_shadow",
     "memory.context_canary",
@@ -124,6 +125,43 @@ def check_context_shadow_report() -> SmokeCheck:
         return SmokeCheck("context_shadow_canary_report", False, str(exc))
 
 
+def check_readiness_contract(rows: list[Any]) -> SmokeCheck:
+    try:
+        by_id = {row.id: row for row in rows}
+        row = by_id.get("memory.readiness")
+        raw = getattr(row, "raw", {}) if row is not None else {}
+        required_fields = (
+            "readiness_status",
+            "strict_readiness_state",
+            "accounted_surface_count",
+            "accounted_surface_total",
+            "required_surface_count",
+            "required_accounted_surface_count",
+            "warning_count",
+        )
+        missing_fields = [field for field in required_fields if field not in raw]
+        ok = (
+            row is not None
+            and raw.get("schema_version") == "memory_kernel_readiness.v1"
+            and raw.get("strict_readiness_state") in {"strict_ready", "strict_blocked"}
+            and not missing_fields
+        )
+        detail = (
+            f"status={raw.get('readiness_status', '<missing>')} "
+            f"strict={raw.get('strict_readiness_state', '<missing>')} "
+            f"accounted={raw.get('accounted_surface_count', '<missing>')}/"
+            f"{raw.get('accounted_surface_total', '<missing>')} "
+            f"required={raw.get('required_accounted_surface_count', '<missing>')}/"
+            f"{raw.get('required_surface_count', '<missing>')} "
+            f"warnings={raw.get('warning_count', '<missing>')}"
+        )
+        if missing_fields:
+            detail += " missing_fields=" + ",".join(missing_fields)
+        return SmokeCheck("memory_readiness_contract", ok, detail)
+    except Exception as exc:
+        return SmokeCheck("memory_readiness_contract", False, str(exc))
+
+
 def check_rollback_switch_presence(rows: list[Any]) -> SmokeCheck:
     try:
         by_id = {row.id: row for row in rows}
@@ -142,6 +180,24 @@ def check_rollback_switch_presence(rows: list[Any]) -> SmokeCheck:
         return SmokeCheck("rollback_switch_presence", ok, detail)
     except Exception as exc:
         return SmokeCheck("rollback_switch_presence", False, str(exc))
+
+
+def check_burn_in_safety(rows: list[Any]) -> SmokeCheck:
+    try:
+        by_id = {row.id: row for row in rows}
+        gate = by_id.get("memory.rollout_gate")
+        raw = getattr(gate, "raw", {}) if gate is not None else {}
+        blockers = tuple(raw.get("burn_in_blockers", ()))
+        safe = bool(raw.get("burn_in_safe"))
+        ok = gate is not None and safe and "burn_in_safety_state" in raw
+        detail = (
+            f"rollout={getattr(gate, 'observed_state', '<missing>')} "
+            f"safety={raw.get('burn_in_safety_state', '<missing>')} "
+            f"blockers={','.join(str(item) for item in blockers) or '<none>'}"
+        )
+        return SmokeCheck("memory_burn_in_safety", ok, detail)
+    except Exception as exc:
+        return SmokeCheck("memory_burn_in_safety", False, str(exc))
 
 
 def run_smoke(repo_root: Path) -> tuple[SmokeCheck, ...]:
@@ -168,7 +224,9 @@ def run_smoke(repo_root: Path) -> tuple[SmokeCheck, ...]:
             check_row_projection(rows),
             check_memory_writer_sentinel(repo_root),
             check_context_shadow_report(),
+            check_readiness_contract(rows),
             check_rollback_switch_presence(rows),
+            check_burn_in_safety(rows),
         ]
     )
     return tuple(checks)

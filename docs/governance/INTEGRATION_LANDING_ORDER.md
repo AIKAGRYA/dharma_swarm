@@ -8,10 +8,10 @@ mergeable without broadening any feature scope.
 
 ## Proposed Order
 
-1. Land `cleanup/memory-kernel-shadow-context-main-2026-05-13` at `b3c45e7`
-   after the final coordinator gates pass. Treat `Makefile`,
-   `docs/governance/INTEGRATION_LANDING_ORDER.md`, and DocOps count refreshes
-   as the only Agent F edits on top of the existing MemoryKernel branch.
+1. Land `cleanup/memory-kernel-shadow-context-main-2026-05-13` at `fde1443`
+   after the final coordinator gates pass and the MemoryKernel 100% landing
+   gate below is satisfied. Keep Agent F follow-up edits scoped to governance,
+   architecture, and DocOps surfaces.
 2. Rebase PR #191 (`feat(knowledge-ops): seed semantic metabolism organ`) on
    the new `main`, resolve DocOps count surfaces, then merge it if the focused
    KnowledgeOps tests and governance gates stay green.
@@ -22,6 +22,38 @@ mergeable without broadening any feature scope.
 4. Defer any MemoryKernel-to-KnowledgeOps promotion or write-path integration
    to a follow-up branch. The current landing sequence should stay read-only
    and shadow-mode only.
+
+## MemoryKernel 100% Landing Gate
+
+For this landing, 100% means accounted safe readiness. It does not mean every
+home-state directory has a live adapter, and it does not permit MemoryKernel
+atoms to mutate prompts, canon, Chetana, vectors, or runtime state.
+
+Required before the branch is called operationally ready:
+
+- `make memory-kernel-readiness` exits 0. This target runs adapter readiness,
+  writer sentinel CI mode, context eval default cases, and the shadow context
+  sweep.
+- The adapter readiness report keeps `schema_version=memory_kernel_readiness.v1`
+  and `required_surface_count=7`.
+- The seven required adapter surfaces are all registered and none is
+  `unavailable` or `missing_adapter`.
+- A required `degraded` row remains a blocker unless the landing code and tests
+  explicitly classify that warning as reviewed safe degradation.
+- Non-required `missing_adapter` rows may remain only as accounted census
+  backlog with `required=false`; they are not a request to read all live memory
+  surfaces.
+- Writer sentinel output has `unregistered_surface_count=0`,
+  `unreviewed_discovery_count=0`, and `action_required_count=0`.
+- Context eval and shadow sweep have `hard_failure_count=0`. Warnings are
+  acceptable only when they preserve shadow mode, no write-through, and no
+  prompt injection.
+
+The latest local run passes the make target with adapter readiness
+`status=ready`: 81 registered adapters, 7 ready required surfaces, 74 accounted
+optional surfaces, 0 missing adapters, and 0 warnings. This is the target shape
+for the final coordinator: complete required coverage plus accounted optional
+surface metadata, not unconstrained live memory.
 
 ## PR #191 Handling
 

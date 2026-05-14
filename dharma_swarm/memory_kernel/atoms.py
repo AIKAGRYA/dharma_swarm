@@ -88,9 +88,12 @@ class AdapterMode(StrEnum):
 class SurfaceStatus(StrEnum):
     ACTIVE = "active"
     MISSING = "missing"
+    EXPECTED_UNAVAILABLE = "expected_unavailable"
     DORMANT = "dormant"
     SNAPSHOT = "snapshot"
     EXTERNAL = "external"
+    RETIRED = "retired"
+    DISABLED = "disabled"
     UNSAFE = "unsafe"
 
 
@@ -575,8 +578,14 @@ def infer_freshness(surface: MemorySurface) -> str:
         return "snapshot"
     if surface.active_status == SurfaceStatus.ACTIVE:
         return "current_or_live_snapshot"
+    if surface.active_status == SurfaceStatus.EXPECTED_UNAVAILABLE:
+        return "expected_unavailable"
     if surface.active_status == SurfaceStatus.DORMANT:
         return "dormant"
+    if surface.active_status == SurfaceStatus.RETIRED:
+        return "retired"
+    if surface.active_status == SurfaceStatus.DISABLED:
+        return "disabled"
     if surface.active_status == SurfaceStatus.MISSING:
         return "missing"
     return "unknown"

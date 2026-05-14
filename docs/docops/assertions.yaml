@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "verified_at": "2026-05-05",
+  "verified_at": "2026-05-14",
   "ttl_days": 14,
   "assertions": [
     {
@@ -146,6 +146,7 @@
         "docs/governance/BUILD_SESSION_ENTRYPOINT.md",
         "docs/governance/COHERENCE_DELTA.md",
         "docs/governance/INTEGRATION_LANDING_ORDER.md",
+        "docs/governance/README.md",
         "docs/governance/SOVEREIGN_MANIFEST.md",
       "docs/MEGAFILE_INDEX.md",
       "docs/vision_maps/MASTER_2026-05-07_attractor_closure_synthesis.md",
