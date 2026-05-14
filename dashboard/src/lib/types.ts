@@ -511,6 +511,23 @@ export interface HotPath {
 // Control Surface (GET /api/control-surface/*)
 // ---------------------------------------------------------------------------
 
+export interface ControlSurfaceEvidenceItem {
+  kind: string;
+  source: string;
+  line_range?: [number, number] | null;
+  observed_at?: string;
+  raw_content?: string | null;
+  status?: string | null;
+  provenance_chain?: string[];
+}
+
+export interface ControlSurfaceSourceRef {
+  kind: string;
+  path: string;
+  exists?: boolean;
+  line_range?: [number, number] | null;
+}
+
 export interface ControlSurfaceRow {
   id: string;
   kind: string;
@@ -523,12 +540,14 @@ export interface ControlSurfaceRow {
   priority: string;
   owner_module: string;
   truth_owner: string;
-  evidence: string[];
+  evidence: ControlSurfaceEvidenceItem[];
+  evidence_labels?: string[];
   freshness: string;
   gap_codes: string[];
   next_action: string;
   human_decision_required: boolean;
-  source_refs: string[];
+  source_refs: ControlSurfaceSourceRef[];
+  source_ref_labels?: string[];
   raw: Record<string, unknown>;
 }
 

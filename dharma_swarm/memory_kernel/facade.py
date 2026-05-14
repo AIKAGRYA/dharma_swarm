@@ -20,7 +20,13 @@ from dharma_swarm.memory_kernel.adapters.read_only import (
     SmritiAdapter,
     WitnessJsonlAdapter,
 )
-from dharma_swarm.memory_kernel.atoms import MemoryAtom, MemoryAtomType, MemoryQuery, MemorySurface
+from dharma_swarm.memory_kernel.atoms import (
+    MemoryAtom,
+    MemoryAtomType,
+    MemoryQuery,
+    MemorySurface,
+    ReadMode,
+)
 from dharma_swarm.memory_kernel.census import CensusConfig, CensusResult, MemorySurfaceCensus
 from dharma_swarm.memory_kernel.context_admission import (
     MemoryContextBudget,
@@ -98,9 +104,16 @@ class MemoryKernel:
         for surface_id in selected_ids:
             adapter = self.get_adapter(surface_id)
             if adapter is None:
+                degraded_atom = self._degraded_surface_atom(surface_id, resolved_query)
+                if degraded_atom is not None:
+                    yield degraded_atom
+                    if remaining_total is not None:
+                        remaining_total -= 1
+                        if remaining_total <= 0:
+                            return
                 continue
             for atom in adapter.iter_atoms(query=adapter_query):
-                if atom_types is None or atom.atom_type in atom_types:
+                if resolved_query.allows_atom(atom):
                     yield atom
                     if remaining_total is not None:
                         remaining_total -= 1
@@ -209,6 +222,21 @@ class MemoryKernel:
             budget=resolved_budget,
         )
 
+    def adapter_readiness_report(
+        self,
+        *,
+        required_surface_ids: Iterable[str] | None = None,
+    ):
+        from dharma_swarm.memory_kernel.readiness import (  # noqa: PLC0415
+            build_adapter_readiness_report,
+        )
+
+        return build_adapter_readiness_report(
+            surfaces=self.list_surfaces(),
+            adapter_factories=self._adapter_factories,
+            required_surface_ids=required_surface_ids,
+        )
+
     def _resolve_query(
         self,
         query: MemoryQuery | None,
@@ -228,6 +256,45 @@ class MemoryKernel:
         if limit_total is not None:
             resolved = replace(resolved, limit_total=limit_total)
         return resolved
+
+    def _degraded_surface_atom(
+        self,
+        surface_id: str,
+        query: MemoryQuery,
+    ) -> MemoryAtom | None:
+        if not query.include_degraded_metadata or not query.allows_atom_type(MemoryAtomType.METADATA):
+            return None
+        surface = self.surfaces_by_id.get(surface_id)
+        if surface is None:
+            return None
+        warnings: list[str] = []
+        if surface_id not in self._adapter_factories:
+            warnings.append("adapter_not_registered")
+        if not surface.health.exists:
+            warnings.append("surface_missing")
+        if surface.health.probe_error:
+            warnings.append("surface_probe_error")
+        if not warnings:
+            warnings.append("adapter_unavailable")
+        atom = MemoryAtom.build(
+            surface=surface,
+            atom_type=MemoryAtomType.METADATA,
+            content_ref=f"{surface_id}:degraded_surface",
+            content=None,
+            timestamp=surface.health.last_modified,
+            source_path=surface.path,
+            adapter_name="memory_kernel_facade",
+            read_mode=ReadMode.METADATA_ONLY,
+            metadata={
+                "degraded": True,
+                "read_warnings": tuple(dict.fromkeys(warnings)),
+                "surface_exists": surface.health.exists,
+            },
+            source_row_key=f"{surface_id}:degraded_surface",
+        )
+        if query.allows_atom(atom):
+            return atom
+        return None
 
 
 def default_adapter_factories(

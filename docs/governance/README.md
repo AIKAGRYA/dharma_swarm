@@ -21,6 +21,9 @@ This directory is the easiest single place to orient any human or agent before w
 5. [REPO_GOVERNANCE_AUDIT.md](/Users/dhyana/dharma_swarm/docs/governance/REPO_GOVERNANCE_AUDIT.md)  
    Contradictions, stale claims, and audit evidence.
 
+6. [INTEGRATION_LANDING_ORDER.md](/Users/dhyana/dharma_swarm/docs/governance/INTEGRATION_LANDING_ORDER.md)
+   Current merge-order note for active integration branches.
+
 ## Use
 
 - Read these before starting a new agent session.

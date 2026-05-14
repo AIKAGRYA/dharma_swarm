@@ -3,10 +3,17 @@
 from __future__ import annotations
 
 import ast
+from dataclasses import replace
 from pathlib import Path
 from typing import Iterable
 
 from dharma_swarm.memory_kernel.surfaces import default_surface_specs
+from dharma_swarm.memory_kernel.write_policy import (
+    MemoryWritePolicy,
+    WriteDecisionOutcome,
+    WriteRequest,
+    reviewed_write_key,
+)
 from dharma_swarm.memory_kernel.writer_discovery import (
     _MemoryWriteVisitor,
     _matching_writer_ids,
@@ -37,9 +44,11 @@ class MemoryWriterSentinel:
         repo_root: Path | str,
         specs: Iterable[MemoryWriterSpec] | None = None,
         known_surface_ids: Iterable[str] | None = None,
+        write_policy: MemoryWritePolicy | None = None,
     ) -> None:
         self.repo_root = Path(repo_root)
         self.specs = tuple(specs or default_writer_specs())
+        self.write_policy = write_policy or MemoryWritePolicy()
         self.known_surface_ids = set(
             known_surface_ids
             if known_surface_ids is not None
@@ -78,6 +87,8 @@ class MemoryWriterSentinel:
     ) -> tuple[DiscoveredMemoryWrite, ...]:
         files = tuple(self._iter_scan_files(scan_roots=scan_roots, max_files=max_files))
         registered = self._registered_symbol_index()
+        specs_by_id = {spec.writer_id: spec for spec in self.specs}
+        policy_occurrences: dict[tuple[str, str, str, str], int] = {}
         discovered: list[DiscoveredMemoryWrite] = []
         for source_path in files:
             try:
@@ -97,6 +108,34 @@ class MemoryWriterSentinel:
                     candidate,
                     status=status,
                 )
+                matched_specs = tuple(
+                    specs_by_id[writer_id]
+                    for writer_id in matches
+                    if writer_id in specs_by_id
+                )
+                identity = self.write_policy.identity_for_writer_specs(
+                    matched_specs,
+                    source_path=candidate.source_path,
+                    symbol=candidate.symbol,
+                )
+                request = WriteRequest(
+                    source_path=candidate.source_path,
+                    symbol=candidate.symbol,
+                    operation=candidate.operation,
+                    target=candidate.target,
+                    mode=candidate.mode,
+                    writer_identity=identity,
+                )
+                policy_key = reviewed_write_key(
+                    candidate.source_path,
+                    candidate.symbol,
+                    candidate.operation,
+                    candidate.target,
+                )
+                occurrence_index = policy_occurrences.get(policy_key, 0) + 1
+                policy_occurrences[policy_key] = occurrence_index
+                request = replace(request, occurrence_index=occurrence_index)
+                write_decision = self.write_policy.decide(request)
                 discovered.append(
                     DiscoveredMemoryWrite(
                         source_path=candidate.source_path,
@@ -110,6 +149,7 @@ class MemoryWriterSentinel:
                         triage_category=triage_category,
                         triage_reason=triage_reason,
                         matched_writer_ids=matches,
+                        write_decision=write_decision.to_json(),
                     )
                 )
         return tuple(discovered)
@@ -125,11 +165,15 @@ class MemoryWriterSentinel:
         by_operation: dict[str, int] = {}
         by_status: dict[str, int] = {}
         by_triage: dict[str, int] = {}
+        by_decision: dict[str, int] = {}
         by_unregistered_source: dict[str, int] = {}
         for row in rows:
             by_operation[row.operation] = by_operation.get(row.operation, 0) + 1
             by_status[row.status.value] = by_status.get(row.status.value, 0) + 1
             by_triage[row.triage_category.value] = by_triage.get(row.triage_category.value, 0) + 1
+            decision = _discovery_decision(row)
+            if decision:
+                by_decision[decision] = by_decision.get(decision, 0) + 1
             if row.status == DiscoveredWriteStatus.UNREGISTERED:
                 by_unregistered_source[row.source_path] = (
                     by_unregistered_source.get(row.source_path, 0) + 1
@@ -154,16 +198,35 @@ class MemoryWriterSentinel:
             action_required_count=sum(
                 1
                 for row in rows
-                if row.triage_category
-                in {
-                    DiscoveryTriageCategory.MEMORY_WRITER_NEEDS_SPEC,
-                    DiscoveryTriageCategory.SURFACE_NEEDS_REGISTRY,
-                }
+                if (
+                    row.triage_category
+                    in {
+                        DiscoveryTriageCategory.MEMORY_WRITER_NEEDS_SPEC,
+                        DiscoveryTriageCategory.SURFACE_NEEDS_REGISTRY,
+                    }
+                    or (
+                        _discovery_decision(row) == WriteDecisionOutcome.DENY.value
+                        and not _discovery_reviewed(row)
+                    )
+                )
             ),
             top_unregistered_sources=top_unregistered_sources,
             by_operation=by_operation,
             by_status=by_status,
             by_triage=by_triage,
+            by_decision=by_decision,
+            policy_denied_count=sum(
+                1
+                for row in rows
+                if _discovery_decision(row) == WriteDecisionOutcome.DENY.value
+            ),
+            unreviewed_discovery_count=sum(
+                1
+                for row in rows
+                if row.status == DiscoveredWriteStatus.UNREGISTERED
+                and _discovery_decision(row) == WriteDecisionOutcome.DENY.value
+                and not _discovery_reviewed(row)
+            ),
         )
 
     def _observe(self, spec: MemoryWriterSpec) -> MemoryWriterObservation:
@@ -271,3 +334,16 @@ class MemoryWriterSentinel:
             key = _relative_path(source_path, self.repo_root)
             by_path.setdefault(key, []).append(spec)
         return {path: tuple(specs) for path, specs in by_path.items()}
+
+
+def _discovery_decision(row: DiscoveredMemoryWrite) -> str:
+    if not row.write_decision:
+        return ""
+    decision = row.write_decision.get("decision")
+    return decision if isinstance(decision, str) else ""
+
+
+def _discovery_reviewed(row: DiscoveredMemoryWrite) -> bool:
+    if not row.write_decision:
+        return False
+    return bool(row.write_decision.get("reviewed_baseline"))
