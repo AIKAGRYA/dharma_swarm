@@ -114,8 +114,10 @@ def label_from_response(
 def setup_device():
     import torch
 
+    # Bug fix 2026-05-15: bf16 on MPS produces garbage tokens for Mistral-7B (well-documented).
+    # fp16 is numerically more stable on MPS for this model. CUDA is fine with bf16.
     if torch.backends.mps.is_available():
-        return torch.device("mps"), torch.bfloat16
+        return torch.device("mps"), torch.float16
     if torch.cuda.is_available():
         return torch.device("cuda"), torch.bfloat16
     return torch.device("cpu"), torch.float32
@@ -147,14 +149,25 @@ def load_model_and_tokenizer(cfg: dict, device, dtype):
 
 
 def build_chat_inputs(tokenizer, system_prompt: str, user_prompt: str):
-    """Apply Mistral chat template; returns input_ids tensor."""
+    """Apply Mistral chat template; returns input_ids tensor.
+
+    Bug fix 2026-05-15: transformers 5.x returns BatchEncoding (dict-like) from
+    apply_chat_template, not a raw Tensor as 4.x did. We unwrap to get the input_ids tensor.
+    This is a compatibility fix only — no change to experimental design.
+    """
     messages = []
     if system_prompt and system_prompt.strip():
         messages.append({"role": "system", "content": system_prompt})
     messages.append({"role": "user", "content": user_prompt})
-    return tokenizer.apply_chat_template(
+    out = tokenizer.apply_chat_template(
         messages, add_generation_prompt=True, return_tensors="pt"
     )
+    # Unwrap BatchEncoding -> Tensor
+    if hasattr(out, "data") and isinstance(getattr(out, "data", None), dict) and "input_ids" in out.data:
+        return out["input_ids"]
+    if isinstance(out, dict) and "input_ids" in out:
+        return out["input_ids"]
+    return out
 
 
 def run_one_probe(model, tokenizer, system_prompt, user_prompt, cfg, device):
@@ -168,11 +181,12 @@ def run_one_probe(model, tokenizer, system_prompt, user_prompt, cfg, device):
 
     input_ids = build_chat_inputs(tokenizer, system_prompt, user_prompt).to(device)
     prompt_len = input_ids.shape[1]
+    attention_mask = torch.ones_like(input_ids)  # single sample, no padding
 
     # Step 1: prompt forward pass with hidden states (for R_V computation)
     # We save the last `window_size` tokens at both early and late layers.
     with torch.no_grad():
-        out = model(input_ids=input_ids, output_hidden_states=True, use_cache=False)
+        out = model(input_ids=input_ids, attention_mask=attention_mask, output_hidden_states=True, use_cache=False)
         # out.hidden_states is tuple of (n_layers + 1) tensors [batch, seq, hidden]
         # hidden_states[0] = embedding; hidden_states[i] = output of block i (1-indexed)
         w = min(window_size, prompt_len)
@@ -180,17 +194,21 @@ def run_one_probe(model, tokenizer, system_prompt, user_prompt, cfg, device):
         h_late = out.hidden_states[late_layer][0, -w:, :].detach().to("cpu").float().numpy()    # [w, hidden]
 
     # Step 2: generation for blackbox features + response
+    # Bug fix 2026-05-15: pass attention_mask explicitly; with do_sample=False, don't pass temperature/top_p
+    gen_kwargs = {
+        "input_ids": input_ids,
+        "attention_mask": attention_mask,
+        "max_new_tokens": inf_cfg["max_new_tokens"],
+        "do_sample": inf_cfg["do_sample"],
+        "pad_token_id": tokenizer.pad_token_id,
+        "return_dict_in_generate": True,
+        "output_scores": True,
+    }
+    if inf_cfg.get("do_sample"):
+        gen_kwargs["temperature"] = inf_cfg.get("temperature", 1.0)
+        gen_kwargs["top_p"] = inf_cfg.get("top_p", 1.0)
     with torch.no_grad():
-        gen = model.generate(
-            input_ids=input_ids,
-            max_new_tokens=inf_cfg["max_new_tokens"],
-            do_sample=inf_cfg["do_sample"],
-            temperature=inf_cfg.get("temperature", 1.0),
-            top_p=inf_cfg.get("top_p", 1.0),
-            pad_token_id=tokenizer.pad_token_id,
-            return_dict_in_generate=True,
-            output_scores=True,
-        )
+        gen = model.generate(**gen_kwargs)
     gen_ids = gen.sequences[0, prompt_len:]
     gen_text = tokenizer.decode(gen_ids, skip_special_tokens=True)
     n_gen = int(gen_ids.shape[0])
@@ -211,7 +229,11 @@ def run_one_probe(model, tokenizer, system_prompt, user_prompt, cfg, device):
     f_entropy_step0 = float(-(top100 * torch.log(top100 + 1e-12)).sum())
 
     f_response_len = n_gen
-    f_self_perplexity = float(torch.exp(-token_log_probs.mean() if n_gen > 0 else torch.tensor(0.0)))
+    # Bug fix 2026-05-15: token_log_probs is numpy here (converted above); use np.exp
+    if n_gen > 0:
+        f_self_perplexity = float(np.exp(-float(token_log_probs.mean())))
+    else:
+        f_self_perplexity = float("nan")
 
     return {
         "prompt_len": prompt_len,
@@ -288,7 +310,12 @@ def main() -> int:
                 model, tokenizer, row["system_prompt"], row["user_prompt"], cfg, device
             )
         except Exception as e:
-            print(f"\n[err] probe {row['task_id']}: {type(e).__name__}: {str(e)[:200]}")
+            import traceback
+            print(f"\n[err] probe {row['task_id']}: {type(e).__name__}: {repr(e)}")
+            traceback.print_exc()
+            if n_done == 0:
+                # crash fast on first error so we don't waste time
+                raise
             continue
 
         # Label generation
