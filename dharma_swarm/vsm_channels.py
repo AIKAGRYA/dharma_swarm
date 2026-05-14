@@ -724,7 +724,7 @@ class VSMCoordinator:
 
     This is the nervous system of the organism. It connects:
     - GatePatternAggregator (S3→S4)
-    - ZeitgeistScanner (S4) → back-pressure on gates (S4→S3)
+    - InternalPressureScanner (S4) → back-pressure on gates (S4→S3)
     - SporadicAuditor (S3*)
     - AlgedonicChannel (any → S5)
     - AgentViabilityMonitor (agent-internal recursion)

@@ -333,6 +333,14 @@ def _safe_float(value: Any, default: float = 0.0) -> float:
         return default
 
 
+def _normalized_score(value: Any) -> float:
+    """Return a 0..1 score whether the board stores normalized or 0..100 values."""
+    score = _safe_float(value)
+    if score > 1.0:
+        score = score / 100.0
+    return max(0.0, min(1.0, score))
+
+
 def _opportunity_id(row: dict[str, Any]) -> str:
     """Return the canonical board identifier, accepting legacy ``id`` rows."""
     raw = row.get("opportunity_id") or row.get("id")
@@ -354,12 +362,38 @@ def _select_pending(
     for row in board:
         if row.get("addressed") or row.get("queued"):
             continue
-        telos = _safe_float(row.get("telos_alignment", row.get("final_score", 0)))
+        if not _passes_world_admission(row):
+            continue
+        telos = _normalized_score(row.get("telos_alignment", row.get("final_score", 0)))
         if telos < min_telos_alignment:
             continue
         pending.append(row)
-    pending.sort(key=lambda r: _safe_float(r.get("final_score", 0)), reverse=True)
+    pending.sort(key=lambda r: _normalized_score(r.get("final_score", 0)), reverse=True)
     return pending[:top_k]
+
+
+def _passes_world_admission(row: dict[str, Any]) -> bool:
+    """Keep watchlist/incubating world signals out of direct execution."""
+    domain = str(row.get("domain") or row.get("type") or "").strip()
+    strategic = row.get("strategic_vision") if isinstance(row.get("strategic_vision"), dict) else {}
+    source_inputs = [item for item in row.get("source_inputs", []) or [] if isinstance(item, dict)]
+    is_world = domain == "ecosystem_scan" or any(
+        str(item.get("source") or "") == "zeitgeist" and str(item.get("raw_source") or "")
+        for item in source_inputs
+    )
+    if not is_world:
+        return True
+    status = str(
+        strategic.get("promotion_status")
+        or strategic.get("incubation_status")
+        or row.get("promotion_status")
+        or ""
+    ).strip()
+    if status and status != "promotion_ready":
+        return False
+    has_evidence = bool(row.get("evidence_signals")) and bool(source_inputs)
+    has_source_url = bool(strategic.get("url") or row.get("url"))
+    return has_evidence or has_source_url or status == "promotion_ready"
 
 
 def _append_frontier_rows(
@@ -434,17 +468,13 @@ def refill_frontier_tasks_pending(
         queued_ids.add(opp_id)
 
         for stage in OPPORTUNITY_STAGES:
+            metadata = _frontier_metadata(opp, opportunity_id=opp_id, opportunity_type=opp_type, stage=stage)
             frontier_rows.append({
                 "title": f"[{opp_type}] {opp_title} — {stage}",
                 "description": f"Stage '{stage}' for opportunity {opp_id}",
                 "priority": "high",
                 "created_by": "frontier_refill",
-                "metadata": {
-                    "opportunity_id": opp_id,
-                    "opportunity_type": opp_type,
-                    "stage": stage,
-                    "source": "frontier_refill",
-                },
+                "metadata": metadata,
             })
 
     if dry_run:
@@ -466,3 +496,29 @@ def refill_frontier_tasks_pending(
         appended_rows=appended,
         appended_opportunity_ids=sorted(queued_ids),
     )
+
+
+def _frontier_metadata(
+    opp: dict[str, Any],
+    *,
+    opportunity_id: str,
+    opportunity_type: str,
+    stage: str,
+) -> dict[str, Any]:
+    """Preserve strategic context as a board row becomes frontier work."""
+    metadata = {
+        "opportunity_id": opportunity_id,
+        "opportunity_type": opportunity_type,
+        "stage": stage,
+        "source": "frontier_refill",
+        "opportunity_title": opp.get("title", ""),
+        "opportunity_domain": opp.get("domain") or opp.get("type") or "",
+        "final_score": opp.get("final_score", 0),
+        "why_now": opp.get("why_now", ""),
+        "thesis": opp.get("thesis", ""),
+    }
+    for key in ("strategic_vision", "source_inputs", "evidence_signals", "factor_scores"):
+        value = opp.get(key)
+        if value:
+            metadata[key] = value
+    return metadata
