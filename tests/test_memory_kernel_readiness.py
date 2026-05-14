@@ -75,7 +75,7 @@ def _kernel(home: Path, repo: Path) -> MemoryKernel:
     )
 
 
-def test_readiness_report_is_deterministic_and_warns_on_degraded_reads(
+def test_readiness_report_tolerates_live_tail_and_empty_wal(
     tmp_path: Path,
 ) -> None:
     home, repo = _fixture_memory_home(tmp_path)
@@ -89,9 +89,14 @@ def test_readiness_report_is_deterministic_and_warns_on_degraded_reads(
     ).to_json()
 
     assert report_one == report_two
-    assert report_one["status"] == "degraded"
-    assert "home.memory_plane:immutable_probe_may_ignore_live_wal" in report_one["warnings"]
-    assert "home.witness:jsonl_trailing_partial_line_skipped" in report_one["warnings"]
+    assert report_one["status"] == "ready"
+    assert report_one["warnings"] == ()
+    assert report_one["summary"]["required_surface_count"] == 2
+    assert report_one["summary"]["required_ready_count"] == 2
+    assert report_one["summary"]["required_failure_count"] == 0
+    assert report_one["summary"]["degraded_count"] == 0
+    assert report_one["summary"]["missing_adapter_count"] == 0
+    assert report_one["summary"]["uncovered_count"] == 0
 
 
 def test_readiness_cli_outputs_stable_json_and_strict_exit(
@@ -120,7 +125,12 @@ def test_readiness_cli_outputs_stable_json_and_strict_exit(
 
     assert payload["schema_version"] == "memory_kernel_readiness.v1"
     assert payload["summary"]["required_surface_count"] == 2
-    assert payload["status"] == "degraded"
+    assert payload["status"] == "ready"
+
+    _write(
+        home / ".dharma/witness/2026-05-11.jsonl",
+        '{"content": "complete", "timestamp": "2026-05-11T04:00:00Z"}\n{"content": \n',
+    )
 
     assert (
         readiness_cli_main(
@@ -130,13 +140,110 @@ def test_readiness_cli_outputs_stable_json_and_strict_exit(
                 "--home",
                 str(home),
                 "--require-surface",
-                "home.memory_plane",
+                "home.witness",
                 "--strict",
                 "--dry-run",
             ]
         )
         == 5
     )
+    capsys.readouterr()
+
+    assert (
+        readiness_cli_main(
+            [
+                "--repo-root",
+                str(repo),
+                "--home",
+                str(home),
+                "--require-surface",
+                "home.smriti",
+                "--strict",
+                "--summary-only",
+                "--dry-run",
+            ]
+        )
+        == 0
+    )
+    summary_payload = json.loads(capsys.readouterr().out)
+    assert "surfaces" not in summary_payload
+    assert summary_payload["status"] == "ready"
+    assert summary_payload["summary"]["required_ready_count"] == 1
+    assert summary_payload["summary"]["degraded_count"] == 0
+
+
+def test_absent_optional_lifecycle_surfaces_are_accounted_separately(
+    tmp_path: Path,
+) -> None:
+    kernel = _kernel(tmp_path / "home", tmp_path / "repo")
+
+    payload = kernel.adapter_readiness_report().to_json()
+    rows = {row["surface_id"]: row for row in payload["surfaces"]}
+
+    expected_statuses = {
+        "home.alerts": ("expected_unavailable", "expected_unavailable"),
+        "home.custodians": ("expected_unavailable", "expected_unavailable"),
+        "home.gaia_ledger": ("expected_unavailable", "expected_unavailable"),
+        "home.gaia_platform": ("expected_unavailable", "expected_unavailable"),
+        "home.hibernation": ("expected_unavailable", "expected_unavailable"),
+        "home.routing_memory": ("retired", "retired"),
+        "home.ecosystem_index": ("disabled", "disabled"),
+        "home.distilled": ("disabled", "disabled"),
+        "home.citations": ("disabled", "disabled"),
+        "repo.literal_tilde_dharma": ("unsafe", "unsafe_disabled"),
+    }
+
+    for surface_id, (active_status, readiness_status) in expected_statuses.items():
+        row = rows[surface_id]
+        assert row["active_status"] == active_status
+        assert row["status"] == readiness_status
+        assert row["warnings"] == ()
+
+    assert payload["summary"]["expected_unavailable_count"] == 5
+    assert payload["summary"]["retired_count"] == 1
+    assert payload["summary"]["disabled_count"] == 3
+    assert payload["summary"]["unsafe_disabled_count"] == 1
+    assert payload["summary"]["accounted_optional_absent_count"] >= 5
+    assert payload["summary"]["accounted_optional_lifecycle_count"] >= 10
+
+
+def test_required_lifecycle_surface_remains_strict(
+    tmp_path: Path,
+) -> None:
+    kernel = _kernel(tmp_path / "home", tmp_path / "repo")
+
+    payload = kernel.adapter_readiness_report(
+        required_surface_ids=("home.alerts",)
+    ).to_json()
+    row = {
+        surface["surface_id"]: surface
+        for surface in payload["surfaces"]
+    }["home.alerts"]
+
+    assert payload["status"] == "unavailable"
+    assert row["required"] is True
+    assert row["adapter_registered"] is True
+    assert row["active_status"] == "expected_unavailable"
+    assert row["status"] == "unavailable"
+    assert row["warnings"] == ("surface_missing",)
+
+
+def test_explicit_missing_required_surface_is_uncovered_gate_failure(
+    tmp_path: Path,
+) -> None:
+    kernel = _kernel(tmp_path / "home", tmp_path / "repo")
+
+    payload = kernel.adapter_readiness_report(
+        required_surface_ids=("missing.required",)
+    ).to_json()
+
+    assert payload["status"] == "unavailable"
+    assert payload["summary"]["required_surface_count"] == 1
+    assert payload["summary"]["required_ready_count"] == 0
+    assert payload["summary"]["required_failure_count"] == 1
+    assert payload["summary"]["missing_required_surface_count"] == 1
+    assert payload["summary"]["uncovered_count"] == 1
+    assert payload["warnings"] == ("missing.required:required_surface_not_found",)
 
 
 def test_memory_atoms_carry_provenance_extensions_without_content(
@@ -209,7 +316,7 @@ def test_memory_query_filters_high_risk_projection_and_unsafe_atoms(
     assert MemoryQuery(include_unsafe=True).allows_atom(unsafe_atom)
 
 
-def test_jsonl_adapter_skips_trailing_partial_line_and_reports_metadata(
+def test_jsonl_adapter_skips_live_tail_without_metadata_warning(
     tmp_path: Path,
 ) -> None:
     home, repo = _fixture_memory_home(tmp_path)
@@ -234,8 +341,7 @@ def test_jsonl_adapter_skips_trailing_partial_line_and_reports_metadata(
 
     assert len(events) == 1
     assert events[0].content == "complete"
-    assert len(metadata) == 1
-    assert "jsonl_trailing_partial_line_skipped" in metadata[0].metadata["read_warnings"]
+    assert metadata == []
 
 
 def test_explicit_missing_surface_returns_stable_degraded_metadata(

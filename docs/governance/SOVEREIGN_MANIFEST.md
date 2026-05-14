@@ -17,10 +17,10 @@
 These are immutable engineering laws for this repository. Violation = architectural regression.
 
 ### A1: NO FLAT-PACKAGE GROWTH
-The `dharma_swarm/` package currently has **388 files at its top level (61.1% of 635 total Python modules)** (V). No new .py file may be added to the top level. New modules must go into an appropriate subdirectory. Existing top-level files will be organized over time.
+The `dharma_swarm/` package currently has **388 files at its top level (60.9% of 637 total Python modules)** (V). No new .py file may be added to the top level. New modules must go into an appropriate subdirectory. Existing top-level files will be organized over time.
 
 ### A2: NO DUPLICATE IMPLEMENTATIONS
-Before creating a new file for routing, bridging, adapting, or orchestrating, check if one already exists. The repo currently has **23 bridge files** (V), **3 model_routing copies** (2 are identical, 1 is different) (V), **4 orchestrators** (V), **17 adapter files** (V), and **13 router files** (V). Do not add more without deprecating an existing one.
+Before creating a new file for routing, bridging, adapting, or orchestrating, check if one already exists. The repo currently has **23 bridge files** (V), **3 model_routing copies** (2 are identical, 1 is different) (V), **4 orchestrators** (V), **18 adapter files** (V), and **13 router files** (V). Do not add more without deprecating an existing one.
 
 ### A3: NO UNDOCUMENTED SEAMS
 If your code creates a new interface between domains (a bridge, adapter, or protocol), you must update `NAVIGATION.md` with its purpose, entry point, and boundary constraints. Undocumented seams become invisible coupling.
@@ -41,7 +41,7 @@ No single file should exceed 3,000 lines. Current violations (V):
 **148 files exceed 500 lines; 39 exceed 1,000; 7 exceed 3,000** (V). These must be decomposed over time, not grown further.
 
 ### A6: DOCS DECAY -- CHECK BEFORE CITING
-All numerical claims in docs become stale within weeks. Before citing module counts, test counts, or line counts from any doc (including this one), verify against the actual filesystem. See `REPO_GOVERNANCE_AUDIT.md` for the current staleness log. The current DocOps inventory reports **295 Markdown files containing at least one reserved trust-language term** (V). Treat these as authority-scope review candidates, not confirmed repo-wide authority.
+All numerical claims in docs become stale within weeks. Before citing module counts, test counts, or line counts from any doc (including this one), verify against the actual filesystem. See `REPO_GOVERNANCE_AUDIT.md` for the current staleness log. The current DocOps inventory reports **294 Markdown files containing at least one reserved trust-language term** (V). Treat these as authority-scope review candidates, not confirmed repo-wide authority.
 
 ### A7: NO CIRCULAR IMPORTS
 The repo has **9 verified circular dependency chains** (V). The worst:
@@ -62,17 +62,17 @@ These are the ground-truth metrics. All other documents citing different numbers
 
 | Metric | Value | Verification |
 |--------|-------|-------------|
-| Total Python modules | **635** | find dharma_swarm -name "*.py" -type f |
-| Top-level (flat) modules | **388 (61.1%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
-| Total Python LOC | **271,000** | wc -l across dharma_swarm Python modules |
-| Test files | **592** | find tests -name "*.py" -type f |
-| Test functions | **10,326 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Total Python modules | **637** | find dharma_swarm -name "*.py" -type f |
+| Top-level (flat) modules | **388 (60.9%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
+| Total Python LOC | **271,737** | wc -l across dharma_swarm Python modules |
+| Test files | **593** | find tests -name "*.py" -type f |
+| Test functions | **10,341 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
 | Markdown files | **1029** | find . -name "*.md" -type f |
-| Markdown total lines | **277,430** | wc -l across all .md |
+| Markdown total lines | **277,552** | wc -l across all .md |
 | Bridge files | **23** | find dharma_swarm -name "*bridge*.py" |
-| Adapter files | **17** | find dharma_swarm -type f \| rg -i "adapter" |
+| Adapter files | **18** | find dharma_swarm -type f \| rg -i "adapter" |
 | Orchestrator files | **4** (6,034 LOC total) | find dharma_swarm -name "*orchestrat*" |
 | Router files | **13** (4,976 LOC total) | find dharma_swarm -type f \| rg -i "rout" |
 | Memory modules | **11** (5,848 LOC) | find dharma_swarm -name "*memory*" |
@@ -267,6 +267,47 @@ These are the ground-truth metrics. All other documents citing different numbers
 - **Key databases**: memory_plane.db (58 MB), messages.db (3.6 MB), runtime.db (3.1 MB), ontology.db (1.3 MB)
 - **Volatility Level**: HIGH
 - **Notes for Agents**: This is the highest-entropy zone for state. 126 modules write JSONL and 49 use SQLite with no unified data access layer. State writes are scattered across the codebase.
+
+### MemoryKernel Operational Readiness Boundary (2026-05-14)
+
+MemoryKernel 100% readiness means accounted safe readiness, not unconstrained
+live memory. The required read-only adapter surfaces are:
+
+- `home.memory_plane`
+- `home.runtime_state`
+- `home.smriti`
+- `home.witness`
+- `home.knowledge_wiki`
+- `home.codex_memory`
+- `home.conversation_log`
+
+The landing gate is `make memory-kernel-readiness`. It covers adapter readiness,
+writer sentinel CI mode, context eval default cases, and the shadow context
+sweep. For the final MemoryKernel branch to be called operationally 100% ready:
+
+- the adapter report must keep `schema_version=memory_kernel_readiness.v1` and
+  `required_surface_count=7`
+- every required surface must have a registered adapter
+- no required surface may be `unavailable` or `missing_adapter`
+- a required `degraded` row remains a blocker unless code and tests explicitly
+  classify the warning as reviewed safe degradation
+- non-required `missing_adapter` rows are census backlog only; they do not
+  require live adapters and must not be read into prompts
+- writer sentinel output must have zero unregistered MemoryKernel surfaces, zero
+  unreviewed discoveries, and zero action-required discoveries
+- context eval and shadow sweep must have zero hard failures
+
+The latest local run passes the make target with adapter readiness
+`status=ready`: `adapter_registered_count=81`,
+`required_adapter_registered_count=7`, `required_ready_count=7`,
+`required_surface_count=7`, `accounted_optional_count=74`,
+`missing_adapter_count=0`, and `warning_count=0`. This is the intended final
+shape: complete required coverage plus accounted optional surface metadata, not
+unconstrained live memory.
+
+This boundary does not authorize MemoryKernel write-through, live prompt
+injection, Chetana mutation, canon promotion, vector rebuilds, or direct reading
+of every state directory under `~/.dharma/`.
 
 ---
 

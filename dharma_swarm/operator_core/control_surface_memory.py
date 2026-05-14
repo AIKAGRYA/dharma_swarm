@@ -13,6 +13,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from dharma_swarm.operator_core.control_surface_memory_readiness import (
+    READINESS_ROW_RAW_FIELDS,
+    READINESS_SCHEMA_VERSION,
+    ROLLOUT_READINESS_RAW_FIELDS,
+    burn_in_safety,
+    context_canary_visible,
+    readiness_contract,
+)
 from dharma_swarm.operator_core.control_surface_models import ControlSurfaceRow
 
 
@@ -27,6 +35,8 @@ class KernelProjection:
     kernel: Any | None
     error: str
     summary: dict[str, Any]
+    readiness: dict[str, Any]
+    readiness_error: str
     adapter_ids: tuple[str, ...]
     home: str
     home_source: str
@@ -36,17 +46,19 @@ def memory_kernel_control_rows(repo_root: Path) -> list[ControlSurfaceRow]:
     """Build MemoryKernel rows for operator visibility and control."""
 
     projection = _kernel_projection(repo_root)
+    context_canary = _memory_context_canary_row(repo_root)
     rows = [
         _memory_census_row(repo_root, projection),
         _memory_adapter_coverage_row(repo_root, projection),
         _memory_writer_sentinel_row(repo_root),
         _memory_context_shadow_row(repo_root),
-        _memory_context_canary_row(repo_root),
+        context_canary,
     ]
     rows.extend(_knowledgeops_rows(repo_root, projection))
     rows.extend(
         [
-            _memory_rollout_gate_row(),
+            _memory_readiness_row(repo_root, projection),
+            _memory_rollout_gate_row(projection, context_canary),
             _memory_rollback_switch_row(),
             _operator_prod_smoke_row(repo_root),
         ]
@@ -79,10 +91,19 @@ def _kernel_projection(repo_root: Path) -> KernelProjection:
                 )
             )
         )
+        readiness: dict[str, Any] = {}
+        readiness_error = ""
+        try:
+            readiness = dict(kernel.adapter_readiness_report().to_json())
+        except Exception as exc:
+            readiness_error = str(exc)
+
         return KernelProjection(
             kernel=kernel,
             error="",
             summary=dict(kernel.summarize_surface_health()),
+            readiness=readiness,
+            readiness_error=readiness_error,
             adapter_ids=tuple(kernel.list_adapter_ids()),
             home=str(home),
             home_source=home_source,
@@ -92,6 +113,8 @@ def _kernel_projection(repo_root: Path) -> KernelProjection:
             kernel=None,
             error=str(exc),
             summary={},
+            readiness={},
+            readiness_error=str(exc),
             adapter_ids=(),
             home=str(home),
             home_source=home_source,
@@ -102,7 +125,7 @@ def _memory_home(repo_root: Path) -> tuple[Path, str]:
     configured = os.environ.get(MEMORY_HOME_ENV_VAR, "").strip()
     if configured:
         return Path(configured).expanduser(), "env"
-    return repo_root, "repo_root_safe_default"
+    return Path.home(), "path_home_default"
 
 
 def _memory_census_row(repo_root: Path, projection: KernelProjection) -> ControlSurfaceRow:
@@ -653,9 +676,124 @@ def _review_summary(review: Any) -> dict[str, Any]:
     return payload
 
 
-def _memory_rollout_gate_row() -> ControlSurfaceRow:
+def _memory_readiness_row(repo_root: Path, projection: KernelProjection) -> ControlSurfaceRow:
+    if projection.error or projection.readiness_error:
+        row = _memory_error_row(
+            row_id="memory.readiness",
+            kind="memory_readiness",
+            label="MemoryKernel Strict Readiness",
+            owner_module="dharma_swarm/memory_kernel/readiness.py",
+            error=projection.readiness_error or projection.error,
+            next_action="Repair MemoryKernel adapter readiness projection",
+        )
+        row.add_source_ref("file", "dharma_swarm/memory_kernel/readiness.py", exists=True)
+        return row
+
+    readiness = readiness_contract(projection)
+    strict_ready = bool(readiness["strict_ready"])
+    status = str(readiness["readiness_status"])
+    schema_ok = readiness["schema_version"] == READINESS_SCHEMA_VERSION
+    required_accounted = bool(readiness["required_surfaces_accounted"])
+    all_accounted = int(readiness["unaccounted_surface_count"]) == 0
+    warning_count = int(readiness["warning_count"])
+    gap_codes: list[str] = []
+    if not schema_ok:
+        gap_codes.append("memory_readiness_schema_mismatch")
+    if status == "unavailable":
+        gap_codes.append("memory_readiness_unavailable")
+    elif status == "degraded":
+        gap_codes.append("memory_readiness_degraded")
+    if not required_accounted:
+        gap_codes.append("memory_required_surface_unaccounted")
+    if not all_accounted:
+        gap_codes.append("memory_surface_adapters_unaccounted")
+    if warning_count > 0:
+        gap_codes.append("memory_readiness_warnings")
+
+    raw = {field: readiness[field] for field in READINESS_ROW_RAW_FIELDS}
+    raw["projection_mode"] = "readiness_contract_projection"
+    row = ControlSurfaceRow(
+        id="memory.readiness",
+        kind="memory_readiness",
+        label="MemoryKernel Strict Readiness",
+        authority_role="evidence",
+        declared_state="readiness_contract_v1",
+        desired_state="strict_ready_all_accounted_warning_free",
+        observed_state=f"{status}:{readiness['strict_readiness_state']}",
+        coherence_state="bound" if strict_ready else "partial",
+        priority="p1" if status != "unavailable" else "p0",
+        owner_module="dharma_swarm/memory_kernel/readiness.py",
+        truth_owner="MemoryKernel",
+        gap_codes=gap_codes,
+        next_action=(
+            ""
+            if strict_ready
+            else "Resolve readiness warnings and unaccounted adapters before preview/canary/live burn-in"
+        ),
+        raw=raw,
+    )
+    row.add_evidence(
+        "process",
+        (
+            f"status={status} strict={readiness['strict_readiness_state']} "
+            f"accounted={readiness['accounted_surface_ratio']} "
+            f"required={readiness['required_accounted_surface_ratio']} "
+            f"warnings={warning_count}"
+        ),
+        status="present" if strict_ready else "stale",
+        provenance_chain=["MemoryKernel", "adapter_readiness_report", "strict_projection"],
+    )
+    row.add_source_ref("file", "dharma_swarm/memory_kernel/readiness.py", exists=True)
+    row.add_source_ref("file", "scripts/memory_kernel_readiness.py", exists=True)
+    row.add_source_ref(
+        "file",
+        "tests/test_memory_kernel_readiness.py",
+        exists=(repo_root / "tests/test_memory_kernel_readiness.py").exists(),
+    )
+    return row
+
+
+def _memory_rollout_gate_row(
+    projection: KernelProjection,
+    context_canary: ControlSurfaceRow,
+) -> ControlSurfaceRow:
     state, configured, invalid = _rollout_state()
-    unsafe_live = state == "live"
+    readiness = readiness_contract(projection)
+    burn_in = burn_in_safety(
+        state=state,
+        invalid=invalid,
+        rollback_engaged=_truthy(os.environ.get(ROLLBACK_ENV_VAR, "")),
+        readiness=readiness,
+        context_canary_visible=context_canary_visible(context_canary),
+    )
+    burn_in_safe = bool(burn_in["burn_in_safe"])
+    gap_codes: list[str] = []
+    if invalid:
+        gap_codes.append("memory_kernel_rollout_invalid_state")
+    if not burn_in_safe:
+        gap_codes.append("memory_kernel_burn_in_blocked")
+        gap_codes.extend(
+            f"memory_kernel_burn_in_{blocker}_blocked"
+            for blocker in burn_in["burn_in_blockers"]
+        )
+    raw = {
+        "state": state,
+        "configured_value": configured,
+        "allowed_states": ROLLOUT_STATES,
+        "default_state": "off",
+        "state_source": f"env:{ROLLOUT_ENV_VAR}" if configured else "safe_default",
+        "rollback_switch": f"env:{ROLLBACK_ENV_VAR}",
+    }
+    raw.update({field: readiness[field] for field in ROLLOUT_READINESS_RAW_FIELDS})
+    raw.update(
+        {
+            "burn_in_safety_state": burn_in["burn_in_safety_state"],
+            "burn_in_safe": burn_in_safe,
+            "burn_in_blockers": burn_in["burn_in_blockers"],
+            "burn_in_required_checks": burn_in["burn_in_required_checks"],
+            "burn_in_checks": burn_in["burn_in_checks"],
+        }
+    )
     row = ControlSurfaceRow(
         id="memory.rollout_gate",
         kind="memory_rollout",
@@ -664,40 +802,34 @@ def _memory_rollout_gate_row() -> ControlSurfaceRow:
         declared_state="operator_controlled_rollout",
         desired_state="off_shadow_preview_canary_before_live",
         observed_state=state,
-        coherence_state="partial" if unsafe_live or invalid else "bound",
-        priority="p0" if unsafe_live else "p1",
+        coherence_state="bound" if burn_in_safe else "partial",
+        priority="p0" if state in {"preview", "canary", "live"} and not burn_in_safe else "p1",
         owner_module="dharma_swarm/operator_core/control_surface_memory.py",
         truth_owner="operator_control",
-        gap_codes=(
-            ["memory_kernel_rollout_invalid_state"]
-            if invalid
-            else ["memory_kernel_live_rollout_requires_review"]
-            if unsafe_live
-            else []
-        ),
+        gap_codes=gap_codes,
         next_action=(
             "Set DHARMA_MEMORY_KERNEL_ROLLOUT to off, shadow, preview, canary, or live"
             if invalid
-            else "Confirm rollback switch before live rollout"
-            if unsafe_live
+            else (
+                "Resolve MemoryKernel burn-in blockers before advancing rollout: "
+                + ", ".join(burn_in["burn_in_blockers"])
+            )
+            if not burn_in_safe
             else ""
         ),
-        raw={
-            "state": state,
-            "configured_value": configured,
-            "allowed_states": ROLLOUT_STATES,
-            "default_state": "off",
-            "state_source": f"env:{ROLLOUT_ENV_VAR}" if configured else "safe_default",
-            "rollback_switch": f"env:{ROLLBACK_ENV_VAR}",
-        },
+        raw=raw,
     )
     row.add_evidence(
         "process",
-        f"{ROLLOUT_ENV_VAR}={configured or '<unset>'} resolved={state}",
-        status="present" if not invalid else "error",
-        provenance_chain=["operator_control", "rollout_gate", "env_projection"],
+        (
+            f"{ROLLOUT_ENV_VAR}={configured or '<unset>'} resolved={state} "
+            f"burn_in_safe={burn_in_safe}"
+        ),
+        status="present" if burn_in_safe else "error",
+        provenance_chain=["operator_control", "rollout_gate", "burn_in_projection"],
     )
     row.add_source_ref("config", f"env:{ROLLOUT_ENV_VAR}", exists=bool(configured))
+    row.add_source_ref("file", "dharma_swarm/memory_kernel/readiness.py", exists=True)
     return row
 
 

@@ -7,13 +7,15 @@ claim canonical truth.
 
 from __future__ import annotations
 
+import ast
 import json
 import os
 import sqlite3
+from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, Iterator
 from urllib.parse import quote
 
 from dharma_swarm.memory_kernel.adapters.base import SurfaceProbe
@@ -147,6 +149,7 @@ class BaseReadOnlyAdapter:
         payload_digest: str | None = None,
         source_row_key: str | None = None,
         source_last_modified: str | None = None,
+        read_mode: ReadMode | None = None,
         read_warnings: tuple[str, ...] = (),
     ) -> MemoryAtom:
         safe_metadata = _safe_metadata(
@@ -170,7 +173,7 @@ class BaseReadOnlyAdapter:
             timestamp=timestamp,
             source_path=source_path,
             adapter_name=self.adapter_name,
-            read_mode=self.read_mode,
+            read_mode=read_mode or self.read_mode,
             metadata=safe_metadata,
             source_digest=source_digest,
             payload_digest=payload_digest,
@@ -200,7 +203,7 @@ class SQLiteReadOnlyAdapter(BaseReadOnlyAdapter):
         scan_limit = self._scan_limit(resolved_query, surface_limit)
         try:
             atoms: list[MemoryAtom] = []
-            with _connect_sqlite_immutable(self.path) as conn:
+            with _connect_sqlite_live_safe(self.path) as (conn, read_mode):
                 conn.row_factory = sqlite3.Row
                 conn.execute("PRAGMA query_only=ON")
                 tables = _sqlite_tables(conn)
@@ -249,15 +252,17 @@ class SQLiteReadOnlyAdapter(BaseReadOnlyAdapter):
                                 ),
                                 payload_digest=stable_digest(row_data),
                                 source_row_key=content_ref,
+                                read_mode=read_mode,
                             )
                         )
             for atom in _after_cursor(_ordered_atoms(atoms, resolved_query.order_by), resolved_query.cursor)[
                 :surface_limit
             ]:
                 yield atom
-        except sqlite3.Error as exc:
+        except (sqlite3.Error, OSError) as exc:
             if not resolved_query.allows_atom_type(MemoryAtomType.METADATA):
                 return
+            read_warnings = ["sqlite_probe_error", *sqlite_surface_read_warnings(self.path)]
             yield self._atom(
                 MemoryAtomType.METADATA,
                 query=resolved_query,
@@ -271,7 +276,7 @@ class SQLiteReadOnlyAdapter(BaseReadOnlyAdapter):
                     }
                 ),
                 source_row_key=f"{self.surface_id}:sqlite_probe_error",
-                read_warnings=("sqlite_probe_error",),
+                read_warnings=tuple(read_warnings),
             )
 
 
@@ -513,9 +518,53 @@ def _probe_path_metadata(path: Path) -> MemorySurfaceHealth:
         return MemorySurfaceHealth(exists=True, probe_error=str(exc))
 
 
+@contextmanager
+def _connect_sqlite_live_safe(path: Path) -> Iterator[tuple[sqlite3.Connection, ReadMode]]:
+    if _sqlite_has_live_wal(path):
+        conn = _connect_sqlite_readonly(path)
+        read_mode = ReadMode.READ_ONLY
+    else:
+        conn = _connect_sqlite_immutable(path)
+        read_mode = ReadMode.IMMUTABLE_SNAPSHOT
+    try:
+        yield conn, read_mode
+    finally:
+        conn.close()
+
+
+def _connect_sqlite_readonly(path: Path) -> sqlite3.Connection:
+    uri_path = quote(path.resolve().as_posix(), safe="/:")
+    return sqlite3.connect(f"file:{uri_path}?mode=ro", uri=True, timeout=1.0)
+
+
 def _connect_sqlite_immutable(path: Path) -> sqlite3.Connection:
     uri_path = quote(path.resolve().as_posix(), safe="/:")
     return sqlite3.connect(f"file:{uri_path}?mode=ro&immutable=1", uri=True, timeout=1.0)
+
+
+def _sqlite_wal_path(path: Path) -> Path:
+    return path.with_name(path.name + "-wal")
+
+
+def _sqlite_has_live_wal(path: Path) -> bool:
+    wal_path = _sqlite_wal_path(path)
+    return wal_path.exists() and wal_path.stat().st_size > 0
+
+
+def sqlite_surface_read_warnings(path: Path) -> tuple[str, ...]:
+    """Return warnings for SQLite read conditions that can lose visible data."""
+    try:
+        if not _sqlite_has_live_wal(path):
+            return ()
+    except OSError:
+        return ("sqlite_live_wal_stat_error",)
+    try:
+        with _connect_sqlite_live_safe(path) as (conn, _read_mode):
+            conn.execute("PRAGMA query_only=ON")
+            conn.execute("SELECT name FROM sqlite_master WHERE type='table' LIMIT 1").fetchone()
+    except sqlite3.Error:
+        return ("sqlite_live_wal_read_error",)
+    return ()
 
 
 def _sqlite_tables(conn: sqlite3.Connection) -> set[str]:
@@ -637,13 +686,7 @@ def _iter_jsonl(path: Path, max_lines: int) -> Iterable[JsonlReadRecord]:
             for line_number, raw_line in enumerate(handle, start=1):
                 if line_number > max_lines:
                     break
-                if raw_line and not raw_line.endswith(b"\n"):
-                    yield JsonlReadRecord(
-                        line_number=0,
-                        payload={},
-                        warnings=("jsonl_trailing_partial_line_skipped",),
-                    )
-                    break
+                is_live_tail = bool(raw_line) and not raw_line.endswith(b"\n")
                 line = raw_line.decode("utf-8", errors="replace")
                 stripped = line.strip()
                 if not stripped:
@@ -652,8 +695,13 @@ def _iter_jsonl(path: Path, max_lines: int) -> Iterable[JsonlReadRecord]:
                 try:
                     payload = json.loads(stripped)
                 except json.JSONDecodeError:
-                    payload = {"raw": stripped, "parse_error": True}
-                    warnings = ("jsonl_parse_error",)
+                    if is_live_tail:
+                        break
+                    try:
+                        payload = ast.literal_eval(stripped)
+                    except (SyntaxError, ValueError):
+                        payload = {"raw": stripped, "parse_error": True}
+                        warnings = ("jsonl_parse_error",)
                 if not isinstance(payload, dict):
                     payload = {"value": payload}
                 yield JsonlReadRecord(line_number=line_number, payload=payload, warnings=warnings)
@@ -663,6 +711,19 @@ def _iter_jsonl(path: Path, max_lines: int) -> Iterable[JsonlReadRecord]:
             payload={"read_error": str(exc)},
             warnings=("jsonl_read_error",),
         )
+
+
+def jsonl_surface_read_warnings(
+    path: Path,
+    *,
+    max_files: int = 100,
+    max_lines_per_file: int = 100,
+) -> tuple[str, ...]:
+    warnings: list[str] = []
+    for file_path in _jsonl_files(path, max_files):
+        for record in _iter_jsonl(file_path, max_lines_per_file):
+            warnings.extend(record.warnings)
+    return tuple(sorted(dict.fromkeys(warnings)))
 
 
 def _payload_content(payload: dict[str, Any]) -> str:
@@ -835,12 +896,15 @@ def _snapshot_warnings(surface: MemorySurface) -> tuple[str, ...]:
     notes = tuple(
         note
         for note in surface.health.notes
-        if "wal" in note.lower() or "immutable" in note.lower() or "snapshot" in note.lower()
+        if (
+            note != "immutable_probe_may_ignore_live_wal"
+            and ("wal" in note.lower() or "immutable" in note.lower() or "snapshot" in note.lower())
+        )
     )
     path = Path(surface.path).expanduser()
-    wal_path = path.with_name(path.name + "-wal")
-    if wal_path.exists() and "immutable_probe_may_ignore_live_wal" not in notes:
-        notes = (*notes, "immutable_probe_may_ignore_live_wal")
+    sqlite_warnings = sqlite_surface_read_warnings(path)
+    if sqlite_warnings:
+        notes = (*notes, *sqlite_warnings)
     return notes
 
 

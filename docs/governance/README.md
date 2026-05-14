@@ -1,6 +1,6 @@
 # Governance Hub
 
-Last updated: 2026-04-04 Asia/Tokyo
+Last updated: 2026-05-14 Asia/Makassar
 
 This directory is the easiest single place to orient any human or agent before working in `dharma_swarm`, with [DHARMA_SWARM_ALL_AGENTS.md](/Users/dhyana/dharma_swarm/DHARMA_SWARM_ALL_AGENTS.md) as the neutral root entry.
 
@@ -24,10 +24,15 @@ This directory is the easiest single place to orient any human or agent before w
 6. [INTEGRATION_LANDING_ORDER.md](/Users/dhyana/dharma_swarm/docs/governance/INTEGRATION_LANDING_ORDER.md)
    Current merge-order note for active integration branches.
 
+7. [memory_kernel_m4b_knowledgeops_writer_readiness.md](/Users/dhyana/dharma_swarm/docs/architecture/memory_kernel_m4b_knowledgeops_writer_readiness.md)
+   MemoryKernel read-only readiness boundary and CI-facing 100% definition.
+
 ## Use
 
 - Read these before starting a new agent session.
 - Use them to orient, not to guess implementation seams.
+- Treat MemoryKernel 100% as accounted safe readiness, not permission to read
+  or mutate every live memory surface.
 - After reading them, open the exact code files for the domain you are touching.
 
 ## Why This Exists
