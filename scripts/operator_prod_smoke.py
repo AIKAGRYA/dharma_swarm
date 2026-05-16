@@ -133,6 +133,7 @@ def check_readiness_contract(rows: list[Any]) -> SmokeCheck:
         required_fields = (
             "readiness_status",
             "strict_readiness_state",
+            "strict_ready",
             "accounted_surface_count",
             "accounted_surface_total",
             "required_surface_count",
@@ -140,10 +141,22 @@ def check_readiness_contract(rows: list[Any]) -> SmokeCheck:
             "warning_count",
         )
         missing_fields = [field for field in required_fields if field not in raw]
+        accounted_count = _int_value(raw.get("accounted_surface_count"))
+        accounted_total = _int_value(raw.get("accounted_surface_total"))
+        required_count = _int_value(raw.get("required_surface_count"))
+        required_accounted = _int_value(raw.get("required_accounted_surface_count"))
+        warning_count = _int_value(raw.get("warning_count"))
         ok = (
             row is not None
             and raw.get("schema_version") == "memory_kernel_readiness.v1"
-            and raw.get("strict_readiness_state") in {"strict_ready", "strict_blocked"}
+            and raw.get("readiness_status") == "ready"
+            and raw.get("strict_readiness_state") == "strict_ready"
+            and raw.get("strict_ready") is True
+            and accounted_total > 0
+            and accounted_count == accounted_total
+            and required_count > 0
+            and required_accounted == required_count
+            and warning_count == 0
             and not missing_fields
         )
         detail = (
@@ -160,6 +173,13 @@ def check_readiness_contract(rows: list[Any]) -> SmokeCheck:
         return SmokeCheck("memory_readiness_contract", ok, detail)
     except Exception as exc:
         return SmokeCheck("memory_readiness_contract", False, str(exc))
+
+
+def _int_value(value: Any) -> int:
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0
 
 
 def check_rollback_switch_presence(rows: list[Any]) -> SmokeCheck:
