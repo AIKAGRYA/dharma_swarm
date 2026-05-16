@@ -57,7 +57,31 @@ def test_smoke_rollback_switch_presence() -> None:
     assert "rollout=off" in check.detail
 
 
-def test_smoke_readiness_contract_requires_strict_fields() -> None:
+def test_smoke_readiness_contract_accepts_strict_ready() -> None:
+    rows = [
+        SimpleNamespace(
+            id="memory.readiness",
+            raw={
+                "schema_version": "memory_kernel_readiness.v1",
+                "readiness_status": "ready",
+                "strict_readiness_state": "strict_ready",
+                "strict_ready": True,
+                "accounted_surface_count": 81,
+                "accounted_surface_total": 81,
+                "required_surface_count": 7,
+                "required_accounted_surface_count": 7,
+                "warning_count": 0,
+            },
+        )
+    ]
+
+    check = check_readiness_contract(rows)
+
+    assert check.ok is True
+    assert "strict=strict_ready" in check.detail
+
+
+def test_smoke_readiness_contract_rejects_blocked_readiness() -> None:
     rows = [
         SimpleNamespace(
             id="memory.readiness",
@@ -65,6 +89,7 @@ def test_smoke_readiness_contract_requires_strict_fields() -> None:
                 "schema_version": "memory_kernel_readiness.v1",
                 "readiness_status": "degraded",
                 "strict_readiness_state": "strict_blocked",
+                "strict_ready": False,
                 "accounted_surface_count": 7,
                 "accounted_surface_total": 81,
                 "required_surface_count": 7,
@@ -76,7 +101,7 @@ def test_smoke_readiness_contract_requires_strict_fields() -> None:
 
     check = check_readiness_contract(rows)
 
-    assert check.ok is True
+    assert check.ok is False
     assert "strict=strict_blocked" in check.detail
 
 
