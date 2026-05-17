@@ -60,6 +60,48 @@ async def test_openrouter_turn_uses_model_router_complete_for_task(_) -> None:
     "dharma_swarm.autonomous_agent.preferred_runtime_provider_configs",
     return_value=[
         RuntimeProviderConfig(
+            provider=ProviderType.ANTHROPIC,
+            default_model="claude-test",
+            available=True,
+        )
+    ],
+)
+@pytest.mark.asyncio
+async def test_anthropic_turn_uses_model_router_complete_for_task(_) -> None:
+    captured: dict[str, LLMRequest | None] = {"req": None}
+
+    class _Capture(_DummyCompleter):
+        async def complete(self, request: LLMRequest) -> LLMResponse:
+            captured["req"] = request
+            return await super().complete(request)
+
+    router = ModelRouter({ProviderType.ANTHROPIC: _Capture("routed-anthropic")})
+    ident = AgentIdentity(
+        name="unit",
+        role="test",
+        system_prompt="sys",
+        provider="anthropic",
+        model="claude-test",
+    )
+    defs = [
+        {
+            "name": "read_file",
+            "description": "Read a file",
+            "input_schema": {"type": "object", "properties": {"path": {"type": "string"}}},
+        }
+    ]
+    agent = AutonomousAgent(ident, model_router=router)
+    out = await agent._call_anthropic("s", [{"role": "user", "content": "hi"}], defs)
+    assert out["text"] == ["routed-anthropic"]
+    inner = captured["req"]
+    assert inner is not None
+    assert inner.tools == defs
+
+
+@patch(
+    "dharma_swarm.autonomous_agent.preferred_runtime_provider_configs",
+    return_value=[
+        RuntimeProviderConfig(
             provider=ProviderType.OPENROUTER_FREE,
             default_model="test/model",
             available=True,
@@ -112,6 +154,58 @@ async def test_openrouter_turn_falls_back_when_router_misses_providers(
     out = await agent._call_openrouter("s", [{"role": "user", "content": "hi"}], [])
     assert out["text"] == ["legacy-fallback"]
     spy.assert_not_awaited()
+    mock_factory.assert_called_once()
+
+
+@patch(
+    "dharma_swarm.autonomous_agent.preferred_runtime_provider_configs",
+    return_value=[
+        RuntimeProviderConfig(
+            provider=ProviderType.ANTHROPIC,
+            default_model="claude-test",
+            available=True,
+        )
+    ],
+)
+@patch(
+    "dharma_swarm.autonomous_agent.create_runtime_provider",
+)
+@pytest.mark.asyncio
+async def test_anthropic_turn_falls_back_to_runtime_provider_factory(
+    mock_factory, _
+) -> None:
+    orphan = AsyncMock()
+    defs = [
+        {
+            "name": "bash",
+            "description": "Run a command",
+            "input_schema": {"type": "object", "properties": {"command": {"type": "string"}}},
+        }
+    ]
+
+    async def _complete(req: LLMRequest) -> LLMResponse:
+        assert req.model == "claude-test"
+        assert req.tools == defs
+        return LLMResponse(
+            content="factory-anthropic",
+            model="claude-test",
+            usage={"input_tokens": 1, "output_tokens": 2},
+            stop_reason="end_turn",
+        )
+
+    orphan.complete = AsyncMock(side_effect=_complete)
+    mock_factory.side_effect = lambda *_a, **_k: orphan
+
+    ident = AgentIdentity(
+        name="unit",
+        role="test",
+        system_prompt="sys",
+        provider="anthropic",
+        model="claude-test",
+    )
+    agent = AutonomousAgent(ident)
+    out = await agent._call_anthropic("s", [{"role": "user", "content": "hi"}], defs)
+    assert out["text"] == ["factory-anthropic"]
     mock_factory.assert_called_once()
 
 

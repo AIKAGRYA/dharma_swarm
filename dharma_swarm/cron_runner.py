@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from dharma_swarm.cron_job_runtime import CronJobExecutionResult, CronJobRunStatus
+from dharma_swarm.daemon_config import dharma_state_dir
 from dharma_swarm.context import (
     read_agni_state,
     read_manifest,
@@ -132,7 +133,11 @@ def _run_tcs_heartbeat(job: dict[str, Any]) -> CronJobExecutionResult:
     try:
         from dharma_swarm.identity import IdentityMonitor
 
-        state_dir = Path(str(job.get("state_dir") or Path.home() / ".dharma"))
+        state_dir = (
+            Path(str(job["state_dir"])).expanduser()
+            if job.get("state_dir")
+            else dharma_state_dir()
+        )
         monitor = IdentityMonitor(state_dir=state_dir)
         state = asyncio.run(
             monitor.measure(threat_boost=_as_bool(job.get("threat_boost"), False))
