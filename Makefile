@@ -1,7 +1,7 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts uplift-guards module-budget docops-integrity docops-report memory-kernel-readiness memory-kernel-readiness-strict operator-prod-smoke governance-all go-fmt-check go-test go-vet go-ci
+.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts uplift-guards module-budget docops-integrity docops-report memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-full-power-preflight operator-prod-smoke prod-preflight governance-all go-fmt-check go-test go-vet go-ci
 
 PYTHON ?= python3
 GO ?= go
@@ -46,7 +46,12 @@ help:
 	@echo "  make docops-report Generate local DocOps JSON/Markdown reports"
 	@echo "  make memory-kernel-readiness Run read-only MemoryKernel readiness gates"
 	@echo "  make memory-kernel-readiness-strict Require 100% strict MemoryKernel readiness"
+	@echo "  make memory-kernel-burn-in Append M3 context preview burn-in receipts"
+	@echo "  make memory-kernel-write-receipt-smoke Smoke M4 governed write receipts"
+	@echo "  make memory-kernel-promotion-smoke Smoke M5 human-gated promotion receipts"
+	@echo "  make memory-kernel-full-power-preflight Run M2-M5 governed live preflight"
 	@echo "  make operator-prod-smoke Run fast read-only operator production smoke"
+	@echo "  make prod-preflight Run release-candidate production preflight"
 	@echo "  make go-ci        Run Go evidence sense-organ fmt/vet/test gates"
 	@echo ""
 
@@ -215,8 +220,27 @@ memory-kernel-readiness-strict:
 	$(PYTHON) scripts/memory_context_eval.py --repo-root . --run-default-cases --fail-on-hard-failure --dry-run
 	$(PYTHON) scripts/memory_context_shadow_sweep.py --repo-root . --fail-on-hard-failure --dry-run
 
+memory-kernel-burn-in:
+	$(PYTHON) scripts/memory_kernel_burn_in.py --repo-root . --fail-on-blocked
+
+memory-kernel-write-receipt-smoke:
+	$(PYTHON) scripts/memory_kernel_write_receipt_smoke.py --repo-root . --fail-on-blocked
+
+memory-kernel-promotion-smoke: memory-kernel-write-receipt-smoke
+	$(PYTHON) scripts/memory_kernel_promotion_smoke.py --repo-root . --fail-on-blocked
+
+memory-kernel-full-power-preflight:
+	$(MAKE) memory-kernel-readiness-strict
+	$(MAKE) memory-kernel-burn-in
+	$(MAKE) memory-kernel-write-receipt-smoke
+	$(MAKE) memory-kernel-promotion-smoke
+	DHARMA_MEMORY_KERNEL_ROLLOUT=live $(PYTHON) scripts/operator_prod_smoke.py --repo-root .
+
 operator-prod-smoke:
 	$(PYTHON) scripts/operator_prod_smoke.py --repo-root .
+
+prod-preflight:
+	$(PYTHON) scripts/prod_preflight.py --repo-root .
 
 governance-all: semgrep gitleaks test-hygiene test-contracts uplift-guards module-budget docops-integrity
 

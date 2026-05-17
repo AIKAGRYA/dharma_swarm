@@ -15,6 +15,8 @@ READINESS_ROW_RAW_FIELDS = (
     "readiness_status",
     "strict_readiness_state",
     "strict_ready",
+    "max_ready_tier",
+    "readiness_tiers",
     "summary",
     "accounted_surface_count",
     "accounted_surface_total",
@@ -42,14 +44,31 @@ ROLLOUT_READINESS_RAW_FIELDS = (
     "required_accounted_surface_ratio",
     "warning_count",
 )
+READY_TIERS = (
+    "m0_rollout_off",
+    "m2_strict_read_only",
+    "m3_safe_context_preview",
+    "m4_governed_write_receipts",
+    "m5_live_promotion_candidate",
+)
+ROLLOUT_READY_TIER_REQUIREMENTS = {
+    "off": "m0_rollout_off",
+    "shadow": "m2_strict_read_only",
+    "preview": "m3_safe_context_preview",
+    "canary": "m4_governed_write_receipts",
+    "live": "m5_live_promotion_candidate",
+}
 BURN_IN_REQUIRED_CHECKS = {
     "off": ("rollout_state_valid",),
     "shadow": ("rollout_state_valid", "readiness_contract_present", "rollback_available"),
     "preview": (
         "rollout_state_valid",
         "readiness_contract_present",
-        "required_surfaces_accounted",
-        "readiness_status_ready",
+        "strict_readiness_ready",
+        "context_canary_visible",
+        "burn_in_receipts_ready",
+        "parity_eval_zero_hard_failures",
+        "rollout_not_above_ready_tier",
         "rollback_available",
     ),
     "canary": (
@@ -57,6 +76,10 @@ BURN_IN_REQUIRED_CHECKS = {
         "readiness_contract_present",
         "strict_readiness_ready",
         "context_canary_visible",
+        "burn_in_receipts_ready",
+        "parity_eval_zero_hard_failures",
+        "write_receipts_ready",
+        "rollout_not_above_ready_tier",
         "rollback_available",
     ),
     "live": (
@@ -64,6 +87,11 @@ BURN_IN_REQUIRED_CHECKS = {
         "readiness_contract_present",
         "strict_readiness_ready",
         "context_canary_visible",
+        "burn_in_receipts_ready",
+        "parity_eval_zero_hard_failures",
+        "write_receipts_ready",
+        "promotion_ready",
+        "rollout_not_above_ready_tier",
         "rollback_available",
     ),
 }
@@ -120,12 +148,18 @@ def readiness_contract(projection: Any) -> dict[str, Any]:
     warnings = report.get("warnings", ())
     if not isinstance(warnings, (tuple, list)):
         warnings = ()
+    readiness_tiers = report.get("readiness_tiers", ())
+    if not isinstance(readiness_tiers, (tuple, list)):
+        readiness_tiers = ()
+    report_max_ready_tier = str(report.get("max_ready_tier", "none"))
 
     return {
         "schema_version": str(report.get("schema_version", "")),
         "readiness_status": str(report.get("status", "unavailable")),
         "strict_readiness_state": "strict_ready" if strict_ready else "strict_blocked",
         "strict_ready": strict_ready,
+        "max_ready_tier": report_max_ready_tier,
+        "readiness_tiers": tuple(readiness_tiers),
         "contract_present": report.get("schema_version") == READINESS_SCHEMA_VERSION,
         "summary": {
             "surface_count": surface_count,
@@ -165,7 +199,22 @@ def burn_in_safety(
     rollback_engaged: bool,
     readiness: dict[str, Any],
     context_canary_visible: bool,
+    burn_in_status: dict[str, Any] | None = None,
+    write_receipts_ready: bool = False,
+    promotion_ready: bool = False,
 ) -> dict[str, Any]:
+    resolved_burn_in = burn_in_status or {}
+    parity_hard_failures = int_value(resolved_burn_in.get("parity_hard_failure_count"))
+    burn_in_ready = bool(resolved_burn_in.get("burn_in_ready"))
+    max_tier = max_ready_tier(
+        readiness=readiness,
+        context_canary_visible=context_canary_visible,
+        burn_in_ready=burn_in_ready,
+        parity_hard_failure_count=parity_hard_failures,
+        write_receipts_ready=write_receipts_ready,
+        promotion_ready=promotion_ready,
+    )
+    required_tier = ROLLOUT_READY_TIER_REQUIREMENTS.get(state, "m0_rollout_off")
     checks = {
         "rollout_state_valid": not invalid,
         "readiness_contract_present": bool(readiness["contract_present"]),
@@ -173,6 +222,11 @@ def burn_in_safety(
         "readiness_status_ready": readiness["readiness_status"] == "ready",
         "strict_readiness_ready": bool(readiness["strict_ready"]),
         "context_canary_visible": context_canary_visible,
+        "burn_in_receipts_ready": burn_in_ready,
+        "parity_eval_zero_hard_failures": parity_hard_failures == 0,
+        "write_receipts_ready": write_receipts_ready,
+        "promotion_ready": promotion_ready,
+        "rollout_not_above_ready_tier": tier_allows_state(max_tier, state),
         "rollback_available": not rollback_engaged,
     }
     required_checks = BURN_IN_REQUIRED_CHECKS.get(state, ("rollout_state_valid",))
@@ -182,11 +236,47 @@ def burn_in_safety(
         "burn_in_safe": not blockers,
         "burn_in_blockers": blockers,
         "burn_in_required_checks": required_checks,
+        "max_ready_tier": max_tier,
+        "required_ready_tier": required_tier,
         "burn_in_checks": {
             name: {"ok": ok, "required": name in required_checks}
             for name, ok in checks.items()
         },
     }
+
+
+def max_ready_tier(
+    *,
+    readiness: dict[str, Any],
+    context_canary_visible: bool,
+    burn_in_ready: bool,
+    parity_hard_failure_count: int,
+    write_receipts_ready: bool,
+    promotion_ready: bool,
+) -> str:
+    tier = "m0_rollout_off"
+    if not bool(readiness["strict_ready"]):
+        return tier
+    tier = "m2_strict_read_only"
+    if context_canary_visible and burn_in_ready and parity_hard_failure_count == 0:
+        tier = "m3_safe_context_preview"
+    if tier_index(tier) >= tier_index("m3_safe_context_preview") and write_receipts_ready:
+        tier = "m4_governed_write_receipts"
+    if tier_index(tier) >= tier_index("m4_governed_write_receipts") and promotion_ready:
+        tier = "m5_live_promotion_candidate"
+    return tier
+
+
+def tier_allows_state(max_tier: str, state: str) -> bool:
+    required = ROLLOUT_READY_TIER_REQUIREMENTS.get(state, "m0_rollout_off")
+    return tier_index(max_tier) >= tier_index(required)
+
+
+def tier_index(tier: str) -> int:
+    try:
+        return READY_TIERS.index(tier)
+    except ValueError:
+        return 0
 
 
 def context_canary_visible(context_canary: Any) -> bool:

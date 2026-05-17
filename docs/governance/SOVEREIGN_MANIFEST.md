@@ -17,10 +17,10 @@
 These are immutable engineering laws for this repository. Violation = architectural regression.
 
 ### A1: NO FLAT-PACKAGE GROWTH
-The `dharma_swarm/` package currently has **388 files at its top level (60.9% of 637 total Python modules)** (V). No new .py file may be added to the top level. New modules must go into an appropriate subdirectory. Existing top-level files will be organized over time.
+The `dharma_swarm/` package currently has **389 files at its top level (60.3% of 645 total Python modules)** (V). No new .py file may be added to the top level. New modules must go into an appropriate subdirectory. Existing top-level files will be organized over time.
 
 ### A2: NO DUPLICATE IMPLEMENTATIONS
-Before creating a new file for routing, bridging, adapting, or orchestrating, check if one already exists. The repo currently has **23 bridge files** (V), **3 model_routing copies** (2 are identical, 1 is different) (V), **4 orchestrators** (V), **18 adapter files** (V), and **13 router files** (V). Do not add more without deprecating an existing one.
+Before creating a new file for routing, bridging, adapting, or orchestrating, check if one already exists. The repo currently has **24 bridge files** (V), **3 model_routing copies** (2 are identical, 1 is different) (V), **4 orchestrators** (V), **19 adapter files** (V), and **13 router files** (V). Do not add more without deprecating an existing one.
 
 ### A3: NO UNDOCUMENTED SEAMS
 If your code creates a new interface between domains (a bridge, adapter, or protocol), you must update `NAVIGATION.md` with its purpose, entry point, and boundary constraints. Undocumented seams become invisible coupling.
@@ -52,27 +52,27 @@ The repo has **9 verified circular dependency chains** (V). The worst:
 All 9 cycles were independently confirmed with exact import lines. Most are mitigated by lazy imports but remain architectural debt. **New code must not create circular imports.**
 
 ### A8: FRONTMATTER DISCIPLINE
-Do not inject machine-readable YAML frontmatter into governance or architecture docs unless explicitly requested. Current state: **416 of 1029 Markdown files start with YAML frontmatter; 36 docs/architecture Markdown files exist** (V). Long frontmatter remains an authority/noise risk even when the prose is useful.
+Do not inject machine-readable YAML frontmatter into governance or architecture docs unless explicitly requested. Current state: **216 of 711 Markdown files start with YAML frontmatter; 36 docs/architecture Markdown files exist** (V). Long frontmatter remains an authority/noise risk even when the prose is useful.
 
 ---
 
-## VERIFIED NUMBERS (2026-05-14 COUNT REFRESH)
+## VERIFIED NUMBERS (2026-05-17 COUNT REFRESH)
 
 These are the ground-truth metrics. All other documents citing different numbers are stale.
 
 | Metric | Value | Verification |
 |--------|-------|-------------|
-| Total Python modules | **637** | find dharma_swarm -name "*.py" -type f |
-| Top-level (flat) modules | **388 (60.9%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
-| Total Python LOC | **271,737** | wc -l across dharma_swarm Python modules |
-| Test files | **593** | find tests -name "*.py" -type f |
-| Test functions | **10,342 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Total Python modules | **645** | find dharma_swarm -name "*.py" -type f |
+| Top-level (flat) modules | **389 (60.3%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
+| Total Python LOC | **275,695** | wc -l across dharma_swarm Python modules |
+| Test files | **598** | find tests -name "*.py" -type f |
+| Test functions | **10,387 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
-| Markdown files | **1029** | find . -name "*.md" -type f |
-| Markdown total lines | **277,552** | wc -l across all .md |
-| Bridge files | **23** | find dharma_swarm -name "*bridge*.py" |
-| Adapter files | **18** | find dharma_swarm -type f \| rg -i "adapter" |
+| Markdown files | **711** | find . -name "*.md" -type f |
+| Markdown total lines | **178,326** | wc -l across all .md |
+| Bridge files | **24** | find dharma_swarm -name "*bridge*.py" |
+| Adapter files | **19** | find dharma_swarm -type f \| rg -i "adapter" |
 | Orchestrator files | **4** (6,034 LOC total) | find dharma_swarm -name "*orchestrat*" |
 | Router files | **13** (4,976 LOC total) | find dharma_swarm -type f \| rg -i "rout" |
 | Memory modules | **11** (5,848 LOC) | find dharma_swarm -name "*memory*" |
@@ -171,7 +171,7 @@ These are the ground-truth metrics. All other documents citing different numbers
 
 ### Domain 6: Bridges (Integration Layer)
 
-**23 bridge files** (V), **11,910 total LOC**:
+**24 bridge files** (V), **11,910 total LOC**:
 
 | Bridge | Lines | Importers | Status |
 |--------|-------|-----------|--------|
@@ -396,13 +396,13 @@ This re-audit found errors in the earlier 5-model audit:
 | Error in prior audit | Corrected value |
 |---------------------|----------------|
 | "codex_overnight.py is 10K lines" | **1,008 lines** (V) |
-| "17 bridge files" / "19 bridge files" (self-contradicting) | **23 bridge files** (V) |
+| "17 bridge files" / "19 bridge files" (self-contradicting) | **24 bridge files** (V) |
 | "16 TUI test errors" | **16 total errors: 10 numpy, 2 textual, 1 typer, 1 pytest_asyncio, 1 yaml, 1 tui.app** -- only 3 are TUI-specific (V) |
 | "10 pillars" with "PILLAR_04 missing, PILLAR_11 present" | **10 pillar files exist** (PILLAR_01-03, 05-11; PILLAR_04 never created). Sparse numbering, not 11. (V) |
 | "router_v1.py is LEGACY" | **router_v1.py is ALIVE** -- actively used by providers.py for signal generation (V) |
 | "18 provider classes" (VIVEKA) | **19 classes** (including abstract LLMProvider base); **18 ProviderType enum values** (V) |
 | "engine/ is legacy duplicate of tui/engine/" | **Both are ALIVE** -- engine/ has 41 importers, tui/engine/ has 31 importers. Different purposes. (V) |
-| Bridge count of "30" (Phase 3A) | **23 actual bridge files** -- the "30" counted test files and non-bridge files with "bridge" in name (V) |
+| Bridge count of "30" (Phase 3A) | **24 actual bridge files** -- the "30" counted test files and non-bridge files with "bridge" in name (V) |
 
 ---
 

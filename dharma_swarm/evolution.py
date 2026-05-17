@@ -195,6 +195,8 @@ class SealedPacketApplyResult(BaseModel):
     proof_exit_code: int | None = None
     files_changed: list[str] = Field(default_factory=list)
     test_results: dict[str, Any] = Field(default_factory=dict)
+    recursive_trace_id: str | None = None
+    recursive_receipt_ids: list[str] = Field(default_factory=list)
 
 
 class EvolutionPlan(BaseModel):
@@ -2268,11 +2270,17 @@ class DarwinEngine:
         proof_timeout: float = 120.0,
         max_diff_lines: int = 50,
         halt_path: Path | None = None,
+        recursive_session_id: str = "",
+        recursive_task_id: str = "",
+        recursive_event_log: Any | None = None,
+        recursive_evaluation_registry: Any | None = None,
+        recursive_trace_id: str | None = None,
+        recursive_created_by: str = "darwin.sealed_packet",
     ) -> SealedPacketApplyResult:
         """Ingest a sealed Build Protocol packet through Darwin guards."""
         from dharma_swarm.sealed_packet_apply import apply_sealed_packet
 
-        return await apply_sealed_packet(
+        result = await apply_sealed_packet(
             self,
             dryrun_root,
             shadow=shadow,
@@ -2281,6 +2289,23 @@ class DarwinEngine:
             max_diff_lines=max_diff_lines,
             halt_path=halt_path,
         )
+        if recursive_session_id:
+            from dharma_swarm.recursive_discovery import record_sealed_packet_recursive_receipts
+
+            bridge = await record_sealed_packet_recursive_receipts(
+                result,
+                session_id=recursive_session_id,
+                task_id=recursive_task_id,
+                event_log=recursive_event_log,
+                evaluation_registry=recursive_evaluation_registry,
+                created_by=recursive_created_by,
+                trace_id=recursive_trace_id,
+            )
+            result.recursive_trace_id = bridge.trace_id
+            result.recursive_receipt_ids = [
+                receipt.receipt_id for receipt in bridge.receipts
+            ]
+        return result
 
     async def apply_in_sandbox(
         self,

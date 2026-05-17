@@ -5,11 +5,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+
+MEMORY_HOME_ENV_VAR = "DHARMA_MEMORY_KERNEL_HOME"
+MIN_STRICT_READY_TIER = "m2_strict_read_only_warning_free"
 
 REQUIRED_MEMORY_ROW_IDS = {
     "memory.census",
@@ -20,6 +24,8 @@ REQUIRED_MEMORY_ROW_IDS = {
     "memory.context_canary",
     "memory.knowledgeops_intake",
     "memory.promotion_queue",
+    "memory.write_receipts",
+    "memory.live_promotion",
     "memory.rollout_gate",
     "memory.rollback_switch",
 }
@@ -67,7 +73,6 @@ def check_row_projection(rows: list[Any]) -> SmokeCheck:
 def check_memory_writer_sentinel(repo_root: Path) -> SmokeCheck:
     try:
         from dharma_swarm.memory_kernel import (
-            DiscoveryTriageCategory,
             MemoryWriterSentinel,
             WriterClassification,
             WriterStatus,
@@ -76,15 +81,12 @@ def check_memory_writer_sentinel(repo_root: Path) -> SmokeCheck:
         sentinel = MemoryWriterSentinel(repo_root=repo_root)
         observations = sentinel.run()
         discoveries = sentinel.discover_write_paths(max_files=2000)
-        action_required = sum(
-            1
-            for item in discoveries
-            if item.triage_category
-            in {
-                DiscoveryTriageCategory.MEMORY_WRITER_NEEDS_SPEC,
-                DiscoveryTriageCategory.SURFACE_NEEDS_REGISTRY,
-            }
+        discovery_summary = sentinel.summarize_discoveries(
+            discoveries,
+            scanned_file_count=sentinel.count_scan_files(max_files=2000),
+            parse_error_count=sentinel.count_parse_errors(max_files=2000),
         )
+        action_required = discovery_summary.action_required_count
         missing = sum(
             1
             for item in observations
@@ -116,10 +118,15 @@ def check_context_shadow_report() -> SmokeCheck:
         report = project_context_canary_report()
         hard_failures = int(report.get("hard_failure_count", 0) or 0)
         warnings = int(report.get("warning_count", 0) or 0)
+        detected = hard_failures > 0
         return SmokeCheck(
             "context_shadow_canary_report",
-            hard_failures > 0,
-            f"hard_failures={hard_failures} warnings={warnings}",
+            detected,
+            (
+                "synthetic_canary_detected="
+                f"{str(detected).lower()} synthetic_canary_failures={hard_failures} "
+                f"warnings={warnings}"
+            ),
         )
     except Exception as exc:
         return SmokeCheck("context_shadow_canary_report", False, str(exc))
@@ -134,6 +141,7 @@ def check_readiness_contract(rows: list[Any]) -> SmokeCheck:
             "readiness_status",
             "strict_readiness_state",
             "strict_ready",
+            "max_ready_tier",
             "accounted_surface_count",
             "accounted_surface_total",
             "required_surface_count",
@@ -146,12 +154,14 @@ def check_readiness_contract(rows: list[Any]) -> SmokeCheck:
         required_count = _int_value(raw.get("required_surface_count"))
         required_accounted = _int_value(raw.get("required_accounted_surface_count"))
         warning_count = _int_value(raw.get("warning_count"))
+        max_ready_tier = str(raw.get("max_ready_tier", "none"))
         ok = (
             row is not None
             and raw.get("schema_version") == "memory_kernel_readiness.v1"
             and raw.get("readiness_status") == "ready"
             and raw.get("strict_readiness_state") == "strict_ready"
             and raw.get("strict_ready") is True
+            and _tier_rank(max_ready_tier) >= _tier_rank(MIN_STRICT_READY_TIER)
             and accounted_total > 0
             and accounted_count == accounted_total
             and required_count > 0
@@ -166,7 +176,8 @@ def check_readiness_contract(rows: list[Any]) -> SmokeCheck:
             f"{raw.get('accounted_surface_total', '<missing>')} "
             f"required={raw.get('required_accounted_surface_count', '<missing>')}/"
             f"{raw.get('required_surface_count', '<missing>')} "
-            f"warnings={raw.get('warning_count', '<missing>')}"
+            f"warnings={raw.get('warning_count', '<missing>')} "
+            f"tier={raw.get('max_ready_tier', '<missing>')}"
         )
         if missing_fields:
             detail += " missing_fields=" + ",".join(missing_fields)
@@ -180,6 +191,21 @@ def _int_value(value: Any) -> int:
         return int(value or 0)
     except (TypeError, ValueError):
         return 0
+
+
+def _tier_rank(tier_id: str) -> int:
+    ranks = {
+        "none": 0,
+        "m0_rollout_off": 0,
+        "m0_accounted_read_only": 1,
+        "m1_required_semantic_adapters": 2,
+        "m2_strict_read_only": 3,
+        "m2_strict_read_only_warning_free": 3,
+        "m3_safe_context_preview": 4,
+        "m4_governed_write_receipts": 5,
+        "m5_live_promotion_candidate": 6,
+    }
+    return ranks.get(tier_id, -1)
 
 
 def check_rollback_switch_presence(rows: list[Any]) -> SmokeCheck:
@@ -209,15 +235,49 @@ def check_burn_in_safety(rows: list[Any]) -> SmokeCheck:
         raw = getattr(gate, "raw", {}) if gate is not None else {}
         blockers = tuple(raw.get("burn_in_blockers", ()))
         safe = bool(raw.get("burn_in_safe"))
-        ok = gate is not None and safe and "burn_in_safety_state" in raw
+        exceeds = bool(raw.get("rollout_exceeds_ready_tier"))
+        ok = gate is not None and safe and not exceeds and "burn_in_safety_state" in raw
         detail = (
             f"rollout={getattr(gate, 'observed_state', '<missing>')} "
             f"safety={raw.get('burn_in_safety_state', '<missing>')} "
+            f"max_ready_tier={raw.get('max_ready_tier', '<missing>')} "
             f"blockers={','.join(str(item) for item in blockers) or '<none>'}"
         )
         return SmokeCheck("memory_burn_in_safety", ok, detail)
     except Exception as exc:
         return SmokeCheck("memory_burn_in_safety", False, str(exc))
+
+
+def check_memory_home_alignment(rows: list[Any]) -> SmokeCheck:
+    try:
+        by_id = {row.id: row for row in rows}
+        row = by_id.get("memory.census")
+        raw = getattr(row, "raw", {}) if row is not None else {}
+        observed_home = raw.get("home")
+        expected_home = _expected_memory_home()
+        ok = row is not None and _same_path(observed_home, expected_home)
+        detail = (
+            f"observed={observed_home or '<missing>'} "
+            f"expected={expected_home} "
+            f"source={raw.get('home_source', '<missing>')}"
+        )
+        return SmokeCheck("memory_home_alignment", ok, detail)
+    except Exception as exc:
+        return SmokeCheck("memory_home_alignment", False, str(exc))
+
+
+def _expected_memory_home() -> Path:
+    configured = os.environ.get(MEMORY_HOME_ENV_VAR, "").strip()
+    return Path(configured).expanduser() if configured else Path.home()
+
+
+def _same_path(left: object, right: Path) -> bool:
+    if not left:
+        return False
+    try:
+        return Path(str(left)).expanduser().resolve(strict=False) == right.expanduser().resolve(strict=False)
+    except OSError:
+        return str(left) == str(right)
 
 
 def run_smoke(repo_root: Path) -> tuple[SmokeCheck, ...]:
@@ -242,6 +302,7 @@ def run_smoke(repo_root: Path) -> tuple[SmokeCheck, ...]:
     checks.extend(
         [
             check_row_projection(rows),
+            check_memory_home_alignment(rows),
             check_memory_writer_sentinel(repo_root),
             check_context_shadow_report(),
             check_readiness_contract(rows),

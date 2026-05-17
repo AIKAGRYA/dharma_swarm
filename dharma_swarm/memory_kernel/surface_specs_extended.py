@@ -113,6 +113,8 @@ def extended_surface_specs() -> tuple[SurfaceSpec, ...]:
             AdapterMode.READ_ONLY,
             feeds=("ops_events",),
             sqlite_count_tables=("events", "cron_health", "scout_health"),
+            canon_risk=RiskLevel.MEDIUM,
+            pii_secrets_risk=RiskLevel.MEDIUM,
             migration_status=MigrationStatus.ADAPTER_NEEDED,
         ),
         SurfaceSpec(

@@ -10,13 +10,22 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass, replace
 
 from dharma_swarm.memory_kernel.adapters.base import MemorySurfaceAdapter
+from dharma_swarm.memory_kernel.adapters.file_snapshot import ArtifactsMetadataAdapter
 from dharma_swarm.memory_kernel.adapters.generic import GenericSurfaceMetadataAdapter
 from dharma_swarm.memory_kernel.adapters.read_only import (
     CodexMemoryAdapter,
     ConversationLogMetadataAdapter,
+    ConversationsAdapter,
+    EvalsAdapter,
+    KaizenOpsAdapter,
+    KnowledgeRootAdapter,
+    KnowledgeStagingAdapter,
     KnowledgeWikiAdapter,
+    LegacyMemoryDbAdapter,
     MemoryPlaneAdapter,
+    QualityGatesAdapter,
     ReadOnlyAdapterConfig,
+    RouterAuditLogAdapter,
     RuntimeStateAdapter,
     SmritiAdapter,
     WitnessJsonlAdapter,
@@ -322,9 +331,36 @@ def default_adapter_factories(
     factories: dict[str, AdapterFactory] = {
         "home.memory_plane": lambda surface: MemoryPlaneAdapter(surface, config=adapter_config),
         "home.runtime_state": lambda surface: RuntimeStateAdapter(surface, config=adapter_config),
+        "home.memory_db": lambda surface: LegacyMemoryDbAdapter(surface, config=adapter_config),
         "home.smriti": lambda surface: SmritiAdapter(surface, config=adapter_config),
         "home.witness": lambda surface: WitnessJsonlAdapter(surface, config=adapter_config),
+        "home.router_audit_log": lambda surface: RouterAuditLogAdapter(
+            surface,
+            config=adapter_config,
+        ),
+        "home.conversations": lambda surface: ConversationsAdapter(
+            surface,
+            config=adapter_config,
+        ),
+        "home.knowledge_root": lambda surface: KnowledgeRootAdapter(
+            surface,
+            config=adapter_config,
+        ),
+        "home.knowledge_staging": lambda surface: KnowledgeStagingAdapter(
+            surface,
+            config=adapter_config,
+        ),
         "home.knowledge_wiki": lambda surface: KnowledgeWikiAdapter(surface, config=adapter_config),
+        "home.quality_gates": lambda surface: QualityGatesAdapter(
+            surface,
+            config=adapter_config,
+        ),
+        "home.evals": lambda surface: EvalsAdapter(surface, config=adapter_config),
+        "home.artifacts": lambda surface: ArtifactsMetadataAdapter(
+            surface,
+            config=adapter_config,
+        ),
+        "home.kaizen_ops": lambda surface: KaizenOpsAdapter(surface, config=adapter_config),
         "home.codex_memory": lambda surface: CodexMemoryAdapter(surface, config=adapter_config),
         "home.conversation_log": lambda surface: ConversationLogMetadataAdapter(
             surface,

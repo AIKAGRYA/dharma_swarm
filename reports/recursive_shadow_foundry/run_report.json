@@ -1,0 +1,42 @@
+{
+  "archive_entry_ids": [
+    "2e039e0c2b6e4bdb",
+    "336382f3a2ec446a",
+    "40759cbc9a344c38",
+    "46eb13c270d74ef8",
+    "51965cb059b74ad3",
+    "6158f92b98984895",
+    "6284908a29ec4a28",
+    "78d8f7661e7d4ef8",
+    "a41084f178a347dd",
+    "f96728263ad84bc3"
+  ],
+  "duration_seconds": 0.225,
+  "promotion_decisions": [
+    "hold",
+    "hold",
+    "hold",
+    "hold",
+    "hold",
+    "hold",
+    "hold",
+    "hold",
+    "hold",
+    "hold"
+  ],
+  "proof_command": "deterministic foundry variant commands",
+  "proof_exit_code": 1,
+  "receipt_count": 60,
+  "receipt_counts": {
+    "candidate_diff": 10,
+    "experiment_result": 10,
+    "generated_eval": 10,
+    "limitation": 10,
+    "promotion_decision": 10,
+    "witness_verdict": 10
+  },
+  "registry_summary_count": 0,
+  "schema_version": "recursive_discovery_run.v0",
+  "session_id": "governed-recursive-proof-v0",
+  "trace_id": "foundry-b3a7e04cbeea"
+}

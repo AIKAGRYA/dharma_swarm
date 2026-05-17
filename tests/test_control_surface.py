@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import textwrap
 from pathlib import Path
-from typing import Any
 
 import pytest
 import yaml
@@ -42,6 +41,7 @@ from dharma_swarm.operator_core.control_surface_memory import (
     memory_kernel_control_rows,
     project_context_canary_report,
 )
+from dharma_swarm.operator_core.control_surface_memory_readiness import burn_in_safety
 
 
 # ---------------------------------------------------------------------------
@@ -401,6 +401,8 @@ class TestMemoryKernelOperatorRows:
             "memory.context_canary",
             "memory.knowledgeops_intake",
             "memory.promotion_queue",
+            "memory.write_receipts",
+            "memory.live_promotion",
             "memory.rollout_gate",
             "memory.rollback_switch",
         }.issubset(ids)
@@ -421,6 +423,8 @@ class TestMemoryKernelOperatorRows:
         assert gate.raw["burn_in_safety_state"] == "safe"
         assert gate.raw["burn_in_safe"] is True
         assert gate.raw["burn_in_blockers"] == ()
+        assert gate.raw["max_ready_tier"] in set(gate.raw["ready_tiers"])
+        assert gate.raw["rollout_exceeds_ready_tier"] is False
 
     def test_invalid_rollout_state_resolves_to_off(
         self,
@@ -453,6 +457,8 @@ class TestMemoryKernelOperatorRows:
         assert "accounted_surface_total" in readiness.raw
         assert "required_accounted_surface_count" in readiness.raw
         assert "required_surface_count" in readiness.raw
+        assert "max_ready_tier" in readiness.raw
+        assert "readiness_tiers" in readiness.raw
 
     def test_preview_rollout_is_blocked_without_strict_readiness(
         self,
@@ -469,6 +475,7 @@ class TestMemoryKernelOperatorRows:
         assert gate.raw["burn_in_safety_state"] == "blocked"
         assert gate.raw["burn_in_safe"] is False
         assert "memory_kernel_burn_in_blocked" in gate.gap_codes
+        assert gate.raw["required_ready_tier"] == "m3_safe_context_preview"
 
     def test_context_canary_projects_failures(self) -> None:
         report = project_context_canary_report()
@@ -476,6 +483,47 @@ class TestMemoryKernelOperatorRows:
         assert report["projection_kind"] == "synthetic_canary"
         assert report["persistence"] == "projected_not_persisted"
         assert report["hard_failure_count"] >= 1
+
+    def test_preview_burn_in_requires_strict_readiness(self) -> None:
+        readiness = {
+            "contract_present": True,
+            "required_surfaces_accounted": True,
+            "readiness_status": "ready",
+            "strict_ready": False,
+        }
+
+        safety = burn_in_safety(
+            state="preview",
+            invalid=False,
+            rollback_engaged=False,
+            readiness=readiness,
+            context_canary_visible=True,
+        )
+
+        assert safety["burn_in_safe"] is False
+        assert "strict_readiness_ready" in safety["burn_in_required_checks"]
+        assert "context_canary_visible" in safety["burn_in_required_checks"]
+        assert "strict_readiness_ready" in safety["burn_in_blockers"]
+
+    def test_canary_burn_in_requires_strict_readiness_and_canary(self) -> None:
+        readiness = {
+            "contract_present": True,
+            "required_surfaces_accounted": True,
+            "readiness_status": "ready",
+            "strict_ready": False,
+        }
+
+        safety = burn_in_safety(
+            state="canary",
+            invalid=False,
+            rollback_engaged=False,
+            readiness=readiness,
+            context_canary_visible=False,
+        )
+
+        assert safety["burn_in_safe"] is False
+        assert "strict_readiness_ready" in safety["burn_in_blockers"]
+        assert "context_canary_visible" in safety["burn_in_blockers"]
 
 
 # ---------------------------------------------------------------------------

@@ -80,6 +80,8 @@ class AdapterReadinessReport:
     summary: dict[str, int]
     surfaces: tuple[AdapterSurfaceReadiness, ...]
     warnings: tuple[str, ...]
+    readiness_tiers: tuple[dict[str, Any], ...]
+    max_ready_tier: str
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -87,6 +89,8 @@ class AdapterReadinessReport:
             "status": self.status,
             "summary": dict(self.summary),
             "warnings": self.warnings,
+            "readiness_tiers": self.readiness_tiers,
+            "max_ready_tier": self.max_ready_tier,
             "surfaces": tuple(surface.to_json() for surface in self.surfaces),
         }
 
@@ -169,12 +173,16 @@ def build_adapter_readiness_report(
         "total_warning_count": sum(len(row.warnings) for row in rows),
     }
     report_warnings = _report_warnings(rows)
+    status = _report_status(rows)
+    readiness_tiers = _readiness_tiers(summary, rows, status)
     return AdapterReadinessReport(
         schema_version=READINESS_SCHEMA_VERSION,
-        status=_report_status(rows),
+        status=status,
         summary=summary,
         surfaces=rows,
         warnings=report_warnings,
+        readiness_tiers=readiness_tiers,
+        max_ready_tier=_max_ready_tier(readiness_tiers),
     )
 
 
@@ -379,3 +387,139 @@ def _report_warnings(rows: tuple[AdapterSurfaceReadiness, ...]) -> tuple[str, ..
         for warning in row.warnings:
             warnings.append(f"{row.surface_id}:{warning}")
     return tuple(sorted(dict.fromkeys(warnings)))
+
+
+def _readiness_tiers(
+    summary: dict[str, int],
+    rows: tuple[AdapterSurfaceReadiness, ...],
+    status: str,
+) -> tuple[dict[str, Any], ...]:
+    """Return explicit readiness tiers so "ready" is not over-read as full power."""
+
+    required_count = summary.get("required_surface_count", 0)
+    surface_count = summary.get("surface_count", 0)
+    optional_count = summary.get("optional_surface_count", 0)
+    accounted_all = (
+        surface_count > 0
+        and summary.get("accounted_surface_count", 0) == surface_count
+        and summary.get("total_missing_adapter_count", 0) == 0
+        and summary.get("total_uncovered_count", 0) == 0
+    )
+    required_ready = (
+        required_count > 0
+        and summary.get("required_ready_count", 0) == required_count
+        and summary.get("required_failure_count", 0) == 0
+        and summary.get("missing_adapter_count", 0) == 0
+        and summary.get("degraded_count", 0) == 0
+        and summary.get("unavailable_count", 0) == 0
+    )
+    optional_accounted = (
+        optional_count >= 0
+        and summary.get("optional_missing_adapter_count", 0) == 0
+        and summary.get("optional_uncovered_count", 0) == 0
+        and summary.get("optional_warning_count", 0) == 0
+    )
+    warning_free = summary.get("total_warning_count", 0) == 0
+    generic_count = sum(
+        1
+        for row in rows
+        if row.adapter_name == "generic_surface_metadata_adapter"
+    )
+    bespoke_count = summary.get("adapter_registered_count", 0) - generic_count
+    strict_ready = status == "ready" and accounted_all and required_ready and optional_accounted and warning_free
+
+    return (
+        _tier(
+            "m0_accounted_read_only",
+            "All registered memory surfaces are accounted by read-only or metadata adapters",
+            accounted_all,
+            blockers=(
+                _blocker("unaccounted_surfaces", surface_count - summary.get("accounted_surface_count", 0)),
+                _blocker("missing_adapters", summary.get("total_missing_adapter_count", 0)),
+                _blocker("uncovered_surfaces", summary.get("total_uncovered_count", 0)),
+            ),
+            metrics={
+                "accounted_surface_count": summary.get("accounted_surface_count", 0),
+                "surface_count": surface_count,
+            },
+        ),
+        _tier(
+            "m1_required_semantic_adapters",
+            "Required MemoryKernel surfaces have bespoke read-only adapters and no required failures",
+            required_ready,
+            blockers=(
+                _blocker("required_failures", summary.get("required_failure_count", 0)),
+                _blocker("missing_required_surfaces", summary.get("missing_required_surface_count", 0)),
+                _blocker("required_missing_adapters", summary.get("missing_adapter_count", 0)),
+            ),
+            metrics={
+                "required_ready_count": summary.get("required_ready_count", 0),
+                "required_surface_count": required_count,
+                "bespoke_adapter_count": bespoke_count,
+            },
+        ),
+        _tier(
+            "m2_strict_read_only_warning_free",
+            "Strict read-only readiness is warning-free across required and optional accounted surfaces",
+            strict_ready,
+            blockers=(
+                _blocker("readiness_status_not_ready", 1 if status != "ready" else 0),
+                _blocker("optional_missing_adapters", summary.get("optional_missing_adapter_count", 0)),
+                _blocker("optional_uncovered_surfaces", summary.get("optional_uncovered_count", 0)),
+                _blocker("total_warnings", summary.get("total_warning_count", 0)),
+            ),
+            metrics={
+                "total_ready_count": summary.get("total_ready_count", 0),
+                "total_warning_count": summary.get("total_warning_count", 0),
+                "generic_metadata_adapter_count": generic_count,
+            },
+        ),
+        _tier(
+            "m3_safe_context_preview",
+            "Context preview/append burn-in is safe under operator canary and rollback controls",
+            False,
+            blockers=("operator_burn_in_required",),
+            metrics={"evaluated_by": "operator_control_surface"},
+        ),
+        _tier(
+            "m4_governed_write_receipts",
+            "Memory writes are limited to governed append-only proposal and receipt artifacts",
+            False,
+            blockers=("write_receipt_burn_in_required",),
+            metrics={"live_memory_mutation": 0},
+        ),
+        _tier(
+            "m5_live_promotion_candidate",
+            "Human-gated promotion to canonical memory is enabled and rollback-proven",
+            False,
+            blockers=("live_promotion_disabled",),
+            metrics={"canon_mutation_enabled": 0},
+        ),
+    )
+
+
+def _tier(
+    tier_id: str,
+    description: str,
+    ready: bool,
+    *,
+    blockers: tuple[str | None, ...],
+    metrics: dict[str, Any],
+) -> dict[str, Any]:
+    normalized_blockers = tuple(item for item in blockers if item)
+    return {
+        "tier_id": tier_id,
+        "status": "ready" if ready else "blocked",
+        "description": description,
+        "blockers": normalized_blockers,
+        "metrics": metrics,
+    }
+
+
+def _blocker(name: str, count: int) -> str | None:
+    return f"{name}:{count}" if count else None
+
+
+def _max_ready_tier(tiers: tuple[dict[str, Any], ...]) -> str:
+    ready = [str(tier["tier_id"]) for tier in tiers if tier.get("status") == "ready"]
+    return ready[-1] if ready else "none"

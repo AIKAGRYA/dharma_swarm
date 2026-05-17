@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 
 from dharma_swarm.knowledge_ops.memory_conflict_review import (
@@ -28,8 +29,16 @@ from dharma_swarm.knowledge_ops.memory_promotion_executor import (
     append_memory_promotion_artifacts,
     execute_memory_promotion_dry_run,
 )
+from dharma_swarm.knowledge_ops.memory_kernel_promotion_bridge import (
+    DEFAULT_BRIDGE_WRITE_RECEIPT_TARGET,
+    append_memory_kernel_promotion_bridge_artifacts,
+    execute_memory_kernel_promotion_bridge,
+)
 from dharma_swarm.memory_kernel import CensusConfig, MemoryKernel, MemoryKernelConfig
 from dharma_swarm.memory_kernel.context_admission import redact_context_text
+
+
+MEMORY_HOME_ENV_VAR = "DHARMA_MEMORY_KERNEL_HOME"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -52,12 +61,24 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--memory-promotion-target-surface")
     parser.add_argument("--memory-promotion-request-out", type=Path)
     parser.add_argument("--memory-promotion-receipt-out", type=Path)
+    parser.add_argument("--memory-kernel-promotion-bridge", action="store_true")
+    parser.add_argument(
+        "--memory-kernel-write-receipt-target",
+        default=DEFAULT_BRIDGE_WRITE_RECEIPT_TARGET,
+    )
+    parser.add_argument("--memory-kernel-write-receipt-out", type=Path)
+    parser.add_argument("--memory-kernel-promotion-decision-out", type=Path)
+    parser.add_argument("--memory-kernel-canonical-receipt-out", type=Path)
     parser.add_argument("--dry-run", action="store_true")
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    home_error = _resolve_memory_home(args)
+    if home_error:
+        print(_safe_json_text({"error": home_error}))
+        return 2
     validation_error = _validate_args(args)
     if validation_error:
         print(_safe_json_text({"error": validation_error}))
@@ -96,15 +117,25 @@ def main(argv: list[str] | None = None) -> int:
             else ()
         )
         ledger = build_memory_decision_ledger(queue, decisions)
-        promotion_result = (
-            execute_memory_promotion_dry_run(
+        bridge_result = None
+        if args.memory_kernel_promotion_bridge:
+            bridge_result = execute_memory_kernel_promotion_bridge(
                 queue,
                 ledger,
                 target_authority_surface=args.memory_promotion_target_surface,
+                write_receipt_target_surface=args.memory_kernel_write_receipt_target,
             )
-            if args.memory_promotion_target_surface
-            else None
-        )
+            promotion_result = bridge_result.dry_run_result
+        else:
+            promotion_result = (
+                execute_memory_promotion_dry_run(
+                    queue,
+                    ledger,
+                    target_authority_surface=args.memory_promotion_target_surface,
+                )
+                if args.memory_promotion_target_surface
+                else None
+            )
         payload.update(
             {
                 "memory_review": evidence_review.to_json(),
@@ -115,6 +146,8 @@ def main(argv: list[str] | None = None) -> int:
         )
         if promotion_result is not None:
             payload["memory_promotion_dry_run"] = promotion_result.to_json()
+        if bridge_result is not None:
+            payload["memory_kernel_promotion_bridge"] = bridge_result.to_json()
         outputs.extend(
             [
                 (args.memory_review_out, _safe_json_text(evidence_review.to_json())),
@@ -152,7 +185,11 @@ def main(argv: list[str] | None = None) -> int:
             resolved = _resolve_output(output_path, args.repo_root)
             resolved.parent.mkdir(parents=True, exist_ok=True)
             resolved.write_text(text + "\n", encoding="utf-8")
-        if args.include_memory_kernel and args.memory_promotion_target_surface:
+        if (
+            args.include_memory_kernel
+            and args.memory_promotion_target_surface
+            and not args.memory_kernel_promotion_bridge
+        ):
             append_memory_promotion_artifacts(
                 promotion_result,
                 request_path=(
@@ -167,6 +204,42 @@ def main(argv: list[str] | None = None) -> int:
                 ),
                 forbidden_roots=_memory_surface_roots(args),
             )
+        if args.include_memory_kernel and args.memory_kernel_promotion_bridge:
+            append_memory_kernel_promotion_bridge_artifacts(
+                bridge_result,
+                write_receipt_path=(
+                    _resolve_output(args.memory_kernel_write_receipt_out, args.repo_root)
+                    if args.memory_kernel_write_receipt_out
+                    else None
+                ),
+                decision_path=(
+                    _resolve_output(
+                        args.memory_kernel_promotion_decision_out,
+                        args.repo_root,
+                    )
+                    if args.memory_kernel_promotion_decision_out
+                    else None
+                ),
+                canonical_receipt_path=(
+                    _resolve_output(
+                        args.memory_kernel_canonical_receipt_out,
+                        args.repo_root,
+                    )
+                    if args.memory_kernel_canonical_receipt_out
+                    else None
+                ),
+                dry_run_request_path=(
+                    _resolve_output(args.memory_promotion_request_out, args.repo_root)
+                    if args.memory_promotion_request_out
+                    else None
+                ),
+                dry_run_receipt_path=(
+                    _resolve_output(args.memory_promotion_receipt_out, args.repo_root)
+                    if args.memory_promotion_receipt_out
+                    else None
+                ),
+                forbidden_roots=_memory_surface_roots(args),
+            )
     return 0
 
 
@@ -174,7 +247,10 @@ def _validate_args(args: argparse.Namespace) -> str:
     promotion_requested = _promotion_requested(args)
     if args.include_memory_kernel:
         if args.memory_home is None:
-            return "--include-memory-kernel requires explicit --memory-home"
+            return (
+                "--include-memory-kernel requires explicit --memory-home "
+                f"or {MEMORY_HOME_ENV_VAR}"
+            )
         if not args.memory_surface:
             return "--include-memory-kernel requires at least one --memory-surface"
     elif any(_output_paths(args)):
@@ -192,6 +268,23 @@ def _validate_args(args: argparse.Namespace) -> str:
     return ""
 
 
+def _resolve_memory_home(args: argparse.Namespace) -> str:
+    configured = os.environ.get(MEMORY_HOME_ENV_VAR, "").strip()
+    env_home = Path(configured).expanduser() if configured else None
+    if args.memory_home is None:
+        args.memory_home = env_home
+        return ""
+    if env_home is None:
+        return ""
+    cli_home = args.memory_home.expanduser()
+    if cli_home.resolve() != env_home.resolve():
+        return (
+            "--memory-home must match "
+            f"{MEMORY_HOME_ENV_VAR} when both are configured"
+        )
+    return ""
+
+
 def _output_paths(args: argparse.Namespace) -> tuple[Path | None, ...]:
     return (
         args.memory_review_out,
@@ -204,6 +297,9 @@ def _output_paths(args: argparse.Namespace) -> tuple[Path | None, ...]:
         args.memory_decision_ledger_md_out,
         args.memory_promotion_request_out,
         args.memory_promotion_receipt_out,
+        args.memory_kernel_write_receipt_out,
+        args.memory_kernel_promotion_decision_out,
+        args.memory_kernel_canonical_receipt_out,
     )
 
 
@@ -212,6 +308,10 @@ def _promotion_requested(args: argparse.Namespace) -> bool:
         args.memory_promotion_target_surface
         or args.memory_promotion_request_out
         or args.memory_promotion_receipt_out
+        or args.memory_kernel_promotion_bridge
+        or args.memory_kernel_write_receipt_out
+        or args.memory_kernel_promotion_decision_out
+        or args.memory_kernel_canonical_receipt_out
     )
 
 
