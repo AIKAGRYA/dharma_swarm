@@ -16,10 +16,18 @@ from typing import Any
 from dharma_swarm.operator_core.control_surface_memory_readiness import (
     READINESS_ROW_RAW_FIELDS,
     READINESS_SCHEMA_VERSION,
+    READY_TIERS,
     ROLLOUT_READINESS_RAW_FIELDS,
+    ROLLOUT_READY_TIER_REQUIREMENTS,
     burn_in_safety,
     context_canary_visible,
     readiness_contract,
+    tier_allows_state,
+)
+from dharma_swarm.operator_core.control_surface_memory_receipts import (
+    memory_knowledgeops_bridge_row,
+    memory_promotion_candidate_row,
+    memory_write_receipts_row,
 )
 from dharma_swarm.operator_core.control_surface_models import ControlSurfaceRow
 
@@ -47,18 +55,31 @@ def memory_kernel_control_rows(repo_root: Path) -> list[ControlSurfaceRow]:
 
     projection = _kernel_projection(repo_root)
     context_canary = _memory_context_canary_row(repo_root)
+    write_receipts = memory_write_receipts_row(repo_root)
+    promotion_candidate = memory_promotion_candidate_row(repo_root)
+    knowledgeops_bridge = memory_knowledgeops_bridge_row(repo_root)
     rows = [
         _memory_census_row(repo_root, projection),
         _memory_adapter_coverage_row(repo_root, projection),
         _memory_writer_sentinel_row(repo_root),
         _memory_context_shadow_row(repo_root),
         context_canary,
+        write_receipts,
+        promotion_candidate,
+        knowledgeops_bridge,
     ]
     rows.extend(_knowledgeops_rows(repo_root, projection))
     rows.extend(
         [
             _memory_readiness_row(repo_root, projection),
-            _memory_rollout_gate_row(projection, context_canary),
+            _memory_rollout_gate_row(
+                repo_root,
+                projection,
+                context_canary,
+                write_receipts,
+                promotion_candidate,
+                knowledgeops_bridge,
+            ),
             _memory_rollback_switch_row(),
             _operator_prod_smoke_row(repo_root),
         ]
@@ -236,7 +257,6 @@ def _memory_adapter_coverage_row(repo_root: Path, projection: KernelProjection) 
 def _memory_writer_sentinel_row(repo_root: Path) -> ControlSurfaceRow:
     try:
         from dharma_swarm.memory_kernel import (
-            DiscoveryTriageCategory,
             MemoryWriterSentinel,
             WriterClassification,
             WriterStatus,
@@ -260,15 +280,7 @@ def _memory_writer_sentinel_row(repo_root: Path) -> ControlSurfaceRow:
         unregistered = sum(
             1 for item in observations if item.status == WriterStatus.UNREGISTERED_SURFACE
         )
-        action_required = sum(
-            1
-            for item in discoveries
-            if item.triage_category
-            in {
-                DiscoveryTriageCategory.MEMORY_WRITER_NEEDS_SPEC,
-                DiscoveryTriageCategory.SURFACE_NEEDS_REGISTRY,
-            }
-        )
+        action_required = discovery_summary.action_required_count
         ok = missing == 0 and unregistered == 0 and action_required == 0
         row = ControlSurfaceRow(
             id="memory.writer_sentinel",
@@ -754,28 +766,52 @@ def _memory_readiness_row(repo_root: Path, projection: KernelProjection) -> Cont
 
 
 def _memory_rollout_gate_row(
+    repo_root: Path,
     projection: KernelProjection,
     context_canary: ControlSurfaceRow,
+    write_receipts: ControlSurfaceRow,
+    promotion_candidate: ControlSurfaceRow,
+    knowledgeops_bridge: ControlSurfaceRow,
 ) -> ControlSurfaceRow:
+    from dharma_swarm.memory_kernel import DEFAULT_BURN_IN_RECEIPT_PATH, load_burn_in_status
+
     state, configured, invalid = _rollout_state()
     readiness = readiness_contract(projection)
+    burn_in_status = load_burn_in_status(repo_root / DEFAULT_BURN_IN_RECEIPT_PATH).to_json()
+    write_receipts_ready = bool(write_receipts.raw.get("ready"))
+    promotion_ready = bool(promotion_candidate.raw.get("promotion_ready"))
+    knowledgeops_bridge_ready = bool(knowledgeops_bridge.raw.get("ready"))
     burn_in = burn_in_safety(
         state=state,
         invalid=invalid,
         rollback_engaged=_truthy(os.environ.get(ROLLBACK_ENV_VAR, "")),
         readiness=readiness,
         context_canary_visible=context_canary_visible(context_canary),
+        burn_in_status=burn_in_status,
+        write_receipts_ready=write_receipts_ready,
+        promotion_ready=promotion_ready,
     )
-    burn_in_safe = bool(burn_in["burn_in_safe"])
+    bridge_required = state == "live"
+    bridge_blocked = bridge_required and not knowledgeops_bridge_ready
+    burn_in_blockers = list(burn_in["burn_in_blockers"])
+    if bridge_blocked:
+        burn_in_blockers.append("knowledgeops_bridge_receipts_linked")
+    burn_in_safe = bool(burn_in["burn_in_safe"]) and not bridge_blocked
+    max_ready = str(burn_in["max_ready_tier"])
+    exceeds_ready_tier = not tier_allows_state(max_ready, state)
     gap_codes: list[str] = []
     if invalid:
         gap_codes.append("memory_kernel_rollout_invalid_state")
+    if exceeds_ready_tier:
+        gap_codes.append("memory_kernel_rollout_exceeds_ready_tier")
     if not burn_in_safe:
         gap_codes.append("memory_kernel_burn_in_blocked")
         gap_codes.extend(
             f"memory_kernel_burn_in_{blocker}_blocked"
-            for blocker in burn_in["burn_in_blockers"]
+            for blocker in burn_in_blockers
         )
+    if bridge_blocked:
+        gap_codes.append("memory_kernel_knowledgeops_bridge_blocked")
     raw = {
         "state": state,
         "configured_value": configured,
@@ -783,15 +819,26 @@ def _memory_rollout_gate_row(
         "default_state": "off",
         "state_source": f"env:{ROLLOUT_ENV_VAR}" if configured else "safe_default",
         "rollback_switch": f"env:{ROLLBACK_ENV_VAR}",
+        "ready_tiers": READY_TIERS,
+        "state_ready_tier_requirements": ROLLOUT_READY_TIER_REQUIREMENTS,
     }
     raw.update({field: readiness[field] for field in ROLLOUT_READINESS_RAW_FIELDS})
     raw.update(
         {
-            "burn_in_safety_state": burn_in["burn_in_safety_state"],
+            "burn_in_safety_state": "safe" if burn_in_safe else "blocked",
             "burn_in_safe": burn_in_safe,
-            "burn_in_blockers": burn_in["burn_in_blockers"],
+            "burn_in_blockers": tuple(burn_in_blockers),
             "burn_in_required_checks": burn_in["burn_in_required_checks"],
             "burn_in_checks": burn_in["burn_in_checks"],
+            "burn_in_receipt_status": burn_in_status,
+            "write_receipts_ready": write_receipts_ready,
+            "promotion_ready": promotion_ready,
+            "knowledgeops_bridge_required": bridge_required,
+            "knowledgeops_bridge_ready": knowledgeops_bridge_ready,
+            "knowledgeops_bridge_status": knowledgeops_bridge.raw,
+            "max_ready_tier": max_ready,
+            "required_ready_tier": burn_in["required_ready_tier"],
+            "rollout_exceeds_ready_tier": exceeds_ready_tier,
         }
     )
     row = ControlSurfaceRow(
@@ -812,7 +859,7 @@ def _memory_rollout_gate_row(
             if invalid
             else (
                 "Resolve MemoryKernel burn-in blockers before advancing rollout: "
-                + ", ".join(burn_in["burn_in_blockers"])
+                + ", ".join(burn_in_blockers)
             )
             if not burn_in_safe
             else ""

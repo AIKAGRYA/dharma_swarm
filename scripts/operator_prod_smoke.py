@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -20,6 +21,9 @@ REQUIRED_MEMORY_ROW_IDS = {
     "memory.context_canary",
     "memory.knowledgeops_intake",
     "memory.promotion_queue",
+    "memory.knowledgeops_bridge",
+    "memory.write_receipts",
+    "memory.live_promotion",
     "memory.rollout_gate",
     "memory.rollback_switch",
 }
@@ -67,7 +71,6 @@ def check_row_projection(rows: list[Any]) -> SmokeCheck:
 def check_memory_writer_sentinel(repo_root: Path) -> SmokeCheck:
     try:
         from dharma_swarm.memory_kernel import (
-            DiscoveryTriageCategory,
             MemoryWriterSentinel,
             WriterClassification,
             WriterStatus,
@@ -76,15 +79,12 @@ def check_memory_writer_sentinel(repo_root: Path) -> SmokeCheck:
         sentinel = MemoryWriterSentinel(repo_root=repo_root)
         observations = sentinel.run()
         discoveries = sentinel.discover_write_paths(max_files=2000)
-        action_required = sum(
-            1
-            for item in discoveries
-            if item.triage_category
-            in {
-                DiscoveryTriageCategory.MEMORY_WRITER_NEEDS_SPEC,
-                DiscoveryTriageCategory.SURFACE_NEEDS_REGISTRY,
-            }
+        discovery_summary = sentinel.summarize_discoveries(
+            discoveries,
+            scanned_file_count=sentinel.count_scan_files(max_files=2000),
+            parse_error_count=sentinel.count_parse_errors(max_files=2000),
         )
+        action_required = discovery_summary.action_required_count
         missing = sum(
             1
             for item in observations
@@ -209,15 +209,72 @@ def check_burn_in_safety(rows: list[Any]) -> SmokeCheck:
         raw = getattr(gate, "raw", {}) if gate is not None else {}
         blockers = tuple(raw.get("burn_in_blockers", ()))
         safe = bool(raw.get("burn_in_safe"))
-        ok = gate is not None and safe and "burn_in_safety_state" in raw
+        exceeds = bool(raw.get("rollout_exceeds_ready_tier"))
+        ok = gate is not None and safe and not exceeds and "burn_in_safety_state" in raw
         detail = (
             f"rollout={getattr(gate, 'observed_state', '<missing>')} "
             f"safety={raw.get('burn_in_safety_state', '<missing>')} "
+            f"max_ready_tier={raw.get('max_ready_tier', '<missing>')} "
             f"blockers={','.join(str(item) for item in blockers) or '<none>'}"
         )
         return SmokeCheck("memory_burn_in_safety", ok, detail)
     except Exception as exc:
         return SmokeCheck("memory_burn_in_safety", False, str(exc))
+
+
+def check_memory_home_contract(rows: list[Any]) -> SmokeCheck:
+    try:
+        by_id = {row.id: row for row in rows}
+        census = by_id.get("memory.census")
+        raw = getattr(census, "raw", {}) if census is not None else {}
+        operator_home = str(raw.get("home", ""))
+        env_home = os.environ.get("DHARMA_MEMORY_KERNEL_HOME", "").strip()
+        ok = census is not None and (
+            not env_home or Path(operator_home).expanduser() == Path(env_home).expanduser()
+        )
+        detail = (
+            f"operator_home={operator_home or '<missing>'} "
+            f"env_home={env_home or '<unset>'}"
+        )
+        return SmokeCheck("memory_home_contract", ok, detail)
+    except Exception as exc:
+        return SmokeCheck("memory_home_contract", False, str(exc))
+
+
+def check_knowledgeops_bridge_contract(rows: list[Any]) -> SmokeCheck:
+    try:
+        by_id = {row.id: row for row in rows}
+        row = by_id.get("memory.knowledgeops_bridge")
+        raw = getattr(row, "raw", {}) if row is not None else {}
+        latest_proposal = str(raw.get("latest_source_proposal_id", ""))
+        latest_decision = str(raw.get("latest_source_decision_id", ""))
+        latest_write = str(raw.get("latest_source_write_receipt_id", ""))
+        latest_canonical = str(raw.get("latest_canonical_receipt_id", ""))
+        ready = bool(raw.get("ready"))
+        linked = _int_value(raw.get("linked_canonical_receipt_count"))
+        matched = _int_value(raw.get("matched_write_receipt_link_count"))
+        ok = (
+            row is not None
+            and raw.get("schema_version") == "memory_kernel_knowledgeops_bridge.v1"
+            and ready
+            and linked > 0
+            and matched > 0
+            and latest_proposal.startswith("memory_promotion_proposal:")
+            and latest_decision.startswith("knowledgeops_promotion_decision:")
+            and latest_write.startswith("memory_kernel_write_receipt:")
+            and latest_canonical.startswith("memory_kernel_canonical_receipt:")
+        )
+        detail = (
+            f"ready={ready} linked={linked} matched={matched} "
+            f"proposal={latest_proposal or '<missing>'} "
+            f"decision={latest_decision or '<missing>'}"
+        )
+        blockers = tuple(raw.get("blockers", ()))
+        if blockers:
+            detail += " blockers=" + ",".join(str(item) for item in blockers)
+        return SmokeCheck("memory_knowledgeops_bridge_contract", ok, detail)
+    except Exception as exc:
+        return SmokeCheck("memory_knowledgeops_bridge_contract", False, str(exc))
 
 
 def run_smoke(repo_root: Path) -> tuple[SmokeCheck, ...]:
@@ -245,8 +302,10 @@ def run_smoke(repo_root: Path) -> tuple[SmokeCheck, ...]:
             check_memory_writer_sentinel(repo_root),
             check_context_shadow_report(),
             check_readiness_contract(rows),
+            check_knowledgeops_bridge_contract(rows),
             check_rollback_switch_presence(rows),
             check_burn_in_safety(rows),
+            check_memory_home_contract(rows),
         ]
     )
     return tuple(checks)

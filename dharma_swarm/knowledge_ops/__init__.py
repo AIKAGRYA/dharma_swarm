@@ -48,8 +48,17 @@ from dharma_swarm.knowledge_ops.memory_promotion_executor import (
     append_memory_promotion_artifacts,
     execute_memory_promotion_dry_run,
 )
+from dharma_swarm.knowledge_ops.memory_kernel_promotion_bridge import (
+    DEFAULT_BRIDGE_WRITE_RECEIPT_TARGET,
+    MemoryKernelPromotionBridgeRecord,
+    MemoryKernelPromotionBridgeResult,
+    append_memory_kernel_promotion_bridge_artifacts,
+    execute_memory_kernel_promotion_bridge,
+    knowledgeops_promotion_decision_id,
+)
 
 __all__ = [
+    "DEFAULT_BRIDGE_WRITE_RECEIPT_TARGET",
     "MemoryConflictProjectionReview",
     "MemoryEvidenceReview",
     "MemoryKernelIntake",
@@ -57,6 +66,8 @@ __all__ = [
     "MemoryKnowledgeEdge",
     "MemoryKnowledgeNode",
     "MemoryKnowledgeSnapshot",
+    "MemoryKernelPromotionBridgeRecord",
+    "MemoryKernelPromotionBridgeResult",
     "MemoryPromotionCandidate",
     "MemoryPromotionDecision",
     "MemoryPromotionDecisionKind",
@@ -75,10 +86,13 @@ __all__ = [
     "MemoryPromotionRollbackMetadata",
     "MemoryPromotionTombstoneMetadata",
     "MemoryReviewFinding",
+    "append_memory_kernel_promotion_bridge_artifacts",
     "append_memory_promotion_artifacts",
     "build_memory_decision_ledger",
     "build_memory_promotion_queue",
+    "execute_memory_kernel_promotion_bridge",
     "execute_memory_promotion_dry_run",
+    "knowledgeops_promotion_decision_id",
     "load_memory_promotion_decisions",
     "memory_atoms_to_snapshot",
     "merge_snapshots",

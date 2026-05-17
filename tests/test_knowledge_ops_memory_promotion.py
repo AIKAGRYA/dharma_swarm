@@ -13,6 +13,10 @@ from dharma_swarm.knowledge_ops.memory_decision_ledger import (
     build_memory_decision_ledger,
 )
 from dharma_swarm.knowledge_ops.memory_intake import review_memory_atoms
+from dharma_swarm.knowledge_ops.memory_kernel_promotion_bridge import (
+    append_memory_kernel_promotion_bridge_artifacts,
+    execute_memory_kernel_promotion_bridge,
+)
 from dharma_swarm.knowledge_ops.memory_promotion_executor import (
     append_memory_promotion_artifacts,
     execute_memory_promotion_dry_run,
@@ -27,12 +31,15 @@ from dharma_swarm.memory_kernel import (
     MemorySurface,
     MemorySurfaceHealth,
     MemorySurfaceRole,
+    MemoryKernelPromotionReceiptStatus,
     ReadMode,
     RiskLevel,
     SurfaceCategory,
     SurfaceStatus,
     TruthState,
     WriteMode,
+    load_promotion_status,
+    load_write_receipts,
 )
 
 
@@ -164,6 +171,65 @@ def test_promotion_dry_run_emits_request_receipt_and_appends_jsonl(tmp_path: Pat
     assert "SECRET_TOKEN" not in combined
     assert "/Users/dhyana" not in combined
     assert "/private/tmp" not in combined
+
+
+def test_end_to_end_knowledgeops_acceptance_emits_memorykernel_canonical_receipt(
+    tmp_path: Path,
+) -> None:
+    queue = _queue_for(_atom(content_ref="runtime_event:safe"))
+    proposal = queue.proposals[0]
+    ledger = build_memory_decision_ledger(queue, (_valid_accept(proposal),))
+
+    result = execute_memory_kernel_promotion_bridge(
+        queue,
+        ledger,
+        target_authority_surface="knowledge_authority.shadow_canon",
+    )
+
+    assert result.dry_run_result.request_count == 1
+    assert result.bridge_record_count == 1
+    assert result.blocked_canonical_receipt_count == 0
+    record = result.records[0]
+    assert record.proposal_id == proposal.proposal_id
+    assert record.promotion_decision.source_proposal_id == proposal.proposal_id
+    assert record.promotion_decision.source_decision_id == record.knowledgeops_decision_id
+    assert record.promotion_decision.target_authority_surface == (
+        "knowledge_authority.shadow_canon"
+    )
+    assert record.canonical_receipt.status == MemoryKernelPromotionReceiptStatus.REVIEWED
+    assert record.canonical_receipt.source_proposal_id == proposal.proposal_id
+    assert record.canonical_receipt.source_decision_id == record.knowledgeops_decision_id
+    assert record.canonical_receipt.target_authority_surface == (
+        "knowledge_authority.shadow_canon"
+    )
+    assert record.canonical_receipt.mutation_performed is False
+
+    request_path = tmp_path / "knowledgeops_requests.jsonl"
+    receipt_path = tmp_path / "knowledgeops_receipts.jsonl"
+    write_receipt_path = tmp_path / "write_receipts.jsonl"
+    decision_path = tmp_path / "promotion_decisions.jsonl"
+    canonical_path = tmp_path / "canonical_receipts.jsonl"
+    append_memory_kernel_promotion_bridge_artifacts(
+        result,
+        dry_run_request_path=request_path,
+        dry_run_receipt_path=receipt_path,
+        write_receipt_path=write_receipt_path,
+        decision_path=decision_path,
+        canonical_receipt_path=canonical_path,
+    )
+
+    write_rows, write_immutable = load_write_receipts(write_receipt_path)
+    promotion_status = load_promotion_status(canonical_path)
+    assert write_immutable is True
+    assert len(write_rows) == 1
+    assert write_rows[0]["receipt_id"] == record.write_receipt.receipt_id
+    assert promotion_status.promotion_ready is True
+    assert promotion_status.latest_canonical_receipt_id == (
+        record.canonical_receipt.canonical_receipt_id
+    )
+    assert request_path.exists()
+    assert receipt_path.exists()
+    assert decision_path.exists()
 
 
 def test_promotion_dry_run_accepts_once_and_skips_reject_defer_invalid_duplicate() -> None:
