@@ -45,6 +45,10 @@ from dharma_swarm.operator_core.control_surface_models import (
     _needs_human_decision,
     _utc_now_iso,
 )
+from dharma_swarm.operator_core.control_surface_recursive import (
+    observe_recursive_discovery_shadow,
+    swarm_integrity_rows,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -540,53 +544,6 @@ def _observe_feedback_loop(row: ControlSurfaceRow, repo_root: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# G) Recursive discovery shadow adapter
-# ---------------------------------------------------------------------------
-
-def _observe_recursive_discovery_shadow(row: ControlSurfaceRow, repo_root: Path) -> None:
-    try:
-        from dharma_swarm.recursive_discovery import (
-            receipt_counts_by_type,
-            shadow_fixture_receipts,
-        )
-    except Exception as exc:
-        row.observed_state = "adapter_error"
-        row.coherence_state = "drifted"
-        row.gap_codes.append("recursive_discovery_adapter_error")
-        row.add_evidence(
-            "process",
-            f"recursive discovery adapter failed: {exc}",
-            status="error",
-            provenance_chain=["recursive_discovery", "adapter_import"],
-        )
-        return
-
-    receipts = shadow_fixture_receipts()
-    counts = receipt_counts_by_type(receipts)
-    receipt_type = row.raw.get("receipt_type", "")
-    count = counts.get(receipt_type, 0)
-    row.add_source_ref("file", "dharma_swarm/recursive_discovery.py", exists=True)
-    row.add_evidence(
-        "recursive_receipt",
-        f"{receipt_type}: fixture_count={count}",
-        status="present" if count else "missing",
-        provenance_chain=["recursive_discovery", "shadow_fixture"],
-    )
-    row.freshness = _file_freshness(repo_root / "dharma_swarm" / "recursive_discovery.py")
-
-    if count:
-        row.observed_state = f"shadow_fixture:{count}"
-        row.coherence_state = "partial"
-        row.gap_codes.append("shadow_only")
-        if receipt_type in {"candidate_diff", "promotion_decision"}:
-            row.gap_codes.append("human_promotion_required")
-    else:
-        row.observed_state = "missing_fixture"
-        row.coherence_state = "declared_only"
-        row.gap_codes.append("fixture_missing")
-
-
-# ---------------------------------------------------------------------------
 # H) Operating facts adapter
 # ---------------------------------------------------------------------------
 
@@ -851,6 +808,7 @@ def _runtime_state_row(repo_root: Path | None = None) -> ControlSurfaceRow | Non
 def build_control_surface_rows(
     repo_root: Path | None = None,
     runtime_db: Path | None = None,
+    event_log_dir: Path | None = None,
 ) -> list[ControlSurfaceRow]:
     """Build the full control surface projection.
 
@@ -909,10 +867,13 @@ def build_control_surface_rows(
         row.coherence_state = "declared_only"
     rows.extend(state_rows)
 
-    # G) Recursive discovery shadow receipts (fixture-backed only)
+    # G) Recursive discovery shadow receipts (EventLog-backed)
     for row in recursive_rows:
-        _observe_recursive_discovery_shadow(row, root)
+        observe_recursive_discovery_shadow(row, root, event_log_dir=event_log_dir)
     rows.extend(recursive_rows)
+
+    # G2) Swarm-native integrity benchmark evidence
+    rows.extend(swarm_integrity_rows(root, event_log_dir=event_log_dir))
 
     # H) Operating facts (organ-level observed reality)
     rows.extend(_operating_facts_rows())
@@ -928,7 +889,7 @@ def build_control_surface_rows(
     if rt_row is not None:
         rows.append(rt_row)
 
-    # K) Go receipts (optional)
+    # L) Go receipts (optional)
     rows.extend(_go_receipt_rows(root))
 
     # Apply human-decision policy with structured context
@@ -969,6 +930,7 @@ def build_control_surface_summary(
         "runtime_state",
         "go_sdk",
         "recursive_discovery_shadow",
+        "swarm_integrity",
         "code/filesystem",
     ]
 
