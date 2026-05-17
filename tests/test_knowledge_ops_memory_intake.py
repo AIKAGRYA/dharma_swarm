@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from dharma_swarm.knowledge_ops.cli import main as knowledge_ops_main
 from dharma_swarm.knowledge_ops.memory_conflict_review import review_memory_conflicts
 from dharma_swarm.knowledge_ops.memory_decision_ledger import (
@@ -195,6 +197,59 @@ def test_knowledge_ops_cli_requires_explicit_home_and_surface(capsys) -> None:
     payload = json.loads(capsys.readouterr().out)
 
     assert "--include-memory-kernel requires explicit --memory-home" in payload["error"]
+    assert "DHARMA_MEMORY_KERNEL_HOME" in payload["error"]
+
+
+def test_knowledge_ops_cli_accepts_memory_home_env(
+    capsys,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    home = tmp_path / "home"
+    repo = tmp_path / "repo"
+    _write(home / ".dharma/conversation_log/2026-05-13.jsonl", "{}\n")
+    monkeypatch.setenv("DHARMA_MEMORY_KERNEL_HOME", str(home))
+
+    assert (
+        knowledge_ops_main(
+            [
+                "--repo-root",
+                str(repo),
+                "--include-memory-kernel",
+                "--memory-surface",
+                "home.conversation_log",
+                "--dry-run",
+            ]
+        )
+        == 0
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["include_memory_kernel"] is True
+
+
+def test_knowledge_ops_cli_rejects_memory_home_env_mismatch(
+    capsys,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("DHARMA_MEMORY_KERNEL_HOME", str(tmp_path / "env-home"))
+
+    assert (
+        knowledge_ops_main(
+            [
+                "--memory-home",
+                str(tmp_path / "cli-home"),
+                "--include-memory-kernel",
+                "--memory-surface",
+                "home.conversation_log",
+            ]
+        )
+        == 2
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert "must match DHARMA_MEMORY_KERNEL_HOME" in payload["error"]
 
 
 def test_knowledge_ops_cli_writes_redacted_read_only_reports(capsys, tmp_path: Path) -> None:

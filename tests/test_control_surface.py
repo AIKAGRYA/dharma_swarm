@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import textwrap
 from pathlib import Path
-from typing import Any
 
 import pytest
 import yaml
@@ -401,6 +400,9 @@ class TestMemoryKernelOperatorRows:
             "memory.context_canary",
             "memory.knowledgeops_intake",
             "memory.promotion_queue",
+            "memory.knowledgeops_bridge",
+            "memory.write_receipts",
+            "memory.live_promotion",
             "memory.rollout_gate",
             "memory.rollback_switch",
         }.issubset(ids)
@@ -421,6 +423,8 @@ class TestMemoryKernelOperatorRows:
         assert gate.raw["burn_in_safety_state"] == "safe"
         assert gate.raw["burn_in_safe"] is True
         assert gate.raw["burn_in_blockers"] == ()
+        assert gate.raw["max_ready_tier"] in set(gate.raw["ready_tiers"])
+        assert gate.raw["rollout_exceeds_ready_tier"] is False
 
     def test_invalid_rollout_state_resolves_to_off(
         self,
@@ -469,6 +473,16 @@ class TestMemoryKernelOperatorRows:
         assert gate.raw["burn_in_safety_state"] == "blocked"
         assert gate.raw["burn_in_safe"] is False
         assert "memory_kernel_burn_in_blocked" in gate.gap_codes
+        assert gate.raw["required_ready_tier"] == "m3_safe_context_preview"
+
+    def test_knowledgeops_bridge_row_requires_linked_receipts(self, tmp_repo: Path) -> None:
+        rows = memory_kernel_control_rows(tmp_repo)
+        bridge = [row for row in rows if row.id == "memory.knowledgeops_bridge"][0]
+
+        assert bridge.observed_state == "blocked"
+        assert bridge.raw["schema_version"] == "memory_kernel_knowledgeops_bridge.v1"
+        assert bridge.raw["ready"] is False
+        assert "no_linked_knowledgeops_canonical_receipt" in bridge.raw["blockers"]
 
     def test_context_canary_projects_failures(self) -> None:
         report = project_context_canary_report()

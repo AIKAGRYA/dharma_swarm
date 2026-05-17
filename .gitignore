@@ -54,6 +54,7 @@ node_modules/
 reports/psmv_hyperfiles_20260313/graphs/*.json
 
 # Generated outputs (not source)
+reports/memory_kernel/
 reports/docops/
 reports/system_map/latest.json
 results.tsv
