@@ -36,12 +36,16 @@ from dharma_swarm.operator_core.control_surface_models import (
     PRIORITIES,
     ROW_KINDS,
     AgentHandoffPrompt,  # noqa: F401
+    ControlSurfaceEnvelope,  # noqa: F401
     ControlSurfaceRow,
+    DisplayHints,  # noqa: F401
     EvidenceItem,  # noqa: F401
     HumanDecisionContext,
+    SourceError,  # noqa: F401
     SourceRef,  # noqa: F401
     VerificationEvent,  # noqa: F401
     _build_human_decision_context,
+    _compute_display_hints,
     _needs_human_decision,
     _utc_now_iso,
 )
@@ -936,6 +940,10 @@ def build_control_surface_rows(
         ctx = _build_human_decision_context(row)
         row.human_decision_required = ctx.required
         row.human_decision = ctx
+
+    # Compute display hints for each row
+    for row in rows:
+        row.display_hints = _compute_display_hints(row)
 
     return rows
 
