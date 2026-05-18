@@ -815,14 +815,15 @@ class TestAgentHandoffPrompt:
 
 
 class TestHandoffPromptAPI:
-    def test_handoff_prompt_returns_ok(self) -> None:
+    def test_handoff_prompt_returns_envelope(self) -> None:
         client = _control_surface_client()
         rows_resp = client.get("/api/control-surface/rows")
         first_id = rows_resp.json()["data"][0]["id"]
         resp = client.post(f"/api/control-surface/rows/{first_id}/handoff-prompt")
         assert resp.status_code == 200
         body = resp.json()
-        assert body["status"] == "ok"
+        assert body["schema_version"] == "0.2.0"
+        assert body["request_id"]
         data = body["data"]
         assert data["row_id"] == first_id
         assert "prompt_text" in data

@@ -21,8 +21,6 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
-from api.models import ApiResponse
-
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/control-surface", tags=["control-surface"])
@@ -127,7 +125,7 @@ async def control_surface_rows() -> dict[str, Any]:
 
 
 @router.post("/rows/{row_id:path}/handoff-prompt")
-async def control_surface_handoff_prompt(row_id: str) -> ApiResponse:
+async def control_surface_handoff_prompt(row_id: str) -> dict[str, Any]:
     """Generate a scoped agent handoff prompt for a control surface row."""
     try:
         from dharma_swarm.operator_core.control_surface import generate_handoff_prompt
@@ -136,12 +134,12 @@ async def control_surface_handoff_prompt(row_id: str) -> ApiResponse:
         if row is None:
             raise HTTPException(status_code=404, detail=f"row '{row_id}' not found")
         prompt = generate_handoff_prompt(row)
-        return ApiResponse(data=prompt.model_dump())
+        return _build_envelope(prompt.model_dump())
     except HTTPException:
         raise
     except Exception as e:
         logger.exception("control-surface/handoff-prompt failed")
-        return ApiResponse(status="error", data=None, error=str(e))
+        return _build_envelope(None, [{"source": f"handoff/{row_id}", "error": str(e)}])
 
 
 @router.get("/rows/{row_id:path}")
