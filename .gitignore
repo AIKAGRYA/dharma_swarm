@@ -54,7 +54,10 @@ node_modules/
 reports/psmv_hyperfiles_20260313/graphs/*.json
 
 # Generated outputs (not source)
+reports/benchmarks/
+reports/governed_evolution/
 reports/memory_kernel/
+reports/prod_preflight/
 reports/docops/
 reports/system_map/latest.json
 results.tsv
