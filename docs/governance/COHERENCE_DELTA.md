@@ -13,7 +13,7 @@ Three independent audit waves on 2026-05-07 (megafile survey, convergence audit,
 The Coherence Delta gate is the four-field discipline applied at the merge boundary. It does not introduce new substrates. It closes the loop between:
 
 - The **map of organs** (what exists, where, how it connects) — see [`docs/architecture/NAVIGATION.md`](../architecture/NAVIGATION.md)
-- The **declared-vs-actual gap log** (what's broken, stale, or degraded) — see the broken-register surface (`docs/state/BROKEN_REGISTER.md` once landed; until then, `INTERFACE_MISMATCH_MAP.md` is the closest substrate)
+- The **declared-vs-actual gap log** (what's broken, stale, or degraded) — see [`docs/state/BROKEN_REGISTER.md`](../state/BROKEN_REGISTER.md), with [`INTERFACE_MISMATCH_MAP.md`](../../INTERFACE_MISMATCH_MAP.md) as the parallel interface-level substrate
 - The **architectural truth** (the one-sentence answer to "what does this organ do?") — see [`SOVEREIGN_MANIFEST.md`](SOVEREIGN_MANIFEST.md)
 - The **immune system** (interface mismatches that cause runtime failures) — see [`INTERFACE_MISMATCH_MAP.md`](../../INTERFACE_MISMATCH_MAP.md)
 
