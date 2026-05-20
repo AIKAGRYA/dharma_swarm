@@ -1,73 +1,91 @@
 {
-  "generated_at": "2026-05-21T00:17:00+08:00",
-  "active_track_id": "trace-identity-coverage-2026-05",
+  "generated_at": "2026-05-20T10:15:45+00:00",
+  "active_track_id": "cockpit-control-surface-2026-05",
   "shippable": false,
   "prerequisites_ok": true,
   "completion_progress": {
-    "passed": 5,
-    "total": 6
+    "passed": 0,
+    "total": 4
   },
   "criteria": [
     {
-      "id": "trace_attractor_causal_spine_closed",
+      "id": "control_surface_envelope_exists",
       "kind": "file_contains",
       "passed": true,
-      "detail": "pattern 'Trace Attractor Causal Spine shipped' found in docs/governance/ACTIVE_TRACK.yaml"
+      "detail": "pattern 'class ControlSurfaceEnvelope' found in dharma_swarm/operator_core/control_surface_models.py"
     },
     {
-      "id": "correlation_context_exists",
+      "id": "display_hints_exists",
       "kind": "file_contains",
       "passed": true,
-      "detail": "pattern 'class CorrelationContext' found in dharma_swarm/correlation_context.py"
+      "detail": "pattern 'DisplayHints' found in dharma_swarm/operator_core/control_surface_models.py"
     },
     {
-      "id": "dgc_trace_attractor_wired",
-      "kind": "file_contains",
-      "passed": true,
-      "detail": "pattern 'trace-attractor' found in dharma_swarm/dgc_cli.py"
-    },
-    {
-      "id": "operator_brief_consumes_correlation_context",
-      "kind": "file_contains",
-      "passed": true,
-      "detail": "pattern 'correlation_context' found in dharma_swarm/operator_brief/persistence.py"
-    },
-    {
-      "id": "board_event_context_trace_defaults",
-      "kind": "file_contains",
-      "passed": true,
-      "detail": "pattern '_current_trace_id' found in dharma_swarm/board/event_log.py"
-    },
-    {
-      "id": "sakshi_context_trace_defaults",
-      "kind": "file_contains",
-      "passed": true,
-      "detail": "pattern '_current_trace_id' found in dharma_swarm/sakshi/provenance_log.py"
-    },
-    {
-      "id": "guardian_soft_trace_coverage",
-      "kind": "file_contains",
-      "passed": true,
-      "detail": "pattern 'operator_brief_trace_coverage' found in dharma_swarm/operator_brief/watchdog.py"
-    },
-    {
-      "id": "trace_identity_coverage_witness",
+      "id": "cockpit_dashboard_page_exists",
       "kind": "file_exists",
       "passed": true,
-      "detail": "reports/witness/2026-05-21-trace-identity-coverage.md present"
+      "detail": "dashboard/src/app/dashboard/control-surface/page.tsx present"
     },
     {
-      "id": "hard_gate_policy_adr",
+      "id": "world_radar_wired",
+      "kind": "file_exists",
+      "passed": true,
+      "detail": "dharma_swarm/world_radar/__init__.py present"
+    },
+    {
+      "id": "control_surface_router_registered",
+      "kind": "file_contains",
+      "passed": true,
+      "detail": "pattern 'control_surface' found in api/main.py"
+    },
+    {
+      "id": "contract_tests_present",
+      "kind": "file_exists",
+      "passed": true,
+      "detail": "tests/test_control_surface.py present"
+    },
+    {
+      "id": "pr_307_merged",
+      "kind": "pr_merged",
+      "passed": true,
+      "detail": "PR #307: gh query failed, skipped"
+    },
+    {
+      "id": "pr_244_merged",
+      "kind": "pr_merged",
+      "passed": true,
+      "detail": "PR #244: gh query failed, skipped"
+    },
+    {
+      "id": "control_surface_adr_published",
       "kind": "file_exists",
       "passed": false,
-      "detail": "docs/architecture/adr/0002-trace-coverage-gate.md MISSING"
+      "detail": "docs/architecture/CONTROL_SURFACE.md MISSING"
+    },
+    {
+      "id": "ledger_watcher_envelope_aware",
+      "kind": "file_contains",
+      "passed": false,
+      "detail": "pattern 'ControlSurfaceEnvelope|envelope' NOT FOUND in dharma_swarm/operator_brief/watchdog.py"
+    },
+    {
+      "id": "manifest_health_snapshot_archived",
+      "kind": "file_exists",
+      "passed": false,
+      "detail": "reports/state/control_surface_manifest_health_snapshot.md MISSING"
+    },
+    {
+      "id": "next_seam_adr_drafted",
+      "kind": "file_exists",
+      "passed": false,
+      "detail": "docs/architecture/adr/0001-next-seam-candidate.md MISSING"
     }
   ],
   "findings": [
     {
       "severity": "INFO",
       "check": "track-in-progress",
-      "message": "5/6 completion criteria pass. Track 'trace-identity-coverage-2026-05' is in progress.",
+      "message": "0/4 completion criteria pass. Track 'cockpit-control-surface-2026-05' is in progress.",
       "criterion_id": null
     }
   ]
