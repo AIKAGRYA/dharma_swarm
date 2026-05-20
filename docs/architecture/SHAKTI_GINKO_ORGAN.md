@@ -7,7 +7,7 @@
 **Priority:** ★20 (per `~/AGNI-AUNT-HILLARY-PSMV/SHAKTI_GINKO/README.md`; Phase 4.5 of FULL_AWAKENING_SEQUENCE)
 **Audience:** dharma_swarm contributors (human + AI agents)
 **Companion docs:** `VENTURE_CELL_LIFECYCLE.md`, `BUSINESS_INTELLIGENCE_NOTICERS.md`, `ADRs/ADR-006-shakti-ginko-organ.md`
-**Substrate dependency:** `SWARM_BOARDSTORE_SPEC.md` (in progress, Codex)
+**Substrate dependency:** `SWARM_BOARDSTORE_SPEC.md` (PR #316, Codex — spec-only, merge before Phase 1 implementation)
 
 ---
 
@@ -35,7 +35,12 @@ SHAKTI_GINKO is the **revenue-generating organ** of dharma_swarm. It is not a mo
 
 **The umbrella-vs-implementation distinction.** The repo currently has 18 `ginko_*` Python modules and 18 corresponding test files. These were named after the umbrella before the umbrella was formalized. They implement *one cell* (the Trading Lab). The spec does **not propose renaming them** in this PR. It defines the conceptual grouping; renames happen in a follow-up PR with full deprecation shims.
 
-**The ARJUNA gate framing.** Every cell carries an `arjuna_weight ∈ [0.0, 1.0]` on its Card. The organ refuses to auto-fund cells below threshold (default 0.6) without explicit operator override (logged + auditable). The trading lab passes because it funds the diversified swarm treasury which funds Jagat Kalyan operations. The ideation cell needs careful gating because of meta-tooling drift risk (see §15).
+**The ARJUNA gate framing.** Every cell (and every Card) carries an `arjuna_weight ∈ [0.0, 1.0]`. There are **two thresholds at two layers**:
+
+- **Card-create threshold (`0.35`)** — enforced by `BoardStore.create_card` per `SWARM_BOARDSTORE_SPEC.md §11`. Cards below this are refused without operator override. This is the substrate gate.
+- **Cell auto-fund threshold (`0.6`)** — enforced by the organ's allocator. Cells below this require explicit operator override to receive automatic budget allocation or auto-advance autonomy. This is the organ gate.
+
+The trading lab passes (`0.85`) because it funds the diversified swarm treasury which funds Jagat Kalyan operations. The ideation cell sits at `0.50` precisely *because* of meta-tooling drift risk — it can exist and propose but cannot auto-fund (see §15).
 
 ---
 
@@ -237,7 +242,7 @@ VentureCell exists in the ontology at `ontology.py:1470`. This spec **extends** 
 | `budget_tokens` | INTEGER | yes | Token budget |
 | `kpis` | DICT | yes | Performance indicators |
 | `card_id` | STRING | **new** | Foreign key to BoardStore Card (every VentureCell IS a Card) |
-| `arjuna_weight` | FLOAT [0.0–1.0] | **new** | ARJUNA-gate score (default 0.6 threshold) |
+| `arjuna_weight` | FLOAT [0.0–1.0] | **new** | ARJUNA-gate score. Two thresholds (see §1 + §15): card-create floor `0.35` (facade-enforced), cell auto-fund floor `0.6` (allocator-enforced). |
 | `budget_usd` | FLOAT | **new** | Dollar budget (separate from token budget) |
 | `budget_time_hours` | FLOAT | **new** | Wall-clock time budget |
 | `pnl_7d_usd` | FLOAT | **new** | Trailing 7-day P&L (computed) |
@@ -511,7 +516,7 @@ Every SHAKTI_GINKO concept maps to a BoardStore primitive. This section enumerat
 | Cost cap breach | `ControlEvent` with `event_type="BudgetExceeded"` + automatic cell pause |
 | Kill switch | `ControlEvent` with `event_type="Kill"` at granularity per-command / per-cell / per-noticer / per-organ |
 
-**Validation:** Every row above must have a corresponding contract in `SWARM_BOARDSTORE_SPEC.md` when Codex's spec lands. If a row has no binding, file an issue against the substrate spec.
+**Validation:** Every row above maps to a primitive in `SWARM_BOARDSTORE_SPEC.md` (PR #316). The Card schema (§3), the seven store contracts (§4), and the facade interface (§5) cover Card / ClaimLease / ReceiptRef / AuditEntry / ControlEvent. Cell-as-Card uses the `card.body` + `capability_manifest` + adapter-owned native fields (organ stores cell-specific data in an adapter table; the Card stays schema-stable). If any row above lacks a binding when Codex's spec lands on `main`, file an issue against the substrate spec.
 
 ---
 
@@ -754,7 +759,26 @@ Only one substrate instance writes to a cell at a time (lease-enforced per Codex
 
 ## 15. ARJUNA Gate Per Cell
 
-Every cell carries `arjuna_weight`. The organ refuses to *auto-fund* (allocator + autonomy stage advancement) cells below threshold without operator override (logged + auditable). Manual operator funding always works.
+Every cell (and every Card) carries `arjuna_weight ∈ [0.0, 1.0]`. Two thresholds at two layers (introduced in §1):
+
+1. **Card-create floor `0.35`** — facade-enforced per `SWARM_BOARDSTORE_SPEC.md §11`. Any card below this is refused by `BoardStore.create_card` unless an `override=ArjunaOverride(reason=…)` is supplied. Only operator/admin can override; noticers and agents cannot. The reason must name an external user, dataset, partner, measurable impact, or active-track dependency.
+2. **Cell auto-fund floor `0.6`** — organ-enforced by the allocator (§8.3). Cells below this can exist, can receive cards, and can be funded *manually* by the operator, but the allocator will not auto-allocate budget or auto-advance autonomy to them without explicit override.
+
+The two floors compose: a card at `arjuna_weight = 0.40` is accepted by the facade but its parent cell (if also at `0.40`) does not auto-fund. Both gates are auditable.
+
+### 15.1 Scoring rubric (operator + noticer + allocator)
+
+From Codex's facade spec, used as the canonical band semantics:
+
+| Band | Meaning |
+|------|---------|
+| `0.00–0.19` | Internal recursion, no named external target. Reject. |
+| `0.20–0.34` | Possible indirect value. Needs operator override at facade gate. |
+| `0.35–0.59` | Plausible substrate or operational value linked to active work. Card accepted. Cell does not auto-fund. |
+| `0.60–0.84` | Clear external-user, funding, impact, or safety leverage. Card accepted. Cell auto-funds. |
+| `0.85–1.00` | Directly blocks or enables real-world action, vulnerable-person safety, revenue, or high-leverage external work. Highest priority. |
+
+### 15.2 Default per-cell weights
 
 | Cell | Default `arjuna_weight` | Reasoning |
 |---|---|---|
@@ -762,11 +786,26 @@ Every cell carries `arjuna_weight`. The organ refuses to *auto-fund* (allocator 
 | `revenue-wedge` | 0.80 | Intelligence-report wedge — produces real outputs humans can use. Per existing governance doc. |
 | `info-products` | 0.75 if quality bar met | Educational content on dharma + AI; serves directly. Lower than trading because requires per-product quality assessment. |
 | `agentic-services` | 0.70 (per-client per-project) | Paid agent runs for aligned clients. Requires per-engagement ARJUNA scoring (separate cell-internal gate). |
-| `ideation` | 0.50 | Meta-tooling risk. Gated by: "must propose, not execute, and proposals must score against existing ARJUNA weights." Cell can run but cannot fund itself above this threshold without operator override on every proposal. |
+| `ideation` | 0.50 | Meta-tooling risk. Card-create floor passes; cell auto-fund floor does not. Cell can run and propose; every proposal it generates is then scored on its own merits. |
 
-**The override path:** Operator can manually override the gate for any cell by issuing `ControlEvent.OverrideArjuna` with: cell_id, current_weight, target_weight, justification (free text, mandatory), duration_hours (until weight reverts). Override is logged forever.
+### 15.3 The override path
 
-**Drift detection:** `arjuna_drift = current_weight - initial_weight`. If `drift > 0.2`, QualityNoticer creates an alert card. Persistent drift triggers kill criteria (§8.4).
+At the **facade level** (card create / refuse):
+
+- Operator (or admin) supplies `override=ArjunaOverride(reason=…)`.
+- Emits `control.posted` with event type `arjuna_override`.
+- Reason must name external user, dataset, partner, measurable impact, or active-track dependency.
+- Override is permanent in the audit stream.
+
+At the **organ level** (cell auto-fund):
+
+- Operator issues `ControlEvent.OverrideArjuna` with: `cell_id`, `current_weight`, `target_weight`, `justification` (free text, mandatory), `duration_hours` (until weight reverts).
+- Override is logged forever and visible on the cell card's audit log.
+- Manual budget allocation by operator always works without override (the organ gate is on *auto*-fund, not on operator action).
+
+### 15.4 Drift detection
+
+`arjuna_drift = current_weight - initial_weight`. If `drift > 0.2`, QualityNoticer creates an alert card. Persistent drift triggers kill criteria (§8.4). Drift can be either direction — a cell whose weight inflates over time without justified evidence is as much a problem as one whose weight collapses.
 
 ---
 

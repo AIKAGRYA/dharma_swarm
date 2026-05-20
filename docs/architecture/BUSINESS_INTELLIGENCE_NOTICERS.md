@@ -113,14 +113,16 @@ class RankingSignals:
 `RankingWeights` defaults (operator-tunable in `~/.dharma/noticer_weights.toml`):
 
 ```toml
-arjuna = 0.40   # ARJUNA Directive dominates
-vision = 0.25   # vault-aligned beats vault-orthogonal
-recency = 0.15
-blocker = 0.15
-ci = 0.05
+arjuna  = 0.40   # ARJUNA Directive dominates
+blocker = 0.20   # unblocking active track / CI / claimed work
+ci      = 0.15   # failing-check severity, PR blocker
+vision  = 0.15   # citation proximity to active vision/doctrine files
+recency = 0.10
 ```
 
-These weights are written down — there is no learned model. If we add learned ranking later, it lands behind a feature flag with its own ADR (`ADR-XXX-learned-ranking`).
+These defaults are pinned to `docs/architecture/SWARM_BOARDSTORE_SPEC.md §8 Noticer Contract — Ranking signals` (Codex's facade spec, PR #316). Both documents must agree on the same default weights; if either changes, the other follows. The substrate enforces these weights as the noticer-role's deterministic ranking formula. Operators may override per-installation by editing the TOML.
+
+These weights are written down — there is no learned model. If we add learned ranking later, it lands behind a feature flag with its own ADR (`ADR-007-learned-ranking-signals`, currently deferred).
 
 ### 1.4 Card deduplication
 
@@ -177,7 +179,7 @@ For each detected opportunity:
 1. Compute ranking signals.
 2. Look up matching existing cells by domain. If found, propose card on cell board. Else propose on organ board.
 3. Card body: source URL, title, summary, why-this-matches (top-3 ranking signals), competitive-signal-rating.
-4. ARJUNA-gated: cards below `arjuna_weight = 0.3` are auto-suppressed (still written to WitnessEvent for audit, but not surfaced).
+4. ARJUNA-gated: every card carries a justified `arjuna_weight ∈ [0.0, 1.0]` per the rubric in §9.2. The noticer does not pre-suppress — it submits and lets the BoardStore facade enforce the threshold (see §9.3).
 
 ### 2.4 Pseudocode
 
@@ -205,8 +207,8 @@ class MarketScanNoticer:
 
         # 3. Dedupe + propose
         for candidate in candidates:
-            if candidate.signals.score(ctx.weights) < 0.3:
-                continue   # ARJUNA-suppressed
+            # No pre-suppression — facade enforces threshold (§9).
+            # Noticer is responsible only for honest scoring + justification.
             self._propose_card(candidate, ctx, report)
 
         # 4. Emit signals + witness
@@ -541,14 +543,53 @@ def register_all(scheduler: NoticerScheduler) -> None:
 
 ## 9. ARJUNA Enforcement Across Noticers
 
-Each noticer must, before proposing a card:
+The ARJUNA test is doctrine; the gate is code at the BoardStore facade. This section pins how noticers participate in that gate. Authority: `docs/doctrine/OPERATIONAL_DOCTRINE.md:52` (the test) and `docs/architecture/SWARM_BOARDSTORE_SPEC.md §11 ARJUNA Gate Integration` (the code-level rules).
 
-1. Compute `arjuna_weight` (per §1.3).
-2. Suppress cards with `arjuna_weight < 0.3` (configurable).
-3. Boost cards where the underlying claim cites a vault VISION file with matching `[SWARM_TARGET]`.
-4. Log suppressed cards to WitnessEvent for audit (operator can review what was *not* proposed).
+### 9.1 The threshold
 
-This is how "ARJUNA-gated" is implemented in practice — not as a separate component but as a vector embedded in every noticer's ranking step.
+**Default threshold: `arjuna_weight = 0.35`.** This is the facade-enforced floor in `SWARM_BOARDSTORE_SPEC.md §11` and is **operator-tunable**, not noticer-tunable.
+
+`BoardStore.create_card` refuses any card with `arjuna_weight < 0.35` unless an `override` is supplied. Noticers, by their role contract (§0, `SWARM_BOARDSTORE_SPEC.md §8`), **cannot** supply override. Only operator or admin can.
+
+### 9.2 Scoring rubric
+
+Codex's facade pins the meaning of weight bands (`SWARM_BOARDSTORE_SPEC.md §11`):
+
+| Band | Meaning | Noticer behaviour |
+|------|---------|-------------------|
+| `0.00–0.19` | Internal recursion, no named external target | reject — do not propose |
+| `0.20–0.34` | Possible indirect value | propose but expect facade to refuse without operator override |
+| `0.35–0.59` | Plausible substrate or operational value linked to active work | propose normally |
+| `0.60–0.84` | Clear external-user, funding, impact, or safety leverage | propose with priority boost in card list |
+| `0.85–1.00` | Directly blocks or enables real-world action, vulnerable-person safety, revenue, or high-leverage external work | propose with highest priority + emit `SIGNAL_VENTURE_CELL_HIGH_LEVERAGE` |
+
+### 9.3 What each noticer must do, before proposing
+
+1. Compute `arjuna_weight ∈ [0.0, 1.0]` per the rubric above. The score itself must be auditable: the noticer logs the named external target, dataset, partner, measurable impact, or active-track dependency that justifies the band.
+2. Compute the full ranking score using the v1 weights in §1.3.
+3. Boost cards where the underlying claim cites a vault `[SWARM_TARGET]` marker (this is what `vision_file_proximity` measures).
+4. Submit the card via `BoardStore.create_card`. **Do not pre-suppress.** Let the facade enforce the threshold. This makes refusal centralized, audited, and consistent across all six noticers.
+5. If the facade refuses with `ArjunaThresholdNotMet`, log the refusal to WitnessEvent so the operator can review what was *not* proposed and tune weights/thresholds with full visibility.
+
+### 9.4 Override flow (operator only)
+
+When the operator chooses to override (e.g., to surface a 0.30-band card they personally judge worth pursuing):
+
+1. Operator (or admin) calls `BoardStore.create_card(..., override=ArjunaOverride(reason=…))`.
+2. The `reason` field **must** name one of: external user, dataset, partner, measurable impact, or active-track dependency. Free-text reasons without a named target are rejected by the facade.
+3. Override emits `control.posted` with event type `arjuna_override` (per `SWARM_BOARDSTORE_SPEC.md §7 Control event schema`).
+4. The override is permanent in the audit stream — replay always shows it.
+
+Noticers and other agents have **no** override path. This is enforced by RBAC in the facade.
+
+### 9.5 Why centralize in the facade and not in each noticer
+
+This is a change from earlier drafts of this document (which had noticers pre-suppress at 0.30). Centralizing in the facade gives us:
+
+- **One threshold** all six noticers, all six agent kinds, and all surface paths (CLI, dashboard, Telegram, API) obey identically.
+- **One audit stream** for every refusal and every override.
+- **One tunable** (`arjuna_threshold` in operator config) instead of six noticer-local knobs.
+- **No drift** between what a noticer thinks the threshold is and what the substrate enforces.
 
 ---
 
@@ -572,6 +613,7 @@ No noticer ships until BoardStore facade lands (`SWARM_BOARDSTORE_SPEC.md`). Wit
 4. **CONTINUOUS for QualityNoticer.** Should we *also* CONTINUOUS-ify ViabilityNoticer, accepting more compute for tighter loops? Doc currently says TRIGGERED + 24 h fallback.
 5. **Cross-noticer dedupe.** If MarketScanNoticer and OpportunityNoticer both surface the same external opportunity, what wins? Current spec: first-write-wins with merge. Better: operator-visible "agreement strength" indicator showing both noticers concur.
 6. **Learned ranking.** Forbidden in v1. When (not if) we add it, what's the gating ADR look like? Probably ADR-007 (next after this PR).
+7. **AutoProposer direct Darwin submission.** Codex flagged this at `SWARM_BOARDSTORE_SPEC.md §16 Open Question 5`: should `AutoProposer`'s existing direct Darwin / evolution submission be retired or gated behind cards? Our noticer roster (§2–6) implicitly assumes Darwin submissions flow through the BoardStore as proposal cards, so the operator can see and approve them. This needs an explicit operator decision before the Phase 3 noticer-roster PR lands.
 
 ---
 
@@ -588,4 +630,4 @@ No noticer ships until BoardStore facade lands (`SWARM_BOARDSTORE_SPEC.md`). Wit
 - `dharma_swarm/ginko_orchestrator.py:826-892` — `AUTONOMY_REQUIREMENTS`, `check_autonomy_advancement` (used by ViabilityNoticer)
 - `docs/architecture/SHAKTI_GINKO_ORGAN.md` — organ spec (this doc's parent)
 - `docs/architecture/VENTURE_CELL_LIFECYCLE.md` — lifecycle spec (kill/spinout semantics that noticers respect)
-- (forthcoming) `docs/architecture/SWARM_BOARDSTORE_SPEC.md` — Codex's substrate spec (defines BoardStoreClient noticers consume)
+- `docs/architecture/SWARM_BOARDSTORE_SPEC.md` — Codex's substrate spec (PR #316; defines BoardStoreClient noticers consume, §8 Noticer Contract, §11 ARJUNA Gate Integration)
