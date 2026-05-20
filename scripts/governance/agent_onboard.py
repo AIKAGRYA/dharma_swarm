@@ -295,6 +295,41 @@ def render_decay_watch() -> None:
         print(f"  [{tag}] {doc}")
 
 
+def _tool_available(*, which: str | None = None,
+                    python_import: str | None = None) -> bool:
+    """Return True if a CLI tool or Python import is reachable."""
+    if python_import:
+        try:
+            result = subprocess.run(
+                [sys.executable, "-c", f"import {python_import}"],
+                capture_output=True, timeout=10,
+            )
+            return result.returncode == 0
+        except (subprocess.TimeoutExpired, OSError):
+            return False
+    if which:
+        try:
+            result = subprocess.run(
+                ["which", which], capture_output=True, timeout=10,
+            )
+            return result.returncode == 0
+        except (subprocess.TimeoutExpired, OSError):
+            return False
+    return False
+
+
+# (label, probe_kwargs, install_hint)
+_TOOLING_PROBES: list[tuple[str, dict[str, str], str]] = [
+    ("xray.py", {"python_import": "dharma_swarm.xray"}, "built-in — check dharma_swarm install"),
+    ("gitnexus", {"which": "gitnexus"}, "pip install gitnexus"),
+    ("ast-grep", {"which": "ast-grep"}, "cargo install ast-grep / brew install ast-grep"),
+    ("radon", {"which": "radon"}, "pip install radon"),
+    ("grimp", {"python_import": "grimp"}, "pip install grimp"),
+    ("vulture", {"which": "vulture"}, "pip install vulture"),
+    ("lint-imports", {"which": "lint-imports"}, "pip install import-linter"),
+]
+
+
 def render_tooling_first() -> None:
     section("TOOLING-FIRST CONTEXT PASS")
     print("  Before grep/read-heavy investigation in dharma_swarm, prefer:")
@@ -307,6 +342,15 @@ def render_tooling_first() -> None:
     print("  - grimp                                  — import graph / dependency truth")
     print("  - vulture + ruff F401/F811               — dead-code / import rot")
     print("  - lint-imports                           — advisory unless contracts green")
+    print("  - wiki show <topic> / wiki search <term> — 115-article wiki at ~/.dharma/knowledge/wiki/")
+    print("  - memory MCP open_nodes / search_nodes   — cross-session graph (most-skipped tool)")
+    print()
+    print("  Tool availability on this machine:")
+    for label, kwargs, hint in _TOOLING_PROBES:
+        ok = _tool_available(**kwargs)
+        mark = "✅" if ok else "❌"
+        suffix = "" if ok else f"  (install: {hint})"
+        print(f"    {mark} {label}{suffix}")
 
 
 def render_enforcement_and_depth() -> None:

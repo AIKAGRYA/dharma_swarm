@@ -2,6 +2,8 @@
 
 ## Before Anything Else — the single remembered gate
 
+If you have not run `make onboard` this session, do it now — before any non-trivial Read, Grep, or Edit. It renders the current operating reality and the code-structure tools you should reach for before grep.
+
 `make onboard` is the only command you need to remember. Everything else
 (active track, live ops, broken register, axioms, tooling hints, depth
 pointers) is rendered from the existing owners by that command:

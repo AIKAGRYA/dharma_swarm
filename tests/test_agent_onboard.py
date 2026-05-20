@@ -64,6 +64,18 @@ def test_onboard_renders_required_sections():
         assert header in result.stdout, f"missing onboarding section: {header}"
 
 
+def test_tooling_first_includes_wiki_and_memory():
+    """The TOOLING-FIRST section must list wiki and memory MCP tools."""
+    result = subprocess.run(
+        [sys.executable, str(ONBOARD_SCRIPT)],
+        cwd=REPO_ROOT, capture_output=True, text=True, timeout=60,
+    )
+    assert "wiki show" in result.stdout, "TOOLING-FIRST must mention wiki show"
+    assert "wiki search" in result.stdout, "TOOLING-FIRST must mention wiki search"
+    assert "memory MCP" in result.stdout, "TOOLING-FIRST must mention memory MCP"
+    assert "Tool availability" in result.stdout, "TOOLING-FIRST must probe tool availability"
+
+
 # ---------------------------------------------------------------------------
 # Fixture-driven unit tests for the parsers
 # ---------------------------------------------------------------------------
