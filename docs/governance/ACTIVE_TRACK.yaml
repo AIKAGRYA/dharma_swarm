@@ -1,0 +1,176 @@
+# ACTIVE_TRACK.yaml
+#
+# THE ONLY PLACE where the current build track is declared.
+#
+# Other governance docs (CLAUDE.md, SOVEREIGN_MANIFEST.md, BUILD_SESSION_ENTRYPOINT.md)
+# render their "current track" line from this file via the DOCOPS include
+# mechanism (scripts/docops/render_includes.py). Do not hand-write the track
+# name into any other file.
+#
+# Lifecycle:
+#   1. A new track is opened by declaring it here with status=ACTIVE,
+#      acceptance criteria, and TTL.
+#   2. CI runs scripts/governance/check_track_status.py on every PR.
+#      When all acceptance criteria evaluate true, status flips to SHIPPABLE
+#      (via the active_track_evidence.json artifact, not by editing this file).
+#   3. The next operator closes the track by moving its block to history
+#      and declaring the next track ACTIVE. CI fails any PR that leaves the
+#      repo with zero ACTIVE tracks for more than 7 days.
+#   4. Stale claims (TTL exceeded with no re-verification) raise a CI failure
+#      until either re-verified (bump verified_at) or retired.
+#
+# Schema version: 1
+schema_version: 1
+
+# ---------------------------------------------------------------------------
+# Active track (exactly one block with status=ACTIVE at any time)
+# ---------------------------------------------------------------------------
+active_track:
+  id: cockpit-control-surface-2026-05
+  name: Operator Cockpit v1 + Control-Surface contract hardening
+  status: ACTIVE
+  opened_at: "2026-05-19"
+  verified_at: "2026-05-19"   # bump when you re-confirm this is still the live focus
+  ttl_days: 14                # CI fails if (today - verified_at) > ttl_days
+  owner: "@AmitabhainArunachala"
+
+  # One-paragraph human description (rendered into CLAUDE.md and BUILD_SESSION_ENTRYPOINT.md)
+  description: |
+    Harden the operator cockpit and control-surface contract that landed in
+    PRs #244, #254, #275, #296, #307. This is the second ontology-native
+    seam — the first (operator_brief) shipped including items 5-9 of the
+    retired NEXT_10 plan and item 10 (Dharma Radar v0) is already wired
+    into Shakti via PRs #261, #275, #296. The cockpit lane is now the
+    convergence point: structured evidence, SSE stream, world-signal
+    receipt projection, and the ControlSurfaceEnvelope + DisplayHints
+    contract together form the operator-facing read seam of the substrate.
+
+  # Where the work lives (path globs validated by check_track_status.py)
+  surfaces:
+    - dharma_swarm/operator_core/control_surface*.py
+    - dharma_swarm/operator_core/world_radar/**
+    - dharma_swarm/world_radar/**
+    - api/routers/control_surface.py
+    - api/routers/manifest.py
+    - dashboard/src/app/dashboard/control-surface/page.tsx
+    - tests/test_control_surface.py
+
+  # Two categories of machine-verifiable criteria:
+  #
+  #   prerequisites:        Must already be true for the track to have begun.
+  #                         A failure here means the track is mis-declared.
+  #   completion_criteria:  Must become true for the track to finish.
+  #                         When all pass, status flips SHIPPABLE.
+  #
+  # This separation is the structural fix for the failure mode that retired
+  # operator-brief: don't conflate "infrastructure landed" with "track done".
+  prerequisites:
+    - id: control_surface_envelope_exists
+      kind: file_contains
+      file: dharma_swarm/operator_core/control_surface_models.py
+      pattern: "class ControlSurfaceEnvelope"
+    - id: display_hints_exists
+      kind: file_contains
+      file: dharma_swarm/operator_core/control_surface_models.py
+      pattern: "DisplayHints"
+    - id: cockpit_dashboard_page_exists
+      kind: file_exists
+      file: dashboard/src/app/dashboard/control-surface/page.tsx
+    - id: world_radar_wired
+      kind: file_exists
+      file: dharma_swarm/world_radar/__init__.py
+    - id: control_surface_router_registered
+      kind: file_contains
+      file: api/main.py
+      pattern: "control_surface"
+    - id: contract_tests_present
+      kind: file_exists
+      file: tests/test_control_surface.py
+    - id: pr_307_merged
+      kind: pr_merged
+      pr: 307
+    - id: pr_244_merged
+      kind: pr_merged
+      pr: 244
+
+  completion_criteria:
+    # The track is SHIPPABLE only when every next_item below has produced its
+    # falsifiable artifact. These predicates flip from false to true as work
+    # lands. The operator updates this block (not next_items prose) to declare
+    # "this item is done".
+    - id: control_surface_adr_published
+      kind: file_exists
+      file: docs/architecture/CONTROL_SURFACE.md
+    - id: ledger_watcher_envelope_aware
+      kind: file_contains
+      file: dharma_swarm/operator_brief/watchdog.py
+      pattern: "ControlSurfaceEnvelope|envelope"
+    - id: manifest_health_snapshot_archived
+      kind: file_exists
+      file: reports/state/control_surface_manifest_health_snapshot.md
+    - id: next_seam_adr_drafted
+      kind: file_exists
+      file: docs/architecture/adr/0001-next-seam-candidate.md
+
+  # Non-goals — explicit guards against scope creep on this track.
+  non_goals:
+    - Do not open a third seam (training flywheel, identity unification,
+      dashboard chat routing) before this track flips SHIPPABLE.
+    - Do not retroactively expand operator_brief scope. That track is closed.
+    - Do not decompose god objects on this track. A5 enforcement is a
+      separate maintenance lane.
+
+  # Next ~5 concrete items on this track (the new "NEXT_5", succeeding NEXT_10).
+  # Items are short. Each must be either a PR ref, a path, or a one-line spec.
+  next_items:
+    - id: 1
+      what: "Close test gaps in tests/test_control_surface.py for envelope edge cases."
+      kind: code
+      blocker: false
+    - id: 2
+      what: "Document operator cockpit zones in docs/architecture/CONTROL_SURFACE.md (new ADR-class doc)."
+      kind: docs
+      blocker: false
+    - id: 3
+      what: "Wire ControlSurfaceEnvelope into the ledger watcher so DEGRADED zones are surfaced."
+      kind: code
+      blocker: false
+    - id: 4
+      what: "Run manifest_health.build_health_report() against live runtime, archive snapshot under reports/state/."
+      kind: ops
+      blocker: false
+    - id: 5
+      what: "Open ADR for the next seam candidate (training flywheel vs. identity unification). Do not implement."
+      kind: docs
+      blocker: false
+
+# ---------------------------------------------------------------------------
+# Closed tracks (history, append-only; do not edit prior entries)
+# ---------------------------------------------------------------------------
+closed_tracks:
+  - id: operator-brief-seam-2026-04
+    name: Ontology-Native Operator Brief (first substrate-native seam)
+    status: SHIPPED
+    opened_at: "2026-04-04"
+    closed_at: "2026-05-19"
+    closed_by: "governance/active-track-self-healing-2026-05-19"
+    evidence:
+      - "dharma_swarm/operator_brief/ package (6 files, 1,579 LOC)"
+      - "PR #84 — Guardian operator-brief ledger watcher"
+      - "PR #89 — dgc value-events CLI command"
+      - "commit 695f149 — first ontology-native seam (v0)"
+      - "commit e0cdb79 — runtime artifact seam wiring"
+    superseded_by: cockpit-control-surface-2026-05
+    notes: |
+      Original master spec at docs/plans/ONTOLOGY_NATIVE_OPERATOR_BRIEF_MASTER_SPEC.md
+      and NEXT_10 at docs/plans/NEXT_10_SUBSTRATE_TODO.md are retained as historical
+      reference, marked deprecated. Item 10 (Dharma Radar v0) was opened during the
+      cockpit lane build, which is consistent with the original gating rule
+      (item 9 had shipped).
+
+# ---------------------------------------------------------------------------
+# Living axioms — filesystem-verifiable invariants that always apply.
+# Distinct from the active track. Owned by SOVEREIGN_MANIFEST.md.
+# Listed here only for cross-reference; do not duplicate the text.
+# ---------------------------------------------------------------------------
+living_axioms_ref: docs/governance/SOVEREIGN_MANIFEST.md#global-axioms

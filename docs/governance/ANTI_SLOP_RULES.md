@@ -76,9 +76,11 @@ Verified during audit; each module owns one slice of `~/.dharma`:
 `pulse.py`, `custodians.py`, `kaizen_ops_local.py`, `scout_report.py`,
 `review_cycle.py`, `ginko_backtest.py`, `ginko_evolution.py`.
 
-To add a new owner: open a governance issue, document the surface in
-`docs/governance/STATE_DIR_OWNERS.md` (create if needed), then update
-`.semgrep/dharma-anti-slop.yml` paths.exclude.
+To add a new owner: open a governance issue, declare the new surface in
+[`ACTIVE_SURFACE_MANIFEST.yaml`](../../ACTIVE_SURFACE_MANIFEST.yaml) under the
+relevant entity, then update `.semgrep/dharma-anti-slop.yml` paths.exclude.
+The manifest is the single owner of declared surfaces — do not create a
+parallel `STATE_DIR_OWNERS.md` doc.
 
 ### Rule 8: root markdown allowlist
 `README.md`, `CLAUDE.md`, `CHANGELOG.md`, `LICENSE.md`,

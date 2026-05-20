@@ -1,0 +1,92 @@
+{
+  "generated_at": "2026-05-20T06:00:40+00:00",
+  "active_track_id": "cockpit-control-surface-2026-05",
+  "shippable": false,
+  "prerequisites_ok": true,
+  "completion_progress": {
+    "passed": 0,
+    "total": 4
+  },
+  "criteria": [
+    {
+      "id": "control_surface_envelope_exists",
+      "kind": "file_contains",
+      "passed": true,
+      "detail": "pattern 'class ControlSurfaceEnvelope' found in dharma_swarm/operator_core/control_surface_models.py"
+    },
+    {
+      "id": "display_hints_exists",
+      "kind": "file_contains",
+      "passed": true,
+      "detail": "pattern 'DisplayHints' found in dharma_swarm/operator_core/control_surface_models.py"
+    },
+    {
+      "id": "cockpit_dashboard_page_exists",
+      "kind": "file_exists",
+      "passed": true,
+      "detail": "dashboard/src/app/dashboard/control-surface/page.tsx present"
+    },
+    {
+      "id": "world_radar_wired",
+      "kind": "file_exists",
+      "passed": true,
+      "detail": "dharma_swarm/world_radar/__init__.py present"
+    },
+    {
+      "id": "control_surface_router_registered",
+      "kind": "file_contains",
+      "passed": true,
+      "detail": "pattern 'control_surface' found in api/main.py"
+    },
+    {
+      "id": "contract_tests_present",
+      "kind": "file_exists",
+      "passed": true,
+      "detail": "tests/test_control_surface.py present"
+    },
+    {
+      "id": "pr_307_merged",
+      "kind": "pr_merged",
+      "passed": true,
+      "detail": "PR #307: gh query failed, skipped"
+    },
+    {
+      "id": "pr_244_merged",
+      "kind": "pr_merged",
+      "passed": true,
+      "detail": "PR #244: gh query failed, skipped"
+    },
+    {
+      "id": "control_surface_adr_published",
+      "kind": "file_exists",
+      "passed": false,
+      "detail": "docs/architecture/CONTROL_SURFACE.md MISSING"
+    },
+    {
+      "id": "ledger_watcher_envelope_aware",
+      "kind": "file_contains",
+      "passed": false,
+      "detail": "pattern 'ControlSurfaceEnvelope|envelope' NOT FOUND in dharma_swarm/operator_brief/watchdog.py"
+    },
+    {
+      "id": "manifest_health_snapshot_archived",
+      "kind": "file_exists",
+      "passed": false,
+      "detail": "reports/state/control_surface_manifest_health_snapshot.md MISSING"
+    },
+    {
+      "id": "next_seam_adr_drafted",
+      "kind": "file_exists",
+      "passed": false,
+      "detail": "docs/architecture/adr/0001-next-seam-candidate.md MISSING"
+    }
+  ],
+  "findings": [
+    {
+      "severity": "INFO",
+      "check": "track-in-progress",
+      "message": "0/4 completion criteria pass. Track 'cockpit-control-surface-2026-05' is in progress.",
+      "criterion_id": null
+    }
+  ]
+}

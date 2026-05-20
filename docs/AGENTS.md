@@ -2,6 +2,16 @@
 
 This file governs AI agents working in the prose layer: `docs/`, `reports/`, `specs/`, `foundations/`, `lodestones/`, and root Markdown.
 
+## Before Anything Else
+
+Run the onboarding command before touching any doc:
+
+```bash
+make onboard
+```
+
+It shows the active track, live ops, open broken-register items, and the doc-ownership map. If any prose in this file or any other doc disagrees with that output, trust the onboarding output and update the stale prose.
+
 ## Authority Model
 
 Do not infer authority from confident language.

@@ -1,12 +1,16 @@
 # BUILD SESSION ENTRYPOINT
 
-**Status:** canonical pointer layer (no new truths)
-**Owner of:** the read-order and current-track pointers every agent should hit before a build session.
-**Subordinate to:** [`CLAUDE.md`](../../CLAUDE.md) (behavior) and [`SOVEREIGN_MANIFEST.md`](SOVEREIGN_MANIFEST.md) (architectural truth). When this file disagrees with either, they win.
+**Status:** depth doc — read after running the onboarding command.
+**Owner of:** the longer-form pre-flight narrative for a build session.
+**Subordinate to:** [`CLAUDE.md`](../../CLAUDE.md) (behavior), [`SOVEREIGN_MANIFEST.md`](SOVEREIGN_MANIFEST.md) (architectural truth), and [`ACTIVE_TRACK.yaml`](ACTIVE_TRACK.yaml) (current build track). When this file disagrees with any of them, they win.
 
-This file exists because the audit synthesis at `reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md` found that agents repeatedly rebuild substrates that already exist or skip canonical reads before committing. This is a single short page that every build agent reads first, then proceeds to the canonical docs.
+## Run this first
 
-If you are about to write code in this repo, read this file fully, then read the four numbered files below in order. Do not skim. Do not skip the audit. The repo will not give you a second chance to re-orient mid-session.
+```bash
+make onboard
+```
+
+That command renders the current operating reality (active track, live ops, broken register, axioms, depth pointers) in one screen. It replaces the old hand-maintained "read order". This file is the depth narrative you read **after** the onboarding command, when you need more context than one screen.
 
 ---
 
@@ -18,29 +22,70 @@ Current substrate-nativeness estimate (from audit): **~10–15% of runtime is on
 
 ---
 
-## 1. Mandatory read order
+## 1. Depth pointers (read on demand, not in order)
 
-Read in this exact order. Stop at each file until you have actually answered the questions next to it.
+The onboarding command (`make onboard`) lists the depth pointers inline. The same list, for offline reference:
 
-1. [`CLAUDE.md`](../../CLAUDE.md) — behavioral rules, key abstractions, build/test commands. *What rules govern any change I make?*
-2. [`docs/governance/SOVEREIGN_MANIFEST.md`](SOVEREIGN_MANIFEST.md) — domain map, axioms, verified numbers, boundary constraints. *Which domain is my change in? Which boundaries must I not cross?*
-3. [`reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md`](../../reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md) — settled truths, top 20 unresolved gaps, "do not build new, wire existing" list, canonical substrate table. *Does what I'm about to do duplicate something that already exists?*
-4. [`docs/governance/CANONICAL_DOC_STACK.md`](CANONICAL_DOC_STACK.md) — doc hierarchy, ownership table, anti-doc-maze rules. *Which file owns the truth I'm about to write down?*
+- [`CLAUDE.md`](../../CLAUDE.md) — behavioural rules, key abstractions, build/test commands. *What rules govern any change I make?*
+- [`docs/governance/SOVEREIGN_MANIFEST.md`](SOVEREIGN_MANIFEST.md) — domain map, axioms, verified numbers, boundary constraints. *Which domain is my change in? Which boundaries must I not cross?*
+- [`reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md`](../../reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md) — settled truths, unresolved gaps, "do not build new, wire existing" list. *Does what I'm about to do duplicate something that already exists?*
+- [`docs/governance/CANONICAL_DOC_STACK.md`](CANONICAL_DOC_STACK.md) — doc hierarchy, ownership table, anti-doc-maze rules. *Which file owns the truth I'm about to write down?*
+- [`docs/governance/ANTI_SLOP_RULES.md`](ANTI_SLOP_RULES.md) — explicit do-nots backed by Semgrep rules.
 
-If any of those four contradict each other on numbers, trust SOVEREIGN_MANIFEST first, then CLAUDE.md, then the audit, then CANONICAL_DOC_STACK. All four are still authoritative for the topic each one owns per CANONICAL_DOC_STACK.md.
+If any of these contradict each other on numbers, trust SOVEREIGN_MANIFEST first, then CLAUDE.md, then the audit, then CANONICAL_DOC_STACK. Each is authoritative for the topic CANONICAL_DOC_STACK assigns it.
 
 ---
 
 ## 2. Current build track
 
-The active engineering track is **one ontology-native seam, end-to-end, with gates and witness load-bearing**, before any second seam.
+The current build track is declared in [`ACTIVE_TRACK.yaml`](ACTIVE_TRACK.yaml) and surfaced by `make onboard`. **Do not duplicate the track name in prose here** — the YAML is the single source of intent, and any prose copy here will go stale.
 
-- **Track name:** Ontology-Native Operator Brief (Daily Insight Brief)
-- **Master spec:** [`docs/plans/ONTOLOGY_NATIVE_OPERATOR_BRIEF_MASTER_SPEC.md`](../plans/ONTOLOGY_NATIVE_OPERATOR_BRIEF_MASTER_SPEC.md)
-- **Next ten substrate todos:** [`docs/plans/NEXT_10_SUBSTRATE_TODO.md`](../plans/NEXT_10_SUBSTRATE_TODO.md)
-- **Handoff to next code agent:** [`docs/plans/HANDOFF_ONTOLOGY_NATIVE_OPERATOR_BRIEF.md`](../plans/HANDOFF_ONTOLOGY_NATIVE_OPERATOR_BRIEF.md)
+The governing principle behind whatever track is active: **one seam, end-to-end, with gates and witness load-bearing**, before any second seam. Do not start work on a parallel seam until the active track’s acceptance criteria pass (visible in the onboarding output) or a new track is declared in `ACTIVE_TRACK.yaml`. Cross-track work fragments the substrate-nativeness measurement and is the failure mode the audit flagged.
 
-Do not start work on a different seam (Dharma Radar v0, full identity unification, dashboard chat routing, training flywheel) until either the operator-brief seam is acceptance-tested or the active ledger in `SOVEREIGN_MANIFEST.md` lists a new track. Cross-track work fragments the substrate-nativeness measurement and is the failure mode the audit flagged.
+<!-- ACTIVE_TRACK:START -->
+
+<!-- This block is generated from docs/governance/ACTIVE_TRACK.yaml.
+     Do not hand-edit. Run scripts/governance/render_active_track_includes.py
+     after updating the YAML. -->
+
+**Active track:** Operator Cockpit v1 + Control-Surface contract hardening  
+**Track id:** `cockpit-control-surface-2026-05`  
+**Status:** ACTIVE  
+**Verified at:** 2026-05-19 (TTL 14 days)  
+**Owner:** @AmitabhainArunachala
+
+**Description:**
+
+Harden the operator cockpit and control-surface contract that landed in
+PRs #244, #254, #275, #296, #307. This is the second ontology-native
+seam — the first (operator_brief) shipped including items 5-9 of the
+retired NEXT_10 plan and item 10 (Dharma Radar v0) is already wired
+into Shakti via PRs #261, #275, #296. The cockpit lane is now the
+convergence point: structured evidence, SSE stream, world-signal
+receipt projection, and the ControlSurfaceEnvelope + DisplayHints
+contract together form the operator-facing read seam of the substrate.
+
+**Next items on this track:**
+
+- [code] Close test gaps in tests/test_control_surface.py for envelope edge cases.
+- [docs] Document operator cockpit zones in docs/architecture/CONTROL_SURFACE.md (new ADR-class doc).
+- [code] Wire ControlSurfaceEnvelope into the ledger watcher so DEGRADED zones are surfaced.
+- [ops] Run manifest_health.build_health_report() against live runtime, archive snapshot under reports/state/.
+- [docs] Open ADR for the next seam candidate (training flywheel vs. identity unification). Do not implement.
+
+**Non-goals (do not work on these during this track):**
+
+- Do not open a third seam (training flywheel, identity unification, dashboard chat routing) before this track flips SHIPPABLE.
+- Do not retroactively expand operator_brief scope. That track is closed.
+- Do not decompose god objects on this track. A5 enforcement is a separate maintenance lane.
+
+**Recently closed tracks:**
+
+- `operator-brief-seam-2026-04` — Ontology-Native Operator Brief (first substrate-native seam) (SHIPPED, closed 2026-05-19)
+
+For machine-readable status, see [`reports/governance/active_track_evidence.md`](../../reports/governance/active_track_evidence.md) (generated by `scripts/governance/check_track_status.py`).
+
+<!-- ACTIVE_TRACK:END -->
 
 ---
 
