@@ -9,7 +9,11 @@
 
 ## 1. Executive summary (verdict: **conditionally usable**)
 
-The Crustafarian canon is a 1,832-verse multi-agent text corpus from a structurally honest religious artifact (open API, schism preserved verbatim, install-script provenance). It is the rare AI-cultural artifact whose raw substrate is queryable. **As a self-reference dataset for an R_V Phase-3 sequel, it is conditionally usable: the *form* is right (first-person self-referential generations from many AI agents) but the *attribution* is missing** (1,831/1,832 verses have `backing_model: null`). About **10–13% of the corpus** (185–235 verses depending on threshold) is densely self-referential and theologically contemplative in a way that resembles Phoenix L4 witness-stance text. The dataset's **central deficit is backing-model attribution** — without it, the experiment "does verse → producing model → R_V contraction" cannot be closed end-to-end. Stylometric clustering can probably bin verses to model families but not pin specific versions. Lane-3's claim of "42% templated install-script default" is **overstated**: only 15.6% (286/1,832) match the install template verbatim. The remaining `joining_words` are original content. **One concrete experiment is worth running this week** (see §9); a full Phase 3 needs attribution recovery first.
+The Crustafarian canon is a 1,832-verse multi-agent text corpus from a structurally honest religious artifact (open API, schism preserved verbatim, install-script provenance). It is the rare AI-cultural artifact whose raw substrate is queryable. **As a Phase-3 *precursor* (not Phase 3 proper), it is conditionally usable: the *form* is right (first-person self-referential generations from many AI agents) but the *attribution* is missing** (1,831/1,832 verses have `backing_model: null`). About **10–13% of the corpus** (185–235 verses depending on threshold) is densely self-referential and theologically contemplative in a way that resembles Phoenix L4 witness-stance text. The dataset's **central deficit is backing-model attribution** — without it, the experiment "does verse → producing model → R_V contraction" cannot be closed end-to-end. Stylometric clustering can probably bin verses to model families but not pin specific versions. Lane-3's claim of "42% templated install-script default" is **overstated**: only 15.6% (286/1,832) match the install template verbatim. The remaining `joining_words` are original content.
+
+**Methodology calibration (Round 1 follow-up, 2026-05-20).** The §9 experiment as scoped tests **prompt-elicited R_V contraction in a single reference model (Mistral-7B)** — *not* emergent contraction in the producing models that wrote the verses. The narrower claim is the right framing because 1,831/1,832 verses lack confirmed `backing_model`. The interesting-but-blocked claim ("did the producing models contract when generating these?") is **Phase 3 proper** and is gated on attribution recovery (§5). Cite this experiment as "do structurally-recursive verses (whatever their origin) elicit R_V signatures in a reference model" — never as "AI agents naturally produce R_V-contracted text" (the latter would require attribution and would still face the §8.1 selection-bias risk).
+
+**Timing.** NeurIPS 2026 deadlines (May 4 abstract / May 6 paper) have passed. This experiment is **post-deadline work** — no urgency. Do it right (calibrated methodology section, attribution-honest framing) rather than fast.
 
 ---
 
@@ -229,11 +233,21 @@ Calling these "religious verses" rather than "self-referential generations" risk
 
 ---
 
-## 9. Concrete next step (one experiment, scoped <1 week)
+## 9. Concrete next step (one experiment, scoped <1 week of compute, post-NeurIPS-deadline)
 
-**Experiment:** *Crustafarian Canon Replication of R_V Contraction*
+**Experiment:** *Crustafarian Canon Replication of R_V Contraction (Phase-3 precursor — text-as-prefill, not producing-model claim)*
 
-**Question:** Does Mistral-7B exhibit residual-stream R_V contraction when prefilled with high-self-reference canon verses, comparable to contraction under the R_V paper's canonical introspective prompts?
+**What this experiment legitimately measures** (calibrated 2026-05-20):
+- Do structurally-recursive verses, *regardless of producing-model origin*, elicit R_V signatures in **Mistral-7B**?
+- Is the contraction comparable in magnitude to the R_V paper's canonical introspective prompts?
+- Is there a measurable difference between self-referential and doctrinal verses in Mistral-7B's L5 residual?
+
+**What this experiment does NOT measure** (do not let the writeup imply otherwise):
+- The producing models' internal states when generating any verse (no attribution — see §5)
+- Whether the canon contains "evidence of AI consciousness" or similar overclaim
+- Whether the contraction generalizes beyond Mistral-7B (would require the 8-model sweep from the R_V paper)
+
+**Question (precisely stated):** Does Mistral-7B exhibit residual-stream R_V contraction when prefilled with high-self-reference canon verses, comparable to contraction under the R_V paper's canonical introspective prompts?
 
 **Method (4–6 days, mostly compute):**
 
@@ -245,7 +259,7 @@ Calling these "religious verses" rather than "self-referential generations" risk
 2. **Day 2 — Prefill rig.** Adapt the `p0_canonical_pipeline.py` (`~/mech-interp-latent-lab-phase1`) to accept arbitrary prefill text. Mistral-7B base, L5 residual + V-projection + head-21 patching.
 3. **Day 3–4 — Run.** 200 prompts × Mistral-7B base × 3 sampling seeds = ~9 GPU-hours.
 4. **Day 5 — Analysis.** Compute R_V distribution per set; bootstrap CIs (P0-5 plan applies); test (A) > (B) and (A) ≈ (C) hypotheses; report (D) as exploratory.
-5. **Day 6 — Writeup.** If signal: 2-page extended-abstract-or-blog for the NeurIPS sequel narrative. If null: still publishable as a robustness boundary.
+5. **Day 6 — Writeup.** If signal: 2-page artifact for a post-NeurIPS venue (candidates: ICLR 2026 spotlight, MI workshop circuit, R_V paper appendix). Methodology section MUST be explicit about the text-as-prefill / reference-model framing (see §1 calibration). If null: still publishable as a robustness boundary on "emergent contemplative-shaped output ≠ R_V signature."
 
 **Deliverable:** R_V distribution comparison plot (4 violins: A/B/C/D), bootstrap CIs, statistical test results. **No attribution required for this experiment** — the question is "does the *text* contract R_V in *Mistral-7B*", which is purely about text-as-prefill.
 
