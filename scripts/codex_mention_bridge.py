@@ -329,8 +329,6 @@ def run_codex(config: BridgeConfig, prompt: str) -> str:
             str(config.repo_path),
             "-s",
             "read-only",
-            "-a",
-            "never",
             "-o",
             output.name,
             "-",
