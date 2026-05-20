@@ -321,7 +321,7 @@ def _tool_available(*, which: str | None = None,
 # (label, probe_kwargs, install_hint)
 _TOOLING_PROBES: list[tuple[str, dict[str, str], str]] = [
     ("xray.py", {"python_import": "dharma_swarm.xray"}, "built-in — check dharma_swarm install"),
-    ("gitnexus", {"which": "gitnexus"}, "pip install gitnexus"),
+    ("gitnexus", {"which": "gitnexus"}, "npm install -g gitnexus"),
     ("ast-grep", {"which": "ast-grep"}, "cargo install ast-grep / brew install ast-grep"),
     ("radon", {"which": "radon"}, "pip install radon"),
     ("grimp", {"python_import": "grimp"}, "pip install grimp"),
