@@ -1,0 +1,41 @@
+name: codex-mention-router
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+
+permissions:
+  contents: read
+
+jobs:
+  route:
+    if: >
+      ${{
+        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association) &&
+        contains(github.event.comment.body, '@codex')
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Send event to local Codex bridge
+        run: |
+          test -n "$CODEX_WEBHOOK_URL"
+          test -n "$CODEX_WEBHOOK_TOKEN"
+
+          cat > event.json <<'JSON'
+          ${{ toJson(github.event) }}
+          JSON
+
+          curl --fail-with-body -sS -X POST "$CODEX_WEBHOOK_URL" \
+            -H "Authorization: Bearer $CODEX_WEBHOOK_TOKEN" \
+            -H "Content-Type: application/json" \
+            -H "X-GitHub-Event: ${{ github.event_name }}" \
+            -H "X-GitHub-Delivery: ${{ github.run_id }}-${{ github.run_attempt }}" \
+            --connect-timeout 10 \
+            --max-time 60 \
+            --data-binary @event.json
+        env:
+          CODEX_WEBHOOK_URL: ${{ secrets.CODEX_WEBHOOK_URL }}
+          CODEX_WEBHOOK_TOKEN: ${{ secrets.CODEX_WEBHOOK_TOKEN }}
