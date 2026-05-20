@@ -34,6 +34,7 @@ class BridgeConfig:
     repo_path: Path
     token: str
     model: str
+    mention_handle: str
     host: str
     port: int
     allowed_repos: frozenset[str]
@@ -128,7 +129,11 @@ def parse_allowed_repos(raw: str | None, repo_path: Path) -> frozenset[str]:
     return frozenset({detect_local_repo(repo_path)})
 
 
-def extract_event(payload: dict[str, Any], event_name: str) -> MentionEvent:
+def extract_event(
+    payload: dict[str, Any],
+    event_name: str,
+    mention_handle: str,
+) -> MentionEvent:
     repo = payload.get("repository") or {}
     comment = payload.get("comment") or {}
     user = comment.get("user") or {}
@@ -146,9 +151,9 @@ def extract_event(payload: dict[str, Any], event_name: str) -> MentionEvent:
     if not repo_full_name:
         raise ValueError("payload is missing repository.full_name")
     if pr_number is None:
-        raise ValueError("@codex bridge only handles pull request comments")
-    if "@codex" not in body:
-        raise ValueError("comment does not contain @codex")
+        raise ValueError("mention bridge only handles pull request comments")
+    if mention_handle not in body:
+        raise ValueError(f"comment does not contain {mention_handle}")
 
     return MentionEvent(
         event_name=event_name,
@@ -217,7 +222,7 @@ Inline comment context:
 
     return textwrap.dedent(
         f"""
-        You are Codex running as a local @codex GitHub PR reviewer.
+        You are Codex running as a local GitHub PR mention reviewer.
 
         Return one concise GitHub Markdown comment. Do not modify files. Do not ask
         for permissions. Focus on correctness bugs, security issues, behavioral
@@ -351,7 +356,7 @@ def run_codex(config: BridgeConfig, prompt: str) -> str:
 def process_event(config: BridgeConfig, payload: dict[str, Any], event_name: str) -> None:
     status_comment_id: int | None = None
     try:
-        event = extract_event(payload, event_name)
+        event = extract_event(payload, event_name, config.mention_handle)
         if event.repo_full_name not in config.allowed_repos:
             raise ValueError(
                 f"repository {event.repo_full_name} is not in CODEX_ALLOWED_REPOS"
@@ -477,6 +482,7 @@ def build_config(argv: list[str]) -> BridgeConfig:
         repo_path=repo_path,
         token=token,
         model=os.environ.get("CODEX_MODEL", "gpt-5.5"),
+        mention_handle=os.environ.get("CODEX_MENTION_HANDLE", "@local-codex"),
         host=args.host,
         port=args.port,
         allowed_repos=parse_allowed_repos(os.environ.get("CODEX_ALLOWED_REPOS"), repo_path),
@@ -491,7 +497,8 @@ def main(argv: list[str]) -> int:
     server = BridgeServer((config.host, config.port), config)
     log(
         f"listening on http://{config.host}:{config.port}/github "
-        f"for {', '.join(sorted(config.allowed_repos))}"
+        f"for {', '.join(sorted(config.allowed_repos))} "
+        f"with trigger {config.mention_handle}"
     )
     try:
         server.serve_forever()
