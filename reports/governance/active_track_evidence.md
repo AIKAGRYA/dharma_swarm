@@ -1,26 +1,24 @@
 # Active Track Evidence
 
-Generated: 2026-05-20T12:16:15+00:00
-Track: `cockpit-control-surface-2026-05`
+Generated: 2026-05-20T13:34:42+00:00
+Track: `boardstore-facade-2026-05`
 Prerequisites: **OK**
-Completion: **4/4**
+Completion: **6/6**
 Shippable: **YES**
 
 ## Criteria
 
-- ✓ `control_surface_envelope_exists` (file_contains) — pattern 'class ControlSurfaceEnvelope' found in dharma_swarm/operator_core/control_surface_models.py
-- ✓ `display_hints_exists` (file_contains) — pattern 'DisplayHints' found in dharma_swarm/operator_core/control_surface_models.py
-- ✓ `cockpit_dashboard_page_exists` (file_exists) — dashboard/src/app/dashboard/control-surface/page.tsx present
-- ✓ `world_radar_wired` (file_exists) — dharma_swarm/world_radar/__init__.py present
-- ✓ `control_surface_router_registered` (file_contains) — pattern 'control_surface' found in api/main.py
-- ✓ `contract_tests_present` (file_exists) — tests/test_control_surface.py present
-- ✓ `pr_307_merged` (pr_merged) — PR #307: state=MERGED mergedAt=2026-05-18T14:04:59Z
-- ✓ `pr_244_merged` (pr_merged) — PR #244: state=MERGED mergedAt=2026-05-13T14:16:33Z
-- ✓ `control_surface_adr_published` (file_exists) — docs/architecture/CONTROL_SURFACE.md present
-- ✓ `ledger_watcher_envelope_aware` (file_contains) — pattern 'ControlSurfaceEnvelope|envelope' found in dharma_swarm/operator_brief/watchdog.py
-- ✓ `manifest_health_snapshot_archived` (file_exists) — reports/state/control_surface_manifest_health_snapshot.md present
-- ✓ `next_seam_adr_drafted` (file_exists) — docs/architecture/adr/0001-next-seam-candidate.md present
+- ✓ `boardstore_spec_exists` (file_exists) — docs/architecture/SWARM_BOARDSTORE_SPEC.md present
+- ✓ `next_seam_adr_exists` (file_exists) — docs/architecture/adr/0001-next-seam-candidate.md present
+- ✓ `cockpit_track_closed` (file_contains) — pattern 'cockpit-control-surface-2026-05' found in docs/governance/ACTIVE_TRACK.yaml
+- ✓ `task_board_exists` (file_exists) — dharma_swarm/task_board.py present
+- ✓ `board_package_scaffolded` (file_exists) — dharma_swarm/board/__init__.py present
+- ✓ `card_schema_defined` (file_contains) — pattern 'class Card' found in dharma_swarm/board/models.py
+- ✓ `event_log_implemented` (file_contains) — pattern 'class BoardEventLog' found in dharma_swarm/board/event_log.py
+- ✓ `facade_lifecycle_tests_pass` (file_exists) — tests/test_board_facade.py present
+- ✓ `dhyana_drift_triage_exists` (file_exists) — dharma_swarm/dhyana/drift_triage.py present
+- ✓ `sakshi_provenance_log_exists` (file_exists) — dharma_swarm/sakshi/provenance_log.py present
 
 ## Findings
 
-- **INFO** `track-shippable`: All 4 completion criteria pass. Track 'cockpit-control-surface-2026-05' is SHIPPABLE — close it and declare the next active track.
+- **INFO** `track-shippable`: All 6 completion criteria pass. Track 'boardstore-facade-2026-05' is SHIPPABLE — close it and declare the next active track.
