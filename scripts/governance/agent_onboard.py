@@ -295,6 +295,20 @@ def render_decay_watch() -> None:
         print(f"  [{tag}] {doc}")
 
 
+def render_tooling_first() -> None:
+    section("TOOLING-FIRST CONTEXT PASS")
+    print("  Before grep/read-heavy investigation in dharma_swarm, prefer:")
+    print("  - make onboard")
+    print("  - xray.py / make xray                   — repo overview")
+    print("  - GitNexus impact/context                — blast radius, callers/callees")
+    print("  - Context+ MCP semantic search           — blast radius where available")
+    print("  - ast-grep                               — structural search")
+    print("  - radon                                  — complexity hotspots")
+    print("  - grimp                                  — import graph / dependency truth")
+    print("  - vulture + ruff F401/F811               — dead-code / import rot")
+    print("  - lint-imports                           — advisory unless contracts green")
+
+
 def render_enforcement_and_depth() -> None:
     section("ENFORCEMENT (run before opening a PR)")
     print("  make docops-integrity      # documentation invariants")
@@ -362,6 +376,7 @@ def main() -> int:
     render_axioms()
     render_recent_activity(track)
     render_decay_watch()
+    render_tooling_first()
     render_enforcement_and_depth()
 
     section("WHAT TO DO NEXT")

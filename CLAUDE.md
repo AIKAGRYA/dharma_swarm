@@ -1,8 +1,10 @@
 # dharma_swarm — Claude Code Configuration
 
-## Before Anything Else
+## Before Anything Else — the single remembered gate
 
-Run the onboarding command. It is the single door into the current operating reality (active track, live ops, broken register, axioms, depth pointers):
+`make onboard` is the only command you need to remember. Everything else
+(active track, live ops, broken register, axioms, tooling hints, depth
+pointers) is rendered from the existing owners by that command:
 
 ```bash
 make onboard

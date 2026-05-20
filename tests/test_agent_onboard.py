@@ -55,6 +55,7 @@ def test_onboard_renders_required_sections():
         "SURFACE MANIFEST HEALTH",
         "BROKEN REGISTER",
         "LIVING AXIOMS",
+        "TOOLING-FIRST CONTEXT PASS",
         "ENFORCEMENT",
         "DEPTH POINTERS",
         "WHAT TO DO NEXT",
