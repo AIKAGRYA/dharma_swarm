@@ -1,10 +1,10 @@
 {
-  "generated_at": "2026-05-20T08:05:58+00:00",
+  "generated_at": "2026-05-20T12:16:15+00:00",
   "active_track_id": "cockpit-control-surface-2026-05",
-  "shippable": false,
+  "shippable": true,
   "prerequisites_ok": true,
   "completion_progress": {
-    "passed": 0,
+    "passed": 4,
     "total": 4
   },
   "criteria": [
@@ -48,44 +48,44 @@
       "id": "pr_307_merged",
       "kind": "pr_merged",
       "passed": true,
-      "detail": "PR #307: gh query failed, skipped"
+      "detail": "PR #307: state=MERGED mergedAt=2026-05-18T14:04:59Z"
     },
     {
       "id": "pr_244_merged",
       "kind": "pr_merged",
       "passed": true,
-      "detail": "PR #244: gh query failed, skipped"
+      "detail": "PR #244: state=MERGED mergedAt=2026-05-13T14:16:33Z"
     },
     {
       "id": "control_surface_adr_published",
       "kind": "file_exists",
-      "passed": false,
-      "detail": "docs/architecture/CONTROL_SURFACE.md MISSING"
+      "passed": true,
+      "detail": "docs/architecture/CONTROL_SURFACE.md present"
     },
     {
       "id": "ledger_watcher_envelope_aware",
       "kind": "file_contains",
-      "passed": false,
-      "detail": "pattern 'ControlSurfaceEnvelope|envelope' NOT FOUND in dharma_swarm/operator_brief/watchdog.py"
+      "passed": true,
+      "detail": "pattern 'ControlSurfaceEnvelope|envelope' found in dharma_swarm/operator_brief/watchdog.py"
     },
     {
       "id": "manifest_health_snapshot_archived",
       "kind": "file_exists",
-      "passed": false,
-      "detail": "reports/state/control_surface_manifest_health_snapshot.md MISSING"
+      "passed": true,
+      "detail": "reports/state/control_surface_manifest_health_snapshot.md present"
     },
     {
       "id": "next_seam_adr_drafted",
       "kind": "file_exists",
-      "passed": false,
-      "detail": "docs/architecture/adr/0001-next-seam-candidate.md MISSING"
+      "passed": true,
+      "detail": "docs/architecture/adr/0001-next-seam-candidate.md present"
     }
   ],
   "findings": [
     {
       "severity": "INFO",
-      "check": "track-in-progress",
-      "message": "0/4 completion criteria pass. Track 'cockpit-control-surface-2026-05' is in progress.",
+      "check": "track-shippable",
+      "message": "All 4 completion criteria pass. Track 'cockpit-control-surface-2026-05' is SHIPPABLE \u2014 close it and declare the next active track.",
       "criterion_id": null
     }
   ]
