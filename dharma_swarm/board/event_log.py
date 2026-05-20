@@ -12,8 +12,8 @@ It is append-only and tamper-evident by design.
 
 from __future__ import annotations
 
-import json
 import logging
+import sqlite3
 import time
 import uuid
 from pathlib import Path
@@ -74,14 +74,15 @@ class BoardEvent(BaseModel):
 # Event log persistence
 # ---------------------------------------------------------------------------
 
-_DEFAULT_LOG_PATH = Path.home() / ".dharma" / "board" / "event_log.jsonl"
+_DEFAULT_LOG_PATH = Path.home() / ".dharma" / "board" / "event_log.sqlite3"
 
 
 class BoardEventLog:
     """Append-only event log for board operations.
 
-    Writes to a JSONL file. Each line is a complete BoardEvent serialized
-    as JSON. The log never modifies or deletes past entries.
+    Writes to a local-first SQLite database. Each row stores one complete
+    BoardEvent JSON payload plus queryable routing columns. The log never
+    modifies or deletes past entries.
 
     Usage:
         log = BoardEventLog()
@@ -93,16 +94,89 @@ class BoardEventLog:
     def __init__(self, path: Path | None = None) -> None:
         self._path = path or _DEFAULT_LOG_PATH
         self._path.parent.mkdir(parents=True, exist_ok=True)
+        self._ensure_schema()
 
     @property
     def path(self) -> Path:
         return self._path
 
+    def _connect(self) -> sqlite3.Connection:
+        conn = sqlite3.connect(self._path)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA foreign_keys=ON")
+        return conn
+
+    def _ensure_schema(self) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS board_events (
+                    sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+                    event_id TEXT NOT NULL UNIQUE,
+                    kind TEXT NOT NULL,
+                    card_id TEXT,
+                    actor_id TEXT NOT NULL,
+                    actor_kind TEXT NOT NULL,
+                    timestamp TEXT NOT NULL,
+                    card_version INTEGER,
+                    from_status TEXT,
+                    to_status TEXT,
+                    idempotency_key TEXT NOT NULL,
+                    governance_snapshot_hash TEXT NOT NULL,
+                    event_json TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_board_events_card_sequence
+                ON board_events(card_id, sequence)
+                """
+            )
+            conn.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_board_events_timestamp_sequence
+                ON board_events(timestamp, sequence)
+                """
+            )
+
     def append(self, event: BoardEvent) -> EventId:
         """Append an event to the log. Returns the event ID."""
-        line = event.model_dump_json() + "\n"
-        with self._path.open("a", encoding="utf-8") as f:
-            f.write(line)
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO board_events (
+                    event_id,
+                    kind,
+                    card_id,
+                    actor_id,
+                    actor_kind,
+                    timestamp,
+                    card_version,
+                    from_status,
+                    to_status,
+                    idempotency_key,
+                    governance_snapshot_hash,
+                    event_json
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    str(event.event_id),
+                    event.kind,
+                    str(event.card_id) if event.card_id is not None else None,
+                    event.actor_id,
+                    event.actor_kind,
+                    str(event.timestamp),
+                    int(event.card_version) if event.card_version is not None else None,
+                    event.from_status,
+                    event.to_status,
+                    event.idempotency_key,
+                    event.governance_snapshot_hash,
+                    event.model_dump_json(),
+                ),
+            )
         logger.debug("board_event: %s %s %s", event.kind, event.card_id, event.event_id)
         return event.event_id
 
@@ -110,31 +184,64 @@ class BoardEventLog:
         """Read all events from the log."""
         if not self._path.exists():
             return []
-        events: list[BoardEvent] = []
-        with self._path.open("r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                events.append(BoardEvent.model_validate_json(line))
-        return events
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT event_json FROM board_events ORDER BY sequence ASC"
+            ).fetchall()
+        return [BoardEvent.model_validate_json(row["event_json"]) for row in rows]
 
     def read_since(self, after: str) -> list[BoardEvent]:
         """Read events with timestamp > after (ISO string comparison)."""
-        return [e for e in self.read_all() if e.timestamp > after]
+        if not self._path.exists():
+            return []
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT event_json FROM board_events
+                WHERE timestamp > ?
+                ORDER BY sequence ASC
+                """,
+                (after,),
+            ).fetchall()
+        return [BoardEvent.model_validate_json(row["event_json"]) for row in rows]
 
     def read_for_card(self, card_id: CardId) -> list[BoardEvent]:
         """Read all events for a specific card."""
-        return [e for e in self.read_all() if e.card_id == card_id]
+        if not self._path.exists():
+            return []
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT event_json FROM board_events
+                WHERE card_id = ?
+                ORDER BY sequence ASC
+                """,
+                (str(card_id),),
+            ).fetchall()
+        return [BoardEvent.model_validate_json(row["event_json"]) for row in rows]
 
     def count(self) -> int:
         """Count total events in the log."""
         if not self._path.exists():
             return 0
-        with self._path.open("r", encoding="utf-8") as f:
-            return sum(1 for line in f if line.strip())
+        with self._connect() as conn:
+            row = conn.execute("SELECT COUNT(*) AS count FROM board_events").fetchone()
+        return int(row["count"])
 
     def tail(self, n: int = 10) -> list[BoardEvent]:
         """Read the last N events."""
-        all_events = self.read_all()
-        return all_events[-n:]
+        if not self._path.exists():
+            return []
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT event_json FROM board_events
+                ORDER BY sequence DESC
+                LIMIT ?
+                """,
+                (n,),
+            ).fetchall()
+        return [
+            BoardEvent.model_validate_json(row["event_json"])
+            for row in reversed(rows)
+        ]

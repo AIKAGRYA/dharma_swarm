@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import tempfile
+import sqlite3
 from decimal import Decimal
 from pathlib import Path
 
@@ -11,15 +11,11 @@ import pytest
 from dharma_swarm.board.models import (
     Card,
     CardId,
-    CardStatus,
     ClaimLease,
     AcceptanceCriterion,
-    AuditEntry,
-    EventId,
     LeaseId,
     AgentId,
     IsoDatetime,
-    RenderHints,
     Version,
 )
 from dharma_swarm.board.event_log import BoardEvent, BoardEventLog
@@ -109,6 +105,18 @@ class TestBoardEventLog:
         assert len(events) == 1
         assert events[0].kind == "card_created"
         assert events[0].card_id == "card_001"
+
+    def test_event_log_uses_sqlite_schema(self, tmp_path: Path) -> None:
+        db_path = tmp_path / "events.sqlite3"
+        log = BoardEventLog(path=db_path)
+        log.append(BoardEvent(kind="card_created", card_id=CardId("card_sqlite")))
+
+        with sqlite3.connect(db_path) as conn:
+            rows = conn.execute(
+                "SELECT kind, card_id FROM board_events ORDER BY sequence"
+            ).fetchall()
+
+        assert rows == [("card_created", "card_sqlite")]
 
     def test_append_multiple(self, tmp_path: Path) -> None:
         log = BoardEventLog(path=tmp_path / "events.jsonl")
