@@ -482,7 +482,7 @@ def build_config(argv: list[str]) -> BridgeConfig:
         repo_path=repo_path,
         token=token,
         model=os.environ.get("CODEX_MODEL", "gpt-5.5"),
-        mention_handle=os.environ.get("CODEX_MENTION_HANDLE", "@local-codex"),
+        mention_handle=os.environ.get("CODEX_MENTION_HANDLE", "@terminal-review"),
         host=args.host,
         port=args.port,
         allowed_repos=parse_allowed_repos(os.environ.get("CODEX_ALLOWED_REPOS"), repo_path),
