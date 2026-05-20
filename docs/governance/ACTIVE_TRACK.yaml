@@ -26,128 +26,123 @@ schema_version: 1
 # Active track (exactly one block with status=ACTIVE at any time)
 # ---------------------------------------------------------------------------
 active_track:
-  id: cockpit-control-surface-2026-05
-  name: Operator Cockpit v1 + Control-Surface contract hardening
+  id: boardstore-facade-2026-05
+  name: BoardStore Facade — unified task/state surface for multi-agent coordination
   status: ACTIVE
-  opened_at: "2026-05-19"
-  verified_at: "2026-05-19"   # bump when you re-confirm this is still the live focus
-  ttl_days: 14                # CI fails if (today - verified_at) > ttl_days
+  opened_at: "2026-05-20"
+  verified_at: "2026-05-20"
+  ttl_days: 14
   owner: "@AmitabhainArunachala"
 
-  # One-paragraph human description (rendered into CLAUDE.md and BUILD_SESSION_ENTRYPOINT.md)
   description: |
-    Harden the operator cockpit and control-surface contract that landed in
-    PRs #244, #254, #275, #296, #307. This is the second ontology-native
-    seam — the first (operator_brief) shipped including items 5-9 of the
-    retired NEXT_10 plan and item 10 (Dharma Radar v0) is already wired
-    into Shakti via PRs #261, #275, #296. The cockpit lane is now the
-    convergence point: structured evidence, SSE stream, world-signal
-    receipt projection, and the ControlSurfaceEnvelope + DisplayHints
-    contract together form the operator-facing read seam of the substrate.
+    Implement the BoardStore facade contract specified in
+    docs/architecture/SWARM_BOARDSTORE_SPEC.md. This is the third
+    ontology-native seam — the first (operator_brief) shipped, the second
+    (cockpit/control-surface) shipped. The facade unifies 7 existing stores
+    behind a typed read/write surface with Card schema, event log,
+    noticer/doer separation, and cost-cap semantics. Implementation follows
+    the 5-step migration plan: scaffold → schema → adapt → client → cutover.
+    Additionally, seed Dhyana (System 4 observer) and Sakshi (provenance
+    witness) as supporting infrastructure for the board's decision chain.
 
-  # Where the work lives (path globs validated by check_track_status.py)
   surfaces:
-    - dharma_swarm/operator_core/control_surface*.py
-    - dharma_swarm/operator_core/world_radar/**
-    - dharma_swarm/world_radar/**
-    - api/routers/control_surface.py
-    - api/routers/manifest.py
-    - dashboard/src/app/dashboard/control-surface/page.tsx
-    - tests/test_control_surface.py
+    - dharma_swarm/board/**
+    - dharma_swarm/dhyana/**
+    - dharma_swarm/sakshi/**
+    - tests/test_board*.py
+    - tests/test_dhyana*.py
+    - tests/test_sakshi*.py
+    - docs/architecture/SWARM_BOARDSTORE_SPEC.md
 
-  # Two categories of machine-verifiable criteria:
-  #
-  #   prerequisites:        Must already be true for the track to have begun.
-  #                         A failure here means the track is mis-declared.
-  #   completion_criteria:  Must become true for the track to finish.
-  #                         When all pass, status flips SHIPPABLE.
-  #
-  # This separation is the structural fix for the failure mode that retired
-  # operator-brief: don't conflate "infrastructure landed" with "track done".
   prerequisites:
-    - id: control_surface_envelope_exists
-      kind: file_contains
-      file: dharma_swarm/operator_core/control_surface_models.py
-      pattern: "class ControlSurfaceEnvelope"
-    - id: display_hints_exists
-      kind: file_contains
-      file: dharma_swarm/operator_core/control_surface_models.py
-      pattern: "DisplayHints"
-    - id: cockpit_dashboard_page_exists
+    - id: boardstore_spec_exists
       kind: file_exists
-      file: dashboard/src/app/dashboard/control-surface/page.tsx
-    - id: world_radar_wired
-      kind: file_exists
-      file: dharma_swarm/world_radar/__init__.py
-    - id: control_surface_router_registered
-      kind: file_contains
-      file: api/main.py
-      pattern: "control_surface"
-    - id: contract_tests_present
-      kind: file_exists
-      file: tests/test_control_surface.py
-    - id: pr_307_merged
-      kind: pr_merged
-      pr: 307
-    - id: pr_244_merged
-      kind: pr_merged
-      pr: 244
-
-  completion_criteria:
-    # The track is SHIPPABLE only when every next_item below has produced its
-    # falsifiable artifact. These predicates flip from false to true as work
-    # lands. The operator updates this block (not next_items prose) to declare
-    # "this item is done".
-    - id: control_surface_adr_published
-      kind: file_exists
-      file: docs/architecture/CONTROL_SURFACE.md
-    - id: ledger_watcher_envelope_aware
-      kind: file_contains
-      file: dharma_swarm/operator_brief/watchdog.py
-      pattern: "ControlSurfaceEnvelope|envelope"
-    - id: manifest_health_snapshot_archived
-      kind: file_exists
-      file: reports/state/control_surface_manifest_health_snapshot.md
-    - id: next_seam_adr_drafted
+      file: docs/architecture/SWARM_BOARDSTORE_SPEC.md
+    - id: next_seam_adr_exists
       kind: file_exists
       file: docs/architecture/adr/0001-next-seam-candidate.md
+    - id: cockpit_track_closed
+      kind: file_contains
+      file: docs/governance/ACTIVE_TRACK.yaml
+      pattern: "cockpit-control-surface-2026-05"
+    - id: task_board_exists
+      kind: file_exists
+      file: dharma_swarm/task_board.py
 
-  # Non-goals — explicit guards against scope creep on this track.
+  completion_criteria:
+    - id: board_package_scaffolded
+      kind: file_exists
+      file: dharma_swarm/board/__init__.py
+    - id: card_schema_defined
+      kind: file_contains
+      file: dharma_swarm/board/models.py
+      pattern: "class Card"
+    - id: event_log_implemented
+      kind: file_contains
+      file: dharma_swarm/board/event_log.py
+      pattern: "class BoardEventLog"
+    - id: facade_lifecycle_tests_pass
+      kind: file_exists
+      file: tests/test_board_facade.py
+    - id: dhyana_drift_triage_exists
+      kind: file_exists
+      file: dharma_swarm/dhyana/drift_triage.py
+    - id: sakshi_provenance_log_exists
+      kind: file_exists
+      file: dharma_swarm/sakshi/provenance_log.py
+
   non_goals:
-    - Do not open a third seam (training flywheel, identity unification,
-      dashboard chat routing) before this track flips SHIPPABLE.
-    - Do not retroactively expand operator_brief scope. That track is closed.
-    - Do not decompose god objects on this track. A5 enforcement is a
-      separate maintenance lane.
+    - Do not open the live evolution gate (BR-003). Shadow-apply only.
+    - Do not implement dharma_swarm.client until facade lifecycle tests pass.
+    - Do not cut over existing stores until adapters have rollback semantics.
+    - Do not decompose god objects on this track. A5 enforcement is separate.
+    - Do not change the orchestrator's agent dispatch path on this track.
 
-  # Next ~5 concrete items on this track (the new "NEXT_5", succeeding NEXT_10).
-  # Items are short. Each must be either a PR ref, a path, or a one-line spec.
   next_items:
     - id: 1
-      what: "Close test gaps in tests/test_control_surface.py for envelope edge cases."
+      what: "Scaffold dharma_swarm/board/ package with __init__.py, models.py, facade.py, event_log.py."
+      kind: code
+      blocker: true
+    - id: 2
+      what: "Define Card + BoardEventLog schema per SWARM_BOARDSTORE_SPEC.md §Data Model."
       kind: code
       blocker: false
-    - id: 2
-      what: "Document operator cockpit zones in docs/architecture/CONTROL_SURFACE.md (new ADR-class doc)."
-      kind: docs
-      blocker: false
     - id: 3
-      what: "Wire ControlSurfaceEnvelope into the ledger watcher so DEGRADED zones are surfaced."
+      what: "Seed dharma_swarm/dhyana/drift_triage.py — rank DEGRADED control surface zones by blast_radius × age."
       kind: code
       blocker: false
     - id: 4
-      what: "Run manifest_health.build_health_report() against live runtime, archive snapshot under reports/state/."
-      kind: ops
+      what: "Seed dharma_swarm/sakshi/provenance_log.py — append-only decision chain for multi-agent attribution."
+      kind: code
       blocker: false
     - id: 5
-      what: "Open ADR for the next seam candidate (training flywheel vs. identity unification). Do not implement."
-      kind: docs
+      what: "Adapt TaskBoard as first store behind the facade with compatibility wrapper + rollback."
+      kind: code
       blocker: false
 
 # ---------------------------------------------------------------------------
 # Closed tracks (history, append-only; do not edit prior entries)
 # ---------------------------------------------------------------------------
 closed_tracks:
+  - id: cockpit-control-surface-2026-05
+    name: Operator Cockpit v1 + Control-Surface contract hardening
+    status: SHIPPED
+    opened_at: "2026-05-19"
+    closed_at: "2026-05-20"
+    closed_by: "devin/track-transition-PR-318-tested"
+    evidence:
+      - "docs/architecture/CONTROL_SURFACE.md — ADR for projector architecture"
+      - "dharma_swarm/operator_brief/watchdog.py — ControlSurfaceEnvelope wired into ledger watcher"
+      - "reports/state/control_surface_manifest_health_snapshot.md — archived health report"
+      - "docs/architecture/adr/0001-next-seam-candidate.md — next seam ADR (BoardStore)"
+      - "PR #318 — all 4 completion criteria met, tested 6/6"
+    superseded_by: boardstore-facade-2026-05
+    notes: |
+      Track declared SHIPPABLE by check_track_status.py after PR #318 landed
+      all four completion criteria artifacts. Tested adversarially: watchdog
+      surfaces 21 DEGRADED zones, control surface projects 95 rows, make onboard
+      renders correctly, DocOps passes clean.
+
   - id: operator-brief-seam-2026-04
     name: Ontology-Native Operator Brief (first substrate-native seam)
     status: SHIPPED
