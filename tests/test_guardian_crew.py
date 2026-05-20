@@ -488,6 +488,28 @@ async def test_ledger_watcher_operator_brief_ok_with_artifacts(tmp_path: Path) -
 
 
 @pytest.mark.asyncio
+async def test_ledger_watcher_operator_brief_trace_coverage_degraded(
+    tmp_path: Path,
+) -> None:
+    state_dir, db_path = _runtime_db(tmp_path)
+    _seed_operator_brief_events(db_path, 50)
+    _seed_operator_brief_artifacts(db_path, 5)
+    _seed_structured_rows(db_path)
+
+    findings = await run_ledger_watcher(state_dir)
+
+    trace_findings = [
+        f
+        for f in findings
+        if f.check == "LEDGER_WATCHER:operator_brief_trace_coverage"
+    ]
+    assert len(trace_findings) == 1
+    finding = trace_findings[0]
+    assert finding.severity == "DEGRADED"
+    assert "5/5 operator_brief artifact_records" in finding.detail
+
+
+@pytest.mark.asyncio
 async def test_ledger_watcher_operator_brief_below_threshold(tmp_path: Path) -> None:
     state_dir, db_path = _runtime_db(tmp_path)
     _seed_operator_brief_events(db_path, 9)

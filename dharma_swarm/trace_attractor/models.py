@@ -20,6 +20,7 @@ DHARMA_JSONLD_CONTEXT = {
     "prov": "http://www.w3.org/ns/prov#",
     "dharma": "https://dharma.local/ns#",
     "trace_id": "dharma:traceId",
+    "trace_id_source": "dharma:traceIdSource",
     "value_summary": "dharma:valueSummary",
 }
 
@@ -188,6 +189,7 @@ class AttractorPacket(_TraceAttractorModel):
 
     schema_version: int = ATTRACTOR_PACKET_SCHEMA_VERSION
     trace_id: str
+    trace_id_source: str = "unknown"
     generated_at: str = Field(default_factory=utc_now_iso)
     session_ids: list[str] = Field(default_factory=list)
     proposal_ids: list[str] = Field(default_factory=list)

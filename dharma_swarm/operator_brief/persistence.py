@@ -7,6 +7,7 @@ import hashlib
 import logging
 from pathlib import Path
 
+from dharma_swarm.correlation_context import get_correlation
 from dharma_swarm.ontology import OntologyObj, OntologyRegistry
 from dharma_swarm.runtime_state import ArtifactRecord, RuntimeStateStore
 
@@ -21,6 +22,17 @@ from dharma_swarm.operator_brief.types import (
 )
 
 logger = logging.getLogger(__name__)
+
+OPERATOR_BRIEF_TRACE_ID_SOURCE = "synthetic_legacy_alias"
+
+
+def _operator_brief_trace(proposal_id: str, date_str: str) -> tuple[str, str]:
+    """Return a deterministic legacy trace alias until upstream trace propagation lands."""
+    correlation = get_correlation()
+    if correlation.trace_id:
+        return correlation.trace_id, "correlation_context"
+    anchor = proposal_id or date_str
+    return f"operator_brief::{anchor}", OPERATOR_BRIEF_TRACE_ID_SOURCE
 
 
 def _artifact_root() -> Path:
@@ -54,6 +66,7 @@ def _materialise_artifact(
     ``failed_materialise`` outcome.
     """
     del agent_obj  # retained in the call signature for seam readability
+    trace_id, trace_id_source = _operator_brief_trace(proposal_id, date_str)
     artifact_obj = OntologyObj(
         type_name="KnowledgeArtifact",
         properties={
@@ -72,6 +85,8 @@ def _materialise_artifact(
             "cause_id": OPERATOR_BRIEF_CAUSE_ID,
             "cell_id": cell_id,
             "movement_kind": OPERATOR_BRIEF_CELL_KIND,
+            "trace_id": trace_id,
+            "trace_id_source": trace_id_source,
             "cited_fact_ids": list(drafted.cited_fact_ids),
         },
         created_by="operator_brief",
@@ -87,6 +102,8 @@ def _materialise_artifact(
         f"proposal_id: {proposal_id}\n"
         f"cause_id: {OPERATOR_BRIEF_CAUSE_ID}\n"
         f"cell_id: {cell_id}\n"
+        f"trace_id: {trace_id}\n"
+        f"trace_id_source: {trace_id_source}\n"
         f"brief_date: {date_str}\n"
         f"cited_fact_ids: [{', '.join(drafted.cited_fact_ids)}]\n"
         f"gate_decision_ids: [{', '.join(gate_decision_ids)}]\n"
@@ -120,6 +137,8 @@ def _materialise_artifact(
         date_str=date_str,
         proposal_id=proposal_id,
         cell_id=cell_id,
+        trace_id=trace_id,
+        trace_id_source=trace_id_source,
         brief_input=brief_input,
         gate_decision_ids=gate_decision_ids,
         witness_log_ids=witness_log_ids,
@@ -193,6 +212,13 @@ def _backfill_existing_runtime_artifact(
     content_hash = str(existing.properties.get("content_sha256") or "")
     if not file_path_str or not content_hash:
         return None
+    trace_id = str(existing.properties.get("trace_id") or "")
+    trace_id_source = str(existing.properties.get("trace_id_source") or "")
+    if not trace_id:
+        trace_id, trace_id_source = _operator_brief_trace(
+            str(existing.properties.get("provenance") or ""),
+            date_str,
+        )
     error = _record_runtime_artifact(
         runtime_state,
         artifact_id=existing.id,
@@ -201,6 +227,8 @@ def _backfill_existing_runtime_artifact(
         date_str=date_str,
         proposal_id=str(existing.properties.get("provenance") or ""),
         cell_id=cell_id or str(existing.properties.get("cell_id") or ""),
+        trace_id=trace_id,
+        trace_id_source=trace_id_source,
         brief_input=brief_input,
         gate_decision_ids=gate_decision_ids or [],
         witness_log_ids=witness_log_ids or [],
@@ -222,6 +250,8 @@ def _record_runtime_artifact(
     date_str: str,
     proposal_id: str,
     cell_id: str,
+    trace_id: str,
+    trace_id_source: str,
     brief_input: _BriefInput | None,
     gate_decision_ids: list[str],
     witness_log_ids: list[str],
@@ -251,6 +281,8 @@ def _record_runtime_artifact(
             "cause_id": OPERATOR_BRIEF_CAUSE_ID,
             "cell_id": cell_id,
             "movement_kind": OPERATOR_BRIEF_CELL_KIND,
+            "trace_id": trace_id,
+            "trace_id_source": trace_id_source,
             "proposal_id": proposal_id,
             "outcome_id": outcome_id,
             "value_event_id": value_event_id,

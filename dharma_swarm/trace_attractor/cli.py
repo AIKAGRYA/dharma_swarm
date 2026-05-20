@@ -8,8 +8,7 @@ pure TraceAttractorProjector.build_packet() for deterministic projection.
 from __future__ import annotations
 
 import asyncio
-import json
-from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 
@@ -20,6 +19,8 @@ def run_trace_attractor(
     registry_path: str | None = None,
     runtime_db: str | None = None,
     telemetry_db: str | None = None,
+    board_db: str | None = None,
+    sakshi_log: str | None = None,
 ) -> str:
     """Project a trace_id into an AttractorPacket and return formatted output."""
     loop = asyncio.new_event_loop()
@@ -31,6 +32,8 @@ def run_trace_attractor(
                 registry_path=registry_path,
                 runtime_db=runtime_db,
                 telemetry_db=telemetry_db,
+                board_db=board_db,
+                sakshi_log=sakshi_log,
             )
         )
     finally:
@@ -42,120 +45,50 @@ async def _collect_events(
     registry_path: str | None,
     runtime_db: str | None,
     telemetry_db: str | None,
+    board_db: str | None,
+    sakshi_log: str | None,
 ) -> list[dict[str, Any]]:
     """Gather raw records from available stores and normalise to event dicts."""
-    from dharma_swarm.trace_attractor.models import AttractorEvent
-
-    events: list[dict[str, Any]] = []
-    now_iso = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-
-    # --- Ontology objects ---
+    registry = None
     try:
         from dharma_swarm.ontology_runtime import get_shared_registry
 
         registry = get_shared_registry(path=registry_path)
-        for type_name in (
-            "ActionProposal", "GateDecision", "Outcome",
-            "ValueEvent", "Contribution", "WitnessLog",
-        ):
-            for obj in registry.get_objects_by_type(type_name):
-                props = getattr(obj, "properties", {}) or {}
-                if props.get("trace_id") != trace_id:
-                    meta = getattr(obj, "metadata", {}) or {}
-                    if meta.get("trace_id") != trace_id:
-                        continue
-                created = getattr(obj, "created_at", None)
-                events.append(
-                    AttractorEvent(
-                        event_id=f"onto_{obj.id}",
-                        trace_id=trace_id,
-                        proposal_id=props.get("proposal_id", ""),
-                        session_id=props.get("session_id", ""),
-                        source_store="ontology",
-                        source_table_or_type=type_name,
-                        source_object_id=obj.id,
-                        event_type=type_name,
-                        occurred_at=str(created) if created else now_iso,
-                        attributes=dict(props),
-                    ).model_dump(mode="json")
-                )
     except Exception:
         pass
 
-    # --- RuntimeState (task_claims, delegation_runs) ---
     try:
-        import aiosqlite
-        from dharma_swarm.runtime_state import DEFAULT_RUNTIME_DB
-
-        db = runtime_db or str(DEFAULT_RUNTIME_DB)
-        async with aiosqlite.connect(db) as conn:
-            conn.row_factory = aiosqlite.Row
-            for table, id_col in [
-                ("task_claims", "claim_id"),
-                ("delegation_runs", "run_id"),
-            ]:
-                try:
-                    cursor = await conn.execute(
-                        f"SELECT * FROM {table} WHERE trace_id = ?",
-                        (trace_id,),
-                    )
-                    for row in await cursor.fetchall():
-                        row_d = dict(row)
-                        events.append(
-                            AttractorEvent(
-                                event_id=f"rt_{row_d.get(id_col, '')}",
-                                trace_id=trace_id,
-                                session_id=row_d.get("session_id", ""),
-                                source_store="runtime_state",
-                                source_table_or_type=table,
-                                source_object_id=row_d.get(id_col, ""),
-                                event_type=table,
-                                occurred_at=row_d.get(
-                                    "started_at",
-                                    row_d.get("claimed_at", now_iso),
-                                ),
-                                attributes=row_d,
-                            ).model_dump(mode="json")
-                        )
-                except Exception:
-                    pass
+        from dharma_swarm.runtime_state import DEFAULT_RUNTIME_DB as default_runtime_db
     except Exception:
-        pass
+        default_runtime_db = None
 
-    # --- TelemetryPlane (economic_events) ---
     try:
-        import aiosqlite
-        from dharma_swarm.telemetry_plane import DEFAULT_TELEMETRY_DB
-
-        db = telemetry_db or str(DEFAULT_TELEMETRY_DB)
-        async with aiosqlite.connect(db) as conn:
-            conn.row_factory = aiosqlite.Row
-            try:
-                cursor = await conn.execute(
-                    "SELECT * FROM economic_events WHERE trace_id = ?",
-                    (trace_id,),
-                )
-                for row in await cursor.fetchall():
-                    row_d = dict(row)
-                    events.append(
-                        AttractorEvent(
-                            event_id=f"tel_{row_d.get('event_id', '')}",
-                            trace_id=trace_id,
-                            session_id=row_d.get("session_id", ""),
-                            source_store="telemetry_plane",
-                            source_table_or_type="economic_events",
-                            source_object_id=row_d.get("event_id", ""),
-                            event_type="economic_event",
-                            occurred_at=row_d.get("created_at", now_iso),
-                            attributes=row_d,
-                        ).model_dump(mode="json")
-                    )
-            except Exception:
-                pass
+        from dharma_swarm.telemetry_plane import (
+            DEFAULT_TELEMETRY_DB as default_telemetry_db,
+        )
     except Exception:
-        pass
+        default_telemetry_db = None
 
-    return events
+    from dharma_swarm.trace_attractor.readers import TraceAttractorStoreReader
+
+    runtime_db_path = (
+        Path(runtime_db)
+        if runtime_db
+        else Path(default_runtime_db) if default_runtime_db else None
+    )
+    telemetry_db_path = (
+        Path(telemetry_db)
+        if telemetry_db
+        else Path(default_telemetry_db) if default_telemetry_db else None
+    )
+    reader = TraceAttractorStoreReader(
+        registry=registry,
+        runtime_db_path=runtime_db_path,
+        telemetry_db_path=telemetry_db_path,
+        board_db_path=Path(board_db) if board_db else None,
+        sakshi_log_path=Path(sakshi_log) if sakshi_log else None,
+    )
+    return [event.model_dump(mode="json") for event in reader.read_events(trace_id)]
 
 
 async def _project(
@@ -165,11 +98,13 @@ async def _project(
     registry_path: str | None,
     runtime_db: str | None,
     telemetry_db: str | None,
+    board_db: str | None,
+    sakshi_log: str | None,
 ) -> str:
     from dharma_swarm.trace_attractor.projector import TraceAttractorProjector
 
     events = await _collect_events(
-        trace_id, registry_path, runtime_db, telemetry_db,
+        trace_id, registry_path, runtime_db, telemetry_db, board_db, sakshi_log,
     )
 
     projector = TraceAttractorProjector()

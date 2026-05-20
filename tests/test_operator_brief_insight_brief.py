@@ -22,6 +22,7 @@ from dharma_swarm.models import GateCheckResult, GateDecision, GateResult
 from dharma_swarm.ontology import OntologyRegistry
 from dharma_swarm.operator_brief import insight_brief, persistence
 from dharma_swarm.operator_brief.insight_brief import REQUIRED_GATES, run_once
+from dharma_swarm.correlation_context import correlation_scope_sync
 from dharma_swarm.runtime_state import MemoryFact, RuntimeStateStore, SessionEventRecord
 from dharma_swarm.telos_gates import DEFAULT_GATEKEEPER
 
@@ -447,12 +448,13 @@ def test_runtime_state_sources_drive_brief_and_artifact_record(
         )
     )
 
-    result = run_once(
-        registry=registry,
-        input_payload=None,
-        runtime_state=runtime,
-        gatekeeper=_all_pass_keeper(),
-    )
+    with correlation_scope_sync(trace_id="trc-operator-brief"):
+        result = run_once(
+            registry=registry,
+            input_payload=None,
+            runtime_state=runtime,
+            gatekeeper=_all_pass_keeper(),
+        )
 
     assert result["outcome"] == "success", result
     assert result["artifact_id"]
@@ -473,6 +475,9 @@ def test_runtime_state_sources_drive_brief_and_artifact_record(
     assert persisted.promotion_state == "published"
     assert persisted.metadata["cause_id"] == insight_brief.OPERATOR_BRIEF_CAUSE_ID
     assert persisted.metadata["cell_id"] == artifact.properties["cell_id"]
+    assert persisted.metadata["trace_id"] == "trc-operator-brief"
+    assert persisted.metadata["trace_id"] == artifact.properties["trace_id"]
+    assert persisted.metadata["trace_id_source"] == "correlation_context"
     assert persisted.metadata["source_event_ids"] == ["sevt-operator-1"]
     assert persisted.metadata["memory_fact_ids"] == ["fact-operator-1"]
     assert persisted.metadata["value_event_id"]

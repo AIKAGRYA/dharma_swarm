@@ -15,6 +15,7 @@ See ``docs/plans/NEXT_10_SUBSTRATE_TODO.md`` item 8.
 
 from __future__ import annotations
 
+import json
 import logging
 import sqlite3
 
@@ -52,6 +53,30 @@ def _operator_brief_artifact_count(db: sqlite3.Connection) -> int:
     return int(row[0] if row else 0)
 
 
+def _operator_brief_artifacts_missing_trace(db: sqlite3.Connection) -> int:
+    """Count operator_brief artifact records whose metadata lacks trace_id."""
+    exists = db.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'artifact_records'",
+    ).fetchone()
+    if exists is None:
+        return 0
+    rows = db.execute(
+        """
+        SELECT metadata_json FROM artifact_records
+        WHERE artifact_kind = 'operator_brief'
+        """
+    ).fetchall()
+    missing = 0
+    for row in rows:
+        try:
+            metadata = json.loads(row[0] or "{}")
+        except json.JSONDecodeError:
+            metadata = {}
+        if not str(metadata.get("trace_id") or "").strip():
+            missing += 1
+    return missing
+
+
 def check_operator_brief_output(
     db: sqlite3.Connection,
     runtime_db_path: str,
@@ -78,6 +103,36 @@ def check_operator_brief_output(
                 "Check DHARMA_OPERATOR_BRIEF_ENABLED=1, verify gate "
                 "decisions are not all blocking, and inspect "
                 "operator_brief persistence in RuntimeStateStore."
+            ),
+        )
+    ]
+
+
+def check_operator_brief_trace_coverage(
+    db: sqlite3.Connection,
+    runtime_db_path: str,
+) -> list[GuardianFinding]:
+    """Return DEGRADED findings for operator-brief artifacts lacking trace_id."""
+    artifacts = _operator_brief_artifact_count(db)
+    if artifacts == 0:
+        return []
+    missing = _operator_brief_artifacts_missing_trace(db)
+    if missing == 0:
+        return []
+    return [
+        GuardianFinding(
+            severity="DEGRADED",
+            check="LEDGER_WATCHER:operator_brief_trace_coverage",
+            title="Operator brief artifacts lack trace identity",
+            detail=(
+                f"{runtime_db_path} has {missing}/{artifacts} operator_brief "
+                "artifact_records without metadata.trace_id. Trace Attractor can "
+                "still project legacy aliases, but native causality is degraded."
+            ),
+            file=runtime_db_path,
+            fix_hint=(
+                "Run operator_brief under CorrelationContext and preserve "
+                "metadata.trace_id / metadata.trace_id_source in RuntimeStateStore."
             ),
         )
     ]

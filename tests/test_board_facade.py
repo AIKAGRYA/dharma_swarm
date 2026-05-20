@@ -23,6 +23,7 @@ from dharma_swarm.board.facade import (
     BoardStoreFacade,
     VersionConflictError,
 )
+from dharma_swarm.correlation_context import correlation_scope_sync
 
 
 class TestCardSchema:
@@ -136,6 +137,22 @@ class TestBoardEventLog:
         c1_events = log.read_for_card(CardId("c1"))
         assert len(c1_events) == 2
 
+    def test_read_for_trace(self, tmp_path: Path) -> None:
+        log = BoardEventLog(path=tmp_path / "events.sqlite3")
+        log.append(BoardEvent(
+            kind="card_created",
+            card_id=CardId("c1"),
+            trace_id="trc-board",
+            trace_id_source="operator_supplied",
+        ))
+        log.append(BoardEvent(kind="card_created", card_id=CardId("c2")))
+
+        trace_events = log.read_for_trace("trc-board")
+
+        assert len(trace_events) == 1
+        assert trace_events[0].card_id == "c1"
+        assert trace_events[0].trace_id_source == "operator_supplied"
+
     def test_empty_log(self, tmp_path: Path) -> None:
         log = BoardEventLog(path=tmp_path / "events.jsonl")
         assert log.read_all() == []
@@ -217,3 +234,48 @@ class TestBoardStoreFacade:
         assert events[1].kind == "card_transitioned"
         assert events[1].from_status == "inbox"
         assert events[1].to_status == "triaged"
+
+    def test_facade_writes_trace_metadata(self, tmp_path: Path) -> None:
+        log = BoardEventLog(path=tmp_path / "e.sqlite3")
+        facade = BoardStoreFacade(event_log=log)
+        card = facade.create_card(
+            title="Trace card",
+            body="",
+            source_surface="dashboard",
+            arjuna_weight=0.6,
+            trace_id="trc-facade",
+            trace_id_source="operator_supplied",
+        )
+        facade.transition(
+            card.id,
+            "triaged",
+            Version(1),
+            trace_id="trc-facade",
+            trace_id_source="operator_supplied",
+        )
+
+        events = log.read_for_trace("trc-facade")
+        assert [event.kind for event in events] == [
+            "card_created",
+            "card_transitioned",
+        ]
+
+    def test_facade_defaults_trace_metadata_from_correlation_context(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        log = BoardEventLog(path=tmp_path / "e.sqlite3")
+        facade = BoardStoreFacade(event_log=log)
+
+        with correlation_scope_sync(trace_id="trc-context-board"):
+            card = facade.create_card(
+                title="Context trace card",
+                body="",
+                source_surface="dashboard",
+                arjuna_weight=0.6,
+            )
+
+        events = log.read_for_trace("trc-context-board")
+        assert len(events) == 1
+        assert events[0].card_id == card.id
+        assert events[0].trace_id_source == "correlation_context"

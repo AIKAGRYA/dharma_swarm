@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from dharma_swarm.correlation_context import correlation_scope_sync
 from dharma_swarm.sakshi.provenance_log import (
     ProvenanceEntry,
     ProvenanceLog,
@@ -127,6 +128,36 @@ class TestProvenanceLog:
 
         track_a = log.read_for_track("track-a")
         assert len(track_a) == 1
+
+    def test_read_for_trace(self, tmp_path: Path) -> None:
+        log = ProvenanceLog(path=tmp_path / "prov.jsonl")
+        log.append(ProvenanceEntry(
+            actor_id="codex",
+            actor_kind="codex",
+            action="track_opened",
+            trace_id="trc-sakshi",
+            trace_id_source="operator_supplied",
+        ))
+        log.append(ProvenanceEntry(
+            actor_id="codex",
+            actor_kind="codex",
+            action="track_closed",
+        ))
+
+        entries = log.read_for_trace("trc-sakshi")
+        assert len(entries) == 1
+        assert entries[0].trace_id_source == "operator_supplied"
+
+    def test_entry_defaults_trace_metadata_from_correlation_context(self) -> None:
+        with correlation_scope_sync(trace_id="trc-sakshi-context"):
+            entry = ProvenanceEntry(
+                actor_id="codex",
+                actor_kind="codex",
+                action="track_opened",
+            )
+
+        assert entry.trace_id == "trc-sakshi-context"
+        assert entry.trace_id_source == "correlation_context"
 
     def test_empty_log(self, tmp_path: Path) -> None:
         log = ProvenanceLog(path=tmp_path / "prov.jsonl")

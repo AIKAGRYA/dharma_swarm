@@ -1,79 +1,73 @@
 {
-  "generated_at": "2026-05-20T13:34:42+00:00",
-  "active_track_id": "boardstore-facade-2026-05",
-  "shippable": true,
+  "generated_at": "2026-05-21T00:17:00+08:00",
+  "active_track_id": "trace-identity-coverage-2026-05",
+  "shippable": false,
   "prerequisites_ok": true,
   "completion_progress": {
-    "passed": 6,
+    "passed": 5,
     "total": 6
   },
   "criteria": [
     {
-      "id": "boardstore_spec_exists",
-      "kind": "file_exists",
-      "passed": true,
-      "detail": "docs/architecture/SWARM_BOARDSTORE_SPEC.md present"
-    },
-    {
-      "id": "next_seam_adr_exists",
-      "kind": "file_exists",
-      "passed": true,
-      "detail": "docs/architecture/adr/0001-next-seam-candidate.md present"
-    },
-    {
-      "id": "cockpit_track_closed",
+      "id": "trace_attractor_causal_spine_closed",
       "kind": "file_contains",
       "passed": true,
-      "detail": "pattern 'cockpit-control-surface-2026-05' found in docs/governance/ACTIVE_TRACK.yaml"
+      "detail": "pattern 'Trace Attractor Causal Spine shipped' found in docs/governance/ACTIVE_TRACK.yaml"
     },
     {
-      "id": "task_board_exists",
-      "kind": "file_exists",
-      "passed": true,
-      "detail": "dharma_swarm/task_board.py present"
-    },
-    {
-      "id": "board_package_scaffolded",
-      "kind": "file_exists",
-      "passed": true,
-      "detail": "dharma_swarm/board/__init__.py present"
-    },
-    {
-      "id": "card_schema_defined",
+      "id": "correlation_context_exists",
       "kind": "file_contains",
       "passed": true,
-      "detail": "pattern 'class Card' found in dharma_swarm/board/models.py"
+      "detail": "pattern 'class CorrelationContext' found in dharma_swarm/correlation_context.py"
     },
     {
-      "id": "event_log_implemented",
+      "id": "dgc_trace_attractor_wired",
       "kind": "file_contains",
       "passed": true,
-      "detail": "pattern 'class BoardEventLog' found in dharma_swarm/board/event_log.py"
+      "detail": "pattern 'trace-attractor' found in dharma_swarm/dgc_cli.py"
     },
     {
-      "id": "facade_lifecycle_tests_pass",
-      "kind": "file_exists",
+      "id": "operator_brief_consumes_correlation_context",
+      "kind": "file_contains",
       "passed": true,
-      "detail": "tests/test_board_facade.py present"
+      "detail": "pattern 'correlation_context' found in dharma_swarm/operator_brief/persistence.py"
     },
     {
-      "id": "dhyana_drift_triage_exists",
-      "kind": "file_exists",
+      "id": "board_event_context_trace_defaults",
+      "kind": "file_contains",
       "passed": true,
-      "detail": "dharma_swarm/dhyana/drift_triage.py present"
+      "detail": "pattern '_current_trace_id' found in dharma_swarm/board/event_log.py"
     },
     {
-      "id": "sakshi_provenance_log_exists",
+      "id": "sakshi_context_trace_defaults",
+      "kind": "file_contains",
+      "passed": true,
+      "detail": "pattern '_current_trace_id' found in dharma_swarm/sakshi/provenance_log.py"
+    },
+    {
+      "id": "guardian_soft_trace_coverage",
+      "kind": "file_contains",
+      "passed": true,
+      "detail": "pattern 'operator_brief_trace_coverage' found in dharma_swarm/operator_brief/watchdog.py"
+    },
+    {
+      "id": "trace_identity_coverage_witness",
       "kind": "file_exists",
       "passed": true,
-      "detail": "dharma_swarm/sakshi/provenance_log.py present"
+      "detail": "reports/witness/2026-05-21-trace-identity-coverage.md present"
+    },
+    {
+      "id": "hard_gate_policy_adr",
+      "kind": "file_exists",
+      "passed": false,
+      "detail": "docs/architecture/adr/0002-trace-coverage-gate.md MISSING"
     }
   ],
   "findings": [
     {
       "severity": "INFO",
-      "check": "track-shippable",
-      "message": "All 6 completion criteria pass. Track 'boardstore-facade-2026-05' is SHIPPABLE \u2014 close it and declare the next active track.",
+      "check": "track-in-progress",
+      "message": "5/6 completion criteria pass. Track 'trace-identity-coverage-2026-05' is in progress.",
       "criterion_id": null
     }
   ]

@@ -26,6 +26,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from dharma_swarm.correlation_context import get_correlation
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -61,6 +63,14 @@ ActionKind = Literal[
 ]
 
 
+def _current_trace_id() -> str:
+    return get_correlation().trace_id
+
+
+def _current_trace_id_source() -> str:
+    return "correlation_context" if get_correlation().trace_id else ""
+
+
 class ProvenanceEntry(BaseModel):
     """A single provenance record in the witness chain."""
 
@@ -73,6 +83,8 @@ class ProvenanceEntry(BaseModel):
     actor_id: str
     actor_kind: ActorKind
     session_id: str = ""
+    trace_id: str = Field(default_factory=_current_trace_id)
+    trace_id_source: str = Field(default_factory=_current_trace_id_source)
 
     # What
     action: ActionKind
@@ -195,6 +207,10 @@ class ProvenanceLog:
     def read_for_track(self, track_id: str) -> list[ProvenanceEntry]:
         """Read all entries associated with a specific track."""
         return [e for e in self.read_all() if e.track_id == track_id]
+
+    def read_for_trace(self, trace_id: str) -> list[ProvenanceEntry]:
+        """Read all entries associated with a specific trace_id."""
+        return [e for e in self.read_all() if e.trace_id == trace_id]
 
     def read_for_action(self, action: ActionKind) -> list[ProvenanceEntry]:
         """Read all entries of a specific action kind."""

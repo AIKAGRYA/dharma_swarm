@@ -43,6 +43,15 @@ def _new_id(prefix: str = "card") -> str:
     return f"{prefix}_{uuid.uuid4().hex[:12]}"
 
 
+def _trace_kwargs(trace_id: str, trace_id_source: str) -> dict[str, str]:
+    if not trace_id and not trace_id_source:
+        return {}
+    return {
+        "trace_id": trace_id,
+        "trace_id_source": trace_id_source or "operator_supplied",
+    }
+
+
 class VersionConflictError(Exception):
     """Raised when a write conflicts with the current card version."""
 
@@ -78,6 +87,8 @@ class BoardStoreFacade:
         cost_ceiling_usd: Decimal = Decimal("0.00"),
         capability_required: list[str] | None = None,
         initial_status: CardStatus = "inbox",
+        trace_id: str = "",
+        trace_id_source: str = "",
     ) -> Card:
         """Create a new card and record the event."""
         card_id = CardId(_new_id("card"))
@@ -124,6 +135,7 @@ class BoardStoreFacade:
                 card_version=Version(1),
                 to_status=initial_status,
                 idempotency_key=idempotency_key,
+                **_trace_kwargs(trace_id, trace_id_source),
             )
         )
 
@@ -137,6 +149,8 @@ class BoardStoreFacade:
         expected_version: Version,
         actor_id: str = "facade",
         reason: str = "",
+        trace_id: str = "",
+        trace_id_source: str = "",
     ) -> Card:
         """Transition a card's status with optimistic concurrency."""
         card = self._cards.get(card_id)
@@ -179,6 +193,7 @@ class BoardStoreFacade:
                 card_version=new_version,
                 from_status=from_status,
                 to_status=to_status,
+                **_trace_kwargs(trace_id, trace_id_source),
             )
         )
 

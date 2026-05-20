@@ -48,42 +48,39 @@ The governing principle behind whatever track is active: **one seam, end-to-end,
      Do not hand-edit. Run scripts/governance/render_active_track_includes.py
      after updating the YAML. -->
 
-**Active track:** BoardStore Facade — unified task/state surface for multi-agent coordination  
-**Track id:** `boardstore-facade-2026-05`  
-**Status:** ACTIVE  
-**Verified at:** 2026-05-20 (TTL 14 days)  
+**Active track:** Trace Identity Coverage — native propagation and soft coverage findings
+**Track id:** `trace-identity-coverage-2026-05`
+**Status:** ACTIVE
+**Verified at:** 2026-05-21 (TTL 14 days)
 **Owner:** @AmitabhainArunachala
 
 **Description:**
 
-Implement the BoardStore facade contract specified in
-docs/architecture/SWARM_BOARDSTORE_SPEC.md. This is the third
-ontology-native seam — the first (operator_brief) shipped, the second
-(cockpit/control-surface) shipped. The facade unifies 7 existing stores
-behind a typed read/write surface with Card schema, event log,
-noticer/doer separation, and cost-cap semantics. Implementation follows
-the 5-step migration plan: scaffold → schema → adapt → client → cutover.
-Additionally, seed Dhyana (System 4 observer) and Sakshi (provenance
-witness) as supporting infrastructure for the board's decision chain.
+Move Trace Attractor from first packet visibility to native trace identity
+propagation. New operator-brief, BoardStore, and Sakshi records should
+inherit CorrelationContext trace metadata when it exists; legacy records may
+still project through explicit synthetic aliases. Guardian should surface
+missing trace identity as DEGRADED evidence first, with any hard blocker
+policy deferred to an ADR.
 
 **Next items on this track:**
 
-- [code] (blocker) Scaffold dharma_swarm/board/ package with __init__.py, models.py, facade.py, event_log.py.
-- [code] Define Card + BoardEventLog schema per SWARM_BOARDSTORE_SPEC.md §Data Model.
-- [code] Seed dharma_swarm/dhyana/drift_triage.py — rank DEGRADED control surface zones by blast_radius × age.
-- [code] Seed dharma_swarm/sakshi/provenance_log.py — append-only decision chain for multi-agent attribution.
-- [code] Adapt TaskBoard as first store behind the facade with compatibility wrapper + rollback.
+- [code] (blocker) Default operator-brief, BoardStore, and Sakshi trace metadata from CorrelationContext.
+- [code] (blocker) Add Guardian DEGRADED finding for operator-brief artifacts missing metadata.trace_id.
+- [evidence] Write the trace identity coverage witness report.
+- [governance] (blocker) Write ADR-0002 deciding when missing trace identity becomes a hard blocker.
 
 **Non-goals (do not work on these during this track):**
 
-- Do not open the live evolution gate (BR-003). Shadow-apply only.
-- Do not implement dharma_swarm.client until facade lifecycle tests pass.
-- Do not cut over existing stores until adapters have rollback semantics.
-- Do not decompose god objects on this track. A5 enforcement is separate.
-- Do not change the orchestrator's agent dispatch path on this track.
+- Do not make missing trace_id a hard CI gate until the ADR is written.
+- Do not turn Trace Attractor into an autonomous apply trigger.
+- Do not mutate MemoryKernel or live evolution state on this track.
+- Do not claim BoardStore adapter/cutover completion.
+- Do not add dashboard/API surface unless it is implemented and manifest-registered.
 
 **Recently closed tracks:**
 
+- `boardstore-facade-2026-05` — BoardStore Facade — unified task/state surface for multi-agent coordination (SHIPPED, closed 2026-05-20)
 - `cockpit-control-surface-2026-05` — Operator Cockpit v1 + Control-Surface contract hardening (SHIPPED, closed 2026-05-20)
 - `operator-brief-seam-2026-04` — Ontology-Native Operator Brief (first substrate-native seam) (SHIPPED, closed 2026-05-19)
 

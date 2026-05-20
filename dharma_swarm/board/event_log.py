@@ -21,6 +21,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from dharma_swarm.correlation_context import get_correlation
 from dharma_swarm.board.models import (
     CardId,
     CardStatus,
@@ -49,6 +50,14 @@ EventKind = Literal[
 ]
 
 
+def _current_trace_id() -> str:
+    return get_correlation().trace_id
+
+
+def _current_trace_id_source() -> str:
+    return "correlation_context" if get_correlation().trace_id else ""
+
+
 class BoardEvent(BaseModel):
     """A single append-only event in the board event log."""
 
@@ -67,6 +76,8 @@ class BoardEvent(BaseModel):
     to_status: CardStatus | None = None
     idempotency_key: str = ""
     governance_snapshot_hash: str = ""
+    trace_id: str = Field(default_factory=_current_trace_id)
+    trace_id_source: str = Field(default_factory=_current_trace_id_source)
     detail: dict[str, str | int | float | bool | None] = Field(default_factory=dict)
 
 
@@ -124,10 +135,26 @@ class BoardEventLog:
                     to_status TEXT,
                     idempotency_key TEXT NOT NULL,
                     governance_snapshot_hash TEXT NOT NULL,
+                    trace_id TEXT NOT NULL DEFAULT '',
+                    trace_id_source TEXT NOT NULL DEFAULT '',
                     event_json TEXT NOT NULL
                 )
                 """
             )
+            columns = {
+                str(row["name"])
+                for row in conn.execute("PRAGMA table_info(board_events)")
+            }
+            if "trace_id" not in columns:
+                conn.execute(
+                    "ALTER TABLE board_events "
+                    "ADD COLUMN trace_id TEXT NOT NULL DEFAULT ''"
+                )
+            if "trace_id_source" not in columns:
+                conn.execute(
+                    "ALTER TABLE board_events "
+                    "ADD COLUMN trace_id_source TEXT NOT NULL DEFAULT ''"
+                )
             conn.execute(
                 """
                 CREATE INDEX IF NOT EXISTS idx_board_events_card_sequence
@@ -138,6 +165,12 @@ class BoardEventLog:
                 """
                 CREATE INDEX IF NOT EXISTS idx_board_events_timestamp_sequence
                 ON board_events(timestamp, sequence)
+                """
+            )
+            conn.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_board_events_trace_sequence
+                ON board_events(trace_id, sequence)
                 """
             )
 
@@ -158,9 +191,11 @@ class BoardEventLog:
                     to_status,
                     idempotency_key,
                     governance_snapshot_hash,
+                    trace_id,
+                    trace_id_source,
                     event_json
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     str(event.event_id),
@@ -174,6 +209,8 @@ class BoardEventLog:
                     event.to_status,
                     event.idempotency_key,
                     event.governance_snapshot_hash,
+                    event.trace_id,
+                    event.trace_id_source,
                     event.model_dump_json(),
                 ),
             )
@@ -187,6 +224,21 @@ class BoardEventLog:
         with self._connect() as conn:
             rows = conn.execute(
                 "SELECT event_json FROM board_events ORDER BY sequence ASC"
+            ).fetchall()
+        return [BoardEvent.model_validate_json(row["event_json"]) for row in rows]
+
+    def read_for_trace(self, trace_id: str) -> list[BoardEvent]:
+        """Read all events associated with a trace_id."""
+        if not self._path.exists():
+            return []
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT event_json FROM board_events
+                WHERE trace_id = ?
+                ORDER BY sequence ASC
+                """,
+                (trace_id,),
             ).fetchall()
         return [BoardEvent.model_validate_json(row["event_json"]) for row in rows]
 
