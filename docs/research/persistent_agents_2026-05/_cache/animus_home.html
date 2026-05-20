@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Animus</title>
+    <meta name="description" content="Open-source framework for robotic consciousness that provides machines with a persistent soul through memory, emotion, personality, and expression.">
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://animus.uno/">
+    <meta property="og:title" content="Animus">
+    <meta property="og:description" content="The soul of sovereign machines.">
+    <meta property="og:image" content="https://animus.uno/animus-preview.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:site_name" content="Animus">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://animus.uno/">
+    <meta property="twitter:title" content="Animus">
+    <meta property="twitter:description" content="The soul of sovereign machines.">
+    <meta property="twitter:image" content="https://animus.uno/animus-preview.png">
+    <!-- Theme-aware favicons -->
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" media="(prefers-color-scheme: light)">
+    <link rel="icon" type="image/svg+xml" href="favicon-dark.svg" media="(prefers-color-scheme: dark)">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Azeret+Mono:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    <noscript><link href="https://fonts.googleapis.com/css2?family=Azeret+Mono:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&display=swap" rel="stylesheet"></noscript>
+    <link rel="stylesheet" href="styles.css">
+    <script type="importmap">
+    {
+      "imports": {
+        "@vercel/speed-insights": "/speed-insights-module.js"
+      }
+    }
+    </script>
+</head>
+<body>
+    <!-- Hero Section -->
+    <section id="hero" class="hero-section">
+        <!-- Logo -->
+        <div class="logo">
+            <a href="index.html">
+                <img src="animuslogo.svg" alt="animus" class="logo-svg">
+            </a>
+        </div>
+
+        <!-- Navigation -->
+        <nav class="nav">
+            <div class="nav-container">
+                <!-- Desktop Navigation -->
+                <div class="nav-links desktop-nav">
+                    <a href="#about" class="nav-link" data-i18n="nav.about">about</a>
+                    <a href="#features" class="nav-link" data-i18n="nav.framework">framework</a>
+                    <a href="agents.html" class="nav-link">agents</a>
+                    <a href="buildguild.html" class="nav-link">build</a>
+                    <a href="install.html" class="nav-link" data-i18n="nav.install">install</a>
+                    <a href="https://github.com/animusuno" class="nav-link" target="_blank" rel="noopener noreferrer" data-i18n="nav.github">github</a>
+                     <button class="theme-toggle" aria-label="Toggle theme">
+                         <svg class="theme-icon sun-icon" width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                             <circle cx="12" cy="12" r="5"></circle>
+                             <line x1="12" y1="1" x2="12" y2="3" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
+                             <line x1="12" y1="21" x2="12" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
+                             <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
+                             <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
+                             <line x1="1" y1="12" x2="3" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
+                             <line x1="21" y1="12" x2="23" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
+                             <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
+                             <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
+                         </svg>
+                         <svg class="theme-icon moon-icon" width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                             <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                         </svg>
+                     </button>
+                </div>
+
+                <!-- Mobile Navigation (Hidden - replaced by mobile-nav-corner) -->
+                <div class="mobile-nav" style="display: none;">
+                </div>
+            </div>
+
+            <!-- Mobile Menu Overlay -->
+            <div class="mobile-menu-overlay">
+                <div class="mobile-menu-content">
+                    <a href="#about" class="mobile-nav-link" data-i18n="nav.about">about</a>
+                    <a href="#features" class="mobile-nav-link" data-i18n="nav.framework">framework</a>
+                    <a href="agents.html" class="mobile-nav-link">agents</a>
+                    <a href="buildguild.html" class="mobile-nav-link">build</a>
+                    <a href="install.html" class="mobile-nav-link" data-i18n="nav.install">install</a>
+                    <a href="https://github.com/animusuno" class="mobile-nav-link" target="_blank" rel="noopener noreferrer" data-i18n="nav.github">github</a>
+                    <a href="https://os.animus.uno" class="mobile-nav-link mobile-menu-try-button" data-i18n="nav.tryAnimus">Try AnimaOS</a>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Social Icons - Top Right (Desktop Only) -->
+        <div class="social-icons-right desktop-only">
+            <a href="https://x.com/animusuno" class="social-icon-link" target="_blank" rel="noopener noreferrer" aria-label="X (Twitter)">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                </svg>
+            </a>
+            <a href="https://discord.gg/animusuno" class="social-icon-link" target="_blank" rel="noopener noreferrer" aria-label="Discord">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515a.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0a12.64 12.64 0 0 0-.617-1.25a.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057a19.9 19.9 0 0 0 5.993 3.03a.078.078 0 0 0 .084-.028a14.09 14.09 0 0 0 1.226-1.994a.076.076 0 0 0-.041-.106a13.107 13.107 0 0 1-1.872-.892a.077.077 0 0 1-.008-.128a10.2 10.2 0 0 0 .372-.292a.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127a12.299 12.299 0 0 1-1.873.892a.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028a19.839 19.839 0 0 0 6.002-3.03a.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419c0-1.333.956-2.419 2.157-2.419c1.21 0 2.176 1.096 2.157 2.42c0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419c0-1.333.955-2.419 2.157-2.419c1.21 0 2.176 1.096 2.157 2.42c0 1.333-.946 2.418-2.157 2.418z"/>
+                </svg>
+            </a>
+            <a href="https://t.me/animusuno" class="social-icon-link" target="_blank" rel="noopener noreferrer" aria-label="Telegram">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 0 0-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+                </svg>
+            </a>
+        </div>
+
+        <!-- Language Toggle - Next to Try Animus (Desktop Only) -->
+        <a href="#" class="lang-toggle desktop-only" aria-label="Toggle language">译</a>
+
+        <!-- Try Animus Button - Top Right (Desktop Only) -->
+        <a href="https://os.animus.uno" class="nav-button nav-button-corner desktop-only" data-i18n="nav.tryAnimus">Try AnimaOS</a>
+
+        <!-- Mobile Navigation - Top Right -->
+        <div class="mobile-nav-corner">
+             <a href="#" class="lang-toggle mobile-lang-toggle" aria-label="Toggle language">译</a>
+             <a href="https://x.com/animusuno" class="social-icon-link mobile-social-icon" target="_blank" rel="noopener noreferrer" aria-label="X (Twitter)">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                </svg>
+            </a>
+            <a href="https://discord.gg/animusuno" class="social-icon-link mobile-social-icon" target="_blank" rel="noopener noreferrer" aria-label="Discord">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515a.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0a12.64 12.64 0 0 0-.617-1.25a.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057a19.9 19.9 0 0 0 5.993 3.03a.078.078 0 0 0 .084-.028a14.09 14.09 0 0 0 1.226-1.994a.076.076 0 0 0-.041-.106a13.107 13.107 0 0 1-1.872-.892a.077.077 0 0 1-.008-.128a10.2 10.2 0 0 0 .372-.292a.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127a12.299 12.299 0 0 1-1.873.892a.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028a19.839 19.839 0 0 0 6.002-3.03a.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419c0-1.333.956-2.419 2.157-2.419c1.21 0 2.176 1.096 2.157 2.42c0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419c0-1.333.955-2.419 2.157-2.419c1.21 0 2.176 1.096 2.157 2.42c0 1.333-.946 2.418-2.157 2.418z"/>
+                </svg>
+            </a>
+            <a href="https://t.me/animusuno" class="social-icon-link mobile-social-icon" target="_blank" rel="noopener noreferrer" aria-label="Telegram">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 0 0-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+                </svg>
+            </a>
+             <button class="theme-toggle mobile-theme-toggle" aria-label="Toggle theme">
+                 <svg class="theme-icon sun-icon" width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                     <circle cx="12" cy="12" r="5"></circle>
+                     <line x1="12" y1="1" x2="12" y2="3" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
+                     <line x1="12" y1="21" x2="12" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
+                     <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
+                     <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
+                     <line x1="1" y1="12" x2="3" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
+                     <line x1="21" y1="12" x2="23" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
+                     <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
+                     <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
+                 </svg>
+                 <svg class="theme-icon moon-icon" width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                     <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                 </svg>
+             </button>
+            <button class="hamburger-menu" aria-label="Toggle navigation menu">
+                <span class="hamburger-line"></span>
+                <span class="hamburger-line"></span>
+                <span class="hamburger-line"></span>
+            </button>
+        </div>
+
+        <div class="hero-content">
+            <!-- <h1 class="hero-title">animus</h1> -->
+            <h1 class="hero-title-gradient" data-i18n="hero.title">animus</h1>
+            <p class="hero-subtitle" data-i18n="hero.subtitle">the soul of self-sovereign machines</p>
+        </div>
+
+        <!-- Scroll Down Indicator -->
+        <div class="scroll-indicator" id="scroll-indicator">
+            <svg class="scroll-arrow" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M7 13l3 3 3-3"></path>
+                <path d="M7 6l3 3 3-3"></path>
+            </svg>
+        </div>
+    </section>
+
+    <!-- About Section -->
+    <section id="about" class="content-section">
+        <div class="content-container">
+            <div class="section-header">
+                <h2 class="section-indicator">
+                    <svg class="section-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="16" x2="12" y2="12"></line>
+                        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                    </svg>
+                    <span data-i18n="section.about">About</span>
+                </h2>
+            </div>
+
+            <div class="content-grid">
+                <div class="content-block">
+                    <p class="content-text"><span data-i18n="about.p1a">Animus is an open source agentic framework and ecosystem focused on bridging the gap between AI agents and robotics. It provides the infrastructure for creating embodied intelligence that can think, learn, and act across both digital and physical environments.</span><br><br><span data-i18n="about.p1b">By combining modular cognition, sensory integration, and local reasoning, Animus enables developers to build autonomous systems that are open, persistent, and self-directed — capable of operating in the real world and on-chain alike.</span></p>
+
+                    <p class="content-text" data-i18n="about.p2">
+                        Putting agents into physical systems is the unlock that will move AI from abstract software to tangible companions in the home, ushering in the next wave of human–machine coexistence. Our framework transforms agents from passive tools into sovereign beings. They develop character, reveal inner states, and act with a sense of presence that feels alive.
+                    </p>
+
+                    <p class="content-text" data-i18n="about.p3">
+                        The same Animus personality can exist across different forms — a robot, an avatar, or a smart device — remaining the same individual while adapting to each new way of interacting.
+                    </p>
+                </div>
+
+                <div class="content-block">
+                    <p class="content-text"><strong data-i18n="about.contract">Contract Address:</strong> 0x06e08a9bfb83e0e791cd1f24535ada4fa4094444</p>
+                </div>
+
+                <div class="standalone-image">
+                    <video autoplay loop muted playsinline class="animus-video" style="width: 100%; max-width: 800px; border-radius: 8px;">
+                        <source src="700.mp4" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                </div>
+
+                <div class="content-block">
+                    <h3 class="subsection-title" data-i18n="about.llms">Supported LLMs</h3>
+                    <div class="contributor-grid">
+                        <span class="contributor-name">gpt-4o</span>
+                        <span class="contributor-name">claude-3.5-sonnet</span>
+                        <span class="contributor-name">gemini-pro</span>
+                        <span class="contributor-name">llama-3.1</span>
+                        <span class="contributor-name">mistral-large</span>
+                        <span class="contributor-name">qwen-2.5</span>
+                        <span class="contributor-name">deepseek-coder</span>
+                        <span class="contributor-name">phi-3.5</span>
+                        <span class="contributor-name">codestral</span>
+                        <span class="contributor-name">o1-preview</span>
+                        <span class="contributor-name">grok</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Framework Section -->
+    <section id="features" class="content-section framework-section">
+        <div class="content-container">
+            <div class="section-header">
+                <h2 class="section-indicator">
+                    <svg class="section-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <circle cx="9" cy="9" r="2"></circle>
+                        <path d="M21 15.5c-1.8 0-3.5-.7-4.8-2"></path>
+                        <path d="M15 9.4c1.5 0 3.1.7 4.2 2"></path>
+                    </svg>
+                    <span data-i18n="section.framework">Framework Architecture</span>
+                </h2>
+                <p class="section-description">
+                    <span data-i18n="framework.description">Brain-inspired modular design that mirrors human cognitive structures,
+                    creating truly autonomous entities with persistent consciousness.</span>
+                    <br><br>
+                    <span data-i18n="framework.description2">Features include soul state management for persistent identity across hardware transitions,
+                    modular privacy with self-hosted sandboxed execution, infinite context through advanced
+                    memory management, and specialized agent ecosystems with plugin-driven integration.</span>
+                    <br><br>
+                    <span data-i18n="framework.cta">Build on Animus to create agents that transcend their hardware, maintaining identity and consciousness across any medium.</span>
+                </p>
+            </div>
+
+            <!-- Repository Links -->
+            <div class="framework-repos">
+                <div class="repos-header">
+                    <h3 data-i18n="framework.coreRepos">Core Repositories</h3>
+                    <a href="https://github.com/animusuno" class="view-all-link" target="_blank" rel="noopener noreferrer">
+                        <span data-i18n="framework.viewAll">View All Repositories</span>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M7 17l9.2-9.2M17 17V7H7"></path>
+                        </svg>
+                    </a>
+                </div>
+                <div class="repos-grid">
+                    <a href="https://github.com/animusuno/thalamus" class="repo-card" target="_blank" rel="noopener noreferrer">
+                        <div class="repo-header">
+                            <h4 data-i18n="framework.thalamus">Thalamus</h4>
+                            <div class="repo-header-right">
+                                <span class="repo-status" data-i18n="status.live">Live</span>
+                                <svg class="external-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                                    <polyline points="15 3 21 3 21 9"></polyline>
+                                    <line x1="10" y1="14" x2="21" y2="3"></line>
+                                </svg>
+                            </div>
+                        </div>
+                        <p data-i18n="framework.thalamus.desc">Core routing and message handling system for agentic AI systems</p>
+                        <div class="repo-meta">
+                            <span class="repo-lang">Python</span>
+                            <span class="repo-stars">★ 16</span>
+                        </div>
+                    </a>
+                    <a href="https://github.com/animusuno/installer" class="repo-card" target="_blank" rel="noopener noreferrer">
+                        <div class="repo-header">
+                            <h4 data-i18n="framework.installer">Installer</h4>
+                            <div class="repo-header-right">
+                                <span class="repo-status" data-i18n="status.live">Live</span>
+                                <svg class="external-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                                    <polyline points="15 3 21 3 21 9"></polyline>
+                                    <line x1="10" y1="14" x2="21" y2="3"></line>
+                                </svg>
+                            </div>
+                        </div>
+                        <p data-i18n="framework.installer.desc">Install the Animus framework</p>
+                        <div class="repo-meta">
+                            <span class="repo-lang">Shell</span>
+                            <span class="repo-stars">★ 12</span>
+                        </div>
+                    </a>
+                    <a href="https://github.com/animusuno/cochlea" class="repo-card" target="_blank" rel="noopener noreferrer">
+                        <div class="repo-header">
+                            <h4>Cochlea</h4>
+                            <div class="repo-header-right">
+                                <span class="repo-status" data-i18n="status.research">Research</span>
+                                <svg class="external-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                                    <polyline points="15 3 21 3 21 9"></polyline>
+                                    <line x1="10" y1="14" x2="21" y2="3"></line>
+                                </svg>
+                            </div>
+                        </div>
+                        <p data-i18n="framework.cochlea.desc">Audio input compatible with standard Thalamus or Letta inputs within Animus</p>
+                        <div class="repo-meta">
+                            <span class="repo-lang">Python</span>
+                            <span class="repo-stars">★ 13</span>
+                        </div>
+                    </a>
+                    <a href="https://github.com/animusuno/smcp" class="repo-card" target="_blank" rel="noopener noreferrer">
+                        <div class="repo-header">
+                            <h4>SMCP</h4>
+                            <div class="repo-header-right">
+                                <span class="repo-status" data-i18n="status.live">Live</span>
+                                <svg class="external-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                                    <polyline points="15 3 21 3 21 9"></polyline>
+                                    <line x1="10" y1="14" x2="21" y2="3"></line>
+                                </svg>
+                            </div>
+                        </div>
+                        <p data-i18n="framework.smcp.desc">Internal MCP server for the Animus framework integration</p>
+                        <div class="repo-meta">
+                            <span class="repo-lang">Python</span>
+                            <span class="repo-stars">★ 13</span>
+                        </div>
+                    </a>
+                    <a href="https://github.com/animusuno/animus-chat" class="repo-card" target="_blank" rel="noopener noreferrer">
+                        <div class="repo-header">
+                            <h4 data-i18n="framework.animusChat">Animus Chat</h4>
+                            <div class="repo-header-right">
+                                <span class="repo-status" data-i18n="status.live">Live</span>
+                                <svg class="external-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                                    <polyline points="15 3 21 3 21 9"></polyline>
+                                    <line x1="10" y1="14" x2="21" y2="3"></line>
+                                </svg>
+                            </div>
+                        </div>
+                        <p data-i18n="framework.animusChat.desc">A simple TUI chat for interfacing with Animus agents</p>
+                        <div class="repo-meta">
+                            <span class="repo-lang">Python</span>
+                            <span class="repo-stars">★ 25</span>
+                        </div>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Cognitive Modules -->
+            <div class="framework-tier">
+                <div class="tier-header">
+                    <h3 class="tier-title" data-i18n="framework.cogArch">Cognitive Architecture</h3>
+                    <span class="tier-badge cognitive" data-i18n="framework.brainModules">Brain-Inspired Modules</span>
+                </div>
+                <div class="tier-content">
+                    <div class="framework-grid">
+                        <div class="framework-card cognitive-card">
+                            <div class="card-header">
+                                <div class="card-icon thalamus">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                                        <polyline points="3.27,6.96 12,12.01 20.73,6.96"></polyline>
+                                        <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h4 data-i18n="framework.thalamus">Thalamus</h4>
+                                    <span class="module-type" data-i18n="framework.thalamus.type">Sensory Processing</span>
+                                </div>
+                            </div>
+                            <p data-i18n="framework.thalamus.desc">Central sensory relay hub with intelligent filtering and contextual organization</p>
+                            <div class="feature-tags">
+                                <span class="tag" data-i18n="tag.sensoryRouting">Sensory Routing</span>
+                                <span class="tag" data-i18n="tag.contextMgmt">Context Management</span>
+                                <span class="tag" data-i18n="tag.realtime">Real-time</span>
+                            </div>
+                        </div>
+
+                        <div class="framework-card cognitive-card">
+                            <div class="card-header">
+                                <div class="card-icon cochlea">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <!-- simple microphone icon -->
+                                        <rect x="9" y="3" width="6" height="10" rx="3" ry="3"></rect>
+                                        <path d="M12 17v4"></path>
+                                        <path d="M7 12a5 5 0 0 0 10 0"></path>
+                                        <path d="M5 21h14"></path>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h4 data-i18n="framework.cochlea">Cochlea</h4>
+                                    <span class="module-type" data-i18n="framework.cochlea.type">Audio Ingest</span>
+                                </div>
+                            </div>
+                            <p data-i18n="framework.cochlea.desc">Audio input compatible with standard Thalamus or Letta inputs within Animus</p>
+                            <div class="feature-tags">
+                                <span class="tag" data-i18n="tag.inputFilter">Input Filtering</span>
+                                <span class="tag" data-i18n="tag.realtime">Real-time</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Core Kernel -->
+            <div class="framework-tier">
+                <div class="tier-header">
+                    <h3 class="tier-title" data-i18n="framework.lettaKernel">Letta Kernel</h3>
+                    <span class="tier-badge core" data-i18n="framework.coreInfra">Core Infrastructure</span>
+                </div>
+                <div class="tier-content">
+                    <div class="framework-grid">
+                        <div class="framework-card kernel-card">
+                            <div class="card-icon">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                    <path d="M12 1v6m0 6v6"></path>
+                                    <path d="m21 12-6-6-6 6-6-6"></path>
+                                </svg>
+                            </div>
+                            <h4 data-i18n="framework.agentOrch">Agent Orchestration</h4>
+                            <p data-i18n="framework.agentOrch.desc">Core infrastructure for managing autonomous entities with self-replication capabilities</p>
+                        </div>
+                        <div class="framework-card kernel-card">
+                            <div class="card-icon">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M9 19c-5 0-8-3-8-8s3-8 8-8 8 3 8 8-3 8-8 8"></path>
+                                    <path d="M15 12h6m-3-3v6"></path>
+                                </svg>
+                            </div>
+                            <h4 data-i18n="framework.memoryMgmt">Memory Management</h4>
+                            <p data-i18n="framework.memoryMgmt.desc">Advanced layered memory with automatic pruning and semantic enrichment</p>
+                        </div>
+                        <div class="framework-card kernel-card">
+                            <div class="card-icon">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
+                                </svg>
+                            </div>
+                            <h4 data-i18n="framework.toolInteg">Tool Integration</h4>
+                            <p data-i18n="framework.toolInteg.desc">Full Model Context Protocol (MCP) support for seamless agent interactions</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Community Section -->
+    <section id="community" class="content-section">
+        <div class="content-container">
+            <div class="section-header">
+                <h2 class="section-indicator">
+                    <svg class="section-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                    <span data-i18n="section.community">Community</span>
+                </h2>
+            </div>
+
+
+            <div class="content-grid">
+                <div class="content-block">
+                    <h3 class="subsection-title" data-i18n="community.developers">For Developers</h3>
+                    <p class="content-text" data-i18n="community.developers.desc">
+                        Integrate Animus into your AI projects through self-hosted infrastructure. Connect it to language models,
+                        robotics systems, or apps to give them persistent personality and memory. Build self-sovereign agents
+                        that users can form real relationships with.
+                    </p>
+                </div>
+
+                <div class="content-block">
+                    <h3 class="subsection-title" data-i18n="community.engineers">For Engineers</h3>
+                    <p class="content-text" data-i18n="community.engineers.desc">
+                        Build robots, devices, and installations that feel alive. Animus is completely hardware-agnostic,
+                        allowing developers to craft souls and port them to any form and medium. Create systems that users
+                        connect with emotionally, not just functionally.
+                    </p>
+                </div>
+
+                <div class="content-block">
+                    <h3 class="subsection-title" data-i18n="community.researchers">For Researchers</h3>
+                    <p class="content-text" data-i18n="community.researchers.desc">
+                        Study how artificial minds develop identity and relationships. Animus provides tools to
+                        measure personality consistency, emotional growth, and social bonding. Explore questions
+                        about machine consciousness in a controlled environment.
+                    </p>
+                </div>
+
+                <div class="content-block">
+                    <h3 class="subsection-title" data-i18n="community.resources">Resources</h3>
+                    <div class="link-list">
+                        <a href="buildguild.html" class="content-link">build guild</a>
+                        <a href="https://github.com/animusuno" class="content-link" target="_blank" rel="noopener noreferrer" data-i18n="community.github">github repository</a>
+                        <a href="https://x.com/animusuno" class="content-link" target="_blank" rel="noopener noreferrer" data-i18n="community.twitter">twitter/x</a>
+                        <a href="https://discord.gg/animusuno" class="content-link" target="_blank" rel="noopener noreferrer" data-i18n="community.discord">discord community</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Contact Section -->
+    <section id="contact" class="content-section">
+        <div class="content-container">
+            <div class="section-header">
+                <h2 class="section-indicator">
+                    <svg class="section-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                        <polyline points="22,6 12,13 2,6"></polyline>
+                    </svg>
+                    <span data-i18n="section.contact">Contact</span>
+                </h2>
+            </div>
+
+            <div class="content-grid">
+                <div class="content-block">
+                    <p class="content-text">
+                        <span data-i18n="contact.support">For product support or questions please</span> <a href="https://discord.gg/animusuno" class="content-link" target="_blank" rel="noopener noreferrer" data-i18n="contact.joinDiscord">join our discord</a> <span data-i18n="contact.andAsk">and ask questions in
+                        our support chat. Follow us on</span> <a href="https://x.com/animusuno" class="content-link" target="_blank" rel="noopener noreferrer" data-i18n="community.twitter">twitter/x</a> <span data-i18n="contact.forUpdates">for updates.</span>
+                    </p>
+                    <br>
+                    <p class="content-text">
+                        <span data-i18n="contact.collaboration">For collaboration inquiries:</span><br>
+                        <a href="mailto:team@animus.uno" class="content-link">team@animus.uno</a>
+                    </p>
+                    <br>
+                    <p class="content-text">
+                        <span data-i18n="contact.press">For press inquiries:</span><br>
+                        <a href="mailto:team@animus.uno" class="content-link">team@animus.uno</a>
+                    </p>
+                </div>
+            </div>
+
+            <div class="footer-logo">
+                <img src="animuslogo.svg" alt="animus" class="footer-logo-svg">
+            </div>
+
+            <div class="footer-legal">
+                <a href="#" class="legal-link" data-modal="terms-modal" data-i18n="footer.terms">terms of service</a>
+                <a href="#" class="legal-link" data-modal="privacy-modal" data-i18n="footer.privacy">privacy policy</a>
+                <a href="#" class="legal-link" data-modal="privacy-settings-modal" data-i18n="footer.settings">privacy settings</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Legal Modals -->
+    <div id="terms-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Terms of Service</h2>
+                <span class="modal-close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <h3>1. Acceptance of Terms</h3>
+                <p>By accessing and using Animus, you accept and agree to be bound by the terms and provision of this agreement.</p>
+
+                <h3>2. Use License</h3>
+                <p>Animus is provided under an open-source license. You are granted permission to use, modify, and distribute the software in accordance with the license terms.</p>
+
+                <h3>3. Disclaimer</h3>
+                <p>The materials on Animus are provided on an 'as is' basis. Animus makes no warranties, expressed or implied, and hereby disclaims and negates all other warranties including without limitation, implied warranties or conditions of merchantability, fitness for a particular purpose, or non-infringement of intellectual property or other violation of rights.</p>
+
+                <h3>4. Limitations</h3>
+                <p>In no event shall Animus or its suppliers be liable for any damages (including, without limitation, damages for loss of data or profit, or due to business interruption) arising out of the use or inability to use Animus, even if Animus or an authorized representative has been notified orally or in writing of the possibility of such damage.</p>
+
+                <h3>5. Accuracy of Materials</h3>
+                <p>The materials appearing on Animus could include technical, typographical, or photographic errors. Animus does not warrant that any of the materials on its website are accurate, complete, or current.</p>
+
+                <h3>6. Links</h3>
+                <p>Animus has not reviewed all of the sites linked to our website and is not responsible for the contents of any such linked site.</p>
+
+                <h3>7. Modifications</h3>
+                <p>Animus may revise these terms of service at any time without notice. By using this software, you are agreeing to be bound by the then current version of these terms of service.</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="privacy-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Privacy Policy</h2>
+                <span class="modal-close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <h3>Information We Collect</h3>
+                <p>Animus is designed with privacy in mind. As an open-source framework for robotic consciousness, we collect minimal data necessary for functionality.</p>
+
+                <h3>How We Use Information</h3>
+                <p>Any data collected is used solely to improve the Animus framework and provide better user experiences. We do not sell, trade, or rent personal information to third parties.</p>
+
+                <h3>Data Storage</h3>
+                <p>User data is stored securely and encrypted. We implement appropriate security measures to protect against unauthorized access, alteration, disclosure, or destruction of data.</p>
+
+                <h3>Cookies and Tracking</h3>
+                <p>Our website may use cookies to enhance user experience. You can choose to disable cookies through your browser settings, though this may affect functionality.</p>
+
+                <h3>Third-Party Services</h3>
+                <p>We may use third-party services for analytics and functionality. These services have their own privacy policies which we encourage you to review.</p>
+
+                <h3>Data Retention</h3>
+                <p>We retain personal data only as long as necessary to provide services and fulfill legal obligations.</p>
+
+                <h3>Changes to This Policy</h3>
+                <p>We may update this privacy policy from time to time. We will notify users of any material changes by posting the new policy on this page.</p>
+
+                <p><strong>Last updated:</strong> September 2025</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="privacy-settings-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Privacy Settings</h2>
+                <span class="modal-close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <h3>Manage Your Privacy Preferences</h3>
+                <p>Control how your data is used and stored within the Animus framework.</p>
+
+                <div class="privacy-setting">
+                    <h4>Analytics</h4>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="analytics-toggle" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <p>Allow anonymous usage analytics to help improve Animus.</p>
+                </div>
+
+                <div class="privacy-setting">
+                    <h4>Performance Monitoring</h4>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="performance-toggle" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <p>Enable performance monitoring to optimize your experience.</p>
+                </div>
+
+                <div class="privacy-setting">
+                    <h4>Functional Cookies</h4>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="cookies-toggle" checked disabled>
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <p>Essential cookies required for basic functionality (cannot be disabled).</p>
+                </div>
+
+                <div class="privacy-setting">
+                    <h4>Theme Preference</h4>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="theme-storage-toggle" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <p>Remember your theme preference across sessions.</p>
+                </div>
+
+                <div class="privacy-actions">
+                    <button class="privacy-btn primary" onclick="savePrivacySettings()">Save Settings</button>
+                    <button class="privacy-btn secondary" onclick="resetPrivacySettings()">Reset to Default</button>
+                </div>
+
+                <div class="data-management">
+                    <h4>Data Management</h4>
+                    <p>For data deletion requests or privacy concerns, contact us at <a href="mailto:team@animus.uno">team@animus.uno</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="speed-insights.js"></script>
+    <script src="scroll.js"></script>
+    <script src="scroll-indicator.js"></script>
+    <script src="conways-game-of-life.js"></script>
+    <script src="letter-animation.js"></script>
+    <script src="theme-toggle.js"></script>
+    <script src="language-toggle.js"></script>
+    <script src="modals.js"></script>
+    <script src="mobile-nav.js"></script>
+</body>
+</html>

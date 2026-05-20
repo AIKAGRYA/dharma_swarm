@@ -1,0 +1,53 @@
+<!--
+Trimmed evidence cache for CrewAI memory docs.
+Original fetched dynamic HTML exceeded repository large-file limits.
+Survey date: 2026-05-20.
+Primary sources:
+- https://github.com/crewaiinc/crewai/blob/main/docs/en/concepts/memory.mdx
+- Context7 documentation query for /crewaiinc/crewai on CrewAI memory
+-->
+
+<h1>CrewAI memory - evidence excerpt</h1>
+
+<h2>Memory enablement</h2>
+
+<pre><code>from crewai import Agent
+
+analyst = Agent(
+    role="Data Analyst",
+    goal="Analyze and remember complex data patterns",
+    memory=True,
+    verbose=True,
+)</code></pre>
+
+<p>Context7 source summary: CrewAI agents can enable memory with
+<code>memory=True</code> to maintain context across multiple interactions and
+improve handling of complex multi-step tasks.</p>
+
+<h2>Crew memory</h2>
+
+<pre><code>crew = Crew(
+    agents=[researcher, writer],
+    tasks=[research_task, writing_task],
+    process=Process.sequential,
+    memory=True,
+    verbose=True,
+)</code></pre>
+
+<p>Context7 source summary: CrewAI crews can use default memory or custom
+<code>Memory</code> instances. The crew extracts facts from task outputs and
+injects relevant context into prompts.</p>
+
+<h2>Memory types and scoring</h2>
+
+<p>Context7 source summary: CrewAI docs describe short-term memory for recent
+context, long-term memory for persistent patterns across sessions, entity
+memory for people/places/concepts, and contextual memory for continuity. The
+newer unified <code>Memory</code> API supports semantic similarity, recency,
+and importance scoring with configurable weights.</p>
+
+<h2>Survey interpretation</h2>
+
+<p>CrewAI is not scored as a SAB participant because it is a framework. The
+pattern worth porting is a single agent-facing memory API over multiple memory
+types with scored recall.</p>
