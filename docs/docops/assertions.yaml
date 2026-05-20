@@ -159,6 +159,7 @@
       "docs/architecture/CONTROL_SURFACE.md",
       "docs/architecture/NAVIGATION.md",
       "docs/architecture/MODEL_ROUTING_CANON.md",
+      "docs/architecture/SWARM_BOARDSTORE_SPEC.md",
       "docs/architecture/WIRING_AND_LOOPS.md",
       "docs/architecture/WORLD_ZEITGEIST.md",
       "docs/MEGAFILE_INDEX.md",
