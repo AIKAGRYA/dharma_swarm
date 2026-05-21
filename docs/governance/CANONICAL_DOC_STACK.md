@@ -63,6 +63,7 @@ is **depth-on-demand**. Read it when you need it. Do not memorise a read order.
 | PR coherence gate | `docs/governance/COHERENCE_DELTA.md` | PR template |
 | Action warrant | `docs/governance/FOURFOLD_ACTION_WARRANT.md` | — |
 | Module-level what-does-what | `docs/architecture/NAVIGATION.md` | — |
+| Router/TaskBoard domain pinning | `docs/architecture/ROUTERS_AND_TASKBOARD.md` | — |
 | Model / provider routing | `docs/architecture/MODEL_ROUTING_CANON.md` | root `MODEL_ROUTING_MAP.md` (archive pointer) |
 | BoardStore facade / agent participation | `docs/architecture/SWARM_BOARDSTORE_SPEC.md` | — |
 | Terminal protocol | `specs/DGC_TERMINAL_ARCHITECTURE_v1.1.md` | v1.0 is archived |
