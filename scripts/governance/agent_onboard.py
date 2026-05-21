@@ -533,7 +533,8 @@ def _load_track_yaml() -> dict[str, Any]:
 
 def main() -> int:
     os.chdir(REPO_ROOT)
-    _refresh_evidence()
+    if os.getenv("AGENT_ONBOARD_REFRESH", "").strip() == "1":
+        _refresh_evidence()
     evidence = _load_evidence()
     track = _load_track_yaml()
 
