@@ -72,6 +72,7 @@ is **depth-on-demand**. Read it when you need it. Do not memorise a read order.
 | Onboarding megafile slots | `docs/MEGAFILE_INDEX.md` | individual slot files |
 | Audit trail | `docs/governance/REPO_GOVERNANCE_AUDIT.md` | — |
 | Work loops | `docs/governance/AGENTOPS.md`, `KAIZENOPS.md`, `DAILY_OPERATING_BRIEF.md`, `METABOLIC_CLOCK.md`, `HUMAN_YDS_LEDGER.md` | — |
+| Cross-agent coordination | `docs/state/CROSS_AGENT_INVENTORY.md` | — |
 
 If any file claims to own a fact already owned above, the rule is: **the file
 in this table wins; the other file becomes a pointer.**
