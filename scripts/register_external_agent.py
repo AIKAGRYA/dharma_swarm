@@ -21,6 +21,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from dharma_swarm.daemon_config import dharma_state_dir  # noqa: E402
 from dharma_swarm.external_agent_registration import (  # noqa: E402
     AutonomyPolicy,
     ExternalRoamingWorker,
@@ -177,7 +178,7 @@ def normalize_manifest(raw: dict[str, Any], *, dharma_home: Path) -> dict[str, A
     )
     workspace = dict(data.get("workspace_policy") or {})
     sandbox_root_raw = str(workspace.get("sandbox_root") or "").strip()
-    default_home = Path.home() / ".dharma"
+    default_home = dharma_state_dir()
     default_external_root = external_agent_sandbox_root(default_home).expanduser()
     use_default_sandbox = not sandbox_root_raw
     if sandbox_root_raw:
@@ -539,8 +540,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--dharma-home",
         type=Path,
-        default=Path.home() / ".dharma",
-        help="State root to write under. Defaults to ~/.dharma.",
+        default=dharma_state_dir(),
+        help="State root to write under. Defaults to the canonical local Dharma state dir.",
     )
     parser.add_argument(
         "--dry-run",
