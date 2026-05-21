@@ -103,8 +103,8 @@ async def lifespan(app: FastAPI):
 
     # Normalize dkeys/external env aliases before any provider resolution.
     aliased = normalize_env_aliases()
-    for alias, canonical, masked in aliased:
-        logger.info("env alias: %s → %s (%s)", alias, canonical, masked)
+    for alias, canonical, _masked in aliased:
+        logger.info("env alias applied: %s → %s", alias, canonical)
 
     from dharma_swarm.ontology_runtime import get_shared_registry
 

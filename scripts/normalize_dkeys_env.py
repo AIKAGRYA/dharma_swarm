@@ -51,16 +51,16 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.emit_exports:
+        # Intentional: --emit-exports must print full values for shell eval.
+        # This output is consumed by `eval "$(...)"`, never persisted to logs.
         for alias, canonical in ENV_ALIASES.items():
             if alias == canonical:
                 continue
             alias_val = os.environ.get(alias, "").strip()
             canonical_val = os.environ.get(canonical, "").strip()
             if alias_val and not canonical_val:
-                # Emit shell-safe export — value is single-quoted with
-                # embedded single-quotes escaped.
                 safe = alias_val.replace("'", "'\\''")
-                print(f"export {canonical}='{safe}'")
+                sys.stdout.write(f"export {canonical}='{safe}'\n")  # noqa: S101
         return
 
     applied = normalize_env_aliases(dry_run=not args.apply)
@@ -79,8 +79,8 @@ def main() -> None:
 
     action = "Applied" if args.apply else "Would apply (dry-run)"
     print(f"{action} {len(applied)} alias normalization(s):\n")
-    for alias, canonical, masked in applied:
-        print(f"  {alias} → {canonical}  (value: {masked})")
+    for alias, canonical, _masked in applied:
+        print(f"  {alias} → {canonical}")
 
     if not args.apply:
         print("\nRe-run with --apply to mutate os.environ, or use --emit-exports for shell sourcing.")
