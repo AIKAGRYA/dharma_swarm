@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 from pathlib import Path
 import shutil
@@ -14,6 +15,68 @@ _MODEL_ALIASES: dict[str, str] = {
     "gpt4": "sonnet",
     "gpt-4": "sonnet",
 }
+
+_ANTHROPIC_MODELS = frozenset({
+    "sonnet", "opus", "haiku",
+    "claude-sonnet-4-20250514", "claude-opus-4-6",
+    "claude-3-5-sonnet", "claude-3-haiku",
+})
+
+_default_router = None
+
+
+def _get_default_router():
+    """Lazy singleton for the canonical ModelRouter."""
+    global _default_router
+    if _default_router is None:
+        from dharma_swarm.providers import create_default_router
+        _default_router = create_default_router()
+    return _default_router
+
+
+def _canonical_fallback(prompt: str, *, model: str | None = None) -> str:
+    """Route through the canonical ModelRouter when Claude CLI is unavailable.
+
+    Uses create_default_router() which wires provider_policy, smart_router,
+    resilience (circuit breaker + retry), session affinity, routing memory,
+    and reward ranking — the full chain.
+    """
+    from dharma_swarm.models import LLMRequest, ProviderType
+    from dharma_swarm.provider_policy import ProviderRouteRequest
+
+    router = _get_default_router()
+    available = list(router._providers.keys())
+    fallback_model = (
+        model if model and model not in _ANTHROPIC_MODELS
+        and model not in _MODEL_ALIASES else None
+    )
+    route_req = ProviderRouteRequest(
+        action_name="claude_cli_fallback",
+        risk_score=0.3,
+        uncertainty=0.3,
+        novelty=0.2,
+        urgency=0.5,
+        expected_impact=0.5,
+    )
+    llm_req = LLMRequest(
+        model=fallback_model or "gemini-2.5-flash",
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=4096,
+    )
+
+    async def _dispatch():
+        _decision, response = await router.complete_for_task(
+            route_req, llm_req,
+            available_provider_types=available,
+        )
+        return response.content
+
+    try:
+        return asyncio.run(_dispatch())
+    except RuntimeError:
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            return pool.submit(asyncio.run, _dispatch()).result(timeout=60)
 
 
 def resolve_claude_binary() -> str:
@@ -106,22 +169,17 @@ def run_claude_headless(
     """Run Claude Code in headless mode for unattended/background work.
 
     When Claude CLI auth is unavailable (no ANTHROPIC_API_KEY), falls back
-    to the provider_fallback system which uses Gemini/OpenRouter directly.
+    to the canonical ModelRouter (provider_policy + smart_router + resilience)
+    which routes through Gemini/OpenRouter/etc directly.
     """
     env = build_claude_headless_env()
     auth_error = unattended_claude_auth_error(bare=bare, env=env)
 
     if auth_error:
-        # Claude CLI not available — fall back to direct provider call
         try:
-            from dharma_swarm.provider_fallback import quick_complete
-            # Anthropic-specific model names are meaningless to fallback providers
-            anthropic_models = {"sonnet", "opus", "haiku", "claude-sonnet-4-20250514",
-                                "claude-opus-4-6", "claude-3-5-sonnet", "claude-3-haiku"}
-            fallback_model = model if model and model not in anthropic_models and model not in _MODEL_ALIASES else None
-            return quick_complete(prompt, model=fallback_model)
+            return _canonical_fallback(prompt, model=model)
         except Exception as exc:
-            return f"ERROR: Claude CLI auth failed and provider fallback failed: {exc}"
+            return f"ERROR: Claude CLI auth failed and canonical fallback failed: {exc}"
 
     try:
         result = subprocess.run(
@@ -142,13 +200,8 @@ def run_claude_headless(
             return result.stdout[:5000]
         detail = result.stderr or result.stdout or ""
         if "Credit balance is too low" in detail:
-            # Credits exhausted mid-call — fall back
             try:
-                from dharma_swarm.provider_fallback import quick_complete
-                anthropic_models = {"sonnet", "opus", "haiku", "claude-sonnet-4-20250514",
-                                    "claude-opus-4-6", "claude-3-5-sonnet", "claude-3-haiku"}
-                fallback_model = model if model and model not in anthropic_models and model not in _MODEL_ALIASES else None
-                return quick_complete(prompt, model=fallback_model)
+                return _canonical_fallback(prompt, model=model)
             except Exception:
                 pass
         return f"Error (rc={result.returncode}): {detail[:500]}"

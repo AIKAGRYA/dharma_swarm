@@ -206,6 +206,79 @@ closed_tracks:
       (item 9 had shipped).
 
 # ---------------------------------------------------------------------------
+# Queued tracks (informational; do not open as ACTIVE until current track
+# closes. The check_track_status.py script ignores this block — it is only
+# read by humans and agents picking up future work.)
+# ---------------------------------------------------------------------------
+queued_tracks:
+  - id: command-plane-redesign-2026-05
+    name: Command Plane Redesign — Nihonga-anchored operator cockpit (7 verb-zones, 2D-canonical, 3D-where-it-earns)
+    status: QUEUED
+    queued_at: "2026-05-21"
+    owner: "@AmitabhainArunachala"
+    spec: docs/plans/2026-05-21-command-plane-design-lock.md
+    vision: docs/plans/COMMAND_PLANE_VISION.md
+    checklist: docs/plans/COMMAND_PLANE_CHECKLIST.md
+    multiagent_protocol: docs/plans/COMMAND_PLANE_MULTIAGENT_PROTOCOL.md
+
+    description: |
+      Refine /dashboard/control-surface from a flat 2D 4-zone shell into a
+      Nihonga-anchored, observatory-leaning operator cockpit. Seven verb-zones
+      (COCKPIT/TALK/WATCH/JUDGE/MAP/SENSE/REMEMBER) with shared grammar but
+      not shared chrome. 2D canonical; 3D opt-in per zone gated on a 60fps
+      benchmark. Custom shadcn registry + Commit Mono + Nihonga mineral
+      palette as the anti-AI-slop discipline. Numbers as the protagonist;
+      UI chrome as stage-hand.
+
+      Produced by a 10-agent process: 5 research scouts (claude-code,
+      vercel-lovable, palantir-ui, mcp-ecosystem, frontier-stack) +
+      4 adversarial stress-testers (r3f-craft-specialist, fractal-architect,
+      red-team, craft-reviewer) + grill-me interview cycle.
+
+    prerequisites_when_active:
+      - id: lock_doc_committed
+        kind: file_exists
+        file: docs/plans/2026-05-21-command-plane-design-lock.md
+      - id: vision_committed
+        kind: file_exists
+        file: docs/plans/COMMAND_PLANE_VISION.md
+      - id: checklist_committed
+        kind: file_exists
+        file: docs/plans/COMMAND_PLANE_CHECKLIST.md
+      - id: multiagent_protocol_committed
+        kind: file_exists
+        file: docs/plans/COMMAND_PLANE_MULTIAGENT_PROTOCOL.md
+      - id: trace_identity_track_closed
+        kind: file_not_contains
+        file: docs/governance/ACTIVE_TRACK.yaml
+        pattern: "id: trace-identity-coverage-2026-05\n  name: Trace Identity Coverage"
+
+    completion_criteria_target:
+      # These are aspirational; finalize when track moves from queued to active
+      - cockpit_v2_2d_shipped
+      - nihonga_palette_revalued
+      - benchmark_60fps_locked
+      - all_seven_zones_consolidated
+      - manifest_registered
+      - feature_flag_removed
+      - final_adversarial_acceptance_passed
+
+    non_goals:
+      - Do not open as ACTIVE while trace-identity-coverage-2026-05 is active.
+      - Do not re-debate locked design decisions (see spec).
+      - Do not use R_V framing in any aesthetic or architectural decision.
+      - Do not use "living system / heartbeat" metaphor language in code.
+      - Do not modify terminal_bridge.py (over LOC ceiling).
+      - Do not commit the untracked codex-composer page (separate PR).
+
+    pickup_instructions: |
+      Any agent (or human) opening cold: read docs/plans/COMMAND_PLANE_MULTIAGENT_PROTOCOL.md
+      first. Then docs/plans/COMMAND_PLANE_CHECKLIST.md. Phase 0 items are
+      mechanical pre-flight; safe to work on now even while this track is
+      queued. Phase 1+ should wait until the active track closes (or be
+      feature-flagged so they don't add new dashboard surface).
+
+# ---------------------------------------------------------------------------
 # Living axioms — filesystem-verifiable invariants that always apply.
 # Distinct from the active track. Owned by SOVEREIGN_MANIFEST.md.
 # Listed here only for cross-reference; do not duplicate the text.
