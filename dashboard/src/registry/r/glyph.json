@@ -1,0 +1,15 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "glyph",
+  "type": "registry:component",
+  "title": "Glyph",
+  "description": "Monochrome status glyph (✓ ✗ ◐ ⊘). No emoji.",
+  "files": [
+    {
+      "path": "components/primitives/Glyph.tsx",
+      "type": "registry:component"
+    }
+  ],
+  "dependencies": [],
+  "cssVars": {}
+}

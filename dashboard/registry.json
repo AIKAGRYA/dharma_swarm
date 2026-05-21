@@ -1,0 +1,61 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry.json",
+  "name": "dharma-swarm",
+  "homepage": "https://github.com/AmitabhainArunachala/dharma_swarm",
+  "items": [
+    {
+      "name": "numeral",
+      "type": "registry:component",
+      "title": "Numeral",
+      "description": "Tabular-figure numeric display — the protagonist on every screen.",
+      "files": [
+        { "path": "components/primitives/Numeral.tsx", "type": "registry:component" }
+      ]
+    },
+    {
+      "name": "status-badge",
+      "type": "registry:component",
+      "title": "StatusBadge",
+      "description": "ALLCAPS-MONO 4-state badge (PASS/FAIL/STALE/DRIFT). Reserved status tokens only.",
+      "files": [
+        { "path": "components/primitives/StatusBadge.tsx", "type": "registry:component" }
+      ]
+    },
+    {
+      "name": "glyph",
+      "type": "registry:component",
+      "title": "Glyph",
+      "description": "Monochrome status glyph (✓ ✗ ◐ ⊘). No emoji.",
+      "files": [
+        { "path": "components/primitives/Glyph.tsx", "type": "registry:component" }
+      ]
+    },
+    {
+      "name": "evidence-row",
+      "type": "registry:component",
+      "title": "EvidenceRow",
+      "description": "Dense row primitive — hairline border, no shadow, 24-28px row height.",
+      "files": [
+        { "path": "components/primitives/EvidenceRow.tsx", "type": "registry:component" }
+      ]
+    },
+    {
+      "name": "zone-frame",
+      "type": "registry:component",
+      "title": "ZoneFrame",
+      "description": "Positioning frame for the 7-zone hexagonal layout. Never renders the hex outline.",
+      "files": [
+        { "path": "components/primitives/ZoneFrame.tsx", "type": "registry:component" }
+      ]
+    },
+    {
+      "name": "pane",
+      "type": "registry:component",
+      "title": "Pane",
+      "description": "Resizable pane primitive wrapping react-resizable-panels.",
+      "files": [
+        { "path": "components/primitives/Pane.tsx", "type": "registry:component" }
+      ]
+    }
+  ]
+}

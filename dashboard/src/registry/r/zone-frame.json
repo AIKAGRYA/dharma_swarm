@@ -1,0 +1,15 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "zone-frame",
+  "type": "registry:component",
+  "title": "ZoneFrame",
+  "description": "Positioning frame for the 7-zone hexagonal layout. Never renders the hex outline. Holds verb-appropriate chrome per zone.",
+  "files": [
+    {
+      "path": "components/primitives/ZoneFrame.tsx",
+      "type": "registry:component"
+    }
+  ],
+  "dependencies": [],
+  "cssVars": {}
+}

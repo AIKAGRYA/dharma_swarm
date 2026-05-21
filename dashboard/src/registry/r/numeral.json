@@ -1,0 +1,15 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "numeral",
+  "type": "registry:component",
+  "title": "Numeral",
+  "description": "Tabular-figure numeric display — the protagonist on every screen.",
+  "files": [
+    {
+      "path": "components/primitives/Numeral.tsx",
+      "type": "registry:component"
+    }
+  ],
+  "dependencies": [],
+  "cssVars": {}
+}

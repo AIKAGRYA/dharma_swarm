@@ -1,0 +1,15 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "evidence-row",
+  "type": "registry:component",
+  "title": "EvidenceRow",
+  "description": "Dense row primitive — hairline border, no shadow, 24-28px row height, tabular figures.",
+  "files": [
+    {
+      "path": "components/primitives/EvidenceRow.tsx",
+      "type": "registry:component"
+    }
+  ],
+  "dependencies": [],
+  "cssVars": {}
+}

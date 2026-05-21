@@ -1,0 +1,15 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "pane",
+  "type": "registry:component",
+  "title": "Pane",
+  "description": "Resizable pane primitive wrapping react-resizable-panels for cockpit split-views.",
+  "files": [
+    {
+      "path": "components/primitives/Pane.tsx",
+      "type": "registry:component"
+    }
+  ],
+  "dependencies": ["react-resizable-panels"],
+  "cssVars": {}
+}

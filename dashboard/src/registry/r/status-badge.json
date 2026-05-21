@@ -1,0 +1,15 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "status-badge",
+  "type": "registry:component",
+  "title": "StatusBadge",
+  "description": "ALLCAPS-MONO 4-state badge (PASS / FAIL / STALE / DRIFT). Reserved status tokens only.",
+  "files": [
+    {
+      "path": "components/primitives/StatusBadge.tsx",
+      "type": "registry:component"
+    }
+  ],
+  "dependencies": [],
+  "cssVars": {}
+}
