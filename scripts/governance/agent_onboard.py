@@ -73,6 +73,29 @@ def git(*args: str, cwd: Path = REPO_ROOT) -> str:
         return ""
 
 
+def _run_probe(args: list[str], *, cwd: Path = REPO_ROOT, timeout: int = 8) -> tuple[bool, str]:
+    try:
+        completed = subprocess.run(
+            args,
+            cwd=cwd,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            timeout=timeout,
+        )
+    except (subprocess.TimeoutExpired, OSError) as exc:
+        return False, str(exc)
+    return completed.returncode == 0, completed.stdout.strip()
+
+
+def _port_listening(port: int) -> bool:
+    ok, _out = _run_probe(
+        ["lsof", "-nP", f"-iTCP:{port}", "-sTCP:LISTEN"],
+        timeout=4,
+    )
+    return ok
+
+
 def _today() -> date:
     return datetime.now(tz=timezone.utc).date()
 
@@ -353,6 +376,75 @@ def render_tooling_first() -> None:
         print(f"    {mark} {label}{suffix}")
 
 
+def render_frontend_readiness() -> None:
+    section("FRONTEND READINESS (canonical dashboard + terminal)")
+    dashboard_dir = REPO_ROOT / "dashboard"
+    build_id = dashboard_dir / ".next/BUILD_ID"
+    node_modules = dashboard_dir / "node_modules"
+
+    deps_ok, deps_out = _run_probe(
+        ["npm", "--prefix", "dashboard", "ls", "--depth=0"],
+        timeout=12,
+    )
+    bridge_ok, bridge_out = _run_probe(
+        [sys.executable, "-c", "import dharma_swarm.terminal_bridge"],
+        timeout=8,
+    )
+    api_http_ok, _ = _run_probe(
+        ["curl", "--max-time", "2", "-fsS", "http://127.0.0.1:8420/api/health"],
+        timeout=4,
+    )
+    web_http_ok, _ = _run_probe(
+        ["curl", "--max-time", "2", "-fsS", "http://127.0.0.1:3420/dashboard"],
+        timeout=4,
+    )
+    api_listening = api_http_ok or _port_listening(8420)
+    web_listening = web_http_ok or _port_listening(3420)
+
+    print(f"  Dashboard deps : {'OK' if deps_ok else 'BROKEN'}")
+    if not deps_ok:
+        first_line = deps_out.splitlines()[0] if deps_out else "npm ls failed"
+        print(f"    fix: make dashboard-install  ({first_line})")
+    print(f"  Dashboard build: {'present' if build_id.exists() else 'missing'}")
+    if not build_id.exists():
+        print("    fix: make dashboard-build")
+    api_status = "healthy" if api_http_ok else "listening" if api_listening else "not ready"
+    web_status = "serving /dashboard" if web_http_ok else "listening" if web_listening else "not ready"
+    print(f"  API :8420      : {api_status}")
+    print(f"  Web :3420      : {web_status}")
+    print(f"  Terminal bridge: {'imports cleanly' if bridge_ok else 'BROKEN'}")
+    if not bridge_ok:
+        first_line = bridge_out.splitlines()[-1] if bridge_out else "bridge import failed"
+        print(f"    fix: make terminal-check  ({first_line})")
+    print(f"  node_modules   : {'present' if node_modules.exists() else 'missing'}")
+
+
+def render_context_quorum() -> None:
+    section("CONTEXT QUORUM — MULTI-AGENT COORDINATION SPINE")
+    script = REPO_ROOT / "scripts/runtime/context_quorum.py"
+    policy = REPO_ROOT / "docs/ops/context_quorum_policy.json"
+    ok, out = _run_probe([sys.executable, str(script), "status", "--json"], timeout=8)
+    data: dict[str, Any] = {}
+    if ok and out:
+        try:
+            data = json.loads(out)
+        except json.JSONDecodeError:
+            data = {}
+
+    print(f"  CLI            : {'present' if script.exists() else 'missing'}")
+    print(f"  Policy         : {'present' if policy.exists() else 'missing'}")
+    if data:
+        print(f"  Agent homes    : {data.get('agent_home_count', 0)} at {data.get('agent_home_root', '~/.dharma/agents')}")
+        sample = data.get("sample_agents") or []
+        if sample:
+            print(f"  Sample agents  : {', '.join(sample[:6])}")
+    else:
+        print("  Agent homes    : unknown")
+    print("  Start agent    : make context-quorum-init AGENT=name ROLE=role")
+    print("  Pre-edit gate  : make context-quorum-check AGENT=name RISK=Q2 QUESTION='...'")
+    print("  Handoff        : make context-quorum-handoff AGENT=name SUMMARY='...'")
+
+
 def render_enforcement_and_depth() -> None:
     section("ENFORCEMENT (run before opening a PR)")
     print("  make docops-integrity      # documentation invariants")
@@ -420,6 +512,8 @@ def main() -> int:
     render_axioms()
     render_recent_activity(track)
     render_decay_watch()
+    render_frontend_readiness()
+    render_context_quorum()
     render_tooling_first()
     render_enforcement_and_depth()
 

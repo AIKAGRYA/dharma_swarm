@@ -1,7 +1,7 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts uplift-guards module-budget docops-integrity docops-report governance-all onboard go-fmt-check go-test go-vet go-ci
+.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts uplift-guards module-budget docops-integrity docops-report dashboard-install dashboard-lint dashboard-build dashboard-status terminal-check frontend-check context-quorum-status context-quorum-init context-quorum-check context-quorum-handoff context-quorum-protect governance-all onboard go-fmt-check go-test go-vet go-ci
 
 PYTHON ?= python3
 GO ?= go
@@ -44,6 +44,15 @@ help:
 	@echo "  make uplift-guards Run uplift pre-commit guards"
 	@echo "  make docops-integrity Run machine-verifiable documentation checks"
 	@echo "  make docops-report Generate local DocOps JSON/Markdown reports"
+	@echo "  make dashboard-install Install dashboard deps with CI-compatible peer handling"
+	@echo "  make dashboard-build Build the canonical Next dashboard"
+	@echo "  make dashboard-status Show dashboard launchd/port status"
+	@echo "  make terminal-check Run Bun terminal checks plus Python bridge import smoke"
+	@echo "  make frontend-check Run dashboard and terminal frontend readiness gates"
+	@echo "  make context-quorum-status Show multi-agent coordination spine status"
+	@echo "  make context-quorum-init AGENT=name ROLE=role Create a persistent agent home"
+	@echo "  make context-quorum-check AGENT=name RISK=Q2 QUESTION='...' Record context receipts"
+	@echo "  make context-quorum-handoff AGENT=name SUMMARY='...' Write current agent handoff"
 	@echo "  make onboard      Render current operating reality (active track, live ops, broken register, axioms)"
 	@echo "  make go-ci        Run Go evidence sense-organ fmt/vet/test gates"
 	@echo ""
@@ -201,7 +210,60 @@ docops-report:
 		--inventory-json reports/docops/corpus_inventory.json \
 		--inventory-markdown reports/docops/corpus_inventory.md
 
-governance-all: semgrep gitleaks test-hygiene test-contracts uplift-guards module-budget docops-integrity
+dashboard-install:
+	npm --prefix dashboard ci --legacy-peer-deps
+
+dashboard-lint:
+	npm --prefix dashboard run lint -- --quiet
+
+dashboard-build:
+	NEXT_PUBLIC_WS_URL="$${NEXT_PUBLIC_WS_URL:-ws://127.0.0.1:8420}" npm --prefix dashboard run build
+
+dashboard-status:
+	bash scripts/dashboard_ctl.sh status
+
+terminal-check:
+	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -c "import dharma_swarm.terminal_bridge"
+	bun run --cwd terminal typecheck
+	bun run --cwd terminal test
+
+frontend-check: dashboard-lint dashboard-build terminal-check
+
+context-quorum-status:
+	$(PYTHON) scripts/runtime/context_quorum.py status
+
+context-quorum-init:
+	$(PYTHON) scripts/runtime/context_quorum.py init-agent \
+		--agent "$${AGENT:?set AGENT=name}" \
+		--role "$${ROLE:-meta-agent}" \
+		--purpose "$${PURPOSE:-Persistent meta-agent with context quorum duties}"
+
+context-quorum-check:
+	@set --; \
+	if [ -n "$${SEMANTIC_RECEIPT:-}" ]; then set -- "$$@" --receipt "semantic_code=$${SEMANTIC_RECEIPT}"; fi; \
+	if [ -n "$${TEST_COMMAND:-}" ]; then set -- "$$@" --test-command "$${TEST_COMMAND}"; fi; \
+	if [ -n "$${HUMAN_APPROVAL:-}" ]; then set -- "$$@" --human-approval "$${HUMAN_APPROVAL}"; fi; \
+	if [ -n "$${ROLLBACK_PLAN:-}" ]; then set -- "$$@" --rollback-plan "$${ROLLBACK_PLAN}"; fi; \
+	$(PYTHON) scripts/runtime/context_quorum.py check \
+		--agent "$${AGENT:?set AGENT=name}" \
+		--task-id "$${TASK_ID:-manual-context-quorum}" \
+		--risk "$${RISK:-Q2}" \
+		--question "$${QUESTION:-manual context quorum}" \
+		--exact-query "$${EXACT_QUERY:-context quorum}" \
+		--changed-from "$${CHANGED_FROM:-HEAD}" \
+		"$$@"
+
+context-quorum-handoff:
+	$(PYTHON) scripts/runtime/context_quorum.py handoff \
+		--agent "$${AGENT:?set AGENT=name}" \
+		--task-id "$${TASK_ID:-manual-context-quorum}" \
+		--summary "$${SUMMARY:-No summary provided}" \
+		--next-step "$${NEXT_STEP:-Run make onboard and refresh context quorum before editing}"
+
+context-quorum-protect:
+	$(PYTHON) scripts/runtime/context_quorum.py protect --changed-from "$${CHANGED_FROM:-HEAD}" --fail-on-hit
+
+governance-all: semgrep gitleaks test-hygiene test-contracts uplift-guards module-budget docops-integrity frontend-check
 
 # Single-door onboarding: prints the current operating reality from existing
 # owners (ACTIVE_TRACK.yaml, LIVE_OPS_DASHBOARD.md, BROKEN_REGISTER.md,

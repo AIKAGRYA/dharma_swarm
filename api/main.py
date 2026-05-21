@@ -232,7 +232,7 @@ _ALLOWED_ORIGINS = [
     origin.strip()
     for origin in os.environ.get(
         "DASHBOARD_CORS_ORIGINS",
-        "http://localhost:3000,http://localhost:3001,http://localhost:8420",
+        "http://localhost:3000,http://localhost:3001,http://localhost:3420,http://127.0.0.1:3420,http://localhost:8420",
     ).split(",")
     if origin.strip()
 ]
@@ -250,7 +250,7 @@ app.add_middleware(
 
 def _register_routers(api_app: FastAPI) -> None:
     from api.routers.health import router as health_router
-    from api.routers.agents import router as agents_router
+    from api.routers.agents import router as agents_router, ws_router as agents_ws_router
     from api.routers.evolution import router as evolution_router
     from api.routers.ontology import router as ontology_router
     from api.routers.lineage import router as lineage_router
@@ -265,9 +265,12 @@ def _register_routers(api_app: FastAPI) -> None:
     from api.routers.manifest import router as manifest_router
     from api.routers.revenue import router as revenue_router
     from api.routers.control_surface import router as control_surface_router
+    from api.routers.viz import router as viz_router
+    from api.routers.pool import router as pool_router
 
     api_app.include_router(health_router)
     api_app.include_router(agents_router)
+    api_app.include_router(agents_ws_router)
     api_app.include_router(evolution_router)
     api_app.include_router(ontology_router)
     api_app.include_router(lineage_router)
@@ -282,6 +285,8 @@ def _register_routers(api_app: FastAPI) -> None:
     api_app.include_router(manifest_router)
     api_app.include_router(revenue_router)
     api_app.include_router(control_surface_router)
+    api_app.include_router(viz_router)
+    api_app.include_router(pool_router)
 
     from api.routers.chat import router as chat_router, ws_router as chat_ws_router
     from api.routers.fleet import router as fleet_router

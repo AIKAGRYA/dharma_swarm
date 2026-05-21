@@ -31,12 +31,4 @@ export const CONTROL_PLANE_ROUTE_DECK = [
     accent: "kinpaku",
     navIcon: "Settings2",
   },
-  {
-    id: "opportunities",
-    href: "/dashboard/opportunities",
-    label: "Opportunities",
-    summary: "Revenue loop pipeline: governed opportunity dispatch, stage tracking, and artifact output.",
-    accent: "aozora",
-    navIcon: "Sparkles",
-  },
 ];

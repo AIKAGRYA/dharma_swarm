@@ -14,15 +14,6 @@
     <key>RunAtLoad</key>
     <true/>
 
-    <key>KeepAlive</key>
-    <dict>
-        <key>SuccessfulExit</key>
-        <false/>
-    </dict>
-
-    <key>ThrottleInterval</key>
-    <integer>10</integer>
-
     <key>StandardOutPath</key>
     <string>__HOME__/.dharma/logs/dashboard-web.stdout.log</string>
 
@@ -42,6 +33,8 @@
         <string>127.0.0.1</string>
         <key>DASHBOARD_PORT</key>
         <string>3420</string>
+        <key>NEXT_PUBLIC_WS_URL</key>
+        <string>ws://127.0.0.1:8420</string>
     </dict>
 </dict>
 </plist>

@@ -10,6 +10,7 @@ HOME_DIR="${HOME}"
 LAUNCH_AGENTS_DIR="${HOME_DIR}/Library/LaunchAgents"
 LOG_DIR="${HOME_DIR}/.dharma/logs"
 LAUNCH_DOMAIN="gui/${UID}"
+NPM_BIN="${NPM_BIN:-npm}"
 
 API_LABEL="com.dharma.dashboard-api"
 WEB_LABEL="com.dharma.dashboard-web"
@@ -43,13 +44,41 @@ kickstart_label() {
     launchctl kickstart -k "${LAUNCH_DOMAIN}/${label}" >/dev/null 2>&1 || true
 }
 
+dashboard_deps_stale() {
+    local dashboard_dir="${REPO_ROOT}/dashboard"
+    if [[ ! -d "${dashboard_dir}/node_modules" ]]; then
+        return 0
+    fi
+    if [[ "${dashboard_dir}/package-lock.json" -nt "${dashboard_dir}/node_modules/.package-lock.json" ]]; then
+        return 0
+    fi
+    if ! (
+        cd "${dashboard_dir}"
+        "${NPM_BIN}" ls --depth=0 >/dev/null 2>&1
+    ); then
+        return 0
+    fi
+    return 1
+}
+
+ensure_dashboard_deps() {
+    if ! dashboard_deps_stale; then
+        return 0
+    fi
+    (
+        cd "${REPO_ROOT}/dashboard"
+        "${NPM_BIN}" ci --legacy-peer-deps
+    )
+}
+
 ensure_dashboard_build() {
+    ensure_dashboard_deps
     if [[ -f "${REPO_ROOT}/dashboard/.next/BUILD_ID" ]]; then
         return 0
     fi
     (
         cd "${REPO_ROOT}/dashboard"
-        npm run build
+        NEXT_PUBLIC_WS_URL="${NEXT_PUBLIC_WS_URL:-ws://127.0.0.1:8420}" "${NPM_BIN}" run build
     )
 }
 

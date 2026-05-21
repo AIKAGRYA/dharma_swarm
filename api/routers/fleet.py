@@ -127,6 +127,24 @@ async def fleet_capabilities() -> JSONResponse:
     return JSONResponse(content={"capabilities": cap_map})
 
 
+@router.get("/config")
+async def fleet_config() -> JSONResponse:
+    """Dashboard compatibility view for fleet-select controls."""
+    reg = _get_registry()
+    payload = []
+    for node in reg.list_all():
+        metadata = node.metadata or {}
+        payload.append({
+            "name": node.node_id,
+            "display_name": metadata.get("display_name") or node.node_id,
+            "role": metadata.get("role") or "remote_node",
+            "model": metadata.get("model") or metadata.get("provider") or node.status,
+            "tool_name": metadata.get("tool_name") or ",".join(node.capabilities[:3]) or None,
+            "thread": metadata.get("thread") or node.endpoint or None,
+        })
+    return JSONResponse(content=payload)
+
+
 @router.post("/dispatch")
 async def dispatch_task(body: dict[str, Any]) -> JSONResponse:
     """Dispatch a task to a specific remote node.

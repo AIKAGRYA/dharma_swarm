@@ -24,7 +24,16 @@ if [[ -f "$HOME/.zshrc" ]]; then
     )"
 fi
 
-for envfile in "$HOME/.env" "$HOME/.dharma/.env" "$HOME/.dharma/daemon.env"; do
+_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_REPO_ROOT="$(cd "${_SCRIPT_DIR}/.." && pwd)"
+
+for envfile in \
+    "$_REPO_ROOT/.env" \
+    "$HOME/.env" \
+    "$HOME/.dharma/.env" \
+    "$HOME/.dharma/agent_keys.env" \
+    "$HOME/.dharma/daemon.env"
+do
     _load_env_file "$envfile"
 done
 

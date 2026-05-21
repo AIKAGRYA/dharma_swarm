@@ -22,6 +22,7 @@ from dharma_swarm.ontology_agents import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["agents"])
+ws_router = APIRouter(tags=["agents-ws"])
 
 
 def _get_swarm():
@@ -305,6 +306,80 @@ async def list_agents() -> ApiResponse:
         return ApiResponse(data=[], error=str(e))
 
 
+@router.get("/agents/observatory")
+async def agent_observatory() -> ApiResponse:
+    """Fleet-wide dashboard summary used by the Observatory page."""
+    swarm = _get_swarm()
+    try:
+        agents = []
+        if swarm is not None and hasattr(swarm, "list_agents"):
+            try:
+                agents = await swarm.list_agents()
+            except Exception:
+                logger.debug("Observatory fallback: swarm agents unavailable", exc_info=True)
+        summaries = []
+        timeline = []
+        total_cost = 0.0
+        struggling = []
+
+        for agent in agents:
+            out = _agent_to_out(agent)
+            status = str(out.get("status") or "unknown")
+            tasks_completed = int(out.get("tasks_completed") or 0)
+            error = out.get("error")
+            success_rate = 0.0 if error else (1.0 if tasks_completed > 0 else 0.5)
+            composite = success_rate if status not in {"failed", "error"} else 0.0
+            if composite < 0.4:
+                struggling.append(str(out.get("name") or out.get("id")))
+            summaries.append({
+                "name": str(out.get("name") or out.get("id")),
+                "model": str(out.get("model_label") or out.get("model") or ""),
+                "role": str(out.get("role") or "general"),
+                "status": status,
+                "last_active": str(out.get("last_heartbeat") or out.get("started_at") or ""),
+                "composite_fitness": composite,
+                "success_rate": success_rate,
+                "avg_latency": 0,
+                "total_calls": tasks_completed,
+                "total_tokens": int(out.get("turns_used") or 0),
+                "total_cost_usd": 0,
+                "speed_score": 0,
+                "daily_spent": 0,
+                "weekly_spent": 0,
+                "budget_status": "unknown",
+                "sparkline": [composite],
+                "recent_tasks": [],
+            })
+            timeline.append({
+                "agent": str(out.get("name") or out.get("id")),
+                "task": str(out.get("current_task") or "status heartbeat"),
+                "success": not bool(error),
+                "tokens": int(out.get("turns_used") or 0),
+                "latency_ms": 0,
+                "cost_usd": 0,
+                "timestamp": str(out.get("last_heartbeat") or out.get("started_at") or ""),
+            })
+
+        top = max(summaries, key=lambda item: item["composite_fitness"], default=None)
+        fleet_fitness = (
+            sum(float(item["composite_fitness"]) for item in summaries) / len(summaries)
+            if summaries
+            else 0.0
+        )
+        return ApiResponse(data={
+            "agents": summaries,
+            "fleet_fitness": fleet_fitness,
+            "total_cost_usd": total_cost,
+            "agent_count": len(summaries),
+            "anomalies": [],
+            "timeline": timeline[:20],
+            "top_performer": str(top["name"]) if top else "",
+            "struggling": struggling,
+        })
+    except Exception as e:
+        return ApiResponse(status="error", data=None, error=str(e))
+
+
 @router.get("/agents/{agent_id}")
 async def get_agent(agent_id: str) -> ApiResponse:
     try:
@@ -579,8 +654,7 @@ async def get_agent_notes(agent_id: str) -> ApiResponse:
     return ApiResponse(data={"notes": notes})
 
 
-@router.websocket("/ws/agents")
-async def ws_agents(websocket: WebSocket):
+async def _ws_agents_loop(websocket: WebSocket) -> None:
     await manager.connect(websocket, "agents")
     try:
         while True:
@@ -597,3 +671,13 @@ async def ws_agents(websocket: WebSocket):
             await asyncio.sleep(5)
     except WebSocketDisconnect:
         await manager.disconnect(websocket, "agents")
+
+
+@router.websocket("/ws/agents")
+async def ws_agents_legacy(websocket: WebSocket):
+    await _ws_agents_loop(websocket)
+
+
+@ws_router.websocket("/ws/agents")
+async def ws_agents(websocket: WebSocket):
+    await _ws_agents_loop(websocket)

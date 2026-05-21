@@ -103,11 +103,26 @@ def run_claude_headless(
     bare: bool = True,
     tools: str | None = "default",
 ) -> str:
-    """Run Claude Code in headless mode for unattended/background work."""
+    """Run Claude Code in headless mode for unattended/background work.
+
+    When Claude CLI auth is unavailable (no ANTHROPIC_API_KEY), falls back
+    to the provider_fallback system which uses Gemini/OpenRouter directly.
+    """
     env = build_claude_headless_env()
     auth_error = unattended_claude_auth_error(bare=bare, env=env)
+
     if auth_error:
-        return auth_error
+        # Claude CLI not available — fall back to direct provider call
+        try:
+            from dharma_swarm.provider_fallback import quick_complete
+            # Anthropic-specific model names are meaningless to fallback providers
+            anthropic_models = {"sonnet", "opus", "haiku", "claude-sonnet-4-20250514",
+                                "claude-opus-4-6", "claude-3-5-sonnet", "claude-3-haiku"}
+            fallback_model = model if model and model not in anthropic_models and model not in _MODEL_ALIASES else None
+            return quick_complete(prompt, model=fallback_model)
+        except Exception as exc:
+            return f"ERROR: Claude CLI auth failed and provider fallback failed: {exc}"
+
     try:
         result = subprocess.run(
             build_claude_headless_command(
@@ -126,6 +141,16 @@ def run_claude_headless(
         if result.returncode == 0:
             return result.stdout[:5000]
         detail = result.stderr or result.stdout or ""
+        if "Credit balance is too low" in detail:
+            # Credits exhausted mid-call — fall back
+            try:
+                from dharma_swarm.provider_fallback import quick_complete
+                anthropic_models = {"sonnet", "opus", "haiku", "claude-sonnet-4-20250514",
+                                    "claude-opus-4-6", "claude-3-5-sonnet", "claude-3-haiku"}
+                fallback_model = model if model and model not in anthropic_models and model not in _MODEL_ALIASES else None
+                return quick_complete(prompt, model=fallback_model)
+            except Exception:
+                pass
         return f"Error (rc={result.returncode}): {detail[:500]}"
     except subprocess.TimeoutExpired:
         return "TIMEOUT: Claude Code exceeded limit"

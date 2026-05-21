@@ -21,6 +21,13 @@ NPM_BIN="${NPM_BIN:-npm}"
 
 mkdir -p "${STATE_DIR}/logs"
 
+if [[ -f "${SCRIPT_DIR}/load_runtime_env.sh" ]]; then
+    # shellcheck disable=SC1090
+    source "${SCRIPT_DIR}/load_runtime_env.sh"
+fi
+
+export NEXT_PUBLIC_WS_URL="${NEXT_PUBLIC_WS_URL:-ws://${OPERATOR_HOST:-127.0.0.1}:${OPERATOR_PORT:-8420}}"
+
 ui_cmd_matches() {
     local pid="$1"
     local cmd
@@ -76,7 +83,40 @@ dashboard_build_stale() {
     return 1
 }
 
+dashboard_deps_stale() {
+    if [[ ! -d "${DASHBOARD_DIR}/node_modules" ]]; then
+        return 0
+    fi
+
+    if [[ "${DASHBOARD_DIR}/package-lock.json" -nt "${DASHBOARD_DIR}/node_modules/.package-lock.json" ]]; then
+        return 0
+    fi
+
+    if ! (
+        cd "${DASHBOARD_DIR}"
+        "${NPM_BIN}" ls --depth=0 >/dev/null 2>&1
+    ); then
+        return 0
+    fi
+
+    return 1
+}
+
+ensure_dashboard_deps() {
+    if ! dashboard_deps_stale; then
+        return 0
+    fi
+
+    echo "Dashboard dependencies missing or stale; running npm ci --legacy-peer-deps..."
+    (
+        cd "${DASHBOARD_DIR}"
+        "${NPM_BIN}" ci --legacy-peer-deps
+    ) >> "${LOG_FILE}" 2>&1
+}
+
 ensure_dashboard_build() {
+    ensure_dashboard_deps
+
     if ! dashboard_build_stale; then
         return 0
     fi
@@ -91,15 +131,6 @@ ensure_dashboard_build() {
         "${NPM_BIN}" run build
     ) >> "${LOG_FILE}" 2>&1
 }
-
-for envfile in "${HOME}/.env" "${HOME}/.dharma/.env" "${HOME}/.dharma/daemon.env"; do
-    if [[ -f "$envfile" ]]; then
-        set -a
-        # shellcheck disable=SC1090
-        source "$envfile"
-        set +a
-    fi
-done
 
 if [[ -f "$PID_FILE" ]]; then
     old_pid="$(cat "$PID_FILE" 2>/dev/null || true)"
