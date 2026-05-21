@@ -53,7 +53,7 @@ help:
 	@echo "  make memory-kernel-knowledgeops-bridge-smoke Smoke KnowledgeOps to MemoryKernel promotion bridge"
 	@echo "  make memory-kernel-full-power-preflight Run M2-M5 governed live preflight"
 	@echo "  make operator-prod-smoke Run fast read-only operator production smoke"
-	@echo "  make onboard      Render current operating reality (active track, live ops, broken register, axioms)"
+	@echo "  make onboard      Render new-agent onboarding, toolbelt status, and current operating reality"
 	@echo "  make go-ci        Run Go evidence sense-organ fmt/vet/test gates"
 	@echo ""
 
@@ -247,12 +247,12 @@ operator-prod-smoke:
 
 governance-all: semgrep gitleaks test-hygiene test-contracts uplift-guards module-budget docops-integrity
 
-# Single-door onboarding: prints the current operating reality from existing
-# owners (ACTIVE_TRACK.yaml, LIVE_OPS_DASHBOARD.md, BROKEN_REGISTER.md,
-# ACTIVE_SURFACE_MANIFEST.yaml). Always exits 0. Run this before any build
-# session — humans and agents both.
+# Single-door onboarding: prints toolbelt status plus current operating reality
+# from existing owners (ACTIVE_TRACK.yaml, LIVE_OPS_DASHBOARD.md,
+# BROKEN_REGISTER.md, ACTIVE_SURFACE_MANIFEST.yaml). Always exits 0.
+# Run this before any build session — humans and agents both.
 onboard:
-	$(PYTHON) scripts/governance/agent_onboard.py
+	@bash scripts/runtime/agent_onboard.sh
 
 # ============================================================================
 # Go evidence sense-organ gates (Track G)
