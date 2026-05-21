@@ -185,7 +185,7 @@ def normalize_env_aliases(
 
     When *env* is ``None`` the real ``os.environ`` is mutated in-place.
     """
-    target = env if env is not None else dict(os.environ)
+    target = env if env is not None else os.environ
     applied: list[tuple[str, str, str]] = []
 
     for alias, canonical in ENV_ALIASES.items():
@@ -195,10 +195,7 @@ def normalize_env_aliases(
         canonical_val = target.get(canonical, "").strip()
         if alias_val and not canonical_val:
             if not dry_run:
-                if env is not None:
-                    env[canonical] = alias_val
-                else:
-                    os.environ[canonical] = alias_val
+                target[canonical] = alias_val
             masked = alias_val[:4] + "..." if len(alias_val) > 4 else "***"
             applied.append((alias, canonical, masked))
 
