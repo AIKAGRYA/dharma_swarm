@@ -192,7 +192,8 @@
       "dharma_swarm/inter_agent/devin/outbound/2026-05-22T13-55Z-devin-first_response.md",
       "docs/agents/devin-roaming-2987d222/SOUL.md",
       "docs/agents/devin-roaming-2987d222/MEMORY.md",
-      "docs/agents/devin-roaming-2987d222/PROTOCOLS.md"
+      "docs/agents/devin-roaming-2987d222/PROTOCOLS.md",
+      "docs/state/CROSS_AGENT_INVENTORY.md"
     ]
   },
   "auto_sections": {
