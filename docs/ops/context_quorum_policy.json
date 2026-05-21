@@ -1,0 +1,99 @@
+{
+  "version": 1,
+  "agent_home_root": "~/.dharma/agents",
+  "risk_levels": {
+    "Q0": {
+      "label": "read_only",
+      "required_families": ["onboard"],
+      "min_families": 1
+    },
+    "Q1": {
+      "label": "low_risk_docs",
+      "required_families": ["onboard", "exact_local"],
+      "min_families": 2
+    },
+    "Q2": {
+      "label": "bounded_code",
+      "required_families": ["onboard", "exact_local", "semantic_code", "tests_or_ci"],
+      "min_families": 3
+    },
+    "Q3": {
+      "label": "shared_runtime_or_governance",
+      "required_families": ["onboard", "exact_local", "semantic_code", "git_history", "memory_or_docs", "tests_or_ci", "protected_files"],
+      "min_families": 5
+    },
+    "Q4": {
+      "label": "sacred_measurement_or_self_modification",
+      "required_families": ["onboard", "exact_local", "semantic_code", "git_history", "memory_or_docs", "tests_or_ci", "protected_files", "human_approval", "rollback_plan"],
+      "min_families": 8
+    }
+  },
+  "tool_families": {
+    "onboard": "make onboard or equivalent current-state render",
+    "exact_local": "rg, git grep, fd, or targeted file evidence",
+    "semantic_code": "Context+, GitNexus, Augment, Sourcebot, Sourcegraph, Cursor index, Qodo, Greptile, or another code-context engine",
+    "git_history": "git log/show/blame evidence for touched surfaces",
+    "memory_or_docs": "Memory Palace recall, durable repo docs, ADRs, AGENTS.md, CLAUDE.md, or canonical owner docs",
+    "tests_or_ci": "local test, typecheck, build, GitHub Actions, GitLab CI, or measurement receipt",
+    "protected_files": "protected-file policy check",
+    "human_approval": "explicit human approval receipt",
+    "rollback_plan": "rollback or recovery plan receipt"
+  },
+  "protected_files": [
+    {
+      "pattern": "specs/Dharma_Constitution_v0.md",
+      "tier": "sacred",
+      "reason": "Hardcoded Prohibitions and priority hierarchy"
+    },
+    {
+      "pattern": "dharma_swarm/dharma_kernel.py",
+      "tier": "sacred",
+      "reason": "Dharma Layer identity kernel"
+    },
+    {
+      "pattern": "dharma_swarm/telos_gates.py",
+      "tier": "sacred",
+      "reason": "Telos gate enforcement"
+    },
+    {
+      "pattern": "dharma_swarm/*omega*",
+      "tier": "measurement",
+      "reason": "Omega measurement/scoring surface"
+    },
+    {
+      "pattern": "dharma_swarm/*scorer*",
+      "tier": "measurement",
+      "reason": "Scorer integrity"
+    },
+    {
+      "pattern": "scripts/governance/**",
+      "tier": "governance",
+      "reason": "Local governance gates"
+    },
+    {
+      "pattern": ".github/workflows/**",
+      "tier": "ci",
+      "reason": "CI authority"
+    },
+    {
+      "pattern": "tests/**",
+      "tier": "measurement",
+      "reason": "Tests can be abused to hide regressions"
+    },
+    {
+      "pattern": "CLAUDE.md",
+      "tier": "behavior",
+      "reason": "Agent behavior contract"
+    },
+    {
+      "pattern": "AGENTS.md",
+      "tier": "behavior",
+      "reason": "Agent behavior contract"
+    },
+    {
+      "pattern": "docs/governance/**",
+      "tier": "governance",
+      "reason": "Governance authority docs"
+    }
+  ]
+}

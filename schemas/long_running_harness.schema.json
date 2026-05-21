@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dharma.local/schemas/long_running_harness.schema.json",
+  "title": "Dharma Swarm Long-Running Harness Run",
+  "type": "object",
+  "required": ["version", "run_id", "goal", "mode", "status", "created_at", "repo_root", "git_state", "active_track", "harness_standard", "roles", "artifacts"],
+  "properties": {
+    "version": { "const": 1 },
+    "run_id": { "type": "string", "minLength": 1 },
+    "goal": { "type": "string", "minLength": 1 },
+    "mode": { "enum": ["brownfield", "greenfield", "command-plane"] },
+    "status": { "enum": ["initialized", "contracting", "building", "evaluating", "blocked", "complete", "retired"] },
+    "created_at": { "type": "string" },
+    "repo_root": { "type": "string" },
+    "git_state": {
+      "type": "object",
+      "required": ["branch", "base_sha", "dirty_count", "dirty_entries_sample", "is_clean"],
+      "properties": {
+        "branch": { "type": "string" },
+        "base_sha": { "type": "string" },
+        "dirty_count": { "type": "integer", "minimum": 0 },
+        "dirty_entries_sample": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "is_clean": { "type": "boolean" }
+      }
+    },
+    "risk_level": { "type": "string" },
+    "max_rounds": { "type": "integer", "minimum": 1 },
+    "active_track": {
+      "type": "object",
+      "required": ["id", "name", "status"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "status": { "type": "string" }
+      }
+    },
+    "harness_standard": {
+      "type": "object",
+      "required": ["id", "name", "applies_when", "repo_bridge", "repo_scaffold", "min_contract_criteria", "rules"],
+      "properties": {
+        "id": { "const": "pge" },
+        "name": { "type": "string" },
+        "adopted_at": { "type": "string" },
+        "applies_when": { "type": "string" },
+        "repo_bridge": { "type": "string" },
+        "repo_scaffold": { "type": "string" },
+        "memory_rule_path": { "type": "string" },
+        "wiki_atom_path": { "type": "string" },
+        "min_contract_criteria": { "type": "integer", "minimum": 20 },
+        "rules": {
+          "type": "array",
+          "minItems": 10,
+          "items": {
+            "type": "object",
+            "required": ["id", "rule"],
+            "properties": {
+              "id": { "type": "string" },
+              "rule": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "roles": {
+      "type": "object",
+      "required": ["planner", "generator", "evaluator", "trace_critic"],
+      "additionalProperties": { "type": "string" }
+    },
+    "artifacts": {
+      "type": "object",
+      "required": [
+        "run.json",
+        "planner/spec.md",
+        "planner/plan.json",
+        "contracts/done_contract.v0.md",
+        "contracts/contract.json",
+        "generator/GENERATOR_BRIEF.md",
+        "evaluator/EVALUATOR_BRIEF.md",
+        "rubrics/evaluator_rubric.json",
+        "progress/progress.json",
+        "traces/trace_index.jsonl",
+        "handoff/HANDOFF.md"
+      ],
+      "additionalProperties": { "type": "string" }
+    },
+    "context_quorum": {
+      "type": "object",
+      "required": ["required", "manifest_path", "status"],
+      "properties": {
+        "required": { "type": "boolean" },
+        "manifest_path": { "type": "string" },
+        "status": { "type": "string" }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "properties": {
+        "allowed_write_paths": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "forbidden_paths": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}

@@ -178,6 +178,17 @@ def render_active_track(evidence: dict[str, Any] | None,
             print(f"        {c.get('detail', '')}")
 
 
+def render_product_center() -> None:
+    section("PRODUCT CENTER")
+    print("  Dharma Swarm is a telos-gated DGM Goodworks Intelligence Core.")
+    print("  Job: verifiable welfare, ecological MRV, regenerative coordination.")
+    print("  API: /api/goodworks-dgm/status, /api/goodworks-dgm/goal, /api/goodworks-dgm/receipts")
+    print("  Dashboard: /dashboard/goodworks")
+    print("  Runtime: scripts/runtime/goodworks_dgm_tick.py --seed-pilot")
+    print("  Agent tool: goodworks_dgm; optional MCP: python3 -m dharma_swarm.goodworks_dgm.mcp")
+    print("  Key truth: GitHub never contains API key values; reconcile dkeys via local probes only.")
+
+
 def render_live_ops() -> None:
     section("LIVE OPS SNAPSHOT (owner: docs/state/LIVE_OPS_DASHBOARD.md)")
     if not LIVE_OPS.exists():
@@ -456,6 +467,7 @@ def render_enforcement_and_depth() -> None:
     print("  Anti-slop rules        : docs/governance/ANTI_SLOP_RULES.md")
     print("  Doc ownership map      : docs/governance/CANONICAL_DOC_STACK.md")
     print("  Architecture/doctrine  : docs/governance/SOVEREIGN_MANIFEST.md, docs/doctrine/")
+    print("  PGE/long-run harness   : docs/ops/PGE_AUTONOMOUS_BUILD_SYSTEM.md, docs/ops/LONG_RUNNING_HARNESS.md")
     print("  Coherence Delta        : docs/governance/COHERENCE_DELTA.md")
     print("  Daily/work loops       : docs/governance/AGENTOPS.md, KAIZENOPS.md, DAILY_OPERATING_BRIEF.md")
 
@@ -506,6 +518,7 @@ def main() -> int:
 
     render_repo_state()
     render_active_track(evidence, track)
+    render_product_center()
     render_live_ops()
     render_manifest_health()
     render_broken_register()
