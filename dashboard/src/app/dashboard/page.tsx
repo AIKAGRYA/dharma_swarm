@@ -5,7 +5,9 @@
  * MetricCards, FitnessTrend, Agent cards, Activity table.
  */
 
+import Link from "next/link";
 import { motion } from "framer-motion";
+import { Settings2 } from "lucide-react";
 import { useOverview } from "@/hooks/useOverview";
 import { useAgents } from "@/hooks/useAgents";
 import { useHealth } from "@/hooks/useHealth";
@@ -65,6 +67,13 @@ export default function DashboardOverview() {
               ? `Uptime ${Math.floor(overview.uptime_seconds / 3600)}h · ${overview.stigmergy_density} marks · ${overview.evolution_entries} evolution entries`
               : "Awaiting swarm telemetry."}
         </p>
+        <Link
+          href="/dashboard/control-surface"
+          className="mt-2 inline-flex items-center gap-2 rounded-lg border border-sumi-700/40 bg-sumi-950/70 px-3 py-1.5 text-xs font-medium text-sumi-300 transition-colors hover:bg-sumi-900 hover:text-aozora"
+        >
+          <Settings2 size={13} />
+          Open Operator Cockpit
+        </Link>
       </motion.div>
 
       {/* Metric cards */}

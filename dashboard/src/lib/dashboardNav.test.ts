@@ -10,25 +10,31 @@ function commandSection() {
   return section;
 }
 
-test("buildDashboardNavSections keeps the canonical operator deck contiguous near the top of COMMAND", () => {
+test("COMMAND section has Overview, Control Surface, then the canonical operator deck", () => {
   const items = commandSection().items;
 
+  assert.equal(items[0].label, "Overview");
+  assert.equal(items[0].href, "/dashboard");
+  assert.equal(items[1].label, "Control Surface");
+  assert.equal(items[1].href, "/dashboard/control-surface");
   assert.deepEqual(
-    items.slice(0, 6).map((item) => item.label),
-    ["Overview", ...CONTROL_PLANE_ROUTE_DECK.map((route) => route.label), "Conv. Log"],
-  );
-  assert.deepEqual(
-    items.slice(0, 5).map((item) => item.href),
-    ["/dashboard", ...CONTROL_PLANE_ROUTE_DECK.map((route) => route.href)],
+    items.slice(2, 2 + CONTROL_PLANE_ROUTE_DECK.length).map((item) => item.label),
+    CONTROL_PLANE_ROUTE_DECK.map((route) => route.label),
   );
 });
 
-test("buildDashboardNavSections avoids advertising /dashboard/claude as a second control plane", () => {
+test("COMMAND section stays lean (max 12 items) to prevent nav inflation", () => {
   const items = commandSection().items;
-  const semanticGraph = items.find((item) => item.href === "/dashboard/claude");
+  assert.ok(items.length <= 12, `COMMAND has ${items.length} items, expected <= 12`);
+});
 
+test("Semantic Graph lives in DEEP, not COMMAND", () => {
+  const sections = buildDashboardNavSections();
+  const deep = sections.find((s) => s.label === "DEEP");
+  assert.ok(deep, "expected DEEP section");
+  const semanticGraph = deep.items.find((item) => item.href === "/dashboard/claude");
   assert.equal(semanticGraph?.label, "Semantic Graph");
-  assert.equal(items.some((item) => item.label === "Control Plane"), false);
+  assert.equal(commandSection().items.some((item) => item.label === "Control Plane"), false);
 });
 
 test("isDashboardPathActive keeps nested routes attached to their canonical top-level nav item", () => {
