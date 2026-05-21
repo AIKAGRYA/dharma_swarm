@@ -94,25 +94,6 @@ body::before {
   background-repeat: repeat;
 }
 
-/* ============================================================
-   CRT scan lines (3% opacity)
-   ============================================================ */
-
-body::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  pointer-events: none;
-  opacity: 0.03;
-  background: repeating-linear-gradient(
-    to bottom,
-    transparent 0px,
-    transparent 2px,
-    rgba(0, 0, 0, 0.4) 2px,
-    rgba(0, 0, 0, 0.4) 4px
-  );
-}
 
 /* ============================================================
    Keyframe animations
@@ -176,15 +157,6 @@ body::after {
   100% {
     opacity: 1;
     filter: blur(0);
-  }
-}
-
-@keyframes scan-drift {
-  0% {
-    transform: translateY(-100%);
-  }
-  100% {
-    transform: translateY(100vh);
   }
 }
 
@@ -330,28 +302,6 @@ h1, h2, h3, h4, h5, h6 {
 /* Code blocks default to JetBrains Mono */
 code, pre, kbd, samp {
   font-family: var(--font-mono);
-}
-
-/* ============================================================
-   Ambient particle (used by AmbientParticles component)
-   ============================================================ */
-
-.particle {
-  position: fixed;
-  width: 1px;
-  height: 40px;
-  background: linear-gradient(
-    to top,
-    transparent,
-    color-mix(in srgb, var(--color-aozora) 25%, transparent),
-    transparent
-  );
-  pointer-events: none;
-  z-index: 0;
-  animation: drift var(--duration, 18s) linear infinite;
-  animation-delay: var(--delay, 0s);
-  left: var(--x, 50%);
-  opacity: 0.4;
 }
 
 /* ============================================================

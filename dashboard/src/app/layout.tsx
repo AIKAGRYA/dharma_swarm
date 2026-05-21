@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import { Providers } from "./providers";
 import { Sidebar } from "@/components/layout/Sidebar";
-import { AmbientParticles } from "@/components/layout/AmbientParticles";
-import { ScanLines } from "@/components/layout/ScanLines";
 import { ChatOverlayWrapper } from "@/components/chat/ChatOverlayWrapper";
 import "./globals.css";
 
@@ -28,11 +26,6 @@ export default function RootLayout({
     <html lang="en">
       <body className="min-h-screen bg-sumi-950 font-body text-torinoko antialiased">
         <Providers>
-          {/* Ambient effects */}
-          <AmbientParticles />
-          <ScanLines />
-
-          {/* Layout shell: sidebar + main */}
           <div className="flex min-h-screen">
             <Sidebar />
             <main className="ml-[260px] flex-1">
