@@ -6,31 +6,34 @@
    ============================================================ */
 
 @theme inline {
-  /* --- Sumi (ink) base tones --- */
-  --color-sumi-950: #0D0E13;
-  --color-sumi-900: #181A20;
-  --color-sumi-850: #1E2028;
-  --color-sumi-800: #252730;
-  --color-sumi-700: #383A44;
-  --color-sumi-600: #4E5060;
+  /* --- Sumi (ink) base tones — warm-ink substrate (Nihonga 2026-05-21) --- */
+  --color-sumi-950: #0F0D0B;
+  --color-sumi-900: #1A1715;
+  --color-sumi-850: #211E1B;
+  --color-sumi-800: #292621;
+  --color-sumi-700: #3A352F;
+  --color-sumi-600: #4F4A42;
 
-  /* --- Accent palette --- */
-  --color-aozora: #4FD1D9;
-  --color-botan: #D47DB5;
-  --color-kinpaku: #D4A855;
-  --color-rokusho: #8FA89B;
-  --color-bengara: #C19392;
-  --color-fuji: #A89DB9;
+  /* --- Accent palette — Nihonga / iwa-enogu mineral pigments --- */
+  --color-aozora: #1F4F8C;     /* 群青 Gunjō — azurite */
+  --color-botan: #5B3E72;      /* 紫 Murasaki — Heian gentian */
+  --color-kinpaku: #A57A35;    /* 黄土 Ōdo — aged ochre */
+  --color-rokusho: #6C8E7A;    /* 緑青 — muted malachite */
+  --color-bengara: #7A3E2A;    /* 弁柄 — weathered iron oxide */
+  --color-fuji: #5B5070;       /* 藤 — deeper wisteria */
+
+  /* --- Alarm-only token — DO NOT add to accent rotations --- */
+  --color-shu: #9C2A1F;        /* 朱 — lacquer-shrine vermillion (FAIL/urgent) */
 
   /* --- Text tones --- */
-  --color-torinoko: #D8DCE6;
-  --color-kitsurubami: #C5B198;
+  --color-torinoko: #F2EDE3;   /* 胡粉 Gofun — oyster-shell washi cream */
+  --color-kitsurubami: #B89E7D;/* 黄橡 — aged paper-tan */
 
-  /* --- Semantic status --- */
-  --color-status-ok: #8FA89B;
-  --color-status-warn: #D4A855;
-  --color-status-error: #C19392;
-  --color-status-info: #4FD1D9;
+  /* --- Semantic status — match theme.ts statusColorMap --- */
+  --color-status-ok: #6C8E7A;     /* rokusho */
+  --color-status-warn: #A57A35;   /* kinpaku */
+  --color-status-error: #9C2A1F;  /* shu (was bengara) */
+  --color-status-info: #1F4F8C;   /* aozora */
 
   /* --- Typography --- */
   --font-body: "Inter", ui-sans-serif, system-ui, sans-serif;

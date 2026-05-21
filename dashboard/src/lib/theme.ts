@@ -1,29 +1,41 @@
 /**
  * DHARMA COMMAND -- Color constants and theme helpers.
  * All values mirror the CSS custom properties in globals.css.
+ *
+ * Palette: Nihonga / iwa-enogu (mineral pigments).
+ * Per docs/plans/2026-05-21-command-plane-design-lock.md §VII.
  */
 
 // ---------------------------------------------------------------------------
-// Base palette
+// Base palette — Nihonga mineral pigments (revalued 2026-05-21, PR 1)
 // ---------------------------------------------------------------------------
 
 export const colors = {
   sumi: {
-    950: "#0D0E13",
-    900: "#181A20",
-    850: "#1E2028",
-    800: "#252730",
-    700: "#383A44",
-    600: "#4E5060",
+    // 墨 — warm ink substrate (not cool graphite)
+    950: "#0F0D0B",
+    900: "#1A1715",
+    850: "#211E1B",
+    800: "#292621",
+    700: "#3A352F", // Tetsu-iro adjacent (hairlines)
+    600: "#4F4A42", // idle / muted text
   },
-  aozora: "#4FD1D9",
-  botan: "#D47DB5",
-  kinpaku: "#D4A855",
-  rokusho: "#8FA89B",
-  bengara: "#C19392",
-  fuji: "#A89DB9",
-  torinoko: "#D8DCE6",
-  kitsurubami: "#C5B198",
+  aozora: "#1F4F8C",     // 群青 Gunjō — azurite blue (identity / actuation)
+  botan: "#5B3E72",      // 紫 Murasaki — Heian gentian purple (recall / contemplation)
+  kinpaku: "#A57A35",    // 黄土 Ōdo — aged ochre (STALE / warn)
+  rokusho: "#6C8E7A",    // 緑青 — muted malachite (OK / fresh / done)
+  bengara: "#7A3E2A",    // 弁柄 — weathered iron oxide (earthen depth / weight)
+  fuji: "#5B5070",       // 藤 — deeper wisteria (secondary purple)
+  torinoko: "#F2EDE3",   // 胡粉 Gofun — oyster-shell washi cream (paper-white)
+  kitsurubami: "#B89E7D",// 黄橡 — aged paper-tan (secondary)
+
+  // -------------------------------------------------------------------------
+  // ALARM-ONLY — DO NOT add `shu` to accentCycle or accentTwAt.
+  // Reserved for genuine FAIL/urgent semantic only. If shu leaks into
+  // the decorative accent rotation, alarm-red will pull into routine UI
+  // and destroy the semantic split (bengara = depth, shu = real urgency).
+  // -------------------------------------------------------------------------
+  shu: "#9C2A1F",        // 朱 — lacquer-shrine vermillion (FAIL / urgent)
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -35,12 +47,12 @@ export type StatusKey = "ok" | "warn" | "error" | "info" | "idle" | "running" | 
 const statusColorMap: Record<StatusKey, string> = {
   ok: colors.rokusho,
   warn: colors.kinpaku,
-  error: colors.bengara,
+  error: colors.shu,       // was bengara — semantic split: bengara = depth, shu = alarm
   info: colors.aozora,
   idle: colors.sumi[600],
   running: colors.aozora,
   done: colors.rokusho,
-  failed: colors.bengara,
+  failed: colors.shu,      // was bengara
 };
 
 export function statusColor(status: string): string {
@@ -53,23 +65,26 @@ export function statusTwColor(status: string): string {
   const map: Record<string, string> = {
     ok: "rokusho",
     warn: "kinpaku",
-    error: "bengara",
+    error: "shu",          // was "bengara"
     info: "aozora",
     idle: "sumi-600",
     running: "aozora",
     done: "rokusho",
-    failed: "bengara",
+    failed: "shu",         // was "bengara"
   };
   return map[status.toLowerCase()] ?? "sumi-600";
 }
 
 // ---------------------------------------------------------------------------
 // Glow shadow generators
+// (Note: helpers retained for compatibility; Phase 1.5 will remove them.
+//  Subtler glow on muted Nihonga hex is closer to locked aesthetic than
+//  punchy glow on saturated cyan / hot-pink.)
 // ---------------------------------------------------------------------------
 
 /**
  * Returns a CSS `text-shadow` string that produces a neon glow effect.
- * @param hex -- hex color string (e.g. "#4FD1D9")
+ * @param hex -- hex color string (e.g. "#1F4F8C")
  * @param intensity -- multiplier 0..1 (default 0.6)
  */
 export function glowText(hex: string, intensity = 0.6): string {
@@ -99,6 +114,7 @@ export function glowBorder(hex: string, intensity = 0.25): string {
 
 // ---------------------------------------------------------------------------
 // Accent color cycle (for sequential items like agent cards)
+// ALARM-ONLY tokens (shu) MUST NOT appear in this cycle.
 // ---------------------------------------------------------------------------
 
 export const accentCycle = [
@@ -116,6 +132,7 @@ export function accentAt(index: number): string {
 
 /** Tailwind class name for the accent at a given index. */
 export function accentTwAt(index: number): string {
+  // shu is omitted intentionally — alarm-only, must not enter the cycle.
   const names = ["aozora", "botan", "kinpaku", "rokusho", "bengara", "fuji"] as const;
   return names[index % names.length];
 }
