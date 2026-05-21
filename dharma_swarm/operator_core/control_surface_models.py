@@ -76,36 +76,6 @@ class AgentHandoffPrompt(BaseModel):
     generated_at: str
 
 
-class DisplayHints(BaseModel):
-    """Frontend-safe rendering hints computed from row semantics."""
-
-    severity_rank: int = 0
-    tone: Literal["critical", "warning", "info", "ok"] = "info"
-    icon_key: str = "circle"
-    group: str = "other"
-    freshness_state: Literal["fresh", "stale", "unknown"] = "unknown"
-    available_actions: list[str] = []
-
-
-class SourceError(BaseModel):
-    """An error encountered while building the projection."""
-
-    source: str
-    error: str
-    timestamp: str = ""
-
-
-class ControlSurfaceEnvelope(BaseModel):
-    """Typed wrapper for control surface API responses."""
-
-    schema_version: str = "0.2.0"
-    request_id: str = ""
-    generated_at: str = ""
-    source_errors: list[SourceError] = []
-    freshness_window: str = ""
-    data: Any = None
-
-
 # ---------------------------------------------------------------------------
 # Row contract
 # ---------------------------------------------------------------------------
@@ -170,7 +140,6 @@ class ControlSurfaceRow:
     source_refs: list[SourceRef] = field(default_factory=list)
     source_ref_labels: list[str] = field(default_factory=list)
     verification_timeline: list[VerificationEvent] = field(default_factory=list)
-    display_hints: DisplayHints | None = None
     raw: dict[str, Any] = field(default_factory=dict)
 
     # -- helpers for appending structured evidence/refs ----
@@ -223,8 +192,6 @@ class ControlSurfaceRow:
         d["verification_timeline"] = [
             v.model_dump() for v in self.verification_timeline
         ]
-        if self.display_hints is not None:
-            d["display_hints"] = self.display_hints.model_dump()
         return d
 
 
@@ -310,107 +277,4 @@ def _build_human_decision_context(row: ControlSurfaceRow) -> HumanDecisionContex
         recommended_action=recommended_action,
         evidence_count=len(row.evidence),
         staleness_hours=staleness_hours,
-    )
-
-
-# ---------------------------------------------------------------------------
-# Display hints computation
-# ---------------------------------------------------------------------------
-
-_KIND_GROUP_MAP: dict[str, str] = {
-    "api_router": "api",
-    "dashboard_page": "dashboard",
-    "runtime_store": "runtime",
-    "state_writer": "runtime",
-    "organ": "organs",
-    "fleet": "runtime",
-    "memory_surface": "runtime",
-    "broken_register": "issues",
-    "go_receipt": "go_sdk",
-    "doc_surface": "docs",
-    "integration": "integrations",
-    "feedback_loop": "loops",
-    "agent_subsystem": "agents",
-    "cron_job": "cron",
-}
-
-_KIND_ICON_MAP: dict[str, str] = {
-    "api_router": "server",
-    "dashboard_page": "layout-dashboard",
-    "runtime_store": "database",
-    "state_writer": "hard-drive",
-    "organ": "heart-pulse",
-    "fleet": "users",
-    "memory_surface": "brain",
-    "broken_register": "alert-triangle",
-    "go_receipt": "file-code",
-    "doc_surface": "file-text",
-    "integration": "plug",
-    "feedback_loop": "refresh-cw",
-    "agent_subsystem": "bot",
-    "cron_job": "clock",
-}
-
-_PRIORITY_RANK: dict[str, int] = {"p0": 0, "p1": 1, "p2": 2, "backlog": 3, "unknown": 4}
-
-
-def _compute_display_hints(row: ControlSurfaceRow) -> DisplayHints:
-    """Derive frontend-safe rendering hints from row semantics."""
-    cs = row.coherence_state
-    pri = row.priority
-
-    # severity_rank: lower = more severe
-    base = _PRIORITY_RANK.get(pri, 4)
-    if cs == "drifted":
-        severity_rank = base
-    elif cs == "unknown":
-        severity_rank = base + 1
-    elif cs == "partial":
-        severity_rank = base + 5
-    elif cs == "declared_only":
-        severity_rank = base + 8
-    else:
-        severity_rank = base + 10
-
-    # tone
-    if cs == "drifted" or (cs == "unknown" and pri == "p0"):
-        tone: str = "critical"
-    elif cs in ("partial", "unknown"):
-        tone = "warning"
-    elif cs == "bound":
-        tone = "ok"
-    else:
-        tone = "info"
-
-    icon_key = _KIND_ICON_MAP.get(row.kind, "circle")
-    group = _KIND_GROUP_MAP.get(row.kind, "other")
-
-    # freshness_state
-    freshness_state: str = "unknown"
-    if row.freshness:
-        try:
-            observed_dt = datetime.fromisoformat(row.freshness)
-            age_hours = (datetime.now(timezone.utc) - observed_dt).total_seconds() / 3600
-            freshness_state = "fresh" if age_hours < 24 else "stale"
-        except (ValueError, TypeError):
-            pass
-
-    # available_actions
-    actions: list[str] = []
-    if cs in ("drifted", "partial", "unknown"):
-        actions.append("investigate")
-    if row.human_decision_required:
-        actions.append("decide")
-    if cs != "bound":
-        actions.append("handoff")
-    if row.kind == "broken_register":
-        actions.append("close_br")
-
-    return DisplayHints(
-        severity_rank=severity_rank,
-        tone=tone,  # type: ignore[arg-type]
-        icon_key=icon_key,
-        group=group,
-        freshness_state=freshness_state,  # type: ignore[arg-type]
-        available_actions=actions,
     )

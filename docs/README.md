@@ -134,15 +134,16 @@ If a file does not fit one of those classes, it probably should not be created y
 - topic subtrees such as `docs/dse/`, `docs/merge/`, `docs/reports/`:
   domain-local material that should not compete with canon
 
-## Current Canon
+## Current Canon Set
 
-The current canon is rendered live by the onboarding command, not by a hand-maintained list here:
+The current compact canon for repo understanding is:
 
-```bash
-make onboard
-```
-
-That command shows the active track, live ops snapshot, open broken-register items, and pointers to the depth docs (CLAUDE.md, SOVEREIGN_MANIFEST.md, CANONICAL_DOC_STACK.md, ANTI_SLOP_RULES.md). See [`governance/CANONICAL_DOC_STACK.md`](governance/CANONICAL_DOC_STACK.md) for the doc-ownership map and [`governance/README.md`](governance/README.md) for the depth-pointer index.
+- [README.md](/Users/dhyana/dharma_swarm/README.md)
+- [CLAUDE.md](/Users/dhyana/dharma_swarm/CLAUDE.md)
+- [PRODUCT_SURFACE.md](/Users/dhyana/dharma_swarm/PRODUCT_SURFACE.md)
+- [REPO_LIVING_MAP_2026-03-31.md](/Users/dhyana/dharma_swarm/docs/REPO_LIVING_MAP_2026-03-31.md)
+- [SWARM_FRONTEND_MASTER_SPEC_2026-04-01.md](/Users/dhyana/dharma_swarm/docs/SWARM_FRONTEND_MASTER_SPEC_2026-04-01.md)
+- [REPO_ONTOLOGY_AND_HYGIENE_MASTER_SPEC_2026-04-01.md](/Users/dhyana/dharma_swarm/docs/REPO_ONTOLOGY_AND_HYGIENE_MASTER_SPEC_2026-04-01.md)
 
 ## Architecture-Local Docs
 

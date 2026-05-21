@@ -2,20 +2,6 @@
 
 This file governs AI agents working in the prose layer: `docs/`, `reports/`, `specs/`, `foundations/`, `lodestones/`, and root Markdown.
 
-## Before Anything Else — the single remembered gate
-
-`make onboard` is the only command you need to remember. Run it before
-touching any doc:
-
-```bash
-make onboard
-```
-
-It shows the active track, live ops, open broken-register items, tooling
-hints, and the doc-ownership map. If any prose in this file or any other
-doc disagrees with that output, trust the onboarding output and update the
-stale prose.
-
 ## Authority Model
 
 Do not infer authority from confident language.

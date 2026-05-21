@@ -6,16 +6,16 @@ Do not hand-edit the generated block.
 <!-- DOCOPS:START metric=repo_inventory -->
 | Metric | Value |
 |---|---:|
-| Dharma Python modules | 610 |
+| Dharma Python modules | 602 |
 | Top-level Dharma Python modules | 387 |
-| Dharma Python LOC | 260,870 |
-| Test files | 585 |
-| Test function occurrences | 10,297 |
-| Markdown files | 703 |
-| Markdown total lines | 181,097 |
+| Dharma Python LOC | 259,177 |
+| Test files | 580 |
+| Test function occurrences | 10,217 |
+| Markdown files | 692 |
+| Markdown total lines | 176,149 |
 | Bridge files | 23 |
 | Adapter files | 14 |
 | Orchestrator files | 4 |
 | Router files | 13 |
-| Authority candidate docs | 284 |
+| Authority candidate docs | 279 |
 <!-- DOCOPS:END -->

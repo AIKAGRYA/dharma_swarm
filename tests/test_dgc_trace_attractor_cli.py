@@ -8,7 +8,6 @@ are unavailable).
 from __future__ import annotations
 
 import json
-import sys
 
 import pytest
 
@@ -60,39 +59,3 @@ def test_cli_deterministic_json(tmp_path):
     r1.pop("generated_at")
     r2.pop("generated_at")
     assert r1 == r2
-
-
-def test_dgc_dispatch_wires_trace_attractor(monkeypatch, capsys):
-    """Public dgc command dispatches to the Trace Attractor CLI runner."""
-    from dharma_swarm import dgc_cli
-
-    called = {}
-
-    def fake_run_trace_attractor(**kwargs):
-        called.update(kwargs)
-        return "trace output"
-
-    monkeypatch.setattr(
-        "dharma_swarm.trace_attractor.cli.run_trace_attractor",
-        fake_run_trace_attractor,
-    )
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        [
-            "dgc",
-            "trace-attractor",
-            "--trace-id",
-            "trc-cli",
-            "--json",
-            "--runtime-db",
-            "/tmp/runtime.db",
-        ],
-    )
-
-    dgc_cli.main()
-
-    assert called["trace_id"] == "trc-cli"
-    assert called["as_json"] is True
-    assert called["runtime_db"] == "/tmp/runtime.db"
-    assert capsys.readouterr().out.strip() == "trace output"

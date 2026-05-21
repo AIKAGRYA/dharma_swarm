@@ -31,12 +31,7 @@ _CONTRIBUTION_TYPES = {"contribution", "contributions"}
 _ECONOMIC_TYPES = {"economic_event", "economic_events", "economiceventrecord"}
 _SIGNAL_STORES = {"signal_bus", "signalbus"}
 _WITNESS_TYPES = {"witnesslog", "witness_logs"}
-_LINEAGE_TYPES = {
-    "lineageedge",
-    "lineage_edges",
-    "provenanceentry",
-    "provenance_entries",
-}
+_LINEAGE_TYPES = {"lineageedge", "lineage_edges"}
 
 
 def _norm(value: str) -> str:
@@ -67,14 +62,6 @@ def _add(target: set[str], value: Any) -> None:
         target.add(text)
 
 
-def _add_many(target: set[str], value: Any) -> None:
-    if isinstance(value, (list, tuple, set)):
-        for item in value:
-            _add(target, item)
-        return
-    _add(target, value)
-
-
 def _float_attr(event: AttractorEvent, key: str) -> float:
     raw = event.attributes.get(key)
     if raw is None or raw == "":
@@ -100,16 +87,6 @@ def _node_kind(source_type: str) -> str:
     if normalized in _SIGNAL_STORES:
         return "prov:Activity"
     return "prov:Entity"
-
-
-def _trace_source(event: AttractorEvent) -> str:
-    direct = _first_text(event, "trace_id_source")
-    if direct:
-        return direct
-    metadata = event.attributes.get("metadata")
-    if isinstance(metadata, dict):
-        return _text(metadata.get("trace_id_source")).strip()
-    return ""
 
 
 class TraceAttractorProjector:
@@ -154,7 +131,6 @@ class TraceAttractorProjector:
         lineage_edge_ids: set[str] = set()
         agent_ids: set[str] = set()
         currencies: set[str] = set()
-        trace_id_sources: set[str] = set()
         findings: list[LifecycleFinding] = []
         nodes: dict[str, ProvenanceNode] = {}
         edges: dict[tuple[str, str, str, str], ProvenanceEdge] = {}
@@ -178,7 +154,6 @@ class TraceAttractorProjector:
                 agent_ids,
                 _first_text(event, "agent_id", "created_by", "attributed_to"),
             )
-            _add(trace_id_sources, _trace_source(event))
 
             if event.source_store and _norm(event.source_store) in _SIGNAL_STORES:
                 _add(signal_event_ids, event.event_id)
@@ -234,7 +209,6 @@ class TraceAttractorProjector:
                 claim_ids=claim_ids,
                 delegation_run_ids=delegation_run_ids,
                 artifact_ids=artifact_ids,
-                gate_decision_ids=gate_decision_ids,
                 outcome_ids=outcome_ids,
                 value_event_ids=value_event_ids,
                 contribution_ids=contribution_ids,
@@ -274,22 +248,8 @@ class TraceAttractorProjector:
                 message="No Fourfold Action Warrant evidence was present in projected events.",
             ))
 
-        if any(
-            "legacy" in _norm(source) or "synthetic" in _norm(source)
-            for source in trace_id_sources
-        ):
-            findings.append(LifecycleFinding(
-                code="legacy_trace_alias",
-                severity=FindingSeverity.DEGRADED,
-                message=(
-                    "Projected trace uses a legacy or synthetic trace alias; "
-                    "upstream trace propagation is still required."
-                ),
-            ))
-
         packet = AttractorPacket(
             trace_id=trace_id,
-            trace_id_source=self._packet_trace_id_source(trace_id_sources),
             generated_at=generated_at or utc_now_iso(),
             session_ids=_sorted(session_ids),
             proposal_ids=_sorted(proposal_ids),
@@ -346,7 +306,6 @@ class TraceAttractorProjector:
         claim_ids: set[str],
         delegation_run_ids: set[str],
         artifact_ids: set[str],
-        gate_decision_ids: set[str],
         outcome_ids: set[str],
         value_event_ids: set[str],
         contribution_ids: set[str],
@@ -358,17 +317,12 @@ class TraceAttractorProjector:
         _add(claim_ids, _attr(event, "claim_id"))
         _add(delegation_run_ids, _first_text(event, "run_id", "delegation_run_id"))
         _add(artifact_ids, _first_text(event, "artifact_id", "knowledge_artifact_id"))
-        _add(gate_decision_ids, _first_text(event, "gate_decision_id", "decision_id"))
         _add(outcome_ids, _attr(event, "outcome_id"))
         _add(value_event_ids, _attr(event, "value_event_id"))
         _add(contribution_ids, _attr(event, "contribution_id"))
         _add(economic_event_ids, _first_text(event, "economic_event_id"))
         _add(witness_log_ids, _first_text(event, "witness_log_id"))
         _add(lineage_edge_ids, _first_text(event, "lineage_edge_id", "edge_id"))
-        _add_many(gate_decision_ids, event.attributes.get("gate_decision_ids"))
-        _add_many(witness_log_ids, event.attributes.get("witness_log_ids"))
-        _add_many(outcome_ids, event.attributes.get("outcome_ids"))
-        _add_many(value_event_ids, event.attributes.get("value_event_ids"))
 
     def _merge_warrant(
         self,
@@ -539,13 +493,6 @@ class TraceAttractorProjector:
                 ))
 
         return findings
-
-    def _packet_trace_id_source(self, trace_id_sources: set[str]) -> str:
-        if not trace_id_sources:
-            return "unknown"
-        if len(trace_id_sources) == 1:
-            return next(iter(trace_id_sources))
-        return "mixed"
 
     def _currency(self, currencies: set[str]) -> str:
         if not currencies:

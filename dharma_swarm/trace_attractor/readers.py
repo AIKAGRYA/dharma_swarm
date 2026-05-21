@@ -1,8 +1,8 @@
 """Read-only store readers for Trace Attractor Ledger events.
 
-These adapters normalize existing ontology, runtime, telemetry, BoardStore,
-and Sakshi records into AttractorEvent objects.  They do not initialize
-schemas, write rows, subscribe to SignalBus, or project packets.
+These adapters normalize existing ontology, runtime, and telemetry records into
+AttractorEvent objects.  They do not initialize schemas, write rows, subscribe
+to SignalBus, or project packets.
 """
 
 from __future__ import annotations
@@ -66,18 +66,6 @@ def _extract_trace_id(data: dict[str, Any]) -> str:
         trace_id = _text(nested.get("trace_id"))
         if trace_id:
             return trace_id
-    return ""
-
-
-def _extract_trace_id_source(data: dict[str, Any]) -> str:
-    direct = _text(data.get("trace_id_source"))
-    if direct:
-        return direct
-    for key in ("metadata", "correlation", "context", "provenance"):
-        nested = _nested_mapping(data, key)
-        trace_id_source = _text(nested.get("trace_id_source"))
-        if trace_id_source:
-            return trace_id_source
     return ""
 
 
@@ -159,10 +147,6 @@ def _matches_trace(row: sqlite3.Row, trace_id: str) -> bool:
     return _row_trace_id(row) == trace_id
 
 
-def _metadata_trace_id_source(row: sqlite3.Row) -> str:
-    return _extract_trace_id_source(_metadata_for_row(row))
-
-
 def _query_rows(
     conn: sqlite3.Connection,
     table: str,
@@ -230,7 +214,6 @@ def _task_claim_event(row: sqlite3.Row) -> AttractorEvent:
     metadata = _metadata_for_row(row)
     trace_id = _row_trace_id(row)
     proposal_id = _extract_proposal_id(metadata)
-    trace_id_source = _metadata_trace_id_source(row)
     claim_id = _text(row["claim_id"])
     attributes = {
         "claim_id": claim_id,
@@ -245,8 +228,6 @@ def _task_claim_event(row: sqlite3.Row) -> AttractorEvent:
         "retry_count": int(row["retry_count"] or 0),
         "metadata": metadata,
     }
-    if trace_id_source:
-        attributes["trace_id_source"] = trace_id_source
     if proposal_id:
         attributes["proposal_id"] = proposal_id
     return AttractorEvent(
@@ -268,7 +249,6 @@ def _delegation_run_event(row: sqlite3.Row) -> AttractorEvent:
     metadata = _metadata_for_row(row)
     trace_id = _row_trace_id(row)
     proposal_id = _extract_proposal_id(metadata)
-    trace_id_source = _metadata_trace_id_source(row)
     run_id = _text(row["run_id"])
     attributes = {
         "run_id": run_id,
@@ -287,8 +267,6 @@ def _delegation_run_event(row: sqlite3.Row) -> AttractorEvent:
         "failure_code": _text(row["failure_code"]),
         "metadata": metadata,
     }
-    if trace_id_source:
-        attributes["trace_id_source"] = trace_id_source
     if proposal_id:
         attributes["proposal_id"] = proposal_id
     return AttractorEvent(
@@ -310,7 +288,6 @@ def _artifact_event(row: sqlite3.Row) -> AttractorEvent:
     metadata = _metadata_for_row(row)
     trace_id = _row_trace_id(row)
     proposal_id = _extract_proposal_id(metadata)
-    trace_id_source = _metadata_trace_id_source(row)
     artifact_id = _text(row["artifact_id"])
     attributes = {
         "artifact_id": artifact_id,
@@ -324,20 +301,6 @@ def _artifact_event(row: sqlite3.Row) -> AttractorEvent:
         "promotion_state": _text(row["promotion_state"]),
         "metadata": metadata,
     }
-    for key in (
-        "trace_id_source",
-        "value_event_id",
-        "outcome_id",
-        "agent_id",
-        "cell_id",
-        "gate_decision_ids",
-        "witness_log_ids",
-    ):
-        value = metadata.get(key)
-        if value:
-            attributes[key] = value
-    if trace_id_source:
-        attributes["trace_id_source"] = trace_id_source
     if proposal_id:
         attributes["proposal_id"] = proposal_id
     return AttractorEvent(
@@ -400,7 +363,6 @@ def _economic_event(row: sqlite3.Row) -> AttractorEvent:
     metadata = _metadata_for_row(row)
     trace_id = _row_trace_id(row)
     proposal_id = _extract_proposal_id(metadata)
-    trace_id_source = _metadata_trace_id_source(row)
     event_id = _text(row["event_id"])
     attributes = {
         "economic_event_id": event_id,
@@ -418,8 +380,6 @@ def _economic_event(row: sqlite3.Row) -> AttractorEvent:
         value = _text(metadata.get(key))
         if value:
             attributes[key] = value
-    if trace_id_source:
-        attributes["trace_id_source"] = trace_id_source
     if proposal_id:
         attributes["proposal_id"] = proposal_id
     return AttractorEvent(
@@ -462,104 +422,6 @@ def read_telemetry_events(
         conn.close()
 
 
-def _board_event(row: sqlite3.Row) -> AttractorEvent:
-    data = _json_load_dict(row["event_json"])
-    keys = set(row.keys())
-    trace_id = _text(row["trace_id"]) if "trace_id" in keys else ""
-    trace_id = trace_id or _extract_trace_id(data)
-    trace_id_source = (
-        _text(row["trace_id_source"]) if "trace_id_source" in keys else ""
-    ) or _extract_trace_id_source(data)
-    event_id = _text(data.get("event_id")) or _text(row["event_id"])
-    card_id = _text(data.get("card_id"))
-    attributes = dict(data)
-    if trace_id_source:
-        attributes["trace_id_source"] = trace_id_source
-    return AttractorEvent(
-        event_id=_event_id("boardstore", "board_events", event_id),
-        trace_id=trace_id,
-        session_id=_extract_session_id(data),
-        source_store="boardstore",
-        source_table_or_type="board_events",
-        source_object_id=card_id or event_id,
-        event_type=_text(data.get("kind")) or "board_event",
-        subject=card_id or event_id,
-        occurred_at=_text(data.get("timestamp")),
-        attributes=attributes,
-    )
-
-
-def read_board_events(
-    db_path: str | Path,
-    trace_id: str,
-    *,
-    limit_per_table: int = 500,
-) -> list[AttractorEvent]:
-    """Read BoardStore event-log rows for a trace."""
-    conn = _sqlite_ro(Path(db_path))
-    if conn is None:
-        return []
-    try:
-        events: list[AttractorEvent] = []
-        for row in _query_rows(
-            conn,
-            "board_events",
-            order_column="timestamp",
-            limit=limit_per_table,
-        ):
-            event = _board_event(row)
-            if event.trace_id == trace_id:
-                events.append(event)
-        return sorted(events, key=lambda event: (event.occurred_at, event.event_id))
-    finally:
-        conn.close()
-
-
-def _sakshi_event(data: dict[str, Any]) -> AttractorEvent:
-    entry_id = _text(data.get("entry_id"))
-    trace_id = _extract_trace_id(data)
-    trace_id_source = _extract_trace_id_source(data)
-    attributes = dict(data)
-    if trace_id_source:
-        attributes["trace_id_source"] = trace_id_source
-    return AttractorEvent(
-        event_id=_event_id("sakshi", "provenance_entries", entry_id),
-        trace_id=trace_id,
-        session_id=_extract_session_id(data),
-        source_store="sakshi",
-        source_table_or_type="provenance_entries",
-        source_object_id=entry_id,
-        event_type=_text(data.get("action")) or "provenance_entry",
-        subject=_text(data.get("target_ref")) or entry_id,
-        occurred_at=_text(data.get("timestamp")),
-        attributes=attributes,
-    )
-
-
-def read_sakshi_events(
-    log_path: str | Path,
-    trace_id: str,
-    *,
-    limit: int = 500,
-) -> list[AttractorEvent]:
-    """Read Sakshi provenance JSONL entries for a trace."""
-    path = Path(log_path)
-    if not path.exists():
-        return []
-    events: list[AttractorEvent] = []
-    with path.open("r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            data = _json_load_dict(line)
-            if _extract_trace_id(data) == trace_id:
-                events.append(_sakshi_event(data))
-            if len(events) >= max(1, limit):
-                break
-    return sorted(events, key=lambda event: (event.occurred_at, event.event_id))
-
-
 @dataclass(frozen=True)
 class TraceAttractorStoreReader:
     """Facade for collecting read-only AttractorEvents across stores."""
@@ -567,8 +429,6 @@ class TraceAttractorStoreReader:
     registry: OntologyRegistry | None = None
     runtime_db_path: Path | None = None
     telemetry_db_path: Path | None = None
-    board_db_path: Path | None = None
-    sakshi_log_path: Path | None = None
     ontology_type_names: tuple[str, ...] = DEFAULT_ONTOLOGY_TYPES
     limit_per_table: int = 500
 
@@ -591,17 +451,5 @@ class TraceAttractorStoreReader:
                 self.telemetry_db_path,
                 trace_id,
                 limit_per_table=self.limit_per_table,
-            ))
-        if self.board_db_path is not None:
-            events.extend(read_board_events(
-                self.board_db_path,
-                trace_id,
-                limit_per_table=self.limit_per_table,
-            ))
-        if self.sakshi_log_path is not None:
-            events.extend(read_sakshi_events(
-                self.sakshi_log_path,
-                trace_id,
-                limit=self.limit_per_table,
             ))
         return sorted(events, key=lambda event: (event.occurred_at, event.event_id))

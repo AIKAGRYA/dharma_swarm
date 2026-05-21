@@ -10,7 +10,7 @@
 # Your workflow: Declare → Observe → Reconcile → Dispatch → Verify.
 
 schema_version: 2
-last_updated: "2026-05-20"
+last_updated: "2026-05-13"
 
 state_dir:
   canonical: "~/.dharma"
@@ -21,8 +21,6 @@ state_dir:
   economics: "~/.dharma/economics"
   revenue_packets: "~/.dharma/revenue_packets"
   go_world_receipts: "~/.dharma/go_receipts/world"
-  board_event_log: "~/.dharma/board/event_log.sqlite3"
-  sakshi_provenance_log: "~/.dharma/sakshi/provenance_log.jsonl"
   env_override: "DHARMA_STATE_DIR"
 
 api_routers:
@@ -273,7 +271,7 @@ dashboard_surfaces:
     status: degraded
     health_check_ids: [dashboard_route_exists, api_router_registered, ontology_db_present]
     priority: p0
-    next_action: "Propagate trace_id through operator brief records and Trace Attractor packets"
+    next_action: "Complete ontology-native operator brief seam"
 
   - id: lineage
     label: "Lineage"
@@ -282,7 +280,7 @@ dashboard_surfaces:
     status: degraded
     health_check_ids: [dashboard_route_exists, api_router_registered]
     priority: p2
-    next_action: "Wire lineage graph to Sakshi provenance and Trace Attractor packets"
+    next_action: "Wire lineage graph to live provenance data"
 
   - id: stigmergy
     label: "Stigmergy"
@@ -309,7 +307,7 @@ dashboard_surfaces:
     status: degraded
     health_check_ids: [dashboard_route_exists]
     priority: p2
-    next_action: "Wire audit view to witness logs and Trace Attractor findings"
+    next_action: "Wire audit view to witness log entries"
 
   - id: telemetry
     label: "Telemetry"
@@ -318,7 +316,7 @@ dashboard_surfaces:
     status: degraded
     health_check_ids: [dashboard_route_exists, api_router_registered]
     priority: p1
-    next_action: "Project trace-tagged telemetry into Trace Attractor packets"
+    next_action: "Wire telemetry panels to live operator brief data"
 
   - id: ecosystem
     label: "Ecosystem Map"
@@ -412,43 +410,7 @@ agents:
     health_check_ids: [module_file_exists, ontology_db_present]
     wired_to: [ontology]
     priority: p0
-    next_action: "Use explicit trace_id metadata for operator-brief causal packets"
-
-  - id: trace_attractor
-    label: "Trace Attractor Ledger"
-    module: dharma_swarm/trace_attractor/cli.py
-    status: live
-    health_check_ids: [module_file_exists, test_file_exists]
-    wired_to: [ontology, lineage, audit, telemetry]
-    priority: p0
-    next_action: "Run first operator-visible AttractorPacket witness report"
-
-  - id: boardstore_facade
-    label: "BoardStore Facade"
-    module: dharma_swarm/board/facade.py
-    status: live
-    health_check_ids: [module_file_exists, test_file_exists]
-    wired_to: [tasks, lineage, audit]
-    priority: p0
-    next_action: "Adapt TaskBoard behind facade in a later BoardStore adapter track"
-
-  - id: sakshi_provenance
-    label: "Sakshi Provenance Log"
-    module: dharma_swarm/sakshi/provenance_log.py
-    status: live
-    health_check_ids: [module_file_exists, test_file_exists]
-    wired_to: [lineage, audit, trace_attractor]
-    priority: p0
-    next_action: "Feed trace-bearing provenance into Trace Attractor readers"
-
-  - id: dhyana_drift_triage
-    label: "Dhyana Drift Triage"
-    module: dharma_swarm/dhyana/drift_triage.py
-    status: live
-    health_check_ids: [module_file_exists, test_file_exists]
-    wired_to: [audit, control_surface]
-    priority: p1
-    next_action: "Rank Trace Attractor degraded findings alongside control-surface drift"
+    next_action: "Complete ontology-native operator brief seam end-to-end"
 
   - id: agent_runner
     label: "Agent Runner"

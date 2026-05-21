@@ -299,19 +299,6 @@ def _build_parser() -> argparse.ArgumentParser:
     p_ve.add_argument("--json", action="store_true", help="Emit JSON output")
     p_ve.add_argument("--registry-path", default=None, help="Override ontology registry path")
 
-    # -- trace-attractor --
-    p_trace = sub.add_parser(
-        "trace-attractor",
-        help="Project a trace_id into an operator-visible AttractorPacket",
-    )
-    p_trace.add_argument("--trace-id", required=True, help="Trace identifier to project")
-    p_trace.add_argument("--json", action="store_true", help="Emit deterministic JSON output")
-    p_trace.add_argument("--registry-path", default=None, help="Override ontology registry path")
-    p_trace.add_argument("--runtime-db", default=None, help="Override runtime SQLite path")
-    p_trace.add_argument("--telemetry-db", default=None, help="Override telemetry SQLite path")
-    p_trace.add_argument("--board-db", default=None, help="Optional BoardStore event-log SQLite path")
-    p_trace.add_argument("--sakshi-log", default=None, help="Optional Sakshi provenance JSONL path")
-
     # -- chat --
     p_chat = sub.add_parser("chat", help="Launch native Claude Code interactive UI")
     p_chat.add_argument(
@@ -1322,17 +1309,6 @@ def main() -> None:
                 since=args.since,
                 as_json=args.json,
                 registry_path=args.registry_path,
-            ))
-        case "trace-attractor":
-            from dharma_swarm.trace_attractor.cli import run_trace_attractor
-            print(run_trace_attractor(
-                trace_id=args.trace_id,
-                as_json=args.json,
-                registry_path=args.registry_path,
-                runtime_db=args.runtime_db,
-                telemetry_db=args.telemetry_db,
-                board_db=args.board_db,
-                sakshi_log=args.sakshi_log,
             ))
         case "up":
             cmd_up(background=args.background)

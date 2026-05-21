@@ -1,16 +1,12 @@
 # BUILD SESSION ENTRYPOINT
 
-**Status:** depth doc — read after running the onboarding command.
-**Owner of:** the longer-form pre-flight narrative for a build session.
-**Subordinate to:** [`CLAUDE.md`](../../CLAUDE.md) (behavior), [`SOVEREIGN_MANIFEST.md`](SOVEREIGN_MANIFEST.md) (architectural truth), and [`ACTIVE_TRACK.yaml`](ACTIVE_TRACK.yaml) (current build track). When this file disagrees with any of them, they win.
+**Status:** canonical pointer layer (no new truths)
+**Owner of:** the read-order and current-track pointers every agent should hit before a build session.
+**Subordinate to:** [`CLAUDE.md`](../../CLAUDE.md) (behavior) and [`SOVEREIGN_MANIFEST.md`](SOVEREIGN_MANIFEST.md) (architectural truth). When this file disagrees with either, they win.
 
-## Run this first
+This file exists because the audit synthesis at `reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md` found that agents repeatedly rebuild substrates that already exist or skip canonical reads before committing. This is a single short page that every build agent reads first, then proceeds to the canonical docs.
 
-```bash
-make onboard
-```
-
-That command renders the current operating reality (active track, live ops, broken register, axioms, depth pointers) in one screen. It replaces the old hand-maintained "read order". This file is the depth narrative you read **after** the onboarding command, when you need more context than one screen.
+If you are about to write code in this repo, read this file fully, then read the four numbered files below in order. Do not skim. Do not skip the audit. The repo will not give you a second chance to re-orient mid-session.
 
 ---
 
@@ -22,71 +18,29 @@ Current substrate-nativeness estimate (from audit): **~10–15% of runtime is on
 
 ---
 
-## 1. Depth pointers (read on demand, not in order)
+## 1. Mandatory read order
 
-The onboarding command (`make onboard`) lists the depth pointers inline. The same list, for offline reference:
+Read in this exact order. Stop at each file until you have actually answered the questions next to it.
 
-- [`CLAUDE.md`](../../CLAUDE.md) — behavioural rules, key abstractions, build/test commands. *What rules govern any change I make?*
-- [`docs/governance/SOVEREIGN_MANIFEST.md`](SOVEREIGN_MANIFEST.md) — domain map, axioms, verified numbers, boundary constraints. *Which domain is my change in? Which boundaries must I not cross?*
-- [`reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md`](../../reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md) — settled truths, unresolved gaps, "do not build new, wire existing" list. *Does what I'm about to do duplicate something that already exists?*
-- [`docs/governance/CANONICAL_DOC_STACK.md`](CANONICAL_DOC_STACK.md) — doc hierarchy, ownership table, anti-doc-maze rules. *Which file owns the truth I'm about to write down?*
-- [`docs/governance/ANTI_SLOP_RULES.md`](ANTI_SLOP_RULES.md) — explicit do-nots backed by Semgrep rules.
+1. [`CLAUDE.md`](../../CLAUDE.md) — behavioral rules, key abstractions, build/test commands. *What rules govern any change I make?*
+2. [`docs/governance/SOVEREIGN_MANIFEST.md`](SOVEREIGN_MANIFEST.md) — domain map, axioms, verified numbers, boundary constraints. *Which domain is my change in? Which boundaries must I not cross?*
+3. [`reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md`](../../reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md) — settled truths, top 20 unresolved gaps, "do not build new, wire existing" list, canonical substrate table. *Does what I'm about to do duplicate something that already exists?*
+4. [`docs/governance/CANONICAL_DOC_STACK.md`](CANONICAL_DOC_STACK.md) — doc hierarchy, ownership table, anti-doc-maze rules. *Which file owns the truth I'm about to write down?*
 
-If any of these contradict each other on numbers, trust SOVEREIGN_MANIFEST first, then CLAUDE.md, then the audit, then CANONICAL_DOC_STACK. Each is authoritative for the topic CANONICAL_DOC_STACK assigns it.
+If any of those four contradict each other on numbers, trust SOVEREIGN_MANIFEST first, then CLAUDE.md, then the audit, then CANONICAL_DOC_STACK. All four are still authoritative for the topic each one owns per CANONICAL_DOC_STACK.md.
 
 ---
 
 ## 2. Current build track
 
-The current build track is declared in [`ACTIVE_TRACK.yaml`](ACTIVE_TRACK.yaml) and surfaced by `make onboard`. **Do not duplicate the track name in prose here** — the YAML is the single source of intent, and any prose copy here will go stale.
+The active engineering track is **one ontology-native seam, end-to-end, with gates and witness load-bearing**, before any second seam.
 
-The governing principle behind whatever track is active: **one seam, end-to-end, with gates and witness load-bearing**, before any second seam. Do not start work on a parallel seam until the active track’s acceptance criteria pass (visible in the onboarding output) or a new track is declared in `ACTIVE_TRACK.yaml`. Cross-track work fragments the substrate-nativeness measurement and is the failure mode the audit flagged.
+- **Track name:** Ontology-Native Operator Brief (Daily Insight Brief)
+- **Master spec:** [`docs/plans/ONTOLOGY_NATIVE_OPERATOR_BRIEF_MASTER_SPEC.md`](../plans/ONTOLOGY_NATIVE_OPERATOR_BRIEF_MASTER_SPEC.md)
+- **Next ten substrate todos:** [`docs/plans/NEXT_10_SUBSTRATE_TODO.md`](../plans/NEXT_10_SUBSTRATE_TODO.md)
+- **Handoff to next code agent:** [`docs/plans/HANDOFF_ONTOLOGY_NATIVE_OPERATOR_BRIEF.md`](../plans/HANDOFF_ONTOLOGY_NATIVE_OPERATOR_BRIEF.md)
 
-<!-- ACTIVE_TRACK:START -->
-
-<!-- This block is generated from docs/governance/ACTIVE_TRACK.yaml.
-     Do not hand-edit. Run scripts/governance/render_active_track_includes.py
-     after updating the YAML. -->
-
-**Active track:** Trace Identity Coverage — native propagation and soft coverage findings
-**Track id:** `trace-identity-coverage-2026-05`
-**Status:** ACTIVE
-**Verified at:** 2026-05-21 (TTL 14 days)
-**Owner:** @AmitabhainArunachala
-
-**Description:**
-
-Move Trace Attractor from first packet visibility to native trace identity
-propagation. New operator-brief, BoardStore, and Sakshi records should
-inherit CorrelationContext trace metadata when it exists; legacy records may
-still project through explicit synthetic aliases. Guardian should surface
-missing trace identity as DEGRADED evidence first, with any hard blocker
-policy deferred to an ADR.
-
-**Next items on this track:**
-
-- [code] (blocker) Default operator-brief, BoardStore, and Sakshi trace metadata from CorrelationContext.
-- [code] (blocker) Add Guardian DEGRADED finding for operator-brief artifacts missing metadata.trace_id.
-- [evidence] Write the trace identity coverage witness report.
-- [governance] (blocker) Write ADR-0002 deciding when missing trace identity becomes a hard blocker.
-
-**Non-goals (do not work on these during this track):**
-
-- Do not make missing trace_id a hard CI gate until the ADR is written.
-- Do not turn Trace Attractor into an autonomous apply trigger.
-- Do not mutate MemoryKernel or live evolution state on this track.
-- Do not claim BoardStore adapter/cutover completion.
-- Do not add dashboard/API surface unless it is implemented and manifest-registered.
-
-**Recently closed tracks:**
-
-- `boardstore-facade-2026-05` — BoardStore Facade — unified task/state surface for multi-agent coordination (SHIPPED, closed 2026-05-20)
-- `cockpit-control-surface-2026-05` — Operator Cockpit v1 + Control-Surface contract hardening (SHIPPED, closed 2026-05-20)
-- `operator-brief-seam-2026-04` — Ontology-Native Operator Brief (first substrate-native seam) (SHIPPED, closed 2026-05-19)
-
-For machine-readable status, see [`reports/governance/active_track_evidence.md`](../../reports/governance/active_track_evidence.md) (generated by `scripts/governance/check_track_status.py`).
-
-<!-- ACTIVE_TRACK:END -->
+Do not start work on a different seam (Dharma Radar v0, full identity unification, dashboard chat routing, training flywheel) until either the operator-brief seam is acceptance-tested or the active ledger in `SOVEREIGN_MANIFEST.md` lists a new track. Cross-track work fragments the substrate-nativeness measurement and is the failure mode the audit flagged.
 
 ---
 

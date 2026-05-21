@@ -1,7 +1,9 @@
 """Trace Attractor Ledger projection contracts.
 
 This package is intentionally read-model only.  It defines normalized event
-and packet types plus deterministic projection helpers and store readers.
+and packet types plus deterministic in-memory projection helpers; store readers,
+SignalBus subscribers, CLI commands, and dashboard surfaces belong in later
+implementation PRs.
 """
 
 from dharma_swarm.trace_attractor.models import (
@@ -21,10 +23,8 @@ from dharma_swarm.trace_attractor.projector import TraceAttractorProjector
 from dharma_swarm.trace_attractor.readers import (
     DEFAULT_ONTOLOGY_TYPES,
     TraceAttractorStoreReader,
-    read_board_events,
     read_ontology_events,
     read_runtime_events,
-    read_sakshi_events,
     read_telemetry_events,
 )
 
@@ -43,9 +43,7 @@ __all__ = [
     "TraceAttractorStoreReader",
     "ValueSummary",
     "WarrantStatus",
-    "read_board_events",
     "read_ontology_events",
     "read_runtime_events",
-    "read_sakshi_events",
     "read_telemetry_events",
 ]

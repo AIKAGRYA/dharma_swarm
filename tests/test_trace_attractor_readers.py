@@ -6,8 +6,6 @@ from pathlib import Path
 
 import pytest
 
-from dharma_swarm.board.event_log import BoardEvent, BoardEventLog
-from dharma_swarm.board.models import CardId
 from dharma_swarm.correlation_context import correlation_scope
 from dharma_swarm.ontology import OntologyRegistry
 from dharma_swarm.runtime_state import (
@@ -16,15 +14,12 @@ from dharma_swarm.runtime_state import (
     RuntimeStateStore,
     TaskClaim,
 )
-from dharma_swarm.sakshi.provenance_log import ProvenanceEntry, ProvenanceLog
 from dharma_swarm.telemetry_plane import EconomicEventRecord, TelemetryPlaneStore
 from dharma_swarm.trace_attractor import (
     TraceAttractorProjector,
     TraceAttractorStoreReader,
-    read_board_events,
     read_ontology_events,
     read_runtime_events,
-    read_sakshi_events,
     read_telemetry_events,
 )
 
@@ -274,62 +269,3 @@ def test_readers_return_empty_for_missing_databases(tmp_path: Path) -> None:
     assert read_runtime_events(missing, TRACE_ID) == []
     assert read_telemetry_events(missing, TRACE_ID) == []
     assert not missing.exists()
-
-
-def test_board_reader_reads_trace_metadata(tmp_path: Path) -> None:
-    board_db = tmp_path / "board.sqlite3"
-    log = BoardEventLog(path=board_db)
-    log.append(BoardEvent(
-        kind="card_created",
-        card_id=CardId("card-reader"),
-        trace_id=TRACE_ID,
-        trace_id_source="operator_supplied",
-        detail={"task_id": "task-reader"},
-    ))
-    log.append(BoardEvent(
-        kind="card_created",
-        card_id=CardId("card-other"),
-        trace_id=OTHER_TRACE_ID,
-    ))
-
-    events = read_board_events(board_db, TRACE_ID)
-    packet = TraceAttractorProjector().build_packet(
-        TRACE_ID,
-        events,
-        generated_at="2026-05-05T00:00:00Z",
-    )
-
-    assert len(events) == 1
-    assert events[0].source_store == "boardstore"
-    assert packet.trace_id_source == "operator_supplied"
-
-
-def test_sakshi_reader_reads_trace_metadata(tmp_path: Path) -> None:
-    sakshi_log = tmp_path / "sakshi.jsonl"
-    log = ProvenanceLog(path=sakshi_log)
-    log.append(ProvenanceEntry(
-        actor_id="codex",
-        actor_kind="codex",
-        action="track_opened",
-        target_ref="trace-attractor-causal-spine-2026-05",
-        trace_id=TRACE_ID,
-        trace_id_source="operator_supplied",
-        track_id="trace-attractor-causal-spine-2026-05",
-    ))
-    log.append(ProvenanceEntry(
-        actor_id="codex",
-        actor_kind="codex",
-        action="track_closed",
-        trace_id=OTHER_TRACE_ID,
-    ))
-
-    events = read_sakshi_events(sakshi_log, TRACE_ID)
-    packet = TraceAttractorProjector().build_packet(
-        TRACE_ID,
-        events,
-        generated_at="2026-05-05T00:00:00Z",
-    )
-
-    assert len(events) == 1
-    assert events[0].source_store == "sakshi"
-    assert packet.lineage_edge_ids == [events[0].source_object_id]

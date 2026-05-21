@@ -1,116 +1,120 @@
 # CANONICAL DOC STACK
 
-**Purpose:** Define which doc owns which kind of truth, and which surfaces an
-agent reads first. This is the doc-ownership map. The single *door* into the
-current operating state is the onboarding command, not this file:
+**Date**: 2026-04-04
+**Purpose**: Define the minimal root-adjacent file stack for repo integrity.
 
-```bash
-make onboard
-# or: python3 scripts/governance/agent_onboard.py
+---
+
+## Hierarchy (Read Order)
+
+```
+TIER 1 — MANDATORY FIRST-READ (agents MUST ingest before any action)
+├── CLAUDE.md                          → Agent operating instructions (OWNER of: behavioral rules, architecture, build commands)
+├── docs/governance/SOVEREIGN_MANIFEST.md → Repo ground truth (OWNER of: axioms, domain map, invariants, locks)
+│
+TIER 2 — DOMAIN REFERENCE (read when working in that domain)
+├── docs/architecture/NAVIGATION.md    → Module-level map (OWNER of: which file does what, layer assignments)
+├── docs/architecture/MODEL_ROUTING_CANON.md → Routing truth (OWNER of: provider selection, model hierarchy)
+├── specs/DGC_TERMINAL_ARCHITECTURE_v1.1.md → Terminal protocol (OWNER of: Bun↔Python JSON stdio contract)
+│
+TIER 3 — FOUNDATIONAL (read for deep context, rarely changes)
+├── foundations/INDEX.md               → 10-pillar intellectual genome entry point
+├── specs/Dharma_Constitution_v0.md    → Constitutional rules
+├── specs/KERNEL_CORE_SPEC.md          → Kernel immutability spec
+│
+TIER 4 — OPERATIONAL REFERENCE (read when operating the system)
+├── README.md                          → Repo overview, quick-start
+├── docs/governance/REPO_GOVERNANCE_AUDIT.md → Audit findings, contradictions, stale doc log
+├── docs/MEGAFILE_INDEX.md          → Ten-slot onboarding map
+├── docs/state/LIVE_OPS_DASHBOARD.md → Current live state front door
+├── docs/state/BROKEN_REGISTER.md    → Declared-vs-actual contradiction register
+│
+TIER 5 — ARCHIVE (do not read unless investigating history)
+├── docs/archive/*                     → Correctly quarantined old docs
+├── LIVING_LAYERS.md                   → Demote to archive (stale, overlaps NAVIGATION.md)
+├── program.md                         → Demote to archive (overlaps README)
+├── PRODUCT_SURFACE.md                 → Demote to archive or merge into SOVEREIGN_MANIFEST
 ```
 
-That command reads the owners below and renders the live truth in one screen.
+---
+
+## File Ownership Rules
+
+| Kind of Truth | Canonical File | All Others Must Defer |
+|---------------|---------------|----------------------|
+| Agent behavior rules | `CLAUDE.md` | — |
+| Repo axioms & domain map | `SOVEREIGN_MANIFEST.md` | — |
+| Module-level what-does-what | `NAVIGATION.md` | — |
+| Model/provider routing | `MODEL_ROUTING_CANON.md` | model_routing.py files must not contradict |
+| Terminal protocol | `specs/DGC_TERMINAL_ARCHITECTURE_v1.1.md` | v1.0 is deprecated |
+| Constitutional axioms | `specs/Dharma_Constitution_v0.md` | — |
+| Kernel spec | `specs/KERNEL_CORE_SPEC.md` | — |
+| Contradictions & staleness | `REPO_GOVERNANCE_AUDIT.md` | — |
+| Megafile onboarding slots | `docs/MEGAFILE_INDEX.md` | slot files defer to their registered boundary |
+| Current live state | `docs/state/LIVE_OPS_DASHBOARD.md` | live probes override stale prose |
+| Declared-vs-actual gaps | `docs/state/BROKEN_REGISTER.md` | PR bodies must update relevant entries |
 
 ---
 
-## The Three-Layer SSoT Model
+## Authority Registry
 
-Every governance fact lives in exactly one of three layers:
+Only the files below may claim repo-wide canonical authority. Any other file
+using phrases such as "source of truth", "canonical", "authoritative", or
+"ground truth" must scope the claim to its local domain or be corrected.
 
-| Layer | What it answers | Owner file | Decay protection |
-|---|---|---|---|
-| **Intent** | What are we working on right now? | [`ACTIVE_TRACK.yaml`](ACTIVE_TRACK.yaml) | CI gate + TTL + managed-block render |
-| **Surface** | What exists in the codebase (routers, state dirs, nav)? | [`ACTIVE_SURFACE_MANIFEST.yaml`](../../ACTIVE_SURFACE_MANIFEST.yaml) | Manifest Health API |
-| **State** | What is live right now (HEAD, recent merges, runtime)? | [`docs/state/LIVE_OPS_DASHBOARD.md`](../state/LIVE_OPS_DASHBOARD.md) | Onboarding surfaces staleness as soft warning |
+| File | Authority Boundary |
+|------|--------------------|
+| `AGENTS.md` | Cross-agent repo instructions and mandatory read order |
+| `CLAUDE.md` | Behavioral rules for coding agents |
+| `README.md` | Public repo overview, quick-start, and pointer surface into canonical docs |
+| `docs/AGENTS.md` | Documentation-specific cleanup and semantic-experiment rules |
+| `docs/governance/BUILD_SESSION_ENTRYPOINT.md` | Current build track and pre-change read order |
+| `docs/governance/COHERENCE_DELTA.md` | PR Coherence Delta field semantics and merge-boundary discipline |
+| `docs/governance/SOVEREIGN_MANIFEST.md` | Repo architecture, invariants, domains, measured state |
+| `docs/governance/CANONICAL_DOC_STACK.md` | Documentation hierarchy and ownership |
+| `docs/governance/REPO_GOVERNANCE_AUDIT.md` | Contradiction, staleness, and drift ledger |
+| `docs/MEGAFILE_INDEX.md` | Ten-slot highest-system onboarding index |
+| `docs/vision_maps/MASTER_2026-05-07_attractor_closure_synthesis.md` | Highest vision / Attractor Closure synthesis |
+| `docs/state/LIVE_OPS_DASHBOARD.md` | Current live operating-state front door |
+| `docs/state/BROKEN_REGISTER.md` | Declared-vs-actual contradiction register |
+| `docs/architecture/NAVIGATION.md` | Module map, after count refresh |
+| `docs/architecture/MODEL_ROUTING_CANON.md` | Provider/model routing, after merge with root routing map |
+| `docs/architecture/WIRING_AND_LOOPS.md` | Build Protocol and feedback-loop wiring map |
+| `docs/architecture/WORLD_ZEITGEIST.md` | External world-radar loop, Shakti wiring, and safety boundaries |
+| `docs/MEGAFILE_INDEX.md` | Onboarding megafile slot index and convergence map |
+| `docs/state/BROKEN_REGISTER.md` | Persistent broken/degraded surface register |
+| `docs/vision_maps/MASTER_2026-05-07_attractor_closure.md` | Attractor-closure synthesis source map |
+| `docs/vision_maps/MASTER_2026-05-07_attractor_closure_synthesis.md` | Attractor-closure synthesis entry point |
+| `docs/vision_maps/2026-05-07_attractor_closure/01_gnani_prakruti.md` | Attractor-closure source map: gnani/prakruti |
+| `docs/vision_maps/2026-05-07_attractor_closure/02_vsm_viability.md` | Attractor-closure source map: VSM viability |
+| `docs/vision_maps/2026-05-07_attractor_closure/03_omega_state.md` | Attractor-closure source map: omega state |
+| `docs/vision_maps/2026-05-07_attractor_closure/04_recognition_self_model.md` | Attractor-closure source map: recognition self-model |
+| `docs/vision_maps/2026-05-07_attractor_closure/05_autopoiesis_evolution.md` | Attractor-closure source map: autopoiesis/evolution |
+| `docs/vision_maps/2026-05-07_attractor_closure/06_outward_organs.md` | Attractor-closure source map: outward organs |
+| `docs/vision_maps/_archive/codex_DHARMA_SWARM_MASTER_MAP_2026-05-07.md` | Archived source map retained as historical evidence |
+| `PRODUCT_SURFACE.md` | Product-surface precedence for dashboard, browser shell, and desktop shell |
+| `specs/DGC_TERMINAL_ARCHITECTURE_v1.1.md` | Terminal protocol, after Bun/Textual split is reconciled |
+| `specs/Dharma_Constitution_v0.md` | Constitutional rules |
+| `specs/KERNEL_CORE_SPEC.md` | Kernel immutability |
 
-Everything else is **doctrine** (stable, prose-friendly: axioms, anti-slop
-rules, AGENTOPS loops, architecture). Doctrine never claims live state;
-live state never claims doctrine.
-
----
-
-## First-Read Surfaces (max 5)
-
-Earlier versions of this doc said "max 5 governance docs". That was wrong;
-governance/ has more than 5 files and that is fine — most are doctrine.
-The honest constraint is **max 5 first-read surfaces**: docs an agent must
-ingest before any action. They are:
-
-1. The onboarding command output (`make onboard`)
-2. [`CLAUDE.md`](../../CLAUDE.md) — behavioural contract for coding agents
-3. [`docs/governance/SOVEREIGN_MANIFEST.md`](SOVEREIGN_MANIFEST.md) — architecture, axioms, invariants
-4. [`docs/governance/ACTIVE_TRACK.yaml`](ACTIVE_TRACK.yaml) — active build track
-5. [`docs/governance/ANTI_SLOP_RULES.md`](ANTI_SLOP_RULES.md) — what not to do
-
-Everything else in `docs/governance/`, `docs/doctrine/`, and `docs/architecture/`
-is **depth-on-demand**. Read it when you need it. Do not memorise a read order.
-
----
-
-## Ownership Map (what owns what)
-
-| Kind of truth | Single owner | Who defers to it |
-|---|---|---|
-| Active build track (intent) | `ACTIVE_TRACK.yaml` | CLAUDE.md, SOVEREIGN_MANIFEST.md, BUILD_SESSION_ENTRYPOINT.md (rendered via managed blocks) |
-| Declared surfaces (routers, state dirs, nav) | `ACTIVE_SURFACE_MANIFEST.yaml` | Manifest Health API, anti-slop allowlists |
-| Live runtime / merge state | `docs/state/LIVE_OPS_DASHBOARD.md` | Daily Operating Brief, situational prose |
-| Known breakage | `docs/state/BROKEN_REGISTER.md` | INTERFACE_MISMATCH_MAP.md (parallel substrate) |
-| Behavioural contract (coding agents) | `CLAUDE.md` | — |
-| Behavioural contract (cross-agent) | `AGENTS.md` (root), `docs/AGENTS.md` | — |
-| Architecture / invariants / axioms | `docs/governance/SOVEREIGN_MANIFEST.md`, `docs/doctrine/` | — |
-| Doc ownership | `docs/governance/CANONICAL_DOC_STACK.md` (this file) | — |
-| Anti-slop / repo-rule discipline | `docs/governance/ANTI_SLOP_RULES.md` + `.semgrep/dharma-anti-slop.yml` | — |
-| PR coherence gate | `docs/governance/COHERENCE_DELTA.md` | PR template |
-| Action warrant | `docs/governance/FOURFOLD_ACTION_WARRANT.md` | — |
-| Module-level what-does-what | `docs/architecture/NAVIGATION.md` | — |
-| Model / provider routing | `docs/architecture/MODEL_ROUTING_CANON.md` | root `MODEL_ROUTING_MAP.md` (archive pointer) |
-| BoardStore facade / agent participation | `docs/architecture/SWARM_BOARDSTORE_SPEC.md` | — |
-| Terminal protocol | `specs/DGC_TERMINAL_ARCHITECTURE_v1.1.md` | v1.0 is archived |
-| Constitutional rules | `specs/Dharma_Constitution_v0.md` | — |
-| Kernel immutability | `specs/KERNEL_CORE_SPEC.md` | — |
-| Onboarding megafile slots | `docs/MEGAFILE_INDEX.md` | individual slot files |
-| Audit trail | `docs/governance/REPO_GOVERNANCE_AUDIT.md` | — |
-| Work loops | `docs/governance/AGENTOPS.md`, `KAIZENOPS.md`, `DAILY_OPERATING_BRIEF.md`, `METABOLIC_CLOCK.md`, `HUMAN_YDS_LEDGER.md` | — |
-
-If any file claims to own a fact already owned above, the rule is: **the file
-in this table wins; the other file becomes a pointer.**
+All reports, plans, prompts, generated outputs, missions, and research notes
+are evidence or context unless explicitly promoted through this registry.
 
 ---
 
-## Anti-Doc-Maze Rules
+## DocOps Lifecycle
 
-1. **Max 5 first-read surfaces.** Listed above. Adding a sixth requires removing one.
-2. **One owner per fact.** Use the ownership map above. New facts pick exactly one home.
-3. **No "single source of truth" claim** for something the ownership map gives to another file.
-4. **Active state lives in YAML or live registers, not in prose.** Prose ages; YAML and registers are inspected by tools.
-5. **Depth docs may live in `docs/governance/`, `docs/doctrine/`, `docs/architecture/`** — there is no cap on depth docs, but they are read on demand, never in a forced order.
-6. **Stale archive within 2 weeks** of becoming stale (move to `docs/archive/` with a redirect).
+Use this lifecycle before moving or deleting docs:
 
----
+1. **Inventory**: identify current claims, incoming links, and replacement owner.
+2. **Demote**: mark stale or historical docs with replacement and reason.
+3. **Redirect**: update live links to the replacement owner.
+4. **Archive**: move only after links and hardcoded paths are accounted for.
+5. **Delete later**: remove only generated or duplicate material with no remaining authority or path dependency.
 
-## DocOps Lifecycle (before moving or deleting a doc)
-
-1. **Inventory** — identify current claims, incoming links, replacement owner.
-2. **Demote** — mark stale or historical docs with replacement and reason.
-3. **Redirect** — update live links to the replacement owner.
-4. **Archive** — move only after links and hardcoded paths are accounted for.
-5. **Delete later** — remove only generated or duplicate material with no remaining authority or path dependency.
-
-Documentation PRs should classify changed files as one of: `canon`, `ADR`,
-`active_spec`, `working_plan`, `report`, `witness`, `reference`, `archive`,
-or `experiment`.
-
----
-
-## Frontmatter Policy
-
-1. **Root governance docs** (this file, CLAUDE.md, README.md, SOVEREIGN_MANIFEST.md, ANTI_SLOP_RULES.md): NO frontmatter. Plain markdown. Maximum clarity.
-2. **Architecture docs**: minimal frontmatter (title, date, status only — 5 lines max).
-3. **Archive docs**: leave existing frontmatter in place.
-4. **New docs**: no frontmatter unless consumed by a machine-readable pipeline.
-
-If a Codex (GPT-5) or similar agent injects frontmatter into a Tier-1 doc,
-strip it and move the metadata into `.codex/` or a sibling YAML file.
+Documentation PRs should classify changed files as one of:
+`canon`, `ADR`, `active_spec`, `working_plan`, `report`, `witness`,
+`reference`, `archive`, or `experiment`.
 
 ---
 
@@ -121,15 +125,71 @@ research directions, but they are not canonical documentation or runtime
 authority by default.
 
 Allowed now:
+
 - read-only extraction of repeated semantic patterns during doc cleanup;
 - reports or plans that include a human-readable legend;
 - round-trip experiments where compact agent messages expand back to clear
   English and cite source files.
 
 Not allowed yet:
+
 - opaque compact language controlling runtime behavior;
 - new ontology schema created from clustering alone;
 - hidden symbolic instructions that replace docs, gates, witnesses, or ADRs.
 
 If a semantic pattern becomes load-bearing, promote it through an ADR or active
 spec with tests or witness evidence.
+
+---
+
+## Deprecation / Merge Decisions
+
+### DEPRECATE (move to docs/archive/)
+| File | Reason |
+|------|--------|
+| `LIVING_LAYERS.md` | Overlaps NAVIGATION.md, stale line counts, bloated frontmatter |
+| `program.md` | Overlaps README.md |
+| `PRODUCT_SURFACE.md` | Content belongs in SOVEREIGN_MANIFEST or README |
+| `specs/DGC_TERMINAL_ARCHITECTURE.md` (v1.0) | Superseded by v1.1 |
+| `specs/SOVEREIGN_BUILD_PHASE_MASTER_SPEC_2026-03-19.md` | Stale build plan |
+| `specs/ONTOLOGY_PHASE2_*.md` | Stale migration spec |
+| `docs/architecture/DHARMA_SWARM_THREE_PLANE_ARCHITECTURE_2026-03-16.md` | Pre-TUI, stale |
+| `docs/architecture/JIKOKU_SAMAYA_*.md` (4 files) | Merge into 1 or archive |
+| `docs/architecture/SWARMLENS_MASTER_SPEC.md` | Replaced by Bun TUI |
+
+### RETAIN AND UPDATE
+| File | Action Needed |
+|------|--------------|
+| `CLAUDE.md` | Fix stale numbers (514 modules, 8571 collected tests, swarm.py 3119 lines, 18 providers not 9). Add pointer to SOVEREIGN_MANIFEST.md. |
+| `docs/architecture/NAVIGATION.md` | Fix stale numbers, add bridge/adapter/orchestrator maps |
+| `docs/architecture/MODEL_ROUTING_CANON.md` | Acknowledge 3 routing files, define which is canonical |
+| `README.md` | Strip excessive Codex frontmatter, keep concise |
+
+### CREATED BY GOVERNANCE AUDIT (2026-04-04)
+| File | Purpose | Status |
+|------|---------|--------|
+| `docs/governance/SOVEREIGN_MANIFEST.md` | Repo ground truth for all agents | **EXISTS** — rewritten with filesystem-verified numbers |
+| `docs/governance/REPO_GOVERNANCE_AUDIT.md` | Audit findings and contradiction log | **EXISTS** — updated with re-audit corrections |
+| `docs/governance/CANONICAL_DOC_STACK.md` | This file — doc hierarchy | **EXISTS** |
+
+---
+
+## Frontmatter Policy
+
+The Codex (GPT-5) frontmatter injection is present in 214 of 632 Markdown
+files, including 15 of 20 `docs/architecture` files. Policy going forward:
+
+1. **Root governance docs** (Tier 1-2): NO frontmatter. Plain markdown. Maximum clarity.
+2. **Architecture docs** (Tier 2-3): Minimal frontmatter (title, date, status only — 5 lines max).
+3. **Archive docs**: Leave existing frontmatter in place (it's archived, doesn't matter).
+4. **New docs**: No frontmatter unless the doc is consumed by a machine-readable pipeline.
+
+---
+
+## Anti-Doc-Maze Rules
+
+1. **Maximum governance docs at root or docs/governance/**: 5 files
+2. **Maximum architecture docs**: 10 files (current: 20 — cut in half)
+3. **Any new doc must identify which existing doc it replaces or subordinates to**
+4. **No doc may claim "single source of truth" for something another doc also covers**
+5. **Stale docs must be archived within 2 weeks of becoming stale**
