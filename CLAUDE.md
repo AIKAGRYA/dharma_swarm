@@ -265,13 +265,13 @@ This project is indexed by GitNexus as **dharma_swarm** (99064 symbols, 170038 r
 
 ## CLI
 
-| Task | Read this skill file |
+| Task | Use this GitNexus skill |
 |------|---------------------|
-| Understand architecture / "How does X work?" | `.claude/skills/gitnexus/gitnexus-exploring/SKILL.md` |
-| Blast radius / "What breaks if I change X?" | `.claude/skills/gitnexus/gitnexus-impact-analysis/SKILL.md` |
-| Trace bugs / "Why is X failing?" | `.claude/skills/gitnexus/gitnexus-debugging/SKILL.md` |
-| Rename / extract / split / refactor | `.claude/skills/gitnexus/gitnexus-refactoring/SKILL.md` |
-| Tools, resources, schema reference | `.claude/skills/gitnexus/gitnexus-guide/SKILL.md` |
-| Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md` |
+| Understand architecture / "How does X work?" | gitnexus-exploring |
+| Blast radius / "What breaks if I change X?" | gitnexus-impact-analysis |
+| Trace bugs / "Why is X failing?" | gitnexus-debugging |
+| Rename / extract / split / refactor | gitnexus-refactoring |
+| Tools, resources, schema reference | gitnexus-guide |
+| Index, status, clean, wiki CLI commands | gitnexus-cli |
 
 <!-- gitnexus:end -->

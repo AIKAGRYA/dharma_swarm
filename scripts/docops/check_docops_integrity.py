@@ -17,6 +17,7 @@ import sys
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
+from functools import lru_cache
 from typing import Any, Iterable
 
 
@@ -80,6 +81,67 @@ def is_ignored(path: Path, repo_root: Path) -> bool:
     return any(part in IGNORE_DIR_NAMES for part in rel_parts)
 
 
+@lru_cache(maxsize=8)
+def tracked_repo_files(repo_root_text: str) -> tuple[str, ...]:
+    repo_root = Path(repo_root_text)
+    try:
+        result = subprocess.run(
+            ["git", "ls-files", "-z"],
+            cwd=repo_root,
+            check=True,
+            capture_output=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return ()
+    return tuple(
+        item.decode("utf-8")
+        for item in result.stdout.split(b"\0")
+        if item
+    )
+
+
+def path_matches_pattern(rel: str, pattern: str) -> bool:
+    path = Path(rel)
+    rel = rel.replace("\\", "/")
+    pattern = pattern.replace("\\", "/")
+    if "/**/" in pattern:
+        prefix, suffix = pattern.split("/**/", 1)
+        prefix = prefix.rstrip("/")
+        if not rel.startswith(f"{prefix}/"):
+            return False
+        return fnmatch.fnmatch(rel.removeprefix(f"{prefix}/"), suffix)
+    if pattern.startswith("**/"):
+        stripped = pattern.removeprefix("**/")
+        return fnmatch.fnmatch(rel, stripped) or fnmatch.fnmatch(path.name, stripped)
+    if "/" in pattern:
+        prefix, leaf_pattern = pattern.rsplit("/", 1)
+        prefix = prefix.rstrip("/")
+        if not rel.startswith(f"{prefix}/"):
+            return False
+        remainder = rel.removeprefix(f"{prefix}/")
+        return "/" not in remainder and fnmatch.fnmatch(remainder, leaf_pattern)
+    if path.match(pattern):
+        return True
+    return fnmatch.fnmatch(path.name, pattern)
+
+
+def iter_pattern_paths(repo_root: Path, pattern: str) -> list[Path]:
+    tracked = tracked_repo_files(str(repo_root.resolve()))
+    if tracked:
+        return [
+            repo_root / rel
+            for rel in tracked
+            if path_matches_pattern(rel, pattern)
+            and (repo_root / rel).is_file()
+            and not is_ignored(repo_root / rel, repo_root)
+        ]
+    return [
+        path
+        for path in repo_root.glob(pattern)
+        if path.is_file() and not is_ignored(path, repo_root)
+    ]
+
+
 def load_config(path: Path) -> dict[str, Any]:
     text = path.read_text(encoding="utf-8")
     try:
@@ -96,63 +158,52 @@ def load_config(path: Path) -> dict[str, Any]:
 def iter_files(repo_root: Path, patterns: Iterable[str]) -> list[Path]:
     paths: set[Path] = set()
     for pattern in patterns:
-        for path in repo_root.glob(pattern):
-            if path.is_file() and not is_ignored(path, repo_root):
-                paths.add(path)
+        for path in iter_pattern_paths(repo_root, pattern):
+            paths.add(path)
     return sorted(paths)
 
 
 def count_files(repo_root: Path, pattern: str) -> int:
-    return sum(
-        1
-        for path in repo_root.glob(pattern)
-        if path.is_file() and not is_ignored(path, repo_root)
-    )
+    return len(iter_pattern_paths(repo_root, pattern))
 
 
 def count_paths_containing(repo_root: Path, pattern: str, needle: str) -> int:
     return sum(
         1
-        for path in repo_root.glob(pattern)
-        if path.is_file()
-        and not is_ignored(path, repo_root)
-        and needle.lower() in path.as_posix().lower()
+        for path in iter_pattern_paths(repo_root, pattern)
+        if needle.lower() in path.as_posix().lower()
     )
 
 
 def count_regex(repo_root: Path, pattern: str, regex: str) -> int:
     compiled = re.compile(regex)
     count = 0
-    for path in repo_root.glob(pattern):
-        if path.is_file() and not is_ignored(path, repo_root):
-            count += len(compiled.findall(path.read_text(encoding="utf-8", errors="ignore")))
+    for path in iter_pattern_paths(repo_root, pattern):
+        count += len(compiled.findall(path.read_text(encoding="utf-8", errors="ignore")))
     return count
 
 
 def total_lines(repo_root: Path, pattern: str) -> int:
     total = 0
-    for path in repo_root.glob(pattern):
-        if path.is_file() and not is_ignored(path, repo_root):
-            total += path.read_bytes().count(b"\n")
+    for path in iter_pattern_paths(repo_root, pattern):
+        total += path.read_bytes().count(b"\n")
     return total
 
 
 def count_frontmatter(repo_root: Path, pattern: str) -> int:
     count = 0
-    for path in repo_root.glob(pattern):
-        if path.is_file() and not is_ignored(path, repo_root):
-            if path.read_text(encoding="utf-8", errors="ignore").startswith("---\n"):
-                count += 1
+    for path in iter_pattern_paths(repo_root, pattern):
+        if path.read_text(encoding="utf-8", errors="ignore").startswith("---\n"):
+            count += 1
     return count
 
 
 def count_authority_candidate_docs(repo_root: Path) -> int:
     count = 0
-    for path in repo_root.glob("**/*.md"):
-        if path.is_file() and not is_ignored(path, repo_root):
-            text = path.read_text(encoding="utf-8", errors="ignore").lower()
-            if any(term in text for term in AUTHORITY_TERMS):
-                count += 1
+    for path in iter_pattern_paths(repo_root, "**/*.md"):
+        text = path.read_text(encoding="utf-8", errors="ignore").lower()
+        if any(term in text for term in AUTHORITY_TERMS):
+            count += 1
     return count
 
 
