@@ -23,6 +23,7 @@ from typing import Any, Iterable
 DEFAULT_CONFIG = Path("docs/docops/assertions.yaml")
 IGNORE_DIR_NAMES = {
     ".git",
+    ".claude",
     ".mypy_cache",
     ".pytest_cache",
     ".ruff_cache",
@@ -31,6 +32,7 @@ IGNORE_DIR_NAMES = {
     "node_modules",
 }
 IGNORE_REL_PATTERNS = (
+    "AGENTS.md",
     "reports/docops/**",
 )
 AUTHORITY_TERMS = (

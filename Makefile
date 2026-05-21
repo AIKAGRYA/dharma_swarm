@@ -1,7 +1,7 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts uplift-guards module-budget docops-integrity docops-report governance-all go-fmt-check go-test go-vet go-ci
+.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts uplift-guards module-budget docops-integrity docops-report governance-all onboard go-fmt-check go-test go-vet go-ci
 
 PYTHON ?= python3
 GO ?= go
@@ -44,6 +44,7 @@ help:
 	@echo "  make uplift-guards Run uplift pre-commit guards"
 	@echo "  make docops-integrity Run machine-verifiable documentation checks"
 	@echo "  make docops-report Generate local DocOps JSON/Markdown reports"
+	@echo "  make onboard      Render current operating reality (active track, live ops, broken register, axioms)"
 	@echo "  make go-ci        Run Go evidence sense-organ fmt/vet/test gates"
 	@echo ""
 
@@ -201,6 +202,13 @@ docops-report:
 		--inventory-markdown reports/docops/corpus_inventory.md
 
 governance-all: semgrep gitleaks test-hygiene test-contracts uplift-guards module-budget docops-integrity
+
+# Single-door onboarding: prints the current operating reality from existing
+# owners (ACTIVE_TRACK.yaml, LIVE_OPS_DASHBOARD.md, BROKEN_REGISTER.md,
+# ACTIVE_SURFACE_MANIFEST.yaml). Always exits 0. Run this before any build
+# session — humans and agents both.
+onboard:
+	$(PYTHON) scripts/governance/agent_onboard.py
 
 # ============================================================================
 # Go evidence sense-organ gates (Track G)

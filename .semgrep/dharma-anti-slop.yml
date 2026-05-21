@@ -13,7 +13,8 @@ rules:
       Even reads should go through RuntimeStateStore (dharma_swarm/runtime_state.py)
       so state ownership stays centralized. If this module legitimately owns
       a slice of ~/.dharma, add the file to the allowlist below AFTER
-      documenting in docs/governance/STATE_DIR_OWNERS.md.
+      declaring the owned surface in ACTIVE_SURFACE_MANIFEST.yaml. See
+      docs/governance/ANTI_SLOP_RULES.md Rule 1 for the procedure.
     severity: WARNING
     languages: [python]
     paths:

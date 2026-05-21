@@ -1,99 +1,3 @@
----
-title: DHARMA SWARM
-path: README.md
-slug: dharma-swarm
-doc_type: readme
-status: reference
-summary: DHARMA SWARM is the operator-facing swarm runtime and control-plane codebase behind DHARMA COMMAND. It combines a Python orchestration core, a FastAPI backend, a Next.js dashboard, and a large research/spec layer that...
-source:
-  provenance: repo_local
-  kind: readme
-  origin_signals:
-  - run_operator.sh
-  - dharma_swarm/dgc_cli.py
-  - dharma_swarm/swarm.py
-  - dharma_swarm/agent_runner.py
-  - dharma_swarm/evolution.py
-  cited_urls: []
-  generated_hint: human_or_agent_authored_repo_doc
-disciplines:
-- multi_agent_systems
-- software_architecture
-- knowledge_management
-- research_methodology
-- verification
-- frontend_engineering
-inspiration:
-- verification
-- operator_runtime
-- product_surface
-- research_synthesis
-connected_python_files:
-- dharma_swarm/dgc_cli.py
-- dharma_swarm/swarm.py
-- dharma_swarm/agent_runner.py
-- dharma_swarm/evolution.py
-- api/main.py
-connected_python_modules:
-- dharma_swarm.dgc_cli
-- dharma_swarm.swarm
-- dharma_swarm.agent_runner
-- dharma_swarm.evolution
-- api.main
-connected_relevant_files:
-- run_operator.sh
-- dharma_swarm/dgc_cli.py
-- dharma_swarm/swarm.py
-- dharma_swarm/agent_runner.py
-- dharma_swarm/evolution.py
-improvement:
-  room_for_improvement:
-  - Keep entry points and commands aligned with the current runtime.
-  - Add sharper cross-links into the most active specs, tests, and dashboards.
-  - Make shipped behavior vs. exploratory material explicit.
-  - Review whether this file should stay in `.` or be consolidated elsewhere.
-  next_review_at: '2026-04-01T00:43:19+09:00'
-pkm:
-  note_class: readme
-  vault_path: README.md
-  retrieval_terms:
-  - operator
-  - facing
-  - runtime
-  - control
-  - plane
-  - codebase
-  - behind
-  - command
-  - combines
-  - python
-  - orchestration
-  - core
-  evergreen_potential: high
-stigmergy:
-  meaning: This file is a shared environmental trace in the DHARMA corpus. Its path, recency, and linked surfaces guide future agent attention; its frontmatter now adds machine-readable coordination cues.
-  state: canonical
-  semantic_weight: 0.95
-  coordination_comment: DHARMA SWARM is the operator-facing swarm runtime and control-plane codebase behind DHARMA COMMAND. It combines a Python orchestration core, a FastAPI backend, a Next.js dashboard, and a large research/spec layer that...
-  levels:
-    sematectonic:
-      what_it_is: The document itself is the mark. Its existence, filename, location, and revision history attract or repel future work.
-      access_mark: Opening, linking, and revising README.md reinforces its salience without needing a separate message.
-    marker_based:
-      what_it_is: The frontmatter is an explicit annotation layer on top of the document.
-      semantic_mark: Semantic weight, improvement prompts, related files, and provenance comments tell later agents how to use this document.
-  trace_role: coordination_trace
-curation:
-  last_frontmatter_refresh: '2026-04-01T00:43:19+09:00'
-  curated_by_model: Codex (GPT-5)
-  source_model_in_file: 
-  future_model_handoffs:
-  - GPT-5 Codex
-  - Claude
-  - Gemini
-  - Local evaluator
-  schema_version: pkm-phd-stigmergy-v1
----
 # DHARMA SWARM
 
 DHARMA SWARM is the operator-facing swarm runtime and control-plane codebase behind DHARMA COMMAND.
@@ -154,13 +58,27 @@ That report is the fastest way to answer:
 
 ## Before Writing Any Code
 
-- **Read [`docs/governance/BUILD_SESSION_ENTRYPOINT.md`](docs/governance/BUILD_SESSION_ENTRYPOINT.md)** — canonical read order, current build track, and the seven ontology-native checks. Every build session starts here.
-- **Read [`docs/MEGAFILE_INDEX.md`](docs/MEGAFILE_INDEX.md)** — ten highest-system onboarding slots, current canonical/partial/missing status, and where future megafiles belong.
-- **Current build track:** ontology-native Operator Brief seam. See [`docs/plans/ONTOLOGY_NATIVE_OPERATOR_BRIEF_MASTER_SPEC.md`](docs/plans/ONTOLOGY_NATIVE_OPERATOR_BRIEF_MASTER_SPEC.md), [`docs/plans/NEXT_10_SUBSTRATE_TODO.md`](docs/plans/NEXT_10_SUBSTRATE_TODO.md), and [`docs/plans/HANDOFF_ONTOLOGY_NATIVE_OPERATOR_BRIEF.md`](docs/plans/HANDOFF_ONTOLOGY_NATIVE_OPERATOR_BRIEF.md). Do not open a second seam until this one ships.
-- **Read [`CLAUDE.md`](CLAUDE.md)** — system genome, key abstractions, behavioral rules, the Transcendence Principle.
-- **Read [`INTERFACE_MISMATCH_MAP.md`](INTERFACE_MISMATCH_MAP.md)** — every known interface mismatch between modules, with exact line numbers, root causes, and fixes. This is the primary source of runtime failures. Follow the Bootstrap Sequence to unblock the system.
-- **Read [`docs/architecture/NAVIGATION.md`](docs/architecture/NAVIGATION.md)** — full module map across 12 architectural layers with line counts and "When to Touch" guidance.
-- **Read [`MODEL_ROUTING_MAP.md`](MODEL_ROUTING_MAP.md)** — how every LLM call flows through the system. 18 providers, 3 calling surfaces, 5 inconsistencies, the HuggingFace fix, and the minimum viable path to first LLM call.
+One command. Run it. Read its output. That is the entire pre-flight.
+
+```bash
+make onboard
+# or: python3 scripts/governance/agent_onboard.py
+```
+
+`agent_onboard.py` is the **single door** into the current operating reality. It does not own any fact — it renders the current truth from the existing owners:
+
+| What you need | Owner (the only place this fact lives) |
+|---|---|
+| Active build track | [`docs/governance/ACTIVE_TRACK.yaml`](docs/governance/ACTIVE_TRACK.yaml) |
+| Live runtime / merge state | [`docs/state/LIVE_OPS_DASHBOARD.md`](docs/state/LIVE_OPS_DASHBOARD.md) |
+| Declared surfaces / routers / nav | [`ACTIVE_SURFACE_MANIFEST.yaml`](ACTIVE_SURFACE_MANIFEST.yaml) |
+| Known broken / stale surfaces | [`docs/state/BROKEN_REGISTER.md`](docs/state/BROKEN_REGISTER.md) |
+| Behavioural contract | [`CLAUDE.md`](CLAUDE.md), [`AGENTS.md`](AGENTS.md), [`docs/AGENTS.md`](docs/AGENTS.md) |
+| Architecture / doctrine | [`docs/governance/SOVEREIGN_MANIFEST.md`](docs/governance/SOVEREIGN_MANIFEST.md), [`docs/doctrine/`](docs/doctrine/) |
+| Doc ownership map | [`docs/governance/CANONICAL_DOC_STACK.md`](docs/governance/CANONICAL_DOC_STACK.md) |
+| Anti-slop rules | [`docs/governance/ANTI_SLOP_RULES.md`](docs/governance/ANTI_SLOP_RULES.md) |
+
+If any prose in any doc disagrees with `make onboard`, **trust `make onboard`**, the filesystem, and `git log`. The onboarding output is informational — it never gates merges — but it is the freshest read of reality.
 
 ## First Places To Look
 

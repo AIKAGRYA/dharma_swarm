@@ -71,6 +71,7 @@ Current examples:
 - [DGC_STRESS_HARNESS.md](/Users/dhyana/dharma_swarm/docs/architecture/DGC_STRESS_HARNESS.md)
 - [ORCHESTRATOR_LEDGERS.md](/Users/dhyana/dharma_swarm/docs/architecture/ORCHESTRATOR_LEDGERS.md)
 - [PROVIDER_MATRIX_HARNESS.md](/Users/dhyana/dharma_swarm/docs/architecture/PROVIDER_MATRIX_HARNESS.md)
+- [SWARM_BOARDSTORE_SPEC.md](SWARM_BOARDSTORE_SPEC.md)
 - [SWARMLENS_MASTER_SPEC.md](/Users/dhyana/dharma_swarm/docs/architecture/SWARMLENS_MASTER_SPEC.md)
 
 Rule:

@@ -239,6 +239,33 @@ def test_projector_emits_lifecycle_findings_from_normalized_events() -> None:
     assert findings["warrant_unknown"].severity == FindingSeverity.INFO.value
 
 
+def test_projector_marks_legacy_trace_alias_and_collects_list_ids() -> None:
+    event = _event(
+        "evt-legacy-artifact",
+        source_store="runtime_state",
+        source_type="artifact_records",
+        source_object_id="artifact-legacy",
+        event_type="artifact_recorded",
+        artifact_id="artifact-legacy",
+        manifest_path="reports/witness/operator-brief.md",
+        trace_id_source="synthetic_legacy_alias",
+        gate_decision_ids=["gate-a", "gate-b"],
+        witness_log_ids=["witness-a"],
+    )
+
+    packet = TraceAttractorProjector().build_packet(
+        "trc-main",
+        [event],
+        generated_at=FIXED_AT,
+    )
+    findings = {finding.code: finding for finding in packet.lifecycle_findings}
+
+    assert packet.trace_id_source == "synthetic_legacy_alias"
+    assert packet.gate_decision_ids == ["gate-a", "gate-b"]
+    assert packet.witness_log_ids == ["witness-a"]
+    assert findings["legacy_trace_alias"].severity == FindingSeverity.DEGRADED.value
+
+
 def test_attractor_event_maps_to_cloudevent_envelope() -> None:
     event = _event(
         "evt-signal",
