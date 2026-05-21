@@ -112,6 +112,19 @@ class TestNormalizeEnvAliases:
         applied = normalize_env_aliases(env)
         assert env["NVIDIA_NIM_API_KEY"] == "canonical-nim"
 
+    def test_first_alias_wins_when_two_share_canonical(self) -> None:
+        """When NVIDIA_API_KEY and NIM_API_KEY both map to NVIDIA_NIM_API_KEY,
+        only the first one in iteration order should be applied — the second
+        must see the canonical as already set and skip."""
+        env: dict[str, str] = {
+            "NVIDIA_API_KEY": "first-wins",
+            "NIM_API_KEY": "second-loses",
+        }
+        applied = normalize_env_aliases(env)
+        assert env["NVIDIA_NIM_API_KEY"] == "first-wins"
+        nvidia_applied = [a for a in applied if a[1] == "NVIDIA_NIM_API_KEY"]
+        assert len(nvidia_applied) == 1
+
 
 class TestNormalizeDkeysScript:
     """Smoke-test the CLI wrapper."""
