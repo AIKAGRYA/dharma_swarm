@@ -88,6 +88,26 @@ def isolated_shared_ontology(tmp_path, monkeypatch):
     reset_shared_registry()
 
 
+def test_read_active_track_id_parses_active_track_block(tmp_path, monkeypatch) -> None:
+    governance_dir = tmp_path / "docs" / "governance"
+    governance_dir.mkdir(parents=True)
+    (governance_dir / "ACTIVE_TRACK.yaml").write_text(
+        "\n".join(
+            [
+                "closed_tracks:",
+                "  - id: old-track",
+                "",
+                "active_track:",
+                "  id: goodworks-dgm-core-2026-05",
+                "  status: ACTIVE",
+            ]
+        )
+    )
+    monkeypatch.setattr(agents_router, "_REPO_ROOT", tmp_path)
+
+    assert agents_router._read_active_track_id() == "goodworks-dgm-core-2026-05"
+
+
 def test_list_agents_includes_identity_fields(monkeypatch, isolated_shared_ontology) -> None:
     monkeypatch.setattr(agents_router, "_get_swarm", lambda: _DummySwarm())
     client = _client()

@@ -30,11 +30,26 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _read_active_track_id() -> str:
-    """Read active_track.id from ACTIVE_TRACK.yaml via regex (no yaml dep)."""
+    """Read active_track.id from ACTIVE_TRACK.yaml without a yaml dependency."""
     try:
         text = (_REPO_ROOT / "docs" / "governance" / "ACTIVE_TRACK.yaml").read_text()
-        m = re.search(r"^active_track:\s*\n(?:\s+[^\n]+\n)*?\s+id:\s*([^\s\n]+)", text, re.M)
-        return m.group(1) if m else ""
+        in_active_track = False
+        active_track_indent = 0
+        for raw_line in text.splitlines():
+            stripped = raw_line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            indent = len(raw_line) - len(raw_line.lstrip(" "))
+            if not in_active_track:
+                if stripped == "active_track:":
+                    in_active_track = True
+                    active_track_indent = indent
+                continue
+            if indent <= active_track_indent:
+                return ""
+            if stripped.startswith("id:"):
+                return stripped.split(":", 1)[1].strip().strip("\"'")
+        return ""
     except Exception:
         return ""
 
