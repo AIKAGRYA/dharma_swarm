@@ -25,6 +25,10 @@ schema_version: 1
 # ---------------------------------------------------------------------------
 # Active track (exactly one block with status=ACTIVE at any time)
 # ---------------------------------------------------------------------------
+# Companion file (control-plane surface inventory; read alongside this track):
+#   ACTIVE_SURFACE_MANIFEST.yaml — declares api_routers, state_dir, dashboard_nav,
+#   hot_path_modules, governance_rules, opportunity_stages, agents, integrations.
+#   Both files are rendered together by `make onboard`.
 active_track:
   id: trace-identity-coverage-2026-05
   name: Trace Identity Coverage — native propagation and soft coverage findings
@@ -33,6 +37,7 @@ active_track:
   verified_at: "2026-05-21"
   ttl_days: 14
   owner: "@AmitabhainArunachala"
+  companion_manifest: ACTIVE_SURFACE_MANIFEST.yaml
 
   description: |
     Move Trace Attractor from first packet visibility to native trace identity

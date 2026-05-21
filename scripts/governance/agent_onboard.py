@@ -539,6 +539,17 @@ def main() -> int:
     else:
         print("  No next_items declared. Add to ACTIVE_TRACK.yaml or pick from BR-* open items.")
     print()
+    print("=" * 72)
+    print("SEE-ALSO LINKS")
+    print("=" * 72)
+    print("  Substrate map      ~/.dharma/knowledge/wiki/concepts/dharma-swarm-substrate-map.md")
+    print("                       (existing surfaces — look here BEFORE writing new files)")
+    print("  Anti-slop rules    docs/governance/ANTI_SLOP_RULES.md  (10 rules; Rule 2 load-bearing)")
+    print("  Sovereign manifest docs/governance/SOVEREIGN_MANIFEST.md  (architectural truth)")
+    print("  Surface manifest   ACTIVE_SURFACE_MANIFEST.yaml  (control-plane inventory)")
+    print("  Wiki index         ~/.dharma/knowledge/wiki/index.md  (355 atoms, 8 MOCs)")
+    print("  Broken register    docs/state/BROKEN_REGISTER.md  (interface mismatches + decay)")
+    print()
     print("  Reminder: this command renders the owners; it does not own any fact.")
     print("  When in doubt: trust the filesystem, git log, and ACTIVE_TRACK.yaml.")
 

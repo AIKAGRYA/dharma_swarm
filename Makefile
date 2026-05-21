@@ -1,7 +1,7 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts uplift-guards module-budget docops-integrity docops-report dashboard-install dashboard-lint dashboard-build dashboard-status terminal-check frontend-check context-quorum-status context-quorum-init context-quorum-check context-quorum-handoff context-quorum-protect governance-all onboard go-fmt-check go-test go-vet go-ci
+.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts uplift-guards module-budget docops-integrity docops-report dashboard-install dashboard-lint dashboard-build dashboard-status terminal-check frontend-check context-quorum-status context-quorum-init context-quorum-check context-quorum-handoff context-quorum-protect governance-all onboard install-command-plane-stack stack-status go-fmt-check go-test go-vet go-ci
 
 PYTHON ?= python3
 GO ?= go
@@ -54,6 +54,8 @@ help:
 	@echo "  make context-quorum-check AGENT=name RISK=Q2 QUESTION='...' Record context receipts"
 	@echo "  make context-quorum-handoff AGENT=name SUMMARY='...' Write current agent handoff"
 	@echo "  make onboard      Render current operating reality (active track, live ops, broken register, axioms)"
+	@echo "  make install-command-plane-stack  Install MCPs required by command-plane-redesign-2026-05 (idempotent)"
+	@echo "  make stack-status  Verify MCP servers for the command-plane stack"
 	@echo "  make go-ci        Run Go evidence sense-organ fmt/vet/test gates"
 	@echo ""
 
@@ -271,6 +273,27 @@ governance-all: semgrep gitleaks test-hygiene test-contracts uplift-guards modul
 # session — humans and agents both.
 onboard:
 	$(PYTHON) scripts/governance/agent_onboard.py
+
+# ============================================================================
+# Command-plane stack installer (queued track command-plane-redesign-2026-05)
+# ============================================================================
+
+# install-command-plane-stack — Install MCP servers required by the
+# command-plane-redesign-2026-05 queued track. Idempotent. See
+# docs/plans/COMMAND_PLANE_MULTIAGENT_PROTOCOL.md for usage.
+install-command-plane-stack:
+	@bash scripts/setup/install_command_plane_stack.sh
+
+# stack-status — Verify the command-plane stack is installed and healthy
+stack-status:
+	@echo "▶ MCP servers (Connected | Needs auth | Failed):"
+	@claude mcp list 2>/dev/null | grep -E "Connected|authentication|✗" | sort | uniq -c | sort -rn || echo "  (claude mcp list failed — is claude on PATH?)"
+	@echo
+	@echo "▶ Required MCPs for command-plane track:"
+	@for mcp in shadcn figma vercel sentry linear builder posthog playwright context7 tavily filesystem github sequential-thinking memory fetch; do \
+		status=$$(claude mcp list 2>/dev/null | grep "^$$mcp:" | grep -oE "Connected|authentication|✗" | head -1); \
+		printf "  %-22s %s\n" "$$mcp" "$${status:-NOT INSTALLED}"; \
+	done
 
 # ============================================================================
 # Go evidence sense-organ gates (Track G)

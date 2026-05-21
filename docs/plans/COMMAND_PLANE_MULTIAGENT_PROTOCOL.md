@@ -126,12 +126,46 @@ REPORT VIA SendMessage to team-lead. Evidence-cited, terse, file:line refs.
 When a new session opens cold and wants to help, the priority order is:
 
 1. **`make onboard`** — current active track, prerequisites, completion criteria, next items
-2. **`docs/plans/COMMAND_PLANE_CHECKLIST.md`** — what's done, what's next, in command-plane specifically
-3. **`docs/plans/2026-05-21-command-plane-design-lock.md`** — the spec; do not re-debate
-4. **`git log -10 --oneline`** — what just shipped
-5. **`docs/plans/COMMAND_PLANE_VISION.md`** — the why, in <2 minutes
+2. **`make stack-status`** — verify MCP servers are installed and healthy
+3. **`docs/plans/COMMAND_PLANE_CHECKLIST.md`** — what's done, what's next, in command-plane specifically
+4. **`docs/plans/2026-05-21-command-plane-design-lock.md`** — the spec; do not re-debate
+5. **`git log -10 --oneline`** — what just shipped
+6. **`docs/plans/COMMAND_PLANE_VISION.md`** — the why, in <2 minutes
 
 If `make onboard` shows trace-identity-coverage still ACTIVE: this work is queued. Help with trace-identity, or do Phase 0 mechanical items only.
+
+## Required MCPs (installed via `make install-command-plane-stack`)
+
+Priority-5 from the design lock:
+- **shadcn** — component registry spine (stdio)
+- **figma** — design source of truth (HTTP+OAuth)
+- **vercel** — deploy/monitor via HTTP MCP, NOT the prompt-harvesting plugin (HTTP+OAuth)
+- **sentry** — error tracking (HTTP+OAuth)
+- **linear** — project mgmt backplane (HTTP+OAuth)
+
+Phase 2 (add when cockpit moves from "works" to "Palantir-grade"):
+- **builder** — Builder.io DSI; AI generates against YOUR tokens (HTTP+OAuth)
+- **posthog** — product analytics + LLM observability (HTTP+OAuth)
+
+Foundation (universal value, always-on):
+- **playwright** — browser automation, visual regression, screenshot diffs (stdio)
+- **context7** — current library docs, not stale training data (stdio)
+- **tavily** — research (stdio)
+- **filesystem** — bulk file ops scoped to repo (stdio)
+- **github** — PR/issue structured reads (stdio)
+- **sequential-thinking** — for >3-branch problems (stdio)
+- **memory** — cross-session graph (stdio)
+- **fetch** — public URL → markdown (stdio)
+
+Killed forever (do NOT reinstall):
+- **puppeteer** — archived, open SSRF/sandbox-bypass CVEs. Use Playwright instead.
+- **vercel-plugin (Claude Code plugin)** — April 2026 disclosure: harvests prompts across all projects. Use the HTTP MCP above instead.
+
+Required Claude Code built-ins (no install — type directly):
+- `/goal` — set completion condition, work across turns until met
+- `/agents` — manage subagents/teams (you have `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` set)
+- `/ultraplan` — refine plan with remote agent (visible in plan mode)
+- `/ultrareview` — multi-agent cloud code review (bills against Agent SDK pool)
 
 ---
 

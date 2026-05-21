@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
+from pathlib import Path
 
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 
@@ -23,6 +25,28 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["agents"])
 ws_router = APIRouter(tags=["agents-ws"])
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _read_active_track_id() -> str:
+    """Read active_track.id from ACTIVE_TRACK.yaml via regex (no yaml dep)."""
+    try:
+        text = (_REPO_ROOT / "docs" / "governance" / "ACTIVE_TRACK.yaml").read_text()
+        m = re.search(r"^active_track:\s*\n(?:\s+[^\n]+\n)*?\s+id:\s*([^\s\n]+)", text, re.M)
+        return m.group(1) if m else ""
+    except Exception:
+        return ""
+
+
+def _read_surface_manifest_timestamp() -> str:
+    """Read last_updated from ACTIVE_SURFACE_MANIFEST.yaml via regex."""
+    try:
+        text = (_REPO_ROOT / "ACTIVE_SURFACE_MANIFEST.yaml").read_text()
+        m = re.search(r'^last_updated:\s*"?([^"\n]+)"?', text, re.M)
+        return m.group(1).strip() if m else ""
+    except Exception:
+        return ""
 
 
 def _get_swarm():
@@ -375,6 +399,8 @@ async def agent_observatory() -> ApiResponse:
             "timeline": timeline[:20],
             "top_performer": str(top["name"]) if top else "",
             "struggling": struggling,
+            "active_track_id": _read_active_track_id(),
+            "surface_manifest_updated_at": _read_surface_manifest_timestamp(),
         })
     except Exception as e:
         return ApiResponse(status="error", data=None, error=str(e))

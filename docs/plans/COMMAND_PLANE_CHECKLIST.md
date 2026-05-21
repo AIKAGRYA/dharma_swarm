@@ -21,6 +21,10 @@
 
 - [x] Carry-forward commit of in-flight command-plane work (`d7ccfe40`)
 - [x] Remove AmbientParticles + ScanLines + body::after scan-lines + orphan CSS (`f1bba2a4`)
+- [x] Open command-plane-redesign-2026-05 as queued track + vision + checklist + multi-agent protocol (`71469731`)
+- [x] Install command-plane MCP stack via `make install-command-plane-stack` (shadcn, figma, vercel, sentry, linear, builder, posthog, playwright, context7, tavily, filesystem, github, sequential-thinking, memory, fetch). Removes archived/CVE-flagged puppeteer.
+- [ ] OAuth the HTTP MCPs (figma/vercel/sentry/linear/builder/posthog) via `/mcp` in Claude Code
+- [ ] Verify stack health: `make stack-status` — all required MCPs Connected or authenticated
 - [ ] Fix `dharma_swarm.terminal_engine.events` ModuleNotFoundError (still failing per `python -c "import dharma_swarm.terminal_bridge"`). Locate where `ToolCallComplete`, `PermissionDecisionEvent`, etc. actually live or restore from git history.
 - [ ] Refresh GitNexus index: `npx gitnexus analyze` (currently stale at `74f9d79`)
 - [ ] Lockfile health: confirm `npm --prefix dashboard run build` stays green between sessions

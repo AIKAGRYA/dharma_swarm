@@ -12,6 +12,11 @@
 schema_version: 2
 last_updated: "2026-05-20"
 
+# Companion file (current build window; read alongside this manifest):
+#   docs/governance/ACTIVE_TRACK.yaml — exactly-one ACTIVE track with completion
+#   criteria, next_items, and TTL. Both files rendered together by `make onboard`.
+companion_track: docs/governance/ACTIVE_TRACK.yaml
+
 state_dir:
   canonical: "~/.dharma"
   runtime_db: "~/.dharma/state/runtime.db"
