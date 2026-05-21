@@ -547,6 +547,86 @@ export interface ControlSurfaceSummary {
 }
 
 // ---------------------------------------------------------------------------
+// Goodworks DGM (GET /api/goodworks-dgm/*)
+// ---------------------------------------------------------------------------
+
+export interface GoodworksProviderKeyTruth {
+  repo_contains_key_values: boolean;
+  local_configured_key_names: string[];
+  local_configured_key_count: number;
+  remote_agent_note: string;
+}
+
+export interface GoodworksMetricSnapshot {
+  reciprocity_chain_valid: boolean;
+  gaia_chain_valid: boolean;
+  reciprocity_entries: number;
+  gaia_entries: number;
+  verified_outcomes: number;
+  evidence_records: number;
+  audit_records: number;
+  verified_offsets_tco2e: number;
+  net_carbon_position_tco2e: number;
+  routed_usd: number;
+  obligation_usd: number;
+  invariant_issue_count: number;
+  conservation_violation_count: number;
+  issue_codes: string[];
+  warnings: string[];
+}
+
+export interface GoodworksReceipt {
+  receipt_id?: string;
+  goal_id?: string;
+  created_at?: string;
+  [key: string]: unknown;
+}
+
+export interface GoodworksGoalSpec {
+  goal_id: string;
+  title: string;
+  objective: string;
+  domain: string;
+  success_metric: string;
+  data_sources: string[];
+  mutation_mode: "dry_run" | "shadow" | string;
+  risk_level: string;
+  budget_iterations: number;
+  created_by: string;
+  created_at: string;
+  operator_note: string;
+}
+
+export interface GoodworksGoalRun {
+  run_id: string;
+  spec: GoodworksGoalSpec;
+  status: string;
+  created_at: string;
+  completed_at?: string | null;
+  latest_score: number;
+  metrics: GoodworksMetricSnapshot;
+  wiki_receipt?: GoodworksReceipt | null;
+  autoresearch_receipt?: GoodworksReceipt | null;
+  dgm_receipt?: GoodworksReceipt | null;
+  receipts: GoodworksReceipt[];
+  next_required_action: string;
+  error?: string | null;
+}
+
+export interface GoodworksDgmStatus {
+  thesis: string;
+  state_dir: string;
+  allowed_mutation_modes: string[];
+  live_mutation_exposed: boolean;
+  default_domain: string;
+  provider_key_truth: GoodworksProviderKeyTruth;
+  current_metrics: GoodworksMetricSnapshot;
+  run_count: number;
+  last_run?: GoodworksGoalRun | null;
+  recent_runs: GoodworksGoalRun[];
+}
+
+// ---------------------------------------------------------------------------
 // WebSocket events
 // ---------------------------------------------------------------------------
 

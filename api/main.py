@@ -265,6 +265,7 @@ def _register_routers(api_app: FastAPI) -> None:
     from api.routers.manifest import router as manifest_router
     from api.routers.revenue import router as revenue_router
     from api.routers.control_surface import router as control_surface_router
+    from api.routers.goodworks_dgm import router as goodworks_dgm_router
     from api.routers.viz import router as viz_router
     from api.routers.pool import router as pool_router
 
@@ -285,6 +286,7 @@ def _register_routers(api_app: FastAPI) -> None:
     api_app.include_router(manifest_router)
     api_app.include_router(revenue_router)
     api_app.include_router(control_surface_router)
+    api_app.include_router(goodworks_dgm_router)
     api_app.include_router(viz_router)
     api_app.include_router(pool_router)
 

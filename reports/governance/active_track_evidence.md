@@ -1,23 +1,24 @@
 # Active Track Evidence
 
-Generated: 2026-05-21T21:32:24+08:00
-Track: `trace-identity-coverage-2026-05`
+Generated: 2026-05-21T23:39:30+08:00
+Track: `goodworks-dgm-core-2026-05`
 Prerequisites: **OK**
-Completion: **6/6**
+Completion: **9/9**
 Shippable: **YES**
 
 ## Criteria
 
-- ✓ `trace_attractor_causal_spine_closed` (file_contains) — pattern 'Trace Attractor Causal Spine shipped' found in docs/governance/ACTIVE_TRACK.yaml
-- ✓ `correlation_context_exists` (file_contains) — pattern 'class CorrelationContext' found in dharma_swarm/correlation_context.py
-- ✓ `dgc_trace_attractor_wired` (file_contains) — pattern 'trace-attractor' found in dharma_swarm/dgc_cli.py
-- ✓ `operator_brief_consumes_correlation_context` (file_contains) — pattern 'correlation_context' found in dharma_swarm/operator_brief/persistence.py
-- ✓ `board_event_context_trace_defaults` (file_contains) — pattern '_current_trace_id' found in dharma_swarm/board/event_log.py
-- ✓ `sakshi_context_trace_defaults` (file_contains) — pattern '_current_trace_id' found in dharma_swarm/sakshi/provenance_log.py
-- ✓ `guardian_soft_trace_coverage` (file_contains) — pattern 'operator_brief_trace_coverage' found in dharma_swarm/operator_brief/watchdog.py
-- ✓ `trace_identity_coverage_witness` (file_exists) — reports/witness/2026-05-21-trace-identity-coverage.md present
-- ✓ `hard_gate_policy_adr` (file_exists) — docs/architecture/adr/0002-trace-coverage-gate.md present
+- ✓ `command_plane_phase_1_closed` (file_contains) — pattern 'Command Plane Phase 1 shipped' found in docs/governance/ACTIVE_TRACK.yaml
+- ✓ `product_center_onboarding` (file_contains) — pattern 'telos-gated DGM Goodworks Intelligence Core' found in docs/ops/AGENT_ONBOARDING.md
+- ✓ `make_onboard_product_center` (file_contains) — pattern 'PRODUCT CENTER' found in scripts/governance/agent_onboard.py
+- ✓ `goodworks_api_registered` (file_contains) — pattern 'goodworks_dgm_router' found in api/main.py
+- ✓ `goodworks_manifest_registered` (file_contains) — pattern 'goodworks_dgm' found in ACTIVE_SURFACE_MANIFEST.yaml
+- ✓ `goodworks_dashboard_page` (file_exists) — dashboard/src/app/dashboard/goodworks/page.tsx present
+- ✓ `goodworks_agent_tool` (file_contains) — pattern 'goodworks_dgm' found in api/chat_tools.py
+- ✓ `goodworks_tick_script` (file_exists) — scripts/runtime/goodworks_dgm_tick.py present
+- ✓ `goodworks_seed_script` (file_exists) — scripts/runtime/seed_goodworks_mrv.py present
+- ✓ `goodworks_tests` (file_exists) — tests/test_goodworks_dgm.py present
 
 ## Findings
 
-- **INFO** `track-shippable`: All 6 completion criteria pass. Track 'trace-identity-coverage-2026-05' is SHIPPABLE — close it and declare the next active track.
+- **INFO** `track-shippable`: All 9 completion criteria pass. Track 'goodworks-dgm-core-2026-05' is SHIPPABLE — close it and declare the next active track.

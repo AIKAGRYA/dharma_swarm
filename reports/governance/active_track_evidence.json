@@ -1,73 +1,79 @@
 {
-  "generated_at": "2026-05-21T21:32:24+08:00",
-  "active_track_id": "trace-identity-coverage-2026-05",
+  "generated_at": "2026-05-21T23:39:30+08:00",
+  "active_track_id": "goodworks-dgm-core-2026-05",
   "shippable": true,
   "prerequisites_ok": true,
   "completion_progress": {
-    "passed": 6,
-    "total": 6
+    "passed": 9,
+    "total": 9
   },
   "criteria": [
     {
-      "id": "trace_attractor_causal_spine_closed",
+      "id": "command_plane_phase_1_closed",
       "kind": "file_contains",
       "passed": true,
-      "detail": "pattern 'Trace Attractor Causal Spine shipped' found in docs/governance/ACTIVE_TRACK.yaml"
+      "detail": "pattern 'Command Plane Phase 1 shipped' found in docs/governance/ACTIVE_TRACK.yaml"
     },
     {
-      "id": "correlation_context_exists",
+      "id": "product_center_onboarding",
       "kind": "file_contains",
       "passed": true,
-      "detail": "pattern 'class CorrelationContext' found in dharma_swarm/correlation_context.py"
+      "detail": "pattern 'telos-gated DGM Goodworks Intelligence Core' found in docs/ops/AGENT_ONBOARDING.md"
     },
     {
-      "id": "dgc_trace_attractor_wired",
+      "id": "make_onboard_product_center",
       "kind": "file_contains",
       "passed": true,
-      "detail": "pattern 'trace-attractor' found in dharma_swarm/dgc_cli.py"
+      "detail": "pattern 'PRODUCT CENTER' found in scripts/governance/agent_onboard.py"
     },
     {
-      "id": "operator_brief_consumes_correlation_context",
+      "id": "goodworks_api_registered",
       "kind": "file_contains",
       "passed": true,
-      "detail": "pattern 'correlation_context' found in dharma_swarm/operator_brief/persistence.py"
+      "detail": "pattern 'goodworks_dgm_router' found in api/main.py"
     },
     {
-      "id": "board_event_context_trace_defaults",
+      "id": "goodworks_manifest_registered",
       "kind": "file_contains",
       "passed": true,
-      "detail": "pattern '_current_trace_id' found in dharma_swarm/board/event_log.py"
+      "detail": "pattern 'goodworks_dgm' found in ACTIVE_SURFACE_MANIFEST.yaml"
     },
     {
-      "id": "sakshi_context_trace_defaults",
-      "kind": "file_contains",
-      "passed": true,
-      "detail": "pattern '_current_trace_id' found in dharma_swarm/sakshi/provenance_log.py"
-    },
-    {
-      "id": "guardian_soft_trace_coverage",
-      "kind": "file_contains",
-      "passed": true,
-      "detail": "pattern 'operator_brief_trace_coverage' found in dharma_swarm/operator_brief/watchdog.py"
-    },
-    {
-      "id": "trace_identity_coverage_witness",
+      "id": "goodworks_dashboard_page",
       "kind": "file_exists",
       "passed": true,
-      "detail": "reports/witness/2026-05-21-trace-identity-coverage.md present"
+      "detail": "dashboard/src/app/dashboard/goodworks/page.tsx present"
     },
     {
-      "id": "hard_gate_policy_adr",
+      "id": "goodworks_agent_tool",
+      "kind": "file_contains",
+      "passed": true,
+      "detail": "pattern 'goodworks_dgm' found in api/chat_tools.py"
+    },
+    {
+      "id": "goodworks_tick_script",
       "kind": "file_exists",
       "passed": true,
-      "detail": "docs/architecture/adr/0002-trace-coverage-gate.md present"
+      "detail": "scripts/runtime/goodworks_dgm_tick.py present"
+    },
+    {
+      "id": "goodworks_seed_script",
+      "kind": "file_exists",
+      "passed": true,
+      "detail": "scripts/runtime/seed_goodworks_mrv.py present"
+    },
+    {
+      "id": "goodworks_tests",
+      "kind": "file_exists",
+      "passed": true,
+      "detail": "tests/test_goodworks_dgm.py present"
     }
   ],
   "findings": [
     {
       "severity": "INFO",
       "check": "track-shippable",
-      "message": "All 6 completion criteria pass. Track 'trace-identity-coverage-2026-05' is SHIPPABLE \u2014 close it and declare the next active track.",
+      "message": "All 9 completion criteria pass. Track 'goodworks-dgm-core-2026-05' is SHIPPABLE \u2014 close it and declare the next active track.",
       "criterion_id": null
     }
   ]

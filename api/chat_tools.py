@@ -355,6 +355,53 @@ TOOL_DEFINITIONS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "goodworks_dgm",
+            "description": (
+                "Use the Goodworks DGM core: inspect verifiable MRV status, "
+                "create a dry-run or shadow goal, or read recent receipts. "
+                "This never exposes live DGM mutation."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "action": {
+                        "type": "string",
+                        "enum": ["status", "create_goal", "receipts", "score"],
+                        "description": "Goodworks DGM action to run.",
+                    },
+                    "title": {
+                        "type": "string",
+                        "description": "Goal title for create_goal.",
+                    },
+                    "objective": {
+                        "type": "string",
+                        "description": "Goal objective for create_goal.",
+                    },
+                    "success_metric": {
+                        "type": "string",
+                        "description": "Metric the dry-run/shadow goal should improve.",
+                    },
+                    "mutation_mode": {
+                        "type": "string",
+                        "enum": ["dry_run", "shadow"],
+                        "description": "Allowed bounded execution mode. Default: dry_run.",
+                    },
+                    "budget_iterations": {
+                        "type": "integer",
+                        "description": "Bounded iteration budget for create_goal. Default: 1; max: 5.",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum rows for status/receipts. Default: 10.",
+                    },
+                },
+                "required": ["action"],
+            },
+        },
+    },
 ]
 
 
@@ -817,6 +864,59 @@ async def exec_agent_control(args: dict) -> str:
         return f"Agent control error: {e}"
 
 
+async def exec_goodworks_dgm(args: dict) -> str:
+    action = args.get("action", "status")
+    limit = min(100, int(args.get("limit", 10) or 10))
+    try:
+        from dharma_swarm.goodworks_dgm import (
+            GoalSpec,
+            GoodworksDGMService,
+            MutationMode,
+        )
+
+        service = GoodworksDGMService()
+
+        if action == "status":
+            return json.dumps(service.status(limit=limit), indent=2, default=str)
+
+        if action == "receipts":
+            return json.dumps(service.recent_receipts(limit=limit), indent=2, default=str)
+
+        if action == "score":
+            return json.dumps(
+                service.score_goodworks_mrv().model_dump(mode="json"),
+                indent=2,
+                default=str,
+            )
+
+        if action == "create_goal":
+            title = str(args.get("title", "")).strip()
+            objective = str(args.get("objective", "")).strip()
+            if not title or not objective:
+                return "ERROR: title and objective are required for create_goal"
+            mode = MutationMode(str(args.get("mutation_mode", "dry_run") or "dry_run"))
+            budget = max(1, min(5, int(args.get("budget_iterations", 1) or 1)))
+            spec = GoalSpec(
+                title=title,
+                objective=objective,
+                success_metric=str(
+                    args.get(
+                        "success_metric",
+                        "increase_verified_restorative_flow_without_invalidating_ledger",
+                    )
+                ),
+                mutation_mode=mode,
+                budget_iterations=budget,
+                created_by="dashboard_chat_tool",
+            )
+            run = await service.create_goal(spec)
+            return json.dumps(run.model_dump(mode="json"), indent=2, default=str)
+
+        return f"Unknown Goodworks DGM action: {action}"
+    except Exception as e:
+        return f"Goodworks DGM error: {e}"
+
+
 # ---------------------------------------------------------------------------
 # Dispatcher
 # ---------------------------------------------------------------------------
@@ -833,6 +933,7 @@ EXECUTORS = {
     "stigmergy_query": exec_stigmergy_query,
     "trace_query": exec_trace_query,
     "agent_control": exec_agent_control,
+    "goodworks_dgm": exec_goodworks_dgm,
 }
 
 

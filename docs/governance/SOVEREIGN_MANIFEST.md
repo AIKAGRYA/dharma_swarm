@@ -18,35 +18,35 @@
      Do not hand-edit. Run scripts/governance/render_active_track_includes.py
      after updating the YAML. -->
 
-**Active track:** Trace Identity Coverage — native propagation and soft coverage findings
-**Track id:** `trace-identity-coverage-2026-05`
+**Active track:** Goodworks DGM Core — verifiable MRV loop and agent-first surface
+**Track id:** `goodworks-dgm-core-2026-05`
 **Status:** ACTIVE
 **Verified at:** 2026-05-21 (TTL 14 days)
 **Owner:** @AmitabhainArunachala
 
 **Description:**
 
-Move Trace Attractor from first packet visibility to native trace identity
-propagation. New operator-brief, BoardStore, and Sakshi records should
-inherit CorrelationContext trace metadata when it exists; legacy records may
-still project through explicit synthetic aliases. Guardian should surface
-missing trace identity as DEGRADED evidence first, with any hard blocker
-policy deferred to an ADR.
+Make the system's actual product center executable: a telos-gated DGM
+Goodworks Intelligence Core for verifiable welfare, ecological MRV, and
+regenerative coordination. The track wires a bounded /goal loop, ledger
+scoring, wiki/context receipts, AutoResearch planning, DGM shadow receipts,
+dashboard visibility, agent tool access, local pilot MRV seeding, and
+provider-key truth without introducing a new orchestration substrate.
 
 **Next items on this track:**
 
-- [code] (blocker) Default operator-brief, BoardStore, and Sakshi trace metadata from CorrelationContext.
-- [code] (blocker) Add Guardian DEGRADED finding for operator-brief artifacts missing metadata.trace_id.
-- [evidence] Write the trace identity coverage witness report.
-- [governance] (blocker) Write ADR-0002 deciding when missing trace identity becomes a hard blocker.
+- [code] Connect Goodworks DGM receipts into the control-surface reconciliation rows.
+- [data] Replace local pilot MRV seed with an externally checkable project receipt when real project data is available.
+- [runtime] Install a default-off launchd/cron wrapper only after operator review of dry-run receipts.
+- [tooling] Register the Goodworks DGM MCP server in Codex only if the operator wants this repo-local server globally exposed.
 
 **Non-goals (do not work on these during this track):**
 
-- Do not make missing trace_id a hard CI gate until the ADR is written.
-- Do not turn Trace Attractor into an autonomous apply trigger.
-- Do not mutate MemoryKernel or live evolution state on this track.
-- Do not claim BoardStore adapter/cutover completion.
-- Do not add dashboard/API surface unless it is implemented and manifest-registered.
+- Do not expose live DGM mutation through the Goodworks API.
+- Do not store provider key values, secrets, OAuth files, or DSNs in the repo.
+- Do not create a second task board, ledger, runner, router, or evolution engine.
+- Do not claim third-party-verified carbon credits from local pilot seed data.
+- Do not re-add Sourcegraph, GDrive, or Postgres MCPs unless their gates are green.
 
 **Recently closed tracks:**
 
@@ -65,7 +65,7 @@ For machine-readable status, see [`reports/governance/active_track_evidence.md`]
 These are immutable engineering laws for this repository. Violation = architectural regression.
 
 ### A1: NO FLAT-PACKAGE GROWTH
-The `dharma_swarm/` package currently has **387 files at its top level (63.4% of 610 total Python modules)** (V). No new .py file may be added to the top level. New modules must go into an appropriate subdirectory. Existing top-level files will be organized over time.
+The `dharma_swarm/` package currently has **388 files at its top level (62.9% of 617 total Python modules)** (V). No new .py file may be added to the top level. New modules must go into an appropriate subdirectory. Existing top-level files will be organized over time.
 
 ### A2: NO DUPLICATE IMPLEMENTATIONS
 Before creating a new file for routing, bridging, adapting, or orchestrating, check if one already exists. The repo currently has **23 bridge files** (V), **3 model_routing copies** (2 are identical, 1 is different) (V), **4 orchestrators** (V), **14 adapter files across 7 locations** (V), and **13 router files** (V). Do not add more without deprecating an existing one.
@@ -110,15 +110,15 @@ These are the ground-truth metrics. All other documents citing different numbers
 
 | Metric | Value | Verification |
 |--------|-------|-------------|
-| Total Python modules | **610** | find dharma_swarm -name "*.py" -type f |
-| Top-level (flat) modules | **387 (63.4%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
-| Total Python LOC | **260,948** | wc -l across dharma_swarm Python modules |
-| Test files | **587** | find tests -name "*.py" -type f |
-| Test functions | **10,304 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Total Python modules | **617** | find dharma_swarm -name "*.py" -type f |
+| Top-level (flat) modules | **388 (62.9%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
+| Total Python LOC | **262,808** | wc -l across dharma_swarm Python modules |
+| Test files | **591** | find tests -name "*.py" -type f |
+| Test functions | **10,326 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
 | Markdown files | **823** | find . -name "*.md" -type f |
-| Markdown total lines | **215,622** | wc -l across all .md |
+| Markdown total lines | **215,623** | wc -l across all .md |
 | Bridge files | **23** | find dharma_swarm -name "*bridge*.py" |
 | Adapter files | **14 across 7 locations** | find dharma_swarm -type f \| rg -i "adapter" |
 | Orchestrator files | **4** (6,034 LOC total) | find dharma_swarm -name "*orchestrat*" |

@@ -8,6 +8,9 @@ import type {
   ApiResponse,
   ArchiveEntryOut,
   ChatStatusOut,
+  GoodworksDgmStatus,
+  GoodworksGoalRun,
+  GoodworksReceipt,
   HeatmapCell,
   HealthOut,
   ImpactOut,
@@ -288,6 +291,30 @@ export function fetchChatStatus(): Promise<ApiResponse<ChatStatusOut>> {
 
 export function fetchModules(): Promise<ApiResponse<ModuleTruthOut[]>> {
   return apiGet<ModuleTruthOut[]>("/api/modules");
+}
+
+// -- Goodworks DGM ----------------------------------------------------------
+
+export function fetchGoodworksDgmStatus(): Promise<ApiResponse<GoodworksDgmStatus>> {
+  return apiGet<GoodworksDgmStatus>("/api/goodworks-dgm/status");
+}
+
+export function fetchGoodworksDgmReceipts(
+  limit = 20,
+): Promise<ApiResponse<GoodworksReceipt[]>> {
+  return apiGet<GoodworksReceipt[]>(`/api/goodworks-dgm/receipts?limit=${limit}`);
+}
+
+export function createGoodworksDgmGoal(body: {
+  title: string;
+  objective: string;
+  success_metric?: string;
+  mutation_mode?: "dry_run" | "shadow";
+  budget_iterations?: number;
+  operator_note?: string;
+  run_now?: boolean;
+}): Promise<ApiResponse<GoodworksGoalRun>> {
+  return apiPost<GoodworksGoalRun>("/api/goodworks-dgm/goal", body);
 }
 
 // ---------------------------------------------------------------------------

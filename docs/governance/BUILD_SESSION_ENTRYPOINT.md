@@ -48,35 +48,35 @@ The governing principle behind whatever track is active: **one seam, end-to-end,
      Do not hand-edit. Run scripts/governance/render_active_track_includes.py
      after updating the YAML. -->
 
-**Active track:** Trace Identity Coverage — native propagation and soft coverage findings
-**Track id:** `trace-identity-coverage-2026-05`
+**Active track:** Goodworks DGM Core — verifiable MRV loop and agent-first surface
+**Track id:** `goodworks-dgm-core-2026-05`
 **Status:** ACTIVE
 **Verified at:** 2026-05-21 (TTL 14 days)
 **Owner:** @AmitabhainArunachala
 
 **Description:**
 
-Move Trace Attractor from first packet visibility to native trace identity
-propagation. New operator-brief, BoardStore, and Sakshi records should
-inherit CorrelationContext trace metadata when it exists; legacy records may
-still project through explicit synthetic aliases. Guardian should surface
-missing trace identity as DEGRADED evidence first, with any hard blocker
-policy deferred to an ADR.
+Make the system's actual product center executable: a telos-gated DGM
+Goodworks Intelligence Core for verifiable welfare, ecological MRV, and
+regenerative coordination. The track wires a bounded /goal loop, ledger
+scoring, wiki/context receipts, AutoResearch planning, DGM shadow receipts,
+dashboard visibility, agent tool access, local pilot MRV seeding, and
+provider-key truth without introducing a new orchestration substrate.
 
 **Next items on this track:**
 
-- [code] (blocker) Default operator-brief, BoardStore, and Sakshi trace metadata from CorrelationContext.
-- [code] (blocker) Add Guardian DEGRADED finding for operator-brief artifacts missing metadata.trace_id.
-- [evidence] Write the trace identity coverage witness report.
-- [governance] (blocker) Write ADR-0002 deciding when missing trace identity becomes a hard blocker.
+- [code] Connect Goodworks DGM receipts into the control-surface reconciliation rows.
+- [data] Replace local pilot MRV seed with an externally checkable project receipt when real project data is available.
+- [runtime] Install a default-off launchd/cron wrapper only after operator review of dry-run receipts.
+- [tooling] Register the Goodworks DGM MCP server in Codex only if the operator wants this repo-local server globally exposed.
 
 **Non-goals (do not work on these during this track):**
 
-- Do not make missing trace_id a hard CI gate until the ADR is written.
-- Do not turn Trace Attractor into an autonomous apply trigger.
-- Do not mutate MemoryKernel or live evolution state on this track.
-- Do not claim BoardStore adapter/cutover completion.
-- Do not add dashboard/API surface unless it is implemented and manifest-registered.
+- Do not expose live DGM mutation through the Goodworks API.
+- Do not store provider key values, secrets, OAuth files, or DSNs in the repo.
+- Do not create a second task board, ledger, runner, router, or evolution engine.
+- Do not claim third-party-verified carbon credits from local pilot seed data.
+- Do not re-add Sourcegraph, GDrive, or Postgres MCPs unless their gates are green.
 
 **Recently closed tracks:**
 

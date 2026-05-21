@@ -10,7 +10,7 @@
 # Your workflow: Declare → Observe → Reconcile → Dispatch → Verify.
 
 schema_version: 2
-last_updated: "2026-05-20"
+last_updated: "2026-05-21"
 
 # Companion file (current build window; read alongside this manifest):
 #   docs/governance/ACTIVE_TRACK.yaml — exactly-one ACTIVE track with completion
@@ -26,6 +26,7 @@ state_dir:
   economics: "~/.dharma/economics"
   revenue_packets: "~/.dharma/revenue_packets"
   go_world_receipts: "~/.dharma/go_receipts/world"
+  goodworks_dgm: "~/.dharma/goodworks_dgm"
   board_event_log: "~/.dharma/board/event_log.sqlite3"
   sakshi_provenance_log: "~/.dharma/sakshi/provenance_log.jsonl"
   env_override: "DHARMA_STATE_DIR"
@@ -79,12 +80,16 @@ api_routers:
   - id: control_surface
     prefix: /api/control-surface
     module: api.routers.control_surface
+  - id: goodworks_dgm
+    prefix: /api/goodworks-dgm
+    module: api.routers.goodworks_dgm
 
 dashboard_nav_sections:
   - label: COMMAND
     items:
       - Overview
       - Control Surface
+      - Goodworks
       - Command Post
       - Qwen Surgeon
       - Observatory
@@ -185,6 +190,15 @@ dashboard_surfaces:
     label: "Control Surface"
     route: /dashboard/control-surface
     api_dependencies: [/api/control-surface/summary, /api/control-surface/rows]
+    status: live
+    health_check_ids: [dashboard_route_exists, api_router_registered]
+    priority: p0
+    next_action: null
+
+  - id: goodworks
+    label: "Goodworks"
+    route: /dashboard/goodworks
+    api_dependencies: [/api/goodworks-dgm/status, /api/goodworks-dgm/receipts]
     status: live
     health_check_ids: [dashboard_route_exists, api_router_registered]
     priority: p0
@@ -481,6 +495,15 @@ agents:
     wired_to: [control_surface, eval_harness, audit, lineage, evolution]
     priority: p0
     next_action: "Keep shadow-only: record receipts and recommend PRs without autonomous apply"
+
+  - id: goodworks_dgm_core
+    label: "Goodworks DGM Core"
+    module: dharma_swarm/goodworks_dgm/service.py
+    status: live
+    health_check_ids: [module_file_exists]
+    wired_to: [goodworks, control_surface, evolution, audit]
+    priority: p0
+    next_action: "Connect Goodworks DGM receipts into control-surface reconciliation rows"
 
 # ── Integrations ──────────────────────────────────────────────────
 # External services and APIs the system depends on.

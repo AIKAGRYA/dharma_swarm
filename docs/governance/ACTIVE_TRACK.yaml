@@ -30,107 +30,179 @@ schema_version: 1
 #   hot_path_modules, governance_rules, opportunity_stages, agents, integrations.
 #   Both files are rendered together by `make onboard`.
 active_track:
-  id: trace-identity-coverage-2026-05
-  name: Trace Identity Coverage — native propagation and soft coverage findings
+  id: goodworks-dgm-core-2026-05
+  name: Goodworks DGM Core — verifiable MRV loop and agent-first surface
   status: ACTIVE
   opened_at: "2026-05-21"
   verified_at: "2026-05-21"
   ttl_days: 14
   owner: "@AmitabhainArunachala"
   companion_manifest: ACTIVE_SURFACE_MANIFEST.yaml
+  spec: CLAUDE.md
+  vision: docs/ops/AGENT_ONBOARDING.md
+  checklist: tests/test_goodworks_dgm.py
 
   description: |
-    Move Trace Attractor from first packet visibility to native trace identity
-    propagation. New operator-brief, BoardStore, and Sakshi records should
-    inherit CorrelationContext trace metadata when it exists; legacy records may
-    still project through explicit synthetic aliases. Guardian should surface
-    missing trace identity as DEGRADED evidence first, with any hard blocker
-    policy deferred to an ADR.
+    Make the system's actual product center executable: a telos-gated DGM
+    Goodworks Intelligence Core for verifiable welfare, ecological MRV, and
+    regenerative coordination. The track wires a bounded /goal loop, ledger
+    scoring, wiki/context receipts, AutoResearch planning, DGM shadow receipts,
+    dashboard visibility, agent tool access, local pilot MRV seeding, and
+    provider-key truth without introducing a new orchestration substrate.
 
   surfaces:
-    - dharma_swarm/correlation_context.py
-    - dharma_swarm/operator_brief/**
-    - dharma_swarm/board/**
-    - dharma_swarm/sakshi/**
-    - dharma_swarm/guardian_crew.py
-    - dharma_swarm/operator_brief/watchdog.py
-    - dharma_swarm/dgc_cli.py
-    - tests/test_trace_attractor*.py
-    - tests/test_dgc_trace_attractor_cli.py
-    - tests/test_board_facade.py
-    - tests/test_sakshi_provenance.py
-    - tests/test_operator_brief_insight_brief.py
-    - tests/test_guardian_crew.py
-    - reports/witness/*trace-attractor*.md
-    - reports/witness/*trace-identity*.md
+    - dharma_swarm/goodworks_dgm/**
+    - api/routers/goodworks_dgm.py
+    - api/chat_tools.py
+    - dashboard/src/app/dashboard/goodworks/**
+    - dashboard/src/hooks/useGoodworksDgm.ts
+    - dashboard/src/lib/api.ts
+    - dashboard/src/lib/types.ts
+    - dashboard/src/lib/dashboardNav.ts
+    - scripts/runtime/goodworks_dgm_tick.py
+    - scripts/runtime/seed_goodworks_mrv.py
+    - docs/ops/AGENT_ONBOARDING.md
+    - scripts/governance/agent_onboard.py
+    - ACTIVE_SURFACE_MANIFEST.yaml
+    - tests/test_goodworks_dgm.py
 
   prerequisites:
-    - id: trace_attractor_causal_spine_closed
+    - id: command_plane_phase_1_closed
       kind: file_contains
       file: docs/governance/ACTIVE_TRACK.yaml
-      pattern: "Trace Attractor Causal Spine shipped"
-    - id: correlation_context_exists
-      kind: file_contains
-      file: dharma_swarm/correlation_context.py
-      pattern: "class CorrelationContext"
-    - id: dgc_trace_attractor_wired
-      kind: file_contains
-      file: dharma_swarm/dgc_cli.py
-      pattern: "trace-attractor"
+      pattern: "Command Plane Phase 1 shipped"
 
   completion_criteria:
-    - id: operator_brief_consumes_correlation_context
+    - id: product_center_onboarding
       kind: file_contains
-      file: dharma_swarm/operator_brief/persistence.py
-      pattern: "correlation_context"
-    - id: board_event_context_trace_defaults
+      file: docs/ops/AGENT_ONBOARDING.md
+      pattern: "telos-gated DGM Goodworks Intelligence Core"
+    - id: make_onboard_product_center
       kind: file_contains
-      file: dharma_swarm/board/event_log.py
-      pattern: "_current_trace_id"
-    - id: sakshi_context_trace_defaults
+      file: scripts/governance/agent_onboard.py
+      pattern: "PRODUCT CENTER"
+    - id: goodworks_api_registered
       kind: file_contains
-      file: dharma_swarm/sakshi/provenance_log.py
-      pattern: "_current_trace_id"
-    - id: guardian_soft_trace_coverage
+      file: api/main.py
+      pattern: "goodworks_dgm_router"
+    - id: goodworks_manifest_registered
       kind: file_contains
-      file: dharma_swarm/operator_brief/watchdog.py
-      pattern: "operator_brief_trace_coverage"
-    - id: trace_identity_coverage_witness
+      file: ACTIVE_SURFACE_MANIFEST.yaml
+      pattern: "goodworks_dgm"
+    - id: goodworks_dashboard_page
       kind: file_exists
-      file: reports/witness/2026-05-21-trace-identity-coverage.md
-    - id: hard_gate_policy_adr
+      file: dashboard/src/app/dashboard/goodworks/page.tsx
+    - id: goodworks_agent_tool
+      kind: file_contains
+      file: api/chat_tools.py
+      pattern: "goodworks_dgm"
+    - id: goodworks_tick_script
       kind: file_exists
-      file: docs/architecture/adr/0002-trace-coverage-gate.md
+      file: scripts/runtime/goodworks_dgm_tick.py
+    - id: goodworks_seed_script
+      kind: file_exists
+      file: scripts/runtime/seed_goodworks_mrv.py
+    - id: goodworks_tests
+      kind: file_exists
+      file: tests/test_goodworks_dgm.py
 
   non_goals:
-    - Do not make missing trace_id a hard CI gate until the ADR is written.
-    - Do not turn Trace Attractor into an autonomous apply trigger.
-    - Do not mutate MemoryKernel or live evolution state on this track.
-    - Do not claim BoardStore adapter/cutover completion.
-    - Do not add dashboard/API surface unless it is implemented and manifest-registered.
+    - Do not expose live DGM mutation through the Goodworks API.
+    - Do not store provider key values, secrets, OAuth files, or DSNs in the repo.
+    - Do not create a second task board, ledger, runner, router, or evolution engine.
+    - Do not claim third-party-verified carbon credits from local pilot seed data.
+    - Do not re-add Sourcegraph, GDrive, or Postgres MCPs unless their gates are green.
 
   next_items:
     - id: 1
-      what: "Default operator-brief, BoardStore, and Sakshi trace metadata from CorrelationContext."
+      what: "Connect Goodworks DGM receipts into the control-surface reconciliation rows."
       kind: code
-      blocker: true
+      blocker: false
     - id: 2
-      what: "Add Guardian DEGRADED finding for operator-brief artifacts missing metadata.trace_id."
-      kind: code
-      blocker: true
+      what: "Replace local pilot MRV seed with an externally checkable project receipt when real project data is available."
+      kind: data
+      blocker: false
     - id: 3
-      what: "Write the trace identity coverage witness report."
-      kind: evidence
+      what: "Install a default-off launchd/cron wrapper only after operator review of dry-run receipts."
+      kind: runtime
       blocker: false
     - id: 4
-      what: "Write ADR-0002 deciding when missing trace identity becomes a hard blocker."
-      kind: governance
-      blocker: true
+      what: "Register the Goodworks DGM MCP server in Codex only if the operator wants this repo-local server globally exposed."
+      kind: tooling
+      blocker: false
 
 # ---------------------------------------------------------------------------
 # Closed tracks (history, append-only; do not edit prior entries)
 # ---------------------------------------------------------------------------
 closed_tracks:
+  - id: command-plane-phase-1-tokens-palette-2026-05
+    name: Command Plane Phase 1 — Nihonga Tokens & Palette Revaluation
+    status: SHIPPED
+    opened_at: "2026-05-21"
+    closed_at: "2026-05-21"
+    closed_by: "codex/goodworks-dgm-core-2026-05"
+    evidence:
+      - "python3 scripts/governance/check_track_status.py — all 7 completion criteria passed"
+      - "dashboard/src/lib/theme.ts — Nihonga token revaluation criteria present"
+      - "dashboard/src/app/globals.css — azurite global token criterion present"
+      - "dashboard/src/lib/motion.ts — motion vocabulary criterion present"
+    superseded_by: goodworks-dgm-core-2026-05
+    notes: |
+      Command Plane Phase 1 shipped before this track transition; its
+      completion criteria were already all passing. The next active track
+      recenters the product on the Goodworks DGM core rather than continuing
+      visual-system work.
+
+  - id: command-plane-redesign-2026-05
+    name: Command Plane Redesign — Nihonga-anchored operator cockpit activation
+    status: SHIPPED
+    opened_at: "2026-05-21"
+    closed_at: "2026-05-21"
+    closed_by: "claude/command-plane-phase-1-tokens-palette-2026-05"
+    evidence:
+      - "python3 scripts/governance/check_track_status.py — all 8 completion criteria passed"
+      - "reports/witness/2026-05-21-command-plane-stack-status.md — MCP stack (15 installed, OAuth deferred for 3)"
+      - "reports/witness/2026-05-21-command-plane-terminal-bridge-import.md — import succeeds"
+      - "reports/witness/2026-05-21-command-plane-dashboard-build.md — npm build green"
+      - "reports/witness/2026-05-21-command-plane-workthread-triage.md — untracked work triaged"
+      - "docs/ops/AGENT_ONBOARDING.md — points to COMMAND_PLANE_MULTIAGENT_PROTOCOL.md"
+      - "scripts/runtime/agent_onboard.sh — points to agentic_harness_2026-05"
+      - "scripts/governance/agent_onboard.py — points to COMMAND_PLANE_CHECKLIST.md"
+    superseded_by: command-plane-phase-1-tokens-palette-2026-05
+    notes: |
+      Command Plane Redesign activation track shipped after check_track_status
+      reported all 8 completion criteria passing. The 4 witness files exist;
+      the 3 onboarding-string-contains criteria were already satisfied at track
+      open time. The untracked-work triage (next_item #4) is recorded in the
+      workthread-triage witness; the actual git-cleanup of those untracked
+      items remains explicitly deferred to a separate cleanup PR.
+
+      The next track moves from activation/readiness into the first material
+      change: revalue the existing AI-bright Japanese-named color tokens to
+      actual Nihonga mineral-pigment values, add `shu` for FAIL/urgent, and
+      ship a motion vocabulary file.
+
+  - id: trace-identity-coverage-2026-05
+    name: Trace Identity Coverage — native propagation and soft coverage findings
+    status: SHIPPED
+    opened_at: "2026-05-21"
+    closed_at: "2026-05-21"
+    closed_by: "codex/command-plane-activation-2026-05"
+    evidence:
+      - "python3 scripts/governance/check_track_status.py — all 6 completion criteria passed"
+      - "dharma_swarm/operator_brief/persistence.py — operator-brief artifacts consume CorrelationContext"
+      - "dharma_swarm/board/event_log.py — BoardStore defaults trace metadata from current context"
+      - "dharma_swarm/sakshi/provenance_log.py — Sakshi defaults trace metadata from current context"
+      - "dharma_swarm/operator_brief/watchdog.py — Guardian soft trace coverage finding wired"
+      - "reports/witness/2026-05-21-trace-identity-coverage.md — trace identity coverage witness"
+      - "docs/architecture/adr/0002-trace-coverage-gate.md — hard-gate policy ADR"
+    superseded_by: command-plane-redesign-2026-05
+    notes: |
+      Trace Identity Coverage shipped after check_track_status reported 6/6
+      completion criteria passing. Missing trace identity remains a soft
+      coverage finding under ADR-0002 policy; this closeout does not promote it
+      to a hard CI gate.
+
   - id: trace-attractor-causal-spine-2026-05
     name: Trace Attractor Causal Spine — operator-visible trace packets
     status: SHIPPED

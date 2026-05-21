@@ -1,7 +1,7 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts uplift-guards module-budget docops-integrity docops-report dashboard-install dashboard-lint dashboard-build dashboard-status terminal-check frontend-check context-quorum-status context-quorum-init context-quorum-check context-quorum-handoff context-quorum-protect governance-all onboard install-command-plane-stack stack-status go-fmt-check go-test go-vet go-ci
+.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts uplift-guards module-budget docops-integrity docops-report dashboard-install dashboard-lint dashboard-build dashboard-status terminal-check frontend-check context-quorum-status context-quorum-init context-quorum-check context-quorum-handoff context-quorum-protect long-harness-init long-harness-status long-harness-validate goodworks-dgm-seed goodworks-dgm-tick goodworks-dgm-status governance-all onboard install-command-plane-stack stack-status go-fmt-check go-test go-vet go-ci
 
 PYTHON ?= python3
 GO ?= go
@@ -53,6 +53,12 @@ help:
 	@echo "  make context-quorum-init AGENT=name ROLE=role Create a persistent agent home"
 	@echo "  make context-quorum-check AGENT=name RISK=Q2 QUESTION='...' Record context receipts"
 	@echo "  make context-quorum-handoff AGENT=name SUMMARY='...' Write current agent handoff"
+	@echo "  make long-harness-init GOAL='...' MODE=command-plane Create a planner/generator/evaluator run scaffold"
+	@echo "  make long-harness-status RUN_ID=id Show long-running harness run status"
+	@echo "  make long-harness-validate RUN_ID=id PHASE=scaffold Validate long-running harness artifacts"
+	@echo "  make goodworks-dgm-seed Seed the local Goodworks MRV pilot ledger"
+	@echo "  make goodworks-dgm-tick Run one bounded Goodworks DGM dry-run tick"
+	@echo "  make goodworks-dgm-status Print Goodworks DGM status JSON"
 	@echo "  make onboard      Render current operating reality (active track, live ops, broken register, axioms)"
 	@echo "  make install-command-plane-stack  Install MCPs required by command-plane-redesign-2026-05 (idempotent)"
 	@echo "  make stack-status  Verify MCP servers for the command-plane stack"
@@ -264,6 +270,34 @@ context-quorum-handoff:
 
 context-quorum-protect:
 	$(PYTHON) scripts/runtime/context_quorum.py protect --changed-from "$${CHANGED_FROM:-HEAD}" --fail-on-hit
+
+long-harness-init:
+	@set --; \
+	if [ -n "$${RUN_ID:-}" ]; then set -- "$$@" --run-id "$${RUN_ID}"; fi; \
+	if [ -n "$${REQUIRE_CLEAN:-}" ]; then set -- "$$@" --require-clean; fi; \
+	$(PYTHON) scripts/runtime/long_running_harness.py init \
+		--mode "$${MODE:-brownfield}" \
+		--risk "$${RISK:-Q3}" \
+		--max-rounds "$${MAX_ROUNDS:-3}" \
+		--goal "$${GOAL:?set GOAL='harness goal'}" \
+		"$$@"
+
+long-harness-status:
+	$(PYTHON) scripts/runtime/long_running_harness.py status --run-id "$${RUN_ID:?set RUN_ID=id}"
+
+long-harness-validate:
+	$(PYTHON) scripts/runtime/long_running_harness.py validate \
+		--run-id "$${RUN_ID:?set RUN_ID=id}" \
+		--phase "$${PHASE:-scaffold}"
+
+goodworks-dgm-seed:
+	$(PYTHON) scripts/runtime/seed_goodworks_mrv.py
+
+goodworks-dgm-tick:
+	$(PYTHON) scripts/runtime/goodworks_dgm_tick.py $${ARGS:-}
+
+goodworks-dgm-status:
+	$(PYTHON) -c "import json; from dharma_swarm.goodworks_dgm import GoodworksDGMService; print(json.dumps(GoodworksDGMService().status(), indent=2))"
 
 governance-all: semgrep gitleaks test-hygiene test-contracts uplift-guards module-budget docops-integrity frontend-check
 

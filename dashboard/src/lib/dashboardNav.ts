@@ -52,6 +52,7 @@ export function buildDashboardNavSections(): DashboardNavSection[] {
       items: [
         { label: "Overview", href: "/dashboard", icon: "LayoutDashboard", level: 1 },
         { label: "Control Surface", href: "/dashboard/control-surface", icon: "Settings2", level: 1 },
+        { label: "Goodworks", href: "/dashboard/goodworks", icon: "Activity", level: 1 },
         ...canonicalOperatorDeckItems(),
         { label: "Agents", href: "/dashboard/agents", icon: "Bot", level: 1 },
         { label: "Tasks", href: "/dashboard/tasks", icon: "ListTodo", level: 1 },
