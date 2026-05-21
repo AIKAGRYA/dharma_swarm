@@ -3,7 +3,8 @@
 **Date:** 2026-05-21
 **Author:** Devin (multi-session architecture review)
 **Scope:** Every open string, seeded-but-stopped project, and unfinished thread across the repo, PRs, and session history.
-**Verified against:** 15+ governance/architecture/runtime files, `make onboard` output, all 30 open PRs, all 610 Python source files.
+**Verified against:** 15+ governance/architecture/runtime files, `make onboard` output, all 35 open PRs (verified via `gh pr list --state open --limit 100` at 2026-05-21T08:38Z), all 610 Python source files.
+**Inventory provenance:** `gh pr list --state open --limit 100 --json number,title,createdAt,updatedAt,author`
 
 ---
 
@@ -17,7 +18,7 @@ Everything else shipped: CorrelationContext (`dharma_swarm/correlation_context.p
 
 ---
 
-## 2. OPEN PRs — FULL INVENTORY (30 total)
+## 2. OPEN PRs — FULL INVENTORY (35 total, 34 listed + this PR #326)
 
 ### Tier A: Ready to merge now
 
@@ -63,6 +64,10 @@ Everything else shipped: CorrelationContext (`dharma_swarm/correlation_context.p
 | **#117** | Module consolidation (Devin) | 2026-05-05 | Close — superseded |
 | **#99** | Seed revenue cell | 2026-05-05 | Review or close |
 | **#271** | PR triage report (Copilot) | 2026-05-13 | Close — one-time report |
+| **#59** | Chetana grand memory integration (draft) | 2026-05-02 | Close or rebase — large feature, INCUBATE bucket |
+| **#58** | Phase 1 ontology-native insight brief | 2026-05-02 | Review — pre-dates current ontology work |
+| **#55** | Cross-agent work OS interface (draft) | 2026-04-29 | Close — AGENTS.md since rewritten, INCUBATE bucket |
+| **#44** | Clean canonical drift maps (draft) | 2026-04-27 | Close — conflicts with INTERFACE_MISMATCH_MAP.md, superseded |
 
 ---
 
@@ -219,7 +224,7 @@ Provider keys ARE present locally (OpenRouter, OpenAI, NVIDIA NIM, Ollama, Cereb
 | 0.1 | Re-push PR #321 to trigger CI, then merge #321, #323, #325 | Unlocks 4 BR closures + env aliases + onboarding docs | 30 min |
 | 0.2 | Write ADR-0002 (trace coverage gate policy) | Closes active track (1 file) | 30 min |
 | 0.3 | Close trace-identity-coverage track → open next track | Governance hygiene | 15 min |
-| 0.4 | Triage 19 stale PRs (close superseded, rebase keepers) | Drops PR queue from 30 → ~11 | 45 min |
+| 0.4 | Triage 23 stale PRs (close superseded, rebase keepers) | Drops PR queue from 35 → ~12 | 60 min |
 
 ### Phase 1: Close Loop 1 (~1-2 days)
 
@@ -272,7 +277,7 @@ This makes 13 PROVIDER-GATED dashboard pages come alive.
 
 | Metric | Now | After Phase 0 | After Phase 1 |
 |---|---|---|---|
-| Open PRs | 30 | ~11 | ~10 |
+| Open PRs | 35 | ~12 | ~11 |
 | Broken register open | 9 | 5 | 5 |
 | Loops closed (prod) | 0 | 0 | 1 |
 | Dashboard LIVE pages | 9 | 9 | 9-15 |
