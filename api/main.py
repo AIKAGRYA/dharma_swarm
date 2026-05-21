@@ -24,7 +24,7 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 
-from dharma_swarm.api_keys import DASHBOARD_API_KEY_ENV
+from dharma_swarm.api_keys import DASHBOARD_API_KEY_ENV, normalize_env_aliases
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +100,11 @@ async def lifespan(app: FastAPI):
     logger.info("DHARMA COMMAND API starting...")
     operator_pid = os.getpid()
     _publish_operator_pid(operator_pid)
+
+    # Normalize dkeys/external env aliases before any provider resolution.
+    aliased = normalize_env_aliases()
+    for alias, canonical, masked in aliased:
+        logger.info("env alias: %s → %s (%s)", alias, canonical, masked)
 
     from dharma_swarm.ontology_runtime import get_shared_registry
 

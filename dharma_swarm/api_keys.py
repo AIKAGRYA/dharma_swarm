@@ -147,6 +147,64 @@ ALL_API_KEY_ENV_KEYS: tuple[str, ...] = _unique_in_order(
 )
 
 
+# ---------------------------------------------------------------------------
+# dkeys ↔ dharma_swarm env alias normalization
+# ---------------------------------------------------------------------------
+# External tools (dkeys, keychain helpers, CI) may export credentials under
+# names that differ from the canonical names used by dharma_swarm.  The table
+# below maps each known alias to the canonical env var so that
+# `normalize_env_aliases()` can bridge the gap at process start.  Direction:
+# alias (source) → canonical (target); we never overwrite an existing
+# canonical value.
+
+ENV_ALIASES: dict[str, str] = {
+    # dkeys exports GEMINI_API_KEY; dharma runtime expects GOOGLE_AI_API_KEY
+    "GEMINI_API_KEY": GOOGLE_AI_API_KEY_ENV,
+    # dkeys exports NVIDIA_API_KEY; dharma runtime expects NVIDIA_NIM_API_KEY
+    "NVIDIA_API_KEY": NVIDIA_NIM_API_KEY_ENV,
+    # keychain / older scripts export NIM_API_KEY
+    "NIM_API_KEY": NVIDIA_NIM_API_KEY_ENV,
+    # some tools use PERPLEXITY_API_KEY; dharma expects PPLX_API_KEY
+    "PERPLEXITY_API_KEY": PPLX_API_KEY_ENV,
+    # dkeys may export DEEPSEEK_API_KEY; no first-class provider yet but
+    # OpenRouter is the canonical lane — alias for forward-compat
+    "DEEPSEEK_API_KEY": "DEEPSEEK_API_KEY",
+}
+
+
+def normalize_env_aliases(
+    env: dict[str, str] | None = None,
+    *,
+    dry_run: bool = False,
+) -> list[tuple[str, str, str]]:
+    """Copy alias env vars to their canonical dharma_swarm names.
+
+    Only sets the canonical name when it is absent/empty **and** the alias is
+    present.  Returns a list of ``(alias, canonical, masked_value)`` tuples for
+    every variable that was (or would be, in *dry_run* mode) propagated.
+
+    When *env* is ``None`` the real ``os.environ`` is mutated in-place.
+    """
+    target = env if env is not None else dict(os.environ)
+    applied: list[tuple[str, str, str]] = []
+
+    for alias, canonical in ENV_ALIASES.items():
+        if alias == canonical:
+            continue
+        alias_val = target.get(alias, "").strip()
+        canonical_val = target.get(canonical, "").strip()
+        if alias_val and not canonical_val:
+            if not dry_run:
+                if env is not None:
+                    env[canonical] = alias_val
+                else:
+                    os.environ[canonical] = alias_val
+            masked = alias_val[:4] + "..." if len(alias_val) > 4 else "***"
+            applied.append((alias, canonical, masked))
+
+    return applied
+
+
 def _provider_key(provider: object) -> str:
     value = getattr(provider, "value", provider)
     return str(value)
@@ -199,6 +257,7 @@ __all__ = [
     "CHUTES_API_KEY_ENV",
     "CHUTES_BASE_URL_ENV",
     "DASHBOARD_API_KEY_ENV",
+    "ENV_ALIASES",
     "DGC_DATA_FLYWHEEL_API_KEY_ENV",
     "DGC_KAIZENOPS_API_KEY_ENV",
     "DGC_RECIPROCITY_COMMONS_API_KEY_ENV",
@@ -237,6 +296,7 @@ __all__ = [
     "TOGETHER_BASE_URL_ENV",
     "env_has_value",
     "env_value",
+    "normalize_env_aliases",
     "present_api_key_envs",
     "provider_api_key_env",
     "provider_available",

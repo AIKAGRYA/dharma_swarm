@@ -56,9 +56,30 @@ if [[ -z "${OPENROUTER_API_KEY:-}" ]]; then
     _load_keychain_var "OPENROUTER_API_KEY" "openrouter" "openrouter-api-key"
 fi
 
+# ── dkeys ↔ dharma_swarm alias normalization ──────────────────────────────
+# External tools (dkeys, keychain helpers) may export keys under names that
+# differ from what dharma_swarm expects.  Bridge the gap here so runtime
+# providers find credentials regardless of origin.
+
+# NIM_API_KEY ↔ NVIDIA_NIM_API_KEY (bidirectional)
 if [[ -n "${NIM_API_KEY:-}" && -z "${NVIDIA_NIM_API_KEY:-}" ]]; then
     export NVIDIA_NIM_API_KEY="$NIM_API_KEY"
 fi
 if [[ -n "${NVIDIA_NIM_API_KEY:-}" && -z "${NIM_API_KEY:-}" ]]; then
     export NIM_API_KEY="$NVIDIA_NIM_API_KEY"
+fi
+
+# NVIDIA_API_KEY → NVIDIA_NIM_API_KEY (dkeys uses the former)
+if [[ -n "${NVIDIA_API_KEY:-}" && -z "${NVIDIA_NIM_API_KEY:-}" ]]; then
+    export NVIDIA_NIM_API_KEY="$NVIDIA_API_KEY"
+fi
+
+# GEMINI_API_KEY → GOOGLE_AI_API_KEY (dkeys uses the former)
+if [[ -n "${GEMINI_API_KEY:-}" && -z "${GOOGLE_AI_API_KEY:-}" ]]; then
+    export GOOGLE_AI_API_KEY="$GEMINI_API_KEY"
+fi
+
+# PERPLEXITY_API_KEY → PPLX_API_KEY
+if [[ -n "${PERPLEXITY_API_KEY:-}" && -z "${PPLX_API_KEY:-}" ]]; then
+    export PPLX_API_KEY="$PERPLEXITY_API_KEY"
 fi
