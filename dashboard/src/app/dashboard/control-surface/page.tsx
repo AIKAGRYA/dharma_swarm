@@ -1,14 +1,16 @@
 "use client";
 
 /**
- * OPERATOR COCKPIT -- Five-zone operational control surface.
+ * OPERATOR COCKPIT — Five-zone operational control surface.
  *
- * Zones:
- *  1. Needs John Queue — decision-required rows, always visible
- *  2. System Truth Matrix — TanStack Table with column pinning
- *  3. Evidence Drawer — structured provenance for selected row
- *  4. Agent Handoff Panel — scoped prompt generation (stub)
- *  5. Runtime Rail — live health, freshness, CI status
+ * Layout (Round 6 — persistent right-rail composition):
+ *   1. NeedsJohnQueue — decision-required rows, always visible (top)
+ *   2. RuntimeRail — compact 36px horizontal summary strip, always visible
+ *   3. Pane (horizontal) split:
+ *        LEFT: SystemTruthMatrix — TanStack Table
+ *        RIGHT: EvidenceDrawer — persistent right rail (empty placeholder
+ *               when no row selected; never a modal overlay)
+ *   4. Freshness stamp
  */
 
 import { useState, useMemo, useCallback } from "react";
@@ -21,6 +23,8 @@ import { NeedsJohnQueue } from "@/components/cockpit/NeedsJohnQueue";
 import { SystemTruthMatrix } from "@/components/cockpit/SystemTruthMatrix";
 import { EvidenceDrawer } from "@/components/cockpit/EvidenceDrawer";
 import { RuntimeRail } from "@/components/cockpit/RuntimeRail";
+import { Pane } from "@/components/primitives/Pane";
+import { colors } from "@/lib/theme";
 
 export default function OperatorCockpitPage() {
   const { rows, isLoading, error, refetch } = useControlSurfaceRows();
@@ -57,7 +61,7 @@ export default function OperatorCockpitPage() {
 
   return (
     <div className="flex h-[calc(100vh-8rem)] flex-col gap-3">
-      {/* Zone 1: Needs John Queue — always visible top bar */}
+      {/* Zone 1: Needs John Queue */}
       <NeedsJohnQueue
         rows={needsJohnRows}
         totalCount={summary?.human_decision_required_count ?? 0}
@@ -66,45 +70,47 @@ export default function OperatorCockpitPage() {
         isLoading={isLoading}
       />
 
-      {/* Zones 2-5: Split layout */}
-      <div className="flex flex-1 gap-0 overflow-hidden rounded-xl border border-sumi-700/30">
-        {/* Left: System Truth Matrix */}
-        <div className={`flex-1 overflow-hidden transition-all ${selectedRow ? "basis-[55%]" : "basis-full"}`}>
-          <SystemTruthMatrix
-            rows={rows}
-            isLoading={isLoading}
-            selectedRowId={selectedRowId}
-            onSelectRow={handleSelectRow}
-            onRefresh={refetch}
-            summary={summary}
-          />
-        </div>
+      {/* Zone 5: Runtime Rail — compact horizontal strip, always visible */}
+      <div className="shrink-0">
+        <RuntimeRail summary={summary} isLoading={isLoading} onRefresh={refetch} />
+      </div>
 
-        {/* Right: Evidence Drawer + Runtime Rail (visible when a row is selected) */}
-        {selectedRow && (
-          <div className="flex basis-[45%] flex-col border-l border-sumi-800/40">
-            {/* Evidence Drawer — top portion */}
-            <div className="flex-1 overflow-hidden border-b border-sumi-800/40">
-              <EvidenceDrawer
-                row={selectedRow}
-                onClose={() => setSelectedRowId(null)}
-              />
-            </div>
-            {/* Runtime Rail — bottom portion */}
-            <div className="h-[200px] shrink-0">
-              <RuntimeRail
-                summary={summary}
-                isLoading={isLoading}
-                onRefresh={refetch}
-              />
-            </div>
-          </div>
-        )}
+      {/* Zones 2 + 3: SystemTruthMatrix (left) | EvidenceDrawer (right) — persistent Pane */}
+      <div
+        className="flex-1 overflow-hidden"
+        style={{ border: `1px solid ${colors.sumi[700]}` }}
+      >
+        <Pane
+          direction="horizontal"
+          storageKey="control-surface-evidence"
+          primaryDefaultSize={62}
+          primaryMinSize={40}
+          secondaryMinSize={25}
+          primary={
+            <SystemTruthMatrix
+              rows={rows}
+              isLoading={isLoading}
+              selectedRowId={selectedRowId}
+              onSelectRow={handleSelectRow}
+              onRefresh={refetch}
+              summary={summary}
+            />
+          }
+          secondary={
+            <EvidenceDrawer
+              row={selectedRow}
+              onClose={() => setSelectedRowId(null)}
+            />
+          }
+        />
       </div>
 
       {/* Freshness stamp */}
       {summary?.generated_at && (
-        <div className="text-[10px] text-sumi-600">
+        <div
+          className="font-mono text-[10px] tabular-nums"
+          style={{ color: colors.sumi[600], letterSpacing: "0.06em" }}
+        >
           Generated {summary.generated_at} · Sources:{" "}
           {summary.sources_consulted.join(", ")}
         </div>

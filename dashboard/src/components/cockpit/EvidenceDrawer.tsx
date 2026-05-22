@@ -11,7 +11,7 @@ import type { ControlSurfaceRow } from "@/lib/types";
 import { colors } from "@/lib/theme";
 
 interface EvidenceDrawerProps {
-  row: ControlSurfaceRow;
+  row: ControlSurfaceRow | null;
   onClose: () => void;
 }
 
@@ -56,6 +56,27 @@ function RefIcon({ kind }: { kind: ReturnType<typeof guessRefKind> }) {
 }
 
 export function EvidenceDrawer({ row, onClose }: EvidenceDrawerProps) {
+  if (!row) {
+    return (
+      <div
+        className="flex h-full flex-col items-center justify-center"
+        style={{ backgroundColor: `color-mix(in srgb, ${colors.sumi[950]} 60%, transparent)` }}
+      >
+        <div className="flex flex-col items-center gap-2 px-4 text-center">
+          <span
+            className="font-mono text-xs uppercase"
+            style={{ color: colors.sumi[600], letterSpacing: "0.14em" }}
+          >
+            EVIDENCE
+          </span>
+          <span className="text-xs" style={{ color: colors.sumi[600] }}>
+            Select a row to inspect provenance.
+          </span>
+        </div>
+      </div>
+    );
+  }
+
   const cc = coherenceColor(row.coherence_state);
 
   return (
