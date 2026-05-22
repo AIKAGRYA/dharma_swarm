@@ -35,10 +35,14 @@
   --color-status-error: #9C2A1F;  /* shu (was bengara) */
   --color-status-info: #1F4F8C;   /* aozora */
 
-  /* --- Typography --- */
-  --font-body: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-heading: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  /* --- Typography (Phase 2 swap) ---
+     Commit Mono first so an operator who installs the (free) font locally
+     gets the locked aesthetic; Geist Mono is the always-loaded fallback
+     (next/font/google). Headings collapse to Inter (single family — fewer
+     network requests, more taste discipline) at weight 600. */
+  --font-body: var(--font-inter), "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-inter), "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Commit Mono", var(--font-geist-mono), "Geist Mono", "JetBrains Mono", ui-monospace, monospace;
 }
 
 /* ============================================================
