@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .extractors import extract_via_markitdown, extract_webclip
 from .provenance import (
     AtomSource,
     AtomType,
@@ -130,12 +131,7 @@ def _ingest_simple(
     tags: list[str],
     related: list[str],
 ) -> Path:
-    if isinstance(source, Path):
-        body = source.read_text(encoding="utf-8")
-        src_path = str(source.resolve())
-    else:
-        body = source
-        src_path = "<inline>"
+    body, src_path, title, tags = _load_simple_source(source, source_kind, title, tags)
 
     schema = FrontmatterSchema(
         title=title,
@@ -158,6 +154,26 @@ def _ingest_simple(
         tags=tags,
     )
     return write_staged(schema, body)
+
+
+def _load_simple_source(
+    source: str | Path,
+    source_kind: SourceKind,
+    title: str,
+    tags: list[str],
+) -> tuple[str, str, str, list[str]]:
+    if isinstance(source, Path):
+        if source_kind == "webclip":
+            clip = extract_webclip(source)
+            merged_tags = list(dict.fromkeys(tags + clip.tags))
+            return clip.body, clip.source_url or str(source.resolve()), clip.title or title, merged_tags
+        if source_kind in ("pdf", "voice"):
+            converted = extract_via_markitdown(source)
+            if not converted.ok:
+                raise RuntimeError(converted.error or "markitdown extraction failed")
+            return converted.body, converted.source_path, title, tags
+        return source.read_text(encoding="utf-8"), str(source.resolve()), title, tags
+    return source, "<inline>", title, tags
 
 
 def _ingest_session(

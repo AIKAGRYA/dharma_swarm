@@ -55,6 +55,32 @@ def test_ingest_session_jsonl_creates_atom_per_substantive_turn(
         assert atom.exists()
 
 
+def test_ingest_webclip_uses_existing_extractor(chetana_sandbox: Path, tmp_path: Path):
+    clip = tmp_path / "clip.md"
+    clip.write_text(
+        "---\n"
+        "title: Clipped Source Title\n"
+        "url: https://example.test/source\n"
+        "tags: [clip, source]\n"
+        "---\n"
+        "Clipped body only.\n",
+        encoding="utf-8",
+    )
+
+    result = ingest(
+        source=clip,
+        source_kind="webclip",
+        title="fallback title",
+        confidence=0.6,
+        tags=["manual"],
+    )
+    parsed, body = parse_frontmatter(result.atoms[0].read_text(encoding="utf-8"))
+    assert parsed.title == "Clipped Source Title"
+    assert parsed.source[0].path == "https://example.test/source"
+    assert parsed.tags == ["manual", "clip", "source"]
+    assert body == "Clipped body only.\n"
+
+
 def test_promote_writes_trusted_atom_with_provenance(chetana_sandbox: Path):
     ingested = ingest(
         source="atom body for promotion",
