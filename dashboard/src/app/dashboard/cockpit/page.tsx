@@ -17,19 +17,21 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { colors } from "@/lib/theme";
 import { Numeral } from "@/components/primitives/Numeral";
-import { StatusBadge } from "@/components/primitives/StatusBadge";
+import { StatusBadge, type StatusBadgeState } from "@/components/primitives/StatusBadge";
 import { Glyph } from "@/components/primitives/Glyph";
 import { ZONES } from "@/components/dashboard/ZoneTabs";
 import {
   useControlSurfaceRows,
   useControlSurfaceSummary,
 } from "@/hooks/useControlSurface";
+import { useRepoTruth } from "@/hooks/useRepoTruth";
 
 const ZONE = ZONES.find((z) => z.id === "cockpit")!;
 
 export default function CockpitLandingPage() {
   const { rows, isLoading } = useControlSurfaceRows();
   const { summary } = useControlSurfaceSummary();
+  const repo = useRepoTruth();
 
   const needsJohn = rows.filter((r) => r.human_decision_required);
   const top3NeedsJohn = needsJohn
@@ -111,6 +113,201 @@ export default function CockpitLandingPage() {
           }
           isLoading={isLoading}
         />
+      </section>
+
+      {/* REPO TRUTH — single source of truth for repo state */}
+      <section className="flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <h2
+            className="font-mono text-xs uppercase"
+            style={{ color: colors.sumi[600], letterSpacing: "0.14em" }}
+          >
+            REPO TRUTH · SSoT
+          </h2>
+          <span
+            className="font-mono text-[10px] uppercase tabular-nums"
+            style={{ color: colors.sumi[600], letterSpacing: "0.12em" }}
+          >
+            {repo.activeTrack?.companion_manifest ?? "ACTIVE_SURFACE_MANIFEST.yaml"} · ACTIVE_TRACK.yaml · git
+          </span>
+        </div>
+
+        {/* Manifest health ribbon */}
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-6">
+          <Stat
+            label="MANIFEST"
+            value={repo.summary?.summary.total ?? 0}
+            tone="active"
+            isLoading={repo.isLoading}
+          />
+          <Stat
+            label="LIVE"
+            value={repo.summary?.summary.live ?? 0}
+            tone="ok"
+            isLoading={repo.isLoading}
+          />
+          <Stat
+            label="DEGRADED"
+            value={repo.summary?.summary.degraded ?? 0}
+            tone={repo.summary && repo.summary.summary.degraded > 0 ? "warn" : "rest"}
+            isLoading={repo.isLoading}
+          />
+          <Stat
+            label="BROKEN"
+            value={repo.summary?.summary.broken ?? 0}
+            tone={repo.summary && repo.summary.summary.broken > 0 ? "fail" : "rest"}
+            isLoading={repo.isLoading}
+          />
+          <Stat
+            label="STUB"
+            value={repo.summary?.summary.stub ?? 0}
+            tone="rest"
+            isLoading={repo.isLoading}
+          />
+          <Stat
+            label="UNKNOWN"
+            value={repo.summary?.summary.unknown ?? 0}
+            tone="rest"
+            isLoading={repo.isLoading}
+          />
+        </div>
+
+        {/* Active track + recent commits side by side */}
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          {/* Active track card */}
+          <div
+            style={{
+              padding: "12px 16px",
+              border: `1px solid ${colors.sumi[700]}`,
+              backgroundColor: colors.sumi[900],
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+            }}
+          >
+            <div className="flex items-center justify-between">
+              <span
+                className="font-mono text-[10px] uppercase tabular-nums"
+                style={{ color: colors.sumi[600], letterSpacing: "0.14em" }}
+              >
+                ACTIVE TRACK
+              </span>
+              {repo.activeTrack?.status && (
+                <StatusBadge
+                  state={trackStatusBadge(repo.activeTrack.status)}
+                  title={repo.activeTrack.status}
+                />
+              )}
+            </div>
+            {repo.activeTrack ? (
+              <>
+                <span
+                  className="font-mono text-sm tabular-nums"
+                  style={{ color: colors.aozora, letterSpacing: "0.04em" }}
+                >
+                  {repo.activeTrack.id ?? "unknown"}
+                </span>
+                <p
+                  className="text-xs"
+                  style={{ color: colors.torinoko, opacity: 0.85, lineHeight: 1.4 }}
+                >
+                  {repo.activeTrack.description ?? "—"}
+                </p>
+                <div
+                  className="flex items-center gap-3 font-mono text-[10px] tabular-nums"
+                  style={{ color: colors.sumi[600], letterSpacing: "0.10em" }}
+                >
+                  <span>OWNER {repo.activeTrack.owner ?? "—"}</span>
+                  <span>·</span>
+                  <span>VERIFIED {repo.activeTrack.verified_at ?? "—"}</span>
+                  <span>·</span>
+                  <span>TTL {repo.activeTrack.ttl_days ?? "—"}d</span>
+                  <span>·</span>
+                  <span>{repo.activeTrack.completion_criteria_count} CRITERIA</span>
+                  <span>·</span>
+                  <span>{repo.activeTrack.surfaces_count} SURFACES</span>
+                </div>
+              </>
+            ) : (
+              <span
+                className="font-mono text-xs uppercase"
+                style={{ color: colors.sumi[600], letterSpacing: "0.12em" }}
+              >
+                {repo.isLoading ? "Loading…" : "No active track"}
+              </span>
+            )}
+          </div>
+
+          {/* Recent commits card */}
+          <div
+            style={{
+              padding: "12px 16px",
+              border: `1px solid ${colors.sumi[700]}`,
+              backgroundColor: colors.sumi[900],
+              display: "flex",
+              flexDirection: "column",
+              gap: 6,
+            }}
+          >
+            <div className="flex items-center justify-between">
+              <span
+                className="font-mono text-[10px] uppercase tabular-nums"
+                style={{ color: colors.sumi[600], letterSpacing: "0.14em" }}
+              >
+                RECENT COMMITS
+              </span>
+              {repo.recentCommits?.branch && (
+                <span
+                  className="font-mono text-[10px] tabular-nums"
+                  style={{ color: colors.aozora, letterSpacing: "0.06em" }}
+                >
+                  {repo.recentCommits.branch}
+                </span>
+              )}
+            </div>
+            <div className="flex flex-col gap-1" style={{ minHeight: 80 }}>
+              {repo.recentCommits?.commits.slice(0, 6).map((c) => (
+                <div
+                  key={c.sha}
+                  className="flex items-center gap-2 font-mono text-xs tabular-nums"
+                  style={{ height: 18, lineHeight: 1.2 }}
+                  title={`${c.subject} (by ${c.author}, ${c.relative})`}
+                >
+                  <span style={{ color: colors.aozora, width: 70 }}>
+                    {c.short_sha}
+                  </span>
+                  <span
+                    className="truncate"
+                    style={{ color: colors.torinoko, opacity: 0.92, flex: 1 }}
+                  >
+                    {c.subject}
+                  </span>
+                  <span
+                    style={{ color: colors.sumi[600], whiteSpace: "nowrap" }}
+                  >
+                    {c.relative}
+                  </span>
+                </div>
+              ))}
+              {!repo.recentCommits && (
+                <span
+                  className="font-mono text-xs uppercase"
+                  style={{ color: colors.sumi[600], letterSpacing: "0.12em" }}
+                >
+                  {repo.isLoading ? "Loading…" : "git log unavailable"}
+                </span>
+              )}
+            </div>
+            {repo.recentCommits && (
+              <span
+                className="font-mono text-[10px] uppercase tabular-nums"
+                style={{ color: colors.sumi[600], letterSpacing: "0.12em" }}
+              >
+                showing {Math.min(6, repo.recentCommits.count)} of {repo.recentCommits.count}
+              </span>
+            )}
+          </div>
+        </div>
       </section>
 
       {/* Top 3 needs-john preview */}
@@ -249,6 +446,15 @@ export default function CockpitLandingPage() {
       </footer>
     </div>
   );
+}
+
+function trackStatusBadge(status: string): StatusBadgeState {
+  const s = status.toUpperCase();
+  if (s === "ACTIVE" || s === "SHIPPABLE" || s === "SHIPPED") return "pass";
+  if (s === "QUEUED" || s === "DRAFT" || s === "DEFERRED") return "drift";
+  if (s === "STALE" || s === "TTL_EXPIRED") return "stale";
+  if (s === "FAILED" || s === "BLOCKED") return "fail";
+  return "drift";
 }
 
 function Stat({
