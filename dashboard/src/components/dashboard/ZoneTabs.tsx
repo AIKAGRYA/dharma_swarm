@@ -19,11 +19,19 @@ import { colors } from "@/lib/theme";
 
 type ZoneId = "cockpit" | "talk" | "watch" | "judge" | "map" | "sense" | "remember";
 
+interface ZoneRoute {
+  path: string;
+  label: string;
+  description: string;
+}
+
 interface Zone {
   id: ZoneId;
   label: string;
   verb: string;
-  routes: { path: string; label: string }[];
+  description: string;
+  landingPath: string;
+  routes: ZoneRoute[];
 }
 
 const ZONES: Zone[] = [
@@ -31,76 +39,97 @@ const ZONES: Zone[] = [
     id: "cockpit",
     label: "COCKPIT",
     verb: "act",
+    landingPath: "/dashboard/cockpit",
+    description: "Operator surface. Dirty rows, needs-john queue, evidence drawer, runtime rail.",
     routes: [
-      { path: "/dashboard/control-surface", label: "Control Surface" },
-      { path: "/dashboard/command-post", label: "Command Post" },
-      { path: "/dashboard/synthesizer", label: "Synthesizer" },
+      { path: "/dashboard/control-surface", label: "Control Surface", description: "Five-zone operator cockpit: needs-john queue, system truth matrix, evidence drawer, runtime rail." },
+      { path: "/dashboard/command-post", label: "Command Post", description: "Active-track view, pending PRs, governance gate status." },
+      { path: "/dashboard/synthesizer", label: "Synthesizer", description: "Synthesis surface for combining signals across zones." },
     ],
   },
   {
     id: "talk",
     label: "TALK",
     verb: "converse",
+    landingPath: "/dashboard/talk",
+    description: "Per-provider transcript surfaces. Local + cloud frontier models.",
     routes: [
-      { path: "/dashboard/claude", label: "Claude" },
-      { path: "/dashboard/glm5", label: "GLM-5" },
-      { path: "/dashboard/qwen35", label: "Qwen-3.5" },
-      { path: "/dashboard/models", label: "Models" },
+      { path: "/dashboard/claude", label: "Claude", description: "Claude Opus / Sonnet / Haiku transcripts and tool-use." },
+      { path: "/dashboard/glm5", label: "GLM-5", description: "Z.ai GLM-5 744B — free frontier tier-1." },
+      { path: "/dashboard/qwen35", label: "Qwen-3.5", description: "Alibaba Qwen-3.5 / Qwen-3-32B telemetry." },
+      { path: "/dashboard/models", label: "Models", description: "Cross-provider model hierarchy and availability." },
     ],
   },
   {
     id: "watch",
     label: "WATCH",
     verb: "observe",
+    landingPath: "/dashboard/watch",
+    description: "Fleet-wide observability. Agent health, runtime control plane, routing telemetry.",
     routes: [
-      { path: "/dashboard/observatory", label: "Observatory" },
-      { path: "/dashboard/runtime", label: "Runtime" },
-      { path: "/dashboard/telemetry", label: "Telemetry" },
+      { path: "/dashboard/observatory", label: "Observatory", description: "Agent fitness grid, leaderboard, anomaly feed, activity timeline." },
+      { path: "/dashboard/runtime", label: "Runtime", description: "Chat profiles, control-plane sync, transport mode, operator handbook." },
+      { path: "/dashboard/telemetry", label: "Telemetry", description: "Routing topology, economic flow, policy interventions, outcomes." },
     ],
   },
   {
     id: "judge",
     label: "JUDGE",
     verb: "evaluate",
+    landingPath: "/dashboard/judge",
+    description: "Evaluation surfaces. Eval results, audit trails, gate status.",
     routes: [
-      { path: "/dashboard/eval", label: "Eval" },
-      { path: "/dashboard/gates", label: "Gates" },
+      { path: "/dashboard/eval", label: "Eval", description: "Run evaluations, view scores per skill / agent / model." },
+      { path: "/dashboard/gates", label: "Gates", description: "Telos / dharmic / pre-commit gate status across the kernel." },
     ],
   },
   {
     id: "map",
     label: "MAP",
     verb: "relate",
+    landingPath: "/dashboard/map",
+    description: "Topology surfaces. Concepts, lineage, ecosystem graph, module dependencies.",
     routes: [
-      { path: "/dashboard/ontology", label: "Ontology" },
-      { path: "/dashboard/lineage", label: "Lineage" },
-      { path: "/dashboard/ecosystem", label: "Ecosystem" },
-      { path: "/dashboard/modules", label: "Modules" },
+      { path: "/dashboard/ontology", label: "Ontology", description: "Concept graph, definitions, relations across the kernel." },
+      { path: "/dashboard/lineage", label: "Lineage", description: "Mutation lineage and provenance trails." },
+      { path: "/dashboard/ecosystem", label: "Ecosystem", description: "Cross-system links — Claude Code, dharma_swarm, MI research." },
+      { path: "/dashboard/modules", label: "Modules", description: "500+ module dependency graph and ownership map." },
     ],
   },
   {
     id: "sense",
     label: "SENSE",
     verb: "trails",
+    landingPath: "/dashboard/sense",
+    description: "Pheromone trails and self-modification. Hot paths, marks, evolution archive.",
     routes: [
-      { path: "/dashboard/stigmergy", label: "Stigmergy" },
-      { path: "/dashboard/evolution", label: "Evolution" },
+      { path: "/dashboard/stigmergy", label: "Stigmergy", description: "Pheromone marks, hot paths, stigmergic coordination signals." },
+      { path: "/dashboard/evolution", label: "Evolution", description: "DarwinEngine fitness trends, archive, diversity-preserving selection." },
     ],
   },
   {
     id: "remember",
     label: "REMEMBER",
     verb: "recall",
+    landingPath: "/dashboard/remember",
+    description: "Session memory. Captured sessions, timeline, atom revival queue.",
     routes: [
-      { path: "/dashboard/log", label: "Log" },
-      { path: "/dashboard/timeline", label: "Timeline" },
+      { path: "/dashboard/log", label: "Log", description: "Session captures, decisions, problems, insights." },
+      { path: "/dashboard/timeline", label: "Timeline", description: "Chronological event stream across the kernel." },
     ],
   },
 ];
 
 function activeZoneFor(pathname: string | null): Zone | null {
   if (!pathname) return null;
-  return ZONES.find((z) => z.routes.some((r) => pathname.startsWith(r.path))) ?? null;
+  return (
+    ZONES.find(
+      (z) =>
+        pathname === z.landingPath ||
+        pathname.startsWith(z.landingPath + "/") ||
+        z.routes.some((r) => pathname.startsWith(r.path)),
+    ) ?? null
+  );
 }
 
 export function ZoneTabs() {
@@ -178,4 +207,4 @@ export function ZoneTabs() {
   );
 }
 
-export { ZONES, type Zone, type ZoneId };
+export { ZONES, type Zone, type ZoneId, type ZoneRoute };

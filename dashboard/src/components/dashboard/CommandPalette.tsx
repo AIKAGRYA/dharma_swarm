@@ -133,6 +133,46 @@ export function CommandPalette() {
               No matches.
             </Command.Empty>
 
+            {/* Zone landings — primary navigation */}
+            <Command.Group heading="ZONES · jump to landing">
+              {ZONES.map((zone) => (
+                <Command.Item
+                  key={zone.id}
+                  value={`${zone.label} ${zone.verb} ${zone.landingPath}`}
+                  onSelect={() => go(zone.landingPath)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    padding: "6px 12px",
+                    height: 28,
+                    fontSize: 13,
+                    color: colors.torinoko,
+                    cursor: "pointer",
+                  }}
+                >
+                  <span
+                    className="font-mono text-[10px] uppercase tabular-nums"
+                    style={{
+                      color: colors.aozora,
+                      letterSpacing: "0.12em",
+                      width: 64,
+                      fontWeight: 500,
+                    }}
+                  >
+                    {zone.label}
+                  </span>
+                  <span style={{ color: colors.torinoko }}>{zone.verb}</span>
+                  <span
+                    className="font-mono text-[10px]"
+                    style={{ color: colors.sumi[600], marginLeft: "auto" }}
+                  >
+                    {zone.landingPath}
+                  </span>
+                </Command.Item>
+              ))}
+            </Command.Group>
+
             {ZONES.map((zone) => (
               <Command.Group
                 key={zone.id}
