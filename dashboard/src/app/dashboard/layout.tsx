@@ -6,6 +6,7 @@ import { OperatorMicrographics } from "@/components/layout/OperatorMicrographics
 import { ChatPanel } from "@/components/chat/ChatPanel";
 import { BackendStatus } from "@/components/ui/ErrorBanner";
 import { KeyboardNav } from "@/components/ui/KeyboardNav";
+import { ZoneTabs } from "@/components/dashboard/ZoneTabs";
 import { useChatWorkspace } from "@/hooks/useChatWorkspace";
 
 /**
@@ -23,6 +24,7 @@ export default function DashboardLayout({
     <div className="flex min-h-screen flex-col">
       <KeyboardNav />
       <Header onToggleChat={() => togglePanel()} chatOpen={panelOpen} />
+      <ZoneTabs />
       <div className="flex flex-1">
         <div className={`flex-1 p-6 transition-all ${panelOpen ? "pr-3" : ""}`}>
           <div className="flex flex-col gap-6">
