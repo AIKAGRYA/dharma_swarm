@@ -6,6 +6,8 @@ import json
 
 from dharma_swarm.chetana import graph_unifier as gu_mod
 from dharma_swarm.chetana.graph_unifier import coverage_summary, query
+from dharma_swarm.chetana.ingest import ingest
+from dharma_swarm.chetana.promote import promote
 
 
 def test_query_against_empty_catalytic_returns_no_hits(tmp_path, monkeypatch):
@@ -34,6 +36,20 @@ def test_query_finds_node_in_catalytic_graph(tmp_path, monkeypatch):
     assert result.coverage["catalytic"] >= 1
     hits = result.by_source("catalytic")
     assert any("Strange Loop" in h.label for h in hits)
+
+
+def test_query_finds_promoted_wiki_atom(chetana_sandbox):
+    ingested = ingest(
+        source="A wiki-native strange loop page for direct markdown search.",
+        source_kind="note",
+        title="Wiki Search Atom",
+        confidence=0.8,
+    )
+    promote(staged_path=ingested.atoms[0], promoted_by="graph-test")
+
+    result = query("strange loop", sources=["wiki"])
+    assert result.coverage["wiki"] == 1
+    assert result.by_source("wiki")[0].label == "Wiki Search Atom"
 
 
 def test_query_missing_backends_dont_break(tmp_path, monkeypatch):

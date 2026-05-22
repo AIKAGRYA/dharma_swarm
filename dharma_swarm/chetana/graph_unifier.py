@@ -25,6 +25,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from . import staging as staging_mod
+
 logger = logging.getLogger(__name__)
 
 
@@ -59,12 +61,19 @@ def query(
 ) -> UnifiedQueryResult:
     """Query all configured graph backends, merge results.
 
-    `sources` is a subset of {"memory", "gitnexus", "contextplus", "catalytic"}.
+    `sources` is a subset of {"wiki", "memory", "gitnexus", "contextplus", "catalytic"}.
     Defaults to all available. Backends that are unreachable contribute 0 hits
     plus a note.
     """
-    sources = sources or ["memory", "gitnexus", "contextplus", "catalytic"]
+    sources = sources or ["wiki", "memory", "gitnexus", "contextplus", "catalytic"]
     result = UnifiedQueryResult(query=text)
+
+    if "wiki" in sources:
+        hits, note = _query_wiki(text, limit=limit_per_source)
+        result.hits.extend(hits)
+        result.coverage["wiki"] = len(hits)
+        if note:
+            result.notes.append(f"wiki: {note}")
 
     if "catalytic" in sources:
         hits, note = _query_catalytic(text, limit=limit_per_source)
@@ -95,6 +104,39 @@ def query(
             result.notes.append(f"contextplus: {note}")
 
     return result
+
+
+def _query_wiki(text: str, *, limit: int) -> tuple[list[GraphHit], str | None]:
+    trusted = staging_mod.TRUSTED_DEFAULT
+    if not trusted.exists():
+        return [], f"trusted wiki root missing: {trusted}"
+    needles = [part for part in text.lower().split() if part]
+    hits: list[GraphHit] = []
+    for path in sorted(trusted.glob("*.md")):
+        try:
+            raw = path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        haystack = raw.lower()
+        if needles and not all(needle in haystack for needle in needles):
+            continue
+        title = _extract_title(raw) or path.stem.replace("-", " ").title()
+        try:
+            rel = path.relative_to(staging_mod.WIKI_ROOT)
+        except ValueError:
+            rel = path
+        hits.append(
+            GraphHit(
+                source="wiki",
+                kind="page",
+                id=rel.as_posix(),
+                label=title,
+                payload={"path": str(path)},
+            )
+        )
+        if len(hits) >= limit:
+            break
+    return hits, None
 
 
 def _query_catalytic(text: str, *, limit: int) -> tuple[list[GraphHit], str | None]:
@@ -193,6 +235,15 @@ def _query_contextplus(text: str, *, limit: int) -> tuple[list[GraphHit], str | 
         "contextplus query requires MCP client (use chetana.mcp_server tool or "
         "call mcp__contextplus__semantic_code_search from an agent harness)"
     )
+
+
+def _extract_title(raw: str) -> str | None:
+    for line in raw.splitlines()[:20]:
+        if line.startswith("title:"):
+            return line.split(":", 1)[1].strip().strip('"')
+        if line.startswith("# "):
+            return line[2:].strip()
+    return None
 
 
 def coverage_summary(result: UnifiedQueryResult) -> str:
