@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { useTelemetry } from "@/hooks/useTelemetry";
-import { colors, glowBorder, glowBox, statusColor } from "@/lib/theme";
+import { colors, glowBorder, statusColor } from "@/lib/theme";
 import { timeAgo } from "@/lib/utils";
 
 function formatUsd(value: number): string {
@@ -105,7 +105,7 @@ export default function TelemetryPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.45, delay: 0.04 }}
           className="glass-panel p-5 xl:col-span-1"
-          style={{ boxShadow: `${glowBorder(colors.aozora, 0.2)}, ${glowBox(colors.aozora, 0.18)}` }}
+          style={{ boxShadow: glowBorder(colors.aozora, 0.2) }}
         >
           <div className="mb-4 flex items-center gap-2">
             <Route size={16} className="text-aozora" />
@@ -165,7 +165,7 @@ export default function TelemetryPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.45, delay: 0.08 }}
           className="glass-panel p-5 xl:col-span-2"
-          style={{ boxShadow: `${glowBorder(colors.botan, 0.18)}, ${glowBox(colors.botan, 0.16)}` }}
+          style={{ boxShadow: glowBorder(colors.botan, 0.18) }}
         >
           <div className="mb-4 flex items-center gap-2">
             <Banknote size={16} className="text-botan" />

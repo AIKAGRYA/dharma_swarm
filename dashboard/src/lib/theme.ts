@@ -83,25 +83,20 @@ export function statusTwColor(status: string): string {
 // ---------------------------------------------------------------------------
 
 /**
- * Returns a CSS `text-shadow` string that produces a neon glow effect.
- * @param hex -- hex color string (e.g. "#1F4F8C")
- * @param intensity -- multiplier 0..1 (default 0.6)
+ * Phase 1.5 — returns "none". The Nihonga design lock muted-by-default
+ * makes neon text-shadow visually inappropriate. Signature preserved so
+ * callsites keep compiling; the visual effect is now flat. The helper
+ * itself will be deleted in a follow-up after every callsite is cleaned.
  */
-export function glowText(hex: string, intensity = 0.6): string {
-  const inner = Math.round(intensity * 100);
-  const outer = Math.round(intensity * 50);
-  return `0 0 6px color-mix(in srgb, ${hex} ${inner}%, transparent), 0 0 20px color-mix(in srgb, ${hex} ${outer}%, transparent)`;
+export function glowText(_hex: string, _intensity = 0.6): string {
+  return "none";
 }
 
 /**
- * Returns a CSS `box-shadow` string for glowing panels / cards.
- * @param hex -- hex color string
- * @param intensity -- multiplier 0..1 (default 0.4)
+ * Phase 1.5 — returns "none". See glowText for rationale.
  */
-export function glowBox(hex: string, intensity = 0.4): string {
-  const inner = Math.round(intensity * 100);
-  const outer = Math.round(intensity * 40);
-  return `0 0 8px color-mix(in srgb, ${hex} ${inner}%, transparent), 0 0 24px color-mix(in srgb, ${hex} ${outer}%, transparent)`;
+export function glowBox(_hex: string, _intensity = 0.4): string {
+  return "none";
 }
 
 /**

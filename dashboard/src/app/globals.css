@@ -202,62 +202,25 @@ body::before {
 }
 
 /* ============================================================
-   Neon glow utilities
+   Neon glow utilities — Phase 1.5 neutralized
+   Class names retained so legacy callsites don't break;
+   the visual effect is now flat per Nihonga design lock.
+   These classes can be deleted once every callsite is migrated.
    ============================================================ */
 
-.glow-aozora {
-  text-shadow:
-    0 0 6px color-mix(in srgb, var(--color-aozora) 60%, transparent),
-    0 0 20px color-mix(in srgb, var(--color-aozora) 30%, transparent);
-}
-
-.glow-botan {
-  text-shadow:
-    0 0 6px color-mix(in srgb, var(--color-botan) 60%, transparent),
-    0 0 20px color-mix(in srgb, var(--color-botan) 30%, transparent);
-}
-
-.glow-kinpaku {
-  text-shadow:
-    0 0 6px color-mix(in srgb, var(--color-kinpaku) 60%, transparent),
-    0 0 20px color-mix(in srgb, var(--color-kinpaku) 30%, transparent);
-}
-
-.glow-rokusho {
-  text-shadow:
-    0 0 6px color-mix(in srgb, var(--color-rokusho) 60%, transparent),
-    0 0 20px color-mix(in srgb, var(--color-rokusho) 30%, transparent);
-}
-
-.glow-bengara {
-  text-shadow:
-    0 0 6px color-mix(in srgb, var(--color-bengara) 60%, transparent),
-    0 0 20px color-mix(in srgb, var(--color-bengara) 30%, transparent);
-}
-
+.glow-aozora,
+.glow-botan,
+.glow-kinpaku,
+.glow-rokusho,
+.glow-bengara,
 .glow-fuji {
-  text-shadow:
-    0 0 6px color-mix(in srgb, var(--color-fuji) 60%, transparent),
-    0 0 20px color-mix(in srgb, var(--color-fuji) 30%, transparent);
+  text-shadow: none;
 }
 
-/* Box-shadow variants */
-.glow-box-aozora {
-  box-shadow:
-    0 0 8px color-mix(in srgb, var(--color-aozora) 40%, transparent),
-    0 0 24px color-mix(in srgb, var(--color-aozora) 15%, transparent);
-}
-
-.glow-box-botan {
-  box-shadow:
-    0 0 8px color-mix(in srgb, var(--color-botan) 40%, transparent),
-    0 0 24px color-mix(in srgb, var(--color-botan) 15%, transparent);
-}
-
+.glow-box-aozora,
+.glow-box-botan,
 .glow-box-kinpaku {
-  box-shadow:
-    0 0 8px color-mix(in srgb, var(--color-kinpaku) 40%, transparent),
-    0 0 24px color-mix(in srgb, var(--color-kinpaku) 15%, transparent);
+  box-shadow: none;
 }
 
 /* ============================================================

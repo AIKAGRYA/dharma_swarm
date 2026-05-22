@@ -5,7 +5,7 @@ import { Brain, Archive, User, Clock, Eye, Tag } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useAgentWorkspace } from "../layout";
 import { stagger } from "@/components/agent-workspace/shared";
-import { colors, glowBorder, glowBox } from "@/lib/theme";
+import { colors, glowBorder } from "@/lib/theme";
 import { HPBar } from "@/components/game/HPBar";
 import { apiFetch } from "@/lib/api";
 
@@ -75,7 +75,7 @@ function MemoryCard({
       className="glass-panel p-4 transition-all"
       style={{
         boxShadow: hot
-          ? `${glowBorder(accent, 0.18)}, ${glowBox(accent, 0.04)}`
+          ? glowBorder(accent, 0.18)
           : glowBorder(accent, 0.08),
       }}
     >
