@@ -7,6 +7,7 @@ import { ChatPanel } from "@/components/chat/ChatPanel";
 import { BackendStatus } from "@/components/ui/ErrorBanner";
 import { KeyboardNav } from "@/components/ui/KeyboardNav";
 import { ZoneTabs } from "@/components/dashboard/ZoneTabs";
+import { CommandPalette } from "@/components/dashboard/CommandPalette";
 import { useChatWorkspace } from "@/hooks/useChatWorkspace";
 
 /**
@@ -23,6 +24,7 @@ export default function DashboardLayout({
   return (
     <div className="flex min-h-screen flex-col">
       <KeyboardNav />
+      <CommandPalette />
       <Header onToggleChat={() => togglePanel()} chatOpen={panelOpen} />
       <ZoneTabs />
       <div className="flex flex-1">
