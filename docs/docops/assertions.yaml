@@ -184,7 +184,8 @@
       "specs/Dharma_Constitution_v0.md",
       "specs/KERNEL_CORE_SPEC.md",
       "docs/docops/DOCOPS_INTEGRITY.md",
-      "docs/docops/AUTO_INVENTORY.md"
+      "docs/docops/AUTO_INVENTORY.md",
+      "docs/plans/2026-05-22-dashboard-ssot-architecture.md"
     ]
   },
   "auto_sections": {
