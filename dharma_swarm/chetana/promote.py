@@ -23,6 +23,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import staging as staging_mod
+from .cross_update import cross_update_trusted
 from .governance import gate_check_atom
 from .provenance import (
     GateResult,
@@ -131,6 +132,16 @@ def promote(
         notes.append(f"log appended → {log_path}")
     except OSError as e:
         notes.append(f"log append failed: {e}")
+    try:
+        cross = cross_update_trusted(trusted_path)
+        notes.append(
+            "cross-update: "
+            f"backlinks={len(cross.backlinks_updated)}, "
+            f"missing_related={len(cross.missing_related)}, "
+            f"contradictions={len(cross.contradictions_flagged)}"
+        )
+    except Exception as e:
+        notes.append(f"cross-update failed: {type(e).__name__}: {e}")
 
     result = PromoteResult(
         staged_path=staged_path,

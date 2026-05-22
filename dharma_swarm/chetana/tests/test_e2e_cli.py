@@ -59,7 +59,17 @@ def test_cli_status_runs_against_empty_home(cli_home: Path):
 def test_cli_help_shows_all_subcommands(cli_home: Path):
     proc = _run(["--help"], home=cli_home)
     assert proc.returncode == 0
-    for sub in ["ingest", "promote", "decay", "revive", "gap-scan", "palace", "query", "status"]:
+    for sub in [
+        "ingest",
+        "promote",
+        "decay",
+        "revive",
+        "gap-scan",
+        "palace",
+        "query",
+        "cross-update",
+        "status",
+    ]:
         assert sub in proc.stdout, f"subcommand {sub} missing from --help"
 
 

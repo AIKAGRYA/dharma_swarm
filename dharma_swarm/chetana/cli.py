@@ -23,6 +23,7 @@ import sys
 from pathlib import Path
 
 from .decay import decay_summary, scan_decay
+from .cross_update import cross_update_summary, cross_update_trusted
 from .gap_scan import gap_scan, gap_summary, write_gap_queue
 from .graph_unifier import coverage_summary, query as unified_query
 from .ingest import ingest
@@ -155,6 +156,19 @@ def _cmd_query(args: argparse.Namespace) -> int:
     print()
     for h in result.hits[: args.limit]:
         print(f"[{h.source}] {h.kind}: {h.id} — {h.label}")
+    return 0
+
+
+def _cmd_cross_update(args: argparse.Namespace) -> int:
+    path = Path(args.path).expanduser().resolve()
+    if not path.exists() and TRUSTED_DEFAULT.exists():
+        candidates = list(TRUSTED_DEFAULT.glob(f"{args.path}.md"))
+        if candidates:
+            path = candidates[0]
+    result = cross_update_trusted(path)
+    print(cross_update_summary(result))
+    for related in result.missing_related:
+        print(f"  · missing related page: {related}")
     return 0
 
 
@@ -445,6 +459,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     sp_st = sub.add_parser("status", help="show staged / trusted / quarantine counts")
     sp_st.set_defaults(func=_cmd_status)
+
+    sp_cu = sub.add_parser("cross-update", help="update index/backlinks for a trusted atom")
+    sp_cu.add_argument("path", help="trusted atom path or slug")
+    sp_cu.set_defaults(func=_cmd_cross_update)
 
     sp_vf = sub.add_parser(
         "verify",

@@ -81,6 +81,40 @@ def test_promote_writes_trusted_atom_with_provenance(chetana_sandbox: Path):
     assert not staged.exists()
 
 
+def test_promote_runs_cross_update_index_backlinks_and_contradiction_ledger(
+    chetana_sandbox: Path,
+):
+    related = ingest(
+        source="Bridge hypothesis background",
+        source_kind="note",
+        title="Bridge Hypothesis",
+        confidence=0.8,
+    )
+    related_promoted = promote(staged_path=related.atoms[0], promoted_by="tester")
+
+    main = ingest(
+        source="This contradicts older synthesis and relates to the bridge hypothesis.",
+        source_kind="note",
+        title="Main Cross Update",
+        confidence=0.8,
+        related=["Bridge Hypothesis"],
+    )
+    promoted = promote(staged_path=main.atoms[0], promoted_by="tester")
+
+    index_text = (chetana_sandbox / "wiki" / "index.md").read_text(encoding="utf-8")
+    assert "Main Cross Update" in index_text
+    assert str(promoted.trusted_path.name).removesuffix(".md") in index_text
+
+    related_text = related_promoted.trusted_path.read_text(encoding="utf-8")
+    assert "## Backlinks" in related_text
+    assert "Main Cross Update" in related_text
+
+    contradictions = (chetana_sandbox / "wiki" / "contradictions.md").read_text(
+        encoding="utf-8"
+    )
+    assert "Main Cross Update" in contradictions
+
+
 def test_double_promote_raises(chetana_sandbox: Path):
     ingested = ingest(source="x", source_kind="note", title="t", confidence=0.5)
     staged = ingested.atoms[0]
