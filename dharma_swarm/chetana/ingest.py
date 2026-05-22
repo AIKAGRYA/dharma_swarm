@@ -33,6 +33,7 @@ from .provenance import (
 )
 from .staging import write_staged
 from .stigmergy_emit import emit_mark
+from .wiki_log import append_wiki_log
 
 logger = logging.getLogger(__name__)
 
@@ -104,6 +105,15 @@ def ingest(
         connections=["chetana", "ingest", source_kind],
         salience=0.4,
     )
+    try:
+        append_wiki_log(
+            operation="ingest",
+            title=title or _infer_title(source, source_kind),
+            atom_path=result.atoms[0] if result.atoms else None,
+            atom_id=None,
+        )
+    except OSError as e:
+        result.notes.append(f"log append failed: {e}")
 
     return result
 

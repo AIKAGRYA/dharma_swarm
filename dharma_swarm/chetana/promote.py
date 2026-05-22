@@ -31,6 +31,7 @@ from .provenance import (
 )
 from .staging import quarantine_atom, write_trusted
 from .stigmergy_emit import emit_mark
+from .wiki_log import append_wiki_log
 
 logger = logging.getLogger(__name__)
 
@@ -120,6 +121,16 @@ def promote(
 
     trusted_path = write_trusted(promoted_schema, body)
     notes.append(f"promoted ({gov.result}, review={review_status}) → {trusted_path}")
+    try:
+        log_path = append_wiki_log(
+            operation="promote",
+            title=schema.title,
+            atom_path=trusted_path,
+            atom_id=schema.atom_id,
+        )
+        notes.append(f"log appended → {log_path}")
+    except OSError as e:
+        notes.append(f"log append failed: {e}")
 
     result = PromoteResult(
         staged_path=staged_path,

@@ -27,6 +27,8 @@ def test_ingest_simple_note_creates_staged_atom(chetana_sandbox: Path):
     assert parsed.title == "Strange Loops Note"
     assert parsed.provenance is None  # staged atoms have NO provenance
     assert "strange loops" in body
+    log_text = (chetana_sandbox / "wiki" / "log.md").read_text(encoding="utf-8")
+    assert "ingest | Strange Loops Note" in log_text
 
 
 def test_ingest_session_jsonl_creates_atom_per_substantive_turn(
@@ -72,6 +74,8 @@ def test_promote_writes_trusted_atom_with_provenance(chetana_sandbox: Path):
     assert parsed.provenance.gate_check.result == pr.decision
     assert len(parsed.provenance.axiom_signature) == 64
     assert "atom body for promotion" in body
+    log_text = (chetana_sandbox / "wiki" / "log.md").read_text(encoding="utf-8")
+    assert "promote | Promotion test" in log_text
 
     # Staged file should be removed after successful promote
     assert not staged.exists()
