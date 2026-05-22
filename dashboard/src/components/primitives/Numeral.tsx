@@ -22,7 +22,7 @@ export type NumeralTone =
   | "fail"     // FAIL / urgent — Shu vermillion (sparing)
   | "muted";   // idle / inactive — warm sumi-600
 
-export type NumeralSize = "sm" | "md" | "lg" | "xl";
+export type NumeralSize = "sm" | "md" | "lg" | "xl" | "hero";
 
 interface NumeralProps {
   /** Value to display (number or pre-formatted string). */
@@ -48,11 +48,15 @@ const TONE_COLOR: Record<NumeralTone, string> = {
   muted: colors.sumi[600],
 };
 
+// Protagonist scale: numbers MUST be 1.5-2x surrounding prose.
+// Body text is text-sm (~14px). Protagonist xl is text-3xl (~30px) so
+// live instrument tiles read as numbers-first, chrome-second.
 const SIZE_CLASS: Record<NumeralSize, string> = {
-  sm: "text-xs",     // ~12px — chrome
-  md: "text-sm",     // ~14px — body
-  lg: "text-base",   // ~16px — protagonist
-  xl: "text-xl",     // ~20px — hero number
+  sm: "text-xs",      // ~12px — chrome / tertiary
+  md: "text-sm",      // ~14px — body baseline
+  lg: "text-lg",      // ~18px — secondary number
+  xl: "text-3xl",     // ~30px — protagonist instrument number
+  hero: "text-5xl",   // ~48px — single hero number (cockpit etc.)
 };
 
 export function Numeral({

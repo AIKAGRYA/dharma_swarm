@@ -2,7 +2,6 @@
 
 import { AnimatePresence } from "framer-motion";
 import { Header } from "@/components/layout/Header";
-import { OperatorMicrographics } from "@/components/layout/OperatorMicrographics";
 import { ChatPanel } from "@/components/chat/ChatPanel";
 import { BackendStatus } from "@/components/ui/ErrorBanner";
 import { KeyboardNav } from "@/components/ui/KeyboardNav";
@@ -31,7 +30,6 @@ export default function DashboardLayout({
         <div className={`flex-1 p-6 transition-all ${panelOpen ? "pr-3" : ""}`}>
           <div className="flex flex-col gap-6">
             <BackendStatus />
-            <OperatorMicrographics />
             {children}
           </div>
         </div>
