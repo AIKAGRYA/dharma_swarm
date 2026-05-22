@@ -1,8 +1,12 @@
 "use client";
 
 /**
- * Zone 2: System Truth Matrix — TanStack Table replacing hand-built grid.
- * Features: column pinning, sorting, filtering, column visibility.
+ * Zone 2: System Truth Matrix — TanStack Table refactored to primitives
+ * (Round 5b). Cell renderers swap to <StatusBadge>, <Numeral>, <Glyph>;
+ * dense 26px rows; 8px horizontal padding; tabular figures.
+ *
+ * Per docs/plans/2026-05-21-command-plane-design-lock.md:
+ *   "Row height 24-28px when dense. 8px h-padding. Tabular figures."
  */
 
 import { useMemo, useState } from "react";
@@ -20,6 +24,9 @@ import {
 import { ArrowUpDown, RefreshCw, Columns } from "lucide-react";
 import type { ControlSurfaceRow, ControlSurfaceSummary } from "@/lib/types";
 import { colors } from "@/lib/theme";
+import { StatusBadge, type StatusBadgeState } from "@/components/primitives/StatusBadge";
+import { Numeral } from "@/components/primitives/Numeral";
+import { Glyph } from "@/components/primitives/Glyph";
 
 interface SystemTruthMatrixProps {
   rows: ControlSurfaceRow[];
@@ -30,46 +37,30 @@ interface SystemTruthMatrixProps {
   summary: ControlSurfaceSummary | null;
 }
 
-type CoherenceState = "bound" | "partial" | "drifted" | "declared_only" | "unknown";
-
-const COHERENCE_COLORS: Record<CoherenceState, { border: string; bg: string; text: string }> = {
-  bound: {
-    border: `color-mix(in srgb, ${colors.rokusho} 40%, transparent)`,
-    bg: `color-mix(in srgb, ${colors.rokusho} 10%, transparent)`,
-    text: colors.rokusho,
-  },
-  partial: {
-    border: `color-mix(in srgb, ${colors.kinpaku} 40%, transparent)`,
-    bg: `color-mix(in srgb, ${colors.kinpaku} 10%, transparent)`,
-    text: colors.kinpaku,
-  },
-  drifted: {
-    border: `color-mix(in srgb, ${colors.bengara} 40%, transparent)`,
-    bg: `color-mix(in srgb, ${colors.bengara} 10%, transparent)`,
-    text: colors.bengara,
-  },
-  declared_only: {
-    border: `color-mix(in srgb, ${colors.fuji} 40%, transparent)`,
-    bg: `color-mix(in srgb, ${colors.fuji} 10%, transparent)`,
-    text: colors.fuji,
-  },
-  unknown: {
-    border: `color-mix(in srgb, ${colors.sumi[600]} 40%, transparent)`,
-    bg: `color-mix(in srgb, ${colors.sumi[600]} 10%, transparent)`,
-    text: colors.sumi[600],
-  },
+/** Coherence state -> StatusBadge state. 5→4 lossy mapping; title preserves original. */
+const COHERENCE_BADGE: Record<string, StatusBadgeState> = {
+  bound: "pass",
+  partial: "stale",
+  drifted: "drift",
+  declared_only: "drift",
+  unknown: "drift",
 };
 
-function coherenceStyle(state: string) {
-  return COHERENCE_COLORS[state as CoherenceState] ?? COHERENCE_COLORS.unknown;
+/** Priority -> StatusBadge state. Same mapping NeedsJohnQueue uses. */
+const PRIORITY_BADGE: Record<string, StatusBadgeState> = {
+  p0: "fail",
+  p1: "stale",
+  p2: "drift",
+  backlog: "drift",
+};
+
+function coherenceBadgeState(state: string): StatusBadgeState {
+  return COHERENCE_BADGE[state] ?? "drift";
 }
 
-const PRIORITY_COLORS: Record<string, string> = {
-  p0: colors.bengara,
-  p1: colors.kinpaku,
-  p2: colors.sumi[600],
-  backlog: colors.sumi[600],
-};
+function priorityBadgeState(p: string): StatusBadgeState {
+  return PRIORITY_BADGE[p] ?? "drift";
+}
 
 type FilterKey = "all" | "needs_john" | "p0" | "drifted" | "broken_register" | "organs";
 
@@ -103,10 +94,15 @@ const columns: ColumnDef<ControlSurfaceRow>[] = [
   {
     accessorKey: "label",
     header: "Entity",
-    size: 180,
+    size: 200,
     enablePinning: true,
     cell: ({ row }) => (
-      <span className="font-medium text-sumi-200">{row.original.label}</span>
+      <span
+        className="truncate text-sm"
+        style={{ color: colors.torinoko, opacity: 0.92 }}
+      >
+        {row.original.label}
+      </span>
     ),
   },
   {
@@ -114,7 +110,13 @@ const columns: ColumnDef<ControlSurfaceRow>[] = [
     header: "Kind",
     size: 100,
     cell: ({ row }) => (
-      <code className="rounded bg-sumi-800/50 px-1.5 py-0.5 text-[10px] text-sumi-400">
+      <code
+        className="rounded px-1.5 py-0.5 text-[10px] font-mono"
+        style={{
+          backgroundColor: `color-mix(in srgb, ${colors.sumi[800]} 60%, transparent)`,
+          color: colors.sumi[600],
+        }}
+      >
         {row.original.kind}
       </code>
     ),
@@ -122,50 +124,43 @@ const columns: ColumnDef<ControlSurfaceRow>[] = [
   {
     accessorKey: "declared_state",
     header: "Declared",
-    size: 120,
+    size: 110,
     cell: ({ row }) => (
-      <span className="text-sumi-400">{row.original.declared_state || "—"}</span>
+      <span className="truncate text-xs" style={{ color: colors.sumi[600] }}>
+        {row.original.declared_state || "—"}
+      </span>
     ),
   },
   {
     accessorKey: "observed_state",
     header: "Observed",
-    size: 120,
+    size: 110,
     cell: ({ row }) => (
-      <span className="text-sumi-300">{row.original.observed_state || "—"}</span>
+      <span className="truncate text-xs" style={{ color: colors.torinoko, opacity: 0.92 }}>
+        {row.original.observed_state || "—"}
+      </span>
     ),
   },
   {
     accessorKey: "coherence_state",
     header: "Coherence",
-    size: 110,
-    cell: ({ row }) => {
-      const cs = coherenceStyle(row.original.coherence_state);
-      return (
-        <span
-          className="rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em]"
-          style={{
-            borderColor: cs.border,
-            backgroundColor: cs.bg,
-            color: cs.text,
-          }}
-        >
-          {row.original.coherence_state}
-        </span>
-      );
-    },
+    size: 100,
+    cell: ({ row }) => (
+      <StatusBadge
+        state={coherenceBadgeState(row.original.coherence_state)}
+        title={row.original.coherence_state}
+      />
+    ),
   },
   {
     accessorKey: "priority",
     header: "Priority",
-    size: 80,
+    size: 90,
     cell: ({ row }) => (
-      <span
-        className="text-[10px] font-bold uppercase"
-        style={{ color: PRIORITY_COLORS[row.original.priority] ?? colors.sumi[600] }}
-      >
-        {row.original.priority}
-      </span>
+      <StatusBadge
+        state={priorityBadgeState(row.original.priority)}
+        title={row.original.priority.toUpperCase()}
+      />
     ),
   },
   {
@@ -173,7 +168,10 @@ const columns: ColumnDef<ControlSurfaceRow>[] = [
     header: "Gap",
     size: 140,
     cell: ({ row }) => (
-      <span className="max-w-[140px] truncate text-sumi-400">
+      <span
+        className="max-w-[140px] truncate text-xs"
+        style={{ color: colors.sumi[600] }}
+      >
         {row.original.gap_codes.length > 0 ? row.original.gap_codes.join(", ") : "—"}
       </span>
     ),
@@ -183,7 +181,10 @@ const columns: ColumnDef<ControlSurfaceRow>[] = [
     header: "Next Action",
     size: 180,
     cell: ({ row }) => (
-      <span className="max-w-[180px] truncate text-sumi-400">
+      <span
+        className="max-w-[180px] truncate text-xs"
+        style={{ color: colors.torinoko, opacity: 0.85 }}
+      >
         {row.original.next_action || "—"}
       </span>
     ),
@@ -192,25 +193,32 @@ const columns: ColumnDef<ControlSurfaceRow>[] = [
     accessorKey: "evidence",
     header: "Evidence",
     size: 90,
-    cell: ({ row }) => (
-      <span className="text-sumi-500">
-        {row.original.evidence.length > 0
-          ? `${row.original.evidence.length} item${row.original.evidence.length > 1 ? "s" : ""}`
-          : "—"}
-      </span>
-    ),
+    cell: ({ row }) => {
+      const n = row.original.evidence.length;
+      if (n === 0) {
+        return (
+          <span className="text-xs" style={{ color: colors.sumi[600] }}>
+            —
+          </span>
+        );
+      }
+      return (
+        <Numeral
+          value={n}
+          tone={n > 0 ? "rest" : "muted"}
+          size="sm"
+          unit={n === 1 ? "item" : "items"}
+        />
+      );
+    },
   },
   {
     accessorKey: "human_decision_required",
     header: "John",
-    size: 60,
+    size: 50,
     cell: ({ row }) =>
       row.original.human_decision_required ? (
-        <span
-          className="inline-block h-2.5 w-2.5 rounded-full"
-          style={{ backgroundColor: colors.botan }}
-          title="Human decision required"
-        />
+        <Glyph kind="dot" tone="active" title="Human decision required" />
       ) : null,
   },
 ];
@@ -250,21 +258,31 @@ export function SystemTruthMatrix({
   });
 
   return (
-    <div className="flex h-full flex-col bg-sumi-950/40">
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-sumi-800/40 px-3 py-2">
-        <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-sumi-500">
-          System Truth
-        </div>
+    <div className="flex h-full flex-col" style={{ backgroundColor: colors.sumi[950] }}>
+      {/* Toolbar — compact 28px strip */}
+      <div
+        className="flex flex-wrap items-center gap-2 px-2"
+        style={{
+          height: 28,
+          borderBottom: `1px solid ${colors.sumi[700]}`,
+          backgroundColor: colors.sumi[850],
+        }}
+      >
+        <span
+          className="font-mono text-xs uppercase"
+          style={{ color: colors.sumi[600], letterSpacing: "0.12em" }}
+        >
+          SYSTEM TRUTH
+        </span>
 
-        {/* Summary counts */}
+        {/* Summary counts — Numerals are protagonist */}
         {summary && (
-          <div className="flex gap-1.5 text-[10px] tabular-nums">
-            <span style={{ color: colors.aozora }}>{summary.total}</span>
-            <span className="text-sumi-600">·</span>
-            <span style={{ color: colors.rokusho }}>{summary.bound} bound</span>
-            <span className="text-sumi-600">·</span>
-            <span style={{ color: colors.bengara }}>{summary.drifted} drift</span>
+          <div className="flex items-center gap-1.5">
+            <Numeral value={summary.total} tone="active" size="md" />
+            <span className="text-xs" style={{ color: colors.sumi[700] }}>·</span>
+            <Numeral value={summary.bound} tone="ok" size="sm" unit="bound" />
+            <span className="text-xs" style={{ color: colors.sumi[700] }}>·</span>
+            <Numeral value={summary.drifted} tone="warn" size="sm" unit="drift" />
           </div>
         )}
 
@@ -276,30 +294,51 @@ export function SystemTruthMatrix({
           value={globalFilter}
           onChange={(e) => setGlobalFilter(e.target.value)}
           placeholder="Filter..."
-          className="rounded-md border border-sumi-700/40 bg-sumi-900/60 px-2 py-1 text-xs text-sumi-300 placeholder:text-sumi-600 focus:border-aozora/40 focus:outline-none"
+          className="font-mono text-xs focus:outline-none"
+          style={{
+            backgroundColor: colors.sumi[900],
+            color: colors.torinoko,
+            border: `1px solid ${colors.sumi[700]}`,
+            padding: "2px 6px",
+            height: 20,
+          }}
         />
 
         {/* Column visibility toggle */}
         <div className="relative">
           <button
             onClick={() => setShowColumnPicker((p) => !p)}
-            className="rounded-md border border-sumi-700/40 bg-sumi-900/60 p-1.5 text-sumi-500 hover:text-sumi-300"
+            className="flex items-center justify-center"
+            style={{
+              width: 20,
+              height: 20,
+              border: `1px solid ${colors.sumi[700]}`,
+              backgroundColor: colors.sumi[900],
+              color: colors.sumi[600],
+            }}
             title="Toggle columns"
           >
-            <Columns size={12} />
+            <Columns size={11} />
           </button>
           {showColumnPicker && (
-            <div className="absolute right-0 top-full z-20 mt-1 rounded-lg border border-sumi-700/40 bg-sumi-900 p-2 shadow-lg">
+            <div
+              className="absolute right-0 top-full z-20 mt-1 p-2"
+              style={{
+                backgroundColor: colors.sumi[900],
+                border: `1px solid ${colors.sumi[700]}`,
+              }}
+            >
               {table.getAllLeafColumns().map((column) => (
                 <label
                   key={column.id}
-                  className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-[10px] text-sumi-400 hover:bg-sumi-800/50"
+                  className="flex cursor-pointer items-center gap-2 px-2 py-1 text-[10px]"
+                  style={{ color: colors.sumi[600] }}
                 >
                   <input
                     type="checkbox"
                     checked={column.getIsVisible()}
                     onChange={column.getToggleVisibilityHandler()}
-                    className="accent-aozora"
+                    style={{ accentColor: colors.aozora }}
                   />
                   {typeof column.columnDef.header === "string"
                     ? column.columnDef.header
@@ -313,26 +352,47 @@ export function SystemTruthMatrix({
         {/* Refresh */}
         <button
           onClick={onRefresh}
-          className="rounded-md border border-sumi-700/40 bg-sumi-900/60 p-1.5 text-sumi-500 hover:text-aozora"
+          className="flex items-center justify-center"
+          style={{
+            width: 20,
+            height: 20,
+            border: `1px solid ${colors.sumi[700]}`,
+            backgroundColor: colors.sumi[900],
+            color: colors.sumi[600],
+          }}
           title="Refresh"
         >
-          <RefreshCw size={12} />
+          <RefreshCw size={11} />
         </button>
       </div>
 
-      {/* Pre-filter tabs */}
-      <div className="flex flex-wrap gap-1.5 border-b border-sumi-800/40 px-3 py-1.5">
+      {/* Pre-filter tabs — compact 24px strip */}
+      <div
+        className="flex flex-wrap items-center gap-1 px-2"
+        style={{
+          minHeight: 24,
+          borderBottom: `1px solid ${colors.sumi[700]}`,
+          backgroundColor: colors.sumi[900],
+        }}
+      >
         {FILTER_OPTIONS.map(({ key, label }) => {
           const count = applyPreFilter(rows, key).length;
+          const active = preFilter === key;
           return (
             <button
               key={key}
               onClick={() => setPreFilter(key)}
-              className={`rounded-md border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] transition-all ${
-                preFilter === key
-                  ? "border-aozora/40 bg-aozora/10 text-aozora"
-                  : "border-sumi-700/30 text-sumi-500 hover:text-sumi-300"
-              }`}
+              className="font-mono text-[10px] uppercase tabular-nums"
+              style={{
+                letterSpacing: "0.1em",
+                padding: "2px 6px",
+                border: `1px solid ${active ? colors.aozora : "transparent"}`,
+                backgroundColor: active
+                  ? `color-mix(in srgb, ${colors.aozora} 8%, transparent)`
+                  : "transparent",
+                color: active ? colors.aozora : colors.sumi[600],
+                fontFeatureSettings: "'tnum' 1",
+              }}
             >
               {label} ({count})
             </button>
@@ -343,31 +403,44 @@ export function SystemTruthMatrix({
       {/* Table */}
       <div className="flex-1 overflow-auto">
         {isLoading ? (
-          <div className="flex h-32 items-center justify-center text-sm text-sumi-500">
-            Loading control surface...
+          <div
+            className="flex h-32 items-center justify-center font-mono text-xs uppercase"
+            style={{ color: colors.sumi[600], letterSpacing: "0.12em" }}
+          >
+            LOADING CONTROL SURFACE
           </div>
         ) : (
-          <table className="w-full text-left text-xs">
+          <table className="w-full text-left" style={{ tableLayout: "fixed" }}>
             <thead className="sticky top-0 z-10">
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr
                   key={headerGroup.id}
-                  className="border-b border-sumi-700/40 bg-sumi-900/90 text-[10px] font-semibold uppercase tracking-[0.12em] text-sumi-500 backdrop-blur-sm"
+                  style={{
+                    borderBottom: `1px solid ${colors.sumi[700]}`,
+                    backgroundColor: colors.sumi[900],
+                  }}
                 >
                   {headerGroup.headers.map((header) => (
                     <th
                       key={header.id}
-                      className="px-3 py-2.5"
-                      style={{ width: header.getSize() }}
+                      className="px-2 font-mono text-[10px] uppercase"
+                      style={{
+                        width: header.getSize(),
+                        height: 24,
+                        color: colors.sumi[600],
+                        letterSpacing: "0.12em",
+                        fontWeight: 500,
+                      }}
                     >
                       {header.isPlaceholder ? null : (
                         <button
-                          className="flex items-center gap-1 hover:text-sumi-300"
+                          className="flex items-center gap-1"
+                          style={{ color: colors.sumi[600] }}
                           onClick={header.column.getToggleSortingHandler()}
                         >
                           {flexRender(header.column.columnDef.header, header.getContext())}
                           {header.column.getIsSorted() && (
-                            <ArrowUpDown size={10} className="text-aozora" />
+                            <ArrowUpDown size={9} style={{ color: colors.aozora }} />
                           )}
                         </button>
                       )}
@@ -381,9 +454,14 @@ export function SystemTruthMatrix({
                 <tr>
                   <td
                     colSpan={columns.length}
-                    className="h-32 text-center text-sm text-sumi-500"
+                    className="text-center font-mono text-xs uppercase"
+                    style={{
+                      height: 64,
+                      color: colors.sumi[600],
+                      letterSpacing: "0.12em",
+                    }}
                   >
-                    No rows match the current filter.
+                    NO ROWS MATCH FILTER
                   </td>
                 </tr>
               ) : (
@@ -393,14 +471,25 @@ export function SystemTruthMatrix({
                     <tr
                       key={row.id}
                       onClick={() => onSelectRow(row.original)}
-                      className={`cursor-pointer border-b border-sumi-800/30 transition-colors ${
-                        selected
-                          ? "bg-aozora/5"
-                          : "hover:bg-sumi-900/50"
-                      }`}
+                      className="cursor-pointer"
+                      style={{
+                        height: 26,
+                        borderBottom: `1px solid ${colors.sumi[800]}`,
+                        backgroundColor: selected
+                          ? `color-mix(in srgb, ${colors.aozora} 6%, transparent)`
+                          : "transparent",
+                        transition: "background-color 100ms cubic-bezier(0.2, 0, 0, 1)",
+                      }}
                     >
                       {row.getVisibleCells().map((cell) => (
-                        <td key={cell.id} className="px-3 py-2">
+                        <td
+                          key={cell.id}
+                          className="px-2 tabular-nums"
+                          style={{
+                            fontFeatureSettings: "'tnum' 1",
+                            lineHeight: 1.2,
+                          }}
+                        >
                           {flexRender(cell.column.columnDef.cell, cell.getContext())}
                         </td>
                       ))}
