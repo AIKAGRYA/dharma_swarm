@@ -2,14 +2,19 @@
 
 /**
  * Zone 1: Needs John Queue — decision-required rows, always visible.
- * Sorted by priority/freshness, each item shows: why now, evidence count,
- * recommended action, and a select button.
+ *
+ * Refactored Round 5: dense vertical row list using EvidenceRow + StatusBadge
+ * + Glyph + Numeral primitives. 24-28px row density. Mono-protagonist numbers
+ * (priority + evidence count). No horizontal card-scroll — context density
+ * over breathing room (per command-plane-phase-1 contract).
  */
 
-import { motion, AnimatePresence } from "framer-motion";
-import { AlertTriangle, ChevronRight, User } from "lucide-react";
 import type { ControlSurfaceRow } from "@/lib/types";
 import { colors } from "@/lib/theme";
+import { EvidenceRow } from "@/components/primitives/EvidenceRow";
+import { Glyph } from "@/components/primitives/Glyph";
+import { Numeral } from "@/components/primitives/Numeral";
+import { StatusBadge, type StatusBadgeState } from "@/components/primitives/StatusBadge";
 
 interface NeedsJohnQueueProps {
   rows: ControlSurfaceRow[];
@@ -19,15 +24,16 @@ interface NeedsJohnQueueProps {
   isLoading: boolean;
 }
 
-const PRIORITY_ACCENT: Record<string, string> = {
-  p0: colors.bengara,
-  p1: colors.kinpaku,
-  p2: colors.sumi[600],
-  backlog: colors.sumi[600],
+/** Map priority -> StatusBadge state. */
+const PRIORITY_BADGE: Record<string, StatusBadgeState> = {
+  p0: "fail",     // alarm-only — Shu
+  p1: "stale",    // attention-aged — Ōdo
+  p2: "drift",    // notice — Fuji
+  backlog: "drift",
 };
 
-function priorityAccent(p: string): string {
-  return PRIORITY_ACCENT[p] ?? colors.sumi[600];
+function priorityState(p: string): StatusBadgeState {
+  return PRIORITY_BADGE[p] ?? "drift";
 }
 
 export function NeedsJohnQueue({
@@ -39,123 +45,135 @@ export function NeedsJohnQueue({
 }: NeedsJohnQueueProps) {
   if (isLoading) {
     return (
-      <div className="rounded-xl border border-sumi-700/30 bg-sumi-900/50 px-4 py-3">
-        <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-sumi-500">
-          Loading queue...
-        </div>
-      </div>
-    );
-  }
-
-  if (rows.length === 0) {
-    return (
-      <div className="rounded-xl border border-sumi-700/30 bg-sumi-900/50 px-4 py-3">
-        <div className="flex items-center gap-2">
-          <User size={14} className="text-rokusho" />
-          <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-rokusho">
-            Needs John
+      <section
+        style={{
+          border: `1px solid ${colors.sumi[700]}`,
+          backgroundColor: colors.sumi[900],
+        }}
+      >
+        <header
+          className="flex items-center px-3"
+          style={{
+            height: 28,
+            borderBottom: `1px solid ${colors.sumi[700]}`,
+            backgroundColor: colors.sumi[850],
+          }}
+        >
+          <span
+            className="font-mono text-xs uppercase tracking-widest"
+            style={{ color: colors.sumi[600], letterSpacing: "0.12em" }}
+          >
+            NEEDS JOHN · LOADING
           </span>
-          <span className="text-xs text-sumi-500">— Nothing requires attention</span>
-        </div>
-      </div>
+        </header>
+      </section>
     );
   }
 
   return (
-    <div className="rounded-xl border border-botan/20 bg-sumi-900/50">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-sumi-800/40 px-4 py-2.5">
-        <div className="flex items-center gap-2">
-          <AlertTriangle size={14} style={{ color: colors.botan }} />
-          <span className="text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: colors.botan }}>
-            Needs John
-          </span>
+    <section
+      style={{
+        border: `1px solid ${colors.sumi[700]}`,
+        backgroundColor: colors.sumi[900],
+      }}
+    >
+      {/* Header strip — mono uppercase, numeral count is protagonist */}
+      <header
+        className="flex items-center justify-between px-3"
+        style={{
+          height: 28,
+          borderBottom: `1px solid ${colors.sumi[700]}`,
+          backgroundColor: colors.sumi[850],
+        }}
+      >
+        <div className="flex items-center gap-3">
           <span
-            className="rounded-full px-2 py-0.5 text-[10px] font-bold tabular-nums"
-            style={{
-              backgroundColor: `color-mix(in srgb, ${colors.botan} 15%, transparent)`,
-              color: colors.botan,
-            }}
+            className="font-mono text-xs uppercase tracking-widest"
+            style={{ color: colors.sumi[600], letterSpacing: "0.12em" }}
           >
-            {totalCount}
+            NEEDS JOHN
           </span>
+          <Numeral
+            value={totalCount}
+            tone={totalCount > 0 ? "active" : "muted"}
+            size="md"
+          />
         </div>
-        <span className="text-[10px] text-sumi-500">
+        <span
+          className="font-mono text-xs"
+          style={{ color: colors.sumi[600] }}
+        >
           sorted by priority
         </span>
-      </div>
+      </header>
 
-      {/* Queue items — horizontal scrollable on overflow */}
-      <div className="flex gap-2 overflow-x-auto p-3">
-        <AnimatePresence mode="popLayout">
+      {/* Body — dense vertical row list */}
+      {rows.length === 0 ? (
+        <div
+          className="flex items-center gap-2 px-3"
+          style={{
+            height: 28,
+            color: colors.sumi[600],
+            fontSize: "0.8125rem",
+          }}
+        >
+          <Glyph kind="check" tone="ok" />
+          <span>nothing requires attention</span>
+        </div>
+      ) : (
+        <div>
           {rows.map((row) => {
             const selected = row.id === selectedRowId;
-            const accent = priorityAccent(row.priority);
+            const detailParts: string[] = [];
+            if (row.coherence_state && row.coherence_state !== "bound") {
+              detailParts.push(row.coherence_state);
+            }
+            if (row.gap_codes.length > 0) {
+              detailParts.push(row.gap_codes.join(", "));
+            }
+            const detail = detailParts.length > 0 ? detailParts.join(" · ") : undefined;
 
             return (
-              <motion.button
+              <EvidenceRow
                 key={row.id}
-                layout
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
+                id={row.id}
+                density="medium"
+                selected={selected}
                 onClick={() => onSelectRow(row)}
-                className={`group flex min-w-[220px] max-w-[300px] shrink-0 flex-col gap-1.5 rounded-lg border px-3 py-2.5 text-left transition-all ${
-                  selected
-                    ? "ring-1 ring-current"
-                    : "hover:border-sumi-600/50"
-                }`}
-                style={{
-                  borderColor: selected
-                    ? accent
-                    : `color-mix(in srgb, ${colors.sumi[700]} 50%, transparent)`,
-                  backgroundColor: selected
-                    ? `color-mix(in srgb, ${accent} 8%, transparent)`
-                    : `color-mix(in srgb, ${colors.sumi[900]} 60%, transparent)`,
-                }}
-              >
-                {/* Row label + priority */}
-                <div className="flex items-start justify-between gap-2">
-                  <span className="text-xs font-medium text-sumi-200 line-clamp-1">
-                    {row.label}
-                  </span>
-                  <span
-                    className="shrink-0 text-[10px] font-bold uppercase"
-                    style={{ color: accent }}
-                  >
-                    {row.priority}
-                  </span>
-                </div>
-
-                {/* Why now: coherence state + gap codes */}
-                <div className="text-[10px] text-sumi-400 line-clamp-1">
-                  {row.coherence_state !== "bound" && (
-                    <span className="mr-1 capitalize">{row.coherence_state}</span>
-                  )}
-                  {row.gap_codes.length > 0 && (
-                    <span>· {row.gap_codes.join(", ")}</span>
-                  )}
-                </div>
-
-                {/* Bottom: evidence count + next action */}
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-[10px] text-sumi-500">
-                    {row.evidence.length > 0
-                      ? `${row.evidence.length} evidence`
-                      : "no evidence"}
-                  </span>
-                  <div className="flex items-center gap-0.5 text-[10px] text-sumi-500 group-hover:text-aozora">
-                    <span className="max-w-[100px] truncate">
+                leading={
+                  <StatusBadge
+                    state={priorityState(row.priority)}
+                    title={row.priority.toUpperCase()}
+                  />
+                }
+                label={row.label}
+                detail={detail}
+                value={
+                  <Numeral
+                    value={row.evidence.length}
+                    tone={row.evidence.length > 0 ? "rest" : "muted"}
+                    size="sm"
+                    unit={row.evidence.length === 1 ? "evidence" : "evidence"}
+                  />
+                }
+                meta={
+                  <span className="flex items-center gap-1">
+                    <span className="max-w-[140px] truncate">
                       {row.next_action || "inspect"}
                     </span>
-                    <ChevronRight size={10} />
-                  </div>
-                </div>
-              </motion.button>
+                    <Glyph
+                      kind="dot"
+                      tone={selected ? "active" : "muted"}
+                      pulse={selected}
+                    />
+                  </span>
+                }
+                title={row.next_action || row.label}
+              />
             );
           })}
-        </AnimatePresence>
-      </div>
-    </div>
+        </div>
+      )}
+    </section>
   );
 }
