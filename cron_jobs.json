@@ -305,5 +305,41 @@
     "handler": "store_sync",
     "enabled": true,
     "prompt": "Materialize ontology Outcome objects into runtime ArtifactRecords."
+  },
+  {
+    "id": "staging_promote",
+    "name": "Knowledge Staging Promote",
+    "trigger": "cron",
+    "schedule": {
+      "hour": "*/6",
+      "minute": 15
+    },
+    "handler": "shell",
+    "shell_command": "python3 scripts/consume_review_marks.py --auto-promote --max-batch 5000",
+    "enabled": true,
+    "prompt": "Bulk-promote staging atoms (type=atomic, confidence>=0.5) to trusted wiki/concepts. Prevents unbounded staging growth (~1k atoms/day ingest with zero graduation)."
+  },
+  {
+    "id": "hermes_heartbeat_poll",
+    "name": "Hermes M5 Heartbeat + Queue Poll",
+    "trigger": "interval",
+    "interval_seconds": 1800,
+    "handler": "shell",
+    "shell_command": "python3 scripts/hermes_heartbeat_poll.py",
+    "enabled": true,
+    "prompt": "Write Hermes state file (liveness proof) and poll queue.jsonl for unclaimed tasks matching Hermes capabilities."
+  },
+  {
+    "id": "provider_credit_check",
+    "name": "Provider Credit Health Check",
+    "trigger": "cron",
+    "schedule": {
+      "hour": 5,
+      "minute": 0
+    },
+    "handler": "shell",
+    "shell_command": "python3 scripts/check_provider_credits.py --json > ~/.dharma/logs/provider_credits_latest.json",
+    "enabled": true,
+    "prompt": "Check all provider API keys for presence and credit exhaustion. Writes diagnostic to logs for operator review."
   }
 ]
