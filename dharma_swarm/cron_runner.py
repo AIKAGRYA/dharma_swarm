@@ -109,8 +109,13 @@ def _run_system_map_populator(job: dict[str, Any]) -> CronJobExecutionResult:
 
 
 def _run_shell_command(job: dict[str, Any]) -> CronJobExecutionResult:
-    """Run an arbitrary shell command specified in the job's shell_command field."""
+    """Run a shell command specified in the job's shell_command field.
 
+    The command is split via shlex (no shell=True) to avoid injection risks.
+    Commands come from cron_jobs.json (repo-checked config), not user input.
+    """
+
+    import shlex
     import subprocess
 
     shell_cmd = str(job.get("shell_command", "")).strip()
@@ -124,11 +129,11 @@ def _run_shell_command(job: dict[str, Any]) -> CronJobExecutionResult:
 
     repo_root = Path(str(job.get("repo_root") or Path(__file__).resolve().parent.parent))
     timeout = _as_int(job.get("timeout_sec"), 120)
+    args = shlex.split(shell_cmd)
 
     try:
         proc = subprocess.run(
-            shell_cmd,
-            shell=True,
+            args,
             capture_output=True,
             text=True,
             timeout=timeout,
