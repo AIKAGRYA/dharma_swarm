@@ -4,6 +4,7 @@
 .PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts uplift-guards module-budget docops-integrity docops-report memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all onboard go-fmt-check go-test go-vet go-ci
 
 PYTHON ?= python3
+REPO_PYTHON ?= PYTHONPATH=. $(PYTHON)
 GO ?= go
 GOFMT ?= gofmt
 SEMGREP ?= scripts/governance/run_semgrep_with_ca.sh
@@ -210,28 +211,28 @@ docops-report:
 		--inventory-markdown reports/docops/corpus_inventory.md
 
 memory-kernel-readiness:
-	$(PYTHON) scripts/memory_kernel_readiness.py --repo-root . --dry-run
-	$(PYTHON) scripts/memory_writer_sentinel.py --repo-root . --ci
-	$(PYTHON) scripts/memory_context_eval.py --repo-root . --run-default-cases --fail-on-hard-failure --dry-run
-	$(PYTHON) scripts/memory_context_shadow_sweep.py --repo-root . --fail-on-hard-failure --dry-run
+	$(REPO_PYTHON) scripts/memory_kernel_readiness.py --repo-root . --dry-run
+	$(REPO_PYTHON) scripts/memory_writer_sentinel.py --repo-root . --ci
+	$(REPO_PYTHON) scripts/memory_context_eval.py --repo-root . --run-default-cases --fail-on-hard-failure --dry-run
+	$(REPO_PYTHON) scripts/memory_context_shadow_sweep.py --repo-root . --fail-on-hard-failure --dry-run
 
 memory-kernel-readiness-strict:
-	$(PYTHON) scripts/memory_kernel_readiness.py --repo-root . --dry-run --strict --fail-on-missing-adapter
-	$(PYTHON) scripts/memory_writer_sentinel.py --repo-root . --ci
-	$(PYTHON) scripts/memory_context_eval.py --repo-root . --run-default-cases --fail-on-hard-failure --dry-run
-	$(PYTHON) scripts/memory_context_shadow_sweep.py --repo-root . --fail-on-hard-failure --dry-run
+	$(REPO_PYTHON) scripts/memory_kernel_readiness.py --repo-root . --dry-run --strict --fail-on-missing-adapter
+	$(REPO_PYTHON) scripts/memory_writer_sentinel.py --repo-root . --ci
+	$(REPO_PYTHON) scripts/memory_context_eval.py --repo-root . --run-default-cases --fail-on-hard-failure --dry-run
+	$(REPO_PYTHON) scripts/memory_context_shadow_sweep.py --repo-root . --fail-on-hard-failure --dry-run
 
 memory-kernel-burn-in:
-	$(PYTHON) scripts/memory_kernel_burn_in.py --repo-root . --fail-on-blocked
+	$(REPO_PYTHON) scripts/memory_kernel_burn_in.py --repo-root . --fail-on-blocked
 
 memory-kernel-write-receipt-smoke:
-	$(PYTHON) scripts/memory_kernel_write_receipt_smoke.py --repo-root . --fail-on-blocked
+	$(REPO_PYTHON) scripts/memory_kernel_write_receipt_smoke.py --repo-root . --fail-on-blocked
 
 memory-kernel-promotion-smoke: memory-kernel-write-receipt-smoke
-	$(PYTHON) scripts/memory_kernel_promotion_smoke.py --repo-root . --fail-on-blocked
+	$(REPO_PYTHON) scripts/memory_kernel_promotion_smoke.py --repo-root . --fail-on-blocked
 
 memory-kernel-knowledgeops-bridge-smoke:
-	$(PYTHON) scripts/memory_kernel_knowledgeops_bridge_smoke.py --repo-root . --fail-on-blocked
+	$(REPO_PYTHON) scripts/memory_kernel_knowledgeops_bridge_smoke.py --repo-root . --fail-on-blocked
 
 memory-kernel-full-power-preflight:
 	$(MAKE) memory-kernel-readiness-strict
@@ -239,10 +240,10 @@ memory-kernel-full-power-preflight:
 	$(MAKE) memory-kernel-write-receipt-smoke
 	$(MAKE) memory-kernel-promotion-smoke
 	$(MAKE) memory-kernel-knowledgeops-bridge-smoke
-	DHARMA_MEMORY_KERNEL_ROLLOUT=live $(PYTHON) scripts/operator_prod_smoke.py --repo-root .
+	DHARMA_MEMORY_KERNEL_ROLLOUT=live $(REPO_PYTHON) scripts/operator_prod_smoke.py --repo-root .
 
 operator-prod-smoke:
-	$(PYTHON) scripts/operator_prod_smoke.py --repo-root .
+	$(REPO_PYTHON) scripts/operator_prod_smoke.py --repo-root .
 
 governance-all: semgrep gitleaks test-hygiene test-contracts uplift-guards module-budget docops-integrity
 
