@@ -216,8 +216,8 @@ def poll_queue(dry_run: bool = False) -> list[dict[str, Any]]:
         except Exception as exc:
             logger.warning("Failed to write back queue: %s", exc)
             try:
-                os.unlink(tmp_path)
-            except OSError:
+                os.unlink(tmp_path)  # type: ignore[possibly-undefined]
+            except (OSError, NameError):
                 pass
 
     return claimed

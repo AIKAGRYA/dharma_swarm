@@ -309,11 +309,8 @@
   {
     "id": "staging_promote",
     "name": "Knowledge Staging Promote",
-    "trigger": "cron",
-    "schedule": {
-      "hour": "*/6",
-      "minute": 15
-    },
+    "trigger": "interval",
+    "interval_seconds": 21600,
     "handler": "shell",
     "shell_command": "python3 scripts/consume_review_marks.py --auto-promote --max-batch 5000",
     "enabled": true,

@@ -108,6 +108,57 @@ def _run_system_map_populator(job: dict[str, Any]) -> CronJobExecutionResult:
     )
 
 
+def _run_shell_command(job: dict[str, Any]) -> CronJobExecutionResult:
+    """Run an arbitrary shell command specified in the job's shell_command field."""
+
+    import subprocess
+
+    shell_cmd = str(job.get("shell_command", "")).strip()
+    if not shell_cmd:
+        error = "shell handler requires a 'shell_command' field"
+        return CronJobExecutionResult(
+            status=CronJobRunStatus.FAILED,
+            output=error,
+            error=error,
+        )
+
+    repo_root = Path(str(job.get("repo_root") or Path(__file__).resolve().parent.parent))
+    timeout = _as_int(job.get("timeout_sec"), 120)
+
+    try:
+        proc = subprocess.run(
+            shell_cmd,
+            shell=True,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            cwd=str(repo_root),
+        )
+    except subprocess.TimeoutExpired:
+        error = f"shell command timed out after {timeout}s: {shell_cmd}"
+        return CronJobExecutionResult(
+            status=CronJobRunStatus.FAILED,
+            output="",
+            error=error,
+        )
+    except Exception as exc:
+        error = f"shell command failed to launch: {exc}"
+        return CronJobExecutionResult(
+            status=CronJobRunStatus.FAILED,
+            output="",
+            error=error,
+        )
+
+    output_text = (proc.stdout or "").strip()
+    err = (proc.stderr or "").strip()
+    status = CronJobRunStatus.COMPLETED if proc.returncode == 0 else CronJobRunStatus.FAILED
+    return CronJobExecutionResult(
+        status=status,
+        output=output_text or "(no output)",
+        error=err if proc.returncode != 0 else "",
+    )
+
+
 def _run_revenue_scout(job: dict[str, Any]) -> CronJobExecutionResult:
     """Run the revenue scout daemon cycle."""
     try:
@@ -807,6 +858,8 @@ def execute_cron_job(job: dict[str, Any]) -> CronJobExecutionResult:
         return _run_world_scout(job)
     if handler == "store_sync":
         return _run_store_sync(job)
+    if handler == "shell":
+        return _run_shell_command(job)
 
     error = f"Unsupported cron handler: {handler}"
     return CronJobExecutionResult(
