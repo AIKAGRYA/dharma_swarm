@@ -78,16 +78,34 @@ def _parse_active_track() -> dict[str, str]:
 
 
 def _count_broken_register() -> tuple[int, int]:
-    """Return (total, open-like) from BROKEN_REGISTER.md."""
+    """Return (total, open-like) from BROKEN_REGISTER.md.
+
+    Parses section-by-section: each BR heading (### BR-NNN) starts a
+    section, and we look for `**status:**` on subsequent lines to
+    determine if it's open-like.
+    """
     if not BROKEN_REGISTER.exists():
         return 0, 0
     text = BROKEN_REGISTER.read_text()
-    br_ids = re.findall(r"BR-\d{3}", text)
-    total = len(set(br_ids))
-    open_like = len(set(re.findall(
-        r"BR-\d{3}(?=.*(?:PARTIAL|OPEN|DEGRADED|BLOCKER))", text,
-    )))
-    return total, open_like
+    # Split into sections by BR headings
+    sections = re.split(r"(?=^### BR-\d{3})", text, flags=re.MULTILINE)
+    seen: set[str] = set()
+    open_like: set[str] = set()
+    for section in sections:
+        m = re.match(r"### (BR-\d{3})", section)
+        if not m:
+            continue
+        br_id = m.group(1)
+        seen.add(br_id)
+        # Look for **status:** line within this section
+        status_m = re.search(
+            r"\*\*status:\*\*\s*(.+)", section, re.IGNORECASE
+        )
+        if status_m:
+            status_val = status_m.group(1).upper()
+            if any(kw in status_val for kw in ("OPEN", "PARTIAL", "DEGRADED", "BLOCKER", "INVESTIGATING")):
+                open_like.add(br_id)
+    return len(seen), len(open_like)
 
 
 def _hotlist_summary() -> tuple[int, int, int]:
