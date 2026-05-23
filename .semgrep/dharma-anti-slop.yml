@@ -32,6 +32,10 @@ rules:
         - "dharma_swarm/ginko_backtest.py"
         - "dharma_swarm/ginko_evolution.py"
         - "dharma_swarm/engine/store_sync.py"
+        # Operational cron scripts (own knowledge/staging, agent state, logs)
+        - "scripts/consume_review_marks.py"
+        - "scripts/hermes_heartbeat_poll.py"
+        - "scripts/check_provider_credits.py"
     pattern: Path.home() / ".dharma"
 
   # ===========================================================================
