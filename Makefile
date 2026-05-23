@@ -282,3 +282,20 @@ go-vet:
 	done
 
 go-ci: go-fmt-check go-vet go-test
+
+# ── Operational targets ──────────────────────────────────────────────────
+
+staging-report:
+	$(PYTHON) scripts/consume_review_marks.py --report
+
+staging-promote:
+	$(PYTHON) scripts/consume_review_marks.py --auto-promote
+
+staging-promote-dry:
+	$(PYTHON) scripts/consume_review_marks.py --auto-promote --dry-run
+
+provider-check:
+	$(PYTHON) scripts/check_provider_credits.py
+
+hermes-heartbeat:
+	$(PYTHON) scripts/hermes_heartbeat_poll.py
