@@ -99,6 +99,126 @@ def test_hash_state_order_independent(replay_engine):
 
 
 @pytest.mark.asyncio
+async def test_execute_replay_reconstructs_runtime_snapshot(replay_engine):
+    """Latest state.snapshot wins when reconstructing runtime state."""
+    events = [
+        {
+            "event_type": "state.snapshot",
+            "emitted_at": "2026-01-01T00:00:00Z",
+            "payload": {
+                "cycle_count": 1,
+                "uptime_seconds": 10,
+                "runtime_mode": "boot",
+                "status": "starting",
+            },
+        },
+        {
+            "event_type": "state.snapshot",
+            "emitted_at": "2026-01-01T00:00:05Z",
+            "payload": {
+                "cycle_count": 2,
+                "uptime_seconds": 20,
+                "runtime_mode": "active",
+                "status": "ok",
+            },
+        },
+    ]
+
+    state = await replay_engine._execute_replay(events)
+
+    assert state["runtime"]["cycle_count"] == 2
+    assert state["runtime"]["status"] == "ok"
+    assert state["final_timestamp"] == "2026-01-01T00:00:05Z"
+
+
+@pytest.mark.asyncio
+async def test_execute_replay_accumulates_typed_events(replay_engine):
+    """Memory, action, and audit events fold into typed reconstructed state."""
+    events = [
+        {
+            "event_type": "memory.event",
+            "payload": {
+                "memory_id": "m1",
+                "memory_type": "episodic",
+                "importance": 3,
+                "summary": "a",
+            },
+        },
+        {
+            "event_type": "action.event",
+            "payload": {"action_name": "evolve", "decision": "apply", "confidence": 0.8},
+        },
+        {
+            "event_type": "audit.event",
+            "payload": {"gate": "telos", "result": "pass", "reason": "ok"},
+        },
+        {
+            "event_type": "audit.event",
+            "payload": {"gate": "telos", "result": "fail", "reason": "blocked"},
+        },
+    ]
+
+    state = await replay_engine._execute_replay(events)
+
+    assert state["event_count"] == 4
+    assert state["memory"]["count"] == 1
+    assert state["memory"]["by_id"]["m1"]["importance"] == 3
+    assert state["actions"]["count"] == 1
+    assert state["actions"]["last_by_name"]["evolve"]["decision"] == "apply"
+    assert state["audits"]["by_gate"]["telos"] == {
+        "pass": 1,
+        "fail": 1,
+        "last_result": "fail",
+    }
+
+
+@pytest.mark.asyncio
+async def test_execute_replay_counts_unknown_event_types(replay_engine):
+    """Unknown event types are counted but do not mutate typed state."""
+    events = [
+        {"event_type": "test", "data": "foo"},
+        {"event_type": "test", "data": "bar"},
+    ]
+
+    state = await replay_engine._execute_replay(events)
+
+    assert state["unknown_event_count"] == 2
+    assert state["runtime"] == {}
+    assert state["memory"]["count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_execute_replay_mixed_stream_is_deterministic(replay_engine):
+    """A mixed typed stream replays to an identical hash every time."""
+    events = [
+        {
+            "event_type": "state.snapshot",
+            "emitted_at": "2026-01-01T00:00:00Z",
+            "payload": {
+                "cycle_count": 1,
+                "uptime_seconds": 10,
+                "runtime_mode": "active",
+                "status": "ok",
+            },
+        },
+        {
+            "event_type": "memory.event",
+            "payload": {
+                "memory_id": "m1",
+                "memory_type": "episodic",
+                "importance": 1,
+                "summary": "x",
+            },
+        },
+    ]
+
+    hash1 = replay_engine._hash_state(await replay_engine._execute_replay(events))
+    hash2 = replay_engine._hash_state(await replay_engine._execute_replay(events))
+
+    assert hash1 == hash2
+
+
+@pytest.mark.asyncio
 async def test_replay_session_no_events(replay_engine):
     """replay_session handles missing session gracefully."""
     result = await replay_engine.replay_session(
