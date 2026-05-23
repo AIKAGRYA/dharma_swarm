@@ -273,9 +273,11 @@ class TaskBoardAdapter:
     async def sync_all(self) -> int:
         """Load all tasks from TaskBoard and project them as Cards.
 
+        Passes a high limit to avoid the default cap of 50.
+
         Returns the number of cards synced.
         """
-        tasks = await self._board.list_tasks()
+        tasks = await self._board.list_tasks(limit=100_000)
         synced = 0
         for task in tasks:
             card = task_to_card(task)

@@ -258,3 +258,15 @@ async def test_adapter_list_all(adapter):
 
     all_cards = adapter.list_cards()
     assert len(all_cards) == 2
+
+
+@pytest.mark.asyncio
+async def test_adapter_sync_all_beyond_default_limit(board, tmp_path):
+    """Regression: sync_all must retrieve ALL tasks, not just the first 50."""
+    for i in range(75):
+        await board.create(f"Task {i:03d}")
+
+    adapter = TaskBoardAdapter(board, BoardEventLog(path=tmp_path / "bulk_events.db"))
+    synced = await adapter.sync_all()
+    assert synced == 75
+    assert len(adapter.cards) == 75
