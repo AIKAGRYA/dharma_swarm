@@ -44,6 +44,39 @@ def test_run_cron_job_surfaces_headless_failures():
     assert error == "ERROR: boom"
 
 
+def test_tcs_heartbeat_uses_canonical_state_dir_when_job_has_no_override(tmp_path):
+    canonical_state = tmp_path / ".dharma"
+
+    class FakeIdentityMonitor:
+        state_dir = None
+
+        def __init__(self, state_dir):
+            FakeIdentityMonitor.state_dir = state_dir
+
+        async def measure(self, *, threat_boost):
+            assert threat_boost is False
+            return SimpleNamespace(
+                tcs=0.9,
+                regime="stable",
+                gpr=0.8,
+                bsi=0.7,
+                rm=0.6,
+            )
+
+        def save_history(self, history_path):
+            assert history_path is None
+
+    with patch("dharma_swarm.cron_runner.dharma_state_dir", return_value=canonical_state):
+        with patch("dharma_swarm.identity.IdentityMonitor", FakeIdentityMonitor):
+            result = execute_cron_job({"handler": "tcs_heartbeat"})
+
+    assert result.status == CronJobRunStatus.COMPLETED
+    assert FakeIdentityMonitor.state_dir == canonical_state
+    assert result.metadata["history_path"] == str(
+        canonical_state / "meta" / "identity_history.jsonl"
+    )
+
+
 def test_run_cron_job_keeps_default_headless_jobs_claude_locked_without_explicit_portable_surface():
     with patch("dharma_swarm.pulse.run_claude_headless", return_value="Mission pulse ok") as mock_claude:
         with patch("dharma_swarm.cron_runner.complete_via_preferred_runtime_providers") as mock_runtime:

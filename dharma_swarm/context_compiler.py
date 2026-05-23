@@ -2,15 +2,29 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
 import logging
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Callable
 
+from dharma_swarm.context_compiler_utils import (
+    ContextSection,
+    approx_char_budget as _approx_char_budget,
+    canonical_json as _canonical_json,
+    context_scan_metadata as _context_scan_metadata,
+    dedupe_strings as _dedupe,
+    sha256_text as _sha256,
+    truncate_text as _truncate,
+    utc_now as _utc_now,
+)
 from dharma_swarm.memory_lattice import MemoryLattice, MemoryRecallHit
+from dharma_swarm.memory_kernel.context_compiler_shadow import (
+    bundle_with_memory_kernel_context_canary,
+    memory_kernel_context_metadata,
+    memory_kernel_context_section_dict,
+    memory_kernel_context_source_refs,
+    notify_memory_kernel_context_canary,
+    run_memory_kernel_context_canary,
+)
 from dharma_swarm.provider_policy import ProviderPolicyRouter, ProviderRouteRequest
 from dharma_swarm.runtime_state import (
     ArtifactRecord,
@@ -23,81 +37,6 @@ from dharma_swarm.runtime_state import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-def _canonical_json(data: dict[str, Any]) -> str:
-    return json.dumps(data, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
-
-
-def _sha256(payload: str) -> str:
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
-
-
-def _utc_now() -> datetime:
-    return datetime.now(timezone.utc)
-
-
-def _approx_char_budget(token_budget: int) -> int:
-    return max(800, max(1, int(token_budget)) * 4)
-
-
-def _dedupe(values: Iterable[str]) -> list[str]:
-    seen: set[str] = set()
-    out: list[str] = []
-    for value in values:
-        item = str(value).strip()
-        if not item or item in seen:
-            continue
-        seen.add(item)
-        out.append(item)
-    return out
-
-
-def _truncate(text: str, max_chars: int) -> str:
-    if max_chars <= 0:
-        return ""
-    if len(text) <= max_chars:
-        return text
-    if max_chars <= 20:
-        return text[:max_chars]
-    return text[: max_chars - 15].rstrip() + "\n... [truncated]"
-
-
-def _context_scan_metadata(rendered_text: str) -> dict[str, Any]:
-    try:
-        from dharma_swarm.injection_scanner import scan_content
-
-        result = scan_content(rendered_text, "context_bundle")
-    except Exception:
-        logger.debug("Context bundle scan failed", exc_info=True)
-        return {
-            "status": "scanner_unavailable",
-            "findings": [],
-            "scanner": "dharma_swarm.injection_scanner.scan_content",
-        }
-    return {
-        "status": "clean" if result.is_clean else "blocked",
-        "findings": list(result.findings),
-        "scanner": "dharma_swarm.injection_scanner.scan_content",
-    }
-
-
-@dataclass(frozen=True)
-class ContextSection:
-    name: str
-    priority: int
-    content: str
-    source_refs: list[str] = field(default_factory=list)
-    metadata: dict[str, Any] = field(default_factory=dict)
-
-    def as_dict(self) -> dict[str, Any]:
-        return {
-            "name": self.name,
-            "priority": self.priority,
-            "content": self.content,
-            "source_refs": list(self.source_refs),
-            "metadata": dict(self.metadata),
-        }
 
 
 class ContextCompiler:
@@ -181,6 +120,11 @@ class ContextCompiler:
         metadata: dict[str, Any] | None = None,
         force_refresh: bool = False,
         previous_mem: Any = None,
+        memory_kernel_shadow: bool = False,
+        memory_kernel_context_mode: str | None = None,
+        memory_kernel_shadow_home: Path | None = None,
+        memory_kernel_shadow_surfaces: tuple[str, ...] = (),
+        memory_kernel_shadow_callback: Callable[[object], object] | None = None,
     ) -> ContextBundleRecord:
         # ── MemPO-style truncation ──────────────────────────────────
         # When ENABLE_MEM_TRUNCATION is set and a previous_mem is provided,
@@ -207,39 +151,101 @@ class ContextCompiler:
                     content=truncated,
                     metadata={"mem_truncated": True},
                 )
+                canary = run_memory_kernel_context_canary(
+                    truncated,
+                    query=query or task_description,
+                    token_budget=token_budget,
+                    enabled=memory_kernel_shadow,
+                    requested_mode=memory_kernel_context_mode,
+                    home=memory_kernel_shadow_home,
+                    surface_ids=memory_kernel_shadow_surfaces,
+                    surface_env_names=(
+                        "DHARMA_MEMORY_KERNEL_CONTEXT_COMPILER_SURFACE_IDS",
+                        "DHARMA_MEMORY_KERNEL_CONTEXT_COMPILER_SURFACES",
+                        "DHARMA_MEMORY_KERNEL_CONTEXT_SURFACE_IDS",
+                        "DHARMA_MEMORY_KERNEL_CONTEXT_SURFACES",
+                    ),
+                    legacy_shadow_env_names=(
+                        "DHARMA_MEMORY_KERNEL_CONTEXT_COMPILER_SHADOW",
+                        "DHARMA_MEMORY_KERNEL_CONTEXT_SHADOW",
+                    ),
+                )
+                rendered_text = canary.rendered_text
+                sections = [section.as_dict()]
+                source_refs: list[str] = []
+                if canary.appended:
+                    sections.append(memory_kernel_context_section_dict(canary))
+                    source_refs = list(memory_kernel_context_source_refs(canary))
                 checksum = _sha256(
                     _canonical_json({
                         "session_id": session_id,
                         "task_id": task_id,
                         "run_id": run_id,
-                        "rendered_text": truncated,
-                        "source_refs": [],
+                        "rendered_text": rendered_text,
+                        "source_refs": source_refs,
                     })
                 )
+                bundle_metadata = memory_kernel_context_metadata(
+                    {
+                        **(metadata or {}),
+                        "mem_truncated": True,
+                    },
+                    canary,
+                )
+                bundle_metadata["context_scan"] = _context_scan_metadata(rendered_text)
                 bundle = ContextBundleRecord(
                     bundle_id=self.runtime_state.new_bundle_id(),
                     session_id=session_id,
                     task_id=task_id,
                     run_id=run_id,
                     token_budget=int(token_budget),
-                    rendered_text=truncated,
-                    sections=[section.as_dict()],
-                    source_refs=[],
+                    rendered_text=rendered_text,
+                    sections=sections,
+                    source_refs=source_refs,
                     checksum=checksum,
                     created_at=created_at,
-                    metadata={
-                        **(metadata or {}),
-                        "mem_truncated": True,
-                        "context_scan": _context_scan_metadata(truncated),
-                    },
+                    metadata=bundle_metadata,
                 )
                 await self.runtime_state.init_db()
                 saved = await self.runtime_state.record_context_bundle(bundle)
+                await notify_memory_kernel_context_canary(
+                    memory_kernel_shadow_callback,
+                    canary,
+                )
                 return saved
 
         # Return frozen snapshot if available (preserves prompt cache)
         if not force_refresh and session_id in self._frozen_bundles:
-            return self._frozen_bundles[session_id]
+            frozen = self._frozen_bundles[session_id]
+            canary = run_memory_kernel_context_canary(
+                frozen.rendered_text,
+                query=self._compose_recall_query(
+                    operator_intent=operator_intent,
+                    task_description=task_description,
+                    query=query,
+                    task_id=task_id,
+                ),
+                token_budget=token_budget,
+                enabled=memory_kernel_shadow,
+                requested_mode=memory_kernel_context_mode,
+                home=memory_kernel_shadow_home,
+                surface_ids=memory_kernel_shadow_surfaces,
+                surface_env_names=(
+                    "DHARMA_MEMORY_KERNEL_CONTEXT_COMPILER_SURFACE_IDS",
+                    "DHARMA_MEMORY_KERNEL_CONTEXT_COMPILER_SURFACES",
+                    "DHARMA_MEMORY_KERNEL_CONTEXT_SURFACE_IDS",
+                    "DHARMA_MEMORY_KERNEL_CONTEXT_SURFACES",
+                ),
+                legacy_shadow_env_names=(
+                    "DHARMA_MEMORY_KERNEL_CONTEXT_COMPILER_SHADOW",
+                    "DHARMA_MEMORY_KERNEL_CONTEXT_SHADOW",
+                ),
+            )
+            await notify_memory_kernel_context_canary(
+                memory_kernel_shadow_callback,
+                canary,
+            )
+            return bundle_with_memory_kernel_context_canary(frozen, canary)
         await self.runtime_state.init_db()
         await self.memory_lattice.init_db()
 
@@ -339,6 +345,40 @@ class ContextCompiler:
             for section in trimmed_sections
             for ref in section.source_refs
         )
+        canary = run_memory_kernel_context_canary(
+            rendered_text,
+            query=recall_query,
+            token_budget=token_budget,
+            enabled=memory_kernel_shadow,
+            requested_mode=memory_kernel_context_mode,
+            home=memory_kernel_shadow_home,
+            surface_ids=memory_kernel_shadow_surfaces,
+            surface_env_names=(
+                "DHARMA_MEMORY_KERNEL_CONTEXT_COMPILER_SURFACE_IDS",
+                "DHARMA_MEMORY_KERNEL_CONTEXT_COMPILER_SURFACES",
+                "DHARMA_MEMORY_KERNEL_CONTEXT_SURFACE_IDS",
+                "DHARMA_MEMORY_KERNEL_CONTEXT_SURFACES",
+            ),
+            legacy_shadow_env_names=(
+                "DHARMA_MEMORY_KERNEL_CONTEXT_COMPILER_SHADOW",
+                "DHARMA_MEMORY_KERNEL_CONTEXT_SHADOW",
+            ),
+        )
+        if canary.appended:
+            rendered_text = canary.rendered_text
+            trimmed_sections = [
+                *trimmed_sections,
+                ContextSection(
+                    name="MemoryKernel Context Canary",
+                    priority=99,
+                    content=canary.appended_section,
+                    source_refs=list(memory_kernel_context_source_refs(canary)),
+                    metadata=dict(canary.metadata),
+                ),
+            ]
+            source_refs = _dedupe(
+                (*source_refs, *memory_kernel_context_source_refs(canary))
+            )
         created_at = _utc_now()
         checksum = _sha256(
             _canonical_json(
@@ -351,6 +391,8 @@ class ContextCompiler:
                 }
             )
         )
+        bundle_metadata = memory_kernel_context_metadata(metadata, canary)
+        bundle_metadata["context_scan"] = _context_scan_metadata(rendered_text)
         bundle = ContextBundleRecord(
             bundle_id=self.runtime_state.new_bundle_id(),
             session_id=session_id,
@@ -362,10 +404,7 @@ class ContextCompiler:
             source_refs=source_refs,
             checksum=checksum,
             created_at=created_at,
-            metadata={
-                **(metadata or {}),
-                "context_scan": _context_scan_metadata(rendered_text),
-            },
+            metadata=bundle_metadata,
         )
         saved = await self.runtime_state.record_context_bundle(bundle)
         if session is not None:
@@ -381,6 +420,10 @@ class ContextCompiler:
                     updated_at=created_at,
                 )
             )
+        await notify_memory_kernel_context_canary(
+            memory_kernel_shadow_callback,
+            canary,
+        )
         return saved
 
     def _compose_recall_query(

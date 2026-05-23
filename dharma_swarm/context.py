@@ -16,12 +16,13 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import sqlite3
 import time
 from dataclasses import dataclass
 from datetime import timezone
 from pathlib import Path
-from typing import Literal
+from typing import Callable, Literal
 
 logger = logging.getLogger(__name__)
 
@@ -605,11 +606,30 @@ def read_memory_context(
     consumer: str = "context.read_memory_context",
     task_id: str | None = None,
     allow_semantic_search: bool = True,
+    memory_kernel_shadow: bool = False,
+    memory_kernel_context_mode: str | None = None,
+    memory_kernel_shadow_home: Path | None = None,
+    memory_kernel_shadow_surfaces: tuple[str, ...] = (),
+    memory_kernel_shadow_callback: Callable[[object], None] | None = None,
 ) -> str:
     """Get recent or query-specific memory from dharma_swarm state."""
     base_dir = state_dir or STATE_DIR
     db_path = base_dir / "db" / "memory.db"
     plane_path = base_dir / "db" / "memory_plane.db"
+
+    def finish(result: str) -> str:
+        return _run_memory_kernel_context_shadow(
+            result,
+            state_dir=state_dir,
+            query=query,
+            limit=limit,
+            enabled=memory_kernel_shadow,
+            requested_mode=memory_kernel_context_mode,
+            home=memory_kernel_shadow_home,
+            surface_ids=memory_kernel_shadow_surfaces,
+            callback=memory_kernel_shadow_callback,
+        )
+
     if query and plane_path.exists():
         try:
             plane_result = _read_memory_plane_context(
@@ -621,9 +641,9 @@ def read_memory_context(
                 allow_semantic_search=allow_semantic_search,
             )
             if plane_result:
-                return plane_result
+                return finish(plane_result)
         except Exception as e:
-            return f"Memory plane unavailable: {e}"
+            return finish(f"Memory plane unavailable: {e}")
 
     if not db_path.exists():
         if plane_path.exists():
@@ -637,10 +657,10 @@ def read_memory_context(
                     allow_semantic_search=allow_semantic_search,
                 )
                 if plane_result:
-                    return plane_result
+                    return finish(plane_result)
             except Exception as e:
-                return f"Memory plane unavailable: {e}"
-        return "No memory database yet."
+                return finish(f"Memory plane unavailable: {e}")
+        return finish("No memory database yet.")
     try:
         conn = sqlite3.connect(str(db_path))
         try:
@@ -663,13 +683,72 @@ def read_memory_context(
                         allow_semantic_search=allow_semantic_search,
                     )
                     if plane_result:
-                        return plane_result
+                        return finish(plane_result)
                 except Exception:
                     logger.debug("Memory plane recall failed", exc_info=True)
-            return "No memories stored yet."
-        return "\n".join(f"  [{r['layer']}] {r['content'][:100]}" for r in rows)
+            return finish("No memories stored yet.")
+        return finish("\n".join(f"  [{r['layer']}] {r['content'][:100]}" for r in rows))
     except Exception as e:
-        return f"Memory unavailable: {e}"
+        return finish(f"Memory unavailable: {e}")
+
+
+def _run_memory_kernel_context_shadow(
+    legacy_text: str,
+    *,
+    state_dir: Path | None,
+    query: str | None,
+    limit: int,
+    enabled: bool,
+    requested_mode: str | None,
+    home: Path | None,
+    surface_ids: tuple[str, ...],
+    callback: Callable[[object], None] | None,
+) -> str:
+    """Run the MemoryKernel canary while failing closed to legacy text."""
+
+    try:
+        from dharma_swarm.memory_kernel.context_compiler_shadow import (
+            run_memory_kernel_context_canary,
+        )
+
+        result = run_memory_kernel_context_canary(
+            legacy_text,
+            query=query,
+            limit=limit,
+            enabled=enabled,
+            requested_mode=requested_mode,
+            home=home,
+            surface_ids=surface_ids,
+            legacy_shadow_env_names=("DHARMA_MEMORY_KERNEL_CONTEXT_SHADOW",),
+        )
+        if callback and result.report is not None:
+            callback(result.report)
+        logger.debug(
+            "MemoryKernel context canary: mode=%s appended=%s fallback=%s metadata=%s state_dir=%s",
+            result.mode,
+            result.appended,
+            result.fallback_reason,
+            result.metadata,
+            state_dir,
+        )
+        return result.rendered_text
+    except Exception:
+        logger.debug("MemoryKernel context canary failed", exc_info=True)
+        return legacy_text
+
+
+def _truthy_env(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _csv_env(name: str) -> tuple[str, ...]:
+    value = os.environ.get(name, "")
+    return tuple(item.strip() for item in value.split(",") if item.strip())
+
+
+def _path_env(name: str) -> Path | None:
+    value = os.environ.get(name, "").strip()
+    return Path(value).expanduser() if value else None
 
 
 def read_latent_gold_context(
@@ -1173,13 +1252,16 @@ def _read_recognition_seed(state_dir: Path | None = None, max_chars: int = 2000)
     if not seed_path.exists():
         return ""
     try:
-        content = seed_path.read_text()
+        header = "## L9: META -- Recognition Seed\n"
+        raw_content = seed_path.read_text()
+        content_limit = max(0, max_chars - len(header))
+        was_truncated = len(raw_content) > content_limit
+        content = raw_content[:content_limit]
         content = scan_and_sanitize(content, "recognition_seed.md")
         if not content.strip():
             return ""
-        header = "## L9: META -- Recognition Seed\n"
-        if len(content) > max_chars - len(header):
-            content = content[:max_chars - len(header)] + "\n... [seed truncated]"
+        if was_truncated:
+            content = content.rstrip() + "\n... [seed truncated]"
         return header + content
     except Exception:
         return ""
