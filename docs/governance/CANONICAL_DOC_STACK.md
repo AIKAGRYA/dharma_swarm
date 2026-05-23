@@ -56,6 +56,7 @@ is **depth-on-demand**. Read it when you need it. Do not memorise a read order.
 | Live runtime / merge state | `docs/state/LIVE_OPS_DASHBOARD.md` | Daily Operating Brief, situational prose |
 | Known breakage | `docs/state/BROKEN_REGISTER.md` | INTERFACE_MISMATCH_MAP.md (parallel substrate) |
 | Behavioural contract (coding agents) | `CLAUDE.md` | — |
+| Operational manual (Devin sessions) | `DEVIN.md` | Defers to `CLAUDE.md` on repo governance |
 | Behavioural contract (cross-agent) | `AGENTS.md` (root), `docs/AGENTS.md` | — |
 | Architecture / invariants / axioms | `docs/governance/SOVEREIGN_MANIFEST.md`, `docs/doctrine/` | — |
 | Doc ownership | `docs/governance/CANONICAL_DOC_STACK.md` (this file) | — |
