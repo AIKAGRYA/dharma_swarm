@@ -33,6 +33,7 @@ jobs:
           allow=(
             "README.md"
             "CLAUDE.md"
+            "DEVIN.md"
             "CHANGELOG.md"
             "LICENSE.md"
             "INTERFACE_MISMATCH_MAP.md"
