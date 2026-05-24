@@ -54,8 +54,10 @@ def main() -> None:
         for alias, canonical in ENV_ALIASES.items():
             if alias == canonical:
                 continue
-            if os.environ.get(alias, "").strip() and not os.environ.get(canonical, "").strip():
-                sys.stdout.write(f'export {canonical}="${{{alias}}}"\n')
+            sys.stdout.write(
+                f'[ -n "${{{alias}:-}}" ] && [ -z "${{{canonical}:-}}" ] '
+                f'&& export {canonical}="${{{alias}}}"\n'
+            )
         return
 
     applied = normalize_env_aliases(dry_run=not args.apply)
