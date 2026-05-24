@@ -256,10 +256,12 @@ def runtime_rows_missing_context(
     else:
         return 0
 
+    quoted_table = '"' + table.replace('"', '""') + '"'
+    quoted_ts = '"' + timestamp_column.replace('"', '""') + '"'
     row = db.execute(
-        f"SELECT COUNT(*) FROM {table} t "
+        f"SELECT COUNT(*) FROM {quoted_table} t "
         f"LEFT JOIN context_bundles cb ON {join_clause} "
-        f"WHERE t.{timestamp_column} >= ? "
+        f"WHERE t.{quoted_ts} >= ? "
         "AND t.status IN ('claimed', 'running', 'completed', 'failed') "
         "AND cb.bundle_id IS NULL",
         (since_iso,),
@@ -283,8 +285,10 @@ def runtime_context_status_counts(
         columns = _runtime_table_columns(db, table)
         if timestamp_column not in columns or "metadata_json" not in columns:
             continue
+        quoted_table = '"' + table.replace('"', '""') + '"'
+        quoted_ts = '"' + timestamp_column.replace('"', '""') + '"'
         rows = db.execute(
-            f"SELECT metadata_json FROM {table} WHERE {timestamp_column} >= ?",
+            f"SELECT metadata_json FROM {quoted_table} WHERE {quoted_ts} >= ?",
             (since_iso,),
         ).fetchall()
         for (metadata_json,) in rows:
@@ -307,7 +311,10 @@ def _runtime_table_names(db: sqlite3.Connection) -> set[str]:
 
 
 def _runtime_table_columns(db: sqlite3.Connection, table: str) -> set[str]:
-    return {str(row[1]) for row in db.execute(f"PRAGMA table_info({table})").fetchall()}
+    if table not in _runtime_table_names(db):
+        return set()
+    quoted_table = '"' + table.replace('"', '""') + '"'
+    return {str(row[1]) for row in db.execute(f"PRAGMA table_info({quoted_table})").fetchall()}
 
 
 def _json_load(raw: object, default: object) -> object:
