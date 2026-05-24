@@ -157,3 +157,24 @@ class TestNormalizeDkeysScript:
         assert "GOOGLE_AI_API_KEY" in result.stdout
         assert "${GEMINI_API_KEY}" in result.stdout
         assert "test-gemini-key" not in result.stdout
+
+    def test_emit_exports_mirror_alias_table(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("normalize_dkeys_env", self._SCRIPT)
+        assert spec is not None
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+
+        expected_pairs = {
+            (alias, canonical)
+            for alias, canonical in ENV_ALIASES.items()
+            if alias != canonical
+        }
+        emitted_pairs = set()
+        for line in module._SAFE_EXPORT_LINES:
+            for alias, canonical in expected_pairs:
+                if f"${{{alias}:-}}" in line and f"export {canonical}=" in line:
+                    emitted_pairs.add((alias, canonical))
+        assert emitted_pairs == expected_pairs
