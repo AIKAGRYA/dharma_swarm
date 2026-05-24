@@ -1,9 +1,10 @@
 # Interface Mismatch Map — dharma_swarm
 
-**Last X-Ray:** 2026-05-04 (provenance-completion audit against HEAD `74d015c`)
-**Previous version:** 2026-04-08 (55 module pairs, 13 mismatches, 9 prioritized)
+**Last X-Ray:** 2026-05-20 (verified against current HEAD on main)
+**Previous version:** 2026-05-04 (provenance-completion audit against `74d015c`)
 **Maintainer:** Guardian Crew (`guardian_crew.py`) — auto-updates every 4 hours
 **How to read this:** Severity = BLOCKER (crashes at runtime), DEGRADED (silent failure / wrong behavior), WARNING (structural smell).
+**Status:** All BLOCKERs resolved. 3 items remain (NEW-05 GUARDED, NEW-07/08 PARTIAL+) — actively monitored, not stale.
 
 ---
 
