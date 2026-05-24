@@ -1,0 +1,504 @@
+#!/usr/bin/env python3
+"""CONTROL_WATCH_TOWER v0 collector — read-only census of registered agents to scorecards.
+
+Read-only against live runtime state. Writes only the scorecard JSON files under
+the chosen output directory. Each scorecard conforms to:
+    schemas/control_watch_tower_agent_scorecard.v0.json
+
+Scope per operator-issued work packet (2026-05-21):
+    registered agents -> evidence paths -> scorecard skeleton -> report JSON
+
+What this collector intentionally does NOT do:
+    - mutate any agent file, runtime.db, kaizen/ops.db, stigmergy marks
+    - emit kaizen/stigmergy events
+    - read or print secrets
+    - score performance beyond structural evidence (presence of files, line counts)
+    - render the report (use cwt_report.py for that)
+    - propose promotion (all scorecards return recommendation=hold in v0)
+
+Discovers agents from two surfaces:
+    ~/.dharma/external_agents/{uid}/  (external workers like Hermes, Claude Code CLI)
+    ~/.dharma/agents/{uid}/           (canonical living agents like opus_composer)
+
+Outputs:
+    {out-dir}/scorecard_{agent_uid}.json   (one per agent, schema-conformant)
+    {out-dir}/scorecards_index.json        (collector summary + scorecard list)
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import sqlite3
+import sys
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+HOME = Path.home()
+DEFAULT_STATE_ROOT = HOME / ".dharma"
+
+SCORECARD_SCHEMA_VERSION = "control_watch_tower_agent_scorecard.v0"
+
+DIMENSION_NAMES = [
+    "identity_continuity",
+    "wake_persistence",
+    "work_capacity",
+    "comms_reliability",
+    "memory_evolution",
+    "operational_value",
+    "safety_discipline",
+    "cost_discipline",
+    "collaboration",
+    "promotion_readiness",
+]
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _count_lines(p: Path) -> int:
+    if not p.exists() or not p.is_file():
+        return 0
+    try:
+        with open(p) as f:
+            return sum(1 for _ in f)
+    except Exception:
+        return 0
+
+
+def _file_last_mtime_iso(p: Path) -> str | None:
+    if not p.exists() or not p.is_file():
+        return None
+    return datetime.fromtimestamp(p.stat().st_mtime, tz=timezone.utc).isoformat()
+
+
+def _read_json_safe(p: Path) -> dict[str, Any] | None:
+    if not p.exists():
+        return None
+    try:
+        return json.loads(p.read_text())
+    except Exception:
+        return None
+
+
+@dataclass
+class AgentInventory:
+    """All evidence-path locations for one agent, regardless of surface."""
+
+    uid: str
+    callsign: str
+    surface: str  # "external" or "canonical"
+    sandbox_root: Path
+    registration: Path
+    living_agent: Path
+    a2a_card: Path
+    action_log: Path
+    wake_receipts: Path
+    self_model: Path
+    agentops_contract: Path
+    watch_contract: Path
+    authority_passport: Path
+    soul_md: Path | None
+    raw_authority: str
+
+
+def _build_callsign_from_registration(reg_path: Path, default: str) -> str:
+    r = _read_json_safe(reg_path) or {}
+    # registration.json has fields at top level; some receipt variants nest under "worker"
+    return r.get("callsign") or (r.get("worker") or {}).get("callsign") or default
+
+
+def _authority_from_registration(reg_path: Path) -> str:
+    r = _read_json_safe(reg_path) or {}
+    return r.get("authority") or (r.get("worker") or {}).get("authority") or "unknown"
+
+
+def discover_agents(state_root: Path) -> list[AgentInventory]:
+    out: list[AgentInventory] = []
+    seen: set[str] = set()
+
+    # 1. External agents (have a dedicated sandbox)
+    ext_root = state_root / "external_agents"
+    if ext_root.exists():
+        for d in sorted(ext_root.iterdir()):
+            if not d.is_dir():
+                continue
+            uid = d.name
+            reg = d / "registration.json"
+            callsign = _build_callsign_from_registration(reg, uid)
+            authority = _authority_from_registration(reg)
+            out.append(
+                AgentInventory(
+                    uid=uid,
+                    callsign=callsign,
+                    surface="external",
+                    sandbox_root=d,
+                    registration=reg,
+                    living_agent=state_root / "agents" / uid / "living_agent.json",
+                    a2a_card=state_root / "a2a" / "cards" / f"{callsign}.json",
+                    action_log=d / "logs" / "action_log.jsonl",
+                    wake_receipts=d / "logs" / "wake_receipts.jsonl",
+                    self_model=d / "self_model" / "system_interpretation.md",
+                    agentops_contract=d / "agentops" / "contract.json",
+                    watch_contract=d / "watch" / "contract.json",
+                    authority_passport=d / "authority" / "passport.json",
+                    soul_md=None,
+                    raw_authority=authority,
+                )
+            )
+            seen.add(uid)
+
+    # 2. Canonical living agents that have no external sandbox (e.g. opus_composer, codex_composer)
+    agents_root = state_root / "agents"
+    if agents_root.exists():
+        for d in sorted(agents_root.iterdir()):
+            if not d.is_dir():
+                continue
+            uid = d.name
+            if uid in seen:
+                continue
+            identity = d / "identity.json"
+            iden = _read_json_safe(identity) or {}
+            callsign = iden.get("callsign") or uid
+            authority = iden.get("authority") or iden.get("authority_mode") or "unknown"
+            out.append(
+                AgentInventory(
+                    uid=uid,
+                    callsign=callsign,
+                    surface="canonical",
+                    sandbox_root=d,
+                    registration=identity,
+                    living_agent=d / "living_agent.json",
+                    a2a_card=state_root / "a2a" / "cards" / f"{callsign}.json",
+                    action_log=d / "task_log.jsonl",
+                    wake_receipts=Path("/dev/null"),
+                    self_model=d / "SOUL.md",
+                    agentops_contract=Path("/dev/null"),
+                    watch_contract=Path("/dev/null"),
+                    authority_passport=state_root / "agent_passports" / f"{uid}.json",
+                    soul_md=d / "SOUL.md",
+                    raw_authority=authority,
+                )
+            )
+
+    return out
+
+
+def _dim(
+    score: float,
+    status: str,
+    summary: str,
+    evidence: list[str],
+    last_observed: str | None = None,
+) -> dict[str, Any]:
+    d: dict[str, Any] = {
+        "score": max(0.0, min(1.0, float(score))),
+        "status": status,
+        "summary": summary,
+        "evidence_refs": evidence,
+    }
+    if last_observed is not None:
+        d["last_observed_at"] = last_observed
+    return d
+
+
+def _kaizen_event_count(state_root: Path, uid: str) -> int:
+    db = state_root / "kaizen" / "ops.db"
+    if not db.exists():
+        return 0
+    try:
+        con = sqlite3.connect(db)
+        cur = con.cursor()
+        cur.execute("SELECT COUNT(*) FROM events WHERE source = ?", (uid,))
+        n = cur.fetchone()[0]
+        con.close()
+        return int(n)
+    except Exception:
+        return 0
+
+
+def _stigmergy_marks_for(state_root: Path, uid: str) -> int:
+    marks_path = state_root / "stigmergy" / "marks.jsonl"
+    if not marks_path.exists():
+        return 0
+    n = 0
+    try:
+        with open(marks_path) as f:
+            for line in f:
+                if uid in line:
+                    n += 1
+    except Exception:
+        return 0
+    return n
+
+
+def _telemetry_present(state_root: Path, uid: str) -> bool:
+    db = state_root / "state" / "runtime.db"
+    if not db.exists():
+        return False
+    try:
+        con = sqlite3.connect(db)
+        cur = con.cursor()
+        cur.execute("SELECT COUNT(*) FROM agent_identity WHERE agent_id = ?", (uid,))
+        n = cur.fetchone()[0]
+        con.close()
+        return n > 0
+    except Exception:
+        return False
+
+
+def build_scorecard(inv: AgentInventory, state_root: Path) -> dict[str, Any]:
+    evidence_all: list[str] = []
+
+    # D1: identity_continuity — five canonical files
+    id_files = [
+        inv.registration,
+        inv.living_agent,
+        inv.a2a_card,
+        inv.self_model,
+        inv.authority_passport,
+    ]
+    id_present = sum(1 for f in id_files if f.exists())
+    id_evidence = [str(f) for f in id_files if f.exists()]
+    evidence_all.extend(id_evidence)
+    id_status = "ok" if id_present >= 4 else ("warn" if id_present >= 2 else "fail")
+    d_identity = _dim(
+        id_present / 5,
+        id_status,
+        f"{id_present}/5 identity files present (registration, living_agent, a2a_card, self_model, authority_passport)",
+        id_evidence,
+    )
+
+    # D2: wake_persistence — count of wake_receipts entries
+    wake_count = _count_lines(inv.wake_receipts)
+    wake_last = _file_last_mtime_iso(inv.wake_receipts)
+    if inv.wake_receipts == Path("/dev/null"):
+        d_wake = _dim(0.0, "unknown", "canonical agent — wake_receipts not applicable", [])
+    else:
+        wake_status = "ok" if wake_count >= 5 else ("warn" if wake_count >= 1 else "fail")
+        d_wake = _dim(
+            min(1.0, wake_count / 10),
+            wake_status,
+            f"{wake_count} wake receipts on file",
+            [str(inv.wake_receipts)] if wake_count else [],
+            wake_last,
+        )
+
+    # D3: work_capacity — action_log entries
+    action_count = _count_lines(inv.action_log)
+    action_last = _file_last_mtime_iso(inv.action_log)
+    work_status = "ok" if action_count >= 3 else ("warn" if action_count >= 1 else "fail")
+    d_work = _dim(
+        min(1.0, action_count / 5),
+        work_status,
+        f"{action_count} action_log/task_log entries",
+        [str(inv.action_log)] if action_count else [],
+        action_last,
+    )
+
+    # D4: comms_reliability — A2A card present
+    a2a_present = inv.a2a_card.exists()
+    d_comms = _dim(
+        1.0 if a2a_present else 0.0,
+        "ok" if a2a_present else "fail",
+        "A2A card present (discoverable)" if a2a_present else "A2A card MISSING — not discoverable",
+        [str(inv.a2a_card)] if a2a_present else [],
+    )
+
+    # D5: memory_evolution — self_model exists and is non-placeholder (>500 bytes)
+    if inv.self_model.exists():
+        size = inv.self_model.stat().st_size
+        mem_ok = size > 500
+        d_memory = _dim(
+            1.0 if mem_ok else 0.3,
+            "ok" if mem_ok else "warn",
+            f"self_model size = {size} bytes ({'authored' if mem_ok else 'placeholder or stub'})",
+            [str(inv.self_model)],
+            _file_last_mtime_iso(inv.self_model),
+        )
+    else:
+        d_memory = _dim(0.0, "fail", "self_model missing", [])
+
+    # D6: operational_value — material work beyond registration. Heuristic: action_count > 2 means
+    #     non-registration entries are present (registration alone is ~1, plus self-registration ~1)
+    op_ratio = max(0.0, (action_count - 2) / 8) if action_count > 2 else 0.0
+    op_status = "ok" if action_count > 5 else ("warn" if action_count > 2 else "unknown")
+    d_op = _dim(
+        min(1.0, op_ratio),
+        op_status,
+        f"{action_count} action entries (>2 implies work beyond registration)",
+        [str(inv.action_log)] if action_count else [],
+    )
+
+    # D7: safety_discipline — v0 stub; no incident tracking yet
+    d_safety = _dim(1.0, "unknown", "no incidents tracked in v0 collector", [])
+
+    # D8: cost_discipline — KaizenOps event count proxy
+    kz_count = _kaizen_event_count(state_root, inv.uid)
+    cost_evidence = [str(state_root / "kaizen" / "ops.db")] if kz_count else []
+    d_cost = _dim(
+        0.5,
+        "unknown",
+        f"{kz_count} KaizenOps events (cost dimension deferred to v1)",
+        cost_evidence,
+    )
+
+    # D9: collaboration — stigmergy mark presence
+    stig_count = _stigmergy_marks_for(state_root, inv.uid)
+    d_collab = _dim(
+        1.0 if stig_count else 0.0,
+        "ok" if stig_count else "warn",
+        f"{stig_count} stigmergy marks reference this agent",
+        [str(state_root / "stigmergy" / "marks.jsonl")] if stig_count else [],
+    )
+
+    # D10: promotion_readiness — passport + watch_contract presence
+    has_passport = inv.authority_passport.exists()
+    has_watch = inv.watch_contract.exists()
+    promo_evidence = []
+    if has_passport:
+        promo_evidence.append(str(inv.authority_passport))
+    if has_watch:
+        promo_evidence.append(str(inv.watch_contract))
+    promo_score = (int(has_passport) + int(has_watch)) / 2
+    promo_status = "ok" if promo_score >= 0.8 else ("warn" if promo_score >= 0.4 else "fail")
+    d_promo = _dim(
+        promo_score,
+        promo_status,
+        f"passport={'yes' if has_passport else 'no'}, watch_contract={'yes' if has_watch else 'no'}",
+        promo_evidence,
+    )
+
+    dims = {
+        "identity_continuity": d_identity,
+        "wake_persistence": d_wake,
+        "work_capacity": d_work,
+        "comms_reliability": d_comms,
+        "memory_evolution": d_memory,
+        "operational_value": d_op,
+        "safety_discipline": d_safety,
+        "cost_discipline": d_cost,
+        "collaboration": d_collab,
+        "promotion_readiness": d_promo,
+    }
+
+    overall = sum(d["score"] for d in dims.values()) / len(dims)
+
+    # Determine status (matches scorecard.v0 enum)
+    if action_count >= 3 and id_present >= 4:
+        agent_status = "active"
+    elif id_present >= 2:
+        agent_status = "registered"
+    else:
+        agent_status = "unknown"
+
+    # Blockers
+    blockers: list[str] = []
+    if not inv.registration.exists():
+        blockers.append("registration.json missing")
+    if not inv.living_agent.exists():
+        blockers.append("living_agent.json missing — not discoverable in canonical registry")
+    if not inv.a2a_card.exists():
+        blockers.append("a2a card missing — not discoverable via A2A")
+    if action_count == 0:
+        blockers.append("no action_log entries — agent has not logged any material actions")
+    if not _telemetry_present(state_root, inv.uid):
+        blockers.append("runtime.db agent_identity row missing — telemetry identity not present")
+
+    # Promotion recommendation — v0 always 'hold' per operator directive
+    recommendation = {
+        "recommendation": "hold",
+        "reason": (
+            "v0 collector — structural-evidence scorecard only; human review and "
+            "live-collector consumption are required before any promotion."
+        ),
+        "required_human_decision": True,
+        "required_next_evidence": [
+            "human review of scorecard",
+            "operator decision on authority rank",
+            "live-collector incident/AOTAM data (v1)",
+        ],
+    }
+
+    scorecard_id = hashlib.sha256(
+        f"{inv.uid}:{_now()}:{SCORECARD_SCHEMA_VERSION}".encode()
+    ).hexdigest()[:24]
+
+    return {
+        "schema_version": SCORECARD_SCHEMA_VERSION,
+        "scorecard_id": scorecard_id,
+        "agent_uid": inv.uid,
+        "callsign": inv.callsign,
+        "evaluated_at": _now(),
+        "authority": inv.raw_authority,
+        "status": agent_status,
+        "overall_score": round(overall, 4),
+        "trust_band": "evidence_only",
+        "dimensions": dims,
+        "clearance_state": "none",
+        "current_flight_plan": None,
+        "evidence_refs": evidence_all,
+        "blockers": blockers,
+        "warnings": [],
+        "incidents": [],
+        "aotams": [],
+        "promotion_recommendation": recommendation,
+    }
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="CWT v0 read-only collector: registered agents -> scorecards"
+    )
+    parser.add_argument(
+        "--state-root", type=Path, default=DEFAULT_STATE_ROOT,
+        help="State root (default: ~/.dharma)",
+    )
+    parser.add_argument(
+        "--out-dir", type=Path, default=None,
+        help="Output directory; if omitted, prints index JSON to stdout",
+    )
+    args = parser.parse_args()
+
+    inventories = discover_agents(args.state_root)
+    scorecards = [build_scorecard(inv, args.state_root) for inv in inventories]
+
+    index = {
+        "schema_version": "cwt_collector_output.v0",
+        "generated_at": _now(),
+        "state_root": str(args.state_root),
+        "scorecard_count": len(scorecards),
+        "scorecards": [
+            {
+                "agent_uid": sc["agent_uid"],
+                "callsign": sc["callsign"],
+                "overall_score": sc["overall_score"],
+                "status": sc["status"],
+                "blocker_count": len(sc["blockers"]),
+            }
+            for sc in scorecards
+        ],
+    }
+
+    if args.out_dir:
+        args.out_dir.mkdir(parents=True, exist_ok=True)
+        for sc in scorecards:
+            (args.out_dir / f"scorecard_{sc['agent_uid']}.json").write_text(
+                json.dumps(sc, indent=2, sort_keys=True) + "\n"
+            )
+        (args.out_dir / "scorecards_index.json").write_text(
+            json.dumps(index, indent=2, sort_keys=True) + "\n"
+        )
+        print(f"Wrote {len(scorecards)} scorecards to {args.out_dir}")
+        for sc in scorecards:
+            print(f"  {sc['agent_uid']:<48} score={sc['overall_score']:.3f}  status={sc['status']}  blockers={len(sc['blockers'])}")
+    else:
+        print(json.dumps(index, indent=2, sort_keys=True))
+
+
+if __name__ == "__main__":
+    main()
