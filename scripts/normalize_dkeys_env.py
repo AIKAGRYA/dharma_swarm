@@ -35,6 +35,17 @@ def _mask(value: str) -> str:
     return value[:4] + "..." + value[-2:]
 
 
+def _emit_export_lines() -> None:
+    # Values are copied by the caller shell during eval; Python never reads them.
+    for source_name, target_name in ENV_ALIASES.items():
+        if source_name == target_name:
+            continue
+        sys.stdout.write(
+            f'[ -n "${{{source_name}:-}}" ] && [ -z "${{{target_name}:-}}" ] '
+            f'&& export {target_name}="${{{source_name}}}"\n'
+        )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     group = parser.add_mutually_exclusive_group()
@@ -51,14 +62,7 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.emit_exports:
-        # Emit shell logic that copies values during eval without printing them.
-        for alias, canonical in ENV_ALIASES.items():
-            if alias == canonical:
-                continue
-            sys.stdout.write(
-                f'[ -n "${{{alias}:-}}" ] && [ -z "${{{canonical}:-}}" ] '
-                f'&& export {canonical}="${{{alias}}}"\n'
-            )
+        _emit_export_lines()
         return
 
     applied = normalize_env_aliases(dry_run=not args.apply)
