@@ -65,10 +65,10 @@ For machine-readable status, see [`reports/governance/active_track_evidence.md`]
 These are immutable engineering laws for this repository. Violation = architectural regression.
 
 ### A1: NO FLAT-PACKAGE GROWTH
-The `dharma_swarm/` package currently has **387 files at its top level (63.4% of 610 total Python modules)** (V). No new .py file may be added to the top level. New modules must go into an appropriate subdirectory. Existing top-level files will be organized over time.
+The `dharma_swarm/` package currently has **387 files at its top level (63.2% of 612 total Python modules)** (V). No new .py file may be added to the top level. New modules must go into an appropriate subdirectory. Existing top-level files will be organized over time.
 
 ### A2: NO DUPLICATE IMPLEMENTATIONS
-Before creating a new file for routing, bridging, adapting, or orchestrating, check if one already exists. The repo currently has **24 bridge files** (V), **3 model_routing copies** (2 are identical, 1 is different) (V), **4 orchestrators** (V), **18 adapter files across 7 locations** (V), and **13 router files** (V). Do not add more without deprecating an existing one.
+Before creating a new file for routing, bridging, adapting, or orchestrating, check if one already exists. The repo currently has **24 bridge files** (V), **3 model_routing copies** (2 are identical, 1 is different) (V), **4 orchestrators** (V), **16 adapter files across 8 locations** (V), and **13 router files** (V). Do not add more without deprecating an existing one.
 
 ### A3: NO UNDOCUMENTED SEAMS
 If your code creates a new interface between domains (a bridge, adapter, or protocol), you must update `NAVIGATION.md` with its purpose, entry point, and boundary constraints. Undocumented seams become invisible coupling.
@@ -110,17 +110,17 @@ These are the ground-truth metrics. All other documents citing different numbers
 
 | Metric | Value | Verification |
 |--------|-------|-------------|
-| Total Python modules | **650** | find dharma_swarm -name "*.py" -type f |
-| Top-level (flat) modules | **388 (59.7%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
-| Total Python LOC | **275,641** | wc -l across dharma_swarm Python modules |
-| Test files | **604** | find tests -name "*.py" -type f |
-| Test functions | **10,472 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Total Python modules | **652** | find dharma_swarm -name "*.py" -type f |
+| Top-level (flat) modules | **388 (59.5%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
+| Total Python LOC | **275,949** | wc -l across dharma_swarm Python modules |
+| Test files | **605** | find tests -name "*.py" -type f |
+| Test functions | **10,493 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
 | Markdown files | **726** | find . -name "*.md" -type f |
-| Markdown total lines | **184,452** | wc -l across all .md |
+| Markdown total lines | **184,454** | wc -l across all .md |
 | Bridge files | **24** | find dharma_swarm -name "*bridge*.py" |
-| Adapter files | **18 across 7 locations** | find dharma_swarm -type f \| rg -i "adapter" |
+| Adapter files | **20 across 8 locations** | find dharma_swarm -type f \| rg -i "adapter" |
 | Orchestrator files | **4** (6,034 LOC total) | find dharma_swarm -name "*orchestrat*" |
 | Router files | **13** (4,976 LOC total) | find dharma_swarm -type f \| rg -i "rout" |
 | Memory modules | **11** (5,848 LOC) | find dharma_swarm -name "*memory*" |
@@ -439,7 +439,7 @@ SOVEREIGN_MANIFEST.md (this file)
 **Stale numbers to fix**:
 - "~1,700 lines" for swarm.py -> **3,119** (V)
 - References NAVIGATION.md which claims "500 modules" -> current filesystem count **532 dharma_swarm Python modules** (V)
-- No mention of the 17 bridges, 13 routers, 14 adapters, or their hierarchy
+- No mention of the 17 bridges, 13 routers, 16 adapters, or their hierarchy
 - Provider list says 9 -> should acknowledge **18 types** (V)
 
 **Do NOT**:
