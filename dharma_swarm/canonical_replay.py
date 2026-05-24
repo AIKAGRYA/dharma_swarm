@@ -133,28 +133,92 @@ class CanonicalReplayEngine:
         )
 
     async def _execute_replay(self, events: list[dict[str, Any]]) -> dict[str, Any]:
-        """Execute a replay of events and return final state.
+        """Reconstruct final state by folding the ordered event stream.
 
-        This is a SKELETON implementation. Full replay would:
-        1. Initialize clean state
-        2. Apply each event as a state transition
-        3. Return final state
-
-        For now, we simulate by returning event metadata.
+        Starts from a clean initial state and applies each runtime envelope
+        as a typed state transition. The four runtime-contract event types
+        (``state.snapshot``, ``memory.event``, ``action.event``,
+        ``audit.event``) each have a dedicated reducer; any other type is
+        counted but leaves typed state untouched. The fold reads events in
+        the order supplied (``read_envelopes`` sorts by ``emitted_at`` then
+        ``event_id``), so replaying the same events always yields the same
+        state — and therefore the same hash.
         """
-        # TODO: Implement actual state reconstruction from events
-        # This requires:
-        # - State machine for each event type
-        # - Clean initial state
-        # - Deterministic event application
-
-        # For now, return a deterministic hash of the event sequence
-        state = {
-            "event_count": len(events),
-            "event_types": [e.get("event_type", "unknown") for e in events],
-            "final_timestamp": events[-1].get("emitted_at", "") if events else "",
-        }
+        state = self._initial_state()
+        for event in events:
+            self._apply_event(state, event)
+        state["event_count"] = len(events)
         return state
+
+    @staticmethod
+    def _initial_state() -> dict[str, Any]:
+        """Return the clean state every replay folds events into."""
+        return {
+            "event_count": 0,
+            "event_types": [],
+            "final_timestamp": "",
+            "runtime": {},
+            "memory": {"count": 0, "by_id": {}},
+            "actions": {"count": 0, "last_by_name": {}},
+            "audits": {"count": 0, "by_gate": {}},
+            "unknown_event_count": 0,
+        }
+
+    def _apply_event(self, state: dict[str, Any], event: dict[str, Any]) -> None:
+        """Apply a single event to ``state`` as a typed transition."""
+        event_type = str(event.get("event_type", "unknown"))
+        state["event_types"].append(event_type)
+        emitted_at = str(event.get("emitted_at", ""))
+        if emitted_at:
+            state["final_timestamp"] = emitted_at
+
+        payload = event.get("payload") or {}
+        if not isinstance(payload, dict):
+            payload = {}
+
+        if event_type == "state.snapshot":
+            # Latest snapshot wins — it is the authoritative runtime state.
+            state["runtime"] = {
+                "cycle_count": payload.get("cycle_count"),
+                "uptime_seconds": payload.get("uptime_seconds"),
+                "runtime_mode": payload.get("runtime_mode"),
+                "status": payload.get("status"),
+            }
+        elif event_type == "memory.event":
+            memory = state["memory"]
+            memory["count"] += 1
+            memory_id = str(payload.get("memory_id", ""))
+            if memory_id:
+                memory["by_id"][memory_id] = {
+                    "memory_type": payload.get("memory_type"),
+                    "importance": payload.get("importance"),
+                    "summary": payload.get("summary"),
+                }
+        elif event_type == "action.event":
+            actions = state["actions"]
+            actions["count"] += 1
+            action_name = str(payload.get("action_name", ""))
+            if action_name:
+                actions["last_by_name"][action_name] = {
+                    "decision": payload.get("decision"),
+                    "confidence": payload.get("confidence"),
+                }
+        elif event_type == "audit.event":
+            audits = state["audits"]
+            audits["count"] += 1
+            gate = str(payload.get("gate", ""))
+            if gate:
+                bucket = audits["by_gate"].setdefault(
+                    gate, {"pass": 0, "fail": 0, "last_result": None}
+                )
+                result = payload.get("result")
+                bucket["last_result"] = result
+                if str(result).strip().lower() in ("pass", "passed", "ok", "true"):
+                    bucket["pass"] += 1
+                else:
+                    bucket["fail"] += 1
+        else:
+            state["unknown_event_count"] += 1
 
     def _hash_state(self, state: dict[str, Any]) -> str:
         """Compute deterministic hash of state."""
@@ -220,23 +284,43 @@ async def test_replay_engine():
     """Test the replay engine with a synthetic session (proof of concept)."""
     print("🧪 Testing Canonical Replay Engine...")
 
-    # For now, demonstrate the replay engine exists and can be instantiated
-    # Full replay would require:
-    # 1. State machine for each event type
-    # 2. Clean initial state
-    # 3. Deterministic event application
-
     engine = CanonicalReplayEngine()
     print(f"✅ Replay engine created (log_dir: {engine.event_log_dir})")
 
-    # Mock a simple replay
+    # A mixed stream exercising each typed reducer.
     test_events = [
-        {"event_type": "action", "data": "step_1"},
-        {"event_type": "action", "data": "step_2"},
-        {"event_type": "action", "data": "step_3"},
+        {
+            "event_type": "state.snapshot",
+            "emitted_at": "2026-01-01T00:00:00Z",
+            "payload": {
+                "cycle_count": 1,
+                "uptime_seconds": 10,
+                "runtime_mode": "active",
+                "status": "ok",
+            },
+        },
+        {
+            "event_type": "memory.event",
+            "emitted_at": "2026-01-01T00:00:01Z",
+            "payload": {
+                "memory_id": "m1",
+                "memory_type": "episodic",
+                "importance": 3,
+                "summary": "first memory",
+            },
+        },
+        {
+            "event_type": "action.event",
+            "emitted_at": "2026-01-01T00:00:02Z",
+            "payload": {"action_name": "evolve", "decision": "apply", "confidence": 0.9},
+        },
+        {
+            "event_type": "audit.event",
+            "emitted_at": "2026-01-01T00:00:03Z",
+            "payload": {"gate": "telos", "result": "pass", "reason": "aligned"},
+        },
     ]
 
-    # Simulate replay
     state = await engine._execute_replay(test_events)
     hash1 = engine._hash_state(state)
 
@@ -246,6 +330,11 @@ async def test_replay_engine():
 
     deterministic = (hash1 == hash2)
     print(f"✅ Replay executed: {len(test_events)} events")
+    print(f"✅ Reconstructed runtime status: {state['runtime'].get('status')}")
+    print(
+        f"✅ Reconstructed counts: memory={state['memory']['count']} "
+        f"actions={state['actions']['count']} audits={state['audits']['count']}"
+    )
     print(f"✅ State hash: {hash1[:16]}...")
     print(f"✅ Deterministic: {deterministic}")
 
@@ -255,12 +344,7 @@ async def test_replay_engine():
         print(f"   Hash 2: {hash2}")
         return False
 
-    print(f"✅ PASSED: Replay infrastructure works!")
-    print(f"")
-    print(f"NOTE: This is a skeleton. Full replay requires:")
-    print(f"  1. State reconstruction from events")
-    print(f"  2. Event type handlers")
-    print(f"  3. Integration with actual event log")
+    print(f"✅ PASSED: Replay reconstructs typed state deterministically!")
 
     return True
 

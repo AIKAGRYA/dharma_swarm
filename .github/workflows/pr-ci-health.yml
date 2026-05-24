@@ -1,0 +1,128 @@
+name: pr-ci-health
+
+# Durable hourly PR CI-health backstop.
+#
+# This is the *mechanical* safety net that runs even when no agent session is
+# alive (the in-session `/pr-ci-health` loop dies with its ephemeral container).
+# A YAML job cannot reason, so it only does non-destructive / low-risk healing:
+#
+#   1. report  — triage every open PR via scripts/governance/pr_ci_health.py and
+#                refresh a single tracking issue + the run summary.
+#   2. rerun   — re-run failed workflow runs for PRs whose only failures are
+#                transient infra flakes (e.g. the CodeQL default-setup umbrella
+#                status that completes in seconds while `codeql / python` passes).
+#   3. rebase  — rebase conflict-free behind-main PR branches onto origin/main
+#                and push with --force-with-lease.
+#
+# The heavier, judgement-bearing fixes (Coherence-Delta body fields, Fourfold
+# Shakti Warrant causes, real test/lint failures) are handled by the agent
+# playbook at .claude/commands/pr-ci-health.md. This workflow never merges a PR.
+
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "report | rerun | rebase | all"
+        default: "all"
+
+concurrency:
+  group: pr-ci-health
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+  issues: write
+
+jobs:
+  triage-and-heal:
+    name: PR CI-health triage + mechanical heal
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      MODE: ${{ github.event.inputs.mode || 'all' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Triage open PRs
+        run: |
+          set -euo pipefail
+          python3 scripts/governance/pr_ci_health.py --repo "$REPO" --json > triage.json
+          python3 scripts/governance/pr_ci_health.py --repo "$REPO" > triage.md
+          {
+            echo "## PR CI-Health triage"
+            echo
+            cat triage.md
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upsert tracking issue
+        if: env.MODE == 'all' || env.MODE == 'report'
+        run: |
+          set -euo pipefail
+          title="PR CI-Health triage (auto)"
+          body="$(printf '_Auto-updated by the hourly pr-ci-health workflow. Run: %s_\n\n' "${GITHUB_RUN_ID}"; cat triage.md)"
+          num="$(gh issue list --repo "$REPO" --state open --search "$title in:title" --json number,title \
+                 --jq "map(select(.title == \"$title\")) | .[0].number // empty")"
+          if [ -n "$num" ]; then
+            gh issue edit "$num" --repo "$REPO" --body "$body"
+            echo "updated issue #$num"
+          else
+            gh issue create --repo "$REPO" --title "$title" --body "$body"
+          fi
+
+      - name: Re-run transient infra failures
+        if: env.MODE == 'all' || env.MODE == 'rerun'
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          # PRs whose categories include transient_infra (and not a real failure).
+          mapfile -t prs < <(jq -r '.[] | select(.categories | index("transient_infra")) | select(.categories | index("real_test_lint") | not) | .number' triage.json)
+          for pr in "${prs[@]:-}"; do
+            [ -z "$pr" ] && continue
+            sha="$(gh api "repos/$REPO/pulls/$pr" --jq .head.sha)"
+            echo "PR #$pr ($sha): re-running failed workflow runs"
+            for run_id in $(gh api "repos/$REPO/actions/runs?head_sha=$sha&status=failure&per_page=20" --jq '.workflow_runs[].id'); do
+              gh run rerun "$run_id" --repo "$REPO" --failed || echo "  rerun $run_id skipped"
+            done
+          done
+
+      - name: Rebase conflict-free behind-main branches
+        if: env.MODE == 'all' || env.MODE == 'rebase'
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          git config user.name "pr-ci-health-bot"
+          git config user.email "pr-ci-health-bot@users.noreply.github.com"
+          git fetch origin main
+          mapfile -t prs < <(jq -r '.[] | select(.categories | index("behind_main")) | select(.mergeable_state == "behind") | "\(.number)\t\(.head)\t\(.base)"' triage.json)
+          for line in "${prs[@]:-}"; do
+            [ -z "$line" ] && continue
+            pr="$(echo "$line" | cut -f1)"; head="$(echo "$line" | cut -f2)"; base="$(echo "$line" | cut -f3)"
+            if [ "$base" != "main" ]; then
+              echo "PR #$pr base=$base (not main); skipping auto-rebase"
+              continue
+            fi
+            echo "PR #$pr: rebasing $head onto origin/main"
+            git fetch origin "$head" || { echo "  fetch failed"; continue; }
+            git checkout -B "ci-rebase/$head" "origin/$head" || { echo "  checkout failed"; continue; }
+            if git rebase origin/main; then
+              git push origin "ci-rebase/$head:$head" --force-with-lease || echo "  push rejected (remote moved); leaving as-is"
+            else
+              echo "  conflict during rebase; aborting, leaving PR #$pr for human/agent"
+              git rebase --abort || true
+            fi
+            git checkout -f "$GITHUB_SHA" || true
+          done
