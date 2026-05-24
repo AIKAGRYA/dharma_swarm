@@ -19,6 +19,7 @@ import hashlib
 import inspect
 import json
 import logging
+import os
 import re
 import time
 from datetime import datetime, timezone
@@ -935,14 +936,32 @@ class Orchestrator:
         try:
             from dharma_swarm.context_compiler import ContextCompiler
             from dharma_swarm.memory_lattice import MemoryLattice
+            from dharma_swarm.memory_kernel import (
+                CensusConfig,
+                MemoryKernel,
+                MemoryKernelConfig,
+            )
 
             lattice = MemoryLattice(
                 db_path=store.db_path,
                 event_log_dir=runtime_root / "events",
             )
+            memory_kernel_home = Path(
+                os.getenv("DHARMA_MEMORY_KERNEL_HOME") or Path.home()
+            ).expanduser()
+            memory_kernel = MemoryKernel(
+                MemoryKernelConfig(
+                    census=CensusConfig(
+                        repo_root=Path.cwd(),
+                        home=memory_kernel_home,
+                        include_discovered=False,
+                    )
+                )
+            )
             compiler = ContextCompiler(
                 runtime_state=store,
                 memory_lattice=lattice,
+                memory_kernel=memory_kernel,
             )
             bundle = await compiler.compile_bundle(
                 session_id=self._ledger.session_id,
@@ -959,6 +978,19 @@ class Orchestrator:
                 },
                 workspace_root=runtime_root,
             )
+            kernel_meta = dict(bundle.metadata.get("memory_kernel_default") or {})
+            if kernel_meta:
+                meta["memory_kernel_status"] = kernel_meta.get("status", "unknown")
+                meta["memory_kernel_pack_id"] = kernel_meta.get("pack_id", "")
+                meta["memory_kernel_admitted_count"] = kernel_meta.get(
+                    "admitted_count",
+                    0,
+                )
+                meta["memory_kernel_omitted_count"] = kernel_meta.get(
+                    "omitted_count",
+                    0,
+                )
+                meta["memory_kernel_warnings"] = kernel_meta.get("warnings", [])
         except Exception as exc:
             error = str(exc)[:300]
             meta["context_bundle_status"] = "failed"
@@ -992,6 +1024,15 @@ class Orchestrator:
         td.metadata["context_bundle_status"] = "attached"
         td.metadata["runtime_db_path"] = runtime_db_path
         td.metadata.setdefault("state_dir", state_dir)
+        for key in (
+            "memory_kernel_status",
+            "memory_kernel_pack_id",
+            "memory_kernel_admitted_count",
+            "memory_kernel_omitted_count",
+            "memory_kernel_warnings",
+        ):
+            if key in meta:
+                td.metadata[key] = meta[key]
         return meta
 
     @staticmethod

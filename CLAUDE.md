@@ -114,6 +114,7 @@ For machine-readable status, see [`reports/governance/active_track_evidence.md`]
 - **DarwinEngine** (`dharma_swarm/evolution.py`): Self-improvement via gated evolution.
 - **LoopEngine** (`dharma_swarm/cascade.py`): F(S)=S universal convergence loop across 5 domains.
 - **DharmaKernel** (`dharma_swarm/dharma_kernel.py`): 25 immutable axioms (SHA-256 signed).
+- **MemoryKernel** (`dharma_swarm/memory_kernel/`): Canonical front door for agent memory context; legacy MemoryPlane, RuntimeState facts, MemoryPalace, MemoryLattice, vector, graph, log, and wiki stores are subordinate sources, adapters, projections, or promotion feeds.
 - **TelosGatekeeper** (`dharma_swarm/telos_gates.py`): 11 dharmic safety gates.
 - **StigmergyStore** (`dharma_swarm/stigmergy.py`): Pheromone-trail coordination.
 - **CatalyticGraph** (`dharma_swarm/catalytic_graph.py`): Autocatalytic set detection (Tarjan SCC).
