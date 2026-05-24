@@ -1,9 +1,10 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts uplift-guards module-budget docops-integrity docops-report governance-all onboard go-fmt-check go-test go-vet go-ci
+.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts uplift-guards module-budget docops-integrity docops-report memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all onboard go-fmt-check go-test go-vet go-ci
 
 PYTHON ?= python3
+REPO_PYTHON ?= PYTHONPATH=. $(PYTHON)
 GO ?= go
 GOFMT ?= gofmt
 SEMGREP ?= scripts/governance/run_semgrep_with_ca.sh
@@ -44,6 +45,14 @@ help:
 	@echo "  make uplift-guards Run uplift pre-commit guards"
 	@echo "  make docops-integrity Run machine-verifiable documentation checks"
 	@echo "  make docops-report Generate local DocOps JSON/Markdown reports"
+	@echo "  make memory-kernel-readiness Run read-only MemoryKernel readiness gates"
+	@echo "  make memory-kernel-readiness-strict Require 100% strict MemoryKernel readiness"
+	@echo "  make memory-kernel-burn-in Append M3 context preview burn-in receipts"
+	@echo "  make memory-kernel-write-receipt-smoke Smoke M4 governed write receipts"
+	@echo "  make memory-kernel-promotion-smoke Smoke M5 human-gated promotion receipts"
+	@echo "  make memory-kernel-knowledgeops-bridge-smoke Smoke KnowledgeOps to MemoryKernel promotion bridge"
+	@echo "  make memory-kernel-full-power-preflight Run M2-M5 governed live preflight"
+	@echo "  make operator-prod-smoke Run fast read-only operator production smoke"
 	@echo "  make onboard      Render current operating reality (active track, live ops, broken register, axioms)"
 	@echo "  make go-ci        Run Go evidence sense-organ fmt/vet/test gates"
 	@echo ""
@@ -200,6 +209,41 @@ docops-report:
 		--report-json reports/docops/check.json \
 		--inventory-json reports/docops/corpus_inventory.json \
 		--inventory-markdown reports/docops/corpus_inventory.md
+
+memory-kernel-readiness:
+	$(REPO_PYTHON) scripts/memory_kernel_readiness.py --repo-root . --dry-run
+	$(REPO_PYTHON) scripts/memory_writer_sentinel.py --repo-root . --ci
+	$(REPO_PYTHON) scripts/memory_context_eval.py --repo-root . --run-default-cases --fail-on-hard-failure --dry-run
+	$(REPO_PYTHON) scripts/memory_context_shadow_sweep.py --repo-root . --fail-on-hard-failure --dry-run
+
+memory-kernel-readiness-strict:
+	$(REPO_PYTHON) scripts/memory_kernel_readiness.py --repo-root . --dry-run --strict --fail-on-missing-adapter
+	$(REPO_PYTHON) scripts/memory_writer_sentinel.py --repo-root . --ci
+	$(REPO_PYTHON) scripts/memory_context_eval.py --repo-root . --run-default-cases --fail-on-hard-failure --dry-run
+	$(REPO_PYTHON) scripts/memory_context_shadow_sweep.py --repo-root . --fail-on-hard-failure --dry-run
+
+memory-kernel-burn-in:
+	$(REPO_PYTHON) scripts/memory_kernel_burn_in.py --repo-root . --fail-on-blocked
+
+memory-kernel-write-receipt-smoke:
+	$(REPO_PYTHON) scripts/memory_kernel_write_receipt_smoke.py --repo-root . --fail-on-blocked
+
+memory-kernel-promotion-smoke: memory-kernel-write-receipt-smoke
+	$(REPO_PYTHON) scripts/memory_kernel_promotion_smoke.py --repo-root . --fail-on-blocked
+
+memory-kernel-knowledgeops-bridge-smoke:
+	$(REPO_PYTHON) scripts/memory_kernel_knowledgeops_bridge_smoke.py --repo-root . --fail-on-blocked
+
+memory-kernel-full-power-preflight:
+	$(MAKE) memory-kernel-readiness-strict
+	$(MAKE) memory-kernel-burn-in
+	$(MAKE) memory-kernel-write-receipt-smoke
+	$(MAKE) memory-kernel-promotion-smoke
+	$(MAKE) memory-kernel-knowledgeops-bridge-smoke
+	DHARMA_MEMORY_KERNEL_ROLLOUT=live $(REPO_PYTHON) scripts/operator_prod_smoke.py --repo-root .
+
+operator-prod-smoke:
+	$(REPO_PYTHON) scripts/operator_prod_smoke.py --repo-root .
 
 governance-all: semgrep gitleaks test-hygiene test-contracts uplift-guards module-budget docops-integrity
 

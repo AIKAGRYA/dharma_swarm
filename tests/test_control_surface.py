@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import textwrap
 from pathlib import Path
-from typing import Any
 
 import pytest
 import yaml
@@ -41,6 +40,12 @@ from dharma_swarm.operator_core.control_surface_models import (
     ControlSurfaceEnvelope,
     SourceError,
     _compute_display_hints,
+)
+from dharma_swarm.operator_core.control_surface_memory import (
+    ROLLOUT_ENV_VAR,
+    ROLLOUT_STATES,
+    memory_kernel_control_rows,
+    project_context_canary_report,
 )
 
 
@@ -383,6 +388,117 @@ class TestFullBuild:
 
 
 # ---------------------------------------------------------------------------
+# MemoryKernel operator controls
+# ---------------------------------------------------------------------------
+
+
+class TestMemoryKernelOperatorRows:
+    def test_projects_required_memory_kernel_rows(self, tmp_repo: Path) -> None:
+        rows = memory_kernel_control_rows(tmp_repo)
+        ids = {row.id for row in rows}
+
+        assert {
+            "memory.census",
+            "memory.adapter_coverage",
+            "memory.readiness",
+            "memory.writer_sentinel",
+            "memory.context_shadow",
+            "memory.context_canary",
+            "memory.knowledgeops_intake",
+            "memory.promotion_queue",
+            "memory.knowledgeops_bridge",
+            "memory.write_receipts",
+            "memory.live_promotion",
+            "memory.rollout_gate",
+            "memory.rollback_switch",
+        }.issubset(ids)
+
+    def test_rollout_gate_defaults_safe_off(
+        self,
+        tmp_repo: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.delenv(ROLLOUT_ENV_VAR, raising=False)
+
+        rows = memory_kernel_control_rows(tmp_repo)
+        gate = [row for row in rows if row.id == "memory.rollout_gate"][0]
+
+        assert gate.observed_state == "off"
+        assert tuple(gate.raw["allowed_states"]) == ROLLOUT_STATES
+        assert gate.raw["default_state"] == "off"
+        assert gate.raw["burn_in_safety_state"] == "safe"
+        assert gate.raw["burn_in_safe"] is True
+        assert gate.raw["burn_in_blockers"] == ()
+        assert gate.raw["max_ready_tier"] in set(gate.raw["ready_tiers"])
+        assert gate.raw["rollout_exceeds_ready_tier"] is False
+
+    def test_invalid_rollout_state_resolves_to_off(
+        self,
+        tmp_repo: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setenv(ROLLOUT_ENV_VAR, "unsafe-now")
+
+        rows = memory_kernel_control_rows(tmp_repo)
+        gate = [row for row in rows if row.id == "memory.rollout_gate"][0]
+
+        assert gate.observed_state == "off"
+        assert "memory_kernel_rollout_invalid_state" in gate.gap_codes
+        assert gate.raw["burn_in_safety_state"] == "blocked"
+        assert "rollout_state_valid" in gate.raw["burn_in_blockers"]
+
+    def test_readiness_row_projects_strict_accounting_fields(
+        self,
+        tmp_repo: Path,
+    ) -> None:
+        rows = memory_kernel_control_rows(tmp_repo)
+        readiness = [row for row in rows if row.id == "memory.readiness"][0]
+
+        assert readiness.raw["schema_version"] == "memory_kernel_readiness.v1"
+        assert readiness.raw["strict_readiness_state"] in {
+            "strict_ready",
+            "strict_blocked",
+        }
+        assert "accounted_surface_count" in readiness.raw
+        assert "accounted_surface_total" in readiness.raw
+        assert "required_accounted_surface_count" in readiness.raw
+        assert "required_surface_count" in readiness.raw
+
+    def test_preview_rollout_is_blocked_without_strict_readiness(
+        self,
+        tmp_repo: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setenv(ROLLOUT_ENV_VAR, "preview")
+        monkeypatch.setenv("DHARMA_MEMORY_KERNEL_HOME", str(tmp_repo / "empty-home"))
+
+        rows = memory_kernel_control_rows(tmp_repo)
+        gate = [row for row in rows if row.id == "memory.rollout_gate"][0]
+
+        assert gate.observed_state == "preview"
+        assert gate.raw["burn_in_safety_state"] == "blocked"
+        assert gate.raw["burn_in_safe"] is False
+        assert "memory_kernel_burn_in_blocked" in gate.gap_codes
+        assert gate.raw["required_ready_tier"] == "m3_safe_context_preview"
+
+    def test_knowledgeops_bridge_row_requires_linked_receipts(self, tmp_repo: Path) -> None:
+        rows = memory_kernel_control_rows(tmp_repo)
+        bridge = [row for row in rows if row.id == "memory.knowledgeops_bridge"][0]
+
+        assert bridge.observed_state == "blocked"
+        assert bridge.raw["schema_version"] == "memory_kernel_knowledgeops_bridge.v1"
+        assert bridge.raw["ready"] is False
+        assert "no_linked_knowledgeops_canonical_receipt" in bridge.raw["blockers"]
+
+    def test_context_canary_projects_failures(self) -> None:
+        report = project_context_canary_report()
+
+        assert report["projection_kind"] == "synthetic_canary"
+        assert report["persistence"] == "projected_not_persisted"
+        assert report["hard_failure_count"] >= 1
+
+
+# ---------------------------------------------------------------------------
 # Go receipt lane adapter
 # ---------------------------------------------------------------------------
 
@@ -487,6 +603,18 @@ class TestControlSurfaceAPI:
         assert "coherence_state" in first
         assert "declared_state" in first
         assert "observed_state" in first
+
+    def test_rows_keep_evidence_and_source_refs_structured(self) -> None:
+        client = _control_surface_client()
+        resp = client.get("/api/control-surface/rows")
+        assert resp.status_code == 200
+        rows = resp.json()["data"]
+        memory_row = [row for row in rows if row["id"] == "memory.census"][0]
+
+        assert isinstance(memory_row["evidence"][0], dict)
+        assert "source" in memory_row["evidence"][0]
+        assert isinstance(memory_row["source_refs"][0], dict)
+        assert "path" in memory_row["source_refs"][0]
 
     def test_row_by_id_returns_envelope(self) -> None:
         client = _control_surface_client()

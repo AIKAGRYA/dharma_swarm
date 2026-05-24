@@ -2,12 +2,60 @@
 
 from __future__ import annotations
 
+import sqlite3
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from dharma_swarm.context_compiler import ContextCompiler
 from dharma_swarm.runtime_state import ContextBundleRecord
+
+
+def _write_runtime_state_context_bundle(home):
+    runtime_dir = home / ".dharma" / "state"
+    runtime_dir.mkdir(parents=True)
+    conn = sqlite3.connect(str(runtime_dir / "runtime.db"))
+    conn.execute(
+        """
+        CREATE TABLE context_bundles (
+            bundle_id TEXT PRIMARY KEY,
+            session_id TEXT NOT NULL DEFAULT '',
+            task_id TEXT NOT NULL DEFAULT '',
+            run_id TEXT NOT NULL DEFAULT '',
+            token_budget INTEGER NOT NULL,
+            rendered_text TEXT NOT NULL,
+            sections_json TEXT NOT NULL DEFAULT '[]',
+            source_refs_json TEXT NOT NULL DEFAULT '[]',
+            checksum TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            metadata_json TEXT NOT NULL DEFAULT '{}'
+        )
+        """
+    )
+    conn.execute(
+        """
+        INSERT INTO context_bundles (
+            bundle_id, session_id, task_id, run_id, token_budget,
+            rendered_text, sections_json, source_refs_json, checksum,
+            created_at, metadata_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            "bnd_fixture",
+            "sess_fixture",
+            "task_fixture",
+            "run_fixture",
+            1200,
+            "Safe runtime bundle",
+            "[]",
+            "[]",
+            "checksum",
+            "2026-05-13T00:00:00Z",
+            "{}",
+        ),
+    )
+    conn.commit()
+    conn.close()
 
 
 @pytest.fixture
@@ -111,3 +159,50 @@ class TestCompileBundleWithCache:
         result = await mock_compiler.compile_bundle(session_id="sess_fresh")
         # Should have queried runtime
         mock_compiler.runtime_state.get_session.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_memory_kernel_shadow_disabled_by_default(self, mock_compiler):
+        reports = []
+
+        result = await mock_compiler.compile_bundle(
+            session_id="sess_shadow_off",
+            task_description="Compile regular context.",
+            memory_kernel_shadow_callback=reports.append,
+        )
+
+        assert "# DGC Context Bundle" in result.rendered_text
+        assert reports == []
+
+    @pytest.mark.asyncio
+    async def test_memory_kernel_shadow_preserves_fresh_compile_result(self, mock_compiler):
+        reports = []
+
+        result = await mock_compiler.compile_bundle(
+            session_id="sess_shadow_on",
+            task_description="Compile regular context.",
+            memory_kernel_shadow=True,
+            memory_kernel_shadow_callback=reports.append,
+        )
+
+        assert "# DGC Context Bundle" in result.rendered_text
+        assert len(reports) == 1
+        assert reports[0].legacy_report is not None
+        assert reports[0].legacy_report.char_count == len(result.rendered_text)
+        assert reports[0].memory_report is not None
+        assert reports[0].memory_report.atom_count == 0
+
+    @pytest.mark.asyncio
+    async def test_memory_kernel_shadow_callback_failure_does_not_break_compile(
+        self,
+        mock_compiler,
+    ):
+        def fail_callback(_report):
+            raise RuntimeError("callback failed")
+
+        result = await mock_compiler.compile_bundle(
+            session_id="sess_shadow_callback_fail",
+            memory_kernel_shadow=True,
+            memory_kernel_shadow_callback=fail_callback,
+        )
+
+        assert "# DGC Context Bundle" in result.rendered_text

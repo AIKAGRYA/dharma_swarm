@@ -22,7 +22,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import os
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -368,7 +367,9 @@ class AutonomousAgent:
     ``create_default_router()`` are not built per-agent cwd — routing Codex
     through them would regress CLI working directory. Without an injected
     router, ``openrouter`` uses the cheap-first runtime chain as before.
-    ``anthropic`` still uses the Anthropic SDK directly.
+    ``anthropic`` uses the canonical runtime provider factory so it stays
+    under the same provider-routing and connection policy as the rest of the
+    swarm.
 
     Usage::
 
@@ -387,7 +388,6 @@ class AutonomousAgent:
         self.identity = identity
         self.memory = AgentMemoryBank(identity.name)
         self._model_router = model_router
-        self._anthropic_client: Any = None
         self._openai_client: Any = None
         self._message_bus: Any = None
         self._stigmergy: Any = None
@@ -582,39 +582,73 @@ class AutonomousAgent:
     async def _call_anthropic(
         self, system: str, messages: list[dict], tools: list[dict],
     ) -> dict[str, Any]:
-        if self._anthropic_client is None:
-            from anthropic import AsyncAnthropic
-            self._anthropic_client = AsyncAnthropic(
-                api_key=os.environ.get("ANTHROPIC_API_KEY"),
+        from dharma_swarm.models import LLMRequest
+
+        configs = preferred_runtime_provider_configs(
+            provider_order=(ProviderType.ANTHROPIC,),
+            model_overrides={ProviderType.ANTHROPIC: self.identity.model},
+        )
+        if not configs:
+            raise RuntimeError("Anthropic provider unavailable; configure ANTHROPIC_API_KEY")
+
+        routed_order = (
+            _providers_registered_on_router(
+                self._model_router, [c.provider for c in configs]
             )
+            if self._model_router is not None
+            else []
+        )
+        if self._model_router is not None and routed_order:
+            llm_req = LLMRequest(
+                model=self.identity.model,
+                system=system,
+                messages=messages,
+                max_tokens=4096,
+                temperature=0.0,
+                tools=tools,
+            )
+            route_req = self._build_autonomous_route_request(
+                has_tools=bool(tools),
+                available_provider_types=routed_order,
+            )
+            _, response = await self._model_router.complete_for_task(
+                route_req,
+                llm_req,
+                available_provider_types=routed_order,
+            )
+            return _llm_response_to_react_shape(response)
 
-        kwargs: dict[str, Any] = {
-            "model": self.identity.model,
-            "system": system,
-            "messages": messages,
-            "max_tokens": 4096,
-        }
-        if tools:
-            kwargs["tools"] = tools
+        last_exc: Exception | None = None
+        for config in configs:
+            provider = create_runtime_provider(config)
+            try:
+                response = await provider.complete(
+                    LLMRequest(
+                        model=config.default_model or self.identity.model,
+                        system=system,
+                        messages=messages,
+                        max_tokens=4096,
+                        temperature=0.0,
+                        tools=tools,
+                    )
+                )
+                return _llm_response_to_react_shape(response)
+            except Exception as exc:
+                last_exc = exc
+                logger.warning(
+                    "[%s] provider %s failed for anthropic lane: %s",
+                    self.identity.name,
+                    config.provider.value,
+                    exc,
+                )
+            finally:
+                close = getattr(provider, "close", None)
+                if callable(close):
+                    await close()
 
-        resp = await self._anthropic_client.messages.create(**kwargs)
-
-        text_parts: list[str] = []
-        tool_uses: list[dict] = []
-        for block in resp.content:
-            if hasattr(block, "text"):
-                text_parts.append(block.text)
-            elif block.type == "tool_use":
-                tool_uses.append({"id": block.id, "name": block.name, "input": block.input})
-
-        return {
-            "text": text_parts,
-            "tool_uses": tool_uses,
-            "raw_content": resp.content,
-            "stop_reason": resp.stop_reason,
-            "tokens_in": resp.usage.input_tokens,
-            "tokens_out": resp.usage.output_tokens,
-        }
+        if last_exc is not None:
+            raise last_exc
+        raise RuntimeError("Anthropic provider chain exhausted without an explicit error")
 
     async def _call_openrouter(
         self, system: str, messages: list[dict], tools: list[dict],
