@@ -24,6 +24,7 @@ from dharma_swarm.guardian_runtime_checks import (
     runtime_context_bundle_injection_findings,
     runtime_rows_missing_context,
     runtime_context_status_counts,
+    _runtime_table_columns,
     _REGISTERED_DHARMA_TOP_LEVEL_DIRS,
 )
 
@@ -285,3 +286,26 @@ class TestRuntimeContextStatusCounts:
         assert counts.get("failed", 0) == 2
         assert counts.get("missing_runtime_state", 0) == 1
         db.close()
+
+
+def test_runtime_table_columns_quotes_identifiers_and_guards_missing():
+    """Regression for SQL identifier injection in _runtime_table_columns.
+
+    The helper must (1) return an empty set for tables that do not exist
+    rather than interpolating an unchecked name into a PRAGMA, and
+    (2) safely handle table names that require quoting/escaping.
+    """
+    db = sqlite3.connect(":memory:")
+    db.execute("CREATE TABLE task_queue (id TEXT, status TEXT)")
+    # A table name containing a double quote — must be quote-escaped, not injected.
+    db.execute('CREATE TABLE "weird""name" (alpha TEXT, beta TEXT)')
+    db.commit()
+
+    assert _runtime_table_columns(db, "task_queue") == {"id", "status"}
+    assert _runtime_table_columns(db, 'weird"name') == {"alpha", "beta"}
+    # Unknown table is guarded before any PRAGMA interpolation.
+    assert _runtime_table_columns(db, "no_such_table") == set()
+    # A classic injection payload is treated as a (non-existent) table name.
+    assert _runtime_table_columns(db, "task_queue); DROP TABLE task_queue;--") == set()
+    assert _runtime_table_columns(db, "task_queue") == {"id", "status"}
+    db.close()
