@@ -61,8 +61,8 @@ def _clear_operator_pid(pid: int | None = None) -> None:
 def _log_auth_mode() -> None:
     if _get_api_key() is None:
         logger.warning(
-            "Dashboard API bearer auth is disabled because no auth secret is configured. "
-            "All API routes are open in dev mode."
+            "Dashboard bearer auth is disabled; all API routes are open in dev mode. "
+            "Configure the dashboard credential environment variable to enable auth."
         )
     else:
         logger.info("Bearer token auth enabled for /api/* routes.")
@@ -104,7 +104,7 @@ async def lifespan(app: FastAPI):
     # Normalize dkeys/external env aliases before any provider resolution.
     aliased = normalize_env_aliases()
     if aliased:
-        logger.info("env alias normalization applied for %d configured credential(s)", len(aliased))
+        logger.info("Applied %d provider credential env alias normalization(s).", len(aliased))
 
     from dharma_swarm.ontology_runtime import get_shared_registry
 
