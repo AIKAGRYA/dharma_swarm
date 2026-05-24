@@ -158,7 +158,7 @@ def promote_atom(src: Path, dst_dir: Path, dry_run: bool = False) -> bool:
             counter += 1
 
     if dry_run:
-        logger.info("  [DRY-RUN] would promote: %s → %s", src, dst)
+        logger.info("  [DRY-RUN] would promote staging atom")
         return True
 
     shutil.move(str(src), str(dst))
