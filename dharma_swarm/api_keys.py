@@ -176,17 +176,17 @@ def normalize_env_aliases(
     env: dict[str, str] | None = None,
     *,
     dry_run: bool = False,
-) -> list[tuple[str, str, str]]:
+) -> list[tuple[str, str]]:
     """Copy alias env vars to their canonical dharma_swarm names.
 
     Only sets the canonical name when it is absent/empty **and** the alias is
-    present.  Returns a list of ``(alias, canonical, masked_value)`` tuples for
-    every variable that was (or would be, in *dry_run* mode) propagated.
+    present.  Returns a list of ``(alias, canonical)`` tuples for every
+    variable that was (or would be, in *dry_run* mode) propagated.
 
     When *env* is ``None`` the real ``os.environ`` is mutated in-place.
     """
     target = env if env is not None else os.environ
-    applied: list[tuple[str, str, str]] = []
+    applied: list[tuple[str, str]] = []
 
     for alias, canonical in ENV_ALIASES.items():
         if alias == canonical:
@@ -196,8 +196,7 @@ def normalize_env_aliases(
         if alias_val and not canonical_val:
             if not dry_run:
                 target[canonical] = alias_val
-            masked = alias_val[:4] + "..." if len(alias_val) > 4 else "***"
-            applied.append((alias, canonical, masked))
+            applied.append((alias, canonical))
 
     return applied
 
