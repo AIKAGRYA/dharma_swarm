@@ -155,4 +155,5 @@ class TestNormalizeDkeysScript:
         )
         assert result.returncode == 0
         assert "GOOGLE_AI_API_KEY" in result.stdout
-        assert "test-gemini-key" in result.stdout
+        assert "${GEMINI_API_KEY}" in result.stdout
+        assert "test-gemini-key" not in result.stdout
