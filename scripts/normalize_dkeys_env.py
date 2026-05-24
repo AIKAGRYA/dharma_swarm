@@ -56,8 +56,8 @@ def main() -> None:
             if alias == canonical:
                 continue
             sys.stdout.write(
-                f"if [ -n \"${{{alias}:-}}\" ] && [ -z \"${{{canonical}:-}}\" ]; "
-                f"then export {canonical}=\"${{{alias}}}\"; fi\n"
+                f'[ -n "${{{alias}:-}}" ] && [ -z "${{{canonical}:-}}" ] '
+                f'&& export {canonical}="${{{alias}}}"\n'
             )
         return
 
