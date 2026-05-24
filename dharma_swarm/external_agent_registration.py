@@ -42,6 +42,7 @@ from typing import Any
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from dharma_swarm.dgm_loop import DGM_PROTECTED_FILES
+from dharma_swarm.operator_core.identity_invariant import build_identity_invariant, canonical_serial
 from dharma_swarm.roaming_onboarding import (
     OnboardingReceipt,
     RoamingAgentRegistration,
@@ -250,6 +251,7 @@ class ExternalRoamingWorker(BaseModel):
     notes: str = ""
     registration_source: str = "external_agent_registration"
     capabilities: tuple[str, ...] = ()
+    identity_invariant: dict[str, Any] = Field(default_factory=dict)
     metadata: dict[str, Any] = Field(default_factory=dict)
     created_at: str = Field(default_factory=_utc_now_iso)
     updated_at: str = Field(default_factory=_utc_now_iso)
@@ -292,6 +294,19 @@ class ExternalRoamingWorker(BaseModel):
             raise ValueError(
                 f"memory_namespace must start with {expected_prefix!r}; "
                 f"got {self.memory_namespace!r}"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _attach_identity_invariant(self) -> "ExternalRoamingWorker":
+        if not self.identity_invariant:
+            self.identity_invariant = build_identity_invariant(
+                agent_uid=self.agent_uid,
+                authority_floor=self.authority.value,
+                memory_namespace=self.memory_namespace,
+                trace_identity=self.trace_identity,
+                serial=canonical_serial(self.agent_uid),
+                created_at=self.created_at,
             )
         return self
 
@@ -406,6 +421,8 @@ async def register_external_worker(
                 "workspace_policy": worker.workspace_policy.model_dump(),
                 "memory_namespace": worker.memory_namespace,
                 "trace_identity": worker.trace_identity,
+                "identity_invariant": worker.identity_invariant,
+                "identity_invariant_digest": worker.identity_invariant.get("digest"),
                 "status": worker.status.value,
                 "is_returning_historical_embodiment": (
                     worker.is_returning_historical_embodiment

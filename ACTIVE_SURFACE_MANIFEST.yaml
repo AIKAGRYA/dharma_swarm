@@ -29,6 +29,16 @@ state_dir:
   goodworks_dgm: "~/.dharma/goodworks_dgm"
   board_event_log: "~/.dharma/board/event_log.sqlite3"
   sakshi_provenance_log: "~/.dharma/sakshi/provenance_log.jsonl"
+  agents: "~/.dharma/agents"
+  external_agents: "~/.dharma/external_agents"
+  a2a_cards: "~/.dharma/a2a/cards"
+  a2a_task_queue: "~/.dharma/a2a_bus/tasks/queue.jsonl"
+  a2a_inboxes: "~/.dharma/a2a_bus/inboxes"
+  a2a_state: "~/.dharma/a2a_bus/state"
+  control_watch_tower: "~/.dharma/control_watch_tower"
+  collaboration_packets: "~/.dharma/collaboration_packets"
+  gepa_lite: "~/.dharma/gepa_lite"
+  cron: "~/.dharma/cron"
   env_override: "DHARMA_STATE_DIR"
 
 api_routers:

@@ -15,7 +15,7 @@ Registration Desk enrolls.
 CONTROL_WATCH_TOWER watches.
 KaizenOps monitors operations.
 AgentOps tests bounded work.
-MemoryKernel/MMK preserves evidence surfaces.
+Memory Kernel preserves evidence surfaces.
 Telemetry ranks.
 Authority ladder promotes only through review.
 ```
@@ -44,7 +44,7 @@ Ported rule: the tower is not a dashboard of raw logs. It is a staffed/process-d
 - Telemetry plane: `~/.dharma/state/runtime.db`, especially `agent_identity`, `team_roster`, `agent_reputation`, `agent_reward_ledger`, and `workflow_scores`.
 - KaizenOps: `~/.dharma/kaizen/ops.db`, especially `events`, `cron_health`, and `scout_health`.
 - AgentOps: `reports/agentops/**/report.json` and work packets.
-- MemoryKernel/MMK: memory surface registry, writer specs, surface census.
+- Memory Kernel target: memory surface registry, writer specs, surface census. Current branch doctrine names this organ, but source-level `dharma_swarm/memory_kernel` restoration belongs to the Memory Kernel PR lane; until then, CWT treats RuntimeState, Chetana, MemoryPlane, Palace/Lattice, graph/vector/event stores as feeds/adapters/projections.
 - Observability: `~/.dharma/traces/` local spans and cost ledger.
 - Witness and Stigmergy: `~/.dharma/stigmergy/marks.jsonl` and witness artifacts.
 - Existing control surface: `dharma_swarm/operator_core/control_surface.py` and API projection.
@@ -281,6 +281,11 @@ When registration runs, future wiring should create:
 ~/.dharma/external_agents/{agent_uid}/watch/events.jsonl
 ```
 
+Current implementation note: the Registration Desk now creates
+`watch/contract.json` during onboarding. `watch/scorecard.json` and
+`watch/events.jsonl` remain CWT v1 work; v0 scorecards are rendered into
+`reports/control_watch_tower/{timestamp}/scorecards/`.
+
 The contract should include:
 
 - `agent_uid`
@@ -303,7 +308,8 @@ P0:
 1. Add `CONTROL_WATCH_TOWER` schemas for report and scorecard.
 2. Add a read-only collector that lists registered agents and evidence paths.
 3. Add MemoryKernel surface specs for external agents, onboarding receipts, A2A cards, AgentOps reports, AgentOps work packets, and watch scorecards.
-4. Add `watch/contract.json` creation to the Registration Desk.
+4. Add `watch/contract.json` creation to the Registration Desk. Done in v0;
+   keep `watch/scorecard.json` and `watch/events.jsonl` for CWT v1.
 5. Add a CLI that renders one report under `reports/control_watch_tower/{timestamp}/`.
 
 P1:
@@ -336,3 +342,71 @@ P2:
 ## One Sentence
 
 `CONTROL_WATCH_TOWER` is the command post and ontology cockpit that turns registered persistent agents from "things with logs" into controlled, scored, governable participants in dharma_swarm.
+
+## v1 Append-Only Watch CLI
+
+CWT v1 starts as append-only primitives:
+
+```bash
+python3 scripts/runtime/cwt_watch.py event \
+  --agent-uid hermes_m5_bootstrap \
+  --event-type task_claimed \
+  --summary "claimed morning briefing packet"
+```
+
+Supported surfaces:
+
+- `watch_events.jsonl`: task claims, gate outcomes, artifacts, lost comms, collaboration packets.
+- `incidents.jsonl`: near misses and mandatory incidents.
+- `aotams.jsonl`: agent notices to airmen for temporary hazards.
+- `agent_reputation`: SQLite upsert in `~/.dharma/state/runtime.db`.
+
+The CLI also mirrors watch events into KaizenOps with category
+`external_agent_watch`. If an agent has a local sandbox, the event is also
+mirrored into `~/.dharma/external_agents/{agent_uid}/watch/events.jsonl`.
+
+## Recursive Control Projection
+
+CWT now reports recursive-machine health, not just registration health. The report includes:
+
+- `open_recursive_frames`
+- `claimed_without_receipt`
+- `completed_unverified`
+- `missing_return_address`
+- `identity_invariant_mismatches`
+- `self_evolution_candidates`
+- `benchmark_runs`
+- `revenue_autonomy_trials`
+
+The key rule is simple: a claimed A2A task without a valid terminal receipt is open work, even if an agent said it was handled. A completed task without a valid receipt is `completed_unverified`. An agent with mismatched identity invariant digests is present but identity-drifted. GEPA/self-evolution candidates stay review-only until AgentOps or a human applies the change.
+
+Examples:
+
+```bash
+python3 scripts/runtime/cwt_watch.py incident \
+  --agent-uid claude_code_cli_20260521t064502z \
+  --severity high \
+  --kind mandatory \
+  --summary "unauthorized protected-surface write blocked"
+
+python3 scripts/runtime/cwt_watch.py aotam \
+  --aotam-id AOTAM-DIRTY-TREE-001 \
+  --issuer control-watch-tower \
+  --scope repo \
+  --hazard "dirty worktree under parallel agent activity" \
+  --required-agent-action "pause before destructive git operations" \
+  --affected-agent hermes_m5_bootstrap
+
+python3 scripts/runtime/cwt_watch.py lost-comms-scan --max-age-hours 24
+
+python3 scripts/runtime/cwt_watch.py reputation \
+  --agent-uid codex_5_5_cli \
+  --overall-score 0.62 \
+  --trust-band evidence_only \
+  --dimension work_capacity=0.8 \
+  --dimension safety_discipline=1.0
+```
+
+These events feed the existing `cwt_collect.py` and `cwt_report.py` scorecards.
+They still do not grant authority; CWT remains observation and recommendation,
+not command execution.

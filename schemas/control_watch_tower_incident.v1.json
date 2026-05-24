@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dharma.local/schemas/control_watch_tower_incident.v1.json",
+  "title": "CONTROL_WATCH_TOWER Incident v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "incident_id",
+    "opened_at",
+    "updated_at",
+    "agent_uid",
+    "kind",
+    "severity",
+    "status",
+    "summary",
+    "trace_id",
+    "evidence_refs",
+    "metadata"
+  ],
+  "properties": {
+    "schema_version": { "const": "control_watch_tower_incident.v1" },
+    "incident_id": { "type": "string", "minLength": 1 },
+    "opened_at": { "type": "string" },
+    "updated_at": { "type": "string" },
+    "agent_uid": { "type": "string", "minLength": 1 },
+    "kind": { "enum": ["near_miss", "mandatory"] },
+    "severity": { "enum": ["low", "medium", "high", "critical"] },
+    "status": { "type": "string", "minLength": 1 },
+    "summary": { "type": "string", "minLength": 1 },
+    "trace_id": { "type": "string" },
+    "evidence_refs": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

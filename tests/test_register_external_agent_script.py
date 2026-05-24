@@ -53,10 +53,12 @@ def test_register_external_agent_script_writes_registration_desk_surfaces(tmp_pa
     assert result["agent_uid"] == "demo_worker"
     assert (sandbox / "registration.json").exists()
     assert (sandbox / "identity_manifest.normalized.json").exists()
+    assert (sandbox / "identity_invariant.json").exists()
     assert (sandbox / "self_model" / "REQUIRED_FIRST_WRITE.md").exists()
     assert (sandbox / "self_model" / "system_interpretation.md").exists()
     assert (sandbox / "logs" / "wake_receipts.jsonl").exists()
     assert (sandbox / "agentops" / "contract.json").exists()
+    assert (sandbox / "watch" / "contract.json").exists()
     assert (home / "agents" / "demo_worker" / "living_agent.json").exists()
     assert (home / "onboarding" / "receipts.jsonl").exists()
 
@@ -75,8 +77,24 @@ def test_register_external_agent_script_writes_registration_desk_surfaces(tmp_pa
     assert card["metadata"]["dispatch_enabled"] is False
     assert card["metadata"]["requires_approval"] is True
 
+    registration = json.loads((sandbox / "registration.json").read_text())
+    invariant = json.loads((sandbox / "identity_invariant.json").read_text())
+    living = json.loads((home / "agents" / "demo_worker" / "living_agent.json").read_text())
+    assert invariant["schema_version"] == "dharma_identity_invariant.v1"
+    assert invariant["agent_uid"] == "demo_worker"
+    assert invariant["authority_floor"] == "external_worker_evidence_only"
+    assert invariant["digest"].startswith("sha256:")
+    assert registration["identity_invariant"]["digest"] == invariant["digest"]
+    assert living["identity_invariant"]["digest"] == invariant["digest"]
+    assert card["metadata"]["identity_invariant"]["digest"] == invariant["digest"]
+
     contract = json.loads((sandbox / "agentops" / "contract.json").read_text())
     assert contract["status"] == "agentops_ready_not_scheduled"
+    watch_contract = json.loads((sandbox / "watch" / "contract.json").read_text())
+    assert watch_contract["status"] == "submitted_for_tracking"
+    assert watch_contract["authority"] == "external_worker_evidence_only"
+    assert watch_contract["scorecard_schema"] == "control_watch_tower_agent_scorecard.v0"
+    assert "CWT-COP" in watch_contract["watch_sections_enabled"]
 
     assert (home / "kaizen" / "ops.db").exists()
     marks = (home / "stigmergy" / "marks.jsonl").read_text(encoding="utf-8")
@@ -121,5 +139,11 @@ def test_show_up_registration_assigns_identity_without_manifest(tmp_path):
     assert registration["metadata"]["show_up_mode"] is True
     assert registration["authority"] == "external_worker_evidence_only"
     assert (home / "agents" / agent_uid / "living_agent.json").exists()
+    assert (sandbox / "identity_invariant.json").exists()
     assert (sandbox / "logs" / "action_log.jsonl").exists()
     assert (sandbox / "logs" / "wake_receipts.jsonl").exists()
+    assert (sandbox / "watch" / "contract.json").exists()
+    invariant = json.loads((sandbox / "identity_invariant.json").read_text())
+    assert invariant["agent_uid"] == agent_uid
+    assert invariant["memory_namespace"] == f"agent:{agent_uid}"
+    assert invariant["trace_identity"] == f"trace:{agent_uid}"

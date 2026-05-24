@@ -35,6 +35,9 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_STATE_ROOT = HOME / ".dharma"
 DEFAULT_REPORTS_BASE = REPO_ROOT / "reports" / "control_watch_tower"
 COLLECTOR_PATH = REPO_ROOT / "scripts" / "runtime" / "cwt_collect.py"
+sys.path.insert(0, str(REPO_ROOT))
+
+from dharma_swarm.operator_core.a2a_task_lifecycle import task_lifecycle_state  # noqa: E402
 
 REPORT_SCHEMA_VERSION = "control_watch_tower_report.v0"
 GENERATED_BY = "CONTROL_WATCH_TOWER cwt_report.v0"
@@ -48,7 +51,14 @@ def _stamp() -> str:
     return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
 
-def _source_status(name: str, status: str, severity: str, summary: str, evidence_paths: list[str] | None = None, metrics: dict[str, Any] | None = None) -> dict[str, Any]:
+def _source_status(
+    name: str,
+    status: str,
+    severity: str,
+    summary: str,
+    evidence_paths: list[str] | None = None,
+    metrics: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     return {
         "source": name,
         "status": status,
@@ -58,6 +68,27 @@ def _source_status(name: str, status: str, severity: str, summary: str, evidence
         "metrics": metrics or {},
         "checked_at": _now(),
     }
+
+
+def read_jsonl_safe(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    rows: list[dict[str, Any]] = []
+    try:
+        with path.open(encoding="utf-8") as handle:
+            for line in handle:
+                stripped = line.strip()
+                if not stripped:
+                    continue
+                try:
+                    value = json.loads(stripped)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(value, dict):
+                    rows.append(value)
+    except Exception:
+        return []
+    return rows
 
 
 def collect_source_statuses(state_root: Path) -> list[dict[str, Any]]:
@@ -198,12 +229,54 @@ def collect_source_statuses(state_root: Path) -> list[dict[str, Any]]:
             "agent_passports root does not exist", [str(pp)],
         ))
 
+    # CWT v1 watch events
+    cwt = state_root / "control_watch_tower"
+    watch_events = cwt / "watch_events.jsonl"
+    incidents = cwt / "incidents.jsonl"
+    aotams = cwt / "aotams.jsonl"
+    for name, path in (
+        ("cwt_watch_events", watch_events),
+        ("cwt_incidents", incidents),
+        ("cwt_aotams", aotams),
+    ):
+        if path.exists():
+            try:
+                with path.open(encoding="utf-8") as handle:
+                    lines = sum(1 for line in handle if line.strip())
+                statuses.append(_source_status(
+                    name, "ok", "INFO",
+                    f"{lines} records present",
+                    [str(path)], {"record_count": lines},
+                ))
+            except Exception as e:
+                statuses.append(_source_status(
+                    name, "fail", "WARNING",
+                    f"{name} read error: {type(e).__name__}",
+                    [str(path)],
+                ))
+        else:
+            statuses.append(_source_status(
+                name, "missing", "INFO",
+                f"{path.name} does not exist yet",
+                [str(path)],
+            ))
+
     return statuses
 
 
 def aggregate_agent_summaries(scorecards_dir: Path) -> tuple[list[dict[str, Any]], dict[str, int]]:
     summaries: list[dict[str, Any]] = []
-    counts = {"registered": 0, "active": 0, "blocked": 0, "lost_comms": 0, "quarantined": 0, "retired": 0, "unknown": 0, "incident": 0, "promotion_candidate": 0}
+    counts = {
+        "registered": 0,
+        "active": 0,
+        "blocked": 0,
+        "lost_comms": 0,
+        "quarantined": 0,
+        "retired": 0,
+        "unknown": 0,
+        "incident": 0,
+        "promotion_candidate": 0,
+    }
     for sc_path in sorted(scorecards_dir.glob("scorecard_*.json")):
         try:
             sc = json.loads(sc_path.read_text())
@@ -221,11 +294,104 @@ def aggregate_agent_summaries(scorecards_dir: Path) -> tuple[list[dict[str, Any]
             "status": status,
             "scorecard_ref": str(sc_path.relative_to(scorecards_dir.parent.parent)),
             "blockers": sc.get("blockers", []),
+            "incident_count": len(sc.get("incidents", [])),
+            "aotam_count": len(sc.get("aotams", [])),
         })
+        counts["incident"] += len(sc.get("incidents", []))
         rec = sc.get("promotion_recommendation", {}).get("recommendation", "hold")
         if rec in ("promote_candidate", "promote_scoped"):
             counts["promotion_candidate"] += 1
     return summaries, counts
+
+
+def collect_identity_invariant_mismatches(scorecards_dir: Path) -> list[dict[str, Any]]:
+    mismatches: list[dict[str, Any]] = []
+    for sc_path in sorted(scorecards_dir.glob("scorecard_*.json")):
+        try:
+            sc = json.loads(sc_path.read_text())
+        except Exception:
+            continue
+        invariant = sc.get("identity_invariant") or {}
+        if invariant.get("valid") is True:
+            continue
+        errors = invariant.get("errors") or []
+        mismatches.append(
+            {
+                "agent_uid": sc.get("agent_uid"),
+                "callsign": sc.get("callsign"),
+                "errors": errors or ["identity invariant missing or invalid"],
+                "scorecard_ref": str(sc_path),
+            }
+        )
+    return mismatches
+
+
+def collect_recursive_control_projection(state_root: Path, scorecards_dir: Path) -> dict[str, Any]:
+    queue_path = state_root / "a2a_bus" / "tasks" / "queue.jsonl"
+    queue_rows = read_jsonl_safe(queue_path)
+    open_frames: list[dict[str, Any]] = []
+    claimed_without_receipt: list[dict[str, Any]] = []
+    completed_unverified: list[dict[str, Any]] = []
+    missing_return_address: list[dict[str, Any]] = []
+    for row in queue_rows:
+        lifecycle = task_lifecycle_state(row)
+        item = {
+            "task_id": row.get("id"),
+            "from": row.get("from"),
+            "to": row.get("to"),
+            "status": row.get("status") or "pending",
+            "lifecycle_state": lifecycle["state"],
+            "claimed_by": row.get("claimed_by"),
+        }
+        if not lifecycle["closed"]:
+            open_frames.append(item)
+        if lifecycle["state"] == "claimed_open":
+            claimed_without_receipt.append(item)
+        if lifecycle["state"] == "completed_unverified":
+            validation = lifecycle.get("validation") or {}
+            completed_unverified.append(item | {"errors": validation.get("errors", [])})
+        receipt = row.get("receipt") if isinstance(row.get("receipt"), dict) else {}
+        if not row.get("return_address") and not receipt.get("return_address"):
+            missing_return_address.append(item)
+
+    self_evolution_candidates: list[dict[str, Any]] = []
+    for review_path in sorted((state_root / "gepa_lite").glob("*/promotion_reviews/*.json")):
+        try:
+            review = json.loads(review_path.read_text())
+        except Exception:
+            continue
+        self_evolution_candidates.append(
+            {
+                "experiment_id": review.get("experiment_id"),
+                "candidate_id": review.get("candidate_id"),
+                "status": review.get("status"),
+                "path": str(review_path),
+            }
+        )
+
+    benchmark_runs = [
+        str(path)
+        for root in (state_root / "benchmarks", REPO_ROOT / "reports" / "benchmarks")
+        if root.exists()
+        for path in sorted(root.rglob("*.json"))
+    ][:50]
+    revenue_trials = [
+        str(path)
+        for root in (state_root / "revenue_packets", state_root / "economics")
+        if root.exists()
+        for path in sorted(root.rglob("*.json"))
+    ][:50]
+
+    return {
+        "open_recursive_frames": open_frames,
+        "claimed_without_receipt": claimed_without_receipt,
+        "completed_unverified": completed_unverified,
+        "missing_return_address": missing_return_address,
+        "identity_invariant_mismatches": collect_identity_invariant_mismatches(scorecards_dir),
+        "self_evolution_candidates": self_evolution_candidates,
+        "benchmark_runs": benchmark_runs,
+        "revenue_autonomy_trials": revenue_trials,
+    }
 
 
 def build_report(state_root: Path, report_dir: Path) -> dict[str, Any]:
@@ -240,13 +406,28 @@ def build_report(state_root: Path, report_dir: Path) -> dict[str, Any]:
     ]
     collector_result = subprocess.run(collector_cmd, capture_output=True, text=True)
     if collector_result.returncode != 0:
-        raise RuntimeError(f"cwt_collect.py failed (exit {collector_result.returncode}): {collector_result.stderr[:500]}")
+        raise RuntimeError(
+            f"cwt_collect.py failed (exit {collector_result.returncode}): "
+            f"{collector_result.stderr[:500]}"
+        )
 
     # 2. Source statuses
     sources = collect_source_statuses(state_root)
 
     # 3. Agent summaries
     summaries, counts = aggregate_agent_summaries(scorecards_dir)
+    recursive_control = collect_recursive_control_projection(state_root, scorecards_dir)
+    cwt_root = state_root / "control_watch_tower"
+    incidents = [
+        row
+        for row in read_jsonl_safe(cwt_root / "incidents.jsonl")
+        if row.get("status", "open") != "closed"
+    ]
+    aotams = [
+        row
+        for row in read_jsonl_safe(cwt_root / "aotams.jsonl")
+        if row.get("status", "active") == "active"
+    ]
 
     # 4. Common operational picture
     cop = {
@@ -255,7 +436,9 @@ def build_report(state_root: Path, report_dir: Path) -> dict[str, Any]:
             f"{counts['registered']} registered, {counts['unknown']} unknown. "
             f"{counts['promotion_candidate']} promotion candidates."
         ),
-        "registered_agents": sum([counts["registered"], counts["active"], counts["blocked"]]),
+        "registered_agents": sum(
+            [counts["registered"], counts["active"], counts["blocked"]]
+        ),
         "active_agents": counts["active"],
         "lost_comms_agents": counts["lost_comms"],
         "blocked_agents": counts["blocked"],
@@ -263,14 +446,7 @@ def build_report(state_root: Path, report_dir: Path) -> dict[str, Any]:
         "promotion_candidates": counts["promotion_candidate"],
     }
 
-    # 5. Overall status from source severities
-    overall = "ok"
-    if any(s["severity"] == "BLOCKER" for s in sources):
-        overall = "fail"
-    elif any(s["severity"] == "WARNING" for s in sources):
-        overall = "warn"
-
-    # 6. Blockers + warnings (collected from sources + scorecards)
+    # 5. Blockers + warnings (collected from sources, scorecards, recursive control)
     blockers_list: list[str] = []
     warnings_list: list[str] = []
     for s in sources:
@@ -281,12 +457,47 @@ def build_report(state_root: Path, report_dir: Path) -> dict[str, Any]:
     for summ in summaries:
         for b in summ.get("blockers", []):
             blockers_list.append(f"{summ['agent_uid']}: {b}")
+    for frame in recursive_control["claimed_without_receipt"]:
+        blockers_list.append(f"A2A claimed without receipt: {frame['task_id']} -> {frame['to']}")
+    for frame in recursive_control["completed_unverified"]:
+        errors = "; ".join(frame.get("errors") or [])
+        detail = f" ({errors})" if errors else ""
+        blockers_list.append(
+            f"A2A completed unverified: {frame['task_id']} -> {frame['to']}{detail}"
+        )
+    for frame in recursive_control["missing_return_address"]:
+        blockers_list.append(f"A2A missing return address: {frame['task_id']} -> {frame['to']}")
+    for mismatch in recursive_control["identity_invariant_mismatches"]:
+        blockers_list.append(
+            f"{mismatch['agent_uid']}: identity invariant invalid/missing"
+        )
+
+    # 6. Overall status must reflect every blocker surface, not only source health.
+    if blockers_list:
+        overall = "fail"
+    elif warnings_list:
+        overall = "warn"
+    else:
+        overall = "ok"
 
     next_actions = [
         "Review per-agent scorecards under reports/control_watch_tower/<ts>/scorecards/",
-        "For agents with 'no action_log entries' blocker — verify they have a real wake/work loop or accept registered-only status.",
-        "For agents missing a2a card or telemetry identity — re-register via scripts/register_external_agent.py.",
-        "v1 collector should add: incident tracking, AOTAM ingestion, cost-discipline real metrics, true comms_reliability via heartbeat checks.",
+        (
+            "For agents with 'no action_log entries' blocker — verify they have "
+            "a real wake/work loop or accept registered-only status."
+        ),
+        (
+            "For agents missing a2a card or telemetry identity — re-register via "
+            "scripts/register_external_agent.py."
+        ),
+        (
+            "CWT v1 now ingests watch events, incidents, AOTAMs, lost-comms scans, "
+            "and reputation upserts; remaining v1 work is true cost and heartbeat metrics."
+        ),
+        (
+            "Use scripts/runtime/cwt_watch.py for append-only watch events, incidents, "
+            "AOTAMs, lost-comms scans, and reputation upserts."
+        ),
     ]
 
     report_id = hashlib.sha256(f"cwt_report:{_now()}".encode()).hexdigest()[:20]
@@ -307,8 +518,9 @@ def build_report(state_root: Path, report_dir: Path) -> dict[str, Any]:
         "common_operational_picture": cop,
         "sources": sources,
         "agents": summaries,
-        "aotams": [],
-        "incidents": [],
+        "aotams": aotams,
+        "incidents": incidents,
+        "recursive_control": recursive_control,
         "blockers": blockers_list,
         "warnings": warnings_list,
         "next_operator_actions": next_actions,
@@ -343,6 +555,9 @@ def render_markdown(report: dict[str, Any]) -> str:
         f"- lost_comms_agents: **{report['common_operational_picture']['lost_comms_agents']}**",
         f"- promotion_candidates: **{report['common_operational_picture']['promotion_candidates']}**",
         f"- incident_count: **{report['common_operational_picture']['incident_count']}**",
+        f"- open_recursive_frames: **{len(report['recursive_control']['open_recursive_frames'])}**",
+        f"- claimed_without_receipt: **{len(report['recursive_control']['claimed_without_receipt'])}**",
+        f"- self_evolution_candidates: **{len(report['recursive_control']['self_evolution_candidates'])}**",
         "",
         "## Sources",
         "",
@@ -355,13 +570,38 @@ def render_markdown(report: dict[str, Any]) -> str:
         "",
         "## Agents",
         "",
-        "| agent_uid | callsign | authority | status | blockers |",
-        "|---|---|---|---|---|",
+        "| agent_uid | callsign | authority | status | blockers | incidents | AOTAMs |",
+        "|---|---|---|---|---|---|---|",
     ])
     for a in report["agents"]:
         lines.append(
-            f"| `{a['agent_uid']}` | `{a['callsign']}` | {a['authority']} | {a['status']} | {len(a['blockers'])} |"
+            f"| `{a['agent_uid']}` | `{a['callsign']}` | {a['authority']} | "
+            f"{a['status']} | {len(a['blockers'])} | {a.get('incident_count', 0)} | "
+            f"{a.get('aotam_count', 0)} |"
         )
+    recursive = report["recursive_control"]
+    lines.extend(
+        [
+            "",
+            "## Recursive Control",
+            "",
+            f"- open_recursive_frames: `{len(recursive['open_recursive_frames'])}`",
+            f"- claimed_without_receipt: `{len(recursive['claimed_without_receipt'])}`",
+            f"- completed_unverified: `{len(recursive['completed_unverified'])}`",
+            f"- missing_return_address: `{len(recursive['missing_return_address'])}`",
+            f"- identity_invariant_mismatches: `{len(recursive['identity_invariant_mismatches'])}`",
+            f"- self_evolution_candidates: `{len(recursive['self_evolution_candidates'])}`",
+            f"- benchmark_runs: `{len(recursive['benchmark_runs'])}`",
+            f"- revenue_autonomy_trials: `{len(recursive['revenue_autonomy_trials'])}`",
+        ]
+    )
+    if recursive["claimed_without_receipt"]:
+        lines.extend(["", "### Claimed Without Receipt", ""])
+        for frame in recursive["claimed_without_receipt"][:20]:
+            lines.append(
+                f"- `{frame['task_id']}` from `{frame['from']}` to `{frame['to']}` "
+                f"claimed_by `{frame.get('claimed_by') or ''}`"
+            )
     if report["blockers"]:
         lines.extend(["", "## Blockers", ""])
         for b in report["blockers"]:

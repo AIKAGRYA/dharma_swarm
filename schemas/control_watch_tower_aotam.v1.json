@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dharma.local/schemas/control_watch_tower_aotam.v1.json",
+  "title": "CONTROL_WATCH_TOWER AOTAM v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "aotam_id",
+    "issued_at",
+    "issuer",
+    "scope",
+    "affected_agents",
+    "hazard",
+    "effective_from",
+    "expires_at",
+    "required_agent_action",
+    "evidence_refs",
+    "status"
+  ],
+  "properties": {
+    "schema_version": { "const": "control_watch_tower_aotam.v1" },
+    "aotam_id": { "type": "string", "minLength": 1 },
+    "issued_at": { "type": "string" },
+    "issuer": { "type": "string", "minLength": 1 },
+    "scope": { "type": "string", "minLength": 1 },
+    "affected_agents": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "hazard": { "type": "string", "minLength": 1 },
+    "effective_from": { "type": "string" },
+    "expires_at": { "type": "string" },
+    "required_agent_action": { "type": "string", "minLength": 1 },
+    "evidence_refs": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "status": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": true
+}

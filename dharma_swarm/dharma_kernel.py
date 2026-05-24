@@ -92,6 +92,24 @@ class PrincipleSpec(BaseModel):
     structured_predicate: dict[str, Any] | None = None
 
 
+class AXIOM(BaseModel):
+    """Runtime object form of a kernel principle.
+
+    ``MetaPrinciple`` is the enum vocabulary. ``PrincipleSpec`` is the static
+    manifest payload. ``AXIOM`` is the object the rest of the system can count,
+    route, and attach gate decisions to without confusing "a defined enum" with
+    "an instantiated governance object".
+    """
+
+    axiom_id: str
+    principle: MetaPrinciple
+    name: str
+    description: str
+    formal_constraint: str
+    severity: Literal["critical", "high", "medium"]
+    kernel_signature: str
+
+
 class DharmaKernel(BaseModel):
     """Immutable kernel of dharmic principles with tamper-evident signature."""
 
@@ -363,6 +381,31 @@ class DharmaKernel(BaseModel):
     def verify_integrity(self) -> bool:
         """Recompute signature and compare to stored value."""
         return self.compute_signature() == self.signature
+
+    def instantiate_axioms(self) -> list[AXIOM]:
+        """Return one AXIOM object for every kernel principle."""
+        return instantiate_axioms(self)
+
+
+def instantiate_axioms(kernel: DharmaKernel | None = None) -> list[AXIOM]:
+    """Instantiate the default/kernel principles as first-class AXIOM objects."""
+
+    kernel = kernel or DharmaKernel.create_default()
+    return [
+        AXIOM(
+            axiom_id=f"AXIOM:{name}",
+            principle=MetaPrinciple(name),
+            name=spec.name,
+            description=spec.description,
+            formal_constraint=spec.formal_constraint,
+            severity=spec.severity,
+            kernel_signature=kernel.signature,
+        )
+        for name, spec in sorted(kernel.principles.items())
+    ]
+
+
+DEFAULT_AXIOMS: tuple[AXIOM, ...] = tuple(instantiate_axioms())
 
 
 # === Guard ===

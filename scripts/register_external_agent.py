@@ -215,6 +215,8 @@ def scaffold_self_filesystem(
     manifest_path: Path | None,
 ) -> dict[str, str]:
     now = _utc_now()
+    state_root = root.parent.parent
+    identity_invariant = dict(worker.identity_invariant)
     root.mkdir(parents=True, exist_ok=True)
     for rel in (
         "self_model",
@@ -222,6 +224,7 @@ def scaffold_self_filesystem(
         "receipts",
         "wake",
         "agentops",
+        "watch",
         "scratch",
         "outbox",
         "inbox",
@@ -236,8 +239,11 @@ def scaffold_self_filesystem(
     system_map_path = root / "self_model" / "system_interpretation.md"
     required_path = root / "self_model" / "REQUIRED_FIRST_WRITE.md"
     agentops_contract_path = root / "agentops" / "contract.json"
+    watch_contract_path = root / "watch" / "contract.json"
+    identity_invariant_path = root / "identity_invariant.json"
 
     _write_json(normalized_manifest_path, manifest)
+    _write_json(identity_invariant_path, identity_invariant)
     _write_json(registration_receipt_path, registration_result)
     _write_text(
         root / "README.md",
@@ -251,6 +257,7 @@ def scaffold_self_filesystem(
                 f"- authority: `{worker.authority.value}`",
                 f"- memory_namespace: `{worker.memory_namespace}`",
                 f"- trace_identity: `{worker.trace_identity}`",
+                f"- identity_invariant_digest: `{identity_invariant.get('digest', '')}`",
                 "",
                 "This directory is the agent's sandboxed dharma_swarm filesystem.",
                 f"The agent must append every material action to `logs/{ACTION_LOG_NAME}`.",
@@ -317,6 +324,53 @@ def scaffold_self_filesystem(
             "workspace_policy": worker.workspace_policy.model_dump(),
         },
     )
+    _write_json(
+        watch_contract_path,
+        {
+            "schema_version": "control_watch_tower_watch_contract.v0",
+            "agent_uid": worker.agent_uid,
+            "callsign": worker.callsign,
+            "registration_receipt": str(registration_receipt_path),
+            "authority": worker.authority.value,
+            "identity_invariant": identity_invariant,
+            "status": "submitted_for_tracking",
+            "watch_sections_enabled": [
+                "CWT-COP",
+                "CWT-J2-INTEL",
+                "CWT-J3-OPS",
+                "CWT-J6-COMMS",
+                "CWT-SAFETY",
+                "CWT-BOARD",
+            ],
+            "required_logs": [
+                str(action_log_path),
+                str(wake_log_path),
+            ],
+            "source_paths": {
+                "sandbox_root": str(root),
+                "registration": str(root / "registration.json"),
+                "living_agent": str(
+                    state_root / "agents" / worker.agent_uid / "living_agent.json"
+                ),
+                "a2a_card": str(
+                    state_root / "a2a" / "cards" / f"{worker.callsign}.json"
+                ),
+                "agentops_contract": str(agentops_contract_path),
+                "action_log": str(action_log_path),
+                "wake_receipts": str(wake_log_path),
+                "identity_invariant": str(identity_invariant_path),
+            },
+            "scorecard_schema": "control_watch_tower_agent_scorecard.v0",
+            "promotion_blockers": [
+                "registration_is_not_authority",
+                "watch_tracking_is_not_promotion",
+                "human_review_required",
+            ],
+            "last_evaluated_at": "",
+            "created_at": now,
+            "updated_at": now,
+        },
+    )
 
     action_event = {
         "schema_version": ACTION_LOG_SCHEMA,
@@ -330,6 +384,8 @@ def scaffold_self_filesystem(
         "authority": worker.authority.value,
         "memory_namespace": worker.memory_namespace,
         "trace_identity": worker.trace_identity,
+        "identity_invariant": identity_invariant,
+        "identity_invariant_digest": identity_invariant.get("digest"),
         "action": "register",
         "summary": "Registered through dharma_swarm external-agent registration desk.",
         "source_manifest": str(manifest_path) if manifest_path else "show_up_cli",
@@ -353,6 +409,8 @@ def scaffold_self_filesystem(
         "wake_log_path": str(wake_log_path),
         "system_interpretation_path": str(system_map_path),
         "agentops_contract_path": str(agentops_contract_path),
+        "watch_contract_path": str(watch_contract_path),
+        "identity_invariant_path": str(identity_invariant_path),
     }
 
 
@@ -385,6 +443,8 @@ def harden_a2a_card(
                 "autonomy_policy": worker.autonomy_policy.model_dump(),
                 "workspace_policy": worker.workspace_policy.model_dump(),
                 "registration_desk_hardened": True,
+                "identity_invariant": worker.identity_invariant,
+                "identity_invariant_digest": worker.identity_invariant.get("digest"),
             }
         )
         card["metadata"] = metadata
@@ -452,6 +512,7 @@ async def run_registration(args: argparse.Namespace) -> dict[str, Any]:
     raw = load_manifest(manifest_path) if manifest_path else build_show_up_manifest(args)
     manifest = normalize_manifest(raw, dharma_home=dharma_home)
     worker = build_worker(manifest)
+    manifest["identity_invariant"] = worker.identity_invariant
 
     if args.dry_run:
         return {
@@ -504,6 +565,7 @@ async def run_registration(args: argparse.Namespace) -> dict[str, Any]:
         "registration_result": registration_result,
         "scaffold": scaffold,
         "hooks": hooks,
+        "identity_invariant": worker.identity_invariant,
     }
     _write_json(root / "receipts" / "registration_desk_result.json", summary)
     append_action_log(
@@ -516,6 +578,7 @@ async def run_registration(args: argparse.Namespace) -> dict[str, Any]:
             "callsign": worker.callsign,
             "model_identity": worker.model_identity,
             "authority": worker.authority.value,
+            "identity_invariant_digest": worker.identity_invariant.get("digest"),
             "action": "emit_registration_hooks",
             "summary": "Emitted registration desk ops hooks.",
             "outputs": hooks,

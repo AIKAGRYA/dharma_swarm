@@ -32,6 +32,16 @@ rules:
         - "dharma_swarm/ginko_backtest.py"
         - "dharma_swarm/ginko_evolution.py"
         - "dharma_swarm/engine/store_sync.py"
+        # A2A queue closure adapter; declared in ACTIVE_SURFACE_MANIFEST.yaml.
+        - "/dharma_swarm/operator_core/a2a_task_lifecycle.py"
+        # Declared governance/runtime owners for registered agents, CWT,
+        # collaboration packets, GEPA-lite, cron, and Codex hook telemetry.
+        - "/scripts/governance/backfill_identity_invariants.py"
+        - "/scripts/governance/collaboration_packet.py"
+        - "/scripts/runtime/cwt_watch.py"
+        - "/scripts/runtime/gepa_lite.py"
+        - "/dharma_swarm/cron_runner.py"
+        - "/hooks/codex_dharma_bridge.py"
     pattern: Path.home() / ".dharma"
 
   # ===========================================================================

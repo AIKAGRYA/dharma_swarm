@@ -52,6 +52,8 @@ After a successful registration, your durable dharma_swarm surfaces are:
 
 Your `agent_uid` is the stable internal identity. Your `callsign` is the discoverable name. Your `harness` is the runtime shell. Your `model_identity` is the model/provider substrate. Your `memory_namespace` must begin with `agent:{agent_uid}`. Your `trace_identity` must be stable across restarts.
 
+Registration also writes an `identity_invariant` digest across the registration, living-agent, A2A, telemetry, and action-log surfaces. The digest is not authority; it is a continuity check. If the digest disagrees across surfaces, CWT should treat the agent as present but identity-drifted.
+
 Modern external standards point in the same direction: A2A uses an Agent Card as the discoverable document containing identity, capabilities, skills, endpoint, and auth; OpenTelemetry requires stable service identity fields such as `service.instance.id`; current AI-agent identity guidance emphasizes identification, authorization, delegation, logging, and provenance. dharma_swarm maps those ideas locally without pretending Stage-1 external workers are trusted workloads.
 
 ## 4. Authority Model
@@ -156,6 +158,10 @@ Stigmergy is environmental coordination. Registration leaves a governance mark t
 ## 11. A2A
 
 A2A card means discovery. The card says what you can do, where to contact you, and what auth is expected. It does not grant authority. Stage-1 external cards are hardened with `dispatch_enabled=false` and `requires_approval=true` so discovery does not silently become routing. If your card says you have a capability, your logs should eventually prove you exercised it successfully.
+
+The local A2A task queue is `~/.dharma/a2a_bus/tasks/queue.jsonl`. Claiming or closing a queue row is not authority and is not dispatch; it is a receipt trail over an already-declared coordination surface. Use `python3 -m dharma_swarm.operator_core.a2a_task_lifecycle` or the same contract: claim only tasks addressed to you, and close them only as `completed`, `failed`, or `blocked` with a valid `dharma_a2a_task_receipt.v1` receipt. A claimed task without a terminal receipt remains unfinished.
+
+Every terminal task receipt needs a return address: where the next process resumes, what obligation remains, and what base case closes the recursion. Missing return address means the task may have produced output, but the loop is not resumable.
 
 ## 12. Memory And Receipts
 

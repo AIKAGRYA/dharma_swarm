@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dharma.local/schemas/control_watch_tower_watch_event.v1.json",
+  "title": "CONTROL_WATCH_TOWER Watch Event v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "event_id",
+    "timestamp",
+    "agent_uid",
+    "event_type",
+    "status",
+    "summary",
+    "source",
+    "trace_id",
+    "metadata"
+  ],
+  "properties": {
+    "schema_version": { "const": "control_watch_tower_watch_event.v1" },
+    "event_id": { "type": "string", "minLength": 1 },
+    "timestamp": { "type": "string" },
+    "agent_uid": { "type": "string", "minLength": 1 },
+    "event_type": {
+      "enum": [
+        "task_claimed",
+        "task_started",
+        "gate_passed",
+        "gate_failed",
+        "artifact_produced",
+        "collaboration_packet_registered",
+        "incident_opened",
+        "aotam_issued",
+        "lost_comms",
+        "comms_restored",
+        "reputation_upserted"
+      ]
+    },
+    "status": { "type": "string", "minLength": 1 },
+    "summary": { "type": "string", "minLength": 1 },
+    "source": { "type": "string", "minLength": 1 },
+    "trace_id": { "type": "string" },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

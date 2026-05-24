@@ -5,10 +5,13 @@ import json
 import pytest
 
 from dharma_swarm.dharma_kernel import (
+    DEFAULT_AXIOMS,
+    AXIOM,
     DharmaKernel,
     KernelGuard,
     MetaPrinciple,
     PrincipleSpec,
+    instantiate_axioms,
 )
 
 
@@ -30,6 +33,19 @@ def test_all_principles_present():
     kernel = DharmaKernel.create_default()
     for mp in MetaPrinciple:
         assert mp.value in kernel.principles, f"Missing principle: {mp.value}"
+
+
+def test_default_axioms_instantiate_all_principles():
+    assert len(DEFAULT_AXIOMS) == 25
+    assert all(isinstance(axiom, AXIOM) for axiom in DEFAULT_AXIOMS)
+    assert {axiom.principle for axiom in DEFAULT_AXIOMS} == set(MetaPrinciple)
+
+
+def test_kernel_instantiates_axioms_with_matching_signature():
+    kernel = DharmaKernel.create_default()
+    axioms = instantiate_axioms(kernel)
+    assert len(axioms) == len(kernel.principles)
+    assert {axiom.kernel_signature for axiom in axioms} == {kernel.signature}
 
 
 def test_signature_deterministic():

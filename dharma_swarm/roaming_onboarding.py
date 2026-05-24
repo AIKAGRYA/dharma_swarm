@@ -26,6 +26,11 @@ from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 from dharma_swarm.a2a.agent_card import AgentCapability, AgentCard, CardRegistry
+from dharma_swarm.operator_core.identity_invariant import (
+    build_identity_invariant,
+    canonical_serial,
+    validate_identity_invariant,
+)
 from dharma_swarm.telemetry_plane import (
     AgentIdentityRecord,
     TeamRosterRecord,
@@ -75,7 +80,7 @@ def _read_json(path: Path) -> dict[str, Any] | None:
 
 
 def _serial_for(agent_uid: str) -> str:
-    return f"AGT-{_slug(agent_uid).replace('-', '_').upper()}"
+    return canonical_serial(agent_uid)
 
 
 @dataclass(frozen=True)
@@ -149,6 +154,21 @@ async def onboard_roaming_agent(
 
     existing = _read_json(dock_path) or {}
     serial = existing.get("serial") or registration.serial or _serial_for(agent_uid)
+    authority_floor = str(registration.metadata.get("authority") or "external_worker_evidence_only")
+    memory_namespace = str(registration.metadata.get("memory_namespace") or f"agent:{agent_uid}")
+    trace_identity = str(registration.metadata.get("trace_identity") or f"trace:{agent_uid}")
+    provided_invariant = registration.metadata.get("identity_invariant")
+    if isinstance(provided_invariant, dict) and validate_identity_invariant(provided_invariant)["valid"]:
+        identity_invariant = dict(provided_invariant)
+    else:
+        identity_invariant = build_identity_invariant(
+            agent_uid=agent_uid,
+            authority_floor=authority_floor,
+            memory_namespace=memory_namespace,
+            trace_identity=trace_identity,
+            serial=serial,
+            created_at=str(existing.get("created_at") or now.isoformat()),
+        )
 
     embodiment = {
         "timestamp": now.isoformat(),
@@ -171,6 +191,8 @@ async def onboard_roaming_agent(
         "team_id": registration.team_id,
         "home_dock": str(dock_dir),
         "memory_namespace": f"agent:{agent_uid}",
+        "trace_identity": trace_identity,
+        "identity_invariant": identity_invariant,
         "status": "starting",
         "autonomy_policy": {
             "mode": "manual",
@@ -181,7 +203,9 @@ async def onboard_roaming_agent(
         "created_at": existing.get("created_at") or now.isoformat(),
         "updated_at": now.isoformat(),
         "last_seen_at": now.isoformat(),
-        "metadata": dict(existing.get("metadata") or {}) | dict(registration.metadata),
+        "metadata": dict(existing.get("metadata") or {})
+        | dict(registration.metadata)
+        | {"identity_invariant_digest": identity_invariant["digest"]},
     }
     _write_json(dock_path, dock_payload)
     _append_jsonl(embodiments_path, embodiment)
@@ -206,6 +230,7 @@ async def onboard_roaming_agent(
             "squad_id": registration.squad_id,
             "team_id": registration.team_id,
             "registration_source": registration.registration_source,
+            "identity_invariant": identity_invariant,
             **dict(registration.metadata),
         },
     )
@@ -232,6 +257,7 @@ async def onboard_roaming_agent(
                 "model": registration.model,
                 "team_id": registration.team_id,
                 "registration_source": registration.registration_source,
+                "identity_invariant": identity_invariant,
                 **dict(registration.metadata),
             },
             created_at=now,
@@ -249,6 +275,7 @@ async def onboard_roaming_agent(
                 "department": registration.department,
                 "callsign": registration.callsign,
                 "harness": registration.harness,
+                "identity_invariant_digest": identity_invariant["digest"],
             },
             created_at=now,
             updated_at=now,
@@ -275,6 +302,7 @@ async def onboard_roaming_agent(
     _write_json(receipt_path, receipt.to_dict())
     _write_json(last_receipt_path, receipt.to_dict())
     _append_jsonl(receipts_index, receipt.to_dict())
+    _write_json(dock_dir / "identity_invariant.json", identity_invariant)
     return receipt
 
 
