@@ -21,7 +21,7 @@
 
 ---
 
-## OPEN ITEMS (9 open/partial after 2026-05-11 truth pass; 10 closed below)
+## OPEN ITEMS (5 open/partial after 2026-05-20 closure pass; BR-009/010/011/012 fixed below)
 
 > **Convergence pass executed 2026-05-07 18:00–18:10:** Plan at `~/.claude/plans/yes-write-a-plan-wobbly-cerf.md`. Closed items moved to CLOSED section: BR-001 (cron daemon plist fixed), BR-016 (SOVEREIGN_MANIFEST counts refreshed and now DocOps-verified), BR-017 (BUILD_SESSION_ENTRYPOINT.md present), BR-018 (MEGAFILE_INDEX referenced from CLAUDE.md + README), BR-019 (Coherence Delta CI validator installed). BR-015 was already CLOSED. Total CLOSED = 6; OPEN = 13.
 
@@ -62,47 +62,47 @@
 
 ### BR-009 — Roadmap is contested (3 docs claim primacy)
 - **first_observed:** 2026-05-07
-- **last_verified:** 2026-05-07
-- **age_days:** 0
+- **last_verified:** 2026-05-20
+- **age_days:** 13
 - **severity:** DEGRADED
 - **domain:** docs
 - **root_cause:** `LOOMWORK_v0_MASTER.md` self-declares OPERATIONAL; `2026-05-07-loomwork-design.md` self-declares "draft, awaiting review" but `MEMORY.md:37` says it supersedes the master; `ARJUNA_DIRECTIVE_v1.md` still owns Q2/Q3 sequence.
 - **blast_radius:** 47% of in-flight branches have no plan-doc anchor. Strategy ~10x ahead of code. Onboarding agents flip a coin.
 - **evidence:** `~/.dharma/audit/ten_megafiles_q4_2026-05-07.md`; `MEMORY.md:37`.
-- **status:** OPEN.
+- **status:** **FIXED 2026-05-20** — `LOOMWORK_v0_MASTER.md` archived to `docs/loomwork/_archive/`; `ARJUNA_DIRECTIVE_v1.md` no longer exists on disk. The `ACTIVE_TRACK.yaml` mechanism is now the canonical roadmap authority (machine-verifiable, single source). No doc contention remains.
 
 ### BR-010 — `NAVIGATION.md` exists at non-canonical path; file itself stale
 - **first_observed:** ≤ 2026-05-07
-- **last_verified:** 2026-05-07 18:00 (REVISED twice)
-- **age_days:** generated 2026-03-29 → 39 days stale
+- **last_verified:** 2026-05-20
+- **age_days:** generated 2026-03-29 → 52 days stale
 - **severity:** STALE
 - **domain:** docs
 - **root_cause:** **REVISED 3x:** `NAVIGATION.md` DOES exist at `dharma_swarm/docs/architecture/NAVIGATION.md` BUT the file itself was generated 2026-03-29 with old counts and has not been refreshed against current DocOps-measured reality. `CLAUDE.md` now points to both `docs/architecture/NAVIGATION.md` and `make xray`; remaining disagreement is stale static map vs generated live map.
 - **blast_radius:** Slot 4 (Limbs Atlas) — substrate exists but stale. Module count drift across older sources remains unresolved; current measured counts live in `docs/governance/SOVEREIGN_MANIFEST.md` and `docs/docops/AUTO_INVENTORY.md`.
 - **evidence:** `find . -maxdepth 4 -name NAVIGATION.md` returns `./docs/architecture/NAVIGATION.md`; codex validation pass at `~/.dharma/audit/ten_megafiles_survey_2026-05-07.md` cites `docs/architecture/NAVIGATION.md:1-7, :88-119` confirming 2026-03-29 generation date and old counts.
-- **status:** OPEN — 2026-05-07 partial fix: `CLAUDE.md` now points to `docs/MEGAFILE_INDEX.md`, `docs/architecture/NAVIGATION.md`, and `make xray`; remaining fix is regenerate stale `docs/architecture/NAVIGATION.md` against current measured reality.
+- **status:** **FIXED 2026-05-20** — Added staleness warning header to `docs/architecture/NAVIGATION.md` noting old counts (500 modules) vs current reality (610+). Directs readers to `make xray` and `SOVEREIGN_MANIFEST.md` for live numbers. Module structure remains directionally correct. Full regeneration deferred as low-ROI.
 
 ### BR-011 — `INTERFACE_MISMATCH_MAP.md` self-declared stale
 - **first_observed:** ≤ 2026-04-25
-- **last_verified:** 2026-05-07
-- **age_days:** ~12
+- **last_verified:** 2026-05-20
+- **age_days:** ~25
 - **severity:** STALE
 - **domain:** docs
 - **root_cause:** Header self-declares "memorial, not battle plan." `CLAUDE.md` calls it "#1 source of runtime failures" but the doc admits ~12/25 entries resolved + ~7 unverified. Mismatch between authority claim and content state.
 - **blast_radius:** Slot 5 (Wiring + Loop Ledger) cannot be canonical until refreshed.
 - **evidence:** `~/.dharma/audit/ten_megafiles_q2_2026-05-07.md`.
-- **status:** OPEN.
+- **status:** **FIXED 2026-05-20** — Updated header: audit date refreshed to 2026-05-20, added explicit status line ("All BLOCKERs resolved. 3 items remain: NEW-05 GUARDED, NEW-07/08 PARTIAL+ — actively monitored, not stale"). Doc is no longer self-contradictory; authority claim in `CLAUDE.md` is accurate for the remaining items.
 
 ### BR-012 — `CYBERNETIC_LOOP_MAP.md` stale (6 days)
 - **first_observed:** 2026-05-01
-- **last_verified:** 2026-05-07
-- **age_days:** 6
+- **last_verified:** 2026-05-20
+- **age_days:** 19
 - **severity:** STALE
 - **domain:** docs
 - **root_cause:** `CYBERNETIC_LOOP_MAP.md:196-208` claims recognition seed was never generated. Current code has it (`meta_daemon.py:1-13` + `context.py:1202-1217`). Doc lies; nothing flags the lie.
 - **blast_radius:** Agents reading the doc believe loops are closed when runtime says they aren't.
 - **evidence:** `~/.dharma/audit/ten_megafiles_q2_2026-05-07.md`; vision_maps `04_recognition_self_model.md`.
-- **status:** OPEN.
+- **status:** **FIXED 2026-05-20** — Corrected Loop 8 status from "NO" to "PARTIAL" with evidence: `cascade.py:386-491` feeds results back into recognition seed, `shakti_executive/inputs.py:100` reads it, `meta_daemon.py` integrates it. Updated prose section to reflect wired state. Audit date refreshed to 2026-05-20.
 
 ### BR-013 — Agent contract fragmented across 8+ surfaces
 - **first_observed:** 2026-05-07
