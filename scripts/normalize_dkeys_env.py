@@ -51,36 +51,21 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.emit_exports:
-        # Intentional: --emit-exports must print full values for shell eval.
-        # This output is consumed by `eval "$(...)"`, never persisted to logs.
         for alias, canonical in ENV_ALIASES.items():
             if alias == canonical:
                 continue
-            alias_val = os.environ.get(alias, "").strip()
-            canonical_val = os.environ.get(canonical, "").strip()
-            if alias_val and not canonical_val:
-                safe = alias_val.replace("'", "'\\''")
-                sys.stdout.write(f"export {canonical}='{safe}'\n")  # noqa: S101
+            if os.environ.get(alias, "").strip() and not os.environ.get(canonical, "").strip():
+                sys.stdout.write(f'export {canonical}="${{{alias}}}"\n')
         return
 
     applied = normalize_env_aliases(dry_run=not args.apply)
 
     if not applied:
-        print("✓ All dkeys aliases already match dharma_swarm canonical names (or no aliases present).")
-        # Also show the full alias table for reference.
-        print("\nAlias table (dharma_swarm.api_keys.ENV_ALIASES):")
-        for alias, canonical in ENV_ALIASES.items():
-            if alias == canonical:
-                continue
-            alias_present = "SET" if os.environ.get(alias, "").strip() else "—"
-            canonical_present = "SET" if os.environ.get(canonical, "").strip() else "—"
-            print(f"  {alias:<25s} → {canonical:<25s}  alias={alias_present}  canonical={canonical_present}")
+        print("All dkeys aliases already match dharma_swarm canonical names (or no aliases present).")
         return
 
     action = "Applied" if args.apply else "Would apply (dry-run)"
-    print(f"{action} {len(applied)} alias normalization(s):\n")
-    for alias, canonical, _masked in applied:
-        print(f"  {alias} → {canonical}")
+    print(f"{action} {len(applied)} alias normalization(s).")
 
     if not args.apply:
         print("\nRe-run with --apply to mutate os.environ, or use --emit-exports for shell sourcing.")
