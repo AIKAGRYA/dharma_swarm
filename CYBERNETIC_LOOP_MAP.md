@@ -1,6 +1,6 @@
 # Cybernetic Loop Map — dharma_swarm
 
-**Last audit:** 2026-05-05 (against HEAD `74d015c` on main)
+**Last audit:** 2026-05-20 (against HEAD on main — recognition loop status corrected)
 **Previous version:** 2026-04-04 (initial map: 0 closed, 2 partial, 11 blocked)
 **Purpose:** Document every feedback loop's sense→act→evaluate→adapt path.
 Each loop is "closed" only when its output feeds back as input to a future cycle.
@@ -32,7 +32,7 @@ Each loop is "closed" only when its output feeds back as input to a future cycle
 | 5 | Zeitgeist Scanner | configurable | **PARTIAL** | Local scanning works. Gate pressure feedback path structurally present. No real gate check data flowing yet. |
 | 6 | Witness Auditor | 3600s | **YES (in test)** | 1,013 witness entries across 2 days. BLOCKED destructive filesystem commands (AHIMSA gate). PASSED 444, BLOCKED 230, WARN 4. Provider mismatch (MM-11) RESOLVED. Code path fully functional — operates on test data from pytest; will audit real agent actions when Loop 1 closes. |
 | 7 | Training Flywheel | 300s | **PARTIAL** | Quality gate evaluations running (structural scorer, 5+ evaluations logged in `quality_gates/log/evaluations.jsonl`). 182 trace entries. Trajectory scoring from real tasks still blocked on Loop 1. |
-| 8 | Recognition Loop | 7200s | **NO** | Recognition seed never generated. 89 organism_memory entities provide input data. Cascade computation not yet triggered. |
+| 8 | Recognition Loop | 7200s | **PARTIAL** | Recognition seed computation wired in `cascade.py:386-491` and `shakti_executive/inputs.py:100`. Seed is read by `meta_daemon.py` and feeds into context health. Actual periodic trigger depends on LoopEngine schedule. |
 | 9 | Conductors | 120s | **PARTIAL** | Conductor configs use proper enum values. Cron health shows 7 jobs tracked (pulse: 3 runs, 0 failures). Blocked on LLM provider availability for actual conductor work. |
 | 10 | Context Agent | 60s | **NO** | Depends on Loop 1 (working agent_runner). MM-01 resolved, but no provider available for real execution. |
 | 11 | Replication Monitor | 3600s | **PARTIAL** | MM-02/03 RESOLVED (enum coercion fixed). Replication path structurally correct. No replication events triggered yet because no tasks complete to trigger child spawning. |
@@ -236,7 +236,7 @@ ADAPT:   Write recognition_seed.md to ~/.dharma/meta/
          The recognition seed influences future agent system prompts
 ```
 
-**Current state (updated):** 89 organism_memory entities provide potential input. Recognition seed never generated. This loop has raw material but the recognition computation has never been triggered.
+**Current state (updated 2026-05-20):** Recognition seed computation is wired: `cascade.py:386-491` feeds loop results back into the seed, `shakti_executive/inputs.py:100` reads it as an executive signal, `meta_daemon.py` includes it in context health. 89 organism_memory entities provide input. Periodic trigger depends on LoopEngine schedule activation.
 
 ---
 
