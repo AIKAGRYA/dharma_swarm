@@ -88,6 +88,7 @@ curation:
 # dharma_swarm Navigation Map
 
 Generated: 2026-03-29 | 500 Python modules | 494 test files | 8,848 tests
+**⚠️ STALE (2026-05-20):** Counts above are from generation date. Current measured reality: ~610+ Python modules, 585+ test files, 10,287+ tests. For live counts use `make xray` or `docs/governance/SOVEREIGN_MANIFEST.md`. Module structure below remains directionally correct but not exhaustive.
 
 ---
 
@@ -109,6 +110,8 @@ Generated: 2026-03-29 | 500 Python modules | 494 test files | 8,848 tests
 | Check kernel integrity | `dgc dharma status` |
 | See evolution trend | `dgc evolve trend` |
 | See subconscious dreams | `dgc hum` |
+| Run the CWT read-only collector v0 | `python3 scripts/runtime/cwt_collect.py` (stdout) or `--out-dir <path>` |
+| Render a CWT v0 report | `python3 scripts/runtime/cwt_report.py` → writes to `reports/control_watch_tower/<ts>/` (doctrine: [`docs/agents/CONTROL_WATCH_TOWER.md`](../agents/CONTROL_WATCH_TOWER.md); schemas: [`schemas/control_watch_tower_*.v0.json`](../../schemas/)) |
 | Find a module | Search this file or `ls dharma_swarm/dharma_swarm/*.py` |
 | Find the data model | `dharma_swarm/models.py` |
 | Find the config | `dharma_swarm/config.py` (env var overrides) |

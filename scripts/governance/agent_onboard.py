@@ -368,6 +368,32 @@ def render_enforcement_and_depth() -> None:
     print("  Daily/work loops       : docs/governance/AGENTOPS.md, KAIZENOPS.md, DAILY_OPERATING_BRIEF.md")
 
 
+def render_drift_triage() -> None:
+    """Dhyana drift triage — top priority drifted zones."""
+    section("DRIFT TRIAGE (owner: dharma_swarm/dhyana/drift_triage.py)")
+    try:
+        from dharma_swarm.dhyana.drift_triage import triage_drifted_zones
+        entries = triage_drifted_zones()
+    except Exception as exc:
+        print(f"  (could not run drift triage: {exc})")
+        return
+
+    if not entries:
+        print("  No drifted zones found. Control surface is clean.")
+        return
+
+    top = entries[:5]
+    print(f"  {len(entries)} zones triaged. Top {len(top)} by priority_score:")
+    print()
+    for i, e in enumerate(top, 1):
+        br_tag = f" [{', '.join(e.related_br_ids)}]" if e.related_br_ids else ""
+        print(f"  {i}. [{e.coherence_state}] {e.label[:60]}")
+        print(f"     score={e.priority_score:.1f}  blast={e.blast_radius:.1f}  age={e.age_days:.0f}d  centrality={e.semantic_centrality:.2f}{br_tag}")
+        if e.recommended_action:
+            print(f"     → {e.recommended_action[:80]}")
+    print()
+
+
 # ---------------------------------------------------------------------------
 # Loaders
 # ---------------------------------------------------------------------------
@@ -423,6 +449,7 @@ def main() -> int:
     render_decay_watch()
     render_tooling_first()
     render_enforcement_and_depth()
+    render_drift_triage()
 
     section("WHAT TO DO NEXT")
     block = (track or {}).get("active_track") or {}
