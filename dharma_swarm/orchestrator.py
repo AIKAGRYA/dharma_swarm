@@ -936,32 +936,20 @@ class Orchestrator:
         try:
             from dharma_swarm.context_compiler import ContextCompiler
             from dharma_swarm.memory_lattice import MemoryLattice
-            from dharma_swarm.memory_kernel import (
-                CensusConfig,
-                MemoryKernel,
-                MemoryKernelConfig,
+            from dharma_swarm.memory_kernel.orchestrator_context import (
+                MEMORY_KERNEL_DISPATCH_KEYS,
+                build_orchestrator_memory_kernel,
+                memory_kernel_dispatch_metadata,
             )
 
             lattice = MemoryLattice(
                 db_path=store.db_path,
                 event_log_dir=runtime_root / "events",
             )
-            memory_kernel_home = Path(
-                os.getenv("DHARMA_MEMORY_KERNEL_HOME") or Path.home()
-            ).expanduser()
-            memory_kernel = MemoryKernel(
-                MemoryKernelConfig(
-                    census=CensusConfig(
-                        repo_root=Path.cwd(),
-                        home=memory_kernel_home,
-                        include_discovered=False,
-                    )
-                )
-            )
             compiler = ContextCompiler(
                 runtime_state=store,
                 memory_lattice=lattice,
-                memory_kernel=memory_kernel,
+                memory_kernel=build_orchestrator_memory_kernel(repo_root=Path.cwd()),
             )
             bundle = await compiler.compile_bundle(
                 session_id=self._ledger.session_id,
@@ -978,19 +966,7 @@ class Orchestrator:
                 },
                 workspace_root=runtime_root,
             )
-            kernel_meta = dict(bundle.metadata.get("memory_kernel_default") or {})
-            if kernel_meta:
-                meta["memory_kernel_status"] = kernel_meta.get("status", "unknown")
-                meta["memory_kernel_pack_id"] = kernel_meta.get("pack_id", "")
-                meta["memory_kernel_admitted_count"] = kernel_meta.get(
-                    "admitted_count",
-                    0,
-                )
-                meta["memory_kernel_omitted_count"] = kernel_meta.get(
-                    "omitted_count",
-                    0,
-                )
-                meta["memory_kernel_warnings"] = kernel_meta.get("warnings", [])
+            meta.update(memory_kernel_dispatch_metadata(bundle.metadata))
         except Exception as exc:
             error = str(exc)[:300]
             meta["context_bundle_status"] = "failed"
@@ -1024,13 +1000,7 @@ class Orchestrator:
         td.metadata["context_bundle_status"] = "attached"
         td.metadata["runtime_db_path"] = runtime_db_path
         td.metadata.setdefault("state_dir", state_dir)
-        for key in (
-            "memory_kernel_status",
-            "memory_kernel_pack_id",
-            "memory_kernel_admitted_count",
-            "memory_kernel_omitted_count",
-            "memory_kernel_warnings",
-        ):
+        for key in MEMORY_KERNEL_DISPATCH_KEYS:
             if key in meta:
                 td.metadata[key] = meta[key]
         return meta
@@ -1156,7 +1126,6 @@ class Orchestrator:
         if len(candidates) <= 1:
             return candidates[0] if candidates else None
 
-        import os
         if os.getenv("ENABLE_EFE_ROUTING", "").lower() not in ("1", "true", "yes"):
             return None  # Falls through to fitness-biased or FIFO
 
@@ -1192,7 +1161,6 @@ class Orchestrator:
             return candidates[0] if candidates else None
 
         # Feature flag: ENABLE_FITNESS_ROUTING (default off until enough data)
-        import os
         if os.getenv("ENABLE_FITNESS_ROUTING", "").lower() not in ("1", "true", "yes"):
             return None  # Falls through to FIFO
 
