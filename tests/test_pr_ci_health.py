@@ -68,6 +68,16 @@ def test_all_passing_clean_pr_is_green():
     assert triage.actionable is False
 
 
+def test_passing_rerun_supersedes_earlier_failure():
+    # Same check name twice: older run failed, newer re-run passed.
+    runs = [
+        {"name": "Coherence Delta PR body", "conclusion": "success", "started_at": "2026-05-21T14:16:40Z"},
+        {"name": "Coherence Delta PR body", "conclusion": "failure", "started_at": "2026-05-21T14:16:26Z"},
+        {"name": "pytest (3.11)", "conclusion": "success", "started_at": "2026-05-21T14:16:25Z"},
+    ]
+    assert classify_pr(_pr(314), runs).categories == ["green"]
+
+
 def test_real_test_failure_and_merge_conflict():
     runs = [{"name": "pytest (3.12)", "conclusion": "failure"}]
     triage = classify_pr(_pr(400, state="dirty"), runs)

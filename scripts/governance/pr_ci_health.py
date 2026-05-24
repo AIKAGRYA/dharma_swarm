@@ -114,9 +114,19 @@ def classify_pr(pr: dict, check_runs: list[dict]) -> PRTriage:
         mergeable_state=str(pr.get("mergeable_state", "unknown")),
     )
 
+    # A check name can appear multiple times when a check is re-run. Keep only
+    # the most recent run per name (by started_at) so a passing re-run supersedes
+    # an earlier failure.
+    latest: dict[str, dict] = {}
+    for run in check_runs:
+        name = str(run.get("name", ""))
+        started = str(run.get("started_at") or "")
+        prev = latest.get(name)
+        if prev is None or started >= str(prev.get("started_at") or ""):
+            latest[name] = run
     conclusions = {
-        str(run.get("name", "")): str(run.get("conclusion") or run.get("status") or "")
-        for run in check_runs
+        name: str(run.get("conclusion") or run.get("status") or "")
+        for name, run in latest.items()
     }
     failing = sorted(
         name
