@@ -95,7 +95,7 @@ Broader observations:
 - The `docs/plans/` spec references Mac-local paths (`/Users/dhyana/dharma_swarm/...`) — a minor hygiene issue but not a doctrine violation.
 - No new root-level files proposed by the 11-step chain that would violate `AGENTS.md` cleanup rules.
 
-**One flag:** The original `MASTER_BUILD_SPEC.md` at root was correctly demoted to a 3-line redirect. Any attempt to resurrect a primary build spec at root would violate the governance model (per `docs/governance/CANONICAL_DOC_STACK.md`).
+**One flag:** The original `MASTER_BUILD_SPEC.md` at root was correctly demoted to a 3-line redirect. Any attempt to resurrect a primary build spec at root would violate the governance model (per the doc stack in `docs/governance/`).
 
 ---
 
