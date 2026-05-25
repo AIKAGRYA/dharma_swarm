@@ -37,13 +37,13 @@ The 11-step chain describes real, structurally sound code. It is not theater. Bu
 
 **Claim:** The build spec describes the system architecture.
 
-**Verdict: Partially True — the spec is archived, not canonical**
+**Verdict: Partially True — the spec is archived, not current**
 
 | Document | Status | Location |
 |---|---|---|
 | `MASTER_BUILD_SPEC.md` (root) | Stub redirect, 3 lines | Points to `docs/_archive/2026-04/MASTER_BUILD_SPEC.md` |
 | Archived build spec | 658 lines, dated April 7 2026 | Explicitly marked: "Snapshot, do not trust without re-verification. Archived 2026-05-06." |
-| `2026-03-26-self-evolving-organism-master-build-spec.md` | 825 lines, canonical at time of writing | Under `docs/plans/`, references local Mac paths (`/Users/dhyana/...`) |
+| `2026-03-26-self-evolving-organism-master-build-spec.md` | 825 lines, was the primary spec when written | Under `docs/plans/`, references local Mac paths (`/Users/dhyana/...`) |
 
 **The temporal build spec partially duplicates existing governance surfaces.** The system has evolved past the original spec. Current authority lives in:
 - `CYBERNETIC_LOOP_MAP.md` for loop status
@@ -95,7 +95,7 @@ Broader observations:
 - The `docs/plans/` spec references Mac-local paths (`/Users/dhyana/dharma_swarm/...`) — a minor hygiene issue but not a doctrine violation.
 - No new root-level files proposed by the 11-step chain that would violate `AGENTS.md` cleanup rules.
 
-**One flag:** The original `MASTER_BUILD_SPEC.md` at root was correctly demoted to a 3-line redirect. Any attempt to resurrect a canonical build spec at root would violate the governance model (authority comes from `docs/governance/CANONICAL_DOC_STACK.md`).
+**One flag:** The original `MASTER_BUILD_SPEC.md` at root was correctly demoted to a 3-line redirect. Any attempt to resurrect a primary build spec at root would violate the governance model (per `docs/governance/CANONICAL_DOC_STACK.md`).
 
 ---
 
