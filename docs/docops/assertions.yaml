@@ -197,7 +197,10 @@
       "docs/agents/devin-roaming-2987d222/PROTOCOLS.md",
       "docs/state/NEXT_PHASE_MAP.md",
       "docs/state/HOTLIST.md",
-      "docs/state/CROSS_AGENT_INVENTORY.md"
+      "docs/state/CROSS_AGENT_INVENTORY.md",
+      "docs/plans/2026-05-24-11step-build-plan.md",
+      "docs/plans/NEXT_10_SUBSTRATE_TODO.md",
+      "dharma_swarm/inter_agent/devin/outbound/2026-05-24T12-00Z-devin-build-plan-verification-request.md"
     ]
   },
   "auto_sections": {
