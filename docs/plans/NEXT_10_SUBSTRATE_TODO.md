@@ -78,6 +78,30 @@ The order is load-bearing. Do not skip ahead. Each item lands as its own PR, wit
 
 ---
 
+## Track 5 — 11-Step Spec Integration (added 2026-05-24)
+
+Full plan at [`docs/plans/2026-05-24-11step-build-plan.md`](2026-05-24-11step-build-plan.md). Status: PROPOSED — awaiting verification.
+
+### 11. Implement facade lease methods (`claim_card`, `heartbeat_claim`, `release_claim`)
+- Files: `dharma_swarm/board/facade.py`, `dharma_swarm/board/models.py`, `tests/test_board_facade.py`
+- Spec: `SWARM_BOARDSTORE_SPEC.md` §14, lines 1036-1060.
+- Definition of done: unit tests assert event log entries for claim/heartbeat/release lifecycle. TaskBoard adapter maps claim states.
+- Why now: blocks Temporal SwarmTaskWorkflow (§4.2) and Loop 1 dispatch integration. Facade has 0 runtime consumers — this is the first step to making it load-bearing.
+
+### 12. Fix Sakshi interceptor to use actual `ProvenanceLog` API
+- Files: new interceptor module under `dharma_swarm/sakshi/`, `dharma_swarm/sakshi/provenance_log.py`
+- Spec: §4.4 interceptor code sample needs 3 corrections: class name, method name, async→sync.
+- Definition of done: interceptor constructs `ProvenanceEntry` objects, calls `ProvenanceLog.append()` synchronously. Integration test with mock Activity confirms entries carry `trace_id` from `CorrelationContext`.
+- Why now: Sakshi has 0 runtime writers. This is the wire-up that makes provenance load-bearing.
+
+### 13. Enforce ARJUNA 0.35 threshold + scoring stub
+- Files: `dharma_swarm/board/facade.py` (`create_card` method), new scoring stub
+- Spec: `SWARM_BOARDSTORE_SPEC.md` §11 (lines 1784-1791), `SHAKTI_GINKO_ORGAN.md` §15 (lines 764-778), ADR-007.
+- Definition of done: `create_card()` rejects `arjuna_weight < 0.35` unless `override=True`. 5-dimensional scoring function stub with documented extension points.
+- Why now: ADR-007 (merged) mandates all submissions through ARJUNA gate. The gate exists in design but not in code.
+
+---
+
 ## How this list stays current
 
 - Each item is a PR. The PR closes by editing this file: status flips from `pending` to `done` with the merged commit hash.

@@ -273,7 +273,38 @@ This makes 13 PROVIDER-GATED dashboard pages come alive.
 
 ---
 
-## 11. THE HONEST NUMBERS
+## 11. 11-STEP SPEC INTEGRATION — BUILD PLAN (added 2026-05-24)
+
+**Source:** Compatibility audit of "11-Step Verified Chain & Build Spec" (1278 lines). Full plan at `docs/plans/2026-05-24-11step-build-plan.md`.
+**Audit verdict:** ~85% code-grounded. 7 inaccuracies, 3 structural gaps block literal implementation.
+**Recent merged work validates spec design:** ADR-007 (ARJUNA gate), trace identity coverage (CorrelationContext), TaskBoard adapter (facade projection pattern).
+
+### 3 HIGH Blockers (Phases 0-1)
+
+| # | Blocker | File | Spec Section | HOTLIST |
+|---|---------|------|-------------|---------|
+| HIGH-1 | `claim_card()` / `release_claim()` / `heartbeat_claim()` not on facade | `board/facade.py` | BOARDSTORE_SPEC §14 (lines 1036-1060) | H-027 |
+| HIGH-2 | Sakshi interceptor uses wrong class/method/async | `sakshi/provenance_log.py:124` | Spec §4.4 | H-028 |
+| HIGH-3 | ARJUNA 0.35 threshold unenforced in `create_card()` | `board/facade.py:84` | BOARDSTORE_SPEC §11, SHAKTI_GINKO §15 | H-029 |
+
+### 4 Supporting Streams (Phase 1-2, parallel)
+
+| # | Task | Depends on | HOTLIST |
+|---|------|-----------|---------|
+| S-1 | KV-cache timestamp fixes (`master_prompt_engineer.py:460,621,669,771`) | — | H-030 |
+| S-2 | Loop 1 dispatch test (running AgentRunner + provider) | HIGH-1 | H-007 |
+| S-3 | Facade → orchestrator wiring | HIGH-1 | H-011 |
+| S-4 | Sakshi provenance → state transitions | HIGH-2 | H-012 |
+
+### Sequencing
+
+Phase 0 → HIGH-1 + HIGH-2 (blocking). Phase 1 → HIGH-3 + S-1 (parallel). Phase 2 → S-2 + S-3 + S-4 (depends on Phase 0). Phase 3 → Temporal layer + VENTURE_CELL pilot.
+
+**Status:** PROPOSED — awaiting verification from Codex, Opus_Composer, HERMES M5.
+
+---
+
+## 12. THE HONEST NUMBERS
 
 | Metric | Now | After Phase 0 | After Phase 1 |
 |---|---|---|---|

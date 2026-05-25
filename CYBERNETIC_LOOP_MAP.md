@@ -99,6 +99,8 @@ ADAPT:   orchestrator.route_next() reads stigmergy hot_paths to influence routin
 
 **Current state (updated):** MM-01 (huggingface crash) RESOLVED — heuristic fallback works. MM-02/03 (enum coercion) RESOLVED. Routing decisions succeed in test (39/86). Dispatch fails because `AgentRunner` is not running in test context. **The code path from routing through dispatch is structurally sound. The remaining gap is operational: a running `AgentRunner` with a configured LLM provider.**
 
+**Build plan (2026-05-24):** 11-Step Spec integration plan at `docs/plans/2026-05-24-11step-build-plan.md` identifies Loop 1 closure as the Phase 2 goal. Prerequisites: facade lease methods (H-027), Sakshi interceptor fix (H-028), ARJUNA enforcement (H-029). Loop 1 dispatch test is HOTLIST H-007 + H-031. Status: PROPOSED — awaiting agent verification.
+
 ---
 
 ### Loop 2: Organism Heartbeat

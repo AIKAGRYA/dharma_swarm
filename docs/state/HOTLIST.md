@@ -1,7 +1,7 @@
 # HOTLIST — Repo-Wide Running Task Board
 
 **Path:** `docs/state/HOTLIST.md`
-**Last updated:** 2026-05-21
+**Last updated:** 2026-05-24
 **Owner:** Any agent may update this file. Use append-only discipline for status changes.
 
 This is the repo-wide kanban that any agent (Devin, Codex, Claude Code, Cursor) can read and update. It is the single place to see what needs doing next.
@@ -39,6 +39,16 @@ For full context on each item, see `docs/state/NEXT_PHASE_MAP.md`.
 | H-008 | Refresh CYBERNETIC_LOOP_MAP.md (stale: claims "no LLM provider" but providers work) | Map last audit 2026-05-05 (16d) | TODO | — |
 | H-009 | Refresh LIVE_OPS_DASHBOARD.md (snapshot 2026-05-11, 10d old, threshold 7d) | `docs/state/LIVE_OPS_DASHBOARD.md:4` | TODO | — |
 | H-010 | Refresh INTERFACE_MISMATCH_MAP.md (last X-ray 2026-05-04, 17d) | `INTERFACE_MISMATCH_MAP.md:3` | TODO | — |
+
+### 11-Step Spec Integration (see `docs/plans/2026-05-24-11step-build-plan.md`)
+
+| # | Task | Evidence | Status | Agent |
+|---|---|---|---|---|
+| H-027 | Implement `claim_card()` / `heartbeat_claim()` / `release_claim()` on BoardStoreFacade | `SWARM_BOARDSTORE_SPEC.md:1036-1060` — fully specified, not coded. Blocks Temporal Workflow §4.2. | TODO | — |
+| H-028 | Fix Sakshi interceptor API: use `ProvenanceLog.append(ProvenanceEntry(...))` not `SakshiProvenanceLog.record()` | `sakshi/provenance_log.py:124` — class is `ProvenanceLog`, method is `append`, sync not async | TODO | — |
+| H-029 | Enforce ARJUNA 0.35 threshold in `create_card()` | `BOARDSTORE_SPEC:1784`, `SHAKTI_GINKO:40-41`, ADR-007 mandates gate — code has no check | TODO | — |
+| H-030 | Fix KV-cache timestamp violations in `master_prompt_engineer.py` | Lines 460, 621, 669, 771 — `datetime.now()` in prompt text poisons prefix sharing | TODO | — |
+| H-031 | Wire facade + provenance into orchestrator dispatch (Loop 1 closure) | H-007 + H-011 + H-012 combined — depends on H-027, H-028 | TODO | — |
 
 ## MEDIUM (next 1-2 weeks)
 
