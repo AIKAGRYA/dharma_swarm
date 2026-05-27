@@ -31,17 +31,14 @@ Define the Runtime Truth Spine before expanding agent fabric. Three audits
 spine. The fix is one invariant chain (Task + Runner + Claim + Context +
 RoutingDecision + ProviderCall + EvidenceReceipt = safe execution path).
 Every dispatch produces exactly one receipt. No more generic dispatch_dropoff.
-
 PR A.5 (governance convergence): the spine guard is fused into the existing
 uplift_guards composition (no parallel CI workflow), each closure layer's
 canonical receipt is declared in ACTIVE_SURFACE_MANIFEST.yaml under
 correlation_spine, and ANTI_SLOP Rule 2 is extended with role vocabulary
 so future receipts must declare their layer instead of growing a second
 truth surface.
-
 Doctrine line that must hold across all closure layers:
   Receipts may differ by closure layer. Correlation identity must not.
-
 Reference: docs/reports/CONVERGED_SEAM_AUDIT_RUNTIME_TRUTH_SPINE.md
 A2A anchor: dharma_swarm/a2a/README.md (three-layer receipt architecture)
 
@@ -83,7 +80,7 @@ These are immutable engineering laws for this repository. Violation = architectu
 The `dharma_swarm/` package currently has **387 files at its top level (63.2% of 612 total Python modules)** (V). No new .py file may be added to the top level. New modules must go into an appropriate subdirectory. Existing top-level files will be organized over time.
 
 ### A2: NO DUPLICATE IMPLEMENTATIONS
-Before creating a new file for routing, bridging, adapting, or orchestrating, check if one already exists. The repo currently has **24 bridge files** (V), **3 model_routing copies** (2 are identical, 1 is different) (V), **4 orchestrators** (V), **16 adapter files across 8 locations** (V), and **14 router files** (V). Do not add more without deprecating an existing one.
+Before creating a new file for routing, bridging, adapting, or orchestrating, check if one already exists. The repo currently has **24 bridge files** (V), **3 model_routing copies** (2 are identical, 1 is different) (V), **4 orchestrators** (V), **16 adapter files across 8 locations** (V), and **13 router files** (V). Do not add more without deprecating an existing one.
 
 ### A3: NO UNDOCUMENTED SEAMS
 If your code creates a new interface between domains (a bridge, adapter, or protocol), you must update `NAVIGATION.md` with its purpose, entry point, and boundary constraints. Undocumented seams become invisible coupling.
@@ -127,13 +124,13 @@ These are the ground-truth metrics. All other documents citing different numbers
 |--------|-------|-------------|
 | Total Python modules | **657** | find dharma_swarm -name "*.py" -type f |
 | Top-level (flat) modules | **388 (59.5%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
-| Total Python LOC | **276,766** | wc -l across dharma_swarm Python modules |
+| Total Python LOC | **276,472** | wc -l across dharma_swarm Python modules |
 | Test files | **608** | find tests -name "*.py" -type f |
 | Test functions | **10,596 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
-| Markdown files | **736** | find . -name "*.md" -type f |
-| Markdown total lines | **186,545** | wc -l across all .md |
+| Markdown files | **737** | find . -name "*.md" -type f |
+| Markdown total lines | **186,653** | wc -l across all .md |
 | Bridge files | **24** | find dharma_swarm -name "*bridge*.py" |
 | Adapter files | **20 across 8 locations** | find dharma_swarm -type f \| rg -i "adapter" |
 | Orchestrator files | **4** (6,034 LOC total) | find dharma_swarm -name "*orchestrat*" |
