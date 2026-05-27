@@ -153,6 +153,11 @@ type archiveFetchResult struct {
 	Entry ArchiveEntry
 }
 
+type archiveFileRefs struct {
+	BodyPath    string
+	ReceiptPath string
+}
+
 type archiveFetchOutcome struct {
 	Body              []byte
 	StartedAt         time.Time
@@ -375,6 +380,7 @@ func runArchiveQueue(client *archiveHTTPClient, queue []archiveQueueItem, archiv
 	}
 	seenURL := map[string]bool{}
 	seenHash := map[string]string{}
+	keptFilesByURL := map[string]archiveFileRefs{}
 	entries := []ArchiveEntry{}
 	errors := []string{}
 	dedupeCount := 0
@@ -399,7 +405,7 @@ func runArchiveQueue(client *archiveHTTPClient, queue []archiveQueueItem, archiv
 		active--
 		entry := result.Entry
 		if entry.FinalCanonicalURL != "" && entry.FinalCanonicalURL != entry.CanonicalURL && seenURL[entry.FinalCanonicalURL] {
-			removeDuplicateArchiveFiles(entry)
+			removeDuplicateArchiveFilesExcept(entry, keptFilesByURL[entry.FinalCanonicalURL])
 			entry.DedupeOf = entry.FinalCanonicalURL
 			entry.BodyPath = ""
 			entry.ReceiptPath = ""
@@ -417,6 +423,13 @@ func runArchiveQueue(client *archiveHTTPClient, queue []archiveQueueItem, archiv
 			dedupeCount++
 		} else if entry.ContentHash != "" && archiveEntryDedupeEligible(entry) {
 			seenHash[entry.ContentHash] = firstNonEmpty(entry.FinalCanonicalURL, entry.CanonicalURL)
+		}
+		if archiveEntryDedupeEligible(entry) {
+			files := archiveFileRefs{BodyPath: entry.BodyPath, ReceiptPath: entry.ReceiptPath}
+			keptFilesByURL[entry.CanonicalURL] = files
+			if entry.FinalCanonicalURL != "" {
+				keptFilesByURL[entry.FinalCanonicalURL] = files
+			}
 		}
 		if len(entry.Errors) > 0 {
 			errors = append(errors, fmt.Sprintf("%s: %s", entry.CanonicalURL, strings.Join(entry.Errors, "; ")))
@@ -443,11 +456,19 @@ func archiveEntryDedupeEligible(entry ArchiveEntry) bool {
 }
 
 func removeDuplicateArchiveFiles(entry ArchiveEntry) {
+	removeDuplicateArchiveFilesExcept(entry, archiveFileRefs{})
+}
+
+func removeDuplicateArchiveFilesExcept(entry ArchiveEntry, preserve archiveFileRefs) {
 	if entry.BodyPath != "" {
-		_ = os.Remove(entry.BodyPath)
+		if preserve.BodyPath == "" || entry.BodyPath != preserve.BodyPath {
+			_ = os.Remove(entry.BodyPath)
+		}
 	}
 	if entry.ReceiptPath != "" {
-		_ = os.Remove(entry.ReceiptPath)
+		if preserve.ReceiptPath == "" || entry.ReceiptPath != preserve.ReceiptPath {
+			_ = os.Remove(entry.ReceiptPath)
+		}
 	}
 }
 

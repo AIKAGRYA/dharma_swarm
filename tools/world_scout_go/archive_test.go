@@ -350,6 +350,87 @@ func TestArchiveDoesNotContentDedupeHTTPErrorRows(t *testing.T) {
 	}
 }
 
+func TestArchiveConcurrentRedirectsDoNotDeleteKeptEvidence(t *testing.T) {
+	var mu sync.Mutex
+	finalHits := 0
+	releaseFinal := make(chan struct{})
+	client := &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		switch req.URL.Path {
+		case "/robots.txt":
+			return &http.Response{StatusCode: http.StatusNotFound, Body: io.NopCloser(strings.NewReader("")), Request: req}, nil
+		case "/r1", "/r2":
+			return &http.Response{
+				StatusCode: http.StatusFound,
+				Header:     http.Header{"Location": []string{"https://redirect-dedupe.test/final"}},
+				Body:       io.NopCloser(strings.NewReader("")),
+				Request:    req,
+			}, nil
+		case "/final":
+			mu.Lock()
+			finalHits++
+			hits := finalHits
+			if hits == 2 {
+				close(releaseFinal)
+			}
+			mu.Unlock()
+			if hits < 2 {
+				select {
+				case <-releaseFinal:
+				case <-time.After(time.Second):
+				}
+			}
+			return textResponse(req, `<html><head><title>Shared Final</title></head><body>same final</body></html>`), nil
+		default:
+			return &http.Response{StatusCode: http.StatusNotFound, Body: io.NopCloser(strings.NewReader("missing")), Request: req}, nil
+		}
+	})}
+
+	result := archiveSourcesWithHTTPClient([]Source{
+		{Name: "r1", URL: "https://redirect-dedupe.test/r1", Kind: "html"},
+		{Name: "r2", URL: "https://redirect-dedupe.test/r2", Kind: "html"},
+	}, ArchiveOptions{
+		ArchiveDir: filepath.Join(t.TempDir(), "archive"),
+		MaxPages:   2,
+		Workers:    2,
+	}, client)
+	if result.ReplayValidation.Status != "passed" {
+		t.Fatalf("expected replay validation to preserve kept evidence, got %+v", result.ReplayValidation)
+	}
+	if result.DedupeCount != 1 {
+		t.Fatalf("expected one redirect identity dedupe, got %d entries=%+v", result.DedupeCount, result.Entries)
+	}
+
+	captured := 0
+	deduped := 0
+	var kept ArchiveEntry
+	for _, entry := range result.Entries {
+		switch entry.CaptureStatus {
+		case CaptureCaptured:
+			captured++
+			kept = entry
+		case CaptureDeduped:
+			deduped++
+		}
+	}
+	if captured != 1 || deduped != 1 {
+		t.Fatalf("expected one captured and one deduped entry, got captured=%d deduped=%d entries=%+v", captured, deduped, result.Entries)
+	}
+	if kept.BodyPath == "" || kept.ReceiptPath == "" {
+		t.Fatalf("kept entry missing evidence paths: %+v", kept)
+	}
+	if _, err := os.Stat(kept.BodyPath); err != nil {
+		t.Fatalf("kept body was removed: %v", err)
+	}
+	if _, err := os.Stat(kept.ReceiptPath); err != nil {
+		t.Fatalf("kept receipt was removed: %v", err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if finalHits != 2 {
+		t.Fatalf("expected both redirect workers to hit final URL, got %d", finalHits)
+	}
+}
+
 func TestArchiveFixtureServerEndToEndEvidenceSemantics(t *testing.T) {
 	client, origin := newArchiveFixtureClient(t)
 	archiveDir := filepath.Join(t.TempDir(), "archive")
