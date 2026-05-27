@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 from dharma_swarm.world_radar import go_bridge as bridge
@@ -124,6 +125,101 @@ def test_no_fetch_pass_preserves_prior_radar_raw_observations(
     assert result.raw_observations == 2
     assert len(_read_jsonl(raw_path)) == 2
     assert result.promotion_ready == 1
+
+
+
+def test_run_go_scout_plumbs_archive_flags(monkeypatch, tmp_path: Path) -> None:
+    state = tmp_path / ".dharma"
+    output_path = tmp_path / "observations.jsonl"
+    health_path = tmp_path / "health.json"
+    archive_dir = tmp_path / "archive"
+    url_file = tmp_path / "urls.txt"
+    url_file.write_text("https://cofounder.co/how-to/start\n", encoding="utf-8")
+    captured: dict[str, object] = {}
+
+    def fake_run(cmd, cwd, capture_output, text, timeout):  # type: ignore[no-untyped-def]
+        captured["cmd"] = cmd
+        _write_jsonl(output_path, [_signal("cofounder", score=0.91)])
+        health_path.write_text(
+            json.dumps(
+                {
+                    "successful_sources": 1,
+                    "failed_sources": 0,
+                    "archive_enabled": True,
+                    "archive_count": 2,
+                    "dedupe_count": 0,
+                    "archive_dir": str(archive_dir),
+                    "archive_index_path": str(archive_dir / "archive_index.jsonl"),
+                    "archive_manifest_path": str(archive_dir / "manifest.json"),
+                    "archive_discovered_count": 3,
+                    "archive_workers": 8,
+                    "archive_total_bytes": 1234,
+                    "archive_error_count": 1,
+                }
+            ),
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+
+    monkeypatch.setattr(bridge.subprocess, "run", fake_run)
+
+    rows, error, counts = bridge._run_go_scout(
+        state=state,
+        output_path=output_path,
+        health_path=health_path,
+        timeout_s=30,
+        archive=True,
+        archive_dir=archive_dir,
+        archive_urls=["https://cofounder.co/how-to/start"],
+        archive_url_files=[str(url_file)],
+        archive_max_bytes=123_456,
+        archive_max_pages=4,
+        archive_max_depth=0,
+        archive_same_domain=False,
+        archive_rate_limit_ms=250,
+        archive_robots=False,
+        archive_default_crawl_delay_ms=75,
+        archive_max_retries=3,
+        archive_retry_base_delay_ms=11,
+        archive_retry_max_delay_ms=99,
+        archive_max_fetch_duration_ms=1234,
+        archive_exclude=["app.cofounder.co"],
+        archive_workers=8,
+        archive_discover_llms=True,
+        archive_discover_sitemap=True,
+        archive_sitemap_max_urls=25,
+    )
+
+    cmd = captured["cmd"]
+    assert isinstance(cmd, list)
+    assert error is None
+    assert rows[0]["source"] == "cofounder"
+    assert counts["archive_enabled"] is True
+    assert counts["archive_count"] == 2
+    assert counts["archive_index_path"] == str(archive_dir / "archive_index.jsonl")
+    assert counts["archive_discovered_count"] == 3
+    assert counts["archive_workers"] == 8
+    assert counts["archive_total_bytes"] == 1234
+    assert counts["archive_error_count"] == 1
+    assert "--archive" in cmd
+    assert "--archive-discover-llms" in cmd
+    assert "--archive-discover-sitemap" in cmd
+    assert [cmd[idx + 1] for idx, item in enumerate(cmd) if item == "--archive-workers"] == ["8"]
+    assert [cmd[idx + 1] for idx, item in enumerate(cmd) if item == "--archive-sitemap-max-urls"] == ["25"]
+    assert [cmd[idx + 1] for idx, item in enumerate(cmd) if item == "--archive-max-bytes"] == ["123456"]
+    assert [cmd[idx + 1] for idx, item in enumerate(cmd) if item == "--archive-rate-limit-ms"] == ["250"]
+    assert "--archive-same-domain=false" in cmd
+    assert "--archive-robots=false" in cmd
+    assert [cmd[idx + 1] for idx, item in enumerate(cmd) if item == "--archive-default-crawl-delay-ms"] == ["75"]
+    assert [cmd[idx + 1] for idx, item in enumerate(cmd) if item == "--archive-max-retries"] == ["3"]
+    assert [cmd[idx + 1] for idx, item in enumerate(cmd) if item == "--archive-retry-base-delay-ms"] == ["11"]
+    assert [cmd[idx + 1] for idx, item in enumerate(cmd) if item == "--archive-retry-max-delay-ms"] == ["99"]
+    assert [cmd[idx + 1] for idx, item in enumerate(cmd) if item == "--archive-max-fetch-duration-ms"] == ["1234"]
+    assert [cmd[idx + 1] for idx, item in enumerate(cmd) if item == "--query-url"] == [
+        "https://cofounder.co/how-to/start"
+    ]
+    assert [cmd[idx + 1] for idx, item in enumerate(cmd) if item == "--query-url-file"] == [str(url_file)]
+    assert "app.cofounder.co" in cmd
 
 
 def _fake_ingestor(

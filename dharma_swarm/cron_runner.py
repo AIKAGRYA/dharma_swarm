@@ -69,6 +69,15 @@ def _as_bool(value: Any, default: bool = False) -> bool:
     return default
 
 
+def _as_str_list(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [value] if value.strip() else []
+    if isinstance(value, (list, tuple, set)):
+        return [str(item) for item in value if str(item).strip()]
+    return [str(value)] if str(value).strip() else []
+
 def _run_system_map_populator(job: dict[str, Any]) -> CronJobExecutionResult:
     """Refresh reports/system_map/latest.json from local read-only probes."""
 
@@ -658,6 +667,26 @@ def _run_world_scout(job: dict[str, Any]) -> CronJobExecutionResult:
             scout_fetch=True,
             min_score=_as_float(job.get("min_score"), 0.45),
             timeout_s=_as_int(job.get("timeout_sec"), 60),
+            scout_archive=_as_bool(job.get("archive"), False),
+            scout_archive_urls=_as_str_list(job.get("archive_urls")),
+            scout_archive_url_files=_as_str_list(job.get("archive_url_files")),
+            scout_archive_max_bytes=_as_int(job.get("archive_max_bytes"), 2_000_000),
+            scout_archive_max_pages=_as_int(job.get("archive_max_pages"), 100),
+            scout_archive_max_depth=_as_int(job.get("archive_max_depth"), 0),
+            scout_archive_same_domain=_as_bool(job.get("archive_same_domain"), True),
+            scout_archive_rate_limit_ms=_as_int(job.get("archive_rate_limit_ms"), 100),
+            scout_archive_robots=_as_bool(job.get("archive_robots"), True),
+            scout_archive_default_crawl_delay_ms=_as_int(job.get("archive_default_crawl_delay_ms"), 0),
+            scout_archive_max_retries=_as_int(job.get("archive_max_retries"), 1),
+            scout_archive_retry_base_delay_ms=_as_int(job.get("archive_retry_base_delay_ms"), 250),
+            scout_archive_retry_max_delay_ms=_as_int(job.get("archive_retry_max_delay_ms"), 2000),
+            scout_archive_max_fetch_duration_ms=_as_int(job.get("archive_max_fetch_duration_ms"), 30000),
+            scout_archive_include=_as_str_list(job.get("archive_include")),
+            scout_archive_exclude=_as_str_list(job.get("archive_exclude")),
+            scout_archive_workers=_as_int(job.get("archive_workers"), 6),
+            scout_archive_discover_llms=_as_bool(job.get("archive_discover_llms"), False),
+            scout_archive_discover_sitemap=_as_bool(job.get("archive_discover_sitemap"), False),
+            scout_archive_sitemap_max_urls=_as_int(job.get("archive_sitemap_max_urls"), 100),
         )
         canonical_signals = asyncio.run(
             ZeitgeistScanner(
@@ -688,6 +717,16 @@ def _run_world_scout(job: dict[str, Any]) -> CronJobExecutionResult:
                 "board_path": result.board_path,
                 "brief_path": result.brief_path,
                 "health_path": result.health_path,
+                "archive_enabled": getattr(result, "archive_enabled", False),
+                "archive_count": getattr(result, "archive_count", 0),
+                "dedupe_count": getattr(result, "dedupe_count", 0),
+                "archive_dir": getattr(result, "archive_dir", ""),
+                "archive_index_path": getattr(result, "archive_index_path", ""),
+                "archive_manifest_path": getattr(result, "archive_manifest_path", ""),
+                "archive_discovered_count": getattr(result, "archive_discovered_count", 0),
+                "archive_workers": getattr(result, "archive_workers", 0),
+                "archive_total_bytes": getattr(result, "archive_total_bytes", 0),
+                "archive_error_count": getattr(result, "archive_error_count", 0),
             },
         )
     except Exception as e:  # noqa: BLE001

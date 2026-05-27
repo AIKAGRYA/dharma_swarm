@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -74,6 +75,58 @@ func SourcesForQueries(queries []string, cascadeFor string) []Source {
 	return sources
 }
 
+func URLsFromFiles(paths []string) ([]string, error) {
+	urls := []string{}
+	errors := []string{}
+	for _, path := range paths {
+		data, err := os.ReadFile(strings.TrimSpace(path))
+		if err != nil {
+			errors = append(errors, err.Error())
+			continue
+		}
+		for _, line := range strings.Split(string(data), "\n") {
+			trimmed := strings.TrimSpace(line)
+			if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+				continue
+			}
+			urls = append(urls, trimmed)
+		}
+	}
+	if len(errors) > 0 {
+		return urls, fmt.Errorf("url file errors: %s", strings.Join(errors, "; "))
+	}
+	return urls, nil
+}
+
+func SourcesForURLs(rawURLs []string, cascadeFor string) []Source {
+	sources := []Source{}
+	seen := map[string]bool{}
+	for idx, rawURL := range rawURLs {
+		trimmed := strings.TrimSpace(rawURL)
+		canonical := canonicalURL(trimmed)
+		if canonical == "" || seen[canonical] {
+			continue
+		}
+		seen[canonical] = true
+		nameURL := strings.TrimPrefix(strings.TrimPrefix(canonical, "https://"), "http://")
+		nameURL = strings.NewReplacer("/", "_", ":", "_", "?", "_", "&", "_", "=", "_").Replace(nameURL)
+		nameURL = strings.Trim(nameURL, "_")
+		if len(nameURL) > 72 {
+			nameURL = nameURL[:72]
+		}
+		if nameURL == "" {
+			nameURL = "url"
+		}
+		sources = append(sources, Source{
+			Name:       "direct_" + strconv.Itoa(idx) + "_" + nameURL,
+			URL:        canonical,
+			Kind:       inferKind(canonical),
+			CascadeFor: cascadeFor,
+		})
+	}
+	return sources
+}
+
 func inferKind(rawURL string) string {
 	switch {
 	case strings.Contains(rawURL, "hn.algolia.com"):
@@ -84,6 +137,8 @@ func inferKind(rawURL string) string {
 		return "github_advisories"
 	case strings.Contains(rawURL, "export.arxiv.org"):
 		return "arxiv"
+	case strings.HasSuffix(rawURL, "/llms.txt") || strings.HasSuffix(rawURL, "/llms-full.txt"):
+		return "llms_txt"
 	case strings.Contains(rawURL, "reddit.com"):
 		return "reddit"
 	default:

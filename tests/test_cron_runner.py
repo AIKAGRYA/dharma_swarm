@@ -527,6 +527,99 @@ def test_world_scout_job_fetch_runs_without_env(monkeypatch, tmp_path):
     assert seen["timeout_s"] == 7
 
 
+
+def test_world_scout_forwards_archive_power_flags(monkeypatch, tmp_path):
+    fake = SimpleNamespace(
+        ok=True,
+        raw_observations=1,
+        emitted_signals=1,
+        promotion_ready=0,
+        incubations_written=0,
+        board_path="/tmp/board.json",
+        brief_path="/tmp/brief.md",
+        health_path="/tmp/health.json",
+        archive_enabled=True,
+        archive_count=4,
+        dedupe_count=0,
+        archive_dir="/tmp/archive",
+        archive_index_path="/tmp/archive/archive_index.jsonl",
+        archive_manifest_path="/tmp/archive/manifest.json",
+        archive_discovered_count=2,
+        archive_workers=9,
+        archive_total_bytes=555,
+        archive_error_count=1,
+        errors=(),
+    )
+    seen: dict[str, object] = {}
+    monkeypatch.delenv("DHARMA_WORLD_SCOUT_FETCH", raising=False)
+
+    def fake_run(**kwargs):
+        seen.update(kwargs)
+        return fake
+
+    monkeypatch.setattr(
+        "dharma_swarm.world_radar.go_bridge.run_world_radar_go_once",
+        fake_run,
+    )
+
+    result = execute_cron_job(
+        {
+            "handler": "world_scout",
+            "fetch": True,
+            "state_dir": str(tmp_path),
+            "archive": True,
+            "archive_urls": "https://cofounder.co/",
+            "archive_url_files": ["/tmp/cofounder-urls.txt"],
+            "archive_max_bytes": 123456,
+            "archive_same_domain": False,
+            "archive_rate_limit_ms": 250,
+            "archive_robots": False,
+            "archive_default_crawl_delay_ms": 75,
+            "archive_max_retries": 3,
+            "archive_retry_base_delay_ms": 11,
+            "archive_retry_max_delay_ms": 99,
+            "archive_max_fetch_duration_ms": 1234,
+            "archive_include": ["cofounder.co"],
+            "archive_exclude": "app.cofounder.co",
+            "archive_workers": 9,
+            "archive_discover_llms": True,
+            "archive_discover_sitemap": True,
+            "archive_sitemap_max_urls": 25,
+        }
+    )
+
+    assert result.status is CronJobRunStatus.COMPLETED
+    assert seen["scout_archive"] is True
+    assert seen["scout_archive_urls"] == ["https://cofounder.co/"]
+    assert seen["scout_archive_url_files"] == ["/tmp/cofounder-urls.txt"]
+    assert seen["scout_archive_max_bytes"] == 123456
+    assert seen["scout_archive_same_domain"] is False
+    assert seen["scout_archive_rate_limit_ms"] == 250
+    assert seen["scout_archive_robots"] is False
+    assert seen["scout_archive_default_crawl_delay_ms"] == 75
+    assert seen["scout_archive_max_retries"] == 3
+    assert seen["scout_archive_retry_base_delay_ms"] == 11
+    assert seen["scout_archive_retry_max_delay_ms"] == 99
+    assert seen["scout_archive_max_fetch_duration_ms"] == 1234
+    assert seen["scout_archive_exclude"] == ["app.cofounder.co"]
+    assert seen["scout_archive_workers"] == 9
+    assert seen["scout_archive_discover_llms"] is True
+    assert seen["scout_archive_discover_sitemap"] is True
+    assert seen["scout_archive_sitemap_max_urls"] == 25
+    assert result.metadata["archive_enabled"] is True
+    assert result.metadata["archive_index_path"] == "/tmp/archive/archive_index.jsonl"
+    assert result.metadata["archive_manifest_path"] == "/tmp/archive/manifest.json"
+    assert result.metadata["archive_total_bytes"] == 555
+    assert result.metadata["archive_error_count"] == 1
+
+
+def test_chetana_bulk_promote_is_not_registered_in_world_archive_pr():
+    result = execute_cron_job({"handler": "chetana_bulk_promote"})
+
+    assert result.status is CronJobRunStatus.FAILED
+    assert "Unsupported cron handler: chetana_bulk_promote" in result.output
+
+
 def test_execute_cron_job_maps_overnight_waiting_summary_to_waiting_external():
     async def _fake_run_overnight(**kwargs):
         assert kwargs["external_wait_handoff"] is True

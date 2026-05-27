@@ -37,6 +37,16 @@ class WorldRadarGoResult:
     board_path: str
     brief_path: str
     health_path: str
+    archive_enabled: bool = False
+    archive_count: int = 0
+    dedupe_count: int = 0
+    archive_dir: str = ""
+    archive_index_path: str = ""
+    archive_manifest_path: str = ""
+    archive_discovered_count: int = 0
+    archive_workers: int = 0
+    archive_total_bytes: int = 0
+    archive_error_count: int = 0
     errors: tuple[str, ...] = ()
 
 
@@ -46,6 +56,27 @@ def run_world_radar_go_once(
     scout_fetch: bool = False,
     min_score: float = 0.45,
     timeout_s: int = 60,
+    scout_archive: bool = False,
+    scout_archive_dir: Path | str | None = None,
+    scout_archive_urls: list[str] | None = None,
+    scout_archive_url_files: list[str] | None = None,
+    scout_archive_max_bytes: int = 2_000_000,
+    scout_archive_max_pages: int = 100,
+    scout_archive_max_depth: int = 0,
+    scout_archive_same_domain: bool = True,
+    scout_archive_rate_limit_ms: int = 100,
+    scout_archive_robots: bool = True,
+    scout_archive_default_crawl_delay_ms: int = 0,
+    scout_archive_max_retries: int = 1,
+    scout_archive_retry_base_delay_ms: int = 250,
+    scout_archive_retry_max_delay_ms: int = 2000,
+    scout_archive_max_fetch_duration_ms: int = 30000,
+    scout_archive_include: list[str] | None = None,
+    scout_archive_exclude: list[str] | None = None,
+    scout_archive_workers: int = 6,
+    scout_archive_discover_llms: bool = False,
+    scout_archive_discover_sitemap: bool = False,
+    scout_archive_sitemap_max_urls: int = 100,
 ) -> WorldRadarGoResult:
     """Run one world-radar pass and publish board, brief, health, and promotions."""
     started = time.monotonic()
@@ -65,6 +96,16 @@ def run_world_radar_go_once(
     source_weights_path = radar / "source_weights.json"
     feedback_ledger_path = radar / "source_feedback_ledger.json"
     errors: list[str] = []
+    archive_enabled = False
+    archive_count = 0
+    dedupe_count = 0
+    archive_dir = ""
+    archive_index_path = ""
+    archive_manifest_path = ""
+    archive_discovered_count = 0
+    archive_workers = 0
+    archive_total_bytes = 0
+    archive_error_count = 0
 
     source_weights = load_source_weights(source_weights_path)
     applied_feedback_ids = load_source_feedback_ledger(feedback_ledger_path)
@@ -90,10 +131,41 @@ def run_world_radar_go_once(
             output_path=radar / "world_scout_observations.jsonl",
             health_path=scout_health_path,
             timeout_s=timeout_s,
+            archive=scout_archive,
+            archive_dir=Path(scout_archive_dir).expanduser() if scout_archive_dir else radar / "archive" / "world_scout",
+            archive_urls=scout_archive_urls,
+            archive_url_files=scout_archive_url_files,
+            archive_max_bytes=scout_archive_max_bytes,
+            archive_max_pages=scout_archive_max_pages,
+            archive_max_depth=scout_archive_max_depth,
+            archive_same_domain=scout_archive_same_domain,
+            archive_rate_limit_ms=scout_archive_rate_limit_ms,
+            archive_robots=scout_archive_robots,
+            archive_default_crawl_delay_ms=scout_archive_default_crawl_delay_ms,
+            archive_max_retries=scout_archive_max_retries,
+            archive_retry_base_delay_ms=scout_archive_retry_base_delay_ms,
+            archive_retry_max_delay_ms=scout_archive_retry_max_delay_ms,
+            archive_max_fetch_duration_ms=scout_archive_max_fetch_duration_ms,
+            archive_include=scout_archive_include,
+            archive_exclude=scout_archive_exclude,
+            archive_workers=scout_archive_workers,
+            archive_discover_llms=scout_archive_discover_llms,
+            archive_discover_sitemap=scout_archive_discover_sitemap,
+            archive_sitemap_max_urls=scout_archive_sitemap_max_urls,
         )
         raw_rows.extend(scout_rows)
-        successful_sources += scout_counts.get("successful_sources", 0)
-        failed_sources += scout_counts.get("failed_sources", 0)
+        successful_sources += int(scout_counts.get("successful_sources", 0) or 0)
+        failed_sources += int(scout_counts.get("failed_sources", 0) or 0)
+        archive_enabled = bool(scout_counts.get("archive_enabled", archive_enabled) or archive_enabled)
+        archive_count += int(scout_counts.get("archive_count", 0) or 0)
+        dedupe_count += int(scout_counts.get("dedupe_count", 0) or 0)
+        archive_dir = str(scout_counts.get("archive_dir", "") or archive_dir)
+        archive_index_path = str(scout_counts.get("archive_index_path", "") or archive_index_path)
+        archive_manifest_path = str(scout_counts.get("archive_manifest_path", "") or archive_manifest_path)
+        archive_discovered_count += int(scout_counts.get("archive_discovered_count", 0) or 0)
+        archive_workers = int(scout_counts.get("archive_workers", 0) or archive_workers)
+        archive_total_bytes += int(scout_counts.get("archive_total_bytes", 0) or 0)
+        archive_error_count += int(scout_counts.get("archive_error_count", 0) or 0)
         if scout_error:
             errors.append(scout_error)
     _write_jsonl(raw_path, raw_rows)
@@ -155,6 +227,16 @@ def run_world_radar_go_once(
         errors=errors,
         duration_s=round(time.monotonic() - started, 3),
         feedback_events_applied=len(applied_feedback_ids) - applied_before,
+        archive_enabled=archive_enabled,
+        archive_count=archive_count,
+        dedupe_count=dedupe_count,
+        archive_dir=archive_dir,
+        archive_index_path=archive_index_path,
+        archive_manifest_path=archive_manifest_path,
+        archive_discovered_count=archive_discovered_count,
+        archive_workers=archive_workers,
+        archive_total_bytes=archive_total_bytes,
+        archive_error_count=archive_error_count,
     )
     _write_json_atomic(health_path, health)
     _write_text_atomic(health_md_path, _render_health_markdown(health))
@@ -169,6 +251,16 @@ def run_world_radar_go_once(
         board_path=str(board_path),
         brief_path=str(brief_path),
         health_path=str(health_path),
+        archive_enabled=archive_enabled,
+        archive_count=archive_count,
+        dedupe_count=dedupe_count,
+        archive_dir=archive_dir,
+        archive_index_path=archive_index_path,
+        archive_manifest_path=archive_manifest_path,
+        archive_discovered_count=archive_discovered_count,
+        archive_workers=archive_workers,
+        archive_total_bytes=archive_total_bytes,
+        archive_error_count=archive_error_count,
         errors=tuple(errors),
     )
 
@@ -199,8 +291,8 @@ def _run_cascade(
             cascade_for=movement_id,
         )
         rows.extend(scout_rows)
-        counts["successful_sources"] += scout_counts.get("successful_sources", 0)
-        counts["failed_sources"] += scout_counts.get("failed_sources", 0)
+        counts["successful_sources"] += int(scout_counts.get("successful_sources", 0) or 0)
+        counts["failed_sources"] += int(scout_counts.get("failed_sources", 0) or 0)
         if scout_error:
             errors.append(scout_error)
     return rows, errors, counts
@@ -231,7 +323,28 @@ def _run_go_scout(
     timeout_s: int,
     queries: list[str] | None = None,
     cascade_for: str = "",
-) -> tuple[list[dict[str, Any]], str | None, dict[str, int]]:
+    archive: bool = False,
+    archive_dir: Path | None = None,
+    archive_urls: list[str] | None = None,
+    archive_url_files: list[str] | None = None,
+    archive_max_bytes: int = 2_000_000,
+    archive_max_pages: int = 100,
+    archive_max_depth: int = 0,
+    archive_same_domain: bool = True,
+    archive_rate_limit_ms: int = 100,
+    archive_robots: bool = True,
+    archive_default_crawl_delay_ms: int = 0,
+    archive_max_retries: int = 1,
+    archive_retry_base_delay_ms: int = 250,
+    archive_retry_max_delay_ms: int = 2000,
+    archive_max_fetch_duration_ms: int = 30000,
+    archive_include: list[str] | None = None,
+    archive_exclude: list[str] | None = None,
+    archive_workers: int = 6,
+    archive_discover_llms: bool = False,
+    archive_discover_sitemap: bool = False,
+    archive_sitemap_max_urls: int = 100,
+) -> tuple[list[dict[str, Any]], str | None, dict[str, int | str]]:
     module_dir = _repo_root() / "tools" / "world_scout_go"
     if not module_dir.exists():
         return [], f"missing Go scout module: {module_dir}", {}
@@ -251,6 +364,34 @@ def _run_go_scout(
         cmd.extend(["--cascade-for", cascade_for])
     for query in queries or []:
         cmd.extend(["--query", query])
+    if archive:
+        effective_archive_dir = archive_dir or (state / "meta" / "world_radar" / "archive" / "world_scout")
+        cmd.extend(["--archive", "--archive-dir", str(effective_archive_dir)])
+        cmd.extend(["--archive-max-bytes", str(archive_max_bytes)])
+        cmd.extend(["--archive-max-pages", str(archive_max_pages)])
+        cmd.extend(["--archive-max-depth", str(archive_max_depth)])
+        cmd.append(f"--archive-same-domain={str(archive_same_domain).lower()}")
+        cmd.extend(["--archive-rate-limit-ms", str(archive_rate_limit_ms)])
+        cmd.append(f"--archive-robots={str(archive_robots).lower()}")
+        cmd.extend(["--archive-default-crawl-delay-ms", str(archive_default_crawl_delay_ms)])
+        cmd.extend(["--archive-max-retries", str(archive_max_retries)])
+        cmd.extend(["--archive-retry-base-delay-ms", str(archive_retry_base_delay_ms)])
+        cmd.extend(["--archive-retry-max-delay-ms", str(archive_retry_max_delay_ms)])
+        cmd.extend(["--archive-max-fetch-duration-ms", str(archive_max_fetch_duration_ms)])
+        cmd.extend(["--archive-workers", str(archive_workers)])
+        cmd.extend(["--archive-sitemap-max-urls", str(archive_sitemap_max_urls)])
+        if archive_discover_llms:
+            cmd.append("--archive-discover-llms")
+        if archive_discover_sitemap:
+            cmd.append("--archive-discover-sitemap")
+        for raw_url in archive_urls or []:
+            cmd.extend(["--query-url", raw_url])
+        for url_file in archive_url_files or []:
+            cmd.extend(["--query-url-file", url_file])
+        for pattern in archive_include or []:
+            cmd.extend(["--archive-include", pattern])
+        for pattern in archive_exclude or []:
+            cmd.extend(["--archive-exclude", pattern])
     try:
         proc = subprocess.run(cmd, cwd=module_dir, capture_output=True, text=True, timeout=timeout_s)
     except FileNotFoundError as exc:
@@ -311,6 +452,16 @@ def _build_health(
     errors: list[str],
     duration_s: float,
     feedback_events_applied: int,
+    archive_enabled: bool = False,
+    archive_count: int = 0,
+    dedupe_count: int = 0,
+    archive_dir: str = "",
+    archive_index_path: str = "",
+    archive_manifest_path: str = "",
+    archive_discovered_count: int = 0,
+    archive_workers: int = 0,
+    archive_total_bytes: int = 0,
+    archive_error_count: int = 0,
 ) -> dict[str, Any]:
     from datetime import datetime, timezone
 
@@ -337,6 +488,16 @@ def _build_health(
         "incubations_written": incubation_count,
         "duration_s": duration_s,
         "feedback_events_applied": feedback_events_applied,
+        "archive_enabled": archive_enabled,
+        "archive_count": archive_count,
+        "dedupe_count": dedupe_count,
+        "archive_dir": archive_dir,
+        "archive_index_path": archive_index_path,
+        "archive_manifest_path": archive_manifest_path,
+        "archive_discovered_count": archive_discovered_count,
+        "archive_workers": archive_workers,
+        "archive_total_bytes": archive_total_bytes,
+        "archive_error_count": archive_error_count,
         "errors": errors[:10],
     }
 
@@ -352,17 +513,33 @@ def _render_health_markdown(health: dict[str, Any]) -> str:
         f"- last_successful_scan: {health.get('last_successful_scan')}\n"
         f"- duration_s: {health.get('duration_s')}\n"
         f"- feedback_events_applied: {health.get('feedback_events_applied')}\n"
+        f"- archive_enabled: {health.get('archive_enabled', False)}\n"
+        f"- archive_count: {health.get('archive_count', 0)}\n"
+        f"- archive_index_path: {health.get('archive_index_path', '')}\n"
+        f"- archive_discovered_count: {health.get('archive_discovered_count', 0)}\n"
+        f"- archive_total_bytes: {health.get('archive_total_bytes', 0)}\n"
+        f"- archive_error_count: {health.get('archive_error_count', 0)}\n"
         f"- signals: {health.get('signals')}\n"
         f"- promotion_ready: {health.get('promotion_ready')}\n"
     )
 
 
-def _source_counts(health: Any) -> dict[str, int]:
+def _source_counts(health: Any) -> dict[str, int | str]:
     if not isinstance(health, dict):
         return {"successful_sources": 0, "failed_sources": 0}
     return {
         "successful_sources": int(float(health.get("successful_sources", 0) or 0)),
         "failed_sources": int(float(health.get("failed_sources", 0) or 0)),
+        "archive_enabled": bool(health.get("archive_enabled", False)),
+        "archive_count": int(float(health.get("archive_count", 0) or 0)),
+        "dedupe_count": int(float(health.get("dedupe_count", 0) or 0)),
+        "archive_dir": str(health.get("archive_dir", "") or ""),
+        "archive_index_path": str(health.get("archive_index_path", "") or ""),
+        "archive_manifest_path": str(health.get("archive_manifest_path", "") or ""),
+        "archive_discovered_count": int(float(health.get("archive_discovered_count", 0) or 0)),
+        "archive_workers": int(float(health.get("archive_workers", 0) or 0)),
+        "archive_total_bytes": int(float(health.get("archive_total_bytes", 0) or 0)),
+        "archive_error_count": int(float(health.get("archive_error_count", 0) or 0)),
     }
 
 
