@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import importlib
 import os
 import re
 import sys
@@ -80,15 +79,36 @@ def _is_grandfathered(rel: Path) -> bool:
 
 
 def _check_spine_importable() -> list[str]:
-    """Verify the spine package is importable."""
+    """Verify spine modules parse and export expected symbols."""
+    import subprocess
+
     failures: list[str] = []
-    sys.path.insert(0, str(_REPO_ROOT))
-    try:
-        importlib.import_module("dharma_swarm.spine")
-    except Exception as e:
-        failures.append(f"FAIL: cannot import dharma_swarm.spine: {e}")
-    finally:
-        sys.path.pop(0)
+    # Run in a subprocess with a clean PYTHONPATH pointing at repo root.
+    # Use a flat import that bypasses dharma_swarm/__init__.py (which needs
+    # pydantic and other heavy deps not available in the CI minimal env).
+    script = (
+        "import sys, types, os\n"
+        "root = os.environ['REPO_ROOT']\n"
+        "sys.path.insert(0, root)\n"
+        "# Register parent packages as empty stubs so submodule imports resolve\n"
+        "sys.modules.setdefault('dharma_swarm', types.ModuleType('dharma_swarm'))\n"
+        "sys.modules['dharma_swarm'].__path__ = [os.path.join(root, 'dharma_swarm')]\n"
+        "sp = types.ModuleType('dharma_swarm.spine')\n"
+        "sp.__path__ = [os.path.join(root, 'dharma_swarm', 'spine')]\n"
+        "sys.modules['dharma_swarm.spine'] = sp\n"
+        "from dharma_swarm.spine import receipt, routing, invoke\n"
+        "assert hasattr(receipt, 'EvidenceReceipt'), 'missing EvidenceReceipt'\n"
+        "assert hasattr(routing, 'RoutingDecision'), 'missing RoutingDecision'\n"
+        "assert hasattr(invoke, 'invoke_agent'), 'missing invoke_agent'\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        capture_output=True, text=True,
+        env={**os.environ, "REPO_ROOT": str(_REPO_ROOT)},
+    )
+    if result.returncode != 0:
+        err = result.stderr.strip().split("\n")[-1] if result.stderr else "unknown"
+        failures.append(f"FAIL: cannot import dharma_swarm.spine: {err}")
     return failures
 
 
