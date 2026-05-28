@@ -52,7 +52,7 @@ LLM provider. The spine types exist but are not yet the production path.
 - The active track (`runtime-truth-spine-2026-06`) explicitly declares
   non-goals: no new daemon, no new event log, no second truth surface.
   This is disciplined.
-- `ACTIVE_SURFACE_MANIFEST.yaml` (740 lines) declares the canonical
+- `ACTIVE_SURFACE_MANIFEST.yaml` (740 lines) declares the primary
   state directories, API routers, and control surfaces. Any new temporal
   spec must reconcile against this file or it creates a parallel truth
   surface.
