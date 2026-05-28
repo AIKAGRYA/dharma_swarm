@@ -40,7 +40,19 @@ active_track:
     spine. The fix is one invariant chain (Task + Runner + Claim + Context +
     RoutingDecision + ProviderCall + EvidenceReceipt = safe execution path).
     Every dispatch produces exactly one receipt. No more generic dispatch_dropoff.
-    Doctrine: docs/reports/CONVERGED_SEAM_AUDIT_RUNTIME_TRUTH_SPINE.md
+
+    PR A.5 (governance convergence): the spine guard is fused into the existing
+    uplift_guards composition (no parallel CI workflow), each closure layer's
+    canonical receipt is declared in ACTIVE_SURFACE_MANIFEST.yaml under
+    correlation_spine, and ANTI_SLOP Rule 2 is extended with role vocabulary
+    so future receipts must declare their layer instead of growing a second
+    truth surface.
+
+    Doctrine line that must hold across all closure layers:
+      Receipts may differ by closure layer. Correlation identity must not.
+
+    Reference: docs/reports/CONVERGED_SEAM_AUDIT_RUNTIME_TRUTH_SPINE.md
+    A2A anchor: dharma_swarm/a2a/README.md (three-layer receipt architecture)
 
   surfaces:
     - dharma_swarm/spine/**
@@ -48,7 +60,9 @@ active_track:
     - dharma_swarm/agent_runner.py
     - dharma_swarm/runtime_state.py
     - tests/test_dispatch_dropoff_sources.py
-    - tools/spine_check.py
+    - scripts/uplift_guards/check_spine_ownership.py
+    - ACTIVE_SURFACE_MANIFEST.yaml
+    - .semgrep/dharma-anti-slop.yml
 
   prerequisites:
     - id: converged_doctrine_exists
@@ -75,9 +89,37 @@ active_track:
       kind: file_contains
       file: dharma_swarm/spine/invoke.py
       pattern: "async def invoke_agent"
-    - id: spine_check_ci
+    - id: spine_ownership_guard
       kind: file_exists
-      file: .github/workflows/spine-check.yml
+      file: scripts/uplift_guards/check_spine_ownership.py
+    - id: spine_guard_registered
+      kind: file_contains
+      file: scripts/uplift_guards/run_pre_commit.py
+      pattern: "check_spine_ownership"
+    - id: spine_doctrine_anchored
+      kind: file_contains
+      file: dharma_swarm/spine/__init__.py
+      pattern: "Correlation identity must not"
+    - id: correlation_spine_manifest_block
+      kind: file_contains
+      file: ACTIVE_SURFACE_MANIFEST.yaml
+      pattern: "correlation_spine:"
+    - id: correlation_id_alias_present
+      kind: file_contains
+      file: dharma_swarm/spine/receipt.py
+      pattern: "dharma.correlation_id"
+    - id: onboard_renders_spine
+      kind: file_contains
+      file: scripts/governance/agent_onboard.py
+      pattern: "render_spine_status"
+    - id: anti_slop_role_vocabulary
+      kind: file_contains
+      file: docs/governance/ANTI_SLOP_RULES.md
+      pattern: "canonical-store"
+    - id: runtime_state_receipt_field
+      kind: file_contains
+      file: dharma_swarm/runtime_state.py
+      pattern: "receipt_json"
     - id: dropoff_tests_pass
       kind: file_contains
       file: tests/test_dispatch_dropoff_sources.py
@@ -90,6 +132,7 @@ active_track:
     - Do not introduce NATS, Redis, gRPC, or a new daemon.
     - Do not create a second event log or truth surface.
     - Do not add another spiritual/metaphoric naming layer.
+    - Do not add a parallel spine-check CI workflow — the uplift_guards composition is the only entry point.
 
   next_items:
     - id: 1
