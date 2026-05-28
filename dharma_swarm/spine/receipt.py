@@ -87,6 +87,13 @@ class EvidenceReceipt:
             "dharma.receipt_id": str(self.receipt_id),
             "dharma.status": self.status,
             "dharma.provider_attempted": self.provider_attempted,
+            # Cross-layer identity alias: per the correlation_spine doctrine
+            # (ACTIVE_SURFACE_MANIFEST.yaml), each closure layer has its own
+            # canonical receipt but they must share a single correlation
+            # identity. The A2A and closure_v0 layers call this field
+            # ``correlation_id``; on the dispatch layer it is ``trace_id``.
+            # Exporting both names keeps cross-layer joins trivial.
+            "dharma.correlation_id": self.trace_id,
         }
         if self.input_tokens is not None:
             attrs["gen_ai.usage.input_tokens"] = self.input_tokens
