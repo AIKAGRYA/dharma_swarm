@@ -655,3 +655,86 @@ loops:
     health_check_ids: [module_file_exists, test_file_exists]
     priority: p1
     next_action: null
+
+# =========================================================================
+# Correlation Spine — closure-layer receipt map (PR A.5)
+# =========================================================================
+# Doctrine (cross-agent convergence: Perplexity / Codex / Devin / Hermes /
+# GPT-5.5):
+#
+#   Receipts may differ by closure layer. Correlation identity must not.
+#   Each closure layer may have its own canonical receipt.
+#   Cross-layer identity continuity is the global invariant.
+#
+# Each layer below holds a receipt that is CANONICAL-WITHIN-LAYER (not a
+# derived view of another receipt). The invariant is that a single
+# correlation value (under whatever local name) must appear on the
+# receipts of every layer a request traverses, so traces can be joined
+# end-to-end without table-collapsing the three layers into one.
+#
+# Adding a new receipt type to dharma_swarm requires adding a new layer
+# entry here AND extending docs/governance/ANTI_SLOP_RULES.md Rule 2
+# vocabulary. The spine-ownership uplift guard
+# (scripts/uplift_guards/check_spine_ownership.py) enforces that
+# sqlite/aiosqlite importers under dharma_swarm/spine/ declare their
+# role against this vocabulary.
+# =========================================================================
+correlation_spine:
+  schema_version: 1
+  invariant: "Receipts may differ by closure layer. Correlation identity must not."
+  vocabulary:
+    - canonical-store    # owns the source of truth for its layer
+    - derived-view       # read-only projection of a canonical-store
+    - plugin-sink        # write-only export adapter (e.g. OTel)
+    - cache              # ephemeral, rebuildable from canonical sources
+    - legacy-mirror      # transitional dual-write, scheduled for removal
+    - migration-mirror   # active migration target, becomes canonical-store on cutover
+    - exempt             # documented exception (must justify here)
+
+  layers:
+    - id: request_response
+      label: "A2A request/response closure"
+      receipt_class: A2ATaskReceipt
+      receipt_module: dharma_swarm.operator_core.a2a_task_lifecycle
+      identity_field: correlation_id
+      role: canonical-within-layer
+      owner: hermes
+      notes: |
+        Hermes domain. Stamped at A2A gateway entry; fail-closed on empty
+        correlation_id (see tests/test_a2a_gateway_init.py). Architecture
+        anchor: dharma_swarm/a2a/README.md.
+
+    - id: dispatch_invocation
+      label: "Spine dispatch / invocation closure"
+      receipt_class: EvidenceReceipt
+      receipt_module: dharma_swarm.spine.receipt
+      identity_field: trace_id
+      identity_alias: correlation_id
+      role: canonical-within-layer
+      owner: spine
+      notes: |
+        The dispatch-layer receipt produced by invoke_agent(). Field name
+        is trace_id locally; to_otel_span() also exports dharma.correlation_id
+        with the same value so cross-layer joins use a single column.
+
+    - id: test_acceptance
+      label: "Closure-v0 test/acceptance receipt"
+      receipt_class: EvidenceReceipt
+      receipt_module: dharma_swarm.operator_core.closure_v0
+      identity_field: correlation_id
+      role: canonical-within-layer
+      owner: operator_core
+      notes: |
+        Distinct class with the same name as the spine receipt. Naming
+        collision is intentionally tolerated during PR A/B turbulence;
+        layer-prefixed renames (A2ATaskReceipt / SpineEvidenceReceipt /
+        ClosureEvidenceReceipt) are tracked as a follow-up, not forced
+        here.
+
+  cross_layer_joins:
+    - "A2ATaskReceipt.correlation_id == EvidenceReceipt(spine).trace_id"
+    - "EvidenceReceipt(spine).trace_id == EvidenceReceipt(closure_v0).correlation_id"
+
+  guard: scripts/uplift_guards/check_spine_ownership.py
+  doctrine_ref: docs/reports/CONVERGED_SEAM_AUDIT_RUNTIME_TRUTH_SPINE.md
+  anchor_doc: dharma_swarm/a2a/README.md
