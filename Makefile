@@ -246,10 +246,15 @@ memory-kernel-full-power-preflight:
 operator-prod-smoke:
 	$(REPO_PYTHON) scripts/operator_prod_smoke.py --repo-root .
 
-governance-all: semgrep gitleaks test-hygiene test-contracts uplift-guards module-budget docops-integrity spine-check
+# spine-check is composed into uplift-guards via
+# scripts/uplift_guards/check_spine_ownership.py (PR A.5 governance
+# convergence). It is intentionally NOT a separate governance-all
+# dependency — running it once via uplift-guards is enough. The standalone
+# `make spine-check` target stays as an operator-convenience alias only.
+governance-all: semgrep gitleaks test-hygiene test-contracts uplift-guards module-budget docops-integrity
 
 spine-check:
-	$(PYTHON) tools/spine_check.py
+	$(PYTHON) -m scripts.uplift_guards.check_spine_ownership
 
 # Single-door onboarding: prints the current operating reality from existing
 # owners (ACTIVE_TRACK.yaml, LIVE_OPS_DASHBOARD.md, BROKEN_REGISTER.md,
