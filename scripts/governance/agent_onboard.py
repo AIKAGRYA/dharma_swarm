@@ -286,23 +286,32 @@ def render_spine_status() -> None:
     """Surface the correlation_spine declaration to operators.
 
     Reads from the existing owners only (ACTIVE_SURFACE_MANIFEST.yaml plus
-    on-disk file presence). Does not own any fact; does not gate anything.
-    Always exits 0 — informational, matching the rest of agent_onboard.
+    on-disk file presence and the live runtime.db). Does not own any fact;
+    does not gate anything. Always exits 0 — informational, matching the
+    rest of agent_onboard.
 
     Per PR A.5 doctrine: receipts may differ by closure layer, correlation
     identity must not. This section makes the layer map visible at every
     build-session boot so operators don't accidentally introduce a fourth
     receipt without declaring it here.
+
+    Three rendering passes:
+      1. Declared layers (read from manifest correlation_spine.layers)
+      2. Schema introspection (does receipt_json column exist in DDL?)
+      3. Live DB stats (receipt fill-rate on delegation_runs, if DB present)
+
+    Pass (1) is the doctrinal map. Passes (2) and (3) close the
+    declared-vs-actual gap by checking what the live system reports back.
+    Together they form a cybernetic loop: declare → observe → reconcile.
     """
     section("CORRELATION SPINE — closure layers and canonical receipts")
-    manifest_path = REPO_ROOT / "ACTIVE_SURFACE_MANIFEST.yaml"
     layers: list[dict[str, Any]] = []
     invariant: str | None = None
     try:
         import yaml  # type: ignore
 
-        if manifest_path.exists():
-            data = yaml.safe_load(manifest_path.read_text(encoding="utf-8")) or {}
+        if SURFACE_MANIFEST.exists():
+            data = yaml.safe_load(SURFACE_MANIFEST.read_text(encoding="utf-8")) or {}
             spine = data.get("correlation_spine") or {}
             layers = spine.get("layers", []) or []
             invariant = spine.get("invariant")
@@ -319,6 +328,7 @@ def render_spine_status() -> None:
         print(f"  Invariant: {invariant}")
         print()
 
+    # Pass 1: declared layers
     for layer in layers:
         lid = layer.get("id", "?")
         receipt_class = layer.get("receipt_class", "?")
@@ -331,6 +341,44 @@ def render_spine_status() -> None:
         print(f"  [{tag}] {lid}: {receipt_class} ({role})")
         print(f"          module: {receipt_module}")
         print(f"          identity: {identity}")
+
+    # Pass 2: schema introspection — does the dispatch-layer canonical store
+    # actually carry the receipt column? (Preserved from PR #367's framing
+    # as a useful declared-vs-actual reconciliation; runtime_state.py is the
+    # legacy dispatch-layer persistence surface, distinct from but adjacent
+    # to the spine receipt itself.)
+    runtime_state = REPO_ROOT / "dharma_swarm" / "runtime_state.py"
+    if runtime_state.exists():
+        rs_text = runtime_state.read_text(encoding="utf-8", errors="replace")
+        has_receipt = "receipt_json" in rs_text
+        print()
+        print(f"  runtime_state.py receipt_json DDL: {'present' if has_receipt else 'MISSING'}")
+
+    # Pass 3: live DB fill-rate — informational, never fails.
+    db_path = Path.home() / ".dharma" / "state" / "runtime.db"
+    if db_path.exists():
+        try:
+            import sqlite3
+            conn = sqlite3.connect(str(db_path))
+            try:
+                cur = conn.cursor()
+                cur.execute("SELECT COUNT(*) FROM delegation_runs")
+                total = cur.fetchone()[0]
+                cur.execute(
+                    "SELECT COUNT(*) FROM delegation_runs WHERE receipt_json IS NOT NULL"
+                )
+                filled = cur.fetchone()[0]
+                if total > 0:
+                    fill_rate = f"{filled}/{total} ({100 * filled // total}%)"
+                else:
+                    fill_rate = "0/0"
+                print(f"  Live receipt fill rate (delegation_runs): {fill_rate}")
+            finally:
+                conn.close()
+        except Exception as exc:  # pragma: no cover — informational only
+            print(f"  (live DB unavailable: {type(exc).__name__})")
+    else:
+        print("  (runtime.db not present — no live stats)")
 
 
 def render_decay_watch() -> None:
