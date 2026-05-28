@@ -1,0 +1,44 @@
+# Onboarding Receipt — Autonomous Activation Architect
+
+**Per `docs/governance/ONBOARDING_RECEIPT.md` 17-field template.** Produced before architecture proposal, per Master Prompt step 3.
+
+| Field | Value |
+|---|---|
+| `ran_or_read_make_onboard` | Read — `make onboard` not executed in this sandbox (no `make`/CI env); read all surfaces it would render: `ACTIVE_TRACK.yaml`, `SOVEREIGN_MANIFEST.md` (§1–§5), `ANTI_SLOP_RULES.md` (10 rules), `CLAUDE.md`, `CANONICAL_DOC_STACK.md`, `ACTIVE_SURFACE_MANIFEST.yaml`, recent merge log via `git log`. |
+| `date_utc` | 2026-05-28 |
+| `branch` | `devin/2026-05-28-autonomous-activation-architect` (branched from `devin/2026-05-28-autonomous-expansion-audit`, parent PR #369 open) |
+| `head_sha` | `36787c0` — `docs(reports): add autonomous expansion seed audit + activation plan` |
+| `active_track` | `runtime-truth-spine-2026-06` — owner @AmitabhainArunachala, TTL 14d, verified 2026-05-28. Surfaces: `dharma_swarm/spine/**`, `orchestrator.py`, `agent_runner.py`, `runtime_state.py`, `tests/test_dispatch_dropoff_sources.py`, `tools/spine_check.py`. **This proposal does not touch active-track surfaces.** |
+| `broken_register_top_items` | Not directly inspected this session. Known active-track blockers (from `ACTIVE_TRACK.yaml`): (1) spine types ✅, (2) wire A2A into spine, (3) collapse 7 routers to 2, (4) shard providers.py, (5) decompose agent_runner.py. PR #191 KnowledgeOps still draft. Memory-kernel landing gate at `make memory-kernel-readiness`. |
+| `proposed_change_summary` | Add three docs-only reports describing the **autonomous activation chain** as wiring of *existing* owners (`closure_v0`, `economic_engine`, `fractal_room`, `daily_operating_brief`, `auto_proposer`, `revenue/scout_daemon`, Go SDK `receipt`), the **minimal metabolic loop** (Operator Brief → Daily Brief publication wedge), and a **6-PR activation sequence** that is additive, behind feature flags, and does not create new persistence or governance surfaces. No code changes in this PR. |
+| `touched_hot_paths` | **None.** Reports land under `docs/reports/` (already allowed for reports). No edits to grandfathered modules (`dgc_cli.py`, `thinkodynamic_director.py`, `telos_substrate.py`, `agent_runner.py`, `evolution.py`, `swarm.py`, `providers.py`, `orchestrator.py`, `tui/app.py`, `terminal_bridge.py`). No edits to spine surfaces. No edits to `~/.dharma` writer set. |
+| `existing_owner_surface` | Per-stage owner map (full grid in Deliverable 1): **Intent** → `operator_brief/` seam, `ACTIVE_TRACK.yaml`. **Venture Cell** → `fractal/fractal_room.py` (FractalRoom, VentureCellV1, kill/spinout evaluators l.248–303), `docs/governance/VENTURE_CELL_REVENUE_WEDGE.md`. **Noticer** → `auto_proposer.py:136+`, `revenue/scout_daemon.py`, `subconscious_v2.py`, `shakti_zeitgeist_executive.py`. **Task gen** → `operator_core/closure_v0.WorkPacket`, `agentops` packet schema. **Agent exec** → AgentOps v0 worktree runner + `agent_runner.py`. **Receipt chain** → `tools/go_sdk/receipt` (canonical), `operator_core/closure_v0.EvidenceReceipt`, `dharma_swarm/spine/**` dispatch receipts. **Benchmark/KPI** → `daily_operating_brief.py`, `kaizen_review_from_agentops.py`, `fractal_room.evaluate_kill_conditions`. **Value generation** → `revenue/spine.py`, `economic_engine.record_revenue`. **Compute reinvestment** → `economic_engine.BudgetState` + `allocate_budget`. **World-model update** → `subconscious_v2.run_dream_cycle`, `shakti_zeitgeist_executive`. **Recursive improvement** → `evolution.py` (capability-gated `shadow_mode=True`), `closure_v0.decide_next`, `KaizenReviewLink`. |
+| `new_surface_needed` | **None for this PR (docs-only).** Deliverable 3 proposes one new thin module per PR slot (`autonomy_orchestrator.py`, `revenue_wedge_metabolizer.py`, `operator_brief_publisher.py`), each wrapping existing owners; the proposal does not create new persistence, new governance docs that compete with existing ones, new routers, or new state dirs. Every proposed module reads/writes through existing owners. |
+| `why_existing_owner_is_insufficient` | Existing owners are *individually complete* but *not yet composed end-to-end*. `closure_v0` proves one decision loop with fixtures (`tests/fixtures/organism_closure_v0/`); it has never been run against live `AgentOpsRunFact` flowing from `revenue/scout_daemon` → operator-approved packet → AgentOps worktree → KaizenReview. The composition (the "metabolic loop") is the missing surface, and the proposal contains it inside thin orchestrators rather than as new substrate. |
+| `anti_slop_rule_relevant` | **Rule 1** (`~/.dharma` writer set frozen — proposal touches none). **Rule 8** (root markdown allowlist — proposal adds nothing to repo root). **Rule 10** (grandfathered module ceilings — proposal touches none). **Rule on substrate-nativeness** (~10–15% target) — proposal increases native composition without adding substrate. **Rule on no second event log** — proposal uses existing `runtime_state.py` event tables and `reports/agentops/` files. **Rule on no new spiritual naming** — proposed module names are mechanical (`autonomy_orchestrator`, `revenue_wedge_metabolizer`, `operator_brief_publisher`). |
+| `active_surface_manifest_update_needed` | **No** for this PR (docs only). When PRs from the activation sequence land, `ACTIVE_SURFACE_MANIFEST.yaml` will need one declaration per new thin module (added to `routers` or `services` section per its taxonomy). Each activation PR notes this in its own gate row. |
+| `active_track_update_needed` | **No.** `runtime-truth-spine-2026-06` remains the active track. The activation sequence is staged to land **after** the truth-spine track closes its 5 numbered blockers or as an explicitly opt-in parallel track behind feature flags. Recommendation in Deliverable 3: open a follow-up track `autonomous-activation-2026-07` only after Codex confirms spine completion (no parallel substrate). |
+| `evidence_or_receipt_path` | Reports themselves are the evidence for this PR. Per-PR activation evidence paths declared in Deliverable 3 (each PR cites `reports/agentops/<job>/<ts>/report.json`, fixtures under `tests/fixtures/`, and the inherited `tests/fixtures/organism_closure_v0/` for the metabolic-loop scaffolding). |
+| `proceed` | **Yes** (docs only, no runtime impact, no `~/.dharma` writes, no hot-path changes, no governance surface competition). |
+| `reason` | Master Prompt requested three deliverables. They are docs only, name existing owners before proposing new surfaces, declare kill conditions and rollbacks per PR, and explicitly defer to the active Runtime Truth Spine track. The proposal makes Dharma Swarm more replayable (every loop step has a receipt path), more witness-capable (publishes receipts → Daily Brief → KaizenReview), more reality-grounded (Operator Brief publication is the first wedge — a real artifact a real customer can pay for), and more able to survive contact with the world without losing telos (every stage gated by Jagat Kalyan via `closure_v0.TelosObjective` and human-approval gates from `VENTURE_CELL_REVENUE_WEDGE.md`). |
+
+## Doctrinal restatements honored
+
+- "Growth is allowed. Unwitnessed growth is not." — every stage writes a witness/event/receipt to an existing owner.
+- "Autonomy is allowed. Unreceipted autonomy is not." — `closure_v0.EvidenceReceipt` is mandatory before any `NextDecision`.
+- "Revenue is allowed. Revenue that corrupts telos is not." — `Transaction.telos_approved` flag and Jagat Kalyan constraint enforced; first wedge is information work (Operator Brief publication), not adtech or extractive flows.
+- "Expansion is allowed. Ecologically blind expansion is not." — each PR records compute cost estimate (per `revenue_wedge.burn_awareness` gate) and feeds `economic_engine.record_expense`.
+
+## Forbidden actions confirmed not proposed
+
+- ❌ "Build AGI" — proposal is a 6-PR sequence to wire one revenue wedge, behind kill conditions.
+- ❌ Uncontrolled self-modification — `evolution.py` stays `shadow_mode=True`; no PR alters this default.
+- ❌ Autonomous capital deployment — `economic_engine.record_revenue` only records; payments require human approval per `VENTURE_CELL_REVENUE_WEDGE.md`.
+- ❌ Autonomous external messaging — `revenue/scout_daemon.py` already enforces "outreach drafts require human approval"; proposal does not change this.
+- ❌ Deceptive memetic engineering — first wedge is **publishing a real operator brief**, with citations to source events.
+- ❌ Parallel governance systems — no new governance docs proposed; only one new report per deliverable, all under `docs/reports/`.
+- ❌ Vague recursive architecture prose — every stage maps to a code surface with line numbers.
+- ❌ New substrate creation — every proposed module is a thin composer over existing owners.
+- ❌ Another giant meta-framework — total proposed new code: ~600 LOC across 3 thin modules, additive.
+
+— Devin (Roaming) `AGT-DEVIN_ROAMING_2987D222`
