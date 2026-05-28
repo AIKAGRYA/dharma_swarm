@@ -1,6 +1,24 @@
 """Node Gateway — HTTP transport for the A2A fleet control plane.
 
-A2A 1.0 spec-conformant HTTP transport with both standard and legacy endpoints.
+Dharma Swarm Tier-1 HTTP gateway subset of the A2A 1.0 specification.
+This implements the core task lifecycle operations over HTTP+JSON but does
+NOT cover the full A2A 1.0 transport surface.  Specifically:
+
+  Implemented (Tier 1):
+    - Task submit, poll, cancel, reject
+    - SSE streaming (statusUpdate events for a single task)
+    - Agent card discovery at /.well-known/agent-card.json
+    - API key authentication (X-A2A-Key header)
+    - Skills listing
+
+  Not yet implemented (future follow-up):
+    - message:send / message:stream semantics (distinct from task submit)
+    - task subscribe semantics (if distinct from current SSE stream)
+    - Push notification config registration (POST /tasks/{id}/pushNotificationConfigs)
+    - Full StreamResponse event typing (task, message, statusUpdate, artifactUpdate)
+    - Ordering and fanout guarantees for concurrent SSE subscribers
+    - gRPC / NATS transport bindings (Tier 2)
+    - OAuth2 / mTLS / JWS enforcement (Tier 2)
 
 Spec-standard endpoints (A2A 1.0):
   - GET  /.well-known/agent-card.json  — Agent card discovery
@@ -26,9 +44,10 @@ Four-question discipline (Contemplative Spine §11):
   4. Self-correcting?  Health endpoint + heartbeat lets Guardian detect failures
 
 Security:
-  - API key auth via X-A2A-Key header
+  - API key auth via X-A2A-Key header (enforced)
   - Allowed keys loaded from ~/.dharma/a2a/allowed_keys.json
   - No key file = gateway rejects all remote requests (safe default)
+  - OAuth2/mTLS/JWS are declared in AgentCard but not yet enforced (Tier 2)
 """
 
 from __future__ import annotations
@@ -147,7 +166,22 @@ def _task_to_dict(task: A2ATask) -> dict[str, Any]:
     d = asdict(task)
     # Exclude the property alias from serialization
     d.pop("messages", None)
+    # Strip internal validation flags from serialized parts
+    _strip_internal_fields(d)
     return d
+
+
+def _strip_internal_fields(obj: Any) -> None:
+    """Recursively remove internal fields (prefixed with _) from dicts."""
+    if isinstance(obj, dict):
+        for key in list(obj.keys()):
+            if key.startswith("_"):
+                del obj[key]
+            else:
+                _strip_internal_fields(obj[key])
+    elif isinstance(obj, list):
+        for item in obj:
+            _strip_internal_fields(item)
 
 
 def _utc_now() -> str:

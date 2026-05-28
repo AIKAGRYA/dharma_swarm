@@ -182,6 +182,25 @@ class A2AClient:
             self._active_chains.pop(context_id, None)
             self._chain_depth.pop(context_id, None)
 
+    def notify_terminal(self, context_id: str, from_agent: str,
+                        to_agent: str, capability: str) -> None:
+        """Release a specific chain entry when its task reaches terminal state.
+
+        Called after a delegation completes, fails, or is cancelled.
+        This prevents false-positive cycle detection in long-lived
+        contexts where earlier chains have already finished.
+        """
+        if not context_id:
+            return
+        chain = self._active_chains.get(context_id)
+        if chain is None:
+            return
+        chain_key = (from_agent, to_agent, capability)
+        chain.discard(chain_key)
+        depth = self._chain_depth.get(context_id, 0)
+        if depth > 0:
+            self._chain_depth[context_id] = depth - 1
+
     def delegate(
         self,
         capability: str,
@@ -335,6 +354,9 @@ class A2AClient:
             card.name, capability, message[:80],
         )
         result_task = self._server.submit(task)
+        # Auto-release chain entry when task reaches terminal state
+        if result_task.is_terminal():
+            self.notify_terminal(context_id, from_agent, card.name, capability)
         return DelegationResult(
             success=result_task.status == A2ATaskStatus.COMPLETED,
             task=result_task,

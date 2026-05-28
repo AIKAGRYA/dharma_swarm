@@ -36,6 +36,19 @@ def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _strip_internal(obj: Any) -> None:
+    """Recursively remove internal fields (prefixed with _) from dicts."""
+    if isinstance(obj, dict):
+        for key in list(obj.keys()):
+            if key.startswith("_"):
+                del obj[key]
+            else:
+                _strip_internal(obj[key])
+    elif isinstance(obj, list):
+        for item in obj:
+            _strip_internal(item)
+
+
 # ---------------------------------------------------------------------------
 # Data models
 # ---------------------------------------------------------------------------
@@ -43,9 +56,22 @@ def _utc_now_iso() -> str:
 
 @dataclass
 class SecurityScheme:
-    """A2A 1.0 security scheme declaration.
+    """A2A 1.0 security scheme declaration (card-level metadata only).
 
-    Maps to the spec's securitySchemes object.
+    Maps to the spec's securitySchemes object.  These declarations
+    advertise which auth mechanisms the agent *accepts* but do NOT
+    enforce them at runtime.  Enforcement is handled by the transport
+    layer (NodeGateway ``_verify_api_key`` for APIKey).
+
+    Currently enforced:
+        - APIKey via X-A2A-Key header (NodeGateway)
+
+    Declared but not yet enforced (TODO — Tier 2):
+        - OAuth2 (PKCE flows)
+        - HTTPAuth (Bearer / Basic)
+        - MutualTLS
+        - OpenIdConnect
+        - JWS card signatures
     """
 
     scheme_type: str = "APIKey"  # APIKey, HTTPAuth, OAuth2, MutualTLS, OpenIdConnect
@@ -151,7 +177,9 @@ class AgentCard:
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize to JSON-safe dict."""
-        return asdict(self)
+        d = asdict(self)
+        _strip_internal(d)
+        return d
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> AgentCard:
@@ -249,54 +277,36 @@ class AgentCard:
         return [cap.name for cap in self.capabilities]
 
 
+def _skill(sid: str, desc: str, tags: list[str]) -> AgentSkill:
+    return AgentSkill(id=sid, name=sid, description=desc, tags=tags)
+
+
 def _skills_for_role(role: str) -> list[AgentSkill]:
-    """Map an agent role to a default set of skills.
-
-    This is a heuristic -- agents can override with explicit skills.
-    """
+    """Map an agent role to a default set of skills."""
     role_lower = role.lower()
-
     _ROLE_MAP: dict[str, list[AgentSkill]] = {
-        "coder": [
-            AgentSkill(id="code_generation", name="code_generation", description="Write, modify, and refactor code", tags=["code", "dev"]),
-            AgentSkill(id="code_review", name="code_review", description="Review code for bugs and improvements", tags=["review", "quality"]),
-            AgentSkill(id="testing", name="testing", description="Write and run tests", tags=["test", "qa"]),
-        ],
-        "reviewer": [
-            AgentSkill(id="code_review", name="code_review", description="Thorough code review with feedback", tags=["review", "quality"]),
-            AgentSkill(id="security_review", name="security_review", description="Check for security vulnerabilities", tags=["security", "audit"]),
-        ],
-        "researcher": [
-            AgentSkill(id="research", name="research", description="Deep research and analysis", tags=["research", "analysis"]),
-            AgentSkill(id="literature_review", name="literature_review", description="Review academic papers and docs", tags=["research", "review"]),
-            AgentSkill(id="synthesis", name="synthesis", description="Synthesize information from multiple sources", tags=["synthesis", "integration"]),
-        ],
-        "tester": [
-            AgentSkill(id="testing", name="testing", description="Write and execute test suites", tags=["test", "qa"]),
-            AgentSkill(id="verification", name="verification", description="Verify claims and results", tags=["verify", "audit"]),
-        ],
-        "orchestrator": [
-            AgentSkill(id="task_routing", name="task_routing", description="Route tasks to appropriate agents", tags=["orchestration", "routing"]),
-            AgentSkill(id="coordination", name="coordination", description="Coordinate multi-agent workflows", tags=["coordination", "workflow"]),
-            AgentSkill(id="monitoring", name="monitoring", description="Monitor agent health and progress", tags=["monitoring", "health"]),
-        ],
-        "architect": [
-            AgentSkill(id="architecture", name="architecture", description="Design system architecture", tags=["architecture", "design"]),
-            AgentSkill(id="code_review", name="code_review", description="Review architectural decisions", tags=["review", "architecture"]),
-        ],
-        "operator": [
-            AgentSkill(id="deployment", name="deployment", description="Deploy and manage services", tags=["deploy", "ops"]),
-            AgentSkill(id="monitoring", name="monitoring", description="System monitoring and alerting", tags=["monitoring", "ops"]),
-            AgentSkill(id="infrastructure", name="infrastructure", description="Manage infrastructure", tags=["infra", "ops"]),
-        ],
-        "witness": [
-            AgentSkill(id="observation", name="observation", description="Observe and record system state", tags=["observe", "witness"]),
-            AgentSkill(id="reflection", name="reflection", description="Reflect on system behavior patterns", tags=["reflect", "insight"]),
-        ],
-        "strategist": [
-            AgentSkill(id="strategic_planning", name="strategic_planning", description="High-level strategic analysis", tags=["strategy", "planning"]),
-            AgentSkill(id="prioritization", name="prioritization", description="Prioritize tasks and goals", tags=["priority", "planning"]),
-        ],
+        "coder": [_skill("code_generation", "Write, modify, and refactor code", ["code", "dev"]),
+                  _skill("code_review", "Review code for bugs and improvements", ["review", "quality"]),
+                  _skill("testing", "Write and run tests", ["test", "qa"])],
+        "reviewer": [_skill("code_review", "Thorough code review with feedback", ["review", "quality"]),
+                     _skill("security_review", "Check for security vulnerabilities", ["security", "audit"])],
+        "researcher": [_skill("research", "Deep research and analysis", ["research", "analysis"]),
+                       _skill("literature_review", "Review academic papers and docs", ["research", "review"]),
+                       _skill("synthesis", "Synthesize information from multiple sources", ["synthesis", "integration"])],
+        "tester": [_skill("testing", "Write and execute test suites", ["test", "qa"]),
+                   _skill("verification", "Verify claims and results", ["verify", "audit"])],
+        "orchestrator": [_skill("task_routing", "Route tasks to appropriate agents", ["orchestration", "routing"]),
+                         _skill("coordination", "Coordinate multi-agent workflows", ["coordination", "workflow"]),
+                         _skill("monitoring", "Monitor agent health and progress", ["monitoring", "health"])],
+        "architect": [_skill("architecture", "Design system architecture", ["architecture", "design"]),
+                      _skill("code_review", "Review architectural decisions", ["review", "architecture"])],
+        "operator": [_skill("deployment", "Deploy and manage services", ["deploy", "ops"]),
+                     _skill("monitoring", "System monitoring and alerting", ["monitoring", "ops"]),
+                     _skill("infrastructure", "Manage infrastructure", ["infra", "ops"])],
+        "witness": [_skill("observation", "Observe and record system state", ["observe", "witness"]),
+                    _skill("reflection", "Reflect on system behavior patterns", ["reflect", "insight"])],
+        "strategist": [_skill("strategic_planning", "High-level strategic analysis", ["strategy", "planning"]),
+                       _skill("prioritization", "Prioritize tasks and goals", ["priority", "planning"])],
     }
 
     skills = _ROLE_MAP.get(role_lower, [])

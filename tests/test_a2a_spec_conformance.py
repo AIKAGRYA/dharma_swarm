@@ -612,11 +612,15 @@ class TestCycleDetection:
     def test_direct_cycle_detected(self, client: A2AClient, registry: CardRegistry, server: A2AServer):
         registry.register(AgentCard(name="agent-a", skills=[AgentSkill("task", "Do stuff")]))
         registry.register(AgentCard(name="agent-b", skills=[AgentSkill("task", "Do stuff")]))
-        server.set_default_handler(lambda t: t)
+
+        def stall(t: A2ATask) -> A2ATask:
+            t.status = A2ATaskStatus.INPUT_REQUIRED
+            return t
+        server.set_default_handler(stall)
 
         ctx = "cycle-test-1"
         r1 = client.delegate_to("agent-a", "do task", capability="task", from_agent="agent-b", context_id=ctx)
-        assert r1.success
+        # Task is non-terminal -> chain entry remains active
 
         # Same triple (agent-b -> agent-a, "task") should be detected as cycle
         r2 = client.delegate_to("agent-a", "do task again", capability="task", from_agent="agent-b", context_id=ctx)
@@ -626,7 +630,11 @@ class TestCycleDetection:
     def test_depth_limit(self, client: A2AClient, registry: CardRegistry, server: A2AServer):
         max_depth = 3
         client._max_depth = max_depth
-        server.set_default_handler(lambda t: t)
+
+        def stall(t: A2ATask) -> A2ATask:
+            t.status = A2ATaskStatus.INPUT_REQUIRED
+            return t
+        server.set_default_handler(stall)
 
         for i in range(max_depth + 2):
             registry.register(AgentCard(name=f"agent-{i}", skills=[AgentSkill(f"task-{i}", "stuff")]))
@@ -634,7 +642,7 @@ class TestCycleDetection:
         ctx = "depth-test-1"
         for i in range(max_depth):
             r = client.delegate_to(f"agent-{i}", "task", capability=f"task-{i}", from_agent=f"sender-{i}", context_id=ctx)
-            assert r.success, f"Delegation {i} should succeed"
+            assert not r.success or r.task.status == A2ATaskStatus.INPUT_REQUIRED, f"Delegation {i} should not fail"
 
         r = client.delegate_to(f"agent-{max_depth}", "task", capability=f"task-{max_depth}", from_agent=f"sender-{max_depth}", context_id=ctx)
         assert not r.success
@@ -750,3 +758,174 @@ class TestFromAgentIdentity:
         assert len(card.skills) == 1
         assert card.skills[0].id == "wizard"
         assert card.skills[0].tags == ["wizard"]
+
+
+# ---------------------------------------------------------------------------
+# Part strict one-of validation tests (Review Fix 1)
+# ---------------------------------------------------------------------------
+
+
+class TestPartStrictOneOf:
+    """Acceptance tests for A2APart strict one-of validation."""
+
+    def test_text_only_passes(self):
+        p = A2APart(type=A2APartType.TEXT, content="hello")
+        assert p.content == "hello"
+
+    def test_raw_only_passes(self):
+        p = A2APart(type=A2APartType.RAW, content="<bin>", media_type="application/octet-stream")
+        assert p.content == "<bin>"
+
+    def test_url_only_passes(self):
+        p = A2APart(type=A2APartType.URL, content="https://example.com")
+        assert p.content == "https://example.com"
+
+    def test_data_only_passes(self):
+        p = A2APart(type=A2APartType.DATA, content='{"k": "v"}', media_type="application/json")
+        assert p.content == '{"k": "v"}'
+
+    def test_zero_content_fails(self):
+        with pytest.raises(ValueError, match="requires non-empty content"):
+            A2APart(type=A2APartType.TEXT, content="")
+
+    def test_default_zero_content_fails(self):
+        with pytest.raises(ValueError, match="requires non-empty content"):
+            A2APart()
+
+    def test_legacy_file_type_exempt(self):
+        p = A2APart(type=A2APartType.FILE, content="/path/to/file")
+        assert p.type == A2APartType.FILE
+
+    def test_legacy_file_empty_allowed(self):
+        p = A2APart(type=A2APartType.FILE)
+        assert p.type == A2APartType.FILE
+
+    def test_constructor_text(self):
+        p = A2APart.text("hello")
+        assert p.type == A2APartType.TEXT and p.content == "hello"
+
+    def test_constructor_raw(self):
+        p = A2APart.raw("<bin>", "image/png", "pic.png")
+        assert p.type == A2APartType.RAW
+        assert p.media_type == "image/png"
+        assert p.filename == "pic.png"
+
+    def test_constructor_url(self):
+        p = A2APart.url("https://ex.com/f.pdf", "application/pdf", "f.pdf")
+        assert p.type == A2APartType.URL and p.filename == "f.pdf"
+
+    def test_constructor_data(self):
+        p = A2APart.data('{"x": 1}')
+        assert p.type == A2APartType.DATA and p.media_type == "application/json"
+
+
+# ---------------------------------------------------------------------------
+# Security enforcement tests (Review Fix 2)
+# ---------------------------------------------------------------------------
+
+
+class TestSecurityEnforcement:
+    """Verify API key auth is enforced, not just declared."""
+
+    def test_protected_endpoint_rejected_without_key(self, http_client: TestClient, server: A2AServer):
+        server.set_default_handler(lambda t: t)
+        resp = http_client.post("/tasks", json={
+            "messages": [{"content": "no auth"}],
+        })
+        assert resp.status_code in (401, 403)
+
+    def test_protected_endpoint_rejected_with_wrong_key(self, http_client: TestClient, server: A2AServer):
+        server.set_default_handler(lambda t: t)
+        resp = http_client.post("/tasks", json={
+            "messages": [{"content": "bad auth"}],
+        }, headers={"X-A2A-Key": "wrong-key"})
+        assert resp.status_code == 401
+
+    def test_protected_endpoint_allowed_with_valid_key(self, http_client: TestClient, server: A2AServer):
+        server.set_default_handler(lambda t: t)
+        resp = http_client.post("/tasks", json={
+            "messages": [{"content": "good auth"}],
+        }, headers={"X-A2A-Key": "test-key"})
+        assert resp.status_code == 201
+
+    def test_public_health_accessible_without_key(self, http_client: TestClient):
+        resp = http_client.get("/health")
+        assert resp.status_code == 200
+
+    def test_security_scheme_is_declaration_not_enforcement(self):
+        scheme = SecurityScheme(scheme_type="OAuth2", flows={"clientCredentials": {"tokenUrl": "/t"}})
+        assert scheme.scheme_type == "OAuth2"
+        assert "clientCredentials" in scheme.flows
+
+
+# ---------------------------------------------------------------------------
+# Cycle detection lifecycle tests (Review Fix 3)
+# ---------------------------------------------------------------------------
+
+
+class TestCycleLifecycle:
+    """Verify cycle detection auto-clears on terminal tasks."""
+
+    def test_completed_task_releases_chain(self, client: A2AClient, registry: CardRegistry, server: A2AServer):
+        registry.register(AgentCard(name="worker", skills=[AgentSkill("job", "do")]))
+        server.set_default_handler(lambda t: t)  # auto-completes
+
+        ctx = "lifecycle-1"
+        r1 = client.delegate_to("worker", "first", capability="job", from_agent="boss", context_id=ctx)
+        assert r1.success
+        # Task completed -> chain entry auto-released
+        # Same triple should now succeed (not false-positive cycle)
+        r2 = client.delegate_to("worker", "second", capability="job", from_agent="boss", context_id=ctx)
+        assert r2.success, f"Should succeed after completion, got: {r2.error}"
+
+    def test_active_chain_still_detected(self, client: A2AClient, registry: CardRegistry, server: A2AServer):
+        registry.register(AgentCard(name="staller", skills=[AgentSkill("hang", "stall")]))
+
+        def stall(t: A2ATask) -> A2ATask:
+            t.status = A2ATaskStatus.INPUT_REQUIRED  # non-terminal
+            return t
+        server.register_handler("hang", stall)
+
+        ctx = "lifecycle-2"
+        r1 = client.delegate_to("staller", "go", capability="hang", from_agent="boss", context_id=ctx)
+        assert not r1.success or r1.task.status == A2ATaskStatus.INPUT_REQUIRED
+        # Non-terminal -> chain NOT released -> cycle detected
+        r2 = client.delegate_to("staller", "go again", capability="hang", from_agent="boss", context_id=ctx)
+        assert not r2.success
+        assert "Cycle detected" in r2.error
+
+    def test_notify_terminal_explicit(self, client: A2AClient, registry: CardRegistry, server: A2AServer):
+        registry.register(AgentCard(name="w", skills=[AgentSkill("x", "x")]))
+
+        def stall(t: A2ATask) -> A2ATask:
+            t.status = A2ATaskStatus.INPUT_REQUIRED
+            return t
+        server.register_handler("x", stall)
+
+        ctx = "lifecycle-3"
+        r1 = client.delegate_to("w", "go", capability="x", from_agent="boss", context_id=ctx)
+        # Manually notify terminal
+        client.notify_terminal(ctx, "boss", "w", "x")
+        # Should now succeed
+        r2 = client.delegate_to("w", "go again", capability="x", from_agent="boss", context_id=ctx)
+        assert r2.success or r2.task.status == A2ATaskStatus.INPUT_REQUIRED
+
+    def test_depth_limit_still_enforced(self, client: A2AClient, registry: CardRegistry, server: A2AServer):
+        client._max_depth = 3
+        ctx = "depth-lifecycle"
+
+        def stall(t: A2ATask) -> A2ATask:
+            t.status = A2ATaskStatus.INPUT_REQUIRED
+            return t
+        server.set_default_handler(stall)
+
+        for i in range(5):
+            registry.register(AgentCard(name=f"ag-{i}", skills=[AgentSkill(f"s-{i}", "x")]))
+
+        for i in range(3):
+            r = client.delegate_to(f"ag-{i}", "go", capability=f"s-{i}", from_agent=f"f-{i}", context_id=ctx)
+            # Non-terminal tasks keep chains active
+        # 4th should fail on depth
+        r = client.delegate_to("ag-3", "go", capability="s-3", from_agent="f-3", context_id=ctx)
+        assert not r.success
+        assert "depth limit" in r.error

@@ -71,7 +71,9 @@ class A2APart:
     """A single part of an A2A message — strict one-of per spec.
 
     A2A 1.0 requires exactly one content field set (text, raw, url, or data)
-    plus optional mediaType and filename.
+    plus optional mediaType and filename.  Validation in ``__post_init__``
+    rejects zero-content and multi-content construction (except for the
+    legacy ``FILE`` type which is exempt for backward compatibility).
 
     Attributes:
         type: One of text, raw, url, data (or file for backward compat).
@@ -86,6 +88,43 @@ class A2APart:
     media_type: str = ""
     filename: str = ""
     metadata: dict[str, Any] = field(default_factory=dict)
+    _skip_validation: bool = field(default=False, repr=False)
+
+    def __post_init__(self) -> None:
+        if self._skip_validation:
+            return
+        # Legacy FILE type is exempt from strict one-of validation
+        if self.type == A2APartType.FILE:
+            return
+        if not self.content:
+            raise ValueError(
+                f"A2APart(type={self.type.value!r}) requires non-empty content. "
+                "Exactly one content field must be set per A2A 1.0 spec."
+            )
+
+    @classmethod
+    def text(cls, content: str) -> A2APart:
+        """Construct a text part."""
+        return cls(type=A2APartType.TEXT, content=content)
+
+    @classmethod
+    def raw(cls, content: str, media_type: str = "application/octet-stream",
+            filename: str = "") -> A2APart:
+        """Construct a raw (binary) part."""
+        return cls(type=A2APartType.RAW, content=content,
+                   media_type=media_type, filename=filename)
+
+    @classmethod
+    def url(cls, content: str, media_type: str = "",
+            filename: str = "") -> A2APart:
+        """Construct a URL part."""
+        return cls(type=A2APartType.URL, content=content,
+                   media_type=media_type, filename=filename)
+
+    @classmethod
+    def data(cls, content: str, media_type: str = "application/json") -> A2APart:
+        """Construct a structured data part."""
+        return cls(type=A2APartType.DATA, content=content, media_type=media_type)
 
 
 @dataclass
