@@ -146,6 +146,7 @@ async def lifespan(app: FastAPI):
         else:
             # Register echo handler as default (proof-of-life, no LLM call)
             def _echo_handler(task):
+                import time
                 from dharma_swarm.operator_core.a2a_task_lifecycle import (
                     build_task_receipt,
                     default_state_root,
@@ -161,6 +162,11 @@ async def lifespan(app: FastAPI):
                 }
                 task.status = A2ATaskStatus.COMPLETED
 
+                created = task.created_at
+                finished = time.time()
+                started = __import__("datetime").datetime.fromisoformat(created).timestamp() if created else finished
+                elapsed_ms = (finished - started) * 1000.0
+
                 receipt = build_task_receipt(
                     task_id=task.id,
                     agent_uid="hermes-m5",
@@ -168,6 +174,9 @@ async def lifespan(app: FastAPI):
                     summary=f"Echo handler: {len(task.messages)} message(s) reflected",
                     harness="dharma_swarm.a2a.gateway_echo",
                     model_identity="echo/identity",
+                    correlation_id=task.correlation_id,
+                    duration_ms=elapsed_ms,
+                    replay_command=f"curl -s -X POST http://localhost:8420/a2a/tasks -H 'Content-Type: application/json' -d '{{\"from_agent\":\"{task.from_agent}\",\"to_agent\":\"hermes-m5\",\"correlation_id\":\"{task.correlation_id}\",\"messages\":[{{\"content\":\"{first_text}\"}}]}}'",
                 )
                 receipt_dir = default_state_root() / "a2a_bus" / "receipts"
                 receipt_dir.mkdir(parents=True, exist_ok=True)

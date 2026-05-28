@@ -188,6 +188,8 @@ async def submit_task(request: Request) -> JSONResponse:
         messages=messages,
         metadata=body.get("metadata", {}),
     )
+    if body.get("correlation_id"):
+        task.correlation_id = body["correlation_id"]
 
     result = _server.submit(task)
     return JSONResponse(

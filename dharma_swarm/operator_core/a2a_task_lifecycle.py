@@ -1,9 +1,17 @@
 """A2A task lifecycle helpers.
 
+Receipts may differ by closure layer.  Correlation identity must not.
+
 This module owns the narrow, file-native contract for closing tasks on the
-existing ``~/.dharma/a2a_bus/tasks/queue.jsonl`` surface. It does not create a
-new bus, dispatcher, authority layer, or runtime. It gives persistent-agent
+existing ``~/.dharma/a2a_bus/tasks/queue.jsonl`` surface.  It does not create a
+new bus, dispatcher, authority layer, or runtime.  It gives persistent-agent
 wake scripts one shared way to claim a task and prove closure with a receipt.
+
+Correlation spine convention (declared, not yet enforced via lint):
+  - A2ATaskReceipt        (this module — request/response layer)
+  - SpineEvidenceReceipt  (spine/receipt.py — dispatch/invocation layer)
+  - ClosureEvidenceReceipt (closure_v0 — test/work-packet layer)
+  All link by ``correlation_id``, never by inheritance.
 """
 
 from __future__ import annotations
@@ -96,6 +104,7 @@ def build_task_receipt(
     agent_uid: str,
     status: CloseStatus,
     summary: str,
+    correlation_id: str | None = None,
     artifacts: list[str | dict[str, Any]] | None = None,
     return_address: dict[str, Any] | None = None,
     model_identity: str | None = None,
@@ -104,11 +113,25 @@ def build_task_receipt(
     evidence: dict[str, Any] | None = None,
     evaluation: dict[str, Any] | None = None,
     next_wake_hint: str | None = None,
+    duration_ms: float | None = None,
+    replay_command: str | None = None,
+    spine_receipt_id: str | None = None,
     completion_via: str = "dharma_swarm.operator_core.a2a_task_lifecycle",
     failure_reason: str | None = None,
     timestamp: str | None = None,
 ) -> dict[str, Any]:
-    """Build a CWT/GEPA-readable closure receipt for an A2A task."""
+    """Build a CWT/GEPA-readable closure receipt for an A2A task.
+
+    Phase 2A additions (pure additive, backwards compatible):
+        correlation_id: Cross-layer trace identity. Required for three-layer
+            receipt chain (A2A → spine → closure_v0). If provided, stamped
+            into every receipt. Chains to spine.EvidenceReceipt.trace_id.
+        duration_ms: Wall-clock time from task submission to completion.
+        replay_command: Shell command to reproduce this task invocation.
+        spine_receipt_id: Optional pointer to the spine.EvidenceReceipt
+            that captured the dispatch invocation. Enables bi-directional
+            chain navigation without log scanning.
+    """
 
     ts = timestamp or iso_now()
     receipt: dict[str, Any] = {
@@ -143,6 +166,14 @@ def build_task_receipt(
         receipt["evidence"] = evidence
     if next_wake_hint:
         receipt["next_wake_hint"] = next_wake_hint
+    if correlation_id:
+        receipt["correlation_id"] = correlation_id
+    if duration_ms is not None:
+        receipt["duration_ms"] = duration_ms
+    if replay_command:
+        receipt["replay_command"] = replay_command
+    if spine_receipt_id:
+        receipt["spine_receipt_id"] = spine_receipt_id
     if status in {"failed", "blocked"}:
         receipt["failure_reason"] = failure_reason or "not specified"
     receipt["content_hash"] = _content_hash(receipt)
