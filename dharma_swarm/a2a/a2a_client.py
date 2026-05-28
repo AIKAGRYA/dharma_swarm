@@ -1,8 +1,13 @@
 """A2A Client -- delegates tasks to other agents.
 
-Discovers agent capabilities via cards, selects the best agent,
+Discovers agent skills via cards, selects the best agent,
 sends tasks, and monitors completion. This is the outbound half
 of the A2A protocol.
+
+A2A 1.0 features:
+- Cycle detection on dispatch chains (monotonic-progress guard)
+- context_id threading across related delegations
+- Uses spec-standard /tasks endpoint (falls back to /a2a/tasks)
 
 Local agents: direct dispatch via A2AServer (in-process).
 Remote agents: HTTP dispatch via node gateways.
@@ -40,6 +45,9 @@ from dharma_swarm.a2a.a2a_server import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Max depth before cycle detection rejects a delegation chain
+_MAX_DELEGATION_DEPTH = 10
 
 
 class DelegationResult:
@@ -92,11 +100,16 @@ class A2AClient:
         server: A2AServer,
         default_from: str = "client",
         node_registry: Any | None = None,
+        max_depth: int = _MAX_DELEGATION_DEPTH,
     ) -> None:
         self._registry = registry
         self._server = server
         self._default_from = default_from
         self._node_registry = node_registry
+        self._max_depth = max_depth
+        # Track active delegation chains: context_id -> set of (from_agent, to_agent, capability)
+        self._active_chains: dict[str, set[tuple[str, str, str]]] = {}
+        self._chain_depth: dict[str, int] = {}
 
     # -- discovery -----------------------------------------------------------
 
@@ -125,30 +138,98 @@ class A2AClient:
 
     # -- delegation ----------------------------------------------------------
 
+    def _check_cycle(
+        self,
+        context_id: str,
+        from_agent: str,
+        to_agent: str,
+        capability: str,
+    ) -> str | None:
+        """Check for cycles in the delegation chain.
+
+        Returns an error message if a cycle or depth limit is detected,
+        None if the delegation is safe.
+        """
+        if not context_id:
+            return None
+
+        chain_key = (from_agent, to_agent, capability)
+        chain = self._active_chains.setdefault(context_id, set())
+        depth = self._chain_depth.get(context_id, 0)
+
+        if chain_key in chain:
+            return (
+                f"Cycle detected: {from_agent} -> {to_agent} "
+                f"(capability={capability!r}) already in chain for context {context_id}"
+            )
+
+        if depth >= self._max_depth:
+            return (
+                f"Delegation depth limit ({self._max_depth}) reached "
+                f"for context {context_id}"
+            )
+
+        chain.add(chain_key)
+        self._chain_depth[context_id] = depth + 1
+        return None
+
+    def reset_chains(self, context_id: str | None = None) -> None:
+        """Clear cycle detection state for a context (or all if None)."""
+        if context_id is None:
+            self._active_chains.clear()
+            self._chain_depth.clear()
+        else:
+            self._active_chains.pop(context_id, None)
+            self._chain_depth.pop(context_id, None)
+
+    def notify_terminal(self, context_id: str, from_agent: str,
+                        to_agent: str, capability: str) -> None:
+        """Release a specific chain entry when its task reaches terminal state.
+
+        Called after a delegation completes, fails, or is cancelled.
+        This prevents false-positive cycle detection in long-lived
+        contexts where earlier chains have already finished.
+        """
+        if not context_id:
+            return
+        chain = self._active_chains.get(context_id)
+        if chain is None:
+            return
+        chain_key = (from_agent, to_agent, capability)
+        chain.discard(chain_key)
+        depth = self._chain_depth.get(context_id, 0)
+        if depth > 0:
+            self._chain_depth[context_id] = depth - 1
+        else:
+            # Floor at zero — prevent negative drift from stray calls
+            self._chain_depth[context_id] = 0
+
     def delegate(
         self,
         capability: str,
         message: str,
         from_agent: str | None = None,
         metadata: dict[str, Any] | None = None,
+        context_id: str = "",
     ) -> DelegationResult:
         """Discover the best agent for a capability and delegate a task.
 
-        Agent selection: picks the first available agent with the capability.
-        Future: score by fitness, latency, cost, etc.
+        Includes cycle detection: rejects if the same (from, to, capability)
+        triple already exists in the context's delegation chain, or if
+        the chain depth exceeds the configured maximum.
 
         Args:
             capability: The capability needed.
             message: Task description / instruction text.
             from_agent: Requester name (defaults to self._default_from).
             metadata: Optional metadata to attach to the task.
+            context_id: A2A 1.0 context for grouping related tasks.
 
         Returns:
             DelegationResult with the outcome.
         """
         agents = self.discover_available(capability)
         if not agents:
-            # Fall back to all agents with capability (even busy ones)
             agents = self.discover(capability)
 
         if not agents:
@@ -158,7 +239,6 @@ class A2AClient:
                 error=f"No agent found with capability: {capability!r}",
             )
 
-        # Select best candidate (first match for now)
         card = agents[0]
         return self.delegate_to(
             card.name,
@@ -166,6 +246,7 @@ class A2AClient:
             capability=capability,
             from_agent=from_agent,
             metadata=metadata,
+            context_id=context_id,
         )
 
     def delegate_to(
@@ -175,11 +256,12 @@ class A2AClient:
         capability: str = "",
         from_agent: str | None = None,
         metadata: dict[str, Any] | None = None,
+        context_id: str = "",
     ) -> DelegationResult:
         """Delegate a task to a specific named agent.
 
         Routes automatically: local dispatch for local:// agents,
-        synchronous HTTP for remote agents.
+        synchronous HTTP for remote agents. Includes cycle detection.
 
         Args:
             agent_name: Target agent name.
@@ -187,10 +269,12 @@ class A2AClient:
             capability: Capability being requested (optional).
             from_agent: Requester name.
             metadata: Optional metadata.
+            context_id: A2A 1.0 context for grouping related tasks.
 
         Returns:
             DelegationResult with the outcome.
         """
+        sender = from_agent or self._default_from
         card = self._registry.get(agent_name)
         if card is None:
             return DelegationResult(
@@ -198,15 +282,17 @@ class A2AClient:
                 error=f"Agent not found in registry: {agent_name!r}",
             )
 
+        cycle_err = self._check_cycle(context_id, sender, agent_name, capability)
+        if cycle_err:
+            logger.warning("Cycle guard: %s", cycle_err)
+            return DelegationResult(success=False, error=cycle_err)
+
         if _is_remote(card):
             return self._dispatch_remote_sync(
-                card, message, capability,
-                from_agent or self._default_from, metadata,
+                card, message, capability, sender, metadata, context_id,
             )
-
         return self._dispatch_local(
-            card, message, capability,
-            from_agent or self._default_from, metadata,
+            card, message, capability, sender, metadata, context_id,
         )
 
     async def delegate_to_async(
@@ -217,12 +303,15 @@ class A2AClient:
         from_agent: str | None = None,
         metadata: dict[str, Any] | None = None,
         timeout: float = 60.0,
+        context_id: str = "",
     ) -> DelegationResult:
         """Async version of delegate_to for remote agents.
 
         Preferred for remote dispatch — non-blocking HTTP.
         Falls back to local dispatch for local agents.
+        Includes cycle detection.
         """
+        sender = from_agent or self._default_from
         card = self._registry.get(agent_name)
         if card is None:
             return DelegationResult(
@@ -230,15 +319,17 @@ class A2AClient:
                 error=f"Agent not found in registry: {agent_name!r}",
             )
 
+        cycle_err = self._check_cycle(context_id, sender, agent_name, capability)
+        if cycle_err:
+            logger.warning("Cycle guard: %s", cycle_err)
+            return DelegationResult(success=False, error=cycle_err)
+
         if _is_remote(card):
             return await self._dispatch_remote_async(
-                card, message, capability,
-                from_agent or self._default_from, metadata, timeout,
+                card, message, capability, sender, metadata, timeout, context_id,
             )
-
         return self._dispatch_local(
-            card, message, capability,
-            from_agent or self._default_from, metadata,
+            card, message, capability, sender, metadata, context_id,
         )
 
     # -- internal dispatch ---------------------------------------------------
@@ -250,6 +341,7 @@ class A2AClient:
         capability: str,
         from_agent: str,
         metadata: dict[str, Any] | None,
+        context_id: str = "",
     ) -> DelegationResult:
         """Dispatch to local A2AServer (in-process)."""
         trace_id = _current_trace_id()
@@ -257,7 +349,8 @@ class A2AClient:
             from_agent=from_agent,
             to_agent=card.name,
             capability=capability,
-            messages=[A2AMessage.text(message)],
+            context_id=context_id,
+            history=[A2AMessage.text(message)],
             trace_id=trace_id,
             metadata=metadata or {},
         )
@@ -266,6 +359,9 @@ class A2AClient:
             card.name, capability, message[:80],
         )
         result_task = self._server.submit(task)
+        # Auto-release chain entry when task reaches terminal state
+        if result_task.is_terminal():
+            self.notify_terminal(context_id, from_agent, card.name, capability)
         return DelegationResult(
             success=result_task.status == A2ATaskStatus.COMPLETED,
             task=result_task,
@@ -281,9 +377,10 @@ class A2AClient:
         capability: str,
         from_agent: str,
         metadata: dict[str, Any] | None,
+        context_id: str = "",
     ) -> DelegationResult:
         """Synchronous HTTP dispatch to a remote node gateway."""
-        url = f"{card.endpoint.rstrip('/')}/a2a/tasks"
+        url = f"{card.endpoint.rstrip('/')}/tasks"
         headers = {"Content-Type": "application/json"}
         api_key = card.metadata.get("api_key", "")
         if api_key:
@@ -298,6 +395,8 @@ class A2AClient:
         trace_id = _current_trace_id()
         if trace_id:
             body["trace_id"] = trace_id
+        if context_id:
+            body["context_id"] = context_id
 
         logger.info(
             "Remote delegation to %s at %s: capability=%s",
@@ -331,9 +430,10 @@ class A2AClient:
         from_agent: str,
         metadata: dict[str, Any] | None,
         timeout: float = 60.0,
+        context_id: str = "",
     ) -> DelegationResult:
         """Async HTTP dispatch to a remote node gateway."""
-        url = f"{card.endpoint.rstrip('/')}/a2a/tasks"
+        url = f"{card.endpoint.rstrip('/')}/tasks"
         headers = {"Content-Type": "application/json"}
         api_key = card.metadata.get("api_key", "")
         if api_key:
@@ -348,6 +448,8 @@ class A2AClient:
         trace_id = _current_trace_id()
         if trace_id:
             body["trace_id"] = trace_id
+        if context_id:
+            body["context_id"] = context_id
 
         logger.info(
             "Remote async delegation to %s at %s: capability=%s",

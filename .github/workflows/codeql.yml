@@ -32,10 +32,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@fee9466b8957867761f2d78f922ab084e3e2dd17 # v3
         with:
           languages: ${{ matrix.language }}
           # `security-extended` adds higher-precision queries; `security-and-quality`
@@ -60,10 +60,10 @@ jobs:
               - dashboard/node_modules
 
       - name: Autobuild
-        uses: github/codeql-action/autobuild@v3
+        uses: github/codeql-action/autobuild@fee9466b8957867761f2d78f922ab084e3e2dd17 # v3
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@fee9466b8957867761f2d78f922ab084e3e2dd17 # v3
         with:
           category: "/language:${{ matrix.language }}"
           # Findings flow into the Security tab even when this step exits 0.
