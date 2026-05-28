@@ -43,12 +43,19 @@ rules:
   - id: dharma.no-new-substrate
     message: |
       New persistence-substrate class detected. dharma_swarm should have
-      ONE canonical state store (RuntimeStateStore). Adding a new Store /
-      Ledger / Registry that opens its own SQLite or appends its own
-      JSONL creates substrate drift. Either:
-        (a) wrap the data in RuntimeStateStore tables, or
-        (b) document the new substrate in docs/governance/ and add the
-            class name to this rule's allowlist with justification.
+      ONE canonical state store per closure layer (see correlation_spine
+      in ACTIVE_SURFACE_MANIFEST.yaml). Adding a new Store / Ledger /
+      Registry that opens its own SQLite or appends its own JSONL creates
+      substrate drift unless the class declares a closure-layer role.
+      Options:
+        (a) wrap the data in an existing canonical-store, or
+        (b) declare a role from docs/governance/ANTI_SLOP_RULES.md
+            (Rule 2 vocabulary: canonical-store | derived-view |
+            plugin-sink | cache | legacy-mirror | migration-mirror |
+            exempt) in a file-header comment AND, if it is a receipt,
+            add an entry to ACTIVE_SURFACE_MANIFEST.yaml
+            correlation_spine.layers, then add the class name to this
+            rule's allowlist with the role and PR link as justification.
     severity: WARNING
     languages: [python]
     paths:
