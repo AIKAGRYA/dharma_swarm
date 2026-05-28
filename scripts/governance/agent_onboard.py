@@ -282,6 +282,57 @@ def render_recent_activity(track: dict[str, Any]) -> None:
         print("  (no commits in the window — the track may be paused)")
 
 
+def render_spine_status() -> None:
+    """Surface the correlation_spine declaration to operators.
+
+    Reads from the existing owners only (ACTIVE_SURFACE_MANIFEST.yaml plus
+    on-disk file presence). Does not own any fact; does not gate anything.
+    Always exits 0 — informational, matching the rest of agent_onboard.
+
+    Per PR A.5 doctrine: receipts may differ by closure layer, correlation
+    identity must not. This section makes the layer map visible at every
+    build-session boot so operators don't accidentally introduce a fourth
+    receipt without declaring it here.
+    """
+    section("CORRELATION SPINE — closure layers and canonical receipts")
+    manifest_path = REPO_ROOT / "ACTIVE_SURFACE_MANIFEST.yaml"
+    layers: list[dict[str, Any]] = []
+    invariant: str | None = None
+    try:
+        import yaml  # type: ignore
+
+        if manifest_path.exists():
+            data = yaml.safe_load(manifest_path.read_text(encoding="utf-8")) or {}
+            spine = data.get("correlation_spine") or {}
+            layers = spine.get("layers", []) or []
+            invariant = spine.get("invariant")
+    except Exception as exc:  # pragma: no cover — informational only
+        print(f"  (could not parse ACTIVE_SURFACE_MANIFEST.yaml correlation_spine: {exc})")
+        return
+
+    if not layers:
+        print("  No correlation_spine block declared in ACTIVE_SURFACE_MANIFEST.yaml.")
+        print("  Expected for PR A.5 — add the block before adding new receipt types.")
+        return
+
+    if invariant:
+        print(f"  Invariant: {invariant}")
+        print()
+
+    for layer in layers:
+        lid = layer.get("id", "?")
+        receipt_class = layer.get("receipt_class", "?")
+        receipt_module = layer.get("receipt_module", "?")
+        identity = layer.get("identity_field", "?")
+        role = layer.get("role", "?")
+        rel = receipt_module.replace(".", "/") + ".py" if receipt_module != "?" else ""
+        present = (REPO_ROOT / rel).exists() if rel else False
+        tag = "ok" if present else "MISSING"
+        print(f"  [{tag}] {lid}: {receipt_class} ({role})")
+        print(f"          module: {receipt_module}")
+        print(f"          identity: {identity}")
+
+
 def render_decay_watch() -> None:
     section("KNOWN-DECAY DOCS — verify before citing")
     for doc in KNOWN_DECAY_DOCS:
@@ -445,6 +496,7 @@ def main() -> int:
     render_broken_register()
     render_axioms()
     render_recent_activity(track)
+    render_spine_status()
     render_decay_watch()
     render_tooling_first()
     render_enforcement_and_depth()
