@@ -116,6 +116,10 @@ active_track:
       kind: file_contains
       file: docs/governance/ANTI_SLOP_RULES.md
       pattern: "canonical-store"
+    - id: runtime_state_receipt_field
+      kind: file_contains
+      file: dharma_swarm/runtime_state.py
+      pattern: "receipt_json"
     - id: dropoff_tests_pass
       kind: file_contains
       file: tests/test_dispatch_dropoff_sources.py
