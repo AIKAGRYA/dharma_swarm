@@ -1,7 +1,7 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts uplift-guards module-budget docops-integrity docops-report memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all onboard status go-fmt-check go-test go-vet go-ci
+.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts uplift-guards module-budget docops-integrity docops-report memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all spine-check onboard status go-fmt-check go-test go-vet go-ci
 
 PYTHON ?= python3
 REPO_PYTHON ?= PYTHONPATH=. $(PYTHON)
@@ -246,7 +246,10 @@ memory-kernel-full-power-preflight:
 operator-prod-smoke:
 	$(REPO_PYTHON) scripts/operator_prod_smoke.py --repo-root .
 
-governance-all: semgrep gitleaks test-hygiene test-contracts uplift-guards module-budget docops-integrity
+governance-all: semgrep gitleaks test-hygiene test-contracts uplift-guards module-budget docops-integrity spine-check
+
+spine-check:
+	$(PYTHON) tools/spine_check.py
 
 # Single-door onboarding: prints the current operating reality from existing
 # owners (ACTIVE_TRACK.yaml, LIVE_OPS_DASHBOARD.md, BROKEN_REGISTER.md,
