@@ -54,9 +54,9 @@ exists in the repository. The only reference is the inbound request itself
 
 The closest existing governance surfaces are:
 - `ACTIVE_TRACK.yaml` — single source of current development intent
-- `docs/governance/BUILD_SESSION_ENTRYPOINT.md` — canonical build session read order
+- `docs/governance/BUILD_SESSION_ENTRYPOINT.md` — build session read order
 - `CYBERNETIC_LOOP_MAP.md` — loop closure status
-- `SOVEREIGN_MANIFEST.md` — architectural ground truth
+- `SOVEREIGN_MANIFEST.md` — architectural reference
 
 If a "temporal build spec" was proposed externally, it would need to justify
 its existence against these four surfaces. Without seeing the spec document,
