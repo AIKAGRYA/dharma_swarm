@@ -186,6 +186,7 @@ async def submit_task(request: Request) -> JSONResponse:
         to_agent=body.get("to_agent", ""),
         capability=body.get("capability", ""),
         messages=messages,
+        trace_id=body.get("trace_id", ""),
         metadata=body.get("metadata", {}),
     )
 

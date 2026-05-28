@@ -117,11 +117,14 @@ class A2ABridge:
                 metadata={"source": "trishula"},
             ))
 
+        trace_id = message.get("trace_id", "")
+
         task = A2ATask(
             from_agent=from_agent,
             to_agent=to_agent,
             messages=[A2AMessage(role="user", parts=parts)],
             capability=_infer_capability_from_type(msg_type),
+            trace_id=trace_id,
             metadata={
                 "source": "trishula",
                 "trishula_type": msg_type,
@@ -222,6 +225,7 @@ class A2ABridge:
             "body": body,
             "created_at": now,
             "reply_to": task.metadata.get("trishula_id", ""),
+            "trace_id": task.trace_id,
             "attachments": [],
             "metadata": {
                 "a2a_task_id": task.id,
