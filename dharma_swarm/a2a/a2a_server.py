@@ -340,7 +340,7 @@ class A2AServer:
         task.status = A2ATaskStatus.REJECTED
         task.error = reason
         task.updated_at = datetime.now(timezone.utc).isoformat()
-        logger.info("A2A task %s rejected: %s", task_id, reason)
+        logger.info("A2A task %s rejected: %s", task_id, reason.replace("\n", " ")[:200])
         return True
 
     def require_auth(self, task_id: str, reason: str = "") -> bool:
@@ -353,7 +353,7 @@ class A2AServer:
         task.status = A2ATaskStatus.AUTH_REQUIRED
         task.error = reason
         task.updated_at = datetime.now(timezone.utc).isoformat()
-        logger.info("A2A task %s requires auth: %s", task_id, reason)
+        logger.info("A2A task %s requires auth: %s", task_id, reason.replace("\n", " ")[:200])
         return True
 
     def list_tasks(
