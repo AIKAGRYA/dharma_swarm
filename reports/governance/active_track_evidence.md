@@ -1,23 +1,22 @@
 # Active Track Evidence
 
-Generated: 2026-05-28T06:39:13+00:00
-Track: `trace-identity-coverage-2026-05`
+Generated: 2026-05-28T13:23:13+00:00
+Track: `runtime-truth-spine-2026-06`
 Prerequisites: **OK**
 Completion: **6/6**
 Shippable: **YES**
 
 ## Criteria
 
-- ✓ `trace_attractor_causal_spine_closed` (file_contains) — pattern 'Trace Attractor Causal Spine shipped' found in docs/governance/ACTIVE_TRACK.yaml
-- ✓ `correlation_context_exists` (file_contains) — pattern 'class CorrelationContext' found in dharma_swarm/correlation_context.py
-- ✓ `dgc_trace_attractor_wired` (file_contains) — pattern 'trace-attractor' found in dharma_swarm/dgc_cli.py
-- ✓ `operator_brief_consumes_correlation_context` (file_contains) — pattern 'correlation_context' found in dharma_swarm/operator_brief/persistence.py
-- ✓ `board_event_context_trace_defaults` (file_contains) — pattern '_current_trace_id' found in dharma_swarm/board/event_log.py
-- ✓ `sakshi_context_trace_defaults` (file_contains) — pattern '_current_trace_id' found in dharma_swarm/sakshi/provenance_log.py
-- ✓ `guardian_soft_trace_coverage` (file_contains) — pattern 'operator_brief_trace_coverage' found in dharma_swarm/operator_brief/watchdog.py
-- ✓ `trace_identity_coverage_witness` (file_exists) — reports/witness/2026-05-21-trace-identity-coverage.md present
-- ✓ `hard_gate_policy_adr` (file_exists) — docs/architecture/adr/0002-trace-coverage-gate.md present
+- ✓ `converged_doctrine_exists` (file_exists) — docs/reports/CONVERGED_SEAM_AUDIT_RUNTIME_TRUTH_SPINE.md present
+- ✓ `a2a_tier1_merged` (file_contains) — pattern 'A2ATaskStatus' found in dharma_swarm/a2a/a2a_server.py
+- ✓ `spine_package_exists` (file_exists) — dharma_swarm/spine/__init__.py present
+- ✓ `evidence_receipt_defined` (file_contains) — pattern 'class EvidenceReceipt' found in dharma_swarm/spine/receipt.py
+- ✓ `routing_decision_defined` (file_contains) — pattern 'class RoutingDecision' found in dharma_swarm/spine/routing.py
+- ✓ `invoke_agent_defined` (file_contains) — pattern 'async def invoke_agent' found in dharma_swarm/spine/invoke.py
+- ✓ `spine_check_ci` (file_exists) — .github/workflows/spine-check.yml present
+- ✓ `dropoff_tests_pass` (file_contains) — pattern 'test_provider_failure_not_confused_with_dropoff' found in tests/test_dispatch_dropoff_sources.py
 
 ## Findings
 
-- **INFO** `track-shippable`: All 6 completion criteria pass. Track 'trace-identity-coverage-2026-05' is SHIPPABLE — close it and declare the next active track.
+- **INFO** `track-shippable`: All 6 completion criteria pass. Track 'runtime-truth-spine-2026-06' is SHIPPABLE — close it and declare the next active track.

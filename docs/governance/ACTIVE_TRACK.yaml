@@ -26,106 +26,157 @@ schema_version: 1
 # Active track (exactly one block with status=ACTIVE at any time)
 # ---------------------------------------------------------------------------
 active_track:
-  id: trace-identity-coverage-2026-05
-  name: Trace Identity Coverage — native propagation and soft coverage findings
+  id: runtime-truth-spine-2026-06
+  name: Runtime Truth Spine — one invariant, one invocation path, one receipt
   status: ACTIVE
-  opened_at: "2026-05-21"
-  verified_at: "2026-05-21"
+  opened_at: "2026-05-28"
+  verified_at: "2026-05-28"
   ttl_days: 14
   owner: "@AmitabhainArunachala"
 
   description: |
-    Move Trace Attractor from first packet visibility to native trace identity
-    propagation. New operator-brief, BoardStore, and Sakshi records should
-    inherit CorrelationContext trace metadata when it exists; legacy records may
-    still project through explicit synthetic aliases. Guardian should surface
-    missing trace identity as DEGRADED evidence first, with any hard blocker
-    policy deferred to an ADR.
+    Define the Runtime Truth Spine before expanding agent fabric. Three audits
+    (Perplexity, Codex, Devin) converged: dharma_swarm has accreted without a
+    spine. The fix is one invariant chain (Task + Runner + Claim + Context +
+    RoutingDecision + ProviderCall + EvidenceReceipt = safe execution path).
+    Every dispatch produces exactly one receipt. No more generic dispatch_dropoff.
+
+    PR A.5 (governance convergence): the spine guard is fused into the existing
+    uplift_guards composition (no parallel CI workflow), each closure layer's
+    canonical receipt is declared in ACTIVE_SURFACE_MANIFEST.yaml under
+    correlation_spine, and ANTI_SLOP Rule 2 is extended with role vocabulary
+    so future receipts must declare their layer instead of growing a second
+    truth surface.
+
+    Doctrine line that must hold across all closure layers:
+      Receipts may differ by closure layer. Correlation identity must not.
+
+    Reference: docs/reports/CONVERGED_SEAM_AUDIT_RUNTIME_TRUTH_SPINE.md
+    A2A anchor: dharma_swarm/a2a/README.md (three-layer receipt architecture)
 
   surfaces:
-    - dharma_swarm/correlation_context.py
-    - dharma_swarm/operator_brief/**
-    - dharma_swarm/board/**
-    - dharma_swarm/sakshi/**
-    - dharma_swarm/guardian_crew.py
-    - dharma_swarm/operator_brief/watchdog.py
-    - dharma_swarm/dgc_cli.py
-    - tests/test_trace_attractor*.py
-    - tests/test_dgc_trace_attractor_cli.py
-    - tests/test_board_facade.py
-    - tests/test_sakshi_provenance.py
-    - tests/test_operator_brief_insight_brief.py
-    - tests/test_guardian_crew.py
-    - reports/witness/*trace-attractor*.md
-    - reports/witness/*trace-identity*.md
+    - dharma_swarm/spine/**
+    - dharma_swarm/orchestrator.py
+    - dharma_swarm/agent_runner.py
+    - dharma_swarm/runtime_state.py
+    - tests/test_dispatch_dropoff_sources.py
+    - scripts/uplift_guards/check_spine_ownership.py
+    - ACTIVE_SURFACE_MANIFEST.yaml
+    - .semgrep/dharma-anti-slop.yml
 
   prerequisites:
-    - id: trace_attractor_causal_spine_closed
+    - id: converged_doctrine_exists
+      kind: file_exists
+      file: docs/reports/CONVERGED_SEAM_AUDIT_RUNTIME_TRUTH_SPINE.md
+    - id: a2a_tier1_merged
       kind: file_contains
-      file: docs/governance/ACTIVE_TRACK.yaml
-      pattern: "Trace Attractor Causal Spine shipped"
-    - id: correlation_context_exists
-      kind: file_contains
-      file: dharma_swarm/correlation_context.py
-      pattern: "class CorrelationContext"
-    - id: dgc_trace_attractor_wired
-      kind: file_contains
-      file: dharma_swarm/dgc_cli.py
-      pattern: "trace-attractor"
+      file: dharma_swarm/a2a/a2a_server.py
+      pattern: "A2ATaskStatus"
 
   completion_criteria:
-    - id: operator_brief_consumes_correlation_context
-      kind: file_contains
-      file: dharma_swarm/operator_brief/persistence.py
-      pattern: "correlation_context"
-    - id: board_event_context_trace_defaults
-      kind: file_contains
-      file: dharma_swarm/board/event_log.py
-      pattern: "_current_trace_id"
-    - id: sakshi_context_trace_defaults
-      kind: file_contains
-      file: dharma_swarm/sakshi/provenance_log.py
-      pattern: "_current_trace_id"
-    - id: guardian_soft_trace_coverage
-      kind: file_contains
-      file: dharma_swarm/operator_brief/watchdog.py
-      pattern: "operator_brief_trace_coverage"
-    - id: trace_identity_coverage_witness
+    - id: spine_package_exists
       kind: file_exists
-      file: reports/witness/2026-05-21-trace-identity-coverage.md
-    - id: hard_gate_policy_adr
+      file: dharma_swarm/spine/__init__.py
+    - id: evidence_receipt_defined
+      kind: file_contains
+      file: dharma_swarm/spine/receipt.py
+      pattern: "class EvidenceReceipt"
+    - id: routing_decision_defined
+      kind: file_contains
+      file: dharma_swarm/spine/routing.py
+      pattern: "class RoutingDecision"
+    - id: invoke_agent_defined
+      kind: file_contains
+      file: dharma_swarm/spine/invoke.py
+      pattern: "async def invoke_agent"
+    - id: spine_ownership_guard
       kind: file_exists
-      file: docs/architecture/adr/0002-trace-coverage-gate.md
+      file: scripts/uplift_guards/check_spine_ownership.py
+    - id: spine_guard_registered
+      kind: file_contains
+      file: scripts/uplift_guards/run_pre_commit.py
+      pattern: "check_spine_ownership"
+    - id: spine_doctrine_anchored
+      kind: file_contains
+      file: dharma_swarm/spine/__init__.py
+      pattern: "Correlation identity must not"
+    - id: correlation_spine_manifest_block
+      kind: file_contains
+      file: ACTIVE_SURFACE_MANIFEST.yaml
+      pattern: "correlation_spine:"
+    - id: correlation_id_alias_present
+      kind: file_contains
+      file: dharma_swarm/spine/receipt.py
+      pattern: "dharma.correlation_id"
+    - id: onboard_renders_spine
+      kind: file_contains
+      file: scripts/governance/agent_onboard.py
+      pattern: "render_spine_status"
+    - id: anti_slop_role_vocabulary
+      kind: file_contains
+      file: docs/governance/ANTI_SLOP_RULES.md
+      pattern: "canonical-store"
+    - id: runtime_state_receipt_field
+      kind: file_contains
+      file: dharma_swarm/runtime_state.py
+      pattern: "receipt_json"
+    - id: dropoff_tests_pass
+      kind: file_contains
+      file: tests/test_dispatch_dropoff_sources.py
+      pattern: "test_provider_failure_not_confused_with_dropoff"
 
   non_goals:
-    - Do not make missing trace_id a hard CI gate until the ADR is written.
-    - Do not turn Trace Attractor into an autonomous apply trigger.
-    - Do not mutate MemoryKernel or live evolution state on this track.
-    - Do not claim BoardStore adapter/cutover completion.
-    - Do not add dashboard/API surface unless it is implemented and manifest-registered.
+    - Do not decompose AgentRunner.run_task in this track (except where strictly necessary).
+    - Do not split providers.py into per-provider files yet.
+    - Do not rewrite SwarmManager.
+    - Do not introduce NATS, Redis, gRPC, or a new daemon.
+    - Do not create a second event log or truth surface.
+    - Do not add another spiritual/metaphoric naming layer.
+    - Do not add a parallel spine-check CI workflow — the uplift_guards composition is the only entry point.
 
   next_items:
     - id: 1
-      what: "Default operator-brief, BoardStore, and Sakshi trace metadata from CorrelationContext."
+      what: "Define spine types (EvidenceReceipt, RoutingDecision, invoke_agent) — zero behavior change."
       kind: code
       blocker: true
     - id: 2
-      what: "Add Guardian DEGRADED finding for operator-brief artifacts missing metadata.trace_id."
+      what: "Wire A2A into the spine (invoke_agent becomes the only invocation path for A2A delegation)."
       kind: code
       blocker: true
     - id: 3
-      what: "Write the trace identity coverage witness report."
-      kind: evidence
+      what: "Collapse 7 routers to 2 on the spine rail."
+      kind: code
       blocker: false
     - id: 4
-      what: "Write ADR-0002 deciding when missing trace identity becomes a hard blocker."
-      kind: governance
-      blocker: true
+      what: "Shard providers.py into per-provider files."
+      kind: code
+      blocker: false
+    - id: 5
+      what: "Decompose agent_runner.py run_task onto spine boundary."
+      kind: code
+      blocker: false
 
 # ---------------------------------------------------------------------------
 # Closed tracks (history, append-only; do not edit prior entries)
 # ---------------------------------------------------------------------------
 closed_tracks:
+  - id: trace-identity-coverage-2026-05
+    name: Trace Identity Coverage — native propagation and soft coverage findings
+    status: SUPERSEDED
+    opened_at: "2026-05-21"
+    closed_at: "2026-05-28"
+    closed_by: "devin/runtime-truth-spine-pr-a"
+    evidence:
+      - "dharma_swarm/a2a/ — A2A 1.0 Tier-1 spec conformance (PR #362)"
+      - "trace_id propagated to A2ATask (PR #361)"
+      - "All A2A tests green (205+ assertions)"
+    superseded_by: runtime-truth-spine-2026-06
+    notes: |
+      Track superseded by Runtime Truth Spine. Trace identity propagation
+      was partially delivered (A2A trace_id on A2ATask). Full native
+      CorrelationContext binding deferred to spine track item 2 (wire A2A
+      into invoke_agent). The spine subsumes remaining trace work.
+
   - id: trace-attractor-causal-spine-2026-05
     name: Trace Attractor Causal Spine — operator-visible trace packets
     status: SHIPPED

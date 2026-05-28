@@ -18,6 +18,45 @@ workflows for things Semgrep cannot express.
 | 9 | `dharma.no-committed-guardian-report` | `.github/workflows/structure.yml` | hard fail on PR | Active |
 | 10 | `dharma.module-line-budget` | `.github/workflows/module-budget.yml` + `scripts/governance/check_module_budget.py` | hard fail on PR | Active |
 
+## Rule 2 — closure-layer role vocabulary (PR A.5)
+
+Rule 2 (`dharma.no-new-substrate`) historically flagged any new
+`Store/Ledger/Registry/Substrate` class that opens its own SQLite or
+aiosqlite connection. The runtime truth spine convergence (PR A / A.5)
+formalises a richer answer than "don't": every persistence-substrate
+introduction must declare a closure-layer role from the vocabulary below.
+
+The vocabulary is shared between Rule 2 and the spine ownership uplift
+guard (`scripts/uplift_guards/check_spine_ownership.py`). The guard
+requires a `# spine: <role>` comment on every sqlite/aiosqlite importer
+under `dharma_swarm/spine/`; the manifest declares the role of each
+canonical receipt in the `correlation_spine:` block of
+`ACTIVE_SURFACE_MANIFEST.yaml`.
+
+Role vocabulary:
+
+| Role | Meaning |
+|---|---|
+| `canonical-store` | Owns the source of truth for its closure layer. Other layers must read through this module, not duplicate the data. |
+| `canonical-within-layer` | Receipt-level variant of `canonical-store`. Declares that this layer's receipt is canonical (not a derived view of another layer's). Used in the correlation_spine manifest block. |
+| `derived-view` | Read-only projection of a canonical-store. Must not accept writes; rebuilds from the canonical source on demand. |
+| `plugin-sink` | Write-only export adapter (e.g. OpenTelemetry). Crashes/data-loss here must not affect canonical state. |
+| `cache` | Ephemeral and rebuildable from canonical sources without operator intervention. |
+| `legacy-mirror` | Transitional dual-write; scheduled for removal with a tracking issue. |
+| `migration-mirror` | Active migration target; becomes a `canonical-store` on cutover with an explicit cutover commit. |
+| `exempt` | Documented exception. Must justify in the file header and link the governance issue. |
+
+Doctrine line (verbatim, from CONVERGED_SEAM_AUDIT and the
+correlation_spine block):
+
+> Receipts may differ by closure layer. Correlation identity must not.
+> Each closure layer may have its own canonical receipt. Cross-layer
+> identity continuity is the global invariant.
+
+When a PR adds a new `Store/Ledger/Registry/Substrate` class, the
+reviewer should ask: which role above does this declare? If the answer
+is "none of these," the change should be reshaped, not waived.
+
 ## Known offenders (fix before promoting Rule 3 / Rule 4 / Rule 6)
 
 Three violations were known at the time the rules were introduced.

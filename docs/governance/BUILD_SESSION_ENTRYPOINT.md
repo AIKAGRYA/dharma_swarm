@@ -48,35 +48,50 @@ The governing principle behind whatever track is active: **one seam, end-to-end,
      Do not hand-edit. Run scripts/governance/render_active_track_includes.py
      after updating the YAML. -->
 
-**Active track:** Trace Identity Coverage — native propagation and soft coverage findings
-**Track id:** `trace-identity-coverage-2026-05`
+**Active track:** Runtime Truth Spine — one invariant, one invocation path, one receipt
+**Track id:** `runtime-truth-spine-2026-06`
 **Status:** ACTIVE
-**Verified at:** 2026-05-21 (TTL 14 days)
+**Verified at:** 2026-05-28 (TTL 14 days)
 **Owner:** @AmitabhainArunachala
 
 **Description:**
 
-Move Trace Attractor from first packet visibility to native trace identity
-propagation. New operator-brief, BoardStore, and Sakshi records should
-inherit CorrelationContext trace metadata when it exists; legacy records may
-still project through explicit synthetic aliases. Guardian should surface
-missing trace identity as DEGRADED evidence first, with any hard blocker
-policy deferred to an ADR.
+Define the Runtime Truth Spine before expanding agent fabric. Three audits
+(Perplexity, Codex, Devin) converged: dharma_swarm has accreted without a
+spine. The fix is one invariant chain (Task + Runner + Claim + Context +
+RoutingDecision + ProviderCall + EvidenceReceipt = safe execution path).
+Every dispatch produces exactly one receipt. No more generic dispatch_dropoff.
+
+PR A.5 (governance convergence): the spine guard is fused into the existing
+uplift_guards composition (no parallel CI workflow), each closure layer's
+canonical receipt is declared in ACTIVE_SURFACE_MANIFEST.yaml under
+correlation_spine, and ANTI_SLOP Rule 2 is extended with role vocabulary
+so future receipts must declare their layer instead of growing a second
+truth surface.
+
+Doctrine line that must hold across all closure layers:
+  Receipts may differ by closure layer. Correlation identity must not.
+
+Reference: docs/reports/CONVERGED_SEAM_AUDIT_RUNTIME_TRUTH_SPINE.md
+A2A anchor: dharma_swarm/a2a/README.md (three-layer receipt architecture)
 
 **Next items on this track:**
 
-- [code] (blocker) Default operator-brief, BoardStore, and Sakshi trace metadata from CorrelationContext.
-- [code] (blocker) Add Guardian DEGRADED finding for operator-brief artifacts missing metadata.trace_id.
-- [evidence] Write the trace identity coverage witness report.
-- [governance] (blocker) Write ADR-0002 deciding when missing trace identity becomes a hard blocker.
+- [code] (blocker) Define spine types (EvidenceReceipt, RoutingDecision, invoke_agent) — zero behavior change.
+- [code] (blocker) Wire A2A into the spine (invoke_agent becomes the only invocation path for A2A delegation).
+- [code] Collapse 7 routers to 2 on the spine rail.
+- [code] Shard providers.py into per-provider files.
+- [code] Decompose agent_runner.py run_task onto spine boundary.
 
 **Non-goals (do not work on these during this track):**
 
-- Do not make missing trace_id a hard CI gate until the ADR is written.
-- Do not turn Trace Attractor into an autonomous apply trigger.
-- Do not mutate MemoryKernel or live evolution state on this track.
-- Do not claim BoardStore adapter/cutover completion.
-- Do not add dashboard/API surface unless it is implemented and manifest-registered.
+- Do not decompose AgentRunner.run_task in this track (except where strictly necessary).
+- Do not split providers.py into per-provider files yet.
+- Do not rewrite SwarmManager.
+- Do not introduce NATS, Redis, gRPC, or a new daemon.
+- Do not create a second event log or truth surface.
+- Do not add another spiritual/metaphoric naming layer.
+- Do not add a parallel spine-check CI workflow — the uplift_guards composition is the only entry point.
 
 **Recently closed tracks:**
 
