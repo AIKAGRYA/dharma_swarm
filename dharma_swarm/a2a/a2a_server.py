@@ -1,16 +1,25 @@
 """A2A Server -- accepts task delegations from other agents.
 
 Receives A2A task requests and dispatches them to the dharma_swarm
-task board and orchestrator. Manages the A2A task lifecycle:
+task board and orchestrator. Manages the A2A task lifecycle per
+A2A 1.0 spec (Linux Foundation):
 
-    submitted -> working -> input-required -> completed/failed
+    submitted -> working -> {completed, failed, canceled,
+                             rejected, input-required, auth-required}
 
 For local agents: direct function calls (no HTTP).
-For remote agents (AGNI/RUSHABDEV): HTTP endpoint (future milestone).
+For remote agents (AGNI/RUSHABDEV): HTTP endpoint via NodeGateway.
 
 The server maintains an in-memory task store with A2A-specific metadata
 layered on top of dharma_swarm's Task model. This keeps the protocol
 boundary clean while reusing existing infrastructure.
+
+A2A 1.0 spec conformance:
+    - 8 task states (SUBMITTED through AUTH_REQUIRED)
+    - contextId for grouping related tasks
+    - Part as strict one-of (text|raw|url|data) with mediaType/filename
+    - Artifact separate from Message (outputs vs conversation)
+    - extensions[] with required flag for dharma-specific layers
 """
 
 from __future__ import annotations
@@ -31,7 +40,7 @@ logger = logging.getLogger(__name__)
 
 
 class A2ATaskStatus(str, Enum):
-    """Task lifecycle states per A2A protocol."""
+    """Task lifecycle states per A2A 1.0 spec (all 8 states)."""
 
     SUBMITTED = "submitted"
     WORKING = "working"
@@ -39,31 +48,96 @@ class A2ATaskStatus(str, Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
+    REJECTED = "rejected"
+    AUTH_REQUIRED = "auth-required"
+
+    @classmethod
+    def terminal_states(cls) -> frozenset[A2ATaskStatus]:
+        return frozenset({cls.COMPLETED, cls.FAILED, cls.CANCELLED, cls.REJECTED})
 
 
 class A2APartType(str, Enum):
-    """Message part types per A2A protocol."""
+    """Part types per A2A 1.0 spec — strict one-of."""
 
     TEXT = "text"
-    FILE = "file"
+    RAW = "raw"
+    URL = "url"
     DATA = "data"
+    FILE = "file"  # backward compat alias for RAW
 
 
 @dataclass
 class A2APart:
-    """A single part of an A2A message.
+    """A single part of an A2A message — strict one-of per spec.
 
-    Simplified from the full spec -- covers the 80% case.
+    A2A 1.0 requires exactly one content field set (text, raw, url, or data)
+    plus optional mediaType and filename.  Validation in ``__post_init__``
+    rejects zero-content and multi-content construction (except for the
+    legacy ``FILE`` type which is exempt for backward compatibility).
 
     Attributes:
-        type: One of text, file, data.
-        content: The actual content (text string, file path, or serialized data).
-        metadata: Optional extra context (e.g., mime_type, filename).
+        type: One of text, raw, url, data (or file for backward compat).
+        content: The actual content string.
+        media_type: MIME type (e.g. "application/json", "image/png").
+        filename: Original filename when transferring files.
+        metadata: Extra context (preserved for backward compat).
     """
 
     type: A2APartType = A2APartType.TEXT
     content: str = ""
+    media_type: str = ""
+    filename: str = ""
     metadata: dict[str, Any] = field(default_factory=dict)
+    _skip_validation: bool = field(default=False, repr=False)
+
+    def __post_init__(self) -> None:
+        if self._skip_validation:
+            return
+        # Legacy FILE type is exempt from strict one-of validation
+        if self.type == A2APartType.FILE:
+            return
+        if not self.content:
+            raise ValueError(
+                f"A2APart(type={self.type.value!r}) requires non-empty content. "
+                "Exactly one content field must be set per A2A 1.0 spec."
+            )
+
+    @classmethod
+    def text(cls, content: str) -> A2APart:
+        """Construct a text part."""
+        return cls(type=A2APartType.TEXT, content=content)
+
+    @classmethod
+    def raw(cls, content: str, media_type: str = "application/octet-stream",
+            filename: str = "") -> A2APart:
+        """Construct a raw (binary) part."""
+        return cls(type=A2APartType.RAW, content=content,
+                   media_type=media_type, filename=filename)
+
+    @classmethod
+    def url(cls, content: str, media_type: str = "",
+            filename: str = "") -> A2APart:
+        """Construct a URL part."""
+        return cls(type=A2APartType.URL, content=content,
+                   media_type=media_type, filename=filename)
+
+    @classmethod
+    def data(cls, content: str, media_type: str = "application/json") -> A2APart:
+        """Construct a structured data part."""
+        return cls(type=A2APartType.DATA, content=content, media_type=media_type)
+
+
+@dataclass
+class A2AExtension:
+    """A2A 1.0 extension declaration.
+
+    Allows dharma-specific semantics (telos gates, witness packets,
+    gnani lodestone) to layer on top of A2A without breaking interop.
+    """
+
+    uri: str = ""
+    required: bool = False
+    data: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -84,38 +158,71 @@ class A2AMessage:
 
 
 @dataclass
+class A2AArtifact:
+    """An output artifact from a task — distinct from conversation Messages.
+
+    A2A 1.0 separates outputs (artifacts) from conversation (history).
+    Artifacts are the deliverables; messages are the dialogue.
+    """
+
+    id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
+    parts: list[A2APart] = field(default_factory=list)
+    name: str = ""
+    description: str = ""
+    extensions: list[A2AExtension] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
 class A2ATask:
     """An A2A task -- the core unit of work in the protocol.
 
-    Maps to dharma_swarm Task but adds A2A-specific lifecycle tracking.
+    A2A 1.0 spec-conformant with contextId, artifacts/history split,
+    extensions, and all 8 lifecycle states.
 
     Attributes:
         id: Unique task identifier.
+        context_id: Groups related tasks (server-generated, opaque to clients).
         from_agent: Name of the requesting agent.
         to_agent: Name of the target agent (or empty for capability-based routing).
-        status: Current lifecycle state.
-        messages: Conversation history (request + responses).
+        status: Current lifecycle state (8 states per A2A 1.0).
+        history: Conversation messages (request + responses).
+        artifacts: Output deliverables (distinct from conversation).
         capability: The capability being requested (for discovery-based routing).
         dharma_task_id: ID of the corresponding dharma_swarm Task (if created).
         created_at: ISO-8601 creation timestamp.
         updated_at: ISO-8601 last update timestamp.
-        result: Final result (populated on completion).
-        error: Error message (populated on failure).
+        result: Final result text (convenience — also in artifacts).
+        error: Error message (populated on failure/rejection).
+        extensions: A2A 1.0 extension declarations.
         metadata: Arbitrary extra data.
     """
 
     id: str = field(default_factory=lambda: uuid.uuid4().hex[:16])
+    context_id: str = ""
     from_agent: str = ""
     to_agent: str = ""
     status: A2ATaskStatus = A2ATaskStatus.SUBMITTED
+    history: list[A2AMessage] = field(default_factory=list)
     messages: list[A2AMessage] = field(default_factory=list)
+    artifacts: list[A2AArtifact] = field(default_factory=list)
     capability: str = ""
     dharma_task_id: str = ""
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     updated_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     result: str = ""
     error: str = ""
+    extensions: list[A2AExtension] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        # Merge messages into history for backward compat
+        if self.messages and not self.history:
+            self.history = self.messages
+        self.messages = self.history
+
+    def is_terminal(self) -> bool:
+        return self.status in A2ATaskStatus.terminal_states()
 
 
 # Type alias for task handler callbacks
@@ -186,10 +293,7 @@ class A2AServer:
     def submit(self, task: A2ATask) -> A2ATask:
         """Submit a new task for processing.
 
-        The task is stored, then dispatched to the appropriate handler
-        based on the requested capability. If no handler matches,
-        the default handler is tried. If no default handler exists,
-        the task fails immediately.
+        Auto-generates context_id if not set (A2A 1.0 spec: server-generated).
 
         Args:
             task: The A2ATask to submit.
@@ -199,14 +303,15 @@ class A2AServer:
         """
         task.status = A2ATaskStatus.SUBMITTED
         task.updated_at = datetime.now(timezone.utc).isoformat()
+        if not task.context_id:
+            task.context_id = uuid.uuid4().hex[:12]
         self._tasks[task.id] = task
 
         logger.info(
-            "A2A task submitted: %s (from=%s, to=%s, cap=%s)",
-            task.id, task.from_agent, task.to_agent, task.capability,
+            "A2A task submitted: %s ctx=%s (from=%s, to=%s, cap=%s)",
+            task.id, task.context_id, task.from_agent, task.to_agent, task.capability,
         )
 
-        # Dispatch to handler
         return self._dispatch(task)
 
     def _dispatch(self, task: A2ATask) -> A2ATask:
@@ -252,16 +357,44 @@ class A2AServer:
     def cancel(self, task_id: str) -> bool:
         """Cancel a task. Returns True if successful.
 
-        Only submitted or working tasks can be cancelled.
+        Only non-terminal tasks can be cancelled.
         """
         task = self._tasks.get(task_id)
         if task is None:
             return False
-        if task.status in (A2ATaskStatus.COMPLETED, A2ATaskStatus.FAILED, A2ATaskStatus.CANCELLED):
+        if task.is_terminal():
             return False
         task.status = A2ATaskStatus.CANCELLED
         task.updated_at = datetime.now(timezone.utc).isoformat()
         logger.info("A2A task %s cancelled", task_id)
+        return True
+
+    def reject(self, task_id: str, reason: str = "") -> bool:
+        """Reject a task (A2A 1.0). Returns True if successful."""
+        task = self._tasks.get(task_id)
+        if task is None:
+            return False
+        if task.is_terminal():
+            return False
+        safe_reason = str(reason).replace("\n", " ").replace("\r", " ")[:200]
+        task.status = A2ATaskStatus.REJECTED
+        task.error = safe_reason
+        task.updated_at = datetime.now(timezone.utc).isoformat()
+        logger.info("A2A task %s rejected: %s", task_id, safe_reason)
+        return True
+
+    def require_auth(self, task_id: str, reason: str = "") -> bool:
+        """Set a task to AUTH_REQUIRED (A2A 1.0). Returns True if successful."""
+        task = self._tasks.get(task_id)
+        if task is None:
+            return False
+        if task.is_terminal():
+            return False
+        safe_reason = str(reason).replace("\n", " ").replace("\r", " ")[:200]
+        task.status = A2ATaskStatus.AUTH_REQUIRED
+        task.error = safe_reason
+        task.updated_at = datetime.now(timezone.utc).isoformat()
+        logger.info("A2A task %s requires auth: %s", task_id, safe_reason)
         return True
 
     def list_tasks(
@@ -269,6 +402,7 @@ class A2AServer:
         status: A2ATaskStatus | None = None,
         from_agent: str | None = None,
         to_agent: str | None = None,
+        context_id: str | None = None,
     ) -> list[A2ATask]:
         """List tasks with optional filters.
 
@@ -276,6 +410,7 @@ class A2AServer:
             status: Filter by task status.
             from_agent: Filter by requesting agent.
             to_agent: Filter by target agent.
+            context_id: Filter by context group (A2A 1.0).
 
         Returns:
             List of matching tasks.
@@ -287,6 +422,8 @@ class A2AServer:
             tasks = [t for t in tasks if t.from_agent == from_agent]
         if to_agent is not None:
             tasks = [t for t in tasks if t.to_agent == to_agent]
+        if context_id is not None:
+            tasks = [t for t in tasks if t.context_id == context_id]
         return tasks
 
     def task_count(self) -> int:

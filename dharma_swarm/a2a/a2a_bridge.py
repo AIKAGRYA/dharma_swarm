@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 from dharma_swarm.daemon_config import dharma_state_dir
@@ -30,7 +29,6 @@ from dharma_swarm.a2a.a2a_server import (
     A2APartType,
     A2AServer,
     A2ATask,
-    A2ATaskStatus,
 )
 
 logger = logging.getLogger(__name__)
@@ -120,7 +118,7 @@ class A2ABridge:
         task = A2ATask(
             from_agent=from_agent,
             to_agent=to_agent,
-            messages=[A2AMessage(role="user", parts=parts)],
+            history=[A2AMessage(role="user", parts=parts)],
             capability=_infer_capability_from_type(msg_type),
             metadata={
                 "source": "trishula",
