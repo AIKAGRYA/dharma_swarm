@@ -1,13 +1,24 @@
 """A2A (Agent-to-Agent) protocol implementation for dharma_swarm.
 
-Implements a subset of Google's Agent-to-Agent protocol for standardized
+Implements the A2A 1.0 spec (Linux Foundation) for standardized
 agent discovery and task delegation. Replaces file-based TRISHULA messaging
-with structured agent cards, capability discovery, and task lifecycle.
+with structured agent cards, skill discovery, and task lifecycle.
+
+A2A 1.0 conformance:
+    - 8 task states (SUBMITTED through AUTH_REQUIRED)
+    - contextId for grouping related tasks
+    - Part as strict one-of (text|raw|url|data) with mediaType/filename
+    - Artifact distinct from Message (outputs vs conversation)
+    - AgentSkill with id, tags, examples, per-skill security
+    - SecuritySchemes (APIKey, HTTPAuth, OAuth2, MutualTLS, OpenIdConnect)
+    - JWS-signed Agent Cards (signatures[])
+    - extensions[] for dharma-specific layers (telos, witness, gnani)
+    - Cycle detection on dispatch chains
 
 Core components:
-    - AgentCard / CardRegistry: capability advertisement and discovery
+    - AgentCard / CardRegistry: skill advertisement and discovery
     - A2AServer: receives task delegations, dispatches to orchestrator
-    - A2AClient: discovers agents, delegates tasks, monitors completion
+    - A2AClient: discovers agents, delegates tasks with cycle guard
     - A2ABridge: backward-compatible bridge to TRISHULA and signal_bus
     - NodeGateway: HTTP transport layer (FastAPI router per node)
     - NodeRegistry: central directory of fleet nodes with health monitoring
@@ -16,9 +27,20 @@ Core components:
 from dharma_swarm.a2a.agent_card import (
     AgentCard,
     AgentCapability,
+    AgentSkill,
     CardRegistry,
+    SecurityScheme,
 )
-from dharma_swarm.a2a.a2a_server import A2AServer
+from dharma_swarm.a2a.a2a_server import (
+    A2AArtifact,
+    A2AExtension,
+    A2AMessage,
+    A2APart,
+    A2APartType,
+    A2AServer,
+    A2ATask,
+    A2ATaskStatus,
+)
 from dharma_swarm.a2a.a2a_client import A2AClient
 from dharma_swarm.a2a.a2a_bridge import A2ABridge
 from dharma_swarm.a2a.node_registry import NodeRegistry, RemoteNode
@@ -26,8 +48,17 @@ from dharma_swarm.a2a.node_registry import NodeRegistry, RemoteNode
 __all__ = [
     "AgentCard",
     "AgentCapability",
+    "AgentSkill",
     "CardRegistry",
+    "SecurityScheme",
+    "A2AArtifact",
+    "A2AExtension",
+    "A2AMessage",
+    "A2APart",
+    "A2APartType",
     "A2AServer",
+    "A2ATask",
+    "A2ATaskStatus",
     "A2AClient",
     "A2ABridge",
     "NodeRegistry",

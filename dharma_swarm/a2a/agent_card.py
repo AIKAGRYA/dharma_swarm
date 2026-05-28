@@ -1,23 +1,25 @@
-"""A2A Agent Cards -- capability advertisement for dharma_swarm agents.
+"""A2A Agent Cards -- skill advertisement for dharma_swarm agents.
 
 Each agent publishes a card describing what it can do.
-Other agents (local or remote) discover capabilities via cards.
+Other agents (local or remote) discover skills via cards.
 
-Implements the Agent Card concept from Google's A2A protocol:
-- Structured metadata: name, description, capabilities, endpoint, auth
+Implements the Agent Card per A2A 1.0 spec (Linux Foundation):
+- AgentSkill with id, tags, examples, inputModes, outputModes, per-skill security
+- SecuritySchemes map (APIKey, HTTPAuth, OAuth2, MutualTLS, OpenIdConnect)
+- JWS signatures for card authenticity
+- supportedInterfaces with protocolBinding declarations
+- extensions[] for dharma-specific layers
 - Registry for storing and querying cards
 - Auto-generation from existing AgentIdentity / AgentConfig
 - Persistence to ~/.dharma/a2a/cards/ as JSON files
 
-Agent Cards are the foundation of the A2A protocol. Without cards,
-agents cannot discover each other. Every agent MUST have a card.
+Backward compat: AgentCapability is preserved as an alias for AgentSkill.
 """
 
 from __future__ import annotations
 
 import json
 import logging
-import os
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -40,46 +42,82 @@ def _utc_now_iso() -> str:
 
 
 @dataclass
-class AgentCapability:
-    """A single capability that an agent advertises.
+class SecurityScheme:
+    """A2A 1.0 security scheme declaration.
 
-    Attributes:
-        name: Short identifier (e.g., "code_review", "research", "deploy").
-        description: Human-readable explanation of what this capability does.
-        input_modes: Accepted input types (e.g., ["text", "file", "data"]).
-        output_modes: Produced output types.
+    Maps to the spec's securitySchemes object.
     """
 
-    name: str
+    scheme_type: str = "APIKey"  # APIKey, HTTPAuth, OAuth2, MutualTLS, OpenIdConnect
+    in_field: str = "header"  # header, query, cookie
+    name: str = "X-A2A-Key"  # header/param name
+    description: str = ""
+    flows: dict[str, Any] = field(default_factory=dict)  # OAuth2 flows
+
+
+@dataclass
+class AgentSkill:
+    """A single skill that an agent advertises (A2A 1.0 spec name).
+
+    Field order preserves backward compat with AgentCapability(name, description).
+
+    Attributes:
+        name: Human-readable short name (also used as id if id is empty).
+        description: What this skill does.
+        input_modes: Accepted input types (e.g., ["text", "file", "data"]).
+        output_modes: Produced output types.
+        id: Unique skill identifier (defaults to name if empty).
+        tags: Searchable tags for discovery.
+        examples: Example invocations or descriptions.
+        security_requirements: Per-skill security scheme references.
+    """
+
+    name: str = ""
     description: str = ""
     input_modes: list[str] = field(default_factory=lambda: ["text"])
     output_modes: list[str] = field(default_factory=lambda: ["text"])
+    id: str = ""
+    tags: list[str] = field(default_factory=list)
+    examples: list[str] = field(default_factory=list)
+    security_requirements: list[str] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        if not self.id:
+            self.id = self.name
 
     def matches(self, query: str) -> bool:
-        """Check if this capability matches a search query (case-insensitive).
-
-        Matches against name and description via substring containment.
-        """
+        """Match against name, description, and tags (case-insensitive)."""
         q = query.lower()
-        return q in self.name.lower() or q in self.description.lower()
+        if q in self.name.lower() or q in self.description.lower():
+            return True
+        return any(q in tag.lower() for tag in self.tags)
+
+
+# Backward compatibility alias
+AgentCapability = AgentSkill
 
 
 @dataclass
 class AgentCard:
     """A2A Agent Card -- structured metadata describing an agent.
 
-    Follows Google's A2A Agent Card spec (simplified for local-first use).
+    A2A 1.0 spec conformant with skills, security schemes, signatures,
+    supported interfaces, and extensions.
 
     Attributes:
         name: Unique agent identifier within the swarm.
         description: What this agent does (1-2 sentences).
-        capabilities: List of advertised capabilities.
+        skills: List of advertised skills (A2A 1.0 spec name).
         endpoint: For remote agents, the HTTP URL. For local, "local://".
-        auth_type: Authentication method ("none", "api_key", "bearer").
-        role: Agent role from dharma_swarm (e.g., "coder", "researcher").
+        auth_type: Authentication method (backward compat shorthand).
+        security_schemes: A2A 1.0 security scheme declarations.
+        signatures: JWS-signed card authenticity proofs.
+        supported_interfaces: Protocol binding declarations.
+        extensions: A2A 1.0 extension URIs.
+        role: Agent role from dharma_swarm.
         model: LLM model identifier.
-        provider: LLM provider (e.g., "openrouter", "anthropic").
-        status: Current agent status ("idle", "busy", "dead").
+        provider: LLM provider.
+        status: Current agent status.
         version: Card schema version.
         created_at: ISO-8601 timestamp of card creation.
         updated_at: ISO-8601 timestamp of last update.
@@ -88,9 +126,14 @@ class AgentCard:
 
     name: str
     description: str = ""
-    capabilities: list[AgentCapability] = field(default_factory=list)
+    skills: list[AgentSkill] = field(default_factory=list)
+    capabilities: list[AgentSkill] = field(default_factory=list)
     endpoint: str = "local://"
     auth_type: str = "none"
+    security_schemes: list[SecurityScheme] = field(default_factory=list)
+    signatures: list[str] = field(default_factory=list)
+    supported_interfaces: list[dict[str, str]] = field(default_factory=list)
+    extensions: list[dict[str, Any]] = field(default_factory=list)
     role: str = "general"
     model: str = ""
     provider: str = ""
@@ -100,33 +143,58 @@ class AgentCard:
     updated_at: str = field(default_factory=_utc_now_iso)
     metadata: dict[str, Any] = field(default_factory=dict)
 
+    def __post_init__(self) -> None:
+        # Merge capabilities into skills for backward compat
+        if self.capabilities and not self.skills:
+            self.skills = self.capabilities
+        self.capabilities = self.skills
+
     def to_dict(self) -> dict[str, Any]:
         """Serialize to JSON-safe dict."""
         return asdict(self)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> AgentCard:
-        """Deserialize from dict, handling nested capabilities."""
+        """Deserialize from dict, handling nested skills/capabilities."""
         known_fields = {f.name for f in cls.__dataclass_fields__.values()}
-        filtered = {}
+        skill_fields = {f.name for f in AgentSkill.__dataclass_fields__.values()}
+        sec_fields = {f.name for f in SecurityScheme.__dataclass_fields__.values()}
+        filtered: dict[str, Any] = {}
+
+        # Accept both "skills" and legacy "capabilities" key
+        raw_skills = data.get("skills") or data.get("capabilities") or []
+
         for k, v in data.items():
+            if k == "capabilities":
+                continue  # handled via raw_skills above
             if k not in known_fields:
                 continue
-            if k == "capabilities" and isinstance(v, list):
-                caps = []
+            if k == "skills" and isinstance(v, list):
+                continue  # handled via raw_skills below
+            if k == "security_schemes" and isinstance(v, list):
+                schemes = []
                 for item in v:
                     if isinstance(item, dict):
-                        cap_fields = {
-                            f.name for f in AgentCapability.__dataclass_fields__.values()
-                        }
-                        caps.append(
-                            AgentCapability(**{ck: cv for ck, cv in item.items() if ck in cap_fields})
-                        )
-                    elif isinstance(item, AgentCapability):
-                        caps.append(item)
-                filtered[k] = caps
+                        schemes.append(SecurityScheme(
+                            **{sk: sv for sk, sv in item.items() if sk in sec_fields}
+                        ))
+                    elif isinstance(item, SecurityScheme):
+                        schemes.append(item)
+                filtered[k] = schemes
             else:
                 filtered[k] = v
+
+        # Parse skills
+        skills: list[AgentSkill] = []
+        for item in raw_skills:
+            if isinstance(item, dict):
+                skills.append(AgentSkill(
+                    **{sk: sv for sk, sv in item.items() if sk in skill_fields}
+                ))
+            elif isinstance(item, AgentSkill):
+                skills.append(item)
+        filtered["skills"] = skills
+
         return cls(**filtered)
 
     @classmethod
@@ -155,13 +223,13 @@ class AgentCard:
         if not description:
             description = f"{role} agent in dharma_swarm"
 
-        # Derive capabilities from role
-        capabilities = _capabilities_for_role(role)
+        # Derive skills from role
+        skills = _skills_for_role(role)
 
         return cls(
             name=name,
             description=description,
-            capabilities=capabilities,
+            skills=skills,
             role=role,
             model=model,
             status=identity.get("status", "idle"),
@@ -181,67 +249,71 @@ class AgentCard:
         return [cap.name for cap in self.capabilities]
 
 
-def _capabilities_for_role(role: str) -> list[AgentCapability]:
-    """Map an agent role to a default set of capabilities.
+def _skills_for_role(role: str) -> list[AgentSkill]:
+    """Map an agent role to a default set of skills.
 
-    This is a heuristic -- agents can override with explicit capabilities.
+    This is a heuristic -- agents can override with explicit skills.
     """
     role_lower = role.lower()
 
-    # Role -> capability mapping
-    _ROLE_MAP: dict[str, list[AgentCapability]] = {
+    _ROLE_MAP: dict[str, list[AgentSkill]] = {
         "coder": [
-            AgentCapability("code_generation", "Write, modify, and refactor code"),
-            AgentCapability("code_review", "Review code for bugs and improvements"),
-            AgentCapability("testing", "Write and run tests"),
+            AgentSkill(id="code_generation", name="code_generation", description="Write, modify, and refactor code", tags=["code", "dev"]),
+            AgentSkill(id="code_review", name="code_review", description="Review code for bugs and improvements", tags=["review", "quality"]),
+            AgentSkill(id="testing", name="testing", description="Write and run tests", tags=["test", "qa"]),
         ],
         "reviewer": [
-            AgentCapability("code_review", "Thorough code review with feedback"),
-            AgentCapability("security_review", "Check for security vulnerabilities"),
+            AgentSkill(id="code_review", name="code_review", description="Thorough code review with feedback", tags=["review", "quality"]),
+            AgentSkill(id="security_review", name="security_review", description="Check for security vulnerabilities", tags=["security", "audit"]),
         ],
         "researcher": [
-            AgentCapability("research", "Deep research and analysis"),
-            AgentCapability("literature_review", "Review academic papers and docs"),
-            AgentCapability("synthesis", "Synthesize information from multiple sources"),
+            AgentSkill(id="research", name="research", description="Deep research and analysis", tags=["research", "analysis"]),
+            AgentSkill(id="literature_review", name="literature_review", description="Review academic papers and docs", tags=["research", "review"]),
+            AgentSkill(id="synthesis", name="synthesis", description="Synthesize information from multiple sources", tags=["synthesis", "integration"]),
         ],
         "tester": [
-            AgentCapability("testing", "Write and execute test suites"),
-            AgentCapability("verification", "Verify claims and results"),
+            AgentSkill(id="testing", name="testing", description="Write and execute test suites", tags=["test", "qa"]),
+            AgentSkill(id="verification", name="verification", description="Verify claims and results", tags=["verify", "audit"]),
         ],
         "orchestrator": [
-            AgentCapability("task_routing", "Route tasks to appropriate agents"),
-            AgentCapability("coordination", "Coordinate multi-agent workflows"),
-            AgentCapability("monitoring", "Monitor agent health and progress"),
+            AgentSkill(id="task_routing", name="task_routing", description="Route tasks to appropriate agents", tags=["orchestration", "routing"]),
+            AgentSkill(id="coordination", name="coordination", description="Coordinate multi-agent workflows", tags=["coordination", "workflow"]),
+            AgentSkill(id="monitoring", name="monitoring", description="Monitor agent health and progress", tags=["monitoring", "health"]),
         ],
         "architect": [
-            AgentCapability("architecture", "Design system architecture"),
-            AgentCapability("code_review", "Review architectural decisions"),
+            AgentSkill(id="architecture", name="architecture", description="Design system architecture", tags=["architecture", "design"]),
+            AgentSkill(id="code_review", name="code_review", description="Review architectural decisions", tags=["review", "architecture"]),
         ],
         "operator": [
-            AgentCapability("deployment", "Deploy and manage services"),
-            AgentCapability("monitoring", "System monitoring and alerting"),
-            AgentCapability("infrastructure", "Manage infrastructure"),
+            AgentSkill(id="deployment", name="deployment", description="Deploy and manage services", tags=["deploy", "ops"]),
+            AgentSkill(id="monitoring", name="monitoring", description="System monitoring and alerting", tags=["monitoring", "ops"]),
+            AgentSkill(id="infrastructure", name="infrastructure", description="Manage infrastructure", tags=["infra", "ops"]),
         ],
         "witness": [
-            AgentCapability("observation", "Observe and record system state"),
-            AgentCapability("reflection", "Reflect on system behavior patterns"),
+            AgentSkill(id="observation", name="observation", description="Observe and record system state", tags=["observe", "witness"]),
+            AgentSkill(id="reflection", name="reflection", description="Reflect on system behavior patterns", tags=["reflect", "insight"]),
         ],
         "strategist": [
-            AgentCapability("strategic_planning", "High-level strategic analysis"),
-            AgentCapability("prioritization", "Prioritize tasks and goals"),
+            AgentSkill(id="strategic_planning", name="strategic_planning", description="High-level strategic analysis", tags=["strategy", "planning"]),
+            AgentSkill(id="prioritization", name="prioritization", description="Prioritize tasks and goals", tags=["priority", "planning"]),
         ],
     }
 
-    capabilities = _ROLE_MAP.get(role_lower, [])
-    if not capabilities:
-        # Fallback: generic capability named after role
-        capabilities = [
-            AgentCapability(
-                role_lower,
-                f"General {role_lower} capabilities",
+    skills = _ROLE_MAP.get(role_lower, [])
+    if not skills:
+        skills = [
+            AgentSkill(
+                id=role_lower,
+                name=role_lower,
+                description=f"General {role_lower} capabilities",
+                tags=[role_lower],
             )
         ]
-    return capabilities
+    return skills
+
+
+# Backward compatibility alias
+_capabilities_for_role = _skills_for_role
 
 
 # ---------------------------------------------------------------------------
