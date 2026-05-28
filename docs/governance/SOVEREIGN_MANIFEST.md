@@ -18,35 +18,37 @@
      Do not hand-edit. Run scripts/governance/render_active_track_includes.py
      after updating the YAML. -->
 
-**Active track:** Trace Identity Coverage — native propagation and soft coverage findings
-**Track id:** `trace-identity-coverage-2026-05`
+**Active track:** Runtime Truth Spine — one invariant, one invocation path, one receipt
+**Track id:** `runtime-truth-spine-2026-06`
 **Status:** ACTIVE
-**Verified at:** 2026-05-21 (TTL 14 days)
+**Verified at:** 2026-05-28 (TTL 14 days)
 **Owner:** @AmitabhainArunachala
 
 **Description:**
 
-Move Trace Attractor from first packet visibility to native trace identity
-propagation. New operator-brief, BoardStore, and Sakshi records should
-inherit CorrelationContext trace metadata when it exists; legacy records may
-still project through explicit synthetic aliases. Guardian should surface
-missing trace identity as DEGRADED evidence first, with any hard blocker
-policy deferred to an ADR.
+Define the Runtime Truth Spine before expanding agent fabric. Three audits
+(Perplexity, Codex, Devin) converged: dharma_swarm has accreted without a
+spine. The fix is one invariant chain (Task + Runner + Claim + Context +
+RoutingDecision + ProviderCall + EvidenceReceipt = safe execution path).
+Every dispatch produces exactly one receipt. No more generic dispatch_dropoff.
+Doctrine: docs/reports/CONVERGED_SEAM_AUDIT_RUNTIME_TRUTH_SPINE.md
 
 **Next items on this track:**
 
-- [code] (blocker) Default operator-brief, BoardStore, and Sakshi trace metadata from CorrelationContext.
-- [code] (blocker) Add Guardian DEGRADED finding for operator-brief artifacts missing metadata.trace_id.
-- [evidence] Write the trace identity coverage witness report.
-- [governance] (blocker) Write ADR-0002 deciding when missing trace identity becomes a hard blocker.
+- [code] (blocker) Define spine types (EvidenceReceipt, RoutingDecision, invoke_agent) — zero behavior change.
+- [code] (blocker) Wire A2A into the spine (invoke_agent becomes the only invocation path for A2A delegation).
+- [code] Collapse 7 routers to 2 on the spine rail.
+- [code] Shard providers.py into per-provider files.
+- [code] Decompose agent_runner.py run_task onto spine boundary.
 
 **Non-goals (do not work on these during this track):**
 
-- Do not make missing trace_id a hard CI gate until the ADR is written.
-- Do not turn Trace Attractor into an autonomous apply trigger.
-- Do not mutate MemoryKernel or live evolution state on this track.
-- Do not claim BoardStore adapter/cutover completion.
-- Do not add dashboard/API surface unless it is implemented and manifest-registered.
+- Do not decompose AgentRunner.run_task in this track (except where strictly necessary).
+- Do not split providers.py into per-provider files yet.
+- Do not rewrite SwarmManager.
+- Do not introduce NATS, Redis, gRPC, or a new daemon.
+- Do not create a second event log or truth surface.
+- Do not add another spiritual/metaphoric naming layer.
 
 **Recently closed tracks:**
 
@@ -68,7 +70,7 @@ These are immutable engineering laws for this repository. Violation = architectu
 The `dharma_swarm/` package currently has **387 files at its top level (63.2% of 612 total Python modules)** (V). No new .py file may be added to the top level. New modules must go into an appropriate subdirectory. Existing top-level files will be organized over time.
 
 ### A2: NO DUPLICATE IMPLEMENTATIONS
-Before creating a new file for routing, bridging, adapting, or orchestrating, check if one already exists. The repo currently has **24 bridge files** (V), **3 model_routing copies** (2 are identical, 1 is different) (V), **4 orchestrators** (V), **16 adapter files across 8 locations** (V), and **13 router files** (V). Do not add more without deprecating an existing one.
+Before creating a new file for routing, bridging, adapting, or orchestrating, check if one already exists. The repo currently has **24 bridge files** (V), **3 model_routing copies** (2 are identical, 1 is different) (V), **4 orchestrators** (V), **16 adapter files across 8 locations** (V), and **14 router files** (V). Do not add more without deprecating an existing one.
 
 ### A3: NO UNDOCUMENTED SEAMS
 If your code creates a new interface between domains (a bridge, adapter, or protocol), you must update `NAVIGATION.md` with its purpose, entry point, and boundary constraints. Undocumented seams become invisible coupling.
@@ -110,19 +112,19 @@ These are the ground-truth metrics. All other documents citing different numbers
 
 | Metric | Value | Verification |
 |--------|-------|-------------|
-| Total Python modules | **652** | find dharma_swarm -name "*.py" -type f |
+| Total Python modules | **657** | find dharma_swarm -name "*.py" -type f |
 | Top-level (flat) modules | **388 (59.5%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
-| Total Python LOC | **276,472** | wc -l across dharma_swarm Python modules |
-| Test files | **606** | find tests -name "*.py" -type f |
-| Test functions | **10,570 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Total Python LOC | **276,766** | wc -l across dharma_swarm Python modules |
+| Test files | **607** | find tests -name "*.py" -type f |
+| Test functions | **10,581 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
-| Markdown files | **734** | find . -name "*.md" -type f |
-| Markdown total lines | **185,850** | wc -l across all .md |
+| Markdown files | **735** | find . -name "*.md" -type f |
+| Markdown total lines | **186,434** | wc -l across all .md |
 | Bridge files | **24** | find dharma_swarm -name "*bridge*.py" |
 | Adapter files | **20 across 8 locations** | find dharma_swarm -type f \| rg -i "adapter" |
 | Orchestrator files | **4** (6,034 LOC total) | find dharma_swarm -name "*orchestrat*" |
-| Router files | **13** (4,976 LOC total) | find dharma_swarm -type f \| rg -i "rout" |
+| Router files | **14** (4,976 LOC total) | find dharma_swarm -type f \| rg -i "rout" |
 | Memory modules | **11** (5,848 LOC) | find dharma_swarm -name "*memory*" |
 | Context modules | **8** (5,828 LOC) | find dharma_swarm -name "*context*" |
 | Provider types (enum) | **18** | models.py ProviderType enum |

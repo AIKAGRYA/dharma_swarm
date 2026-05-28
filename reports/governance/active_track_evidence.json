@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-05-28T06:39:13+00:00",
-  "active_track_id": "trace-identity-coverage-2026-05",
+  "generated_at": "2026-05-28T13:23:13+00:00",
+  "active_track_id": "runtime-truth-spine-2026-06",
   "shippable": true,
   "prerequisites_ok": true,
   "completion_progress": {
@@ -9,65 +9,59 @@
   },
   "criteria": [
     {
-      "id": "trace_attractor_causal_spine_closed",
-      "kind": "file_contains",
-      "passed": true,
-      "detail": "pattern 'Trace Attractor Causal Spine shipped' found in docs/governance/ACTIVE_TRACK.yaml"
-    },
-    {
-      "id": "correlation_context_exists",
-      "kind": "file_contains",
-      "passed": true,
-      "detail": "pattern 'class CorrelationContext' found in dharma_swarm/correlation_context.py"
-    },
-    {
-      "id": "dgc_trace_attractor_wired",
-      "kind": "file_contains",
-      "passed": true,
-      "detail": "pattern 'trace-attractor' found in dharma_swarm/dgc_cli.py"
-    },
-    {
-      "id": "operator_brief_consumes_correlation_context",
-      "kind": "file_contains",
-      "passed": true,
-      "detail": "pattern 'correlation_context' found in dharma_swarm/operator_brief/persistence.py"
-    },
-    {
-      "id": "board_event_context_trace_defaults",
-      "kind": "file_contains",
-      "passed": true,
-      "detail": "pattern '_current_trace_id' found in dharma_swarm/board/event_log.py"
-    },
-    {
-      "id": "sakshi_context_trace_defaults",
-      "kind": "file_contains",
-      "passed": true,
-      "detail": "pattern '_current_trace_id' found in dharma_swarm/sakshi/provenance_log.py"
-    },
-    {
-      "id": "guardian_soft_trace_coverage",
-      "kind": "file_contains",
-      "passed": true,
-      "detail": "pattern 'operator_brief_trace_coverage' found in dharma_swarm/operator_brief/watchdog.py"
-    },
-    {
-      "id": "trace_identity_coverage_witness",
+      "id": "converged_doctrine_exists",
       "kind": "file_exists",
       "passed": true,
-      "detail": "reports/witness/2026-05-21-trace-identity-coverage.md present"
+      "detail": "docs/reports/CONVERGED_SEAM_AUDIT_RUNTIME_TRUTH_SPINE.md present"
     },
     {
-      "id": "hard_gate_policy_adr",
+      "id": "a2a_tier1_merged",
+      "kind": "file_contains",
+      "passed": true,
+      "detail": "pattern 'A2ATaskStatus' found in dharma_swarm/a2a/a2a_server.py"
+    },
+    {
+      "id": "spine_package_exists",
       "kind": "file_exists",
       "passed": true,
-      "detail": "docs/architecture/adr/0002-trace-coverage-gate.md present"
+      "detail": "dharma_swarm/spine/__init__.py present"
+    },
+    {
+      "id": "evidence_receipt_defined",
+      "kind": "file_contains",
+      "passed": true,
+      "detail": "pattern 'class EvidenceReceipt' found in dharma_swarm/spine/receipt.py"
+    },
+    {
+      "id": "routing_decision_defined",
+      "kind": "file_contains",
+      "passed": true,
+      "detail": "pattern 'class RoutingDecision' found in dharma_swarm/spine/routing.py"
+    },
+    {
+      "id": "invoke_agent_defined",
+      "kind": "file_contains",
+      "passed": true,
+      "detail": "pattern 'async def invoke_agent' found in dharma_swarm/spine/invoke.py"
+    },
+    {
+      "id": "spine_check_ci",
+      "kind": "file_exists",
+      "passed": true,
+      "detail": ".github/workflows/spine-check.yml present"
+    },
+    {
+      "id": "dropoff_tests_pass",
+      "kind": "file_contains",
+      "passed": true,
+      "detail": "pattern 'test_provider_failure_not_confused_with_dropoff' found in tests/test_dispatch_dropoff_sources.py"
     }
   ],
   "findings": [
     {
       "severity": "INFO",
       "check": "track-shippable",
-      "message": "All 6 completion criteria pass. Track 'trace-identity-coverage-2026-05' is SHIPPABLE \u2014 close it and declare the next active track.",
+      "message": "All 6 completion criteria pass. Track 'runtime-truth-spine-2026-06' is SHIPPABLE \u2014 close it and declare the next active track.",
       "criterion_id": null
     }
   ]
