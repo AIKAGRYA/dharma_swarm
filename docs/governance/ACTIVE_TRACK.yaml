@@ -60,28 +60,31 @@ active_track:
       pattern: "A2ATaskStatus"
 
   completion_criteria:
-    - id: spine_package_exists
+    - id: evidence-receipt-defined
       kind: file_exists
-      file: dharma_swarm/spine/__init__.py
-    - id: evidence_receipt_defined
-      kind: file_contains
       file: dharma_swarm/spine/receipt.py
-      pattern: "class EvidenceReceipt"
-    - id: routing_decision_defined
-      kind: file_contains
-      file: dharma_swarm/spine/routing.py
-      pattern: "class RoutingDecision"
-    - id: invoke_agent_defined
-      kind: file_contains
-      file: dharma_swarm/spine/invoke.py
-      pattern: "async def invoke_agent"
-    - id: spine_check_ci
+    - id: routing-decision-defined
       kind: file_exists
-      file: .github/workflows/spine-check.yml
-    - id: dropoff_tests_pass
+      file: dharma_swarm/spine/routing.py
+    - id: invoke-agent-defined
+      kind: file_exists
+      file: dharma_swarm/spine/invoke.py
+    - id: runtime-state-receipt-field
       kind: file_contains
-      file: tests/test_dispatch_dropoff_sources.py
-      pattern: "test_provider_failure_not_confused_with_dropoff"
+      file: dharma_swarm/runtime_state.py
+      pattern: "receipt_json"
+    - id: uplift-guard-registered
+      kind: file_contains
+      file: scripts/uplift_guards/run_pre_commit.py
+      pattern: "check_spine_ownership"
+    - id: manifest-spine-declared
+      kind: file_contains
+      file: ACTIVE_SURFACE_MANIFEST.yaml
+      pattern: "runtime_truth_spine"
+    - id: onboard-spine-rendered
+      kind: file_contains
+      file: scripts/governance/agent_onboard.py
+      pattern: "render_spine_status"
 
   non_goals:
     - Do not decompose AgentRunner.run_task in this track (except where strictly necessary).

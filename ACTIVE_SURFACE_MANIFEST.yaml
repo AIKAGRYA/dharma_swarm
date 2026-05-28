@@ -130,6 +130,31 @@ governance_rules:
       - hotpath-ack
       - mismatch-adjacency
       - assurance-diff
+      - spine-ownership
+
+runtime_truth_spine:
+  canonical_object: EvidenceReceipt
+  canonical_store: dharma_swarm/runtime_state.py
+  canonical_table: delegation_runs
+  canonical_field: receipt_json
+  spine_package: dharma_swarm/spine/
+  path_enum:
+    - dharma_swarm/spine/receipt.py
+    - dharma_swarm/spine/routing.py
+    - dharma_swarm/spine/invoke.py
+    - dharma_swarm/spine/persistence.py
+  health_check_ids: [runtime_db_present, module_file_exists]
+  evidence_receipt:
+    # Role vocabulary for persistence surfaces that interact with the spine.
+    # New persistence is not forbidden — unclassified persistence is.
+    roles:
+      - canonical-store     # owns the receipt_json column (runtime_state.py)
+      - derived-view        # reads receipts for display (telemetry_plane, operator_brief)
+      - plugin-sink         # external export adapters (OTel, JSONL)
+      - cache               # ephemeral acceleration (routing_memory)
+      - legacy-mirror       # pre-spine stores pending migration
+      - migration-mirror    # dual-write during cutover
+      - exempt              # not persistence (pure compute)
 
 opportunity_stages:
   - scope

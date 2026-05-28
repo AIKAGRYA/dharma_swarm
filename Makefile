@@ -246,10 +246,10 @@ memory-kernel-full-power-preflight:
 operator-prod-smoke:
 	$(REPO_PYTHON) scripts/operator_prod_smoke.py --repo-root .
 
-governance-all: semgrep gitleaks test-hygiene test-contracts uplift-guards module-budget docops-integrity spine-check
+governance-all: semgrep gitleaks test-hygiene test-contracts uplift-guards module-budget docops-integrity
 
 spine-check:
-	$(PYTHON) tools/spine_check.py
+	$(PYTHON) -c "from scripts.uplift_guards.check_spine_ownership import check_spine_ownership; from pathlib import Path; ok, msg = check_spine_ownership(Path('.')); print(msg); exit(0 if ok else 1)"
 
 # Single-door onboarding: prints the current operating reality from existing
 # owners (ACTIVE_TRACK.yaml, LIVE_OPS_DASHBOARD.md, BROKEN_REGISTER.md,

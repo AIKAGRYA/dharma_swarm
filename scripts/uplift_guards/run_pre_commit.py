@@ -21,6 +21,7 @@ from scripts.uplift_guards import (
     check_mismatch_adjacency,
     check_no_secrets,
 )
+from scripts.uplift_guards.check_spine_ownership import check_spine_ownership
 
 
 def check_assurance_diff(repo_root: Path) -> tuple[bool, str]:
@@ -78,6 +79,7 @@ GUARDS = [
     ("fourfold-shakti-warrant", check_fourfold_shakti_warrant),
     ("mismatch-adjacency", check_mismatch_adjacency),
     ("assurance-diff", check_assurance_diff),
+    ("spine-ownership", check_spine_ownership),
 ]
 
 

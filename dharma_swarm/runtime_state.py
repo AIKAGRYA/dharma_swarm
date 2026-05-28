@@ -73,7 +73,8 @@ CREATE TABLE IF NOT EXISTS delegation_runs (
     completed_at TEXT,
     failure_code TEXT NOT NULL DEFAULT '',
     metadata_json TEXT NOT NULL DEFAULT '{}',
-    trace_id TEXT NOT NULL DEFAULT ''
+    trace_id TEXT NOT NULL DEFAULT '',
+    receipt_json TEXT
 )"""
 
 _WORKSPACE_LEASES_DDL = """

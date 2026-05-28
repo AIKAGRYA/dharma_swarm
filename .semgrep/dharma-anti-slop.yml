@@ -39,6 +39,12 @@ rules:
   # New persistent stores (Store/Ledger/Registry classes that open
   # their own SQLite or append their own JSONL) should be wrapped by
   # RuntimeStateStore, not created as new substrates.
+  #
+  # Role vocabulary (declared in ACTIVE_SURFACE_MANIFEST.yaml → evidence_receipt):
+  #   canonical-store | derived-view | plugin-sink | cache |
+  #   legacy-mirror | migration-mirror | exempt
+  #
+  # Principle: new persistence is not forbidden — unclassified persistence is.
   # ===========================================================================
   - id: dharma.no-new-substrate
     message: |
@@ -47,7 +53,11 @@ rules:
       Ledger / Registry that opens its own SQLite or appends its own
       JSONL creates substrate drift. Either:
         (a) wrap the data in RuntimeStateStore tables, or
-        (b) document the new substrate in docs/governance/ and add the
+        (b) classify with a '# spine: <role>' header comment using the
+            role vocabulary (canonical-store | derived-view | plugin-sink |
+            cache | legacy-mirror | migration-mirror | exempt) and declare
+            in ACTIVE_SURFACE_MANIFEST.yaml → runtime_truth_spine, or
+        (c) document the new substrate in docs/governance/ and add the
             class name to this rule's allowlist with justification.
     severity: WARNING
     languages: [python]

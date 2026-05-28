@@ -8,7 +8,7 @@ workflows for things Semgrep cannot express.
 | # | ID | Where | Severity | Status |
 |---|---|---|---|---|
 | 1 | `dharma.no-unauthorized-dharma-write` | `.semgrep/dharma-anti-slop.yml` | WARNING | Active (advisory) |
-| 2 | `dharma.no-new-substrate` | `.semgrep/dharma-anti-slop.yml` | WARNING | Active |
+| 2 | `dharma.no-new-substrate` | `.semgrep/dharma-anti-slop.yml` | WARNING | Active — role vocabulary: `canonical-store` \| `derived-view` \| `plugin-sink` \| `cache` \| `legacy-mirror` \| `migration-mirror` \| `exempt` |
 | 3 | `dharma.test-no-default-state` | `scripts/governance/check_test_hygiene.py` (Semgrep auto-excludes `tests/`) | warn-only locally, hard fail on PR for NEW offenders | Active |
 | 4 | `dharma.scripts-no-git-add-all` | `.semgrep/dharma-anti-slop.yml` | ERROR | Active — 1 known violation in `dharma_swarm/build_engine.py:269` |
 | 5 | `dharma.tests-no-dgc-subprocess` | `scripts/governance/check_test_hygiene.py` (Semgrep auto-excludes `tests/`) | hard fail on PR | Active |

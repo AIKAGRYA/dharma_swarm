@@ -203,6 +203,64 @@ def render_manifest_health() -> None:
         print(f"  (manifest_health unavailable: {type(exc).__name__})")
 
 
+def render_spine_status() -> None:
+    section("RUNTIME TRUTH SPINE (owner: ACTIVE_SURFACE_MANIFEST.yaml → runtime_truth_spine)")
+    # Read spine block from manifest
+    if not SURFACE_MANIFEST.exists():
+        print("  MISSING — ACTIVE_SURFACE_MANIFEST.yaml not found")
+        return
+    try:
+        import yaml  # noqa: F811
+        manifest = yaml.safe_load(SURFACE_MANIFEST.read_text(encoding="utf-8"))
+    except Exception:
+        # Fallback: check if the key exists via grep
+        text = SURFACE_MANIFEST.read_text(encoding="utf-8", errors="replace")
+        if "runtime_truth_spine:" not in text:
+            print("  NOT DECLARED — no runtime_truth_spine block in manifest")
+            return
+        manifest = None
+
+    spine_block = (manifest or {}).get("runtime_truth_spine") if manifest else None
+    if spine_block:
+        print(f"  Canonical object : {spine_block.get('canonical_object', '?')}")
+        print(f"  Canonical store  : {spine_block.get('canonical_store', '?')}")
+        print(f"  Canonical table  : {spine_block.get('canonical_table', '?')}")
+        print(f"  Canonical field  : {spine_block.get('canonical_field', '?')}")
+        paths = spine_block.get("path_enum", [])
+        existing = sum(1 for p in paths if (REPO_ROOT / p).exists())
+        print(f"  Spine modules    : {existing}/{len(paths)} present")
+    else:
+        print("  Declared in manifest (YAML parse unavailable for detail)")
+
+    # Schema introspection: check if receipt_json column exists in DDL
+    runtime_state = REPO_ROOT / "dharma_swarm" / "runtime_state.py"
+    if runtime_state.exists():
+        rs_text = runtime_state.read_text(encoding="utf-8", errors="replace")
+        has_receipt = "receipt_json" in rs_text
+        print(f"  receipt_json DDL : {'present' if has_receipt else 'MISSING'}")
+    else:
+        print("  runtime_state.py : NOT FOUND")
+
+    # Live DB stats (informational, never fails)
+    db_path = Path.home() / ".dharma" / "state" / "runtime.db"
+    if db_path.exists():
+        try:
+            import sqlite3
+            conn = sqlite3.connect(str(db_path))
+            cur = conn.cursor()
+            cur.execute("SELECT COUNT(*) FROM delegation_runs")
+            total = cur.fetchone()[0]
+            cur.execute("SELECT COUNT(*) FROM delegation_runs WHERE receipt_json IS NOT NULL")
+            filled = cur.fetchone()[0]
+            fill_rate = f"{filled}/{total} ({100*filled//total}%)" if total > 0 else "0/0"
+            print(f"  Receipt fill rate: {fill_rate}")
+            conn.close()
+        except Exception as exc:
+            print(f"  (live DB unavailable: {type(exc).__name__})")
+    else:
+        print("  (runtime.db not present — no live stats)")
+
+
 def _parse_broken_register() -> dict[str, Any]:
     """Return summary counts and top open BR items."""
     if not BROKEN_REGISTER.exists():
@@ -442,6 +500,7 @@ def main() -> int:
     render_active_track(evidence, track)
     render_live_ops()
     render_manifest_health()
+    render_spine_status()
     render_broken_register()
     render_axioms()
     render_recent_activity(track)
