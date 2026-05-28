@@ -376,10 +376,11 @@ class A2AServer:
             return False
         if task.is_terminal():
             return False
+        safe_reason = str(reason).replace("\n", " ").replace("\r", " ")[:200]
         task.status = A2ATaskStatus.REJECTED
-        task.error = reason
+        task.error = safe_reason
         task.updated_at = datetime.now(timezone.utc).isoformat()
-        logger.info("A2A task %s rejected: %s", task_id, reason.replace("\n", " ")[:200])
+        logger.info("A2A task %s rejected: %s", task_id, safe_reason)
         return True
 
     def require_auth(self, task_id: str, reason: str = "") -> bool:
@@ -389,10 +390,11 @@ class A2AServer:
             return False
         if task.is_terminal():
             return False
+        safe_reason = str(reason).replace("\n", " ").replace("\r", " ")[:200]
         task.status = A2ATaskStatus.AUTH_REQUIRED
-        task.error = reason
+        task.error = safe_reason
         task.updated_at = datetime.now(timezone.utc).isoformat()
-        logger.info("A2A task %s requires auth: %s", task_id, reason.replace("\n", " ")[:200])
+        logger.info("A2A task %s requires auth: %s", task_id, safe_reason)
         return True
 
     def list_tasks(
