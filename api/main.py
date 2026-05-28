@@ -116,15 +116,79 @@ async def lifespan(app: FastAPI):
         init_timeout = float(os.getenv("DHARMA_SWARM_INIT_TIMEOUT_SECONDS", "3"))
         swarm_init_task = asyncio.create_task(swarm.init())
         _state["swarm_init_task"] = swarm_init_task
-        await asyncio.wait_for(asyncio.shield(swarm_init_task), timeout=init_timeout)
+        await asyncio.wait_for(swarm_init_task, timeout=init_timeout)
         _state.pop("swarm_init_task", None)
     except TimeoutError:
         logger.warning(
-            "Swarm init exceeded %.1fs; continuing API startup while warmup finishes in background",
+            "Swarm init exceeded %.1fs; cancelling warmup to keep dashboard API responsive",
             init_timeout,
         )
+        if swarm_init_task is not None and not swarm_init_task.done():
+            swarm_init_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await swarm_init_task
+        _state.pop("swarm_init_task", None)
     except Exception as e:
         logger.warning("Swarm init partial: %s", e)
+
+    # Initialize A2A Node Gateway (node_gateway singleton)
+    try:
+        from dharma_swarm.a2a.a2a_server import A2AServer
+        from dharma_swarm.a2a.agent_card import CardRegistry
+        from dharma_swarm.a2a.node_gateway import init_gateway
+        from pathlib import Path
+
+        a2a_server = A2AServer()
+        registry = CardRegistry()
+        node_card = registry.get("hermes-m5")
+        if node_card is None:
+            logger.warning("A2A: hermes-m5 card not found, gateway stays uninitialised")
+        else:
+            # Register echo handler as default (proof-of-life, no LLM call)
+            def _echo_handler(task):
+                from dharma_swarm.operator_core.a2a_task_lifecycle import (
+                    build_task_receipt,
+                    default_state_root,
+                )
+                from dharma_swarm.a2a.a2a_server import A2ATaskStatus
+                first_text = ""
+                if task.messages and task.messages[0].parts:
+                    first_text = task.messages[0].parts[0].content[:200]
+                task.result = {
+                    "echo": True,
+                    "messages_received": len(task.messages),
+                    "content_preview": first_text,
+                }
+                task.status = A2ATaskStatus.COMPLETED
+
+                receipt = build_task_receipt(
+                    task_id=task.id,
+                    agent_uid="hermes-m5",
+                    status="completed",
+                    summary=f"Echo handler: {len(task.messages)} message(s) reflected",
+                    harness="dharma_swarm.a2a.gateway_echo",
+                    model_identity="echo/identity",
+                )
+                receipt_dir = default_state_root() / "a2a_bus" / "receipts"
+                receipt_dir.mkdir(parents=True, exist_ok=True)
+                receipt_path = receipt_dir / f"{task.id}.json"
+                receipt_path.write_text(
+                    __import__("json").dumps(receipt, indent=2, default=str) + "\n",
+                    encoding="utf-8",
+                )
+                task.metadata["receipt_path"] = str(receipt_path)
+                return task
+
+            a2a_server.set_default_handler(_echo_handler)
+            init_gateway(
+                server=a2a_server,
+                registry=registry,
+                node_card=node_card,
+                node_id="hermes-m5",
+            )
+            logger.info("A2A gateway initialised: hermes-m5, echo handler registered")
+    except Exception as exc:
+        logger.warning("A2A gateway init failed: %s", exc)
 
     _log_auth_mode()
     logger.info("DHARMA COMMAND API ready on port 8420")
