@@ -200,6 +200,9 @@ class A2AClient:
         depth = self._chain_depth.get(context_id, 0)
         if depth > 0:
             self._chain_depth[context_id] = depth - 1
+        else:
+            # Floor at zero — prevent negative drift from stray calls
+            self._chain_depth[context_id] = 0
 
     def delegate(
         self,

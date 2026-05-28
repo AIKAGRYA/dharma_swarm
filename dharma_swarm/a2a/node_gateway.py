@@ -44,9 +44,12 @@ Four-question discipline (Contemplative Spine §11):
   4. Self-correcting?  Health endpoint + heartbeat lets Guardian detect failures
 
 Security:
-  - API key auth via X-A2A-Key header (enforced)
+  - API key auth via X-A2A-Key header (enforced on all requests)
   - Allowed keys loaded from ~/.dharma/a2a/allowed_keys.json
-  - No key file = gateway rejects all remote requests (safe default)
+  - No key file = gateway rejects all requests (safe default)
+  - Localhost bypass ONLY when A2A_ALLOW_LOCAL_NOAUTH=1 is set (dev only)
+  - Behind reverse proxy: localhost bypass is disabled by default to prevent
+    auth bypass when request.client.host resolves to proxy's local address
   - OAuth2/mTLS/JWS are declared in AgentCard but not yet enforced (Tier 2)
 """
 
@@ -54,6 +57,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from dataclasses import asdict
 from datetime import datetime, timezone
 from typing import Any
@@ -139,11 +143,14 @@ def _verify_api_key(request: Request) -> None:
     """Validate X-A2A-Key header against allowed keys.
 
     If no keys file exists, all remote requests are rejected (safe default).
-    Local requests (from 127.0.0.1) bypass auth for development.
+    Local requests bypass auth ONLY when A2A_ALLOW_LOCAL_NOAUTH=1 is set.
+    This prevents accidental auth bypass behind reverse proxies where
+    request.client.host resolves to the proxy's local address.
     """
     client_host = request.client.host if request.client else ""
     if client_host in ("127.0.0.1", "::1", "localhost"):
-        return
+        if os.environ.get("A2A_ALLOW_LOCAL_NOAUTH") == "1":
+            return
 
     if not _allowed_keys:
         raise HTTPException(
