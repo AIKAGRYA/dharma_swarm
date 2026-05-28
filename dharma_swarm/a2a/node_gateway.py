@@ -294,6 +294,8 @@ async def submit_task_v1(request: Request) -> JSONResponse:
         content=_task_to_dict(result),
         status_code=201 if result.status != A2ATaskStatus.FAILED else 422,
     )
+    if body.get("correlation_id"):
+        task.correlation_id = body["correlation_id"]
 
 
 # Colon-action routes MUST be registered before the generic /tasks/{task_id}

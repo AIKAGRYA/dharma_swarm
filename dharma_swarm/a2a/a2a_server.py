@@ -182,7 +182,9 @@ class A2ATask:
 
     Attributes:
         id: Unique task identifier.
-        context_id: Groups related tasks (server-generated, opaque to clients).
+        correlation_id: Cross-layer trace identity. Auto-generated UUID4
+            if not provided. Chains to spine.EvidenceReceipt.trace_id and
+            closure_v0.EvidenceReceipt.correlation_id.
         from_agent: Name of the requesting agent.
         to_agent: Name of the target agent (or empty for capability-based routing).
         status: Current lifecycle state (8 states per A2A 1.0).
@@ -199,7 +201,7 @@ class A2ATask:
     """
 
     id: str = field(default_factory=lambda: uuid.uuid4().hex[:16])
-    context_id: str = ""
+    correlation_id: str = field(default_factory=lambda: uuid.uuid4().hex)
     from_agent: str = ""
     to_agent: str = ""
     status: A2ATaskStatus = A2ATaskStatus.SUBMITTED
