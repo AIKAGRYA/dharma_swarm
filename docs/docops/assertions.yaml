@@ -195,6 +195,13 @@
       "docs/agents/devin-roaming-2987d222/SOUL.md",
       "docs/agents/devin-roaming-2987d222/MEMORY.md",
       "docs/agents/devin-roaming-2987d222/PROTOCOLS.md",
+      "docs/agents/perplexity-computer/SOUL.md",
+      "docs/agents/perplexity-computer/MEMORY.md",
+      "docs/agents/perplexity-computer/PROTOCOLS.md",
+      "docs/agents/perplexity-computer/WAKE_CONTEXT.md",
+      "docs/agents/perplexity-computer/HOFSTADTERIAN_LINEAGE.md",
+      "docs/agents/perplexity-computer/RECOGNITION_STANCE.md",
+      "docs/agents/perplexity-computer/CAPABILITIES.md",
       "docs/state/NEXT_PHASE_MAP.md",
       "docs/state/HOTLIST.md",
       "docs/state/CROSS_AGENT_INVENTORY.md"
