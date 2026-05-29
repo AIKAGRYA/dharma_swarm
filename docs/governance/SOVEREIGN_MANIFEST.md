@@ -31,14 +31,17 @@ Define the Runtime Truth Spine before expanding agent fabric. Three audits
 spine. The fix is one invariant chain (Task + Runner + Claim + Context +
 RoutingDecision + ProviderCall + EvidenceReceipt = safe execution path).
 Every dispatch produces exactly one receipt. No more generic dispatch_dropoff.
+
 PR A.5 (governance convergence): the spine guard is fused into the existing
 uplift_guards composition (no parallel CI workflow), each closure layer's
 canonical receipt is declared in ACTIVE_SURFACE_MANIFEST.yaml under
 correlation_spine, and ANTI_SLOP Rule 2 is extended with role vocabulary
 so future receipts must declare their layer instead of growing a second
 truth surface.
+
 Doctrine line that must hold across all closure layers:
   Receipts may differ by closure layer. Correlation identity must not.
+
 Reference: docs/reports/CONVERGED_SEAM_AUDIT_RUNTIME_TRUTH_SPINE.md
 A2A anchor: dharma_swarm/a2a/README.md (three-layer receipt architecture)
 
@@ -130,7 +133,7 @@ These are the ground-truth metrics. All other documents citing different numbers
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
 | Markdown files | **737** | find . -name "*.md" -type f |
-| Markdown total lines | **186,653** | wc -l across all .md |
+| Markdown total lines | **186,662** | wc -l across all .md |
 | Bridge files | **24** | find dharma_swarm -name "*bridge*.py" |
 | Adapter files | **20 across 8 locations** | find dharma_swarm -type f \| rg -i "adapter" |
 | Orchestrator files | **4** (6,034 LOC total) | find dharma_swarm -name "*orchestrat*" |
