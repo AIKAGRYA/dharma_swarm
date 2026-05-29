@@ -34,17 +34,14 @@ Define the Runtime Truth Spine before expanding agent fabric. Three audits
 spine. The fix is one invariant chain (Task + Runner + Claim + Context +
 RoutingDecision + ProviderCall + EvidenceReceipt = safe execution path).
 Every dispatch produces exactly one receipt. No more generic dispatch_dropoff.
-
 PR A.5 (governance convergence): the spine guard is fused into the existing
 uplift_guards composition (no parallel CI workflow), each closure layer's
 canonical receipt is declared in ACTIVE_SURFACE_MANIFEST.yaml under
 correlation_spine, and ANTI_SLOP Rule 2 is extended with role vocabulary
 so future receipts must declare their layer instead of growing a second
 truth surface.
-
 Doctrine line that must hold across all closure layers:
   Receipts may differ by closure layer. Correlation identity must not.
-
 Reference: docs/reports/CONVERGED_SEAM_AUDIT_RUNTIME_TRUTH_SPINE.md
 A2A anchor: dharma_swarm/a2a/README.md (three-layer receipt architecture)
 
