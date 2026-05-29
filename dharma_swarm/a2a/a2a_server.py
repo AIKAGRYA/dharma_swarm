@@ -24,14 +24,21 @@ A2A 1.0 spec conformance:
 
 from __future__ import annotations
 
+import json
 import logging
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
+from pathlib import Path
 from typing import Any, Callable
 
+from dharma_swarm.daemon_config import dharma_state_dir
+
 logger = logging.getLogger(__name__)
+
+_STATE_DIR = dharma_state_dir("DHARMA_HOME")
+_DEFAULT_TASK_LOG = _STATE_DIR / "a2a" / "task_log.jsonl"
 
 
 # ---------------------------------------------------------------------------
@@ -212,6 +219,7 @@ class A2ATask:
     updated_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     result: str = ""
     error: str = ""
+    trace_id: str = ""
     extensions: list[A2AExtension] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
 
@@ -260,10 +268,16 @@ class A2AServer:
         tasks: In-memory store of A2A tasks keyed by task ID.
     """
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        task_log_path: Path | None = None,
+        persist: bool = True,
+    ) -> None:
         self._tasks: dict[str, A2ATask] = {}
         self._handlers: dict[str, TaskHandler] = {}
         self._default_handler: TaskHandler | None = None
+        self._persist = persist
+        self._task_log_path = task_log_path or _DEFAULT_TASK_LOG
 
     # -- handler registration ------------------------------------------------
 
@@ -303,16 +317,24 @@ class A2AServer:
         """
         task.status = A2ATaskStatus.SUBMITTED
         task.updated_at = datetime.now(timezone.utc).isoformat()
+
+        if not task.trace_id:
+            task.trace_id = _inherit_trace_id()
         if not task.context_id:
             task.context_id = uuid.uuid4().hex[:12]
+
         self._tasks[task.id] = task
 
         logger.info(
-            "A2A task submitted: %s ctx=%s (from=%s, to=%s, cap=%s)",
-            task.id, task.context_id, task.from_agent, task.to_agent, task.capability,
+            "A2A task submitted: %s ctx=%s trace=%s (from=%s, to=%s, cap=%s)",
+            task.id, task.context_id, task.trace_id,
+            task.from_agent, task.to_agent, task.capability,
         )
 
-        return self._dispatch(task)
+        # Dispatch to handler
+        result = self._dispatch(task)
+        self._append_task_log(result)
+        return result
 
     def _dispatch(self, task: A2ATask) -> A2ATask:
         """Route task to appropriate handler and execute."""
@@ -437,3 +459,67 @@ class A2AServer:
             key = task.status.value
             counts[key] = counts.get(key, 0) + 1
         return counts
+
+    # -- persistence (JSONL append log) --------------------------------------
+
+    def _append_task_log(self, task: A2ATask) -> None:
+        """Append a task snapshot to the JSONL audit log."""
+        if not self._persist:
+            return
+        try:
+            self._task_log_path.parent.mkdir(parents=True, exist_ok=True)
+            record = _task_to_log_record(task)
+            with self._task_log_path.open("a", encoding="utf-8") as fh:
+                fh.write(json.dumps(record, ensure_ascii=True, default=str) + "\n")
+        except Exception as exc:
+            logger.warning("Failed to persist A2A task log entry: %s", exc)
+
+    def load_task_log(self) -> list[dict[str, Any]]:
+        """Read back the full task log (for auditing / replay)."""
+        if not self._task_log_path.exists():
+            return []
+        entries: list[dict[str, Any]] = []
+        for line in self._task_log_path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if line:
+                try:
+                    entries.append(json.loads(line))
+                except json.JSONDecodeError:
+                    pass
+        return entries
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _inherit_trace_id() -> str:
+    """Pull trace_id from CorrelationContext if set, else generate a new one."""
+    try:
+        from dharma_swarm.correlation_context import get_correlation
+        corr = get_correlation()
+        if corr.trace_id:
+            return corr.trace_id
+    except Exception:
+        pass
+    return f"trc_{uuid.uuid4().hex[:16]}"
+
+
+def _task_to_log_record(task: A2ATask) -> dict[str, Any]:
+    """Serialize an A2ATask to a flat dict for JSONL logging."""
+    return {
+        "id": task.id,
+        "from_agent": task.from_agent,
+        "to_agent": task.to_agent,
+        "status": task.status.value,
+        "capability": task.capability,
+        "trace_id": task.trace_id,
+        "dharma_task_id": task.dharma_task_id,
+        "created_at": task.created_at,
+        "updated_at": task.updated_at,
+        "result": task.result,
+        "error": task.error,
+        "message_count": len(task.messages),
+        "metadata": task.metadata,
+    }

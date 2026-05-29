@@ -291,6 +291,18 @@ def _mark_stale(node: RemoteNode, now: datetime | None = None) -> None:
         node.status = "degraded"
 
 
+def _current_trace_id() -> str:
+    """Read trace_id from CorrelationContext if available."""
+    try:
+        from dharma_swarm.correlation_context import get_correlation
+        corr = get_correlation()
+        if corr.trace_id:
+            return corr.trace_id
+    except Exception:
+        pass
+    return ""
+
+
 # ---------------------------------------------------------------------------
 # Remote task dispatch (used by A2AClient for cross-node delegation)
 # ---------------------------------------------------------------------------
@@ -326,12 +338,16 @@ async def dispatch_remote_task(
     if node.api_key:
         headers["X-A2A-Key"] = node.api_key
 
-    body = {
+    body: dict[str, Any] = {
         "from_agent": from_agent,
         "capability": capability,
         "messages": [{"role": "user", "content": message}],
         "metadata": metadata or {},
     }
+
+    trace_id = _current_trace_id()
+    if trace_id:
+        body["trace_id"] = trace_id
 
     async with httpx.AsyncClient(timeout=timeout) as client:
         resp = await client.post(url, json=body, headers=headers)

@@ -344,12 +344,14 @@ class A2AClient:
         context_id: str = "",
     ) -> DelegationResult:
         """Dispatch to local A2AServer (in-process)."""
+        trace_id = _current_trace_id()
         task = A2ATask(
             from_agent=from_agent,
             to_agent=card.name,
             capability=capability,
             context_id=context_id,
             history=[A2AMessage.text(message)],
+            trace_id=trace_id,
             metadata=metadata or {},
         )
         logger.info(
@@ -390,6 +392,9 @@ class A2AClient:
             "messages": [{"role": "user", "content": message}],
             "metadata": metadata or {},
         }
+        trace_id = _current_trace_id()
+        if trace_id:
+            body["trace_id"] = trace_id
         if context_id:
             body["context_id"] = context_id
 
@@ -440,6 +445,9 @@ class A2AClient:
             "messages": [{"role": "user", "content": message}],
             "metadata": metadata or {},
         }
+        trace_id = _current_trace_id()
+        if trace_id:
+            body["trace_id"] = trace_id
         if context_id:
             body["context_id"] = context_id
 
@@ -490,3 +498,15 @@ class A2AClient:
 def _is_remote(card: AgentCard) -> bool:
     """Check if an agent card points to a remote endpoint."""
     return card.endpoint.startswith(("http://", "https://"))
+
+
+def _current_trace_id() -> str:
+    """Read trace_id from CorrelationContext if available."""
+    try:
+        from dharma_swarm.correlation_context import get_correlation
+        corr = get_correlation()
+        if corr.trace_id:
+            return corr.trace_id
+    except Exception:
+        pass
+    return ""

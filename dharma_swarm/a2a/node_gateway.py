@@ -212,6 +212,7 @@ def _parse_task_from_body(body: dict[str, Any]) -> A2ATask:
         to_agent=body.get("to_agent", ""),
         capability=body.get("capability", ""),
         context_id=body.get("context_id", ""),
+        trace_id=body.get("trace_id", ""),
         history=messages,
         metadata=body.get("metadata", {}),
     )
