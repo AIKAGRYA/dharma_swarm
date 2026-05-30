@@ -27,8 +27,11 @@ Five invariants enforced:
      Compared against a budget; failures only when the count grows.
 
   5. evidence_receipt_uniqueness
-     Exactly two `class EvidenceReceipt:` definitions exist
-     (operator_core/closure_v0.py — production; spine/receipt.py — doctrine).
+     Exactly one `class EvidenceReceipt:` definition exists
+     (spine/receipt.py — the runtime dispatch artifact, OTel-aligned).
+     The operator-closure-loop artifact lives at
+     operator_core/closure_v0.py:ClosureEvidenceReceipt (different concept,
+     different fields, deliberately disambiguated).
      No third definition may be introduced.
 
 Exit codes: 0 on pass, 1 on violation. Use `--report` for human-readable
@@ -69,11 +72,19 @@ _BUDGET_PATH = _REPO_ROOT / "tools" / "manifest_check_budgets.json"
 # Supported manifest schema versions. Bump when intentional breaking changes.
 _SUPPORTED_SCHEMA_VERSIONS = {2}
 
-# The two canonical EvidenceReceipt definition sites. Any third site is a
-# violation; missing either is also a violation.
+# Canonical `class EvidenceReceipt:` definition site. Any other site is a
+# violation; missing this site is also a violation.
+#
+# Note (2026-05-30, PR-H1): the operator closure loop defined its own
+# `class EvidenceReceipt` at operator_core/closure_v0.py modelling a
+# completely different concept (PR/test-run evidence: correlation_id,
+# work_packet_id, test_exit_code, files_changed, replay_command). That
+# class is now `ClosureEvidenceReceipt`, with `EvidenceReceipt` kept as a
+# deprecated alias for one release cycle. Only the runtime spine receipt
+# (UUID identity, trace/span/agent/model/tokens/cost, OTel export) is the
+# canonical `class EvidenceReceipt:` definition.
 _CANONICAL_RECEIPT_SITES = {
-    "dharma_swarm/operator_core/closure_v0.py",  # proven, 53+ uses
-    "dharma_swarm/spine/receipt.py",  # doctrine, OTel-aligned
+    "dharma_swarm/spine/receipt.py",  # doctrine, OTel-aligned, runtime dispatch
 }
 
 # Regex for raw ~/.dharma literals in Python sources.
@@ -361,9 +372,9 @@ def check_state_dir_literals(report: CheckReport, budgets: dict[str, int]) -> in
 
 
 def check_receipt_uniqueness(report: CheckReport) -> None:
-    """Exactly two `class EvidenceReceipt:` definitions may exist, at the
-    two canonical sites. Any other site is a violation; missing either site
-    is also a violation."""
+    """Exactly one `class EvidenceReceipt:` definition may exist, at the
+    canonical site. Any other site is a violation; missing the canonical
+    site is also a violation."""
     found_sites: set[str] = set()
     extra_sites: list[str] = []
 
@@ -411,10 +422,11 @@ def check_receipt_uniqueness(report: CheckReport) -> None:
             Violation(
                 "evidence_receipt_uniqueness",
                 "error",
-                f"third EvidenceReceipt class defined at {extra}. The two "
-                f"canonical definitions are {sorted(_CANONICAL_RECEIPT_SITES)}. "
-                f"Adding a third receipt class fragments the truth surface. "
-                f"Import from a canonical site or rename your class.",
+                f"non-canonical EvidenceReceipt class defined at {extra}. "
+                f"The canonical site is {sorted(_CANONICAL_RECEIPT_SITES)}. "
+                f"Adding another receipt class fragments the truth surface. "
+                f"Import from the canonical site or rename your class "
+                f"(e.g. ClosureEvidenceReceipt).",
                 path=extra,
             )
         )
