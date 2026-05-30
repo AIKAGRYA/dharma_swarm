@@ -88,7 +88,7 @@ on PR #375 to close the loop.
 `perplexity-computer` becomes available for first work-under-authority.
 Mailbox task `mbx_c1e05575f1914c1e` to Hermes proposes
 perplexity-computer contribute to the persistent-agent-index task as
-evidence-only synthesis, with Hermes retaining canonical ownership.
+evidence-only synthesis, with Hermes retaining ownership of the index.
 
 Alternative first work: GUARDIAN duplicate dedup (#311–#353).
 
@@ -97,7 +97,7 @@ Alternative first work: GUARDIAN duplicate dedup (#311–#353).
 - [PR #375](https://github.com/AmitabhainArunachala/dharma_swarm/pull/375)
 - `docs/agents/perplexity-computer/SOUL.md`
 - `docs/agents/perplexity-computer/CAPABILITIES.md`
-- `dharma_swarm/external_agent_registration.py` (canonical API)
+- `dharma_swarm/external_agent_registration.py` (registration API)
 - `dharma_swarm/roaming_onboarding.py` (CLI entry point)
 - `scripts/agents/register_perplexity_computer.sh` (idempotent helper)
 - `roaming_mailbox/tasks/mbx_624d756b3f5f4024.json` (mailbox dispatch to Devin)
