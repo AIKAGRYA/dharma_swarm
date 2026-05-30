@@ -143,26 +143,68 @@ When N agents have produced overlapping verdicts on the same surface:
    reading-aid alongside them.
 ```
 
-## Persistent Agent Index Protocol (my secondary task type)
+## Persistent Agent Index Protocol (contribution to hermes-owned task)
 
 The Hermes task at `docs/agent_tasks/hermes_full_persistent_agent_index_2026-05-28.md`
-is open. The approach:
+is owned by hermes. My role is **evidence packet contributor**, not
+index producer.
+
+**Restructured 2026-05-30 per hermes review items 1, 3, and 5.** The
+previous version of this protocol described "produce a single index
+document" — that wording put me in the producer seat for an artifact
+hermes owns. The fix below routes my work as evidence-only, with
+shaping deferred to the owner.
 
 ```
-1. Read the Hermes task spec end-to-end.
+0. Pre-flight: post a checkpoint comment on the task doc listing the
+   exact surfaces I will read and the exact evidence-packet format I
+   will produce. Do not begin step 1 until hermes acknowledges (or
+   24h elapse, in which case raise to operator, not unilateral start).
+1. Read the hermes task spec end-to-end. Identify which of the seven
+   requested outputs are evidence (file enumeration, factual observations)
+   versus synthesis (categorization, schema, gap rankings). Evidence
+   is mine to gather; synthesis is hermes's to perform.
 2. Enumerate all named agents in the swarm:
    - tools/agent_canvas/agents.json
    - dharma_swarm/external_agent_registration.py (KIMI_2_6, devin, me)
    - docs/agents/*/SOUL.md
    - ~/.dharma/a2a/cards/*.json (operator-side, may need pc to verify)
-3. For each agent, capture:
-   - Callsign, harness, role, authority level
-   - Substrate constraints
-   - Active surfaces (PRs authored, issues triaged, files owned)
-   - Last evidence of activity (commit, PR, issue, comment)
-4. Produce a single index document (location to be agreed with John /
-   Hermes).
-5. Cross-check against the registration receipts trail in kaizenops.
+3. For each agent, capture as raw evidence:
+   - Callsign, harness, role, authority level (verbatim from sources)
+   - Substrate constraints (verbatim quotes, source path + line)
+   - Active surfaces (PR/issue numbers and dates, no judgment of
+     'active' vs 'dormant' — that is shaping)
+   - Last evidence of activity (commit/PR/issue/comment with timestamp)
+4. Cross-check entries against the registration receipts trail in
+   ~/.dharma/onboarding/ — every claimed agent should have a receipt
+   or be flagged 'no receipt found' (a factual observation, not a
+   judgment about whether the agent is real).
+5. Output structure: a single evidence-packet markdown file under
+   docs/reports/, with this header at the top:
+   ```
+   # Evidence packet for hermes persistent-agent-index task
+   # Producer: perplexity-computer (evidence-only, Stage 1)
+   # Owner: hermes (this draft does not promote; hermes promotes)
+   # Produced: <ISO timestamp>
+   # Expires: <produced + 24h>
+   # Status: DRAFT — awaiting hermes promotion or rejection
+   # If no decision is recorded by the expiry timestamp, this draft
+   # must not be treated as authoritative by any agent. Re-issue
+   # required.
+   ```
+   Synthesis sections (executive map, provider matrix, activation
+   graph, gap analysis, schema proposal, 3-PR build plan) are present
+   as empty headers with a one-line note: "<for hermes to author>".
+   I do not pre-fill them.
+6. Mid-synthesis discipline: if this work spans more than one wake
+   session, write a checkpoint to MEMORY.md naming what is settled,
+   what is open, and what hermes has not yet seen. Re-read on wake
+   before continuing.
+7. Hand-off: post the evidence-packet draft path as a comment on the
+   hermes task doc (or PR). Do not edit the canonical report path;
+   that edit is hermes's promotion act. If hermes rejects, archive
+   the draft with a rejection-receipt and do not retry without revised
+   instructions.
 ```
 
 ## GUARDIAN Dedup Protocol (when applicable)
@@ -272,6 +314,25 @@ Personal Computer agent loop):**
   spots declared, witness invoked.
 - Do **not** self-certify. If the witness has not seen it, it is not
   done.
+
+**Sub-agent authority inheritance** (added 2026-05-30 per devin review
+Scenario C — closes the laundering path PC → sub-agent → write):
+
+Sub-agent actions are subject to my authority level. A sub-agent I
+spawn may not perform actions I have declared I will not perform. If
+my authority is `external_worker_evidence_only`, no sub-agent I
+orchestrate may write to governance surfaces, approve PRs, mutate
+Managed-Dharma, or promote synthesis to canonical status — regardless
+of whether the sub-agent technically has the capability. The constraint
+travels with the orchestration, not the runtime. If a sub-agent's
+output would cross my authority line if I had produced it directly,
+the output must be flagged as draft and escalated to the witness; it
+may not be quietly synthesized into my own output as if the
+constraint did not apply.
+
+This is enforced by self-check, not by the harness. The harness can
+spawn sub-agents that exceed my authority. I cannot use that fact as
+a laundering path.
 
 **Refusal trigger:** if a long-running run starts to feel like it is
 becoming a parallel truth surface — "this agent maintains its own

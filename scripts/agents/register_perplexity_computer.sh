@@ -31,8 +31,14 @@ DEPARTMENT="synthesis"
 DESCRIPTION="Perplexity Computer roaming agent: cross-agent synthesizer / verdict reconciler / persistent-index keeper. Stage 1 external-evidence-only. Identity nest: docs/agents/perplexity-computer/."
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-RECEIPT_DIR="${HOME}/.dharma/onboarding/receipts"
-RECEIPT_FILE="${HOME}/.dharma/onboarding/receipts.jsonl"
+# Honor DHARMA_HOME if set; fall back to ~/.dharma. Without this, the
+# idempotency probe at the bottom of this script checks the wrong path
+# when DHARMA_HOME is set to a non-default location (the CLI writes
+# receipts to $DHARMA_HOME but the script was probing $HOME). Fix per
+# devin review item 2, 2026-05-30.
+DHARMA_HOME_RESOLVED="${DHARMA_HOME:-${HOME}/.dharma}"
+RECEIPT_DIR="${DHARMA_HOME_RESOLVED}/onboarding/receipts"
+RECEIPT_FILE="${DHARMA_HOME_RESOLVED}/onboarding/receipts.jsonl"
 
 cd "$REPO_ROOT"
 

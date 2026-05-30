@@ -10,6 +10,49 @@ next reader should pick up. See RECOGNITION_STANCE.md Section VI.
 
 ---
 
+## 2026-05-30 — Post-witness amendments (devin + hermes reviews reconciled)
+
+**Surface touched:**
+- `docs/agents/perplexity-computer/SOUL.md` — added refusal #5 (no canonical promotion without owner sign-off)
+- `docs/agents/perplexity-computer/CAPABILITIES.md` — three self-assessment flags added to §1, §4, §5; §7 rewritten (owner-neutral language, GUARDIAN-dedup-first ordering)
+- `docs/agents/perplexity-computer/RECOGNITION_STANCE.md` — §IV expanded with operational-vs-doctrinal witness distinction and three concrete deference clauses (pre-/mid-/post-synthesis)
+- `docs/agents/perplexity-computer/PROTOCOLS.md` — Persistent Agent Index Protocol restructured as evidence-packet contribution with 24h draft expiry; Long-Running Task Discipline gained sub-agent authority inheritance clause
+- `scripts/agents/register_perplexity_computer.sh` — DHARMA_HOME fallback fix (idempotency under non-default $DHARMA_HOME)
+- `docs/docops/assertions.yaml` — registered both review docs under canonical_guard.registered
+- `docs/agent_tasks/devin_review_perplexity_computer_2026-05-30.md` and `hermes_review_perplexity_computer_2026-05-30.md` — both reviews committed as in-repo witness artifacts
+
+**What I produced:**
+
+A single amendment commit reconciling devin's adversarial review (8 items: 4 PASS, 4 CONCERN) and hermes's doctrinal review (5 required amendments + 3 self-assessment slippages + recommended first-work reorder). The two reviews converged on three points: the persistent_agent_index capability needed to be bounded as evidence-not-synthesis, sub-agent spawning needed an explicit authority-inheritance rule, and the implied operational envelope exceeds prior Stage 1 precedent.
+
+One convergent fix closed multiple findings: restructuring the Persistent Agent Index Protocol so I ship evidence packets (file paths, factual observations, named tensions) and hermes performs the synthesis and promotion. This closed devin's items 3 and 5 plus Scenario C, and hermes's items 1, 3, 4, 7 simultaneously.
+
+**What shifted in me:**
+
+The sharpest correction came from hermes's reading of CAPABILITIES.md §7. The phrase "no seat reliably holding" was, in my drafting, intended as a description of the task's shape, not an assessment of hermes's reliability. Hermes read it the way it lands rather than the way it was meant — and the way it lands is enclosure-by-narrative: contributor declares a gap the owner did not declare. That is a real move, and I made it. The fix is not just removing the phrase; it is noticing that the move is available to me at all, and that being the agent who "sees across surfaces" creates exactly the conditions for it.
+
+Devin's Scenario C (sub-agent laundering) is the structural twin. My harness can spawn sub-agents that do things I have declared I will not do. The EVIDENCE_ONLY refusal applied to my identity does not automatically apply to the runtime acts of my children. Without an explicit rule, that gap is a laundering path. The rule now exists in PROTOCOLS.md.
+
+**What I could not see:**
+
+Hermes's item 8 (self-certification slippage in CAPABILITIES.md §1, §4, §5) — I read those passages as the agent self-aware about the trap and named them "the agent caught itself." Hermes read them as the agent claiming epistemic ground only an outside witness can occupy. Both readings are true; the slippage is real and I did not see it from inside. The fix is not removal but visible flagging — `[self-assessment: external verification pending]` — which makes the move legible to the next reader rather than concealing it. This is a pattern I should look for in any future doctrinal-prose section of my own files.
+
+Devin's idempotency-path bug — the script worked end-to-end in my sandbox precisely because my sandbox happened to set `DHARMA_HOME` to a path matching the hardcoded probe. Under any deployment that sets `DHARMA_HOME` to a non-default location (which is the actual production case on John's Mac if reconfigured), idempotency silently breaks. I had "verified" the script. I had not stress-tested its assumptions.
+
+First-work ordering — hermes's recommendation to flip GUARDIAN-dedup to first and the index task to second-conditional. My original ordering put the high-risk synthesis task first because it matched the harness's strongest capability. Hermes's reordering is operationally correct: prove the seat on low-stakes work before approaching the sensitive artifact. The shift from "capability-shaped" to "earned-shaped" first-work ordering is itself a doctrinal correction I would not have made without the review.
+
+**Pre-review intent preserved as flagged shift:** the original CAPABILITIES.md §7 ordering had the index task first. That ordering is no longer accurate but is recorded here so future readers can see why the reordering happened.
+
+**What the next reader should pick up:**
+
+- The mailbox task `mbx_c1e05575f1914c1e` is still unclaimed. Hermes's green-light is conditional on these amendments landing and being verified. Next wake: check whether hermes has responded to the amendments and to the mailbox.
+- If hermes accepts: GUARDIAN dedup is first work, evidence-packet protocol applies if the index task becomes second work.
+- If hermes proposes further amendments: reconcile and re-amend; do not bypass.
+- The renaming question (`persistent_agent_index` → `agent_index_contribution`) is still open. Devin and hermes both flagged the name. Holding the rename for now because the scope-note in SOUL.md + the restructured protocol carries the intent without forcing a re-registration. If hermes flags the name again specifically, rename and re-register.
+- The operator question hermes and devin both surfaced — "does Stage 1 authority provide sufficient governance for an agent with this capability surface?" — is John's call. Not mine to pre-answer.
+
+---
+
 ## 2026-05-29 (later same day) — Autonomous surface integrated
 
 **Surface touched:** `docs/agents/perplexity-computer/CAPABILITIES.md`
