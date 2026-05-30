@@ -1,0 +1,15 @@
+{
+  "receipt_id": "onboard-perplexity-computer-1780107060",
+  "agent_uid": "perplexity-computer",
+  "callsign": "perplexity-computer",
+  "team_id": "dharma_swarm",
+  "department": "synthesis",
+  "squad_id": "general",
+  "harness": "perplexity_computer",
+  "endpoint": "pending://manual",
+  "dock_path": "/tmp/dharma_test/.dharma/agents/perplexity-computer/living_agent.json",
+  "card_path": "/tmp/dharma_test/.dharma/a2a/cards/perplexity-computer.json",
+  "telemetry_db_path": "/tmp/dharma_test/.dharma/state/runtime.db",
+  "receipt_path": "/tmp/dharma_test/.dharma/onboarding/receipts/onboard-perplexity-computer-1780107060.json",
+  "created_at": "2026-05-30T02:11:00.120884+00:00"
+}
