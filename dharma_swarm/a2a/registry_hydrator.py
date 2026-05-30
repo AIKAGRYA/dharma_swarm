@@ -35,6 +35,7 @@ import logging
 from pathlib import Path
 from typing import Iterable
 
+from ..daemon_config import dharma_state_dir
 from .agent_card import CardRegistry
 from .node_registry import NodeRegistry, RemoteNode
 
@@ -42,10 +43,13 @@ logger = logging.getLogger(__name__)
 
 
 def _default_dharma_home() -> Path:
-    """Match ``roaming_onboarding._dharma_home`` semantics."""
-    import os
+    """Match ``roaming_onboarding._dharma_home`` semantics.
 
-    return Path(os.environ.get("DHARMA_HOME", str(Path.home() / ".dharma")))
+    Delegates to :func:`dharma_swarm.daemon_config.dharma_state_dir`, the
+    canonical owner of ``~/.dharma`` path resolution. Honors
+    ``DHARMA_HOME`` env override.
+    """
+    return dharma_state_dir("DHARMA_HOME")
 
 
 def _iter_receipts(receipts_index: Path) -> Iterable[dict]:
