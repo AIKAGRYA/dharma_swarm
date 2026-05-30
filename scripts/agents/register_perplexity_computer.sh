@@ -26,19 +26,20 @@ set -euo pipefail
 
 CALLSIGN="perplexity-computer"
 HARNESS="perplexity_computer"
-AUTHORITY="external_worker_evidence_only"
+ROLE="external_evidence_worker"
 DEPARTMENT="synthesis"
+DESCRIPTION="Perplexity Computer roaming agent: cross-agent synthesizer / verdict reconciler / persistent-index keeper. Stage 1 external-evidence-only. Identity nest: docs/agents/perplexity-computer/."
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 RECEIPT_DIR="${HOME}/.dharma/onboarding/receipts"
-RECEIPT_FILE="${RECEIPT_DIR}/receipts.jsonl"
+RECEIPT_FILE="${HOME}/.dharma/onboarding/receipts.jsonl"
 
 cd "$REPO_ROOT"
 
 echo "[register_perplexity_computer] repo=${REPO_ROOT}"
 echo "[register_perplexity_computer] callsign=${CALLSIGN}"
 echo "[register_perplexity_computer] harness=${HARNESS}"
-echo "[register_perplexity_computer] authority=${AUTHORITY}"
+echo "[register_perplexity_computer] role=${ROLE}"
 echo "[register_perplexity_computer] department=${DEPARTMENT}"
 
 # Idempotency probe — if a receipt already exists for this callsign, skip.
@@ -61,8 +62,13 @@ set +e
 python3 -m dharma_swarm.roaming_onboarding \
   --callsign "$CALLSIGN" \
   --harness "$HARNESS" \
-  --authority "$AUTHORITY" \
-  --department "$DEPARTMENT"
+  --role "$ROLE" \
+  --department "$DEPARTMENT" \
+  --description "$DESCRIPTION" \
+  --registration-source "docs/agents/perplexity-computer/SOUL.md" \
+  --capability "synthesis" \
+  --capability "verdict_reconciliation" \
+  --capability "persistent_agent_index"
 rc=$?
 set -e
 
