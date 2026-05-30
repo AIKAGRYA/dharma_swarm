@@ -255,6 +255,27 @@ class Message(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+class ProofObligation(BaseModel):
+    """Optional proof-carrying-telos obligation attached to a gate result.
+
+    Records a protected-body invariant a self-modification patch must satisfy
+    before it may enter an apply path, plus where its truth is grounded
+    (external receipt) and witnessed. Proves about the BODY (code/diff
+    invariants), never about mind/intent. Advisory by default; enforcement is
+    gated by the DHARMA_PROOF_ENFORCE env flag (default off), mirroring
+    DHARMA_EVOLUTION_SHADOW. See docs/vision_maps/2026-05-30_binocular_witness_seer_northstar.md
+    and dharma_swarm/telosproof/.
+    """
+    gate_name: str
+    obligation_type: str = "safety_contract"  # safety_contract | fitness_bound | axiom_satisfaction
+    predicate: str = ""
+    satisfied: Optional[bool] = None
+    evidence_required: list[str] = Field(default_factory=list)
+    grounded_by: Optional[str] = None  # external-receipt id (the keystone link)
+    witness_ref: Optional[str] = None  # Sakshi observation reference
+    severity: str = "advisory"  # advisory | enforcing
+
+
 class GateCheckResult(BaseModel):
     """Result of running telos gates on an action."""
     decision: GateDecision
@@ -262,6 +283,7 @@ class GateCheckResult(BaseModel):
     gate: str = ""
     gate_results: dict[str, tuple[GateResult, str]] = Field(default_factory=dict)
     timestamp: datetime = Field(default_factory=_utc_now)
+    proof_obligation: Optional[ProofObligation] = None  # advisory proof-carrying-telos (TelosProof)
 
 
 class MemoryEntry(BaseModel):
