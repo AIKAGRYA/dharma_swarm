@@ -36,7 +36,7 @@ Two blockers prevent execution in this session:
 
 ### What the underlying modules look like
 
-I confirmed the canonical modules exist on `main` and are importable:
+I confirmed the required modules exist on `main` and are importable:
 
 | Module | Path | Status |
 |---|---|---|
