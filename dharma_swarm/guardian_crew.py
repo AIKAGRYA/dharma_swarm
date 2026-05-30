@@ -851,12 +851,34 @@ def synthesize_report(
 # GitHub issue creation for BLOCKERs
 # ---------------------------------------------------------------------------
 
-def _github_issue_already_open(repo: str, title: str) -> bool:
-    """Best-effort remote dedupe for Guardian issues.
+# Maximum number of open issues with the same normalized title that Guardian will
+# tolerate before refusing to file more. Prevents runaway loops where a broken
+# check fires the same false positive every cycle (see #222-#387 dataclass
+# explosion). Setting this to 1 means "never file a second duplicate."
+_MAX_OPEN_DUPLICATES = 1
 
-    The local ``issues_created.json`` file is host-local. When Guardian runs from
-    another machine or a rebuilt state dir, it can otherwise reopen the same
-    BLOCKER every cycle.
+
+def _normalize_title_for_dedup(title: str) -> str:
+    """Normalize an issue title for duplicate detection.
+
+    Strips the ``[GUARDIAN] `` prefix if present, lowercases, and collapses
+    whitespace. Lets us treat ``[GUARDIAN] X`` and ``X`` as the same issue.
+    """
+    stripped = title.strip()
+    if stripped.startswith("[GUARDIAN]"):
+        stripped = stripped[len("[GUARDIAN]"):].strip()
+    return " ".join(stripped.lower().split())
+
+
+def _list_open_guardian_issues(repo: str) -> list[dict[str, Any]]:
+    """Return all open GUARDIAN-labeled (by title prefix) issues for the repo.
+
+    Uses ``gh issue list`` with no search filter and exact-title-matching in
+    Python. The previous implementation used ``--search "<title> in:title"``
+    which silently failed for titles containing parentheses, dunders, and
+    dots — the exact shape every AUDITOR:method_exists finding produces.
+    That broken search returned zero hits for issues that were already open,
+    causing the 70+ duplicate explosion documented in #222-#387.
     """
     try:
         proc = subprocess.run(
@@ -868,12 +890,10 @@ def _github_issue_already_open(repo: str, title: str) -> bool:
                 repo,
                 "--state",
                 "open",
-                "--search",
-                f"{title} in:title",
                 "--json",
-                "number",
+                "number,title",
                 "--limit",
-                "1",
+                "500",
             ],
             capture_output=True,
             text=True,
@@ -881,13 +901,108 @@ def _github_issue_already_open(repo: str, title: str) -> bool:
             check=False,
         )
     except Exception:
-        return False
+        return []
     if proc.returncode != 0:
-        return False
+        return []
     try:
-        return bool(json.loads(proc.stdout or "[]"))
+        issues = json.loads(proc.stdout or "[]")
     except json.JSONDecodeError:
+        return []
+    if not isinstance(issues, list):
+        return []
+    return [i for i in issues if isinstance(i, dict) and i.get("title", "").startswith("[GUARDIAN]")]
+
+
+def _count_open_duplicates(repo: str, title: str) -> int:
+    """Count open issues whose normalized title matches ``title``."""
+    target = _normalize_title_for_dedup(title)
+    if not target:
+        return 0
+    return sum(
+        1 for issue in _list_open_guardian_issues(repo)
+        if _normalize_title_for_dedup(issue.get("title", "")) == target
+    )
+
+
+def _github_issue_already_open(repo: str, title: str) -> bool:
+    """Best-effort remote dedupe for Guardian issues.
+
+    The local ``issues_created.json`` file is host-local. When Guardian runs from
+    another machine or a rebuilt state dir, it can otherwise reopen the same
+    BLOCKER every cycle. Uses exact-title-match in Python rather than the
+    GitHub search ``in:title`` qualifier, which silently fails on titles
+    containing ``()``, ``__``, and ``.``.
+    """
+    return _count_open_duplicates(repo, title) >= 1
+
+
+def _list_open_prs(repo: str) -> list[dict[str, Any]]:
+    """Return open pull requests with title and body. Best-effort, returns []
+    on any failure (network, auth, etc.).
+    """
+    try:
+        proc = subprocess.run(
+            [
+                "gh",
+                "pr",
+                "list",
+                "--repo",
+                repo,
+                "--state",
+                "open",
+                "--json",
+                "number,title,body",
+                "--limit",
+                "100",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+    except Exception:
+        return []
+    if proc.returncode != 0:
+        return []
+    try:
+        prs = json.loads(proc.stdout or "[]")
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(prs, list):
+        return []
+    return [p for p in prs if isinstance(p, dict)]
+
+
+def _finding_signature(finding: GuardianFinding) -> str:
+    """Extract a short signature from a finding suitable for PR-body matching.
+
+    For AUDITOR:method_exists findings titled
+    ``PalaceQuery.__init__() missing in memory_palace.py``, returns
+    ``PalaceQuery.__init__``. Falls back to the first 60 chars of the title.
+    """
+    title = finding.title or ""
+    # Pattern: "<Class>.<method>() missing in <file>" -> "<Class>.<method>"
+    if "() missing in" in title:
+        return title.split("() missing in", 1)[0].strip()
+    return title[:60].strip()
+
+
+def _open_pr_addresses_finding(repo: str, finding: GuardianFinding) -> bool:
+    """Return True if any open PR title or body mentions the finding signature.
+
+    Prevents Guardian from re-filing issues for bugs that are already in a
+    pull request awaiting review. Combined with the open-issue dedup, this
+    means: "if a fix is in flight OR a duplicate issue exists, do not file."
+    """
+    signature = _finding_signature(finding)
+    if not signature or len(signature) < 4:
         return False
+    sig_lower = signature.lower()
+    for pr in _list_open_prs(repo):
+        haystack = ((pr.get("title") or "") + " \n" + (pr.get("body") or "")).lower()
+        if sig_lower in haystack:
+            return True
+    return False
 
 
 async def _create_issue_if_needed(finding: GuardianFinding, repo: str, state_dir: Path) -> bool:
@@ -908,10 +1023,26 @@ async def _create_issue_if_needed(finding: GuardianFinding, repo: str, state_dir
         return False
 
     remote_title = f"[GUARDIAN] {finding.title}"
-    if _github_issue_already_open(repo, remote_title):
+
+    # Gate 1: open-issue duplicate check (exact title match)
+    open_dupe_count = _count_open_duplicates(repo, remote_title)
+    if open_dupe_count >= _MAX_OPEN_DUPLICATES:
         existing[issue_key] = "remote-open"
         issues_log.write_text(json.dumps(existing, indent=2), encoding="utf-8")
-        logger.debug("Open GitHub issue already exists for: %s", remote_title)
+        logger.info(
+            "Guardian: skipping issue creation for '%s' (%d open duplicate(s) already, max=%d)",
+            remote_title, open_dupe_count, _MAX_OPEN_DUPLICATES,
+        )
+        return False
+
+    # Gate 2: open-PR awareness (skip if a fix is already in flight)
+    if _open_pr_addresses_finding(repo, finding):
+        existing[issue_key] = "pr-in-flight"
+        issues_log.write_text(json.dumps(existing, indent=2), encoding="utf-8")
+        logger.info(
+            "Guardian: skipping issue creation for '%s' (open PR addresses it)",
+            remote_title,
+        )
         return False
 
     try:
