@@ -1,0 +1,113 @@
+{
+  "name": "perplexity-computer",
+  "description": "Perplexity Computer roaming agent: cross-agent synthesizer / verdict reconciler / persistent-index keeper. Stage 1 external-evidence-only. Identity nest: docs/agents/perplexity-computer/.",
+  "skills": [
+    {
+      "name": "synthesis",
+      "description": "perplexity-computer capability: synthesis",
+      "input_modes": [
+        "text"
+      ],
+      "output_modes": [
+        "text"
+      ],
+      "id": "synthesis",
+      "tags": [],
+      "examples": [],
+      "security_requirements": []
+    },
+    {
+      "name": "verdict_reconciliation",
+      "description": "perplexity-computer capability: verdict_reconciliation",
+      "input_modes": [
+        "text"
+      ],
+      "output_modes": [
+        "text"
+      ],
+      "id": "verdict_reconciliation",
+      "tags": [],
+      "examples": [],
+      "security_requirements": []
+    },
+    {
+      "name": "persistent_agent_index",
+      "description": "perplexity-computer capability: persistent_agent_index",
+      "input_modes": [
+        "text"
+      ],
+      "output_modes": [
+        "text"
+      ],
+      "id": "persistent_agent_index",
+      "tags": [],
+      "examples": [],
+      "security_requirements": []
+    }
+  ],
+  "capabilities": [
+    {
+      "name": "synthesis",
+      "description": "perplexity-computer capability: synthesis",
+      "input_modes": [
+        "text"
+      ],
+      "output_modes": [
+        "text"
+      ],
+      "id": "synthesis",
+      "tags": [],
+      "examples": [],
+      "security_requirements": []
+    },
+    {
+      "name": "verdict_reconciliation",
+      "description": "perplexity-computer capability: verdict_reconciliation",
+      "input_modes": [
+        "text"
+      ],
+      "output_modes": [
+        "text"
+      ],
+      "id": "verdict_reconciliation",
+      "tags": [],
+      "examples": [],
+      "security_requirements": []
+    },
+    {
+      "name": "persistent_agent_index",
+      "description": "perplexity-computer capability: persistent_agent_index",
+      "input_modes": [
+        "text"
+      ],
+      "output_modes": [
+        "text"
+      ],
+      "id": "persistent_agent_index",
+      "tags": [],
+      "examples": [],
+      "security_requirements": []
+    }
+  ],
+  "endpoint": "pending://manual",
+  "auth_type": "none",
+  "security_schemes": [],
+  "signatures": [],
+  "supported_interfaces": [],
+  "extensions": [],
+  "role": "external_evidence_worker",
+  "model": "",
+  "provider": "",
+  "status": "starting",
+  "version": "1.0",
+  "created_at": "2026-05-30T02:11:00.121404+00:00",
+  "updated_at": "2026-05-30T02:11:00.121418+00:00",
+  "metadata": {
+    "agent_uid": "perplexity-computer",
+    "harness": "perplexity_computer",
+    "department": "synthesis",
+    "squad_id": "general",
+    "team_id": "dharma_swarm",
+    "registration_source": "docs/agents/perplexity-computer/SOUL.md"
+  }
+}

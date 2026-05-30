@@ -44,6 +44,7 @@ from dharma_swarm.a2a.a2a_server import (
 from dharma_swarm.a2a.a2a_client import A2AClient
 from dharma_swarm.a2a.a2a_bridge import A2ABridge
 from dharma_swarm.a2a.node_registry import NodeRegistry, RemoteNode
+from dharma_swarm.a2a.registry_hydrator import hydrate_from_receipts
 
 __all__ = [
     "AgentCard",
@@ -63,4 +64,5 @@ __all__ = [
     "A2ABridge",
     "NodeRegistry",
     "RemoteNode",
+    "hydrate_from_receipts",
 ]
