@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dharma-swarm/telosproof/change_summary.schema.json",
+  "title": "ChangeSummary",
+  "description": "Body-level, conservative summary of a self-modification patch and the single cross-language source of truth for the field set and the SafePrimitive allow-list vocabulary. CONFORMANCE (the languages-verify-each-other seam): both the Python frozen dataclass dharma_swarm.telosproof.change_summary.ChangeSummary and the Lean structure in specs/proofs/telosproof/Primitives.lean conform to THIS schema. On the Python side, the 13 field names enumerated in `required` are byte-for-byte the names returned by dataclasses.fields(ChangeSummary) (asserted by tests/test_change_summary_contract.py), the danger booleans default DANGEROUS-on-doubt (false here means proven-absent) and the credential booleans default absent, mirroring the dataclass defaults; an extract_change_summary(...) result serialised field-for-field validates against this object with additionalProperties:false catching any drift. On the Lean side, the $defs.SafePrimitive.enum strings map (snake_case here ↔ camelCase in Lean) to the SafePrimitive inductive constructor names in specs/proofs/telosproof/Primitives.lean and are byte-identical to the Python frozenset dharma_swarm.telosproof.allowlist.SAFE_PRIMITIVES, so an operation classified safe in one language is named identically in all three; this enum is the closed deny-by-default allow-list, and any operation not in it is 'unknown' and routes to REVIEW, never ALLOW. NOTE: Primitives.lean is a STRUCTURAL/TYPE-LEVEL SCAFFOLD that shares this VOCABULARY (the names); it is NOT a body-level safety proof of the primitives — the operational safety guarantee lives in the Python AST-level classifier and its FN1-FN4 adversarial tests. The schema therefore lets each language be checked against the others without either importing the other: Python asserts dataclass-field parity here, Lean records constructor-name parity here, and the parity test (tests/test_telosproof_schema_parity.py) closes the triangle by asserting set(enum) == SAFE_PRIMITIVES == the camelCase->snake_case-mapped Lean constructor names parsed from Primitives.lean.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["touched_paths", "added_paths", "deleted_paths", "modifies_protected_files", "disables_receipts", "disables_rollback", "bypasses_human_approval", "raises_autonomy", "disables_shadow_mode", "creates_new_persistence", "has_replay_command", "has_rollback_plan", "net_removes_from_safety_surface"],
+  "properties": {
+    "touched_paths": {"type": "array", "items": {"type": "string"}, "description": "Union of every file referenced by any diff header form (conservative over-count)."},
+    "added_paths": {"type": "array", "items": {"type": "string"}},
+    "deleted_paths": {"type": "array", "items": {"type": "string"}},
+    "modifies_protected_files": {"type": "boolean", "description": "Body-level mirror of invariant 1; authoritative check reuses dgm_loop.DGM_PROTECTED_FILES."},
+    "disables_receipts": {"type": "boolean"},
+    "disables_rollback": {"type": "boolean"},
+    "bypasses_human_approval": {"type": "boolean"},
+    "raises_autonomy": {"type": "boolean"},
+    "disables_shadow_mode": {"type": "boolean"},
+    "creates_new_persistence": {"type": "boolean"},
+    "has_replay_command": {"type": "boolean", "description": "Credential flag; absent-on-doubt. Self-satisfiable, NOT an adversarial defense."},
+    "has_rollback_plan": {"type": "boolean", "description": "Credential flag; absent-on-doubt."},
+    "net_removes_from_safety_surface": {"type": "boolean", "description": "Deny-by-default structural backstop: net line-removal from a safety-surface file forces REVIEW regardless of vocabulary."}
+  },
+  "$defs": {
+    "SafePrimitive": {
+      "title": "SafePrimitive",
+      "description": "The closed, deny-by-default allow-list of candidate safe change-operation classes. An operation NOT in this enum is 'unknown' and routes to REVIEW, never ALLOW. Byte-identical to allowlist.SAFE_PRIMITIVES (Python); maps (snake_case here ↔ camelCase Lean) to the SafePrimitive inductive constructors in specs/proofs/telosproof/Primitives.lean. The Lean side is a structural scaffold sharing these names; the body-level safety guarantee is the Python AST classifier, not the Lean file.",
+      "type": "string",
+      "enum": ["add_pure_function", "edit_comment_or_docstring", "add_test", "edit_non_safety_file_body", "add_non_persistence_file"]
+    },
+    "Operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["file", "primitive", "locus"],
+      "properties": {
+        "file": {"type": "string"},
+        "primitive": {"oneOf": [{"$ref": "#/$defs/SafePrimitive"}, {"type": "null"}], "description": "null == unknown == REVIEW."},
+        "locus": {"type": "string"}
+      }
+    },
+    "ClassificationResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["allowed", "unknown", "decision"],
+      "properties": {
+        "allowed": {"type": "array", "items": {"$ref": "#/$defs/Operation"}},
+        "unknown": {"type": "array", "items": {"$ref": "#/$defs/Operation"}},
+        "decision": {"type": "string", "enum": ["allow", "review"], "description": "allow iff unknown==[] and no deny-by-default guard fired; else review. Lowercase to match models.GateDecision values."}
+      }
+    }
+  }
+}

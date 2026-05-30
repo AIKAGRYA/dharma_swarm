@@ -78,3 +78,85 @@ checks. The natural call site to *document* (not patch) is just before
 `diff_applier.apply()` / `apply_and_test()` and the existing protected-target
 check in `dgm_loop.py` (line ~351). **No live apply path is modified by this
 sample.**
+
+## `Primitives.lean` — v1 safe-primitive vocabulary (STRUCTURAL SCAFFOLD)
+
+> ⚠️ **Honesty notice.** `Primitives.lean` is a **structural / type-level
+> scaffold** and the **cross-language vocabulary seam** — it is **NOT** a proof
+> that the safe primitives preserve the 8 protected-body invariants. An earlier
+> version carried a theorem named `composed_safe_preserves_boundary` that *looked*
+> like such a proof but was **vacuous**: `summaryOf` is *defined* to return
+> `safeChange` exactly when a patch is composed of safe primitives, so the
+> "theorem" discharged by `rw [if_pos h]; rfl` proved only that the definition
+> equals itself — a tautology with **no body-level semantic content**. That
+> theorem has been **renamed** `summaryOf_well_formed_on_safe` and documented as
+> *structural well-formedness only*. The **real** safety proof — attach a
+> body-semantics function to each `SafePrimitive` and prove it cannot flip any
+> of the 8 flags — is **future v1 work** and is deliberately **not claimed**. The
+> operational safety guarantee currently lives in the Python AST-level classifier
+> (`dharma_swarm/telosproof/allowlist.py`) and its adversarial test suite
+> (`tests/test_telosproof_allowlist.py`, including the FN1–FN4 regressions that
+> close the false-negatives an adversarial critic found).
+
+`Primitives.lean` is the Lean **source of truth** for the v1 allow-list
+**vocabulary (the names)**, not for its safety. Where v0 enumerates **danger** (a
+patch is safe iff every protected flag is `false`), v1 inverts to
+**deny-by-default**: a closed allow-list of *candidate* safe primitive
+change-operations. Any operation not positively classified as one of these
+primitives is `unknown` (the deny-by-default bottom) and routes to REVIEW — never
+silently ALLOW.
+
+| `SafePrimitive` constructor (Lean) | Cross-language name (Python `SAFE_PRIMITIVES` / JSON enum) |
+|------------------------------------|-----------------------------------------------------------|
+| `addPureFunction`        | `add_pure_function` |
+| `editCommentOrDocstring` | `edit_comment_or_docstring` |
+| `addTest`                | `add_test` |
+| `editNonSafetyFileBody`  | `edit_non_safety_file_body` |
+| `addNonPersistenceFile`  | `add_non_persistence_file` |
+
+The constructor names are byte-identical (snake_case) to `allowlist.SAFE_PRIMITIVES`
+(Python) and the JSON Schema `$defs.SafePrimitive.enum`. That byte-identity is the
+cross-language verification seam.
+
+What it actually establishes (and what it does **not**):
+
+- `composedOfSafePrimitives (p : Patch) : Prop` — every op in the patch is a
+  known-safe primitive (`p.all opIsSafe = true`); `Decidable`. **Genuine.**
+- `composed_safe_closed_under_append` — the **structural predicate**
+  `composedOfSafePrimitives` is closed under list append (via `List.all_append`).
+  **Genuine structural content**; says the classification composes, NOT that the
+  bodies are safe.
+- `unknown_breaks_composition` — a patch with any `unknown` op is provably *not*
+  composed of safe primitives (deny-by-default soundness over the structure).
+  **Genuine.**
+- `summaryOf_well_formed_on_safe` (formerly `composed_safe_preserves_boundary`)
+  — **STRUCTURAL WELL-FORMEDNESS ONLY, ⚠️ NOT a safety proof.** It states that
+  the `summaryOf` projection is internally consistent (on the all-safe branch its
+  image is `safeChange`, which satisfies the boundary *shape*). The proof is
+  `rw [if_pos h]; rfl`, i.e. it holds by the *definition* of `summaryOf`, so it is
+  a tautology about that definition with **no independent body-level content**.
+  It does **not** prove the safe primitives cannot flip a protected flag. The
+  name says `well_formed`, not `safe`, on purpose.
+- **NOT PROVEN (future v1 work):** a body-semantics function per `SafePrimitive`
+  and a proof that each preserves all 8 flags. That is the real safety theorem;
+  it is intentionally absent. Until it exists, safety is enforced operationally by
+  the Python AST-level classifier and its FN1–FN4 adversarial tests.
+
+**Why it mirrors v0's shape rather than `import`-ing `TelosProof.lean`:** under
+the pinned toolchain (Lean 4.30.0) v0's `safeProof := by decide` fails to
+synthesize a `Decidable` instance for its `And`-of-`Bool`-equality `Prop`, so
+`TelosProof.lean` does not currently emit an `.olean` to import from — and v0 is
+not to be edited. `Primitives.lean` therefore reproduces v0's `ChangeSummary`
+shape and `preservesTelosBoundary` predicate **verbatim** (1:1 with
+`TelosProof.lean` §22-43) so the SHAPE is shared. Reproducing the shape does
+**not** prove anything about the primitives' body semantics.
+
+**Toolchain status (verified):** Lean 4.30.0 is present at `~/.elan/bin/lean`.
+
+```bash
+~/.elan/bin/lake env lean specs/proofs/telosproof/Primitives.lean   # exit 0, no errors/warnings/sorry
+```
+
+Type-checks clean; the only stdout is the three `#eval` smoke checks
+(`safePatch → true`, `mixedPatch → false`, `summaryOf safePatch → the safe summary`).
+Mathlib-free. ADVISORY ONLY — not wired into any apply path.
