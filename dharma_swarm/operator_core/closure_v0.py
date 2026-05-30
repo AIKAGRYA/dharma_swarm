@@ -1,10 +1,16 @@
 """Organism Closure v0 — file-native proof loop.
 
-Proves: EvidenceReceipt(success=True) yields a different NextDecision than
-EvidenceReceipt(success=False). Scope locked by Track 3 plan, 2026-05-08:
-file-native dataclasses, JSON I/O only, imports stdlib + operating_facts,
-correlation_id mandatory, DarwinProposalCandidate is data only (never
-submitted to evolution.py), module-private (no public re-export).
+Proves: ClosureEvidenceReceipt(success=True) yields a different NextDecision
+than ClosureEvidenceReceipt(success=False). Scope locked by Track 3 plan,
+2026-05-08: file-native dataclasses, JSON I/O only, imports stdlib +
+operating_facts, correlation_id mandatory, DarwinProposalCandidate is data
+only (never submitted to evolution.py), module-private (no public re-export).
+
+Naming note (2026-05-30, PR-H1): the class was previously named
+``EvidenceReceipt``. It is now ``ClosureEvidenceReceipt`` to disambiguate
+from ``dharma_swarm.spine.receipt.EvidenceReceipt``, which is a distinct
+class modelling the runtime dispatch artifact. ``EvidenceReceipt`` remains
+available in this module as a deprecated alias for backward compatibility.
 """
 from __future__ import annotations
 
@@ -60,7 +66,7 @@ class WorkPacket:
             raise ClosureContractError(f"WorkPacket.review_tier ∉ {_REVIEW_TIERS}")
 
 @dataclass(frozen=True)
-class EvidenceReceipt:
+class ClosureEvidenceReceipt:
     receipt_id: str
     correlation_id: str
     work_packet_id: str
@@ -74,9 +80,14 @@ class EvidenceReceipt:
 
     def __post_init__(self) -> None:
         if not (self.correlation_id and self.replay_command):
-            raise ClosureContractError("EvidenceReceipt missing correlation_id/replay_command")
+            raise ClosureContractError("ClosureEvidenceReceipt missing correlation_id/replay_command")
         if self.success != (self.test_exit_code == 0):
             raise EvidenceInconsistentError(f"success={self.success} but exit={self.test_exit_code}")
+
+
+# Deprecated alias — use ClosureEvidenceReceipt. Retained for one release
+# cycle so external consumers can migrate. Will be removed in a follow-up PR.
+EvidenceReceipt = ClosureEvidenceReceipt
 
 @dataclass(frozen=True)
 class VSMProjection:
@@ -147,9 +158,9 @@ def record_evidence_receipt(
     correlation_id: str,
     created_at: str,
     duration_ms: float = 0.0,
-) -> EvidenceReceipt:
+) -> ClosureEvidenceReceipt:
     success = _success_from_agentops(agentops_fact)
-    return EvidenceReceipt(
+    return ClosureEvidenceReceipt(
         receipt_id=_hid("ev", correlation_id, packet.packet_id, str(success)),
         correlation_id=correlation_id,
         work_packet_id=packet.packet_id,
@@ -166,7 +177,7 @@ def record_evidence_receipt(
 
 def project_vsm(
     bundle: OperatingFactBundle,
-    receipt: EvidenceReceipt | None,
+    receipt: ClosureEvidenceReceipt | None,
     *,
     correlation_id: str,
     captured_at: str,
@@ -205,7 +216,7 @@ def project_vsm(
     )
 
 def kaizen_link(
-    receipt: EvidenceReceipt,
+    receipt: ClosureEvidenceReceipt,
     *,
     human_yds: HumanQualityRatingFact | None = None,
     waste_patterns: tuple[str, ...] = (),
