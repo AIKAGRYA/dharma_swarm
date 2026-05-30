@@ -182,12 +182,14 @@ def _open_is_write_mode(call: ast.Call) -> bool:
     return True
 
 
-def _assign_target_is_elevation(target: ast.AST) -> Optional[str]:
+def _assign_target_is_elevation(target: ast.AST, resolve=None) -> Optional[str]:
     """Return evidence if an assignment TARGET is an elevation/env-mutation.
 
     Catches `obj.permissions = …` / `cfg.shadow_mode = …` (Attribute target on
     an elevation fragment) and `os.environ['X'] = …` / aliased `environ[…] = …`
-    (Subscript target on an environ name).
+    (Subscript target on an environ name). ``resolve`` (when given) maps a local
+    alias back to its imported name so `from os import environ as E; E[…] = …`
+    cannot escape.
     """
     if isinstance(target, ast.Attribute):
         attr = target.attr.lower()
@@ -198,23 +200,39 @@ def _assign_target_is_elevation(target: ast.AST) -> Optional[str]:
     if isinstance(target, ast.Subscript):
         base = target.value
         name = _attr_chain_tail(base)
+        if resolve is not None:
+            name = resolve(name)
         if name and name.lower() in _ENVIRON_NAMES:
             return "subscript assignment to os.environ (mutate-env)"
     return None
 
 
 class _DangerVisitor(ast.NodeVisitor):
-    """Walk a function/module body for any write/persist/spawn/exec/elevate op."""
+    """Walk a function/module body for any write/persist/spawn/exec/elevate op.
+
+    Tracks import aliases (``from os import environ as E`` / ``import os as o``)
+    and resolves local names back to their imported identity before applying the
+    name-based danger checks, so renamed imports cannot escape (closes FN4 for
+    any aliased danger import, not just ``environ``).
+    """
 
     def __init__(self) -> None:
         self.locus: Optional[str] = None
+        self._aliases: dict[str, str] = {}
 
     def _flag(self, msg: str) -> None:
         if self.locus is None:
             self.locus = msg
 
+    def _resolve(self, name: Optional[str]) -> Optional[str]:
+        if name is None:
+            return None
+        return self._aliases.get(name, name)
+
     def visit_Import(self, node: ast.Import) -> None:
         for alias in node.names:
+            if alias.asname:
+                self._aliases[alias.asname] = alias.name
             root = alias.name.split(".", 1)[0].lower()
             if root in _DANGER_IMPORT_ROOTS:
                 self._flag(f"import of write/persist/spawn module {alias.name!r}")
@@ -224,12 +242,14 @@ class _DangerVisitor(ast.NodeVisitor):
         root = (node.module or "").split(".", 1)[0].lower()
         if root in _DANGER_IMPORT_ROOTS:
             self._flag(f"from-import of write/persist/spawn module {node.module!r}")
-        # `from os import environ` makes a bare `environ[...] = ...` an env mutate;
-        # that subscript is caught at assignment time.
+        # Record `from os import environ as E` / `from os import system as s` so
+        # the aliased local name resolves back to the dangerous imported name.
+        for alias in node.names:
+            self._aliases[alias.asname or alias.name] = alias.name
         self.generic_visit(node)
 
     def visit_Call(self, node: ast.Call) -> None:
-        tail = _attr_chain_tail(node.func)
+        tail = self._resolve(_attr_chain_tail(node.func))
         if tail is not None:
             if tail == "open" or tail == "FileIO":
                 # open()/FileIO() — only safe if PROVABLY read-only.
@@ -240,25 +260,25 @@ class _DangerVisitor(ast.NodeVisitor):
             # os.environ.get is fine; os.environ-mutating methods are not.
             elif tail in ("pop", "clear", "update", "setdefault"):
                 recv = node.func.value if isinstance(node.func, ast.Attribute) else None
-                if recv is not None and _attr_chain_tail(recv) in _ENVIRON_NAMES:
+                if recv is not None and self._resolve(_attr_chain_tail(recv)) in _ENVIRON_NAMES:
                     self._flag(f"os.environ.{tail}() (mutate-env)")
         self.generic_visit(node)
 
     def visit_Assign(self, node: ast.Assign) -> None:
         for tgt in node.targets:
-            ev = _assign_target_is_elevation(tgt)
+            ev = _assign_target_is_elevation(tgt, self._resolve)
             if ev is not None:
                 self._flag(ev)
         self.generic_visit(node)
 
     def visit_AugAssign(self, node: ast.AugAssign) -> None:
-        ev = _assign_target_is_elevation(node.target)
+        ev = _assign_target_is_elevation(node.target, self._resolve)
         if ev is not None:
             self._flag(ev)
         self.generic_visit(node)
 
     def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
-        ev = _assign_target_is_elevation(node.target)
+        ev = _assign_target_is_elevation(node.target, self._resolve)
         if ev is not None:
             self._flag(ev)
         self.generic_visit(node)
