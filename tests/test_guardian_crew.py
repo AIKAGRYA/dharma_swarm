@@ -147,7 +147,10 @@ def _repo_src_root(tmp_path: Path) -> Path:
 def test_github_issue_remote_dedupe_detects_open_issue(monkeypatch: pytest.MonkeyPatch) -> None:
     class Proc:
         returncode = 0
-        stdout = '[{"number": 194}]'
+        stdout = (
+            '[{"number": 194, "title": '
+            '"[GUARDIAN] File not found for dharma_swarm.evolution"}]'
+        )
 
     monkeypatch.setattr(guardian_crew.subprocess, "run", lambda *args, **kwargs: Proc())
 
@@ -155,6 +158,124 @@ def test_github_issue_remote_dedupe_detects_open_issue(monkeypatch: pytest.Monke
         "AmitabhainArunachala/dharma_swarm",
         "[GUARDIAN] File not found for dharma_swarm.evolution",
     )
+
+
+def test_normalize_title_strips_prefix_and_lowercases() -> None:
+    """Normalizer makes ``[GUARDIAN] X`` and ``X`` compare equal."""
+    a = guardian_crew._normalize_title_for_dedup(
+        "[GUARDIAN] PalaceQuery.__init__() missing in memory_palace.py"
+    )
+    b = guardian_crew._normalize_title_for_dedup(
+        "  palacequery.__init__()  MISSING  in  memory_palace.py  "
+    )
+    assert a == b
+    assert a == "palacequery.__init__() missing in memory_palace.py"
+
+
+def test_dedup_handles_titles_with_parens_dots_dunders(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Regression: titles containing ``()``, ``__``, and ``.`` must dedupe.
+
+    The previous ``--search '<title> in:title'`` query silently returned
+    zero hits for the exact title shape AUDITOR:method_exists produces,
+    causing the 70+ duplicate explosion documented in #222-#387.
+    Python-side exact-match must handle them.
+    """
+    bad_title = "[GUARDIAN] PalaceQuery.__init__() missing in memory_palace.py"
+
+    class Proc:
+        returncode = 0
+        stdout = (
+            '[{"number": 387, "title": '
+            '"[GUARDIAN] PalaceQuery.__init__() missing in memory_palace.py"}]'
+        )
+
+    monkeypatch.setattr(guardian_crew.subprocess, "run", lambda *args, **kwargs: Proc())
+    assert guardian_crew._count_open_duplicates("x/y", bad_title) == 1
+    assert guardian_crew._github_issue_already_open("x/y", bad_title) is True
+
+
+def test_dedup_filters_non_guardian_issues(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Only issues whose title starts with ``[GUARDIAN]`` are counted."""
+    class Proc:
+        returncode = 0
+        stdout = (
+            '[{"number": 1, "title": "Some unrelated issue"},'
+            ' {"number": 2, "title": "[GUARDIAN] X missing in y.py"}]'
+        )
+
+    monkeypatch.setattr(guardian_crew.subprocess, "run", lambda *args, **kwargs: Proc())
+    issues = guardian_crew._list_open_guardian_issues("x/y")
+    assert len(issues) == 1
+    assert issues[0]["number"] == 2
+
+
+def test_finding_signature_extracts_class_and_method() -> None:
+    """Signature extractor pulls ``Class.method`` from method-existence titles."""
+    f = guardian_crew.GuardianFinding(
+        severity="BLOCKER",
+        check="AUDITOR:method_exists",
+        title="PalaceQuery.__init__() missing in memory_palace.py",
+        detail="",
+    )
+    assert guardian_crew._finding_signature(f) == "PalaceQuery.__init__"
+
+
+def test_open_pr_skip_when_signature_in_pr_body(monkeypatch: pytest.MonkeyPatch) -> None:
+    """PR-awareness: if an open PR mentions the finding signature, skip filing."""
+    finding = guardian_crew.GuardianFinding(
+        severity="BLOCKER",
+        check="AUDITOR:method_exists",
+        title="PalaceQuery.__init__() missing in memory_palace.py",
+        detail="",
+    )
+
+    class Proc:
+        returncode = 0
+        stdout = (
+            '[{"number": 383, '
+            '"title": "fix(guardian): recognize @dataclass-synthesized __init__",'
+            ' "body": "Adds dataclass support; closes PalaceQuery.__init__ false positives"}]'
+        )
+
+    monkeypatch.setattr(guardian_crew.subprocess, "run", lambda *args, **kwargs: Proc())
+    assert guardian_crew._open_pr_addresses_finding("x/y", finding) is True
+
+
+def test_open_pr_skip_negative_when_pr_unrelated(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Negative: PR with no mention of the signature must not trigger a skip."""
+    finding = guardian_crew.GuardianFinding(
+        severity="BLOCKER",
+        check="AUDITOR:method_exists",
+        title="PalaceQuery.__init__() missing in memory_palace.py",
+        detail="",
+    )
+
+    class Proc:
+        returncode = 0
+        stdout = (
+            '[{"number": 999, "title": "feat: unrelated thing", "body": "nothing here"}]'
+        )
+
+    monkeypatch.setattr(guardian_crew.subprocess, "run", lambda *args, **kwargs: Proc())
+    assert guardian_crew._open_pr_addresses_finding("x/y", finding) is False
+
+
+def test_circuit_breaker_blocks_at_max_open_duplicates(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Circuit breaker: ``_MAX_OPEN_DUPLICATES`` is the cap on parallel issues.
+
+    With default cap of 1, ``_github_issue_already_open`` returns True the
+    moment one open duplicate exists. This is what prevents a runaway loop
+    from filing a second, third, fourth copy each cycle.
+    """
+    bad_title = "[GUARDIAN] X missing in y.py"
+
+    class Proc:
+        returncode = 0
+        stdout = '[{"number": 1, "title": "[GUARDIAN] X missing in y.py"}]'
+
+    monkeypatch.setattr(guardian_crew.subprocess, "run", lambda *args, **kwargs: Proc())
+    # One duplicate -> already at the cap
+    assert guardian_crew._count_open_duplicates("x/y", bad_title) >= guardian_crew._MAX_OPEN_DUPLICATES
 
 
 @pytest.mark.asyncio
