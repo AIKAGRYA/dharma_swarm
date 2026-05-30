@@ -18,9 +18,9 @@ import pytest
 
 from dharma_swarm.operator_core.closure_v0 import (
     ClosureContractError,
+    ClosureEvidenceReceipt,
     DarwinProposalCandidate,
     EvidenceInconsistentError,
-    EvidenceReceipt,
     KaizenReviewLink,
     NextDecision,
     TelosObjective,
@@ -118,12 +118,12 @@ def _run_loop(variant: str, *, truth_stale_override: bool = False):
 
 
 # ---------------------------------------------------------------------------
-# T1–T2 — EvidenceReceipt invariants
+# T1–T2 — ClosureEvidenceReceipt invariants
 # ---------------------------------------------------------------------------
 
 def test_t1_evidence_inconsistent_success_with_failing_exit() -> None:
     with pytest.raises(EvidenceInconsistentError):
-        EvidenceReceipt(
+        ClosureEvidenceReceipt(
             receipt_id="ev_x", correlation_id=CORRELATION_ID,
             work_packet_id="wp_x", agentops_source="src",
             test_exit_code=1, files_changed=(), duration_ms=0.0,
@@ -133,14 +133,14 @@ def test_t1_evidence_inconsistent_success_with_failing_exit() -> None:
 
 def test_t2_evidence_requires_correlation_and_replay() -> None:
     with pytest.raises(ClosureContractError):
-        EvidenceReceipt(
+        ClosureEvidenceReceipt(
             receipt_id="ev_x", correlation_id="",
             work_packet_id="wp_x", agentops_source="src",
             test_exit_code=0, files_changed=(), duration_ms=0.0,
             replay_command="pytest x", success=True, created_at=CREATED_AT,
         )
     with pytest.raises(ClosureContractError):
-        EvidenceReceipt(
+        ClosureEvidenceReceipt(
             receipt_id="ev_x", correlation_id=CORRELATION_ID,
             work_packet_id="wp_x", agentops_source="src",
             test_exit_code=0, files_changed=(), duration_ms=0.0,
