@@ -148,6 +148,31 @@ def load_json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def check_name(item: dict[str, Any]) -> str:
+    return str(item.get("name") or item.get("context") or item.get("workflowName") or "unnamed")
+
+
+def latest_check_items(rollup: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Collapse duplicate check names to the newest reported check.
+
+    GitHub can leave a cancelled superseded run in statusCheckRollup next to the
+    successful replacement for the same check name. Treating both as live makes
+    the queue disagree with `gh pr checks`.
+    """
+
+    latest: dict[str, tuple[tuple[str, str, int], dict[str, Any]]] = {}
+    for index, item in enumerate(rollup):
+        name = check_name(item)
+        key = (
+            str(item.get("completedAt") or ""),
+            str(item.get("startedAt") or ""),
+            index,
+        )
+        if name not in latest or key >= latest[name][0]:
+            latest[name] = (key, item)
+    return [payload for _, payload in latest.values()]
+
+
 def check_rollup(pr: dict[str, Any]) -> dict[str, Any]:
     rollup = pr.get("statusCheckRollup") or []
     failing: list[str] = []
@@ -158,8 +183,8 @@ def check_rollup(pr: dict[str, Any]) -> dict[str, Any]:
     if not rollup:
         unknown.append("no status checks reported")
 
-    for item in rollup:
-        name = str(item.get("name") or item.get("context") or item.get("workflowName") or "unnamed")
+    for item in latest_check_items(rollup):
+        name = check_name(item)
         conclusion = str(item.get("conclusion") or "").upper()
         status = str(item.get("status") or "").upper()
         if conclusion in BAD_CONCLUSIONS:

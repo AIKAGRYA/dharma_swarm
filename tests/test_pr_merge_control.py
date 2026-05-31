@@ -91,6 +91,69 @@ def test_classify_pr_blocks_empty_check_rollup():
     assert result["checks"]["unknown"] == ["no status checks reported"]
 
 
+def test_classify_pr_ignores_superseded_cancelled_duplicate_check():
+    pr = {
+        "number": 6,
+        "title": "rerun",
+        "isDraft": False,
+        "mergeable": "MERGEABLE",
+        "reviewDecision": "APPROVED",
+        "statusCheckRollup": [
+            {
+                "name": "Coherence Delta PR body",
+                "status": "COMPLETED",
+                "conclusion": "CANCELLED",
+                "startedAt": "2026-05-31T12:13:36Z",
+                "completedAt": "2026-05-31T12:13:41Z",
+            },
+            {
+                "name": "Coherence Delta PR body",
+                "status": "COMPLETED",
+                "conclusion": "SUCCESS",
+                "startedAt": "2026-05-31T12:13:44Z",
+                "completedAt": "2026-05-31T12:13:51Z",
+            },
+        ],
+    }
+
+    result = prc.classify_pr(pr)
+
+    assert result["status"] == "GITHUB_GREEN_NEEDS_PACKET"
+    assert result["checks"]["failing"] == []
+    assert result["checks"]["passing"] == ["Coherence Delta PR body"]
+
+
+def test_classify_pr_blocks_latest_duplicate_check_failure():
+    pr = {
+        "number": 7,
+        "title": "rerun failed",
+        "isDraft": False,
+        "mergeable": "MERGEABLE",
+        "reviewDecision": "APPROVED",
+        "statusCheckRollup": [
+            {
+                "name": "DocOps integrity gate",
+                "status": "COMPLETED",
+                "conclusion": "SUCCESS",
+                "startedAt": "2026-05-31T12:13:36Z",
+                "completedAt": "2026-05-31T12:13:41Z",
+            },
+            {
+                "name": "DocOps integrity gate",
+                "status": "COMPLETED",
+                "conclusion": "FAILURE",
+                "startedAt": "2026-05-31T12:13:44Z",
+                "completedAt": "2026-05-31T12:13:51Z",
+            },
+        ],
+    }
+
+    result = prc.classify_pr(pr)
+
+    assert result["status"] == "BLOCKED_CHECKS"
+    assert result["checks"]["failing"] == ["DocOps integrity gate"]
+
+
 def test_coherence_results_rejects_placeholder_field():
     body = """
 - Organ touched: docs/governance
