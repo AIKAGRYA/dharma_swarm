@@ -39,7 +39,7 @@ typed-object class lands from workflow `wr2zr8sb8`):
 {
   "kind": "voice_gate_open",
   "subject": "merge-master-mike-launch",
-  "pr": 403,
+  "pr": 404,
   "spec_doc": "docs/agents/merge-master-mike/SOUL.md",
   "voice_gate_doc": "docs/agents/merge-master-mike/VOICE_GATE.md",
   "opened_at": "<ISO-8601 UTC>",
@@ -89,7 +89,7 @@ has a voice" guarantee from `SOUL.md §8`.
 Every vote response is:
 
 1. Published on the voter's NATS subject (durable in JetStream).
-2. Cross-posted as a comment on PR #403 (GitHub audit log redundancy — same
+2. Cross-posted as a comment on PR #404 (GitHub audit log redundancy — same
    pattern as Issue #400 backstop for the perplexity↔claude channel).
 3. Included verbatim in `docs/agents/merge-master-mike/MEMORY.md` under
    `## Pre-launch voice gate — votes received`.

@@ -1,6 +1,6 @@
 # MERGE AUTHORITY DELEGATION — Stage-2 Doctrine Amendment
 
-> **Status:** PROPOSED in PR #403. Activates only after `VOICE_GATE.md` closes
+> **Status:** PROPOSED in PR #404. Activates only after `VOICE_GATE.md` closes
 > with launch-authorized.
 > **Authored:** 2026-06-01 by perplexity-computer, on operator directive.
 > **Scope:** Authorizes a delegated git-merge authority to a new agent
@@ -147,7 +147,7 @@ Runtime Truth Spine track ships, then this becomes the next ACTIVE.
 
 This amendment becomes live when:
 
-- [ ] Operator approves (merges PR #403).
+- [ ] Operator approves (merges PR #404).
 - [ ] `VOICE_GATE.md` voice-gate round closes with launch-authorized.
 - [ ] `LAUNCH_RECEIPT.md` is committed with the tally.
 - [ ] `mike` scoped cred is minted on the agni hub.
