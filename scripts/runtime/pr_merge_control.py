@@ -132,6 +132,9 @@ def check_rollup(pr: dict[str, Any]) -> dict[str, Any]:
     passing: list[str] = []
     unknown: list[str] = []
 
+    if not rollup:
+        unknown.append("no status checks reported")
+
     for item in rollup:
         name = str(item.get("name") or item.get("context") or item.get("workflowName") or "unnamed")
         conclusion = str(item.get("conclusion") or "").upper()
@@ -171,6 +174,9 @@ def classify_pr(pr: dict[str, Any]) -> dict[str, Any]:
     elif checks["failing"]:
         reasons.append(f"{len(checks['failing'])} failing checks")
         status = "BLOCKED_CHECKS"
+    elif checks["unknown"]:
+        reasons.append(f"{len(checks['unknown'])} unknown check states")
+        status = "BLOCKED_CHECKS"
     elif review_decision == "CHANGES_REQUESTED":
         reasons.append("changes requested")
         status = "BLOCKED_REVIEW"
@@ -186,9 +192,6 @@ def classify_pr(pr: dict[str, Any]) -> dict[str, Any]:
     else:
         reasons.append("GitHub green; packet, dual review, and merge gate still required")
         status = "GITHUB_GREEN_NEEDS_PACKET"
-
-    if checks["unknown"]:
-        reasons.append(f"{len(checks['unknown'])} unknown check states")
 
     return {
         "number": pr.get("number"),
@@ -271,8 +274,8 @@ def fetch_pr_view(pr_number: int) -> dict[str, Any]:
         "pr",
         "view",
         str(pr_number),
-        "--json",
-        "number,title,body,author,baseRefName,headRefName,isDraft,mergeable,reviewDecision,statusCheckRollup,comments,commits,updatedAt,url",
+            "--json",
+            "number,title,body,author,baseRefName,headRefName,headRefOid,isDraft,mergeable,reviewDecision,statusCheckRollup,comments,commits,updatedAt,url",
     ])
 
 
@@ -614,13 +617,25 @@ def has_review(path: Path) -> bool:
     return path.exists() and len(path.read_text(encoding="utf-8").strip()) >= 40
 
 
-def review_receipt_status(path: Path) -> dict[str, Any]:
+def review_receipt_status(path: Path, *, expected_head_sha: str = "") -> dict[str, Any]:
     if not has_review(path):
-        return {"ok": False, "verdict": "", "reason": "missing or too short"}
+        return {"ok": False, "verdict": "", "reason": "missing or too short", "reviewed_head_sha": ""}
+    receipt_path = path.with_name(path.stem.replace("_review", "_review_receipt") + ".json")
+    if not receipt_path.exists():
+        return {"ok": False, "verdict": "", "reason": "missing reviewer receipt JSON", "reviewed_head_sha": ""}
+    try:
+        receipt = load_json(receipt_path)
+    except (OSError, json.JSONDecodeError):
+        return {"ok": False, "verdict": "", "reason": "invalid reviewer receipt JSON", "reviewed_head_sha": ""}
+    reviewed_head_sha = str(receipt.get("reviewed_head_sha") or "")
+    if receipt.get("exit_code") != 0:
+        return {"ok": False, "verdict": "", "reason": f"review command exited {receipt.get('exit_code')}", "reviewed_head_sha": reviewed_head_sha}
+    if expected_head_sha and reviewed_head_sha != expected_head_sha:
+        return {"ok": False, "verdict": "", "reason": "reviewed head SHA mismatch", "reviewed_head_sha": reviewed_head_sha}
     text = path.read_text(encoding="utf-8")
     lowered = text.lower()
     if "error:" in lowered or "failed to initialize" in lowered or "traceback" in lowered:
-        return {"ok": False, "verdict": "", "reason": "review command failed"}
+        return {"ok": False, "verdict": "", "reason": "review command failed", "reviewed_head_sha": reviewed_head_sha}
     lines = [line.strip() for line in text.splitlines()]
     allowed = {"APPROVE", "REQUEST_CHANGES", "BLOCKED", "NEEDS_HUMAN"}
     for index, line in enumerate(lines):
@@ -631,9 +646,9 @@ def review_receipt_status(path: Path) -> dict[str, Any]:
                 continue
             verdict = candidate.split()[0].strip("`*_-. ")
             if verdict in allowed:
-                return {"ok": True, "verdict": verdict, "reason": ""}
-            return {"ok": False, "verdict": verdict, "reason": "invalid verdict"}
-    return {"ok": False, "verdict": "", "reason": "missing ## Verdict section"}
+                return {"ok": True, "verdict": verdict, "reason": "", "reviewed_head_sha": reviewed_head_sha}
+            return {"ok": False, "verdict": verdict, "reason": "invalid verdict", "reviewed_head_sha": reviewed_head_sha}
+    return {"ok": False, "verdict": "", "reason": "missing ## Verdict section", "reviewed_head_sha": reviewed_head_sha}
 
 
 def build_gate(args: argparse.Namespace) -> dict[str, Any]:
@@ -644,15 +659,23 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
     current_threads = fetch_review_threads(args.pr, repo)
     current_classification = classify_pr(current_pr)
     current_coherence = coherence_results(current_pr.get("body") or "")
+    packet_head_sha = str((original.get("pr") or {}).get("headRefOid") or "")
+    current_head_sha = str(current_pr.get("headRefOid") or "")
 
     blockers: list[str] = []
     warnings: list[str] = []
+    if not packet_head_sha:
+        blockers.append("packet is missing reviewed head SHA")
+    if current_head_sha and packet_head_sha and current_head_sha != packet_head_sha:
+        blockers.append("PR head changed since packet generation")
     if current_pr.get("isDraft"):
         blockers.append("PR is draft")
     if current_classification["mergeable"] != "MERGEABLE":
         blockers.append(f"mergeable={current_classification['mergeable']}")
     if current_classification["checks"]["failing"]:
         blockers.append(f"failing checks: {', '.join(current_classification['checks']['failing'])}")
+    if current_classification["checks"]["unknown"]:
+        blockers.append(f"unknown checks: {', '.join(current_classification['checks']['unknown'])}")
     if current_classification["checks"]["pending"] and not args.allow_pending:
         blockers.append(f"pending checks: {', '.join(current_classification['checks']['pending'])}")
     if current_classification["reviewDecision"] == "CHANGES_REQUESTED":
@@ -667,8 +690,8 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
 
     codex_path = out_dir / "codex_review.md"
     claude_path = out_dir / "claude_review.md"
-    codex_receipt = review_receipt_status(codex_path)
-    claude_receipt = review_receipt_status(claude_path)
+    codex_receipt = review_receipt_status(codex_path, expected_head_sha=current_head_sha)
+    claude_receipt = review_receipt_status(claude_path, expected_head_sha=current_head_sha)
     if not codex_receipt["ok"]:
         blockers.append(f"invalid codex_review.md receipt: {codex_receipt['reason']}")
     elif codex_receipt["verdict"] != "APPROVE":
@@ -681,9 +704,6 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
     original_risk = original.get("risk", {}).get("level", "UNKNOWN")
     if original_risk in {"HIGH", "CRITICAL"} and not args.human_approved:
         blockers.append(f"{original_risk} risk requires --human-approved")
-    if current_classification["checks"]["unknown"]:
-        warnings.append(f"unknown checks: {', '.join(current_classification['checks']['unknown'])}")
-
     return {
         "schema": "dharma.pr_review.merge_gate.v1",
         "generated_at": utc_now(),
@@ -704,10 +724,16 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
             "codex_present": has_review(codex_path),
             "codex_valid": codex_receipt["ok"],
             "codex_verdict": codex_receipt["verdict"],
+            "codex_reviewed_head_sha": codex_receipt["reviewed_head_sha"],
             "claude": str(claude_path),
             "claude_present": has_review(claude_path),
             "claude_valid": claude_receipt["ok"],
             "claude_verdict": claude_receipt["verdict"],
+            "claude_reviewed_head_sha": claude_receipt["reviewed_head_sha"],
+        },
+        "head_sha": {
+            "packet": packet_head_sha,
+            "current": current_head_sha,
         },
         "risk": original.get("risk", {}),
     }
@@ -738,11 +764,13 @@ def render_gate_markdown(gate: dict[str, Any]) -> str:
     receipts = gate["review_receipts"]
     lines.append(
         f"- Codex: `{receipts['codex']}` present={receipts['codex_present']} "
-        f"valid={receipts['codex_valid']} verdict={receipts['codex_verdict'] or 'NONE'}"
+        f"valid={receipts['codex_valid']} verdict={receipts['codex_verdict'] or 'NONE'} "
+        f"head={receipts['codex_reviewed_head_sha'] or 'NONE'}"
     )
     lines.append(
         f"- Claude: `{receipts['claude']}` present={receipts['claude_present']} "
-        f"valid={receipts['claude_valid']} verdict={receipts['claude_verdict'] or 'NONE'}"
+        f"valid={receipts['claude_valid']} verdict={receipts['claude_verdict'] or 'NONE'} "
+        f"head={receipts['claude_reviewed_head_sha'] or 'NONE'}"
     )
     lines.append("")
     return "\n".join(lines)
@@ -894,15 +922,33 @@ def cmd_merge(args: argparse.Namespace) -> int:
         return 2
     if not args.execute:
         print("decision=MERGE_CANDIDATE")
-        print(f"dry_run=true command=gh pr merge {args.pr} --{args.method} --delete-branch")
+        print(
+            "dry_run=true command="
+            f"gh pr merge {args.pr} --{args.method} --delete-branch "
+            f"--match-head-commit {gate['head_sha']['current']}"
+        )
         return 0
-    run(["gh", "pr", "merge", str(args.pr), f"--{args.method}", "--delete-branch"], timeout=300)
+    run(
+        [
+            "gh",
+            "pr",
+            "merge",
+            str(args.pr),
+            f"--{args.method}",
+            "--delete-branch",
+            "--match-head-commit",
+            gate["head_sha"]["current"],
+        ],
+        timeout=300,
+    )
     print(f"merged=pr-{args.pr} method={args.method}")
     return 0
 
 
 def cmd_run_agent(args: argparse.Namespace) -> int:
     out_dir = latest_or_arg_packet(args)
+    packet = load_json(out_dir / "FACTS.json")
+    reviewed_head_sha = str((packet.get("pr") or {}).get("headRefOid") or "")
     prompt_name = "PROMPT_CLAUDE.md" if args.agent == "claude" else "PROMPT_CODEX.md"
     output_name = "claude_review.md" if args.agent == "claude" else "codex_review.md"
     prompt = (out_dir / prompt_name).read_text(encoding="utf-8")
@@ -925,6 +971,7 @@ def cmd_run_agent(args: argparse.Namespace) -> int:
             "agent": args.agent,
             "command": command,
             "exit_code": result.returncode,
+            "reviewed_head_sha": reviewed_head_sha,
             "output": str(out_dir / output_name),
         },
     )

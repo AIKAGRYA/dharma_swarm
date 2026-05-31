@@ -86,14 +86,16 @@ GraphQL is available.
 The gate blocks when any of these are true:
 
 - PR is draft.
+- PR head SHA changed since packet/review generation.
 - GitHub says the branch is not mergeable.
 - Any check is failing.
+- Check rollup is empty or contains an unknown conclusion.
 - Checks are pending, unless `--allow-pending` is explicitly passed.
 - GitHub review decision is `CHANGES_REQUESTED`.
 - Coherence Delta fields are missing or placeholders.
 - Review-thread lookup fails or review threads are unresolved.
-- `codex_review.md` is missing, invalid, or not an `APPROVE` verdict.
-- `claude_review.md` is missing, invalid, or not an `APPROVE` verdict.
+- `codex_review.md` / `codex_review_receipt.json` is missing, invalid, nonzero-exit, stale-head, or not an `APPROVE` verdict.
+- `claude_review.md` / `claude_review_receipt.json` is missing, invalid, nonzero-exit, stale-head, or not an `APPROVE` verdict.
 - Risk is `HIGH` or `CRITICAL` and no `--human-approved` flag is present.
 
 ## Agent Contract

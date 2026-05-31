@@ -75,6 +75,22 @@ def test_classify_pr_blocks_unrecognized_completed_conclusion():
     assert result["checks"]["failing"] == ["custom:BOGUS"]
 
 
+def test_classify_pr_blocks_empty_check_rollup():
+    pr = {
+        "number": 5,
+        "title": "no checks",
+        "isDraft": False,
+        "mergeable": "MERGEABLE",
+        "reviewDecision": "APPROVED",
+        "statusCheckRollup": [],
+    }
+
+    result = prc.classify_pr(pr)
+
+    assert result["status"] == "BLOCKED_CHECKS"
+    assert result["checks"]["unknown"] == ["no status checks reported"]
+
+
 def test_coherence_results_rejects_placeholder_field():
     body = """
 - Organ touched: docs/governance
@@ -174,8 +190,9 @@ def test_review_receipt_status_rejects_command_error(tmp_path):
         "Error: failed to initialize in-process app-server client\n",
         encoding="utf-8",
     )
+    prc.write_json(path.with_name("codex_review_receipt.json"), {"exit_code": 0, "reviewed_head_sha": "abc"})
 
-    result = prc.review_receipt_status(path)
+    result = prc.review_receipt_status(path, expected_head_sha="abc")
 
     assert result["ok"] is False
     assert result["reason"] == "review command failed"
@@ -190,8 +207,9 @@ def test_review_receipt_status_accepts_verdict(tmp_path):
         "No blocking findings.\n",
         encoding="utf-8",
     )
+    prc.write_json(path.with_name("claude_review_receipt.json"), {"exit_code": 0, "reviewed_head_sha": "abc"})
 
-    result = prc.review_receipt_status(path)
+    result = prc.review_receipt_status(path, expected_head_sha="abc")
 
     assert result["ok"] is True
     assert result["verdict"] == "APPROVE"
@@ -206,11 +224,40 @@ def test_review_receipt_status_accepts_request_changes_for_gate_to_block(tmp_pat
         "1. Blocking issue.\n",
         encoding="utf-8",
     )
+    prc.write_json(path.with_name("codex_review_receipt.json"), {"exit_code": 0, "reviewed_head_sha": "abc"})
 
-    result = prc.review_receipt_status(path)
+    result = prc.review_receipt_status(path, expected_head_sha="abc")
 
     assert result["ok"] is True
     assert result["verdict"] == "REQUEST_CHANGES"
+
+
+def test_review_receipt_status_rejects_nonzero_exit(tmp_path):
+    path = tmp_path / "codex_review.md"
+    path.write_text(
+        "## Verdict\nAPPROVE\n\n## Findings\nNo blocking findings.\n",
+        encoding="utf-8",
+    )
+    prc.write_json(path.with_name("codex_review_receipt.json"), {"exit_code": 1, "reviewed_head_sha": "abc"})
+
+    result = prc.review_receipt_status(path, expected_head_sha="abc")
+
+    assert result["ok"] is False
+    assert result["reason"] == "review command exited 1"
+
+
+def test_review_receipt_status_rejects_stale_head(tmp_path):
+    path = tmp_path / "claude_review.md"
+    path.write_text(
+        "## Verdict\nAPPROVE\n\n## Findings\nNo blocking findings.\n",
+        encoding="utf-8",
+    )
+    prc.write_json(path.with_name("claude_review_receipt.json"), {"exit_code": 0, "reviewed_head_sha": "old"})
+
+    result = prc.review_receipt_status(path, expected_head_sha="new")
+
+    assert result["ok"] is False
+    assert result["reason"] == "reviewed head SHA mismatch"
 
 
 def test_build_gate_blocks_when_review_thread_lookup_fails(tmp_path, monkeypatch):
@@ -221,6 +268,10 @@ def test_build_gate_blocks_when_review_thread_lookup_fails(tmp_path, monkeypatch
         (packet_dir / name).write_text(
             "## Verdict\nAPPROVE\n\n## Findings\nNo blocking findings.\n",
             encoding="utf-8",
+        )
+        prc.write_json(
+            packet_dir / name.replace(".md", "_receipt.json"),
+            {"exit_code": 0, "reviewed_head_sha": "abc"},
         )
 
     args = SimpleNamespace(
@@ -237,6 +288,7 @@ def test_build_gate_blocks_when_review_thread_lookup_fails(tmp_path, monkeypatch
         lambda _pr: {
             "number": 42,
             "title": "ok",
+            "headRefOid": "abc",
             "body": """
 - Organ touched: docs
 - Declared-vs-actual gap closed: reviewer proof is now strict.
@@ -260,6 +312,56 @@ def test_build_gate_blocks_when_review_thread_lookup_fails(tmp_path, monkeypatch
 
     assert gate["decision"] == "BLOCKED"
     assert "could not verify review threads: rate limited" in gate["blockers"]
+
+
+def test_build_gate_blocks_when_head_changed_after_packet(tmp_path, monkeypatch):
+    packet_dir = tmp_path / "packet"
+    packet_dir.mkdir()
+    prc.write_json(packet_dir / "FACTS.json", {"risk": {"level": "LOW"}, "pr": {"headRefOid": "old"}})
+    for name in ("codex_review.md", "claude_review.md"):
+        (packet_dir / name).write_text(
+            "## Verdict\nAPPROVE\n\n## Findings\nNo blocking findings.\n",
+            encoding="utf-8",
+        )
+        prc.write_json(
+            packet_dir / name.replace(".md", "_receipt.json"),
+            {"exit_code": 0, "reviewed_head_sha": "old"},
+        )
+
+    args = SimpleNamespace(
+        packet_dir=str(packet_dir),
+        state_root=str(tmp_path),
+        pr=42,
+        allow_pending=False,
+        human_approved=False,
+    )
+
+    monkeypatch.setattr(
+        prc,
+        "fetch_pr_view",
+        lambda _pr: {
+            "number": 42,
+            "title": "changed",
+            "headRefOid": "new",
+            "body": """
+- Organ touched: docs
+- Declared-vs-actual gap closed: reviewer proof is now strict.
+- Proof that re-reads the map: packet and gate both load.
+- New drift introduced: None
+""",
+            "isDraft": False,
+            "mergeable": "MERGEABLE",
+            "reviewDecision": "APPROVED",
+            "statusCheckRollup": [{"name": "tests", "status": "COMPLETED", "conclusion": "SUCCESS"}],
+        },
+    )
+    monkeypatch.setattr(prc, "repo_name", lambda: "owner/repo")
+    monkeypatch.setattr(prc, "fetch_review_threads", lambda _pr, _repo: {"ok": True, "unresolved_count": 0})
+
+    gate = prc.build_gate(args)
+
+    assert gate["decision"] == "BLOCKED"
+    assert "PR head changed since packet generation" in gate["blockers"]
 
 
 def test_claude_review_env_can_opt_into_api_key():
