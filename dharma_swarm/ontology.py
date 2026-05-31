@@ -310,16 +310,16 @@ def _default_telos_gate_check(action_name: str, params: dict[str, Any]) -> dict[
     """
     try:
         from dharma_swarm.telos_gates import DEFAULT_GATEKEEPER
-    except Exception:  # gates unavailable -> fail open, never brick the registry
-        logging.getLogger(__name__).warning("telos gates unavailable; action ungated")
-        return {}
+    except Exception:  # gates unavailable -> fail closed for declared telos gates
+        logging.getLogger(__name__).warning("telos gates unavailable; action blocked")
+        return {"TELOS": "BLOCK"}
     payload = json.dumps(params, default=str, sort_keys=True)
     # Feed action-name + params as the action description: for typed actions the real
     # harm vector is the PARAMS, not the always-benign verb ("Propose"/"Run"), so
     # AHIMSA's harm scan must see the payload. Params also go as content for the
     # credential/injection scans.
-    action_desc = f"{action_name} {payload}"[:2000]
-    result = DEFAULT_GATEKEEPER.check(action=action_desc, content=payload[:2000])
+    action_desc = f"{action_name} {payload}"
+    result = DEFAULT_GATEKEEPER.check(action=action_desc, content=payload)
     # The authoritative verdict is the overall DECISION, not the per-gate advisory
     # FAILs: Tier-A/B hard violations (harm, deception, credential leak) -> BLOCK;
     # advisory outcomes (REVIEW — e.g. "low epistemological diversity" on a
@@ -1190,10 +1190,12 @@ _EVOLUTION_ENTRY = ObjectType(
                  is_deterministic=False),
         ActionDef(name="Promote", object_type="EvolutionEntry",
                  description="Advance through evidence tiers",
-                 modifies=["promotion_state"]),
+                 modifies=["promotion_state"],
+                 telos_gates=["AHIMSA", "SATYA", "REVERSIBILITY"]),
         ActionDef(name="Revert", object_type="EvolutionEntry",
                  description="Roll back failed change",
-                 modifies=["promotion_state"]),
+                 modifies=["promotion_state"],
+                 telos_gates=["AHIMSA", "SATYA", "REVERSIBILITY"]),
     ],
     security=SecurityPolicy(telos_required=True, audit_all=True),
     telos_alignment=0.95,
