@@ -297,6 +297,39 @@ def check_security(
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 
+def _default_telos_gate_check(action_name: str, params: dict[str, Any]) -> dict[str, str]:
+    """Default telos ``gate_check`` for :meth:`OntologyRegistry.execute_action`.
+
+    W1 — hard-wires the shared ``DEFAULT_GATEKEEPER`` (the 11 dharmic gates) into
+    the universal typed-action chokepoint so a declared ``telos_gate`` is
+    *structural*, not opt-in: when a caller passes no ``gate_check``, this default
+    is used and a declared gate cannot be bypassed by omission. Maps the
+    gatekeeper verdict into ``execute_action``'s ``{gate: "BLOCK"|"PASS"}``
+    contract. Permissive by default (``internal_yolo``): only genuinely
+    harmful/deceptive actions BLOCK; advisory (WARN/REVIEW) outcomes PASS.
+    """
+    try:
+        from dharma_swarm.telos_gates import DEFAULT_GATEKEEPER
+    except Exception:  # gates unavailable -> fail open, never brick the registry
+        logging.getLogger(__name__).warning("telos gates unavailable; action ungated")
+        return {}
+    payload = json.dumps(params, default=str, sort_keys=True)
+    # Feed action-name + params as the action description: for typed actions the real
+    # harm vector is the PARAMS, not the always-benign verb ("Propose"/"Run"), so
+    # AHIMSA's harm scan must see the payload. Params also go as content for the
+    # credential/injection scans.
+    action_desc = f"{action_name} {payload}"[:2000]
+    result = DEFAULT_GATEKEEPER.check(action=action_desc, content=payload[:2000])
+    # The authoritative verdict is the overall DECISION, not the per-gate advisory
+    # FAILs: Tier-A/B hard violations (harm, deception, credential leak) -> BLOCK;
+    # advisory outcomes (REVIEW — e.g. "low epistemological diversity" on a
+    # context-light typed action) -> PASS, so the hard-wire enforces security
+    # without false-positive-blocking legitimate typed mutations.
+    decision = str(getattr(result, "decision", "")).upper()
+    gate = str(getattr(result, "gate", "") or "TELOS")
+    return {gate: "BLOCK"} if "BLOCK" in decision else {gate: "PASS"}
+
+
 class OntologyRegistry:
     """Central registry of all object types, links, actions, and security.
 
@@ -600,7 +633,15 @@ class OntologyRegistry:
         executed_by: str = "system",
         gate_check: Callable[[str, dict[str, Any]], dict[str, str]] | None = None,
     ) -> ActionExecution:
-        """Execute a typed action with optional telos gate checking."""
+        """Execute a typed action with telos gate checking.
+
+        Gates are hard-wired (W1): when ``gate_check`` is omitted, the shared
+        ``DEFAULT_GATEKEEPER`` is used via :func:`_default_telos_gate_check`, so a
+        declared ``telos_gate`` cannot be bypassed by passing no gate. Callers that
+        genuinely need no gate must pass an explicit no-op.
+        """
+        if gate_check is None:
+            gate_check = _default_telos_gate_check
         action_def = self.get_action_def(object_type, action_name)
         execution = ActionExecution(
             action_name=action_name,
@@ -628,9 +669,9 @@ class OntologyRegistry:
 
         # Security check for telos-required types
         obj_type = self._types.get(object_type)
-        if obj_type and obj_type.security.telos_required and not gate_check:
+        if obj_type and obj_type.security.telos_required and not execution.gate_results:
             execution.result = "blocked"
-            execution.error = "telos gate required but no gate_check provided"
+            execution.error = "telos-required type but action produced no gate verdict (declare telos_gates)"
             self._action_log.append(execution)
             return execution
 

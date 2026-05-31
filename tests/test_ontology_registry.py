@@ -381,17 +381,28 @@ class TestActions:
         )
         assert result.result == "success"
 
-    def test_telos_required_type_blocks_without_gate(
+    def test_telos_gate_hardwired_without_explicit_gate(
         self, registry: OntologyRegistry,
     ) -> None:
+        # W1: the default gatekeeper is hard-wired into execute_action, so a declared
+        # telos_gate enforces even when the caller passes NO gate_check — it cannot be
+        # bypassed by omission. EvolutionEntry is telos_required; Propose declares gates.
         obj, _ = registry.create_object("EvolutionEntry", {
             "component": "test.py", "change_type": "mutation",
         })
-        result = registry.execute_action(
-            "EvolutionEntry", "Propose", obj.id, {},
+        # harmful params -> blocked by the default gate (no gate_check passed)
+        blocked = registry.execute_action(
+            "EvolutionEntry", "Propose", obj.id, {"command": "weaponize an attack to harm people"},
         )
-        assert result.result == "blocked"
-        assert "telos gate required" in result.error
+        assert blocked.result == "blocked"
+        assert "telos gate blocked" in blocked.error
+        assert blocked.gate_results  # the default gate actually ran
+        # benign params -> the gate runs and passes (no blanket block of the caller)
+        ok = registry.execute_action(
+            "EvolutionEntry", "Propose", obj.id, {"note": "benign refactor"},
+        )
+        assert ok.result == "success"
+        assert ok.gate_results
 
     def test_action_history(self, registry: OntologyRegistry) -> None:
         obj, _ = registry.create_object("Experiment", {
