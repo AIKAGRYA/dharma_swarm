@@ -10,7 +10,7 @@
 
 **Substrate-nativeness status**: The current runtime is ~10–15% ontology-native; ~85–90% of runtime work bypasses substrate. See [`reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md`](../../reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md) for the audit that established this estimate.
 
-**Active build track**: declared in [`ACTIVE_TRACK.yaml`](ACTIVE_TRACK.yaml) and surfaced by `make onboard`. Do not duplicate the track name in prose here — the YAML is the single source of intent. The governing principle: do not open additional tracks until the active seam ships.
+**Active build tracks**: declared in [`ACTIVE_TRACK.yaml`](ACTIVE_TRACK.yaml) and surfaced by `make onboard`. Do not duplicate track names in prose here — the YAML is the single source of intent. The governing principle: the operator may run between `min_active` and `max_active` concurrent tracks (default floor 1, ceiling 10) as declared by `track_policy` in `ACTIVE_TRACK.yaml`. Opening additional tracks beyond the floor is operator discretion, not automatic — each concurrent track must have a clear owner, distinct surfaces, and non-overlapping non-goals. The single-track default holds whenever the operator has not explicitly opened a second; this amendment authorizes concurrency, it does not mandate it. Rationale: with 10+ agent contributors active on the repo (387 commits in the last 30 days as of 2026-05-31), serializing all work behind one track creates unbounded queueing on the operator and on review capacity. Concurrency is gated on non-overlap, not on agent count.
 
 <!-- ACTIVE_TRACK:START -->
 
@@ -58,7 +58,7 @@ A2A anchor: dharma_swarm/a2a/README.md (three-layer receipt architecture)
 - Do not decompose AgentRunner.run_task in this track (except where strictly necessary).
 - Do not split providers.py into per-provider files yet.
 - Do not rewrite SwarmManager.
-- Do not introduce NATS, Redis, gRPC, or a new daemon.
+- Do not introduce Redis, gRPC, or a new daemon as part of THIS track. (NATS substrate scoped out of this track but no longer globally prohibited as of doctrine amendment 2026-05-31; runs as a concurrent scoped track when opened, with non-overlapping surfaces.)
 - Do not create a second event log or truth surface.
 - Do not add another spiritual/metaphoric naming layer.
 - Do not add a parallel spine-check CI workflow — the uplift_guards composition is the only entry point.

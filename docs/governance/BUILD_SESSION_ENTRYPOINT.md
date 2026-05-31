@@ -88,7 +88,7 @@ A2A anchor: dharma_swarm/a2a/README.md (three-layer receipt architecture)
 - Do not decompose AgentRunner.run_task in this track (except where strictly necessary).
 - Do not split providers.py into per-provider files yet.
 - Do not rewrite SwarmManager.
-- Do not introduce NATS, Redis, gRPC, or a new daemon.
+- Do not introduce Redis, gRPC, or a new daemon as part of THIS track. (NATS substrate scoped out of this track but no longer globally prohibited as of doctrine amendment 2026-05-31; runs as a concurrent scoped track when opened, with non-overlapping surfaces.)
 - Do not create a second event log or truth surface.
 - Do not add another spiritual/metaphoric naming layer.
 - Do not add a parallel spine-check CI workflow — the uplift_guards composition is the only entry point.
