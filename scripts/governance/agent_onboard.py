@@ -452,6 +452,43 @@ def render_tooling_first() -> None:
         print(f"    {mark} {label}{suffix}")
 
 
+def render_pr_hygiene() -> None:
+    section("PR HYGIENE — open pull request health")
+    print("  Rules (see docs/governance/PR_QUALITY_GATES.md):")
+    print("    - Bot authors: max 3 open PRs (enforced by bot-pr-limit.yml)")
+    print("    - Bot PRs: auto-close after 14 days inactivity")
+    print("    - Human PRs: auto-close after 30 days inactivity")
+    print("    - Draft PRs: exempt from auto-close")
+    print("    - Duplicate-intent bot PRs: detected by title-prefix matching")
+    print()
+    print("  Before opening a PR:")
+    print("    1. Run: make governance-all")
+    print("    2. Check for existing PRs on same topic:")
+    print("       gh pr list --state open --search '<your topic>'")
+    print("    3. Fill all PR template sections (Why, Surface, Coherence Delta, ...)")
+    print("    4. Mark WIP/scaffold PRs as drafts; prefix shelved PRs with [SHELVED]")
+    print()
+
+    # Attempt to show open PR count if gh is available.
+    try:
+        result = subprocess.run(
+            ["gh", "pr", "list", "--repo", "AmitabhainArunachala/dharma_swarm",
+             "--state", "open", "--json", "number", "--jq", "length"],
+            capture_output=True, text=True, timeout=15,
+        )
+        if result.returncode == 0 and result.stdout.strip().isdigit():
+            count = int(result.stdout.strip())
+            print(f"  Current open PRs: {count}")
+            if count > 20:
+                print("  ⚠️  HIGH — consider closing stale/duplicate PRs before adding more")
+            elif count > 10:
+                print("  ⚠  MODERATE — review open PRs for duplicates")
+            else:
+                print("  ✓  Healthy")
+    except (subprocess.TimeoutExpired, OSError, FileNotFoundError):
+        print("  (gh CLI unavailable — cannot check open PR count)")
+
+
 def render_enforcement_and_depth() -> None:
     section("ENFORCEMENT (run before opening a PR)")
     print("  make docops-integrity      # documentation invariants")
@@ -545,6 +582,7 @@ def main() -> int:
     render_axioms()
     render_recent_activity(track)
     render_spine_status()
+    render_pr_hygiene()
     render_decay_watch()
     render_tooling_first()
     render_enforcement_and_depth()

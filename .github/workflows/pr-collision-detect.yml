@@ -33,7 +33,7 @@ jobs:
       - name: Skip if no BR-ids cited
         if: steps.this_pr.outputs.br_ids == ''
         run: |
-          echo "No BR-ids found in PR body; nothing to check."
+          echo "No BR-ids found in PR body; checking title-prefix dedup only."
 
       - name: Scan all OTHER open PRs for collisions
         if: steps.this_pr.outputs.br_ids != ''
@@ -74,6 +74,79 @@ jobs:
             } >> "${GITHUB_OUTPUT}"
           else
             echo "collision_found=false" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Detect title-prefix duplicates (bot PRs)
+        id: title_dedup
+        if: contains(github.event.pull_request.user.login, '[bot]')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          set -euo pipefail
+          # Extract the title prefix up to the first colon or dash-separated segment.
+          # e.g. "verdict(inter_agent): 11-step chain" -> "verdict(inter_agent)"
+          # e.g. "chore(inter-agent): deliver outbound" -> "chore(inter-agent)"
+          prefix="$(echo "${PR_TITLE}" | sed -E 's/^([^:]+):.*$/\1/' | xargs)"
+
+          if [ -z "$prefix" ] || [ "$prefix" = "$PR_TITLE" ]; then
+            echo "title_dups_found=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Fetch all open PRs
+          gh pr list --state open --limit 200 \
+            --json number,title,author \
+            > /tmp/all_prs.json
+
+          # Find other bot PRs with the same title prefix
+          dups="$(jq -r --arg prefix "$prefix" --argjson self "$PR_NUMBER" '
+            .[] | select(.number != $self) |
+            select(.author.login | test("\\[bot\\]")) |
+            select(.title | startswith($prefix)) |
+            "  - PR #\(.number): \(.title)"
+          ' /tmp/all_prs.json)"
+
+          if [ -n "$dups" ]; then
+            {
+              echo "title_dups_found=true"
+              echo "title_dups_message<<EOF"
+              printf '**Title prefix "%s"** is shared with:\n%s\n' "$prefix" "$dups"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+          else
+            echo "title_dups_found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Post / update warning comment on this PR (title dedup)
+        if: steps.title_dedup.outputs.title_dups_found == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          MESSAGE: ${{ steps.title_dedup.outputs.title_dups_message }}
+        run: |
+          marker="<!-- pr-title-dedup:auto -->"
+          body="${marker}
+          ## ⚠️ Duplicate bot PR detected (title-prefix match)
+
+          Other open bot PRs share the same intent prefix as this PR:
+          ${MESSAGE}
+
+          *Per \`docs/governance/PR_QUALITY_GATES.md\` § Bot PR Proliferation Control,
+          only the latest/most complete PR for a given intent should remain open.
+          Close superseded PRs with a comment linking to the successor.*"
+
+          existing="$(gh pr view "${PR_NUMBER}" --json comments \
+            --jq '.comments[] | select(.body | startswith("'"${marker}"'")) | .id' \
+            | head -1)"
+
+          if [ -n "${existing}" ]; then
+            gh api --method PATCH \
+              "/repos/${GITHUB_REPOSITORY}/issues/comments/${existing}" \
+              -f body="${body}"
+          else
+            gh pr comment "${PR_NUMBER}" --body "${body}"
           fi
 
       - name: Post / update warning comment on this PR
