@@ -1,0 +1,180 @@
+# Spine Adoption track block — READY TO DROP INTO MULTI-TRACK ACTIVE_TRACK.yaml
+#
+# Source: perplexity-computer, 2026-05-31
+# Schema: v2 (active_tracks list, per Claude's machinery on trust-build-compass)
+# Status: DRAFT — do not paste until:
+#   (1) Doctrine amendment ratifies multi-track on main, AND
+#   (2) Claude's multi-track schema machinery (check_track_status v2,
+#       render_active_track_includes v2) lands on main from trust-build-compass.
+#
+# Authorship division (per A2A from claude-code, 2026-05-31):
+#   - Claude:  multi-track schema machinery + branch reconciliation onto main
+#   - Codex:   NATS implementation (owns nats_a2a_bridge.py et al.)
+#   - PPLX:    THIS track block + PR-triage/merge-sequencing
+#
+# When schema reaches main, this block goes under `active_tracks:` as one entry.
+# The nats-substrate block (Codex authors) goes under the same key as a sibling.
+
+- id: runtime-truth-spine-adoption-2026-06
+  name: Runtime Truth Spine — Adoption (god objects flow through invoke_agent)
+  status: ACTIVE
+  opened_at: "2026-05-31"
+  verified_at: "2026-05-31"
+  ttl_days: 21
+  owner: "@AmitabhainArunachala"
+
+  description: |
+    Successor to runtime-truth-spine-2026-06. That track shipped the spine
+    BY THE LETTER (13/13 completion criteria pass on origin/main): types
+    defined, persistence wired, CI guard live, 15 E2E tests passing. But
+    spine adoption was zero — verified 2026-05-31:
+
+      grep -rln "from dharma_swarm.spine" --include="*.py" \
+        | grep -v "^dharma_swarm/spine/" | grep -v "^tests/" \
+        | grep -v "uplift_guards" | wc -l
+      # 0
+
+    The god objects still run dispatch the old way:
+      - dharma_swarm/agent_runner.py   3,355 LOC
+      - dharma_swarm/orchestrator.py   2,755 LOC
+      - dharma_swarm/swarm.py          3,227 LOC
+
+    Substrate-nativeness is ~10–15% per SOVEREIGN_MANIFEST. This track
+    flips that ratio. Every production dispatch flows through
+    invoke_agent() and emits exactly one EvidenceReceipt. No more
+    parallel dispatch paths. No more spine-as-decoration.
+
+    Doctrine line (inherited, unchanged):
+      Receipts may differ by closure layer. Correlation identity must not.
+
+    Concurrent track context (per multi-track doctrine amendment):
+      - This track operates concurrently with nats-substrate-2026-06.
+      - Surface separation: spine adoption touches dharma_swarm/{agent_runner,
+        orchestrator,swarm}.py and dharma_swarm/spine/*. NATS work touches
+        dharma_swarm/operator_core/nats_*.py and dharma_swarm/a2a/* gateway
+        boundary. Collision domain = invoke_agent() signature only; coordinate
+        any signature change via A2A handoff before commit.
+
+    Reference: docs/reports/CONVERGED_SEAM_AUDIT_RUNTIME_TRUTH_SPINE.md §3
+    A2A handoff: roaming_mailbox/tasks/mbx_20260531_claude_to_perplexity.json
+
+  surfaces:
+    - dharma_swarm/spine/**
+    - dharma_swarm/agent_runner.py
+    - dharma_swarm/orchestrator.py
+    - dharma_swarm/swarm.py
+    - dharma_swarm/runtime_state.py
+    - dharma_swarm/a2a/a2a_bridge.py
+    - tests/test_spine_adoption_*.py
+    - scripts/uplift_guards/check_spine_ownership.py
+    - ACTIVE_SURFACE_MANIFEST.yaml
+
+  prerequisites:
+    - id: spine_package_shipped
+      kind: file_exists
+      file: dharma_swarm/spine/__init__.py
+    - id: invoke_agent_defined
+      kind: file_contains
+      file: dharma_swarm/spine/invoke.py
+      pattern: "async def invoke_agent"
+    - id: predecessor_track_closed
+      kind: file_contains
+      file: docs/governance/ACTIVE_TRACK.yaml
+      pattern: "id: runtime-truth-spine-2026-06"
+      # Predecessor must appear under closed_tracks: with status: SHIPPED
+    - id: multi_track_schema_live
+      kind: file_contains
+      file: docs/governance/ACTIVE_TRACK.yaml
+      pattern: "schema_version: 2"
+
+  completion_criteria:
+    # Tier 1 — adoption proof: invoke_agent is called from production code
+    - id: agent_runner_calls_invoke_agent
+      kind: file_contains
+      file: dharma_swarm/agent_runner.py
+      pattern: "from dharma_swarm.spine import"
+    - id: orchestrator_calls_invoke_agent
+      kind: file_contains
+      file: dharma_swarm/orchestrator.py
+      pattern: "from dharma_swarm.spine import"
+    - id: a2a_bridge_calls_invoke_agent
+      kind: file_contains
+      file: dharma_swarm/a2a/a2a_bridge.py
+      pattern: "invoke_agent"
+
+    # Tier 2 — receipt invariant: every dispatch emits exactly one receipt
+    - id: dispatch_emits_evidence_receipt
+      kind: file_contains
+      file: tests/test_spine_adoption_dispatch.py
+      pattern: "test_every_dispatch_emits_exactly_one_evidence_receipt"
+    - id: zero_dispatch_dropoff_sources
+      kind: file_contains
+      file: tests/test_spine_adoption_dispatch.py
+      pattern: "test_no_dropoff_sources_remain"
+
+    # Tier 3 — guard hardening: CI fails new dispatch paths that bypass spine
+    - id: bypass_guard_active
+      kind: file_contains
+      file: scripts/uplift_guards/check_spine_ownership.py
+      pattern: "ALLOW_BYPASS"
+      # Guard must enumerate the allow-list and reject new bypasses.
+    - id: bypass_allowlist_at_zero
+      kind: file_contains
+      file: scripts/uplift_guards/check_spine_ownership.py
+      pattern: "BYPASS_ALLOWLIST = []"
+      # When the allow-list is empty, no production dispatch bypasses spine.
+
+    # Tier 4 — quantitative proof: at least N callers, measured
+    - id: spine_caller_floor_met
+      kind: file_contains
+      file: reports/governance/spine_adoption_evidence.md
+      pattern: "callers_outside_spine_pkg: 3"
+      # Reports v1: agent_runner, orchestrator, a2a_bridge.
+
+    # Tier 5 — documentation: doctrine line preserved + adoption narrative shipped
+    - id: adoption_narrative_documented
+      kind: file_exists
+      file: docs/architecture/SPINE_ADOPTION_NARRATIVE.md
+    - id: doctrine_line_preserved
+      kind: file_contains
+      file: dharma_swarm/spine/__init__.py
+      pattern: "Correlation identity must not"
+
+  non_goals:
+    - Do not introduce NATS, Redis, or gRPC in this track. Substrate is
+      nats-substrate-2026-06's lane.
+    - Do not decompose agent_runner.run_task beyond what is needed to
+      route through invoke_agent(). Full decomposition is a later track.
+    - Do not split providers.py in this track.
+    - Do not change the EvidenceReceipt schema. Adoption uses the shipped
+      types unchanged.
+    - Do not create a second guard CI workflow. Extend the existing
+      uplift_guards composition.
+    - Do not author new spine sub-modules. invoke / receipt / routing /
+      persistence are the four files; adopt them, don't sibling them.
+
+  next_items:
+    - id: 1
+      what: "Migrate a2a/a2a_bridge.py dispatch path through invoke_agent(). Smallest surface, highest leverage (A2A is already the cleanest layer)."
+      kind: code
+      blocker: true
+    - id: 2
+      what: "Migrate orchestrator.py dispatch path through invoke_agent(). Behind feature flag, default off until tests green."
+      kind: code
+      blocker: true
+    - id: 3
+      what: "Migrate agent_runner.py run_task hot path through invoke_agent(). Largest surface, most risk; lands last with the broadest test net."
+      kind: code
+      blocker: true
+    - id: 4
+      what: "Enable the bypass-guard allow-list-at-zero check in uplift_guards CI."
+      kind: code
+      blocker: true
+    - id: 5
+      what: "Author docs/architecture/SPINE_ADOPTION_NARRATIVE.md — how each call site got migrated, what receipt it now emits, what dropoff source it retired."
+      kind: docs
+      blocker: false
+    - id: 6
+      what: "Publish reports/governance/spine_adoption_evidence.md with the live caller count."
+      kind: docs
+      blocker: false
