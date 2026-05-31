@@ -154,7 +154,8 @@
       "consolidation_promotion_threshold": 0.6,
       "consolidation_promotion_cap_per_tick": 20,
       "lint_cadence": "24h",
-      "consolidation_cron_host": "perplexity_computer_harness",
+      "consolidation_cron_host": "agni_vps_systemd_user_service",
+      "deployment_spec": "docs/agents/perplexity-computer/AGNI_DEPLOYMENT.md",
       "budget_envelope": "full_operator_perplexity_allocation",
       "kill_switches": [
         "nats:dharma.a2a.perplexity payload kind=pause signed_by=operator",
