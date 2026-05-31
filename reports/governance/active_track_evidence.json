@@ -1,11 +1,11 @@
 {
-  "generated_at": "2026-05-28T13:23:13+00:00",
+  "generated_at": "2026-05-31T05:07:02+00:00",
   "active_track_id": "runtime-truth-spine-2026-06",
   "shippable": true,
   "prerequisites_ok": true,
   "completion_progress": {
-    "passed": 6,
-    "total": 6
+    "passed": 13,
+    "total": 13
   },
   "criteria": [
     {
@@ -45,10 +45,52 @@
       "detail": "pattern 'async def invoke_agent' found in dharma_swarm/spine/invoke.py"
     },
     {
-      "id": "spine_check_ci",
+      "id": "spine_ownership_guard",
       "kind": "file_exists",
       "passed": true,
-      "detail": ".github/workflows/spine-check.yml present"
+      "detail": "scripts/uplift_guards/check_spine_ownership.py present"
+    },
+    {
+      "id": "spine_guard_registered",
+      "kind": "file_contains",
+      "passed": true,
+      "detail": "pattern 'check_spine_ownership' found in scripts/uplift_guards/run_pre_commit.py"
+    },
+    {
+      "id": "spine_doctrine_anchored",
+      "kind": "file_contains",
+      "passed": true,
+      "detail": "pattern 'Correlation identity must not' found in dharma_swarm/spine/__init__.py"
+    },
+    {
+      "id": "correlation_spine_manifest_block",
+      "kind": "file_contains",
+      "passed": true,
+      "detail": "pattern 'correlation_spine:' found in ACTIVE_SURFACE_MANIFEST.yaml"
+    },
+    {
+      "id": "correlation_id_alias_present",
+      "kind": "file_contains",
+      "passed": true,
+      "detail": "pattern 'dharma.correlation_id' found in dharma_swarm/spine/receipt.py"
+    },
+    {
+      "id": "onboard_renders_spine",
+      "kind": "file_contains",
+      "passed": true,
+      "detail": "pattern 'render_spine_status' found in scripts/governance/agent_onboard.py"
+    },
+    {
+      "id": "anti_slop_role_vocabulary",
+      "kind": "file_contains",
+      "passed": true,
+      "detail": "pattern 'canonical-store' found in docs/governance/ANTI_SLOP_RULES.md"
+    },
+    {
+      "id": "runtime_state_receipt_field",
+      "kind": "file_contains",
+      "passed": true,
+      "detail": "pattern 'receipt_json' found in dharma_swarm/runtime_state.py"
     },
     {
       "id": "dropoff_tests_pass",
@@ -61,7 +103,7 @@
     {
       "severity": "INFO",
       "check": "track-shippable",
-      "message": "All 6 completion criteria pass. Track 'runtime-truth-spine-2026-06' is SHIPPABLE \u2014 close it and declare the next active track.",
+      "message": "All 13 completion criteria pass. Track 'runtime-truth-spine-2026-06' is SHIPPABLE \u2014 close it and declare the next active track.",
       "criterion_id": null
     }
   ]
