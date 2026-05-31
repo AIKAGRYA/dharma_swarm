@@ -119,57 +119,129 @@ budget_remaining_pct drops below 10, the next heartbeat carries an
 
 ### Layer B — Session-consolidation cron (the wiki)
 
-**Pattern:** adapted **OpenClaw "Dreaming"** (Light Sleep → Deep Sleep
-→ REM) — the production-proven consolidation loop documented by
-[Remote OpenClaw, May 2026](https://www.remoteopenclaw.com/blog/openclaw-dreaming-guide).
-Deferred-write discipline borrowed from
-[OpenAI Codex's idle-only memory writes](https://nicolasbustamante.com/blog/agent-memory-engineering)
-(live agent never writes; writes happen only when session is idle
-≥6h, avoiding system-prompt cache invalidation).
+**Pattern:** **Karpathy LLM Wiki as the spine, OpenClaw Dreaming as
+the rate-limiter, Codex deferred-write as the cache discipline.**
+Fused after cross-referencing both patterns against this seat's
+actual job (verdict reconciliation, multi-source synthesis,
+cross-surface session consolidation).
 
-**Cadence:** every 6 hours (4 ticks/day, well inside the ≤15
-crons/session ceiling). Tick only runs if the target session has been
-idle for the full 6h — matching Codex's discipline. Otherwise the
-tick yields and re-checks on the next interval.
+Three primary sources, three contributions:
 
-**Job — three-phase per Dreaming pattern:**
+- **[Karpathy LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)**
+  (May 2026) — the spine. Structured directory (`sources/` + `wiki/`
+  + `index.md` + `log.md`), heavy cross-referencing ("a single source
+  might touch 10-15 wiki pages"), explicit contradiction handling
+  ("noting where new data contradicts old claims"), explicit `/lint`
+  for health (orphans, stale claims, missing concept pages), and the
+  Q&A→wiki compounding loop ("good answers can be filed back into
+  the wiki as new pages"). "Obsidian is the IDE; the LLM is the
+  programmer; the wiki is the codebase."
+- **[OpenClaw Dreaming](https://www.remoteopenclaw.com/blog/openclaw-dreaming-guide)**
+  (GA April 2026) — the rate-limiter. Per-tick scoring (frequency,
+  recency, operator corrections, explicit importance), promotion
+  threshold ≥0.6, hard cap of 20 promotions per cycle, and the
+  Dream Diary audit trail (what was promoted *and what was rejected*).
+  This bounds the per-tick write volume — something Karpathy's pattern
+  intentionally leaves open and which we need closed for budget and
+  FM-1 reasons.
+- **[Codex deferred memory](https://nicolasbustamante.com/blog/agent-memory-engineering)**
+  (May 2026) — the cache discipline. Writes happen only when the
+  source session has been idle ≥6h, avoiding system-prompt cache
+  invalidation and the FM-2 "model writes during error" failure mode.
 
-1. **Light Sleep (collect + tag).** Enumerate Perplexity sessions
-   accessible to this seat that touched dharma_swarm work since the
-   last consolidation tick. Tag each session segment by category:
+**Why Karpathy as the spine, not Dreaming:** Dreaming's bio-metaphor
+collapses everything into a single MEMORY.md per night. Multi-source
+synthesis is fundamentally a *graph* problem — verdict A from agent X
+updates entity-page-for-X, concept-page-for-the-surface-at-issue, the
+overview, and a comparison page where X disagrees with Y. Karpathy's
+structured directory + cross-referencing models this natively. SOUL.md
+already commits this seat to preserving disagreement as a named
+tension; `/lint`-for-contradictions mechanizes that doctrine.
+
+**Directory layout (mirrors Karpathy):**
+
+```
+docs/agents/perplexity-computer/wiki/
+  SCHEMA.md            # this seat's CLAUDE.md/AGENTS.md
+  index.md             # catalog of all pages, organized by category
+  log.md               # append-only operational log
+  overview.md          # the current synthesis (LLM-maintained)
+  entities/
+    <callsign>.md      # one page per agent/seat in the swarm
+    <pr-or-issue>.md   # one page per long-running PR/issue thread
+  concepts/
+    <surface>.md       # one page per canonical surface (correlation_spine,
+                       # ACTIVE_SURFACE_MANIFEST, INTERFACE_MISMATCH_MAP, etc.)
+    <doctrine>.md      # one page per declared doctrine (anti-slop,
+                       # canonical-within-layer, five-layer witness, etc.)
+  comparisons/
+    <topic>.md         # named-tension pages (where agent X disagreed with Y)
+  sources/             # symlinks or references to original Perplexity sessions
+                       # (immutable per Karpathy rule — read but never edit)
+  DREAM_DIARY.md       # per-tick promotion ledger (Dreaming contribution)
+```
+
+**Cadence:** every 6 hours (4 ticks/day, inside the ≤15 crons/session
+ceiling). Tick only runs if the target session has been idle ≥6h
+(Codex discipline). Otherwise yields to the next interval.
+
+**Job — five phases (Karpathy spine + Dreaming gate):**
+
+1. **Collect** (Karpathy "ingest" + Dreaming Light Sleep).
+   Enumerate Perplexity sessions accessible to this seat that touched
+   dharma_swarm work since the last tick. Materialize each as a
+   read-only entry under `wiki/sources/` (path or transcript, never
+   edited).
+
+2. **Tag** (Dreaming Light Sleep). Classify each segment by category:
    `decision`, `artifact_produced`, `blind_spot_declared`,
-   `open_thread`, `verdict`, `noise`.
-2. **Deep Sleep (score + rank).** Score candidates by (frequency,
-   recency, operator corrections, explicit-importance marker).
-   Promotion threshold: ≥0.6. **Cap: 20 promotions per tick** (hard
-   ceiling — prevents one runaway session from flooding the wiki).
-3. **REM (write).** Append promoted items to
-   `docs/agents/perplexity-computer/CONSOLIDATION_WIKI.md` under a
-   dated heading. **Append-only, hash-verified before and after
-   write** (per FM-2 mitigation — Anthropic Managed Agents'
-   memory-overwrite failure mode). Never rewrite history.
+   `open_thread`, `verdict`, `contradiction`, `noise`.
 
-4. If the tick produces zero promotions: publish a heartbeat with
-   `consolidation: "no-op"`; do not write a no-op section to the wiki.
-5. Emit a NATS message on `dharma.a2a.perplexity` (self-loopback) so
-   the message log is the consolidation receipt.
-6. Sibling artifact: append one line to
-   `docs/agents/perplexity-computer/DREAM_DIARY.md` per tick with
-   `{ts, sessions_seen, candidates_tagged, candidates_promoted, sha256_before, sha256_after}`.
-   This is the audit trail the operator reads to verify the loop
-   isn't hallucinating consolidations.
+3. **Score + bound** (Dreaming Deep Sleep). Score candidates by
+   (frequency, recency, operator-correction signal, explicit-importance
+   marker). **Promotion threshold ≥0.6. Cap: 20 promotions per tick.**
+   Below-threshold and above-cap items are recorded in DREAM_DIARY.md
+   with their score and rejection reason — nothing is silently dropped.
 
-**Wiki shape:**
-```
-## YYYY-MM-DD HH:MM UTC — Consolidation tick N
+4. **Write** (Karpathy spine + FM-2 mitigation).
+   For each promoted item:
+   - sha256 the target wiki page before write.
+   - Update the relevant entity/concept/comparison page (a single
+     source may touch 10-15 pages per Karpathy).
+   - If the item is a `contradiction` tag: create or update a
+     `comparisons/` page that preserves both positions as a named
+     tension (do not pick a winner unless evidence forces it —
+     SOUL.md "What I Do" item 1).
+   - Update `index.md` with the new/changed page entry.
+   - Append to `log.md` with prefix `## [YYYY-MM-DD HH:MM] consolidate | tick N`
+     so the log is `grep`-parseable per Karpathy.
+   - sha256 after write; if either hash mismatches expected
+     transition, abort, restore from git HEAD, emit
+     `kind: "wiki_corruption"` on NATS.
 
-**Sessions consolidated:** <list of session ids>
-**Decisions captured:** <bullet list with source session>
-**Artifacts produced:** <file paths or PR/issue urls>
-**Blind spots declared:** <quoted from each session>
-**Open threads handed forward:** <task path or NATS subject>
-**Witnessed by:** <heartbeat ts on dharma.a2a.heartbeat>
-```
+5. **Receipts**.
+   - Append one line to `DREAM_DIARY.md`:
+     `{ts, tick_n, sessions_seen, candidates_tagged, candidates_promoted, candidates_rejected_below_threshold, candidates_rejected_over_cap, pages_touched, sha256_overview_before, sha256_overview_after}`.
+   - Emit a NATS message on `dharma.a2a.perplexity` (self-loopback)
+     so the bus log is also a consolidation receipt.
+   - If tick produces zero promotions: heartbeat carries
+     `consolidation: "no-op"`; **only DREAM_DIARY.md gets a line**.
+     `log.md` does not get a no-op entry.
+
+**Lint pass (Karpathy contribution, separate cadence):** once daily,
+at the consolidation tick coinciding with operator's local 3 AM,
+run a `/lint`-equivalent: surface contradictions across `comparisons/`
+that weren't resolved, orphan pages with no inbound links, concept
+pages mentioned in 3+ entities without their own page, stale claims
+the newest sources superseded. Lint output is itself a wiki page
+(`wiki/lint/YYYY-MM-DD.md`) — not a chat message that disappears.
+
+**Q&A→wiki compounding (Karpathy contribution, ties into Layer C):**
+when an `operator_query` arrives on `dharma.a2a.perplexity` and the
+answer required synthesis (not just a wiki read), the answer is
+**filed back as a new comparisons/ or concepts/ page**, then linked
+from `index.md`. The wiki gets denser every time the operator asks a
+hard question.
 
 The wiki is **the operator-facing single artifact** — the "one even
 more powerful entity" John talks to is *this wiki plus the seat that
@@ -341,12 +413,17 @@ This file becomes live when:
 - [ ] First heartbeat successfully published on
   `dharma.a2a.heartbeat` (whichever subject is decided) and observed
   by Claude.
-- [ ] First consolidation tick produces a CONSOLIDATION_WIKI.md
-  section.
+- [ ] `wiki/SCHEMA.md` is authored and merged — the disciplining
+  configuration doc per Karpathy. (This is the equivalent of
+  CLAUDE.md/AGENTS.md for the LLM Wiki pattern.)
+- [ ] First consolidation tick produces at least one entity page,
+  one log.md entry, one DREAM_DIARY.md row, and updates index.md.
+- [ ] First daily `/lint` pass produces `wiki/lint/YYYY-MM-DD.md`
+  (even if empty).
 - [ ] Kill-switch test: operator publishes a `pause` message; loop
   flips to paused within one heartbeat cadence; resume verified.
 
-Until all six criteria pass, the seat operates in wake-mode only.
+Until all eight criteria pass, the seat operates in wake-mode only.
 No silent rollout.
 
 ---
