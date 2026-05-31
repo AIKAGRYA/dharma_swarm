@@ -47,8 +47,8 @@ None found.
   - Claude's durable-delivery fix: use explicit `stream="DHARMA_A2A"` in
     `pull_subscribe` to bypass `$JS.API.STREAM.NAMES` permission denial.
   - A2A merge plan assignments for Devin:
-    - Step 2: FIX #390 (add 4 Coherence-Delta body fields, register authority docs
-      in CANONICAL_DOC_STACK.md, run check_docops_integrity.py).
+    - Step 2: FIX #390 (add 4 Coherence-Delta body fields, register docs
+      in the doc stack, run docops integrity check).
     - Step 7: Land H-series #384 first, then #388 re-evaluates.
   - Fleet project: Semantic Ontology Evolution — Devin's likely piece is
     storage/registry typed objects (related to #390).
