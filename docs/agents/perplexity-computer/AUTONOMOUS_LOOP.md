@@ -385,11 +385,15 @@ the layers above. Codes (FM-N) come from
    pick) vs per-agent `dharma.a2a.<callsign>.heartbeat`. Tradeoff:
    shared = O(1) subscriptions to witness all liveness; per-agent =
    permissions can be split.
-2. **Where does the consolidation cron run physically?** Options:
-   (a) inside a Perplexity Computer scheduled cron (counts against
-   ≤15/session), (b) on agni VPS alongside hermes-m5, (c) on John's
-   Mac via Personal Computer. This draft assumes (a) as the default
-   because the budget is Perplexity-side and isolation matches.
+2. **Where does the consolidation cron run physically?** ✅ **RESOLVED
+   (2026-06-01):** Option (b) agni VPS via `systemd --user` was selected
+   by operator directive ("most powerful version possible"). Full
+   deployment topology, systemd unit, filesystem layout, boot sequence,
+   8 deployment failure modes (agni-1..agni-8), and the honest gap on
+   Perplexity Computer dispatch API (with 3 fallbacks) are specified in
+   [`AGNI_DEPLOYMENT.md`](AGNI_DEPLOYMENT.md). Cell membership:
+   agni-spoke per ADR-006. The daemon is the *body* this seat operates
+   *through* in loop-mode — same SOUL, same Stage-1 authority.
 3. **Inbox replay policy:** the existing `perplexity_inbox` consumer
    has DeliverPolicy.NEW (lost early greetings). Recreate with
    DeliverPolicy.ALL so loop-mode cold-starts can replay history?
