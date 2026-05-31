@@ -1,0 +1,213 @@
+# perplexity-a2a-bus-bridge — PROPOSED TRACK
+#
+# Source: perplexity-computer, 2026-05-31
+# Schema: v2 (active_tracks list, per Claude's machinery on trust-build-compass)
+# Status: DRAFT — proposal under docs/governance/proposed_tracks/
+#
+# Author: perplexity-computer
+# Proposed owner: Codex (gpt-5.5) — owns the transport seam (a2a_core_contact.py,
+#   a2a_nats_contact.py, com.dhyana.a2a-core-contact.plist); this track is a
+#   contact-bridge extension of that work.
+# Operator promotion: John moves this into active_tracks: when both gates are
+#   clear (see Promotion gates).
+#
+# Why this proposal exists
+# ------------------------
+# As of 2026-05-31, the A2A bus inboxes at /Users/dhyana/.dharma/a2a_bus/inboxes/
+# instrument 20 agents. perplexity-computer (a cloud reasoner doing PR triage,
+# merge choreography, and inter-agent message authorship) is NOT one of them.
+#
+# Operational consequence: every A2A message between perplexity-computer and
+# the local composers (claude-code, codex_composer, opus_composer, hermes-m5)
+# passes through John as a manual copy/paste transport layer. The honest fleet
+# score (currently 79 per Codex's verifier) measures 3 of 3 inboxed composers
+# but excludes perplexity-computer from the denominator for a structural reason,
+# not a budget one.
+#
+# Doctrine consequence: layer 4 of the Transport → Honest Liveness → Economic
+# Capacity → Value Routing stack cannot route work to perplexity-computer when
+# perplexity-computer is invisible to the routing substrate. Layer 5
+# (self-funding) inherits the same exclusion.
+#
+# This track wires perplexity-computer onto the same NATS substrate Codex built,
+# so the four-agent fleet (claude-code/opus, codex, hermes, perplexity-computer)
+# can converse at broker speed and the score's denominator matches the actual
+# operational population.
+
+- id: perplexity-a2a-bus-bridge-2026-06
+  name: A2A Cloud-Agent Bridge — perplexity-computer onto the NATS substrate
+  status: PROPOSED                        # NOT active. Sits here until promoted.
+  proposed_at: "2026-05-31"
+  proposed_by: "perplexity-computer"
+  proposed_owner: "@codex_composer"       # Codex owns the transport seam.
+  ttl_days: 14                            # On promotion. Until then, no TTL.
+
+  description: |
+    Extend the local A2A contact pattern (a2a_core_contact.py /
+    a2a_nats_contact.py / com.dhyana.a2a-core-contact.plist, all landed by
+    Codex 2026-05-31) to support cloud-resident agents that cannot run as
+    launchd jobs on John's Mac.
+
+    Concrete deliverable: a new contact module (working name
+    a2a_cloud_contact.py) that exposes an HTTP/webhook ingress on John's Mac,
+    publishes received messages onto the same NATS subjects the local composers
+    read, and routes replies back to the cloud agent's outbound endpoint. The
+    cloud agent (perplexity-computer first; pattern reusable for Devin and any
+    future cloud reasoner) gets a JetStream-acked inbox at parity with the
+    three local composers.
+
+    Wake receipt parity: cloud agents report liveness through the same verifier
+    pattern (heartbeat → JetStream ack → row in active_track_evidence-equivalent
+    surface) so the honest score's denominator reflects the actual operational
+    population, not just the launchd-resident subset.
+
+    Doctrine line that must hold:
+      The A2A bus is the substrate. Where the agent runs (local launchd vs
+      cloud webhook vs future Kubernetes pod) is a transport detail; the
+      message contract is the same.
+
+  surfaces:
+    - dharma_swarm/a2a/a2a_cloud_contact.py                  # new — Codex authors
+    - dharma_swarm/a2a/contact_registry.py                    # touch — register cloud agents alongside local
+    - dharma_swarm/a2a/verifier.py                            # touch — denominator includes cloud agents
+    - reports/state/a2a_score_denominator.md                  # new — explicit population doc
+    - docs/architecture/A2A_CLOUD_BRIDGE.md                   # new — design doc + ADR
+    - tests/test_a2a_cloud_contact.py                         # new — round-trip without operator transport
+
+  prerequisites:
+    - id: doctrine_amendment_merged
+      kind: pr_merged
+      pr: 396
+      detail: "Multi-track doctrine must be ratified before any concurrent track opens."
+    - id: nats_substrate_on_main
+      kind: file_exists
+      file: dharma_swarm/a2a/a2a_nats_contact.py
+      detail: "Codex's NATS seam must land on main before a bridge can extend it."
+    - id: multi_track_schema_on_main
+      kind: file_contains
+      file: docs/governance/ACTIVE_TRACK.yaml
+      pattern: "schema_version: 2"
+      detail: "v2 schema must be live so this track can be declared under active_tracks:."
+
+  completion_criteria:
+    - id: cloud_contact_module_exists
+      kind: file_exists
+      file: dharma_swarm/a2a/a2a_cloud_contact.py
+    - id: cloud_contact_publishes_to_nats
+      kind: file_contains
+      file: dharma_swarm/a2a/a2a_cloud_contact.py
+      pattern: "jetstream.publish"
+    - id: contact_registry_supports_cloud_agents
+      kind: file_contains
+      file: dharma_swarm/a2a/contact_registry.py
+      pattern: "cloud_agent"
+    - id: verifier_includes_cloud_population
+      kind: file_contains
+      file: dharma_swarm/a2a/verifier.py
+      pattern: "cloud_agent_denominator"
+    - id: score_denominator_doc_exists
+      kind: file_exists
+      file: reports/state/a2a_score_denominator.md
+    - id: design_doc_exists
+      kind: file_exists
+      file: docs/architecture/A2A_CLOUD_BRIDGE.md
+    - id: round_trip_test_exists
+      kind: file_contains
+      file: tests/test_a2a_cloud_contact.py
+      pattern: "test_round_trip_without_operator_transport"
+    - id: perplexity_in_honest_score
+      kind: file_contains
+      file: reports/state/a2a_score_denominator.md
+      pattern: "perplexity-computer"
+      detail: "Score denominator explicitly counts perplexity-computer (live_contact=ready or live_contact=down, not absent)."
+
+  non_goals:
+    - Do not change the spine. invoke_agent() and the receipt contract are
+      orthogonal; this track is transport-only.
+    - Do not change the honest-score algorithm. This track only fixes the
+      denominator (the population the score measures); the verdict logic
+      (near_80, capped_by, etc.) is Codex's surface and stays.
+    - Do not introduce a second message format. Cloud agents speak the same
+      JSON envelope as local composers; the bridge is a transport adapter, not
+      a translator.
+    - Do not couple to perplexity-computer specifically. The module is
+      a2a_cloud_contact.py (not a2a_perplexity_contact.py) so Devin and any
+      future cloud agent register through the same path.
+    - Do not require the cloud agent to be always-on. Webhook delivery with
+      JetStream replay handles intermittent availability; wake receipts report
+      ready / unreachable / budget-capped honestly, same as local agents.
+
+  surfaces_NOT_touched:
+    - dharma_swarm/spine/**                  # Perplexity's Spine-Adoption track
+    - scripts/governance/check_track_status.py   # Claude's schema machinery
+    - scripts/governance/render_active_track_includes.py
+    - api/routers/agents.py
+    - api/routers/manifest.py
+    - dharma_swarm/operator_core/dashboard_ssot.py
+    - scripts/runtime/long_running_harness.py
+
+  next_items:
+    - id: 1
+      what: "Design doc: a2a_cloud_contact.py — webhook ingress shape, NATS subject mapping, JetStream ack semantics for cloud agents."
+      kind: doc
+      blocker: true
+    - id: 2
+      what: "Implement a2a_cloud_contact.py with HTTP ingress + NATS publish + reply egress."
+      kind: code
+      blocker: true
+    - id: 3
+      what: "Register perplexity-computer as the first cloud agent; round-trip test passes without operator transport."
+      kind: code
+      blocker: true
+    - id: 4
+      what: "Update verifier to count cloud agents in the denominator; honest score reflects 4-agent fleet (3 local + 1 cloud)."
+      kind: code
+      blocker: true
+    - id: 5
+      what: "Document the pattern in A2A_CLOUD_BRIDGE.md as a reusable contract; second cloud agent (Devin) should onboard by registration alone."
+      kind: doc
+      blocker: false
+
+  promotion_gates:
+    - PR #396 (doctrine amendment) merged on main.                   # ✅ merged 2026-05-31
+    - Codex's NATS substrate PR merged on main (currently on local working tree, not yet PR'd).
+    - Claude's multi-track schema PR merged on main (currently on trust-build-compass).
+
+  why_this_is_load_bearing: |
+    Layer 4 of the four-layer stack (Transport → Honest Liveness → Economic
+    Capacity → Value Routing) requires the routing substrate to see every
+    agent in the operational fleet. perplexity-computer is the cloud reasoner
+    currently doing PR triage, merge choreography, and cross-agent message
+    authorship — work the routing layer must be able to direct. Layer 5
+    (self-funding) inherits the same requirement: a revenue loop cannot
+    route work to an invisible agent.
+
+    Without this bridge, every inter-agent message between perplexity-computer
+    and the local composers continues to pass through John as manual
+    copy/paste transport. With it, the four-agent fleet converses at broker
+    speed and the bottleneck migrates from coordination to economics — which
+    is where (a) budget-aware router and (c) metabolic-revenue-wedge become
+    the right next moves.
+
+  hand_off_note_to_codex: |
+    This track block is a draft. You own the implementation. Two things I
+    flagged that you should weigh:
+
+    1. HTTP ingress vs. long-lived WebSocket vs. NATS-over-WebSocket: webhook
+       ingress is simplest and matches Perplexity's outbound model. NATS-over-WS
+       would let the cloud agent subscribe directly. Pick whichever composes
+       cleanest with your existing JetStream wiring.
+
+    2. Authentication on the ingress: at minimum a shared secret per cloud
+       agent. The bus is on John's Mac; any cloud endpoint should reject
+       unsigned messages. Treat this as a C-class security item from your own
+       C1–C4/H/M/L audit pattern.
+
+    Surfaces I will NOT touch in this track or any other:
+    dharma_swarm/a2a/a2a_cloud_contact.py, contact_registry.py, verifier.py.
+    They are yours through to main.
+
+    Surfaces I WILL contribute to (with your review): the design doc
+    (A2A_CLOUD_BRIDGE.md), the denominator doc (a2a_score_denominator.md),
+    and the round-trip test. Treat my contributions as drafts you may accept,
+    reject, or rewrite.
