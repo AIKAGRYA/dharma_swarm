@@ -807,7 +807,7 @@ def cmd_reviewers(args: argparse.Namespace) -> int:
         "generated_at": utc_now(),
         "claude": {
             "command": claude_command,
-            "anthropic_api_key_scrubbed": "ANTHROPIC_API_KEY" not in claude_env,
+            "credential_env_scrubbed": "ANTHROPIC_API_KEY" not in claude_env,
             "auth_status_exit": claude_proc.returncode,
             "auth_status": claude_payload,
             "ready": bool(isinstance(claude_payload, dict) and claude_payload.get("loggedIn")),
@@ -822,7 +822,7 @@ def cmd_reviewers(args: argparse.Namespace) -> int:
         return 0 if result["claude"]["ready"] else 2
 
     print(f"Claude command: {' '.join(claude_command)}")
-    print(f"Claude ANTHROPIC_API_KEY scrubbed: {result['claude']['anthropic_api_key_scrubbed']}")
+    print(f"Claude credential env scrubbed: {result['claude']['credential_env_scrubbed']}")
     print(f"Claude ready: {result['claude']['ready']}")
     if isinstance(claude_payload, dict):
         print(f"Claude auth: {json.dumps(claude_payload, sort_keys=True)}")
