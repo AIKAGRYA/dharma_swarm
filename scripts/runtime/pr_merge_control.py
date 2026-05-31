@@ -28,7 +28,14 @@ REQUIRED_COHERENCE_FIELDS = (
     "Proof that re-reads the map",
     "New drift introduced",
 )
-BAD_CONCLUSIONS = {"FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED"}
+BAD_CONCLUSIONS = {
+    "ACTION_REQUIRED",
+    "CANCELLED",
+    "FAILURE",
+    "STALE",
+    "STARTUP_FAILURE",
+    "TIMED_OUT",
+}
 PASS_CONCLUSIONS = {"SUCCESS", "SKIPPED", "NEUTRAL"}
 HOT_PATH_PATTERNS = (
     ".github/",
@@ -136,7 +143,7 @@ def check_rollup(pr: dict[str, Any]) -> dict[str, Any]:
         elif conclusion in PASS_CONCLUSIONS:
             passing.append(name)
         elif conclusion:
-            unknown.append(f"{name}:{conclusion}")
+            failing.append(f"{name}:{conclusion}")
         else:
             unknown.append(name)
 
@@ -275,11 +282,17 @@ def fetch_pr_files(pr_number: int, repo: str) -> list[dict[str, Any]]:
 
 def fetch_review_threads(pr_number: int, repo: str) -> dict[str, Any]:
     owner, name = repo.split("/", 1)
+    nodes: list[dict[str, Any]] = []
+    cursor = ""
     query = """
-    query($owner: String!, $name: String!, $number: Int!) {
+    query($owner: String!, $name: String!, $number: Int!, $cursor: String) {
       repository(owner: $owner, name: $name) {
         pullRequest(number: $number) {
-          reviewThreads(first: 100) {
+          reviewThreads(first: 100, after: $cursor) {
+            pageInfo {
+              hasNextPage
+              endCursor
+            }
             nodes {
               isResolved
               isOutdated
@@ -298,33 +311,47 @@ def fetch_review_threads(pr_number: int, repo: str) -> dict[str, Any]:
       }
     }
     """
-    result = run(
-        [
-            "gh",
-            "api",
-            "graphql",
-            "-f",
-            f"query={query}",
-            "-F",
-            f"owner={owner}",
-            "-F",
-            f"name={name}",
-            "-F",
-            f"number={pr_number}",
-        ],
-        timeout=120,
-        check=False,
-    )
-    if result.code != 0:
-        return {"ok": False, "error": (result.stderr or result.stdout).strip(), "unresolved": None}
-    payload = json.loads(result.stdout)
-    nodes = (
-        payload.get("data", {})
-        .get("repository", {})
-        .get("pullRequest", {})
-        .get("reviewThreads", {})
-        .get("nodes", [])
-    )
+    while True:
+        result = run(
+            [
+                "gh",
+                "api",
+                "graphql",
+                "-f",
+                f"query={query}",
+                "-F",
+                f"owner={owner}",
+                "-F",
+                f"name={name}",
+                "-F",
+                f"number={pr_number}",
+                "-F",
+                f"cursor={cursor}",
+            ],
+            timeout=120,
+            check=False,
+        )
+        if result.code != 0:
+            return {"ok": False, "error": (result.stderr or result.stdout).strip(), "unresolved": None}
+        try:
+            payload = json.loads(result.stdout)
+        except json.JSONDecodeError:
+            return {"ok": False, "error": "GitHub GraphQL returned non-JSON output", "unresolved": None}
+        threads = (
+            payload.get("data", {})
+            .get("repository", {})
+            .get("pullRequest", {})
+            .get("reviewThreads", {})
+        )
+        if not isinstance(threads, dict):
+            return {"ok": False, "error": "GitHub GraphQL reviewThreads payload missing", "unresolved": None}
+        nodes.extend(threads.get("nodes") or [])
+        page_info = threads.get("pageInfo") or {}
+        if not page_info.get("hasNextPage"):
+            break
+        cursor = str(page_info.get("endCursor") or "")
+        if not cursor:
+            return {"ok": False, "error": "GitHub GraphQL reviewThreads pagination cursor missing", "unresolved": None}
     unresolved = [
         node for node in nodes
         if not node.get("isResolved") and not node.get("isOutdated")
@@ -335,6 +362,21 @@ def fetch_review_threads(pr_number: int, repo: str) -> dict[str, Any]:
 def coherence_results(body: str) -> dict[str, Any]:
     lines = body.splitlines()
     results: dict[str, dict[str, Any]] = {}
+    all_prefix_variants = tuple(
+        prefix
+        for known_field in REQUIRED_COHERENCE_FIELDS
+        for prefix in (
+            f"- {known_field}:",
+            f"* {known_field}:",
+            f"{known_field}:",
+            f"- **{known_field}**:",
+            f"- **{known_field}:**",
+            f"* **{known_field}**:",
+            f"* **{known_field}:**",
+            f"**{known_field}**:",
+            f"**{known_field}:**",
+        )
+    )
     for field in REQUIRED_COHERENCE_FIELDS:
         prefix_variants = (
             f"- {field}:",
@@ -359,9 +401,7 @@ def coherence_results(body: str) -> dict[str, Any]:
                 next_stripped = next_line.strip()
                 if not next_stripped:
                     continue
-                if any(next_stripped.startswith(prefix) for prefix in prefix_variants):
-                    break
-                if any(next_stripped.startswith(f"- {other}:") or next_stripped.startswith(f"- **{other}**:") for other in REQUIRED_COHERENCE_FIELDS):
+                if any(next_stripped.startswith(prefix) for prefix in all_prefix_variants):
                     break
                 if next_stripped.startswith("#"):
                     break
@@ -620,6 +660,8 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
     if not current_coherence["ok"]:
         blockers.append("Coherence Delta fields missing or placeholder")
     unresolved_count = current_threads.get("unresolved_count")
+    if not current_threads.get("ok"):
+        blockers.append(f"could not verify review threads: {current_threads.get('error') or 'unknown error'}")
     if unresolved_count:
         blockers.append(f"{unresolved_count} unresolved review threads")
 

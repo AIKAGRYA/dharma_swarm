@@ -10,11 +10,13 @@ present.
 
 ## Why `@terminal-review` Was Brittle
 
-`.github/workflows/codex-mention-router.yml` only forwards a GitHub comment to
-`CODEX_WEBHOOK_URL`. If that secret, token, or local bridge is down, the mention
-does nothing useful. PR Review Control is pull-based from the local operator
-machine: it asks GitHub for live state, writes packets under `~/.dharma`, and
-does not depend on inbound webhooks.
+`.github/workflows/codex-mention-router.yml` now owns the GitHub-side
+`@terminal-review` response: it creates the same deterministic packet/gate
+summary comment that the local CLI prints. The older
+`scripts/codex_mention_bridge.py` remains a local webhook bridge for inbound
+experiments, but it is not the merge authority. PR Review Control is pull-based
+from the local operator machine: it asks GitHub for live state, writes packets
+under `~/.dharma`, and does not depend on inbound webhooks.
 
 ## Commands
 
@@ -89,9 +91,9 @@ The gate blocks when any of these are true:
 - Checks are pending, unless `--allow-pending` is explicitly passed.
 - GitHub review decision is `CHANGES_REQUESTED`.
 - Coherence Delta fields are missing or placeholders.
-- Review threads are unresolved.
-- `codex_review.md` is missing.
-- `claude_review.md` is missing.
+- Review-thread lookup fails or review threads are unresolved.
+- `codex_review.md` is missing, invalid, or not an `APPROVE` verdict.
+- `claude_review.md` is missing, invalid, or not an `APPROVE` verdict.
 - Risk is `HIGH` or `CRITICAL` and no `--human-approved` flag is present.
 
 ## Agent Contract
