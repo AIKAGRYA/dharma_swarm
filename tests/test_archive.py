@@ -23,6 +23,45 @@ def test_fitness_defaults_zero():
     assert f.weighted() == 0.0
 
 
+def test_from_external_receipt_confirmed_grants_fitness():
+    f = FitnessScore.from_external_receipt(
+        holdout_score=0.9,
+        external_confirmed=True,
+        safety_passed=True,
+        cost_normalized=0.2,
+    )
+    assert f.correctness == pytest.approx(0.9)
+    assert f.economic_value == pytest.approx(0.8)
+    assert f.efficiency == pytest.approx(0.8)
+    assert f.safety == 1.0
+
+
+def test_from_external_receipt_unconfirmed_grants_zero_fitness():
+    """Anti-inward-machine: a receipt not confirmed by an external oracle earns no fitness."""
+    f = FitnessScore.from_external_receipt(
+        holdout_score=0.99,
+        external_confirmed=False,
+        cost_normalized=0.0,
+    )
+    assert f.correctness == 0.0
+    assert f.economic_value == 0.0
+    assert f.efficiency == 0.0
+
+
+def test_from_external_receipt_safety_gate_zeroes_safety():
+    f = FitnessScore.from_external_receipt(
+        holdout_score=0.8,
+        external_confirmed=True,
+        safety_passed=False,
+    )
+    assert f.safety == 0.0
+
+
+def test_from_external_receipt_rejects_out_of_range():
+    with pytest.raises(ValueError):
+        FitnessScore.from_external_receipt(holdout_score=1.5, external_confirmed=True)
+
+
 def test_fitness_weighted_default_weights():
     f = FitnessScore(
         correctness=1.0,

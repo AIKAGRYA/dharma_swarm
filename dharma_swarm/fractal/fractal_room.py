@@ -187,9 +187,26 @@ class VentureCellV1(FractalRoom):
     # Autonomy (maps to ontology VentureCell.autonomy_stage)
     autonomy_stage: int = 1
 
+    # Forge feed — "no side quest without a forge-feed contract".
+    # How this cell feeds the Dharma Reward Forge: the verifiable tasks, outcomes,
+    # failures, receipts, or ontology objects it emits. Optional field; enforced at
+    # Forge-feed/admission time (graded), not retroactively breaking existing cells.
+    forge_feed_contract: str = ""
+
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> VentureCellV1:
         return cls(**{k: v for k, v in data.items() if k in cls.__dataclass_fields__})
+
+
+def forge_feed_contract_status(cell: VentureCellV1) -> str:
+    """Return 'present' if a VentureCell declares how it feeds the Reward Forge, else 'missing'.
+
+    The rule (Dharma Reward Forge doctrine): every side-organ — app, bounty,
+    publication, trading experiment, NGO tool, or Polsia-like shell — must emit
+    verifiable tasks/outcomes/failures/receipts/ontology-objects to the Forge.
+    This is the graded admission check; it does not retroactively invalidate cells.
+    """
+    return "present" if str(getattr(cell, "forge_feed_contract", "")).strip() else "missing"
 
 
 @dataclass

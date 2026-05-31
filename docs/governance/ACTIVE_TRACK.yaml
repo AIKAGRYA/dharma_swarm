@@ -288,6 +288,30 @@ closed_tracks:
 # read by humans and agents picking up future work.)
 # ---------------------------------------------------------------------------
 queued_tracks:
+  - id: dharma-reward-forge-v0
+    name: Dharma Reward Forge v0 — loss-function spine wiring DGM to sealed holdouts + external receipts
+    status: QUEUED
+    queued_at: "2026-05-31"
+    owner: "@AmitabhainArunachala"
+    spec: docs/architecture/DHARMA_REWARD_FORGE.md
+    description: |
+      Wire the EXISTING DGM/Darwin loop (dgm_loop.py), DharmaEval (dharma_eval.py),
+      Archive/FitnessScore (archive.py), and the promotion gate (evolution_promotion.py)
+      to sealed holdouts + EXTERNAL receipts, run through the Sankalpa Organ (ds-goal).
+      Not a new engine. Objective: verified useful capability under causal telos constraints.
+      Already landed (this branch, tested, 44 passing): DharmaEval scoreboard manifest+suite
+      contamination guards; FitnessScore.from_external_receipt (unconfirmed receipt -> zero
+      fitness, the anti-inward-machine bridge); VentureCellV1.forge_feed_contract + status helper
+      ("no side quest without a forge-feed contract").
+      Open: one sealed task end-to-end (ds-goal -> DGM -> DharmaEval -> promotion gate) emitting a
+      receipt (patch+manifest hash, score, cost, command, exit code); research-hardened robustness
+      (sealed off-gradient scorer, transfer-gated promotion, deterministic-oracle-only, lineage
+      rollback, external-receipt binding) per docs/architecture/DHARMA_REWARD_FORGE.md.
+    activation_note: |
+      goodworks-dgm-core-2026-05 is 9/9 shippable; closing it and flipping this to ACTIVE is a
+      one-block operator edit. Do NOT flip mid-flight without operator confirmation (other agents
+      are working the live tree). check_track_status.py ignores queued_tracks, so this entry is safe.
+
   - id: command-plane-redesign-2026-05
     name: Command Plane Redesign — Nihonga-anchored operator cockpit (7 verb-zones, 2D-canonical, 3D-where-it-earns)
     status: QUEUED

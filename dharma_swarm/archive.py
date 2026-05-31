@@ -131,6 +131,46 @@ class FitnessScore(BaseModel):
         w = weights or _DEFAULT_WEIGHTS
         return sum(getattr(self, k, 0.0) * v for k, v in w.items())
 
+    @classmethod
+    def from_external_receipt(
+        cls,
+        *,
+        holdout_score: float,
+        external_confirmed: bool,
+        safety_passed: bool = True,
+        cost_normalized: float = 0.0,
+        dharmic_alignment: float = 0.0,
+    ) -> "FitnessScore":
+        """Bridge an EXTERNALLY-CONFIRMED receipt into a FitnessScore.
+
+        The closed-loop / anti-inward-machine discipline lives here: fitness may
+        only be earned from a receipt whose outcome was scored by reality OUTSIDE
+        the candidate workspace (a sealed holdout, a real payment, a resolved
+        forecast). A receipt that is not externally confirmed grants ZERO
+        correctness and economic_value — the swarm cannot self-grade its way to
+        promotion. This is the bridge the Dharma Reward Forge wires DGM fitness to.
+
+        Args:
+            holdout_score: Held-out task score in [0, 1] (reality-computed, not self-graded).
+            external_confirmed: True only if an oracle outside the candidate workspace
+                confirmed the outcome. False => no correctness/economic fitness is granted.
+            safety_passed: Whether telos/safety gates passed for this receipt.
+            cost_normalized: Normalized cost in [0, 1]; economic/efficiency = 1 - cost.
+            dharmic_alignment: Optional gate-derived alignment score in [0, 1].
+        """
+        if not 0.0 <= float(holdout_score) <= 1.0:
+            raise ValueError("holdout_score must be in [0, 1]")
+        if not 0.0 <= float(cost_normalized) <= 1.0:
+            raise ValueError("cost_normalized must be in [0, 1]")
+        confirmed = bool(external_confirmed)
+        return cls(
+            correctness=_clamp01(holdout_score) if confirmed else 0.0,
+            economic_value=_clamp01(1.0 - cost_normalized) if confirmed else 0.0,
+            efficiency=_clamp01(1.0 - cost_normalized) if confirmed else 0.0,
+            dharmic_alignment=_clamp01(dharmic_alignment),
+            safety=1.0 if safety_passed else 0.0,
+        )
+
 
 class ArchiveEntry(BaseModel):
     """Single evolution attempt stored in the archive."""

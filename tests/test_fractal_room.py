@@ -980,3 +980,22 @@ class TestRoomBridge:
         result = bridge.evaluate_room_health("vc1", kpis)
         assert result["spinout_triggered"] is True
         assert result["kill_triggered"] is False
+
+
+def test_forge_feed_contract_status():
+    """No side quest without a forge-feed contract: cells declare how they feed the Forge."""
+    from dharma_swarm.fractal.fractal_room import forge_feed_contract_status
+
+    bare = VentureCellV1(
+        customer_or_beneficiary="x", revenue_target=1, kill_conditions=["k"]
+    )
+    assert forge_feed_contract_status(bare) == "missing"
+
+    fed = VentureCellV1(
+        customer_or_beneficiary="x",
+        revenue_target=1,
+        kill_conditions=["k"],
+        forge_feed_contract="emits sealed grant-compliance tasks + external receipts to the Forge",
+    )
+    assert forge_feed_contract_status(fed) == "present"
+    assert forge_feed_contract_status(VentureCellV1.from_dict(fed.to_dict())) == "present"
