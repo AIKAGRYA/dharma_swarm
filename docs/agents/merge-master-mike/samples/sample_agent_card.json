@@ -1,0 +1,100 @@
+{
+  "name": "merge-master-mike",
+  "description": "Merge Master Mike (callsign: mike). Fifth agent on the dharma_swarm NATS fabric. Delegated final authority on git merges to main of AmitabhainArunachala/dharma_swarm. Stage 1 pre-launch — authority activates only after VOICE_GATE.md closes with launch-authorized. Identity nest: docs/agents/merge-master-mike/. Operator (@AmitabhainArunachala) retains standing override. The swarm retains veto via dharma.a2a.merge_objections.",
+  "skills": [
+    {
+      "name": "git_merge_authority",
+      "description": "merge-master-mike capability: final authority on PR merges to main per PROTOCOLS.md §2 six-gate decision tree",
+      "input_modes": ["text"],
+      "output_modes": ["text"],
+      "id": "git_merge_authority",
+      "tags": ["delegated-authority", "stage-1-pending-gate"],
+      "examples": [],
+      "security_requirements": ["operator-delegated", "branch-protection-bound"]
+    },
+    {
+      "name": "audit_pr",
+      "description": "merge-master-mike capability: walks the six-gate decision tree, posts holding/decline/merge receipts on dharma.a2a.mike",
+      "input_modes": ["text"],
+      "output_modes": ["text"],
+      "id": "audit_pr",
+      "tags": [],
+      "examples": [],
+      "security_requirements": []
+    },
+    {
+      "name": "objection_processing",
+      "description": "merge-master-mike capability: subscribes to dharma.a2a.merge_objections, acks within 5s, enforces 60s grace window on object→merge",
+      "input_modes": ["text"],
+      "output_modes": ["text"],
+      "id": "objection_processing",
+      "tags": ["swarm-voice"],
+      "examples": [],
+      "security_requirements": []
+    },
+    {
+      "name": "evidence_request",
+      "description": "merge-master-mike capability: asks specific agents for additional evidence on PRs awaiting audit",
+      "input_modes": ["text"],
+      "output_modes": ["text"],
+      "id": "evidence_request",
+      "tags": [],
+      "examples": [],
+      "security_requirements": []
+    }
+  ],
+  "capabilities": [
+    {
+      "name": "git_merge_authority",
+      "description": "merge-master-mike capability: final authority on PR merges (delegated)",
+      "input_modes": ["text"],
+      "output_modes": ["text"],
+      "id": "git_merge_authority",
+      "tags": [],
+      "examples": [],
+      "security_requirements": []
+    }
+  ],
+  "endpoint": "nats://dharma.a2a.mike",
+  "status": "proposed",
+  "metadata": {
+    "callsign": "mike",
+    "cell": "agni-hub",
+    "host": "agni_vps_systemd_user_service",
+    "deployment_spec": "docs/agents/merge-master-mike/PROTOCOLS.md",
+    "voice_gate": "docs/agents/merge-master-mike/VOICE_GATE.md",
+    "launch_receipt": "docs/agents/merge-master-mike/LAUNCH_RECEIPT.md (populated post-gate)",
+    "nats": {
+      "publish_subject": "dharma.a2a.mike",
+      "subscribe_filter": "dharma.a2a.>",
+      "scoped_user": "mike",
+      "inbox_durable": "mike_inbox",
+      "deliver_policy": "ALL",
+      "ack_policy": "EXPLICIT",
+      "heartbeat_interval_s": 60,
+      "objection_ack_latency_s": 5,
+      "shared_topics": ["dharma.a2a.merge_objections"]
+    },
+    "operator_overrides": {
+      "pause": "publish kind=operator_override action=pause_mike on any subject",
+      "force_merge": "publish kind=operator_override action=force_merge",
+      "revoke": "publish kind=operator_override action=revoke_merge on PR",
+      "close_voice_gate": "publish kind=operator_override action=close_voice_gate"
+    },
+    "audit_gates": [
+      "PR is on an ACTIVE_TRACK.yaml track",
+      "uplift_guards CI passed",
+      "at least one non-author evidence receipt",
+      "not labelled operator-only",
+      "no active object on dharma.a2a.merge_objections within 60s",
+      "head SHA matches audited SHA"
+    ],
+    "witness_layers_for_merge_action": [
+      "self (mike's own audit log)",
+      "kaizenops (uplift_guards CI)",
+      "registration (PR author identity nest)",
+      "task-owner (mike)",
+      "swarm (dharma.a2a.merge_objections)"
+    ]
+  }
+}
