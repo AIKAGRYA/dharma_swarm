@@ -115,6 +115,36 @@ def test_claude_review_env_scrubs_anthropic_api_key_by_default():
     assert "ANTHROPIC_API_KEY" not in env
 
 
+def test_review_receipt_status_rejects_command_error(tmp_path):
+    path = tmp_path / "codex_review.md"
+    path.write_text(
+        "Reading prompt from stdin...\n"
+        "Error: failed to initialize in-process app-server client\n",
+        encoding="utf-8",
+    )
+
+    result = prc.review_receipt_status(path)
+
+    assert result["ok"] is False
+    assert result["reason"] == "review command failed"
+
+
+def test_review_receipt_status_accepts_verdict(tmp_path):
+    path = tmp_path / "claude_review.md"
+    path.write_text(
+        "## Verdict\n"
+        "APPROVE\n\n"
+        "## Findings\n"
+        "No blocking findings.\n",
+        encoding="utf-8",
+    )
+
+    result = prc.review_receipt_status(path)
+
+    assert result["ok"] is True
+    assert result["verdict"] == "APPROVE"
+
+
 def test_claude_review_env_can_opt_into_api_key():
     _, env = prc.review_command_and_env(
         "claude",

@@ -574,6 +574,28 @@ def has_review(path: Path) -> bool:
     return path.exists() and len(path.read_text(encoding="utf-8").strip()) >= 40
 
 
+def review_receipt_status(path: Path) -> dict[str, Any]:
+    if not has_review(path):
+        return {"ok": False, "verdict": "", "reason": "missing or too short"}
+    text = path.read_text(encoding="utf-8")
+    lowered = text.lower()
+    if "error:" in lowered or "failed to initialize" in lowered or "traceback" in lowered:
+        return {"ok": False, "verdict": "", "reason": "review command failed"}
+    lines = [line.strip() for line in text.splitlines()]
+    allowed = {"APPROVE", "REQUEST_CHANGES", "BLOCKED", "NEEDS_HUMAN"}
+    for index, line in enumerate(lines):
+        if line.lower() != "## verdict":
+            continue
+        for candidate in lines[index + 1:]:
+            if not candidate:
+                continue
+            verdict = candidate.split()[0].strip("`*_-. ")
+            if verdict in allowed:
+                return {"ok": True, "verdict": verdict, "reason": ""}
+            return {"ok": False, "verdict": verdict, "reason": "invalid verdict"}
+    return {"ok": False, "verdict": "", "reason": "missing ## Verdict section"}
+
+
 def build_gate(args: argparse.Namespace) -> dict[str, Any]:
     out_dir = latest_or_arg_packet(args)
     original = load_json(out_dir / "FACTS.json")
@@ -603,10 +625,12 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
 
     codex_path = out_dir / "codex_review.md"
     claude_path = out_dir / "claude_review.md"
-    if not has_review(codex_path):
-        blockers.append("missing codex_review.md receipt")
-    if not has_review(claude_path):
-        blockers.append("missing claude_review.md receipt")
+    codex_receipt = review_receipt_status(codex_path)
+    claude_receipt = review_receipt_status(claude_path)
+    if not codex_receipt["ok"]:
+        blockers.append(f"invalid codex_review.md receipt: {codex_receipt['reason']}")
+    if not claude_receipt["ok"]:
+        blockers.append(f"invalid claude_review.md receipt: {claude_receipt['reason']}")
 
     original_risk = original.get("risk", {}).get("level", "UNKNOWN")
     if original_risk in {"HIGH", "CRITICAL"} and not args.human_approved:
@@ -632,8 +656,12 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
         "review_receipts": {
             "codex": str(codex_path),
             "codex_present": has_review(codex_path),
+            "codex_valid": codex_receipt["ok"],
+            "codex_verdict": codex_receipt["verdict"],
             "claude": str(claude_path),
             "claude_present": has_review(claude_path),
+            "claude_valid": claude_receipt["ok"],
+            "claude_verdict": claude_receipt["verdict"],
         },
         "risk": original.get("risk", {}),
     }
@@ -662,8 +690,14 @@ def render_gate_markdown(gate: dict[str, Any]) -> str:
         lines.append("- none")
     lines.extend(["", "## Review Receipts", ""])
     receipts = gate["review_receipts"]
-    lines.append(f"- Codex: `{receipts['codex']}` present={receipts['codex_present']}")
-    lines.append(f"- Claude: `{receipts['claude']}` present={receipts['claude_present']}")
+    lines.append(
+        f"- Codex: `{receipts['codex']}` present={receipts['codex_present']} "
+        f"valid={receipts['codex_valid']} verdict={receipts['codex_verdict'] or 'NONE'}"
+    )
+    lines.append(
+        f"- Claude: `{receipts['claude']}` present={receipts['claude_present']} "
+        f"valid={receipts['claude_valid']} verdict={receipts['claude_verdict'] or 'NONE'}"
+    )
     lines.append("")
     return "\n".join(lines)
 
