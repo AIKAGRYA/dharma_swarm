@@ -1,7 +1,7 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts uplift-guards module-budget docops-integrity docops-report memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all spine-check onboard status go-fmt-check go-test go-vet go-ci
+.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts uplift-guards module-budget docops-integrity docops-report pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all spine-check onboard status go-fmt-check go-test go-vet go-ci
 
 PYTHON ?= python3
 REPO_PYTHON ?= PYTHONPATH=. $(PYTHON)
@@ -45,6 +45,13 @@ help:
 	@echo "  make uplift-guards Run uplift pre-commit guards"
 	@echo "  make docops-integrity Run machine-verifiable documentation checks"
 	@echo "  make docops-report Generate local DocOps JSON/Markdown reports"
+	@echo "  make pr-queue Classify open GitHub PRs into a receipt-backed review queue"
+	@echo "  make pr-packet PR=123 Create a Codex/Claude review packet for one PR"
+	@echo "  make pr-reviewers Show local Codex/Claude reviewer readiness"
+	@echo "  make pr-run-codex PR=123 Run Codex against the latest review packet"
+	@echo "  make pr-run-claude PR=123 Run Claude Code against the latest review packet"
+	@echo "  make pr-gate PR=123 Verify merge gate against live GitHub state"
+	@echo "  make pr-merge PR=123 ARGS='--confirm merge-pr-123' Dry-run gated merge"
 	@echo "  make memory-kernel-readiness Run read-only MemoryKernel readiness gates"
 	@echo "  make memory-kernel-readiness-strict Require 100% strict MemoryKernel readiness"
 	@echo "  make memory-kernel-burn-in Append M3 context preview burn-in receipts"
@@ -210,6 +217,27 @@ docops-report:
 		--report-json reports/docops/check.json \
 		--inventory-json reports/docops/corpus_inventory.json \
 		--inventory-markdown reports/docops/corpus_inventory.md
+
+pr-queue:
+	$(PYTHON) scripts/runtime/pr_merge_control.py queue $${ARGS:-}
+
+pr-packet:
+	$(PYTHON) scripts/runtime/pr_merge_control.py packet --pr "$${PR:?set PR=number}" $${ARGS:-}
+
+pr-gate:
+	$(PYTHON) scripts/runtime/pr_merge_control.py gate --pr "$${PR:?set PR=number}" $${ARGS:-}
+
+pr-reviewers:
+	$(PYTHON) scripts/runtime/pr_merge_control.py reviewers $${ARGS:-}
+
+pr-run-codex:
+	$(PYTHON) scripts/runtime/pr_merge_control.py run-agent --agent codex --pr "$${PR:?set PR=number}" $${ARGS:-}
+
+pr-run-claude:
+	$(PYTHON) scripts/runtime/pr_merge_control.py run-agent --agent claude --pr "$${PR:?set PR=number}" $${ARGS:-}
+
+pr-merge:
+	$(PYTHON) scripts/runtime/pr_merge_control.py merge --pr "$${PR:?set PR=number}" $${ARGS:-}
 
 memory-kernel-readiness:
 	$(REPO_PYTHON) scripts/memory_kernel_readiness.py --repo-root . --dry-run
