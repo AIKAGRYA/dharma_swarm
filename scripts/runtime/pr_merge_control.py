@@ -341,8 +341,11 @@ def coherence_results(body: str) -> dict[str, Any]:
             f"* {field}:",
             f"{field}:",
             f"- **{field}**:",
+            f"- **{field}:**",
             f"* **{field}**:",
+            f"* **{field}:**",
             f"**{field}**:",
+            f"**{field}:**",
         )
         value = None
         for index, line in enumerate(lines):

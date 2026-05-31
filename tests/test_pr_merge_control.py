@@ -64,6 +64,19 @@ def test_coherence_results_accepts_substantive_fields():
     assert result["ok"] is True
 
 
+def test_coherence_results_accepts_bold_field_with_colon_inside_bold():
+    body = """
+- **Organ touched:** `inter_agent/devin/outbound/` additive rendezvous surface.
+- **Declared-vs-actual gap closed:** merged outbound response now exists.
+- **Proof that re-reads the map:** rechecked spine imports and loop map.
+- **New drift introduced:** two markdown receipts; no runtime path changed.
+"""
+
+    result = prc.coherence_results(body)
+
+    assert result["ok"] is True
+
+
 def test_risk_from_files_flags_hot_paths():
     files = [
         {"filename": "dharma_swarm/telos_gates.py", "additions": 3, "deletions": 1},
