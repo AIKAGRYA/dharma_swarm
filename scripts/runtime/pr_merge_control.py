@@ -54,6 +54,29 @@ HOT_PATH_PATTERNS = (
     "Makefile",
 )
 CLAUDE_REVIEW_DEFAULT_BIN = Path("/Users/dhyana/.npm-global/bin/claude")
+REQUIRED_REVIEW_SECTIONS = (
+    "Verdict",
+    "Findings",
+    "Missing Tests Or Proof",
+    "Merge Conditions",
+)
+REVIEW_TEMPLATE_MARKERS = (
+    "A single line containing exactly one of",
+    "Numbered findings with severity",
+    "Concrete gaps only",
+    "The exact conditions that must be true before merge",
+)
+REVIEW_EVIDENCE_RE = (
+    "Makefile",
+    ".github/",
+    "scripts/",
+    "tests/",
+    "docs/",
+    "dharma_swarm/",
+    "inter_agent/",
+    "api/",
+    "dashboard/",
+)
 
 
 class PRControlError(Exception):
@@ -617,6 +640,65 @@ def has_review(path: Path) -> bool:
     return path.exists() and len(path.read_text(encoding="utf-8").strip()) >= 40
 
 
+def _review_sections(text: str) -> dict[str, str]:
+    sections: dict[str, list[str]] = {}
+    current: str | None = None
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("## "):
+            heading = stripped[3:].strip()
+            current = heading
+            sections.setdefault(current, [])
+            continue
+        if current:
+            sections.setdefault(current, []).append(line)
+    return {name: "\n".join(lines).strip() for name, lines in sections.items()}
+
+
+def _first_nonempty_line(text: str) -> str:
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped:
+            return stripped
+    return ""
+
+
+def _has_concrete_review_evidence(text: str) -> bool:
+    lowered = text.lower()
+    if "file/line evidence" in lowered or "no blocking findings." == text.strip().lower():
+        return False
+    return any(marker in text for marker in REVIEW_EVIDENCE_RE)
+
+
+def review_contract_status(text: str) -> dict[str, str]:
+    sections = _review_sections(text)
+    if "Verdict" not in sections:
+        return {"ok": "false", "verdict": "", "reason": "missing review sections: Verdict"}
+    verdict = _first_nonempty_line(sections["Verdict"]).strip("`*_-. ")
+    allowed = {"APPROVE", "REQUEST_CHANGES", "BLOCKED", "NEEDS_HUMAN"}
+    if verdict not in allowed:
+        return {"ok": "false", "verdict": verdict, "reason": "invalid verdict"}
+
+    missing = [name for name in REQUIRED_REVIEW_SECTIONS if name not in sections]
+    if missing:
+        return {"ok": "false", "verdict": verdict, "reason": f"missing review sections: {', '.join(missing)}"}
+
+    if any(marker in text for marker in REVIEW_TEMPLATE_MARKERS):
+        return {"ok": "false", "verdict": verdict, "reason": "review still contains prompt template text"}
+
+    for section in ("Findings", "Missing Tests Or Proof", "Merge Conditions"):
+        if len(sections[section].strip()) < 40:
+            return {"ok": "false", "verdict": verdict, "reason": f"{section} section is too thin"}
+
+    if not _has_concrete_review_evidence(text):
+        return {"ok": "false", "verdict": verdict, "reason": "review lacks concrete file/path evidence"}
+
+    if verdict == "APPROVE" and "No blocking findings" not in sections["Findings"]:
+        return {"ok": "false", "verdict": verdict, "reason": "APPROVE review must explicitly state no blocking findings"}
+
+    return {"ok": "true", "verdict": verdict, "reason": ""}
+
+
 def review_receipt_status(path: Path, *, expected_head_sha: str = "") -> dict[str, Any]:
     if not has_review(path):
         return {"ok": False, "verdict": "", "reason": "missing or too short", "reviewed_head_sha": ""}
@@ -636,19 +718,15 @@ def review_receipt_status(path: Path, *, expected_head_sha: str = "") -> dict[st
     lowered = text.lower()
     if "error:" in lowered or "failed to initialize" in lowered or "traceback" in lowered:
         return {"ok": False, "verdict": "", "reason": "review command failed", "reviewed_head_sha": reviewed_head_sha}
-    lines = [line.strip() for line in text.splitlines()]
-    allowed = {"APPROVE", "REQUEST_CHANGES", "BLOCKED", "NEEDS_HUMAN"}
-    for index, line in enumerate(lines):
-        if line.lower() != "## verdict":
-            continue
-        for candidate in lines[index + 1:]:
-            if not candidate:
-                continue
-            verdict = candidate.strip("`*_-. ")
-            if verdict in allowed:
-                return {"ok": True, "verdict": verdict, "reason": "", "reviewed_head_sha": reviewed_head_sha}
-            return {"ok": False, "verdict": verdict, "reason": "invalid verdict", "reviewed_head_sha": reviewed_head_sha}
-    return {"ok": False, "verdict": "", "reason": "missing ## Verdict section", "reviewed_head_sha": reviewed_head_sha}
+    contract = review_contract_status(text)
+    if contract["ok"] != "true":
+        return {
+            "ok": False,
+            "verdict": contract["verdict"],
+            "reason": contract["reason"],
+            "reviewed_head_sha": reviewed_head_sha,
+        }
+    return {"ok": True, "verdict": contract["verdict"], "reason": "", "reviewed_head_sha": reviewed_head_sha}
 
 
 def build_gate(args: argparse.Namespace) -> dict[str, Any]:

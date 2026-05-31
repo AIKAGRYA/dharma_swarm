@@ -14,9 +14,10 @@ present.
 `@terminal-review` response: it creates the same deterministic packet/gate
 summary comment that the local CLI prints. The older
 `scripts/codex_mention_bridge.py` remains a local webhook bridge for inbound
-experiments, but it is not the merge authority. PR Review Control is pull-based
-from the local operator machine: it asks GitHub for live state, writes packets
-under `~/.dharma`, and does not depend on inbound webhooks.
+experiments and now defaults to `@codex`, not `@terminal-review`. It is not the
+merge authority. PR Review Control is pull-based from the local operator
+machine: it asks GitHub for live state, writes packets under `~/.dharma`, and
+does not depend on inbound webhooks.
 
 ## Commands
 
@@ -96,6 +97,9 @@ The gate blocks when any of these are true:
 - Review-thread lookup fails or review threads are unresolved.
 - `codex_review.md` / `codex_review_receipt.json` is missing, invalid, nonzero-exit, stale-head, or not an `APPROVE` verdict.
 - `claude_review.md` / `claude_review_receipt.json` is missing, invalid, nonzero-exit, stale-head, or not an `APPROVE` verdict.
+- A review receipt lacks the exact `## Verdict`, `## Findings`,
+  `## Missing Tests Or Proof`, and `## Merge Conditions` sections.
+- A review receipt is a shallow approval without concrete file/path evidence.
 - Risk is `HIGH` or `CRITICAL` and no `--human-approved` flag plus
   `--human-approval-note` receipt is present.
 

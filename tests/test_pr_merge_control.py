@@ -204,7 +204,13 @@ def test_review_receipt_status_accepts_verdict(tmp_path):
         "## Verdict\n"
         "APPROVE\n\n"
         "## Findings\n"
-        "No blocking findings.\n",
+        "No blocking findings after checking `scripts/runtime/pr_merge_control.py` "
+        "and `tests/test_pr_merge_control.py` for gate behavior.\n\n"
+        "## Missing Tests Or Proof\n"
+        "No missing proof for this bounded change; `tests/test_pr_merge_control.py` "
+        "covers the receipt path.\n\n"
+        "## Merge Conditions\n"
+        "Merge only after CI is green and the reviewed head SHA still matches.",
         encoding="utf-8",
     )
     prc.write_json(path.with_name("claude_review_receipt.json"), {"exit_code": 0, "reviewed_head_sha": "abc"})
@@ -221,7 +227,12 @@ def test_review_receipt_status_accepts_request_changes_for_gate_to_block(tmp_pat
         "## Verdict\n"
         "REQUEST_CHANGES\n\n"
         "## Findings\n"
-        "1. Blocking issue.\n",
+        "1. HIGH - `scripts/runtime/pr_merge_control.py` still accepts a shallow "
+        "review receipt, so the merge gate can be bypassed.\n\n"
+        "## Missing Tests Or Proof\n"
+        "`tests/test_pr_merge_control.py` needs a negative test for shallow approvals.\n\n"
+        "## Merge Conditions\n"
+        "Add the negative test and rerun `pytest -q tests/test_pr_merge_control.py`.",
         encoding="utf-8",
     )
     prc.write_json(path.with_name("codex_review_receipt.json"), {"exit_code": 0, "reviewed_head_sha": "abc"})
@@ -252,7 +263,10 @@ def test_review_receipt_status_rejects_unedited_verdict_template(tmp_path):
 def test_review_receipt_status_rejects_nonzero_exit(tmp_path):
     path = tmp_path / "codex_review.md"
     path.write_text(
-        "## Verdict\nAPPROVE\n\n## Findings\nNo blocking findings.\n",
+        "## Verdict\nAPPROVE\n\n"
+        "## Findings\nNo blocking findings after reading `scripts/runtime/pr_merge_control.py`.\n\n"
+        "## Missing Tests Or Proof\nNo missing local proof for this bounded check.\n\n"
+        "## Merge Conditions\nCI must stay green and the reviewed head must match.\n",
         encoding="utf-8",
     )
     prc.write_json(path.with_name("codex_review_receipt.json"), {"exit_code": 1, "reviewed_head_sha": "abc"})
@@ -266,7 +280,10 @@ def test_review_receipt_status_rejects_nonzero_exit(tmp_path):
 def test_review_receipt_status_rejects_stale_head(tmp_path):
     path = tmp_path / "claude_review.md"
     path.write_text(
-        "## Verdict\nAPPROVE\n\n## Findings\nNo blocking findings.\n",
+        "## Verdict\nAPPROVE\n\n"
+        "## Findings\nNo blocking findings after reading `scripts/runtime/pr_merge_control.py`.\n\n"
+        "## Missing Tests Or Proof\nNo missing local proof for this bounded check.\n\n"
+        "## Merge Conditions\nCI must stay green and the reviewed head must match.\n",
         encoding="utf-8",
     )
     prc.write_json(path.with_name("claude_review_receipt.json"), {"exit_code": 0, "reviewed_head_sha": "old"})
@@ -283,7 +300,10 @@ def test_build_gate_blocks_when_review_thread_lookup_fails(tmp_path, monkeypatch
     prc.write_json(packet_dir / "FACTS.json", {"risk": {"level": "LOW"}})
     for name in ("codex_review.md", "claude_review.md"):
         (packet_dir / name).write_text(
-            "## Verdict\nAPPROVE\n\n## Findings\nNo blocking findings.\n",
+            "## Verdict\nAPPROVE\n\n"
+            "## Findings\nNo blocking findings after reading `scripts/runtime/pr_merge_control.py`.\n\n"
+            "## Missing Tests Or Proof\nNo missing local proof for this bounded check.\n\n"
+            "## Merge Conditions\nCI must stay green and the reviewed head must match.\n",
             encoding="utf-8",
         )
         prc.write_json(
@@ -338,7 +358,10 @@ def test_build_gate_blocks_when_head_changed_after_packet(tmp_path, monkeypatch)
     prc.write_json(packet_dir / "FACTS.json", {"risk": {"level": "LOW"}, "pr": {"headRefOid": "old"}})
     for name in ("codex_review.md", "claude_review.md"):
         (packet_dir / name).write_text(
-            "## Verdict\nAPPROVE\n\n## Findings\nNo blocking findings.\n",
+            "## Verdict\nAPPROVE\n\n"
+            "## Findings\nNo blocking findings after reading `scripts/runtime/pr_merge_control.py`.\n\n"
+            "## Missing Tests Or Proof\nNo missing local proof for this bounded check.\n\n"
+            "## Merge Conditions\nCI must stay green and the reviewed head must match.\n",
             encoding="utf-8",
         )
         prc.write_json(
@@ -389,7 +412,10 @@ def test_build_gate_requires_note_for_high_risk_human_approval(tmp_path, monkeyp
     prc.write_json(packet_dir / "FACTS.json", {"risk": {"level": "HIGH"}, "pr": {"headRefOid": "abc"}})
     for name in ("codex_review.md", "claude_review.md"):
         (packet_dir / name).write_text(
-            "## Verdict\nAPPROVE\n\n## Findings\nNo blocking findings.\n",
+            "## Verdict\nAPPROVE\n\n"
+            "## Findings\nNo blocking findings after reading `scripts/runtime/pr_merge_control.py`.\n\n"
+            "## Missing Tests Or Proof\nNo missing local proof for this bounded check.\n\n"
+            "## Merge Conditions\nCI must stay green and the reviewed head must match.\n",
             encoding="utf-8",
         )
         prc.write_json(
@@ -458,3 +484,46 @@ def test_claude_review_env_can_opt_into_api_key():
     )
 
     assert env["ANTHROPIC_API_KEY"] == "funded"
+
+
+def test_review_receipt_status_rejects_shallow_approval(tmp_path):
+    path = tmp_path / "codex_review.md"
+    path.write_text(
+        "## Verdict\n"
+        "APPROVE\n\n"
+        "## Findings\n"
+        "No blocking findings.\n\n"
+        "## Missing Tests Or Proof\n"
+        "None.\n\n"
+        "## Merge Conditions\n"
+        "Ready.\n",
+        encoding="utf-8",
+    )
+    prc.write_json(path.with_name("codex_review_receipt.json"), {"exit_code": 0, "reviewed_head_sha": "abc"})
+
+    result = prc.review_receipt_status(path, expected_head_sha="abc")
+
+    assert result["ok"] is False
+    assert result["reason"] in {
+        "Findings section is too thin",
+        "Missing Tests Or Proof section is too thin",
+        "Merge Conditions section is too thin",
+        "review lacks concrete file/path evidence",
+    }
+
+
+def test_review_receipt_status_rejects_missing_review_sections(tmp_path):
+    path = tmp_path / "codex_review.md"
+    path.write_text(
+        "## Verdict\n"
+        "APPROVE\n\n"
+        "## Findings\n"
+        "No blocking findings after reading `scripts/runtime/pr_merge_control.py`.\n",
+        encoding="utf-8",
+    )
+    prc.write_json(path.with_name("codex_review_receipt.json"), {"exit_code": 0, "reviewed_head_sha": "abc"})
+
+    result = prc.review_receipt_status(path, expected_head_sha="abc")
+
+    assert result["ok"] is False
+    assert result["reason"].startswith("missing review sections:")
