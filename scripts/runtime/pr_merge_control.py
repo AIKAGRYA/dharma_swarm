@@ -469,7 +469,7 @@ modify files. Check:
 Return markdown with exactly:
 
 ## Verdict
-APPROVE | REQUEST_CHANGES | BLOCKED | NEEDS_HUMAN
+A single line containing exactly one of: APPROVE, REQUEST_CHANGES, BLOCKED, NEEDS_HUMAN.
 
 ## Findings
 Numbered findings with severity, evidence, and why it matters.
@@ -644,7 +644,7 @@ def review_receipt_status(path: Path, *, expected_head_sha: str = "") -> dict[st
         for candidate in lines[index + 1:]:
             if not candidate:
                 continue
-            verdict = candidate.split()[0].strip("`*_-. ")
+            verdict = candidate.strip("`*_-. ")
             if verdict in allowed:
                 return {"ok": True, "verdict": verdict, "reason": "", "reviewed_head_sha": reviewed_head_sha}
             return {"ok": False, "verdict": verdict, "reason": "invalid verdict", "reviewed_head_sha": reviewed_head_sha}
@@ -704,6 +704,8 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
     original_risk = original.get("risk", {}).get("level", "UNKNOWN")
     if original_risk in {"HIGH", "CRITICAL"} and not args.human_approved:
         blockers.append(f"{original_risk} risk requires --human-approved")
+    if original_risk in {"HIGH", "CRITICAL"} and args.human_approved and not args.human_approval_note.strip():
+        blockers.append(f"{original_risk} risk requires --human-approval-note")
     return {
         "schema": "dharma.pr_review.merge_gate.v1",
         "generated_at": utc_now(),
@@ -736,6 +738,10 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
             "current": current_head_sha,
         },
         "risk": original.get("risk", {}),
+        "human_approval": {
+            "approved": bool(args.human_approved),
+            "note": args.human_approval_note.strip(),
+        },
     }
 
 
@@ -781,8 +787,8 @@ def render_github_comment(packet: dict[str, Any], gate: dict[str, Any] | None) -
     classification = packet["classification"]
     risk = packet["risk"]
     coherence = packet["coherence"]
-    decision = gate.get("decision") if gate else "PACKET_ONLY"
-    blockers = gate.get("blockers", []) if gate else []
+    decision = gate.get("decision") if gate else "GATE_MISSING"
+    blockers = gate.get("blockers", []) if gate else ["merge gate output missing or gate execution failed"]
     warnings = gate.get("warnings", []) if gate else []
 
     lines = [
@@ -997,6 +1003,7 @@ def build_parser() -> argparse.ArgumentParser:
     gate.add_argument("--packet-dir")
     gate.add_argument("--allow-pending", action="store_true")
     gate.add_argument("--human-approved", action="store_true")
+    gate.add_argument("--human-approval-note", default="")
     gate.set_defaults(func=cmd_gate)
 
     merge = sub.add_parser("merge", help="Dry-run or execute a gated merge")
@@ -1004,6 +1011,7 @@ def build_parser() -> argparse.ArgumentParser:
     merge.add_argument("--packet-dir")
     merge.add_argument("--allow-pending", action="store_true")
     merge.add_argument("--human-approved", action="store_true")
+    merge.add_argument("--human-approval-note", default="")
     merge.add_argument("--method", choices=("squash", "merge", "rebase"), default="squash")
     merge.add_argument("--confirm", required=True)
     merge.add_argument("--execute", action="store_true")

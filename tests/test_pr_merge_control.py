@@ -232,6 +232,23 @@ def test_review_receipt_status_accepts_request_changes_for_gate_to_block(tmp_pat
     assert result["verdict"] == "REQUEST_CHANGES"
 
 
+def test_review_receipt_status_rejects_unedited_verdict_template(tmp_path):
+    path = tmp_path / "codex_review.md"
+    path.write_text(
+        "## Verdict\n"
+        "APPROVE | REQUEST_CHANGES | BLOCKED | NEEDS_HUMAN\n\n"
+        "## Findings\n"
+        "Template was not edited.\n",
+        encoding="utf-8",
+    )
+    prc.write_json(path.with_name("codex_review_receipt.json"), {"exit_code": 0, "reviewed_head_sha": "abc"})
+
+    result = prc.review_receipt_status(path, expected_head_sha="abc")
+
+    assert result["ok"] is False
+    assert result["reason"] == "invalid verdict"
+
+
 def test_review_receipt_status_rejects_nonzero_exit(tmp_path):
     path = tmp_path / "codex_review.md"
     path.write_text(
@@ -280,6 +297,7 @@ def test_build_gate_blocks_when_review_thread_lookup_fails(tmp_path, monkeypatch
         pr=42,
         allow_pending=False,
         human_approved=False,
+        human_approval_note="",
     )
 
     monkeypatch.setattr(
@@ -334,6 +352,7 @@ def test_build_gate_blocks_when_head_changed_after_packet(tmp_path, monkeypatch)
         pr=42,
         allow_pending=False,
         human_approved=False,
+        human_approval_note="",
     )
 
     monkeypatch.setattr(
@@ -362,6 +381,70 @@ def test_build_gate_blocks_when_head_changed_after_packet(tmp_path, monkeypatch)
 
     assert gate["decision"] == "BLOCKED"
     assert "PR head changed since packet generation" in gate["blockers"]
+
+
+def test_build_gate_requires_note_for_high_risk_human_approval(tmp_path, monkeypatch):
+    packet_dir = tmp_path / "packet"
+    packet_dir.mkdir()
+    prc.write_json(packet_dir / "FACTS.json", {"risk": {"level": "HIGH"}, "pr": {"headRefOid": "abc"}})
+    for name in ("codex_review.md", "claude_review.md"):
+        (packet_dir / name).write_text(
+            "## Verdict\nAPPROVE\n\n## Findings\nNo blocking findings.\n",
+            encoding="utf-8",
+        )
+        prc.write_json(
+            packet_dir / name.replace(".md", "_receipt.json"),
+            {"exit_code": 0, "reviewed_head_sha": "abc"},
+        )
+
+    args = SimpleNamespace(
+        packet_dir=str(packet_dir),
+        state_root=str(tmp_path),
+        pr=42,
+        allow_pending=False,
+        human_approved=True,
+        human_approval_note="",
+    )
+    monkeypatch.setattr(
+        prc,
+        "fetch_pr_view",
+        lambda _pr: {
+            "number": 42,
+            "title": "high",
+            "headRefOid": "abc",
+            "body": """
+- Organ touched: scripts/runtime
+- Declared-vs-actual gap closed: high risk merge proof is receipt backed.
+- Proof that re-reads the map: packet and gate both load.
+- New drift introduced: None
+""",
+            "isDraft": False,
+            "mergeable": "MERGEABLE",
+            "reviewDecision": "APPROVED",
+            "statusCheckRollup": [{"name": "tests", "status": "COMPLETED", "conclusion": "SUCCESS"}],
+        },
+    )
+    monkeypatch.setattr(prc, "repo_name", lambda: "owner/repo")
+    monkeypatch.setattr(prc, "fetch_review_threads", lambda _pr, _repo: {"ok": True, "unresolved_count": 0})
+
+    gate = prc.build_gate(args)
+
+    assert gate["decision"] == "BLOCKED"
+    assert "HIGH risk requires --human-approval-note" in gate["blockers"]
+
+
+def test_render_github_comment_blocks_when_gate_missing():
+    packet = {
+        "pr": {"number": 42},
+        "classification": {"status": "GITHUB_GREEN_NEEDS_PACKET", "mergeable": "MERGEABLE"},
+        "risk": {"level": "LOW", "files_changed": 1, "additions": 1, "deletions": 0},
+        "coherence": {"ok": True},
+    }
+
+    comment = prc.render_github_comment(packet, None)
+
+    assert "Decision: `GATE_MISSING`" in comment
+    assert "merge gate output missing or gate execution failed" in comment
 
 
 def test_claude_review_env_can_opt_into_api_key():
