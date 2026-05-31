@@ -74,6 +74,9 @@ regexes = [
     # Anthropic / OpenAI documented placeholder shapes
     '''sk-ant-api03-AAAAA[A-Za-z0-9_-]{20,}''',
     '''sk-proj-XXXXX''',
+    # OMS api_name fields (dharma.<domain>.<entity>.v<N>) are type identifiers,
+    # not secrets. The "dharma." prefix + version suffix trigger generic-api-key.
+    '''dharma\.[a-z_.]+\.v\d+''',
 ]
 
 # =============================================================================

@@ -84,6 +84,18 @@ class SecurityLevel(str, Enum):
     DHARMIC = "dharmic"
 
 
+class TypeStatus(str, Enum):
+    """Lifecycle status for ObjectType registration.
+
+    Agents propose types as EXPERIMENTAL.  The operator promotes to ACTIVE
+    after review.  PROMOTED marks types that are part of the stable API
+    contract and subject to SEMVER deprecation rules.
+    """
+    EXPERIMENTAL = "experimental"
+    ACTIVE = "active"
+    PROMOTED = "promoted"
+
+
 class ShaktiEnergy(str, Enum):
     """Which creative force primarily drives this object type."""
     MAHESHWARI = "maheshwari"
@@ -175,6 +187,17 @@ class ObjectType(BaseModel):
     pydantic_model: str = ""
     storage_backend: str = "jsonl"
     icon: str = ""
+
+    # OMS hardening (Palantir-grounded)
+    status: TypeStatus = TypeStatus.EXPERIMENTAL
+    api_name: str = Field(
+        default="",
+        description=(
+            "Frozen API identifier in the form 'dharma.<domain>.v<N>'. "
+            "Once set on a PROMOTED type, this name is immutable and "
+            "subject to SEMVER deprecation rules."
+        ),
+    )
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -320,8 +343,19 @@ class OntologyRegistry:
 
     # ── Registration ─────────────────────────────────────────────────
 
-    def register_type(self, obj_type: ObjectType) -> None:
-        """Register an ObjectType in the ontology."""
+    def register_type(self, obj_type: ObjectType, *, allow_overwrite: bool = False) -> None:
+        """Register an ObjectType in the ontology.
+
+        Raises:
+            ValueError: If a type with the same ``name`` is already
+                registered and *allow_overwrite* is ``False``.
+        """
+        existing = self._types.get(obj_type.name)
+        if existing is not None and not allow_overwrite:
+            raise ValueError(
+                f"ObjectType '{obj_type.name}' is already registered. "
+                f"Pass allow_overwrite=True to replace it."
+            )
         self._types[obj_type.name] = obj_type
         for link_def in obj_type.links:
             self.register_link(link_def)
@@ -843,7 +877,7 @@ class OntologyRegistry:
         """
         registry = cls()
         for obj_type in _DOMAIN_TYPES:
-            registry.register_type(obj_type)
+            registry.register_type(obj_type, allow_overwrite=True)
         for link_def in _DOMAIN_LINKS:
             registry.register_link(link_def)
         for link_def in _METABOLIC_LINKS:
@@ -884,6 +918,8 @@ _RESEARCH_THREAD = ObjectType(
     shakti_energy=ShaktiEnergy.MAHESHWARI,
     pydantic_model="dharma_swarm.thread_manager.ThreadState",
     icon="R",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.research.thread.v1",
 )
 
 _EXPERIMENT = ObjectType(
@@ -920,6 +956,8 @@ _EXPERIMENT = ObjectType(
     telos_alignment=0.95,
     shakti_energy=ShaktiEnergy.MAHASARASWATI,
     icon="E",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.research.experiment.v1",
 )
 
 _PAPER = ObjectType(
@@ -948,6 +986,8 @@ _PAPER = ObjectType(
     telos_alignment=0.85,
     shakti_energy=ShaktiEnergy.MAHASARASWATI,
     icon="P",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.research.paper.v1",
 )
 
 _AGENT_IDENTITY = ObjectType(
@@ -1001,6 +1041,8 @@ _AGENT_IDENTITY = ObjectType(
     shakti_energy=ShaktiEnergy.MAHAKALI,
     pydantic_model="dharma_swarm.models.AgentConfig",
     icon="A",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.agent.identity.v1",
 )
 
 _CUSTODIAN_ROLE = ObjectType(
@@ -1062,6 +1104,8 @@ _CUSTODIAN_ROLE = ObjectType(
     telos_alignment=0.75,
     shakti_energy=ShaktiEnergy.MAHASARASWATI,
     icon="U",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.agent.custodian.v1",
 )
 
 _KNOWLEDGE_ARTIFACT = ObjectType(
@@ -1094,6 +1138,8 @@ _KNOWLEDGE_ARTIFACT = ObjectType(
     telos_alignment=0.8,
     shakti_energy=ShaktiEnergy.MAHALAKSHMI,
     icon="K",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.knowledge.artifact.v1",
 )
 
 _TYPED_TASK = ObjectType(
@@ -1126,6 +1172,8 @@ _TYPED_TASK = ObjectType(
     shakti_energy=ShaktiEnergy.MAHAKALI,
     pydantic_model="dharma_swarm.models.Task",
     icon="T",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.task.typed.v1",
 )
 
 _EVOLUTION_ENTRY = ObjectType(
@@ -1159,6 +1207,8 @@ _EVOLUTION_ENTRY = ObjectType(
     shakti_energy=ShaktiEnergy.MAHAKALI,
     pydantic_model="dharma_swarm.archive.ArchiveEntry",
     icon="D",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.evolution.entry.v1",
 )
 
 _WITNESS_LOG = ObjectType(
@@ -1189,6 +1239,8 @@ _WITNESS_LOG = ObjectType(
     telos_alignment=1.0,
     shakti_energy=ShaktiEnergy.MAHESHWARI,
     icon="W",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.governance.witness.v1",
 )
 
 
@@ -1275,6 +1327,8 @@ _ACTION_PROPOSAL = ObjectType(
     telos_alignment=0.9,
     shakti_energy=ShaktiEnergy.MAHAKALI,
     icon="→",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.governance.proposal.v1",
 )
 
 _GATE_DECISION_TYPE = ObjectType(
@@ -1306,6 +1360,8 @@ _GATE_DECISION_TYPE = ObjectType(
     telos_alignment=1.0,
     shakti_energy=ShaktiEnergy.MAHESHWARI,
     icon="⊘",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.governance.gate_decision.v1",
 )
 
 _EXECUTION_LEASE = ObjectType(
@@ -1346,6 +1402,8 @@ _EXECUTION_LEASE = ObjectType(
     telos_alignment=0.95,
     shakti_energy=ShaktiEnergy.MAHASARASWATI,
     icon="⌛",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.execution.lease.v1",
 )
 
 _OUTCOME = ObjectType(
@@ -1384,6 +1442,8 @@ _OUTCOME = ObjectType(
     telos_alignment=0.85,
     shakti_energy=ShaktiEnergy.MAHASARASWATI,
     icon="✓",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.execution.outcome.v1",
 )
 
 _VALUE_EVENT = ObjectType(
@@ -1429,6 +1489,8 @@ _VALUE_EVENT = ObjectType(
     telos_alignment=0.85,
     shakti_energy=ShaktiEnergy.MAHALAKSHMI,
     icon="V",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.economic.value_event.v1",
 )
 
 _CONTRIBUTION = ObjectType(
@@ -1464,6 +1526,8 @@ _CONTRIBUTION = ObjectType(
     telos_alignment=0.85,
     shakti_energy=ShaktiEnergy.MAHALAKSHMI,
     icon="C",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.economic.contribution.v1",
 )
 
 _VENTURE_CELL = ObjectType(
@@ -1504,6 +1568,8 @@ _VENTURE_CELL = ObjectType(
     telos_alignment=0.95,
     shakti_energy=ShaktiEnergy.MAHALAKSHMI,
     icon="◈",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.economic.venture_cell.v1",
 )
 
 
@@ -1545,6 +1611,8 @@ _REVENUE_TARGET = ObjectType(
     telos_alignment=0.8,
     shakti_energy=ShaktiEnergy.MAHALAKSHMI,
     icon="🎯",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.revenue.target.v1",
 )
 
 _REVENUE_OFFER = ObjectType(
@@ -1571,6 +1639,8 @@ _REVENUE_OFFER = ObjectType(
     telos_alignment=0.85,
     shakti_energy=ShaktiEnergy.MAHALAKSHMI,
     icon="📋",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.revenue.offer.v1",
 )
 
 _REVENUE_OUTREACH = ObjectType(
@@ -1606,6 +1676,8 @@ _REVENUE_OUTREACH = ObjectType(
     telos_alignment=0.95,
     shakti_energy=ShaktiEnergy.MAHESHWARI,
     icon="✉",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.revenue.outreach.v1",
 )
 
 _REVENUE_ENGAGEMENT = ObjectType(
@@ -1642,6 +1714,8 @@ _REVENUE_ENGAGEMENT = ObjectType(
     telos_alignment=0.9,
     shakti_energy=ShaktiEnergy.MAHALAKSHMI,
     icon="💰",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.revenue.engagement.v1",
 )
 
 _REVENUE_REINVESTMENT = ObjectType(
@@ -1669,6 +1743,8 @@ _REVENUE_REINVESTMENT = ObjectType(
     telos_alignment=0.9,
     shakti_energy=ShaktiEnergy.MAHALAKSHMI,
     icon="⚡",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.revenue.reinvestment.v1",
 )
 
 

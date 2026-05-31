@@ -21,6 +21,7 @@ from dharma_swarm.ontology import (
     SecurityLevel,
     SecurityPolicy,
     ShaktiEnergy,
+    TypeStatus,
     check_security,
     validate_link,
     validate_object,
@@ -707,3 +708,91 @@ class TestRevenueOntologyTypes:
         })
         assert obj is not None, f"Creation failed: {errors}"
         assert obj.properties["contracted_value_usd"] == 15000.0
+
+
+# ── OMS Hardening (TypeStatus + api_name + uniqueness) ───────────
+
+
+class TestTypeStatus:
+    def test_new_type_defaults_to_experimental(self) -> None:
+        t = ObjectType(name="Scratch", description="test")
+        assert t.status == TypeStatus.EXPERIMENTAL
+
+    def test_domain_types_are_active(self, registry: OntologyRegistry) -> None:
+        for name in registry.type_names():
+            obj_type = registry.get_type(name)
+            assert obj_type is not None
+            assert obj_type.status == TypeStatus.ACTIVE, (
+                f"{name} should be ACTIVE, got {obj_type.status}"
+            )
+
+    def test_status_enum_values(self) -> None:
+        assert set(TypeStatus) == {
+            TypeStatus.EXPERIMENTAL,
+            TypeStatus.ACTIVE,
+            TypeStatus.PROMOTED,
+        }
+
+
+class TestApiName:
+    def test_all_domain_types_have_api_name(self, registry: OntologyRegistry) -> None:
+        for name in registry.type_names():
+            obj_type = registry.get_type(name)
+            assert obj_type is not None
+            assert obj_type.api_name, f"{name} is missing api_name"
+            assert obj_type.api_name.startswith("dharma."), (
+                f"{name} api_name should start with 'dharma.', got {obj_type.api_name!r}"
+            )
+
+    def test_api_names_are_unique(self, registry: OntologyRegistry) -> None:
+        seen: dict[str, str] = {}
+        for name in registry.type_names():
+            obj_type = registry.get_type(name)
+            assert obj_type is not None
+            if obj_type.api_name in seen:
+                pytest.fail(
+                    f"Duplicate api_name {obj_type.api_name!r}: "
+                    f"{seen[obj_type.api_name]} and {name}"
+                )
+            seen[obj_type.api_name] = name
+
+    def test_api_name_format(self, registry: OntologyRegistry) -> None:
+        for name in registry.type_names():
+            obj_type = registry.get_type(name)
+            assert obj_type is not None
+            parts = obj_type.api_name.split(".")
+            assert len(parts) >= 3, (
+                f"{name} api_name should have >=3 parts, got {obj_type.api_name!r}"
+            )
+            assert parts[-1].startswith("v"), (
+                f"{name} api_name should end with version (vN), got {parts[-1]!r}"
+            )
+
+    def test_new_type_has_empty_api_name(self) -> None:
+        t = ObjectType(name="Scratch", description="test")
+        assert t.api_name == ""
+
+
+class TestRegisterTypeUniqueness:
+    def test_duplicate_raises(self, registry: OntologyRegistry) -> None:
+        with pytest.raises(ValueError, match="already registered"):
+            registry.register_type(
+                ObjectType(name="ResearchThread", description="dup")
+            )
+
+    def test_allow_overwrite(self, registry: OntologyRegistry) -> None:
+        registry.register_type(
+            ObjectType(name="ResearchThread", description="replaced"),
+            allow_overwrite=True,
+        )
+        t = registry.get_type("ResearchThread")
+        assert t is not None
+        assert t.description == "replaced"
+
+    def test_new_name_succeeds(self, registry: OntologyRegistry) -> None:
+        registry.register_type(
+            ObjectType(name="BrandNew", description="fresh")
+        )
+        t = registry.get_type("BrandNew")
+        assert t is not None
+        assert t.status == TypeStatus.EXPERIMENTAL
