@@ -145,6 +145,22 @@ def test_review_receipt_status_accepts_verdict(tmp_path):
     assert result["verdict"] == "APPROVE"
 
 
+def test_review_receipt_status_accepts_request_changes_for_gate_to_block(tmp_path):
+    path = tmp_path / "codex_review.md"
+    path.write_text(
+        "## Verdict\n"
+        "REQUEST_CHANGES\n\n"
+        "## Findings\n"
+        "1. Blocking issue.\n",
+        encoding="utf-8",
+    )
+
+    result = prc.review_receipt_status(path)
+
+    assert result["ok"] is True
+    assert result["verdict"] == "REQUEST_CHANGES"
+
+
 def test_claude_review_env_can_opt_into_api_key():
     _, env = prc.review_command_and_env(
         "claude",

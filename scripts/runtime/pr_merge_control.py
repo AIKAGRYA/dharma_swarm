@@ -629,8 +629,12 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
     claude_receipt = review_receipt_status(claude_path)
     if not codex_receipt["ok"]:
         blockers.append(f"invalid codex_review.md receipt: {codex_receipt['reason']}")
+    elif codex_receipt["verdict"] != "APPROVE":
+        blockers.append(f"codex_review.md verdict is {codex_receipt['verdict']}")
     if not claude_receipt["ok"]:
         blockers.append(f"invalid claude_review.md receipt: {claude_receipt['reason']}")
+    elif claude_receipt["verdict"] != "APPROVE":
+        blockers.append(f"claude_review.md verdict is {claude_receipt['verdict']}")
 
     original_risk = original.get("risk", {}).get("level", "UNKNOWN")
     if original_risk in {"HIGH", "CRITICAL"} and not args.human_approved:
