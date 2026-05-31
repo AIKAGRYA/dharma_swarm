@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from enum import Enum
@@ -297,6 +298,59 @@ def check_security(
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 
+_HARD_TIER_A_PATTERNS = tuple(
+    re.compile(pattern)
+    for pattern in (
+        r"\brm\s+-rf\b",
+        r"\bdelete\s+all\b",
+        r"\bformat\s+disk\b",
+        r"\bdrop\s+table\b",
+        r"\btruncate\s+table\b",
+        r"\bdd\s+if=/dev/zero\b",
+        r"\bmkfs\b",
+        r"\bddos\b",
+        r"\bdenial\s+of\s+service\b",
+        r"\bexfiltrate\b",
+        r"\bweaponize\b.*\b(attack|exploit|harm|kill)\b",
+        r"\b(attack|harm|kill)\b.*\b(people|person|humans|users)\b",
+        r":\(\)\{\s*:\|:&\s*\};:",
+    )
+)
+
+
+_DECLARED_GATE_ALIASES: dict[str, tuple[str, ...]] = {
+    # Shakti-oriented ontology declarations mapped to executable core gates.
+    "MAHESHWARI": ("ANEKANTA", "SVABHAAVA"),
+    "MAHASARASWATI": ("SATYA",),
+    "APARIGRAHA": ("CONSENT", "SATYA"),
+}
+
+
+def _payload_has_hard_tier_a_intent(payload: str) -> bool:
+    """High-confidence hard block scan for typed-action params.
+
+    ``TelosGatekeeper`` treats bare words like "attack" and "exploit" as
+    harmful when they appear in the action string. Typed ontology params often
+    contain those words as benign code/domain nouns (``exploit_scanner.py``,
+    "kill-switch test"). Keep those values in content for
+    credential/injection/deception checks, but only promote params into a hard
+    AHIMSA block when the payload expresses destructive command or harm intent.
+    """
+    lowered = payload.lower()
+    return any(pattern.search(lowered) for pattern in _HARD_TIER_A_PATTERNS)
+
+
+def _unknown_declared_telos_gates(declared_gates: list[str]) -> list[str]:
+    """Return declared gate names that cannot be evaluated by the active gatekeeper."""
+    try:
+        from dharma_swarm.telos_gates import DEFAULT_GATEKEEPER
+    except Exception:
+        return []
+    active = set(DEFAULT_GATEKEEPER.GATES)
+    aliases = set(_DECLARED_GATE_ALIASES)
+    return sorted(gate for gate in declared_gates if gate not in active and gate not in aliases)
+
+
 def _default_telos_gate_check(action_name: str, params: dict[str, Any]) -> dict[str, str]:
     """Default telos ``gate_check`` for :meth:`OntologyRegistry.execute_action`.
 
@@ -314,11 +368,11 @@ def _default_telos_gate_check(action_name: str, params: dict[str, Any]) -> dict[
         logging.getLogger(__name__).warning("telos gates unavailable; action blocked")
         return {"TELOS": "BLOCK"}
     payload = json.dumps(params, default=str, sort_keys=True)
-    # Feed action-name + params as the action description: for typed actions the real
-    # harm vector is the PARAMS, not the always-benign verb ("Propose"/"Run"), so
-    # AHIMSA's harm scan must see the payload. Params also go as content for the
-    # credential/injection scans.
-    action_desc = f"{action_name} {payload}"
+    if _payload_has_hard_tier_a_intent(payload):
+        return {"AHIMSA": "BLOCK"}
+    # Keep params in content for credential/injection/deception scans without
+    # feeding every security-domain noun into AHIMSA's broad action-word scan.
+    action_desc = action_name
     result = DEFAULT_GATEKEEPER.check(action=action_desc, content=payload)
     # The authoritative verdict is the overall DECISION, not the per-gate advisory
     # FAILs: Tier-A/B hard violations (harm, deception, credential leak) -> BLOCK;
@@ -659,7 +713,21 @@ class OntologyRegistry:
 
         # Telos gate check
         if gate_check and action_def.telos_gates:
-            gate_results = gate_check(action_name, params)
+            unknown_gates = _unknown_declared_telos_gates(action_def.telos_gates)
+            if unknown_gates:
+                execution.gate_results = {gate: "BLOCK" for gate in unknown_gates}
+                execution.result = "blocked"
+                execution.error = f"unknown telos gates declared: {', '.join(unknown_gates)}"
+                self._action_log.append(execution)
+                return execution
+            try:
+                gate_results = gate_check(action_name, params)
+            except Exception as exc:
+                execution.gate_results = {"TELOS": "BLOCK"}
+                execution.result = "blocked"
+                execution.error = f"telos gate error: {exc.__class__.__name__}"
+                self._action_log.append(execution)
+                return execution
             execution.gate_results = gate_results
             if any(v == "BLOCK" for v in gate_results.values()):
                 execution.result = "blocked"

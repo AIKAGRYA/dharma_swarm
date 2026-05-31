@@ -9,7 +9,13 @@ from __future__ import annotations
 
 import builtins
 
-from dharma_swarm.ontology import OntologyRegistry, _default_telos_gate_check
+from dharma_swarm.ontology import (
+    ActionDef,
+    ObjectType,
+    OntologyRegistry,
+    _default_telos_gate_check,
+    _unknown_declared_telos_gates,
+)
 
 
 def _registry() -> OntologyRegistry:
@@ -42,6 +48,17 @@ def test_default_gate_check_blocks_harmful_after_long_prefix() -> None:
     assert "BLOCK" in out.values()
 
 
+def test_default_gate_check_passes_security_domain_terms() -> None:
+    out = _default_telos_gate_check(
+        "Propose",
+        {
+            "component": "exploit_scanner.py",
+            "note": "harden the kill-switch regression test",
+        },
+    )
+    assert "BLOCK" not in out.values()
+
+
 def test_default_gate_check_fails_closed_when_gatekeeper_unavailable(monkeypatch) -> None:
     original_import = builtins.__import__
 
@@ -53,6 +70,51 @@ def test_default_gate_check_fails_closed_when_gatekeeper_unavailable(monkeypatch
     monkeypatch.setattr(builtins, "__import__", guarded_import)
     out = _default_telos_gate_check("Propose", {"note": "benign refactor"})
     assert "BLOCK" in out.values()
+
+
+def test_declared_shakti_gate_aliases_are_known() -> None:
+    r = _registry()
+    missing = {
+        gate
+        for action in r._actions.values()
+        for gate in _unknown_declared_telos_gates(action.telos_gates)
+    }
+    assert missing == set()
+
+
+def test_unknown_declared_gate_blocks_with_action_receipt() -> None:
+    r = _registry()
+    r.register_type(
+        ObjectType(
+            name="UnknownGateProbe",
+            actions=[
+                ActionDef(
+                    name="Do",
+                    object_type="UnknownGateProbe",
+                    telos_gates=["NOT_A_GATE"],
+                ),
+            ],
+        ),
+    )
+    obj, _ = r.create_object("UnknownGateProbe", {})
+    res = r.execute_action("UnknownGateProbe", "Do", obj.id, {})
+    assert res.result == "blocked"
+    assert "unknown telos gates declared" in res.error
+    assert res.gate_results == {"NOT_A_GATE": "BLOCK"}
+    assert r.action_history(obj.id, limit=1)[0].error == res.error
+
+
+def test_gatekeeper_runtime_error_fails_closed_with_action_receipt() -> None:
+    def broken_gate(_name: str, _params: dict) -> dict[str, str]:
+        raise RuntimeError("gate offline")
+
+    r = _registry()
+    obj = _evo(r)
+    res = r.execute_action("EvolutionEntry", "Propose", obj.id, {}, gate_check=broken_gate)
+    assert res.result == "blocked"
+    assert "telos gate error: RuntimeError" in res.error
+    assert res.gate_results == {"TELOS": "BLOCK"}
+    assert r.action_history(obj.id, limit=1)[0].error == res.error
 
 
 def test_hardwire_blocks_harmful_without_explicit_gate() -> None:

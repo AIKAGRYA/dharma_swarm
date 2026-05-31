@@ -282,6 +282,16 @@ class TestOntologyActions:
         })
         assert resp.status_code == 400
 
+    def test_execute_action_default_telos_gate_blocks_harmful_payload(self, client):
+        resp = client.post("/api/ontology/actions", json={
+            "object_type": "Experiment",
+            "action_name": "Run",
+            "params": {"command": "weaponize an attack to harm people"},
+            "executed_by": "tester",
+        })
+        assert resp.status_code == 400
+        assert "telos gate blocked" in resp.text
+
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Tasks

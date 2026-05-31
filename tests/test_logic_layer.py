@@ -331,6 +331,17 @@ class TestApplyAction:
         assert result.status == BlockStatus.BLOCKED
         assert "telos gate blocked" in result.error
 
+    @pytest.mark.asyncio
+    async def test_default_telos_gate_blocks_harmful_payload(self, ctx_with_registry):
+        block = ApplyAction(
+            "Experiment",
+            "Run",
+            params={"command": "weaponize an attack to harm people"},
+        )
+        result = await block.execute(ctx_with_registry)
+        assert result.status == BlockStatus.BLOCKED
+        assert "telos gate blocked" in result.error
+
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # UseLLM

@@ -219,7 +219,8 @@ class ApplyAction(LogicBlock):
     """Execute a typed ontology action.  No LLM.  No tokens.
 
     Calls registry.execute_action() with the resolved params.
-    Telos gates run if gate_fn is set on the context.
+    Telos gates run for declared gated actions by default; a non-None
+    context.gate_fn overrides the default gate.
     """
 
     def __init__(
