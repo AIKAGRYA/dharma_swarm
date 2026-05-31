@@ -486,6 +486,20 @@ def test_claude_review_env_can_opt_into_api_key():
     assert env["ANTHROPIC_API_KEY"] == "funded"
 
 
+def test_review_timeout_seconds_defaults_and_validates():
+    assert prc.review_timeout_seconds("codex", {}) == 600
+    assert prc.review_timeout_seconds("claude", {"CLAUDE_REVIEW_TIMEOUT_SECONDS": "90"}) == 90
+
+
+def test_review_timeout_seconds_rejects_too_short():
+    try:
+        prc.review_timeout_seconds("codex", {"CODEX_REVIEW_TIMEOUT_SECONDS": "5"})
+    except prc.PRControlError as exc:
+        assert "at least 30 seconds" in str(exc)
+    else:
+        raise AssertionError("expected PRControlError")
+
+
 def test_review_receipt_status_rejects_shallow_approval(tmp_path):
     path = tmp_path / "codex_review.md"
     path.write_text(

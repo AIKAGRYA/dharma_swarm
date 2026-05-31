@@ -534,6 +534,18 @@ def review_command_and_env(
     return command, env
 
 
+def review_timeout_seconds(agent: str, env: dict[str, str]) -> int:
+    key = "CLAUDE_REVIEW_TIMEOUT_SECONDS" if agent == "claude" else "CODEX_REVIEW_TIMEOUT_SECONDS"
+    raw = env.get(key, "600")
+    try:
+        timeout = int(raw)
+    except ValueError as exc:
+        raise PRControlError(f"{key} must be an integer number of seconds") from exc
+    if timeout < 30:
+        raise PRControlError(f"{key} must be at least 30 seconds")
+    return timeout
+
+
 def render_packet_markdown(packet: dict[str, Any]) -> str:
     pr = packet["pr"]
     risk = packet["risk"]
@@ -1037,16 +1049,33 @@ def cmd_run_agent(args: argparse.Namespace) -> int:
     output_name = "claude_review.md" if args.agent == "claude" else "codex_review.md"
     prompt = (out_dir / prompt_name).read_text(encoding="utf-8")
     command, env = review_command_and_env(args.agent)
-    result = subprocess.run(
-        command,
-        input=prompt,
-        text=True,
-        capture_output=True,
-        cwd=str(REPO_ROOT),
-        env=env,
-        check=False,
-    )
-    write_text(out_dir / output_name, result.stdout or result.stderr)
+    timeout = review_timeout_seconds(args.agent, env)
+    timed_out = False
+    try:
+        result = subprocess.run(
+            command,
+            input=prompt,
+            text=True,
+            capture_output=True,
+            cwd=str(REPO_ROOT),
+            env=env,
+            timeout=timeout,
+            check=False,
+        )
+        exit_code = result.returncode
+        output = result.stdout or result.stderr
+    except subprocess.TimeoutExpired as exc:
+        timed_out = True
+        exit_code = 124
+        stdout = exc.stdout or ""
+        stderr = exc.stderr or ""
+        if isinstance(stdout, bytes):
+            stdout = stdout.decode("utf-8", errors="replace")
+        if isinstance(stderr, bytes):
+            stderr = stderr.decode("utf-8", errors="replace")
+        output = (stdout or stderr).strip()
+        output = (output + "\n\n" if output else "") + f"ERROR: review command timed out after {timeout} seconds"
+    write_text(out_dir / output_name, output)
     write_json(
         out_dir / f"{args.agent}_review_receipt.json",
         {
@@ -1054,13 +1083,15 @@ def cmd_run_agent(args: argparse.Namespace) -> int:
             "generated_at": utc_now(),
             "agent": args.agent,
             "command": command,
-            "exit_code": result.returncode,
+            "exit_code": exit_code,
+            "timed_out": timed_out,
+            "timeout_seconds": timeout,
             "reviewed_head_sha": reviewed_head_sha,
             "output": str(out_dir / output_name),
         },
     )
-    print(f"agent={args.agent} exit={result.returncode} output={out_dir / output_name}")
-    return result.returncode
+    print(f"agent={args.agent} exit={exit_code} output={out_dir / output_name}")
+    return exit_code
 
 
 def build_parser() -> argparse.ArgumentParser:
