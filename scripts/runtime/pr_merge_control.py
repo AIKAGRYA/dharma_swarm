@@ -369,7 +369,10 @@ def coherence_results(body: str) -> dict[str, Any]:
             value = "\n".join(part for part in [first, *tail] if part).strip()
             break
         normalized = (value or "").strip().lower().strip("`*_-. ")
-        ok = bool(value) and normalized not in {"", "n/a", "na", "none", "none yet", "tbd", "todo", "unknown", "placeholder"}
+        placeholder_values = {"", "n/a", "na", "tbd", "todo", "unknown", "placeholder"}
+        if field != "New drift introduced":
+            placeholder_values.update({"none", "none yet"})
+        ok = bool(value) and normalized not in placeholder_values
         results[field] = {"ok": ok, "value": value or "", "reason": "" if ok else "missing or placeholder"}
     return {"ok": all(item["ok"] for item in results.values()), "fields": results}
 

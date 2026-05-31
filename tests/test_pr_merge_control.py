@@ -77,6 +77,19 @@ def test_coherence_results_accepts_bold_field_with_colon_inside_bold():
     assert result["ok"] is True
 
 
+def test_coherence_results_accepts_no_new_drift_statement():
+    body = """
+- Organ touched: governance / docs / state
+- Declared-vs-actual gap closed: stale operational surfaces are refreshed.
+- Proof that re-reads the map: `make docops-integrity` passes.
+- New drift introduced: None
+"""
+
+    result = prc.coherence_results(body)
+
+    assert result["ok"] is True
+
+
 def test_risk_from_files_flags_hot_paths():
     files = [
         {"filename": "dharma_swarm/telos_gates.py", "additions": 3, "deletions": 1},
