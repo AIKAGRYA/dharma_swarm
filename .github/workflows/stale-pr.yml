@@ -1,0 +1,150 @@
+name: stale-pr
+
+# Weekly lifecycle management for open PRs.
+#
+# - Labels PRs approaching their staleness threshold
+# - Posts a warning comment before auto-close
+# - Closes truly stale PRs with a governance comment
+# - Deletes branches of auto-closed PRs (orphan cleanup)
+#
+# Thresholds:
+#   Bot authors:   warn at 11 days, close at 14 days
+#   Human authors: warn at 27 days, close at 30 days
+#   Draft PRs:     label only (never auto-closed)
+
+on:
+  schedule:
+    - cron: "30 6 * * 1"  # Weekly on Monday 06:30 UTC
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "If true, only report — don't close or label"
+        default: "false"
+
+concurrency:
+  group: stale-pr
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  stale-pr-lifecycle:
+    name: Stale PR lifecycle
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+      BOT_WARN_DAYS: "11"
+      BOT_CLOSE_DAYS: "14"
+      HUMAN_WARN_DAYS: "27"
+      HUMAN_CLOSE_DAYS: "30"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Process stale PRs
+        run: |
+          set -euo pipefail
+          now_epoch="$(date +%s)"
+
+          # Ensure the 'stale' label exists
+          gh label create "stale" --repo "$GH_REPO" \
+            --description "PR has had no activity beyond threshold" \
+            --color "EDEDED" 2>/dev/null || true
+
+          # Fetch all open PRs with relevant fields
+          gh pr list --repo "$GH_REPO" --state open --limit 200 \
+            --json number,title,author,updatedAt,isDraft,headRefName,labels \
+            > /tmp/open_prs.json
+
+          summary="## Stale PR Lifecycle Report\n\n"
+          closed_count=0
+          warned_count=0
+
+          while IFS= read -r pr_json; do
+            number="$(echo "$pr_json" | jq -r '.number')"
+            title="$(echo "$pr_json" | jq -r '.title')"
+            author="$(echo "$pr_json" | jq -r '.author.login')"
+            updated="$(echo "$pr_json" | jq -r '.updatedAt')"
+            is_draft="$(echo "$pr_json" | jq -r '.isDraft')"
+            head_ref="$(echo "$pr_json" | jq -r '.headRefName')"
+            has_stale="$(echo "$pr_json" | jq -r '.labels | map(.name) | index("stale") // empty')"
+
+            # Calculate days since last update
+            updated_epoch="$(date -d "$updated" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "$updated" +%s 2>/dev/null || echo 0)"
+            if [ "$updated_epoch" -eq 0 ]; then
+              continue
+            fi
+            days_stale=$(( (now_epoch - updated_epoch) / 86400 ))
+
+            # Determine thresholds based on author type
+            if echo "$author" | grep -q '\[bot\]'; then
+              warn_days="$BOT_WARN_DAYS"
+              close_days="$BOT_CLOSE_DAYS"
+              actor_type="bot"
+            else
+              warn_days="$HUMAN_WARN_DAYS"
+              close_days="$HUMAN_CLOSE_DAYS"
+              actor_type="human"
+            fi
+
+            # Skip if not yet at warning threshold
+            if [ "$days_stale" -lt "$warn_days" ]; then
+              continue
+            fi
+
+            # Close if beyond close threshold (unless draft)
+            if [ "$days_stale" -ge "$close_days" ] && [ "$is_draft" != "true" ]; then
+              summary+="- **CLOSED** #${number}: ${title} (${days_stale}d stale, ${actor_type})\n"
+              if [ "$DRY_RUN" = "false" ]; then
+                close_msg="## 🗂️ Auto-closed: stale PR
+
+          This PR has had no activity for **${days_stale} days** (threshold: ${close_days} days for ${actor_type} authors).
+
+          Per \`docs/governance/PR_QUALITY_GATES.md\` § Stale PR Lifecycle:
+          - Bot PRs auto-close after ${BOT_CLOSE_DAYS} days of inactivity
+          - Human PRs auto-close after ${HUMAN_CLOSE_DAYS} days of inactivity
+          - Draft PRs are exempt from auto-close
+
+          **To reopen:** If this work is still needed, reopen the PR and rebase onto \`main\`. Consider marking long-running work as a draft."
+
+                gh pr comment "$number" --repo "$GH_REPO" --body "$close_msg" || true
+                gh pr close "$number" --repo "$GH_REPO" --comment "Auto-closed by stale-pr governance workflow" || true
+
+                # Delete the branch (orphan cleanup)
+                gh api --method DELETE "repos/${GH_REPO}/git/refs/heads/${head_ref}" 2>/dev/null || true
+              fi
+              closed_count=$((closed_count + 1))
+
+            # Warn if at warning threshold but not yet closeable
+            elif [ -z "$has_stale" ]; then
+              summary+="- **WARNED** #${number}: ${title} (${days_stale}d stale, ${actor_type})\n"
+              if [ "$DRY_RUN" = "false" ]; then
+                gh pr edit "$number" --repo "$GH_REPO" --add-label "stale" || true
+                warn_msg="## ⚠️ Stale PR warning
+
+          This PR has had no activity for **${days_stale} days**.
+
+          It will be **auto-closed in $((close_days - days_stale)) days** unless updated.
+
+          To keep it open:
+          - Push new commits, or
+          - Post a comment explaining the delay, or
+          - Convert to a draft PR (exempt from auto-close)
+
+          See \`docs/governance/PR_QUALITY_GATES.md\` § Stale PR Lifecycle."
+
+                gh pr comment "$number" --repo "$GH_REPO" --body "$warn_msg" || true
+              fi
+              warned_count=$((warned_count + 1))
+            fi
+
+          done < <(jq -c '.[]' /tmp/open_prs.json)
+
+          summary+="\n**Summary:** ${closed_count} closed, ${warned_count} warned\n"
+          echo -e "$summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "Closed: $closed_count, Warned: $warned_count"
