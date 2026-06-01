@@ -32,12 +32,32 @@ See ACTIVE_SURFACE_MANIFEST.yaml ``correlation_spine`` block.
 from dharma_swarm.spine.receipt import EvidenceReceipt, ErrorSource, ReceiptStatus
 from dharma_swarm.spine.routing import RoutingDecision
 from dharma_swarm.spine.invoke import invoke_agent, AgentInvoker
+from dharma_swarm.spine.identity import (
+    ExecutionIdentity,
+    MissingExecutionIdentity,
+    require_execution_identity,
+)
+from dharma_swarm.spine.adapters import (
+    adapt_execution_identity,
+    attach_execution_identity,
+    identity_from_carrier,
+    identity_metadata,
+    runtime_receipt_kwargs,
+)
 
 __all__ = [
+    "ExecutionIdentity",
     "EvidenceReceipt",
     "ErrorSource",
+    "MissingExecutionIdentity",
     "ReceiptStatus",
     "RoutingDecision",
+    "adapt_execution_identity",
+    "attach_execution_identity",
+    "identity_from_carrier",
+    "identity_metadata",
     "invoke_agent",
     "AgentInvoker",
+    "require_execution_identity",
+    "runtime_receipt_kwargs",
 ]

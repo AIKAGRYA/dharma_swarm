@@ -25,6 +25,7 @@ from dharma_swarm.engine.event_memory import (
     ensure_memory_plane_schema_async,
     ensure_memory_plane_schema_sync,
 )
+from dharma_swarm.spine.identity import ExecutionIdentity
 
 DEFAULT_RUNTIME_DB = Path.home() / ".dharma" / "state" / "runtime.db"
 
@@ -96,6 +97,7 @@ CREATE TABLE IF NOT EXISTS artifact_records (
     session_id TEXT NOT NULL DEFAULT '',
     task_id TEXT NOT NULL DEFAULT '',
     run_id TEXT NOT NULL DEFAULT '',
+    trace_id TEXT NOT NULL DEFAULT '',
     artifact_kind TEXT NOT NULL,
     manifest_path TEXT NOT NULL DEFAULT '',
     payload_path TEXT NOT NULL DEFAULT '',
@@ -205,6 +207,63 @@ CREATE VIRTUAL TABLE IF NOT EXISTS session_events_fts USING fts5(
     tokenize='porter unicode61'
 )"""
 
+_EXECUTION_IDENTITIES_DDL = """
+CREATE TABLE IF NOT EXISTS execution_identities (
+    run_id TEXT PRIMARY KEY,
+    trace_id TEXT NOT NULL,
+    correlation_id TEXT NOT NULL,
+    task_id TEXT NOT NULL,
+    claim_id TEXT NOT NULL DEFAULT '',
+    idempotency_key TEXT NOT NULL DEFAULT '',
+    causation_id TEXT NOT NULL DEFAULT '',
+    parent_run_id TEXT NOT NULL DEFAULT '',
+    agent_id TEXT NOT NULL DEFAULT '',
+    session_id TEXT NOT NULL DEFAULT '',
+    external_a2a_task_id TEXT NOT NULL DEFAULT '',
+    message_id TEXT NOT NULL DEFAULT '',
+    event_id TEXT NOT NULL DEFAULT '',
+    artifact_id TEXT NOT NULL DEFAULT '',
+    proposal_id TEXT NOT NULL DEFAULT '',
+    source TEXT NOT NULL DEFAULT '',
+    metadata_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+)"""
+
+_RUNTIME_RECEIPTS_DDL = """
+CREATE TABLE IF NOT EXISTS runtime_receipts (
+    receipt_id TEXT PRIMARY KEY,
+    receipt_type TEXT NOT NULL,
+    run_id TEXT NOT NULL DEFAULT '',
+    task_id TEXT NOT NULL DEFAULT '',
+    trace_id TEXT NOT NULL DEFAULT '',
+    correlation_id TEXT NOT NULL DEFAULT '',
+    causation_id TEXT NOT NULL DEFAULT '',
+    parent_run_id TEXT NOT NULL DEFAULT '',
+    agent_id TEXT NOT NULL DEFAULT '',
+    idempotency_key TEXT NOT NULL DEFAULT '',
+    side_effect_key TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL,
+    payload_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL
+)"""
+
+_IDEMPOTENCY_RECORDS_DDL = """
+CREATE TABLE IF NOT EXISTS idempotency_records (
+    idempotency_key TEXT NOT NULL,
+    side_effect_key TEXT NOT NULL,
+    run_id TEXT NOT NULL DEFAULT '',
+    task_id TEXT NOT NULL DEFAULT '',
+    trace_id TEXT NOT NULL DEFAULT '',
+    correlation_id TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL,
+    result_receipt_id TEXT NOT NULL DEFAULT '',
+    metadata_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (idempotency_key, side_effect_key)
+)"""
+
 _INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_sessions_status_updated ON sessions(status, updated_at)",
     "CREATE INDEX IF NOT EXISTS idx_claims_task_status ON task_claims(task_id, status)",
@@ -214,6 +273,7 @@ _INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_leases_zone_released ON workspace_leases(zone_path, released_at)",
     "CREATE INDEX IF NOT EXISTS idx_artifacts_task_created ON artifact_records(task_id, created_at)",
     "CREATE INDEX IF NOT EXISTS idx_artifacts_run_created ON artifact_records(run_id, created_at)",
+    "CREATE INDEX IF NOT EXISTS idx_artifacts_trace_created ON artifact_records(trace_id, created_at)",
     "CREATE INDEX IF NOT EXISTS idx_memory_truth_updated ON memory_facts(truth_state, updated_at)",
     "CREATE INDEX IF NOT EXISTS idx_memory_task_truth ON memory_facts(task_id, truth_state)",
     "CREATE INDEX IF NOT EXISTS idx_context_session_created ON context_bundles(session_id, created_at)",
@@ -221,6 +281,15 @@ _INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_operator_actions_session_created ON operator_actions(session_id, created_at)",
     "CREATE INDEX IF NOT EXISTS idx_session_events_session_created ON session_events(session_id, created_at)",
     "CREATE INDEX IF NOT EXISTS idx_session_events_kind_created ON session_events(ledger_kind, created_at)",
+    "CREATE INDEX IF NOT EXISTS idx_exec_identity_trace ON execution_identities(trace_id)",
+    "CREATE INDEX IF NOT EXISTS idx_exec_identity_correlation ON execution_identities(correlation_id)",
+    "CREATE INDEX IF NOT EXISTS idx_exec_identity_task ON execution_identities(task_id)",
+    "CREATE INDEX IF NOT EXISTS idx_exec_identity_external_a2a ON execution_identities(external_a2a_task_id)",
+    "CREATE INDEX IF NOT EXISTS idx_exec_identity_parent ON execution_identities(parent_run_id)",
+    "CREATE INDEX IF NOT EXISTS idx_runtime_receipts_run_created ON runtime_receipts(run_id, created_at)",
+    "CREATE INDEX IF NOT EXISTS idx_runtime_receipts_trace_created ON runtime_receipts(trace_id, created_at)",
+    "CREATE INDEX IF NOT EXISTS idx_runtime_receipts_idempotency ON runtime_receipts(idempotency_key)",
+    "CREATE INDEX IF NOT EXISTS idx_idempotency_run ON idempotency_records(run_id)",
 ]
 
 
@@ -234,6 +303,41 @@ def _utc_now_iso() -> str:
 
 def _new_id(prefix: str) -> str:
     return f"{prefix}_{uuid4().hex[:16]}"
+
+
+RUNTIME_RECEIPT_TYPES = frozenset(
+    {
+        "task_claim",
+        "delegation_run",
+        "side_effect_intent",
+        "side_effect_complete",
+        "artifact",
+        "artifact_written",
+        "message_consumed",
+        "idempotency_consumed",
+        "ontology_action_requested",
+        "ontology_action_applied",
+        "child_spawned",
+        "child_completed",
+        "self_mod_proposal",
+        "self_mod_gate",
+        "self_mod_apply",
+        "self_mod_verify",
+        "self_mod_promote",
+        "self_mod_revert",
+    }
+)
+
+SELF_MOD_RECEIPT_TYPES = frozenset(
+    {
+        "self_mod_proposal",
+        "self_mod_gate",
+        "self_mod_apply",
+        "self_mod_verify",
+        "self_mod_promote",
+        "self_mod_revert",
+    }
+)
 
 
 def _json_dump(value: Any) -> str:
@@ -290,8 +394,21 @@ def ensure_runtime_state_schema_sync(
         _OPERATOR_ACTIONS_DDL,
         _SESSION_EVENTS_DDL,
         _SESSION_EVENTS_FTS_DDL,
+        _EXECUTION_IDENTITIES_DDL,
+        _RUNTIME_RECEIPTS_DDL,
+        _IDEMPOTENCY_RECORDS_DDL,
     ):
         db.execute(ddl)
+    for tbl, column_sql in (
+        ("task_claims", "trace_id TEXT NOT NULL DEFAULT ''"),
+        ("delegation_runs", "trace_id TEXT NOT NULL DEFAULT ''"),
+        ("delegation_runs", "receipt_json TEXT"),
+        ("artifact_records", "trace_id TEXT NOT NULL DEFAULT ''"),
+    ):
+        try:
+            db.execute(f"ALTER TABLE {tbl} ADD COLUMN {column_sql}")
+        except sqlite3.Error:
+            pass
     for idx in _INDEXES:
         db.execute(idx)
     if include_memory_plane:
@@ -319,18 +436,24 @@ async def ensure_runtime_state_schema_async(
         _OPERATOR_ACTIONS_DDL,
         _SESSION_EVENTS_DDL,
         _SESSION_EVENTS_FTS_DDL,
+        _EXECUTION_IDENTITIES_DDL,
+        _RUNTIME_RECEIPTS_DDL,
+        _IDEMPOTENCY_RECORDS_DDL,
     ):
         await db.execute(ddl)
-    for idx in _INDEXES:
-        await db.execute(idx)
-    # Migrate: add trace_id column to existing task_claims/delegation_runs
-    for tbl in ("task_claims", "delegation_runs"):
+    # Migrate old runtime DBs without changing existing rows destructively.
+    for tbl, column_sql in (
+        ("task_claims", "trace_id TEXT NOT NULL DEFAULT ''"),
+        ("delegation_runs", "trace_id TEXT NOT NULL DEFAULT ''"),
+        ("delegation_runs", "receipt_json TEXT"),
+        ("artifact_records", "trace_id TEXT NOT NULL DEFAULT ''"),
+    ):
         try:
-            await db.execute(
-                f"ALTER TABLE {tbl} ADD COLUMN trace_id TEXT NOT NULL DEFAULT ''"
-            )
+            await db.execute(f"ALTER TABLE {tbl} ADD COLUMN {column_sql}")
         except Exception:
             pass  # column already exists
+    for idx in _INDEXES:
+        await db.execute(idx)
     if include_memory_plane:
         await ensure_memory_plane_schema_async(db)
     await db.commit()
@@ -402,6 +525,7 @@ class ArtifactRecord:
     session_id: str = ""
     task_id: str = ""
     run_id: str = ""
+    trace_id: str = ""
     manifest_path: str = ""
     payload_path: str = ""
     checksum: str = ""
@@ -485,6 +609,39 @@ class SessionEventRecord:
     created_at: datetime = field(default_factory=_utc_now)
 
 
+@dataclass(frozen=True)
+class RuntimeReceipt:
+    receipt_id: str
+    receipt_type: str
+    status: str
+    run_id: str = ""
+    task_id: str = ""
+    trace_id: str = ""
+    correlation_id: str = ""
+    causation_id: str = ""
+    parent_run_id: str = ""
+    agent_id: str = ""
+    idempotency_key: str = ""
+    side_effect_key: str = ""
+    payload: dict[str, Any] = field(default_factory=dict)
+    created_at: datetime = field(default_factory=_utc_now)
+
+
+@dataclass(frozen=True)
+class IdempotencyRecord:
+    idempotency_key: str
+    side_effect_key: str
+    status: str
+    run_id: str = ""
+    task_id: str = ""
+    trace_id: str = ""
+    correlation_id: str = ""
+    result_receipt_id: str = ""
+    metadata: dict[str, Any] = field(default_factory=dict)
+    created_at: datetime = field(default_factory=_utc_now)
+    updated_at: datetime = field(default_factory=_utc_now)
+
+
 def _row_to_session(row: sqlite3.Row | aiosqlite.Row) -> SessionState:
     return SessionState(
         session_id=str(row["session_id"]),
@@ -555,6 +712,7 @@ def _row_to_artifact(row: sqlite3.Row | aiosqlite.Row) -> ArtifactRecord:
         session_id=str(row["session_id"] or ""),
         task_id=str(row["task_id"] or ""),
         run_id=str(row["run_id"] or ""),
+        trace_id=str(row["trace_id"] or "") if "trace_id" in row.keys() else "",
         manifest_path=str(row["manifest_path"] or ""),
         payload_path=str(row["payload_path"] or ""),
         checksum=str(row["checksum"] or ""),
@@ -629,6 +787,74 @@ def _row_to_session_event(row: sqlite3.Row | aiosqlite.Row) -> SessionEventRecor
         payload=_json_load(row["payload_json"], {}),
         created_at=_parse_dt(row["created_at"]) or _utc_now(),
     )
+
+
+def _row_to_execution_identity(row: sqlite3.Row | aiosqlite.Row) -> ExecutionIdentity:
+    return ExecutionIdentity(
+        trace_id=str(row["trace_id"]),
+        correlation_id=str(row["correlation_id"]),
+        task_id=str(row["task_id"]),
+        run_id=str(row["run_id"]),
+        claim_id=str(row["claim_id"] or ""),
+        idempotency_key=str(row["idempotency_key"] or ""),
+        causation_id=str(row["causation_id"] or ""),
+        parent_run_id=str(row["parent_run_id"] or ""),
+        agent_id=str(row["agent_id"] or ""),
+        session_id=str(row["session_id"] or ""),
+        external_a2a_task_id=str(row["external_a2a_task_id"] or ""),
+        message_id=str(row["message_id"] or ""),
+        event_id=str(row["event_id"] or ""),
+        artifact_id=str(row["artifact_id"] or ""),
+        proposal_id=str(row["proposal_id"] or ""),
+        metadata=_json_load(row["metadata_json"], {}),
+    )
+
+
+def _row_to_runtime_receipt(row: sqlite3.Row | aiosqlite.Row) -> RuntimeReceipt:
+    return RuntimeReceipt(
+        receipt_id=str(row["receipt_id"]),
+        receipt_type=str(row["receipt_type"]),
+        status=str(row["status"]),
+        run_id=str(row["run_id"] or ""),
+        task_id=str(row["task_id"] or ""),
+        trace_id=str(row["trace_id"] or ""),
+        correlation_id=str(row["correlation_id"] or ""),
+        causation_id=str(row["causation_id"] or ""),
+        parent_run_id=str(row["parent_run_id"] or ""),
+        agent_id=str(row["agent_id"] or ""),
+        idempotency_key=str(row["idempotency_key"] or ""),
+        side_effect_key=str(row["side_effect_key"] or ""),
+        payload=_json_load(row["payload_json"], {}),
+        created_at=_parse_dt(row["created_at"]) or _utc_now(),
+    )
+
+
+def _row_to_idempotency_record(row: sqlite3.Row | aiosqlite.Row) -> IdempotencyRecord:
+    return IdempotencyRecord(
+        idempotency_key=str(row["idempotency_key"]),
+        side_effect_key=str(row["side_effect_key"]),
+        status=str(row["status"]),
+        run_id=str(row["run_id"] or ""),
+        task_id=str(row["task_id"] or ""),
+        trace_id=str(row["trace_id"] or ""),
+        correlation_id=str(row["correlation_id"] or ""),
+        result_receipt_id=str(row["result_receipt_id"] or ""),
+        metadata=_json_load(row["metadata_json"], {}),
+        created_at=_parse_dt(row["created_at"]) or _utc_now(),
+        updated_at=_parse_dt(row["updated_at"]) or _utc_now(),
+    )
+
+
+def _identity_from_metadata(metadata: dict[str, Any] | None) -> ExecutionIdentity | None:
+    return ExecutionIdentity.from_metadata(metadata, require=False)
+
+
+def _trace_from_metadata(metadata: dict[str, Any] | None) -> str:
+    identity = _identity_from_metadata(metadata)
+    if identity is not None and identity.trace_id:
+        return identity.trace_id
+    meta = dict(metadata or {})
+    return str(meta.get("trace_id", "") or "")
 
 
 def _flatten_search_text(value: Any) -> str:
@@ -1116,7 +1342,7 @@ class RuntimeStateStore:
     async def record_task_claim(self, claim: TaskClaim) -> TaskClaim:
         await self.init_db()
         corr = get_correlation()
-        trace_id = corr.trace_id
+        trace_id = _trace_from_metadata(claim.metadata) or corr.trace_id
         if corr.cell_id:
             claim.metadata.setdefault("cell_id", corr.cell_id)
         async with aiosqlite.connect(self.db_path) as db:
@@ -1269,7 +1495,7 @@ class RuntimeStateStore:
     async def record_delegation_run(self, run: DelegationRun) -> DelegationRun:
         await self.init_db()
         corr = get_correlation()
-        trace_id = corr.trace_id
+        trace_id = _trace_from_metadata(run.metadata) or corr.trace_id
         if corr.cell_id:
             run.metadata.setdefault("cell_id", corr.cell_id)
         async with aiosqlite.connect(self.db_path) as db:
@@ -1639,13 +1865,14 @@ class RuntimeStateStore:
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute(
                 "INSERT INTO artifact_records (artifact_id, session_id, task_id, run_id,"
-                " artifact_kind, manifest_path, payload_path, checksum,"
+                " trace_id, artifact_kind, manifest_path, payload_path, checksum,"
                 " parent_artifact_id, promotion_state, created_at, metadata_json)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
                 " ON CONFLICT(artifact_id) DO UPDATE SET"
                 " session_id = excluded.session_id,"
                 " task_id = excluded.task_id,"
                 " run_id = excluded.run_id,"
+                " trace_id = excluded.trace_id,"
                 " artifact_kind = excluded.artifact_kind,"
                 " manifest_path = excluded.manifest_path,"
                 " payload_path = excluded.payload_path,"
@@ -1659,6 +1886,7 @@ class RuntimeStateStore:
                     artifact.session_id,
                     artifact.task_id,
                     artifact.run_id,
+                    artifact.trace_id,
                     artifact.artifact_kind,
                     artifact.manifest_path,
                     artifact.payload_path,
@@ -1680,8 +1908,8 @@ class RuntimeStateStore:
             db.row_factory = aiosqlite.Row
             row = await (
                 await db.execute(
-                    "SELECT artifact_id, session_id, task_id, run_id, artifact_kind,"
-                    " manifest_path, payload_path, checksum, parent_artifact_id,"
+                    "SELECT artifact_id, session_id, task_id, run_id, trace_id,"
+                    " artifact_kind, manifest_path, payload_path, checksum, parent_artifact_id,"
                     " promotion_state, created_at, metadata_json"
                     " FROM artifact_records WHERE artifact_id = ?",
                     (artifact_id,),
@@ -1695,12 +1923,13 @@ class RuntimeStateStore:
         session_id: str | None = None,
         task_id: str | None = None,
         run_id: str | None = None,
+        trace_id: str | None = None,
         promotion_state: str | None = None,
         limit: int = 20,
     ) -> list[ArtifactRecord]:
         await self.init_db()
         query = (
-            "SELECT artifact_id, session_id, task_id, run_id, artifact_kind,"
+            "SELECT artifact_id, session_id, task_id, run_id, trace_id, artifact_kind,"
             " manifest_path, payload_path, checksum, parent_artifact_id,"
             " promotion_state, created_at, metadata_json"
             " FROM artifact_records WHERE 1=1"
@@ -1715,6 +1944,9 @@ class RuntimeStateStore:
         if run_id is not None:
             query += " AND run_id = ?"
             params.append(run_id)
+        if trace_id is not None:
+            query += " AND trace_id = ?"
+            params.append(trace_id)
         if promotion_state is not None:
             query += " AND promotion_state = ?"
             params.append(promotion_state)
@@ -1724,6 +1956,815 @@ class RuntimeStateStore:
             db.row_factory = aiosqlite.Row
             rows = await (await db.execute(query, params)).fetchall()
         return [_row_to_artifact(row) for row in rows]
+
+    @staticmethod
+    def _identity_params(
+        identity: ExecutionIdentity,
+        *,
+        source: str,
+        now: datetime,
+        metadata: dict[str, Any] | None = None,
+    ) -> tuple[Any, ...]:
+        merged_metadata = {
+            **dict(identity.metadata or {}),
+            **dict(metadata or {}),
+        }
+        return (
+            identity.run_id,
+            identity.trace_id,
+            identity.correlation_id,
+            identity.task_id,
+            identity.claim_id,
+            identity.idempotency_key,
+            identity.causation_id,
+            identity.parent_run_id,
+            identity.agent_id,
+            identity.session_id,
+            identity.external_a2a_task_id,
+            identity.message_id,
+            identity.event_id,
+            identity.artifact_id,
+            identity.proposal_id,
+            source,
+            _json_dump(merged_metadata),
+            now.isoformat(),
+            now.isoformat(),
+        )
+
+    @staticmethod
+    def _identity_upsert_sql() -> str:
+        return (
+            "INSERT INTO execution_identities (run_id, trace_id, correlation_id,"
+            " task_id, claim_id, idempotency_key, causation_id, parent_run_id,"
+            " agent_id, session_id, external_a2a_task_id, message_id, event_id,"
+            " artifact_id, proposal_id, source, metadata_json, created_at, updated_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            " ON CONFLICT(run_id) DO UPDATE SET"
+            " trace_id = excluded.trace_id,"
+            " correlation_id = excluded.correlation_id,"
+            " task_id = excluded.task_id,"
+            " claim_id = excluded.claim_id,"
+            " idempotency_key = excluded.idempotency_key,"
+            " causation_id = excluded.causation_id,"
+            " parent_run_id = excluded.parent_run_id,"
+            " agent_id = excluded.agent_id,"
+            " session_id = excluded.session_id,"
+            " external_a2a_task_id = CASE"
+            "   WHEN excluded.external_a2a_task_id != '' THEN excluded.external_a2a_task_id"
+            "   ELSE execution_identities.external_a2a_task_id"
+            " END,"
+            " message_id = CASE"
+            "   WHEN excluded.message_id != '' THEN excluded.message_id"
+            "   ELSE execution_identities.message_id"
+            " END,"
+            " event_id = CASE"
+            "   WHEN excluded.event_id != '' THEN excluded.event_id"
+            "   ELSE execution_identities.event_id"
+            " END,"
+            " artifact_id = CASE"
+            "   WHEN excluded.artifact_id != '' THEN excluded.artifact_id"
+            "   ELSE execution_identities.artifact_id"
+            " END,"
+            " proposal_id = CASE"
+            "   WHEN excluded.proposal_id != '' THEN excluded.proposal_id"
+            "   ELSE execution_identities.proposal_id"
+            " END,"
+            " source = excluded.source,"
+            " metadata_json = excluded.metadata_json,"
+            " updated_at = excluded.updated_at"
+        )
+
+    async def record_execution_identity(
+        self,
+        identity: ExecutionIdentity,
+        *,
+        source: str = "",
+        metadata: dict[str, Any] | None = None,
+    ) -> ExecutionIdentity:
+        identity.require_for_dispatch()
+        await self.init_db()
+        now = _utc_now()
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                self._identity_upsert_sql(),
+                self._identity_params(identity, source=source, now=now, metadata=metadata),
+            )
+            await db.commit()
+        loaded = await self.get_execution_identity(identity.run_id)
+        assert loaded is not None
+        return loaded
+
+    def record_execution_identity_sync(
+        self,
+        identity: ExecutionIdentity,
+        *,
+        source: str = "",
+        metadata: dict[str, Any] | None = None,
+    ) -> ExecutionIdentity:
+        identity.require_for_dispatch()
+        self.init_db_sync()
+        now = _utc_now()
+        with sqlite3.connect(self.db_path) as db:
+            _apply_connection_pragmas_sync(db)
+            db.execute(
+                self._identity_upsert_sql(),
+                self._identity_params(identity, source=source, now=now, metadata=metadata),
+            )
+            db.commit()
+        return self.get_execution_identity_sync(identity.run_id) or identity
+
+    async def get_execution_identity(self, run_id: str) -> ExecutionIdentity | None:
+        await self.init_db()
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            row = await (
+                await db.execute(
+                    "SELECT run_id, trace_id, correlation_id, task_id, claim_id,"
+                    " idempotency_key, causation_id, parent_run_id, agent_id,"
+                    " session_id, external_a2a_task_id, message_id, event_id,"
+                    " artifact_id, proposal_id, metadata_json"
+                    " FROM execution_identities WHERE run_id = ?",
+                    (run_id,),
+                )
+            ).fetchone()
+        return _row_to_execution_identity(row) if row is not None else None
+
+    def get_execution_identity_sync(self, run_id: str) -> ExecutionIdentity | None:
+        self.init_db_sync()
+        with sqlite3.connect(self.db_path) as db:
+            _apply_connection_pragmas_sync(db)
+            db.row_factory = sqlite3.Row
+            row = db.execute(
+                "SELECT run_id, trace_id, correlation_id, task_id, claim_id,"
+                " idempotency_key, causation_id, parent_run_id, agent_id,"
+                " session_id, external_a2a_task_id, message_id, event_id,"
+                " artifact_id, proposal_id, metadata_json"
+                " FROM execution_identities WHERE run_id = ?",
+                (run_id,),
+            ).fetchone()
+        return _row_to_execution_identity(row) if row is not None else None
+
+    async def get_execution_identity_by_external_a2a_task(
+        self,
+        external_a2a_task_id: str,
+    ) -> ExecutionIdentity | None:
+        await self.init_db()
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            row = await (
+                await db.execute(
+                    "SELECT run_id, trace_id, correlation_id, task_id, claim_id,"
+                    " idempotency_key, causation_id, parent_run_id, agent_id,"
+                    " session_id, external_a2a_task_id, message_id, event_id,"
+                    " artifact_id, proposal_id, metadata_json"
+                    " FROM execution_identities WHERE external_a2a_task_id = ?"
+                    " ORDER BY updated_at DESC LIMIT 1",
+                    (external_a2a_task_id,),
+                )
+            ).fetchone()
+        return _row_to_execution_identity(row) if row is not None else None
+
+    @staticmethod
+    def build_runtime_receipt(
+        identity: ExecutionIdentity,
+        *,
+        receipt_type: str,
+        status: str,
+        side_effect_key: str = "",
+        payload: dict[str, Any] | None = None,
+        receipt_id: str = "",
+        created_at: datetime | None = None,
+    ) -> RuntimeReceipt:
+        """Build a RuntimeReceipt that preserves the canonical identity fields."""
+        identity.require_for_dispatch()
+        return RuntimeReceipt(
+            receipt_id=receipt_id or _new_id("rr"),
+            receipt_type=receipt_type,
+            status=status,
+            run_id=identity.run_id,
+            task_id=identity.task_id,
+            trace_id=identity.trace_id,
+            correlation_id=identity.correlation_id,
+            causation_id=identity.causation_id,
+            parent_run_id=identity.parent_run_id,
+            agent_id=identity.agent_id,
+            idempotency_key=identity.idempotency_key,
+            side_effect_key=side_effect_key,
+            payload=dict(payload or {}),
+            created_at=created_at or _utc_now(),
+        )
+
+    async def record_receipt_for_identity(
+        self,
+        identity: ExecutionIdentity,
+        *,
+        receipt_type: str,
+        status: str,
+        side_effect_key: str = "",
+        payload: dict[str, Any] | None = None,
+        receipt_id: str = "",
+    ) -> RuntimeReceipt:
+        receipt = self.build_runtime_receipt(
+            identity,
+            receipt_type=receipt_type,
+            status=status,
+            side_effect_key=side_effect_key,
+            payload=payload,
+            receipt_id=receipt_id,
+        )
+        return await self.record_runtime_receipt(receipt)
+
+    def record_receipt_for_identity_sync(
+        self,
+        identity: ExecutionIdentity,
+        *,
+        receipt_type: str,
+        status: str,
+        side_effect_key: str = "",
+        payload: dict[str, Any] | None = None,
+        receipt_id: str = "",
+    ) -> RuntimeReceipt:
+        receipt = self.build_runtime_receipt(
+            identity,
+            receipt_type=receipt_type,
+            status=status,
+            side_effect_key=side_effect_key,
+            payload=payload,
+            receipt_id=receipt_id,
+        )
+        return self.record_runtime_receipt_sync(receipt)
+
+    async def record_idempotency_consumed(
+        self,
+        identity: ExecutionIdentity,
+        side_effect_key: str,
+        *,
+        status: str,
+        payload: dict[str, Any] | None = None,
+    ) -> RuntimeReceipt:
+        return await self.record_receipt_for_identity(
+            identity,
+            receipt_type="idempotency_consumed",
+            status=status,
+            side_effect_key=side_effect_key,
+            payload=payload,
+        )
+
+    def record_idempotency_consumed_sync(
+        self,
+        identity: ExecutionIdentity,
+        side_effect_key: str,
+        *,
+        status: str,
+        payload: dict[str, Any] | None = None,
+    ) -> RuntimeReceipt:
+        return self.record_receipt_for_identity_sync(
+            identity,
+            receipt_type="idempotency_consumed",
+            status=status,
+            side_effect_key=side_effect_key,
+            payload=payload,
+        )
+
+    async def record_side_effect_intent(
+        self,
+        identity: ExecutionIdentity,
+        side_effect_key: str,
+        *,
+        payload: dict[str, Any] | None = None,
+    ) -> RuntimeReceipt:
+        return await self.record_receipt_for_identity(
+            identity,
+            receipt_type="side_effect_intent",
+            status="started",
+            side_effect_key=side_effect_key,
+            payload=payload,
+        )
+
+    def record_side_effect_intent_sync(
+        self,
+        identity: ExecutionIdentity,
+        side_effect_key: str,
+        *,
+        payload: dict[str, Any] | None = None,
+    ) -> RuntimeReceipt:
+        return self.record_receipt_for_identity_sync(
+            identity,
+            receipt_type="side_effect_intent",
+            status="started",
+            side_effect_key=side_effect_key,
+            payload=payload,
+        )
+
+    async def record_side_effect_complete(
+        self,
+        identity: ExecutionIdentity,
+        side_effect_key: str,
+        *,
+        status: str = "completed",
+        result_receipt_id: str = "",
+        payload: dict[str, Any] | None = None,
+    ) -> RuntimeReceipt:
+        return await self.record_receipt_for_identity(
+            identity,
+            receipt_type="side_effect_complete",
+            status=status,
+            side_effect_key=side_effect_key,
+            payload={
+                "result_receipt_id": result_receipt_id,
+                **dict(payload or {}),
+            },
+        )
+
+    def record_side_effect_complete_sync(
+        self,
+        identity: ExecutionIdentity,
+        side_effect_key: str,
+        *,
+        status: str = "completed",
+        result_receipt_id: str = "",
+        payload: dict[str, Any] | None = None,
+    ) -> RuntimeReceipt:
+        return self.record_receipt_for_identity_sync(
+            identity,
+            receipt_type="side_effect_complete",
+            status=status,
+            side_effect_key=side_effect_key,
+            payload={
+                "result_receipt_id": result_receipt_id,
+                **dict(payload or {}),
+            },
+        )
+
+    async def record_message_consumed(
+        self,
+        identity: ExecutionIdentity,
+        message_id: str,
+        *,
+        payload: dict[str, Any] | None = None,
+    ) -> RuntimeReceipt:
+        return await self.record_receipt_for_identity(
+            identity.with_updates(message_id=message_id),
+            receipt_type="message_consumed",
+            status="consumed",
+            side_effect_key=f"message:{message_id}",
+            payload={"message_id": message_id, **dict(payload or {})},
+        )
+
+    async def record_ontology_action_receipt(
+        self,
+        identity: ExecutionIdentity,
+        *,
+        action_name: str,
+        object_type: str,
+        object_id: str = "",
+        applied: bool = False,
+        status: str = "",
+        payload: dict[str, Any] | None = None,
+    ) -> RuntimeReceipt:
+        receipt_type = "ontology_action_applied" if applied else "ontology_action_requested"
+        return await self.record_receipt_for_identity(
+            identity,
+            receipt_type=receipt_type,
+            status=status or ("applied" if applied else "requested"),
+            side_effect_key=f"ontology:{object_type}:{object_id}:{action_name}",
+            payload={
+                "action_name": action_name,
+                "object_type": object_type,
+                "object_id": object_id,
+                **dict(payload or {}),
+            },
+        )
+
+    def record_ontology_action_receipt_sync(
+        self,
+        identity: ExecutionIdentity,
+        *,
+        action_name: str,
+        object_type: str,
+        object_id: str = "",
+        applied: bool = False,
+        status: str = "",
+        payload: dict[str, Any] | None = None,
+    ) -> RuntimeReceipt:
+        receipt_type = "ontology_action_applied" if applied else "ontology_action_requested"
+        return self.record_receipt_for_identity_sync(
+            identity,
+            receipt_type=receipt_type,
+            status=status or ("applied" if applied else "requested"),
+            side_effect_key=f"ontology:{object_type}:{object_id}:{action_name}",
+            payload={
+                "action_name": action_name,
+                "object_type": object_type,
+                "object_id": object_id,
+                **dict(payload or {}),
+            },
+        )
+
+    async def record_self_mod_receipt(
+        self,
+        identity: ExecutionIdentity,
+        *,
+        stage: str,
+        status: str,
+        proposal_id: str = "",
+        payload: dict[str, Any] | None = None,
+    ) -> RuntimeReceipt:
+        stage_key = stage.removeprefix("self_mod_")
+        receipt_type = f"self_mod_{stage_key}"
+        if receipt_type not in SELF_MOD_RECEIPT_TYPES:
+            raise ValueError(f"unknown self-mod receipt stage: {stage}")
+        return await self.record_receipt_for_identity(
+            identity.with_updates(proposal_id=proposal_id or identity.proposal_id),
+            receipt_type=receipt_type,
+            status=status,
+            side_effect_key=f"self_mod:{proposal_id or identity.proposal_id}:{stage_key}",
+            payload={"proposal_id": proposal_id or identity.proposal_id, **dict(payload or {})},
+        )
+
+    def record_self_mod_receipt_sync(
+        self,
+        identity: ExecutionIdentity,
+        *,
+        stage: str,
+        status: str,
+        proposal_id: str = "",
+        payload: dict[str, Any] | None = None,
+    ) -> RuntimeReceipt:
+        stage_key = stage.removeprefix("self_mod_")
+        receipt_type = f"self_mod_{stage_key}"
+        if receipt_type not in SELF_MOD_RECEIPT_TYPES:
+            raise ValueError(f"unknown self-mod receipt stage: {stage}")
+        return self.record_receipt_for_identity_sync(
+            identity.with_updates(proposal_id=proposal_id or identity.proposal_id),
+            receipt_type=receipt_type,
+            status=status,
+            side_effect_key=f"self_mod:{proposal_id or identity.proposal_id}:{stage_key}",
+            payload={"proposal_id": proposal_id or identity.proposal_id, **dict(payload or {})},
+        )
+
+    async def record_runtime_receipt(self, receipt: RuntimeReceipt) -> RuntimeReceipt:
+        await self.init_db()
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                "INSERT OR REPLACE INTO runtime_receipts (receipt_id, receipt_type,"
+                " run_id, task_id, trace_id, correlation_id, causation_id,"
+                " parent_run_id, agent_id, idempotency_key, side_effect_key,"
+                " status, payload_json, created_at)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    receipt.receipt_id,
+                    receipt.receipt_type,
+                    receipt.run_id,
+                    receipt.task_id,
+                    receipt.trace_id,
+                    receipt.correlation_id,
+                    receipt.causation_id,
+                    receipt.parent_run_id,
+                    receipt.agent_id,
+                    receipt.idempotency_key,
+                    receipt.side_effect_key,
+                    receipt.status,
+                    _json_dump(receipt.payload),
+                    receipt.created_at.isoformat(),
+                ),
+            )
+            await db.commit()
+        return receipt
+
+    def record_runtime_receipt_sync(self, receipt: RuntimeReceipt) -> RuntimeReceipt:
+        self.init_db_sync()
+        with sqlite3.connect(self.db_path) as db:
+            _apply_connection_pragmas_sync(db)
+            db.execute(
+                "INSERT OR REPLACE INTO runtime_receipts (receipt_id, receipt_type,"
+                " run_id, task_id, trace_id, correlation_id, causation_id,"
+                " parent_run_id, agent_id, idempotency_key, side_effect_key,"
+                " status, payload_json, created_at)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    receipt.receipt_id,
+                    receipt.receipt_type,
+                    receipt.run_id,
+                    receipt.task_id,
+                    receipt.trace_id,
+                    receipt.correlation_id,
+                    receipt.causation_id,
+                    receipt.parent_run_id,
+                    receipt.agent_id,
+                    receipt.idempotency_key,
+                    receipt.side_effect_key,
+                    receipt.status,
+                    _json_dump(receipt.payload),
+                    receipt.created_at.isoformat(),
+                ),
+            )
+            db.commit()
+        return receipt
+
+    async def list_runtime_receipts(
+        self,
+        *,
+        run_id: str | None = None,
+        trace_id: str | None = None,
+        correlation_id: str | None = None,
+        receipt_type: str | None = None,
+        limit: int = 50,
+    ) -> list[RuntimeReceipt]:
+        await self.init_db()
+        query = (
+            "SELECT receipt_id, receipt_type, run_id, task_id, trace_id,"
+            " correlation_id, causation_id, parent_run_id, agent_id,"
+            " idempotency_key, side_effect_key, status, payload_json, created_at"
+            " FROM runtime_receipts WHERE 1=1"
+        )
+        params: list[Any] = []
+        if run_id is not None:
+            query += " AND run_id = ?"
+            params.append(run_id)
+        if trace_id is not None:
+            query += " AND trace_id = ?"
+            params.append(trace_id)
+        if correlation_id is not None:
+            query += " AND correlation_id = ?"
+            params.append(correlation_id)
+        if receipt_type is not None:
+            query += " AND receipt_type = ?"
+            params.append(receipt_type)
+        query += " ORDER BY created_at ASC LIMIT ?"
+        params.append(max(1, limit))
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            rows = await (await db.execute(query, params)).fetchall()
+        return [_row_to_runtime_receipt(row) for row in rows]
+
+    async def try_begin_idempotent_side_effect(
+        self,
+        identity: ExecutionIdentity,
+        side_effect_key: str,
+        *,
+        metadata: dict[str, Any] | None = None,
+    ) -> bool:
+        identity.require_for_dispatch()
+        if not side_effect_key:
+            raise ValueError("side_effect_key is required")
+        await self.init_db()
+        now = _utc_now_iso()
+        async with aiosqlite.connect(self.db_path) as db:
+            cur = await db.execute(
+                "INSERT OR IGNORE INTO idempotency_records (idempotency_key,"
+                " side_effect_key, run_id, task_id, trace_id, correlation_id,"
+                " status, result_receipt_id, metadata_json, created_at, updated_at)"
+                " VALUES (?, ?, ?, ?, ?, ?, 'started', '', ?, ?, ?)",
+                (
+                    identity.idempotency_key,
+                    side_effect_key,
+                    identity.run_id,
+                    identity.task_id,
+                    identity.trace_id,
+                    identity.correlation_id,
+                    _json_dump(metadata or {}),
+                    now,
+                    now,
+                ),
+            )
+            await db.commit()
+            inserted = int(cur.rowcount or 0) == 1
+        await self.record_idempotency_consumed(
+            identity,
+            side_effect_key,
+            status="accepted" if inserted else "duplicate",
+            payload=metadata,
+        )
+        if inserted:
+            await self.record_side_effect_intent(
+                identity,
+                side_effect_key,
+                payload=metadata,
+            )
+        return inserted
+
+    def try_begin_idempotent_side_effect_sync(
+        self,
+        identity: ExecutionIdentity,
+        side_effect_key: str,
+        *,
+        metadata: dict[str, Any] | None = None,
+    ) -> bool:
+        identity.require_for_dispatch()
+        if not side_effect_key:
+            raise ValueError("side_effect_key is required")
+        self.init_db_sync()
+        now = _utc_now_iso()
+        with sqlite3.connect(self.db_path) as db:
+            _apply_connection_pragmas_sync(db)
+            cur = db.execute(
+                "INSERT OR IGNORE INTO idempotency_records (idempotency_key,"
+                " side_effect_key, run_id, task_id, trace_id, correlation_id,"
+                " status, result_receipt_id, metadata_json, created_at, updated_at)"
+                " VALUES (?, ?, ?, ?, ?, ?, 'started', '', ?, ?, ?)",
+                (
+                    identity.idempotency_key,
+                    side_effect_key,
+                    identity.run_id,
+                    identity.task_id,
+                    identity.trace_id,
+                    identity.correlation_id,
+                    _json_dump(metadata or {}),
+                    now,
+                    now,
+                ),
+            )
+            db.commit()
+            inserted = int(cur.rowcount or 0) == 1
+        self.record_idempotency_consumed_sync(
+            identity,
+            side_effect_key,
+            status="accepted" if inserted else "duplicate",
+            payload=metadata,
+        )
+        if inserted:
+            self.record_side_effect_intent_sync(
+                identity,
+                side_effect_key,
+                payload=metadata,
+            )
+        return inserted
+
+    async def complete_idempotent_side_effect(
+        self,
+        identity: ExecutionIdentity,
+        side_effect_key: str,
+        *,
+        status: str = "completed",
+        result_receipt_id: str = "",
+        metadata: dict[str, Any] | None = None,
+    ) -> IdempotencyRecord:
+        identity.require_for_dispatch()
+        await self.init_db()
+        now = _utc_now_iso()
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                "UPDATE idempotency_records SET status = ?, result_receipt_id = ?,"
+                " metadata_json = ?, updated_at = ?"
+                " WHERE idempotency_key = ? AND side_effect_key = ?",
+                (
+                    status,
+                    result_receipt_id,
+                    _json_dump(metadata or {}),
+                    now,
+                    identity.idempotency_key,
+                    side_effect_key,
+                ),
+            )
+            await db.commit()
+        record = await self.get_idempotency_record(identity.idempotency_key, side_effect_key)
+        if record is None:
+            raise KeyError(f"idempotency record {identity.idempotency_key}:{side_effect_key} not found")
+        await self.record_side_effect_complete(
+            identity,
+            side_effect_key,
+            status=status,
+            result_receipt_id=result_receipt_id,
+            payload=metadata,
+        )
+        return record
+
+    def complete_idempotent_side_effect_sync(
+        self,
+        identity: ExecutionIdentity,
+        side_effect_key: str,
+        *,
+        status: str = "completed",
+        result_receipt_id: str = "",
+        metadata: dict[str, Any] | None = None,
+    ) -> IdempotencyRecord:
+        identity.require_for_dispatch()
+        self.init_db_sync()
+        now = _utc_now_iso()
+        with sqlite3.connect(self.db_path) as db:
+            _apply_connection_pragmas_sync(db)
+            db.execute(
+                "UPDATE idempotency_records SET status = ?, result_receipt_id = ?,"
+                " metadata_json = ?, updated_at = ?"
+                " WHERE idempotency_key = ? AND side_effect_key = ?",
+                (
+                    status,
+                    result_receipt_id,
+                    _json_dump(metadata or {}),
+                    now,
+                    identity.idempotency_key,
+                    side_effect_key,
+                ),
+            )
+            db.commit()
+        record = self.get_idempotency_record_sync(identity.idempotency_key, side_effect_key)
+        if record is None:
+            raise KeyError(f"idempotency record {identity.idempotency_key}:{side_effect_key} not found")
+        self.record_side_effect_complete_sync(
+            identity,
+            side_effect_key,
+            status=status,
+            result_receipt_id=result_receipt_id,
+            payload=metadata,
+        )
+        return record
+
+    async def get_idempotency_record(
+        self,
+        idempotency_key: str,
+        side_effect_key: str,
+    ) -> IdempotencyRecord | None:
+        await self.init_db()
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            row = await (
+                await db.execute(
+                    "SELECT idempotency_key, side_effect_key, run_id, task_id,"
+                    " trace_id, correlation_id, status, result_receipt_id,"
+                    " metadata_json, created_at, updated_at FROM idempotency_records"
+                    " WHERE idempotency_key = ? AND side_effect_key = ?",
+                    (idempotency_key, side_effect_key),
+                )
+            ).fetchone()
+        return _row_to_idempotency_record(row) if row is not None else None
+
+    def get_idempotency_record_sync(
+        self,
+        idempotency_key: str,
+        side_effect_key: str,
+    ) -> IdempotencyRecord | None:
+        self.init_db_sync()
+        with sqlite3.connect(self.db_path) as db:
+            _apply_connection_pragmas_sync(db)
+            db.row_factory = sqlite3.Row
+            row = db.execute(
+                "SELECT idempotency_key, side_effect_key, run_id, task_id,"
+                " trace_id, correlation_id, status, result_receipt_id,"
+                " metadata_json, created_at, updated_at FROM idempotency_records"
+                " WHERE idempotency_key = ? AND side_effect_key = ?",
+                (idempotency_key, side_effect_key),
+            ).fetchone()
+        return _row_to_idempotency_record(row) if row is not None else None
+
+    async def was_side_effect_performed(
+        self,
+        idempotency_key: str,
+        side_effect_key: str,
+    ) -> bool:
+        record = await self.get_idempotency_record(idempotency_key, side_effect_key)
+        return record is not None and record.status in {"completed", "skipped"}
+
+    async def list_child_runs(self, parent_run_id: str) -> list[DelegationRun]:
+        await self.init_db()
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            rows = await (
+                await db.execute(
+                    "SELECT run_id, session_id, task_id, claim_id, parent_run_id,"
+                    " assigned_by, assigned_to, requested_output_json,"
+                    " current_artifact_id, status, started_at, completed_at,"
+                    " failure_code, metadata_json FROM delegation_runs"
+                    " WHERE parent_run_id = ? ORDER BY started_at ASC",
+                    (parent_run_id,),
+                )
+            ).fetchall()
+        return [_row_to_run(row) for row in rows]
+
+    async def describe_run(self, run_id: str) -> dict[str, Any]:
+        identity = await self.get_execution_identity(run_id)
+        run = await self.get_delegation_run(run_id)
+        artifacts = await self.list_artifacts(run_id=run_id, limit=100)
+        receipts = await self.list_runtime_receipts(run_id=run_id, limit=200)
+        children = await self.list_child_runs(run_id)
+        idempotency_records: list[IdempotencyRecord] = []
+        if identity is not None:
+            await self.init_db()
+            async with aiosqlite.connect(self.db_path) as db:
+                db.row_factory = aiosqlite.Row
+                rows = await (
+                    await db.execute(
+                        "SELECT idempotency_key, side_effect_key, run_id, task_id,"
+                        " trace_id, correlation_id, status, result_receipt_id,"
+                        " metadata_json, created_at, updated_at"
+                        " FROM idempotency_records WHERE idempotency_key = ?"
+                        " ORDER BY created_at ASC",
+                        (identity.idempotency_key,),
+                    )
+                ).fetchall()
+            idempotency_records = [_row_to_idempotency_record(row) for row in rows]
+        return {
+            "identity": identity,
+            "run": run,
+            "artifacts": artifacts,
+            "receipts": receipts,
+            "children": children,
+            "idempotency_records": idempotency_records,
+        }
+
+    async def get_run_ledger(self, run_id: str) -> dict[str, Any]:
+        """Return the durable runtime facts known for one run."""
+        return await self.describe_run(run_id)
 
     async def record_memory_fact(self, fact: MemoryFact) -> MemoryFact:
         await self.init_db()
