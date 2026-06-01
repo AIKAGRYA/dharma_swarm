@@ -864,6 +864,19 @@ def _row_to_idempotency_record(row: sqlite3.Row | aiosqlite.Row) -> IdempotencyR
     )
 
 
+def _operation_hash(metadata: dict[str, Any] | None) -> str:
+    return str((metadata or {}).get("operation_hash") or "")
+
+
+def _merge_idempotency_metadata(
+    existing: IdempotencyRecord,
+    metadata: dict[str, Any] | None,
+) -> dict[str, Any]:
+    merged = dict(existing.metadata)
+    merged.update(metadata or {})
+    return merged
+
+
 def _identity_from_metadata(metadata: dict[str, Any] | None) -> ExecutionIdentity | None:
     return ExecutionIdentity.from_metadata(metadata, require=False)
 
@@ -2994,12 +3007,176 @@ class RuntimeStateStore:
             rows = await (await db.execute(query, params)).fetchall()
         return [_row_to_runtime_receipt(row) for row in rows]
 
+    async def _mark_idempotency_record_stale(
+        self,
+        existing: IdempotencyRecord,
+        *,
+        metadata: dict[str, Any] | None = None,
+    ) -> IdempotencyRecord:
+        now = _utc_now_iso()
+        merged_metadata = _merge_idempotency_metadata(
+            existing,
+            {
+                **dict(metadata or {}),
+                "stale_quarantined_at": now,
+                "previous_status": existing.status,
+            },
+        )
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                "UPDATE idempotency_records SET status = 'stale',"
+                " metadata_json = ?, updated_at = ?"
+                " WHERE idempotency_key = ? AND side_effect_key = ?",
+                (
+                    _json_dump(merged_metadata),
+                    now,
+                    existing.idempotency_key,
+                    existing.side_effect_key,
+                ),
+            )
+            await db.commit()
+        record = await self.get_idempotency_record(existing.idempotency_key, existing.side_effect_key)
+        if record is None:
+            raise KeyError(f"idempotency record {existing.idempotency_key}:{existing.side_effect_key} not found")
+        return record
+
+    def _mark_idempotency_record_stale_sync(
+        self,
+        existing: IdempotencyRecord,
+        *,
+        metadata: dict[str, Any] | None = None,
+    ) -> IdempotencyRecord:
+        now = _utc_now_iso()
+        merged_metadata = _merge_idempotency_metadata(
+            existing,
+            {
+                **dict(metadata or {}),
+                "stale_quarantined_at": now,
+                "previous_status": existing.status,
+            },
+        )
+        with sqlite3.connect(self.db_path) as db:
+            _apply_connection_pragmas_sync(db)
+            db.execute(
+                "UPDATE idempotency_records SET status = 'stale',"
+                " metadata_json = ?, updated_at = ?"
+                " WHERE idempotency_key = ? AND side_effect_key = ?",
+                (
+                    _json_dump(merged_metadata),
+                    now,
+                    existing.idempotency_key,
+                    existing.side_effect_key,
+                ),
+            )
+            db.commit()
+        record = self.get_idempotency_record_sync(existing.idempotency_key, existing.side_effect_key)
+        if record is None:
+            raise KeyError(f"idempotency record {existing.idempotency_key}:{existing.side_effect_key} not found")
+        return record
+
+    async def _handle_existing_idempotency_record(
+        self,
+        identity: ExecutionIdentity,
+        existing: IdempotencyRecord,
+        *,
+        metadata: dict[str, Any] | None,
+        stale_after_seconds: float | None,
+    ) -> None:
+        existing_hash = _operation_hash(existing.metadata)
+        incoming_hash = _operation_hash(metadata)
+        if existing_hash and incoming_hash and existing_hash != incoming_hash:
+            await self.record_idempotency_consumed(
+                identity,
+                existing.side_effect_key,
+                status="conflict",
+                payload={
+                    **dict(metadata or {}),
+                    "existing_operation_hash": existing_hash,
+                    "operation_hash": incoming_hash,
+                },
+            )
+            raise ValueError(
+                "idempotency operation_hash conflict for "
+                f"{existing.idempotency_key}:{existing.side_effect_key}"
+            )
+        if (
+            existing.status == "started"
+            and stale_after_seconds is not None
+            and (_utc_now() - existing.updated_at).total_seconds() >= stale_after_seconds
+        ):
+            await self._mark_idempotency_record_stale(existing, metadata=metadata)
+            await self.record_idempotency_consumed(
+                identity,
+                existing.side_effect_key,
+                status="stale",
+                payload={
+                    **dict(metadata or {}),
+                    "stale_after_seconds": stale_after_seconds,
+                },
+            )
+            return
+        await self.record_idempotency_consumed(
+            identity,
+            existing.side_effect_key,
+            status="duplicate",
+            payload=metadata,
+        )
+
+    def _handle_existing_idempotency_record_sync(
+        self,
+        identity: ExecutionIdentity,
+        existing: IdempotencyRecord,
+        *,
+        metadata: dict[str, Any] | None,
+        stale_after_seconds: float | None,
+    ) -> None:
+        existing_hash = _operation_hash(existing.metadata)
+        incoming_hash = _operation_hash(metadata)
+        if existing_hash and incoming_hash and existing_hash != incoming_hash:
+            self.record_idempotency_consumed_sync(
+                identity,
+                existing.side_effect_key,
+                status="conflict",
+                payload={
+                    **dict(metadata or {}),
+                    "existing_operation_hash": existing_hash,
+                    "operation_hash": incoming_hash,
+                },
+            )
+            raise ValueError(
+                "idempotency operation_hash conflict for "
+                f"{existing.idempotency_key}:{existing.side_effect_key}"
+            )
+        if (
+            existing.status == "started"
+            and stale_after_seconds is not None
+            and (_utc_now() - existing.updated_at).total_seconds() >= stale_after_seconds
+        ):
+            self._mark_idempotency_record_stale_sync(existing, metadata=metadata)
+            self.record_idempotency_consumed_sync(
+                identity,
+                existing.side_effect_key,
+                status="stale",
+                payload={
+                    **dict(metadata or {}),
+                    "stale_after_seconds": stale_after_seconds,
+                },
+            )
+            return
+        self.record_idempotency_consumed_sync(
+            identity,
+            existing.side_effect_key,
+            status="duplicate",
+            payload=metadata,
+        )
+
     async def try_begin_idempotent_side_effect(
         self,
         identity: ExecutionIdentity,
         side_effect_key: str,
         *,
         metadata: dict[str, Any] | None = None,
+        stale_after_seconds: float | None = None,
     ) -> bool:
         identity.require_for_dispatch()
         if not side_effect_key:
@@ -3026,10 +3203,21 @@ class RuntimeStateStore:
             )
             await db.commit()
             inserted = int(cur.rowcount or 0) == 1
+        if not inserted:
+            existing = await self.get_idempotency_record(identity.idempotency_key, side_effect_key)
+            if existing is None:
+                raise KeyError(f"idempotency record {identity.idempotency_key}:{side_effect_key} not found")
+            await self._handle_existing_idempotency_record(
+                identity,
+                existing,
+                metadata=metadata,
+                stale_after_seconds=stale_after_seconds,
+            )
+            return False
         await self.record_idempotency_consumed(
             identity,
             side_effect_key,
-            status="accepted" if inserted else "duplicate",
+            status="accepted",
             payload=metadata,
         )
         if inserted:
@@ -3046,6 +3234,7 @@ class RuntimeStateStore:
         side_effect_key: str,
         *,
         metadata: dict[str, Any] | None = None,
+        stale_after_seconds: float | None = None,
     ) -> bool:
         identity.require_for_dispatch()
         if not side_effect_key:
@@ -3073,10 +3262,21 @@ class RuntimeStateStore:
             )
             db.commit()
             inserted = int(cur.rowcount or 0) == 1
+        if not inserted:
+            existing = self.get_idempotency_record_sync(identity.idempotency_key, side_effect_key)
+            if existing is None:
+                raise KeyError(f"idempotency record {identity.idempotency_key}:{side_effect_key} not found")
+            self._handle_existing_idempotency_record_sync(
+                identity,
+                existing,
+                metadata=metadata,
+                stale_after_seconds=stale_after_seconds,
+            )
+            return False
         self.record_idempotency_consumed_sync(
             identity,
             side_effect_key,
-            status="accepted" if inserted else "duplicate",
+            status="accepted",
             payload=metadata,
         )
         if inserted:
@@ -3099,6 +3299,10 @@ class RuntimeStateStore:
         identity.require_for_dispatch()
         await self.init_db()
         now = _utc_now_iso()
+        existing = await self.get_idempotency_record(identity.idempotency_key, side_effect_key)
+        if existing is None:
+            raise KeyError(f"idempotency record {identity.idempotency_key}:{side_effect_key} not found")
+        merged_metadata = _merge_idempotency_metadata(existing, metadata)
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute(
                 "UPDATE idempotency_records SET status = ?, result_receipt_id = ?,"
@@ -3107,7 +3311,7 @@ class RuntimeStateStore:
                 (
                     status,
                     result_receipt_id,
-                    _json_dump(metadata or {}),
+                    _json_dump(merged_metadata),
                     now,
                     identity.idempotency_key,
                     side_effect_key,
@@ -3115,14 +3319,12 @@ class RuntimeStateStore:
             )
             await db.commit()
         record = await self.get_idempotency_record(identity.idempotency_key, side_effect_key)
-        if record is None:
-            raise KeyError(f"idempotency record {identity.idempotency_key}:{side_effect_key} not found")
         await self.record_side_effect_complete(
             identity,
             side_effect_key,
             status=status,
             result_receipt_id=result_receipt_id,
-            payload=metadata,
+            payload=merged_metadata,
         )
         return record
 
@@ -3138,6 +3340,10 @@ class RuntimeStateStore:
         identity.require_for_dispatch()
         self.init_db_sync()
         now = _utc_now_iso()
+        existing = self.get_idempotency_record_sync(identity.idempotency_key, side_effect_key)
+        if existing is None:
+            raise KeyError(f"idempotency record {identity.idempotency_key}:{side_effect_key} not found")
+        merged_metadata = _merge_idempotency_metadata(existing, metadata)
         with sqlite3.connect(self.db_path) as db:
             _apply_connection_pragmas_sync(db)
             db.execute(
@@ -3147,7 +3353,7 @@ class RuntimeStateStore:
                 (
                     status,
                     result_receipt_id,
-                    _json_dump(metadata or {}),
+                    _json_dump(merged_metadata),
                     now,
                     identity.idempotency_key,
                     side_effect_key,
@@ -3155,14 +3361,12 @@ class RuntimeStateStore:
             )
             db.commit()
         record = self.get_idempotency_record_sync(identity.idempotency_key, side_effect_key)
-        if record is None:
-            raise KeyError(f"idempotency record {identity.idempotency_key}:{side_effect_key} not found")
         self.record_side_effect_complete_sync(
             identity,
             side_effect_key,
             status=status,
             result_receipt_id=result_receipt_id,
-            payload=metadata,
+            payload=merged_metadata,
         )
         return record
 
@@ -3235,21 +3439,20 @@ class RuntimeStateStore:
         mappings = await self.list_mapping_receipts(run_id=run_id, limit=200)
         children = await self.list_child_runs(run_id)
         idempotency_records: list[IdempotencyRecord] = []
-        if identity is not None:
-            await self.init_db()
-            async with aiosqlite.connect(self.db_path) as db:
-                db.row_factory = aiosqlite.Row
-                rows = await (
-                    await db.execute(
-                        "SELECT idempotency_key, side_effect_key, run_id, task_id,"
-                        " trace_id, correlation_id, status, result_receipt_id,"
-                        " metadata_json, created_at, updated_at"
-                        " FROM idempotency_records WHERE idempotency_key = ?"
-                        " ORDER BY created_at ASC",
-                        (identity.idempotency_key,),
-                    )
-                ).fetchall()
-            idempotency_records = [_row_to_idempotency_record(row) for row in rows]
+        await self.init_db()
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            rows = await (
+                await db.execute(
+                    "SELECT idempotency_key, side_effect_key, run_id, task_id,"
+                    " trace_id, correlation_id, status, result_receipt_id,"
+                    " metadata_json, created_at, updated_at"
+                    " FROM idempotency_records WHERE run_id = ?"
+                    " ORDER BY created_at ASC",
+                    (run_id,),
+                )
+            ).fetchall()
+        idempotency_records = [_row_to_idempotency_record(row) for row in rows]
         return {
             "identity": identity,
             "run": run,
