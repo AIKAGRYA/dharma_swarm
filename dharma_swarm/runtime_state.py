@@ -12,7 +12,7 @@ import hashlib
 import json
 import re
 import sqlite3
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -25,7 +25,7 @@ from dharma_swarm.engine.event_memory import (
     ensure_memory_plane_schema_async,
     ensure_memory_plane_schema_sync,
 )
-from dharma_swarm.spine.identity import ExecutionIdentity
+from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity
 
 DEFAULT_RUNTIME_DB = Path.home() / ".dharma" / "state" / "runtime.db"
 
@@ -849,6 +849,79 @@ def _identity_from_metadata(metadata: dict[str, Any] | None) -> ExecutionIdentit
     return ExecutionIdentity.from_metadata(metadata, require=False)
 
 
+def _required_identity_from_metadata(
+    metadata: dict[str, Any] | None,
+    *,
+    task_id: str,
+    agent_id: str = "",
+    session_id: str = "",
+) -> ExecutionIdentity:
+    identity = ExecutionIdentity.from_metadata(
+        metadata,
+        task_id=task_id,
+        agent_id=agent_id,
+        session_id=session_id,
+        require=True,
+    )
+    if identity is None:
+        raise MissingExecutionIdentity("ExecutionIdentity is required")
+    return identity.require_for_dispatch()
+
+
+def _legacy_no_identity_metadata(metadata: dict[str, Any] | None) -> dict[str, Any]:
+    return {
+        **dict(metadata or {}),
+        "legacy_no_identity_allowed": True,
+        "runtime_spine_status": "legacy_no_identity",
+    }
+
+
+def _metadata_with_identity(
+    metadata: dict[str, Any] | None,
+    identity: ExecutionIdentity,
+) -> dict[str, Any]:
+    return {
+        **dict(metadata or {}),
+        **identity.to_metadata(),
+        "trace_id": identity.trace_id,
+        "correlation_id": identity.correlation_id,
+        "run_id": identity.run_id,
+        "runtime_run_id": identity.run_id,
+        "claim_id": identity.claim_id,
+        "idempotency_key": identity.idempotency_key,
+        "agent_id": identity.agent_id,
+        "session_id": identity.session_id,
+    }
+
+
+def _require_identity_match(
+    identity: ExecutionIdentity,
+    *,
+    surface: str,
+    task_id: str = "",
+    claim_id: str = "",
+    run_id: str = "",
+    agent_id: str = "",
+    session_id: str = "",
+) -> None:
+    expected = {
+        "task_id": task_id,
+        "claim_id": claim_id,
+        "run_id": run_id,
+        "agent_id": agent_id,
+        "session_id": session_id,
+    }
+    mismatches = [
+        f"{name}={actual!r} expected {wanted!r}"
+        for name, wanted in expected.items()
+        if wanted and (actual := str(getattr(identity, name, "") or "")) and actual != wanted
+    ]
+    if mismatches:
+        raise MissingExecutionIdentity(
+            f"ExecutionIdentity does not match {surface}: " + ", ".join(mismatches)
+        )
+
+
 def _trace_from_metadata(metadata: dict[str, Any] | None) -> str:
     identity = _identity_from_metadata(metadata)
     if identity is not None and identity.trace_id:
@@ -1592,16 +1665,60 @@ class RuntimeStateStore:
 
     # ── Sync helpers (for non-async callers like OpportunityDispatcher) ──
 
-    def create_task_claim_sync(self, claim: TaskClaim) -> TaskClaim:
-        """Synchronous version of record_task_claim."""
+    def create_task_claim_sync(
+        self,
+        claim: TaskClaim,
+        *,
+        legacy_no_identity_allowed: bool = False,
+    ) -> TaskClaim:
+        """Synchronous version of record_task_claim.
+
+        Canonical callers must provide a full ExecutionIdentity in metadata.
+        Legacy callers may opt into the temporary compatibility path explicitly.
+        """
+        try:
+            identity = _required_identity_from_metadata(
+                claim.metadata,
+                task_id=claim.task_id,
+                agent_id=claim.agent_id,
+                session_id=claim.session_id,
+            )
+        except MissingExecutionIdentity:
+            if not legacy_no_identity_allowed:
+                raise
+            identity = None
+
+        if identity is None:
+            claim = replace(
+                claim,
+                metadata=_legacy_no_identity_metadata(claim.metadata),
+            )
+        else:
+            _require_identity_match(
+                identity,
+                surface="create_task_claim_sync",
+                task_id=claim.task_id,
+                claim_id=claim.claim_id,
+                agent_id=claim.agent_id,
+                session_id=claim.session_id,
+            )
+            claim = replace(
+                claim,
+                metadata=_metadata_with_identity(claim.metadata, identity),
+            )
+            self.record_execution_identity_sync(
+                identity,
+                source="runtime_state.create_task_claim_sync",
+            )
+        trace_id = identity.trace_id if identity is not None else _trace_from_metadata(claim.metadata)
         self.init_db_sync()
         with sqlite3.connect(self.db_path) as db:
             _apply_connection_pragmas_sync(db)
             db.execute(
                 "INSERT INTO task_claims (claim_id, task_id, session_id, agent_id, status,"
                 " claimed_at, acked_at, heartbeat_at, stale_after, recovered_at,"
-                " retry_count, metadata_json)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                " retry_count, metadata_json, trace_id)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
                 " ON CONFLICT(claim_id) DO UPDATE SET"
                 " task_id = excluded.task_id,"
                 " session_id = excluded.session_id,"
@@ -1613,7 +1730,8 @@ class RuntimeStateStore:
                 " stale_after = excluded.stale_after,"
                 " recovered_at = excluded.recovered_at,"
                 " retry_count = excluded.retry_count,"
-                " metadata_json = excluded.metadata_json",
+                " metadata_json = excluded.metadata_json,"
+                " trace_id = excluded.trace_id",
                 (
                     claim.claim_id,
                     claim.task_id,
@@ -1627,9 +1745,18 @@ class RuntimeStateStore:
                     claim.recovered_at.isoformat() if claim.recovered_at else None,
                     int(claim.retry_count),
                     _json_dump(claim.metadata),
+                    trace_id,
                 ),
             )
             db.commit()
+        if identity is not None:
+            self.record_receipt_for_identity_sync(
+                identity,
+                receipt_id=f"rr_{identity.run_id}_{claim.status}_claim",
+                receipt_type="task_claim",
+                status=claim.status,
+                payload={"claim_id": claim.claim_id},
+            )
         return self.get_task_claim_sync(claim.claim_id) or claim
 
     def get_task_claim_sync(self, claim_id: str) -> TaskClaim | None:
@@ -1683,8 +1810,54 @@ class RuntimeStateStore:
             db.commit()
         return self.get_task_claim_sync(claim_id)
 
-    def create_delegation_run_sync(self, run: DelegationRun) -> DelegationRun:
-        """Synchronous version of record_delegation_run."""
+    def create_delegation_run_sync(
+        self,
+        run: DelegationRun,
+        *,
+        legacy_no_identity_allowed: bool = False,
+    ) -> DelegationRun:
+        """Synchronous version of record_delegation_run.
+
+        Canonical callers must provide a full ExecutionIdentity in metadata.
+        Legacy callers may opt into the temporary compatibility path explicitly.
+        """
+        try:
+            identity = _required_identity_from_metadata(
+                run.metadata,
+                task_id=run.task_id,
+                agent_id=run.assigned_to,
+                session_id=run.session_id,
+            )
+        except MissingExecutionIdentity:
+            if not legacy_no_identity_allowed:
+                raise
+            identity = None
+
+        if identity is None:
+            run = replace(
+                run,
+                metadata=_legacy_no_identity_metadata(run.metadata),
+            )
+        else:
+            _require_identity_match(
+                identity,
+                surface="create_delegation_run_sync",
+                task_id=run.task_id,
+                claim_id=run.claim_id,
+                run_id=run.run_id,
+                agent_id=run.assigned_to,
+                session_id=run.session_id,
+            )
+            run = replace(
+                run,
+                parent_run_id=run.parent_run_id or identity.parent_run_id,
+                metadata=_metadata_with_identity(run.metadata, identity),
+            )
+            self.record_execution_identity_sync(
+                identity,
+                source="runtime_state.create_delegation_run_sync",
+            )
+        trace_id = identity.trace_id if identity is not None else _trace_from_metadata(run.metadata)
         self.init_db_sync()
         with sqlite3.connect(self.db_path) as db:
             _apply_connection_pragmas_sync(db)
@@ -1692,8 +1865,8 @@ class RuntimeStateStore:
                 "INSERT INTO delegation_runs (run_id, session_id, task_id, claim_id,"
                 " parent_run_id, assigned_by, assigned_to, requested_output_json,"
                 " current_artifact_id, status, started_at, completed_at, failure_code,"
-                " metadata_json)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                " metadata_json, trace_id)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
                 " ON CONFLICT(run_id) DO UPDATE SET"
                 " session_id = excluded.session_id,"
                 " task_id = excluded.task_id,"
@@ -1707,7 +1880,8 @@ class RuntimeStateStore:
                 " started_at = excluded.started_at,"
                 " completed_at = excluded.completed_at,"
                 " failure_code = excluded.failure_code,"
-                " metadata_json = excluded.metadata_json",
+                " metadata_json = excluded.metadata_json,"
+                " trace_id = excluded.trace_id",
                 (
                     run.run_id,
                     run.session_id,
@@ -1723,9 +1897,44 @@ class RuntimeStateStore:
                     run.completed_at.isoformat() if run.completed_at else None,
                     run.failure_code,
                     _json_dump(run.metadata),
+                    trace_id,
                 ),
             )
             db.commit()
+        if identity is not None:
+            self.record_receipt_for_identity_sync(
+                identity,
+                receipt_id=f"rr_{identity.run_id}_{run.status}_run",
+                receipt_type="delegation_run",
+                status=run.status,
+                payload={"failure_code": run.failure_code},
+            )
+            if identity.parent_run_id and run.status in {"queued", "claimed", "running"}:
+                self.record_receipt_for_identity_sync(
+                    identity,
+                    receipt_id=f"rr_{identity.parent_run_id}_{identity.run_id}_child_spawned",
+                    receipt_type="child_spawned",
+                    status=run.status,
+                    side_effect_key=f"child:{identity.parent_run_id}:{identity.run_id}",
+                    payload={
+                        "child_run_id": identity.run_id,
+                        "parent_run_id": identity.parent_run_id,
+                        "assigned_to": identity.agent_id,
+                    },
+                )
+            if identity.parent_run_id and run.status in {"completed", "failed"}:
+                self.record_receipt_for_identity_sync(
+                    identity,
+                    receipt_id=f"rr_{identity.parent_run_id}_{identity.run_id}_child_completed_{run.status}",
+                    receipt_type="child_completed",
+                    status=run.status,
+                    side_effect_key=f"child:{identity.parent_run_id}:{identity.run_id}",
+                    payload={
+                        "child_run_id": identity.run_id,
+                        "parent_run_id": identity.parent_run_id,
+                        "failure_code": run.failure_code,
+                    },
+                )
         return self.get_delegation_run_sync(run.run_id) or run
 
     def get_delegation_run_sync(self, run_id: str) -> DelegationRun | None:

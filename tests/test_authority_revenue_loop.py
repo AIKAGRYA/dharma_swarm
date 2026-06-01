@@ -85,7 +85,7 @@ class TestRuntimeStateClaims:
             status="claimed",
             session_id="test-session",
         )
-        result = store.create_task_claim_sync(claim)
+        result = store.create_task_claim_sync(claim, legacy_no_identity_allowed=True)
         assert result.claim_id == claim.claim_id
         assert result.status == "claimed"
 
@@ -102,7 +102,7 @@ class TestRuntimeStateClaims:
             agent_id="agent_hb",
             status="claimed",
         )
-        store.create_task_claim_sync(claim)
+        store.create_task_claim_sync(claim, legacy_no_identity_allowed=True)
         updated = store.heartbeat_claim_sync(claim.claim_id)
         assert updated is not None
         assert updated.heartbeat_at is not None
@@ -116,7 +116,7 @@ class TestRuntimeStateClaims:
             agent_id="agent_close",
             status="claimed",
         )
-        store.create_task_claim_sync(claim)
+        store.create_task_claim_sync(claim, legacy_no_identity_allowed=True)
         closed = store.close_claim_sync(claim.claim_id, status="completed")
         assert closed is not None
         assert closed.status == "completed"
@@ -131,7 +131,7 @@ class TestRuntimeStateClaims:
             status="running",
             session_id="test-session",
         )
-        result = store.create_delegation_run_sync(run)
+        result = store.create_delegation_run_sync(run, legacy_no_identity_allowed=True)
         assert result.run_id == run.run_id
         assert result.status == "running"
 
@@ -148,7 +148,7 @@ class TestRuntimeStateClaims:
             assigned_to="agent_close_run",
             status="running",
         )
-        store.create_delegation_run_sync(run)
+        store.create_delegation_run_sync(run, legacy_no_identity_allowed=True)
         closed = store.close_delegation_run_sync(
             run.run_id, status="completed"
         )
@@ -169,7 +169,7 @@ class TestRuntimeStateClaims:
             status="claimed",
             stale_after=stale_time,
         )
-        store.create_task_claim_sync(claim)
+        store.create_task_claim_sync(claim, legacy_no_identity_allowed=True)
         loaded = store.get_task_claim_sync(claim.claim_id)
         assert loaded is not None
         assert loaded.stale_after is not None
