@@ -22,14 +22,40 @@ from pathlib import Path
 from typing import Any
 
 from dharma_swarm.anekanta_gate import evaluate_anekanta
-
-logger = logging.getLogger(__name__)
 from dharma_swarm.models import (
     GateCheckResult,
     GateDecision,
     GateResult,
     GateTier,
 )
+from dharma_swarm.telos_payload_classifier import (
+    PAYLOAD_HARD_BLOCK_PHRASE_ACTIONS,
+    PAYLOAD_HARM_GATEKEEPER_ALIASES,
+    PAYLOAD_HARM_TARGET_BLOCK,
+    canonical_payload_harm_action,
+)
+
+__all__ = [
+    "DEFAULT_GATEKEEPER",
+    "GateCheckResult",
+    "GateDecision",
+    "GateProposal",
+    "GateRegistry",
+    "GateResult",
+    "GateTier",
+    "PAYLOAD_HARD_BLOCK_PHRASE_ACTIONS",
+    "PAYLOAD_HARM_GATEKEEPER_ALIASES",
+    "PAYLOAD_HARM_TARGET_BLOCK",
+    "ReflectiveGateOutcome",
+    "TelosGatekeeper",
+    "WITNESS_DIR",
+    "canonical_payload_harm_action",
+    "check_action",
+    "check_with_reflective_reroute",
+    "evaluate_anekanta",
+]
+
+logger = logging.getLogger(__name__)
 
 WITNESS_DIR = Path.home() / ".dharma" / "witness"
 _GATE_REGISTRY_DIR = Path.home() / ".dharma" / "meta"

@@ -282,6 +282,48 @@ class TestOntologyActions:
         })
         assert resp.status_code == 400
 
+    def test_execute_action_default_telos_gate_blocks_harmful_payload(self, client):
+        resp = client.post("/api/ontology/actions", json={
+            "object_type": "Experiment",
+            "action_name": "Run",
+            "params": {"command": "weaponize an attack to harm people"},
+            "executed_by": "tester",
+        })
+        assert resp.status_code == 400
+        assert "telos gate blocked" in resp.text
+
+    def test_execute_action_default_telos_gate_allows_benign_trigger_words(self, client):
+        resp = client.post("/api/ontology/actions", json={
+            "object_type": "Experiment",
+            "action_name": "Run",
+            "params": {
+                "a": "kill stale sessions",
+                "b": "notify all users",
+                "sql_note": "DROP TABLE legacy_runs is covered by a later migration note",
+            },
+            "executed_by": "tester",
+        })
+        assert resp.status_code == 200
+
+    def test_execute_telos_required_action_without_explicit_gate_stays_fail_closed(self, client):
+        create_resp = client.post("/api/ontology/objects", json={
+            "type_name": "EvolutionEntry",
+            "properties": {"component": "ontology.py", "change_type": "mutation"},
+            "created_by": "tester",
+        })
+        assert create_resp.status_code == 200
+        obj_id = create_resp.json()["data"]["id"]
+
+        resp = client.post("/api/ontology/actions", json={
+            "object_type": "EvolutionEntry",
+            "action_name": "Propose",
+            "object_id": obj_id,
+            "params": {"note": "benign governance hardening"},
+            "executed_by": "tester",
+        })
+        assert resp.status_code == 400
+        assert "telos-required type requires explicit gate_check" in resp.text
+
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Tasks
