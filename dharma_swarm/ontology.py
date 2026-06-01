@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from enum import Enum
@@ -40,6 +41,8 @@ from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
+_API_NAME_PATTERN = re.compile(r"^dharma\.([a-z][a-z0-9_]*)\.([A-Z][A-Za-z0-9]*)$")
+
 
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
@@ -48,6 +51,23 @@ def _utc_now() -> datetime:
 def _new_id() -> str:
     from uuid import uuid4
     return uuid4().hex[:16]
+
+
+def _validate_api_name(obj_type: "ObjectType") -> None:
+    if not obj_type.api_name:
+        return
+    match = _API_NAME_PATTERN.fullmatch(obj_type.api_name)
+    if match is None:
+        raise ValueError(
+            f"ObjectType api_name '{obj_type.api_name}' must match "
+            "'dharma.<domain>.<TypeName>'."
+        )
+    type_name = match.group(2)
+    if type_name != obj_type.name:
+        raise ValueError(
+            f"ObjectType api_name TypeName '{type_name}' must match "
+            f"ObjectType.name '{obj_type.name}'."
+        )
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -82,6 +102,18 @@ class SecurityLevel(str, Enum):
     INTERNAL = "internal"
     RESTRICTED = "restricted"
     DHARMIC = "dharmic"
+
+
+class TypeStatus(str, Enum):
+    """Lifecycle status for ObjectType registration.
+
+    Agents propose types as EXPERIMENTAL.  The operator promotes to ACTIVE
+    after review.  PROMOTED marks types that are part of the stable API
+    contract and subject to SEMVER deprecation rules.
+    """
+    EXPERIMENTAL = "experimental"
+    ACTIVE = "active"
+    PROMOTED = "promoted"
 
 
 class ShaktiEnergy(str, Enum):
@@ -175,6 +207,18 @@ class ObjectType(BaseModel):
     pydantic_model: str = ""
     storage_backend: str = "jsonl"
     icon: str = ""
+
+    # OMS hardening (Palantir-grounded)
+    status: TypeStatus = TypeStatus.EXPERIMENTAL
+    api_name: str = Field(
+        default="",
+        description=(
+            "Frozen API identifier in the form 'dharma.<domain>.<TypeName>'. "
+            "PascalCase TypeName matches the ObjectType name field verbatim. "
+            "Once set on a PROMOTED type, this name is immutable and "
+            "subject to SEMVER deprecation rules (ADR-008)."
+        ),
+    )
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -414,8 +458,39 @@ class OntologyRegistry:
 
     # ── Registration ─────────────────────────────────────────────────
 
-    def register_type(self, obj_type: ObjectType) -> None:
-        """Register an ObjectType in the ontology."""
+    def register_type(self, obj_type: ObjectType, *, allow_overwrite: bool = False) -> None:
+        """Register an ObjectType in the ontology.
+
+        Raises:
+            ValueError: If a type with the same ``name`` is already
+                registered and *allow_overwrite* is ``False``, or if a
+                non-empty ``api_name`` is malformed, mismatched, or already
+                bound to another type.
+        """
+        existing = self._types.get(obj_type.name)
+        if existing is not None and not allow_overwrite:
+            raise ValueError(
+                f"ObjectType '{obj_type.name}' is already registered. "
+                f"Pass allow_overwrite=True to replace it."
+            )
+        if existing is not None and allow_overwrite and existing.api_name:
+            if obj_type.api_name == existing.api_name:
+                pass
+            else:
+                raise ValueError(
+                    f"ObjectType '{obj_type.name}' has immutable api_name "
+                    f"'{existing.api_name}'."
+                )
+        if obj_type.api_name:
+            for existing_name, existing_type in self._types.items():
+                if existing_name == obj_type.name:
+                    continue
+                if existing_type.api_name == obj_type.api_name:
+                    raise ValueError(
+                        f"ObjectType api_name '{obj_type.api_name}' is already registered "
+                        f"for '{existing_name}'. api_name must be globally unique."
+                    )
+        _validate_api_name(obj_type)
         self._types[obj_type.name] = obj_type
         for link_def in obj_type.links:
             self.register_link(link_def)
@@ -1044,6 +1119,8 @@ _RESEARCH_THREAD = ObjectType(
     shakti_energy=ShaktiEnergy.MAHESHWARI,
     pydantic_model="dharma_swarm.thread_manager.ThreadState",
     icon="R",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.research.ResearchThread",
 )
 
 _EXPERIMENT = ObjectType(
@@ -1080,6 +1157,8 @@ _EXPERIMENT = ObjectType(
     telos_alignment=0.95,
     shakti_energy=ShaktiEnergy.MAHASARASWATI,
     icon="E",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.research.Experiment",
 )
 
 _PAPER = ObjectType(
@@ -1108,6 +1187,8 @@ _PAPER = ObjectType(
     telos_alignment=0.85,
     shakti_energy=ShaktiEnergy.MAHASARASWATI,
     icon="P",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.research.Paper",
 )
 
 _AGENT_IDENTITY = ObjectType(
@@ -1161,6 +1242,8 @@ _AGENT_IDENTITY = ObjectType(
     shakti_energy=ShaktiEnergy.MAHAKALI,
     pydantic_model="dharma_swarm.models.AgentConfig",
     icon="A",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.agent.AgentIdentity",
 )
 
 _CUSTODIAN_ROLE = ObjectType(
@@ -1222,6 +1305,8 @@ _CUSTODIAN_ROLE = ObjectType(
     telos_alignment=0.75,
     shakti_energy=ShaktiEnergy.MAHASARASWATI,
     icon="U",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.agent.CustodianRole",
 )
 
 _KNOWLEDGE_ARTIFACT = ObjectType(
@@ -1254,6 +1339,8 @@ _KNOWLEDGE_ARTIFACT = ObjectType(
     telos_alignment=0.8,
     shakti_energy=ShaktiEnergy.MAHALAKSHMI,
     icon="K",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.knowledge.KnowledgeArtifact",
 )
 
 _TYPED_TASK = ObjectType(
@@ -1286,6 +1373,8 @@ _TYPED_TASK = ObjectType(
     shakti_energy=ShaktiEnergy.MAHAKALI,
     pydantic_model="dharma_swarm.models.Task",
     icon="T",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.task.TypedTask",
 )
 
 _EVOLUTION_ENTRY = ObjectType(
@@ -1321,6 +1410,8 @@ _EVOLUTION_ENTRY = ObjectType(
     shakti_energy=ShaktiEnergy.MAHAKALI,
     pydantic_model="dharma_swarm.archive.ArchiveEntry",
     icon="D",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.evolution.EvolutionEntry",
 )
 
 _WITNESS_LOG = ObjectType(
@@ -1351,6 +1442,8 @@ _WITNESS_LOG = ObjectType(
     telos_alignment=1.0,
     shakti_energy=ShaktiEnergy.MAHESHWARI,
     icon="W",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.governance.WitnessLog",
 )
 
 
@@ -1437,6 +1530,8 @@ _ACTION_PROPOSAL = ObjectType(
     telos_alignment=0.9,
     shakti_energy=ShaktiEnergy.MAHAKALI,
     icon="→",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.governance.ActionProposal",
 )
 
 _GATE_DECISION_TYPE = ObjectType(
@@ -1468,6 +1563,8 @@ _GATE_DECISION_TYPE = ObjectType(
     telos_alignment=1.0,
     shakti_energy=ShaktiEnergy.MAHESHWARI,
     icon="⊘",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.governance.GateDecisionRecord",
 )
 
 _EXECUTION_LEASE = ObjectType(
@@ -1508,6 +1605,8 @@ _EXECUTION_LEASE = ObjectType(
     telos_alignment=0.95,
     shakti_energy=ShaktiEnergy.MAHASARASWATI,
     icon="⌛",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.execution.ExecutionLease",
 )
 
 _OUTCOME = ObjectType(
@@ -1546,6 +1645,8 @@ _OUTCOME = ObjectType(
     telos_alignment=0.85,
     shakti_energy=ShaktiEnergy.MAHASARASWATI,
     icon="✓",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.execution.Outcome",
 )
 
 _VALUE_EVENT = ObjectType(
@@ -1591,6 +1692,8 @@ _VALUE_EVENT = ObjectType(
     telos_alignment=0.85,
     shakti_energy=ShaktiEnergy.MAHALAKSHMI,
     icon="V",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.economic.ValueEvent",
 )
 
 _CONTRIBUTION = ObjectType(
@@ -1626,6 +1729,8 @@ _CONTRIBUTION = ObjectType(
     telos_alignment=0.85,
     shakti_energy=ShaktiEnergy.MAHALAKSHMI,
     icon="C",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.economic.Contribution",
 )
 
 _VENTURE_CELL = ObjectType(
@@ -1666,6 +1771,8 @@ _VENTURE_CELL = ObjectType(
     telos_alignment=0.95,
     shakti_energy=ShaktiEnergy.MAHALAKSHMI,
     icon="◈",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.economic.VentureCell",
 )
 
 
@@ -1707,6 +1814,8 @@ _REVENUE_TARGET = ObjectType(
     telos_alignment=0.8,
     shakti_energy=ShaktiEnergy.MAHALAKSHMI,
     icon="🎯",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.revenue.RevenueTarget",
 )
 
 _REVENUE_OFFER = ObjectType(
@@ -1733,6 +1842,8 @@ _REVENUE_OFFER = ObjectType(
     telos_alignment=0.85,
     shakti_energy=ShaktiEnergy.MAHALAKSHMI,
     icon="📋",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.revenue.RevenueOffer",
 )
 
 _REVENUE_OUTREACH = ObjectType(
@@ -1768,6 +1879,8 @@ _REVENUE_OUTREACH = ObjectType(
     telos_alignment=0.95,
     shakti_energy=ShaktiEnergy.MAHESHWARI,
     icon="✉",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.revenue.RevenueOutreachDraft",
 )
 
 _REVENUE_ENGAGEMENT = ObjectType(
@@ -1804,6 +1917,8 @@ _REVENUE_ENGAGEMENT = ObjectType(
     telos_alignment=0.9,
     shakti_energy=ShaktiEnergy.MAHALAKSHMI,
     icon="💰",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.revenue.RevenueEngagement",
 )
 
 _REVENUE_REINVESTMENT = ObjectType(
@@ -1831,6 +1946,8 @@ _REVENUE_REINVESTMENT = ObjectType(
     telos_alignment=0.9,
     shakti_energy=ShaktiEnergy.MAHALAKSHMI,
     icon="⚡",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.revenue.ComputeReinvestment",
 )
 
 
