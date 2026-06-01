@@ -76,7 +76,7 @@ regexes = [
     '''sk-proj-XXXXX''',
     # OMS api_name fields (dharma.<domain>.<entity>.v<N>) are type identifiers,
     # not secrets. The "dharma." prefix + version suffix trigger generic-api-key.
-    '''dharma\.[a-z_.]+\.v\d+''',
+    '''dharma\.[a-zA-Z_.]+\.v\d+''',
 ]
 
 # =============================================================================

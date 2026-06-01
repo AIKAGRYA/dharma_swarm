@@ -919,7 +919,7 @@ _RESEARCH_THREAD = ObjectType(
     pydantic_model="dharma_swarm.thread_manager.ThreadState",
     icon="R",
     status=TypeStatus.ACTIVE,
-    api_name="dharma.research.thread.v1",
+    api_name="dharma.research.ResearchThread.v1",
 )
 
 _EXPERIMENT = ObjectType(
@@ -957,7 +957,7 @@ _EXPERIMENT = ObjectType(
     shakti_energy=ShaktiEnergy.MAHASARASWATI,
     icon="E",
     status=TypeStatus.ACTIVE,
-    api_name="dharma.research.experiment.v1",
+    api_name="dharma.research.Experiment.v1",
 )
 
 _PAPER = ObjectType(
@@ -987,7 +987,7 @@ _PAPER = ObjectType(
     shakti_energy=ShaktiEnergy.MAHASARASWATI,
     icon="P",
     status=TypeStatus.ACTIVE,
-    api_name="dharma.research.paper.v1",
+    api_name="dharma.research.Paper.v1",
 )
 
 _AGENT_IDENTITY = ObjectType(
@@ -1042,7 +1042,7 @@ _AGENT_IDENTITY = ObjectType(
     pydantic_model="dharma_swarm.models.AgentConfig",
     icon="A",
     status=TypeStatus.ACTIVE,
-    api_name="dharma.agent.identity.v1",
+    api_name="dharma.agent.AgentIdentity.v1",
 )
 
 _CUSTODIAN_ROLE = ObjectType(
@@ -1105,7 +1105,7 @@ _CUSTODIAN_ROLE = ObjectType(
     shakti_energy=ShaktiEnergy.MAHASARASWATI,
     icon="U",
     status=TypeStatus.ACTIVE,
-    api_name="dharma.agent.custodian.v1",
+    api_name="dharma.agent.CustodianRole.v1",
 )
 
 _KNOWLEDGE_ARTIFACT = ObjectType(
@@ -1139,7 +1139,7 @@ _KNOWLEDGE_ARTIFACT = ObjectType(
     shakti_energy=ShaktiEnergy.MAHALAKSHMI,
     icon="K",
     status=TypeStatus.ACTIVE,
-    api_name="dharma.knowledge.artifact.v1",
+    api_name="dharma.knowledge.KnowledgeArtifact.v1",
 )
 
 _TYPED_TASK = ObjectType(
@@ -1173,7 +1173,7 @@ _TYPED_TASK = ObjectType(
     pydantic_model="dharma_swarm.models.Task",
     icon="T",
     status=TypeStatus.ACTIVE,
-    api_name="dharma.task.typed.v1",
+    api_name="dharma.task.TypedTask.v1",
 )
 
 _EVOLUTION_ENTRY = ObjectType(
@@ -1208,7 +1208,7 @@ _EVOLUTION_ENTRY = ObjectType(
     pydantic_model="dharma_swarm.archive.ArchiveEntry",
     icon="D",
     status=TypeStatus.ACTIVE,
-    api_name="dharma.evolution.entry.v1",
+    api_name="dharma.evolution.EvolutionEntry.v1",
 )
 
 _WITNESS_LOG = ObjectType(
@@ -1240,7 +1240,7 @@ _WITNESS_LOG = ObjectType(
     shakti_energy=ShaktiEnergy.MAHESHWARI,
     icon="W",
     status=TypeStatus.ACTIVE,
-    api_name="dharma.governance.witness.v1",
+    api_name="dharma.governance.WitnessLog.v1",
 )
 
 
@@ -1328,7 +1328,7 @@ _ACTION_PROPOSAL = ObjectType(
     shakti_energy=ShaktiEnergy.MAHAKALI,
     icon="→",
     status=TypeStatus.ACTIVE,
-    api_name="dharma.governance.proposal.v1",
+    api_name="dharma.governance.ActionProposal.v1",
 )
 
 _GATE_DECISION_TYPE = ObjectType(
@@ -1361,7 +1361,7 @@ _GATE_DECISION_TYPE = ObjectType(
     shakti_energy=ShaktiEnergy.MAHESHWARI,
     icon="⊘",
     status=TypeStatus.ACTIVE,
-    api_name="dharma.governance.gate_decision.v1",
+    api_name="dharma.governance.GateDecisionRecord.v1",
 )
 
 _EXECUTION_LEASE = ObjectType(
@@ -1403,7 +1403,7 @@ _EXECUTION_LEASE = ObjectType(
     shakti_energy=ShaktiEnergy.MAHASARASWATI,
     icon="⌛",
     status=TypeStatus.ACTIVE,
-    api_name="dharma.execution.lease.v1",
+    api_name="dharma.execution.ExecutionLease.v1",
 )
 
 _OUTCOME = ObjectType(
@@ -1443,7 +1443,7 @@ _OUTCOME = ObjectType(
     shakti_energy=ShaktiEnergy.MAHASARASWATI,
     icon="✓",
     status=TypeStatus.ACTIVE,
-    api_name="dharma.execution.outcome.v1",
+    api_name="dharma.execution.Outcome.v1",
 )
 
 _VALUE_EVENT = ObjectType(
@@ -1490,7 +1490,7 @@ _VALUE_EVENT = ObjectType(
     shakti_energy=ShaktiEnergy.MAHALAKSHMI,
     icon="V",
     status=TypeStatus.ACTIVE,
-    api_name="dharma.economic.value_event.v1",
+    api_name="dharma.economic.ValueEvent.v1",
 )
 
 _CONTRIBUTION = ObjectType(
@@ -1527,7 +1527,7 @@ _CONTRIBUTION = ObjectType(
     shakti_energy=ShaktiEnergy.MAHALAKSHMI,
     icon="C",
     status=TypeStatus.ACTIVE,
-    api_name="dharma.economic.contribution.v1",
+    api_name="dharma.economic.Contribution.v1",
 )
 
 _VENTURE_CELL = ObjectType(
@@ -1569,7 +1569,7 @@ _VENTURE_CELL = ObjectType(
     shakti_energy=ShaktiEnergy.MAHALAKSHMI,
     icon="◈",
     status=TypeStatus.ACTIVE,
-    api_name="dharma.economic.venture_cell.v1",
+    api_name="dharma.economic.VentureCell.v1",
 )
 
 
@@ -1612,7 +1612,7 @@ _REVENUE_TARGET = ObjectType(
     shakti_energy=ShaktiEnergy.MAHALAKSHMI,
     icon="🎯",
     status=TypeStatus.ACTIVE,
-    api_name="dharma.revenue.target.v1",
+    api_name="dharma.revenue.RevenueTarget.v1",
 )
 
 _REVENUE_OFFER = ObjectType(
@@ -1640,7 +1640,7 @@ _REVENUE_OFFER = ObjectType(
     shakti_energy=ShaktiEnergy.MAHALAKSHMI,
     icon="📋",
     status=TypeStatus.ACTIVE,
-    api_name="dharma.revenue.offer.v1",
+    api_name="dharma.revenue.RevenueOffer.v1",
 )
 
 _REVENUE_OUTREACH = ObjectType(
@@ -1677,7 +1677,7 @@ _REVENUE_OUTREACH = ObjectType(
     shakti_energy=ShaktiEnergy.MAHESHWARI,
     icon="✉",
     status=TypeStatus.ACTIVE,
-    api_name="dharma.revenue.outreach.v1",
+    api_name="dharma.revenue.RevenueOutreachDraft.v1",
 )
 
 _REVENUE_ENGAGEMENT = ObjectType(
@@ -1715,7 +1715,7 @@ _REVENUE_ENGAGEMENT = ObjectType(
     shakti_energy=ShaktiEnergy.MAHALAKSHMI,
     icon="💰",
     status=TypeStatus.ACTIVE,
-    api_name="dharma.revenue.engagement.v1",
+    api_name="dharma.revenue.RevenueEngagement.v1",
 )
 
 _REVENUE_REINVESTMENT = ObjectType(
@@ -1744,7 +1744,7 @@ _REVENUE_REINVESTMENT = ObjectType(
     shakti_energy=ShaktiEnergy.MAHALAKSHMI,
     icon="⚡",
     status=TypeStatus.ACTIVE,
-    api_name="dharma.revenue.reinvestment.v1",
+    api_name="dharma.revenue.ComputeReinvestment.v1",
 )
 
 
