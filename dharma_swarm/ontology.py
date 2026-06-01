@@ -297,6 +297,100 @@ def check_security(
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 
+_DECLARED_GATE_ALIASES: dict[str, tuple[str, ...]] = {
+    # Shakti-oriented ontology declarations mapped to executable core gates.
+    "MAHESHWARI": ("ANEKANTA", "SVABHAAVA"),
+    "MAHASARASWATI": ("SATYA",),
+    "APARIGRAHA": ("CONSENT", "SATYA"),
+}
+
+
+DEFAULT_COMPOSITE_GATE_PASS = "PASS(default_composite)"
+
+
+def _default_gate_results_for_declared_gates(
+    gate_results: dict[str, str],
+    declared_gates: list[str],
+) -> dict[str, str]:
+    """Project a composite default gate verdict onto declared gate receipts.
+
+    The default gatekeeper returns one composite decision. A projected PASS means
+    the composite gate allowed the action, not that each declared gate executed
+    as an independent evaluator.
+    """
+    if any(str(value).upper() == "BLOCK" for value in gate_results.values()):
+        return gate_results
+    return {gate: DEFAULT_COMPOSITE_GATE_PASS for gate in declared_gates}
+
+
+def _declared_gate_is_covered(declared_gate: str, result_keys: set[str]) -> bool:
+    if declared_gate in result_keys:
+        return True
+    return any(alias in result_keys for alias in _DECLARED_GATE_ALIASES.get(declared_gate, ()))
+
+
+def _missing_declared_gate_results(declared_gates: list[str], gate_results: dict[str, str]) -> list[str]:
+    result_keys = set(gate_results)
+    return sorted(gate for gate in declared_gates if not _declared_gate_is_covered(gate, result_keys))
+
+
+def _unknown_declared_telos_gates(declared_gates: list[str]) -> list[str]:
+    """Return declared gate names that cannot be evaluated by the active gatekeeper."""
+    try:
+        from dharma_swarm.telos_gates import DEFAULT_GATEKEEPER
+    except Exception:
+        return sorted(declared_gates)
+    active = set(DEFAULT_GATEKEEPER.GATES)
+    aliases = set(_DECLARED_GATE_ALIASES)
+    return sorted(gate for gate in declared_gates if gate not in active and gate not in aliases)
+
+
+def _default_telos_gate_check(action_name: str, params: dict[str, Any]) -> dict[str, str]:
+    """Default telos ``gate_check`` for :meth:`OntologyRegistry.execute_action`.
+
+    W1 — hard-wires the shared ``DEFAULT_GATEKEEPER`` (the 11 dharmic gates) into
+    the universal typed-action chokepoint so a declared ``telos_gate`` is
+    *structural*, not opt-in: when a caller passes no ``gate_check``, this default
+    is used and a declared gate cannot be bypassed by omission. Maps the
+    gatekeeper verdict into ``execute_action``'s ``{gate: "BLOCK"|"PASS"}``
+    contract. For telos-required object types, this is a fail-closed structural
+    boundary: declared gates must receive explicit PASS verdicts after the
+    default gate runs. For non-telos-required typed actions, the param payload
+    classifier is a bounded best-effort harm screen, not a semantic proof system:
+    keyword/paraphrase-detected harmful or deceptive actions BLOCK; advisory
+    (WARN/REVIEW) outcomes PASS.
+    """
+    try:
+        from dharma_swarm.telos_gates import (
+            DEFAULT_GATEKEEPER,
+            canonical_payload_harm_action,
+            check_action,
+        )
+    except Exception:  # gates unavailable -> fail closed for declared telos gates
+        logging.getLogger(__name__).warning("telos gates unavailable; action blocked")
+        return {"TELOS": "BLOCK"}
+    payload = json.dumps(params, default=str, sort_keys=True)
+    # Keep params in content for credential/injection/deception scans without
+    # feeding every security-domain noun into AHIMSA's broad action-word scan.
+    action_desc = canonical_payload_harm_action(action_name, params, DEFAULT_GATEKEEPER.HARM_WORDS) or action_name
+    result = check_action(action=action_desc, content=payload)
+    # The authoritative verdict is the overall DECISION, not the per-gate advisory
+    # FAILs: Tier-A/B hard violations (harm, deception, credential leak) -> BLOCK;
+    # advisory outcomes (REVIEW — e.g. "low epistemological diversity" on a
+    # context-light typed action) -> PASS, so the hard-wire enforces security
+    # without false-positive-blocking legitimate typed mutations.
+    decision_attr = getattr(result, "decision", None)
+    if decision_attr is None:
+        return {"TELOS": "BLOCK"}
+    decision = str(decision_attr).upper()
+    gate = str(getattr(result, "gate", "") or "TELOS")
+    if "BLOCK" in decision:
+        return {gate: "BLOCK"}
+    if "ALLOW" in decision or "REVIEW" in decision:
+        return {gate: "PASS"}
+    return {"TELOS": "BLOCK"}
+
+
 class OntologyRegistry:
     """Central registry of all object types, links, actions, and security.
 
@@ -600,7 +694,17 @@ class OntologyRegistry:
         executed_by: str = "system",
         gate_check: Callable[[str, dict[str, Any]], dict[str, str]] | None = None,
     ) -> ActionExecution:
-        """Execute a typed action with optional telos gate checking."""
+        """Execute a typed action with telos gate checking.
+
+        Gates are hard-wired (W1): the shared ``DEFAULT_GATEKEEPER`` is used via
+        :func:`_default_telos_gate_check`, so a declared ``telos_gate`` cannot be
+        bypassed by omission or by replacing the default with an explicit gate.
+        Explicit gate checks run after the default and must also return verdicts
+        for the action's declared gates.
+        """
+        explicit_gate_check = gate_check
+        if explicit_gate_check is _default_telos_gate_check:
+            explicit_gate_check = None
         action_def = self.get_action_def(object_type, action_name)
         execution = ActionExecution(
             action_name=action_name,
@@ -617,20 +721,76 @@ class OntologyRegistry:
             return execution
 
         # Telos gate check
-        if gate_check and action_def.telos_gates:
-            gate_results = gate_check(action_name, params)
+        if action_def.telos_gates:
+            unknown_gates = _unknown_declared_telos_gates(action_def.telos_gates)
+            if unknown_gates:
+                execution.gate_results = {gate: "BLOCK" for gate in unknown_gates}
+                execution.result = "blocked"
+                execution.error = f"unknown telos gates declared: {', '.join(unknown_gates)}"
+                self._action_log.append(execution)
+                return execution
+            try:
+                gate_results = _default_telos_gate_check(action_name, params)
+            except Exception as exc:
+                execution.gate_results = {"TELOS": "BLOCK"}
+                execution.result = "blocked"
+                execution.error = f"telos gate error: {exc.__class__.__name__}"
+                self._action_log.append(execution)
+                return execution
+            if not isinstance(gate_results, dict):
+                execution.gate_results = {"TELOS": "BLOCK"}
+                execution.result = "blocked"
+                execution.error = "telos gate returned malformed verdict"
+                self._action_log.append(execution)
+                return execution
+            gate_results = _default_gate_results_for_declared_gates(gate_results, action_def.telos_gates)
             execution.gate_results = gate_results
-            if any(v == "BLOCK" for v in gate_results.values()):
+            if any(str(v).upper() == "BLOCK" for v in gate_results.values()):
                 execution.result = "blocked"
                 execution.error = "telos gate blocked"
                 self._action_log.append(execution)
                 return execution
 
+            if explicit_gate_check is not None:
+                try:
+                    explicit_gate_results = explicit_gate_check(action_name, params)
+                except Exception as exc:
+                    execution.gate_results = {"TELOS": "BLOCK"}
+                    execution.result = "blocked"
+                    execution.error = f"telos gate error: {exc.__class__.__name__}"
+                    self._action_log.append(execution)
+                    return execution
+                if not isinstance(explicit_gate_results, dict):
+                    execution.gate_results = {"TELOS": "BLOCK"}
+                    execution.result = "blocked"
+                    execution.error = "telos gate returned malformed verdict"
+                    self._action_log.append(execution)
+                    return execution
+                execution.gate_results = {**gate_results, **explicit_gate_results}
+                if any(str(v).upper() == "BLOCK" for v in explicit_gate_results.values()):
+                    execution.result = "blocked"
+                    execution.error = "telos gate blocked"
+                    self._action_log.append(execution)
+                    return execution
+                gate_results = explicit_gate_results
+
+            missing_gate_results = _missing_declared_gate_results(action_def.telos_gates, gate_results)
+            if missing_gate_results:
+                execution.result = "blocked"
+                execution.error = f"declared telos gates missing verdicts: {', '.join(missing_gate_results)}"
+                self._action_log.append(execution)
+                return execution
+
         # Security check for telos-required types
         obj_type = self._types.get(object_type)
-        if obj_type and obj_type.security.telos_required and not gate_check:
+        if obj_type and obj_type.security.telos_required and not execution.gate_results:
             execution.result = "blocked"
-            execution.error = "telos gate required but no gate_check provided"
+            execution.error = "telos-required type but action produced no gate verdict (declare telos_gates)"
+            self._action_log.append(execution)
+            return execution
+        if obj_type and obj_type.security.telos_required and explicit_gate_check is None:
+            execution.result = "blocked"
+            execution.error = "telos-required type requires explicit gate_check after default gate"
             self._action_log.append(execution)
             return execution
 
@@ -1149,10 +1309,12 @@ _EVOLUTION_ENTRY = ObjectType(
                  is_deterministic=False),
         ActionDef(name="Promote", object_type="EvolutionEntry",
                  description="Advance through evidence tiers",
-                 modifies=["promotion_state"]),
+                 modifies=["promotion_state"],
+                 telos_gates=["AHIMSA", "SATYA", "REVERSIBILITY"]),
         ActionDef(name="Revert", object_type="EvolutionEntry",
                  description="Roll back failed change",
-                 modifies=["promotion_state"]),
+                 modifies=["promotion_state"],
+                 telos_gates=["AHIMSA", "SATYA", "REVERSIBILITY"]),
     ],
     security=SecurityPolicy(telos_required=True, audit_all=True),
     telos_alignment=0.95,
