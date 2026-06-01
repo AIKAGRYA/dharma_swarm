@@ -61,6 +61,19 @@ dharma.governance.AuditFinding          # the consolidation target (devin's 13�
 
 Because `<TypeName>` *is* the internal `name`, ALIGN-002 (api_name ↔ name is 1:1) is trivially satisfied and the mapping is lossless and human-traceable.
 
+### Sibling conventions (Palantir-grounded)
+
+PascalCase applies to **object types**. Palantir's docs ([Create an object type](https://www.palantir.com/docs/foundry/object-link-types/create-object-type)) mandate *different* casing per ontology element — adopted verbatim:
+
+| Element | Casing | Example |
+|---|---|---|
+| **ObjectType** api_name | **PascalCase** (uppercase first) | `dharma.research.ResearchThread` |
+| **Property** api_name | camelCase (lowercase first) | `telosAlignment`, `createdAt` |
+| **Action / Function** api_name | lowerCamelCase | `proposeEntry`, `promoteStatus` |
+| **LinkDef** api_name | camelCase (by analogy to properties; verify vs Foundry link-type docs if load-bearing) | `authoredBy`, `derivedFrom` |
+
+A single global casing was the wrong question: Foundry deliberately uses PascalCase for *types* and camelCase for *properties/actions* because they signal different things (a type vs. a value/verb). perplexity's camelCase grounding was correct **for properties and queries** — it was mis-scoped to object types.
+
 ### Status lifecycle
 
 `TypeStatus` (from #409) is monotonic: `experimental` → `active` → `promoted`.
@@ -102,7 +115,7 @@ These surfaced in the grill and are **not** yet resolved — ADR-008 should not 
 
 1. **Status authority on backfill.** #409 backfills 21 existing types as `active` directly in code, bypassing the `experimental → active` proposal flow. Is `active`-on-merge correct for code-defined types (with `experimental` reserved for in-PR proposals), or should a type become `active` only via an explicit step? *(The related sub-question — when api_names may change — is now answered in Status lifecycle above: renamable only while `experimental`, frozen on `active`, per #413's Palantir grounding.)*
 2. **Gate authority — blocking or advisory?** Is the schema-alignment gate a hard CI failure (blocking), or advisory input to mike + operator? Palantir has a single OMS authority; we have a gate + mike + operator. Which is final?
-3. **LinkDef / ActionDef api_names.** ObjectType has a grammar now. Do links and actions get one too, or do they remain name-scoped to their owning type?
+3. ~~**LinkDef / ActionDef api_names.**~~ **RESOLVED** (Palantir-grounded — see *Sibling conventions* above): actions/functions → lowerCamelCase, properties → camelCase, links → camelCase. Only object types are PascalCase.
 4. **#409 uniqueness guard is process-local** (verified, #410): two agents in parallel processes can both `register_type` the same api_name without detecting the conflict; the CI gate only runs in CI. Is CI-time enforcement sufficient, or does the runtime registry need a guard?
 
 ## Related Decisions
