@@ -757,15 +757,19 @@ class TestApiName:
             seen[obj_type.api_name] = name
 
     def test_api_name_format(self, registry: OntologyRegistry) -> None:
+        """ADR-008: dharma.<domain>.<TypeName>, PascalCase, no .vN suffix."""
         for name in registry.type_names():
             obj_type = registry.get_type(name)
             assert obj_type is not None
             parts = obj_type.api_name.split(".")
-            assert len(parts) >= 3, (
-                f"{name} api_name should have >=3 parts, got {obj_type.api_name!r}"
+            assert len(parts) == 3, (
+                f"{name} api_name should have exactly 3 parts, got {obj_type.api_name!r}"
             )
-            assert parts[-1].startswith("v"), (
-                f"{name} api_name should end with version (vN), got {parts[-1]!r}"
+            assert parts[0] == "dharma", (
+                f"{name} api_name should start with 'dharma', got {parts[0]!r}"
+            )
+            assert parts[2][0].isupper(), (
+                f"{name} api_name TypeName should be PascalCase, got {parts[2]!r}"
             )
 
     def test_new_type_has_empty_api_name(self) -> None:
