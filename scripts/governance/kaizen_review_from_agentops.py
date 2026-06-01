@@ -37,6 +37,7 @@ class AgentOpsSnapshot:
     changed_files: list[str]
     failed_gates: list[str]
     commit_hash: str | None
+    runtime_truth_refs: dict[str, Any]
 
 
 class KaizenBridgeError(Exception):
@@ -108,6 +109,63 @@ def _commit_state(report: dict[str, Any]) -> tuple[str, str | None]:
     return "no_commit", None
 
 
+def _jsonable(value: Any) -> Any:
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, list):
+        return [_jsonable(item) for item in value]
+    if isinstance(value, dict):
+        return {str(key): _jsonable(item) for key, item in value.items()}
+    return str(value)
+
+
+def _clean_string(value: Any) -> str:
+    return str(value).strip() if value is not None else ""
+
+
+def _runtime_truth_refs(report: dict[str, Any]) -> dict[str, Any]:
+    refs: dict[str, Any] = {}
+    scalar_keys = (
+        "agent_uid",
+        "run_id",
+        "trace_id",
+        "correlation_id",
+        "receipt_id",
+        "receipt_hash",
+        "identity_invariant_digest",
+    )
+    list_keys = (
+        "receipt_refs",
+        "runtime_receipt_refs",
+        "runtime_receipts",
+        "evidence_refs",
+    )
+    nested_keys = (
+        "runtime_truth",
+        "runtime_state",
+        "runtime",
+        "spine",
+        "identity",
+    )
+
+    for key in scalar_keys:
+        cleaned = _clean_string(report.get(key))
+        if cleaned:
+            refs[key] = cleaned
+
+    for key in list_keys:
+        value = report.get(key)
+        if isinstance(value, list) and value:
+            refs[key] = _jsonable(value)
+
+    for key in nested_keys:
+        value = report.get(key)
+        if isinstance(value, dict) and value:
+            refs[key] = _jsonable(value)
+
+    return refs
+
+
 def _to_snapshot(report_path: Path, report: dict[str, Any]) -> AgentOpsSnapshot:
     gate_state, failed_gates = _gate_state(report)
     scope_state, changed_files = _scope_state(report)
@@ -131,6 +189,7 @@ def _to_snapshot(report_path: Path, report: dict[str, Any]) -> AgentOpsSnapshot:
         changed_files=changed_files,
         failed_gates=failed_gates,
         commit_hash=commit_hash,
+        runtime_truth_refs=_runtime_truth_refs(report),
     )
 
 
@@ -239,6 +298,27 @@ def build_kaizen_review(report_paths: list[Path], *, review_id: str) -> dict[str
         "human_approval_needed": commit_approval_blocked,
         "human_approval_not_needed": len(snapshots) - commit_approval_blocked,
     }
+    runtime_truth_refs = [
+        {
+            "job_id": s.job_id,
+            "source_report": str(s.report_path),
+            "refs": s.runtime_truth_refs,
+        }
+        for s in snapshots
+        if s.runtime_truth_refs
+    ]
+    runtime_ref_keys = sorted(
+        {
+            key
+            for snapshot in snapshots
+            for key in snapshot.runtime_truth_refs
+        }
+    )
+    runtime_truth_summary = {
+        "jobs_with_refs": len(runtime_truth_refs),
+        "jobs_without_refs": len(snapshots) - len(runtime_truth_refs),
+        "ref_keys": runtime_ref_keys,
+    }
     playbook_candidates = _playbook_candidates(snapshots)
 
     return {
@@ -253,11 +333,14 @@ def build_kaizen_review(report_paths: list[Path], *, review_id: str) -> dict[str
         "scope_summary": scope_summary,
         "commit_summary": commit_summary,
         "approval_summary": approval_summary,
+        "runtime_truth_summary": runtime_truth_summary,
+        "runtime_truth_refs": runtime_truth_refs,
         "summary": {
             "jobs": len(snapshots),
             "gate_counts": gate_summary,
             "scope_counts": scope_summary,
             "commit_counts": commit_summary,
+            "runtime_truth": runtime_truth_summary,
         },
         "jobs": [
             {
@@ -269,6 +352,7 @@ def build_kaizen_review(report_paths: list[Path], *, review_id: str) -> dict[str
                 "failed_gates": s.failed_gates,
                 "changed_files": s.changed_files,
                 "commit_hash": s.commit_hash,
+                "runtime_truth_refs": s.runtime_truth_refs,
             }
             for s in snapshots
         ],
@@ -311,6 +395,22 @@ def render_markdown(review: dict[str, Any]) -> str:
     lines.extend(f"- {item}" for item in review.get("stop_doing_items", []))
     lines.extend(["", "## Playbook Candidates", ""])
     lines.extend(f"- {item}" for item in review.get("playbook_candidates", []))
+    runtime_summary = review.get("runtime_truth_summary")
+    lines.extend(["", "## Runtime Truth References", ""])
+    if isinstance(runtime_summary, dict):
+        lines.append(
+            "- Jobs with runtime refs: "
+            f"`{runtime_summary.get('jobs_with_refs', 0)}`; "
+            "without refs: "
+            f"`{runtime_summary.get('jobs_without_refs', 0)}`."
+        )
+        ref_keys = runtime_summary.get("ref_keys", [])
+        if isinstance(ref_keys, list) and ref_keys:
+            lines.append(f"- Ref keys copied from AgentOps reports: `{', '.join(str(k) for k in ref_keys)}`.")
+        else:
+            lines.append("- No runtime truth reference keys were present in the source reports.")
+    else:
+        lines.append("- No runtime truth references were present in this review.")
     lines.extend(
         [
             "",
