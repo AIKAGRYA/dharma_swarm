@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Local webhook bridge for GitHub @codex PR comments.
 
-The GitHub workflow forwards mention events here. This server verifies the
-shared token, fetches PR context with gh, runs Codex CLI once, and posts the
-result back to the PR conversation.
+This is a local experiment bridge, not the governed `@terminal-review` merge
+control lane. The GitHub workflow in `.github/workflows/codex-mention-router.yml`
+owns `@terminal-review`; this bridge defaults to `@codex` unless an operator
+explicitly sets CODEX_MENTION_HANDLE.
 """
 
 from __future__ import annotations
@@ -482,7 +483,7 @@ def build_config(argv: list[str]) -> BridgeConfig:
         repo_path=repo_path,
         token=token,
         model=os.environ.get("CODEX_MODEL", "gpt-5.5"),
-        mention_handle=os.environ.get("CODEX_MENTION_HANDLE", "@terminal-review"),
+        mention_handle=os.environ.get("CODEX_MENTION_HANDLE", "@codex"),
         host=args.host,
         port=args.port,
         allowed_repos=parse_allowed_repos(os.environ.get("CODEX_ALLOWED_REPOS"), repo_path),

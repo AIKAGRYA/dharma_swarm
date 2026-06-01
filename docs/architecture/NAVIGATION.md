@@ -112,6 +112,7 @@ Generated: 2026-03-29 | 500 Python modules | 494 test files | 8,848 tests
 | See subconscious dreams | `dgc hum` |
 | Run the CWT read-only collector v0 | `python3 scripts/runtime/cwt_collect.py` (stdout) or `--out-dir <path>` |
 | Render a CWT v0 report | `python3 scripts/runtime/cwt_report.py` → writes to `reports/control_watch_tower/<ts>/` (doctrine: [`docs/agents/CONTROL_WATCH_TOWER.md`](../agents/CONTROL_WATCH_TOWER.md); schemas: [`schemas/control_watch_tower_*.v0.json`](../../schemas/)) |
+| Govern PR review/merge cleanup | `make pr-queue`, `make pr-packet PR=<n>`, `make pr-run-codex PR=<n>`, `make pr-run-claude PR=<n>`, `make pr-gate PR=<n>`; implementation: `scripts/runtime/pr_merge_control.py`, docs: [`docs/ops/PR_REVIEW_CONTROL.md`](../ops/PR_REVIEW_CONTROL.md), GitHub mention surface: `.github/workflows/codex-mention-router.yml` |
 | Find a module | Search this file or `ls dharma_swarm/dharma_swarm/*.py` |
 | Find the data model | `dharma_swarm/models.py` |
 | Find the config | `dharma_swarm/config.py` (env var overrides) |
