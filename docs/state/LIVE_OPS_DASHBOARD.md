@@ -1,11 +1,11 @@
 # LIVE OPS DASHBOARD — Morning Brief
 
 **Path:** `docs/state/LIVE_OPS_DASHBOARD.md`  
-**Snapshot date:** 2026-05-11  
-**Status:** CURRENT — convergence checkpoint after merge train + runtime realignment  
+**Snapshot date:** 2026-05-29  
+**Status:** CURRENT — refreshed to main at `a919852` (702 commits)  
 **Read first if tired:** this is the place to learn what shipped, where the live swarm is running, and what not to rediscover tomorrow.
 
-The previous 2026-05-07 dashboard was archived to `docs/state/_archive/LIVE_OPS_DASHBOARD_2026-05-07.md`.
+The previous 2026-05-11 dashboard was archived to `docs/state/_archive/LIVE_OPS_DASHBOARD_2026-05-11.md`.
 
 ---
 
@@ -26,218 +26,140 @@ Short version: the active manifest is the dashboard's structured truth source; t
 
 ## Biggest So What
 
-The repo and live runtime are no longer split across an old cutover branch and a pile of green-but-unmerged PRs.
+The Runtime Truth Spine track (`runtime-truth-spine-2026-06`) has all 13 completion criteria passing. Status: **CRITERIA MET** (13/13 string-presence checks pass). The 13/13 criteria are string-presence checks (file exists, export present, CI gate registered). They do NOT prove runtime dispatch flows through the spine — the spine is defined but not yet wired through `agent_runner.py` or `orchestrator.py`.
+
+A v2 execution-identity spine has also landed (#427), adding typed receipt adapters and tollbooth verification.
 
 As of this snapshot:
 
-- GitHub `main` is green at `f2e5fe5`.
-- The live launchd runtime is running that same `main` commit from `/Users/dhyana/dharma_swarm_main_cutover`.
-- The clean local `main` worktree is `/Users/dhyana/dharma_swarm_tcs_heartbeat`.
-- The largest safe merge train has landed.
-- Remaining local worktrees are real dirty branches that need deliberate triage, not blind deletion or blind merge.
+- GitHub `main` is green at `a919852` (702 commits).
+- Governance amended to allow multi-track (1–10 concurrent tracks) and scoped NATS out of the global prohibition.
+- Perplexity-computer registered as external agent (PR #376 merged).
+- OMS (Ontology Management Service) hardened with TypeStatus lifecycle, api_name, uniqueness guard (#409).
+- Schema-alignment gate (KARMA) and typed-proposal envelope landed (#408).
 
-If you are a new agent tomorrow morning, start from `main` at `f2e5fe5`. Do not restart from the old lf5/cutover worldview.
-
----
-
-## 1. Live Runtime
-
-**Current live code path:**
-
-| Surface | Current value |
-|---|---|
-| Live runtime worktree | `/Users/dhyana/dharma_swarm_main_cutover` |
-| Live branch | `runtime/main-live-20260511` |
-| Live commit | `f2e5fe5` |
-| Clean main worktree | `/Users/dhyana/dharma_swarm_tcs_heartbeat` |
-| Clean main commit | `f2e5fe5` |
-| GitHub branch | `origin/main` |
-
-**Launchd status at refresh:**
-
-| Job | PID at snapshot | Notes |
-|---|---:|---|
-| `com.dharma.swarm` | `49233` | Live orchestrator launched from `dharma_swarm_main_cutover` |
-| `com.dharma.cron-daemon` | `49234` | Cron daemon launched from same worktree |
-
-**Fresh runtime evidence:**
-
-- `dgc --help` works after CLI extraction.
-- Manifest health report imports and builds from live checkout.
-- Latest swarm log shows `All 19 systems launched (19 loops incl. free-grind)`.
-- Known warning still present: `lancedb not installed`; do not treat this as a new regression from the convergence pass.
+**Operator decision needed:** Close the `runtime-truth-spine-2026-06` track and declare the next track, or extend for runtime proof that the spine is wired through dispatch.
 
 ---
 
-## 2. Main / CI
+## 1. Main / CI
 
-**Current main:** `f2e5fe5`  
+**Current main:** `a919852`  
+**Total commits:** 702  
 **Latest main CI:** green
 
 | Workflow | Result |
 |---|---|
-| tests | success |
+| pytest (3.11, 3.12) | success |
 | semgrep | success |
 | CodeQL | success |
 | gitleaks | success |
-
-Do not merge additional PRs until checking this dashboard plus the current PR queue.
-
----
-
-## 3. What Shipped In The Convergence Pass
-
-Merged into `main` during this pass:
-
-- `#198` — high-ROI truth / guardian work
-- `#68`, `#76`, `#116`, `#104`, `#133`, `#197`
-- `#196` — fleet control plane
-- `#186` — ontology-native revenue package
-- `#201` — DharmaAttractor / MM-07 / mismatch-map hardening
-- `#112` — `dgc_cli` extracted into `dharma_swarm/terminal_commands/`
-- `#192` — revenue wedge pipeline, reconciled into `dharma_swarm/revenue/wedge_pipeline.py`
-- `#202` — Manifest Health API, declared-vs-observed comparison engine
-
-Closed as superseded:
-
-- `#184` — superseded by `#186`
-
-Two important fixes happened before merge:
-
-- `#112`: local review caught a real `dgc cron list` crash on scheduler records without `name`; fixed before merge.
-- `#192`: avoided a new top-level `dharma_swarm/revenue_wedge_pipeline.py`; moved it under the existing revenue organ before merge.
+| DocOps integrity | success |
+| go-adapter-contracts | success |
+| go-evidence-ingestor | success |
 
 ---
 
-## 4. Where The New Pieces Fit
+## 2. What Shipped Since Last Dashboard (2026-05-11)
 
-**CLI extraction (`#112`)**
+Major items merged to main since `f2e5fe5`:
 
-- Old shape: one huge `dharma_swarm/dgc_cli.py`.
-- New shape: thin dispatcher in `dgc_cli.py`, command bodies in `dharma_swarm/terminal_commands/`.
-- Why it matters: the launchd entrypoint stayed stable, but command logic is now decomposed enough for future agents to work safely.
-
-**Revenue wedge (`#192`)**
-
-- Lives at `dharma_swarm/revenue/wedge_pipeline.py`.
-- Belongs to the revenue organ created by `#186`.
-- Why it matters: this is not a parallel top-level experiment; it is now inside the canonical revenue package.
-
-**Manifest Health API (`#202`)**
-
-- Core engine: `dharma_swarm/manifest_health.py`.
-- API router: `api/routers/manifest.py`.
-- Registered in: `api/main.py`.
-- Declared truth source: `ACTIVE_SURFACE_MANIFEST.yaml`.
-- Why it matters: the dashboard now has a truth layer that compares declared state against observed reality.
-
----
-
-## 5. Open PR Queue After Convergence
-
-No obvious green merge-train item remains.
-
-Open PRs are mostly draft, stale, conflicting, failing, or based on non-main branches. Treat them as triage, not merge queue.
-
-Examples:
-
-- `#191` KnowledgeOps seed — draft, needs re-evaluation after current main.
-- `#190` routing fusion — draft/stale.
-- `#183` Go GitHub evidence ingestor — previously green but now needs fresh mergeability review.
-- `#182` slop verification — based on `feat/board-feedback-edge`, failing.
-- `#181` telos doctrine — based on `feat/board-feedback-edge`, not main.
-- `#168`, `#161`, `#158`, `#152`, `#151`, `#149`, `#145`, `#142`, `#131`, `#117` — stale/conflicting/failing; do not blindly merge.
-
-If you want a safe next merge, first re-list PRs and check current `mergeable` + checks:
-
-```bash
-gh pr list --repo AmitabhainArunachala/dharma_swarm --state open --limit 100
-```
+| PR | What |
+|---|---|
+| #314 | Router and TaskBoard domain docs |
+| #320 | ADR-007 AutoProposer routing |
+| #326 | Next-phase map and hot list |
+| #327 | make status and cross-agent inventory |
+| #328 | ADR-0002 trace coverage gate |
+| #338 | Devin operations manual |
+| #361 | Trace identity propagation + JSONL persistence + 15 E2E tests |
+| #365 | testing-spine skill for Runtime Truth Spine verification |
+| #376 | A2A dispatch: perplexity-computer registration via roaming mailbox |
+| #396 | Doctrine amendment: multi-track (1–10) + NATS scoped out of prohibition |
+| #401 | Governed review control lane |
+| #403 | Inter-agent inbound check status |
+| #406 | Default-first telos gate with bounded payload screen |
+| #408 | Schema-alignment gate (KARMA) + typed-proposal envelope |
+| #409 | OMS hardening — TypeStatus lifecycle, api_name, uniqueness guard |
+| #416 | Agni NATS CA cert for durable agent connectivity |
+| #427 | Runtime Truth Spine v2 — execution identity spine, typed receipt adapters |
 
 ---
 
-## 6. Worktrees
+## 3. Active Track Status
 
-Worktrees were reduced from 24 to 12. Removed dirty state was archived before removal.
+**Track:** `runtime-truth-spine-2026-06`  
+**Status:** CRITERIA MET (13/13 string-presence checks pass)  
+**Evidence:** `reports/governance/active_track_evidence.md` (generated by `scripts/governance/check_track_status.py`)
 
-Archive root:
+What the 13 criteria verify (string-presence only):
+- Spine types defined (`dharma_swarm/spine/types.py`)
+- Spine exports present (`dharma_swarm/spine/__init__.py`)
+- CI guard registered in uplift_guards
+- `invoke_agent` protocol defined
+- Anti-accretion gate operational
+- E2E tests present and passing
 
-```text
-/Users/dhyana/worktree_cleanup_archives/2026-05-11/
-```
+What the criteria do NOT verify:
+- Runtime dispatch flowing through the spine (agent_runner.py, orchestrator.py still run beside the spine, not through it)
+- Spine v2 adapters wired into actual task execution
 
-Important archived slices include:
+**Action:** Operator decision — close track with caveats and open next, or extend for runtime wiring proof.
 
-- `dharma_swarm_cutover_integration/`
-- `dharma_swarm_doc_convergence/`
-- `dharma_swarm_rollup/`
-- `dharma_swarm_lf5/`
-- `dharma_swarm_closure_v0/`
-- `tcs_heartbeat/system_map/latest.json`
+---
 
-Remaining dirty worktrees are not trash. They are unresolved work packets:
+## 4. Repo Metrics (from SOVEREIGN_MANIFEST)
 
-| Worktree | Branch | Morning stance |
+| Metric | Value |
+|---|---|
+| Python modules | 661 |
+| Total Python LOC | 279,695 |
+| Test files | 617 |
+| Test functions | 10,734 |
+| Markdown files | 757 |
+| Markdown total lines | 190,990 |
+| Total commits | 702 |
+
+These are sourced from `SOVEREIGN_MANIFEST.md` and validated by DocOps integrity. Do not hand-maintain counts — use `make docops-integrity` to verify.
+
+---
+
+## 5. Open PR Queue
+
+The repo has ~264 open PR refs. Most are stale/conflicting/draft. Notable merge-ready or near-ready:
+
+| PR | Title | Status |
 |---|---|---|
-| `/Users/dhyana/dharma_swarm` | `cleanup/mixed-quality-recovery-2026-05-10` | huge mixed recovery bundle; needs decomposition |
-| `/Users/dhyana/dharma_swarm_action_authority_spec` | `chore/action-authority-gate-spec` | large authority-gate branch; likely high value but old and conflicty |
-| `/Users/dhyana/dharma_swarm_budget_fix` | `chore/opportunity-dispatcher-budget-fix` | small dispatcher split; candidate for focused review |
-| `/Users/dhyana/dharma_swarm_runtime_projector` | `feat/runtime-result-projector` | substantial runtime projection work; high risk/high value |
-| `/Users/dhyana/dharma_swarm_truth_spine` | `chore/agent-truth-spine` | truth-spine / operating-facts work; likely overlaps merged manifest health |
-| `/Users/dhyana/dharma_swarm_go_g06_local_model_inventory` | `feat/go-local-model-runtime-inventory` | Go inventory bridge; likely related to `#183` |
+| #395 | docs(state): refresh operational docs | CI green — THIS PR |
+| #375 | perplexity-computer identity nest | Third-witnessed, needs rebase |
+| #371 | 11-step chain verdict v6 | CI green, needs rebase |
+| #374 | 11-step chain verdict v2 | CI green, needs rebase |
 
-Do not delete these without archiving patches and naming the reason.
+Recommendation: merge doc PRs first, then triage the remaining ~260 refs (many are stale and closeable).
+
+---
+
+## 6. Broken Register Summary
+
+| BR-ID | Issue | Status |
+|---|---|---|
+| BR-003 | Evolution apply gate always skips | OPEN — needs Sakshi provenance first |
+| BR-004 | Cron split-brain | OPEN |
+| BR-005 | Algedonic stream unconsumed | OPEN |
+| BR-013 | Agent contract scattered across 8+ surfaces | OPEN |
+| BR-014 | BHED_GNAN telos gate always passes | OPEN — governance-locked |
 
 ---
 
 ## 7. What To Do Tomorrow Morning
 
-Recommended order:
-
-1. Verify the live runtime is still on `f2e5fe5` or newer:
-
-```bash
-git -C /Users/dhyana/dharma_swarm_main_cutover status --short --branch
-launchctl list com.dharma.swarm
-launchctl list com.dharma.cron-daemon
-tail -n 80 /Users/dhyana/.dharma/logs/swarm.log
-```
-
-2. Read this file, then list PRs. Do not trust memory of yesterday's queue.
-
-3. Pick one dirty worktree and decide: merge, split, archive, or abandon. Highest ROI candidates are probably:
-   - `dharma_swarm_budget_fix`
-   - `dharma_swarm_truth_spine`
-   - `dharma_swarm_runtime_projector`
-
-4. Use the manifest health API as the new truth surface:
-
-```bash
-PYTHONPATH=/Users/dhyana/dharma_swarm_tcs_heartbeat \
-  /Users/dhyana/dharma_swarm/.venv/bin/python -c \
-  "from dharma_swarm.manifest_health import build_health_report; print(build_health_report().get('summary'))"
-```
-
-At the 2026-05-11 refresh, it reported:
-
-```text
-{'total': 35, 'live': 24, 'degraded': 0, 'broken': 1, 'stub': 8, 'unknown': 2}
-```
-
-That is the next dashboard truth seam.
-
----
-
-## 8. Do Not Forget
-
-- The system is more converged than it was, but not finished.
-- Live runtime alignment is the big win.
-- The merge train is done for now.
-- Remaining work is no longer “merge all green things”; it is triage of stale/draft/conflicting branches and dirty local worktrees.
-- If you are tired: do not start a new architecture. Read the manifest health summary and pick one small convergence action.
+1. **Close the spine track or extend it.** All 13 criteria pass. The question is: does "criteria met" equal "done"?
+2. **Merge the doc refresh PRs** (#395, then #371 or #374). They keep conflicting with count bumps.
+3. **Triage the ~260 open PR refs.** Most are zombies. Bulk close stale ones.
+4. **Pick next track.** Options: wire spine through runtime, agent fabric, self-evolution gate, NATS substrate.
 
 ---
 
 ## One-Line Verdict
 
-`main` is green, live runtime is on `main`, and the next work is not invention; it is careful cleanup of the remaining dirty worktrees and stale PRs.
+`main` is green at 702 commits, spine criteria are met but not runtime-proven, and the next decision is track closure + next track declaration.
