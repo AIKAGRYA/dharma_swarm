@@ -26,7 +26,7 @@ Grep + read across all `dharma_swarm/**/*.py` for classes containing `State`, `R
 | 6 | `mission_contract.py` | `MissionState`, `CampaignState` | JSONL at `~/.dharma/missions/` | Mission lifecycle (planned→active→complete) |
 | 7 | `iteration_depth.py` | `InitiativeStatus`, ledger | JSONL at `~/.dharma/iteration/` | Quality ratchet — seed→growing→solid→shipped |
 | 8 | `overnight_director.py` | `DurableState` | JSON/JSONL at `~/.dharma/overnight/<run>/` | Long-horizon run persistence (spec + plan + runbook + audit) |
-| 9 | `operator_core/contracts.py` | `CanonicalWorkflowState` | Not persisted (contract type) | Typed contract for workflow snapshots |
+| 9 | `operator_core/contracts.py` | `CWS` (see §3) | Not persisted (contract type) | Typed contract for workflow snapshots |
 | 10 | `rea_runtime.py` | `WaitState`, `WaitStateKind` | SQLite (runtime.db) | REA wait states (approval, feedback, resource) |
 | 11 | `amiros.py` | `AMIROSRegistry` | JSONL at `~/.dharma/amiros/` | Research provenance chain (experiments, claims, artifacts) |
 | 12 | `hibernation.py` | `JobState` | Not examined in detail | Hibernation job lifecycle |
@@ -50,7 +50,7 @@ Grep + read across all `dharma_swarm/**/*.py` for classes containing `State`, `R
 - `DelegationRun` (`runtime_state.py:368`) tracks individual task delegations but not the enclosing workflow
 - `MissionState` (`mission_contract.py:104`) tracks mission-level lifecycle but not individual run instances
 - `LoopHealth` (`loop_supervisor.py:32`) tracks tick-level health but not semantic workflow boundaries
-- `CanonicalWorkflowState` (`operator_core/contracts.py:217`) exists as a **typed contract** with `workflow_id`, `status`, `active_lane_ids`, `blocked_by` — but it is not persisted or populated at runtime. It's a declared shape with no producer.
+- The workflow-state contract at `operator_core/contracts.py:217` (hereafter **CWS**) exists as a **typed contract** with `workflow_id`, `status`, `active_lane_ids`, `blocked_by` — but it is not persisted or populated at runtime. It's a declared shape with no producer.
 
 The gap: a workflow starts in `orchestrate_live.py`, tasks get claimed via `RuntimeStateStore`, results flow back through agent responses, but there is no durable record that says "workflow run X started at T1, included tasks [A, B, C], ended at T2 with outcome Y." The `DelegationRun` comes closest but is scoped to a single delegation, not a workflow boundary.
 
@@ -69,6 +69,6 @@ No two modules write to the same table or file. The "multiple owners" are layere
 
 ## Headline Verdict: **partially_confirmed**
 
-Codex's claim that "multiple workflow-state owners" exist is **confirmed** — there are at least 13 distinct state surfaces. The claim that they lack a `workflowRun` boundary is **confirmed** — `CanonicalWorkflowState` exists as a contract but has no runtime producer. However, the claim is **overstated** in framing: these are **layered** state surfaces serving different concerns (control plane, mission strategy, quality tracking, health monitoring), not competing owners fighting over the same data. The fragmentation is structural (missing unifying type), not pathological (conflicting writes).
+Codex's claim that "multiple workflow-state owners" exist is **confirmed** — there are at least 13 distinct state surfaces. The claim that they lack a `workflowRun` boundary is **confirmed** — CWS (`contracts.py:217`) exists as a contract but has no runtime producer. However, the claim is **overstated** in framing: these are **layered** state surfaces serving different concerns (control plane, mission strategy, quality tracking, health monitoring), not competing owners fighting over the same data. The fragmentation is structural (missing unifying type), not pathological (conflicting writes).
 
 The "LangGraph-style state graph absent" observation is **confirmed** and the most actionable finding: there is no first-class `workflowRun` that traces from dispatch through execution to outcome.
