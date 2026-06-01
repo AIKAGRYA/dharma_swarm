@@ -9,7 +9,7 @@
 
 ## Context
 
-dharma_swarm has **five agents** (claude, perplexity, devin, hermes, mike) editing one ontology concurrently. Palantir Foundry — the grounding reference — does ontology with a *single* forward-deployed engineer and a centralized Object Metadata Service (OMS) authority. We have no single authority; the replacement is a **typed-proposal envelope** (#408) + a **schema-alignment CI gate** (#408, KARMA-style) + **operator-only merge**. The ontology's source of truth is **code** (`dharma_swarm/ontology.py`: 22 module-level `_X = ObjectType(...)` definitions, registry built at import by `create_dharma_registry()`); there is no runtime OMS service. "Proposals" are therefore typed PRs and the gate runs in CI.
+dharma_swarm has **five agents** (claude, perplexity, devin, hermes, mike) editing one ontology concurrently. Palantir Foundry — the grounding reference — does ontology with a *single* forward-deployed engineer and a centralized Object Metadata Service (OMS) authority. We have no single authority; the replacement is a **typed-proposal envelope** (#408) + a **schema-alignment CI gate** (#408, KARMA-style) + **operator-only merge**. The ontology is **defined in code** (`dharma_swarm/ontology.py`: 22 module-level `_X = ObjectType(...)` definitions, registry built at import by `create_dharma_registry()`); there is no runtime OMS service. "Proposals" are therefore typed PRs and the gate runs in CI.
 
 This ADR exists because the multi-agent model produced a **live, concrete conflict** that proves the grammar was under-specified:
 
@@ -32,7 +32,7 @@ Palantir uses **plain, unversioned api_names** plus stable RIDs as the immutable
 | A | `dharma.<domain>.<lowercase_entity>.v<N>` (#409) | ✗ versioned name (anti-pattern); lossy (`ResearchThread`→`thread`); breaks api_name↔name 1:1 |
 | B | `dharma.<domain>.<UpperCamel>.v<N>` (#408) | ✗ versioned name (anti-pattern); case correct |
 | C | `dharma.<domain>.<PascalCase>.v<N>` (operator's first pick, ADR draft) | partial — case correct, but `.v<N>` is the anti-pattern; leaves the two-version problem unresolved |
-| D | **`dharma.<domain>.<PascalCase>` + version in `version:int`** (CHOSEN) | ✓ Palantir-canonical; resolves the two-version problem; api_name↔name 1:1 trivial |
+| D | **`dharma.<domain>.<PascalCase>` + version in `version:int`** (CHOSEN) | ✓ Palantir-aligned; resolves the two-version problem; api_name↔name 1:1 trivial |
 | E | raw Foundry `lowerCamelCase` (`flightAlert`) | ✗ for us — loses the 1:1 mapping to our PascalCase internal `name`; our types are already PascalCase |
 
 ## Decision
@@ -81,7 +81,7 @@ Because `<TypeName>` *is* the internal `name`, ALIGN-002 (api_name ↔ name is 1
 
 ### Positive
 - **One version mechanism, in the right place.** The two-version ambiguity that split #408/#409 is gone.
-- **Palantir-canonical.** We stop enforcing the exact anti-pattern Palantir documents against.
+- **Palantir-aligned.** We stop enforcing the exact anti-pattern Palantir documents against.
 - **api_name is a true stable contract** — safe for the forthcoming OSDK-style codegen (hermes's piece) and for OAG typed queries.
 - **ALIGN-002 trivial**; the schema-alignment gate's job gets simpler.
 
@@ -91,7 +91,7 @@ Because `<TypeName>` *is* the internal `name`, ALIGN-002 (api_name ↔ name is 1
 - "No version in the name" requires discipline: breaking change = new type, which is heavier than a version bump (intentionally — it's the Palantir guardrail against silent breakage).
 
 ### Neutral
-- `version: int` keeps its meaning (it was always there); it is now the canonical version field rather than a redundant one.
+- `version: int` keeps its meaning (it was always there); it is now the single version field rather than a redundant one.
 - LinkDef/ActionDef api_name grammar is **not** decided here (see Open Questions).
 
 ## Open Questions for Operator
