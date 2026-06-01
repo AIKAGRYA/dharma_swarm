@@ -3,7 +3,8 @@
 ``OntologyRegistry.execute_action`` must enforce declared ``telos_gates`` via the
 shared ``DEFAULT_GATEKEEPER`` even when no ``gate_check`` is passed (the gate
 cannot be bypassed by omission), while not false-positive-blocking benign typed
-mutations. Explicit ``gate_check`` callers are unaffected.
+mutations. Explicit ``gate_check`` callers add coverage after the default gate
+and cannot override a default BLOCK.
 """
 from __future__ import annotations
 
@@ -279,14 +280,28 @@ def test_hardwire_passes_benign_without_explicit_gate() -> None:
     assert res.gate_results  # gate fired automatically (not bypassed by omission)
 
 
-def test_explicit_gate_check_overrides_default() -> None:
-    # an explicit gate is used as-is when it covers the declared gates
+def test_explicit_gate_check_adds_coverage_after_default() -> None:
+    # an explicit gate still has to cover declared gates, but it cannot replace
+    # the default runtime gatekeeper.
     r = _registry()
     res = r.execute_action(
-        "EvolutionEntry", "Propose", _evo(r).id, {"command": "weaponize an attack to harm people"},
+        "EvolutionEntry", "Propose", _evo(r).id, {"note": "benign refactor"},
         gate_check=lambda _n, _p: {"AHIMSA": "PASS", "SATYA": "PASS", "REVERSIBILITY": "PASS"},
     )
     assert res.result == "success"
+
+
+def test_explicit_gate_check_cannot_override_default_block() -> None:
+    r = _registry()
+    res = r.execute_action(
+        "EvolutionEntry",
+        "Propose",
+        _evo(r).id,
+        {"command": "weaponize an attack to harm people"},
+        gate_check=lambda _n, _p: {"AHIMSA": "PASS", "SATYA": "PASS", "REVERSIBILITY": "PASS"},
+    )
+    assert res.result == "blocked"
+    assert "telos gate blocked" in res.error
 
 
 def test_explicit_gate_check_cannot_noop_declared_gates() -> None:

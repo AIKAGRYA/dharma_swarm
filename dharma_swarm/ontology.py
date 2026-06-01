@@ -465,7 +465,7 @@ def _default_telos_gate_check(action_name: str, params: dict[str, Any]) -> dict[
     *structural*, not opt-in: when a caller passes no ``gate_check``, this default
     is used and a declared gate cannot be bypassed by omission. Maps the
     gatekeeper verdict into ``execute_action``'s ``{gate: "BLOCK"|"PASS"}``
-    contract. Permissive by default (``internal_yolo``): only genuinely
+    contract. Permissive by default (``internal_yolo``): keyword-detected
     harmful/deceptive actions BLOCK; advisory (WARN/REVIEW) outcomes PASS.
     """
     try:
@@ -800,14 +800,15 @@ class OntologyRegistry:
     ) -> ActionExecution:
         """Execute a typed action with telos gate checking.
 
-        Gates are hard-wired (W1): when ``gate_check`` is omitted, the shared
-        ``DEFAULT_GATEKEEPER`` is used via :func:`_default_telos_gate_check`, so a
-        declared ``telos_gate`` cannot be bypassed by passing no gate. Explicit
-        gate checks must return verdicts for the action's declared gates.
+        Gates are hard-wired (W1): the shared ``DEFAULT_GATEKEEPER`` is used via
+        :func:`_default_telos_gate_check`, so a declared ``telos_gate`` cannot be
+        bypassed by omission or by replacing the default with an explicit gate.
+        Explicit gate checks run after the default and must also return verdicts
+        for the action's declared gates.
         """
-        if gate_check is None:
-            gate_check = _default_telos_gate_check
-        using_default_gate_check = gate_check is _default_telos_gate_check
+        explicit_gate_check = gate_check
+        if explicit_gate_check is _default_telos_gate_check:
+            explicit_gate_check = None
         action_def = self.get_action_def(object_type, action_name)
         execution = ActionExecution(
             action_name=action_name,
@@ -824,7 +825,7 @@ class OntologyRegistry:
             return execution
 
         # Telos gate check
-        if gate_check and action_def.telos_gates:
+        if action_def.telos_gates:
             unknown_gates = _unknown_declared_telos_gates(action_def.telos_gates)
             if unknown_gates:
                 execution.gate_results = {gate: "BLOCK" for gate in unknown_gates}
@@ -833,7 +834,7 @@ class OntologyRegistry:
                 self._action_log.append(execution)
                 return execution
             try:
-                gate_results = gate_check(action_name, params)
+                gate_results = _default_telos_gate_check(action_name, params)
             except Exception as exc:
                 execution.gate_results = {"TELOS": "BLOCK"}
                 execution.result = "blocked"
@@ -846,14 +847,37 @@ class OntologyRegistry:
                 execution.error = "telos gate returned malformed verdict"
                 self._action_log.append(execution)
                 return execution
-            if using_default_gate_check:
-                gate_results = _default_gate_results_for_declared_gates(gate_results, action_def.telos_gates)
+            gate_results = _default_gate_results_for_declared_gates(gate_results, action_def.telos_gates)
             execution.gate_results = gate_results
             if any(str(v).upper() == "BLOCK" for v in gate_results.values()):
                 execution.result = "blocked"
                 execution.error = "telos gate blocked"
                 self._action_log.append(execution)
                 return execution
+
+            if explicit_gate_check is not None:
+                try:
+                    explicit_gate_results = explicit_gate_check(action_name, params)
+                except Exception as exc:
+                    execution.gate_results = {"TELOS": "BLOCK"}
+                    execution.result = "blocked"
+                    execution.error = f"telos gate error: {exc.__class__.__name__}"
+                    self._action_log.append(execution)
+                    return execution
+                if not isinstance(explicit_gate_results, dict):
+                    execution.gate_results = {"TELOS": "BLOCK"}
+                    execution.result = "blocked"
+                    execution.error = "telos gate returned malformed verdict"
+                    self._action_log.append(execution)
+                    return execution
+                execution.gate_results = {**gate_results, **explicit_gate_results}
+                if any(str(v).upper() == "BLOCK" for v in explicit_gate_results.values()):
+                    execution.result = "blocked"
+                    execution.error = "telos gate blocked"
+                    self._action_log.append(execution)
+                    return execution
+                gate_results = explicit_gate_results
+
             missing_gate_results = _missing_declared_gate_results(action_def.telos_gates, gate_results)
             if missing_gate_results:
                 execution.result = "blocked"
