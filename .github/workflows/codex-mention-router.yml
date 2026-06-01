@@ -8,34 +8,69 @@ on:
 
 permissions:
   contents: read
+  issues: write
+  pull-requests: write
 
 jobs:
   route:
     if: >
       ${{
         contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association) &&
-        contains(github.event.comment.body, '@terminal-review')
+        contains(github.event.comment.body, '@terminal-review') &&
+        (github.event_name == 'pull_request_review_comment' || github.event.issue.pull_request)
       }}
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      - name: Send event to local Codex bridge
+      - uses: actions/checkout@v4
+
+      - name: Determine PR number
+        id: pr
         run: |
-          test -n "$CODEX_WEBHOOK_URL"
-          test -n "$CODEX_WEBHOOK_TOKEN"
-
-          cat > event.json <<'JSON'
-          ${{ toJson(github.event) }}
-          JSON
-
-          curl --fail-with-body -sS -X POST "$CODEX_WEBHOOK_URL" \
-            -H "Authorization: Bearer $CODEX_WEBHOOK_TOKEN" \
-            -H "Content-Type: application/json" \
-            -H "X-GitHub-Event: ${{ github.event_name }}" \
-            -H "X-GitHub-Delivery: ${{ github.run_id }}-${{ github.run_attempt }}" \
-            --connect-timeout 10 \
-            --max-time 60 \
-            --data-binary @event.json
+          if [ -n "${PR_FROM_REVIEW:-}" ]; then
+            echo "number=${PR_FROM_REVIEW}" >> "${GITHUB_OUTPUT}"
+          else
+            echo "number=${PR_FROM_ISSUE}" >> "${GITHUB_OUTPUT}"
+          fi
         env:
-          CODEX_WEBHOOK_URL: ${{ secrets.CODEX_WEBHOOK_URL }}
-          CODEX_WEBHOOK_TOKEN: ${{ secrets.CODEX_WEBHOOK_TOKEN }}
+          PR_FROM_ISSUE: ${{ github.event.issue.number }}
+          PR_FROM_REVIEW: ${{ github.event.pull_request.number }}
+
+      - name: Run deterministic terminal-review packet
+        id: review
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+        run: |
+          set -euo pipefail
+          state_root="${RUNNER_TEMP}/dharma-pr-review"
+          python3 scripts/runtime/pr_merge_control.py --state-root "${state_root}" packet --pr "${PR_NUMBER}"
+          set +e
+          python3 scripts/runtime/pr_merge_control.py --state-root "${state_root}" gate --pr "${PR_NUMBER}"
+          gate_exit="$?"
+          set -e
+          python3 scripts/runtime/pr_merge_control.py --state-root "${state_root}" comment --pr "${PR_NUMBER}" --output "${RUNNER_TEMP}/terminal-review.md"
+          echo "gate_exit=${gate_exit}" >> "${GITHUB_OUTPUT}"
+
+      - name: Post or update terminal-review comment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+        run: |
+          set -euo pipefail
+          marker="<!-- dharma-pr-review-control:auto -->"
+          existing="$(gh pr view "${PR_NUMBER}" --json comments \
+            --jq '.comments[] | select(.body | startswith("'"${marker}"'")) | .id' \
+            | head -1)"
+          if [ -n "${existing}" ]; then
+            gh api --method PATCH \
+              "/repos/${GITHUB_REPOSITORY}/issues/comments/${existing}" \
+              -f body="$(cat "${RUNNER_TEMP}/terminal-review.md")"
+          else
+            gh pr comment "${PR_NUMBER}" --body-file "${RUNNER_TEMP}/terminal-review.md"
+          fi
+
+      - name: Summarize
+        run: |
+          echo "terminal-review gate exit: ${{ steps.review.outputs.gate_exit }}"
+          cat "${RUNNER_TEMP}/terminal-review.md"
