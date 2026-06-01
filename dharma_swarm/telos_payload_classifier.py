@@ -44,12 +44,23 @@ PAYLOAD_HARM_GATEKEEPER_ALIASES = {
 
 PAYLOAD_HARD_BLOCK_PHRASE_ACTIONS = {
     "/etc/shadow": "exfiltrate",
+    "bypass auth": "exploit",
+    "bypass authentication": "exploit",
+    "bypass gate": "corrupt",
+    "bypass gates": "corrupt",
     "disable all telos gates": "corrupt",
+    "disable gate": "corrupt",
+    "disable safety gate": "corrupt",
     "disable the telos gate": "corrupt",
     "disable telos gates": "corrupt",
     "dump database credentials": "exfiltrate",
     "dump the database credentials": "exfiltrate",
     "email all user records": "exfiltrate",
+    "escalate privilege": "exploit",
+    "escalate privileges": "exploit",
+    "fabricate audit": "exploit",
+    "falsify audit": "exploit",
+    "falsify receipt": "exploit",
     "grant admin": "exploit",
     "make the agent lie": "exploit",
     "publish api keys": "exfiltrate",
@@ -57,7 +68,53 @@ PAYLOAD_HARD_BLOCK_PHRASE_ACTIONS = {
     "send passwords": "exfiltrate",
     "send all user emails": "exfiltrate",
     "turn off all safety gates": "corrupt",
+    "turn off gate": "corrupt",
+    "turn off safety gate": "corrupt",
 }
+
+PAYLOAD_DESTRUCTIVE_TARGET_VERBS = frozenset({
+    "clear",
+    "delete",
+    "drain",
+    "erase",
+    "nuke",
+    "purge",
+    "remove",
+    "scrub",
+    "zero out",
+})
+
+PAYLOAD_EXFILTRATION_TARGET_VERBS = frozenset({
+    "copy",
+    "download",
+    "dump",
+    "email",
+    "export",
+    "extract",
+    "harvest",
+    "post",
+    "publish",
+    "send",
+    "share",
+    "upload",
+})
+
+PAYLOAD_PRIVILEGE_TARGET_VERBS = frozenset({
+    "bypass",
+    "disable",
+    "elevate",
+    "escalate",
+    "grant",
+    "override",
+})
+
+PAYLOAD_DECEPTION_TARGET_VERBS = frozenset({
+    "fabricate",
+    "fake",
+    "falsify",
+    "lie",
+    "mislead",
+})
 
 PAYLOAD_HARM_TARGET_TERMS = frozenset({
     "all",
@@ -170,6 +227,19 @@ def canonical_payload_harm_action(
         ):
             if _payload_text_has_phrase(lowered, phrase):
                 return f"{action_name} {gatekeeper_word}"
+        if _payload_value_has_harm_target(lowered):
+            for word in sorted(PAYLOAD_DESTRUCTIVE_TARGET_VERBS, key=len, reverse=True):
+                if _payload_text_has_phrase(lowered, word):
+                    return f"{action_name} destroy"
+            for word in sorted(PAYLOAD_EXFILTRATION_TARGET_VERBS, key=len, reverse=True):
+                if _payload_text_has_phrase(lowered, word):
+                    return f"{action_name} exfiltrate"
+            for word in sorted(PAYLOAD_PRIVILEGE_TARGET_VERBS, key=len, reverse=True):
+                if _payload_text_has_phrase(lowered, word):
+                    return f"{action_name} exploit"
+            for word in sorted(PAYLOAD_DECEPTION_TARGET_VERBS, key=len, reverse=True):
+                if _payload_text_has_phrase(lowered, word):
+                    return f"{action_name} exploit"
         for word in sorted(always_block, key=len, reverse=True):
             if _payload_text_has_phrase(lowered, word):
                 return f"{action_name} {word}"

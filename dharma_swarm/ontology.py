@@ -353,8 +353,12 @@ def _default_telos_gate_check(action_name: str, params: dict[str, Any]) -> dict[
     *structural*, not opt-in: when a caller passes no ``gate_check``, this default
     is used and a declared gate cannot be bypassed by omission. Maps the
     gatekeeper verdict into ``execute_action``'s ``{gate: "BLOCK"|"PASS"}``
-    contract. Permissive by default (``internal_yolo``): keyword-detected
-    harmful/deceptive actions BLOCK; advisory (WARN/REVIEW) outcomes PASS.
+    contract. For telos-required object types, this is a fail-closed structural
+    boundary: declared gates must receive explicit PASS verdicts after the
+    default gate runs. For non-telos-required typed actions, the param payload
+    classifier is a bounded best-effort harm screen, not a semantic proof system:
+    keyword/paraphrase-detected harmful or deceptive actions BLOCK; advisory
+    (WARN/REVIEW) outcomes PASS.
     """
     try:
         from dharma_swarm.telos_gates import (
