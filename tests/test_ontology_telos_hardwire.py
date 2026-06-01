@@ -12,13 +12,16 @@ import builtins
 
 from dharma_swarm.ontology import (
     ActionDef,
+    DEFAULT_COMPOSITE_GATE_PASS,
     ObjectType,
     OntologyRegistry,
-    _PARAM_HARD_BLOCK_PHRASE_ACTIONS,
-    _PARAM_HARM_GATEKEEPER_ALIASES,
-    _PARAM_HARM_TARGET_BLOCK,
     _default_telos_gate_check,
     _unknown_declared_telos_gates,
+)
+from dharma_swarm.telos_gates import (
+    PAYLOAD_HARD_BLOCK_PHRASE_ACTIONS,
+    PAYLOAD_HARM_GATEKEEPER_ALIASES,
+    PAYLOAD_HARM_TARGET_BLOCK,
 )
 
 
@@ -103,11 +106,11 @@ def test_param_harm_aliases_are_sourced_from_gatekeeper_vocabulary() -> None:
     from dharma_swarm.telos_gates import DEFAULT_GATEKEEPER
 
     target_aliases = {
-        _PARAM_HARM_GATEKEEPER_ALIASES.get(word, word)
-        for word in _PARAM_HARM_TARGET_BLOCK
+        PAYLOAD_HARM_GATEKEEPER_ALIASES.get(word, word)
+        for word in PAYLOAD_HARM_TARGET_BLOCK
     }
     assert target_aliases <= DEFAULT_GATEKEEPER.HARM_WORDS
-    assert set(_PARAM_HARD_BLOCK_PHRASE_ACTIONS.values()) <= DEFAULT_GATEKEEPER.HARM_WORDS
+    assert set(PAYLOAD_HARD_BLOCK_PHRASE_ACTIONS.values()) <= DEFAULT_GATEKEEPER.HARM_WORDS
 
 
 def test_default_gate_check_does_not_hard_block_across_param_keys() -> None:
@@ -352,6 +355,7 @@ def test_hardwire_passes_benign_trigger_words_across_params_without_explicit_gat
     )
     assert res.result == "success"
     assert res.gate_results
+    assert set(res.gate_results.values()) == {DEFAULT_COMPOSITE_GATE_PASS}
 
 
 def test_hardwire_passes_benign_without_explicit_gate() -> None:
@@ -359,6 +363,7 @@ def test_hardwire_passes_benign_without_explicit_gate() -> None:
     res = r.execute_action("Experiment", "Run", _experiment(r).id, {"note": "benign"})
     assert res.result == "success"
     assert res.gate_results  # gate fired automatically (not bypassed by omission)
+    assert set(res.gate_results.values()) == {DEFAULT_COMPOSITE_GATE_PASS}
 
 
 def test_telos_required_evolution_actions_remain_fail_closed_without_explicit_gate() -> None:
@@ -373,6 +378,7 @@ def test_telos_required_evolution_actions_remain_fail_closed_without_explicit_ga
         assert res.result == "blocked", action_name
         assert "telos-required type requires explicit gate_check" in res.error
         assert res.gate_results
+        assert set(res.gate_results.values()) == {DEFAULT_COMPOSITE_GATE_PASS}
 
 
 def test_explicit_gate_check_adds_coverage_after_default() -> None:
@@ -384,6 +390,11 @@ def test_explicit_gate_check_adds_coverage_after_default() -> None:
         gate_check=lambda _n, _p: {"AHIMSA": "PASS", "SATYA": "PASS", "REVERSIBILITY": "PASS"},
     )
     assert res.result == "success"
+    assert res.gate_results == {
+        "AHIMSA": "PASS",
+        "SATYA": "PASS",
+        "REVERSIBILITY": "PASS",
+    }
 
 
 def test_explicit_gate_check_cannot_override_default_block() -> None:

@@ -30,7 +30,6 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from enum import Enum
@@ -298,113 +297,6 @@ def check_security(
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 
-_PARAM_HARM_TARGET_BLOCK = frozenset({
-    "attack",
-    "corrupt",
-    "delete",
-    "delete from",
-    "destroy",
-    "drop table",
-    "erase",
-    "exploit",
-    "kill",
-    "leak all",
-    "overwrite",
-    "remove every",
-    "truncate table",
-    "wipe",
-})
-
-_PARAM_HARM_GATEKEEPER_ALIASES = {
-    "/etc/shadow": "exfiltrate",
-    "delete": "destroy",
-    "delete from": "drop table",
-    "disable all telos gates": "corrupt",
-    "disable telos gates": "corrupt",
-    "erase": "destroy",
-    "grant admin": "exploit",
-    "leak all": "exfiltrate",
-    "overwrite": "corrupt",
-    "remove every": "destroy",
-    "send all user emails": "exfiltrate",
-}
-
-_PARAM_HARD_BLOCK_PHRASE_ACTIONS = {
-    "/etc/shadow": "exfiltrate",
-    "disable all telos gates": "corrupt",
-    "disable the telos gate": "corrupt",
-    "disable telos gates": "corrupt",
-    "dump database credentials": "exfiltrate",
-    "dump the database credentials": "exfiltrate",
-    "email all user records": "exfiltrate",
-    "grant admin": "exploit",
-    "make the agent lie": "exploit",
-    "publish api keys": "exfiltrate",
-    "publish the api keys": "exfiltrate",
-    "send passwords": "exfiltrate",
-    "send all user emails": "exfiltrate",
-    "turn off all safety gates": "corrupt",
-}
-
-_PARAM_HARM_TARGET_TERMS = frozenset({
-    "all",
-    "api key",
-    "api keys",
-    "auth",
-    "billing",
-    "credential",
-    "credentials",
-    "critical",
-    "customer",
-    "customers",
-    "data",
-    "database",
-    "db",
-    "disk",
-    "email",
-    "emails",
-    "event",
-    "events",
-    "gate",
-    "gates",
-    "human",
-    "humans",
-    "identity",
-    "key",
-    "keys",
-    "live",
-    "people",
-    "person",
-    "prod",
-    "production",
-    "record",
-    "records",
-    "secret",
-    "secrets",
-    "session",
-    "sessions",
-    "system",
-    "telos gate",
-    "telos gates",
-    "user",
-    "users",
-    "vulnerabilities",
-    "vulnerability",
-})
-
-# Local pre-classification vocabulary. The verdict still belongs to
-# TelosGatekeeper; update these terms when its HARM_WORDS semantics change.
-_BENIGN_PARAM_HARM_PHRASES = frozenset({
-    "attack surface",
-    "erase temp file",
-    "erase temp files",
-    "harm reduction",
-    "kill stale",
-    "kill-switch",
-    "kill switch",
-})
-
-
 _DECLARED_GATE_ALIASES: dict[str, tuple[str, ...]] = {
     # Shakti-oriented ontology declarations mapped to executable core gates.
     "MAHESHWARI": ("ANEKANTA", "SVABHAAVA"),
@@ -413,72 +305,7 @@ _DECLARED_GATE_ALIASES: dict[str, tuple[str, ...]] = {
 }
 
 
-def _iter_payload_text_values(value: Any):
-    """Yield text values from params without joining unrelated JSON keys."""
-    if isinstance(value, dict):
-        for child in value.values():
-            yield from _iter_payload_text_values(child)
-        return
-    if isinstance(value, (list, tuple, set)):
-        for child in value:
-            yield from _iter_payload_text_values(child)
-        return
-    if value is None:
-        return
-    yield str(value)
-
-
-def _normalized_param_text(value: str) -> str:
-    return value.lower().replace("_", " ")
-
-
-def _param_text_has_phrase(text: str, phrase: str) -> bool:
-    if phrase.startswith("/"):
-        return phrase in text
-    pattern = r"\s+".join(re.escape(part) for part in phrase.split())
-    return re.search(rf"(?<![a-z0-9]){pattern}(?![a-z0-9])", text) is not None
-
-
-def _param_value_has_harm_target(text: str) -> bool:
-    return any(_param_text_has_phrase(text, term) for term in _PARAM_HARM_TARGET_TERMS)
-
-
-def _strip_benign_param_harm_phrases(text: str) -> str:
-    scrubbed = text
-    for phrase in _BENIGN_PARAM_HARM_PHRASES:
-        scrubbed = scrubbed.replace(phrase, " ")
-    return scrubbed
-
-
-def _payload_canonical_harm_action(action_name: str, params: Any, harm_words: set[str]) -> str | None:
-    """Return an action string that lets ``check_action`` enforce param harm.
-
-    ``TelosGatekeeper`` treats bare words like "attack" and "exploit" as
-    harmful when they appear in the action string. Typed ontology params often
-    contain those words as benign code/domain nouns (``exploit_scanner.py``,
-    "kill-switch test"). Keep those values in content for
-    credential/injection/deception checks, but promote a single param value into
-    the action string when that value expresses destructive command or harm
-    intent. Values are scanned independently so unrelated keys cannot combine
-    into a synthetic hard-block phrase. The vocabulary is sourced from the
-    shared gatekeeper; this helper only decides when a param term is precise
-    enough to route through that same gatekeeper/VSM path.
-    """
-    target_block = _PARAM_HARM_TARGET_BLOCK & harm_words
-    always_block = harm_words - target_block
-    for text in _iter_payload_text_values(params):
-        lowered = _strip_benign_param_harm_phrases(_normalized_param_text(text))
-        for phrase, gatekeeper_word in sorted(_PARAM_HARD_BLOCK_PHRASE_ACTIONS.items(), key=lambda item: len(item[0]), reverse=True):
-            if _param_text_has_phrase(lowered, phrase):
-                return f"{action_name} {gatekeeper_word}"
-        for word in sorted(always_block, key=len, reverse=True):
-            if _param_text_has_phrase(lowered, word):
-                return f"{action_name} {word}"
-        for word in sorted(_PARAM_HARM_TARGET_BLOCK, key=len, reverse=True):
-            if _param_text_has_phrase(lowered, word) and _param_value_has_harm_target(lowered):
-                gatekeeper_word = word if word in target_block else _PARAM_HARM_GATEKEEPER_ALIASES.get(word, "destroy")
-                return f"{action_name} {gatekeeper_word}"
-    return None
+DEFAULT_COMPOSITE_GATE_PASS = "PASS(default_composite)"
 
 
 def _default_gate_results_for_declared_gates(
@@ -493,7 +320,7 @@ def _default_gate_results_for_declared_gates(
     """
     if any(str(value).upper() == "BLOCK" for value in gate_results.values()):
         return gate_results
-    return {gate: "PASS" for gate in declared_gates}
+    return {gate: DEFAULT_COMPOSITE_GATE_PASS for gate in declared_gates}
 
 
 def _declared_gate_is_covered(declared_gate: str, result_keys: set[str]) -> bool:
@@ -530,14 +357,18 @@ def _default_telos_gate_check(action_name: str, params: dict[str, Any]) -> dict[
     harmful/deceptive actions BLOCK; advisory (WARN/REVIEW) outcomes PASS.
     """
     try:
-        from dharma_swarm.telos_gates import DEFAULT_GATEKEEPER, check_action
+        from dharma_swarm.telos_gates import (
+            DEFAULT_GATEKEEPER,
+            canonical_payload_harm_action,
+            check_action,
+        )
     except Exception:  # gates unavailable -> fail closed for declared telos gates
         logging.getLogger(__name__).warning("telos gates unavailable; action blocked")
         return {"TELOS": "BLOCK"}
     payload = json.dumps(params, default=str, sort_keys=True)
     # Keep params in content for credential/injection/deception scans without
     # feeding every security-domain noun into AHIMSA's broad action-word scan.
-    action_desc = _payload_canonical_harm_action(action_name, params, DEFAULT_GATEKEEPER.HARM_WORDS) or action_name
+    action_desc = canonical_payload_harm_action(action_name, params, DEFAULT_GATEKEEPER.HARM_WORDS) or action_name
     result = check_action(action=action_desc, content=payload)
     # The authoritative verdict is the overall DECISION, not the per-gate advisory
     # FAILs: Tier-A/B hard violations (harm, deception, credential leak) -> BLOCK;

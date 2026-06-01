@@ -6,13 +6,10 @@ context resolution, failure propagation, and cost tracking.
 
 from __future__ import annotations
 
-import asyncio
-
 import pytest
 
 from dharma_swarm.logic_layer import (
     ApplyAction,
-    BlockKind,
     BlockStatus,
     Conditional,
     CreateVariable,
@@ -239,7 +236,7 @@ class TestLoop:
             body=ExecuteFunction(inc),
             max_iterations=5,
         )
-        result = await block.execute(ctx)
+        await block.execute(ctx)
         assert count["n"] == 5
 
     @pytest.mark.asyncio
@@ -341,6 +338,31 @@ class TestApplyAction:
         result = await block.execute(ctx_with_registry)
         assert result.status == BlockStatus.BLOCKED
         assert "telos gate blocked" in result.error
+
+    @pytest.mark.asyncio
+    async def test_telos_required_action_with_explicit_gate_passes(self, registry):
+        obj, _ = registry.create_object(
+            "EvolutionEntry",
+            {"component": "logic_layer.py", "change_type": "mutation"},
+        )
+
+        def pass_declared_gates(_action_name: str, _params: dict) -> dict[str, str]:
+            return {"AHIMSA": "PASS", "SATYA": "PASS", "REVERSIBILITY": "PASS"}
+
+        ctx = ExecutionContext(registry=registry, gate_fn=pass_declared_gates)
+        block = ApplyAction(
+            "EvolutionEntry",
+            "Propose",
+            object_id=obj.id,
+            params={"note": "benign governance hardening"},
+        )
+        result = await block.execute(ctx)
+        assert result.status == BlockStatus.SUCCESS
+        assert result.output["gate_results"] == {
+            "AHIMSA": "PASS",
+            "SATYA": "PASS",
+            "REVERSIBILITY": "PASS",
+        }
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
