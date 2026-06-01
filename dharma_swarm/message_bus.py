@@ -28,7 +28,8 @@ from dharma_swarm.models import (
     _new_id,
 )
 from dharma_swarm.runtime_state import RuntimeStateStore
-from dharma_swarm.spine.identity import ExecutionIdentity
+from dharma_swarm.spine.adapters import identity_from_carrier, identity_metadata
+from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity
 
 _MESSAGES_DDL = """
 CREATE TABLE IF NOT EXISTS messages (
@@ -122,9 +123,11 @@ class MessageBus:
         db_path: Path,
         *,
         runtime_state: RuntimeStateStore | None = None,
+        require_identity: bool = False,
     ) -> None:
         self.db_path = db_path
         self._runtime_state = runtime_state
+        self._require_identity = require_identity
 
     def _open(self) -> aiosqlite.Connection:
         """Open a connection with enough headroom for concurrent writers."""
@@ -181,8 +184,77 @@ class MessageBus:
                 await db.execute(idx)
             await db.commit()
 
-    async def send(self, message: Message) -> str:
+    def _resolve_message_identity(
+        self,
+        message: Message,
+        *,
+        require_identity: bool,
+        execution_identity: ExecutionIdentity | None,
+    ) -> ExecutionIdentity | None:
+        if execution_identity is not None:
+            return execution_identity.with_updates(message_id=message.id).require_for_dispatch()
+        if require_identity and self._runtime_state is None:
+            raise MissingExecutionIdentity("RuntimeStateStore is required when MessageBus requires ExecutionIdentity")
+        if require_identity:
+            return identity_from_carrier(
+                message,
+                surface="message_bus",
+                task_id=str(message.metadata.get("task_id") or message.id),
+                agent_id=message.from_agent,
+                require_existing=True,
+            ).with_updates(message_id=message.id)
+        existing = ExecutionIdentity.from_metadata(message.metadata, require=False)
+        if existing is not None:
+            return existing.with_updates(message_id=message.id).require_for_dispatch()
+        if self._runtime_state is not None:
+            return identity_from_carrier(
+                message,
+                surface="message_bus",
+                task_id=message.id,
+                agent_id=message.from_agent,
+            ).with_updates(message_id=message.id)
+        return None
+
+    async def send(
+        self,
+        message: Message,
+        *,
+        execution_identity: ExecutionIdentity | None = None,
+        require_identity: bool | None = None,
+    ) -> str:
         """Insert a message into the bus. Returns the message ID."""
+        effective_require = self._require_identity if require_identity is None else require_identity
+        identity = self._resolve_message_identity(
+            message,
+            require_identity=effective_require,
+            execution_identity=execution_identity,
+        )
+        side_effect_key = ""
+        if identity is not None:
+            metadata = {
+                **dict(message.metadata or {}),
+                **identity_metadata(identity, surface="message_bus"),
+            }
+            message = message.model_copy(update={"metadata": metadata})
+            if self._runtime_state is not None:
+                side_effect_key = f"message_bus.send:{identity.idempotency_key}"
+                should_execute = await self._runtime_state.try_begin_idempotent_side_effect(
+                    identity,
+                    side_effect_key,
+                    metadata={"message_id": message.id, "to_agent": message.to_agent},
+                )
+                if not should_execute:
+                    record = await self._runtime_state.get_idempotency_record(
+                        identity.idempotency_key,
+                        side_effect_key,
+                    )
+                    return (record.result_receipt_id if record else "") or message.id
+                await self._runtime_state.record_execution_identity(
+                    identity,
+                    source="message_bus.send",
+                    metadata={"surface": "message_bus"},
+                )
+
         async def _send() -> str:
             async with self._connect() as db:
                 await db.execute(
@@ -197,7 +269,15 @@ class MessageBus:
                 await db.commit()
             return message.id
 
-        return await self._run_with_lock_retry(_send)
+        message_id = await self._run_with_lock_retry(_send)
+        if identity is not None and self._runtime_state is not None:
+            await self._runtime_state.complete_idempotent_side_effect(
+                identity,
+                side_effect_key,
+                result_receipt_id=message_id,
+                metadata={"message_id": message_id},
+            )
+        return message_id
 
     async def receive(
         self, agent_id: str, status: str = "unread", limit: int = 50,
@@ -684,11 +764,37 @@ class MessageBus:
         self,
         event_type: str,
         limit: int = 100,
+        *,
+        execution_identity: ExecutionIdentity | None = None,
+        require_identity: bool | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> list[dict[str, Any]]:
         """Read and claim unconsumed events of a given type.
 
         Marks consumed events with a timestamp so they aren't re-read.
         """
+        effective_require = self._require_identity if require_identity is None else require_identity
+        identity: ExecutionIdentity | None = None
+        if execution_identity is not None:
+            identity = execution_identity.require_for_dispatch()
+        elif effective_require:
+            if self._runtime_state is None:
+                raise MissingExecutionIdentity("RuntimeStateStore is required when MessageBus requires ExecutionIdentity")
+            identity = identity_from_carrier(
+                {
+                    "id": f"consume:{event_type}",
+                    "task_id": f"consume:{event_type}",
+                    "metadata": metadata or {},
+                },
+                surface="event_bus",
+                require_existing=True,
+            )
+        elif self._runtime_state is not None and metadata:
+            identity = ExecutionIdentity.from_metadata(
+                metadata,
+                task_id=f"consume:{event_type}",
+                require=False,
+            )
 
         async def _consume() -> list[dict[str, Any]]:
             async with self._open() as db:
@@ -717,7 +823,23 @@ class MessageBus:
                 await db.commit()
             return events
 
-        return await self._run_with_lock_retry(_consume)
+        events = await self._run_with_lock_retry(_consume)
+        if identity is not None and self._runtime_state is not None:
+            await self._runtime_state.record_execution_identity(
+                identity,
+                source="message_bus.consume_events",
+                metadata={"event_type": event_type},
+            )
+            for event in events:
+                event_id = str(event.get("event_id") or "")
+                await self._runtime_state.record_receipt_for_identity(
+                    identity.with_updates(event_id=event_id),
+                    receipt_type="message_consumed",
+                    status="consumed",
+                    side_effect_key=f"event:{event_id}",
+                    payload={"event_id": event_id, "event_type": event_type},
+                )
+        return events
 
     async def event_stats(self) -> dict[str, Any]:
         """Return bus metrics: queued, consumed, stale heartbeats."""

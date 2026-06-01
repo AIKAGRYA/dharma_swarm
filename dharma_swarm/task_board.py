@@ -14,6 +14,12 @@ import aiosqlite
 
 from dharma_swarm.correlation_context import get_correlation
 from dharma_swarm.models import Task, TaskPriority, TaskStatus, _new_id, _utc_now
+from dharma_swarm.runtime_state import RuntimeStateStore
+from dharma_swarm.spine.adapters import (
+    identity_from_carrier,
+    identity_metadata,
+)
+from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity
 from dharma_swarm.telos_gates import check_with_reflective_reroute
 
 _TRANSITIONS: dict[TaskStatus, set[TaskStatus]] = {
@@ -74,8 +80,16 @@ class TaskBoard:
 
     _BUSY_TIMEOUT_S = 30  # seconds — must survive contention with daemon + SwarmLens
 
-    def __init__(self, db_path: Path) -> None:
+    def __init__(
+        self,
+        db_path: Path,
+        *,
+        runtime_state: RuntimeStateStore | None = None,
+        require_identity: bool = False,
+    ) -> None:
         self._db_path = db_path
+        self._runtime_state = runtime_state
+        self._require_identity = require_identity
 
     def _open(self) -> aiosqlite.Connection:
         """Open connection with busy_timeout to prevent 'database is locked'."""
@@ -192,6 +206,82 @@ class TaskBoard:
                 f"Telos blocked transition ({think_phase}): {gate.result.reason}"
             )
 
+    def _resolve_identity(
+        self,
+        *,
+        task_id: str,
+        created_by: str,
+        metadata: dict[str, Any],
+        require_identity: bool,
+        execution_identity: ExecutionIdentity | None,
+    ) -> ExecutionIdentity | None:
+        if require_identity and self._runtime_state is None:
+            raise MissingExecutionIdentity("RuntimeStateStore is required when TaskBoard requires ExecutionIdentity")
+        if execution_identity is not None:
+            identity = execution_identity.with_updates(task_id=task_id, agent_id=created_by)
+            return identity.require_for_dispatch()
+        if require_identity:
+            return identity_from_carrier(
+                {"id": task_id, "created_by": created_by, "metadata": metadata},
+                surface="task_board",
+                task_id=task_id,
+                agent_id=created_by,
+                require_existing=True,
+            ).with_updates(task_id=task_id, agent_id=created_by).require_for_dispatch()
+        existing = ExecutionIdentity.from_metadata(metadata, require=False)
+        if existing is not None:
+            return existing.with_updates(task_id=task_id, agent_id=created_by).require_for_dispatch()
+        if self._runtime_state is not None:
+            return identity_from_carrier(
+                {"id": task_id, "created_by": created_by, "metadata": metadata},
+                surface="task_board",
+                task_id=task_id,
+                agent_id=created_by,
+            )
+        return None
+
+    async def _record_taskboard_intent(
+        self,
+        identity: ExecutionIdentity,
+        *,
+        source: str,
+        title: str,
+    ) -> None:
+        if self._runtime_state is None:
+            return
+        await self._runtime_state.record_execution_identity(
+            identity,
+            source=source,
+            metadata={"surface": "task_board", "title": title},
+        )
+        await self._runtime_state.record_side_effect_intent(
+            identity,
+            f"task_board:{identity.task_id}",
+            payload={"surface": "task_board", "title": title},
+        )
+
+    async def _record_taskboard_receipt(
+        self,
+        identity: ExecutionIdentity,
+        *,
+        title: str,
+    ) -> None:
+        if self._runtime_state is None:
+            return
+        await self._runtime_state.record_receipt_for_identity(
+            identity,
+            receipt_type="task_created",
+            status="created",
+            side_effect_key=f"task_board:{identity.task_id}",
+            payload={"surface": "task_board", "title": title},
+        )
+        await self._runtime_state.record_side_effect_complete(
+            identity,
+            f"task_board:{identity.task_id}",
+            result_receipt_id=identity.task_id,
+            payload={"surface": "task_board", "title": title},
+        )
+
     # -- CRUD ---------------------------------------------------------------
 
     async def create(
@@ -202,18 +292,39 @@ class TaskBoard:
         created_by: str = "system",
         depends_on: list[str] | None = None,
         metadata: dict[str, Any] | None = None,
+        execution_identity: ExecutionIdentity | None = None,
+        require_identity: bool | None = None,
     ) -> Task:
         """Create a new task and persist it."""
         task_id = _new_id()
         now = _utc_now()
         dep_ids: list[str] = depends_on or []
         meta = dict(metadata or {})
+        effective_require = self._require_identity if require_identity is None else require_identity
+        identity = self._resolve_identity(
+            task_id=task_id,
+            created_by=created_by,
+            metadata=meta,
+            require_identity=effective_require,
+            execution_identity=execution_identity,
+        )
+        if identity is not None:
+            meta.update(identity_metadata(identity, surface="task_board"))
         corr = get_correlation()
         trace_id = corr.trace_id
         if trace_id:
             meta.setdefault("trace_id", trace_id)
+        elif identity is not None:
+            trace_id = identity.trace_id
         if corr.cell_id:
             meta.setdefault("cell_id", corr.cell_id)
+        trace_id = str(meta.get("trace_id") or trace_id)
+        if identity is not None:
+            await self._record_taskboard_intent(
+                identity,
+                source="task_board.create",
+                title=title,
+            )
         async with self._open() as db:
             await db.execute(
                 "INSERT INTO tasks"
@@ -230,6 +341,11 @@ class TaskBoard:
                     "INSERT INTO task_dependencies VALUES (?,?)", (task_id, dep_id),
                 )
             await db.commit()
+        if identity is not None:
+            await self._record_taskboard_receipt(
+                identity,
+                title=title,
+            )
         return Task(
             id=task_id, title=title, description=description,
             priority=priority, created_by=created_by,
@@ -240,6 +356,8 @@ class TaskBoard:
     async def create_batch(
         self,
         tasks: list[dict[str, Any]],
+        *,
+        require_identity: bool | None = None,
     ) -> list[Task]:
         """Create multiple tasks in a single transaction.
 
@@ -261,21 +379,45 @@ class TaskBoard:
 
         corr = get_correlation()
         trace_id = corr.trace_id
+        effective_require = self._require_identity if require_identity is None else require_identity
+        prepared: list[tuple[str, dict[str, Any], list[str], str, ExecutionIdentity | None]] = []
+        for spec in tasks:
+            task_id = _new_id()
+            created_by = spec.get("created_by", "system")
+            metadata = dict(spec.get("metadata") or {})
+            identity = self._resolve_identity(
+                task_id=task_id,
+                created_by=created_by,
+                metadata=metadata,
+                require_identity=effective_require,
+                execution_identity=spec.get("execution_identity"),
+            )
+            if identity is not None:
+                metadata.update(identity_metadata(identity, surface="task_board"))
+            if trace_id:
+                metadata.setdefault("trace_id", trace_id)
+            elif identity is not None:
+                metadata.setdefault("trace_id", identity.trace_id)
+            if corr.cell_id:
+                metadata.setdefault("cell_id", corr.cell_id)
+            row_trace_id = str(metadata.get("trace_id") or trace_id or "")
+            prepared.append((task_id, metadata, spec.get("depends_on") or [], row_trace_id, identity))
+
+        for spec, (_, _, _, _, identity) in zip(tasks, prepared):
+            if identity is not None:
+                await self._record_taskboard_intent(
+                    identity,
+                    source="task_board.create_batch",
+                    title=spec["title"],
+                )
 
         async with self._open() as db:
             # Single transaction for all tasks
-            for spec in tasks:
-                task_id = _new_id()
+            for spec, (task_id, metadata, dep_ids, row_trace_id, identity) in zip(tasks, prepared):
                 title = spec["title"]
                 description = spec.get("description", "")
                 priority = spec.get("priority", TaskPriority.NORMAL)
                 created_by = spec.get("created_by", "system")
-                dep_ids = spec.get("depends_on") or []
-                metadata = dict(spec.get("metadata") or {})
-                if trace_id:
-                    metadata.setdefault("trace_id", trace_id)
-                if corr.cell_id:
-                    metadata.setdefault("cell_id", corr.cell_id)
 
                 await db.execute(
                     "INSERT INTO tasks"
@@ -285,7 +427,7 @@ class TaskBoard:
                     (task_id, title, description, TaskStatus.PENDING.value,
                      priority.value, None, created_by, now.isoformat(),
                      now.isoformat(), None, json.dumps(metadata, ensure_ascii=True),
-                     trace_id),
+                     row_trace_id),
                 )
 
                 for dep_id in dep_ids:
@@ -303,6 +445,13 @@ class TaskBoard:
 
             # Single commit for entire batch
             await db.commit()
+
+        for task, (_, _, _, _, identity) in zip(created_tasks, prepared):
+            if identity is not None:
+                await self._record_taskboard_receipt(
+                    identity,
+                    title=task.title,
+                )
 
         return created_tasks
 
