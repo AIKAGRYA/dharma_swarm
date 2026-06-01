@@ -214,6 +214,7 @@ class ArtifactManifestStore:
             session_id=manifest.session_id,
             task_id=manifest.task_id,
             run_id=manifest.run_id,
+            trace_id=manifest.trace_id,
             manifest_path=str(manifest_path),
             payload_path=manifest.payload_path,
             checksum=manifest.payload_checksum,
