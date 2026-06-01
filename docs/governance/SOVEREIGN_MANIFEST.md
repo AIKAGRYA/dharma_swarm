@@ -119,7 +119,7 @@ Do not inject machine-readable YAML frontmatter into governance or architecture 
 
 ---
 
-## VERIFIED NUMBERS (2026-05-11 COUNT REFRESH)
+## VERIFIED NUMBERS (2026-06-01 COUNT REFRESH)
 
 These are the ground-truth metrics. All other documents citing different numbers are stale.
 
