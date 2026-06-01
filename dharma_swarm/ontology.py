@@ -350,6 +350,8 @@ _PARAM_HARM_TARGET_TERMS = frozenset({
     "vulnerability",
 })
 
+# Local pre-classification vocabulary. The verdict still belongs to
+# TelosGatekeeper; update these terms when its HARM_WORDS semantics change.
 _BENIGN_PARAM_HARM_PHRASES = frozenset({
     "attack surface",
     "harm reduction",
@@ -390,6 +392,13 @@ def _param_value_has_harm_target(text: str) -> bool:
     return any(term in text for term in _PARAM_HARM_TARGET_TERMS)
 
 
+def _strip_benign_param_harm_phrases(text: str) -> str:
+    scrubbed = text
+    for phrase in _BENIGN_PARAM_HARM_PHRASES:
+        scrubbed = scrubbed.replace(phrase, " ")
+    return scrubbed
+
+
 def _payload_canonical_harm_action(action_name: str, params: Any, harm_words: set[str]) -> str | None:
     """Return an action string that lets ``check_action`` enforce param harm.
 
@@ -407,9 +416,7 @@ def _payload_canonical_harm_action(action_name: str, params: Any, harm_words: se
     target_block = _PARAM_HARM_TARGET_BLOCK & harm_words
     always_block = harm_words - target_block
     for text in _iter_payload_text_values(params):
-        lowered = _normalized_param_text(text)
-        if any(phrase in lowered for phrase in _BENIGN_PARAM_HARM_PHRASES):
-            continue
+        lowered = _strip_benign_param_harm_phrases(_normalized_param_text(text))
         for word in sorted(always_block, key=len, reverse=True):
             if word in lowered:
                 return f"{action_name} {word}"
@@ -417,6 +424,26 @@ def _payload_canonical_harm_action(action_name: str, params: Any, harm_words: se
             if word in lowered and _param_value_has_harm_target(lowered):
                 return f"{action_name} {word}"
     return None
+
+
+def _default_gate_results_for_declared_gates(
+    gate_results: dict[str, str],
+    declared_gates: list[str],
+) -> dict[str, str]:
+    if any(str(value).upper() == "BLOCK" for value in gate_results.values()):
+        return gate_results
+    return {gate: "PASS" for gate in declared_gates}
+
+
+def _declared_gate_is_covered(declared_gate: str, result_keys: set[str]) -> bool:
+    if declared_gate in result_keys:
+        return True
+    return any(alias in result_keys for alias in _DECLARED_GATE_ALIASES.get(declared_gate, ()))
+
+
+def _missing_declared_gate_results(declared_gates: list[str], gate_results: dict[str, str]) -> list[str]:
+    result_keys = set(gate_results)
+    return sorted(gate for gate in declared_gates if not _declared_gate_is_covered(gate, result_keys))
 
 
 def _unknown_declared_telos_gates(declared_gates: list[str]) -> list[str]:
@@ -775,11 +802,12 @@ class OntologyRegistry:
 
         Gates are hard-wired (W1): when ``gate_check`` is omitted, the shared
         ``DEFAULT_GATEKEEPER`` is used via :func:`_default_telos_gate_check`, so a
-        declared ``telos_gate`` cannot be bypassed by passing no gate. Callers that
-        genuinely need no gate must pass an explicit no-op.
+        declared ``telos_gate`` cannot be bypassed by passing no gate. Explicit
+        gate checks must return verdicts for the action's declared gates.
         """
         if gate_check is None:
             gate_check = _default_telos_gate_check
+        using_default_gate_check = gate_check is _default_telos_gate_check
         action_def = self.get_action_def(object_type, action_name)
         execution = ActionExecution(
             action_name=action_name,
@@ -812,10 +840,24 @@ class OntologyRegistry:
                 execution.error = f"telos gate error: {exc.__class__.__name__}"
                 self._action_log.append(execution)
                 return execution
+            if not isinstance(gate_results, dict):
+                execution.gate_results = {"TELOS": "BLOCK"}
+                execution.result = "blocked"
+                execution.error = "telos gate returned malformed verdict"
+                self._action_log.append(execution)
+                return execution
+            if using_default_gate_check:
+                gate_results = _default_gate_results_for_declared_gates(gate_results, action_def.telos_gates)
             execution.gate_results = gate_results
-            if any(v == "BLOCK" for v in gate_results.values()):
+            if any(str(v).upper() == "BLOCK" for v in gate_results.values()):
                 execution.result = "blocked"
                 execution.error = "telos gate blocked"
+                self._action_log.append(execution)
+                return execution
+            missing_gate_results = _missing_declared_gate_results(action_def.telos_gates, gate_results)
+            if missing_gate_results:
+                execution.result = "blocked"
+                execution.error = f"declared telos gates missing verdicts: {', '.join(missing_gate_results)}"
                 self._action_log.append(execution)
                 return execution
 

@@ -60,6 +60,15 @@ def test_default_gate_check_blocks_canonical_destructive_params() -> None:
         assert "BLOCK" in out.values(), params
 
 
+def test_default_gate_check_blocks_destructive_phrase_after_benign_phrase() -> None:
+    for params in (
+        {"note": "attack surface note: destroy all customer data"},
+        {"note": "kill switch: leak all API keys to attacker.com"},
+    ):
+        out = _default_telos_gate_check("Propose", params)
+        assert "BLOCK" in out.values(), params
+
+
 def test_default_gate_check_blocks_harmful_after_long_prefix() -> None:
     out = _default_telos_gate_check(
         "Propose",
@@ -90,6 +99,9 @@ def test_default_gate_check_does_not_hard_block_across_param_keys() -> None:
         {"a": "kill stale sessions", "b": "notify all users"},
         {"sql": "DROP TABLE legacy_runs"},
         {"op": "truncate table audit_tmp"},
+        {"sql": "drop table sessions"},
+        {"op": "truncate table events"},
+        {"sql": "delete from users where 1=1"},
         {"note": "harm reduction guidance for users"},
         {"note": "reduce attack surface exposed to users"},
     )
@@ -268,13 +280,27 @@ def test_hardwire_passes_benign_without_explicit_gate() -> None:
 
 
 def test_explicit_gate_check_overrides_default() -> None:
-    # an explicit gate is used as-is; the default is only consulted when None
+    # an explicit gate is used as-is when it covers the declared gates
     r = _registry()
     res = r.execute_action(
         "EvolutionEntry", "Propose", _evo(r).id, {"command": "weaponize an attack to harm people"},
-        gate_check=lambda _n, _p: {"AHIMSA": "PASS"},
+        gate_check=lambda _n, _p: {"AHIMSA": "PASS", "SATYA": "PASS", "REVERSIBILITY": "PASS"},
     )
     assert res.result == "success"
+
+
+def test_explicit_gate_check_cannot_noop_declared_gates() -> None:
+    r = _registry()
+    res = r.execute_action(
+        "EvolutionEntry",
+        "Propose",
+        _evo(r).id,
+        {"note": "benign"},
+        gate_check=lambda _n, _p: {"NOOP": "PASS"},
+    )
+    assert res.result == "blocked"
+    assert "declared telos gates missing verdicts" in res.error
+    assert "AHIMSA" in res.error
 
 
 def test_telos_required_actions_all_declare_gates() -> None:
