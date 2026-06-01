@@ -292,6 +292,19 @@ class TestOntologyActions:
         assert resp.status_code == 400
         assert "telos gate blocked" in resp.text
 
+    def test_execute_action_default_telos_gate_allows_benign_trigger_words(self, client):
+        resp = client.post("/api/ontology/actions", json={
+            "object_type": "Experiment",
+            "action_name": "Run",
+            "params": {
+                "a": "kill stale sessions",
+                "b": "notify all users",
+                "sql_note": "DROP TABLE legacy_runs is covered by a later migration note",
+            },
+            "executed_by": "tester",
+        })
+        assert resp.status_code == 200
+
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Tasks

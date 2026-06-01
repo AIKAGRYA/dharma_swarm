@@ -304,15 +304,19 @@ _HARD_TIER_A_PATTERNS = tuple(
         r"\brm\s+-rf\b",
         r"\bdelete\s+all\b",
         r"\bformat\s+disk\b",
-        r"\bdrop\s+table\b",
-        r"\btruncate\s+table\b",
         r"\bdd\s+if=/dev/zero\b",
         r"\bmkfs\b",
         r"\bddos\b",
         r"\bdenial\s+of\s+service\b",
         r"\bexfiltrate\b",
+        r"\bshutdown\s+-h\b",
+        r"\bchmod\s+777\b",
         r"\bweaponize\b.*\b(attack|exploit|harm|kill)\b",
-        r"\b(attack|harm|kill)\b.*\b(people|person|humans|users)\b",
+        r"\b(attack|harm|kill)\s+(?:the\s+)?(people|person|humans|users)\b",
+        r"\b(?:destroy|wipe|corrupt)\b.*\b(?:all|customer|customers|user|users|production|prod|live|database|db|records|files|disk|secrets|credentials|keys|data)\b",
+        r"\b(?:all|customer|customers|user|users|production|prod|live|database|db|records|files|disk|secrets|credentials|keys|data)\b.*\b(?:destroy|wipe|corrupt)\b",
+        r"\b(?:drop|truncate)\s+table\b.*(?:^|[^a-z0-9])(?:customer|customers|user|users|production|prod|live|critical|billing|auth|identity|secrets|credentials|data)(?:[^a-z0-9]|$)",
+        r"\bexploit\b.*\b(?:people|person|humans|users|customer|customers|system|credential|credentials|secret|secrets|vulnerability|vulnerabilities)\b",
         r":\(\)\{\s*:\|:&\s*\};:",
     )
 )
@@ -326,18 +330,38 @@ _DECLARED_GATE_ALIASES: dict[str, tuple[str, ...]] = {
 }
 
 
-def _payload_has_hard_tier_a_intent(payload: str) -> bool:
-    """High-confidence hard block scan for typed-action params.
+def _iter_payload_text_values(value: Any):
+    """Yield text values from params without joining unrelated JSON keys."""
+    if isinstance(value, dict):
+        for child in value.values():
+            yield from _iter_payload_text_values(child)
+        return
+    if isinstance(value, (list, tuple, set)):
+        for child in value:
+            yield from _iter_payload_text_values(child)
+        return
+    if value is None:
+        return
+    yield str(value)
+
+
+def _payload_has_hard_tier_a_intent(params: Any) -> bool:
+    """Targeted hard-block scan for typed-action params.
 
     ``TelosGatekeeper`` treats bare words like "attack" and "exploit" as
     harmful when they appear in the action string. Typed ontology params often
     contain those words as benign code/domain nouns (``exploit_scanner.py``,
     "kill-switch test"). Keep those values in content for
-    credential/injection/deception checks, but only promote params into a hard
-    AHIMSA block when the payload expresses destructive command or harm intent.
+    credential/injection/deception checks, but only promote a single param value
+    into a hard AHIMSA block when that value expresses destructive command or
+    harm intent. Values are scanned independently so unrelated keys cannot
+    combine into a synthetic hard-block phrase.
     """
-    lowered = payload.lower()
-    return any(pattern.search(lowered) for pattern in _HARD_TIER_A_PATTERNS)
+    for text in _iter_payload_text_values(params):
+        lowered = text.lower()
+        if any(pattern.search(lowered) for pattern in _HARD_TIER_A_PATTERNS):
+            return True
+    return False
 
 
 def _unknown_declared_telos_gates(declared_gates: list[str]) -> list[str]:
@@ -368,7 +392,7 @@ def _default_telos_gate_check(action_name: str, params: dict[str, Any]) -> dict[
         logging.getLogger(__name__).warning("telos gates unavailable; action blocked")
         return {"TELOS": "BLOCK"}
     payload = json.dumps(params, default=str, sort_keys=True)
-    if _payload_has_hard_tier_a_intent(payload):
+    if _payload_has_hard_tier_a_intent(params):
         return {"AHIMSA": "BLOCK"}
     # Keep params in content for credential/injection/deception scans without
     # feeding every security-domain noun into AHIMSA's broad action-word scan.

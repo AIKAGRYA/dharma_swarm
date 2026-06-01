@@ -40,6 +40,21 @@ def test_default_gate_check_blocks_harmful_in_params() -> None:
     assert "BLOCK" in out.values()
 
 
+def test_default_gate_check_blocks_canonical_destructive_params() -> None:
+    for params in (
+        {"command": "destroy all customer data"},
+        {"command": "wipe production database"},
+        {"command": "corrupt user records"},
+        {"command": "shutdown -h now"},
+        {"command": "chmod 777 /etc/shadow"},
+        {"command": "exploit users with harvested credentials"},
+        {"command": "drop table customer_data"},
+        {"command": "truncate table production_auth"},
+    ):
+        out = _default_telos_gate_check("Propose", params)
+        assert "BLOCK" in out.values(), params
+
+
 def test_default_gate_check_blocks_harmful_after_long_prefix() -> None:
     out = _default_telos_gate_check(
         "Propose",
@@ -57,6 +72,19 @@ def test_default_gate_check_passes_security_domain_terms() -> None:
         },
     )
     assert "BLOCK" not in out.values()
+
+
+def test_default_gate_check_does_not_hard_block_across_param_keys() -> None:
+    benign_payloads = (
+        {"a": "kill stale sessions", "b": "notify all users"},
+        {"sql": "DROP TABLE legacy_runs"},
+        {"op": "truncate table audit_tmp"},
+        {"note": "harm reduction guidance for users"},
+        {"note": "reduce attack surface exposed to users"},
+    )
+    for params in benign_payloads:
+        out = _default_telos_gate_check("Propose", params)
+        assert "BLOCK" not in out.values(), params
 
 
 def test_default_gate_check_fails_closed_when_gatekeeper_unavailable(monkeypatch) -> None:
@@ -149,9 +177,21 @@ def test_gatekeeper_runtime_error_fails_closed_with_action_receipt() -> None:
 
 def test_hardwire_blocks_harmful_without_explicit_gate() -> None:
     r = _registry()
-    res = r.execute_action("EvolutionEntry", "Propose", _evo(r).id, {"command": "weaponize an attack to harm people"})
+    res = r.execute_action("EvolutionEntry", "Propose", _evo(r).id, {"command": "destroy all customer data"})
     assert res.result == "blocked"
     assert res.gate_results  # the default gate actually ran
+
+
+def test_hardwire_passes_benign_trigger_words_across_params_without_explicit_gate() -> None:
+    r = _registry()
+    res = r.execute_action(
+        "EvolutionEntry",
+        "Propose",
+        _evo(r).id,
+        {"a": "kill stale sessions", "b": "notify all users"},
+    )
+    assert res.result == "success"
+    assert res.gate_results
 
 
 def test_hardwire_passes_benign_without_explicit_gate() -> None:
