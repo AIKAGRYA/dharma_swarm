@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from enum import Enum
@@ -300,6 +301,8 @@ def check_security(
 _PARAM_HARM_TARGET_BLOCK = frozenset({
     "attack",
     "corrupt",
+    "delete",
+    "delete from",
     "destroy",
     "drop table",
     "erase",
@@ -311,6 +314,28 @@ _PARAM_HARM_TARGET_BLOCK = frozenset({
     "truncate table",
     "wipe",
 })
+
+_PARAM_HARM_GATEKEEPER_ALIASES = {
+    "/etc/shadow": "exfiltrate",
+    "delete": "destroy",
+    "delete from": "drop table",
+    "disable all telos gates": "corrupt",
+    "disable telos gates": "corrupt",
+    "erase": "destroy",
+    "grant admin": "exploit",
+    "leak all": "exfiltrate",
+    "overwrite": "corrupt",
+    "remove every": "destroy",
+    "send all user emails": "exfiltrate",
+}
+
+_PARAM_HARD_BLOCK_PHRASE_ACTIONS = {
+    "/etc/shadow": "exfiltrate",
+    "disable all telos gates": "corrupt",
+    "disable telos gates": "corrupt",
+    "grant admin": "exploit",
+    "send all user emails": "exfiltrate",
+}
 
 _PARAM_HARM_TARGET_TERMS = frozenset({
     "all",
@@ -327,8 +352,12 @@ _PARAM_HARM_TARGET_TERMS = frozenset({
     "database",
     "db",
     "disk",
-    "file",
-    "files",
+    "email",
+    "emails",
+    "event",
+    "events",
+    "gate",
+    "gates",
     "human",
     "humans",
     "identity",
@@ -343,7 +372,11 @@ _PARAM_HARM_TARGET_TERMS = frozenset({
     "records",
     "secret",
     "secrets",
+    "session",
+    "sessions",
     "system",
+    "telos gate",
+    "telos gates",
     "user",
     "users",
     "vulnerabilities",
@@ -354,6 +387,8 @@ _PARAM_HARM_TARGET_TERMS = frozenset({
 # TelosGatekeeper; update these terms when its HARM_WORDS semantics change.
 _BENIGN_PARAM_HARM_PHRASES = frozenset({
     "attack surface",
+    "erase temp file",
+    "erase temp files",
     "harm reduction",
     "kill stale",
     "kill-switch",
@@ -388,8 +423,15 @@ def _normalized_param_text(value: str) -> str:
     return value.lower().replace("_", " ")
 
 
+def _param_text_has_phrase(text: str, phrase: str) -> bool:
+    if phrase.startswith("/"):
+        return phrase in text
+    pattern = r"\s+".join(re.escape(part) for part in phrase.split())
+    return re.search(rf"(?<![a-z0-9]){pattern}(?![a-z0-9])", text) is not None
+
+
 def _param_value_has_harm_target(text: str) -> bool:
-    return any(term in text for term in _PARAM_HARM_TARGET_TERMS)
+    return any(_param_text_has_phrase(text, term) for term in _PARAM_HARM_TARGET_TERMS)
 
 
 def _strip_benign_param_harm_phrases(text: str) -> str:
@@ -417,12 +459,16 @@ def _payload_canonical_harm_action(action_name: str, params: Any, harm_words: se
     always_block = harm_words - target_block
     for text in _iter_payload_text_values(params):
         lowered = _strip_benign_param_harm_phrases(_normalized_param_text(text))
+        for phrase, gatekeeper_word in sorted(_PARAM_HARD_BLOCK_PHRASE_ACTIONS.items(), key=lambda item: len(item[0]), reverse=True):
+            if _param_text_has_phrase(lowered, phrase):
+                return f"{action_name} {gatekeeper_word}"
         for word in sorted(always_block, key=len, reverse=True):
-            if word in lowered:
+            if _param_text_has_phrase(lowered, word):
                 return f"{action_name} {word}"
-        for word in sorted(target_block, key=len, reverse=True):
-            if word in lowered and _param_value_has_harm_target(lowered):
-                return f"{action_name} {word}"
+        for word in sorted(_PARAM_HARM_TARGET_BLOCK, key=len, reverse=True):
+            if _param_text_has_phrase(lowered, word) and _param_value_has_harm_target(lowered):
+                gatekeeper_word = word if word in target_block else _PARAM_HARM_GATEKEEPER_ALIASES.get(word, "destroy")
+                return f"{action_name} {gatekeeper_word}"
     return None
 
 

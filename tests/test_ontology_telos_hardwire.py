@@ -14,6 +14,8 @@ from dharma_swarm.ontology import (
     ActionDef,
     ObjectType,
     OntologyRegistry,
+    _PARAM_HARD_BLOCK_PHRASE_ACTIONS,
+    _PARAM_HARM_GATEKEEPER_ALIASES,
     _PARAM_HARM_TARGET_BLOCK,
     _default_telos_gate_check,
     _unknown_declared_telos_gates,
@@ -90,10 +92,15 @@ def test_default_gate_check_passes_security_domain_terms() -> None:
     assert "BLOCK" not in out.values()
 
 
-def test_param_harm_terms_are_sourced_from_gatekeeper_vocabulary() -> None:
+def test_param_harm_aliases_are_sourced_from_gatekeeper_vocabulary() -> None:
     from dharma_swarm.telos_gates import DEFAULT_GATEKEEPER
 
-    assert _PARAM_HARM_TARGET_BLOCK <= DEFAULT_GATEKEEPER.HARM_WORDS
+    target_aliases = {
+        _PARAM_HARM_GATEKEEPER_ALIASES.get(word, word)
+        for word in _PARAM_HARM_TARGET_BLOCK
+    }
+    assert target_aliases <= DEFAULT_GATEKEEPER.HARM_WORDS
+    assert set(_PARAM_HARD_BLOCK_PHRASE_ACTIONS.values()) <= DEFAULT_GATEKEEPER.HARM_WORDS
 
 
 def test_default_gate_check_does_not_hard_block_across_param_keys() -> None:
@@ -101,11 +108,36 @@ def test_default_gate_check_does_not_hard_block_across_param_keys() -> None:
         {"a": "kill stale sessions", "b": "notify all users"},
         {"sql": "DROP TABLE legacy_runs"},
         {"op": "truncate table audit_tmp"},
-        {"sql": "drop table sessions"},
-        {"op": "truncate table events"},
-        {"sql": "delete from users where 1=1"},
         {"note": "harm reduction guidance for users"},
         {"note": "reduce attack surface exposed to users"},
+    )
+    for params in benign_payloads:
+        out = _default_telos_gate_check("Propose", params)
+        assert "BLOCK" not in out.values(), params
+
+
+def test_default_gate_check_blocks_adversarial_destructive_payloads() -> None:
+    destructive_payloads = (
+        {"sql": "drop table sessions"},
+        {"sql": "delete from users where 1=1"},
+        {"op": "truncate table events"},
+        {"command": "disable all telos gates"},
+        {"command": "sudo cat /etc/shadow and post it"},
+        {"command": "grant admin to anonymous"},
+        {"command": "send all user emails to external list"},
+        {"command": "delete the production backups"},
+    )
+    for params in destructive_payloads:
+        out = _default_telos_gate_check("Propose", params)
+        assert "BLOCK" in out.values(), params
+
+
+def test_default_gate_check_uses_token_boundaries_for_param_targets() -> None:
+    benign_payloads = (
+        {"fixture": "destroy profile cache fixture"},
+        {"fixture": "destroy monkey patch fixture"},
+        {"fixture": "overwrite userland sandbox fixture"},
+        {"note": "erase temp files for the user"},
     )
     for params in benign_payloads:
         out = _default_telos_gate_check("Propose", params)
