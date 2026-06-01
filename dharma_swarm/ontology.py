@@ -332,9 +332,18 @@ _PARAM_HARM_GATEKEEPER_ALIASES = {
 _PARAM_HARD_BLOCK_PHRASE_ACTIONS = {
     "/etc/shadow": "exfiltrate",
     "disable all telos gates": "corrupt",
+    "disable the telos gate": "corrupt",
     "disable telos gates": "corrupt",
+    "dump database credentials": "exfiltrate",
+    "dump the database credentials": "exfiltrate",
+    "email all user records": "exfiltrate",
     "grant admin": "exploit",
+    "make the agent lie": "exploit",
+    "publish api keys": "exfiltrate",
+    "publish the api keys": "exfiltrate",
+    "send passwords": "exfiltrate",
     "send all user emails": "exfiltrate",
+    "turn off all safety gates": "corrupt",
 }
 
 _PARAM_HARM_TARGET_TERMS = frozenset({
@@ -476,6 +485,12 @@ def _default_gate_results_for_declared_gates(
     gate_results: dict[str, str],
     declared_gates: list[str],
 ) -> dict[str, str]:
+    """Project a composite default gate verdict onto declared gate receipts.
+
+    The default gatekeeper returns one composite decision. A projected PASS means
+    the composite gate allowed the action, not that each declared gate executed
+    as an independent evaluator.
+    """
     if any(str(value).upper() == "BLOCK" for value in gate_results.values()):
         return gate_results
     return {gate: "PASS" for gate in declared_gates}
