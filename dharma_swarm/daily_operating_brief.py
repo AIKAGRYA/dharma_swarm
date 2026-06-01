@@ -233,8 +233,21 @@ def _kaizen_lines(reports_dir: Path | None, missing: list[str]) -> list[str]:
         status = _string(report.get("status") or report.get("verdict") or "recorded")
         score = report.get("score") or report.get("quality_score") or report.get("forge_score")
         suffix = f", advisory score `{score}`" if score is not None else ""
+        suffix += _kaizen_runtime_suffix(report)
         lines.append(f"KaizenReview `{label}` {status}{suffix}.")
     return lines
+
+
+def _kaizen_runtime_suffix(report: dict[str, Any]) -> str:
+    summary = report.get("runtime_truth_summary")
+    if not isinstance(summary, dict):
+        return ""
+    jobs_with_refs = _intish(summary.get("jobs_with_refs"))
+    jobs_without_refs = _intish(summary.get("jobs_without_refs"))
+    total = jobs_with_refs + jobs_without_refs
+    if not total:
+        return ""
+    return f", runtime refs `{jobs_with_refs}/{total}`"
 
 
 def _yds_lines(path: Path | None, missing: list[str]) -> list[str]:
