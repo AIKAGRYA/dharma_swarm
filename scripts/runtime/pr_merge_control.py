@@ -515,8 +515,10 @@ context is already prepared for you. Read:
 {packet_dir_path / "FACTS.json"}
 
 Then review the PR with a code-review stance: findings first, highest severity
-first, with file/line evidence. Do not approve from vibes. Do not merge. Do not
-modify files.
+first, with repo-relative file/line evidence. Use full repository paths from
+the packet or diff such as `dharma_swarm/ontology.py` or
+`tests/test_ontology_telos_hardwire.py`; bare filenames are not sufficient for
+the merge gate. Do not approve from vibes. Do not merge. Do not modify files.
 
 Keep tool use narrow: do not run broad repository searches, skill discovery, or
 indexing. Read only the packet, diff, and exact changed files needed to validate

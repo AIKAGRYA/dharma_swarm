@@ -255,6 +255,14 @@ def test_codex_review_defaults_to_bounded_reasoning():
     assert "model_reasoning_effort=\"medium\"" in command
 
 
+def test_render_agent_prompt_requires_repo_relative_paths(tmp_path):
+    prompt = prc.render_agent_prompt("Claude", tmp_path / "REVIEW_PACKET.md", 406)
+
+    assert "repo-relative file/line evidence" in prompt
+    assert "`dharma_swarm/ontology.py`" in prompt
+    assert "bare filenames are not sufficient" in prompt
+
+
 def test_review_receipt_status_rejects_command_error(tmp_path):
     path = tmp_path / "codex_review.md"
     path.write_text(
