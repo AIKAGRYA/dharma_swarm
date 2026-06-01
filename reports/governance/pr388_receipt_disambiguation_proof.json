@@ -1,0 +1,45 @@
+{
+  "pr": 388,
+  "generated_at": "2026-06-01T12:34:00Z",
+  "purpose": "Merge-gate proof for PR-H1 receipt disambiguation after DocOps counters were refreshed on the stacked branch.",
+  "source_head_before_proof_commit": "003aa886",
+  "commands": [
+    {
+      "command": "python -m pytest tests/test_organism_closure_v0.py -q",
+      "exit_code": 0,
+      "summary": "19 passed, 1 warning"
+    },
+    {
+      "command": "python tools/manifest_check.py",
+      "exit_code": 0,
+      "summary": "manifest-check: all checks passed."
+    },
+    {
+      "command": "python scripts/docops/check_docops_integrity.py",
+      "exit_code": 0,
+      "summary": "DocOps integrity checks passed",
+      "metrics": {
+        "adapter_files": 20,
+        "architecture_markdown_files": 43,
+        "authority_candidate_docs": 308,
+        "bridge_files": 24,
+        "dharma_python_modules": 657,
+        "dharma_top_level_python_modules": 388,
+        "frontmatter_markdown_files": 215,
+        "markdown_files": 752,
+        "markdown_total_lines": 190573,
+        "orchestrator_files": 4,
+        "router_files": 14,
+        "test_def_occurrences": 10581,
+        "test_files": 607,
+        "total_python_loc": 276777
+      }
+    }
+  ],
+  "compatibility_probe": {
+    "import": "from dharma_swarm.operator_core.closure_v0 import ClosureEvidenceReceipt, EvidenceReceipt",
+    "assertion": "ClosureEvidenceReceipt is EvidenceReceipt",
+    "result": true
+  },
+  "behavior_note": "Runtime data flow remains compatible through the temporary alias. The validation exception text is intentionally updated to say ClosureEvidenceReceipt."
+}
