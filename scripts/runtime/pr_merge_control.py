@@ -410,6 +410,14 @@ def fetch_review_threads(pr_number: int, repo: str) -> dict[str, Any]:
     return {"ok": True, "threads": nodes, "unresolved": unresolved, "unresolved_count": len(unresolved)}
 
 
+def fetch_pr_diff(pr_number: int) -> str:
+    result = run(["gh", "pr", "diff", str(pr_number), "--patch"], timeout=180, check=False)
+    if result.code != 0:
+        detail = (result.stderr or result.stdout).strip()
+        return f"# Diff unavailable\n\n`gh pr diff {pr_number} --patch` failed:\n\n```text\n{detail}\n```\n"
+    return result.stdout
+
+
 def coherence_results(body: str) -> dict[str, Any]:
     lines = body.splitlines()
     results: dict[str, dict[str, Any]] = {}
@@ -497,14 +505,25 @@ def risk_from_files(files: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def render_agent_prompt(agent: str, packet_path: Path, pr_number: int) -> str:
+    packet_dir_path = packet_path.parent
     return f"""You are {agent}, reviewing Dharma Swarm PR #{pr_number}.
 
-Read the packet at:
+This is a bounded queue review, not an open-ended repo exploration. Primary
+context is already prepared for you. Read:
 {packet_path}
+{packet_dir_path / "DIFF.patch"}
+{packet_dir_path / "FACTS.json"}
 
 Then review the PR with a code-review stance: findings first, highest severity
 first, with file/line evidence. Do not approve from vibes. Do not merge. Do not
-modify files. Check:
+modify files.
+
+Keep tool use narrow: do not run broad repository searches, skill discovery, or
+indexing. Read only the packet, diff, and exact changed files needed to validate
+the diff. If the packet is insufficient, return NEEDS_HUMAN or BLOCKED with the
+missing proof instead of expanding indefinitely. Target <= 120 lines.
+
+Check:
 
 - CI/check state and mergeability
 - Coherence Delta fields and PR-body honesty
@@ -547,19 +566,35 @@ def review_command_and_env(
         if override:
             command = shlex.split(override)
         elif CLAUDE_REVIEW_DEFAULT_BIN.exists():
-            command = [CLAUDE_REVIEW_DEFAULT_BIN.as_posix(), "-p"]
+            command = [
+                CLAUDE_REVIEW_DEFAULT_BIN.as_posix(),
+                "-p",
+                "--max-turns",
+                env.get("DHARMA_CLAUDE_REVIEW_MAX_TURNS", "8"),
+            ]
         else:
-            command = ["claude", "-p"]
+            command = ["claude", "-p", "--max-turns", env.get("DHARMA_CLAUDE_REVIEW_MAX_TURNS", "8")]
         if env.get("DHARMA_CLAUDE_REVIEW_USE_API_KEY") != "1":
             env.pop("ANTHROPIC_API_KEY", None)
         return command, env
 
     override = env.get("CODEX_REVIEW_COMMAND", "").strip()
-    command = shlex.split(override) if override else ["codex", "exec"]
+    if override:
+        command = shlex.split(override)
+    else:
+        effort = env.get("DHARMA_CODEX_REVIEW_REASONING_EFFORT", "medium")
+        command = ["codex", "exec", "--ephemeral", "-c", f'model_reasoning_effort="{effort}"']
+        model = env.get("DHARMA_CODEX_REVIEW_MODEL", "").strip()
+        if model:
+            command.extend(["--model", model])
     return command, env
 
 
-def review_timeout_seconds(agent: str, env: dict[str, str]) -> int:
+def review_timeout_seconds(agent: str, env: dict[str, str], override: int | None = None) -> int:
+    if override is not None:
+        if override < 30:
+            raise PRControlError("--timeout-s must be at least 30 seconds")
+        return override
     key = "CLAUDE_REVIEW_TIMEOUT_SECONDS" if agent == "claude" else "CODEX_REVIEW_TIMEOUT_SECONDS"
     raw = env.get(key, "600")
     try:
@@ -619,6 +654,7 @@ def render_packet_markdown(packet: dict[str, Any]) -> str:
         "- `codex_review.md`",
         "- `claude_review.md`",
         "- `MERGE_GATE.md`",
+        "- `DIFF.patch` contains the PR diff for bounded review.",
         "",
         "Generate reviews from `PROMPT_CODEX.md` and `PROMPT_CLAUDE.md` in this directory.",
         "",
@@ -642,6 +678,7 @@ def cmd_packet(args: argparse.Namespace) -> int:
     repo = repo_name()
     files = fetch_pr_files(args.pr, repo)
     threads = fetch_review_threads(args.pr, repo)
+    diff = fetch_pr_diff(args.pr)
     classification = classify_pr(pr)
     coherence = coherence_results(pr.get("body") or "")
     risk = risk_from_files(files)
@@ -660,6 +697,7 @@ def cmd_packet(args: argparse.Namespace) -> int:
     write_json(out_dir / "FACTS.json", packet)
     write_text(out_dir / "PR_BODY.md", pr.get("body") or "")
     write_text(out_dir / "changed_files.txt", "\n".join(str(item.get("filename") or "") for item in files) + "\n")
+    write_text(out_dir / "DIFF.patch", diff)
     write_text(out_dir / "REVIEW_PACKET.md", render_packet_markdown(packet))
     write_text(out_dir / "PROMPT_CODEX.md", render_agent_prompt("Codex", out_dir / "REVIEW_PACKET.md", args.pr))
     write_text(out_dir / "PROMPT_CLAUDE.md", render_agent_prompt("Claude Code Opus", out_dir / "REVIEW_PACKET.md", args.pr))
@@ -996,6 +1034,41 @@ def cmd_reviewers(args: argparse.Namespace) -> int:
         claude_payload = json.loads(claude_proc.stdout)
     except json.JSONDecodeError:
         claude_payload = None
+    claude_auth_ready = bool(isinstance(claude_payload, dict) and claude_payload.get("loggedIn"))
+    claude_probe: dict[str, Any] | None = None
+    if args.live_probe:
+        try:
+            probe = subprocess.run(
+                claude_command,
+                input="Reply with OK only.",
+                text=True,
+                capture_output=True,
+                cwd=str(REPO_ROOT),
+                env=claude_env,
+                timeout=args.probe_timeout_s,
+                check=False,
+            )
+            claude_probe = {
+                "status": "completed" if probe.returncode == 0 else "failed",
+                "exit_code": probe.returncode,
+                "timed_out": False,
+                "stdout_excerpt": (probe.stdout or "")[:500],
+                "stderr_excerpt": (probe.stderr or "")[:500],
+            }
+        except subprocess.TimeoutExpired as exc:
+            stdout = exc.stdout or ""
+            stderr = exc.stderr or ""
+            if isinstance(stdout, bytes):
+                stdout = stdout.decode("utf-8", errors="replace")
+            if isinstance(stderr, bytes):
+                stderr = stderr.decode("utf-8", errors="replace")
+            claude_probe = {
+                "status": "timeout",
+                "exit_code": 124,
+                "timed_out": True,
+                "stdout_excerpt": stdout[:500],
+                "stderr_excerpt": stderr[:500],
+            }
 
     result = {
         "schema": "dharma.pr_review.reviewers.v1",
@@ -1005,7 +1078,9 @@ def cmd_reviewers(args: argparse.Namespace) -> int:
             "credential_env_scrubbed": "ANTHROPIC_API_KEY" not in claude_env,
             "auth_status_exit": claude_proc.returncode,
             "auth_status": claude_payload,
-            "ready": bool(isinstance(claude_payload, dict) and claude_payload.get("loggedIn")),
+            "auth_ready": claude_auth_ready,
+            "live_probe": claude_probe,
+            "ready": claude_auth_ready and (claude_probe is None or claude_probe["exit_code"] == 0),
         },
         "codex": {
             "command": codex_command,
@@ -1018,7 +1093,17 @@ def cmd_reviewers(args: argparse.Namespace) -> int:
 
     print(f"Claude command: {' '.join(claude_command)}")
     print(f"Claude credential env scrubbed: {result['claude']['credential_env_scrubbed']}")
-    print(f"Claude ready: {result['claude']['ready']}")
+    print(f"Claude auth ready: {result['claude']['auth_ready']}")
+    if claude_probe is None:
+        print("Claude live probe: not run (use ARGS='--live-probe' to check quota/runtime)")
+    else:
+        print(
+            f"Claude live probe: status={claude_probe['status']} "
+            f"exit={claude_probe['exit_code']} timed_out={claude_probe['timed_out']}"
+        )
+        probe_output = (claude_probe["stdout_excerpt"] or claude_probe["stderr_excerpt"]).strip()
+        if probe_output:
+            print(f"Claude live probe output: {probe_output}")
     if isinstance(claude_payload, dict):
         print(f"Claude auth: {json.dumps(claude_payload, sort_keys=True)}")
     else:
@@ -1074,7 +1159,7 @@ def cmd_run_agent(args: argparse.Namespace) -> int:
     output_name = "claude_review.md" if args.agent == "claude" else "codex_review.md"
     prompt = (out_dir / prompt_name).read_text(encoding="utf-8")
     command, env = review_command_and_env(args.agent)
-    timeout = review_timeout_seconds(args.agent, env)
+    timeout = review_timeout_seconds(args.agent, env, args.timeout_s)
     timed_out = False
     try:
         result = subprocess.run(
@@ -1159,12 +1244,15 @@ def build_parser() -> argparse.ArgumentParser:
 
     reviewers = sub.add_parser("reviewers", help="Check local reviewer command/auth readiness")
     reviewers.add_argument("--json", action="store_true")
+    reviewers.add_argument("--live-probe", action="store_true", help="Run a tiny Claude command to catch quota/runtime failures")
+    reviewers.add_argument("--probe-timeout-s", type=int, default=45)
     reviewers.set_defaults(func=cmd_reviewers)
 
     run_agent = sub.add_parser("run-agent", help="Run Codex or Claude against an existing packet")
     run_agent.add_argument("--pr", type=int, required=True)
     run_agent.add_argument("--packet-dir")
     run_agent.add_argument("--agent", choices=("codex", "claude"), required=True)
+    run_agent.add_argument("--timeout-s", type=int, default=None, help="Reviewer wall-clock timeout (default: reviewer env timeout or 600)")
     run_agent.set_defaults(func=cmd_run_agent)
 
     return parser

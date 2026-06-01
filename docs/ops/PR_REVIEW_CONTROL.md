@@ -25,16 +25,24 @@ does not depend on inbound webhooks.
 make pr-queue
 make pr-packet PR=397
 make pr-reviewers
-make pr-run-codex PR=397
-make pr-run-claude PR=397
+make pr-run-codex PR=397 ARGS="--timeout-s 240"
+make pr-run-claude PR=397 ARGS="--timeout-s 240"
 make pr-gate PR=397
 make pr-merge PR=397 ARGS="--confirm merge-pr-397"
 ```
 
-`make pr-run-claude` prefers `/Users/dhyana/.npm-global/bin/claude` and removes
-`ANTHROPIC_API_KEY` from the Claude process by default. This prevents a depleted
-Anthropic Console key from hijacking Claude Code subscription auth. To force
-API-key billing for a funded key, set:
+`make pr-run-codex` uses `codex exec --ephemeral` with
+`model_reasoning_effort="medium"` by default so queue reviews do not inherit an
+unbounded xhigh interactive profile. Override with
+`DHARMA_CODEX_REVIEW_REASONING_EFFORT=high` or `CODEX_REVIEW_COMMAND=...` when a
+single PR deserves a slower review.
+
+`make pr-run-claude` prefers `/Users/dhyana/.npm-global/bin/claude -p
+--max-turns 8` and removes `ANTHROPIC_API_KEY` from the Claude process by
+default. This prevents a depleted Anthropic Console key from hijacking Claude
+Code subscription auth, and the max-turn cap makes quota/auth failures surface
+as receipts instead of silent stalls. To force API-key billing for a funded key,
+set:
 
 ```bash
 DHARMA_CLAUDE_REVIEW_USE_API_KEY=1 make pr-run-claude PR=397
@@ -44,6 +52,22 @@ To override the binary entirely:
 
 ```bash
 CLAUDE_REVIEW_COMMAND="/Users/dhyana/.npm-global/bin/claude -p" make pr-run-claude PR=397
+```
+
+Reviewer runs are bounded. The default wall-clock timeout is 600 seconds, or
+`CODEX_REVIEW_TIMEOUT_SECONDS` / `CLAUDE_REVIEW_TIMEOUT_SECONDS` when set. To
+tighten one run:
+
+```bash
+make pr-run-codex PR=397 ARGS="--timeout-s 120"
+make pr-run-claude PR=397 ARGS="--timeout-s 120"
+```
+
+Use a live probe when auth says Claude is logged in but runtime/quota may be
+stale:
+
+```bash
+make pr-reviewers ARGS="--live-probe --probe-timeout-s 20"
 ```
 
 `make pr-merge` is dry-run by default. It prints the `gh pr merge` command only
@@ -68,6 +92,7 @@ High-risk and critical PRs require `--human-approved` plus
     20260531T000000Z/
       FACTS.json
       REVIEW_PACKET.md
+      DIFF.patch
       PR_BODY.md
       changed_files.txt
       PROMPT_CODEX.md
@@ -79,8 +104,9 @@ High-risk and critical PRs require `--human-approved` plus
 ```
 
 The packet includes current mergeability, CI rollup, Coherence Delta status,
-changed files, hot-path risk, and unresolved review-thread count when GitHub
-GraphQL is available.
+changed files, hot-path risk, unresolved review-thread count when GitHub
+GraphQL is available, and a `DIFF.patch` snapshot so reviewers do not need to
+start with broad repository scans.
 
 ## Merge Gate
 

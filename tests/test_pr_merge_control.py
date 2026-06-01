@@ -242,8 +242,17 @@ def test_claude_review_env_scrubs_anthropic_api_key_by_default():
         },
     )
 
-    assert command[-1] == "-p"
+    assert "-p" in command
+    assert "--max-turns" in command
     assert "ANTHROPIC_API_KEY" not in env
+
+
+def test_codex_review_defaults_to_bounded_reasoning():
+    command, _ = prc.review_command_and_env("codex", {"PATH": "/usr/bin"})
+
+    assert command[:2] == ["codex", "exec"]
+    assert "--ephemeral" in command
+    assert "model_reasoning_effort=\"medium\"" in command
 
 
 def test_review_receipt_status_rejects_command_error(tmp_path):
