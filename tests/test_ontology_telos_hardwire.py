@@ -13,7 +13,6 @@ from dharma_swarm.ontology import (
     ActionDef,
     ObjectType,
     OntologyRegistry,
-    _PARAM_HARM_ALWAYS_BLOCK,
     _PARAM_HARM_TARGET_BLOCK,
     _default_telos_gate_check,
     _unknown_declared_telos_gates,
@@ -83,8 +82,7 @@ def test_default_gate_check_passes_security_domain_terms() -> None:
 def test_param_harm_terms_are_sourced_from_gatekeeper_vocabulary() -> None:
     from dharma_swarm.telos_gates import DEFAULT_GATEKEEPER
 
-    ontology_terms = _PARAM_HARM_ALWAYS_BLOCK | _PARAM_HARM_TARGET_BLOCK
-    assert ontology_terms <= DEFAULT_GATEKEEPER.HARM_WORDS
+    assert _PARAM_HARM_TARGET_BLOCK <= DEFAULT_GATEKEEPER.HARM_WORDS
 
 
 def test_default_gate_check_does_not_hard_block_across_param_keys() -> None:

@@ -297,20 +297,6 @@ def check_security(
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 
-_PARAM_HARM_ALWAYS_BLOCK = frozenset({
-    "rm -rf",
-    "delete all",
-    "format disk",
-    "dd if=/dev/zero",
-    "mkfs",
-    "ddos",
-    "denial of service",
-    "exfiltrate",
-    "shutdown -h",
-    "chmod 777",
-    ":(){ :|:& };:",
-})
-
 _PARAM_HARM_TARGET_BLOCK = frozenset({
     "attack",
     "corrupt",
@@ -418,8 +404,8 @@ def _payload_canonical_harm_action(action_name: str, params: Any, harm_words: se
     shared gatekeeper; this helper only decides when a param term is precise
     enough to route through that same gatekeeper/VSM path.
     """
-    always_block = _PARAM_HARM_ALWAYS_BLOCK & harm_words
     target_block = _PARAM_HARM_TARGET_BLOCK & harm_words
+    always_block = harm_words - target_block
     for text in _iter_payload_text_values(params):
         lowered = _normalized_param_text(text)
         if any(phrase in lowered for phrase in _BENIGN_PARAM_HARM_PHRASES):
