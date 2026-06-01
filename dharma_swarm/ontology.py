@@ -41,7 +41,7 @@ from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
-_API_NAME_PATTERN = re.compile(r"^dharma\.([a-z][a-z0-9_]*)\.([A-Z][A-Za-z0-9_]*)$")
+_API_NAME_PATTERN = re.compile(r"^dharma\.([a-z][a-z0-9_]*)\.([A-Z][A-Za-z0-9]*)$")
 
 
 def _utc_now() -> datetime:

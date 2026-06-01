@@ -792,6 +792,17 @@ class TestApiName:
                 )
             )
 
+    def test_register_type_rejects_type_name_underscore(self) -> None:
+        registry = OntologyRegistry()
+        with pytest.raises(ValueError, match="must match"):
+            registry.register_type(
+                ObjectType(
+                    name="Bad_Type",
+                    description="underscore is not PascalCase",
+                    api_name="dharma.research.Bad_Type",
+                )
+            )
+
     def test_register_type_rejects_api_name_type_mismatch(self) -> None:
         registry = OntologyRegistry()
         with pytest.raises(ValueError, match="must match ObjectType.name"):

@@ -254,7 +254,7 @@ def register_hub_types(registry: OntologyRegistry) -> None:
     by name, so re-registration is idempotent.
     """
     for obj_type in _HUB_TYPES:
-        registry.register_type(obj_type)
+        registry.register_type(obj_type, allow_overwrite=True)
 
 
 # ---------------------------------------------------------------------------
