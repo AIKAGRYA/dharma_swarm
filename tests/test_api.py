@@ -305,7 +305,7 @@ class TestOntologyActions:
         })
         assert resp.status_code == 200
 
-    def test_execute_telos_required_action_default_gate_allows_benign_payload(self, client):
+    def test_execute_telos_required_action_without_explicit_gate_stays_fail_closed(self, client):
         create_resp = client.post("/api/ontology/objects", json={
             "type_name": "EvolutionEntry",
             "properties": {"component": "ontology.py", "change_type": "mutation"},
@@ -321,10 +321,8 @@ class TestOntologyActions:
             "params": {"note": "benign governance hardening"},
             "executed_by": "tester",
         })
-        assert resp.status_code == 200
-        data = resp.json()["data"]
-        assert data["result"] == "success"
-        assert data["gate_results"]
+        assert resp.status_code == 400
+        assert "telos-required type requires explicit gate_check" in resp.text
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

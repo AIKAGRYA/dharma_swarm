@@ -33,6 +33,13 @@ def _evo(r: OntologyRegistry):
     return obj
 
 
+def _experiment(r: OntologyRegistry):
+    obj, _ = r.create_object(
+        "Experiment", {"name": "probe", "status": "designed"},
+    )
+    return obj
+
+
 def test_default_gate_check_passes_benign() -> None:
     out = _default_telos_gate_check("Propose", {"note": "benign refactor"})
     assert "BLOCK" not in out.values()
@@ -338,9 +345,9 @@ def test_hardwire_blocks_harmful_without_explicit_gate() -> None:
 def test_hardwire_passes_benign_trigger_words_across_params_without_explicit_gate() -> None:
     r = _registry()
     res = r.execute_action(
-        "EvolutionEntry",
-        "Propose",
-        _evo(r).id,
+        "Experiment",
+        "Run",
+        _experiment(r).id,
         {"a": "kill stale sessions", "b": "notify all users"},
     )
     assert res.result == "success"
@@ -349,12 +356,12 @@ def test_hardwire_passes_benign_trigger_words_across_params_without_explicit_gat
 
 def test_hardwire_passes_benign_without_explicit_gate() -> None:
     r = _registry()
-    res = r.execute_action("EvolutionEntry", "Propose", _evo(r).id, {"note": "benign"})
+    res = r.execute_action("Experiment", "Run", _experiment(r).id, {"note": "benign"})
     assert res.result == "success"
     assert res.gate_results  # gate fired automatically (not bypassed by omission)
 
 
-def test_evolution_actions_all_default_gate_benign_payloads() -> None:
+def test_telos_required_evolution_actions_remain_fail_closed_without_explicit_gate() -> None:
     r = _registry()
     for action_name in ("Propose", "Promote", "Revert"):
         res = r.execute_action(
@@ -363,7 +370,8 @@ def test_evolution_actions_all_default_gate_benign_payloads() -> None:
             _evo(r).id,
             {"note": "benign governance hardening"},
         )
-        assert res.result == "success", action_name
+        assert res.result == "blocked", action_name
+        assert "telos-required type requires explicit gate_check" in res.error
         assert res.gate_results
 
 

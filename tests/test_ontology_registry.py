@@ -397,11 +397,13 @@ class TestActions:
         assert blocked.result == "blocked"
         assert "telos gate blocked" in blocked.error
         assert blocked.gate_results  # the default gate actually ran
-        # benign params -> the gate runs and passes (no blanket block of the caller)
+        # benign params -> the gate runs and passes, but telos_required types stay
+        # fail-closed without an explicit post-default gate.
         ok = registry.execute_action(
             "EvolutionEntry", "Propose", obj.id, {"note": "benign refactor"},
         )
-        assert ok.result == "success"
+        assert ok.result == "blocked"
+        assert "telos-required type requires explicit gate_check" in ok.error
         assert ok.gate_results
 
     def test_action_history(self, registry: OntologyRegistry) -> None:

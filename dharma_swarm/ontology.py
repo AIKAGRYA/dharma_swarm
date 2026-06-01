@@ -953,6 +953,11 @@ class OntologyRegistry:
             execution.error = "telos-required type but action produced no gate verdict (declare telos_gates)"
             self._action_log.append(execution)
             return execution
+        if obj_type and obj_type.security.telos_required and explicit_gate_check is None:
+            execution.result = "blocked"
+            execution.error = "telos-required type requires explicit gate_check after default gate"
+            self._action_log.append(execution)
+            return execution
 
         execution.result = "success"
         self._action_log.append(execution)
