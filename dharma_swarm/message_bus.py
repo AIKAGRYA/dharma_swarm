@@ -98,6 +98,12 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _stable_operation_hash(payload: dict[str, Any]) -> str:
+    return hashlib.sha256(
+        json.dumps(payload, sort_keys=True, default=str).encode("utf-8")
+    ).hexdigest()
+
+
 def _row_to_message(row: aiosqlite.Row) -> Message:
     """Convert a database row into a Message model."""
     return Message(
@@ -241,7 +247,20 @@ class MessageBus:
                 should_execute = await self._runtime_state.try_begin_idempotent_side_effect(
                     identity,
                     side_effect_key,
-                    metadata={"message_id": message.id, "to_agent": message.to_agent},
+                    metadata={
+                        "message_id": message.id,
+                        "to_agent": message.to_agent,
+                        "operation_hash": _stable_operation_hash(
+                            {
+                                "from_agent": message.from_agent,
+                                "to_agent": message.to_agent,
+                                "subject": message.subject,
+                                "body": message.body,
+                                "priority": message.priority.value,
+                                "reply_to": message.reply_to,
+                            }
+                        ),
+                    },
                 )
                 if not should_execute:
                     record = await self._runtime_state.get_idempotency_record(
@@ -713,18 +732,14 @@ class MessageBus:
                 side_effect_key,
                 metadata={
                     "event_type": event_type,
-                    "operation_hash": hashlib.sha256(
-                        json.dumps(
-                            {
-                                "event_type": event_type,
-                                "task_id": task_id,
-                                "agent_id": agent_id,
-                                "payload": event_payload,
-                            },
-                            sort_keys=True,
-                            default=str,
-                        ).encode("utf-8")
-                    ).hexdigest(),
+                    "operation_hash": _stable_operation_hash(
+                        {
+                            "event_type": event_type,
+                            "task_id": task_id,
+                            "agent_id": agent_id,
+                            "payload": event_payload,
+                        }
+                    ),
                 },
             )
             if not should_execute:

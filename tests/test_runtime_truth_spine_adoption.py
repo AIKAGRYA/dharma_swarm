@@ -104,7 +104,7 @@ async def test_message_bus_required_identity_dedupes_before_send_side_effect(tmp
     )
     metadata = identity_metadata(identity, surface="message_bus")
     first = Message(from_agent="alice", to_agent="bob", body="first", metadata=metadata)
-    second = Message(from_agent="alice", to_agent="bob", body="second", metadata=metadata)
+    second = Message(from_agent="alice", to_agent="bob", body="first", metadata=metadata)
 
     first_id = await bus.send(first)
     second_id = await bus.send(second)
