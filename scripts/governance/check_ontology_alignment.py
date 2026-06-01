@@ -85,7 +85,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import subprocess
 import sys
 from dataclasses import dataclass, field, asdict
@@ -93,8 +92,12 @@ from pathlib import Path
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from contracts.typed_proposal_envelope import API_NAME_PATTERN  # noqa: E402
+
 ONTOLOGY_PATH_REL = "dharma_swarm/ontology.py"
-API_NAME_PATTERN = re.compile(r"^dharma\.[a-z][a-z0-9_]*\.[A-Z][A-Za-z0-9]*$")
 DEFAULT_PR_LIMIT = 30
 
 # ── Data model ────────────────────────────────────────────────────────
@@ -189,6 +192,36 @@ def _extract_ontology_snapshot(ontology_text: str, source_pr: str,
                 return _literal_or_name(kw.value)
         return None
 
+    def _kwarg_fingerprint(call: ast.Call, key: str) -> Any:
+        for kw in call.keywords:
+            if kw.arg == key:
+                return ast.dump(kw.value, annotate_fields=True, include_attributes=False)
+        return None
+
+    def _param_signature(params: Any) -> list[str]:
+        if isinstance(params, dict):
+            return [f"{key}:{params[key]}" for key in sorted(params)]
+        if isinstance(params, list):
+            return [str(param) for param in params]
+        if params:
+            return [str(params)]
+        return []
+
+    def _extract_action_call(call: ast.Call) -> ActionSpec | None:
+        nm = _kwarg_value(call, "name")
+        ot = _kwarg_value(call, "object_type")
+        params = _kwarg_value(call, "input_params")
+        if params is None:
+            params = _kwarg_value(call, "parameters")
+        if not nm or not ot:
+            return None
+        return ActionSpec(
+            name=nm,
+            object_type=ot,
+            param_signature=_param_signature(params),
+            source_pr=source_pr,
+        )
+
     for node in ast.walk(tree):
         # Module-level: _FOO = ObjectType(name="...", api_name="...", ...)
         if isinstance(node, ast.Assign):
@@ -206,14 +239,31 @@ def _extract_ontology_snapshot(ontology_text: str, source_pr: str,
                         api_name=_kwarg_value(node.value, "api_name"),
                         status=_kwarg_value(node.value, "status"),
                         description=_kwarg_value(node.value, "description") or "",
-                        properties={},  # filled below via LinkDef/PropertyDef extraction
+                        properties=_kwarg_fingerprint(node.value, "properties") or {},
                         telos_alignment=_kwarg_value(node.value, "telos_alignment"),
                         shakti_energy=_kwarg_value(node.value, "shakti_energy"),
+                        security=_kwarg_fingerprint(node.value, "security"),
                         version=_kwarg_value(node.value, "version"),
                         source_pr=source_pr,
                         source_branch=source_branch,
                         source_commit=source_commit,
                     ))
+                    for kw in node.value.keywords:
+                        if kw.arg != "actions" or not isinstance(kw.value, ast.List):
+                            continue
+                        for action_node in kw.value.elts:
+                            if not isinstance(action_node, ast.Call):
+                                continue
+                            action_func = action_node.func
+                            action_func_name = (
+                                getattr(action_func, "id", None)
+                                or getattr(action_func, "attr", None)
+                            )
+                            if action_func_name != "ActionDef":
+                                continue
+                            action = _extract_action_call(action_node)
+                            if action:
+                                actions.append(action)
                 elif func_name == "LinkDef":
                     nm = _kwarg_value(node.value, "name")
                     src = _kwarg_value(node.value, "source_type")
@@ -224,15 +274,12 @@ def _extract_ontology_snapshot(ontology_text: str, source_pr: str,
                                               target_type=tgt_t, cardinality=str(card),
                                               source_pr=source_pr))
                 elif func_name == "ActionDef":
-                    nm = _kwarg_value(node.value, "name")
-                    ot = _kwarg_value(node.value, "object_type")
-                    params = _kwarg_value(node.value, "parameters") or []
-                    if nm and ot:
-                        actions.append(ActionSpec(name=nm, object_type=ot,
-                                                  param_signature=[str(p) for p in params],
-                                                  source_pr=source_pr))
+                    action = _extract_action_call(node.value)
+                    if action:
+                        actions.append(action)
 
     return {
+        "source": source_pr,
         "types": [asdict(t) for t in types],
         "links": [asdict(link) for link in links],
         "actions": [asdict(a) for a in actions],
@@ -253,7 +300,8 @@ def _read_file_at_ref(ref: str, path: str) -> str | None:
         return None
 
 
-def _list_open_ontology_prs(limit: int = DEFAULT_PR_LIMIT) -> list[dict]:
+def _list_open_ontology_prs(limit: int = DEFAULT_PR_LIMIT,
+                            allow_partial: bool = False) -> list[dict]:
     """List open PRs that touch ontology.py via gh CLI."""
     try:
         out = subprocess.run(
@@ -276,8 +324,10 @@ def _list_open_ontology_prs(limit: int = DEFAULT_PR_LIMIT) -> list[dict]:
                     break
         return relevant
     except Exception as e:
-        print(f"[warn] could not list PRs via gh: {e}", file=sys.stderr)
-        return []
+        if allow_partial:
+            print(f"[warn] could not list PRs via gh: {e}", file=sys.stderr)
+            return []
+        raise RuntimeError(f"could not list open ontology PRs via gh: {e}") from e
 
 
 # ── Conflict detection ────────────────────────────────────────────────
@@ -318,7 +368,7 @@ def _detect_conflicts(snapshots: list[dict[str, Any]]) -> list[Conflict]:
 
                 diffs = {}
                 for field_ in ("api_name", "telos_alignment", "shakti_energy",
-                               "version", "description"):
+                               "version", "description", "properties", "security"):
                     if field_ == "api_name" and (
                         a.get("api_name") is None or b.get("api_name") is None
                     ):
@@ -374,6 +424,41 @@ def _detect_conflicts(snapshots: list[dict[str, Any]]) -> list[Conflict]:
                     "metadata if both contracts must coexist."
                 ),
             ))
+
+    # ALIGN-006: PROMOTED type removed without an explicit deprecation path.
+    main_types = {
+        t["name"]: t
+        for t in all_types
+        if t.get("source_pr") == "origin/main" and t.get("status") == "promoted"
+    }
+    if main_types:
+        snapshots_by_source = {
+            snap.get("source") or (
+                snap.get("types", [{}])[0].get("source_pr") if snap.get("types") else "(empty)"
+            ): snap
+            for snap in snapshots
+        }
+        for source, snap in snapshots_by_source.items():
+            if source == "origin/main":
+                continue
+            names = {t["name"] for t in snap.get("types", [])}
+            for name, main_type in main_types.items():
+                if name not in names:
+                    conflicts.append(Conflict(
+                        rule="ALIGN-006",
+                        severity="error",
+                        summary=f"PROMOTED ObjectType '{name}' removed without deprecation marker",
+                        pr_a="origin/main", pr_b=source,
+                        type_or_link=name,
+                        field_diffs={
+                            "status": [main_type.get("status"), "(missing)"],
+                            "api_name": [main_type.get("api_name"), "(missing)"],
+                        },
+                        suggestion=(
+                            "Promoted ObjectTypes are public contracts. Add a deprecation "
+                            "proposal with replacement/migration notes before removal."
+                        ),
+                    ))
 
     # ALIGN-004: LinkDef conflicts
     by_link_key: dict[tuple, list[dict]] = {}
@@ -482,6 +567,8 @@ def main() -> int:
                    help="Emit conflicts as JSON for machine consumption")
     p.add_argument("--warn-only-api-name", action="store_true",
                    help="Report ALIGN-007 api_name violations without failing")
+    p.add_argument("--allow-partial-pr-scan", action="store_true",
+                   help="Continue if GitHub/open-PR snapshot loading fails")
     p.add_argument("--limit", type=int, default=DEFAULT_PR_LIMIT,
                    help=f"Max open PRs to scan (default: {DEFAULT_PR_LIMIT})")
     args = p.parse_args()
@@ -508,7 +595,10 @@ def main() -> int:
                 cur_text, source_pr=f"branch:{cur_branch}", source_branch=cur_branch))
 
     # Snapshot 3+: every other open ontology PR
-    prs = _list_open_ontology_prs(limit=args.limit)
+    prs = _list_open_ontology_prs(
+        limit=args.limit,
+        allow_partial=args.allow_partial_pr_scan,
+    )
     if args.pr:
         prs = [p_ for p_ in prs if p_["number"] == args.pr] + \
               [p_ for p_ in prs if p_["number"] != args.pr]
@@ -516,11 +606,23 @@ def main() -> int:
         ref = pr["headRefOid"]
         head = pr["headRefName"]
         # Fetch the ref into local git first (best-effort)
-        subprocess.run(["git", "fetch", "origin", head, "--quiet"],
-                       cwd=REPO_ROOT, capture_output=True, timeout=20)
+        fetch = subprocess.run(["git", "fetch", "origin", head, "--quiet"],
+                               cwd=REPO_ROOT, capture_output=True, text=True, timeout=20)
+        if fetch.returncode != 0 and not args.allow_partial_pr_scan:
+            print(
+                f"[error] could not fetch PR#{pr['number']} branch {head}: {fetch.stderr}",
+                file=sys.stderr,
+            )
+            return 1
         text = _read_file_at_ref(ref, ONTOLOGY_PATH_REL)
         if text is None:
-            continue
+            if args.allow_partial_pr_scan:
+                print(f"[warn] could not load ontology snapshot for PR#{pr['number']}",
+                      file=sys.stderr)
+                continue
+            print(f"[error] could not load ontology snapshot for PR#{pr['number']}",
+                  file=sys.stderr)
+            return 1
         snapshots.append(_extract_ontology_snapshot(
             text, source_pr=f"PR#{pr['number']}", source_branch=head, source_commit=ref))
 
