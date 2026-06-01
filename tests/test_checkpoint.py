@@ -153,6 +153,25 @@ class TestInterruptGate:
         assert "auto-approved" in resp.reason
 
     @pytest.mark.asyncio
+    async def test_default_no_callback_rejects_fail_closed(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(
+            "dharma_swarm.checkpoint.INTERRUPT_DIR", tmp_path
+        )
+        gate = InterruptGate()
+        req = InterruptRequest(
+            id="failclosed",
+            domain="code",
+            phase="gate",
+            reason="needs review",
+        )
+        resp = await gate.interrupt(req)
+        assert resp.decision == InterruptDecision.REJECT
+        assert "no interrupt handler" in resp.reason
+        assert (tmp_path / "failclosed.request.json").exists()
+        assert (tmp_path / "failclosed.response.json").exists()
+        assert read_pending_interrupts() == []
+
+    @pytest.mark.asyncio
     async def test_manual_resolve(self):
         callback_called = []
 

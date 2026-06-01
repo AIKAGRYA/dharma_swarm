@@ -9,11 +9,13 @@ import pytest
 from dharma_swarm.runtime_state import (
     ContextBundleRecord,
     MemoryFact,
+    RUNTIME_RECEIPT_TYPES,
     RuntimeStateStore,
     SessionState,
     SessionEventRecord,
     build_session_event_from_ledger_record,
 )
+from dharma_swarm.spine.identity import ExecutionIdentity
 
 
 @pytest.mark.asyncio
@@ -171,3 +173,127 @@ def test_runtime_state_indexes_historic_ledgers(tmp_path) -> None:
     assert events_scanned == 2
     assert len(hits) == 1
     assert hits[0].event_id == rebuilt.event_id
+
+
+@pytest.mark.asyncio
+async def test_runtime_state_idempotency_writes_side_effect_receipts(tmp_path) -> None:
+    store = RuntimeStateStore(tmp_path / "runtime.db")
+    identity = ExecutionIdentity.new(
+        task_id="task-receipt",
+        run_id="run-receipt",
+        trace_id="trace-receipt",
+        correlation_id="corr-receipt",
+        claim_id="claim-receipt",
+        idempotency_key="idem-receipt",
+        agent_id="agent-receipt",
+    )
+    side_effect_key = "message_bus.emit_event:test:event-1"
+
+    should_execute = await store.try_begin_idempotent_side_effect(
+        identity,
+        side_effect_key,
+        metadata={"surface": "message_bus"},
+    )
+    await store.complete_idempotent_side_effect(
+        identity,
+        side_effect_key,
+        result_receipt_id="event-1",
+        metadata={"surface": "message_bus"},
+    )
+    duplicate = await store.try_begin_idempotent_side_effect(
+        identity,
+        side_effect_key,
+        metadata={"surface": "message_bus"},
+    )
+
+    receipts = await store.list_runtime_receipts(run_id=identity.run_id, limit=20)
+    by_type = [receipt.receipt_type for receipt in receipts]
+    consumed_statuses = [
+        receipt.status
+        for receipt in receipts
+        if receipt.receipt_type == "idempotency_consumed"
+    ]
+
+    assert should_execute is True
+    assert duplicate is False
+    assert by_type.count("side_effect_intent") == 1
+    assert by_type.count("side_effect_complete") == 1
+    assert consumed_statuses == ["accepted", "duplicate"]
+    assert all(receipt.trace_id == identity.trace_id for receipt in receipts)
+
+
+@pytest.mark.asyncio
+async def test_runtime_state_receipt_helpers_cover_saturation_types(tmp_path) -> None:
+    store = RuntimeStateStore(tmp_path / "runtime.db")
+    identity = ExecutionIdentity.new(
+        task_id="task-saturation",
+        run_id="run-saturation",
+        trace_id="trace-saturation",
+        correlation_id="corr-saturation",
+        claim_id="claim-saturation",
+        idempotency_key="idem-saturation",
+        agent_id="agent-saturation",
+        parent_run_id="run-parent",
+        proposal_id="proposal-saturation",
+    )
+
+    await store.record_message_consumed(
+        identity,
+        "message-saturation",
+        payload={"surface": "message_bus.consume_events"},
+    )
+    await store.record_ontology_action_receipt(
+        identity,
+        action_name="Approve",
+        object_type="ActionProposal",
+        object_id="proposal-saturation",
+    )
+    await store.record_ontology_action_receipt(
+        identity,
+        action_name="Approve",
+        object_type="ActionProposal",
+        object_id="proposal-saturation",
+        applied=True,
+    )
+    await store.record_receipt_for_identity(
+        identity,
+        receipt_type="child_spawned",
+        status="claimed",
+        side_effect_key="child:run-parent:run-saturation",
+        payload={"child_run_id": identity.run_id},
+    )
+    await store.record_receipt_for_identity(
+        identity,
+        receipt_type="child_completed",
+        status="completed",
+        side_effect_key="child:run-parent:run-saturation",
+        payload={"child_run_id": identity.run_id},
+    )
+    for stage in ("proposal", "gate", "apply", "verify", "promote", "revert"):
+        await store.record_self_mod_receipt(
+            identity,
+            stage=stage,
+            status="recorded",
+            proposal_id="proposal-saturation",
+        )
+
+    receipts = await store.list_runtime_receipts(run_id=identity.run_id, limit=50)
+    receipt_types = {receipt.receipt_type for receipt in receipts}
+    expected = {
+        "message_consumed",
+        "ontology_action_requested",
+        "ontology_action_applied",
+        "child_spawned",
+        "child_completed",
+        "self_mod_proposal",
+        "self_mod_gate",
+        "self_mod_apply",
+        "self_mod_verify",
+        "self_mod_promote",
+        "self_mod_revert",
+    }
+
+    assert expected <= receipt_types
+    assert expected <= RUNTIME_RECEIPT_TYPES
+    assert all(receipt.run_id == identity.run_id for receipt in receipts)
+    assert all(receipt.trace_id == identity.trace_id for receipt in receipts)

@@ -8,8 +8,14 @@ from pathlib import Path
 from typing import Any
 
 from dharma_swarm.models import Task, TaskDispatch, _new_id
-from dharma_swarm.runtime_state import ArtifactRecord, DelegationRun, TaskClaim
+from dharma_swarm.runtime_state import (
+    ArtifactRecord,
+    DelegationRun,
+    RuntimeReceipt,
+    TaskClaim,
+)
 from dharma_swarm.session_ledger import SessionLedger
+from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +73,101 @@ class RuntimeLifecycle:
         td.metadata["runtime_run_id"] = run_id
         return run_id
 
+    def ensure_execution_identity(
+        self,
+        td: TaskDispatch,
+        *,
+        task: Task | None = None,
+        require: bool = False,
+    ) -> ExecutionIdentity:
+        task_meta = self._task_meta(task)
+        nested = task_meta.get("execution_identity")
+        merged: dict[str, Any] = {}
+        if isinstance(nested, dict):
+            merged.update(nested)
+        merged.update(task_meta)
+        dispatch_nested = td.metadata.get("execution_identity")
+        if isinstance(dispatch_nested, dict):
+            merged.update(dispatch_nested)
+        merged.update(td.metadata)
+
+        run_id = str(
+            merged.get("run_id")
+            or merged.get("runtime_run_id")
+            or self.ensure_runtime_run_id(td)
+        ).strip()
+        trace_id = str(merged.get("trace_id") or "").strip()
+        if not trace_id:
+            try:
+                from dharma_swarm.correlation_context import get_correlation
+
+                trace_id = get_correlation().trace_id
+            except Exception:
+                trace_id = ""
+        if require and not trace_id:
+            raise MissingExecutionIdentity("ExecutionIdentity requires trace_id on this path")
+        correlation_id = str(merged.get("correlation_id") or trace_id).strip()
+        if require and not correlation_id:
+            raise MissingExecutionIdentity("ExecutionIdentity requires correlation_id on this path")
+        claim_id = str(merged.get("claim_id") or "").strip()
+        if require and not claim_id:
+            raise MissingExecutionIdentity("ExecutionIdentity requires claim_id on this path")
+
+        identity = ExecutionIdentity.new(
+            task_id=td.task_id,
+            agent_id=td.agent_id,
+            session_id=self._ledger.session_id,
+            trace_id=trace_id,
+            correlation_id=correlation_id,
+            causation_id=str(merged.get("causation_id") or ""),
+            parent_run_id=str(merged.get("parent_run_id") or ""),
+            run_id=run_id,
+            claim_id=claim_id,
+            idempotency_key=str(merged.get("idempotency_key") or ""),
+            external_a2a_task_id=str(merged.get("external_a2a_task_id") or ""),
+            message_id=str(merged.get("message_id") or ""),
+            event_id=str(merged.get("event_id") or ""),
+            artifact_id=str(merged.get("artifact_id") or ""),
+            proposal_id=str(merged.get("proposal_id") or ""),
+            metadata={
+                "source": "runtime_lifecycle.ensure_execution_identity",
+                **dict(merged.get("metadata") or {}),
+            },
+        )
+        td.metadata.update(
+            {
+                "execution_identity": identity.to_dict(),
+                "trace_id": identity.trace_id,
+                "correlation_id": identity.correlation_id,
+                "runtime_run_id": identity.run_id,
+                "run_id": identity.run_id,
+                "claim_id": identity.claim_id,
+                "agent_id": identity.agent_id,
+                "session_id": identity.session_id,
+                "idempotency_key": identity.idempotency_key,
+            }
+        )
+        if task is not None:
+            task.metadata = {
+                **self._task_meta(task),
+                "execution_identity": identity.to_dict(),
+                "trace_id": identity.trace_id,
+                "correlation_id": identity.correlation_id,
+                "runtime_run_id": identity.run_id,
+                "run_id": identity.run_id,
+                "claim_id": identity.claim_id,
+                "idempotency_key": identity.idempotency_key,
+            }
+        store = self._runtime_state_store()
+        if store is not None:
+            store.record_execution_identity_sync(
+                identity,
+                source="runtime_lifecycle",
+            )
+        elif require:
+            raise MissingExecutionIdentity("RuntimeStateStore is required on this path")
+        return identity.require_for_dispatch()
+
     def runtime_metadata(
         self,
         td: TaskDispatch,
@@ -110,11 +211,19 @@ class RuntimeLifecycle:
         status: str,
         failure_code: str = "",
         error: str = "",
+        require_identity: bool = False,
     ) -> None:
         store = self._runtime_state_store()
         claim_id = str(td.metadata.get("claim_id", "") or "").strip()
         if store is None or not claim_id:
+            if require_identity:
+                raise MissingExecutionIdentity("RuntimeStateStore and claim_id are required")
             return
+        identity = self.ensure_execution_identity(
+            td,
+            task=task,
+            require=require_identity,
+        )
         task_meta = self._task_meta(task)
         active_claim = task_meta.get("active_claim")
         if not isinstance(active_claim, dict):
@@ -141,11 +250,36 @@ class RuntimeLifecycle:
                 status=status,
                 failure_code=failure_code,
                 error=error,
-            ),
+            )
+            | identity.to_metadata()
+            | {
+                "trace_id": identity.trace_id,
+                "correlation_id": identity.correlation_id,
+                "run_id": identity.run_id,
+                "idempotency_key": identity.idempotency_key,
+            },
         )
         try:
             await store.record_task_claim(claim)
+            await store.record_runtime_receipt(
+                RuntimeReceipt(
+                    receipt_id=f"rr_{identity.run_id}_{status}_claim",
+                    receipt_type="task_claim",
+                    status=status,
+                    run_id=identity.run_id,
+                    task_id=identity.task_id,
+                    trace_id=identity.trace_id,
+                    correlation_id=identity.correlation_id,
+                    causation_id=identity.causation_id,
+                    parent_run_id=identity.parent_run_id,
+                    agent_id=identity.agent_id,
+                    idempotency_key=identity.idempotency_key,
+                    payload={"claim_id": identity.claim_id, "failure_code": failure_code},
+                )
+            )
         except Exception:
+            if require_identity:
+                raise
             logger.debug("Runtime task claim recording failed", exc_info=True)
 
     async def record_delegation_run(
@@ -157,11 +291,19 @@ class RuntimeLifecycle:
         failure_code: str = "",
         error: str = "",
         result: str | None = None,
+        require_identity: bool = False,
     ) -> None:
         store = self._runtime_state_store()
         if store is None:
+            if require_identity:
+                raise MissingExecutionIdentity("RuntimeStateStore is required")
             return
-        run_id = self.ensure_runtime_run_id(td)
+        identity = self.ensure_execution_identity(
+            td,
+            task=task,
+            require=require_identity,
+        )
+        run_id = identity.run_id
         started_raw = td.metadata.get("runtime_run_started_at")
         started_at = self._utc_datetime_from(started_raw)
         if not started_raw:
@@ -191,11 +333,62 @@ class RuntimeLifecycle:
                 failure_code=failure_code,
                 error=error,
                 result=result,
-            ),
+            )
+            | identity.to_metadata()
+            | {
+                "trace_id": identity.trace_id,
+                "correlation_id": identity.correlation_id,
+                "idempotency_key": identity.idempotency_key,
+            },
         )
         try:
             await store.record_delegation_run(run)
+            await store.record_runtime_receipt(
+                RuntimeReceipt(
+                    receipt_id=f"rr_{identity.run_id}_{status}_run",
+                    receipt_type="delegation_run",
+                    status=status,
+                    run_id=identity.run_id,
+                    task_id=identity.task_id,
+                    trace_id=identity.trace_id,
+                    correlation_id=identity.correlation_id,
+                    causation_id=identity.causation_id,
+                    parent_run_id=identity.parent_run_id,
+                    agent_id=identity.agent_id,
+                    idempotency_key=identity.idempotency_key,
+                    payload={"failure_code": failure_code, "result_chars": len(result or "")},
+                )
+            )
+            if identity.parent_run_id and status in {"queued", "claimed", "running"}:
+                await store.record_receipt_for_identity(
+                    identity,
+                    receipt_id=f"rr_{identity.parent_run_id}_{identity.run_id}_child_spawned",
+                    receipt_type="child_spawned",
+                    status=status,
+                    side_effect_key=f"child:{identity.parent_run_id}:{identity.run_id}",
+                    payload={
+                        "child_run_id": identity.run_id,
+                        "parent_run_id": identity.parent_run_id,
+                        "assigned_to": identity.agent_id,
+                    },
+                )
+            if identity.parent_run_id and status in {"completed", "failed"}:
+                await store.record_receipt_for_identity(
+                    identity,
+                    receipt_id=f"rr_{identity.parent_run_id}_{identity.run_id}_child_completed_{status}",
+                    receipt_type="child_completed",
+                    status=status,
+                    side_effect_key=f"child:{identity.parent_run_id}:{identity.run_id}",
+                    payload={
+                        "child_run_id": identity.run_id,
+                        "parent_run_id": identity.parent_run_id,
+                        "failure_code": failure_code,
+                        "result_chars": len(result or ""),
+                    },
+                )
         except Exception:
+            if require_identity:
+                raise
             logger.debug("Runtime delegation run recording failed", exc_info=True)
 
     async def record_artifact(
@@ -209,16 +402,39 @@ class RuntimeLifecycle:
         manifest_path: Path | None = None,
         run_id: str = "",
         metadata: dict[str, Any] | None = None,
+        require_identity: bool = False,
     ) -> None:
         store = self._runtime_state_store()
         if store is None:
+            if require_identity:
+                raise MissingExecutionIdentity("RuntimeStateStore is required")
             return
+        artifact_metadata = {
+            **self._task_meta(task),
+            **dict(metadata or {}),
+        }
+        identity = ExecutionIdentity.from_metadata(
+            artifact_metadata,
+            task_id=task.id,
+            session_id=self._ledger.session_id,
+            require=require_identity,
+        )
+        if identity is None:
+            if require_identity:
+                raise MissingExecutionIdentity("ExecutionIdentity is required for artifact")
+            trace_id = str(artifact_metadata.get("trace_id") or "")
+            correlation_id = str(artifact_metadata.get("correlation_id") or trace_id)
+        else:
+            trace_id = identity.trace_id
+            correlation_id = identity.correlation_id
+            run_id = run_id or identity.run_id
         artifact = ArtifactRecord(
             artifact_id=artifact_id,
             artifact_kind=artifact_kind,
             session_id=self._ledger.session_id,
             task_id=task.id,
             run_id=run_id,
+            trace_id=trace_id,
             manifest_path=str(manifest_path or ""),
             payload_path=str(payload_path),
             checksum=checksum,
@@ -226,10 +442,49 @@ class RuntimeLifecycle:
             metadata={
                 "source": "orchestrator._persist_result",
                 "task_title": task.title,
-                **(metadata or {}),
+                "trace_id": trace_id,
+                "correlation_id": correlation_id,
+                **dict(metadata or {}),
             },
         )
         try:
             await store.record_artifact(artifact)
+            if identity is not None:
+                await store.record_runtime_receipt(
+                    RuntimeReceipt(
+                        receipt_id=f"rr_{identity.run_id}_{artifact_id}_artifact",
+                        receipt_type="artifact",
+                        status="completed",
+                        run_id=identity.run_id,
+                        task_id=identity.task_id,
+                        trace_id=identity.trace_id,
+                        correlation_id=identity.correlation_id,
+                        causation_id=identity.causation_id,
+                        parent_run_id=identity.parent_run_id,
+                        agent_id=identity.agent_id,
+                        idempotency_key=identity.idempotency_key,
+                        side_effect_key=f"artifact:{artifact_id}",
+                        payload={
+                            "artifact_id": artifact_id,
+                            "artifact_kind": artifact_kind,
+                            "payload_path": str(payload_path),
+                        },
+                    )
+                )
+                await store.record_receipt_for_identity(
+                    identity.with_updates(artifact_id=artifact_id),
+                    receipt_id=f"rr_{identity.run_id}_{artifact_id}_artifact_written",
+                    receipt_type="artifact_written",
+                    status="completed",
+                    side_effect_key=f"artifact:{artifact_id}",
+                    payload={
+                        "artifact_id": artifact_id,
+                        "artifact_kind": artifact_kind,
+                        "payload_path": str(payload_path),
+                        "manifest_path": str(manifest_path or ""),
+                    },
+                )
         except Exception:
+            if require_identity:
+                raise
             logger.debug("Runtime artifact recording failed", exc_info=True)

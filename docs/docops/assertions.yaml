@@ -136,7 +136,8 @@
     ],
     "ignore": [
       "docs/archive/**",
-      "docs/_archive/**"
+      "docs/_archive/**",
+      "reports/governance/**"
     ],
       "registered": [
         "AGENTS.md",

@@ -34,6 +34,8 @@ from pathlib import Path
 from typing import Any, Callable
 
 from dharma_swarm.daemon_config import dharma_state_dir
+from dharma_swarm.runtime_state import RuntimeReceipt, RuntimeStateStore
+from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity
 
 logger = logging.getLogger(__name__)
 
@@ -272,12 +274,16 @@ class A2AServer:
         self,
         task_log_path: Path | None = None,
         persist: bool = True,
+        runtime_state: RuntimeStateStore | None = None,
+        require_execution_identity: bool = False,
     ) -> None:
         self._tasks: dict[str, A2ATask] = {}
         self._handlers: dict[str, TaskHandler] = {}
         self._default_handler: TaskHandler | None = None
         self._persist = persist
         self._task_log_path = task_log_path or _DEFAULT_TASK_LOG
+        self._runtime_state = runtime_state
+        self._require_execution_identity = require_execution_identity
 
     # -- handler registration ------------------------------------------------
 
@@ -323,6 +329,31 @@ class A2AServer:
         if not task.context_id:
             task.context_id = uuid.uuid4().hex[:12]
 
+        identity = self._ensure_execution_identity(task)
+        side_effect_key = f"a2a_handler:{task.id}:{task.capability or 'default'}"
+        if self._runtime_state is not None:
+            self._runtime_state.record_execution_identity_sync(
+                identity,
+                source="a2a_server.submit",
+                metadata={
+                    "ingress_surface": "a2a_local",
+                    "context_id": task.context_id,
+                    "capability": task.capability,
+                    "status": task.status.value,
+                },
+            )
+            if not self._runtime_state.try_begin_idempotent_side_effect_sync(
+                identity,
+                side_effect_key,
+                metadata={"source": "a2a_server.submit"},
+            ):
+                existing = self._tasks.get(task.id)
+                if existing is not None:
+                    return existing
+                task.metadata["idempotency_status"] = "duplicate"
+                self._tasks[task.id] = task
+                return task
+
         self._tasks[task.id] = task
 
         logger.info(
@@ -333,8 +364,74 @@ class A2AServer:
 
         # Dispatch to handler
         result = self._dispatch(task)
+        if self._runtime_state is not None:
+            receipt_id = f"rr_{identity.run_id}_a2a_{result.status.value}"
+            self._runtime_state.record_runtime_receipt_sync(
+                RuntimeReceipt(
+                    receipt_id=receipt_id,
+                    receipt_type="a2a_task",
+                    status=result.status.value,
+                    run_id=identity.run_id,
+                    task_id=identity.task_id,
+                    trace_id=identity.trace_id,
+                    correlation_id=identity.correlation_id,
+                    causation_id=identity.causation_id,
+                    parent_run_id=identity.parent_run_id,
+                    agent_id=identity.agent_id,
+                    idempotency_key=identity.idempotency_key,
+                    side_effect_key=side_effect_key,
+                    payload={
+                        "external_a2a_task_id": result.id,
+                        "context_id": result.context_id,
+                        "capability": result.capability,
+                    },
+                )
+            )
+            self._runtime_state.complete_idempotent_side_effect_sync(
+                identity,
+                side_effect_key,
+                result_receipt_id=receipt_id,
+                metadata={"status": result.status.value},
+            )
         self._append_task_log(result)
         return result
+
+    def _ensure_execution_identity(self, task: A2ATask) -> ExecutionIdentity:
+        meta = dict(task.metadata or {})
+        nested = meta.get("execution_identity")
+        explicit = dict(nested) if isinstance(nested, dict) else {}
+        trace_id = task.trace_id or str(meta.get("trace_id") or explicit.get("trace_id") or "")
+        if self._require_execution_identity and not trace_id:
+            raise MissingExecutionIdentity("A2A task requires trace_id")
+        identity = ExecutionIdentity.new(
+            task_id=str(meta.get("task_id") or task.dharma_task_id or task.id),
+            agent_id=task.to_agent or str(meta.get("agent_id") or ""),
+            session_id=str(meta.get("session_id") or explicit.get("session_id") or ""),
+            trace_id=trace_id,
+            correlation_id=str(meta.get("correlation_id") or explicit.get("correlation_id") or trace_id),
+            causation_id=str(meta.get("causation_id") or explicit.get("causation_id") or ""),
+            parent_run_id=str(meta.get("parent_run_id") or explicit.get("parent_run_id") or ""),
+            run_id=str(meta.get("run_id") or meta.get("runtime_run_id") or explicit.get("run_id") or ""),
+            claim_id=str(meta.get("claim_id") or explicit.get("claim_id") or ""),
+            idempotency_key=str(meta.get("idempotency_key") or explicit.get("idempotency_key") or ""),
+            external_a2a_task_id=task.id,
+            metadata={"context_id": task.context_id, "capability": task.capability},
+        )
+        task.trace_id = identity.trace_id
+        task.dharma_task_id = task.dharma_task_id or identity.task_id
+        task.metadata.update(
+            {
+                "execution_identity": identity.to_dict(),
+                "trace_id": identity.trace_id,
+                "correlation_id": identity.correlation_id,
+                "run_id": identity.run_id,
+                "runtime_run_id": identity.run_id,
+                "claim_id": identity.claim_id,
+                "idempotency_key": identity.idempotency_key,
+                "external_a2a_task_id": identity.external_a2a_task_id,
+            }
+        )
+        return identity.require_for_dispatch()
 
     def _dispatch(self, task: A2ATask) -> A2ATask:
         """Route task to appropriate handler and execute."""

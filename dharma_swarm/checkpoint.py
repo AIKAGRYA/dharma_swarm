@@ -91,14 +91,15 @@ class InterruptGate:
       - API: emits WebSocket event and awaits response
       - TUI: shows modal dialog
 
-    If no callback is set, interrupts auto-approve (backward compatible).
+    If no callback is set, interrupts reject immediately unless auto_approve is
+    explicitly enabled.
     """
 
     def __init__(
         self,
         callback: Callable[[InterruptRequest], Any] | None = None,
         timeout_seconds: float = 300.0,
-        auto_approve: bool = True,
+        auto_approve: bool = False,
     ) -> None:
         self._callback = callback
         self._timeout = timeout_seconds
@@ -108,15 +109,22 @@ class InterruptGate:
     async def interrupt(self, request: InterruptRequest) -> InterruptResponse:
         """Pause execution and wait for operator response.
 
-        If no callback is registered and auto_approve is True, returns
-        APPROVE immediately (backward compatible with existing behavior).
+        If no callback is registered, return immediately instead of waiting for
+        a response that no transport can deliver.
         """
-        if self._callback is None and self._auto_approve:
-            return InterruptResponse(
+        if self._callback is None:
+            response = InterruptResponse(
                 request_id=request.id,
-                decision=InterruptDecision.APPROVE,
-                reason="auto-approved (no interrupt handler registered)",
+                decision=InterruptDecision.APPROVE if self._auto_approve else InterruptDecision.REJECT,
+                reason=(
+                    "auto-approved (no interrupt handler registered)"
+                    if self._auto_approve
+                    else "rejected (no interrupt handler registered)"
+                ),
             )
+            _write_interrupt_request(request)
+            write_interrupt_response(response)
+            return response
 
         # Create a future for the response
         loop = asyncio.get_running_loop()

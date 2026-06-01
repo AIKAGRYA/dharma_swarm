@@ -2000,7 +2000,7 @@ class Orchestrator:
             td.metadata["witness_reroutes"] = gate.attempts
 
         claim_meta = self._prepare_claim(task_for_gate, td)
-        self._runtime_lifecycle.ensure_runtime_run_id(td)
+        self._runtime_lifecycle.ensure_execution_identity(td, task=task_for_gate)
         claim_meta = await self._attach_context_bundle(task_for_gate, td, claim_meta)
         claim_meta = self._attach_latent_gold(task_for_gate, claim_meta)
         if task_for_gate is not None:
@@ -2033,6 +2033,7 @@ class Orchestrator:
             task=task_for_gate,
             status="claimed",
         )
+        await self._runtime_lifecycle.record_delegation_run(td, task=task_for_gate, status="claimed")
         _pe_t2 = _adt.monotonic()
         if self._bus is not None:
             await self._bus.send(Message(
@@ -2174,22 +2175,33 @@ class Orchestrator:
         correlation_token = None
         reset_correlation = None
 
-        # Set CorrelationContext with cell_id for room-scoped tracing.
+        # Set CorrelationContext with execution identity for room-scoped tracing.
         # The token is reset in finally to avoid context leakage across tasks.
         cell_id = td.metadata.get("cell_id", "")
-        if cell_id:
+        identity_meta = td.metadata.get("execution_identity")
+        if not isinstance(identity_meta, dict):
+            identity_meta = {}
+        trace_id = str(identity_meta.get("trace_id", "") or "")
+        session_id = str(identity_meta.get("session_id", "") or "")
+        if cell_id or trace_id:
             try:
                 from dharma_swarm.correlation_context import (
+                    CorrelationContext,
                     set_correlation,
                     reset_correlation as _reset_correlation,
                     get_correlation,
                 )
                 current = get_correlation()
-                ctx = current.with_cell(cell_id)
+                ctx = CorrelationContext(
+                    trace_id=trace_id or current.trace_id,
+                    proposal_id=current.proposal_id,
+                    session_id=session_id or current.session_id,
+                    cell_id=cell_id or current.cell_id,
+                )
                 correlation_token = set_correlation(ctx)
                 reset_correlation = _reset_correlation
             except Exception:
-                logger.debug("cell_id correlation context setup failed", exc_info=True)
+                logger.debug("execution correlation context setup failed", exc_info=True)
 
         try:
             await self._runtime_lifecycle.record_delegation_run(
@@ -2444,25 +2456,23 @@ class Orchestrator:
                     except Exception:
                         logger.debug("Lifecycle event emit failed (non-critical)", exc_info=True)
 
-            # Auto-extract: if task says "write to <path>", save result there
-            try:
-                import re as _re_extract
-                desc = task.description or ""
-                path_match = _re_extract.search(
-                    r"[Ww]rite [\w\s]*?(?:to |report to |results to |output to |findings to )(~/[^\s,\"]+\.md)",
-                    desc,
-                )
-                if path_match and result and len(result) > 200:
-                    from pathlib import Path as _P
-                    target = _P(path_match.group(1)).expanduser()
-                    target.parent.mkdir(parents=True, exist_ok=True)
-                    target.write_text(result, encoding="utf-8")
-                    logger.info(
-                        "Auto-extracted %d chars to %s",
-                        len(result), target,
+            # Legacy compatibility only: free-text task descriptions must not
+            # choose infrastructure write paths unless a structured caller opts in.
+            task_metadata = getattr(task, "metadata", {}) or {}
+            if task_metadata.get("allow_free_text_result_path") is True:
+                try:
+                    desc = task.description or ""
+                    path_match = re.search(
+                        r"[Ww]rite [\w\s]*?(?:to |report to |results to |output to |findings to )(~/[^\s,\"]+\.md)",
+                        desc,
                     )
-            except Exception:
-                logger.debug("Auto-extract failed", exc_info=True)
+                    if path_match and result and len(result) > 200:
+                        target = Path(path_match.group(1)).expanduser()
+                        target.parent.mkdir(parents=True, exist_ok=True)
+                        target.write_text(result, encoding="utf-8")
+                        logger.info("Auto-extracted %d chars to %s", len(result), target)
+                except Exception:
+                    logger.debug("Auto-extract failed", exc_info=True)
 
             # Persist result to shared notes and stigmergy
             runner_cfg = getattr(runner, "_config", None)
@@ -2567,12 +2577,17 @@ class Orchestrator:
         trace_id = (
             str(task.metadata.get("trace_id")) if isinstance(task.metadata, dict) else ""
         ) or f"task:{task.id}"
+        correlation_id = (
+            str(task.metadata.get("correlation_id")) if isinstance(task.metadata, dict) else ""
+        ) or trace_id
         result_hash = hashlib.sha256((result or "").encode("utf-8")).hexdigest()
         timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
         # Truncate very long results for notes (full result is in task board)
         summary = result[:2000] if len(result) > 2000 else result
         provenance_record = {
             "trace_id": trace_id,
+            "correlation_id": correlation_id,
+            "run_id": run_id,
             "task_id": task.id,
             "task_title": task.title,
             "agent": agent_name,
@@ -2606,6 +2621,8 @@ class Orchestrator:
                 notes_file=str(notes_file),
                 provenance_file=str(provenance_path),
                 trace_id=trace_id,
+                correlation_id=correlation_id,
+                run_id=run_id,
                 result_chars=len(result or ""),
             )
         except Exception as exc:
@@ -2626,6 +2643,9 @@ class Orchestrator:
             shared_artifact.write_text(
                 f"# {task.title}\n\n"
                 f"**Task ID:** {task.id}\n"
+                f"**Run ID:** {run_id}\n"
+                f"**Trace ID:** {trace_id}\n"
+                f"**Correlation ID:** {correlation_id}\n"
                 f"**Agent:** {agent_name}\n"
                 f"**Completed:** {datetime.now(timezone.utc).isoformat()}\n\n"
                 f"---\n\n"
@@ -2650,6 +2670,8 @@ class Orchestrator:
                     "model": model_name,
                     "provider": provider_name,
                     "trace_id": trace_id,
+                    "correlation_id": correlation_id,
+                    "run_id": run_id,
                     "notes_file": str(notes_file),
                     "result_chars": len(result or ""),
                 },
