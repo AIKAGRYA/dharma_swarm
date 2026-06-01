@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+import sys
 
 import pytest
 
@@ -106,6 +107,13 @@ def test_open_pr_scan_fails_closed(monkeypatch: pytest.MonkeyPatch) -> None:
         _list_open_ontology_prs(limit=1)
 
 
+def test_main_fails_closed_without_origin_main(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(sys, "argv", ["check_ontology_alignment.py", "--limit", "1"])
+    monkeypatch.setattr(gate, "_read_file_at_ref", lambda *_args: None)
+
+    assert gate.main() == 1
+
+
 def test_action_input_params_conflict_is_detected() -> None:
     snapshots = [
         {
@@ -149,6 +157,26 @@ _ACTION_PROPOSAL = ObjectType(
     )
 
     assert snapshot["actions"][0]["param_signature"] == ["target_id:str"]
+
+
+def test_action_extraction_keeps_enum_typed_input_params() -> None:
+    snapshot = _extract_ontology_snapshot(
+        """
+_ACTION_PROPOSAL = ObjectType(
+    name="ActionProposal",
+    actions=[
+        ActionDef(
+            name="Approve",
+            object_type="ActionProposal",
+            input_params={"target_id": PropertyType.STRING},
+        ),
+    ],
+)
+""",
+        source_pr="PR#enum-input",
+    )
+
+    assert snapshot["actions"][0]["param_signature"] == ["target_id:string"]
 
 
 def test_object_properties_and_security_conflicts_are_detected() -> None:
@@ -197,7 +225,7 @@ _AUDIT_FINDING = ObjectType(
     assert type_spec["security"] is not None
 
 
-def test_promoted_type_removal_is_detected() -> None:
+def test_promoted_type_absence_is_detected() -> None:
     snapshots = [
         {
             "source": "origin/main",
@@ -217,3 +245,4 @@ def test_promoted_type_removal_is_detected() -> None:
     conflicts = _detect_conflicts(snapshots)
 
     assert [conflict.rule for conflict in conflicts] == ["ALIGN-006"]
+    assert "deprecation marker" not in conflicts[0].summary

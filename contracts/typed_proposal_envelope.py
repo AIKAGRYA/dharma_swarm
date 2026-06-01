@@ -32,7 +32,8 @@ WORKFLOW
 
 This envelope is the agent-facing contract. The OMS (OntologyRegistry) is the
 server-side authority. The alignment gate is the pre-merge adversarial check.
-Together they form the dharma_swarm equivalent of Palantir's OMS+Funnel+Branches.
+Together they are the repo-local proposal path inspired by Palantir-style
+ontology branches; they are not a complete external OMS/Funnel replacement.
 """
 
 from __future__ import annotations

@@ -37,7 +37,7 @@ the build if any of the following are true:
              different target_type or cardinality.
   ALIGN-005  Two PRs define an ActionDef with same (object_type, name) but
              different parameter signature or effect.
-  ALIGN-006  A PR removes a PROMOTED ObjectType without a deprecation marker.
+  ALIGN-006  A PR removes a PROMOTED ObjectType from the ontology snapshot.
   ALIGN-007  A PR introduces an ObjectType whose api_name does not match the
              frozen pattern `dharma.<domain>.<TypeName>` (api naming
              discipline from PR #405 sec 7.3 — ontology IS the API).
@@ -186,10 +186,22 @@ def _extract_ontology_snapshot(ontology_text: str, source_pr: str,
             return node.id
         return None
 
+    def _literal_name_or_dump(node: ast.AST) -> str:
+        value = _literal_or_name(node)
+        if value is not None:
+            return str(value)
+        return ast.dump(node, annotate_fields=True, include_attributes=False)
+
     def _kwarg_value(call: ast.Call, key: str) -> Any:
         for kw in call.keywords:
             if kw.arg == key:
                 return _literal_or_name(kw.value)
+        return None
+
+    def _kwarg_node(call: ast.Call, key: str) -> ast.AST | None:
+        for kw in call.keywords:
+            if kw.arg == key:
+                return kw.value
         return None
 
     def _kwarg_fingerprint(call: ast.Call, key: str) -> Any:
@@ -198,21 +210,32 @@ def _extract_ontology_snapshot(ontology_text: str, source_pr: str,
                 return ast.dump(kw.value, annotate_fields=True, include_attributes=False)
         return None
 
-    def _param_signature(params: Any) -> list[str]:
-        if isinstance(params, dict):
-            return [f"{key}:{params[key]}" for key in sorted(params)]
-        if isinstance(params, list):
-            return [str(param) for param in params]
-        if params:
-            return [str(params)]
+    def _param_signature(params: ast.AST | None) -> list[str]:
+        if params is None:
+            return []
+        if isinstance(params, ast.Dict):
+            pairs = []
+            for key_node, value_node in zip(params.keys, params.values, strict=False):
+                if key_node is None:
+                    continue
+                pairs.append((
+                    _literal_name_or_dump(key_node),
+                    _literal_name_or_dump(value_node),
+                ))
+            return [f"{key}:{value}" for key, value in sorted(pairs)]
+        if isinstance(params, (ast.List, ast.Tuple)):
+            return [_literal_name_or_dump(elt) for elt in params.elts]
+        value = _literal_or_name(params)
+        if value:
+            return [str(value)]
         return []
 
     def _extract_action_call(call: ast.Call) -> ActionSpec | None:
         nm = _kwarg_value(call, "name")
         ot = _kwarg_value(call, "object_type")
-        params = _kwarg_value(call, "input_params")
+        params = _kwarg_node(call, "input_params")
         if params is None:
-            params = _kwarg_value(call, "parameters")
+            params = _kwarg_node(call, "parameters")
         if not nm or not ot:
             return None
         return ActionSpec(
@@ -425,7 +448,10 @@ def _detect_conflicts(snapshots: list[dict[str, Any]]) -> list[Conflict]:
                 ),
             ))
 
-    # ALIGN-006: PROMOTED type removed without an explicit deprecation path.
+    # ALIGN-006: PROMOTED type removed from a branch snapshot. The typed
+    # deprecation envelope is a separate artifact and is reviewed by the merge
+    # authority; this checker only proves the ontology snapshot is missing the
+    # promoted public contract.
     main_types = {
         t["name"]: t
         for t in all_types
@@ -447,7 +473,7 @@ def _detect_conflicts(snapshots: list[dict[str, Any]]) -> list[Conflict]:
                     conflicts.append(Conflict(
                         rule="ALIGN-006",
                         severity="error",
-                        summary=f"PROMOTED ObjectType '{name}' removed without deprecation marker",
+                        summary=f"PROMOTED ObjectType '{name}' removed from ontology snapshot",
                         pr_a="origin/main", pr_b=source,
                         type_or_link=name,
                         field_diffs={
@@ -455,8 +481,9 @@ def _detect_conflicts(snapshots: list[dict[str, Any]]) -> list[Conflict]:
                             "api_name": [main_type.get("api_name"), "(missing)"],
                         },
                         suggestion=(
-                            "Promoted ObjectTypes are public contracts. Add a deprecation "
-                            "proposal with replacement/migration notes before removal."
+                            "Promoted ObjectTypes are public contracts. Keep the type present "
+                            "or route the removal through an explicit deprecation proposal and "
+                            "operator review."
                         ),
                     ))
 
@@ -550,7 +577,7 @@ def _check_api_name_discipline(snapshots: list[dict[str, Any]],
                     suggestion=(
                         "From PR #405 sec 7.3: ontology IS the API. api_names must be "
                         "frozen and namespaced. Version belongs in ObjectType.version, "
-                        "not in the public api_name. Rename to fit ADR-008."
+                        "not in the public api_name. Rename to fit the OMS api_name contract."
                     ),
                 ))
     return issues
@@ -576,9 +603,15 @@ def main() -> int:
     # Snapshot 1: main
     main_text = _read_file_at_ref("origin/main", ONTOLOGY_PATH_REL)
     snapshots: list[dict] = []
-    if main_text:
-        snapshots.append(_extract_ontology_snapshot(main_text, source_pr="origin/main",
-                                                     source_branch="main"))
+    if not main_text:
+        print(
+            f"[error] could not load authority ontology snapshot: "
+            f"origin/main:{ONTOLOGY_PATH_REL}",
+            file=sys.stderr,
+        )
+        return 1
+    snapshots.append(_extract_ontology_snapshot(main_text, source_pr="origin/main",
+                                                 source_branch="main"))
 
     # Snapshot 2: current branch (if not main)
     try:
