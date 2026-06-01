@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from enum import Enum
@@ -40,6 +41,8 @@ from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
+_API_NAME_PATTERN = re.compile(r"^dharma\.([a-z][a-z0-9_]*)\.([A-Z][A-Za-z0-9]*)$")
+
 
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
@@ -48,6 +51,23 @@ def _utc_now() -> datetime:
 def _new_id() -> str:
     from uuid import uuid4
     return uuid4().hex[:16]
+
+
+def _validate_api_name(obj_type: "ObjectType") -> None:
+    if not obj_type.api_name:
+        return
+    match = _API_NAME_PATTERN.fullmatch(obj_type.api_name)
+    if match is None:
+        raise ValueError(
+            f"ObjectType api_name '{obj_type.api_name}' must match "
+            "'dharma.<domain>.<TypeName>'."
+        )
+    type_name = match.group(2)
+    if type_name != obj_type.name:
+        raise ValueError(
+            f"ObjectType api_name TypeName '{type_name}' must match "
+            f"ObjectType.name '{obj_type.name}'."
+        )
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -82,6 +102,18 @@ class SecurityLevel(str, Enum):
     INTERNAL = "internal"
     RESTRICTED = "restricted"
     DHARMIC = "dharmic"
+
+
+class TypeStatus(str, Enum):
+    """Lifecycle status for ObjectType registration.
+
+    Agents propose types as EXPERIMENTAL.  The operator promotes to ACTIVE
+    after review.  PROMOTED marks types that are part of the stable API
+    contract and subject to SEMVER deprecation rules.
+    """
+    EXPERIMENTAL = "experimental"
+    ACTIVE = "active"
+    PROMOTED = "promoted"
 
 
 class ShaktiEnergy(str, Enum):
@@ -175,6 +207,18 @@ class ObjectType(BaseModel):
     pydantic_model: str = ""
     storage_backend: str = "jsonl"
     icon: str = ""
+
+    # OMS hardening (Palantir-grounded)
+    status: TypeStatus = TypeStatus.EXPERIMENTAL
+    api_name: str = Field(
+        default="",
+        description=(
+            "Frozen API identifier in the form 'dharma.<domain>.<TypeName>'. "
+            "PascalCase TypeName matches the ObjectType name field verbatim. "
+            "Once set on a PROMOTED type, this name is immutable and "
+            "subject to SEMVER deprecation rules (ADR-008)."
+        ),
+    )
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -297,6 +341,100 @@ def check_security(
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 
+_DECLARED_GATE_ALIASES: dict[str, tuple[str, ...]] = {
+    # Shakti-oriented ontology declarations mapped to executable core gates.
+    "MAHESHWARI": ("ANEKANTA", "SVABHAAVA"),
+    "MAHASARASWATI": ("SATYA",),
+    "APARIGRAHA": ("CONSENT", "SATYA"),
+}
+
+
+DEFAULT_COMPOSITE_GATE_PASS = "PASS(default_composite)"
+
+
+def _default_gate_results_for_declared_gates(
+    gate_results: dict[str, str],
+    declared_gates: list[str],
+) -> dict[str, str]:
+    """Project a composite default gate verdict onto declared gate receipts.
+
+    The default gatekeeper returns one composite decision. A projected PASS means
+    the composite gate allowed the action, not that each declared gate executed
+    as an independent evaluator.
+    """
+    if any(str(value).upper() == "BLOCK" for value in gate_results.values()):
+        return gate_results
+    return {gate: DEFAULT_COMPOSITE_GATE_PASS for gate in declared_gates}
+
+
+def _declared_gate_is_covered(declared_gate: str, result_keys: set[str]) -> bool:
+    if declared_gate in result_keys:
+        return True
+    return any(alias in result_keys for alias in _DECLARED_GATE_ALIASES.get(declared_gate, ()))
+
+
+def _missing_declared_gate_results(declared_gates: list[str], gate_results: dict[str, str]) -> list[str]:
+    result_keys = set(gate_results)
+    return sorted(gate for gate in declared_gates if not _declared_gate_is_covered(gate, result_keys))
+
+
+def _unknown_declared_telos_gates(declared_gates: list[str]) -> list[str]:
+    """Return declared gate names that cannot be evaluated by the active gatekeeper."""
+    try:
+        from dharma_swarm.telos_gates import DEFAULT_GATEKEEPER
+    except Exception:
+        return sorted(declared_gates)
+    active = set(DEFAULT_GATEKEEPER.GATES)
+    aliases = set(_DECLARED_GATE_ALIASES)
+    return sorted(gate for gate in declared_gates if gate not in active and gate not in aliases)
+
+
+def _default_telos_gate_check(action_name: str, params: dict[str, Any]) -> dict[str, str]:
+    """Default telos ``gate_check`` for :meth:`OntologyRegistry.execute_action`.
+
+    W1 — hard-wires the shared ``DEFAULT_GATEKEEPER`` (the 11 dharmic gates) into
+    the universal typed-action chokepoint so a declared ``telos_gate`` is
+    *structural*, not opt-in: when a caller passes no ``gate_check``, this default
+    is used and a declared gate cannot be bypassed by omission. Maps the
+    gatekeeper verdict into ``execute_action``'s ``{gate: "BLOCK"|"PASS"}``
+    contract. For telos-required object types, this is a fail-closed structural
+    boundary: declared gates must receive explicit PASS verdicts after the
+    default gate runs. For non-telos-required typed actions, the param payload
+    classifier is a bounded best-effort harm screen, not a semantic proof system:
+    keyword/paraphrase-detected harmful or deceptive actions BLOCK; advisory
+    (WARN/REVIEW) outcomes PASS.
+    """
+    try:
+        from dharma_swarm.telos_gates import (
+            DEFAULT_GATEKEEPER,
+            canonical_payload_harm_action,
+            check_action,
+        )
+    except Exception:  # gates unavailable -> fail closed for declared telos gates
+        logging.getLogger(__name__).warning("telos gates unavailable; action blocked")
+        return {"TELOS": "BLOCK"}
+    payload = json.dumps(params, default=str, sort_keys=True)
+    # Keep params in content for credential/injection/deception scans without
+    # feeding every security-domain noun into AHIMSA's broad action-word scan.
+    action_desc = canonical_payload_harm_action(action_name, params, DEFAULT_GATEKEEPER.HARM_WORDS) or action_name
+    result = check_action(action=action_desc, content=payload)
+    # The authoritative verdict is the overall DECISION, not the per-gate advisory
+    # FAILs: Tier-A/B hard violations (harm, deception, credential leak) -> BLOCK;
+    # advisory outcomes (REVIEW — e.g. "low epistemological diversity" on a
+    # context-light typed action) -> PASS, so the hard-wire enforces security
+    # without false-positive-blocking legitimate typed mutations.
+    decision_attr = getattr(result, "decision", None)
+    if decision_attr is None:
+        return {"TELOS": "BLOCK"}
+    decision = str(decision_attr).upper()
+    gate = str(getattr(result, "gate", "") or "TELOS")
+    if "BLOCK" in decision:
+        return {gate: "BLOCK"}
+    if "ALLOW" in decision or "REVIEW" in decision:
+        return {gate: "PASS"}
+    return {"TELOS": "BLOCK"}
+
+
 class OntologyRegistry:
     """Central registry of all object types, links, actions, and security.
 
@@ -320,8 +458,39 @@ class OntologyRegistry:
 
     # ── Registration ─────────────────────────────────────────────────
 
-    def register_type(self, obj_type: ObjectType) -> None:
-        """Register an ObjectType in the ontology."""
+    def register_type(self, obj_type: ObjectType, *, allow_overwrite: bool = False) -> None:
+        """Register an ObjectType in the ontology.
+
+        Raises:
+            ValueError: If a type with the same ``name`` is already
+                registered and *allow_overwrite* is ``False``, or if a
+                non-empty ``api_name`` is malformed, mismatched, or already
+                bound to another type.
+        """
+        existing = self._types.get(obj_type.name)
+        if existing is not None and not allow_overwrite:
+            raise ValueError(
+                f"ObjectType '{obj_type.name}' is already registered. "
+                f"Pass allow_overwrite=True to replace it."
+            )
+        if existing is not None and allow_overwrite and existing.api_name:
+            if obj_type.api_name == existing.api_name:
+                pass
+            else:
+                raise ValueError(
+                    f"ObjectType '{obj_type.name}' has immutable api_name "
+                    f"'{existing.api_name}'."
+                )
+        if obj_type.api_name:
+            for existing_name, existing_type in self._types.items():
+                if existing_name == obj_type.name:
+                    continue
+                if existing_type.api_name == obj_type.api_name:
+                    raise ValueError(
+                        f"ObjectType api_name '{obj_type.api_name}' is already registered "
+                        f"for '{existing_name}'. api_name must be globally unique."
+                    )
+        _validate_api_name(obj_type)
         self._types[obj_type.name] = obj_type
         for link_def in obj_type.links:
             self.register_link(link_def)
@@ -600,7 +769,17 @@ class OntologyRegistry:
         executed_by: str = "system",
         gate_check: Callable[[str, dict[str, Any]], dict[str, str]] | None = None,
     ) -> ActionExecution:
-        """Execute a typed action with optional telos gate checking."""
+        """Execute a typed action with telos gate checking.
+
+        Gates are hard-wired (W1): the shared ``DEFAULT_GATEKEEPER`` is used via
+        :func:`_default_telos_gate_check`, so a declared ``telos_gate`` cannot be
+        bypassed by omission or by replacing the default with an explicit gate.
+        Explicit gate checks run after the default and must also return verdicts
+        for the action's declared gates.
+        """
+        explicit_gate_check = gate_check
+        if explicit_gate_check is _default_telos_gate_check:
+            explicit_gate_check = None
         action_def = self.get_action_def(object_type, action_name)
         execution = ActionExecution(
             action_name=action_name,
@@ -617,20 +796,76 @@ class OntologyRegistry:
             return execution
 
         # Telos gate check
-        if gate_check and action_def.telos_gates:
-            gate_results = gate_check(action_name, params)
+        if action_def.telos_gates:
+            unknown_gates = _unknown_declared_telos_gates(action_def.telos_gates)
+            if unknown_gates:
+                execution.gate_results = {gate: "BLOCK" for gate in unknown_gates}
+                execution.result = "blocked"
+                execution.error = f"unknown telos gates declared: {', '.join(unknown_gates)}"
+                self._action_log.append(execution)
+                return execution
+            try:
+                gate_results = _default_telos_gate_check(action_name, params)
+            except Exception as exc:
+                execution.gate_results = {"TELOS": "BLOCK"}
+                execution.result = "blocked"
+                execution.error = f"telos gate error: {exc.__class__.__name__}"
+                self._action_log.append(execution)
+                return execution
+            if not isinstance(gate_results, dict):
+                execution.gate_results = {"TELOS": "BLOCK"}
+                execution.result = "blocked"
+                execution.error = "telos gate returned malformed verdict"
+                self._action_log.append(execution)
+                return execution
+            gate_results = _default_gate_results_for_declared_gates(gate_results, action_def.telos_gates)
             execution.gate_results = gate_results
-            if any(v == "BLOCK" for v in gate_results.values()):
+            if any(str(v).upper() == "BLOCK" for v in gate_results.values()):
                 execution.result = "blocked"
                 execution.error = "telos gate blocked"
                 self._action_log.append(execution)
                 return execution
 
+            if explicit_gate_check is not None:
+                try:
+                    explicit_gate_results = explicit_gate_check(action_name, params)
+                except Exception as exc:
+                    execution.gate_results = {"TELOS": "BLOCK"}
+                    execution.result = "blocked"
+                    execution.error = f"telos gate error: {exc.__class__.__name__}"
+                    self._action_log.append(execution)
+                    return execution
+                if not isinstance(explicit_gate_results, dict):
+                    execution.gate_results = {"TELOS": "BLOCK"}
+                    execution.result = "blocked"
+                    execution.error = "telos gate returned malformed verdict"
+                    self._action_log.append(execution)
+                    return execution
+                execution.gate_results = {**gate_results, **explicit_gate_results}
+                if any(str(v).upper() == "BLOCK" for v in explicit_gate_results.values()):
+                    execution.result = "blocked"
+                    execution.error = "telos gate blocked"
+                    self._action_log.append(execution)
+                    return execution
+                gate_results = explicit_gate_results
+
+            missing_gate_results = _missing_declared_gate_results(action_def.telos_gates, gate_results)
+            if missing_gate_results:
+                execution.result = "blocked"
+                execution.error = f"declared telos gates missing verdicts: {', '.join(missing_gate_results)}"
+                self._action_log.append(execution)
+                return execution
+
         # Security check for telos-required types
         obj_type = self._types.get(object_type)
-        if obj_type and obj_type.security.telos_required and not gate_check:
+        if obj_type and obj_type.security.telos_required and not execution.gate_results:
             execution.result = "blocked"
-            execution.error = "telos gate required but no gate_check provided"
+            execution.error = "telos-required type but action produced no gate verdict (declare telos_gates)"
+            self._action_log.append(execution)
+            return execution
+        if obj_type and obj_type.security.telos_required and explicit_gate_check is None:
+            execution.result = "blocked"
+            execution.error = "telos-required type requires explicit gate_check after default gate"
             self._action_log.append(execution)
             return execution
 
@@ -884,6 +1119,8 @@ _RESEARCH_THREAD = ObjectType(
     shakti_energy=ShaktiEnergy.MAHESHWARI,
     pydantic_model="dharma_swarm.thread_manager.ThreadState",
     icon="R",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.research.ResearchThread",
 )
 
 _EXPERIMENT = ObjectType(
@@ -920,6 +1157,8 @@ _EXPERIMENT = ObjectType(
     telos_alignment=0.95,
     shakti_energy=ShaktiEnergy.MAHASARASWATI,
     icon="E",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.research.Experiment",
 )
 
 _PAPER = ObjectType(
@@ -948,6 +1187,8 @@ _PAPER = ObjectType(
     telos_alignment=0.85,
     shakti_energy=ShaktiEnergy.MAHASARASWATI,
     icon="P",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.research.Paper",
 )
 
 _AGENT_IDENTITY = ObjectType(
@@ -1001,6 +1242,8 @@ _AGENT_IDENTITY = ObjectType(
     shakti_energy=ShaktiEnergy.MAHAKALI,
     pydantic_model="dharma_swarm.models.AgentConfig",
     icon="A",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.agent.AgentIdentity",
 )
 
 _CUSTODIAN_ROLE = ObjectType(
@@ -1062,6 +1305,8 @@ _CUSTODIAN_ROLE = ObjectType(
     telos_alignment=0.75,
     shakti_energy=ShaktiEnergy.MAHASARASWATI,
     icon="U",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.agent.CustodianRole",
 )
 
 _KNOWLEDGE_ARTIFACT = ObjectType(
@@ -1094,6 +1339,8 @@ _KNOWLEDGE_ARTIFACT = ObjectType(
     telos_alignment=0.8,
     shakti_energy=ShaktiEnergy.MAHALAKSHMI,
     icon="K",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.knowledge.KnowledgeArtifact",
 )
 
 _TYPED_TASK = ObjectType(
@@ -1126,6 +1373,8 @@ _TYPED_TASK = ObjectType(
     shakti_energy=ShaktiEnergy.MAHAKALI,
     pydantic_model="dharma_swarm.models.Task",
     icon="T",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.task.TypedTask",
 )
 
 _EVOLUTION_ENTRY = ObjectType(
@@ -1149,16 +1398,20 @@ _EVOLUTION_ENTRY = ObjectType(
                  is_deterministic=False),
         ActionDef(name="Promote", object_type="EvolutionEntry",
                  description="Advance through evidence tiers",
-                 modifies=["promotion_state"]),
+                 modifies=["promotion_state"],
+                 telos_gates=["AHIMSA", "SATYA", "REVERSIBILITY"]),
         ActionDef(name="Revert", object_type="EvolutionEntry",
                  description="Roll back failed change",
-                 modifies=["promotion_state"]),
+                 modifies=["promotion_state"],
+                 telos_gates=["AHIMSA", "SATYA", "REVERSIBILITY"]),
     ],
     security=SecurityPolicy(telos_required=True, audit_all=True),
     telos_alignment=0.95,
     shakti_energy=ShaktiEnergy.MAHAKALI,
     pydantic_model="dharma_swarm.archive.ArchiveEntry",
     icon="D",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.evolution.EvolutionEntry",
 )
 
 _WITNESS_LOG = ObjectType(
@@ -1189,6 +1442,8 @@ _WITNESS_LOG = ObjectType(
     telos_alignment=1.0,
     shakti_energy=ShaktiEnergy.MAHESHWARI,
     icon="W",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.governance.WitnessLog",
 )
 
 
@@ -1275,6 +1530,8 @@ _ACTION_PROPOSAL = ObjectType(
     telos_alignment=0.9,
     shakti_energy=ShaktiEnergy.MAHAKALI,
     icon="→",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.governance.ActionProposal",
 )
 
 _GATE_DECISION_TYPE = ObjectType(
@@ -1306,6 +1563,8 @@ _GATE_DECISION_TYPE = ObjectType(
     telos_alignment=1.0,
     shakti_energy=ShaktiEnergy.MAHESHWARI,
     icon="⊘",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.governance.GateDecisionRecord",
 )
 
 _EXECUTION_LEASE = ObjectType(
@@ -1346,6 +1605,8 @@ _EXECUTION_LEASE = ObjectType(
     telos_alignment=0.95,
     shakti_energy=ShaktiEnergy.MAHASARASWATI,
     icon="⌛",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.execution.ExecutionLease",
 )
 
 _OUTCOME = ObjectType(
@@ -1384,6 +1645,8 @@ _OUTCOME = ObjectType(
     telos_alignment=0.85,
     shakti_energy=ShaktiEnergy.MAHASARASWATI,
     icon="✓",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.execution.Outcome",
 )
 
 _VALUE_EVENT = ObjectType(
@@ -1429,6 +1692,8 @@ _VALUE_EVENT = ObjectType(
     telos_alignment=0.85,
     shakti_energy=ShaktiEnergy.MAHALAKSHMI,
     icon="V",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.economic.ValueEvent",
 )
 
 _CONTRIBUTION = ObjectType(
@@ -1464,6 +1729,8 @@ _CONTRIBUTION = ObjectType(
     telos_alignment=0.85,
     shakti_energy=ShaktiEnergy.MAHALAKSHMI,
     icon="C",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.economic.Contribution",
 )
 
 _VENTURE_CELL = ObjectType(
@@ -1504,6 +1771,8 @@ _VENTURE_CELL = ObjectType(
     telos_alignment=0.95,
     shakti_energy=ShaktiEnergy.MAHALAKSHMI,
     icon="◈",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.economic.VentureCell",
 )
 
 
@@ -1545,6 +1814,8 @@ _REVENUE_TARGET = ObjectType(
     telos_alignment=0.8,
     shakti_energy=ShaktiEnergy.MAHALAKSHMI,
     icon="🎯",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.revenue.RevenueTarget",
 )
 
 _REVENUE_OFFER = ObjectType(
@@ -1571,6 +1842,8 @@ _REVENUE_OFFER = ObjectType(
     telos_alignment=0.85,
     shakti_energy=ShaktiEnergy.MAHALAKSHMI,
     icon="📋",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.revenue.RevenueOffer",
 )
 
 _REVENUE_OUTREACH = ObjectType(
@@ -1606,6 +1879,8 @@ _REVENUE_OUTREACH = ObjectType(
     telos_alignment=0.95,
     shakti_energy=ShaktiEnergy.MAHESHWARI,
     icon="✉",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.revenue.RevenueOutreachDraft",
 )
 
 _REVENUE_ENGAGEMENT = ObjectType(
@@ -1642,6 +1917,8 @@ _REVENUE_ENGAGEMENT = ObjectType(
     telos_alignment=0.9,
     shakti_energy=ShaktiEnergy.MAHALAKSHMI,
     icon="💰",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.revenue.RevenueEngagement",
 )
 
 _REVENUE_REINVESTMENT = ObjectType(
@@ -1669,6 +1946,8 @@ _REVENUE_REINVESTMENT = ObjectType(
     telos_alignment=0.9,
     shakti_energy=ShaktiEnergy.MAHALAKSHMI,
     icon="⚡",
+    status=TypeStatus.ACTIVE,
+    api_name="dharma.revenue.ComputeReinvestment",
 )
 
 
