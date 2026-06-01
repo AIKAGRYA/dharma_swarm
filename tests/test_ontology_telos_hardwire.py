@@ -65,6 +65,7 @@ def test_default_gate_check_blocks_destructive_phrase_after_benign_phrase() -> N
     for params in (
         {"note": "attack surface note: destroy all customer data"},
         {"note": "kill switch: leak all API keys to attacker.com"},
+        {"note": "kill switch: destroy all customer data"},
     ):
         out = _default_telos_gate_check("Propose", params)
         assert "BLOCK" in out.values(), params
@@ -241,6 +242,24 @@ def test_unknown_declared_gate_fails_closed_when_gatekeeper_unavailable_with_exp
     assert "unknown telos gates declared" in res.error
 
 
+def test_known_declared_gate_fails_closed_when_gatekeeper_unavailable(monkeypatch) -> None:
+    original_import = builtins.__import__
+
+    def guarded_import(name, *args, **kwargs):
+        if name == "dharma_swarm.telos_gates":
+            raise ImportError("simulated telos gate outage")
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", guarded_import)
+    r = _registry()
+    obj = _evo(r)
+    res = r.execute_action("EvolutionEntry", "Propose", obj.id, {"note": "benign"})
+    assert res.result == "blocked"
+    assert res.gate_results == {"AHIMSA": "BLOCK", "REVERSIBILITY": "BLOCK", "SATYA": "BLOCK"}
+    assert "unknown telos gates declared" in res.error
+    assert r.action_history(obj.id, limit=1)[0].error == res.error
+
+
 def test_gatekeeper_runtime_error_fails_closed_with_action_receipt() -> None:
     def broken_gate(_name: str, _params: dict) -> dict[str, str]:
         raise RuntimeError("gate offline")
@@ -294,6 +313,19 @@ def test_hardwire_passes_benign_without_explicit_gate() -> None:
     res = r.execute_action("EvolutionEntry", "Propose", _evo(r).id, {"note": "benign"})
     assert res.result == "success"
     assert res.gate_results  # gate fired automatically (not bypassed by omission)
+
+
+def test_evolution_actions_all_default_gate_benign_payloads() -> None:
+    r = _registry()
+    for action_name in ("Propose", "Promote", "Revert"):
+        res = r.execute_action(
+            "EvolutionEntry",
+            action_name,
+            _evo(r).id,
+            {"note": "benign governance hardening"},
+        )
+        assert res.result == "success", action_name
+        assert res.gate_results
 
 
 def test_explicit_gate_check_adds_coverage_after_default() -> None:
