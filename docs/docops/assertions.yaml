@@ -137,6 +137,7 @@
     "ignore": [
       "docs/archive/**",
       "docs/_archive/**",
+      "docs/state/_archive/**",
       "reports/governance/**"
     ],
       "registered": [

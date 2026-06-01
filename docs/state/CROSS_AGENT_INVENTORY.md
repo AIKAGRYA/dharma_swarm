@@ -1,8 +1,14 @@
 # Cross-Agent Inventory — All Open Strings Across All Devin Sessions
 
-**Generated:** 2026-05-21T13:00Z
+**Generated:** 2026-05-21T13:00Z (content refresh note added 2026-05-29)
 **Source:** All 12 Devin sessions in org `amitabhainarunachala` + repo state
 **Method:** `devin_session_search` + `devin_session_events` (message history) + `gh pr list --limit 100` + repo filesystem
+
+> **2026-05-29 refresh note:** Since this inventory was generated, main has advanced
+> from ~693 to 702 commits. Notable additions: perplexity-computer registered (PR #376),
+> third-witness verification posted on PRs #375/#376, spine v2 landed (#427),
+> OMS hardened (#409), KARMA gate landed (#408), multi-track doctrine amended (#396).
+> Session 12 (this session) extended with adversarial review + doc refresh work.
 
 ---
 
