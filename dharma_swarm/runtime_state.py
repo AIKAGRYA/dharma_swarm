@@ -314,6 +314,7 @@ RUNTIME_RECEIPT_TYPES = frozenset(
         "artifact",
         "artifact_written",
         "message_consumed",
+        "identity_mapping",
         "idempotency_consumed",
         "ontology_action_requested",
         "ontology_action_applied",
@@ -327,6 +328,24 @@ RUNTIME_RECEIPT_TYPES = frozenset(
         "self_mod_revert",
     }
 )
+
+MAPPING_ID_KINDS = frozenset(
+    {
+        "workflow_id",
+        "proposal_id",
+        "event_id",
+        "message_id",
+        "ontology_action_id",
+        "engine_artifact_id",
+    }
+)
+
+MAPPING_IDENTITY_FIELDS = {
+    "proposal_id": "proposal_id",
+    "event_id": "event_id",
+    "message_id": "message_id",
+    "engine_artifact_id": "artifact_id",
+}
 
 SELF_MOD_RECEIPT_TYPES = frozenset(
     {
@@ -2612,6 +2631,274 @@ class RuntimeStateStore:
             payload={"proposal_id": proposal_id or identity.proposal_id, **dict(payload or {})},
         )
 
+    @staticmethod
+    def _normalize_mapping_id_kind(id_kind: str) -> str:
+        normalized = str(id_kind or "").strip()
+        if normalized not in MAPPING_ID_KINDS:
+            raise ValueError(f"unknown runtime identity mapping kind: {id_kind}")
+        return normalized
+
+    @staticmethod
+    def _mapping_side_effect_key(id_kind: str, external_id: str) -> str:
+        return f"mapping:{id_kind}:{external_id}"
+
+    @staticmethod
+    def _mapping_receipt_id(
+        identity: ExecutionIdentity,
+        *,
+        id_kind: str,
+        external_id: str,
+    ) -> str:
+        digest = hashlib.sha256(
+            f"{identity.run_id}:{id_kind}:{external_id}".encode("utf-8")
+        ).hexdigest()[:16]
+        return f"rr_{identity.run_id}_mapping_{digest}"
+
+    @staticmethod
+    def _identity_with_mapping_field(
+        identity: ExecutionIdentity,
+        *,
+        id_kind: str,
+        external_id: str,
+    ) -> ExecutionIdentity:
+        field_name = MAPPING_IDENTITY_FIELDS.get(id_kind)
+        if not field_name:
+            return identity
+        current = str(getattr(identity, field_name, "") or "").strip()
+        if current and current != external_id:
+            return identity.with_updates(metadata={f"mapped_{id_kind}": external_id})
+        return identity.with_updates(**{field_name: external_id})
+
+    @staticmethod
+    def _mapping_payload(
+        identity: ExecutionIdentity,
+        *,
+        id_kind: str,
+        external_id: str,
+        source: str,
+        payload: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        return {
+            "id_kind": id_kind,
+            "external_id": external_id,
+            "run_id": identity.run_id,
+            "task_id": identity.task_id,
+            "trace_id": identity.trace_id,
+            "correlation_id": identity.correlation_id,
+            "source": source,
+            **dict(payload or {}),
+        }
+
+    async def record_mapping_receipt(
+        self,
+        identity: ExecutionIdentity,
+        *,
+        id_kind: str,
+        external_id: str,
+        source: str = "runtime_state.mapping",
+        status: str = "mapped",
+        payload: dict[str, Any] | None = None,
+    ) -> RuntimeReceipt:
+        identity.require_for_dispatch()
+        normalized_kind = self._normalize_mapping_id_kind(id_kind)
+        normalized_external_id = str(external_id or "").strip()
+        if not normalized_external_id:
+            raise ValueError("external_id is required for runtime identity mapping")
+        mapped_identity = self._identity_with_mapping_field(
+            identity,
+            id_kind=normalized_kind,
+            external_id=normalized_external_id,
+        )
+        mapping_payload = self._mapping_payload(
+            identity,
+            id_kind=normalized_kind,
+            external_id=normalized_external_id,
+            source=source,
+            payload=payload,
+        )
+        await self.record_execution_identity(
+            mapped_identity,
+            source=f"mapping:{normalized_kind}",
+            metadata={"runtime_mapping": mapping_payload},
+        )
+        return await self.record_receipt_for_identity(
+            mapped_identity,
+            receipt_type="identity_mapping",
+            status=status,
+            side_effect_key=self._mapping_side_effect_key(
+                normalized_kind,
+                normalized_external_id,
+            ),
+            payload=mapping_payload,
+            receipt_id=self._mapping_receipt_id(
+                mapped_identity,
+                id_kind=normalized_kind,
+                external_id=normalized_external_id,
+            ),
+        )
+
+    def record_mapping_receipt_sync(
+        self,
+        identity: ExecutionIdentity,
+        *,
+        id_kind: str,
+        external_id: str,
+        source: str = "runtime_state.mapping",
+        status: str = "mapped",
+        payload: dict[str, Any] | None = None,
+    ) -> RuntimeReceipt:
+        identity.require_for_dispatch()
+        normalized_kind = self._normalize_mapping_id_kind(id_kind)
+        normalized_external_id = str(external_id or "").strip()
+        if not normalized_external_id:
+            raise ValueError("external_id is required for runtime identity mapping")
+        mapped_identity = self._identity_with_mapping_field(
+            identity,
+            id_kind=normalized_kind,
+            external_id=normalized_external_id,
+        )
+        mapping_payload = self._mapping_payload(
+            identity,
+            id_kind=normalized_kind,
+            external_id=normalized_external_id,
+            source=source,
+            payload=payload,
+        )
+        self.record_execution_identity_sync(
+            mapped_identity,
+            source=f"mapping:{normalized_kind}",
+            metadata={"runtime_mapping": mapping_payload},
+        )
+        return self.record_receipt_for_identity_sync(
+            mapped_identity,
+            receipt_type="identity_mapping",
+            status=status,
+            side_effect_key=self._mapping_side_effect_key(
+                normalized_kind,
+                normalized_external_id,
+            ),
+            payload=mapping_payload,
+            receipt_id=self._mapping_receipt_id(
+                mapped_identity,
+                id_kind=normalized_kind,
+                external_id=normalized_external_id,
+            ),
+        )
+
+    async def list_mapping_receipts(
+        self,
+        *,
+        run_id: str | None = None,
+        id_kind: str | None = None,
+        external_id: str | None = None,
+        limit: int = 100,
+    ) -> list[RuntimeReceipt]:
+        normalized_kind = self._normalize_mapping_id_kind(id_kind) if id_kind else None
+        normalized_external_id: str | None = None
+        if external_id is not None:
+            normalized_external_id = str(external_id or "").strip()
+            if not normalized_external_id:
+                raise ValueError("external_id is required for runtime identity mapping")
+            if not normalized_kind:
+                raise ValueError("id_kind is required when external_id is provided")
+        await self.init_db()
+        query = (
+            "SELECT receipt_id, receipt_type, run_id, task_id, trace_id,"
+            " correlation_id, causation_id, parent_run_id, agent_id,"
+            " idempotency_key, side_effect_key, status, payload_json, created_at"
+            " FROM runtime_receipts WHERE receipt_type = 'identity_mapping'"
+        )
+        params: list[Any] = []
+        if run_id is not None:
+            query += " AND run_id = ?"
+            params.append(run_id)
+        if normalized_kind and normalized_external_id:
+            query += " AND side_effect_key = ?"
+            params.append(
+                self._mapping_side_effect_key(normalized_kind, normalized_external_id)
+            )
+        elif normalized_kind:
+            query += " AND side_effect_key LIKE ?"
+            params.append(f"mapping:{normalized_kind}:%")
+        query += " ORDER BY created_at ASC LIMIT ?"
+        params.append(max(1, limit))
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            rows = await (await db.execute(query, params)).fetchall()
+        receipts = [_row_to_runtime_receipt(row) for row in rows]
+        if normalized_kind and not normalized_external_id:
+            receipts = [
+                receipt
+                for receipt in receipts
+                if receipt.payload.get("id_kind") == normalized_kind
+            ]
+        return receipts
+
+    def list_mapping_receipts_sync(
+        self,
+        *,
+        run_id: str | None = None,
+        id_kind: str | None = None,
+        external_id: str | None = None,
+        limit: int = 100,
+    ) -> list[RuntimeReceipt]:
+        normalized_kind = self._normalize_mapping_id_kind(id_kind) if id_kind else None
+        normalized_external_id: str | None = None
+        if external_id is not None:
+            normalized_external_id = str(external_id or "").strip()
+            if not normalized_external_id:
+                raise ValueError("external_id is required for runtime identity mapping")
+            if not normalized_kind:
+                raise ValueError("id_kind is required when external_id is provided")
+        self.init_db_sync()
+        query = (
+            "SELECT receipt_id, receipt_type, run_id, task_id, trace_id,"
+            " correlation_id, causation_id, parent_run_id, agent_id,"
+            " idempotency_key, side_effect_key, status, payload_json, created_at"
+            " FROM runtime_receipts WHERE receipt_type = 'identity_mapping'"
+        )
+        params: list[Any] = []
+        if run_id is not None:
+            query += " AND run_id = ?"
+            params.append(run_id)
+        if normalized_kind and normalized_external_id:
+            query += " AND side_effect_key = ?"
+            params.append(
+                self._mapping_side_effect_key(normalized_kind, normalized_external_id)
+            )
+        elif normalized_kind:
+            query += " AND side_effect_key LIKE ?"
+            params.append(f"mapping:{normalized_kind}:%")
+        query += " ORDER BY created_at ASC LIMIT ?"
+        params.append(max(1, limit))
+        with sqlite3.connect(self.db_path) as db:
+            db.row_factory = sqlite3.Row
+            rows = db.execute(query, params).fetchall()
+        receipts = [_row_to_runtime_receipt(row) for row in rows]
+        if normalized_kind and not normalized_external_id:
+            receipts = [
+                receipt
+                for receipt in receipts
+                if receipt.payload.get("id_kind") == normalized_kind
+            ]
+        return receipts
+
+    async def find_run_id_by_mapping(self, id_kind: str, external_id: str) -> str | None:
+        receipts = await self.list_mapping_receipts(
+            id_kind=id_kind,
+            external_id=external_id,
+            limit=1,
+        )
+        return receipts[0].run_id if receipts else None
+
+    def find_run_id_by_mapping_sync(self, id_kind: str, external_id: str) -> str | None:
+        receipts = self.list_mapping_receipts_sync(
+            id_kind=id_kind,
+            external_id=external_id,
+            limit=1,
+        )
+        return receipts[0].run_id if receipts else None
+
     async def record_runtime_receipt(self, receipt: RuntimeReceipt) -> RuntimeReceipt:
         await self.init_db()
         async with aiosqlite.connect(self.db_path) as db:
@@ -2945,6 +3232,7 @@ class RuntimeStateStore:
         run = await self.get_delegation_run(run_id)
         artifacts = await self.list_artifacts(run_id=run_id, limit=100)
         receipts = await self.list_runtime_receipts(run_id=run_id, limit=200)
+        mappings = await self.list_mapping_receipts(run_id=run_id, limit=200)
         children = await self.list_child_runs(run_id)
         idempotency_records: list[IdempotencyRecord] = []
         if identity is not None:
@@ -2967,6 +3255,7 @@ class RuntimeStateStore:
             "run": run,
             "artifacts": artifacts,
             "receipts": receipts,
+            "mappings": mappings,
             "children": children,
             "idempotency_records": idempotency_records,
         }
