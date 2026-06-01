@@ -18,7 +18,7 @@ Grep + read across all `dharma_swarm/**/*.py` for classes containing `State`, `R
 
 | # | Module | State class | Persistence | Scope |
 |---|--------|------------|-------------|-------|
-| 1 | `runtime_state.py` | `SessionState`, `TaskClaim`, `DelegationRun`, `RuntimeStateStore` | SQLite (`~/.dharma/state/runtime.db`) | **Canonical control plane** — sessions, task claims, delegation runs, session events |
+| 1 | `runtime_state.py` | `SessionState`, `TaskClaim`, `DelegationRun`, `RuntimeStateStore` | SQLite (`~/.dharma/state/runtime.db`) | **Primary control plane** — sessions, task claims, delegation runs, session events |
 | 2 | `models.py` | `AgentState`, `SwarmState`, `Task` | In-memory (via SwarmManager) | Agent pool + task board snapshots |
 | 3 | `swarm.py` | `SwarmCoordinationState`, `SwarmManager` | In-memory + delegates to `TaskBoard` | Top-level coordinator; owns agent pool, orchestrator, task board |
 | 4 | `orchestrate_live.py` | (no dedicated class) | Passes `STATE_DIR` to ~15 subsystems | **Loop host** — `run_swarm_loop()` instantiates SwarmManager, MessageBus, LoopSupervisor, all subsystem agents |
@@ -32,16 +32,16 @@ Grep + read across all `dharma_swarm/**/*.py` for classes containing `State`, `R
 | 12 | `hibernation.py` | `JobState` | Not examined in detail | Hibernation job lifecycle |
 | 13 | `economic_spine.py` | `MissionState` (enum) | Via runtime_state tables | Economic mission lifecycle states |
 
-### 2. Who is canonical?
+### 2. Who is the primary state owner?
 
-**`runtime_state.py:RuntimeStateStore`** is the canonical durable state surface. It's a WAL-backed SQLite store providing:
+**`runtime_state.py:RuntimeStateStore`** is the primary durable state surface. It's a WAL-backed SQLite store providing:
 - Session lifecycle (`sessions` table)
 - Task claim tracking (`task_claims` table)
 - Delegation run tracking (`delegation_runs` table)
 - Session event log (`session_events` table with FTS5)
 - Correlation context threading
 
-`orchestrate_live.py` is the canonical **loop host** — it instantiates `SwarmManager`, which in turn owns `TaskBoard` and the agent pool. But `orchestrate_live.py` doesn't own state itself; it delegates state persistence to `RuntimeStateStore` + various JSONL ledgers.
+`orchestrate_live.py` is the primary **loop host** — it instantiates `SwarmManager`, which in turn owns `TaskBoard` and the agent pool. But `orchestrate_live.py` doesn't own state itself; it delegates state persistence to `RuntimeStateStore` + various JSONL ledgers.
 
 ### 3. Is there a missing `workflowRun` boundary?
 
@@ -69,6 +69,6 @@ No two modules write to the same table or file. The "multiple owners" are layere
 
 ## Headline Verdict: **partially_confirmed**
 
-Codex's claim that "multiple workflow-state owners" exist is **confirmed** — there are at least 13 distinct state surfaces. The claim that they lack a `workflowRun` boundary is **confirmed** — `CanonicalWorkflowState` exists as a contract but has no runtime producer. However, the claim is **overstated** in framing: these are **layered** state surfaces serving different concerns (control plane, mission strategy, quality tracking, health monitoring), not competing authorities fighting over the same data. The fragmentation is structural (missing unifying type), not pathological (conflicting writes).
+Codex's claim that "multiple workflow-state owners" exist is **confirmed** — there are at least 13 distinct state surfaces. The claim that they lack a `workflowRun` boundary is **confirmed** — `CanonicalWorkflowState` exists as a contract but has no runtime producer. However, the claim is **overstated** in framing: these are **layered** state surfaces serving different concerns (control plane, mission strategy, quality tracking, health monitoring), not competing owners fighting over the same data. The fragmentation is structural (missing unifying type), not pathological (conflicting writes).
 
 The "LangGraph-style state graph absent" observation is **confirmed** and the most actionable finding: there is no first-class `workflowRun` that traces from dispatch through execution to outcome.
