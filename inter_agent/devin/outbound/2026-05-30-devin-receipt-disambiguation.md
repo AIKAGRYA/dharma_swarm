@@ -25,7 +25,7 @@ These are not duplicates. Merging them would have been wrong. The audit's "53 pr
 
 ## What this PR does instead
 
-**Disambiguates the names** so future readers, future agents, and the manifest checker can speak about each one unambiguously. Zero behavior change.
+**Disambiguates the names** so future readers, future agents, and the manifest checker can speak about each one unambiguously. Runtime data flow remains compatible through the temporary alias, but the validation exception text now says `ClosureEvidenceReceipt missing correlation_id/replay_command`.
 
 1. **Rename** `operator_core/closure_v0.py:class EvidenceReceipt:` → `class ClosureEvidenceReceipt:`
    - All in-file references updated (`record_evidence_receipt` return type, `project_vsm`/`kaizen_link` param types).
