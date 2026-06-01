@@ -41,10 +41,15 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+import re
+
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
-# ── Status lifecycle (mirrors Devin's in-flight TypeStatus enum) ──────
+API_NAME_PATTERN = re.compile(r"^dharma\.[a-z][a-z0-9_]*\.([A-Z][A-Za-z0-9]*)$")
+
+
+# ── Status lifecycle (mirrors OntologyRegistry.TypeStatus) ────────────
 
 
 class TypeStatus(str, Enum):
@@ -89,7 +94,7 @@ class ObjectTypeProposal(BaseModel):
     """Add a new ObjectType (or amend an experimental one)."""
     kind: Literal[ProposalKind.ADD_OBJECT_TYPE] = ProposalKind.ADD_OBJECT_TYPE
     name: str
-    api_name: str                   # MUST match dharma.<domain>.<TypeName>.v<N>
+    api_name: str                   # MUST match dharma.<domain>.<TypeName>
     status: TypeStatus = TypeStatus.EXPERIMENTAL
     description: str
     properties: dict[str, dict[str, Any]] = Field(default_factory=dict)
@@ -104,14 +109,21 @@ class ObjectTypeProposal(BaseModel):
     @field_validator("api_name")
     @classmethod
     def _api_name_pattern(cls, v: str) -> str:
-        import re
-        pattern = re.compile(r"^dharma\.[a-z][a-z0-9_]*\.[A-Z][A-Za-z0-9]*\.v\d+$")
-        if not pattern.match(v):
+        if not API_NAME_PATTERN.match(v):
             raise ValueError(
-                f"api_name '{v}' must match dharma.<domain>.<TypeName>.v<N> "
-                f"(e.g. dharma.findings.AuditFinding.v1)"
+                f"api_name '{v}' must match dharma.<domain>.<TypeName> "
+                f"(e.g. dharma.findings.AuditFinding)"
             )
         return v
+
+    @model_validator(mode="after")
+    def _api_name_type_matches_name(self) -> "ObjectTypeProposal":
+        match = API_NAME_PATTERN.match(self.api_name)
+        if match and match.group(1) != self.name:
+            raise ValueError(
+                f"api_name TypeName '{match.group(1)}' must match name '{self.name}'"
+            )
+        return self
 
     @field_validator("status")
     @classmethod

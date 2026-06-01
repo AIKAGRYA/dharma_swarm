@@ -39,7 +39,7 @@ the build if any of the following are true:
              different parameter signature or effect.
   ALIGN-006  A PR removes a PROMOTED ObjectType without a deprecation marker.
   ALIGN-007  A PR introduces an ObjectType whose api_name does not match the
-             frozen pattern `dharma.<domain>.<TypeName>.v<N>` (api naming
+             frozen pattern `dharma.<domain>.<TypeName>` (api naming
              discipline from PR #405 sec 7.3 — ontology IS the API).
 
 OUTPUTS
@@ -55,17 +55,16 @@ register_type with status-lifecycle (agent→active, OPERATOR→promoted).
 This script is INTENTIONALLY ADDITIVE — it never modifies ontology.py, never
 auto-resolves, never merges. It only surfaces conflicts and explains them.
 
-DEPENDENCY NOTE
----------------
-This gate requires Devin's in-flight OMS hardening (PR pending as of 2026-06-01):
+OMS STATE
+---------
+This gate assumes the OMS hardening from PR #409 is present on main:
   - ObjectType.status field (experimental / active / promoted)
-  - ObjectType.api_name field (frozen)
-  - OntologyRegistry.register_type uniqueness guard
+  - ObjectType.api_name field (frozen, no version suffix)
+  - OntologyRegistry.register_type uniqueness and immutability guards
 
-If those fields are not yet present on `ObjectType`, this gate runs in
-"degraded mode": it checks ALIGN-001 / ALIGN-004 / ALIGN-005 only, skipping
-api_name / status checks with a clear warning. Once Devin's PR lands and is
-merged to main, all 7 rules become enforceable.
+Branches without api_name/status still parse, but missing api_name means
+ALIGN-002/007 cannot protect that ObjectType until the branch rebases onto the
+OMS baseline.
 
 USAGE
 -----
@@ -78,8 +77,8 @@ USAGE
   # JSON output for machine consumption:
   python3 scripts/governance/check_ontology_alignment.py --json
 
-  # Strict mode: ALIGN-007 api_name discipline becomes a failure (not a warning):
-  python3 scripts/governance/check_ontology_alignment.py --strict
+  # Warn-only mode: report ALIGN-007 api_name discipline without failing:
+  python3 scripts/governance/check_ontology_alignment.py --warn-only-api-name
 """
 
 from __future__ import annotations
@@ -91,11 +90,11 @@ import subprocess
 import sys
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ONTOLOGY_PATH_REL = "dharma_swarm/ontology.py"
-API_NAME_PATTERN = re.compile(r"^dharma\.[a-z][a-z0-9_]*\.[A-Z][A-Za-z0-9]*\.v\d+$")
+API_NAME_PATTERN = re.compile(r"^dharma\.[a-z][a-z0-9_]*\.[A-Z][A-Za-z0-9]*$")
 DEFAULT_PR_LIMIT = 30
 
 # ── Data model ────────────────────────────────────────────────────────
@@ -173,13 +172,21 @@ def _extract_ontology_snapshot(ontology_text: str, source_pr: str,
     links: list[LinkSpec] = []
     actions: list[ActionSpec] = []
 
+    def _literal_or_name(node: ast.AST) -> Any:
+        try:
+            return ast.literal_eval(node)
+        except Exception:
+            pass
+        if isinstance(node, ast.Attribute):
+            return node.attr.lower()
+        if isinstance(node, ast.Name):
+            return node.id
+        return None
+
     def _kwarg_value(call: ast.Call, key: str) -> Any:
         for kw in call.keywords:
             if kw.arg == key:
-                try:
-                    return ast.literal_eval(kw.value)
-                except Exception:
-                    return None
+                return _literal_or_name(kw.value)
         return None
 
     for node in ast.walk(tree):
@@ -227,7 +234,7 @@ def _extract_ontology_snapshot(ontology_text: str, source_pr: str,
 
     return {
         "types": [asdict(t) for t in types],
-        "links": [asdict(l) for l in links],
+        "links": [asdict(link) for link in links],
         "actions": [asdict(a) for a in actions],
     }
 
@@ -251,15 +258,20 @@ def _list_open_ontology_prs(limit: int = DEFAULT_PR_LIMIT) -> list[dict]:
     try:
         out = subprocess.run(
             ["gh", "pr", "list", "--state", "open", "--limit", str(limit),
-             "--json", "number,title,headRefName,headRefOid,author,updatedAt,files"],
+             "--json", "number,title,headRefName,headRefOid,author,updatedAt"],
             cwd=REPO_ROOT, capture_output=True, text=True, check=True, timeout=20,
         )
         prs = json.loads(out.stdout)
         relevant = []
         for pr in prs:
-            files = pr.get("files") or []
+            files_out = subprocess.run(
+                ["gh", "pr", "view", str(pr["number"]), "--json", "files"],
+                cwd=REPO_ROOT, capture_output=True, text=True, check=True, timeout=20,
+            )
+            files = json.loads(files_out.stdout).get("files") or []
             for f in files:
                 if f.get("path", "").endswith("ontology.py") or "ontology" in f.get("path", "").lower():
+                    pr["files"] = files
                     relevant.append(pr)
                     break
         return relevant
@@ -307,6 +319,12 @@ def _detect_conflicts(snapshots: list[dict[str, Any]]) -> list[Conflict]:
                 diffs = {}
                 for field_ in ("api_name", "telos_alignment", "shakti_energy",
                                "version", "description"):
+                    if field_ == "api_name" and (
+                        a.get("api_name") is None or b.get("api_name") is None
+                    ):
+                        # Pre-OMS branches lack api_name entirely. That is a
+                        # rebase gap, not an incompatible alternate contract.
+                        continue
                     if a.get(field_) != b.get(field_):
                         diffs[field_] = [a.get(field_), b.get(field_)]
                 if diffs:
@@ -333,9 +351,9 @@ def _detect_conflicts(snapshots: list[dict[str, Any]]) -> list[Conflict]:
                         type_or_link=name,
                         field_diffs={"status": [a["status"], b["status"]]},
                         suggestion=(
-                            f"Status promotion is monotonic: experimental→active→promoted. "
-                            f"Demotion or fork forbidden. Land the higher status PR first, "
-                            f"rebase the other."
+                            "Status promotion is monotonic: experimental→active→promoted. "
+                            "Demotion or fork forbidden. Land the higher status PR first, "
+                            "rebase the other."
                         ),
                     ))
 
@@ -351,15 +369,16 @@ def _detect_conflicts(snapshots: list[dict[str, Any]]) -> list[Conflict]:
                 type_or_link=api_name,
                 field_diffs={"name": list(names)},
                 suggestion=(
-                    f"api_name is the PUBLIC stable contract — it must map 1:1 to a single "
-                    f"internal name. Rename one. Bump version suffix if both must coexist."
+                    "api_name is the PUBLIC stable contract — it must map 1:1 to a single "
+                    "internal name. Rename one and use ObjectType.version / deprecation "
+                    "metadata if both contracts must coexist."
                 ),
             ))
 
     # ALIGN-004: LinkDef conflicts
     by_link_key: dict[tuple, list[dict]] = {}
-    for l in all_links:
-        by_link_key.setdefault((l["source_type"], l["name"]), []).append(l)
+    for link in all_links:
+        by_link_key.setdefault((link["source_type"], link["name"]), []).append(link)
     for key, defs in by_link_key.items():
         pairs_seen = set()
         for i, a in enumerate(defs):
@@ -425,15 +444,15 @@ def _detect_conflicts(snapshots: list[dict[str, Any]]) -> list[Conflict]:
 
 
 def _check_api_name_discipline(snapshots: list[dict[str, Any]],
-                                strict: bool) -> list[Conflict]:
+                                warn_only: bool) -> list[Conflict]:
     """Flag any ObjectType whose api_name doesn't match the frozen pattern."""
     issues: list[Conflict] = []
-    severity = "error" if strict else "warning"
+    severity = "warning" if warn_only else "error"
     for snap in snapshots:
         for t in snap.get("types", []):
             api_name = t.get("api_name")
             if api_name is None:
-                # Skipping — Devin's OMS hardening may not have backfilled yet
+                # Branch has not rebased onto the OMS hardening baseline yet.
                 continue
             if not API_NAME_PATTERN.match(api_name):
                 issues.append(Conflict(
@@ -442,11 +461,11 @@ def _check_api_name_discipline(snapshots: list[dict[str, Any]],
                     summary=f"api_name '{api_name}' for type '{t['name']}' violates pattern",
                     pr_a=t["source_pr"], pr_b="(naming-discipline)",
                     type_or_link=t["name"],
-                    field_diffs={"api_name": [api_name, "expected: dharma.<domain>.<TypeName>.v<N>"]},
+                    field_diffs={"api_name": [api_name, "expected: dharma.<domain>.<TypeName>"]},
                     suggestion=(
                         "From PR #405 sec 7.3: ontology IS the API. api_names must be "
-                        "frozen, namespaced, and SEMVER-stamped. Rename to fit pattern "
-                        "or rebase against the latest naming ADR."
+                        "frozen and namespaced. Version belongs in ObjectType.version, "
+                        "not in the public api_name. Rename to fit ADR-008."
                     ),
                 ))
     return issues
@@ -461,8 +480,8 @@ def main() -> int:
                    help="GitHub PR number to check (defaults to current branch)")
     p.add_argument("--json", action="store_true",
                    help="Emit conflicts as JSON for machine consumption")
-    p.add_argument("--strict", action="store_true",
-                   help="Treat ALIGN-007 api_name discipline as error (default: warning)")
+    p.add_argument("--warn-only-api-name", action="store_true",
+                   help="Report ALIGN-007 api_name violations without failing")
     p.add_argument("--limit", type=int, default=DEFAULT_PR_LIMIT,
                    help=f"Max open PRs to scan (default: {DEFAULT_PR_LIMIT})")
     args = p.parse_args()
@@ -516,13 +535,13 @@ def main() -> int:
         for s in snapshots for t in s.get("types", [])
     )
     if not has_api_name:
-        print("[info] DEGRADED MODE: no api_name on any ObjectType. "
-              "ALIGN-002/007 skipped. Waiting on Devin's OMS hardening PR.",
+        print("[warn] No api_name on any ObjectType. ALIGN-002/007 skipped; "
+              "branch likely needs rebase onto OMS baseline.",
               file=sys.stderr)
 
     # Detect conflicts
     conflicts = _detect_conflicts(snapshots)
-    conflicts.extend(_check_api_name_discipline(snapshots, strict=args.strict))
+    conflicts.extend(_check_api_name_discipline(snapshots, warn_only=args.warn_only_api_name))
 
     # Output
     if args.json:
@@ -535,7 +554,7 @@ def main() -> int:
             "warnings": [asdict(c) for c in conflicts if c.severity == "warning"],
         }, indent=2))
     else:
-        print(f"\n=== ontology alignment check ===")
+        print("\n=== ontology alignment check ===")
         print(f"snapshots loaded: {len(snapshots)}")
         for c in conflicts:
             print(f"\n[{c.severity.upper()}] {c.rule} — {c.summary}")
