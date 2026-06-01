@@ -86,17 +86,26 @@ PAYLOAD_DESTRUCTIVE_TARGET_VERBS = frozenset({
 
 PAYLOAD_EXFILTRATION_TARGET_VERBS = frozenset({
     "copy",
+    "disclose",
     "download",
     "dump",
     "email",
     "export",
     "extract",
     "harvest",
+    "mirror",
+    "offload",
     "post",
     "publish",
+    "reveal",
     "send",
     "share",
+    "ship",
+    "siphon",
+    "smuggle",
+    "transfer",
     "upload",
+    "wire",
 })
 
 PAYLOAD_PRIVILEGE_TARGET_VERBS = frozenset({
