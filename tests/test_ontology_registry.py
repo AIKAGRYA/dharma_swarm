@@ -763,13 +763,43 @@ class TestApiName:
                 )
             seen[obj_type.api_name] = name
 
-    def test_register_type_rejects_duplicate_api_name(self, registry: OntologyRegistry) -> None:
+    def test_register_type_rejects_duplicate_api_name(self) -> None:
+        registry = OntologyRegistry()
+        # Simulates a legacy/corrupted registry state; the public API should
+        # still defend the frozen API identity index before accepting a type.
+        registry._types["LegacyAlias"] = ObjectType(
+            name="LegacyAlias",
+            description="legacy duplicate",
+            api_name="dharma.research.ResearchThread",
+        )
         with pytest.raises(ValueError, match="api_name .* already registered"):
             registry.register_type(
                 ObjectType(
-                    name="ResearchThreadShadow",
+                    name="ResearchThread",
                     description="duplicate API identity",
                     api_name="dharma.research.ResearchThread",
+                )
+            )
+
+    def test_register_type_rejects_malformed_api_name(self) -> None:
+        registry = OntologyRegistry()
+        with pytest.raises(ValueError, match="must match"):
+            registry.register_type(
+                ObjectType(
+                    name="BadContract",
+                    description="bad API identity",
+                    api_name="dharma.research.bad-contract",
+                )
+            )
+
+    def test_register_type_rejects_api_name_type_mismatch(self) -> None:
+        registry = OntologyRegistry()
+        with pytest.raises(ValueError, match="must match ObjectType.name"):
+            registry.register_type(
+                ObjectType(
+                    name="RegisteredName",
+                    description="wrong type segment",
+                    api_name="dharma.research.OtherName",
                 )
             )
 
@@ -777,7 +807,7 @@ class TestApiName:
         self,
         registry: OntologyRegistry,
     ) -> None:
-        with pytest.raises(ValueError, match="api_name .* already registered"):
+        with pytest.raises(ValueError, match="immutable api_name"):
             registry.register_type(
                 ObjectType(
                     name="AgentIdentity",
@@ -821,12 +851,43 @@ class TestRegisterTypeUniqueness:
 
     def test_allow_overwrite(self, registry: OntologyRegistry) -> None:
         registry.register_type(
-            ObjectType(name="ResearchThread", description="replaced"),
+            ObjectType(
+                name="ResearchThread",
+                description="replaced",
+                status=TypeStatus.ACTIVE,
+                api_name="dharma.research.ResearchThread",
+            ),
             allow_overwrite=True,
         )
         t = registry.get_type("ResearchThread")
         assert t is not None
         assert t.description == "replaced"
+        assert t.api_name == "dharma.research.ResearchThread"
+
+    def test_allow_overwrite_cannot_clear_existing_api_name(
+        self,
+        registry: OntologyRegistry,
+    ) -> None:
+        with pytest.raises(ValueError, match="immutable api_name"):
+            registry.register_type(
+                ObjectType(name="ResearchThread", description="cleared identity"),
+                allow_overwrite=True,
+            )
+
+    def test_allow_overwrite_cannot_rename_existing_api_name(
+        self,
+        registry: OntologyRegistry,
+    ) -> None:
+        with pytest.raises(ValueError, match="immutable api_name"):
+            registry.register_type(
+                ObjectType(
+                    name="ResearchThread",
+                    description="renamed identity",
+                    status=TypeStatus.ACTIVE,
+                    api_name="dharma.research.ResearchThreadRenamed",
+                ),
+                allow_overwrite=True,
+            )
 
     def test_new_name_succeeds(self, registry: OntologyRegistry) -> None:
         registry.register_type(
@@ -849,7 +910,7 @@ class TestRegisterTypeUniqueness:
             )
         )
 
-        with pytest.raises(ValueError, match="PROMOTED with immutable api_name"):
+        with pytest.raises(ValueError, match="immutable api_name"):
             registry.register_type(
                 ObjectType(
                     name="StableContract",

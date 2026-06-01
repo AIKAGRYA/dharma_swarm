@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from enum import Enum
@@ -40,6 +41,8 @@ from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
+_API_NAME_PATTERN = re.compile(r"^dharma\.([a-z][a-z0-9_]*)\.([A-Z][A-Za-z0-9_]*)$")
+
 
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
@@ -48,6 +51,23 @@ def _utc_now() -> datetime:
 def _new_id() -> str:
     from uuid import uuid4
     return uuid4().hex[:16]
+
+
+def _validate_api_name(obj_type: "ObjectType") -> None:
+    if not obj_type.api_name:
+        return
+    match = _API_NAME_PATTERN.fullmatch(obj_type.api_name)
+    if match is None:
+        raise ValueError(
+            f"ObjectType api_name '{obj_type.api_name}' must match "
+            "'dharma.<domain>.<TypeName>'."
+        )
+    type_name = match.group(2)
+    if type_name != obj_type.name:
+        raise ValueError(
+            f"ObjectType api_name TypeName '{type_name}' must match "
+            f"ObjectType.name '{obj_type.name}'."
+        )
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -444,7 +464,8 @@ class OntologyRegistry:
         Raises:
             ValueError: If a type with the same ``name`` is already
                 registered and *allow_overwrite* is ``False``, or if a
-                non-empty ``api_name`` is already bound to another type.
+                non-empty ``api_name`` is malformed, mismatched, or already
+                bound to another type.
         """
         existing = self._types.get(obj_type.name)
         if existing is not None and not allow_overwrite:
@@ -452,17 +473,14 @@ class OntologyRegistry:
                 f"ObjectType '{obj_type.name}' is already registered. "
                 f"Pass allow_overwrite=True to replace it."
             )
-        if (
-            existing is not None
-            and allow_overwrite
-            and existing.status == TypeStatus.PROMOTED
-            and existing.api_name
-            and obj_type.api_name != existing.api_name
-        ):
-            raise ValueError(
-                f"ObjectType '{obj_type.name}' is PROMOTED with immutable api_name "
-                f"'{existing.api_name}'."
-            )
+        if existing is not None and allow_overwrite and existing.api_name:
+            if obj_type.api_name == existing.api_name:
+                pass
+            else:
+                raise ValueError(
+                    f"ObjectType '{obj_type.name}' has immutable api_name "
+                    f"'{existing.api_name}'."
+                )
         if obj_type.api_name:
             for existing_name, existing_type in self._types.items():
                 if existing_name == obj_type.name:
@@ -472,6 +490,7 @@ class OntologyRegistry:
                         f"ObjectType api_name '{obj_type.api_name}' is already registered "
                         f"for '{existing_name}'. api_name must be globally unique."
                     )
+        _validate_api_name(obj_type)
         self._types[obj_type.name] = obj_type
         for link_def in obj_type.links:
             self.register_link(link_def)
