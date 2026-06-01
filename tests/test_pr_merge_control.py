@@ -261,6 +261,8 @@ def test_render_agent_prompt_requires_repo_relative_paths(tmp_path):
     assert "repo-relative file/line evidence" in prompt
     assert "`dharma_swarm/ontology.py`" in prompt
     assert "bare filenames are not sufficient" in prompt
+    assert 'phrase "No blocking findings"' in prompt
+    assert "If your only hold is human/operator approval" in prompt
 
 
 def test_review_receipt_status_rejects_command_error(tmp_path):
@@ -537,6 +539,69 @@ def test_build_gate_requires_note_for_high_risk_human_approval(tmp_path, monkeyp
 
     assert gate["decision"] == "BLOCKED"
     assert "HIGH risk requires --human-approval-note" in gate["blockers"]
+
+
+def test_build_gate_allows_needs_human_when_human_approval_recorded(tmp_path, monkeypatch):
+    packet_dir = tmp_path / "packet"
+    packet_dir.mkdir()
+    prc.write_json(packet_dir / "FACTS.json", {"risk": {"level": "CRITICAL"}, "pr": {"headRefOid": "abc"}})
+    (packet_dir / "codex_review.md").write_text(
+        "## Verdict\nAPPROVE\n\n"
+        "## Findings\nNo blocking findings after reading `scripts/runtime/pr_merge_control.py`.\n\n"
+        "## Missing Tests Or Proof\nNo missing local proof for this bounded check.\n\n"
+        "## Merge Conditions\nCI must stay green and the reviewed head must match.\n",
+        encoding="utf-8",
+    )
+    prc.write_json(
+        packet_dir / "codex_review_receipt.json",
+        {"exit_code": 0, "reviewed_head_sha": "abc"},
+    )
+    (packet_dir / "claude_review.md").write_text(
+        "## Verdict\nNEEDS_HUMAN\n\n"
+        "## Findings\nCritical risk needs operator approval after reviewing `dharma_swarm/ontology.py`.\n\n"
+        "## Missing Tests Or Proof\nNo missing local proof beyond human approval for this critical path.\n\n"
+        "## Merge Conditions\nHuman approval must be recorded before merge.\n",
+        encoding="utf-8",
+    )
+    prc.write_json(
+        packet_dir / "claude_review_receipt.json",
+        {"exit_code": 0, "reviewed_head_sha": "abc"},
+    )
+
+    args = SimpleNamespace(
+        packet_dir=str(packet_dir),
+        state_root=str(tmp_path),
+        pr=42,
+        allow_pending=False,
+        human_approved=True,
+        human_approval_note="Operator approved the critical hot-path merge after dual-agent review.",
+    )
+    monkeypatch.setattr(
+        prc,
+        "fetch_pr_view",
+        lambda _pr: {
+            "number": 42,
+            "title": "critical",
+            "headRefOid": "abc",
+            "body": """
+- Organ touched: dharma_swarm/ontology.py
+- Declared-vs-actual gap closed: critical path now has explicit review receipts.
+- Proof that re-reads the map: packet and gate both load.
+- New drift introduced: None
+""",
+            "isDraft": False,
+            "mergeable": "MERGEABLE",
+            "reviewDecision": "APPROVED",
+            "statusCheckRollup": [{"name": "tests", "status": "COMPLETED", "conclusion": "SUCCESS"}],
+        },
+    )
+    monkeypatch.setattr(prc, "repo_name", lambda: "owner/repo")
+    monkeypatch.setattr(prc, "fetch_review_threads", lambda _pr, _repo: {"ok": True, "unresolved_count": 0})
+
+    gate = prc.build_gate(args)
+
+    assert gate["decision"] == "MERGE_CANDIDATE"
+    assert "Claude review returned NEEDS_HUMAN; satisfied by recorded human approval" in gate["warnings"]
 
 
 def test_render_github_comment_blocks_when_gate_missing():

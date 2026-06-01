@@ -548,6 +548,11 @@ Concrete gaps only.
 
 ## Merge Conditions
 The exact conditions that must be true before merge.
+
+If your verdict is APPROVE, the Findings section must explicitly include the
+phrase "No blocking findings" and still cite repo-relative path evidence.
+If your only hold is human/operator approval for a high-risk PR, use
+NEEDS_HUMAN and describe the exact approval condition.
 """
 
 
@@ -806,6 +811,27 @@ def review_receipt_status(path: Path, *, expected_head_sha: str = "") -> dict[st
     return {"ok": True, "verdict": contract["verdict"], "reason": "", "reviewed_head_sha": reviewed_head_sha}
 
 
+def apply_review_gate(
+    blockers: list[str],
+    warnings: list[str],
+    *,
+    name: str,
+    receipt: dict[str, Any],
+    review_file: str,
+    human_approved: bool,
+) -> None:
+    if not receipt["ok"]:
+        blockers.append(f"invalid {review_file} receipt: {receipt['reason']}")
+        return
+    verdict = receipt["verdict"]
+    if verdict == "APPROVE":
+        return
+    if verdict == "NEEDS_HUMAN" and human_approved:
+        warnings.append(f"{name} review returned NEEDS_HUMAN; satisfied by recorded human approval")
+        return
+    blockers.append(f"{review_file} verdict is {verdict}")
+
+
 def build_gate(args: argparse.Namespace) -> dict[str, Any]:
     out_dir = latest_or_arg_packet(args)
     original = load_json(out_dir / "FACTS.json")
@@ -847,14 +873,22 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
     claude_path = out_dir / "claude_review.md"
     codex_receipt = review_receipt_status(codex_path, expected_head_sha=current_head_sha)
     claude_receipt = review_receipt_status(claude_path, expected_head_sha=current_head_sha)
-    if not codex_receipt["ok"]:
-        blockers.append(f"invalid codex_review.md receipt: {codex_receipt['reason']}")
-    elif codex_receipt["verdict"] != "APPROVE":
-        blockers.append(f"codex_review.md verdict is {codex_receipt['verdict']}")
-    if not claude_receipt["ok"]:
-        blockers.append(f"invalid claude_review.md receipt: {claude_receipt['reason']}")
-    elif claude_receipt["verdict"] != "APPROVE":
-        blockers.append(f"claude_review.md verdict is {claude_receipt['verdict']}")
+    apply_review_gate(
+        blockers,
+        warnings,
+        name="Codex",
+        receipt=codex_receipt,
+        review_file="codex_review.md",
+        human_approved=args.human_approved,
+    )
+    apply_review_gate(
+        blockers,
+        warnings,
+        name="Claude",
+        receipt=claude_receipt,
+        review_file="claude_review.md",
+        human_approved=args.human_approved,
+    )
 
     original_risk = original.get("risk", {}).get("level", "UNKNOWN")
     if original_risk in {"HIGH", "CRITICAL"} and not args.human_approved:
