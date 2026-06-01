@@ -15,6 +15,7 @@ from dharma_swarm.ontology import (
     DEFAULT_COMPOSITE_GATE_PASS,
     ObjectType,
     OntologyRegistry,
+    _default_gate_results_for_declared_gates,
     _default_telos_gate_check,
     _unknown_declared_telos_gates,
 )
@@ -71,6 +72,38 @@ def test_default_gate_check_blocks_canonical_destructive_params() -> None:
     ):
         out = _default_telos_gate_check("Propose", params)
         assert "BLOCK" in out.values(), params
+
+
+def test_declared_gate_pass_receipts_are_projected_composite_by_design() -> None:
+    out = _default_gate_results_for_declared_gates(
+        {"TELOS": "PASS"},
+        ["AHIMSA", "SATYA", "REVERSIBILITY"],
+    )
+    assert out == {
+        "AHIMSA": DEFAULT_COMPOSITE_GATE_PASS,
+        "SATYA": DEFAULT_COMPOSITE_GATE_PASS,
+        "REVERSIBILITY": DEFAULT_COMPOSITE_GATE_PASS,
+    }
+
+
+def test_telos_gates_public_exports_preserve_existing_symbols() -> None:
+    from dharma_swarm import telos_gates
+
+    expected = {
+        "DEFAULT_GATEKEEPER",
+        "GateCheckResult",
+        "GateDecision",
+        "GateProposal",
+        "GateRegistry",
+        "GateResult",
+        "GateTier",
+        "ReflectiveGateOutcome",
+        "TelosGatekeeper",
+        "WITNESS_DIR",
+        "check_action",
+        "check_with_reflective_reroute",
+    }
+    assert expected <= set(telos_gates.__all__)
 
 
 def test_default_gate_check_blocks_destructive_phrase_after_benign_phrase() -> None:

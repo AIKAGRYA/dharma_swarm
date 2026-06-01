@@ -37,11 +37,22 @@ from dharma_swarm.telos_payload_classifier import (
 
 __all__ = [
     "DEFAULT_GATEKEEPER",
+    "GateCheckResult",
+    "GateDecision",
+    "GateProposal",
+    "GateRegistry",
+    "GateResult",
+    "GateTier",
     "PAYLOAD_HARD_BLOCK_PHRASE_ACTIONS",
     "PAYLOAD_HARM_GATEKEEPER_ALIASES",
     "PAYLOAD_HARM_TARGET_BLOCK",
+    "ReflectiveGateOutcome",
+    "TelosGatekeeper",
+    "WITNESS_DIR",
     "canonical_payload_harm_action",
     "check_action",
+    "check_with_reflective_reroute",
+    "evaluate_anekanta",
 ]
 
 logger = logging.getLogger(__name__)
