@@ -11,6 +11,7 @@ a foreign key back to ``messages(id)``.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import sqlite3
 from contextlib import asynccontextmanager
@@ -26,6 +27,8 @@ from dharma_swarm.models import (
     MessageStatus,
     _new_id,
 )
+from dharma_swarm.runtime_state import RuntimeStateStore
+from dharma_swarm.spine.identity import ExecutionIdentity
 
 _MESSAGES_DDL = """
 CREATE TABLE IF NOT EXISTS messages (
@@ -114,8 +117,14 @@ class MessageBus:
     _BUSY_TIMEOUT_S = 30
     _LOCK_RETRY_DELAYS_S = (0.05, 0.1, 0.25, 0.5, 1.0)
 
-    def __init__(self, db_path: Path) -> None:
+    def __init__(
+        self,
+        db_path: Path,
+        *,
+        runtime_state: RuntimeStateStore | None = None,
+    ) -> None:
         self.db_path = db_path
+        self._runtime_state = runtime_state
 
     def _open(self) -> aiosqlite.Connection:
         """Open a connection with enough headroom for concurrent writers."""
@@ -586,10 +595,64 @@ class MessageBus:
         task_id: str | None = None,
         agent_id: str | None = None,
         payload: dict[str, Any] | None = None,
+        idempotency_key: str | None = None,
     ) -> str:
         """Persist a cross-process event.  Returns the event_id."""
         import os
-        event_id = _new_id()
+        event_payload = payload or {}
+        event_id = (
+            "evt_" + hashlib.sha256(
+                f"message_bus.emit_event:{idempotency_key}".encode("utf-8")
+            ).hexdigest()[:16]
+            if idempotency_key
+            else _new_id()
+        )
+        identity: ExecutionIdentity | None = None
+        side_effect_key = f"message_bus.emit_event:{event_type}:{event_id}"
+        if idempotency_key:
+            if self._runtime_state is None:
+                raise ValueError("runtime_state is required when idempotency_key is supplied")
+            identity = ExecutionIdentity.new(
+                task_id=str(task_id or event_payload.get("task_id") or "message_bus"),
+                agent_id=str(agent_id or event_payload.get("agent_id") or ""),
+                trace_id=str(event_payload.get("trace_id") or ""),
+                correlation_id=str(event_payload.get("correlation_id") or event_payload.get("trace_id") or ""),
+                run_id=str(event_payload.get("run_id") or ""),
+                claim_id=str(event_payload.get("claim_id") or ""),
+                idempotency_key=idempotency_key,
+                event_id=event_id,
+            )
+            existing = await self._runtime_state.get_idempotency_record(
+                identity.idempotency_key,
+                side_effect_key,
+            )
+            if existing is not None:
+                return existing.result_receipt_id or event_id
+            should_execute = await self._runtime_state.try_begin_idempotent_side_effect(
+                identity,
+                side_effect_key,
+                metadata={
+                    "event_type": event_type,
+                    "operation_hash": hashlib.sha256(
+                        json.dumps(
+                            {
+                                "event_type": event_type,
+                                "task_id": task_id,
+                                "agent_id": agent_id,
+                                "payload": event_payload,
+                            },
+                            sort_keys=True,
+                            default=str,
+                        ).encode("utf-8")
+                    ).hexdigest(),
+                },
+            )
+            if not should_execute:
+                record = await self._runtime_state.get_idempotency_record(
+                    identity.idempotency_key,
+                    side_effect_key,
+                )
+                return (record.result_receipt_id if record else "") or event_id
 
         async def _emit() -> str:
             async with self._open() as db:
@@ -601,13 +664,21 @@ class MessageBus:
                     (
                         event_id, event_type, task_id, agent_id,
                         os.getpid(), _now_iso(),
-                        json.dumps(payload or {}, default=str),
+                        json.dumps(event_payload, default=str),
                     ),
                 )
                 await db.commit()
             return event_id
 
-        return await self._run_with_lock_retry(_emit)
+        emitted = await self._run_with_lock_retry(_emit)
+        if identity is not None and self._runtime_state is not None:
+            await self._runtime_state.complete_idempotent_side_effect(
+                identity,
+                side_effect_key,
+                result_receipt_id=emitted,
+                metadata={"event_type": event_type},
+            )
+        return emitted
 
     async def consume_events(
         self,

@@ -58,6 +58,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import uuid
 from dataclasses import asdict
 from datetime import datetime, timezone
 from typing import Any
@@ -173,6 +174,17 @@ def _task_to_dict(task: A2ATask) -> dict[str, Any]:
     d = asdict(task)
     # Exclude the property alias from serialization
     d.pop("messages", None)
+    metadata = dict(d.get("metadata") or {})
+    for key in (
+        "run_id",
+        "runtime_run_id",
+        "correlation_id",
+        "idempotency_key",
+        "claim_id",
+        "external_a2a_task_id",
+    ):
+        if metadata.get(key):
+            d[key] = metadata[key]
     # Strip internal validation flags from serialized parts
     _strip_internal_fields(d)
     return d
@@ -207,15 +219,32 @@ def _parse_task_from_body(body: dict[str, Any]) -> A2ATask:
     if not messages and body.get("message"):
         messages = [A2AMessage.text(body["message"])]
 
-    return A2ATask(
+    metadata = dict(body.get("metadata", {}) or {})
+    for key in (
+        "run_id",
+        "runtime_run_id",
+        "correlation_id",
+        "causation_id",
+        "parent_run_id",
+        "claim_id",
+        "idempotency_key",
+        "session_id",
+        "task_id",
+    ):
+        if body.get(key):
+            metadata[key] = body[key]
+
+    task = A2ATask(
+        id=str(body.get("id") or body.get("task_id") or "") or uuid.uuid4().hex[:16],
         from_agent=body.get("from_agent", "remote"),
         to_agent=body.get("to_agent", ""),
         capability=body.get("capability", ""),
         context_id=body.get("context_id", ""),
         trace_id=body.get("trace_id", ""),
         history=messages,
-        metadata=body.get("metadata", {}),
+        metadata=metadata,
     )
+    return task
 
 
 def _health_payload() -> dict[str, Any]:

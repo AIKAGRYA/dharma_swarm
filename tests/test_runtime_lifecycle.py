@@ -7,6 +7,7 @@ import pytest
 
 from dharma_swarm.models import Task, TaskDispatch, TopologyType
 from dharma_swarm.runtime_lifecycle import RuntimeLifecycle
+from dharma_swarm.runtime_state import RuntimeStateStore
 from dharma_swarm.session_ledger import SessionLedger
 
 
@@ -109,3 +110,16 @@ async def test_runtime_lifecycle_preserves_structured_row_idempotence(tmp_path: 
     assert run_status == "completed"
     assert stored_run_id == run_id
     assert artifact_run_id == run_id
+
+    receipts = await RuntimeStateStore(runtime_db_path).list_runtime_receipts(
+        run_id=run_id,
+        limit=20,
+    )
+    receipt_types = {receipt.receipt_type for receipt in receipts}
+    assert {
+        "delegation_run",
+        "child_spawned",
+        "child_completed",
+        "artifact",
+        "artifact_written",
+    } <= receipt_types
