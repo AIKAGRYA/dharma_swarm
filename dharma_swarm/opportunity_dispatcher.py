@@ -33,6 +33,7 @@ from dharma_swarm.runtime_state import (
     _utc_now,
     _utc_now_iso,
 )
+from dharma_swarm.spine.identity import ExecutionIdentity
 
 logger = logging.getLogger(__name__)
 
@@ -150,6 +151,8 @@ class OpportunityDispatcher:
         opp_type = str(
             opportunity.get("type") or opportunity.get("domain") or "external_revenue"
         )
+        trace_id = str(opportunity.get("trace_id") or _new_id("trace"))
+        correlation_id = str(opportunity.get("correlation_id") or trace_id)
 
         for stage in OPPORTUNITY_STAGES:
             task_id = _new_id("task")
@@ -171,6 +174,34 @@ class OpportunityDispatcher:
                 },
             )
 
+            identity = ExecutionIdentity.new(
+                task_id=task_id,
+                agent_id=agent_id,
+                session_id=self._session_id,
+                trace_id=trace_id,
+                correlation_id=correlation_id,
+                causation_id=f"opportunity:{opp_id}:{stage}",
+                run_id=run_id,
+                claim_id=claim_id,
+                idempotency_key=f"idem_{run_id}",
+                metadata={
+                    "source": "opportunity_dispatcher",
+                    "opportunity_id": opp_id,
+                    "opportunity_type": opp_type,
+                    "stage": stage,
+                },
+            )
+            identity_metadata = {
+                **identity.to_metadata(),
+                "trace_id": identity.trace_id,
+                "correlation_id": identity.correlation_id,
+                "run_id": identity.run_id,
+                "runtime_run_id": identity.run_id,
+                "claim_id": identity.claim_id,
+                "idempotency_key": identity.idempotency_key,
+            }
+            task.metadata.update(identity_metadata)
+
             proposal_id: str | None = None
             if self._telic_seam is not None:
                 try:
@@ -181,6 +212,20 @@ class OpportunityDispatcher:
                     logger.debug("Telic dispatch record failed: %s", exc)
 
             try:
+                if proposal_id:
+                    identity = identity.with_updates(proposal_id=proposal_id)
+                identity_metadata = {
+                    **identity.to_metadata(),
+                    "trace_id": identity.trace_id,
+                    "correlation_id": identity.correlation_id,
+                    "run_id": identity.run_id,
+                    "runtime_run_id": identity.run_id,
+                    "claim_id": identity.claim_id,
+                    "idempotency_key": identity.idempotency_key,
+                }
+                if identity.proposal_id:
+                    identity_metadata["proposal_id"] = identity.proposal_id
+                task.metadata.update(identity_metadata)
                 self._store.create_task_claim_sync(
                     TaskClaim(
                         claim_id=claim_id,
@@ -188,6 +233,12 @@ class OpportunityDispatcher:
                         agent_id=agent_id,
                         status="claimed",
                         session_id=self._session_id,
+                        metadata={
+                            "source": "opportunity_dispatcher",
+                            "opportunity_id": opp_id,
+                            "stage": stage,
+                            **identity_metadata,
+                        },
                     )
                 )
                 self._store.create_delegation_run_sync(
@@ -198,6 +249,12 @@ class OpportunityDispatcher:
                         status="running",
                         session_id=self._session_id,
                         claim_id=claim_id,
+                        metadata={
+                            "source": "opportunity_dispatcher",
+                            "opportunity_id": opp_id,
+                            "stage": stage,
+                            **identity_metadata,
+                        },
                     )
                 )
                 results.append(DispatchResult(
