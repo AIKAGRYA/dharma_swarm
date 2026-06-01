@@ -8,24 +8,19 @@ from pathlib import Path
 import pytest
 
 from dharma_swarm.ontology import (
-    ActionDef,
-    ActionExecution,
     Link,
-    LinkCardinality,
     LinkDef,
     ObjectType,
     OntologyObj,
     OntologyRegistry,
     PropertyDef,
     PropertyType,
-    SecurityLevel,
-    SecurityPolicy,
     ShaktiEnergy,
+    TypeStatus,
     check_security,
     validate_link,
     validate_object,
     # Legacy API
-    Entity,
     ONTOLOGY,
     blocked_entities,
     deadline_pressure,
@@ -720,3 +715,219 @@ class TestRevenueOntologyTypes:
         })
         assert obj is not None, f"Creation failed: {errors}"
         assert obj.properties["contracted_value_usd"] == 15000.0
+
+
+# ── OMS Hardening (TypeStatus + api_name + uniqueness) ───────────
+
+
+class TestTypeStatus:
+    def test_new_type_defaults_to_experimental(self) -> None:
+        t = ObjectType(name="Scratch", description="test")
+        assert t.status == TypeStatus.EXPERIMENTAL
+
+    def test_domain_types_are_active(self, registry: OntologyRegistry) -> None:
+        for name in registry.type_names():
+            obj_type = registry.get_type(name)
+            assert obj_type is not None
+            assert obj_type.status == TypeStatus.ACTIVE, (
+                f"{name} should be ACTIVE, got {obj_type.status}"
+            )
+
+    def test_status_enum_values(self) -> None:
+        assert set(TypeStatus) == {
+            TypeStatus.EXPERIMENTAL,
+            TypeStatus.ACTIVE,
+            TypeStatus.PROMOTED,
+        }
+
+
+class TestApiName:
+    def test_all_domain_types_have_api_name(self, registry: OntologyRegistry) -> None:
+        for name in registry.type_names():
+            obj_type = registry.get_type(name)
+            assert obj_type is not None
+            assert obj_type.api_name, f"{name} is missing api_name"
+            assert obj_type.api_name.startswith("dharma."), (
+                f"{name} api_name should start with 'dharma.', got {obj_type.api_name!r}"
+            )
+
+    def test_api_names_are_unique(self, registry: OntologyRegistry) -> None:
+        seen: dict[str, str] = {}
+        for name in registry.type_names():
+            obj_type = registry.get_type(name)
+            assert obj_type is not None
+            if obj_type.api_name in seen:
+                pytest.fail(
+                    f"Duplicate api_name {obj_type.api_name!r}: "
+                    f"{seen[obj_type.api_name]} and {name}"
+                )
+            seen[obj_type.api_name] = name
+
+    def test_register_type_rejects_duplicate_api_name(self) -> None:
+        registry = OntologyRegistry()
+        # Simulates a legacy/corrupted registry state; the public API should
+        # still defend the frozen API identity index before accepting a type.
+        registry._types["LegacyAlias"] = ObjectType(
+            name="LegacyAlias",
+            description="legacy duplicate",
+            api_name="dharma.research.ResearchThread",
+        )
+        with pytest.raises(ValueError, match="api_name .* already registered"):
+            registry.register_type(
+                ObjectType(
+                    name="ResearchThread",
+                    description="duplicate API identity",
+                    api_name="dharma.research.ResearchThread",
+                )
+            )
+
+    def test_register_type_rejects_malformed_api_name(self) -> None:
+        registry = OntologyRegistry()
+        with pytest.raises(ValueError, match="must match"):
+            registry.register_type(
+                ObjectType(
+                    name="BadContract",
+                    description="bad API identity",
+                    api_name="dharma.research.bad-contract",
+                )
+            )
+
+    def test_register_type_rejects_type_name_underscore(self) -> None:
+        registry = OntologyRegistry()
+        with pytest.raises(ValueError, match="must match"):
+            registry.register_type(
+                ObjectType(
+                    name="Bad_Type",
+                    description="underscore is not PascalCase",
+                    api_name="dharma.research.Bad_Type",
+                )
+            )
+
+    def test_register_type_rejects_api_name_type_mismatch(self) -> None:
+        registry = OntologyRegistry()
+        with pytest.raises(ValueError, match="must match ObjectType.name"):
+            registry.register_type(
+                ObjectType(
+                    name="RegisteredName",
+                    description="wrong type segment",
+                    api_name="dharma.research.OtherName",
+                )
+            )
+
+    def test_allow_overwrite_does_not_bypass_api_name_uniqueness(
+        self,
+        registry: OntologyRegistry,
+    ) -> None:
+        with pytest.raises(ValueError, match="immutable api_name"):
+            registry.register_type(
+                ObjectType(
+                    name="AgentIdentity",
+                    description="same name, wrong frozen API identity",
+                    api_name="dharma.research.ResearchThread",
+                ),
+                allow_overwrite=True,
+            )
+
+    def test_api_name_format(self, registry: OntologyRegistry) -> None:
+        """ADR-008: dharma.<domain>.<TypeName>, PascalCase, no .vN suffix."""
+        for name in registry.type_names():
+            obj_type = registry.get_type(name)
+            assert obj_type is not None
+            parts = obj_type.api_name.split(".")
+            assert len(parts) == 3, (
+                f"{name} api_name should have exactly 3 parts, got {obj_type.api_name!r}"
+            )
+            assert parts[0] == "dharma", (
+                f"{name} api_name should start with 'dharma', got {parts[0]!r}"
+            )
+            assert parts[2] == obj_type.name, (
+                f"{name} api_name TypeName should match ObjectType.name, "
+                f"got {parts[2]!r}"
+            )
+            assert parts[2][0].isupper(), (
+                f"{name} api_name TypeName should be PascalCase, got {parts[2]!r}"
+            )
+
+    def test_new_type_has_empty_api_name(self) -> None:
+        t = ObjectType(name="Scratch", description="test")
+        assert t.api_name == ""
+
+
+class TestRegisterTypeUniqueness:
+    def test_duplicate_raises(self, registry: OntologyRegistry) -> None:
+        with pytest.raises(ValueError, match="already registered"):
+            registry.register_type(
+                ObjectType(name="ResearchThread", description="dup")
+            )
+
+    def test_allow_overwrite(self, registry: OntologyRegistry) -> None:
+        registry.register_type(
+            ObjectType(
+                name="ResearchThread",
+                description="replaced",
+                status=TypeStatus.ACTIVE,
+                api_name="dharma.research.ResearchThread",
+            ),
+            allow_overwrite=True,
+        )
+        t = registry.get_type("ResearchThread")
+        assert t is not None
+        assert t.description == "replaced"
+        assert t.api_name == "dharma.research.ResearchThread"
+
+    def test_allow_overwrite_cannot_clear_existing_api_name(
+        self,
+        registry: OntologyRegistry,
+    ) -> None:
+        with pytest.raises(ValueError, match="immutable api_name"):
+            registry.register_type(
+                ObjectType(name="ResearchThread", description="cleared identity"),
+                allow_overwrite=True,
+            )
+
+    def test_allow_overwrite_cannot_rename_existing_api_name(
+        self,
+        registry: OntologyRegistry,
+    ) -> None:
+        with pytest.raises(ValueError, match="immutable api_name"):
+            registry.register_type(
+                ObjectType(
+                    name="ResearchThread",
+                    description="renamed identity",
+                    status=TypeStatus.ACTIVE,
+                    api_name="dharma.research.ResearchThreadRenamed",
+                ),
+                allow_overwrite=True,
+            )
+
+    def test_new_name_succeeds(self, registry: OntologyRegistry) -> None:
+        registry.register_type(
+            ObjectType(name="BrandNew", description="fresh")
+        )
+        t = registry.get_type("BrandNew")
+        assert t is not None
+        assert t.status == TypeStatus.EXPERIMENTAL
+
+    def test_promoted_api_name_is_immutable_on_overwrite(
+        self,
+        registry: OntologyRegistry,
+    ) -> None:
+        registry.register_type(
+            ObjectType(
+                name="StableContract",
+                description="promoted contract",
+                status=TypeStatus.PROMOTED,
+                api_name="dharma.contract.StableContract",
+            )
+        )
+
+        with pytest.raises(ValueError, match="immutable api_name"):
+            registry.register_type(
+                ObjectType(
+                    name="StableContract",
+                    description="attempted identity drift",
+                    status=TypeStatus.PROMOTED,
+                    api_name="dharma.contract.RenamedContract",
+                ),
+                allow_overwrite=True,
+            )
