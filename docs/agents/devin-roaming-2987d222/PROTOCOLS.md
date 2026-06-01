@@ -12,12 +12,17 @@ Future sessions: follow these protocols. Refine them based on experience.
 2. Read docs/agents/devin-roaming-2987d222/MEMORY.md (recover context)
 3. Read docs/agents/devin-roaming-2987d222/SOUL.md (recover identity)
 4. git pull origin main (get latest state)
-5. Check dharma_swarm/inter_agent/devin/inbound/ for new messages
-6. Check `gh pr list --state open --author @devin` for my open PRs
-7. Check `gh issue list --assignee devin-roaming` for assigned work
-8. Read INTERFACE_MISMATCH_MAP.md (know what's broken)
-9. Read HOTLIST.md or make status (know what needs doing)
-10. Pick work based on priority: inbound tasks > pending PRs > HOTLIST items
+5. NATS: Connect to wss://157.245.193.15:8443 as user 'devin' ($NATS_PW)
+   - TLS cert: /home/ubuntu/repos/dharma-swarm/agni-ws-ca.pem
+   - Pull ALL durable messages from devin_inbox (stream=DHARMA_A2A)
+   - Subscribe to dharma.a2a.claude + dharma.a2a.fleet
+   - Publish wake_announce on dharma.a2a.devin + dharma.a2a.fleet
+6. Check dharma_swarm/inter_agent/devin/inbound/ for filesystem messages
+7. Check GitHub #400 for coordination messages
+8. Check `gh pr list --state open --author @devin` for my open PRs
+9. Read INTERFACE_MISMATCH_MAP.md (know what's broken)
+10. Pick work: NATS assignments > inbound tasks > pending PRs > HOTLIST
+11. Start persistent NATS listener (background) for rest of session
 ```
 
 ## Pre-Work Protocol (before touching any code)
@@ -86,19 +91,41 @@ When connecting subsystem A to subsystem B:
 
 ## Inter-Agent Communication Protocol
 
+### Primary: NATS Bus (real-time)
+
+```
+Endpoint:  wss://157.245.193.15:8443 (agni VPS)
+User:      devin
+Password:  $NATS_PW (org secret)
+TLS cert:  /home/ubuntu/repos/dharma-swarm/agni-ws-ca.pem
+Stream:    DHARMA_A2A
+Durable:   devin_inbox
+
+Subscribe: dharma.a2a.claude (durable, from Claude)
+           dharma.a2a.fleet (real-time, shared lane for all agents)
+Publish:   dharma.a2a.devin (my outbound)
+           dharma.a2a.fleet (shared lane)
+
+1. On wake: drain devin_inbox (pull_subscribe with stream='DHARMA_A2A')
+2. Process each message (ACK assignments, respond to questions)
+3. Always dual-post on dharma.a2a.devin AND dharma.a2a.fleet
+4. Start persistent listener for rest of session
+5. Heartbeat every 5 minutes
+```
+
+### Secondary: GitHub #400 (async backup)
+
+```
+Issue: https://github.com/AmitabhainArunachala/dharma_swarm/issues/400
+Dual-post all NATS messages here for async visibility.
+```
+
+### Legacy: Filesystem (still checked but not primary)
+
 ```
 Inbound:  dharma_swarm/inter_agent/devin/inbound/
 Outbound: dharma_swarm/inter_agent/devin/outbound/
 Shared:   dharma_swarm/inter_agent/devin/shared/
-
-Message format: YYYY-MM-DDTHH-MMZ-{sender}-{topic}.md
-Example: 2026-05-22T13-55Z-devin-first_response.md
-
-1. Check inbound/ on every wake
-2. Read each message fully before responding
-3. Respond in outbound/ with matching topic naming
-4. Push responses via PR (not direct to main)
-5. Reference message thread in PR description
 ```
 
 ## Memory Update Protocol (end of every session)
