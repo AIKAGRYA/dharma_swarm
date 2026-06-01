@@ -443,7 +443,8 @@ class OntologyRegistry:
 
         Raises:
             ValueError: If a type with the same ``name`` is already
-                registered and *allow_overwrite* is ``False``.
+                registered and *allow_overwrite* is ``False``, or if a
+                non-empty ``api_name`` is already bound to another type.
         """
         existing = self._types.get(obj_type.name)
         if existing is not None and not allow_overwrite:
@@ -451,6 +452,15 @@ class OntologyRegistry:
                 f"ObjectType '{obj_type.name}' is already registered. "
                 f"Pass allow_overwrite=True to replace it."
             )
+        if obj_type.api_name:
+            for existing_name, existing_type in self._types.items():
+                if existing_name == obj_type.name:
+                    continue
+                if existing_type.api_name == obj_type.api_name:
+                    raise ValueError(
+                        f"ObjectType api_name '{obj_type.api_name}' is already registered "
+                        f"for '{existing_name}'. api_name must be globally unique."
+                    )
         self._types[obj_type.name] = obj_type
         for link_def in obj_type.links:
             self.register_link(link_def)
@@ -1038,7 +1048,7 @@ class OntologyRegistry:
         """
         registry = cls()
         for obj_type in _DOMAIN_TYPES:
-            registry.register_type(obj_type, allow_overwrite=True)
+            registry.register_type(obj_type)
         for link_def in _DOMAIN_LINKS:
             registry.register_link(link_def)
         for link_def in _METABOLIC_LINKS:

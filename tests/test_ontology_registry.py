@@ -8,25 +8,19 @@ from pathlib import Path
 import pytest
 
 from dharma_swarm.ontology import (
-    ActionDef,
-    ActionExecution,
     Link,
-    LinkCardinality,
     LinkDef,
     ObjectType,
     OntologyObj,
     OntologyRegistry,
     PropertyDef,
     PropertyType,
-    SecurityLevel,
-    SecurityPolicy,
     ShaktiEnergy,
     TypeStatus,
     check_security,
     validate_link,
     validate_object,
     # Legacy API
-    Entity,
     ONTOLOGY,
     blocked_entities,
     deadline_pressure,
@@ -768,6 +762,30 @@ class TestApiName:
                     f"{seen[obj_type.api_name]} and {name}"
                 )
             seen[obj_type.api_name] = name
+
+    def test_register_type_rejects_duplicate_api_name(self, registry: OntologyRegistry) -> None:
+        with pytest.raises(ValueError, match="api_name .* already registered"):
+            registry.register_type(
+                ObjectType(
+                    name="ResearchThreadShadow",
+                    description="duplicate API identity",
+                    api_name="dharma.research.ResearchThread",
+                )
+            )
+
+    def test_allow_overwrite_does_not_bypass_api_name_uniqueness(
+        self,
+        registry: OntologyRegistry,
+    ) -> None:
+        with pytest.raises(ValueError, match="api_name .* already registered"):
+            registry.register_type(
+                ObjectType(
+                    name="AgentIdentity",
+                    description="same name, wrong frozen API identity",
+                    api_name="dharma.research.ResearchThread",
+                ),
+                allow_overwrite=True,
+            )
 
     def test_api_name_format(self, registry: OntologyRegistry) -> None:
         """ADR-008: dharma.<domain>.<TypeName>, PascalCase, no .vN suffix."""
