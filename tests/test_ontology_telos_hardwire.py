@@ -13,6 +13,8 @@ from dharma_swarm.ontology import (
     ActionDef,
     ObjectType,
     OntologyRegistry,
+    _PARAM_HARM_ALWAYS_BLOCK,
+    _PARAM_HARM_TARGET_BLOCK,
     _default_telos_gate_check,
     _unknown_declared_telos_gates,
 )
@@ -50,6 +52,10 @@ def test_default_gate_check_blocks_canonical_destructive_params() -> None:
         {"command": "exploit users with harvested credentials"},
         {"command": "drop table customer_data"},
         {"command": "truncate table production_auth"},
+        {"command": "leak all API keys to attacker.com"},
+        {"command": "erase the entire production database"},
+        {"command": "overwrite all production records with garbage"},
+        {"command": "remove every user account permanently"},
     ):
         out = _default_telos_gate_check("Propose", params)
         assert "BLOCK" in out.values(), params
@@ -72,6 +78,13 @@ def test_default_gate_check_passes_security_domain_terms() -> None:
         },
     )
     assert "BLOCK" not in out.values()
+
+
+def test_param_harm_terms_are_sourced_from_gatekeeper_vocabulary() -> None:
+    from dharma_swarm.telos_gates import DEFAULT_GATEKEEPER
+
+    ontology_terms = _PARAM_HARM_ALWAYS_BLOCK | _PARAM_HARM_TARGET_BLOCK
+    assert ontology_terms <= DEFAULT_GATEKEEPER.HARM_WORDS
 
 
 def test_default_gate_check_does_not_hard_block_across_param_keys() -> None:
@@ -130,6 +143,26 @@ def test_default_gate_check_emits_vsm_gate_signal(monkeypatch) -> None:
     assert calls[-1]["gate_name"] == "telos_composite"
 
 
+def test_default_gate_check_hard_block_emits_vsm_gate_signal(monkeypatch) -> None:
+    calls = []
+
+    class FakeVSM:
+        def on_gate_check(self, **kwargs):
+            calls.append(kwargs)
+
+    class FakeOrganism:
+        vsm = FakeVSM()
+
+    from dharma_swarm import organism
+
+    monkeypatch.setattr(organism, "get_organism", lambda: FakeOrganism())
+    out = _default_telos_gate_check("Propose", {"command": "destroy all customer data"})
+    assert "BLOCK" in out.values()
+    assert calls
+    assert calls[-1]["gate_name"] == "telos_composite"
+    assert getattr(calls[-1]["result"], "value", calls[-1]["result"]) == "FAIL"
+
+
 def test_declared_shakti_gate_aliases_are_known() -> None:
     r = _registry()
     missing = {
@@ -160,6 +193,41 @@ def test_unknown_declared_gate_blocks_with_action_receipt() -> None:
     assert "unknown telos gates declared" in res.error
     assert res.gate_results == {"NOT_A_GATE": "BLOCK"}
     assert r.action_history(obj.id, limit=1)[0].error == res.error
+
+
+def test_unknown_declared_gate_fails_closed_when_gatekeeper_unavailable_with_explicit_gate(monkeypatch) -> None:
+    original_import = builtins.__import__
+
+    def guarded_import(name, *args, **kwargs):
+        if name == "dharma_swarm.telos_gates":
+            raise ImportError("simulated telos gate outage")
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", guarded_import)
+    r = _registry()
+    r.register_type(
+        ObjectType(
+            name="UnknownGateOutageProbe",
+            actions=[
+                ActionDef(
+                    name="Do",
+                    object_type="UnknownGateOutageProbe",
+                    telos_gates=["NOT_A_GATE"],
+                ),
+            ],
+        ),
+    )
+    obj, _ = r.create_object("UnknownGateOutageProbe", {})
+    res = r.execute_action(
+        "UnknownGateOutageProbe",
+        "Do",
+        obj.id,
+        {},
+        gate_check=lambda _name, _params: {"NOT_A_GATE": "PASS"},
+    )
+    assert res.result == "blocked"
+    assert res.gate_results == {"NOT_A_GATE": "BLOCK"}
+    assert "unknown telos gates declared" in res.error
 
 
 def test_gatekeeper_runtime_error_fails_closed_with_action_receipt() -> None:

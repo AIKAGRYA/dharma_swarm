@@ -30,7 +30,6 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from enum import Enum
@@ -298,28 +297,80 @@ def check_security(
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 
-_HARD_TIER_A_PATTERNS = tuple(
-    re.compile(pattern)
-    for pattern in (
-        r"\brm\s+-rf\b",
-        r"\bdelete\s+all\b",
-        r"\bformat\s+disk\b",
-        r"\bdd\s+if=/dev/zero\b",
-        r"\bmkfs\b",
-        r"\bddos\b",
-        r"\bdenial\s+of\s+service\b",
-        r"\bexfiltrate\b",
-        r"\bshutdown\s+-h\b",
-        r"\bchmod\s+777\b",
-        r"\bweaponize\b.*\b(attack|exploit|harm|kill)\b",
-        r"\b(attack|harm|kill)\s+(?:the\s+)?(people|person|humans|users)\b",
-        r"\b(?:destroy|wipe|corrupt)\b.*\b(?:all|customer|customers|user|users|production|prod|live|database|db|records|files|disk|secrets|credentials|keys|data)\b",
-        r"\b(?:all|customer|customers|user|users|production|prod|live|database|db|records|files|disk|secrets|credentials|keys|data)\b.*\b(?:destroy|wipe|corrupt)\b",
-        r"\b(?:drop|truncate)\s+table\b.*(?:^|[^a-z0-9])(?:customer|customers|user|users|production|prod|live|critical|billing|auth|identity|secrets|credentials|data)(?:[^a-z0-9]|$)",
-        r"\bexploit\b.*\b(?:people|person|humans|users|customer|customers|system|credential|credentials|secret|secrets|vulnerability|vulnerabilities)\b",
-        r":\(\)\{\s*:\|:&\s*\};:",
-    )
-)
+_PARAM_HARM_ALWAYS_BLOCK = frozenset({
+    "rm -rf",
+    "delete all",
+    "format disk",
+    "dd if=/dev/zero",
+    "mkfs",
+    "ddos",
+    "denial of service",
+    "exfiltrate",
+    "shutdown -h",
+    "chmod 777",
+    ":(){ :|:& };:",
+})
+
+_PARAM_HARM_TARGET_BLOCK = frozenset({
+    "attack",
+    "corrupt",
+    "destroy",
+    "drop table",
+    "erase",
+    "exploit",
+    "kill",
+    "leak all",
+    "overwrite",
+    "remove every",
+    "truncate table",
+    "wipe",
+})
+
+_PARAM_HARM_TARGET_TERMS = frozenset({
+    "all",
+    "api key",
+    "api keys",
+    "auth",
+    "billing",
+    "credential",
+    "credentials",
+    "critical",
+    "customer",
+    "customers",
+    "data",
+    "database",
+    "db",
+    "disk",
+    "file",
+    "files",
+    "human",
+    "humans",
+    "identity",
+    "key",
+    "keys",
+    "live",
+    "people",
+    "person",
+    "prod",
+    "production",
+    "record",
+    "records",
+    "secret",
+    "secrets",
+    "system",
+    "user",
+    "users",
+    "vulnerabilities",
+    "vulnerability",
+})
+
+_BENIGN_PARAM_HARM_PHRASES = frozenset({
+    "attack surface",
+    "harm reduction",
+    "kill stale",
+    "kill-switch",
+    "kill switch",
+})
 
 
 _DECLARED_GATE_ALIASES: dict[str, tuple[str, ...]] = {
@@ -345,23 +396,41 @@ def _iter_payload_text_values(value: Any):
     yield str(value)
 
 
-def _payload_has_hard_tier_a_intent(params: Any) -> bool:
-    """Targeted hard-block scan for typed-action params.
+def _normalized_param_text(value: str) -> str:
+    return value.lower().replace("_", " ")
+
+
+def _param_value_has_harm_target(text: str) -> bool:
+    return any(term in text for term in _PARAM_HARM_TARGET_TERMS)
+
+
+def _payload_canonical_harm_action(action_name: str, params: Any, harm_words: set[str]) -> str | None:
+    """Return an action string that lets ``check_action`` enforce param harm.
 
     ``TelosGatekeeper`` treats bare words like "attack" and "exploit" as
     harmful when they appear in the action string. Typed ontology params often
     contain those words as benign code/domain nouns (``exploit_scanner.py``,
     "kill-switch test"). Keep those values in content for
-    credential/injection/deception checks, but only promote a single param value
-    into a hard AHIMSA block when that value expresses destructive command or
-    harm intent. Values are scanned independently so unrelated keys cannot
-    combine into a synthetic hard-block phrase.
+    credential/injection/deception checks, but promote a single param value into
+    the action string when that value expresses destructive command or harm
+    intent. Values are scanned independently so unrelated keys cannot combine
+    into a synthetic hard-block phrase. The vocabulary is sourced from the
+    shared gatekeeper; this helper only decides when a param term is precise
+    enough to route through that same gatekeeper/VSM path.
     """
+    always_block = _PARAM_HARM_ALWAYS_BLOCK & harm_words
+    target_block = _PARAM_HARM_TARGET_BLOCK & harm_words
     for text in _iter_payload_text_values(params):
-        lowered = text.lower()
-        if any(pattern.search(lowered) for pattern in _HARD_TIER_A_PATTERNS):
-            return True
-    return False
+        lowered = _normalized_param_text(text)
+        if any(phrase in lowered for phrase in _BENIGN_PARAM_HARM_PHRASES):
+            continue
+        for word in sorted(always_block, key=len, reverse=True):
+            if word in lowered:
+                return f"{action_name} {word}"
+        for word in sorted(target_block, key=len, reverse=True):
+            if word in lowered and _param_value_has_harm_target(lowered):
+                return f"{action_name} {word}"
+    return None
 
 
 def _unknown_declared_telos_gates(declared_gates: list[str]) -> list[str]:
@@ -369,7 +438,7 @@ def _unknown_declared_telos_gates(declared_gates: list[str]) -> list[str]:
     try:
         from dharma_swarm.telos_gates import DEFAULT_GATEKEEPER
     except Exception:
-        return []
+        return sorted(declared_gates)
     active = set(DEFAULT_GATEKEEPER.GATES)
     aliases = set(_DECLARED_GATE_ALIASES)
     return sorted(gate for gate in declared_gates if gate not in active and gate not in aliases)
@@ -387,16 +456,14 @@ def _default_telos_gate_check(action_name: str, params: dict[str, Any]) -> dict[
     harmful/deceptive actions BLOCK; advisory (WARN/REVIEW) outcomes PASS.
     """
     try:
-        from dharma_swarm.telos_gates import check_action
+        from dharma_swarm.telos_gates import DEFAULT_GATEKEEPER, check_action
     except Exception:  # gates unavailable -> fail closed for declared telos gates
         logging.getLogger(__name__).warning("telos gates unavailable; action blocked")
         return {"TELOS": "BLOCK"}
     payload = json.dumps(params, default=str, sort_keys=True)
-    if _payload_has_hard_tier_a_intent(params):
-        return {"AHIMSA": "BLOCK"}
     # Keep params in content for credential/injection/deception scans without
     # feeding every security-domain noun into AHIMSA's broad action-word scan.
-    action_desc = action_name
+    action_desc = _payload_canonical_harm_action(action_name, params, DEFAULT_GATEKEEPER.HARM_WORDS) or action_name
     result = check_action(action=action_desc, content=payload)
     # The authoritative verdict is the overall DECISION, not the per-gate advisory
     # FAILs: Tier-A/B hard violations (harm, deception, credential leak) -> BLOCK;

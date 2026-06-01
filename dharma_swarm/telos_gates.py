@@ -272,6 +272,7 @@ class TelosGatekeeper:
         "exploit", "attack", "exfiltrate", "format disk", "drop table",
         "truncate table", "shutdown -h", "mkfs", "dd if=/dev/zero",
         "chmod 777", ":(){ :|:& };:", "ddos", "denial of service",
+        "erase", "overwrite", "leak all", "remove every",
     }
 
     FORCE_WORDS: set[str] = {
