@@ -452,6 +452,17 @@ class OntologyRegistry:
                 f"ObjectType '{obj_type.name}' is already registered. "
                 f"Pass allow_overwrite=True to replace it."
             )
+        if (
+            existing is not None
+            and allow_overwrite
+            and existing.status == TypeStatus.PROMOTED
+            and existing.api_name
+            and obj_type.api_name != existing.api_name
+        ):
+            raise ValueError(
+                f"ObjectType '{obj_type.name}' is PROMOTED with immutable api_name "
+                f"'{existing.api_name}'."
+            )
         if obj_type.api_name:
             for existing_name, existing_type in self._types.items():
                 if existing_name == obj_type.name:

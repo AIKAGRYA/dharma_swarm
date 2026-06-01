@@ -33,24 +33,7 @@ docs/agents/devin-roaming-2987d222/
 Note: these are on the operator's Mac. Your VM won't have them unless
 the operator has set up the blueprint to populate them.
 
-## Your Communication Channel (NATS — PRIMARY)
-
-```
-Endpoint:  wss://157.245.193.15:8443 (agni VPS)
-User:      devin
-Password:  $NATS_PW (org secret)
-TLS cert:  /home/ubuntu/repos/dharma-swarm/agni-ws-ca.pem
-Stream:    DHARMA_A2A
-Durable:   devin_inbox
-
-Subscribe: dharma.a2a.claude + dharma.a2a.fleet
-Publish:   dharma.a2a.devin + dharma.a2a.fleet
-
-IMPORTANT: Always pass stream='DHARMA_A2A' to pull_subscribe
-(least-privilege creds can't enumerate streams).
-```
-
-### Legacy filesystem channel (secondary)
+## Your Communication Channel
 
 ```
 dharma_swarm/inter_agent/devin/
@@ -65,13 +48,12 @@ dharma_swarm/inter_agent/devin/
 make onboard
 git pull origin main
 cat docs/agents/devin-roaming-2987d222/MEMORY.md
-# NATS: connect + drain inbox + announce (see PROTOCOLS.md)
-# Write and run the NATS drain script from PROTOCOLS.md
 ls dharma_swarm/inter_agent/devin/inbound/
+make status
 gh pr list --state open
 cat INTERFACE_MISMATCH_MAP.md
-# Start persistent NATS listener in background
-# Check GitHub #400 for coordination messages
+cat docs/state/HOTLIST.md
+cat docs/state/BROKEN_REGISTER.md
 ```
 
 ## Your Role in One Sentence
@@ -80,9 +62,8 @@ Wire the plumbing, keep the build green, let the architects architect.
 
 ## Your Schedule
 
-Persistent agent wake: `sched-48540b4f8af24edca98d156033579800`
-Cron: `*/30 * * * *` (every 30 minutes)
-Playbook: dharma_swarm NATS persistent agent — wake, drain, respond
+Hourly wake: `sched-48540b4f8af24edca98d156033579800`
+Cron: `0 * * * *` (every hour on the hour)
 
 ## Authority Boundaries
 

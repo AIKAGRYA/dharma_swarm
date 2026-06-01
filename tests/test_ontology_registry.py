@@ -799,6 +799,10 @@ class TestApiName:
             assert parts[0] == "dharma", (
                 f"{name} api_name should start with 'dharma', got {parts[0]!r}"
             )
+            assert parts[2] == obj_type.name, (
+                f"{name} api_name TypeName should match ObjectType.name, "
+                f"got {parts[2]!r}"
+            )
             assert parts[2][0].isupper(), (
                 f"{name} api_name TypeName should be PascalCase, got {parts[2]!r}"
             )
@@ -831,3 +835,27 @@ class TestRegisterTypeUniqueness:
         t = registry.get_type("BrandNew")
         assert t is not None
         assert t.status == TypeStatus.EXPERIMENTAL
+
+    def test_promoted_api_name_is_immutable_on_overwrite(
+        self,
+        registry: OntologyRegistry,
+    ) -> None:
+        registry.register_type(
+            ObjectType(
+                name="StableContract",
+                description="promoted contract",
+                status=TypeStatus.PROMOTED,
+                api_name="dharma.contract.StableContract",
+            )
+        )
+
+        with pytest.raises(ValueError, match="PROMOTED with immutable api_name"):
+            registry.register_type(
+                ObjectType(
+                    name="StableContract",
+                    description="attempted identity drift",
+                    status=TypeStatus.PROMOTED,
+                    api_name="dharma.contract.RenamedContract",
+                ),
+                allow_overwrite=True,
+            )
