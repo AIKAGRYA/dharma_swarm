@@ -23,6 +23,10 @@ import json
 import logging
 from typing import Any, Callable, Optional
 
+from dharma_swarm.runtime_state import RuntimeStateStore
+from dharma_swarm.spine.adapters import identity_from_carrier
+from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity
+
 logger = logging.getLogger(__name__)
 
 
@@ -62,9 +66,16 @@ class ToolRegistry:
     for schemas and dispatches calls through it.
     """
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        runtime_state: RuntimeStateStore | None = None,
+        require_identity: bool = False,
+    ) -> None:
         self._tools: dict[str, ToolEntry] = {}
         self._toolset_checks: dict[str, Callable] = {}
+        self._runtime_state = runtime_state
+        self._require_identity = require_identity
 
     # ── Registration ─────────────────────────────────────────────────
 
@@ -126,6 +137,33 @@ class ToolRegistry:
 
     # ── Dispatch ──────────────────────────────────────────────────────
 
+    def _resolve_identity(
+        self,
+        name: str,
+        args: dict,
+        *,
+        runtime_state: RuntimeStateStore | None,
+        require_identity: bool,
+        execution_identity: ExecutionIdentity | None,
+        metadata: dict[str, Any] | None,
+    ) -> ExecutionIdentity | None:
+        if require_identity and runtime_state is None:
+            raise MissingExecutionIdentity("RuntimeStateStore is required when ToolRegistry requires ExecutionIdentity")
+        if execution_identity is not None:
+            return execution_identity.require_for_dispatch()
+        carrier = {
+            "tool_call_id": args.get("tool_call_id") or f"tool:{name}",
+            "tool_name": name,
+            "task_id": args.get("task_id"),
+            "agent_id": args.get("agent_id"),
+            "metadata": metadata or args.get("metadata") or {},
+        }
+        if require_identity:
+            return identity_from_carrier(carrier, surface="tool", require_existing=True)
+        if runtime_state is not None:
+            return identity_from_carrier(carrier, surface="tool")
+        return ExecutionIdentity.from_metadata(carrier["metadata"], require=False)
+
     def dispatch(self, name: str, args: dict, **kwargs: Any) -> str:
         """Execute a tool handler by name.
 
@@ -135,7 +173,34 @@ class ToolRegistry:
         entry = self._tools.get(name)
         if not entry:
             return json.dumps({"error": f"Unknown tool: {name}"})
+        runtime_state = kwargs.pop("runtime_state", self._runtime_state)
+        require_identity = kwargs.pop("require_identity", self._require_identity)
+        execution_identity = kwargs.pop("execution_identity", None)
+        metadata = kwargs.pop("metadata", None)
+        identity: ExecutionIdentity | None = None
+        side_effect_key = f"tool_registry.dispatch:{name}"
         try:
+            identity = self._resolve_identity(
+                name,
+                args,
+                runtime_state=runtime_state,
+                require_identity=require_identity,
+                execution_identity=execution_identity,
+                metadata=metadata,
+            )
+            if identity is not None:
+                side_effect_key = f"tool_registry.dispatch:{name}:{identity.task_id}"
+            if identity is not None and runtime_state is not None:
+                runtime_state.record_execution_identity_sync(
+                    identity,
+                    source="tool_registry.dispatch",
+                    metadata={"tool_name": name},
+                )
+                runtime_state.record_side_effect_intent_sync(
+                    identity,
+                    side_effect_key,
+                    payload={"tool_name": name},
+                )
             if entry.is_async:
                 loop: asyncio.AbstractEventLoop | None = None
                 try:
@@ -146,10 +211,30 @@ class ToolRegistry:
                     import concurrent.futures
                     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
                         future = pool.submit(asyncio.run, entry.handler(args, **kwargs))
-                        return future.result(timeout=120)
-                return asyncio.run(entry.handler(args, **kwargs))
-            return entry.handler(args, **kwargs)
+                        result = future.result(timeout=120)
+                else:
+                    result = asyncio.run(entry.handler(args, **kwargs))
+            else:
+                result = entry.handler(args, **kwargs)
+            if identity is not None and runtime_state is not None:
+                runtime_state.record_side_effect_complete_sync(
+                    identity,
+                    side_effect_key,
+                    result_receipt_id=f"tool:{name}",
+                    payload={"tool_name": name},
+                )
+            return result
         except Exception as e:
+            if identity is not None and runtime_state is not None:
+                try:
+                    runtime_state.record_side_effect_complete_sync(
+                        identity,
+                        side_effect_key,
+                        status="failed",
+                        payload={"tool_name": name, "error": type(e).__name__},
+                    )
+                except Exception:
+                    logger.exception("Tool %s failed to record runtime failure receipt", name)
             logger.exception("Tool %s dispatch error: %s", name, e)
             return json.dumps({"error": f"Tool execution failed: {type(e).__name__}: {e}"})
 
