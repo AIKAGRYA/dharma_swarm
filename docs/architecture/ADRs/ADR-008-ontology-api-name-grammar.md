@@ -69,6 +69,8 @@ Because `<TypeName>` *is* the internal `name`, ALIGN-002 (api_name ↔ name is 1
 - `active` — merged to `main`, usable by all agents.
 - `promoted` — operator-blessed public contract. Promotion is **operator-only** (a separate `ProposalKind.PROMOTE_STATUS` envelope, `blessed_by` = operator handle). Agents may never propose `promoted`.
 
+**api_name mutability is tied to status** (Palantir *Statuses* rule, grounded via #413): an `api_name` may be **renamed only while `experimental`** — it is **frozen on `active`** and immutable once `promoted`. This is the guard against the silent-breakage failure mode #410 documents: once a type is `active`, downstream consumers (OAG queries, OSDK codegen) rely on the name being stable.
+
 ### Versioning / SEMVER policy
 
 `version: int` is the **only** version mechanism (the `.v<N>` suffix is gone).
@@ -98,7 +100,7 @@ Because `<TypeName>` *is* the internal `name`, ALIGN-002 (api_name ↔ name is 1
 
 These surfaced in the grill and are **not** yet resolved — ADR-008 should not be considered final until they are:
 
-1. **Status authority.** #409 backfills 21 existing types as `active` directly in code, bypassing the `experimental → active` proposal flow. Is `active`-on-merge correct for code-defined types, with `experimental` reserved for in-PR proposals? Who/what sets `active` — the merge itself, or an explicit step?
+1. **Status authority on backfill.** #409 backfills 21 existing types as `active` directly in code, bypassing the `experimental → active` proposal flow. Is `active`-on-merge correct for code-defined types (with `experimental` reserved for in-PR proposals), or should a type become `active` only via an explicit step? *(The related sub-question — when api_names may change — is now answered in Status lifecycle above: renamable only while `experimental`, frozen on `active`, per #413's Palantir grounding.)*
 2. **Gate authority — blocking or advisory?** Is the schema-alignment gate a hard CI failure (blocking), or advisory input to mike + operator? Palantir has a single OMS authority; we have a gate + mike + operator. Which is final?
 3. **LinkDef / ActionDef api_names.** ObjectType has a grammar now. Do links and actions get one too, or do they remain name-scoped to their owning type?
 4. **#409 uniqueness guard is process-local** (verified, #410): two agents in parallel processes can both `register_type` the same api_name without detecting the conflict; the CI gate only runs in CI. Is CI-time enforcement sufficient, or does the runtime registry need a guard?
