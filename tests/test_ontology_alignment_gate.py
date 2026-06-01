@@ -139,6 +139,66 @@ def test_action_input_params_conflict_is_detected() -> None:
     assert [conflict.rule for conflict in conflicts] == ["ALIGN-005"]
 
 
+def test_action_effect_conflict_is_detected() -> None:
+    snapshots = [
+        {
+            "actions": [{
+                "name": "approve",
+                "object_type": "ActionProposal",
+                "param_signature": ["target_id:str"],
+                "effect_signature": ["modifies=['status']"],
+                "source_pr": "PR#1",
+            }]
+        },
+        {
+            "actions": [{
+                "name": "approve",
+                "object_type": "ActionProposal",
+                "param_signature": ["target_id:str"],
+                "effect_signature": ["creates=['receipt']"],
+                "source_pr": "PR#2",
+            }]
+        },
+    ]
+
+    conflicts = _detect_conflicts(snapshots)
+
+    assert [conflict.rule for conflict in conflicts] == ["ALIGN-005"]
+    assert "effect_signature" in conflicts[0].field_diffs
+
+
+def test_stale_branch_action_conflict_is_warning() -> None:
+    snapshots = [
+        {
+            "source": "origin/main",
+            "source_commit": "main-sha",
+            "actions": [{
+                "name": "approve",
+                "object_type": "ActionProposal",
+                "param_signature": ["target_id:str"],
+                "effect_signature": ["modifies=['status']"],
+                "source_pr": "origin/main",
+            }],
+        },
+        {
+            "source": "PR#stale",
+            "contains_main": False,
+            "actions": [{
+                "name": "approve",
+                "object_type": "ActionProposal",
+                "param_signature": ["target_id:str"],
+                "effect_signature": [],
+                "source_pr": "PR#stale",
+            }],
+        },
+    ]
+
+    conflicts = _detect_conflicts(snapshots)
+
+    assert [conflict.rule for conflict in conflicts] == ["ALIGN-005"]
+    assert conflicts[0].severity == "warning"
+
+
 def test_action_extraction_reads_input_params_field() -> None:
     snapshot = _extract_ontology_snapshot(
         """
@@ -177,6 +237,50 @@ _ACTION_PROPOSAL = ObjectType(
     )
 
     assert snapshot["actions"][0]["param_signature"] == ["target_id:string"]
+    assert snapshot["actions"][0]["effect_signature"] == []
+
+
+def test_action_extraction_reads_effect_signature() -> None:
+    snapshot = _extract_ontology_snapshot(
+        """
+_ACTION_PROPOSAL = ObjectType(
+    name="ActionProposal",
+    actions=[
+        ActionDef(
+            name="Approve",
+            object_type="ActionProposal",
+            modifies=["status"],
+            requires_approval=True,
+        ),
+    ],
+)
+""",
+        source_pr="PR#effect",
+    )
+
+    signature = snapshot["actions"][0]["effect_signature"]
+    assert "modifies=['status']" in signature
+    assert "requires_approval=True" in signature
+
+
+def test_description_only_drift_is_warning() -> None:
+    snapshots = [
+        {"types": [{
+            "name": "AuditFinding",
+            "description": "old wording",
+            "source_pr": "PR#1",
+        }]},
+        {"types": [{
+            "name": "AuditFinding",
+            "description": "new wording",
+            "source_pr": "PR#2",
+        }]},
+    ]
+
+    conflicts = _detect_conflicts(snapshots)
+
+    assert [conflict.rule for conflict in conflicts] == ["ALIGN-001"]
+    assert conflicts[0].severity == "warning"
 
 
 def test_object_properties_and_security_conflicts_are_detected() -> None:
@@ -225,6 +329,67 @@ _AUDIT_FINDING = ObjectType(
     assert type_spec["security"] is not None
 
 
+def test_api_name_collision_is_detected() -> None:
+    snapshots = [
+        {"types": [{
+            "name": "AuditFinding",
+            "api_name": "dharma.audit.SharedName",
+            "source_pr": "PR#1",
+        }]},
+        {"types": [{
+            "name": "OtherFinding",
+            "api_name": "dharma.audit.SharedName",
+            "source_pr": "PR#2",
+        }]},
+    ]
+
+    conflicts = _detect_conflicts(snapshots)
+
+    assert [conflict.rule for conflict in conflicts] == ["ALIGN-002"]
+
+
+def test_status_conflict_is_detected() -> None:
+    snapshots = [
+        {"types": [{
+            "name": "AuditFinding",
+            "status": "active",
+            "source_pr": "PR#1",
+        }]},
+        {"types": [{
+            "name": "AuditFinding",
+            "status": "promoted",
+            "source_pr": "PR#2",
+        }]},
+    ]
+
+    conflicts = _detect_conflicts(snapshots)
+
+    assert [conflict.rule for conflict in conflicts] == ["ALIGN-003"]
+
+
+def test_link_conflict_is_detected() -> None:
+    snapshots = [
+        {"links": [{
+            "name": "findings",
+            "source_type": "AuditRun",
+            "target_type": "AuditFinding",
+            "cardinality": "ONE_TO_MANY",
+            "source_pr": "PR#1",
+        }]},
+        {"links": [{
+            "name": "findings",
+            "source_type": "AuditRun",
+            "target_type": "OtherFinding",
+            "cardinality": "ONE_TO_MANY",
+            "source_pr": "PR#2",
+        }]},
+    ]
+
+    conflicts = _detect_conflicts(snapshots)
+
+    assert [conflict.rule for conflict in conflicts] == ["ALIGN-004"]
+
+
 def test_promoted_type_absence_is_detected() -> None:
     snapshots = [
         {
@@ -238,6 +403,7 @@ def test_promoted_type_absence_is_detected() -> None:
         },
         {
             "source": "PR#removal",
+            "contains_main": True,
             "types": [],
         },
     ]
@@ -245,4 +411,29 @@ def test_promoted_type_absence_is_detected() -> None:
     conflicts = _detect_conflicts(snapshots)
 
     assert [conflict.rule for conflict in conflicts] == ["ALIGN-006"]
+    assert conflicts[0].severity == "error"
     assert "deprecation marker" not in conflicts[0].summary
+
+
+def test_promoted_type_absence_on_stale_branch_is_warning() -> None:
+    snapshots = [
+        {
+            "source": "origin/main",
+            "types": [{
+                "name": "StableType",
+                "api_name": "dharma.core.StableType",
+                "status": "promoted",
+                "source_pr": "origin/main",
+            }],
+        },
+        {
+            "source": "PR#stale",
+            "contains_main": False,
+            "types": [],
+        },
+    ]
+
+    conflicts = _detect_conflicts(snapshots)
+
+    assert [conflict.rule for conflict in conflicts] == ["ALIGN-006"]
+    assert conflicts[0].severity == "warning"

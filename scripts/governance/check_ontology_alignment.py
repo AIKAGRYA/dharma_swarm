@@ -136,6 +136,7 @@ class ActionSpec:
     name: str
     object_type: str
     param_signature: list[str] = field(default_factory=list)
+    effect_signature: list[str] = field(default_factory=list)
     source_pr: str | None = None
 
 
@@ -238,10 +239,16 @@ def _extract_ontology_snapshot(ontology_text: str, source_pr: str,
             params = _kwarg_node(call, "parameters")
         if not nm or not ot:
             return None
+        effect_parts = []
+        for effect_key in ("modifies", "creates", "requires_approval", "telos_gates"):
+            effect_node = _kwarg_node(call, effect_key)
+            if effect_node is not None:
+                effect_parts.append(f"{effect_key}={_literal_name_or_dump(effect_node)}")
         return ActionSpec(
             name=nm,
             object_type=ot,
             param_signature=_param_signature(params),
+            effect_signature=effect_parts,
             source_pr=source_pr,
         )
 
@@ -303,6 +310,7 @@ def _extract_ontology_snapshot(ontology_text: str, source_pr: str,
 
     return {
         "source": source_pr,
+        "source_commit": source_commit,
         "types": [asdict(t) for t in types],
         "links": [asdict(link) for link in links],
         "actions": [asdict(a) for a in actions],
@@ -321,6 +329,35 @@ def _read_file_at_ref(ref: str, path: str) -> str | None:
         return None
     except Exception:
         return None
+
+
+def _rev_parse(ref: str) -> str:
+    try:
+        return subprocess.run(
+            ["git", "rev-parse", ref],
+            cwd=REPO_ROOT, capture_output=True, text=True, check=True, timeout=10,
+        ).stdout.strip()
+    except Exception:
+        return ""
+
+
+def _commit_contains(ancestor: str, descendant: str) -> bool:
+    if not ancestor or not descendant:
+        return False
+    try:
+        result = subprocess.run(
+            ["git", "merge-base", "--is-ancestor", ancestor, descendant],
+            cwd=REPO_ROOT, capture_output=True, text=True, timeout=10,
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
+
+
+def _snapshot_contains_main(snapshot: dict[str, Any], main_commit: str) -> bool:
+    if "contains_main" in snapshot:
+        return bool(snapshot["contains_main"])
+    return _commit_contains(main_commit, snapshot.get("source_commit", ""))
 
 
 def _list_open_ontology_prs(limit: int = DEFAULT_PR_LIMIT,
@@ -369,6 +406,21 @@ def _detect_conflicts(snapshots: list[dict[str, Any]]) -> list[Conflict]:
         all_links.extend(snap.get("links", []))
         all_actions.extend(snap.get("actions", []))
 
+    main_commit = ""
+    stale_sources: set[str] = set()
+    for snap in snapshots:
+        if snap.get("source") == "origin/main":
+            main_commit = snap.get("source_commit", "")
+            break
+    if main_commit:
+        for snap in snapshots:
+            source = snap.get("source")
+            if source and source != "origin/main" and not _snapshot_contains_main(snap, main_commit):
+                stale_sources.add(source)
+
+    def _severity_for_sources(*sources: str | None) -> str:
+        return "warning" if any(source in stale_sources for source in sources) else "error"
+
     # ALIGN-001 / ALIGN-002 / ALIGN-003: ObjectType conflicts
     by_name: dict[str, list[dict]] = {}
     by_api_name: dict[str, list[dict]] = {}
@@ -391,7 +443,7 @@ def _detect_conflicts(snapshots: list[dict[str, Any]]) -> list[Conflict]:
 
                 diffs = {}
                 for field_ in ("api_name", "telos_alignment", "shakti_energy",
-                               "version", "description", "properties", "security"):
+                               "version", "properties", "security"):
                     if field_ == "api_name" and (
                         a.get("api_name") is None or b.get("api_name") is None
                     ):
@@ -403,7 +455,7 @@ def _detect_conflicts(snapshots: list[dict[str, Any]]) -> list[Conflict]:
                 if diffs:
                     conflicts.append(Conflict(
                         rule="ALIGN-001",
-                        severity="error",
+                        severity=_severity_for_sources(a["source_pr"], b["source_pr"]),
                         summary=f"ObjectType '{name}' defined incompatibly across two PRs",
                         pr_a=a["source_pr"], pr_b=b["source_pr"],
                         type_or_link=name,
@@ -414,11 +466,24 @@ def _detect_conflicts(snapshots: list[dict[str, Any]]) -> list[Conflict]:
                             f"Operator (@AmitabhainArunachala) decides if ambiguous."
                         ),
                     ))
+                if not diffs and a.get("description") != b.get("description"):
+                    conflicts.append(Conflict(
+                        rule="ALIGN-001",
+                        severity="warning",
+                        summary=f"ObjectType '{name}' has description-only drift",
+                        pr_a=a["source_pr"], pr_b=b["source_pr"],
+                        type_or_link=name,
+                        field_diffs={"description": [a.get("description"), b.get("description")]},
+                        suggestion=(
+                            "Description-only amendments are non-breaking. Route them through "
+                            "ProposalKind.AMEND_DESCRIPTION or land the wording-only PR first."
+                        ),
+                    ))
                 # ALIGN-003: status conflict
                 if a.get("status") and b.get("status") and a["status"] != b["status"]:
                     conflicts.append(Conflict(
                         rule="ALIGN-003",
-                        severity="error",
+                        severity=_severity_for_sources(a["source_pr"], b["source_pr"]),
                         summary=f"ObjectType '{name}' has conflicting status across PRs",
                         pr_a=a["source_pr"], pr_b=b["source_pr"],
                         type_or_link=name,
@@ -436,7 +501,7 @@ def _detect_conflicts(snapshots: list[dict[str, Any]]) -> list[Conflict]:
         if len(names) > 1:
             conflicts.append(Conflict(
                 rule="ALIGN-002",
-                severity="error",
+                severity=_severity_for_sources(*[d["source_pr"] for d in defs]),
                 summary=f"api_name '{api_name}' used by multiple ObjectTypes",
                 pr_a=defs[0]["source_pr"], pr_b=defs[-1]["source_pr"],
                 type_or_link=api_name,
@@ -470,9 +535,12 @@ def _detect_conflicts(snapshots: list[dict[str, Any]]) -> list[Conflict]:
             names = {t["name"] for t in snap.get("types", [])}
             for name, main_type in main_types.items():
                 if name not in names:
+                    stale_against_main = source in stale_sources or not _snapshot_contains_main(
+                        snap, main_commit
+                    )
                     conflicts.append(Conflict(
                         rule="ALIGN-006",
-                        severity="error",
+                        severity="warning" if stale_against_main else "error",
                         summary=f"PROMOTED ObjectType '{name}' removed from ontology snapshot",
                         pr_a="origin/main", pr_b=source,
                         type_or_link=name,
@@ -481,6 +549,9 @@ def _detect_conflicts(snapshots: list[dict[str, Any]]) -> list[Conflict]:
                             "api_name": [main_type.get("api_name"), "(missing)"],
                         },
                         suggestion=(
+                            "Branch does not contain the current origin/main baseline; rebase "
+                            "before treating this as a removal."
+                            if stale_against_main else
                             "Promoted ObjectTypes are public contracts. Keep the type present "
                             "or route the removal through an explicit deprecation proposal and "
                             "operator review."
@@ -504,7 +575,7 @@ def _detect_conflicts(snapshots: list[dict[str, Any]]) -> list[Conflict]:
                 if a["target_type"] != b["target_type"] or a["cardinality"] != b["cardinality"]:
                     conflicts.append(Conflict(
                         rule="ALIGN-004",
-                        severity="error",
+                        severity=_severity_for_sources(a["source_pr"], b["source_pr"]),
                         summary=f"LinkDef ({key[0]}).{key[1]} differs across PRs",
                         pr_a=a["source_pr"], pr_b=b["source_pr"],
                         type_or_link=f"{key[0]}.{key[1]}",
@@ -532,20 +603,26 @@ def _detect_conflicts(snapshots: list[dict[str, Any]]) -> list[Conflict]:
                 if pkey in pairs_seen:
                     continue
                 pairs_seen.add(pkey)
+                diffs = {}
                 if a["param_signature"] != b["param_signature"]:
+                    diffs["param_signature"] = [a["param_signature"], b["param_signature"]]
+                if a.get("effect_signature", []) != b.get("effect_signature", []):
+                    diffs["effect_signature"] = [
+                        a.get("effect_signature", []),
+                        b.get("effect_signature", []),
+                    ]
+                if diffs:
                     conflicts.append(Conflict(
                         rule="ALIGN-005",
-                        severity="error",
-                        summary=f"ActionDef {key[0]}.{key[1]} has different parameter signatures",
+                        severity=_severity_for_sources(a["source_pr"], b["source_pr"]),
+                        summary=f"ActionDef {key[0]}.{key[1]} has incompatible signature/effect",
                         pr_a=a["source_pr"], pr_b=b["source_pr"],
                         type_or_link=f"{key[0]}.{key[1]}",
-                        field_diffs={
-                            "param_signature": [a["param_signature"], b["param_signature"]],
-                        },
+                        field_diffs=diffs,
                         suggestion=(
-                            "Actions are the kinetic write-path (Palantir Funnel equivalent). "
-                            "Signature changes break callers. Use SEMVER + deprecation, never "
-                            "mutate in place."
+                            "Actions are typed write-path contracts. "
+                            "Signature or effect changes break callers. Use SEMVER + "
+                            "deprecation, never mutate in place."
                         ),
                     ))
 
@@ -610,8 +687,12 @@ def main() -> int:
             file=sys.stderr,
         )
         return 1
-    snapshots.append(_extract_ontology_snapshot(main_text, source_pr="origin/main",
-                                                 source_branch="main"))
+    snapshots.append(_extract_ontology_snapshot(
+        main_text,
+        source_pr="origin/main",
+        source_branch="main",
+        source_commit=_rev_parse("origin/main"),
+    ))
 
     # Snapshot 2: current branch (if not main)
     try:
@@ -625,7 +706,11 @@ def main() -> int:
             if (Path(REPO_ROOT) / ONTOLOGY_PATH_REL).exists() else None
         if cur_text:
             snapshots.append(_extract_ontology_snapshot(
-                cur_text, source_pr=f"branch:{cur_branch}", source_branch=cur_branch))
+                cur_text,
+                source_pr=f"branch:{cur_branch}",
+                source_branch=cur_branch,
+                source_commit=_rev_parse("HEAD"),
+            ))
 
     # Snapshot 3+: every other open ontology PR
     prs = _list_open_ontology_prs(

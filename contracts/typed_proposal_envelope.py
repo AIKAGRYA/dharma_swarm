@@ -168,6 +168,15 @@ class PromoteStatusProposal(BaseModel):
     blessed_by: str                 # MUST be operator handle ("AmitabhainArunachala")
     provenance: ProposalProvenance
 
+    @field_validator("blessed_by")
+    @classmethod
+    def _operator_only(cls, v: str) -> str:
+        if v != "AmitabhainArunachala":
+            raise ValueError(
+                "Only operator AmitabhainArunachala can bless PROMOTED status."
+            )
+        return v
+
 
 class DeprecateProposal(BaseModel):
     """Mark an ObjectType for removal. Requires replacement target."""
