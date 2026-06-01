@@ -363,7 +363,7 @@ def _default_telos_gate_check(action_name: str, params: dict[str, Any]) -> dict[
     harmful/deceptive actions BLOCK; advisory (WARN/REVIEW) outcomes PASS.
     """
     try:
-        from dharma_swarm.telos_gates import DEFAULT_GATEKEEPER
+        from dharma_swarm.telos_gates import check_action
     except Exception:  # gates unavailable -> fail closed for declared telos gates
         logging.getLogger(__name__).warning("telos gates unavailable; action blocked")
         return {"TELOS": "BLOCK"}
@@ -373,15 +373,22 @@ def _default_telos_gate_check(action_name: str, params: dict[str, Any]) -> dict[
     # Keep params in content for credential/injection/deception scans without
     # feeding every security-domain noun into AHIMSA's broad action-word scan.
     action_desc = action_name
-    result = DEFAULT_GATEKEEPER.check(action=action_desc, content=payload)
+    result = check_action(action=action_desc, content=payload)
     # The authoritative verdict is the overall DECISION, not the per-gate advisory
     # FAILs: Tier-A/B hard violations (harm, deception, credential leak) -> BLOCK;
     # advisory outcomes (REVIEW — e.g. "low epistemological diversity" on a
     # context-light typed action) -> PASS, so the hard-wire enforces security
     # without false-positive-blocking legitimate typed mutations.
-    decision = str(getattr(result, "decision", "")).upper()
+    decision_attr = getattr(result, "decision", None)
+    if decision_attr is None:
+        return {"TELOS": "BLOCK"}
+    decision = str(decision_attr).upper()
     gate = str(getattr(result, "gate", "") or "TELOS")
-    return {gate: "BLOCK"} if "BLOCK" in decision else {gate: "PASS"}
+    if "BLOCK" in decision:
+        return {gate: "BLOCK"}
+    if "ALLOW" in decision or "REVIEW" in decision:
+        return {gate: "PASS"}
+    return {"TELOS": "BLOCK"}
 
 
 class OntologyRegistry:

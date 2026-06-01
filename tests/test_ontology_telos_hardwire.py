@@ -72,6 +72,36 @@ def test_default_gate_check_fails_closed_when_gatekeeper_unavailable(monkeypatch
     assert "BLOCK" in out.values()
 
 
+def test_default_gate_check_malformed_gate_result_fails_closed(monkeypatch) -> None:
+    from dharma_swarm import telos_gates
+
+    class MalformedResult:
+        gate = "AHIMSA"
+
+    monkeypatch.setattr(telos_gates, "check_action", lambda **_kwargs: MalformedResult())
+    out = _default_telos_gate_check("Propose", {"note": "benign refactor"})
+    assert out == {"TELOS": "BLOCK"}
+
+
+def test_default_gate_check_emits_vsm_gate_signal(monkeypatch) -> None:
+    calls = []
+
+    class FakeVSM:
+        def on_gate_check(self, **kwargs):
+            calls.append(kwargs)
+
+    class FakeOrganism:
+        vsm = FakeVSM()
+
+    from dharma_swarm import organism
+
+    monkeypatch.setattr(organism, "get_organism", lambda: FakeOrganism())
+    out = _default_telos_gate_check("Propose", {"note": "benign refactor"})
+    assert "BLOCK" not in out.values()
+    assert calls
+    assert calls[-1]["gate_name"] == "telos_composite"
+
+
 def test_declared_shakti_gate_aliases_are_known() -> None:
     r = _registry()
     missing = {
