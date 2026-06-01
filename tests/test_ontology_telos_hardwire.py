@@ -254,6 +254,22 @@ def test_gatekeeper_runtime_error_fails_closed_with_action_receipt() -> None:
     assert r.action_history(obj.id, limit=1)[0].error == res.error
 
 
+def test_default_gatekeeper_runtime_error_fails_closed_with_action_receipt(monkeypatch) -> None:
+    from dharma_swarm import telos_gates
+
+    def broken_check_action(**_kwargs):
+        raise RuntimeError("default gate offline")
+
+    monkeypatch.setattr(telos_gates, "check_action", broken_check_action)
+    r = _registry()
+    obj = _evo(r)
+    res = r.execute_action("EvolutionEntry", "Propose", obj.id, {"note": "benign"})
+    assert res.result == "blocked"
+    assert "telos gate error: RuntimeError" in res.error
+    assert res.gate_results == {"TELOS": "BLOCK"}
+    assert r.action_history(obj.id, limit=1)[0].error == res.error
+
+
 def test_hardwire_blocks_harmful_without_explicit_gate() -> None:
     r = _registry()
     res = r.execute_action("EvolutionEntry", "Propose", _evo(r).id, {"command": "destroy all customer data"})
