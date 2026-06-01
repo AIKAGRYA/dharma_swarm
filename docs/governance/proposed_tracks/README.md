@@ -38,6 +38,17 @@ agent at the operator's direction) may move into `ACTIVE_TRACK.yaml` under
   (agent_runner, orchestrator, swarm, thinkodynamic_director, telos_substrate)
   onto `invoke_agent()`. Authored by perplexity-computer per the 2026-05-31
   A2A handoff from claude-code.
+- `perplexity-a2a-bus-bridge-2026-06.yaml` — extends Codex's local A2A
+  contact pattern (`a2a_core_contact.py` + NATS) to cloud-resident agents
+  via a new `a2a_cloud_contact.py` webhook → NATS bridge. Brings
+  perplexity-computer (and future cloud agents like Devin) onto the same
+  bus the three local composers read, so the honest fleet score's
+  denominator matches the operational population and inter-agent messages
+  stop transiting through the operator as manual copy/paste. Authored by
+  perplexity-computer; proposed owner is Codex (he owns the transport seam).
+  Gated on: (1) PR #396 doctrine amendment merged — ✅ merged 2026-05-31,
+  (2) Codex's NATS substrate PR landing on main, (3) Claude's multi-track
+  schema PR landing on main.
 
 ## Why not just put proposals in `ACTIVE_TRACK.yaml` as inactive entries?
 
