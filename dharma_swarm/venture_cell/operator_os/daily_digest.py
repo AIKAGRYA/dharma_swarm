@@ -97,6 +97,18 @@ def render_operator_daily_digest(projection: VentureCellOperatorProjection) -> s
             f"({memory.query_eval_passed}/{memory.query_eval_total})",
         ]
     )
+    repair = projection.memory_kernel_repair_packet
+    lines.extend(
+        [
+            "",
+            "## Memory Repair Packet",
+            "",
+            f"- Decision: `{repair.decision}`",
+            f"- Status: `{repair.status}`",
+            f"- Safe next action: {repair.safe_next_action}",
+            f"- Repair items: `{len(repair.repair_items)}`",
+        ]
+    )
     if memory.query_eval_results:
         lines.extend(["", "## Memory Query Evals", ""])
         for result in memory.query_eval_results:

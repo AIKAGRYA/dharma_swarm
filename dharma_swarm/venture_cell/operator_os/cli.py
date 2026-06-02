@@ -43,6 +43,11 @@ def _darshan_go_gate_payload(projection: dict[str, Any]) -> dict[str, Any]:
     return packet if isinstance(packet, dict) else {}
 
 
+def _memory_repair_payload(projection: dict[str, Any]) -> dict[str, Any]:
+    packet = projection.get("memory_kernel_repair_packet")
+    return packet if isinstance(packet, dict) else {}
+
+
 def render_operator_surface(
     *,
     output_dir: Path,
@@ -115,6 +120,16 @@ def render_operator_surface(
         + "\n",
         encoding="utf-8",
     )
+    memory_repair_packet_path = output_dir / "memory_kernel_repair_packet.json"
+    memory_repair_packet_path.write_text(
+        json.dumps(
+            _memory_repair_payload(projection.to_dict()),
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     return {
         "projection": projection_path,
         "digest": digest_path,
@@ -122,6 +137,7 @@ def render_operator_surface(
         "memory_query_eval": memory_query_eval_path,
         "next_action_packet": next_action_packet_path,
         "darshan_go_gate_packet": darshan_go_gate_packet_path,
+        "memory_kernel_repair_packet": memory_repair_packet_path,
     }
 
 

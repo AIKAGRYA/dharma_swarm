@@ -30,6 +30,7 @@ from dharma_swarm.venture_cell.operator_os.schema import (
     DarshanGoGatePacket,
     GateSummary,
     MemoryKernelSnapshot,
+    MemoryKernelRepairPacket,
     OperatorDepartment,
     OperatorNextActionPacket,
     VentureCellOperatorProjection,
@@ -94,6 +95,7 @@ def build_operator_projection(inputs: OperatorOSInputs | None = None) -> Venture
         evidence_refs=evidence_refs,
     )
     darshan_go_gate_packet = _darshan_go_gate_packet(gate)
+    memory_kernel_repair_packet = _memory_kernel_repair_packet(memory)
 
     return VentureCellOperatorProjection(
         venture_cell_id=active.venture_cell_id,
@@ -115,6 +117,7 @@ def build_operator_projection(inputs: OperatorOSInputs | None = None) -> Venture
         memory_kernel=memory,
         next_action_packet=next_action_packet,
         darshan_go_gate_packet=darshan_go_gate_packet,
+        memory_kernel_repair_packet=memory_kernel_repair_packet,
         daily_cycle=_daily_cycle(),
         evidence_refs=evidence_refs,
         gap_codes=gaps,
@@ -759,6 +762,80 @@ def _darshan_go_gate_packet(gate: GateSummary) -> DarshanGoGatePacket:
         ),
         gap_codes=gate.gap_codes,
         raw=raw,
+    )
+
+
+def _memory_kernel_repair_packet(memory: MemoryKernelSnapshot) -> MemoryKernelRepairPacket:
+    failed_results = [
+        result
+        for result in memory.query_eval_results
+        if isinstance(result, dict) and not bool(result.get("passed"))
+    ]
+    repair_items = tuple(
+        {
+            "query": str(result.get("query") or ""),
+            "status": str(result.get("status") or "unknown"),
+            "missing_terms": tuple(str(term) for term in result.get("missing_terms", ())),
+            "matched_count": int(result.get("matched_count") or 0),
+            "tier_counts": result.get("tier_counts") if isinstance(result.get("tier_counts"), dict) else {},
+            "source_refs": tuple(str(ref) for ref in result.get("source_refs", ())),
+            "repair_action": (
+                "Add or stage a provenance-backed local source packet for the missing terms, "
+                "then rerun MemoryKernel evals before any trusted promotion."
+            ),
+            "promotion_policy": "no_trusted_promotion_without_existing_chetana_gates",
+        }
+        for result in failed_results
+    )
+    trusted_promotion_claimed = any(
+        bool(result.get("trusted_promotion_claimed"))
+        for result in memory.query_eval_results
+        if isinstance(result, dict)
+    )
+    if memory.query_eval_status == "pass":
+        status = "clear"
+        decision = "no_repair_needed"
+        safe_next_action = "Use current MemoryKernel evals as read-only context."
+    elif memory.query_eval_status == "not_run":
+        status = "not_run"
+        decision = "run_memory_eval"
+        safe_next_action = "Run MemoryKernel query evals before claiming recall coverage."
+    else:
+        status = "queued"
+        decision = "queue_repair_without_promotion"
+        safe_next_action = (
+            "Create provenance-backed staged repair atoms or docs for missing query terms, "
+            "then rerun evals; do not mark trusted or pass until gates prove it."
+        )
+
+    gap_codes = list(memory.gap_codes)
+    if repair_items:
+        gap_codes.append("memory_kernel_repair_items_queued")
+    if trusted_promotion_claimed:
+        gap_codes.append("memory_kernel_trusted_promotion_claim_detected")
+
+    return MemoryKernelRepairPacket(
+        packet_id="memory_kernel.query_eval_repair",
+        status=status,
+        decision=decision,
+        query_eval_status=memory.query_eval_status,
+        query_eval_passed=memory.query_eval_passed,
+        query_eval_total=memory.query_eval_total,
+        repair_items=repair_items,
+        source_roots=memory.source_roots,
+        evidence_refs=memory.evidence_refs,
+        forbidden_actions=(
+            "trusted_chetana_promotion",
+            "claim_memory_eval_pass",
+            "delete_quarantine_to_hide_failures",
+            "external_research_without_receipt",
+        ),
+        safe_next_action=safe_next_action,
+        gap_codes=tuple(dict.fromkeys(gap_codes)),
+        raw={
+            "trusted_promotion_claimed": trusted_promotion_claimed,
+            "failed_query_count": len(failed_results),
+        },
     )
 
 

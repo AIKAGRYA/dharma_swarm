@@ -141,6 +141,14 @@ def test_projection_blocks_external_autonomy_without_reader_gate(tmp_path: Path)
         projection.next_action_packet.required_unblock_artifact
     )
     assert "live_external_authority" in projection.next_action_packet.forbidden_actions
+    repair = projection.memory_kernel_repair_packet
+    assert repair.decision == "queue_repair_without_promotion"
+    assert repair.status == "queued"
+    assert repair.query_eval_status == "partial"
+    assert repair.query_eval_total == len(MEMORY_KERNEL_EVAL_QUERIES)
+    assert repair.repair_items
+    assert "trusted_chetana_promotion" in repair.forbidden_actions
+    assert repair.raw["trusted_promotion_claimed"] is False
     go_gate = projection.darshan_go_gate_packet
     assert go_gate.decision == "block_external_authority"
     assert go_gate.required_receipt_source == "darshan_external_reader"
@@ -264,6 +272,8 @@ def test_operator_daily_digest_renders_structure_without_live_authority_claim(tm
     assert "## Next Action Packet" in digest
     assert "hold_external_authority" in digest
     assert "## Memory Kernel" in digest
+    assert "## Memory Repair Packet" in digest
+    assert "queue_repair_without_promotion" in digest
     assert "`L0_read_only_plan`" in digest
     assert "autonomous external send" not in digest.lower()
 
@@ -303,6 +313,9 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     go_gate_packet = json.loads(
         paths["darshan_go_gate_packet"].read_text(encoding="utf-8")
     )
+    memory_repair_packet = json.loads(
+        paths["memory_kernel_repair_packet"].read_text(encoding="utf-8")
+    )
 
     assert projection["status"] == "blocked_on_external_reader_gate"
     assert projection["autonomy_level"] == "L0_read_only_plan"
@@ -319,6 +332,10 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert go_gate_packet["required_receipt_source"] == "darshan_external_reader"
     assert "payload.privacy_redacted" in go_gate_packet["required_receipt_fields"]
     assert "publishing" in go_gate_packet["blocked_actions"]
+    assert memory_repair_packet["decision"] == "queue_repair_without_promotion"
+    assert memory_repair_packet["status"] == "queued"
+    assert memory_repair_packet["raw"]["trusted_promotion_claimed"] is False
+    assert "trusted_chetana_promotion" in memory_repair_packet["forbidden_actions"]
 
 
 def test_memory_kernel_query_eval_distinguishes_tiers_and_provenance(tmp_path: Path) -> None:

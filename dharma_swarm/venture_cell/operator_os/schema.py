@@ -150,6 +150,28 @@ class DarshanGoGatePacket:
 
 
 @dataclass(frozen=True)
+class MemoryKernelRepairPacket:
+    """Read-only repair queue for failed MemoryKernel query evals."""
+
+    packet_id: str
+    status: str
+    decision: str
+    query_eval_status: str
+    query_eval_passed: int = 0
+    query_eval_total: int = 0
+    repair_items: tuple[dict[str, Any], ...] = ()
+    source_roots: tuple[str, ...] = ()
+    evidence_refs: tuple[str, ...] = ()
+    forbidden_actions: tuple[str, ...] = ()
+    safe_next_action: str = ""
+    gap_codes: tuple[str, ...] = ()
+    raw: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class VentureCellOperatorProjection:
     """The fused Operator OS projection for one VentureCell."""
 
@@ -186,6 +208,14 @@ class VentureCellOperatorProjection:
             why_external_reader_required="Inspect the Darshan external-reader gate.",
             required_receipt_source="darshan_external_reader",
             required_receipt_schema="go_evidence_receipt.v0",
+        )
+    )
+    memory_kernel_repair_packet: MemoryKernelRepairPacket = field(
+        default_factory=lambda: MemoryKernelRepairPacket(
+            packet_id="memory_kernel.repair",
+            status="not_run",
+            decision="inspect_memory_eval",
+            query_eval_status="not_run",
         )
     )
     daily_cycle: tuple[str, ...] = ()

@@ -176,6 +176,48 @@
       "evidence_refs": [
         "dharma_swarm/task_board.py"
       ],
+      "item_id": "task_board.98faf6e3597b4ddc",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "98faf6e3597b4ddc",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.ba84ced9c7584fdc",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "ba84ced9c7584fdc",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
       "item_id": "task_board.216180fa0a31449e",
       "lane": "task_board",
       "owner_department": "engineering",
@@ -1182,48 +1224,6 @@
     {
       "blocked_reason": "",
       "evidence_refs": [
-        "dharma_swarm/task_board.py"
-      ],
-      "item_id": "task_board.16af25b589344b7c",
-      "lane": "task_board",
-      "owner_department": "engineering",
-      "raw": {
-        "assigned_to": null,
-        "created_by": "eval_harness",
-        "id": "16af25b589344b7c",
-        "metadata": {},
-        "priority": "low",
-        "status": "pending",
-        "title": "eval_probe_task"
-      },
-      "source_surface": "TaskBoard",
-      "status": "pending",
-      "title": "eval_probe_task"
-    },
-    {
-      "blocked_reason": "",
-      "evidence_refs": [
-        "dharma_swarm/task_board.py"
-      ],
-      "item_id": "task_board.1b93e0be72b94706",
-      "lane": "task_board",
-      "owner_department": "engineering",
-      "raw": {
-        "assigned_to": null,
-        "created_by": "eval_harness",
-        "id": "1b93e0be72b94706",
-        "metadata": {},
-        "priority": "low",
-        "status": "pending",
-        "title": "eval_probe_task"
-      },
-      "source_surface": "TaskBoard",
-      "status": "pending",
-      "title": "eval_probe_task"
-    },
-    {
-      "blocked_reason": "",
-      "evidence_refs": [
         "dharma_swarm/operator_core/a2a_task_lifecycle.py"
       ],
       "item_id": "a2a.collab:fleet-health-collab-20260528:collector:hermes-m5",
@@ -1979,13 +1979,13 @@
       "next_action": "Continue bounded internal build work with receipts",
       "observed_state": "mission contract present",
       "raw": {
-        "admission_id": "admission_ca42947ee3d64f49",
+        "admission_id": "admission_60ccaac44ed94f67",
         "allowed_scope": [
           "dharma_swarm/venture_cell/",
           "tests/",
           "reports/venture_operator_os/"
         ],
-        "created_at": "2026-06-02T14:57:32.298601+00:00",
+        "created_at": "2026-06-02T15:04:09.993894+00:00",
         "decision": "allow",
         "expires_at": "",
         "metadata": {
@@ -1998,7 +1998,7 @@
         "reasons": [
           "all_required_controls_present"
         ],
-        "request_id": "admission_req_107685dd44a64416",
+        "request_id": "admission_req_99207b946cfa4384",
         "required_receipts": []
       }
     }
@@ -3005,6 +3005,184 @@
     "status": "read_through_index_available",
     "truncated": true,
     "trusted_count": 1336
+  },
+  "memory_kernel_repair_packet": {
+    "decision": "queue_repair_without_promotion",
+    "evidence_refs": [
+      "/Users/dhyana/.dharma/knowledge/staging",
+      "/Users/dhyana/.dharma/knowledge/wiki/concepts",
+      "/Users/dhyana/.dharma/knowledge/quarantine"
+    ],
+    "forbidden_actions": [
+      "trusted_chetana_promotion",
+      "claim_memory_eval_pass",
+      "delete_quarantine_to_hide_failures",
+      "external_research_without_receipt"
+    ],
+    "gap_codes": [
+      "memory_kernel_index_truncated",
+      "memory_kernel_query_eval_partial",
+      "memory_kernel_repair_items_queued"
+    ],
+    "packet_id": "memory_kernel.query_eval_repair",
+    "query_eval_passed": 0,
+    "query_eval_status": "partial",
+    "query_eval_total": 6,
+    "raw": {
+      "failed_query_count": 6,
+      "trusted_promotion_claimed": false
+    },
+    "repair_items": [
+      {
+        "matched_count": 3,
+        "missing_terms": [
+          "cofounder",
+          "operator",
+          "os"
+        ],
+        "promotion_policy": "no_trusted_promotion_without_existing_chetana_gates",
+        "query": "Polsia Cofounder VentureCell Operator OS",
+        "repair_action": "Add or stage a provenance-backed local source packet for the missing terms, then rerun MemoryKernel evals before any trusted promotion.",
+        "source_refs": [
+          "/Users/dhyana/.dharma/knowledge/wiki/concepts/darshan-publication-venture-cell.md",
+          "/Users/dhyana/.dharma/knowledge/wiki/concepts/ah--does-this-make-sense--are-ytou-following---this-is-the-level-dharma-swarm-n----turn-130.md",
+          "/Users/dhyana/.dharma/knowledge/wiki/concepts/dharma-reward-forge.md"
+        ],
+        "status": "available_truncated",
+        "tier_counts": {
+          "quarantine": 0,
+          "staged": 0,
+          "trusted": 3
+        }
+      },
+      {
+        "matched_count": 3,
+        "missing_terms": [
+          "external",
+          "reader",
+          "gate",
+          "go",
+          "evidence",
+          "receipt"
+        ],
+        "promotion_policy": "no_trusted_promotion_without_existing_chetana_gates",
+        "query": "Darshan external reader gate Go evidence receipt",
+        "repair_action": "Add or stage a provenance-backed local source packet for the missing terms, then rerun MemoryKernel evals before any trusted promotion.",
+        "source_refs": [
+          "/Users/dhyana/.dharma/knowledge/wiki/concepts/darshan-attention-engineering.md",
+          "/Users/dhyana/.dharma/knowledge/wiki/concepts/darshan-publication-venture-cell.md",
+          "/Users/dhyana/.dharma/knowledge/wiki/concepts/dharma-reward-forge.md"
+        ],
+        "status": "available_truncated",
+        "tier_counts": {
+          "quarantine": 0,
+          "staged": 0,
+          "trusted": 3
+        }
+      },
+      {
+        "matched_count": 3,
+        "missing_terms": [
+          "go",
+          "evidence",
+          "receipt",
+          "url",
+          "event",
+          "uid",
+          "accepted"
+        ],
+        "promotion_policy": "no_trusted_promotion_without_existing_chetana_gates",
+        "query": "Go evidence receipt source_url event_uid accepted",
+        "repair_action": "Add or stage a provenance-backed local source packet for the missing terms, then rerun MemoryKernel evals before any trusted promotion.",
+        "source_refs": [
+          "/Users/dhyana/.dharma/knowledge/wiki/concepts/3---turn-121.md",
+          "/Users/dhyana/.dharma/knowledge/wiki/concepts/3---turn-122.md",
+          "/Users/dhyana/.dharma/knowledge/wiki/concepts/3---turn-123.md"
+        ],
+        "status": "available_truncated",
+        "tier_counts": {
+          "quarantine": 0,
+          "staged": 0,
+          "trusted": 3
+        }
+      },
+      {
+        "matched_count": 3,
+        "missing_terms": [
+          "cofounder",
+          "canvas",
+          "library",
+          "execute",
+          "publishing"
+        ],
+        "promotion_policy": "no_trusted_promotion_without_existing_chetana_gates",
+        "query": "Cofounder Canvas Library Plan Execute publishing",
+        "repair_action": "Add or stage a provenance-backed local source packet for the missing terms, then rerun MemoryKernel evals before any trusted promotion.",
+        "source_refs": [
+          "/Users/dhyana/.dharma/knowledge/wiki/concepts/how-does-this-fit-with-your-phase-2-plan----just-pasting-this-for-now---i-m-thi----turn-20.md",
+          "/Users/dhyana/.dharma/knowledge/wiki/concepts/keep-this-plan-but-do-this-resrach-forst-and-paln-to-write-a-v2-of-the-plan---r----turn-11.md",
+          "/Users/dhyana/.dharma/knowledge/wiki/concepts/now-reserach-this-and-think-of-a-build-plan-to-level-this-up-and-integate-it-in----turn-7.md"
+        ],
+        "status": "available_truncated",
+        "tier_counts": {
+          "quarantine": 0,
+          "staged": 0,
+          "trusted": 3
+        }
+      },
+      {
+        "matched_count": 3,
+        "missing_terms": [
+          "staged",
+          "quarantine"
+        ],
+        "promotion_policy": "no_trusted_promotion_without_existing_chetana_gates",
+        "query": "Chetana wiki memory kernel staged trusted quarantine",
+        "repair_action": "Add or stage a provenance-backed local source packet for the missing terms, then rerun MemoryKernel evals before any trusted promotion.",
+        "source_refs": [
+          "/Users/dhyana/.dharma/knowledge/wiki/concepts/hello-memory-agent--you-are-continuing-to-observe-the-primary-claude-session-------turn-2.md",
+          "/Users/dhyana/.dharma/knowledge/wiki/concepts/how-does-this-fit-with-your-phase-2-plan----just-pasting-this-for-now---i-m-thi----turn-20.md",
+          "/Users/dhyana/.dharma/knowledge/wiki/concepts/hello-memory-agent--you-are-continuing-to-observe-the-primary-claude-session-------turn-13.md"
+        ],
+        "status": "available_truncated",
+        "tier_counts": {
+          "quarantine": 0,
+          "staged": 0,
+          "trusted": 3
+        }
+      },
+      {
+        "matched_count": 3,
+        "missing_terms": [
+          "autonomy",
+          "ladder",
+          "external",
+          "action",
+          "approval"
+        ],
+        "promotion_policy": "no_trusted_promotion_without_existing_chetana_gates",
+        "query": "VentureCell autonomy ladder external action approval",
+        "repair_action": "Add or stage a provenance-backed local source packet for the missing terms, then rerun MemoryKernel evals before any trusted promotion.",
+        "source_refs": [
+          "/Users/dhyana/.dharma/knowledge/wiki/concepts/ah--does-this-make-sense--are-ytou-following---this-is-the-level-dharma-swarm-n----turn-130.md",
+          "/Users/dhyana/.dharma/knowledge/wiki/concepts/darshan-publication-venture-cell.md",
+          "/Users/dhyana/.dharma/knowledge/wiki/concepts/dharma-reward-forge.md"
+        ],
+        "status": "available_truncated",
+        "tier_counts": {
+          "quarantine": 0,
+          "staged": 0,
+          "trusted": 3
+        }
+      }
+    ],
+    "safe_next_action": "Create provenance-backed staged repair atoms or docs for missing query terms, then rerun evals; do not mark trusted or pass until gates prove it.",
+    "source_roots": [
+      "/Users/dhyana/.dharma/knowledge/staging",
+      "/Users/dhyana/.dharma/knowledge/wiki/concepts",
+      "/Users/dhyana/.dharma/knowledge/quarantine"
+    ],
+    "status": "queued"
   },
   "next_action_packet": {
     "autonomy_level": "L0_read_only_plan",

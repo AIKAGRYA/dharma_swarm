@@ -123,6 +123,13 @@
 - Index: `available_truncated` with `80` entries
 - Query evals: `partial` (0/6)
 
+## Memory Repair Packet
+
+- Decision: `queue_repair_without_promotion`
+- Status: `queued`
+- Safe next action: Create provenance-backed staged repair atoms or docs for missing query terms, then rerun evals; do not mark trusted or pass until gates prove it.
+- Repair items: `6`
+
 ## Memory Query Evals
 
 - `fail` Polsia Cofounder VentureCell Operator OS: `available_truncated`; matches `3`; missing `cofounder, operator, os`.
