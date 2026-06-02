@@ -152,6 +152,16 @@ def render_operator_daily_digest(projection: VentureCellOperatorProjection) -> s
             f"({memory.query_eval_passed}/{memory.query_eval_total})",
         ]
     )
+    if memory.root_coverage:
+        lines.extend(["", "## Memory Coverage", ""])
+        for coverage in memory.root_coverage[:6]:
+            lines.append(
+                f"- `{coverage.get('role')}` `{coverage.get('tier')}`: "
+                f"scanned `{coverage.get('scanned_count')}`; "
+                f"indexed `{coverage.get('indexed_count')}`/"
+                f"`{coverage.get('entry_budget')}`; "
+                f"truncated `{coverage.get('truncated')}`."
+            )
     repair = projection.memory_kernel_repair_packet
     lines.extend(
         [

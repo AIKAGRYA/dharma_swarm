@@ -114,6 +114,7 @@ class MemoryKernelReadThroughIndex:
     source_roots: tuple[str, ...]
     entries: tuple[MemoryKernelIndexEntry, ...] = ()
     query_terms: tuple[str, ...] = EVAL_QUERY_TERMS
+    root_coverage: tuple[dict[str, Any], ...] = ()
 
     @property
     def indexed_count(self) -> int:
@@ -162,17 +163,18 @@ def build_memory_kernel_index(
         if str(root).strip()
     )
     roots = (
-        ("trusted", trusted_root),
-        ("staged", staging_root),
-        *(("staged", root) for root in supplemental_roots),
-        ("quarantine", quarantine_root),
+        ("trusted", trusted_root, "trusted"),
+        ("staged", staging_root, "staging"),
+        *(("staged", root, "supplemental_staging") for root in supplemental_roots),
+        ("quarantine", quarantine_root, "quarantine"),
     )
     budgets = _root_budgets(len(roots), max_entries)
     entries: list[MemoryKernelIndexEntry] = []
+    root_coverage: list[dict[str, Any]] = []
     counts = {"staged": 0, "trusted": 0, "quarantine": 0}
     truncated = False
 
-    for index, (tier, root) in enumerate(roots):
+    for index, (tier, root, role) in enumerate(roots):
         count, tier_truncated, tier_entries = _scan_root(
             root=root,
             tier=tier,
@@ -183,6 +185,17 @@ def build_memory_kernel_index(
         counts[tier] += count
         truncated = truncated or tier_truncated
         entries.extend(tier_entries)
+        root_coverage.append(
+            {
+                "tier": tier,
+                "role": role,
+                "root": str(root),
+                "scanned_count": count,
+                "indexed_count": len(tier_entries),
+                "entry_budget": budgets[index],
+                "truncated": tier_truncated,
+            }
+        )
 
     if not any(counts.values()):
         status = "empty"
@@ -197,9 +210,10 @@ def build_memory_kernel_index(
         trusted_count=counts["trusted"],
         quarantine_count=counts["quarantine"],
         truncated=truncated,
-        source_roots=tuple(str(root) for _, root in roots),
+        source_roots=tuple(str(root) for _, root, _ in roots),
         entries=tuple(entries),
         query_terms=terms,
+        root_coverage=tuple(root_coverage),
     )
 
 

@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-41271dd7e888aa5e`
-Current scoped HEAD before this packet: `47e4e044 feat(operator-os): add receipt inventory to manifest`
+ds-goal progress receipt: `r-afcc427129fd0bcb`
+Current scoped HEAD before this packet: `498c0786 feat(operator-os): add gap triage packet`
 
 This audit is intentionally written before the final time window so the next
 agent has a concrete attack surface. It is not a completion certificate. The
@@ -33,6 +33,8 @@ updates, and terminal verification exist.
 - Artifact manifest lists receipt paths, but is still not final proof.
 - Gap triage packet reports `external_blocked_with_local_followups`, but is
   still only a local selector and not gate clearance.
+- Memory coverage packet identifies root-level truncation, but does not prove
+  complete MemoryKernel coverage.
 - MemoryKernel query eval now reports `pass` with `6/6` from report-local
   staged sources.
 - MemoryKernel repair now reports `no_repair_needed`; no trusted Chetana
@@ -95,6 +97,8 @@ Adversarial review:
 - Receipt inventory must not be used as a closure certificate.
 - Gap triage must not be used as authority, final proof, or external-reader GO
   clearance.
+- Memory coverage must not be used to claim complete recall or trusted Chetana
+  promotion.
 - Unrelated staged work must not be included in commits for this run.
 
 Keep / revert / queue:
@@ -130,6 +134,7 @@ Queued:
 | Operator OS action ack exists | action-specific NATS/A2A fields are false | false |
 | Receipt inventory proves completion | manifest is an index and reporter is still open | false |
 | Gap triage clears the remaining blockers | `operator_gap_triage_packet.json` is `not_authority: true` | false |
+| Memory coverage proves complete recall | staging and quarantine roots are still truncated | false |
 | Broad dirty work is part of this packet | scoped report-only patch | false |
 
 ## Boundary Audit

@@ -200,6 +200,7 @@ def build_memory_kernel_snapshot(
         indexed_count=index.indexed_count,
         index_entries=tuple(entry.to_dict() for entry in index.entries),
         index_query_terms=index.query_terms,
+        root_coverage=index.root_coverage,
         query_eval_results=tuple(result.to_dict() for result in query_evals),
         query_eval_passed=sum(1 for result in query_evals if result.passed),
         query_eval_total=len(query_evals),

@@ -354,6 +354,9 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     projection = json.loads(paths["projection"].read_text(encoding="utf-8"))
     digest = paths["digest"].read_text(encoding="utf-8")
     memory_index = json.loads(paths["memory_index"].read_text(encoding="utf-8"))
+    memory_coverage_packet = json.loads(
+        paths["memory_coverage_packet"].read_text(encoding="utf-8")
+    )
     memory_query_eval = json.loads(
         paths["memory_query_eval"].read_text(encoding="utf-8")
     )
@@ -385,6 +388,11 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert projection["darshan_go_gate_packet"]["decision"] == "block_external_authority"
     assert "# VentureCell Operator OS Digest: DARSHAN" in digest
     assert "index_status" in memory_index
+    assert "root_coverage" in memory_index
+    assert memory_coverage_packet["schema"] == "dharma.venture_cell_operator_os.memory_coverage.v0"
+    assert memory_coverage_packet["not_authority"] is True
+    assert memory_coverage_packet["trusted_promotion_claimed"] is False
+    assert memory_coverage_packet["root_coverage"]
     assert "query_eval_status" in memory_index
     assert "query_eval_results" in memory_query_eval
     assert memory_query_eval["trusted_promotion_claimed"] is False
@@ -417,10 +425,12 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert artifact_manifest["darshan_go_decision"] == "block_external_authority"
     assert artifact_manifest["authority_decision"] == "local_read_only_external_blocked"
     assert artifact_manifest["gap_triage_decision"] == "external_blocked_with_local_followups"
+    assert "memory_coverage_truncated" in artifact_manifest
     assert artifact_manifest["not_authority"] is True
     assert "projection" in artifact_manifest["artifact_paths"]
     assert "authority_boundary_packet" in artifact_manifest["artifact_paths"]
     assert "gap_triage_packet" in artifact_manifest["artifact_paths"]
+    assert "memory_coverage_packet" in artifact_manifest["artifact_paths"]
     assert str(report_dir / "00_opening_truth.md") in artifact_manifest["receipt_paths"]
     assert str(report_dir / "operator_os_digest.md") not in artifact_manifest["receipt_paths"]
 
@@ -508,6 +518,11 @@ def test_memory_kernel_query_eval_distinguishes_tiers_and_provenance(tmp_path: P
     )
 
     assert {entry.tier for entry in index.entries} == {"trusted", "staged", "quarantine"}
+    coverage_by_role = {coverage["role"]: coverage for coverage in index.root_coverage}
+    assert coverage_by_role["trusted"]["scanned_count"] == 2
+    assert coverage_by_role["staging"]["scanned_count"] == 2
+    assert coverage_by_role["quarantine"]["scanned_count"] == 1
+    assert coverage_by_role["staging"]["truncated"] is False
 
     gate_result = query_memory_kernel_index(
         index,
@@ -536,3 +551,33 @@ def test_memory_kernel_query_eval_distinguishes_tiers_and_provenance(tmp_path: P
     assert all(result.passed for result in evals)
     assert all(result.source_refs for result in evals)
     assert all(result.trusted_promotion_claimed is False for result in evals)
+
+
+def test_memory_kernel_root_coverage_marks_truncated_roots(tmp_path: Path) -> None:
+    trusted = tmp_path / "trusted"
+    staged = tmp_path / "staging"
+    quarantine = tmp_path / "quarantine"
+    trusted.mkdir()
+    staged.mkdir()
+    quarantine.mkdir()
+    (trusted / "operator-os.md").write_text("# Operator OS\n", encoding="utf-8")
+    (staged / "first.md").write_text("# Darshan\nGo evidence receipt\n", encoding="utf-8")
+    (staged / "second.md").write_text("# MemoryKernel\nChetana staged source\n", encoding="utf-8")
+    (quarantine / "raw.md").write_text("# Raw\n", encoding="utf-8")
+
+    index = build_memory_kernel_index(
+        staging_root=staged,
+        trusted_root=trusted,
+        quarantine_root=quarantine,
+        max_scan=1,
+        max_entries=6,
+    )
+
+    coverage_by_role = {coverage["role"]: coverage for coverage in index.root_coverage}
+
+    assert index.truncated is True
+    assert coverage_by_role["trusted"]["truncated"] is True
+    assert coverage_by_role["staging"]["truncated"] is True
+    assert coverage_by_role["quarantine"]["truncated"] is True
+    assert coverage_by_role["staging"]["scanned_count"] == 1
+    assert coverage_by_role["staging"]["indexed_count"] <= coverage_by_role["staging"]["entry_budget"]

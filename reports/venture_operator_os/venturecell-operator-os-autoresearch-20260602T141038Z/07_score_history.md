@@ -3,9 +3,9 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live ledger, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-41271dd7e888aa5e`
+ds-goal progress receipt: `r-afcc427129fd0bcb`
 Baseline: `1aca07a1 Add VentureCell Operator OS Level 70 surface`
-Current scoped HEAD before this packet: `47e4e044 feat(operator-os): add receipt inventory to manifest`
+Current scoped HEAD before this packet: `498c0786 feat(operator-os): add gap triage packet`
 
 This file is a living score ledger. It exists now so later agents do not
 reconstruct scores from memory. It must be reviewed and updated before final
@@ -32,18 +32,19 @@ reporter closure.
 | Loop 17 | `16_periodic_onboard_receipt.md` | `d91b3877` | 95 | +1 | keep periodic onboard evidence |
 | Loop 18 | `17_liveness_key_disambiguation_receipt.md` | `7370b48e` | 96 | +1 | keep action-specific liveness fields |
 | Loop 19 | `18_receipt_inventory_manifest_receipt.md` | `47e4e044` | 97 | +1 | keep receipt inventory manifest |
-| Loop 20 | `19_gap_triage_packet_receipt.md` | pending | 98 | +1 | keep gap triage packet |
+| Loop 20 | `19_gap_triage_packet_receipt.md` | `498c0786` | 98 | +1 | keep gap triage packet |
+| Loop 21 | `20_memory_kernel_coverage_receipt.md` | pending | 99 | +1 | keep MemoryKernel coverage packet |
 
 ## Area History
 
 | Area | Opening | Current | Evidence |
 |---|---:|---:|---|
 | Operator clarity | 11 | 16 | next-action, GO gate, GO template, authority, and gap triage packets expose blockers, owners, local allowances, and artifact shape |
-| Memory usefulness | 10 | 15 | report-local staged source root now passes strict eval `6/6` without trusted promotion |
+| Memory usefulness | 10 | 16 | report-local staged source root now passes strict eval `6/6` without trusted promotion; root coverage now identifies which roots are truncated |
 | Task truth | 8 | 13 | progress receipts and residual risk register distinguish solved local claims, residual risks, and completion blockers |
 | Governance safety | 15 | 15 | external-reader, governed admission, Chetana, completion, authority firewall, and action-specific liveness gates preserved |
 | Iteration quality | 8 | 12+ | every loop has hypothesis, patch/rejection, evals, adversarial review, decision |
-| Product structure | 8 | 15 | Operator OS now emits next-action, GO gate, GO template, authority boundary, gap triage, manifest, memory repair, and report-local recall packets |
+| Product structure | 8 | 16 | Operator OS now emits next-action, GO gate, GO template, authority boundary, gap triage, memory coverage, manifest, memory repair, and report-local recall packets |
 | Tests/evals | 8 | 13 | fixed tests, report-local recall regression, eval artifacts, live verifier matrix, and periodic onboard evidence exist |
 | Metabolization | 2 | 5 | program kernel, receipts, manifest inventory, packets, and this score ledger exist |
 
@@ -69,6 +70,8 @@ audit with explicit evidence.
 - Gap triage packet: `external_blocked_with_local_followups`, with external
   reader as the non-local blocker and MemoryKernel truncation as local
   maintenance.
+- Memory coverage packet: present, with staging and quarantine roots marked
+  truncated and trusted/report-local roots marked not truncated.
 - MemoryKernel query eval: `pass` (`6/6`) from report-local staged roots.
 - MemoryKernel repair packet: `no_repair_needed`, with trusted promotion still forbidden.
 - ds-goal raw/reconciled counts: `open=1 claimed=0 completed=4 failed=0 blocked=0 total=5`.
@@ -113,6 +116,8 @@ current evidence, not as a full-project proof.
   `operator_os_a2a_live_action_ack_proof_present` remain `false`.
 - Receipt inventory is an audit locator, not final proof.
 - Gap triage is a local selector and not authority or final proof.
+- Memory coverage packet explains truncation but does not clear the truncation
+  gap or prove complete memory coverage.
 - The reporter task must remain open until final artifacts and final
   verification prove the full contract.
 
@@ -180,6 +185,37 @@ Adversarial review:
 - Gap triage does not clear the Darshan GO gate.
 - It forbids fake GO receipts, fake liveness claims, and ungated trusted
   Chetana promotion.
+
+Keep / revert / queue:
+
+Decision: keep.
+
+## Loop 21 Score Update
+
+Hypothesis:
+
+If MemoryKernel coverage is exposed per root, future agents can target the
+remaining truncation maintenance gap without overclaiming complete memory
+coverage.
+
+Patch:
+
+- Added `root_coverage` to the MemoryKernel index and projection.
+- Added `memory_kernel_coverage_packet.json` and digest coverage rows.
+- Added focused tests for root coverage and rendered packet semantics.
+
+Evaluation:
+
+- `pytest -q tests/test_venture_cell_operator_os_projection.py` passed.
+- `./.venv/bin/python -m compileall -q dharma_swarm/venture_cell/operator_os`
+  passed.
+- The live coverage packet identifies staging and quarantine as truncated.
+
+Adversarial review:
+
+- The truncation gap remains open as local maintenance.
+- No trusted Chetana promotion, Darshan GO clearance, or external authority is
+  claimed.
 
 Keep / revert / queue:
 

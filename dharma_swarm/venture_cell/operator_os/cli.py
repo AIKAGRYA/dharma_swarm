@@ -33,6 +33,28 @@ def _memory_query_eval_payload(projection: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _memory_coverage_payload(projection: dict[str, Any]) -> dict[str, Any]:
+    memory = _memory_index_payload(projection)
+    truncated = bool(memory.get("truncated"))
+    return {
+        "schema": "dharma.venture_cell_operator_os.memory_coverage.v0",
+        "status": memory.get("status", "unknown"),
+        "index_status": memory.get("index_status", "not_built"),
+        "indexed_count": memory.get("indexed_count", 0),
+        "source_roots": memory.get("source_roots", []),
+        "root_coverage": memory.get("root_coverage", []),
+        "truncated": truncated,
+        "locally_actionable_gap": "memory_kernel_index_truncated" if truncated else "",
+        "safe_next_action": (
+            "Use root coverage to target local read-through maintenance without trusted promotion."
+            if truncated
+            else "Use current MemoryKernel coverage as bounded local recall evidence."
+        ),
+        "trusted_promotion_claimed": False,
+        "not_authority": True,
+    }
+
+
 def _next_action_payload(projection: dict[str, Any]) -> dict[str, Any]:
     packet = projection.get("next_action_packet")
     return packet if isinstance(packet, dict) else {}
@@ -74,6 +96,7 @@ def _artifact_manifest_payload(
     go_gate = _darshan_go_gate_payload(projection)
     authority = _authority_boundary_payload(projection)
     gap_triage = _gap_triage_payload(projection)
+    memory_coverage = _memory_coverage_payload(projection)
     return {
         "schema": "dharma.venture_cell_operator_os.render_manifest.v0",
         "status": projection.get("status", "unknown"),
@@ -84,6 +107,7 @@ def _artifact_manifest_payload(
         "darshan_go_decision": go_gate.get("decision", "unknown"),
         "authority_decision": authority.get("decision", "unknown"),
         "gap_triage_decision": gap_triage.get("decision", "unknown"),
+        "memory_coverage_truncated": memory_coverage.get("truncated", False),
         "artifact_paths": {
             name: str(path)
             for name, path in sorted(artifact_paths.items())
@@ -145,6 +169,16 @@ def render_operator_surface(
     memory_query_eval_path.write_text(
         json.dumps(
             _memory_query_eval_payload(projection.to_dict()),
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    memory_coverage_path = output_dir / "memory_kernel_coverage_packet.json"
+    memory_coverage_path.write_text(
+        json.dumps(
+            _memory_coverage_payload(projection.to_dict()),
             indent=2,
             sort_keys=True,
         )
@@ -216,6 +250,7 @@ def render_operator_surface(
         "digest": digest_path,
         "memory_index": memory_index_path,
         "memory_query_eval": memory_query_eval_path,
+        "memory_coverage_packet": memory_coverage_path,
         "next_action_packet": next_action_packet_path,
         "darshan_go_gate_packet": darshan_go_gate_packet_path,
         "darshan_go_receipt_template": darshan_go_receipt_template_path,

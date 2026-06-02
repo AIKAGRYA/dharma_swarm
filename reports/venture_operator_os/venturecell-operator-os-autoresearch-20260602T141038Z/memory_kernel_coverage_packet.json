@@ -1,0 +1,55 @@
+{
+  "index_status": "available_truncated",
+  "indexed_count": 80,
+  "locally_actionable_gap": "memory_kernel_index_truncated",
+  "not_authority": true,
+  "root_coverage": [
+    {
+      "entry_budget": 20,
+      "indexed_count": 20,
+      "role": "trusted",
+      "root": "/Users/dhyana/.dharma/knowledge/wiki/concepts",
+      "scanned_count": 1336,
+      "tier": "trusted",
+      "truncated": false
+    },
+    {
+      "entry_budget": 20,
+      "indexed_count": 20,
+      "role": "staging",
+      "root": "/Users/dhyana/.dharma/knowledge/staging",
+      "scanned_count": 5000,
+      "tier": "staged",
+      "truncated": true
+    },
+    {
+      "entry_budget": 20,
+      "indexed_count": 20,
+      "role": "supplemental_staging",
+      "root": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z",
+      "scanned_count": 23,
+      "tier": "staged",
+      "truncated": false
+    },
+    {
+      "entry_budget": 20,
+      "indexed_count": 20,
+      "role": "quarantine",
+      "root": "/Users/dhyana/.dharma/knowledge/quarantine",
+      "scanned_count": 5000,
+      "tier": "quarantine",
+      "truncated": true
+    }
+  ],
+  "safe_next_action": "Use root coverage to target local read-through maintenance without trusted promotion.",
+  "schema": "dharma.venture_cell_operator_os.memory_coverage.v0",
+  "source_roots": [
+    "/Users/dhyana/.dharma/knowledge/wiki/concepts",
+    "/Users/dhyana/.dharma/knowledge/staging",
+    "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z",
+    "/Users/dhyana/.dharma/knowledge/quarantine"
+  ],
+  "status": "read_through_index_available",
+  "truncated": true,
+  "trusted_promotion_claimed": false
+}

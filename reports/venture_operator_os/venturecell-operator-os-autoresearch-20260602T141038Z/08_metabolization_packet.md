@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live packet, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-41271dd7e888aa5e`
-Current scoped HEAD before this packet: `47e4e044 feat(operator-os): add receipt inventory to manifest`
+ds-goal progress receipt: `r-afcc427129fd0bcb`
+Current scoped HEAD before this packet: `498c0786 feat(operator-os): add gap triage packet`
 
 This packet captures durable learning from the run so far. It must be reviewed
 and updated during final closeout before the reporter task is closed.
@@ -119,6 +119,24 @@ and updated during final closeout before the reporter task is closed.
    - Future agents should use gap triage as a local loop selector. It does not
      clear gates, grant external authority, or certify final completion.
 
+8. Memory coverage must identify root-level limits.
+
+   Evidence:
+
+   - `memory_kernel_coverage_packet.json` reports root-level scanned counts,
+     entry budgets, indexed counts, and truncation flags.
+   - The current trusted root and report-local supplemental root are not
+     truncated.
+   - The current staging and quarantine roots hit the scan cap.
+   - The packet has `not_authority: true` and
+     `trusted_promotion_claimed: false`.
+
+   Metabolized rule:
+
+   - Future memory loops should target specific truncated roots or
+     query-specific retrieval. Coverage metadata explains limits; it does not
+     prove complete memory coverage or trusted promotion.
+
 ## Committed Packets
 
 | Commit | Packet | Durable effect |
@@ -142,13 +160,15 @@ and updated during final closeout before the reporter task is closed.
 | `d91b3877` | `16_periodic_onboard_receipt.md` | periodic onboard/toolbelt substrate check |
 | `7370b48e` | `17_liveness_key_disambiguation_receipt.md` | action-specific liveness field names |
 | `47e4e044` | `18_receipt_inventory_manifest_receipt.md` | manifest receipt inventory |
-| pending | `19_gap_triage_packet_receipt.md` | local/external gap triage packet |
+| `498c0786` | `19_gap_triage_packet_receipt.md` | local/external gap triage packet |
+| pending | `20_memory_kernel_coverage_receipt.md` | root-level MemoryKernel coverage packet |
 
 ## Current Read-Only Artifacts
 
 - `operator_os_projection.json`
 - `operator_os_digest.md`
 - `memory_kernel_index.json`
+- `memory_kernel_coverage_packet.json`
 - `memory_kernel_query_eval.json`
 - `operator_next_action_packet.json`
 - `darshan_go_gate_packet.json`
@@ -168,6 +188,7 @@ and updated during final closeout before the reporter task is closed.
 - `17_liveness_key_disambiguation_receipt.md`
 - `18_receipt_inventory_manifest_receipt.md`
 - `19_gap_triage_packet_receipt.md`
+- `20_memory_kernel_coverage_receipt.md`
 
 ## Do Not Metabolize As Done
 
@@ -188,6 +209,8 @@ These facts are explicitly not complete:
   OS NATS/A2A action ack proof.
 - Manifest receipt inventory is an audit locator, not final proof.
 - Gap triage is a local loop selector, not authority or final proof.
+- Memory coverage explains root truncation, not complete recall or trusted
+  promotion.
 - Reporter task is not closed.
 - The final adversarial audit and next-goal packet still require final-window
   review/update.
@@ -204,6 +227,7 @@ Start here:
 3. Read `07_score_history.md`.
 4. Inspect `operator_os_projection.json`, `memory_kernel_query_eval.json`,
    `memory_kernel_repair_packet.json`,
+   `memory_kernel_coverage_packet.json`,
    `operator_gap_triage_packet.json`,
    `10_memorykernel_report_source_packet.md`, and
    `darshan_go_gate_packet.json`.

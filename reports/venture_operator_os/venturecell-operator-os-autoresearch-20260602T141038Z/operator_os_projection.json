@@ -2165,13 +2165,13 @@
       "next_action": "Continue bounded internal build work with receipts",
       "observed_state": "mission contract present",
       "raw": {
-        "admission_id": "admission_8da31b0b704a43a7",
+        "admission_id": "admission_da0a585f28bf4599",
         "allowed_scope": [
           "dharma_swarm/venture_cell/",
           "tests/",
           "reports/venture_operator_os/"
         ],
-        "created_at": "2026-06-02T16:11:26.250082+00:00",
+        "created_at": "2026-06-02T16:17:53.325126+00:00",
         "decision": "allow",
         "expires_at": "",
         "metadata": {
@@ -2184,7 +2184,7 @@
         "reasons": [
           "all_required_controls_present"
         ],
-        "request_id": "admission_req_e047c1cb8aba42bd",
+        "request_id": "admission_req_7f089da5e70c4288",
         "required_receipts": []
       }
     }
@@ -2789,7 +2789,7 @@
         "title": "MemoryKernel Report Source Packet"
       },
       {
-        "excerpt": "# Metabolization Packet Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live packet, not final until the 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-41271dd7e888aa5e` Current scoped HEAD before this packet: `47e4e044 feat(operator-os): add receipt inventory to manifes",
+        "excerpt": "# Metabolization Packet Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live packet, not final until the 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-afcc427129fd0bcb` Current scoped HEAD before this packet: `498c0786 feat(operator-os): add gap triage packet` This pack",
         "matched_terms": [
           "VentureCell",
           "Operator OS",
@@ -2805,6 +2805,24 @@
         "path": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/08_metabolization_packet.md",
         "tier": "staged",
         "title": "Metabolization Packet"
+      },
+      {
+        "excerpt": "# Next Goal Packet Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live draft, not final until the 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-afcc427129fd0bcb` Current scoped HEAD before this packet: `498c0786 feat(operator-os): add gap triage packet` This packet is ",
+        "matched_terms": [
+          "VentureCell",
+          "Operator OS",
+          "Darshan",
+          "Chetana",
+          "MemoryKernel",
+          "accepted",
+          "Plan",
+          "staged",
+          "trusted",
+          "quarantine"
+        ],
+        "path": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/09_next_goal_packet.md",
+        "tier": "staged",
+        "title": "Next Goal Packet"
       },
       {
         "excerpt": "# Loop 03 Operator Surface Receipt Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Loop window: Hour 3-4.5 target Status: kept ## Hypothesis A fresh operator or agent should not have to scrape the whole projection to know what is blocked, who owns it, what evidence exists, what the next governed action is, and what external authority remains for",
@@ -2841,7 +2859,7 @@
         "title": "Loop 05 Darshan GO Gate Receipt"
       },
       {
-        "excerpt": "# Adversary Audit Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live draft, not final until the true 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-41271dd7e888aa5e` Current scoped HEAD before this packet: `47e4e044 feat(operator-os): add receipt inventory to manifest`",
+        "excerpt": "# Adversary Audit Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live draft, not final until the true 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-afcc427129fd0bcb` Current scoped HEAD before this packet: `498c0786 feat(operator-os): add gap triage packet` This audit ",
         "matched_terms": [
           "VentureCell",
           "Operator OS",
@@ -2856,23 +2874,6 @@
         "path": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/06_adversary_audit.md",
         "tier": "staged",
         "title": "Adversary Audit"
-      },
-      {
-        "excerpt": "# Next Goal Packet Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live draft, not final until the 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-41271dd7e888aa5e` Current scoped HEAD before this packet: `47e4e044 feat(operator-os): add receipt inventory to manifest` Thi",
-        "matched_terms": [
-          "VentureCell",
-          "Operator OS",
-          "Darshan",
-          "Chetana",
-          "MemoryKernel",
-          "accepted",
-          "Plan",
-          "staged",
-          "trusted"
-        ],
-        "path": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/09_next_goal_packet.md",
-        "tier": "staged",
-        "title": "Next Goal Packet"
       },
       {
         "excerpt": "# Program Kernel Receipt Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Mission ledger: `20260602-venturecell-operator-os-autoresearch-8h` Loop: `01_program_kernel_memory_eval` Planner ds-goal receipt: `r-ed58f2ef8f077f19` Builder ds-goal receipt: `r-0e8c28daa0333f06` Started UTC: `2026-06-02T14:10:38Z` Ended UTC: `2026-06-02T14:19:37Z` Decisio",
@@ -2891,23 +2892,23 @@
         "title": "Program Kernel Receipt"
       },
       {
-        "excerpt": "# Score History Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live ledger, not final until the 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-41271dd7e888aa5e` Baseline: `1aca07a1 Add VentureCell Operator OS Level 70 surface` Current scoped HEAD before this packet: `47",
+        "excerpt": "# Live Verifier Matrix Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live verifier matrix, not final until the true 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-afcc427129fd0bcb` Current scoped HEAD before this packet: `498c0786 feat(operator-os): add gap triage pack",
         "matched_terms": [
           "VentureCell",
           "Operator OS",
           "Darshan",
-          "Chetana",
           "MemoryKernel",
-          "Plan",
+          "accepted",
           "staged",
-          "trusted"
+          "trusted",
+          "quarantine"
         ],
-        "path": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/07_score_history.md",
+        "path": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/12_live_verifier_matrix.md",
         "tier": "staged",
-        "title": "Score History"
+        "title": "Live Verifier Matrix"
       },
       {
-        "excerpt": "# Residual Risk Register Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live risk register, not final until the true 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-41271dd7e888aa5e` Current scoped HEAD before this packet: `47e4e044 feat(operator-os): add receipt invento",
+        "excerpt": "# Residual Risk Register Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live risk register, not final until the true 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-afcc427129fd0bcb` Current scoped HEAD before this packet: `498c0786 feat(operator-os): add gap triage pack",
         "matched_terms": [
           "VentureCell",
           "Operator OS",
@@ -2970,21 +2971,6 @@
         "title": "Loop 06 MemoryKernel Repair Receipt"
       },
       {
-        "excerpt": "# Live Verifier Matrix Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live verifier matrix, not final until the true 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-41271dd7e888aa5e` Current scoped HEAD before this packet: `47e4e044 feat(operator-os): add receipt invento",
-        "matched_terms": [
-          "VentureCell",
-          "Operator OS",
-          "Darshan",
-          "MemoryKernel",
-          "accepted",
-          "staged",
-          "trusted"
-        ],
-        "path": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/12_live_verifier_matrix.md",
-        "tier": "staged",
-        "title": "Live Verifier Matrix"
-      },
-      {
         "excerpt": "# Authority Boundary Receipt Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live packet, not final until the true 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-9e260da4bf76c7dc` ## Loop 14 Receipt Hypothesis: If Operator OS emits one consolidated authority boundary pac",
         "matched_terms": [
           "VentureCell",
@@ -3000,6 +2986,20 @@
         "title": "Authority Boundary Receipt"
       },
       {
+        "excerpt": "# Score History Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live ledger, not final until the 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-afcc427129fd0bcb` Baseline: `1aca07a1 Add VentureCell Operator OS Level 70 surface` Current scoped HEAD before this packet: `49",
+        "matched_terms": [
+          "VentureCell",
+          "Operator OS",
+          "Chetana",
+          "MemoryKernel",
+          "staged",
+          "trusted"
+        ],
+        "path": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/07_score_history.md",
+        "tier": "staged",
+        "title": "Score History"
+      },
+      {
         "excerpt": "# Artifact Manifest Receipt Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live packet, not final until the true 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-fc6ccc17c8ce64f2` Current scoped HEAD before this packet: `6a6401b0 docs(operator-os): add residual risk regis",
         "matched_terms": [
           "VentureCell",
@@ -3012,6 +3012,20 @@
         "path": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/15_artifact_manifest_receipt.md",
         "tier": "staged",
         "title": "Artifact Manifest Receipt"
+      },
+      {
+        "excerpt": "# MemoryKernel Coverage Packet Receipt Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live packet, not final until the true 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-afcc427129fd0bcb` Current scoped HEAD before this packet: `498c0786 feat(operator-os): add gap tria",
+        "matched_terms": [
+          "VentureCell",
+          "Operator OS",
+          "Darshan",
+          "MemoryKernel",
+          "trusted",
+          "quarantine"
+        ],
+        "path": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/20_memory_kernel_coverage_receipt.md",
+        "tier": "staged",
+        "title": "MemoryKernel Coverage Packet Receipt"
       },
       {
         "excerpt": "# Opening Truth Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Started UTC: `2026-06-02T14:10:38Z` Local observed time: `2026-06-02T22:10:39+0800` Contract: `docs/plans/2026-06-02-venturecell-operator-os-autoresearch-8h-goal.md` Baseline commit: `1aca07a1cd706042438ac8ba5305e1e4a73cad12` Branch: `trust-build-compass` ## Baseline Evidence - `mak",
@@ -3047,16 +3061,6 @@
         "path": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/11_go_receipt_template_receipt.md",
         "tier": "staged",
         "title": "GO Receipt Template Receipt"
-      },
-      {
-        "excerpt": "# Loop 04 ds-goal Truth Receipt Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Loop window: Hour 4.5-6 target Status: kept ## Hypothesis The autonomy spine had a practical reliability gap: operators could close a task with `record`, and the runner could write non-closing receipts, but a manual loop could not add a progress receipt without eithe",
-        "matched_terms": [
-          "VentureCell",
-          "Darshan"
-        ],
-        "path": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/04_goal_truth_receipt.md",
-        "tier": "staged",
-        "title": "Loop 04 ds-goal Truth Receipt"
       },
       {
         "excerpt": "title: WOW OWOW OW, there is toally a strong wiki prpot, what do yo umean no wiki as i\u2026 \u2014 turn 5 chetana_version: 0.1.0 atom_id: 0e360da6-2296-46d5-881f-5ebd497be6f1 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/c74c67f4-49a2-453d-ab62-0be4ff41b768.jsonl span: line:179 captured: '2026-04-29T06:22:44.4",
@@ -3499,13 +3503,51 @@
     ],
     "query_eval_status": "pass",
     "query_eval_total": 6,
+    "root_coverage": [
+      {
+        "entry_budget": 20,
+        "indexed_count": 20,
+        "role": "trusted",
+        "root": "/Users/dhyana/.dharma/knowledge/wiki/concepts",
+        "scanned_count": 1336,
+        "tier": "trusted",
+        "truncated": false
+      },
+      {
+        "entry_budget": 20,
+        "indexed_count": 20,
+        "role": "staging",
+        "root": "/Users/dhyana/.dharma/knowledge/staging",
+        "scanned_count": 5000,
+        "tier": "staged",
+        "truncated": true
+      },
+      {
+        "entry_budget": 20,
+        "indexed_count": 20,
+        "role": "supplemental_staging",
+        "root": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z",
+        "scanned_count": 23,
+        "tier": "staged",
+        "truncated": false
+      },
+      {
+        "entry_budget": 20,
+        "indexed_count": 20,
+        "role": "quarantine",
+        "root": "/Users/dhyana/.dharma/knowledge/quarantine",
+        "scanned_count": 5000,
+        "tier": "quarantine",
+        "truncated": true
+      }
+    ],
     "source_roots": [
       "/Users/dhyana/.dharma/knowledge/wiki/concepts",
       "/Users/dhyana/.dharma/knowledge/staging",
       "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z",
       "/Users/dhyana/.dharma/knowledge/quarantine"
     ],
-    "staged_count": 5022,
+    "staged_count": 5023,
     "status": "read_through_index_available",
     "truncated": true,
     "trusted_count": 1336

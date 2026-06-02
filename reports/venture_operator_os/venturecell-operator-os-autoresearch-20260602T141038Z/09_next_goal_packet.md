@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-41271dd7e888aa5e`
-Current scoped HEAD before this packet: `47e4e044 feat(operator-os): add receipt inventory to manifest`
+ds-goal progress receipt: `r-afcc427129fd0bcb`
+Current scoped HEAD before this packet: `498c0786 feat(operator-os): add gap triage packet`
 
 This packet is the handoff for the next bounded AutoResearch loop. It must be
 reviewed and updated in the final hour before reporter closure.
@@ -13,7 +13,7 @@ reviewed and updated in the final hour before reporter closure.
 
 - Operator OS status: `blocked_on_external_reader_gate`.
 - Autonomy level: `L0_read_only_plan`.
-- Score ledger: `98/100` live score, not final.
+- Score ledger: `99/100` live score, not final.
 - ds-goal mission state: `open=1 claimed=0 completed=4 failed=0 blocked=0 total=5`.
 - Reporter task: open by design.
 - MemoryKernel strict eval: `pass` (`6/6`) from report-local staged sources.
@@ -28,7 +28,9 @@ reviewed and updated in the final hour before reporter closure.
 - Manifest receipt inventory: present.
 - Gap triage packet: `external_blocked_with_local_followups`, with external
   reader as non-local blocker and MemoryKernel truncation as local maintenance.
-- Last committed packet: receipt inventory manifest.
+- Memory coverage packet: present; staging and quarantine roots are truncated,
+  trusted and report-local roots are not truncated.
+- Last committed packet: gap triage packet.
 
 ## Next Goal
 
@@ -112,7 +114,14 @@ bounded targets:
    locally actionable maintenance gaps. Use it to pick local loops, but do not
    treat it as a gate-clearance or authority artifact.
 
-12. Final closeout only after true-time proof.
+12. Memory coverage maintenance.
+
+   `memory_kernel_coverage_packet.json` now identifies root-level scan caps.
+   If another local memory loop is chosen, target staging/quarantine retrieval
+   or query-specific coverage while preserving `trusted_promotion_claimed:
+   false`.
+
+13. Final closeout only after true-time proof.
 
    When elapsed time is actually in the final window, update:
 
@@ -172,8 +181,10 @@ If the loop only changes a report packet, also run scoped `git diff --check`.
 - `17_liveness_key_disambiguation_receipt.md`
 - `18_receipt_inventory_manifest_receipt.md`
 - `19_gap_triage_packet_receipt.md`
+- `20_memory_kernel_coverage_receipt.md`
 - `operator_os_projection.json`
 - `operator_next_action_packet.json`
+- `memory_kernel_coverage_packet.json`
 - `operator_gap_triage_packet.json`
 - `darshan_go_gate_packet.json`
 - `darshan_go_receipt_template.json`
