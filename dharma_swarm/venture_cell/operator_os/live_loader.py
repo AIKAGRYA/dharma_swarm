@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 from dharma_swarm.daemon_config import dharma_state_dir
 from dharma_swarm.models import TaskStatus
@@ -91,6 +91,7 @@ def load_live_operator_inputs(
     task_db_path: Path | str | None = None,
     task_limit: int = 50,
     a2a_limit: int = 50,
+    supplemental_memory_roots: Sequence[Path | str] = (),
     max_memory_scan: int = 5000,
 ) -> OperatorOSInputs:
     """Build projection inputs from existing local organs."""
@@ -105,6 +106,9 @@ def load_live_operator_inputs(
         ),
         a2a_tasks=load_a2a_task_rows(state_root=root, limit=a2a_limit),
         state_root=root,
+        supplemental_memory_roots=tuple(
+            Path(path).expanduser() for path in supplemental_memory_roots
+        ),
         max_memory_scan=max_memory_scan,
     )
 

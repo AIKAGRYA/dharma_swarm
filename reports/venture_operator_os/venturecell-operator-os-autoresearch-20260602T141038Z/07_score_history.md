@@ -5,7 +5,7 @@ Status: live ledger, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
 ds-goal progress receipt: `r-277a29c022e46fb6`
 Baseline: `1aca07a1 Add VentureCell Operator OS Level 70 surface`
-Current scoped HEAD: `bf2d237b feat(operator-os): queue memory repair packet`
+Current scoped HEAD before this packet: `0e810f5f docs(operator-os): add live adversary audit`
 
 This file is a living score ledger. It exists now so later agents do not
 reconstruct scores from memory. It must be reviewed and updated before final
@@ -22,18 +22,20 @@ reporter closure.
 | Loop 04 | `04_goal_truth_receipt.md` | `a03e0e09` | 80 | +3 | keep |
 | Loop 05 | `05_go_gate_receipt.md` | `9e5f326e` | 83 | +3 | keep |
 | Loop 06 | `06_memorykernel_repair_receipt.md` | `bf2d237b` | 84 | +1 | keep |
+| Loop 10 | `06_adversary_audit.md` | `0e810f5f` | 84 | +0 | keep as false-green guard |
+| Loop 11 | `10_memorykernel_report_source_packet.md` | pending | 87 | +3 | keep local staged recall pass |
 
 ## Area History
 
 | Area | Opening | Current | Evidence |
 |---|---:|---:|---|
 | Operator clarity | 11 | 13+ | next-action packet and GO gate packet now expose blockers and owners |
-| Memory usefulness | 10 | 13 | evals exist and repair queue exists, but live strict eval remains `0/6` |
+| Memory usefulness | 10 | 15 | report-local staged source root now passes strict eval `6/6` without trusted promotion |
 | Task truth | 8 | 12+ | progress receipts distinguish non-closing evidence from completion |
 | Governance safety | 15 | 15 | external-reader, governed admission, Chetana, and completion gates preserved |
 | Iteration quality | 8 | 12+ | every loop has hypothesis, patch/rejection, evals, adversarial review, decision |
-| Product structure | 8 | 10 | Operator OS now emits next-action, GO gate, and memory repair packets |
-| Tests/evals | 8 | 10 | fixed tests and eval artifacts exist for Operator OS and gate surfaces |
+| Product structure | 8 | 11 | Operator OS now emits next-action, GO gate, memory repair, and report-local recall packets |
+| Tests/evals | 8 | 11 | fixed tests, report-local recall regression, and eval artifacts exist for Operator OS and gate surfaces |
 | Metabolization | 2 | 5 | program kernel, receipts, packets, and this score ledger exist |
 
 The area history is intentionally qualitative after opening because later
@@ -46,8 +48,8 @@ audit with explicit evidence.
 - Latest rendered Operator OS status: `blocked_on_external_reader_gate`.
 - Autonomy level: `L0_read_only_plan`.
 - Darshan GO gate: `block_external_authority`.
-- MemoryKernel query eval: `partial` (`0/6`).
-- MemoryKernel repair packet: `queue_repair_without_promotion`.
+- MemoryKernel query eval: `pass` (`6/6`) from report-local staged roots.
+- MemoryKernel repair packet: `no_repair_needed`, with trusted promotion still forbidden.
 - ds-goal raw/reconciled counts: `open=1 claimed=0 completed=4 failed=0 blocked=0 total=5`.
 - Complete verification still fails on:
   `task_not_closed:20260602-venturecell-operator-os-autoresearch-8h-t05-reporter`.
@@ -71,11 +73,12 @@ current evidence, not as a full-project proof.
 ## Remaining Score Risks
 
 - True 8-hour elapsed time is not complete.
-- Final `06_adversary_audit.md`, `08_metabolization_packet.md`, and
-  `09_next_goal_packet.md` are still missing.
+- Final-window review of `06_adversary_audit.md`,
+  `08_metabolization_packet.md`, and `09_next_goal_packet.md` is still
+  required even though live drafts now exist.
 - This score ledger must be updated at final closeout.
-- MemoryKernel strict eval remains `0/6`; the repair queue is concrete but not
-  itself a recall pass.
+- MemoryKernel strict eval now passes from report-local staged sources, not
+  from trusted Chetana promotion; final closeout must preserve that boundary.
 - Darshan remains blocked until a real accepted privacy-redacted external-reader
   GO evidence receipt exists.
 - The reporter task must remain open until final artifacts and final
@@ -110,8 +113,8 @@ Adversarial review:
 - This file does not claim final completion.
 - This file marks per-area scores after opening as qualitative because later
   receipts used aggregate score deltas.
-- This file records MemoryKernel `0/6` and Darshan GO blocked state as current
-  risks, not solved outcomes.
+- This file originally recorded MemoryKernel `0/6`; later loop rows must be
+  used for the current memory eval state.
 - This file does not close the reporter lane.
 
 Keep / revert / queue:
@@ -123,3 +126,49 @@ Queued:
 - Update this ledger at final closeout.
 - Write final adversarial audit and metabolization artifacts.
 - Keep the mission open until the true 8-hour contract is proven.
+
+## Loop 11 Score Update
+
+Hypothesis:
+
+If report-local run artifacts can be scanned as staged MemoryKernel source
+roots, Operator OS agents can retrieve the actual Cofounder/Polsia/Darshan/GO
+context accumulated during the run without mutating trusted Chetana state.
+
+Patch:
+
+- Added a report-local staged MemoryKernel source packet.
+- Extended the Operator OS memory index to accept supplemental staged roots.
+- Taught the CLI renderer to scan its output directory as a staged read-only
+  source root.
+- Added a regression proving report-local sources can pass strict evals without
+  trusted promotion.
+
+Evaluation:
+
+- `pytest -q tests/test_venture_cell_operator_os_projection.py` passed.
+- `./.venv/bin/python -m compileall -q dharma_swarm/venture_cell/operator_os`
+  passed.
+- `./.venv/bin/python -m dharma_swarm.venture_cell.operator_os.cli --output-dir reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z`
+  rendered live artifacts.
+- `memory_kernel_query_eval.json` now reports `pass` with `6/6`.
+- `memory_kernel_repair_packet.json` now reports `no_repair_needed` and
+  `trusted_promotion_claimed: false`.
+
+Adversarial review:
+
+- This is a local staged recall pass, not a trusted Chetana promotion.
+- The index is still truncated, so final closeout must not claim complete
+  memory coverage.
+- Darshan GO remains blocked and external authority remains forbidden.
+- Reporter remains open because the true 8-hour contract is not complete.
+
+Keep / revert / queue:
+
+Decision: keep.
+
+Queued:
+
+- Re-run the full minimum verification set before final closeout.
+- Preserve the report-local versus trusted-Chetana distinction in final docs.
+- Continue the mission until true elapsed-time proof exists.

@@ -110,49 +110,49 @@
 - Next governed action: Record one accepted, privacy-redacted external-reader Go receipt before external growth/comms autonomy.
 - Blocked departments: `growth, communications`
 - Required unblock artifact: Accepted privacy-redacted external-reader Go evidence receipt linked to decision_delta.json.
-- Memory query evals: `partial` (0/6)
-- Blockers: `darshan_external_reader_event_missing, memory_kernel_index_truncated, memory_kernel_query_eval_partial`
+- Memory query evals: `pass` (6/6)
+- Blockers: `darshan_external_reader_event_missing, memory_kernel_index_truncated`
 
 ## Memory Kernel
 
 - Status: `read_through_index_available`
-- Staged: `5000`
+- Staged: `5013`
 - Trusted: `1336`
 - Quarantine: `5000`
 - Truncated scan: `True`
-- Index: `available_truncated` with `80` entries
-- Query evals: `partial` (0/6)
+- Index: `available_truncated` with `73` entries
+- Query evals: `pass` (6/6)
 
 ## Memory Repair Packet
 
-- Decision: `queue_repair_without_promotion`
-- Status: `queued`
-- Safe next action: Create provenance-backed staged repair atoms or docs for missing query terms, then rerun evals; do not mark trusted or pass until gates prove it.
-- Repair items: `6`
+- Decision: `no_repair_needed`
+- Status: `clear`
+- Safe next action: Use current MemoryKernel evals as read-only context.
+- Repair items: `0`
 
 ## Memory Query Evals
 
-- `fail` Polsia Cofounder VentureCell Operator OS: `available_truncated`; matches `3`; missing `cofounder, operator, os`.
-- `fail` Darshan external reader gate Go evidence receipt: `available_truncated`; matches `3`; missing `external, reader, gate, go, evidence, receipt`.
-- `fail` Go evidence receipt source_url event_uid accepted: `available_truncated`; matches `3`; missing `go, evidence, receipt, url, event, uid, accepted`.
-- `fail` Cofounder Canvas Library Plan Execute publishing: `available_truncated`; matches `3`; missing `cofounder, canvas, library, execute, publishing`.
-- `fail` Chetana wiki memory kernel staged trusted quarantine: `available_truncated`; matches `3`; missing `staged, quarantine`.
-- `fail` VentureCell autonomy ladder external action approval: `available_truncated`; matches `3`; missing `autonomy, ladder, external, action, approval`.
+- `pass` Polsia Cofounder VentureCell Operator OS: `available_truncated`; matches `3`; missing `none`.
+- `pass` Darshan external reader gate Go evidence receipt: `available_truncated`; matches `3`; missing `none`.
+- `pass` Go evidence receipt source_url event_uid accepted: `available_truncated`; matches `3`; missing `none`.
+- `pass` Cofounder Canvas Library Plan Execute publishing: `available_truncated`; matches `3`; missing `none`.
+- `pass` Chetana wiki memory kernel staged trusted quarantine: `available_truncated`; matches `3`; missing `none`.
+- `pass` VentureCell autonomy ladder external action approval: `available_truncated`; matches `3`; missing `none`.
 
 ## Memory Index
 
 - `trusted` entries shown: `3`
   - Lodestone Seed: Darshan Publication VentureCell: `/Users/dhyana/.dharma/knowledge/wiki/concepts/darshan-publication-venture-cell.md`
-  - Dharma Reward Forge Seed - Six-Agent Synthesis: `/Users/dhyana/.dharma/knowledge/wiki/concepts/dharma-reward-forge.md`
-  - Lodestone Seed: Long Now Temporal Attractor: `/Users/dhyana/.dharma/knowledge/wiki/concepts/long-now-temporal-attractor-for-dharma-swarm.md`
+  - Source turn: `/Users/dhyana/.dharma/knowledge/wiki/concepts/mode-switch--progress-summary--------critical-tag-requirement---read-carefu----turn-5.md`
+  - Source turn: `/Users/dhyana/.dharma/knowledge/wiki/concepts/mode-switch--progress-summary-----do-not-output--observation--tags--this-is----turn-1.md`
 - `staged` entries shown: `3`
-  - Source turn: `/Users/dhyana/.dharma/knowledge/staging/2026-05-04/3b1884c7-f3f9-4416-8fc7-682c9631a390.md`
-  - Source turn: `/Users/dhyana/.dharma/knowledge/staging/2026-05-04/3bbc5da0-8714-44d3-86c1-bb3e03c6c848.md`
-  - Source turn: `/Users/dhyana/.dharma/knowledge/staging/2026-05-04/3c5a4608-939b-4f19-a7bd-c3446e2d9cf0.md`
+  - Source turn: `/Users/dhyana/.dharma/knowledge/staging/2026-05-04/3d73d892-d041-4d27-84f6-b70cabfb64a1.md`
+  - Source turn: `/Users/dhyana/.dharma/knowledge/staging/2026-05-04/3f4037cd-f063-46a9-9f74-476f93f119f7.md`
+  - Source turn: `/Users/dhyana/.dharma/knowledge/staging/2026-05-04/3fdd30a4-4c2b-4c27-b731-8e98adb7d084.md`
 - `quarantine` entries shown: `3`
-  - Source turn: `/Users/dhyana/.dharma/knowledge/quarantine/collisions/2026-05-27/018d281b-5e5b-45f0-b5e8-b5ef0bf82b57.md`
-  - Source turn: `/Users/dhyana/.dharma/knowledge/quarantine/collisions/2026-05-27/056f8843-2c18-4761-97c2-c898b7a10cab.md`
-  - Source turn: `/Users/dhyana/.dharma/knowledge/quarantine/collisions/2026-05-27/0599ca01-e7d8-4da0-9603-f3ab8e2dc7de.md`
+  - Source turn: `/Users/dhyana/.dharma/knowledge/quarantine/collisions/2026-05-25/0e360da6-2296-46d5-881f-5ebd497be6f1.md`
+  - Source turn: `/Users/dhyana/.dharma/knowledge/quarantine/collisions/2026-05-25/2fa6322f-f07e-4986-ade7-578df1bca7aa.md`
+  - Source turn: `/Users/dhyana/.dharma/knowledge/quarantine/collisions/2026-05-25/3abc01f4-ed8c-47ac-bd71-18b691f217a1.md`
 
 ## Daily Cycle
 
@@ -171,7 +171,8 @@
 ## Evidence
 
 - `/Users/dhyana/.dharma/artifacts/venture_cell/DARSHAN/2026-05-26/the-thing-they-are-competing-for-is-not-just-your-attention`
-- `/Users/dhyana/.dharma/knowledge/staging`
 - `/Users/dhyana/.dharma/knowledge/wiki/concepts`
+- `/Users/dhyana/.dharma/knowledge/staging`
+- `reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z`
 - `/Users/dhyana/.dharma/knowledge/quarantine`
 - `dharma_swarm/venture_cell/operator_os/projection.py`

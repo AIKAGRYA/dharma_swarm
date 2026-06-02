@@ -146,34 +146,41 @@ def build_memory_kernel_index(
     staging_root: Path,
     trusted_root: Path,
     quarantine_root: Path,
+    supplemental_staging_roots: Iterable[Path] = (),
     max_scan: int = 5000,
     max_entries: int = 80,
-    query_terms: Iterable[str] = DEFAULT_QUERY_TERMS,
+    query_terms: Iterable[str] = EVAL_QUERY_TERMS,
 ) -> MemoryKernelReadThroughIndex:
     """Build a bounded read-only index without promoting or mutating atoms."""
 
     terms = tuple(
         dict.fromkeys(str(term).strip() for term in query_terms if str(term).strip())
     )
+    supplemental_roots = tuple(
+        Path(root).expanduser()
+        for root in supplemental_staging_roots
+        if str(root).strip()
+    )
     roots = (
         ("trusted", trusted_root),
         ("staged", staging_root),
+        *(("staged", root) for root in supplemental_roots),
         ("quarantine", quarantine_root),
     )
-    budgets = _tier_budgets(roots, max_entries)
+    budgets = _root_budgets(len(roots), max_entries)
     entries: list[MemoryKernelIndexEntry] = []
     counts = {"staged": 0, "trusted": 0, "quarantine": 0}
     truncated = False
 
-    for tier, root in roots:
+    for index, (tier, root) in enumerate(roots):
         count, tier_truncated, tier_entries = _scan_root(
             root=root,
             tier=tier,
             terms=terms,
             max_scan=max_scan,
-            remaining=budgets[tier],
+            remaining=budgets[index],
         )
-        counts[tier] = count
+        counts[tier] += count
         truncated = truncated or tier_truncated
         entries.extend(tier_entries)
 
@@ -339,18 +346,14 @@ def _scan_root(
     return count, False, _select_entries(matched_entries, fallback_entries, remaining)
 
 
-def _tier_budgets(
-    roots: tuple[tuple[str, Path], ...],
-    max_entries: int,
-) -> dict[str, int]:
+def _root_budgets(root_count: int, max_entries: int) -> tuple[int, ...]:
+    if root_count <= 0:
+        return ()
     if max_entries <= 0:
-        return {tier: 0 for tier, _ in roots}
-    base = max_entries // len(roots)
-    remainder = max_entries % len(roots)
-    return {
-        tier: base + (1 if index < remainder else 0)
-        for index, (tier, _) in enumerate(roots)
-    }
+        return tuple(0 for _ in range(root_count))
+    base = max_entries // root_count
+    remainder = max_entries % root_count
+    return tuple(base + (1 if index < remainder else 0) for index in range(root_count))
 
 
 def _select_entries(

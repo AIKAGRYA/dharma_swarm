@@ -4,7 +4,7 @@ Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
 ds-goal progress receipt: `r-e5be506a66940367`
-Current scoped HEAD: `82682c30 docs(operator-os): add live metabolization packet`
+Current scoped HEAD before this packet: `0e810f5f docs(operator-os): add live adversary audit`
 
 This packet is the handoff for the next bounded AutoResearch loop. It must be
 reviewed and updated in the final hour before reporter closure.
@@ -13,12 +13,12 @@ reviewed and updated in the final hour before reporter closure.
 
 - Operator OS status: `blocked_on_external_reader_gate`.
 - Autonomy level: `L0_read_only_plan`.
-- Score ledger: `84/100` live score, not final.
+- Score ledger: `87/100` live score, not final.
 - ds-goal mission state: `open=1 claimed=0 completed=4 failed=0 blocked=0 total=5`.
 - Reporter task: open by design.
-- MemoryKernel strict eval: `partial` (`0/6`).
+- MemoryKernel strict eval: `pass` (`6/6`) from report-local staged sources.
 - Darshan GO gate: `block_external_authority`, no accepted receipts.
-- Last committed packet: live metabolization packet.
+- Last committed packet: live adversary audit draft.
 
 ## Next Goal
 
@@ -26,10 +26,10 @@ Continue the same true 8-hour AutoResearch mission until final elapsed-time and
 artifact requirements are proven. The next loop should choose one of these
 bounded targets:
 
-1. Final adversarial audit draft.
+1. Final-window adversarial audit update.
 
-   Create `06_adversary_audit.md` only if it remains clearly marked live until
-   the final window. It should attack:
+   `06_adversary_audit.md` exists as a live draft. Re-review it only in the
+   final window and keep attacking:
 
    - false 8-hour completion claims;
    - MemoryKernel false green claims;
@@ -39,18 +39,18 @@ bounded targets:
    - broad repo dirt accidentally included in commits;
    - final reporter closure before proof.
 
-2. MemoryKernel source repair under gates.
+2. MemoryKernel pass preservation under gates.
 
-   Use `memory_kernel_repair_packet.json` as the queue. Add only
-   provenance-backed local source material under existing Chetana or report
-   gates. Do not promote trusted memory. Rerun:
+   The current eval passes from report-local staged sources. Preserve that
+   boundary and rerun:
 
    ```bash
    pytest -q tests/test_venture_cell_operator_os_projection.py
    ./.venv/bin/python -m dharma_swarm.venture_cell.operator_os.cli --output-dir reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z
    ```
 
-   Keep `partial` if strict query evals still fail.
+   If strict evals regress, keep the packet partial and queue repair. Do not
+   promote trusted memory to make the eval green.
 
 3. Final closeout only after true-time proof.
 
@@ -102,6 +102,7 @@ If the loop only changes a report packet, also run scoped `git diff --check`.
 - `06_memorykernel_repair_receipt.md`
 - `07_score_history.md`
 - `08_metabolization_packet.md`
+- `10_memorykernel_report_source_packet.md`
 - `operator_os_projection.json`
 - `operator_next_action_packet.json`
 - `darshan_go_gate_packet.json`
@@ -154,6 +155,6 @@ Decision: keep.
 
 Queued:
 
-- Final adversarial audit.
+- Final adversarial audit update.
 - Final update of score, metabolization, and next-goal packets.
 - True-time proof and final reporter closure only after verification.

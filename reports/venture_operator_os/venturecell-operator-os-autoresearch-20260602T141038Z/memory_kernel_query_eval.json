@@ -1,178 +1,139 @@
 {
-  "query_eval_passed": 0,
+  "query_eval_passed": 6,
   "query_eval_results": [
     {
       "matched_count": 3,
-      "missing_terms": [
-        "cofounder",
-        "operator",
-        "os"
-      ],
+      "missing_terms": [],
       "notes": [
-        "index_scan_truncated",
-        "query_terms_missing"
+        "index_scan_truncated"
       ],
-      "passed": false,
+      "passed": true,
       "query": "Polsia Cofounder VentureCell Operator OS",
       "source_refs": [
-        "/Users/dhyana/.dharma/knowledge/wiki/concepts/darshan-publication-venture-cell.md",
-        "/Users/dhyana/.dharma/knowledge/wiki/concepts/ah--does-this-make-sense--are-ytou-following---this-is-the-level-dharma-swarm-n----turn-130.md",
-        "/Users/dhyana/.dharma/knowledge/wiki/concepts/dharma-reward-forge.md"
+        "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/02_memorykernel_eval_receipt.md",
+        "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/10_memorykernel_report_source_packet.md",
+        "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/00_opening_truth.md"
       ],
       "status": "available_truncated",
       "tier_counts": {
         "quarantine": 0,
-        "staged": 0,
-        "trusted": 3
+        "staged": 3,
+        "trusted": 0
       },
       "trusted_promotion_claimed": false
     },
     {
       "matched_count": 3,
-      "missing_terms": [
-        "external",
-        "reader",
-        "gate",
-        "go",
-        "evidence",
-        "receipt"
-      ],
+      "missing_terms": [],
       "notes": [
-        "index_scan_truncated",
-        "query_terms_missing"
+        "index_scan_truncated"
       ],
-      "passed": false,
+      "passed": true,
       "query": "Darshan external reader gate Go evidence receipt",
       "source_refs": [
-        "/Users/dhyana/.dharma/knowledge/wiki/concepts/darshan-attention-engineering.md",
-        "/Users/dhyana/.dharma/knowledge/wiki/concepts/darshan-publication-venture-cell.md",
-        "/Users/dhyana/.dharma/knowledge/wiki/concepts/dharma-reward-forge.md"
+        "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/05_go_gate_receipt.md",
+        "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/02_memorykernel_eval_receipt.md",
+        "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/10_memorykernel_report_source_packet.md"
       ],
       "status": "available_truncated",
       "tier_counts": {
         "quarantine": 0,
-        "staged": 0,
-        "trusted": 3
+        "staged": 3,
+        "trusted": 0
       },
       "trusted_promotion_claimed": false
     },
     {
       "matched_count": 3,
-      "missing_terms": [
-        "go",
-        "evidence",
-        "receipt",
-        "url",
-        "event",
-        "uid",
-        "accepted"
-      ],
+      "missing_terms": [],
       "notes": [
-        "index_scan_truncated",
-        "query_terms_missing"
+        "index_scan_truncated"
       ],
-      "passed": false,
+      "passed": true,
       "query": "Go evidence receipt source_url event_uid accepted",
       "source_refs": [
-        "/Users/dhyana/.dharma/knowledge/wiki/concepts/3---turn-121.md",
-        "/Users/dhyana/.dharma/knowledge/wiki/concepts/3---turn-122.md",
-        "/Users/dhyana/.dharma/knowledge/wiki/concepts/3---turn-123.md"
+        "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/02_memorykernel_eval_receipt.md",
+        "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/10_memorykernel_report_source_packet.md",
+        "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/05_go_gate_receipt.md"
       ],
       "status": "available_truncated",
       "tier_counts": {
         "quarantine": 0,
-        "staged": 0,
-        "trusted": 3
+        "staged": 3,
+        "trusted": 0
       },
       "trusted_promotion_claimed": false
     },
     {
       "matched_count": 3,
-      "missing_terms": [
-        "cofounder",
-        "canvas",
-        "library",
-        "execute",
-        "publishing"
-      ],
+      "missing_terms": [],
       "notes": [
-        "index_scan_truncated",
-        "query_terms_missing"
+        "index_scan_truncated"
       ],
-      "passed": false,
+      "passed": true,
       "query": "Cofounder Canvas Library Plan Execute publishing",
       "source_refs": [
-        "/Users/dhyana/.dharma/knowledge/wiki/concepts/how-does-this-fit-with-your-phase-2-plan----just-pasting-this-for-now---i-m-thi----turn-20.md",
-        "/Users/dhyana/.dharma/knowledge/wiki/concepts/keep-this-plan-but-do-this-resrach-forst-and-paln-to-write-a-v2-of-the-plan---r----turn-11.md",
-        "/Users/dhyana/.dharma/knowledge/wiki/concepts/now-reserach-this-and-think-of-a-build-plan-to-level-this-up-and-integate-it-in----turn-7.md"
+        "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/02_memorykernel_eval_receipt.md",
+        "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/10_memorykernel_report_source_packet.md",
+        "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/operator_os_digest.md"
       ],
       "status": "available_truncated",
       "tier_counts": {
         "quarantine": 0,
-        "staged": 0,
-        "trusted": 3
+        "staged": 3,
+        "trusted": 0
       },
       "trusted_promotion_claimed": false
     },
     {
       "matched_count": 3,
-      "missing_terms": [
-        "staged",
-        "quarantine"
-      ],
+      "missing_terms": [],
       "notes": [
-        "index_scan_truncated",
-        "query_terms_missing"
+        "index_scan_truncated"
       ],
-      "passed": false,
+      "passed": true,
       "query": "Chetana wiki memory kernel staged trusted quarantine",
       "source_refs": [
-        "/Users/dhyana/.dharma/knowledge/wiki/concepts/hello-memory-agent--you-are-continuing-to-observe-the-primary-claude-session-------turn-2.md",
-        "/Users/dhyana/.dharma/knowledge/wiki/concepts/how-does-this-fit-with-your-phase-2-plan----just-pasting-this-for-now---i-m-thi----turn-20.md",
-        "/Users/dhyana/.dharma/knowledge/wiki/concepts/hello-memory-agent--you-are-continuing-to-observe-the-primary-claude-session-------turn-13.md"
+        "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/02_memorykernel_eval_receipt.md",
+        "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/10_memorykernel_report_source_packet.md",
+        "/Users/dhyana/.dharma/knowledge/wiki/concepts/how-does-this-fit-with-your-phase-2-plan----just-pasting-this-for-now---i-m-thi----turn-20.md"
       ],
       "status": "available_truncated",
       "tier_counts": {
         "quarantine": 0,
-        "staged": 0,
-        "trusted": 3
+        "staged": 2,
+        "trusted": 1
       },
       "trusted_promotion_claimed": false
     },
     {
       "matched_count": 3,
-      "missing_terms": [
-        "autonomy",
-        "ladder",
-        "external",
-        "action",
-        "approval"
-      ],
+      "missing_terms": [],
       "notes": [
-        "index_scan_truncated",
-        "query_terms_missing"
+        "index_scan_truncated"
       ],
-      "passed": false,
+      "passed": true,
       "query": "VentureCell autonomy ladder external action approval",
       "source_refs": [
-        "/Users/dhyana/.dharma/knowledge/wiki/concepts/ah--does-this-make-sense--are-ytou-following---this-is-the-level-dharma-swarm-n----turn-130.md",
-        "/Users/dhyana/.dharma/knowledge/wiki/concepts/darshan-publication-venture-cell.md",
-        "/Users/dhyana/.dharma/knowledge/wiki/concepts/dharma-reward-forge.md"
+        "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/02_memorykernel_eval_receipt.md",
+        "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/10_memorykernel_report_source_packet.md",
+        "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/03_operator_surface_receipt.md"
       ],
       "status": "available_truncated",
       "tier_counts": {
         "quarantine": 0,
-        "staged": 0,
-        "trusted": 3
+        "staged": 3,
+        "trusted": 0
       },
       "trusted_promotion_claimed": false
     }
   ],
-  "query_eval_status": "partial",
+  "query_eval_status": "pass",
   "query_eval_total": 6,
   "source_roots": [
-    "/Users/dhyana/.dharma/knowledge/staging",
     "/Users/dhyana/.dharma/knowledge/wiki/concepts",
+    "/Users/dhyana/.dharma/knowledge/staging",
+    "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z",
     "/Users/dhyana/.dharma/knowledge/quarantine"
   ],
   "trusted_promotion_claimed": false

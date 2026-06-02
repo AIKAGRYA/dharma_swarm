@@ -49,6 +49,7 @@ class OperatorOSInputs:
     staging_root: Path | None = None
     trusted_root: Path | None = None
     quarantine_root: Path | None = None
+    supplemental_memory_roots: Sequence[Path] = ()
     mission_contract_present: bool = True
     workspace_lease_present: bool = True
     context_quorum_ok: bool = True
@@ -66,6 +67,7 @@ def build_operator_projection(inputs: OperatorOSInputs | None = None) -> Venture
         staging_root=active.staging_root,
         trusted_root=active.trusted_root,
         quarantine_root=active.quarantine_root,
+        supplemental_memory_roots=active.supplemental_memory_roots,
         max_scan=active.max_memory_scan,
     )
     admission = _work_admission_gate(active)
@@ -130,6 +132,7 @@ def build_memory_kernel_snapshot(
     staging_root: Path | None = None,
     trusted_root: Path | None = None,
     quarantine_root: Path | None = None,
+    supplemental_memory_roots: Sequence[Path] = (),
     max_scan: int = 5000,
 ) -> MemoryKernelSnapshot:
     """Summarize Chetana/wiki roots without promoting or mutating atoms."""
@@ -141,6 +144,7 @@ def build_memory_kernel_snapshot(
         staging_root=staging_root,
         trusted_root=trusted_root,
         quarantine_root=quarantine_root,
+        supplemental_staging_roots=supplemental_memory_roots,
         max_scan=max_scan,
     )
     query_evals = evaluate_memory_kernel_queries(index)
@@ -148,7 +152,7 @@ def build_memory_kernel_snapshot(
     trusted_count = index.trusted_count
     quarantine_count = index.quarantine_count
     truncated = index.truncated
-    roots = tuple(str(root) for root in (staging_root, trusted_root, quarantine_root))
+    roots = index.source_roots
 
     gap_codes: list[str] = []
     if staged_count == 0 and trusted_count == 0:
@@ -813,6 +817,17 @@ def _memory_kernel_repair_packet(memory: MemoryKernelSnapshot) -> MemoryKernelRe
         gap_codes.append("memory_kernel_repair_items_queued")
     if trusted_promotion_claimed:
         gap_codes.append("memory_kernel_trusted_promotion_claim_detected")
+    forbidden_actions = (
+        "trusted_chetana_promotion",
+        "delete_quarantine_to_hide_failures",
+        "external_research_without_receipt",
+    )
+    if memory.query_eval_status != "pass":
+        forbidden_actions = (
+            *forbidden_actions[:1],
+            "claim_memory_eval_pass",
+            *forbidden_actions[1:],
+        )
 
     return MemoryKernelRepairPacket(
         packet_id="memory_kernel.query_eval_repair",
@@ -824,12 +839,7 @@ def _memory_kernel_repair_packet(memory: MemoryKernelSnapshot) -> MemoryKernelRe
         repair_items=repair_items,
         source_roots=memory.source_roots,
         evidence_refs=memory.evidence_refs,
-        forbidden_actions=(
-            "trusted_chetana_promotion",
-            "claim_memory_eval_pass",
-            "delete_quarantine_to_hide_failures",
-            "external_research_without_receipt",
-        ),
+        forbidden_actions=forbidden_actions,
         safe_next_action=safe_next_action,
         gap_codes=tuple(dict.fromkeys(gap_codes)),
         raw={

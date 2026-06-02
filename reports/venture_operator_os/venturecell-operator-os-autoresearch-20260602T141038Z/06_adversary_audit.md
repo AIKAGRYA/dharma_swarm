@@ -13,7 +13,7 @@ updates, and terminal verification exist.
 
 ## Current Proven State
 
-- Goal clock is about 69 minutes into an 8-hour objective.
+- Goal clock remains well short of the 8-hour objective.
 - ds-goal remains open: `open=1 claimed=0 completed=4 failed=0 blocked=0 total=5`.
 - Reporter task remains open by design:
   `20260602-venturecell-operator-os-autoresearch-8h-t05-reporter`.
@@ -22,8 +22,10 @@ updates, and terminal verification exist.
 - Autonomy level remains `L0_read_only_plan`.
 - Darshan GO gate decision remains `block_external_authority`.
 - Accepted Darshan GO receipts remain empty.
-- MemoryKernel query eval remains `partial` with `0/6` passing.
-- MemoryKernel repair is queued only; no trusted Chetana promotion is claimed.
+- MemoryKernel query eval now reports `pass` with `6/6` from report-local
+  staged sources.
+- MemoryKernel repair now reports `no_repair_needed`; no trusted Chetana
+  promotion is claimed.
 - The worktree contains broad unrelated dirty and staged work outside this run.
 
 ## Loop 10 Receipt
@@ -66,7 +68,8 @@ Adversarial review:
   completion receipt.
 - A rendered packet is not a live external authority event.
 - Filesystem A2A rows are not live A2A/NATS ack proof.
-- A repair packet is not MemoryKernel query success.
+- A report-local MemoryKernel pass is not trusted Chetana promotion or complete
+  memory coverage.
 - A GO gate packet with `decision: block_external_authority` is not GO
   acceptance.
 - A score above `80/100` is not final while the contract clock and final
@@ -93,7 +96,7 @@ Queued:
 | Reporter can be closed now | ds-goal reporter task is open and complete verify fails | false |
 | Operator OS can act externally | `blocked_on_external_reader_gate`, `L0_read_only_plan` | false |
 | Darshan GO is accepted | accepted receipts are `[]` | false |
-| MemoryKernel recall is solved | strict eval is `0/6` | false |
+| MemoryKernel recall is trusted/complete | strict eval passes from staged report-local roots only | false |
 | Chetana trusted promotion occurred | `trusted_promotion_claimed: false` | false |
 | NATS/A2A liveness is proven | no action-specific ack proof cited | false |
 | Score is final | live ledger only, final time window not reached | false |

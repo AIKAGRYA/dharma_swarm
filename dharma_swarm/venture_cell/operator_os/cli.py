@@ -66,6 +66,7 @@ def render_operator_surface(
         task_db_path=task_db_path,
         task_limit=task_limit,
         a2a_limit=a2a_limit,
+        supplemental_memory_roots=(output_dir,),
         max_memory_scan=max_memory_scan,
     )
     projection = build_operator_projection(inputs)

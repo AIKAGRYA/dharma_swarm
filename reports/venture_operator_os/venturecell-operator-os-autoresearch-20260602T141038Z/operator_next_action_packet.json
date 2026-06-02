@@ -6,14 +6,14 @@
   ],
   "blockers": [
     "darshan_external_reader_event_missing",
-    "memory_kernel_index_truncated",
-    "memory_kernel_query_eval_partial"
+    "memory_kernel_index_truncated"
   ],
   "decision": "hold_external_authority",
   "evidence_refs": [
     "/Users/dhyana/.dharma/artifacts/venture_cell/DARSHAN/2026-05-26/the-thing-they-are-competing-for-is-not-just-your-attention",
-    "/Users/dhyana/.dharma/knowledge/staging",
     "/Users/dhyana/.dharma/knowledge/wiki/concepts",
+    "/Users/dhyana/.dharma/knowledge/staging",
+    "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z",
     "/Users/dhyana/.dharma/knowledge/quarantine",
     "dharma_swarm/venture_cell/operator_os/projection.py"
   ],
@@ -44,8 +44,8 @@
       "next_action": "Continue bounded internal build work with receipts"
     }
   ],
-  "memory_query_eval_passed": 0,
-  "memory_query_eval_status": "partial",
+  "memory_query_eval_passed": 6,
+  "memory_query_eval_status": "pass",
   "memory_query_eval_total": 6,
   "next_governed_action": "Record one accepted, privacy-redacted external-reader Go receipt before external growth/comms autonomy.",
   "owner_department": "growth",

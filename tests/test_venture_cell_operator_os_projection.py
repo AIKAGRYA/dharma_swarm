@@ -101,6 +101,26 @@ def _write_a2a_queue(state_root: Path, rows: list[dict[str, object]]) -> None:
     )
 
 
+def _write_memory_source_packet(root: Path) -> Path:
+    root.mkdir(parents=True, exist_ok=True)
+    path = root / "memory-source.md"
+    path.write_text(
+        "# VentureCell Operator OS Memory Source\n"
+        "Polsia Cofounder VentureCell Operator OS context maps the company "
+        "workspace to Dharma governance.\n"
+        "Darshan external reader gate Go evidence receipt requires accepted "
+        "source_url and event_uid fields before growth or communications act.\n"
+        "Cofounder Canvas Library Plan Execute publishing remains read-only "
+        "until review gates pass.\n"
+        "Chetana wiki MemoryKernel distinguishes staged trusted quarantine "
+        "tiers without trusted promotion claims.\n"
+        "VentureCell autonomy ladder blocks external action approval until "
+        "governed evidence exists.\n",
+        encoding="utf-8",
+    )
+    return path
+
+
 async def _seed_task_board(db_path: Path) -> None:
     db_path.parent.mkdir(parents=True)
     board = TaskBoard(db_path)
@@ -336,6 +356,37 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert memory_repair_packet["status"] == "queued"
     assert memory_repair_packet["raw"]["trusted_promotion_claimed"] is False
     assert "trusted_chetana_promotion" in memory_repair_packet["forbidden_actions"]
+
+
+def test_operator_surface_uses_report_local_memory_source_without_trusted_promotion(tmp_path: Path) -> None:
+    bundle = _bundle(tmp_path)
+    report_dir = tmp_path / "reports"
+    source = _write_memory_source_packet(report_dir)
+
+    paths = render_operator_surface(
+        output_dir=report_dir,
+        bundle_path=bundle,
+        state_root=tmp_path / "state",
+        max_memory_scan=20,
+    )
+
+    memory_index = json.loads(paths["memory_index"].read_text(encoding="utf-8"))
+    memory_query_eval = json.loads(
+        paths["memory_query_eval"].read_text(encoding="utf-8")
+    )
+    memory_repair_packet = json.loads(
+        paths["memory_kernel_repair_packet"].read_text(encoding="utf-8")
+    )
+
+    assert str(report_dir) in memory_index["source_roots"]
+    assert any(entry["path"] == str(source) for entry in memory_index["index_entries"])
+    assert memory_query_eval["query_eval_status"] == "pass"
+    assert memory_query_eval["query_eval_passed"] == len(MEMORY_KERNEL_EVAL_QUERIES)
+    assert memory_query_eval["trusted_promotion_claimed"] is False
+    assert memory_repair_packet["decision"] == "no_repair_needed"
+    assert "claim_memory_eval_pass" not in memory_repair_packet["forbidden_actions"]
+    assert "trusted_chetana_promotion" in memory_repair_packet["forbidden_actions"]
+    assert memory_repair_packet["raw"]["trusted_promotion_claimed"] is False
 
 
 def test_memory_kernel_query_eval_distinguishes_tiers_and_provenance(tmp_path: Path) -> None:
