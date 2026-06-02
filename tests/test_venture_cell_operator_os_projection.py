@@ -141,6 +141,15 @@ def test_projection_blocks_external_autonomy_without_reader_gate(tmp_path: Path)
         projection.next_action_packet.required_unblock_artifact
     )
     assert "live_external_authority" in projection.next_action_packet.forbidden_actions
+    go_gate = projection.darshan_go_gate_packet
+    assert go_gate.decision == "block_external_authority"
+    assert go_gate.required_receipt_source == "darshan_external_reader"
+    assert go_gate.required_receipt_schema == "go_evidence_receipt.v0"
+    assert "source_url" in go_gate.required_receipt_fields
+    assert "payload.privacy_redacted" in go_gate.required_receipt_fields
+    assert go_gate.blocked_departments == ("growth", "communications")
+    assert "external_outreach" in go_gate.blocked_actions
+    assert "decision_delta.json" in " ".join(go_gate.expected_local_artifacts)
     assert len(projection.departments) >= 8
     assert "darshan_external_reader_event_missing" in projection.gap_codes
     assert any(
@@ -229,6 +238,9 @@ def test_projection_maps_reader_gate_taskboard_a2a_and_memory(tmp_path: Path) ->
     )
     assert any(item.item_id == "task_board.task-1" and item.status == "running" for item in projection.canvas)
     assert any(item.item_id == "a2a.a2a-1" and item.status == "claimed_open" for item in projection.canvas)
+    assert projection.darshan_go_gate_packet.decision == "gate_passed_reviewed_internal_only"
+    assert projection.darshan_go_gate_packet.accepted_receipts == ("goev_reply_001",)
+    assert projection.darshan_go_gate_packet.blocked_actions == ()
 
 
 def test_operator_daily_digest_renders_structure_without_live_authority_claim(tmp_path: Path) -> None:
@@ -247,6 +259,8 @@ def test_operator_daily_digest_renders_structure_without_live_authority_claim(tm
     assert "# VentureCell Operator OS Digest: DARSHAN" in digest
     assert "## Departments" in digest
     assert "## Gates" in digest
+    assert "## Darshan GO Gate" in digest
+    assert "block_external_authority" in digest
     assert "## Next Action Packet" in digest
     assert "hold_external_authority" in digest
     assert "## Memory Kernel" in digest
@@ -286,10 +300,14 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     next_action_packet = json.loads(
         paths["next_action_packet"].read_text(encoding="utf-8")
     )
+    go_gate_packet = json.loads(
+        paths["darshan_go_gate_packet"].read_text(encoding="utf-8")
+    )
 
     assert projection["status"] == "blocked_on_external_reader_gate"
     assert projection["autonomy_level"] == "L0_read_only_plan"
     assert projection["next_action_packet"]["decision"] == "hold_external_authority"
+    assert projection["darshan_go_gate_packet"]["decision"] == "block_external_authority"
     assert "# VentureCell Operator OS Digest: DARSHAN" in digest
     assert "index_status" in memory_index
     assert "query_eval_status" in memory_index
@@ -298,6 +316,9 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert next_action_packet["decision"] == "hold_external_authority"
     assert next_action_packet["blocked_departments"] == ["growth", "communications"]
     assert "live_external_authority" in next_action_packet["forbidden_actions"]
+    assert go_gate_packet["required_receipt_source"] == "darshan_external_reader"
+    assert "payload.privacy_redacted" in go_gate_packet["required_receipt_fields"]
+    assert "publishing" in go_gate_packet["blocked_actions"]
 
 
 def test_memory_kernel_query_eval_distinguishes_tiers_and_provenance(tmp_path: Path) -> None:

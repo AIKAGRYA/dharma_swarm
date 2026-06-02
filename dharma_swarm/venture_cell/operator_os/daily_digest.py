@@ -39,6 +39,27 @@ def render_operator_daily_digest(projection: VentureCellOperatorProjection) -> s
             f"coherence `{gate.coherence_state}`; gaps `{gaps}`."
         )
 
+    go_gate = projection.darshan_go_gate_packet
+    blocked_actions = ", ".join(go_gate.blocked_actions) if go_gate.blocked_actions else "none"
+    expected_artifacts = (
+        ", ".join(go_gate.expected_local_artifacts) if go_gate.expected_local_artifacts else "none"
+    )
+    lines.extend(
+        [
+            "",
+            "## Darshan GO Gate",
+            "",
+            f"- Decision: `{go_gate.decision}`",
+            f"- Authority boundary: `{go_gate.authority_boundary}`",
+            f"- Required source: `{go_gate.required_receipt_source}`",
+            f"- Required schema: `{go_gate.required_receipt_schema}`",
+            f"- Countable events: `{', '.join(go_gate.countable_event_types)}`",
+            f"- Blocked actions: `{blocked_actions}`",
+            f"- Expected local artifacts: `{expected_artifacts}`",
+            f"- Next governed action: {go_gate.next_governed_action}",
+        ]
+    )
+
     packet = projection.next_action_packet
     blockers = ", ".join(packet.blockers) if packet.blockers else "none"
     blocked_departments = (

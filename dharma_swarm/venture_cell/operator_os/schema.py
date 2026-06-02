@@ -119,6 +119,37 @@ class OperatorNextActionPacket:
 
 
 @dataclass(frozen=True)
+class DarshanGoGatePacket:
+    """Read-only Darshan external-reader GO gate handoff."""
+
+    packet_id: str
+    gate_id: str
+    decision: str
+    observed_state: str
+    coherence_state: str
+    authority_boundary: str
+    why_external_reader_required: str
+    required_receipt_source: str
+    required_receipt_schema: str
+    required_receipt_fields: tuple[str, ...] = ()
+    countable_event_types: tuple[str, ...] = ()
+    blocked_departments: tuple[str, ...] = ()
+    blocked_actions: tuple[str, ...] = ()
+    accepted_receipts: tuple[str, ...] = ()
+    rejected_receipts: tuple[str, ...] = ()
+    missing_receipts: tuple[str, ...] = ()
+    event_uids: tuple[str, ...] = ()
+    expected_local_artifacts: tuple[str, ...] = ()
+    evidence_refs: tuple[str, ...] = ()
+    next_governed_action: str = ""
+    gap_codes: tuple[str, ...] = ()
+    raw: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class VentureCellOperatorProjection:
     """The fused Operator OS projection for one VentureCell."""
 
@@ -142,6 +173,19 @@ class VentureCellOperatorProjection:
             owner_department="operations",
             decision="inspect_projection",
             next_governed_action="Inspect the current Operator OS projection.",
+        )
+    )
+    darshan_go_gate_packet: DarshanGoGatePacket = field(
+        default_factory=lambda: DarshanGoGatePacket(
+            packet_id="darshan.go_gate",
+            gate_id="darshan.external_reader_go_receipts",
+            decision="inspect_gate",
+            observed_state="unknown",
+            coherence_state="unknown",
+            authority_boundary="read_only_projection",
+            why_external_reader_required="Inspect the Darshan external-reader gate.",
+            required_receipt_source="darshan_external_reader",
+            required_receipt_schema="go_evidence_receipt.v0",
         )
     )
     daily_cycle: tuple[str, ...] = ()

@@ -27,6 +27,7 @@ from dharma_swarm.venture_cell.operator_os.projection import (
 )
 from dharma_swarm.venture_cell.operator_os.schema import (
     CanvasItem,
+    DarshanGoGatePacket,
     GateSummary,
     MemoryKernelSnapshot,
     OperatorDepartment,
@@ -36,6 +37,7 @@ from dharma_swarm.venture_cell.operator_os.schema import (
 
 __all__ = [
     "CanvasItem",
+    "DarshanGoGatePacket",
     "GateSummary",
     "MEMORY_KERNEL_EVAL_QUERIES",
     "MemoryKernelIndexEntry",

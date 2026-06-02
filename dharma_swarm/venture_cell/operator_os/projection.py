@@ -14,8 +14,11 @@ from dharma_swarm.operator_core.governed_work_admission import (
     WorkKind,
     evaluate_governed_work_admission,
 )
+from dharma_swarm.operator_core.go_evidence_bridge import GO_EVIDENCE_SCHEMA_V0
 from dharma_swarm.venture_cell.darshan.bundle import validate_bundle
 from dharma_swarm.venture_cell.darshan.external_reader_gate import (
+    COUNTABLE_EVENT_TYPES,
+    DARSHAN_READER_RECEIPT_SOURCE,
     latest_darshan_bundle_path,
     validate_external_reader_gate_summary,
 )
@@ -24,6 +27,7 @@ from dharma_swarm.venture_cell.operator_os.memory_kernel import build_memory_ker
 from dharma_swarm.venture_cell.operator_os.memory_kernel import evaluate_memory_kernel_queries
 from dharma_swarm.venture_cell.operator_os.schema import (
     CanvasItem,
+    DarshanGoGatePacket,
     GateSummary,
     MemoryKernelSnapshot,
     OperatorDepartment,
@@ -89,6 +93,7 @@ def build_operator_projection(inputs: OperatorOSInputs | None = None) -> Venture
         memory=memory,
         evidence_refs=evidence_refs,
     )
+    darshan_go_gate_packet = _darshan_go_gate_packet(gate)
 
     return VentureCellOperatorProjection(
         venture_cell_id=active.venture_cell_id,
@@ -109,6 +114,7 @@ def build_operator_projection(inputs: OperatorOSInputs | None = None) -> Venture
         gates=gates,
         memory_kernel=memory,
         next_action_packet=next_action_packet,
+        darshan_go_gate_packet=darshan_go_gate_packet,
         daily_cycle=_daily_cycle(),
         evidence_refs=evidence_refs,
         gap_codes=gaps,
@@ -677,6 +683,82 @@ def _next_action_packet(
             "memory_partial": memory_partial,
             "task_truth_missing": task_truth_missing,
         },
+    )
+
+
+def _darshan_go_gate_packet(gate: GateSummary) -> DarshanGoGatePacket:
+    raw = gate.raw if isinstance(gate.raw, dict) else {}
+    pass_gate = gate.decision == "allow"
+    bundle_path = str(raw.get("bundle_path") or "").strip()
+    expected_artifacts: list[str] = []
+    if bundle_path:
+        expected_artifacts.extend(
+            [
+                str(Path(bundle_path) / "decision_delta.json"),
+                str(Path(bundle_path) / "receipts" / "<accepted-go-evidence-receipt>.json"),
+            ]
+        )
+    expected_artifacts.append("dharma_swarm/venture_cell/darshan/external_reader_gate.py")
+
+    return DarshanGoGatePacket(
+        packet_id="darshan.external_reader_go_gate",
+        gate_id=gate.gate_id,
+        decision="gate_passed_reviewed_internal_only" if pass_gate else "block_external_authority",
+        observed_state=gate.observed_state,
+        coherence_state=gate.coherence_state,
+        authority_boundary=(
+            "reader_gate_passed_but_external_actions_still_require_governed_admission"
+            if pass_gate
+            else "read_only_until_accepted_privacy_redacted_go_receipt"
+        ),
+        why_external_reader_required=(
+            "Darshan cannot advance growth, communications, publishing, or external operator action "
+            "from a draft artifact until a countable external reader event is linked to an accepted, "
+            "privacy-redacted GO evidence receipt."
+        ),
+        required_receipt_source=DARSHAN_READER_RECEIPT_SOURCE,
+        required_receipt_schema=GO_EVIDENCE_SCHEMA_V0,
+        required_receipt_fields=(
+            "receipt_id",
+            "correlation_id",
+            "source",
+            "source_url",
+            "observed_at",
+            "content_hash",
+            "event_uid",
+            "schema_version",
+            "status",
+            "payload.artifact_id",
+            "payload.event_type",
+            "payload.reader_label",
+            "payload.contact_surface",
+            "payload.summary",
+            "payload.human_approved_contact",
+            "payload.privacy_redacted",
+        ),
+        countable_event_types=tuple(sorted(event_type.value for event_type in COUNTABLE_EVENT_TYPES)),
+        blocked_departments=() if pass_gate else ("growth", "communications"),
+        blocked_actions=()
+        if pass_gate
+        else (
+            "external_outreach",
+            "publishing",
+            "external_operator_handoff",
+            "live_external_authority",
+        ),
+        accepted_receipts=tuple(str(value) for value in raw.get("accepted_receipts", [])),
+        rejected_receipts=tuple(str(value) for value in raw.get("rejected_receipts", [])),
+        missing_receipts=tuple(str(value) for value in raw.get("missing_receipts", [])),
+        event_uids=tuple(str(value) for value in raw.get("event_uids", [])),
+        expected_local_artifacts=tuple(expected_artifacts),
+        evidence_refs=tuple(ref for ref in gate.evidence_refs if ref),
+        next_governed_action=(
+            "Stage the accepted external-reader event through Chetana only after review."
+            if pass_gate
+            else "Attach one ExternalReaderEvent with an accepted privacy-redacted GO evidence receipt."
+        ),
+        gap_codes=gate.gap_codes,
+        raw=raw,
     )
 
 

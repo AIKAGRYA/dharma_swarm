@@ -92,6 +92,17 @@
 - `darshan.external_reader_go_receipts` decision `block`; coherence `declared_only`; gaps `darshan_external_reader_event_missing`.
 - `operator_os.governed_work_admission` decision `allow`; coherence `bound`; gaps `none`.
 
+## Darshan GO Gate
+
+- Decision: `block_external_authority`
+- Authority boundary: `read_only_until_accepted_privacy_redacted_go_receipt`
+- Required source: `darshan_external_reader`
+- Required schema: `go_evidence_receipt.v0`
+- Countable events: `decision, inspection, read, reply`
+- Blocked actions: `external_outreach, publishing, external_operator_handoff, live_external_authority`
+- Expected local artifacts: `/Users/dhyana/.dharma/artifacts/venture_cell/DARSHAN/2026-05-26/the-thing-they-are-competing-for-is-not-just-your-attention/decision_delta.json, /Users/dhyana/.dharma/artifacts/venture_cell/DARSHAN/2026-05-26/the-thing-they-are-competing-for-is-not-just-your-attention/receipts/<accepted-go-evidence-receipt>.json, dharma_swarm/venture_cell/darshan/external_reader_gate.py`
+- Next governed action: Attach one ExternalReaderEvent with an accepted privacy-redacted GO evidence receipt.
+
 ## Next Action Packet
 
 - Decision: `hold_external_authority`
