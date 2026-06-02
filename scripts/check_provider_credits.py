@@ -31,6 +31,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from dharma_swarm.api_keys import PROVIDER_API_KEY_ENV_KEYS, PROVIDER_BASE_URL_ENV_KEYS
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(message)s",
@@ -38,24 +40,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Provider registry (from dharma_swarm/api_keys.py)
-# ---------------------------------------------------------------------------
-
 PROVIDERS: dict[str, dict[str, str]] = {
-    "anthropic": {"key_env": "ANTHROPIC_API_KEY", "base_env": ""},
-    "openai": {"key_env": "OPENAI_API_KEY", "base_env": "OPENAI_BASE_URL"},
-    "openrouter": {"key_env": "OPENROUTER_API_KEY", "base_env": "OPENROUTER_BASE_URL"},
-    "groq": {"key_env": "GROQ_API_KEY", "base_env": "GROQ_BASE_URL"},
-    "cerebras": {"key_env": "CEREBRAS_API_KEY", "base_env": "CEREBRAS_BASE_URL"},
-    "nvidia_nim": {"key_env": "NVIDIA_NIM_API_KEY", "base_env": "NVIDIA_NIM_BASE_URL"},
-    "together": {"key_env": "TOGETHER_API_KEY", "base_env": "TOGETHER_BASE_URL"},
-    "fireworks": {"key_env": "FIREWORKS_API_KEY", "base_env": "FIREWORKS_BASE_URL"},
-    "google_ai": {"key_env": "GOOGLE_AI_API_KEY", "base_env": "GOOGLE_AI_BASE_URL"},
-    "sambanova": {"key_env": "SAMBANOVA_API_KEY", "base_env": "SAMBANOVA_BASE_URL"},
-    "mistral": {"key_env": "MISTRAL_API_KEY", "base_env": "MISTRAL_BASE_URL"},
-    "siliconflow": {"key_env": "SILICONFLOW_API_KEY", "base_env": "SILICONFLOW_BASE_URL"},
-    "ollama": {"key_env": "OLLAMA_API_KEY", "base_env": "OLLAMA_BASE_URL"},
+    provider: {
+        "key_env": key_env,
+        "base_env": PROVIDER_BASE_URL_ENV_KEYS.get(provider, ""),
+    }
+    for provider, key_env in PROVIDER_API_KEY_ENV_KEYS.items()
 }
 
 # Patterns that indicate credit exhaustion in log files

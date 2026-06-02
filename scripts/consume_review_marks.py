@@ -8,7 +8,7 @@ while nothing ever graduates to trusted.
 Promotion criteria (--auto-promote mode):
   1. type == "atomic" (compound atoms need manual review)
   2. confidence >= 0.5 (frontmatter field)
-  3. reviewed == true or review_status == approved/reviewed
+  3. external review mark exists under knowledge/review_marks/
   4. File is valid markdown with YAML frontmatter
   5. Not quarantined (already in a separate dir)
 
@@ -38,6 +38,7 @@ Exit codes:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import logging
 import os
@@ -63,6 +64,7 @@ DHARMA_HOME = Path(os.environ.get("DHARMA_HOME", Path.home() / ".dharma"))
 STAGING_DIR = DHARMA_HOME / "knowledge" / "staging"
 TRUSTED_DIR = DHARMA_HOME / "knowledge" / "wiki" / "concepts"
 QUARANTINE_DIR = DHARMA_HOME / "knowledge" / "quarantine"
+REVIEW_MARK_DIR = DHARMA_HOME / "knowledge" / "review_marks"
 LOG_PATH = DHARMA_HOME / "logs" / "consume_review_marks.jsonl"
 
 DEFAULT_MIN_CONFIDENCE = 0.5
@@ -128,12 +130,70 @@ def parse_frontmatter(text: str) -> AtomMeta | None:
     )
 
 
+def review_mark_id(src: Path) -> str:
+    """Return the deterministic external review-mark id for a staging atom."""
+
+    rel = src.relative_to(STAGING_DIR).as_posix()
+    return hashlib.sha256(rel.encode("utf-8")).hexdigest()
+
+
+def review_mark_path(src: Path) -> Path:
+    """Return the expected external review-mark path for a staging atom."""
+
+    return REVIEW_MARK_DIR / f"{review_mark_id(src)}.json"
+
+
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def has_external_review_mark(src: Path) -> bool:
+    """Return True only when a separate review-mark receipt approves the atom."""
+
+    try:
+        rel = src.relative_to(STAGING_DIR).as_posix()
+        mark_path = review_mark_path(src)
+    except ValueError:
+        return False
+
+    try:
+        mark = json.loads(mark_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, ValueError):
+        return False
+
+    decision = str(
+        mark.get("decision") or mark.get("review_status") or mark.get("status") or ""
+    ).strip().lower()
+    if decision not in {"approved", "reviewed"}:
+        return False
+    if str(mark.get("path") or "").strip() != rel:
+        return False
+    if not str(mark.get("reviewer") or mark.get("reviewed_by") or "").strip():
+        return False
+    if not str(mark.get("reviewed_at") or mark.get("timestamp") or "").strip():
+        return False
+
+    expected_hash = str(mark.get("atom_sha256") or "").strip()
+    if expected_hash and expected_hash != _file_sha256(src):
+        return False
+    return True
+
+
 # ---------------------------------------------------------------------------
 # Promotion logic
 # ---------------------------------------------------------------------------
 
 
-def should_promote(meta: AtomMeta, min_confidence: float) -> tuple[bool, str]:
+def should_promote(
+    meta: AtomMeta,
+    min_confidence: float,
+    *,
+    has_independent_review: bool = False,
+) -> tuple[bool, str]:
     """Decide if an atom should be promoted.
 
     Returns (should_promote, reason).
@@ -142,8 +202,8 @@ def should_promote(meta: AtomMeta, min_confidence: float) -> tuple[bool, str]:
         return False, f"type={meta.atom_type} not in {ALLOWED_TYPES}"
     if meta.confidence < min_confidence:
         return False, f"confidence={meta.confidence:.2f} < {min_confidence}"
-    if not meta.reviewed:
-        return False, "missing explicit review mark"
+    if not has_independent_review:
+        return False, "missing external review mark"
     return True, "meets criteria"
 
 
@@ -299,7 +359,11 @@ def main() -> int:
                 skipped += 1
                 continue
 
-            ok, reason = should_promote(meta, args.min_confidence)
+            ok, reason = should_promote(
+                meta,
+                args.min_confidence,
+                has_independent_review=has_external_review_mark(path),
+            )
             if not ok:
                 skipped += 1
                 continue
