@@ -3,9 +3,9 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live ledger, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-36c4e1eed5522c07`
+ds-goal progress receipt: `r-6d39cead7335a6bb`
 Baseline: `1aca07a1 Add VentureCell Operator OS Level 70 surface`
-Current scoped HEAD before this packet: `10e7c51d docs(operator-os): record five-hour timebox`
+Current scoped HEAD before this packet: `d426d12c feat(operator-os): detail goal truth duplicates`
 
 This file is a living score ledger. It exists now so later agents do not
 reconstruct scores from memory. It must be reviewed and updated before final
@@ -67,6 +67,7 @@ reporter closure.
 | Loop 52 | `51_goal_truth_packet_receipt.md` | `r-0ee1f0865dd69047` | 100 | +0 | keep goal-truth receipt chain |
 | Loop 53 | `52_timebox_five_hour_receipt.md` | `r-257787644e0f6723` | 100 | +0 | keep five-hour non-final proof |
 | Loop 54 | `53_goal_truth_duplicate_groups_receipt.md` | `r-36c4e1eed5522c07` | 100 | +0 | keep goal-truth duplicate groups |
+| Loop 55 | `54_darshan_go_unblock_receipt.md` | `r-6d39cead7335a6bb` | 100 | +0 | keep GO unblock packet |
 
 ## Area History
 
@@ -77,7 +78,7 @@ reporter closure.
 | Task truth | 8 | 14 | progress receipts, residual risk register, and goal-truth packet distinguish solved local claims, residual risks, missing progress IDs, duplicate progress IDs, and completion blockers |
 | Governance safety | 15 | 15 | external-reader, governed admission, Chetana, completion, authority firewall, and action-specific liveness gates preserved |
 | Iteration quality | 8 | 12+ | every loop has hypothesis, patch/rejection, evals, adversarial review, decision |
-| Product structure | 8 | 16 | Operator OS now emits next-action, GO gate, GO template, authority boundary, gap triage, memory coverage, canvas summary, department summary, gate summary, evidence summary, goal truth, manifest, memory repair, and report-local recall packets |
+| Product structure | 8 | 16 | Operator OS now emits next-action, GO gate, GO template, GO unblock, authority boundary, gap triage, memory coverage, canvas summary, department summary, gate summary, evidence summary, goal truth, manifest, memory repair, and report-local recall packets |
 | Tests/evals | 8 | 13 | fixed tests, report-local recall regression, goal-truth count parity, eval artifacts, live verifier matrix, and periodic onboard evidence exist |
 | Metabolization | 2 | 5 | program kernel, receipts, manifest inventory, packets, and this score ledger exist |
 

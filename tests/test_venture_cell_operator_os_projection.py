@@ -457,6 +457,9 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     go_receipt_template = json.loads(
         paths["darshan_go_receipt_template"].read_text(encoding="utf-8")
     )
+    go_unblock_packet = json.loads(
+        paths["darshan_go_unblock_packet"].read_text(encoding="utf-8")
+    )
     memory_repair_packet = json.loads(
         paths["memory_kernel_repair_packet"].read_text(encoding="utf-8")
     )
@@ -560,6 +563,31 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
         == "required_real_reader_event_url"
     )
     assert go_receipt_template["accepted_receipt_requirements"]["payload.privacy_redacted"] is True
+    assert go_unblock_packet["schema"] == "dharma.venture_cell_operator_os.darshan_go_unblock.v0"
+    assert go_unblock_packet["decision"] == "wait_for_accepted_external_reader_go_receipt"
+    assert go_unblock_packet["darshan_go_decision"] == "block_external_authority"
+    assert go_unblock_packet["authority_decision"] == "local_read_only_external_blocked"
+    assert go_unblock_packet["required_receipt_schema"] == "go_evidence_receipt.v0"
+    assert go_unblock_packet["required_receipt_source"] == "darshan_external_reader"
+    assert go_unblock_packet["required_receipt_field_count"] == len(
+        go_unblock_packet["required_receipt_fields"]
+    )
+    assert "payload.privacy_redacted" in go_unblock_packet["required_receipt_fields"]
+    assert go_unblock_packet["expected_local_artifact_count"] == len(
+        go_unblock_packet["expected_local_artifacts"]
+    )
+    assert go_unblock_packet["blocked_action_count"] == len(
+        go_unblock_packet["blocked_actions"]
+    )
+    assert go_unblock_packet["blocked_department_count"] == len(
+        go_unblock_packet["blocked_departments"]
+    )
+    assert go_unblock_packet["accepted_receipt_count"] == 0
+    assert go_unblock_packet["not_receipt"] is True
+    assert go_unblock_packet["not_evidence"] is True
+    assert go_unblock_packet["not_authority"] is True
+    assert go_unblock_packet["external_authority_granted"] is False
+    assert "create_fake_go_receipt" in go_unblock_packet["forbidden_actions"]
     assert memory_repair_packet["decision"] == "queue_repair_without_promotion"
     assert memory_repair_packet["status"] == "queued"
     assert memory_repair_packet["raw"]["trusted_promotion_claimed"] is False
@@ -715,6 +743,7 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert "projection" in artifact_manifest["artifact_paths"]
     assert "authority_boundary_packet" in artifact_manifest["artifact_paths"]
     assert "gap_triage_packet" in artifact_manifest["artifact_paths"]
+    assert "darshan_go_unblock_packet" in artifact_manifest["artifact_paths"]
     assert "memory_coverage_packet" in artifact_manifest["artifact_paths"]
     assert "canvas_summary_packet" in artifact_manifest["artifact_paths"]
     assert "department_summary_packet" in artifact_manifest["artifact_paths"]
@@ -737,6 +766,18 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert artifact_manifest["receipt_inventory_scope"] == "run_markdown_receipts_excluding_digest"
     assert artifact_manifest["receipt_inventory_not_final"] is True
     assert artifact_manifest["receipt_inventory_not_authority"] is True
+    assert artifact_manifest["darshan_go_unblock_decision"] == (
+        go_unblock_packet["decision"]
+    )
+    assert artifact_manifest["darshan_go_unblock_required_receipt_field_count"] == (
+        go_unblock_packet["required_receipt_field_count"]
+    )
+    assert artifact_manifest["darshan_go_unblock_expected_local_artifact_count"] == (
+        go_unblock_packet["expected_local_artifact_count"]
+    )
+    assert artifact_manifest["darshan_go_unblock_blocked_action_count"] == (
+        go_unblock_packet["blocked_action_count"]
+    )
     assert artifact_manifest["artifact_count"] == len(artifact_manifest["artifact_paths"])
     assert artifact_manifest["json_artifact_count"] == len(
         [

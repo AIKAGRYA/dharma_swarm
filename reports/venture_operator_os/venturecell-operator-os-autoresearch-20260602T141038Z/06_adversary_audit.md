@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-36c4e1eed5522c07`
-Current scoped HEAD before this packet: `10e7c51d docs(operator-os): record five-hour timebox`
+ds-goal progress receipt: `r-6d39cead7335a6bb`
+Current scoped HEAD before this packet: `d426d12c feat(operator-os): detail goal truth duplicates`
 
 This audit is intentionally written before the final time window so the next
 agent has a concrete attack surface. It is not a completion certificate. The
@@ -212,6 +212,7 @@ Queued:
 | GO receipt counts clear the gate | accepted count is `0` and decision remains blocked | false |
 | GO template is evidence | template status is `draft_template_not_evidence` | false |
 | GO template requirements prove acceptance | requirements are prerequisites, not receipts | false |
+| GO unblock packet grants authority | packet is `not_authority: true` and accepted receipts remain `0` | false |
 | MemoryKernel recall is trusted/complete | strict eval passes from staged report-local roots only | false |
 | Chetana trusted promotion occurred | `trusted_promotion_claimed: false` | false |
 | NATS/A2A liveness is proven | no action-specific ack proof cited | false |

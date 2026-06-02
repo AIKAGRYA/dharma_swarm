@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live risk register, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-36c4e1eed5522c07`
-Current scoped HEAD before this packet: `10e7c51d docs(operator-os): record five-hour timebox`
+ds-goal progress receipt: `r-6d39cead7335a6bb`
+Current scoped HEAD before this packet: `d426d12c feat(operator-os): detail goal truth duplicates`
 
 This register separates current blockers, residual risks, and solved local
 claims. It exists to prevent false completion after a high live score.
@@ -26,6 +26,7 @@ claims. It exists to prevent false completion after a high live score.
 | Memory pass is report-local | `memory_kernel_query_eval.json` passes from staged report roots | do not call it trusted Chetana promotion |
 | Memory index truncated | `memory_kernel_index.json` reports truncated scan | do not claim complete memory coverage |
 | GO template misuse | `darshan_go_receipt_template.json` exists with accepted-receipt requirements | keep markers and treat requirements as prerequisites only |
+| GO unblock packet misuse | `darshan_go_unblock_packet.json` lists unblock requirements | treat as routing metadata, not accepted evidence |
 | GO receipt count overclaim | GO gate reports accepted/rejected/missing receipt counts | treat as selectors, not GO clearance |
 | Authority packet overclaim | `authority_boundary_packet.json` exists | treat as firewall view, not grant |
 | Authority boolean overclaim | authority packet has explicit external authority booleans | treat as denial guardrails, not grant |
@@ -115,8 +116,9 @@ claims. It exists to prevent false completion after a high live score.
 | Five-hour timebox recorded | elapsed `18091s`, remaining `10809s` | non-final proof only |
 | Manifest receipt summary renders | receipt count and latest path present | audit locator only |
 | Manifest inventory scope renders | latest name and non-final/non-authority markers present | audit locator only |
-| Goal truth packet renders | receipts `55`, progress ids `50`, missing ids `5`, duplicate groups `1` | receipt-chain inventory only |
+| Goal truth packet renders | receipts `56`, progress ids `51`, missing ids `5`, duplicate groups `1` | receipt-chain inventory only |
 | Goal truth duplicate groups render | duplicate group count `1` with member names | receipt-chain routing only |
+| Darshan GO unblock packet renders | required fields `16`, expected artifacts `4`, blocked actions `4`, accepted receipts `0` | requirements routing only |
 | Admission render stable | volatile id/time redacted | diff hygiene only |
 
 ## Loop 15 Receipt

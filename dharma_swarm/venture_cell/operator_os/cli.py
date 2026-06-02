@@ -338,6 +338,64 @@ def _darshan_go_receipt_template_payload(projection: dict[str, Any]) -> dict[str
     return template if isinstance(template, dict) else {}
 
 
+def _darshan_go_unblock_payload(projection: dict[str, Any]) -> dict[str, Any]:
+    go_gate = _darshan_go_gate_payload(projection)
+    authority = _authority_boundary_payload(projection)
+    accepted_receipts = _sequence_items(go_gate.get("accepted_receipts"))
+    rejected_receipts = _sequence_items(go_gate.get("rejected_receipts"))
+    missing_receipts = _sequence_items(go_gate.get("missing_receipts"))
+    expected_local_artifacts = _sequence_items(go_gate.get("expected_local_artifacts"))
+    required_receipt_fields = _sequence_items(go_gate.get("required_receipt_fields"))
+    blocked_actions = _sequence_items(go_gate.get("blocked_actions"))
+    blocked_departments = _sequence_items(go_gate.get("blocked_departments"))
+    return {
+        "schema": "dharma.venture_cell_operator_os.darshan_go_unblock.v0",
+        "status": projection.get("status", "unknown"),
+        "autonomy_level": projection.get("autonomy_level", "unknown"),
+        "decision": "wait_for_accepted_external_reader_go_receipt",
+        "darshan_go_decision": go_gate.get("decision", "unknown"),
+        "authority_decision": authority.get("decision", "unknown"),
+        "why_external_reader_required": go_gate.get(
+            "why_external_reader_required", ""
+        ),
+        "required_receipt_schema": go_gate.get("required_receipt_schema", ""),
+        "required_receipt_source": go_gate.get("required_receipt_source", ""),
+        "required_receipt_fields": required_receipt_fields,
+        "required_receipt_field_count": len(required_receipt_fields),
+        "expected_local_artifacts": expected_local_artifacts,
+        "expected_local_artifact_count": len(expected_local_artifacts),
+        "accepted_receipts": accepted_receipts,
+        "accepted_receipt_count": len(accepted_receipts),
+        "rejected_receipts": rejected_receipts,
+        "rejected_receipt_count": len(rejected_receipts),
+        "missing_receipts": missing_receipts,
+        "missing_receipt_count": len(missing_receipts),
+        "blocked_actions": blocked_actions,
+        "blocked_action_count": len(blocked_actions),
+        "blocked_departments": blocked_departments,
+        "blocked_department_count": len(blocked_departments),
+        "safe_local_prework": [
+            "inspect_expected_local_artifacts",
+            "prepare_privacy_redacted_receipt_shape_only_after_real_event",
+            "keep_growth_and_communications_internal",
+        ],
+        "safe_local_prework_count": 3,
+        "forbidden_actions": [
+            "create_fake_go_receipt",
+            "mark_template_as_accepted",
+            "perform_external_outreach",
+            "publish_or_handoff_externally",
+            "claim_live_external_authority",
+        ],
+        "forbidden_action_count": 5,
+        "not_receipt": True,
+        "not_evidence": True,
+        "not_authority": True,
+        "external_authority_granted": False,
+        "trusted_promotion_claimed": False,
+    }
+
+
 def _memory_repair_payload(projection: dict[str, Any]) -> dict[str, Any]:
     packet = projection.get("memory_kernel_repair_packet")
     return packet if isinstance(packet, dict) else {}
@@ -357,6 +415,7 @@ def _completion_guard_payload(projection: dict[str, Any]) -> dict[str, Any]:
     status = str(projection.get("status", "unknown"))
     autonomy_level = str(projection.get("autonomy_level", "unknown"))
     go_gate = _darshan_go_gate_payload(projection)
+    go_unblock = _darshan_go_unblock_payload(projection)
     authority = _authority_boundary_payload(projection)
     final_closure_blockers = [
         "true_8h_elapsed_time_not_proven",
@@ -536,6 +595,7 @@ def _artifact_manifest_payload(
 ) -> dict[str, Any]:
     memory = _memory_index_payload(projection)
     go_gate = _darshan_go_gate_payload(projection)
+    go_unblock = _darshan_go_unblock_payload(projection)
     authority = _authority_boundary_payload(projection)
     gap_triage = _gap_triage_payload(projection)
     memory_coverage = _memory_coverage_payload(projection)
@@ -564,6 +624,16 @@ def _artifact_manifest_payload(
         "memory_query_eval_passed": memory.get("query_eval_passed", 0),
         "memory_query_eval_total": memory.get("query_eval_total", 0),
         "darshan_go_decision": go_gate.get("decision", "unknown"),
+        "darshan_go_unblock_decision": go_unblock.get("decision", "unknown"),
+        "darshan_go_unblock_required_receipt_field_count": go_unblock.get(
+            "required_receipt_field_count", 0
+        ),
+        "darshan_go_unblock_expected_local_artifact_count": go_unblock.get(
+            "expected_local_artifact_count", 0
+        ),
+        "darshan_go_unblock_blocked_action_count": go_unblock.get(
+            "blocked_action_count", 0
+        ),
         "authority_decision": authority.get("decision", "unknown"),
         "gap_triage_decision": gap_triage.get("decision", "unknown"),
         "memory_coverage_truncated": memory_coverage.get("truncated", False),
@@ -722,6 +792,16 @@ def render_operator_surface(
         + "\n",
         encoding="utf-8",
     )
+    darshan_go_unblock_packet_path = output_dir / "darshan_go_unblock_packet.json"
+    darshan_go_unblock_packet_path.write_text(
+        json.dumps(
+            _darshan_go_unblock_payload(projection.to_dict()),
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     memory_repair_packet_path = output_dir / "memory_kernel_repair_packet.json"
     memory_repair_packet_path.write_text(
         json.dumps(
@@ -824,6 +904,7 @@ def render_operator_surface(
         "next_action_packet": next_action_packet_path,
         "darshan_go_gate_packet": darshan_go_gate_packet_path,
         "darshan_go_receipt_template": darshan_go_receipt_template_path,
+        "darshan_go_unblock_packet": darshan_go_unblock_packet_path,
         "memory_kernel_repair_packet": memory_repair_packet_path,
         "authority_boundary_packet": authority_boundary_packet_path,
         "gap_triage_packet": gap_triage_packet_path,

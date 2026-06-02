@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live verifier matrix, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-36c4e1eed5522c07`
-Current scoped HEAD before this packet: `10e7c51d docs(operator-os): record five-hour timebox`
+ds-goal progress receipt: `r-6d39cead7335a6bb`
+Current scoped HEAD before this packet: `d426d12c feat(operator-os): detail goal truth duplicates`
 
 This matrix captures the current verification surface for future agents. It is
 not a final verifier matrix and must not be used to close the reporter task.
@@ -21,6 +21,9 @@ not a final verifier matrix and must not be used to close the reporter task.
   arrays and accepted remains `0`.
 - Darshan GO receipt template: rendered, explicitly not evidence.
 - Darshan GO template requirements: rendered prerequisites, not acceptance.
+- Darshan GO unblock packet: passing; required receipt fields, expected local
+  artifacts, blocked actions, and blocked departments render with accepted
+  receipts still `0`.
 - External authority: blocked.
 - Authority booleans: passing; external authority false and action ack
   required.
@@ -64,8 +67,8 @@ not a final verifier matrix and must not be used to close the reporter task.
   rendered.
 - Manifest latest progress receipt id: passing; latest receipt id is rendered
   and marked non-final.
-- Goal truth receipt chain: passing; receipts `55`, progress receipt ids `50`,
-  unique progress receipt ids `44`, missing progress ids `5`, duplicate
+- Goal truth receipt chain: passing; receipts `56`, progress receipt ids `51`,
+  unique progress receipt ids `45`, missing progress ids `5`, duplicate
   progress id groups `1`, and non-final markers render.
 - Goal truth duplicate groups: passing; duplicate group member names render.
 - Stable admission render: passing; volatile id/time redacted, decision visible.
@@ -90,6 +93,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | Manifest artifact counts | `operator_os_artifact_manifest.json` | artifacts `16`, JSON `15`, Markdown `1`, summary packets `4` | pass, not finality |
 | Goal truth packet | `operator_goal_truth_packet.json` | receipts `55`, progress ids `50`, missing ids `5`, duplicate groups `1`; `not_final: true` | pass, not finality |
 | Goal truth duplicate groups | `operator_goal_truth_packet.json` | duplicate group count `1`; member names rendered | pass, routing metadata only |
+| Darshan GO unblock packet | `darshan_go_unblock_packet.json` | required fields `16`, expected artifacts `4`, blocked actions `4`, accepted receipts `0`; `not_authority: true` | pass, not evidence |
 | Periodic onboard | `make onboard` | exit `0` | pass, not mission authority |
 | Codex toolbelt | `bash scripts/runtime/codex_toolbelt_status.sh` | exit `0` with optional credential warnings | pass |
 | Latest periodic onboard/toolbelt | `make onboard`; `bash scripts/runtime/codex_toolbelt_status.sh` | both exit `0`; optional credential warnings | pass, not mission authority |
@@ -205,6 +209,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `r-0ee1f0865dd69047` | keep | goal-truth receipt-chain inventory |
 | `r-257787644e0f6723` | keep | five-hour non-final timebox proof |
 | `r-36c4e1eed5522c07` | keep | goal-truth duplicate group membership |
+| `r-6d39cead7335a6bb` | keep | Darshan GO unblock requirements |
 
 ## Revert / Queue Ledger
 

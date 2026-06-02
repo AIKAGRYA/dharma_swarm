@@ -1,0 +1,74 @@
+{
+  "accepted_receipt_count": 0,
+  "accepted_receipts": [],
+  "authority_decision": "local_read_only_external_blocked",
+  "autonomy_level": "L0_read_only_plan",
+  "blocked_action_count": 4,
+  "blocked_actions": [
+    "external_outreach",
+    "publishing",
+    "external_operator_handoff",
+    "live_external_authority"
+  ],
+  "blocked_department_count": 2,
+  "blocked_departments": [
+    "growth",
+    "communications"
+  ],
+  "darshan_go_decision": "block_external_authority",
+  "decision": "wait_for_accepted_external_reader_go_receipt",
+  "expected_local_artifact_count": 4,
+  "expected_local_artifacts": [
+    "/Users/dhyana/.dharma/artifacts/venture_cell/DARSHAN/2026-05-26/the-thing-they-are-competing-for-is-not-just-your-attention/decision_delta.json",
+    "/Users/dhyana/.dharma/artifacts/venture_cell/DARSHAN/2026-05-26/the-thing-they-are-competing-for-is-not-just-your-attention/receipts/<accepted-go-evidence-receipt>.json",
+    "dharma_swarm/venture_cell/darshan/external_reader_gate.py",
+    "darshan_go_receipt_template.json"
+  ],
+  "external_authority_granted": false,
+  "forbidden_action_count": 5,
+  "forbidden_actions": [
+    "create_fake_go_receipt",
+    "mark_template_as_accepted",
+    "perform_external_outreach",
+    "publish_or_handoff_externally",
+    "claim_live_external_authority"
+  ],
+  "missing_receipt_count": 0,
+  "missing_receipts": [],
+  "not_authority": true,
+  "not_evidence": true,
+  "not_receipt": true,
+  "rejected_receipt_count": 0,
+  "rejected_receipts": [],
+  "required_receipt_field_count": 16,
+  "required_receipt_fields": [
+    "receipt_id",
+    "correlation_id",
+    "source",
+    "source_url",
+    "observed_at",
+    "content_hash",
+    "event_uid",
+    "schema_version",
+    "status",
+    "payload.artifact_id",
+    "payload.event_type",
+    "payload.reader_label",
+    "payload.contact_surface",
+    "payload.summary",
+    "payload.human_approved_contact",
+    "payload.privacy_redacted"
+  ],
+  "required_receipt_schema": "go_evidence_receipt.v0",
+  "required_receipt_source": "darshan_external_reader",
+  "safe_local_prework": [
+    "inspect_expected_local_artifacts",
+    "prepare_privacy_redacted_receipt_shape_only_after_real_event",
+    "keep_growth_and_communications_internal"
+  ],
+  "safe_local_prework_count": 3,
+  "schema": "dharma.venture_cell_operator_os.darshan_go_unblock.v0",
+  "status": "blocked_on_external_reader_gate",
+  "trusted_promotion_claimed": false,
+  "why_external_reader_required": "Darshan cannot advance growth, communications, publishing, or external operator action from a draft artifact until a countable external reader event is linked to an accepted, privacy-redacted GO evidence receipt."
+}

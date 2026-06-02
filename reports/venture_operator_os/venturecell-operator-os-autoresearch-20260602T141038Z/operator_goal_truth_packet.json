@@ -7,7 +7,7 @@
   "duplicate_progress_receipt_groups": [
     {
       "count": 7,
-      "progress_receipt_id": "r-36c4e1eed5522c07",
+      "progress_receipt_id": "r-6d39cead7335a6bb",
       "receipt_names": [
         "06_adversary_audit.md",
         "07_score_history.md",
@@ -15,17 +15,17 @@
         "09_next_goal_packet.md",
         "12_live_verifier_matrix.md",
         "14_residual_risk_register.md",
-        "53_goal_truth_duplicate_groups_receipt.md"
+        "54_darshan_go_unblock_receipt.md"
       ]
     }
   ],
   "duplicate_progress_receipt_id_count": 1,
   "duplicate_progress_receipt_ids": [
-    "r-36c4e1eed5522c07"
+    "r-6d39cead7335a6bb"
   ],
-  "latest_progress_receipt_id": "r-36c4e1eed5522c07",
-  "latest_receipt_name": "53_goal_truth_duplicate_groups_receipt.md",
-  "latest_receipt_path": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/53_goal_truth_duplicate_groups_receipt.md",
+  "latest_progress_receipt_id": "r-6d39cead7335a6bb",
+  "latest_receipt_name": "54_darshan_go_unblock_receipt.md",
+  "latest_receipt_path": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/54_darshan_go_unblock_receipt.md",
   "missing_progress_receipt_count": 5,
   "missing_progress_receipt_names": [
     "00_opening_truth.md",
@@ -36,7 +36,7 @@
   ],
   "not_authority": true,
   "not_final": true,
-  "progress_receipt_count": 50,
+  "progress_receipt_count": 51,
   "progress_receipt_id_counts": {
     "r-0876eae2183f379c": 1,
     "r-0ee1f0865dd69047": 1,
@@ -46,7 +46,7 @@
     "r-2094f1c27d8e0d40": 1,
     "r-238a0985ac2b37f3": 1,
     "r-257787644e0f6723": 1,
-    "r-36c4e1eed5522c07": 7,
+    "r-36c4e1eed5522c07": 1,
     "r-3921119812771fd7": 1,
     "r-3e318b30d3694ffa": 1,
     "r-41271dd7e888aa5e": 1,
@@ -54,6 +54,7 @@
     "r-43933ac6a5701ece": 1,
     "r-446364a1d4cbda18": 1,
     "r-4eaef0bd4e7a0a85": 1,
+    "r-6d39cead7335a6bb": 7,
     "r-7167e2551df4f45e": 1,
     "r-772a578a521880f8": 1,
     "r-7b10153c5bd3f095": 1,
@@ -85,16 +86,16 @@
   },
   "progress_receipt_ids": [
     "r-dd2119655a79a966",
-    "r-36c4e1eed5522c07",
+    "r-6d39cead7335a6bb",
     "r-d8f9e2cb42e94844",
-    "r-36c4e1eed5522c07",
-    "r-36c4e1eed5522c07",
-    "r-36c4e1eed5522c07",
+    "r-6d39cead7335a6bb",
+    "r-6d39cead7335a6bb",
+    "r-6d39cead7335a6bb",
     "r-238a0985ac2b37f3",
     "r-eefe071ec2ba8079",
-    "r-36c4e1eed5522c07",
+    "r-6d39cead7335a6bb",
     "r-9e260da4bf76c7dc",
-    "r-36c4e1eed5522c07",
+    "r-6d39cead7335a6bb",
     "r-fc6ccc17c8ce64f2",
     "r-a20a2acce6d33e41",
     "r-d1fdefdd26464004",
@@ -133,10 +134,11 @@
     "r-802f88903e805cdb",
     "r-0ee1f0865dd69047",
     "r-257787644e0f6723",
-    "r-36c4e1eed5522c07"
+    "r-36c4e1eed5522c07",
+    "r-6d39cead7335a6bb"
   ],
   "receipt_chain_complete_claimed": false,
-  "receipt_count": 55,
+  "receipt_count": 56,
   "receipt_inventory_scope": "run_markdown_receipts_excluding_digest",
   "receipts": [
     {
@@ -179,7 +181,7 @@
       "has_progress_receipt_id": true,
       "name": "06_adversary_audit.md",
       "path": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/06_adversary_audit.md",
-      "progress_receipt_id": "r-36c4e1eed5522c07"
+      "progress_receipt_id": "r-6d39cead7335a6bb"
     },
     {
       "has_progress_receipt_id": true,
@@ -191,19 +193,19 @@
       "has_progress_receipt_id": true,
       "name": "07_score_history.md",
       "path": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/07_score_history.md",
-      "progress_receipt_id": "r-36c4e1eed5522c07"
+      "progress_receipt_id": "r-6d39cead7335a6bb"
     },
     {
       "has_progress_receipt_id": true,
       "name": "08_metabolization_packet.md",
       "path": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/08_metabolization_packet.md",
-      "progress_receipt_id": "r-36c4e1eed5522c07"
+      "progress_receipt_id": "r-6d39cead7335a6bb"
     },
     {
       "has_progress_receipt_id": true,
       "name": "09_next_goal_packet.md",
       "path": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/09_next_goal_packet.md",
-      "progress_receipt_id": "r-36c4e1eed5522c07"
+      "progress_receipt_id": "r-6d39cead7335a6bb"
     },
     {
       "has_progress_receipt_id": true,
@@ -221,7 +223,7 @@
       "has_progress_receipt_id": true,
       "name": "12_live_verifier_matrix.md",
       "path": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/12_live_verifier_matrix.md",
-      "progress_receipt_id": "r-36c4e1eed5522c07"
+      "progress_receipt_id": "r-6d39cead7335a6bb"
     },
     {
       "has_progress_receipt_id": true,
@@ -233,7 +235,7 @@
       "has_progress_receipt_id": true,
       "name": "14_residual_risk_register.md",
       "path": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/14_residual_risk_register.md",
-      "progress_receipt_id": "r-36c4e1eed5522c07"
+      "progress_receipt_id": "r-6d39cead7335a6bb"
     },
     {
       "has_progress_receipt_id": true,
@@ -468,6 +470,12 @@
       "name": "53_goal_truth_duplicate_groups_receipt.md",
       "path": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/53_goal_truth_duplicate_groups_receipt.md",
       "progress_receipt_id": "r-36c4e1eed5522c07"
+    },
+    {
+      "has_progress_receipt_id": true,
+      "name": "54_darshan_go_unblock_receipt.md",
+      "path": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/54_darshan_go_unblock_receipt.md",
+      "progress_receipt_id": "r-6d39cead7335a6bb"
     }
   ],
   "reporter_task_must_remain_open": true,
@@ -476,5 +484,5 @@
   "status": "blocked_on_external_reader_gate",
   "terminal_reporter_receipt_required": true,
   "truth_source": "report_directory_markdown_receipt_headers",
-  "unique_progress_receipt_id_count": 44
+  "unique_progress_receipt_id_count": 45
 }
