@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live verifier matrix, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-0ee1f0865dd69047`
-Current scoped HEAD before this packet: `957bb0c9 feat(operator-os): count rendered artifacts`
+ds-goal progress receipt: `r-257787644e0f6723`
+Current scoped HEAD before this packet: `1f44b1c6 feat(operator-os): render goal truth packet`
 
 This matrix captures the current verification surface for future agents. It is
 not a final verifier matrix and must not be used to close the reporter task.
@@ -58,14 +58,14 @@ not a final verifier matrix and must not be used to close the reporter task.
 - Periodic onboard/toolbelt: passing, environment context only.
 - Latest periodic onboard/toolbelt: passing, environment context only.
 - Periodic substrate refresh: passing, environment context only.
-- Timebox status: elapsed `14410s`, remaining `14390s`.
+- Timebox status: elapsed `18091s`, remaining `10809s`.
 - Manifest receipt summary: passing; count and latest receipt path rendered.
 - Manifest inventory scope: passing; latest receipt name and non-final markers
   rendered.
 - Manifest latest progress receipt id: passing; latest receipt id is rendered
   and marked non-final.
-- Goal truth receipt chain: passing; receipts `53`, progress receipt ids `48`,
-  unique progress receipt ids `42`, missing progress ids `5`, duplicate
+- Goal truth receipt chain: passing; receipts `54`, progress receipt ids `49`,
+  unique progress receipt ids `43`, missing progress ids `5`, duplicate
   progress id groups `1`, and non-final markers render.
 - Stable admission render: passing; volatile id/time redacted, decision visible.
 - Complete ds-goal verification: expected fail on open reporter task.
@@ -87,7 +87,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | Summary helper refactor | `pytest -q tests/test_venture_cell_operator_os_projection.py`; render count checks | helper refactor preserves rendered counts | pass |
 | Latest periodic onboard/toolbelt | `make onboard`; `bash scripts/runtime/codex_toolbelt_status.sh` | both exit `0`; optional credential warnings | pass, not mission authority |
 | Manifest artifact counts | `operator_os_artifact_manifest.json` | artifacts `16`, JSON `15`, Markdown `1`, summary packets `4` | pass, not finality |
-| Goal truth packet | `operator_goal_truth_packet.json` | receipts `53`, progress ids `48`, missing ids `5`, duplicate groups `1`; `not_final: true` | pass, not finality |
+| Goal truth packet | `operator_goal_truth_packet.json` | receipts `54`, progress ids `49`, missing ids `5`, duplicate groups `1`; `not_final: true` | pass, not finality |
 | Periodic onboard | `make onboard` | exit `0` | pass, not mission authority |
 | Codex toolbelt | `bash scripts/runtime/codex_toolbelt_status.sh` | exit `0` with optional credential warnings | pass |
 | Latest periodic onboard/toolbelt | `make onboard`; `bash scripts/runtime/codex_toolbelt_status.sh` | both exit `0`; optional credential warnings | pass, not mission authority |
@@ -139,6 +139,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `32_timebox_three_hour_receipt.md` | elapsed `10982s`, remaining `17818s` | proves still non-final |
 | `38_timebox_active_clock_receipt.md` | elapsed `12907s`, remaining `15893s` | proves still non-final |
 | `43_timebox_four_hour_receipt.md` | elapsed `14410s`, remaining `14390s` | proves still non-final |
+| `52_timebox_five_hour_receipt.md` | elapsed `18091s`, remaining `10809s` | proves still non-final |
 | `18_receipt_inventory_manifest_receipt.md` | manifest receipt inventory | index only, not final proof |
 | `06_adversary_audit.md` | live draft | needs final-window review |
 | `07_score_history.md` | live score `100/100` | not final |
@@ -200,6 +201,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `r-935763168301bf72` | keep | periodic onboard/toolbelt refresh |
 | `r-802f88903e805cdb` | keep | manifest artifact counts |
 | `r-0ee1f0865dd69047` | keep | goal-truth receipt-chain inventory |
+| `r-257787644e0f6723` | keep | five-hour non-final timebox proof |
 
 ## Revert / Queue Ledger
 
