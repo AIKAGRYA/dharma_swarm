@@ -50,14 +50,14 @@ Refreshed `SOVEREIGN_MANIFEST.md` counts + `AUTO_INVENTORY.md` auto-sections:
 **Dominant failure**: DocOps integrity gate (26/26 failing PRs)
 
 Root causes:
-1. **Canonical guard** (~20 PRs): Research/report docs use terms like "canonical" in academic context. Fixed by PR #453 (GREEN, awaiting merge).
+1. **Authority-term guard** (~20 PRs): Research/report docs use authority-scope terms in academic context. Fixed by PR #453 (GREEN, awaiting merge).
 2. **Manifest count mismatch** (~6 PRs): Branch adds files but doesn't update counts. Fixed above for priority PRs.
 3. **Dashboard npm ci** (1 PR, #391): Missing package-lock.json on branch — pre-existing, not caused by this branch's changes.
 
 ## Merge Sequence Recommendation
 
 ### Wave 1 — DocOps/Governance (unblock everything)
-- **#453** — widen canonical_guard (unblocks ~20 CI-red PRs)
+- **#453** — widen authority_guard (unblocks ~20 CI-red PRs)
 
 ### Wave 2 — Bug Fixes
 - **#383** — guardian @dataclass __init__ fix (closes 29 dupe issues)
@@ -91,7 +91,7 @@ Root causes:
 
 ## Blockers for Operator
 
-1. **Merge #453 first** — unblocks canonical_guard failures across ~20 PRs
+1. **Merge #453 first** — unblocks authority_guard failures across ~20 PRs
 2. **Dual-agent reviews** — all GREEN PRs need codex + claude review receipts before gate passes
 3. **PR #391 dashboard CI** — needs investigation into missing package-lock.json
 4. **Draft PRs** (#394, #412, #325) — need operator decision on readiness
