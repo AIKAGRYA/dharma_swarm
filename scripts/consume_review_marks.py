@@ -65,7 +65,7 @@ QUARANTINE_DIR = DHARMA_HOME / "knowledge" / "quarantine"
 LOG_PATH = DHARMA_HOME / "logs" / "consume_review_marks.jsonl"
 
 DEFAULT_MIN_CONFIDENCE = 0.5
-ALLOWED_TYPES = {"atomic", "concept", "proposition", "fact"}
+ALLOWED_TYPES = {"atomic"}
 
 
 # ---------------------------------------------------------------------------

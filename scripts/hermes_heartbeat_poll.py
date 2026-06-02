@@ -152,23 +152,23 @@ def poll_queue(dry_run: bool = False) -> list[dict[str, Any]]:
         logger.warning("Failed to read queue: %s", exc)
         return []
 
-    tasks: list[dict[str, Any]] = []
+    records: list[tuple[str, dict[str, Any] | None]] = []
     claimed: list[dict[str, Any]] = []
     modified = False
     now_iso = datetime.now(timezone.utc).isoformat()
 
-    for i, line in enumerate(lines):
-        line = line.strip()
+    for i, raw_line in enumerate(lines):
+        line = raw_line.strip()
         if not line:
-            tasks.append(None)  # type: ignore[arg-type]
+            records.append((raw_line, None))
             continue
         try:
             task = json.loads(line)
         except json.JSONDecodeError:
-            tasks.append(None)  # type: ignore[arg-type]
+            records.append((raw_line, None))
             continue
 
-        tasks.append(task)
+        records.append(("", task))
 
         # Check if claimable
         if task.get("status") != "pending":
@@ -201,11 +201,11 @@ def poll_queue(dry_run: bool = False) -> list[dict[str, Any]]:
     if modified and not dry_run:
         try:
             new_lines = []
-            for t in tasks:
-                if t is None:
-                    new_lines.append("")
+            for raw_line, task in records:
+                if task is None:
+                    new_lines.append(raw_line)
                 else:
-                    new_lines.append(json.dumps(t, separators=(",", ":")))
+                    new_lines.append(json.dumps(task, separators=(",", ":")))
             tmp_fd, tmp_path = tempfile.mkstemp(
                 dir=str(QUEUE_FILE.parent),
                 suffix=".tmp",

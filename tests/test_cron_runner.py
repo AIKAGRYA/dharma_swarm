@@ -9,6 +9,46 @@ from dharma_swarm.models import LLMResponse, ProviderType
 from dharma_swarm.runtime_provider import RuntimeProviderConfig
 
 
+def test_shell_handler_runs_shlex_split_command_without_shell(tmp_path):
+    calls = []
+
+    class FakeProc:
+        returncode = 0
+        stdout = "ok"
+        stderr = ""
+
+    def fake_run(args, **kwargs):
+        calls.append((args, kwargs))
+        return FakeProc()
+
+    with patch("subprocess.run", fake_run):
+        result = execute_cron_job(
+            {
+                "id": "provider-credit-check",
+                "handler": "shell",
+                "shell_command": (
+                    "python3 scripts/check_provider_credits.py --json "
+                    "--output ~/.dharma/logs/provider_credits_latest.json"
+                ),
+                "repo_root": str(tmp_path),
+            }
+        )
+
+    assert result.status == CronJobRunStatus.COMPLETED
+    assert result.output == "ok"
+    assert len(calls) == 1
+    args, kwargs = calls[0]
+    assert args == [
+        "python3",
+        "scripts/check_provider_credits.py",
+        "--json",
+        "--output",
+        "~/.dharma/logs/provider_credits_latest.json",
+    ]
+    assert kwargs["cwd"] == str(tmp_path)
+    assert "shell" not in kwargs
+
+
 def test_run_cron_job_dispatches_headless_prompt():
     with patch("dharma_swarm.pulse.run_claude_headless", return_value="Mission pulse ok") as mock:
         success, output, error = run_cron_job(

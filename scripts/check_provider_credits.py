@@ -91,7 +91,7 @@ def check_env_keys() -> dict[str, dict[str, Any]]:
         results[provider] = {
             "key_env": key_env,
             "key_present": bool(key_val),
-            "key_prefix": key_val[:8] + "..." if len(key_val) > 8 else ("(empty)" if not key_val else "***"),
+            "key_hint": "present" if key_val else "missing",
             "credit_errors": [],
         }
     return results

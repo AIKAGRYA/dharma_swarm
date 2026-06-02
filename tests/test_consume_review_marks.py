@@ -52,10 +52,11 @@ class TestShouldPromote:
         assert ok is False
         assert "type" in reason
 
-    def test_concept_type_allowed(self) -> None:
+    def test_concept_type_rejected(self) -> None:
         meta = crm.AtomMeta("concept", 0.6, "T", [], "")
         ok, reason = crm.should_promote(meta, 0.5)
-        assert ok is True
+        assert ok is False
+        assert "type" in reason
 
 
 class TestPromoteAtom:
