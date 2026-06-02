@@ -109,10 +109,17 @@
 - Live score can be 100 without completion: `True`
 - Required final proof: true-time proof, final artifact review, terminal reporter receipt, and complete verifier pass.
 
+## Final Window Preflight
+
+- Required elapsed seconds: `28800`
+- Required final artifacts: `6`
+- Complete verifier pass claimed: `False`
+- Preflight packet: `operator_final_window_preflight_packet.json` (checklist only, not final proof)
+
 ## Memory Kernel
 
 - Status: `read_through_index_available`
-- Staged: `5065`
+- Staged: `5066`
 - Trusted: `1343`
 - Quarantine: `5000`
 - Truncated scan: `True`
@@ -123,7 +130,7 @@
 
 - `trusted` `trusted`: scanned `1343`; indexed `20`/`20`; truncated `False`.
 - `staging` `staged`: scanned `5000`; indexed `20`/`20`; truncated `True`.
-- `supplemental_staging` `staged`: scanned `65`; indexed `20`/`20`; truncated `False`.
+- `supplemental_staging` `staged`: scanned `66`; indexed `20`/`20`; truncated `False`.
 - `quarantine` `quarantine`: scanned `5000`; indexed `20`/`20`; truncated `True`.
 
 ## Memory Repair Packet

@@ -579,3 +579,23 @@ Still forbidden:
 - treating preflight as final proof;
 - claiming complete verifier pass before reporter closure;
 - including unrelated staged work in final commits.
+
+## Loop 64 Next Goal Addendum
+
+Current new evidence:
+
+- `63_digest_final_preflight_receipt.md`
+- updated `operator_os_digest.md`
+
+Next safe loop targets:
+
+- Continue local review until elapsed time reaches `28800s`.
+- Preserve digest preflight visibility in any later render.
+- Keep final proof blocked on true time, terminal reporter receipt, and complete
+  verifier pass.
+
+Still forbidden:
+
+- treating digest preflight text as final proof;
+- closing reporter early;
+- external outreach, publishing, handoff, spend, deploy, push, or merge.

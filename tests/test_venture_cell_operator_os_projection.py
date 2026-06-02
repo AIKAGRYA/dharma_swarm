@@ -372,6 +372,12 @@ def test_operator_daily_digest_renders_structure_without_live_authority_claim(tm
     assert "## Completion Guard" in digest
     assert "keep_reporter_open" in digest
     assert "Live score can be 100 without completion" in digest
+    assert "## Final Window Preflight" in digest
+    assert "- Required elapsed seconds: `28800`" in digest
+    assert "- Required final artifacts: `6`" in digest
+    assert "- Complete verifier pass claimed: `False`" in digest
+    assert "operator_final_window_preflight_packet.json" in digest
+    assert "(checklist only, not final proof)" in digest
     assert "## Memory Kernel" in digest
     assert "## Memory Repair Packet" in digest
     assert "queue_repair_without_promotion" in digest

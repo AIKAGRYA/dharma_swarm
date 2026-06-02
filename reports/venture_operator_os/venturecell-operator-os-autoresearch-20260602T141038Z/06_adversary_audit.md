@@ -426,3 +426,24 @@ Keep / revert / queue:
 Decision: keep.
 
 ds-goal progress receipt: `r-5e2e2a08b35ca258`
+
+## Loop 64 Adversary Addendum
+
+New claim under attack: digest preflight visibility means the final checklist is
+satisfied.
+
+Current evidence:
+
+- `operator_os_digest.md` shows required elapsed seconds `28800` and required
+  final artifacts `6`.
+- It labels `operator_final_window_preflight_packet.json` as checklist-only, not
+  final proof.
+- Reporter remains open.
+
+Verdict: false. Digest visibility improves human scanning only.
+
+Keep / revert / queue:
+
+Decision: keep.
+
+ds-goal progress receipt: `r-e6e0bdc502c62176`

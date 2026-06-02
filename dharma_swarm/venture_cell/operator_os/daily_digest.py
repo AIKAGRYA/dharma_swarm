@@ -219,6 +219,26 @@ def render_operator_daily_digest(projection: VentureCellOperatorProjection) -> s
             "- Required final proof: true-time proof, final artifact review, terminal reporter receipt, and complete verifier pass.",
         ]
     )
+    required_final_artifacts = (
+        "06_adversary_audit.md",
+        "07_score_history.md",
+        "08_metabolization_packet.md",
+        "09_next_goal_packet.md",
+        "final_ds_goal_terminal_receipt",
+        "complete_verifier_pass_after_reporter_closure",
+    )
+    lines.extend(
+        [
+            "",
+            "## Final Window Preflight",
+            "",
+            "- Required elapsed seconds: `28800`",
+            f"- Required final artifacts: `{len(required_final_artifacts)}`",
+            "- Complete verifier pass claimed: `False`",
+            "- Preflight packet: `operator_final_window_preflight_packet.json` "
+            "(checklist only, not final proof)",
+        ]
+    )
 
     memory = projection.memory_kernel
     lines.extend(

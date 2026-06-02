@@ -272,6 +272,32 @@ Keep / revert / queue:
 
 Decision: keep.
 
+## Loop 64 Score Update
+
+Hypothesis:
+
+If preflight is visible in the digest, operator clarity improves without adding
+new authority.
+
+Patch:
+
+- Added final-window preflight digest section and focused assertions.
+
+Evaluation:
+
+- Focused Operator OS tests passed.
+- Live digest shows required elapsed seconds `28800`, final artifacts `6`, and
+  preflight pointer as checklist-only.
+
+Adversarial review:
+
+- This is presentation only.
+- Reporter remains open and final proof remains unclaimed.
+
+Keep / revert / queue:
+
+Decision: keep.
+
 ## Loop 63 Score Update
 
 Hypothesis:

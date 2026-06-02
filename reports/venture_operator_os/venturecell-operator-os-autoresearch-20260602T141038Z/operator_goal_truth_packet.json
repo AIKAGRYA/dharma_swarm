@@ -23,9 +23,9 @@
   "duplicate_progress_receipt_ids": [
     "r-12e8775da2b8132f"
   ],
-  "latest_progress_receipt_id": "r-5e2e2a08b35ca258",
-  "latest_receipt_name": "62_final_window_preflight_receipt.md",
-  "latest_receipt_path": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/62_final_window_preflight_receipt.md",
+  "latest_progress_receipt_id": "r-e6e0bdc502c62176",
+  "latest_receipt_name": "63_digest_final_preflight_receipt.md",
+  "latest_receipt_path": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/63_digest_final_preflight_receipt.md",
   "missing_progress_receipt_count": 5,
   "missing_progress_receipt_names": [
     "00_opening_truth.md",
@@ -36,7 +36,7 @@
   ],
   "not_authority": true,
   "not_final": true,
-  "progress_receipt_count": 59,
+  "progress_receipt_count": 60,
   "progress_receipt_id_counts": {
     "r-03653d86821631f9": 1,
     "r-0876eae2183f379c": 1,
@@ -85,6 +85,7 @@
     "r-d8f9e2cb42e94844": 1,
     "r-db9c975774cfbdb2": 1,
     "r-dd2119655a79a966": 1,
+    "r-e6e0bdc502c62176": 1,
     "r-eefe071ec2ba8079": 1,
     "r-f0ae25f637ef306d": 1,
     "r-f1d421f33b5fb379": 1,
@@ -151,10 +152,11 @@
     "r-f1d421f33b5fb379",
     "r-88e06b42dc1848bd",
     "r-03653d86821631f9",
-    "r-5e2e2a08b35ca258"
+    "r-5e2e2a08b35ca258",
+    "r-e6e0bdc502c62176"
   ],
   "receipt_chain_complete_claimed": false,
-  "receipt_count": 64,
+  "receipt_count": 65,
   "receipt_inventory_scope": "run_markdown_receipts_excluding_digest",
   "receipts": [
     {
@@ -540,6 +542,12 @@
       "name": "62_final_window_preflight_receipt.md",
       "path": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/62_final_window_preflight_receipt.md",
       "progress_receipt_id": "r-5e2e2a08b35ca258"
+    },
+    {
+      "has_progress_receipt_id": true,
+      "name": "63_digest_final_preflight_receipt.md",
+      "path": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/63_digest_final_preflight_receipt.md",
+      "progress_receipt_id": "r-e6e0bdc502c62176"
     }
   ],
   "reporter_task_must_remain_open": true,
@@ -548,5 +556,5 @@
   "status": "blocked_on_external_reader_gate",
   "terminal_reporter_receipt_required": true,
   "truth_source": "report_directory_markdown_receipt_headers",
-  "unique_progress_receipt_id_count": 53
+  "unique_progress_receipt_id_count": 54
 }

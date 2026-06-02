@@ -1183,3 +1183,29 @@ Metabolized rule:
 - Future final-window agents should use the preflight packet as a checklist and
   must still prove true time, terminal reporter receipt, and complete verifier
   pass.
+
+## Loop 64 Metabolization Note
+
+Hypothesis:
+
+If digest and JSON both expose preflight state, future agents can choose the
+right entry point without losing the finality boundary.
+
+Patch:
+
+- Added digest preflight section and tests.
+
+Evaluation:
+
+- Focused Operator OS tests passed.
+- Digest pointer is explicitly checklist-only.
+
+Adversarial review:
+
+- Digest text does not satisfy final checks.
+- Reporter remains open.
+
+Metabolized rule:
+
+- Human-facing summaries must repeat non-final markers when pointing at
+  final-window artifacts.

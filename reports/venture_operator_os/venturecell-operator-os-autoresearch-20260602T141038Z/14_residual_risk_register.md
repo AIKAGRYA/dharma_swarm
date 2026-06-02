@@ -176,6 +176,22 @@ New solved local claim:
 
 Decision: keep the risk in the live register until final-window review.
 
+## Loop 64 Risk Addendum
+
+New residual risk:
+
+| Risk | Current evidence | Handling |
+|---|---|---|
+| Digest preflight overclaim | digest points at final-window preflight packet | treat as checklist visibility only; not final proof |
+
+New solved local claim:
+
+| Claim | Evidence | Boundary |
+|---|---|---|
+| Digest preflight visibility renders | focused tests pass and live digest shows required elapsed seconds `28800` | reporter remains open |
+
+Decision: keep the risk in the live register until final-window review.
+
 ## Loop 63 Risk Addendum
 
 New residual risk:
