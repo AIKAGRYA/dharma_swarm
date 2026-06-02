@@ -23,6 +23,7 @@ updates, and terminal verification exist.
 - Darshan GO gate decision remains `block_external_authority`.
 - Accepted Darshan GO receipts remain empty.
 - Darshan GO receipt template exists as `draft_template_not_evidence`.
+- Live verifier matrix exists, but is not final.
 - MemoryKernel query eval now reports `pass` with `6/6` from report-local
   staged sources.
 - MemoryKernel repair now reports `no_repair_needed`; no trusted Chetana
@@ -76,6 +77,7 @@ Adversarial review:
 - A GO receipt template is not an accepted GO receipt.
 - A score above `80/100` is not final while the contract clock and final
   artifacts remain incomplete.
+- A live verifier matrix is not final proof while the reporter task is open.
 - Unrelated staged work must not be included in commits for this run.
 
 Keep / revert / queue:
@@ -103,6 +105,7 @@ Queued:
 | Chetana trusted promotion occurred | `trusted_promotion_claimed: false` | false |
 | NATS/A2A liveness is proven | no action-specific ack proof cited | false |
 | Score is final | live ledger only, final time window not reached | false |
+| Verifier matrix is final | `12_live_verifier_matrix.md` is marked live | false |
 | Broad dirty work is part of this packet | scoped report-only patch | false |
 
 ## Boundary Audit

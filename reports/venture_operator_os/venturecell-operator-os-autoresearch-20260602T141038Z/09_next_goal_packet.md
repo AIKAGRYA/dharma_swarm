@@ -4,7 +4,7 @@ Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
 ds-goal progress receipt: `r-e5be506a66940367`
-Current scoped HEAD before this packet: `0f58774d feat(operator-os): add report-local memory recall`
+Current scoped HEAD before this packet: `b7758b52 feat(operator-os): add Darshan GO receipt template`
 
 This packet is the handoff for the next bounded AutoResearch loop. It must be
 reviewed and updated in the final hour before reporter closure.
@@ -13,13 +13,14 @@ reviewed and updated in the final hour before reporter closure.
 
 - Operator OS status: `blocked_on_external_reader_gate`.
 - Autonomy level: `L0_read_only_plan`.
-- Score ledger: `89/100` live score, not final.
+- Score ledger: `90/100` live score, not final.
 - ds-goal mission state: `open=1 claimed=0 completed=4 failed=0 blocked=0 total=5`.
 - Reporter task: open by design.
 - MemoryKernel strict eval: `pass` (`6/6`) from report-local staged sources.
 - Darshan GO gate: `block_external_authority`, no accepted receipts.
 - Darshan GO template: `draft_template_not_evidence`.
-- Last committed packet: report-local MemoryKernel recall.
+- Live verifier matrix: present, not final.
+- Last committed packet: Darshan GO receipt template.
 
 ## Next Goal
 
@@ -59,7 +60,13 @@ bounded targets:
    again, keep it explicitly non-evidence and test that it cannot be confused
    with accepted GO receipts.
 
-4. Final closeout only after true-time proof.
+4. Verifier matrix preservation.
+
+   `12_live_verifier_matrix.md` now exists. Future loops should update it after
+   any code, artifact, or verification change, but still keep it non-final
+   until the true final window.
+
+5. Final closeout only after true-time proof.
 
    When elapsed time is actually in the final window, update:
 
@@ -111,6 +118,7 @@ If the loop only changes a report packet, also run scoped `git diff --check`.
 - `08_metabolization_packet.md`
 - `10_memorykernel_report_source_packet.md`
 - `11_go_receipt_template_receipt.md`
+- `12_live_verifier_matrix.md`
 - `operator_os_projection.json`
 - `operator_next_action_packet.json`
 - `darshan_go_gate_packet.json`

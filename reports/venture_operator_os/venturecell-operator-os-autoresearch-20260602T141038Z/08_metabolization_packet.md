@@ -4,7 +4,7 @@ Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live packet, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
 ds-goal progress receipt: `r-b73f8ef857f710fd`
-Current scoped HEAD before this packet: `0f58774d feat(operator-os): add report-local memory recall`
+Current scoped HEAD before this packet: `b7758b52 feat(operator-os): add Darshan GO receipt template`
 
 This packet captures durable learning from the run so far. It must be reviewed
 and updated during final closeout before the reporter task is closed.
@@ -80,7 +80,7 @@ and updated during final closeout before the reporter task is closed.
 
    Evidence:
 
-   - `07_score_history.md` records progression from `66/100` to `89/100`.
+   - `07_score_history.md` records progression from `66/100` to `90/100`.
    - The goal clock has not reached a true 8-hour completion window.
    - Required final artifacts still need final review/update.
 
@@ -104,7 +104,8 @@ and updated during final closeout before the reporter task is closed.
 | `e9ea88c8` | `09_next_goal_packet.md` | live next-goal packet |
 | `0e810f5f` | `06_adversary_audit.md` | live adversary audit draft |
 | `0f58774d` | `10_memorykernel_report_source_packet.md` | report-local staged recall source and 6/6 eval pass |
-| pending | `11_go_receipt_template_receipt.md` | safe Darshan GO receipt template, not evidence |
+| `b7758b52` | `11_go_receipt_template_receipt.md` | safe Darshan GO receipt template, not evidence |
+| pending | `12_live_verifier_matrix.md` | live verification and patch ledger |
 
 ## Current Read-Only Artifacts
 
@@ -118,6 +119,8 @@ and updated during final closeout before the reporter task is closed.
 - `memory_kernel_repair_packet.json`
 - `07_score_history.md`
 - `10_memorykernel_report_source_packet.md`
+- `11_go_receipt_template_receipt.md`
+- `12_live_verifier_matrix.md`
 
 ## Do Not Metabolize As Done
 
@@ -270,3 +273,32 @@ Metabolized rule:
 
 - Operator OS may render templates for future governed artifacts, but every
   template must include explicit non-evidence markers and forbidden-use fields.
+
+## Loop 13 Metabolization Note
+
+Hypothesis:
+
+If verification evidence is consolidated as a live matrix, future agents can
+resume from deterministic pass/fail state instead of conversation memory.
+
+Patch:
+
+- Added `12_live_verifier_matrix.md`.
+- Captured current test/render/diff evidence, expected ds-goal blocker,
+  Context+ tool unavailability, kept commits, and queued work.
+
+Evaluation:
+
+- The matrix references the latest focused verification commands.
+- It keeps complete verification blocked on the open reporter task.
+
+Adversarial review:
+
+- The matrix is live, not final.
+- It does not convert local tests into external authority.
+- It does not hide Context+ static-analysis unavailability.
+
+Metabolized rule:
+
+- Future verifier matrices should separate local green checks, expected
+  non-final blockers, unavailable tools, and authority gates in distinct rows.

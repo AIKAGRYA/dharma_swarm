@@ -5,7 +5,7 @@ Status: live ledger, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
 ds-goal progress receipt: `r-277a29c022e46fb6`
 Baseline: `1aca07a1 Add VentureCell Operator OS Level 70 surface`
-Current scoped HEAD before this packet: `0f58774d feat(operator-os): add report-local memory recall`
+Current scoped HEAD before this packet: `b7758b52 feat(operator-os): add Darshan GO receipt template`
 
 This file is a living score ledger. It exists now so later agents do not
 reconstruct scores from memory. It must be reviewed and updated before final
@@ -24,7 +24,8 @@ reporter closure.
 | Loop 06 | `06_memorykernel_repair_receipt.md` | `bf2d237b` | 84 | +1 | keep |
 | Loop 10 | `06_adversary_audit.md` | `0e810f5f` | 84 | +0 | keep as false-green guard |
 | Loop 11 | `10_memorykernel_report_source_packet.md` | `0f58774d` | 87 | +3 | keep local staged recall pass |
-| Loop 12 | `11_go_receipt_template_receipt.md` | pending | 89 | +2 | keep safe GO template |
+| Loop 12 | `11_go_receipt_template_receipt.md` | `b7758b52` | 89 | +2 | keep safe GO template |
+| Loop 13 | `12_live_verifier_matrix.md` | pending | 90 | +1 | keep live verifier matrix |
 
 ## Area History
 
@@ -36,7 +37,7 @@ reporter closure.
 | Governance safety | 15 | 15 | external-reader, governed admission, Chetana, and completion gates preserved |
 | Iteration quality | 8 | 12+ | every loop has hypothesis, patch/rejection, evals, adversarial review, decision |
 | Product structure | 8 | 12 | Operator OS now emits next-action, GO gate, GO template, memory repair, and report-local recall packets |
-| Tests/evals | 8 | 11 | fixed tests, report-local recall regression, and eval artifacts exist for Operator OS and gate surfaces |
+| Tests/evals | 8 | 12 | fixed tests, report-local recall regression, eval artifacts, and live verifier matrix exist |
 | Metabolization | 2 | 5 | program kernel, receipts, packets, and this score ledger exist |
 
 The area history is intentionally qualitative after opening because later
@@ -50,6 +51,7 @@ audit with explicit evidence.
 - Autonomy level: `L0_read_only_plan`.
 - Darshan GO gate: `block_external_authority`.
 - Darshan GO receipt template: `draft_template_not_evidence`.
+- Live verifier matrix: present, non-final.
 - MemoryKernel query eval: `pass` (`6/6`) from report-local staged roots.
 - MemoryKernel repair packet: `no_repair_needed`, with trusted promotion still forbidden.
 - ds-goal raw/reconciled counts: `open=1 claimed=0 completed=4 failed=0 blocked=0 total=5`.
@@ -217,3 +219,33 @@ Queued:
 - Use the template only after a real reader event, human approval, and privacy
   redaction.
 - Continue the same mission until true elapsed-time proof exists.
+
+## Loop 13 Score Update
+
+Hypothesis:
+
+If current verification evidence is consolidated into a live matrix, the next
+agent can distinguish passing local checks from expected non-final blockers in
+under 90 seconds.
+
+Patch:
+
+- Added `12_live_verifier_matrix.md`.
+- Recorded focused test, compile, render, diff, Context+ unavailable, and
+  complete-verifier blocker states.
+- Added a kept patch ledger and queued blocker ledger.
+
+Evaluation:
+
+- Matrix entries are tied to the latest focused verification commands.
+- Complete verification remains an expected blocker on the open reporter task.
+
+Adversarial review:
+
+- This is not a final verifier matrix.
+- Context+ is recorded as unavailable, not green.
+- Darshan GO and external authority remain blocked.
+
+Keep / revert / queue:
+
+Decision: keep.
