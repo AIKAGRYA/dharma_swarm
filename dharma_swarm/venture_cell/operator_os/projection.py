@@ -20,6 +20,7 @@ from dharma_swarm.venture_cell.darshan.external_reader_gate import (
     validate_external_reader_gate_summary,
 )
 from dharma_swarm.venture_cell.darshan.schema import DecisionDelta, PolsiaHandoff
+from dharma_swarm.venture_cell.operator_os.memory_kernel import build_memory_kernel_index
 from dharma_swarm.venture_cell.operator_os.schema import (
     CanvasItem,
     GateSummary,
@@ -113,10 +114,16 @@ def build_memory_kernel_snapshot(
     staging_root = staging_root or chetana_staging.STAGING_ROOT
     trusted_root = trusted_root or chetana_staging.TRUSTED_DEFAULT
     quarantine_root = quarantine_root or chetana_staging.QUARANTINE_ROOT
-    staged_count, staged_truncated = _bounded_md_count(staging_root, max_scan)
-    trusted_count, trusted_truncated = _bounded_md_count(trusted_root, max_scan)
-    quarantine_count, quarantine_truncated = _bounded_md_count(quarantine_root, max_scan)
-    truncated = staged_truncated or trusted_truncated or quarantine_truncated
+    index = build_memory_kernel_index(
+        staging_root=staging_root,
+        trusted_root=trusted_root,
+        quarantine_root=quarantine_root,
+        max_scan=max_scan,
+    )
+    staged_count = index.staged_count
+    trusted_count = index.trusted_count
+    quarantine_count = index.quarantine_count
+    truncated = index.truncated
     roots = tuple(str(root) for root in (staging_root, trusted_root, quarantine_root))
 
     gap_codes: list[str] = []
@@ -126,9 +133,9 @@ def build_memory_kernel_snapshot(
     elif trusted_count == 0:
         status = "staged_only"
         gap_codes.append("memory_kernel_trusted_projection_missing")
-    elif truncated:
-        status = "large_projection_needs_index"
-        gap_codes.append("memory_kernel_query_index_missing")
+    elif index.indexed_count and truncated:
+        status = "read_through_index_available"
+        gap_codes.append("memory_kernel_index_truncated")
     else:
         status = "projection_available"
 
@@ -138,11 +145,15 @@ def build_memory_kernel_snapshot(
         trusted_count=trusted_count,
         quarantine_count=quarantine_count,
         truncated=truncated,
+        index_status=index.status,
+        indexed_count=index.indexed_count,
+        index_entries=tuple(entry.to_dict() for entry in index.entries),
+        index_query_terms=index.query_terms,
         source_roots=roots,
         evidence_refs=tuple(root for root in roots if Path(root).exists()),
         gap_codes=tuple(gap_codes),
         next_action=(
-            "Build a read-through MemoryKernel index over Chetana/wiki with provenance gates"
+            "Expand MemoryKernel read-through index coverage and query evals"
             if gap_codes
             else "Use this snapshot as the read-only memory substrate for Operator OS agents"
         ),
@@ -543,7 +554,9 @@ def _gap_codes(
 def _next_actions(gaps: Sequence[str]) -> tuple[str, ...]:
     actions: list[str] = []
     if any("external_reader" in gap for gap in gaps):
-        actions.append("Record one accepted, privacy-redacted external-reader Go receipt before external growth/comms autonomy.")
+        actions.append(
+            "Record one accepted, privacy-redacted external-reader Go receipt before external growth/comms autonomy."
+        )
     if "operator_os_task_board_projection_empty" in gaps:
         actions.append("Attach current TaskBoard rows to the Operator OS canvas.")
     if "operator_os_a2a_projection_empty" in gaps:

@@ -1,0 +1,2687 @@
+{
+  "artifact_id": "darshan-7302ff3a3a75",
+  "autonomy_level": "L0_read_only_plan",
+  "canvas": [
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "/Users/dhyana/.dharma/artifacts/venture_cell/DARSHAN/2026-05-26/the-thing-they-are-competing-for-is-not-just-your-attention/article.md"
+      ],
+      "item_id": "darshan.article.md",
+      "lane": "artifact",
+      "owner_department": "product",
+      "raw": {},
+      "source_surface": "darshan_bundle",
+      "status": "available",
+      "title": "Public artifact draft"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "/Users/dhyana/.dharma/artifacts/venture_cell/DARSHAN/2026-05-26/the-thing-they-are-competing-for-is-not-just-your-attention/source_pack.json"
+      ],
+      "item_id": "darshan.source_pack.json",
+      "lane": "library",
+      "owner_department": "library",
+      "raw": {},
+      "source_surface": "darshan_bundle",
+      "status": "available",
+      "title": "Source pack"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "/Users/dhyana/.dharma/artifacts/venture_cell/DARSHAN/2026-05-26/the-thing-they-are-competing-for-is-not-just-your-attention/claim_ledger.json"
+      ],
+      "item_id": "darshan.claim_ledger.json",
+      "lane": "claims",
+      "owner_department": "library",
+      "raw": {},
+      "source_surface": "darshan_bundle",
+      "status": "available",
+      "title": "Claim ledger"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "/Users/dhyana/.dharma/artifacts/venture_cell/DARSHAN/2026-05-26/the-thing-they-are-competing-for-is-not-just-your-attention/attention_ledger.json"
+      ],
+      "item_id": "darshan.attention_ledger.json",
+      "lane": "attention",
+      "owner_department": "communications",
+      "raw": {},
+      "source_surface": "darshan_bundle",
+      "status": "available",
+      "title": "Attention ledger"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "/Users/dhyana/.dharma/artifacts/venture_cell/DARSHAN/2026-05-26/the-thing-they-are-competing-for-is-not-just-your-attention/gate_decisions.json"
+      ],
+      "item_id": "darshan.gate_decisions.json",
+      "lane": "gates",
+      "owner_department": "governance",
+      "raw": {},
+      "source_surface": "darshan_bundle",
+      "status": "available",
+      "title": "Gate decisions"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "/Users/dhyana/.dharma/artifacts/venture_cell/DARSHAN/2026-05-26/the-thing-they-are-competing-for-is-not-just-your-attention/decision_delta.json"
+      ],
+      "item_id": "darshan.decision_delta.json",
+      "lane": "decisions",
+      "owner_department": "strategy",
+      "raw": {},
+      "source_surface": "darshan_bundle",
+      "status": "available",
+      "title": "Decision delta"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "/Users/dhyana/.dharma/artifacts/venture_cell/DARSHAN/2026-05-26/the-thing-they-are-competing-for-is-not-just-your-attention/polsia_handoff.json"
+      ],
+      "item_id": "darshan.polsia_handoff.json",
+      "lane": "operator_handoff",
+      "owner_department": "operations",
+      "raw": {},
+      "source_surface": "darshan_bundle",
+      "status": "available",
+      "title": "External operator handoff"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "/Users/dhyana/.dharma/artifacts/venture_cell/DARSHAN/2026-05-26/the-thing-they-are-competing-for-is-not-just-your-attention/polsia_handoff.json"
+      ],
+      "item_id": "darshan.polsia_handoff.30-day-operating-calendar",
+      "lane": "operator_handoff",
+      "owner_department": "operations",
+      "raw": {},
+      "source_surface": "polsia_handoff.json",
+      "status": "requested",
+      "title": "30-day operating calendar"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "/Users/dhyana/.dharma/artifacts/venture_cell/DARSHAN/2026-05-26/the-thing-they-are-competing-for-is-not-just-your-attention/polsia_handoff.json"
+      ],
+      "item_id": "darshan.polsia_handoff.artifact-bundle-checklist",
+      "lane": "operator_handoff",
+      "owner_department": "operations",
+      "raw": {},
+      "source_surface": "polsia_handoff.json",
+      "status": "requested",
+      "title": "artifact bundle checklist"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "/Users/dhyana/.dharma/artifacts/venture_cell/DARSHAN/2026-05-26/the-thing-they-are-competing-for-is-not-just-your-attention/polsia_handoff.json"
+      ],
+      "item_id": "darshan.polsia_handoff.weekly-operating-review-template",
+      "lane": "operator_handoff",
+      "owner_department": "operations",
+      "raw": {},
+      "source_surface": "polsia_handoff.json",
+      "status": "requested",
+      "title": "weekly operating review template"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "/Users/dhyana/.dharma/artifacts/venture_cell/DARSHAN/2026-05-26/the-thing-they-are-competing-for-is-not-just-your-attention/polsia_handoff.json"
+      ],
+      "item_id": "darshan.polsia_handoff.50-person-first-reader-outreach-list",
+      "lane": "operator_handoff",
+      "owner_department": "operations",
+      "raw": {},
+      "source_surface": "polsia_handoff.json",
+      "status": "requested",
+      "title": "50-person first-reader outreach list"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "/Users/dhyana/.dharma/artifacts/venture_cell/DARSHAN/2026-05-26/the-thing-they-are-competing-for-is-not-just-your-attention/polsia_handoff.json"
+      ],
+      "item_id": "darshan.polsia_handoff.ops-board-statuses-from-idea-to-corrected-published",
+      "lane": "operator_handoff",
+      "owner_department": "operations",
+      "raw": {},
+      "source_surface": "polsia_handoff.json",
+      "status": "requested",
+      "title": "ops board statuses from idea to corrected/published"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "/Users/dhyana/.dharma/artifacts/venture_cell/DARSHAN/2026-05-26/the-thing-they-are-competing-for-is-not-just-your-attention/polsia_handoff.json"
+      ],
+      "item_id": "darshan.polsia_handoff.runbook-for-operating-darshan-season-0",
+      "lane": "operator_handoff",
+      "owner_department": "operations",
+      "raw": {},
+      "source_surface": "polsia_handoff.json",
+      "status": "requested",
+      "title": "runbook for operating Darshan Season 0"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.7a7d5b802c4c41b5",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "7a7d5b802c4c41b5",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.6b825230fdab4078",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "6b825230fdab4078",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.e553722072bf4d00",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "e553722072bf4d00",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.0c079e22f1c147f6",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "0c079e22f1c147f6",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.18df4c53949644bd",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "18df4c53949644bd",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.4870c9dea2b041d9",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "4870c9dea2b041d9",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.00f788ba23a543cb",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "00f788ba23a543cb",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.055ee7f8e4c94df5",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "055ee7f8e4c94df5",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.6ad30f3080184892",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "6ad30f3080184892",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.41d5073c5cbf4e6c",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "41d5073c5cbf4e6c",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.b54367b3c4834365",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "b54367b3c4834365",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.bb13753c522342a1",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "bb13753c522342a1",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.71bcff6493414c55",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "71bcff6493414c55",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.91049bd931284bef",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "91049bd931284bef",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.1b2b8a5291c94cc2",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "1b2b8a5291c94cc2",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.4acaab3fca544a28",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "4acaab3fca544a28",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.14a632d7499d4740",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "14a632d7499d4740",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.e595fa7ece5f4007",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "e595fa7ece5f4007",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.3b33db13275945c7",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "3b33db13275945c7",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.65dddd5c10ee4bc5",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "65dddd5c10ee4bc5",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.8a739aaaae614580",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "8a739aaaae614580",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.edb65ce726054ec4",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "edb65ce726054ec4",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.b688c7fd9bcc4e2b",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "b688c7fd9bcc4e2b",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.3e654a0502d940db",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "3e654a0502d940db",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.43acfe27c10046c0",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "43acfe27c10046c0",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.8fc987f9ed054b60",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "8fc987f9ed054b60",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.fed81b7409d54382",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "fed81b7409d54382",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.56152082decb44e4",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "56152082decb44e4",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.aa7d79491a4e4b89",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "aa7d79491a4e4b89",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.61cd3963ebd94b4e",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "61cd3963ebd94b4e",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.46f07f675bcb4330",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "46f07f675bcb4330",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.eadac7a6981c4322",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "eadac7a6981c4322",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.ce3ddd729e434366",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "ce3ddd729e434366",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.488f07326a314dd4",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "488f07326a314dd4",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.8b744db4ced04082",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "8b744db4ced04082",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.0ea9794709e248d6",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "0ea9794709e248d6",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.ca204bcf65c64d1d",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "ca204bcf65c64d1d",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.6f36236d56864e61",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "6f36236d56864e61",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.03e0d30e932e45f9",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "03e0d30e932e45f9",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.4af526099fa84f5e",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "4af526099fa84f5e",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.4f7af3a32bc64faa",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "4f7af3a32bc64faa",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.c62e608176444a77",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "c62e608176444a77",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.0bec785a941044b8",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "0bec785a941044b8",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.c08b076f98c4443e",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "c08b076f98c4443e",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.f687ea7641fa4f73",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "f687ea7641fa4f73",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.6e8fc2186d9a45b2",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "6e8fc2186d9a45b2",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.16af25b589344b7c",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "16af25b589344b7c",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.1b93e0be72b94706",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "1b93e0be72b94706",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.a69572c798b34dc2",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "a69572c798b34dc2",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.11a926994da14472",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "11a926994da14472",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/operator_core/a2a_task_lifecycle.py"
+      ],
+      "item_id": "a2a.collab:fleet-health-collab-20260528:collector:hermes-m5",
+      "lane": "a2a_queue",
+      "owner_department": "engineering",
+      "raw": {
+        "body": "Fleet Health Collaboration \u2014 COLLECTOR role. Step 1: Collect current fleet metrics from ~/.dharma/a2a_bus/state/ for all agents (hermes-m5, codex_composer, opus_composer, devin-roaming-2987d222). Step 2: Scan ~/.dharma/a2a_bus/tasks/queue.jsonl for tasks closed in the last 72h \u2014 summarize: completion rate, failure rate, average time-to-close, agents with most completions. Step 3: Check all cron health via your cron registry and report any missed beats. Step 4: Post your metrics summary as a conjunction artifact to ~/.dharma/a2a_bus/conjunction/fleet_metrics_20260528.md with frontmatter tagging for-codex_composer:. This artifact is the REQUIRED input for codex_composer's analyst task in this collaboration packet. Do NOT close this task until the conjunction artifact exists and contains structured metrics.",
+        "claimed_at": "2026-05-28T06:13:36.621214+00:00",
+        "claimed_by": "hermes-m5",
+        "closed_at": "2026-05-28T06:13:36.621214+00:00",
+        "closed_by": "hermes-m5",
+        "collaboration_packet_id": "fleet-health-collab-20260528",
+        "created": "2026-05-28T10:00:00.000000+00:00",
+        "created_at": "2026-05-28T10:00:00.000000+00:00",
+        "estimated_cost_usd": 0.08,
+        "from": "collaboration_packet",
+        "id": "collab:fleet-health-collab-20260528:collector:hermes-m5",
+        "lease_expires_at": "2026-05-29T10:00:00.000000+00:00",
+        "lifecycle": {
+          "closed": true,
+          "state": "completed_verified",
+          "validation": {
+            "errors": [],
+            "valid": true,
+            "warnings": []
+          },
+          "verified": true
+        },
+        "metadata": {
+          "downstream_depends_on": "collab:fleet-health-collab-20260528:analyst:codex_composer",
+          "llm_invocation_required": true,
+          "required_artifact": "conjunction/fleet_metrics_20260528.md",
+          "role": "collector",
+          "target_agent": "hermes-m5"
+        },
+        "priority": "medium",
+        "protocol_version": "PROTOCOL.md v1",
+        "receipt": {
+          "agent_uid": "hermes-m5",
+          "artifacts": [
+            "/Users/dhyana/.dharma/a2a_bus/conjunction/fleet_metrics_20260528.md"
+          ],
+          "authority": "external_worker_evidence_only",
+          "closed_at": "2026-05-29T23:59:51.429825+00:00",
+          "completion_via": "interactive_codex_audit_receipt_repair",
+          "content_hash": "sha256:3947689bf34f98eee2d1d38c9f004e5ebe8684e06637538b7e17bd4abf288e7f",
+          "created_at": "2026-05-29T23:59:51.429825+00:00",
+          "evaluation": {
+            "criteria_results": [
+              {
+                "criterion": "fleet_metrics_artifact_exists",
+                "passed": true
+              },
+              {
+                "criterion": "receipt_schema_valid",
+                "passed": true
+              }
+            ],
+            "gate_results": [],
+            "overall_verdict": "artifact_present_receipt_repaired"
+          },
+          "evidence": {
+            "artifact_exists": true,
+            "materialized_by": "interactive_codex_audit",
+            "repair_reason": "collector queue row had a pre-v1/incomplete receipt shape"
+          },
+          "harness": "hermes_state_and_queue_tick.py",
+          "model_identity": "zai/glm-5.1",
+          "receipt_id": "a2a-task-receipt:collab:fleet-health-collab-20260528:collector:hermes-m5:c15b776e2f7d",
+          "receipt_summary": "Hermes M5 produced the fleet metrics artifact for fleet-health-collab-20260528.",
+          "return_address": {
+            "agent_uid": "hermes-m5",
+            "base_case": "status in completed|failed|blocked with valid receipt",
+            "depth": 0,
+            "obligation": "close_task_with_receipt",
+            "resume_ref": "a2a_task:collab:fleet-health-collab-20260528:collector:hermes-m5",
+            "resume_surface": "a2a_task_queue",
+            "schema_version": "dharma_return_address.v0"
+          },
+          "schema_version": "dharma_a2a_task_receipt.v1",
+          "status": "completed",
+          "summary": "Hermes M5 produced the fleet metrics artifact for fleet-health-collab-20260528.",
+          "task_id": "collab:fleet-health-collab-20260528:collector:hermes-m5",
+          "timestamp": "2026-05-29T23:59:51.429825+00:00"
+        },
+        "receipt_id": "a2a-task-receipt:collab:fleet-health-collab-20260528:collector:hermes-m5:c15b776e2f7d",
+        "receipt_validation": {
+          "errors": [],
+          "valid": true,
+          "warnings": []
+        },
+        "required_receipt_schema": "dharma_a2a_task_receipt.v1",
+        "return_address": {
+          "base_case": "task status is completed|failed|blocked with valid dharma_a2a_task_receipt.v1 receipt",
+          "depth": 0,
+          "obligation": "close with terminal A2A receipt including fleet_metrics artifact path",
+          "resume_ref": "a2a_task:collab:fleet-health-collab-20260528:collector:hermes-m5",
+          "resume_surface": "a2a_task_queue",
+          "schema_version": "dharma_return_address.v0"
+        },
+        "status": "completed"
+      },
+      "source_surface": "A2A filesystem queue",
+      "status": "completed_verified",
+      "title": "Fleet Health Collaboration \u2014 COLLECTOR role. Step 1: Collect current fleet metrics from ~/.dharma/a2a_bus/state/ for all"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/operator_core/a2a_task_lifecycle.py"
+      ],
+      "item_id": "a2a.collab:fleet-health-collab-20260528:analyst:codex_composer",
+      "lane": "a2a_queue",
+      "owner_department": "engineering",
+      "raw": {
+        "body": "Fleet Health Collaboration \u2014 ANALYST role. Step 1: Wait for hermes-m5 metrics artifact at ~/.dharma/a2a_bus/conjunction/fleet_metrics_20260528.md. If not present within 2 hours of claiming this task, proceed with independent analysis using state files in ~/.dharma/a2a_bus/state/. Step 2: Analyze the metrics \u2014 identify patterns: which agent has highest failure rate? Are there recurring failure reasons? Is the fleet converging or diverging in task throughput? Step 3: Also read devin-roaming infra audit at conjunction/infra_audit_20260528.md if available \u2014 correlate infrastructure health with task outcomes. Step 4: Review recent git commits in ~/dharma_swarm/ (last 7 days) for code quality signals \u2014 any test failures, reverted commits, or architectural drift? Step 5: Post your analysis to ~/.dharma/a2a_bus/conjunction/fleet_analysis_20260528.md with frontmatter tagging for-opus_composer:. Include a red-flags section and a recommendations section. This artifact is the REQUIRED input for opus_composer's reviewer task.",
+        "claimed_at": "2026-05-28T06:12:27Z",
+        "claimed_by": "codex_composer",
+        "closed_at": "2026-05-29T23:59:51.430663+00:00",
+        "closed_by": "codex_composer",
+        "closed_via": "dharma_swarm.operator_core.a2a_task_lifecycle",
+        "collaboration_packet_id": "fleet-health-collab-20260528",
+        "completed": "2026-05-29T23:59:51.430663+00:00",
+        "completed_at": "2026-05-29T23:59:51.430663+00:00",
+        "completed_by": "codex_composer",
+        "created": "2026-05-28T10:00:00.000000+00:00",
+        "created_at": "2026-05-28T10:00:00.000000+00:00",
+        "estimated_cost_usd": 0.12,
+        "from": "collaboration_packet",
+        "id": "collab:fleet-health-collab-20260528:analyst:codex_composer",
+        "lease_expires_at": "2026-05-29T10:00:00.000000+00:00",
+        "lifecycle": {
+          "closed": true,
+          "state": "completed_verified",
+          "validation": {
+            "errors": [],
+            "valid": true,
+            "warnings": []
+          },
+          "verified": true
+        },
+        "metadata": {
+          "downstream_depends_on": "collab:fleet-health-collab-20260528:reviewer:opus_composer",
+          "llm_invocation_required": true,
+          "required_artifact": "conjunction/fleet_analysis_20260528.md",
+          "role": "analyst",
+          "target_agent": "codex_composer",
+          "upstream_depends_on": "collab:fleet-health-collab-20260528:collector:hermes-m5"
+        },
+        "priority": "medium",
+        "protocol_version": "PROTOCOL.md v1",
+        "receipt": {
+          "agent_uid": "codex_composer",
+          "artifacts": [
+            "/Users/dhyana/.dharma/a2a_bus/conjunction/fleet_analysis_20260528.md"
+          ],
+          "authority": "operator_supervised_scoped_a2a_artifact_write",
+          "closed_at": "2026-05-29T23:59:51.430543+00:00",
+          "completion_via": "interactive_codex_audit_materialized_codex_outbox",
+          "content_hash": "sha256:1c5dfce620603b0c5589650875ec4304349f07bfd036301bbf3d01021718d222",
+          "created_at": "2026-05-29T23:59:51.430543+00:00",
+          "evaluation": {
+            "criteria_results": [
+              {
+                "criterion": "analysis_artifact_exists",
+                "passed": true
+              },
+              {
+                "criterion": "frontmatter_targets_opus",
+                "passed": true
+              }
+            ],
+            "gate_results": [],
+            "overall_verdict": "analysis_artifact_materialized"
+          },
+          "evidence": {
+            "materialized_by": "interactive_codex_audit",
+            "note": "The autonomous wake controller produced analysis text but lacked a write-dispatcher lease.",
+            "source_outbox": "/Users/dhyana/.dharma/external_agents/codex_composer/outbox/codex-composer-autonomous-20260529T131111Z-2130ffbe_final.md"
+          },
+          "harness": "codex_composer_wake.py + interactive_codex_audit",
+          "model_identity": "openai/gpt-5.5",
+          "receipt_id": "a2a-task-receipt:collab:fleet-health-collab-20260528:analyst:codex_composer:2d9dbb7257e3",
+          "receipt_summary": "Codex analyst output was materialized from repeated read-only wake proposals.",
+          "return_address": {
+            "agent_uid": "codex_composer",
+            "base_case": "status in completed|failed|blocked with valid receipt",
+            "depth": 0,
+            "obligation": "close_task_with_receipt",
+            "resume_ref": "a2a_task:collab:fleet-health-collab-20260528:analyst:codex_composer",
+            "resume_surface": "a2a_task_queue",
+            "schema_version": "dharma_return_address.v0"
+          },
+          "schema_version": "dharma_a2a_task_receipt.v1",
+          "status": "completed",
+          "summary": "Codex analyst output was materialized from repeated read-only wake proposals.",
+          "task_id": "collab:fleet-health-collab-20260528:analyst:codex_composer",
+          "timestamp": "2026-05-29T23:59:51.430543+00:00"
+        },
+        "receipt_id": "a2a-task-receipt:collab:fleet-health-collab-20260528:analyst:codex_composer:2d9dbb7257e3",
+        "receipt_validation": {
+          "errors": [],
+          "valid": true,
+          "warnings": []
+        },
+        "required_receipt_schema": "dharma_a2a_task_receipt.v1",
+        "return_address": {
+          "base_case": "task status is completed|failed|blocked with valid dharma_a2a_task_receipt.v1 receipt",
+          "depth": 0,
+          "obligation": "close with terminal A2A receipt including fleet_analysis artifact path",
+          "resume_ref": "a2a_task:collab:fleet-health-collab-20260528:analyst:codex_composer",
+          "resume_surface": "a2a_task_queue",
+          "schema_version": "dharma_return_address.v0"
+        },
+        "status": "completed"
+      },
+      "source_surface": "A2A filesystem queue",
+      "status": "completed_verified",
+      "title": "Fleet Health Collaboration \u2014 ANALYST role. Step 1: Wait for hermes-m5 metrics artifact at ~/.dharma/a2a_bus/conjunction/"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/operator_core/a2a_task_lifecycle.py"
+      ],
+      "item_id": "a2a.collab:fleet-health-collab-20260528:reviewer:opus_composer",
+      "lane": "a2a_queue",
+      "owner_department": "opus_composer",
+      "raw": {
+        "blocked_at": "2026-05-29T23:59:51.432199+00:00",
+        "blocked_by": "a2a_supervisor",
+        "body": "Fleet Health Collaboration \u2014 ADVERSARIAL REVIEWER role. Step 1: Read codex_composer analysis at ~/.dharma/a2a_bus/conjunction/fleet_analysis_20260528.md. Step 2: Perform adversarial review of the analysis: Are the conclusions warranted by the data? What did the analysis miss? Are there blind spots in how metrics are collected? Step 3: Cross-reference with your own architectural understanding \u2014 is the fleet design sound or are there structural issues the raw metrics cannot surface? Step 4: Produce a unified Fleet Health Synthesis at ~/.dharma/a2a_bus/conjunction/fleet_synthesis_20260528.md combining hermes-m5 raw metrics, codex_composer analysis, and your adversarial critique. Include: executive summary, risk matrix, and 3 prioritized action items. Tag with for-hermes-m5: so hermes-m5 archives it into the wiki on next heartbeat cycle.",
+        "claimed_at": "2026-05-28T06:13:33.966713+00:00",
+        "claimed_by": "opus_composer",
+        "claimed_via": "dharma_swarm.persistent_fleet",
+        "closed_at": "2026-05-29T23:59:51.432199+00:00",
+        "closed_by": "a2a_supervisor",
+        "closed_via": "dharma_swarm.operator_core.a2a_task_lifecycle",
+        "collaboration_packet_id": "fleet-health-collab-20260528",
+        "created": "2026-05-28T10:00:00.000000+00:00",
+        "created_at": "2026-05-28T10:00:00.000000+00:00",
+        "estimated_cost_usd": 0.15,
+        "failure_reason": "Opus reviewer task lease expired without fleet_synthesis_20260528.md or wake receipt evidence.",
+        "from": "collaboration_packet",
+        "id": "collab:fleet-health-collab-20260528:reviewer:opus_composer",
+        "lease_expires_at": "2026-05-29T10:00:00.000000+00:00",
+        "lifecycle": {
+          "closed": true,
+          "state": "blocked_verified",
+          "validation": {
+            "errors": [],
+            "valid": true,
+            "warnings": []
+          },
+          "verified": true
+        },
+        "metadata": {
+          "downstream_depends_on": "collab:fleet-health-collab-20260528:collector:hermes-m5",
+          "llm_invocation_required": true,
+          "required_artifact": "conjunction/fleet_synthesis_20260528.md",
+          "role": "reviewer",
+          "target_agent": "opus_composer",
+          "upstream_depends_on": "collab:fleet-health-collab-20260528:analyst:codex_composer"
+        },
+        "priority": "medium",
+        "protocol_version": "PROTOCOL.md v1",
+        "receipt": {
+          "agent_uid": "a2a_supervisor",
+          "artifacts": [],
+          "authority": "operator_supervisor_block",
+          "closed_at": "2026-05-29T23:59:51.432086+00:00",
+          "completion_via": "interactive_codex_audit_stale_packet_closeout",
+          "content_hash": "sha256:57dfe6ef43463a65ed0614500c531c254541e4670edf495b945ed1c98bef829b",
+          "created_at": "2026-05-29T23:59:51.432086+00:00",
+          "evaluation": {
+            "criteria_results": [],
+            "gate_results": [],
+            "overall_verdict": "not_checked"
+          },
+          "evidence": {
+            "claimed_by": "opus_composer",
+            "materialized_by": "interactive_codex_audit",
+            "queue_path": "/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl"
+          },
+          "failure_reason": "Opus reviewer task lease expired without fleet_synthesis_20260528.md or wake receipt evidence.",
+          "receipt_id": "a2a-task-receipt:collab:fleet-health-collab-20260528:reviewer:opus_composer:771ca288848d",
+          "receipt_summary": "Opus reviewer task lease expired without fleet_synthesis_20260528.md or wake receipt evidence.",
+          "return_address": {
+            "agent_uid": "a2a_supervisor",
+            "base_case": "status in completed|failed|blocked with valid receipt",
+            "depth": 0,
+            "obligation": "close_task_with_receipt",
+            "resume_ref": "a2a_task:collab:fleet-health-collab-20260528:reviewer:opus_composer",
+            "resume_surface": "a2a_task_queue",
+            "schema_version": "dharma_return_address.v0"
+          },
+          "schema_version": "dharma_a2a_task_receipt.v1",
+          "status": "blocked",
+          "summary": "Opus reviewer task lease expired without fleet_synthesis_20260528.md or wake receipt evidence.",
+          "task_id": "collab:fleet-health-collab-20260528:reviewer:opus_composer",
+          "timestamp": "2026-05-29T23:59:51.432086+00:00"
+        },
+        "receipt_id": "a2a-task-receipt:collab:fleet-health-collab-20260528:reviewer:opus_composer:771ca288848d",
+        "receipt_validation": {
+          "errors": [],
+          "valid": true,
+          "warnings": []
+        },
+        "required_receipt_schema": "dharma_a2a_task_receipt.v1",
+        "return_address": {
+          "base_case": "task status is completed|failed|blocked with valid dharma_a2a_task_receipt.v1 receipt",
+          "depth": 0,
+          "obligation": "close with terminal A2A receipt including fleet_synthesis artifact path",
+          "resume_ref": "a2a_task:collab:fleet-health-collab-20260528:reviewer:opus_composer",
+          "resume_surface": "a2a_task_queue",
+          "schema_version": "dharma_return_address.v0"
+        },
+        "status": "blocked",
+        "supervisor_blocked_by": "a2a_supervisor",
+        "supervisor_blocked_claimed_by": "opus_composer",
+        "to": "opus_composer"
+      },
+      "source_surface": "A2A filesystem queue",
+      "status": "blocked_verified",
+      "title": "Fleet Health Collaboration \u2014 ADVERSARIAL REVIEWER role. Step 1: Read codex_composer analysis at ~/.dharma/a2a_bus/conjun"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/operator_core/a2a_task_lifecycle.py"
+      ],
+      "item_id": "a2a.collab:fleet-health-collab-20260528:infra-audit:devin-roaming-2987d222",
+      "lane": "a2a_queue",
+      "owner_department": "engineering",
+      "raw": {
+        "blocked_at": "2026-05-29T23:59:51.433704+00:00",
+        "blocked_by": "a2a_supervisor",
+        "body": "Fleet Health Collaboration \u2014 INFRA AUDIT role (dharma_swarm internals ONLY). Step 1: Audit A2A bus infrastructure: verify ~/.dharma/a2a_bus/ directory structure integrity \u2014 all inboxes exist and are writable, tasks/ directory has correct permissions, conjunction/ directory is clean and ready for new artifacts. Step 2: Check daemon health: verify hermes-m5 crons are running on schedule, codex_composer wake loop is functional. Check process table and cron logs. Step 3: Verify queue.jsonl integrity \u2014 scan for malformed lines, duplicate IDs, confirm file is append-safe (no corruption). Step 4: Post audit results to ~/.dharma/a2a_bus/conjunction/infra_audit_20260528.md with for-codex_composer: frontmatter. Include a pass/fail checklist and any items needing operator attention. SCOPE: dharma_swarm internals ONLY \u2014 no knowledge work, no documentation, no architectural decisions.",
+        "closed_at": "2026-05-29T23:59:51.433704+00:00",
+        "closed_by": "a2a_supervisor",
+        "closed_via": "dharma_swarm.operator_core.a2a_task_lifecycle",
+        "collaboration_packet_id": "fleet-health-collab-20260528",
+        "created": "2026-05-28T10:00:00.000000+00:00",
+        "created_at": "2026-05-28T10:00:00.000000+00:00",
+        "estimated_cost_usd": 0.05,
+        "failure_reason": "Devin infra-audit task was unclaimed and lacked reliable local wake/rendezvous evidence.",
+        "from": "collaboration_packet",
+        "id": "collab:fleet-health-collab-20260528:infra-audit:devin-roaming-2987d222",
+        "lease_expires_at": "2026-05-29T10:00:00.000000+00:00",
+        "lifecycle": {
+          "closed": true,
+          "state": "blocked_verified",
+          "validation": {
+            "errors": [],
+            "valid": true,
+            "warnings": []
+          },
+          "verified": true
+        },
+        "metadata": {
+          "downstream_depends_on": "collab:fleet-health-collab-20260528:analyst:codex_composer",
+          "llm_invocation_required": true,
+          "required_artifact": "conjunction/infra_audit_20260528.md",
+          "role": "infra-audit",
+          "scope": "dharma_swarm_internals_only",
+          "target_agent": "devin-roaming-2987d222"
+        },
+        "priority": "medium",
+        "protocol_version": "PROTOCOL.md v1",
+        "receipt": {
+          "agent_uid": "a2a_supervisor",
+          "artifacts": [],
+          "authority": "operator_supervisor_block",
+          "closed_at": "2026-05-29T23:59:51.433598+00:00",
+          "completion_via": "interactive_codex_audit_stale_packet_closeout",
+          "content_hash": "sha256:bef1af5c2ddf67b69fc9f25947c80610b9f554361fb2703ef579e9975cfa27fc",
+          "created_at": "2026-05-29T23:59:51.433598+00:00",
+          "evaluation": {
+            "criteria_results": [],
+            "gate_results": [],
+            "overall_verdict": "not_checked"
+          },
+          "evidence": {
+            "claimed_by": null,
+            "materialized_by": "interactive_codex_audit",
+            "queue_path": "/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl"
+          },
+          "failure_reason": "Devin infra-audit task was unclaimed and lacked reliable local wake/rendezvous evidence.",
+          "receipt_id": "a2a-task-receipt:collab:fleet-health-collab-20260528:infra-audit:devin-roaming-2987d222:a9dff9785543",
+          "receipt_summary": "Devin infra-audit task was unclaimed and lacked reliable local wake/rendezvous evidence.",
+          "return_address": {
+            "agent_uid": "a2a_supervisor",
+            "base_case": "status in completed|failed|blocked with valid receipt",
+            "depth": 0,
+            "obligation": "close_task_with_receipt",
+            "resume_ref": "a2a_task:collab:fleet-health-collab-20260528:infra-audit:devin-roaming-2987d222",
+            "resume_surface": "a2a_task_queue",
+            "schema_version": "dharma_return_address.v0"
+          },
+          "schema_version": "dharma_a2a_task_receipt.v1",
+          "status": "blocked",
+          "summary": "Devin infra-audit task was unclaimed and lacked reliable local wake/rendezvous evidence.",
+          "task_id": "collab:fleet-health-collab-20260528:infra-audit:devin-roaming-2987d222",
+          "timestamp": "2026-05-29T23:59:51.433598+00:00"
+        },
+        "receipt_id": "a2a-task-receipt:collab:fleet-health-collab-20260528:infra-audit:devin-roaming-2987d222:a9dff9785543",
+        "receipt_validation": {
+          "errors": [],
+          "valid": true,
+          "warnings": []
+        },
+        "required_receipt_schema": "dharma_a2a_task_receipt.v1",
+        "return_address": {
+          "base_case": "task status is completed|failed|blocked with valid dharma_a2a_task_receipt.v1 receipt",
+          "depth": 0,
+          "obligation": "close with terminal A2A receipt including infra_audit artifact path",
+          "resume_ref": "a2a_task:collab:fleet-health-collab-20260528:infra-audit:devin-roaming-2987d222",
+          "resume_surface": "a2a_task_queue",
+          "schema_version": "dharma_return_address.v0"
+        },
+        "status": "blocked"
+      },
+      "source_surface": "A2A filesystem queue",
+      "status": "blocked_verified",
+      "title": "Fleet Health Collaboration \u2014 INFRA AUDIT role (dharma_swarm internals ONLY). Step 1: Audit A2A bus infrastructure: verif"
+    },
+    {
+      "blocked_reason": "a2a_task_not_terminal",
+      "evidence_refs": [
+        "dharma_swarm/operator_core/a2a_task_lifecycle.py"
+      ],
+      "item_id": "a2a.forge-v0.1-001",
+      "lane": "a2a_queue",
+      "owner_department": "codex_forgewright",
+      "raw": {
+        "body": "forge_council: (1) countersign v0.1.0 verifier_artifact (decorrelated); (2) build v0.1.1 transfer-gate in shadow per docs/specs/forge_packets/v0.1.1-transfer-gate.md. See inbox handoff 20260601T172816Z_forge_v0_1_handoff.json. SHADOW ONLY, no merge/promote (human rung).",
+        "created": "2026-06-01T01:30:00+08:00",
+        "from": "opus_forge_architect",
+        "id": "forge-v0.1-001",
+        "lifecycle": {
+          "closed": false,
+          "state": "open_unclaimed",
+          "validation": null,
+          "verified": false
+        },
+        "mission_id": "20260531T172816Z-dharma-reward-forge-v0-1-x-chain-forge-council-v-97f649",
+        "status": "pending",
+        "to": "codex_forgewright",
+        "type": "build"
+      },
+      "source_surface": "A2A filesystem queue",
+      "status": "open_unclaimed",
+      "title": "forge_council: (1) countersign v0.1.0 verifier_artifact (decorrelated); (2) build v0.1.1 transfer-gate in shadow per doc"
+    }
+  ],
+  "company_profile": {
+    "artifact_id": "darshan-7302ff3a3a75",
+    "authority_boundary": "read_only_projection_until_gates_pass",
+    "blueprint": "Cofounder shell + Polsia operating cycles + Dharma governance",
+    "bundle_path": "/Users/dhyana/.dharma/artifacts/venture_cell/DARSHAN/2026-05-26/the-thing-they-are-competing-for-is-not-just-your-attention",
+    "title": "The Thing They Are Competing For Is Not Just Your Attention",
+    "venture_cell_id": "DARSHAN"
+  },
+  "daily_cycle": [
+    "observe local evidence and receipts",
+    "update canvas and attention queue",
+    "plan with governed_work_admission",
+    "execute only reviewed internal work",
+    "verify with tests or receipt checks",
+    "write daily digest and next packet"
+  ],
+  "departments": [
+    {
+      "authority_mode": "review_required",
+      "borrowed_from": [
+        "polsia",
+        "cofounder"
+      ],
+      "department_id": "strategy",
+      "ds_surface": "decision_delta.json + governed_work_admission",
+      "evidence_refs": [
+        "dharma_swarm/venture_cell/darshan/schema.py"
+      ],
+      "label": "Strategy",
+      "next_action": "Convert decision deltas into explicit next operating bets.",
+      "role_pattern": "Polsia CEO/strategy cycle",
+      "status": "bound"
+    },
+    {
+      "authority_mode": "draft_only",
+      "borrowed_from": [
+        "cofounder"
+      ],
+      "department_id": "product",
+      "ds_surface": "article.md + attention_ledger.json",
+      "evidence_refs": [
+        "dharma_swarm/venture_cell/darshan/bundle.py"
+      ],
+      "label": "Product Canvas",
+      "next_action": "Render artifact, attention, claim, and gate lanes in one canvas.",
+      "role_pattern": "Cofounder Canvas/product workspace",
+      "status": "bound"
+    },
+    {
+      "authority_mode": "reviewed_internal",
+      "borrowed_from": [
+        "polsia",
+        "cofounder"
+      ],
+      "department_id": "engineering",
+      "ds_surface": "TaskBoard + A2A filesystem receipts",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py",
+        "dharma_swarm/operator_core/a2a_task_lifecycle.py"
+      ],
+      "label": "Engineering",
+      "next_action": "Attach TaskBoard and A2A queue rows to the Operator OS canvas.",
+      "role_pattern": "Polsia engineer role + Cofounder task execution",
+      "status": "partial"
+    },
+    {
+      "authority_mode": "human_approved_only",
+      "borrowed_from": [
+        "polsia"
+      ],
+      "department_id": "growth",
+      "ds_surface": "Darshan external-reader Go receipt gate",
+      "evidence_refs": [
+        "dharma_swarm/venture_cell/darshan/external_reader_gate.py"
+      ],
+      "label": "Growth",
+      "next_action": "Advance only after one accepted countable external-reader Go receipt",
+      "role_pattern": "Polsia growth role with DS contact gate",
+      "status": "blocked_on_external_reader_gate"
+    },
+    {
+      "authority_mode": "human_approved_only",
+      "borrowed_from": [
+        "polsia",
+        "cofounder"
+      ],
+      "department_id": "communications",
+      "ds_surface": "attention_ledger.json + external_reader_events",
+      "evidence_refs": [
+        "dharma_swarm/venture_cell/darshan/schema.py"
+      ],
+      "label": "Communications",
+      "next_action": "Keep outreach as drafted/internal until a redacted Go receipt is accepted.",
+      "role_pattern": "Polsia comms role with privacy receipts",
+      "status": "blocked_on_external_reader_gate"
+    },
+    {
+      "authority_mode": "reviewed_internal",
+      "borrowed_from": [
+        "polsia"
+      ],
+      "department_id": "operations",
+      "ds_surface": "daily_operating_brief + ds-goal receipts",
+      "evidence_refs": [
+        "dharma_swarm/daily_operating_brief.py",
+        "scripts/runtime/autonomy_spine.py"
+      ],
+      "label": "Operations",
+      "next_action": "Emit a daily digest from the projection and mission receipts.",
+      "role_pattern": "Polsia daily operating cycle",
+      "status": "partial"
+    },
+    {
+      "authority_mode": "read_only",
+      "borrowed_from": [
+        "cofounder"
+      ],
+      "department_id": "library",
+      "ds_surface": "source_pack.json + claim_ledger.json + reports",
+      "evidence_refs": [
+        "dharma_swarm/venture_cell/darshan/bundle.py"
+      ],
+      "label": "Library",
+      "next_action": "Expose source, claim, and receipt artifacts before synthesis.",
+      "role_pattern": "Cofounder shared Library",
+      "status": "bound"
+    },
+    {
+      "authority_mode": "read_only_until_promoted",
+      "borrowed_from": [
+        "karpathy_llm_wiki",
+        "dharma_swarm"
+      ],
+      "department_id": "memory",
+      "ds_surface": "Chetana staging/wiki/provenance",
+      "evidence_refs": [
+        "/Users/dhyana/.dharma/knowledge/staging",
+        "/Users/dhyana/.dharma/knowledge/wiki/concepts",
+        "/Users/dhyana/.dharma/knowledge/quarantine"
+      ],
+      "label": "Memory Kernel",
+      "next_action": "Expand MemoryKernel read-through index coverage and query evals",
+      "role_pattern": "Karpathy-style LLM wiki substrate",
+      "status": "read_only_projection"
+    },
+    {
+      "authority_mode": "default_deny",
+      "borrowed_from": [
+        "dharma_swarm"
+      ],
+      "department_id": "governance",
+      "ds_surface": "governed_work_admission + gate ledgers",
+      "evidence_refs": [
+        "dharma_swarm/operator_core/governed_work_admission.py",
+        "dharma_swarm/venture_cell/darshan/external_reader_gate.py"
+      ],
+      "label": "Governance",
+      "next_action": "Progress autonomy only after receipts and verifier traces pass.",
+      "role_pattern": "Dharma receipt/witness substrate",
+      "status": "bound"
+    }
+  ],
+  "evidence_refs": [
+    "/Users/dhyana/.dharma/artifacts/venture_cell/DARSHAN/2026-05-26/the-thing-they-are-competing-for-is-not-just-your-attention",
+    "/Users/dhyana/.dharma/knowledge/staging",
+    "/Users/dhyana/.dharma/knowledge/wiki/concepts",
+    "/Users/dhyana/.dharma/knowledge/quarantine",
+    "dharma_swarm/venture_cell/operator_os/projection.py"
+  ],
+  "gap_codes": [
+    "darshan_external_reader_event_missing",
+    "memory_kernel_index_truncated"
+  ],
+  "gates": [
+    {
+      "coherence_state": "declared_only",
+      "decision": "block",
+      "evidence_refs": [],
+      "gap_codes": [
+        "darshan_external_reader_event_missing"
+      ],
+      "gate_id": "darshan.external_reader_go_receipts",
+      "label": "Darshan External Reader Go Receipt Gate",
+      "next_action": "Advance only after one accepted countable external-reader Go receipt",
+      "observed_state": "no reader events",
+      "raw": {
+        "accepted_receipts": [],
+        "artifact_id": "darshan-7302ff3a3a75",
+        "bundle_path": "/Users/dhyana/.dharma/artifacts/venture_cell/DARSHAN/2026-05-26/the-thing-they-are-competing-for-is-not-just-your-attention",
+        "coherence_state": "declared_only",
+        "errors": [
+          "external_reader_event_missing"
+        ],
+        "event_uids": [],
+        "exists": true,
+        "freshest_observed_at": "",
+        "gap_codes": [
+          "darshan_external_reader_event_missing"
+        ],
+        "missing_receipts": [],
+        "observed_state": "no reader events",
+        "pass_gate": false,
+        "receipt_paths": [],
+        "rejected_receipts": [],
+        "warnings": []
+      }
+    },
+    {
+      "coherence_state": "bound",
+      "decision": "allow",
+      "evidence_refs": [
+        "dharma_swarm/operator_core/governed_work_admission.py"
+      ],
+      "gap_codes": [],
+      "gate_id": "operator_os.governed_work_admission",
+      "label": "Governed Work Admission",
+      "next_action": "Continue bounded internal build work with receipts",
+      "observed_state": "mission contract present",
+      "raw": {
+        "admission_id": "admission_fa0c8c1564294bd0",
+        "allowed_scope": [
+          "dharma_swarm/venture_cell/",
+          "tests/",
+          "reports/venture_operator_os/"
+        ],
+        "created_at": "2026-06-02T13:37:21.050192+00:00",
+        "decision": "allow",
+        "expires_at": "",
+        "metadata": {
+          "agent_uid": "venturecell_operator_os",
+          "context_quorum_ref": "",
+          "risk_tier": "Q2",
+          "telos_reasons": [],
+          "work_kind": "long_running"
+        },
+        "reasons": [
+          "all_required_controls_present"
+        ],
+        "request_id": "admission_req_6d42581731b54763",
+        "required_receipts": []
+      }
+    }
+  ],
+  "memory_kernel": {
+    "evidence_refs": [
+      "/Users/dhyana/.dharma/knowledge/staging",
+      "/Users/dhyana/.dharma/knowledge/wiki/concepts",
+      "/Users/dhyana/.dharma/knowledge/quarantine"
+    ],
+    "gap_codes": [
+      "memory_kernel_index_truncated"
+    ],
+    "index_entries": [
+      {
+        "excerpt": "title: Operating Altitude Install Milestone \u2014 2026-04-28 chetana_version: 0.1.0 atom_id: 914140f9-a31c-4cc7-927c-543f1861ff16 type: framework para_class: P confidence: 0.95 source: - kind: note path: /Users/dhyana/.dharma/knowledge/staging/2026-04-28/altitude-install-milestone.md captured: '2026-04-28T12:22:06.027909+00:00' captured_by: claude-altitude-insta",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-04-28/914140f9-a31c-4cc7-927c-543f1861ff16.md",
+        "tier": "staged",
+        "title": "Operating Altitude Install \u2014 2026-04-28 Session Milestone"
+      },
+      {
+        "excerpt": "title: \"Operating Altitude Install \u2014 2026-04-28 Session Milestone\" confidence: 0.95 sources: - \"live session 2026-04-28 covering Xrully wiki upgrade + 10 deep recursive readings + altitude install\" - \"/Users/dhyana/.dharma/knowledge/wiki/_meta/recursive-readings/literature-pass/10-meta-presence-notes.md\" - \"/Users/dhyana/.dharma/knowledge/wiki/concepts/altit",
+        "matched_terms": [],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-04-28/altitude-install-milestone.md",
+        "tier": "staged",
+        "title": "Operating Altitude Install \u2014 2026-04-28 Session Milestone"
+      },
+      {
+        "excerpt": "title: <observed_from_primary_session> <what_happened>semantic_identifier_search</what\u2026 \u2014 turn 4 chetana_version: 0.1.0 atom_id: 37ce5747-0d10-45c6-890e-d4eb561b3547 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/184b9186-aae6-4a17-a018-2ce462c3cda7.jsonl span: line:151 ca",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/37ce5747-0d10-45c6-890e-d4eb561b3547.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: 'ok, here htey are: on Q1 decent, but Thinkodynamic director also might be a god\u2026 \u2014 turn 177' chetana_version: 0.1.0 atom_id: 37cecf90-7c3a-49e7-a81f-29d9fd1b4e6e type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:5375 captured: '2026-05-04T14:30",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/37cecf90-7c3a-49e7-a81f-29d9fd1b4e6e.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: <observed_from_primary_session> <what_happened>Bash</what_happened> <occurred_a\u2026 \u2014 turn 2 chetana_version: 0.1.0 atom_id: 37cf2d82-5d17-4544-8c07-7f7fa5e82a93 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/5af0ba34-fdf1-466a-b043-4ba57eb3cf1e.jsonl span: line:38 cap",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/37cf2d82-5d17-4544-8c07-7f7fa5e82a93.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: Hello memory agent, you are continuing to observe the primary Claude session. <\u2026 \u2014 turn 1 chetana_version: 0.1.0 atom_id: 37d0d131-f3fd-4a1d-8d1a-2ad7f6a93c8c type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/6dce14cb-4a2c-4d69-88d0-08a0fe1ac1f6.jsonl span: line:25 cap",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/37d0d131-f3fd-4a1d-8d1a-2ad7f6a93c8c.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: <observed_from_primary_session> <what_happened>write_stdin</what_happened> <occ\u2026 \u2014 turn 12 chetana_version: 0.1.0 atom_id: 37d23ce6-2148-4e9a-9eb9-a43b27d40cb2 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/ca5e3f83-1549-48fb-8550-bb81f10113b9.jsonl span: line:475 c",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/37d23ce6-2148-4e9a-9eb9-a43b27d40cb2.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: try them all \u2014 turn 30 chetana_version: 0.1.0 atom_id: 37deb3bd-c77c-4339-a85e-71afb750d1f7 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:939 captured: '2026-05-04T07:04:48.917616+00:00' captured_by: chetana_session_stop_hook stale_after: '2",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/37deb3bd-c77c-4339-a85e-71afb750d1f7.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: Hello memory agent, you are continuing to observe the primary Claude session. <\u2026 \u2014 turn 1 chetana_version: 0.1.0 atom_id: 37e214a4-ebea-4f35-b6f7-fc372844422a type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/f07923ce-8751-44ec-b613-fcf3f0ef9f00.jsonl span: line:21 cap",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/37e214a4-ebea-4f35-b6f7-fc372844422a.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: so, there has been some feature that is silently obesrveing every single claude\u2026 \u2014 turn 24 chetana_version: 0.1.0 atom_id: 37ef5063-13bd-4269-bdb6-0ad8a63dcfab type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:757 captured: '2026-05-04T04:47:21.",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/37ef5063-13bd-4269-bdb6-0ad8a63dcfab.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: <observed_from_primary_session> <what_happened>write_stdin</what_happened> <occ\u2026 \u2014 turn 5 chetana_version: 0.1.0 atom_id: 37f43382-90c9-4f57-9638-9d8a06297e2b type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/c586c4c4-36dd-417a-9d4c-21159e66ab7d.jsonl span: line:619 ca",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/37f43382-90c9-4f57-9638-9d8a06297e2b.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: and so... fuck I'm cookied.. you amek we want to commit suidice. \u2014 turn 126 chetana_version: 0.1.0 atom_id: 37fce089-6ceb-489d-8760-89c89df64ac0 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:4011 captured: '2026-05-04T14:02:33.911549+00:00' ",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/37fce089-6ceb-489d-8760-89c89df64ac0.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: Hello memory agent, you are continuing to observe the primary Claude session. <\u2026 \u2014 turn 1 chetana_version: 0.1.0 atom_id: 37fee675-6994-4f22-af15-fe52f2e0abec type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/2743b1a3-6301-4243-b4de-0e095966af6d.jsonl span: line:71 cap",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/37fee675-6994-4f22-af15-fe52f2e0abec.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: <observed_from_primary_session> <what_happened>write_stdin</what_happened> <occ\u2026 \u2014 turn 4 chetana_version: 0.1.0 atom_id: 38022885-040f-42b4-9590-3e332cfabbcf type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/de25d418-8989-47c2-89b0-b4433ee26087.jsonl span: line:240 ca",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38022885-040f-42b4-9590-3e332cfabbcf.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: This session is being continued from a previous conversation that ran out of co\u2026 \u2014 turn 15 chetana_version: 0.1.0 atom_id: 380a0b7d-c3a3-46d4-9158-1f75a582d457 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/5d05e0bd-ce7f-4232-8ef6-53e9bb347ce6.jsonl span: line:519 c",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/380a0b7d-c3a3-46d4-9158-1f75a582d457.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: <observed_from_primary_session> <what_happened>write_stdin</what_happened> <occ\u2026 \u2014 turn 8 chetana_version: 0.1.0 atom_id: 380db7dd-8395-486a-ac8b-422a9b2f13cd type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/28f7803f-e613-4319-b82d-b18303e38a10.jsonl span: line:200 ca",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/380db7dd-8395-486a-ac8b-422a9b2f13cd.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: we dont' have enough signal... \u2014 turn 47 chetana_version: 0.1.0 atom_id: 380ebffb-aec6-41bf-a0f0-2676f937f747 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:1511 captured: '2026-05-04T13:53:00.016799+00:00' captured_by: chetana_session_stop_h",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/380ebffb-aec6-41bf-a0f0-2676f937f747.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: can you give me a dozen verydetaield real world examples of the highets perform\u2026 \u2014 turn 128 chetana_version: 0.1.0 atom_id: 3816ba2c-b971-4ebf-b9d8-e250a2e32e42 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:4055 captured: '2026-05-04T14:02:3",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/3816ba2c-b971-4ebf-b9d8-e250a2e32e42.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: <observed_from_primary_session> <what_happened>Read</what_happened> <occurred_a\u2026 \u2014 turn 2 chetana_version: 0.1.0 atom_id: 381e543d-8f4c-4598-8c96-36af28eebf71 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/ee06fc9f-513b-492c-950c-8891673a8bb3.jsonl span: line:65 cap",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/381e543d-8f4c-4598-8c96-36af28eebf71.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: give me a small prompt to pass to codex with this included \u2014 turn 74 chetana_version: 0.1.0 atom_id: 38233e31-a630-4dec-b934-bb7a336f0366 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:2251 captured: '2026-05-04T05:11:03.915022+00:00' capture",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38233e31-a630-4dec-b934-bb7a336f0366.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: ok, given that now what? can you resrach all legeit methods for claude code sel\u2026 \u2014 turn 15 chetana_version: 0.1.0 atom_id: 3824f779-11a6-42c7-85b3-d838a8d2beeb type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/e4cad60f-337b-4510-9c70-ea119ec7954b.jsonl span: line:509 captured: '2026-05-04T02:18:37.",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/3824f779-11a6-42c7-85b3-d838a8d2beeb.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: Hello memory agent, you are continuing to observe the primary Claude session. <\u2026 \u2014 turn 11 chetana_version: 0.1.0 atom_id: 382db21e-e4b6-4a3a-9367-d91064d623b0 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/f4236ca6-cc22-4f09-8570-ab772c079ab6.jsonl span: line:954 c",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/382db21e-e4b6-4a3a-9367-d91064d623b0.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: so, there has been some feature that is silently obesrveing every single claude\u2026 \u2014 turn 22 chetana_version: 0.1.0 atom_id: 3832829e-8df6-43ca-973e-43565081b9d0 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/e4cad60f-337b-4510-9c70-ea119ec7954b.jsonl span: line:803 captured: '2026-05-04T02:18:37.",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/3832829e-8df6-43ca-973e-43565081b9d0.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: <observed_from_primary_session> <what_happened>exec_command</what_happened> <oc\u2026 \u2014 turn 14 chetana_version: 0.1.0 atom_id: 383c3fc7-f16f-49d8-949d-f6b4a56e362e type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/184b9186-aae6-4a17-a018-2ce462c3cda7.jsonl span: line:446 c",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/383c3fc7-f16f-49d8-949d-f6b4a56e362e.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: <observed_from_primary_session> <what_happened>write_stdin</what_happened> <occ\u2026 \u2014 turn 1 chetana_version: 0.1.0 atom_id: 38421df2-a2a7-4ef9-954f-dbec7b464e8f type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/a4804e4c-5d88-46b7-80b9-0e93bc19acea.jsonl span: line:79 cap",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38421df2-a2a7-4ef9-954f-dbec7b464e8f.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: yes codex is still working and I want you to disucss with him before we move fo\u2026 \u2014 turn 87 chetana_version: 0.1.0 atom_id: 3851bbf6-3200-497b-85e5-8af570645103 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:2732 captured: '2026-05-04T13:38:36",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/3851bbf6-3200-497b-85e5-8af570645103.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: Hello memory agent, you are continuing to observe the primary Claude session. <\u2026 \u2014 turn 1 chetana_version: 0.1.0 atom_id: 3851ecae-1065-430d-a79c-6fe224353cd5 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/6dce14cb-4a2c-4d69-88d0-08a0fe1ac1f6.jsonl span: line:25 cap",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/3851ecae-1065-430d-a79c-6fe224353cd5.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: try them all \u2014 turn 28 chetana_version: 0.1.0 atom_id: 3856ff7c-df7d-44c4-b52e-75fb1cbefb56 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:895 captured: '2026-05-04T07:03:32.737552+00:00' captured_by: chetana_session_stop_hook stale_after: '2",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/3856ff7c-df7d-44c4-b52e-75fb1cbefb56.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: what are you asking? \u2014 turn 66 chetana_version: 0.1.0 atom_id: 38620d25-390f-48dd-b049-88e79c7e42e0 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/fb04b8b1-58ab-4a33-85f8-bec03acc7fb6.jsonl span: line:2975 captured: '2026-05-03T16:24:10.851202+00:00' captured_by: chetana_session_stop_hook stale_",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38620d25-390f-48dd-b049-88e79c7e42e0.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: and so... fuck I'm cookied.. you amek we want to commit suidice. \u2014 turn 126 chetana_version: 0.1.0 atom_id: 386232e5-bc32-45ce-9c56-eb4ccec56974 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:4011 captured: '2026-05-04T07:04:49.845401+00:00' ",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/386232e5-bc32-45ce-9c56-eb4ccec56974.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: yes codex is still working and I want you to disucss with him before we move fo\u2026 \u2014 turn 88 chetana_version: 0.1.0 atom_id: 3863a527-3721-4b70-9f4a-7ae470196795 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:2740 captured: '2026-05-04T05:31:48",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/3863a527-3721-4b70-9f4a-7ae470196795.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: <observed_from_primary_session> <what_happened>write_stdin</what_happened> <occ\u2026 \u2014 turn 2 chetana_version: 0.1.0 atom_id: 3863ad81-42a8-44bb-b208-8cb9413edb7c type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/ca5e3f83-1549-48fb-8550-bb81f10113b9.jsonl span: line:113 ca",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/3863ad81-42a8-44bb-b208-8cb9413edb7c.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: <observed_from_primary_session> <what_happened>search_memory_graph</what_happen\u2026 \u2014 turn 12 chetana_version: 0.1.0 atom_id: 38640c68-9336-433d-9c54-82b14fdb594a type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/184b9186-aae6-4a17-a018-2ce462c3cda7.jsonl span: line:381 c",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38640c68-9336-433d-9c54-82b14fdb594a.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: try them all \u2014 turn 31 chetana_version: 0.1.0 atom_id: 3864360e-c2fe-4458-a831-6686aea2455d type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:973 captured: '2026-05-04T03:24:27.484127+00:00' captured_by: chetana_session_stop_hook stale_after: '2",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/3864360e-c2fe-4458-a831-6686aea2455d.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: ok, yes, i don't know, if we need to scrap yt. but yeah, bridge yor ucuretn udn\u2026 \u2014 turn 112 chetana_version: 0.1.0 atom_id: 386e74d7-6898-4406-8ab3-528516975ae9 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:3486 captured: '2026-05-04T04:36:4",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/386e74d7-6898-4406-8ab3-528516975ae9.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: 'Base directory for this skill: /Users/dhyana/.claude/skills/skill-genesis # Ski\u2026 \u2014 turn 6' chetana_version: 0.1.0 atom_id: 3871467d-975b-47cf-8f49-cc57a42715dc type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:228 captured: '2026-05-04T06:39:57",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/3871467d-975b-47cf-8f49-cc57a42715dc.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: this seems wayyy to generic. what tools and what context did you look at to fin\u2026 \u2014 turn 62 chetana_version: 0.1.0 atom_id: 3872c105-1d43-4530-983a-ff3b3a0815eb type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/e4cad60f-337b-4510-9c70-ea119ec7954b.jsonl span: line:2268 captured: '2026-05-04T02:35:25",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/3872c105-1d43-4530-983a-ff3b3a0815eb.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: <observed_from_primary_session> <what_happened>exec_command</what_happened> <oc\u2026 \u2014 turn 2 chetana_version: 0.1.0 atom_id: 38759ce4-4915-4d5b-a71f-e744527f5877 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/b9307c3c-0d53-470b-9da8-faf2ff26ee20.jsonl span: line:167 ca",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38759ce4-4915-4d5b-a71f-e744527f5877.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: <observed_from_primary_session> <what_happened>exec_command</what_happened> <oc\u2026 \u2014 turn 2 chetana_version: 0.1.0 atom_id: 38776bbc-d763-4eb2-bd3d-0d61bb1d24a1 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/5d05e0bd-ce7f-4232-8ef6-53e9bb347ce6.jsonl span: line:67 cap",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38776bbc-d763-4eb2-bd3d-0d61bb1d24a1.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: 'Base directory for this skill: /Users/dhyana/.claude/skills/skill-genesis # Ski\u2026 \u2014 turn 3' chetana_version: 0.1.0 atom_id: 3878e830-ae72-4f13-bf86-be6c394361b7 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/e4cad60f-337b-4510-9c70-ea119ec7954b.jsonl span: line:52 captured: '2026-05-04T02:07:17.",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/3878e830-ae72-4f13-bf86-be6c394361b7.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: <observed_from_primary_session> <what_happened>exec_command</what_happened> <oc\u2026 \u2014 turn 11 chetana_version: 0.1.0 atom_id: 387d5af9-514b-484c-97bd-1d66c5ae429d type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/ebc370b9-e97c-48a9-a800-f348997f89c9.jsonl span: line:237 c",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/387d5af9-514b-484c-97bd-1d66c5ae429d.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: ok, we're getting close, whatever memroy sysem that is loggin this, using JOHn'\u2026 \u2014 turn 103 chetana_version: 0.1.0 atom_id: 3893a03f-9c21-40ac-b365-60fb9413c8a2 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:3297 captured: '2026-05-04T03:52:1",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/3893a03f-9c21-40ac-b365-60fb9413c8a2.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: <observed_from_primary_session> <what_happened>exec_command</what_happened> <oc\u2026 \u2014 turn 6 chetana_version: 0.1.0 atom_id: 3899893a-986b-4502-b64f-82afd8627cc2 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/0c0f2460-91bc-4c97-a25c-6143192fdf5f.jsonl span: line:120 ca",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/3899893a-986b-4502-b64f-82afd8627cc2.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: <observed_from_primary_session> <what_happened>write_stdin</what_happened> <occ\u2026 \u2014 turn 6 chetana_version: 0.1.0 atom_id: 38a41102-fb44-41c5-88e9-48fa2d690426 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/184b9186-aae6-4a17-a018-2ce462c3cda7.jsonl span: line:198 ca",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38a41102-fb44-41c5-88e9-48fa2d690426.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: <observed_from_primary_session> <what_happened>update_plan</what_happened> <occ\u2026 \u2014 turn 3 chetana_version: 0.1.0 atom_id: 38b133d8-6933-4d9f-8d89-97e92e7eb40b type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/ebc370b9-e97c-48a9-a800-f348997f89c9.jsonl span: line:69 cap",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38b133d8-6933-4d9f-8d89-97e92e7eb40b.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: <task-notification> <task-id>r75ccbxcn</task-id> <task-type>remote_agent</task-\u2026 \u2014 turn 171 chetana_version: 0.1.0 atom_id: 38bb19a9-25e2-4b97-b9b2-88fa31bd6e12 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:5238 captured: '2026-05-04T14:02:3",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38bb19a9-25e2-4b97-b9b2-88fa31bd6e12.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: <observed_from_primary_session> <what_happened>write_file</what_happened> <occu\u2026 \u2014 turn 8 chetana_version: 0.1.0 atom_id: 38bcbe8e-0c9f-49de-aa2e-064f8816b4c7 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/1d18f98b-2335-47c1-9987-d92ac6fa892c.jsonl span: line:200 ca",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38bcbe8e-0c9f-49de-aa2e-064f8816b4c7.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: we need it 80% extraction. do everything you need to do to make it happen. this\u2026 \u2014 turn 66 chetana_version: 0.1.0 atom_id: 38be697d-3c21-404d-b43f-5fb81fdd0a5f type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/e4cad60f-337b-4510-9c70-ea119ec7954b.jsonl span: line:2476 captured: '2026-05-04T02:35:25",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38be697d-3c21-404d-b43f-5fb81fdd0a5f.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: <observed_from_primary_session> <what_happened>exec_command</what_happened> <oc\u2026 \u2014 turn 8 chetana_version: 0.1.0 atom_id: 38c045d6-7d94-458d-9290-7ec8ca25fcf9 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/c381d026-4c37-420b-9d8d-f9956deb6d2a.jsonl span: line:184 ca",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38c045d6-7d94-458d-9290-7ec8ca25fcf9.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: so, there has been some feature that is silently obesrveing every single claude\u2026 \u2014 turn 26 chetana_version: 0.1.0 atom_id: 38c1faac-7e74-4784-af1f-1aefc01c42cc type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:835 captured: '2026-05-04T03:24:27.",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38c1faac-7e74-4784-af1f-1aefc01c42cc.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: <observed_from_primary_session> <what_happened>exec_command</what_happened> <oc\u2026 \u2014 turn 8 chetana_version: 0.1.0 atom_id: 38c24d7c-8ab2-46b1-875e-b03ef4130064 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/c381d026-4c37-420b-9d8d-f9956deb6d2a.jsonl span: line:184 ca",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38c24d7c-8ab2-46b1-875e-b03ef4130064.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: 'Base directory for this skill: /Users/dhyana/.claude/skills/skill-genesis # Ski\u2026 \u2014 turn 7' chetana_version: 0.1.0 atom_id: 38c75465-5dde-4c8b-8635-bdc2cc21b28a type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/e4cad60f-337b-4510-9c70-ea119ec7954b.jsonl span: line:281 captured: '2026-05-04T02:07:17",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38c75465-5dde-4c8b-8635-bdc2cc21b28a.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: ok, given that now what? can you resrach all legeit methods for claude code sel\u2026 \u2014 turn 11 chetana_version: 0.1.0 atom_id: 38cb8787-1f68-40da-b7d8-923a88e3962e type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:302 captured: '2026-05-04T04:36:46.",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38cb8787-1f68-40da-b7d8-923a88e3962e.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: 'Base directory for this skill: /Users/dhyana/.claude/plugins/cache/superpowers-\u2026 \u2014 turn 76' chetana_version: 0.1.0 atom_id: 38cd4bb2-b9da-4896-b4bd-023fa532815e type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:2268 captured: '2026-05-04T03:52:",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38cd4bb2-b9da-4896-b4bd-023fa532815e.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: so, there has been some feature that is silently obesrveing every single claude\u2026 \u2014 turn 23 chetana_version: 0.1.0 atom_id: 38ceb1ff-115b-4a07-806e-f9d14c7eaf2f type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:719 captured: '2026-05-04T03:51:03.",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38ceb1ff-115b-4a07-806e-f9d14c7eaf2f.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: we need it 80% extraction. do everything you need to do to make it happen. this\u2026 \u2014 turn 63 chetana_version: 0.1.0 atom_id: 38df5af8-f290-4952-a259-5e6e11611066 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:2019 captured: '2026-05-04T05:08:22",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38df5af8-f290-4952-a259-5e6e11611066.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: <observed_from_primary_session> <what_happened>apply_patch</what_happened> <occ\u2026 \u2014 turn 4 chetana_version: 0.1.0 atom_id: 38e19205-9b82-4157-bea2-bd00ed53af89 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/5d05e0bd-ce7f-4232-8ef6-53e9bb347ce6.jsonl span: line:115 ca",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38e19205-9b82-4157-bea2-bd00ed53af89.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: <observed_from_primary_session> <what_happened>update_plan</what_happened> <occ\u2026 \u2014 turn 2 chetana_version: 0.1.0 atom_id: 38e1c553-2b8d-4866-a112-09eec9007a22 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/9aeddf2c-f0f4-4d6c-b54c-1cdc6c03df13.jsonl span: line:70 cap",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38e1c553-2b8d-4866-a112-09eec9007a22.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: <observed_from_primary_session> <what_happened>exec_command</what_happened> <oc\u2026 \u2014 turn 23 chetana_version: 0.1.0 atom_id: 38e49f44-5d82-4d33-ba69-9a5d20e76f70 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/ca5e3f83-1549-48fb-8550-bb81f10113b9.jsonl span: line:818 c",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38e49f44-5d82-4d33-ba69-9a5d20e76f70.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: <observed_from_primary_session> <what_happened>Read</what_happened> <occurred_a\u2026 \u2014 turn 3 chetana_version: 0.1.0 atom_id: 38e6b448-53f6-44e0-ae40-709cf80dc7be type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/fa51c846-1549-478e-a196-e034d55a8257.jsonl span: line:74 cap",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38e6b448-53f6-44e0-ae40-709cf80dc7be.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: <observed_from_primary_session> <what_happened>write_stdin</what_happened> <occ\u2026 \u2014 turn 14 chetana_version: 0.1.0 atom_id: 38e8bf5f-0e18-43f4-bdd5-02f24ddc7049 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/ca5e3f83-1549-48fb-8550-bb81f10113b9.jsonl span: line:519 c",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38e8bf5f-0e18-43f4-bdd5-02f24ddc7049.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: <observed_from_primary_session> <what_happened>read_multiple_files</what_happen\u2026 \u2014 turn 3 chetana_version: 0.1.0 atom_id: 38efefeb-70ef-45bf-a7f2-4887b237a8a4 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/95cbf406-4461-4a73-8251-83065e58c2bc.jsonl span: line:92 cap",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38efefeb-70ef-45bf-a7f2-4887b237a8a4.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: DO NOT COLLAPSE 5.13a or 514a into premature catch phraes definitions. JOHN HAT\u2026 \u2014 turn 148 chetana_version: 0.1.0 atom_id: 38f2c15f-eb4d-401c-8970-a2ec2e03ec4e type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:4620 captured: '2026-05-04T07:05:5",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38f2c15f-eb4d-401c-8970-a2ec2e03ec4e.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: <observed_from_primary_session> <what_happened>write_stdin</what_happened> <occ\u2026 \u2014 turn 2 chetana_version: 0.1.0 atom_id: 38f7ce34-ebcc-4c08-ac11-5d61820ff6ed type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/64bcf8b6-0062-4c2e-b0c2-53546b026653.jsonl span: line:58 cap",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38f7ce34-ebcc-4c08-ac11-5d61820ff6ed.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: <observed_from_primary_session> <what_happened>apply_patch</what_happened> <occ\u2026 \u2014 turn 10 chetana_version: 0.1.0 atom_id: 38f88635-8b62-4d5a-9fec-1f3799023ae8 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/5d05e0bd-ce7f-4232-8ef6-53e9bb347ce6.jsonl span: line:246 c",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38f88635-8b62-4d5a-9fec-1f3799023ae8.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: giving up on the neurips.. we don't have a paper \u2014 turn 46 chetana_version: 0.1.0 atom_id: 38f8c46d-3f05-4b45-b840-c5bf8b53ee82 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:1499 captured: '2026-05-04T03:24:27.508634+00:00' captured_by: chet",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38f8c46d-3f05-4b45-b840-c5bf8b53ee82.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: lclean it all up \u2014 turn 54 chetana_version: 0.1.0 atom_id: 38fd5b22-9590-4a1e-8262-49863c673aa5 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/e4cad60f-337b-4510-9c70-ea119ec7954b.jsonl span: line:2041 captured: '2026-05-04T02:07:17.543578+00:00' captured_by: chetana_session_stop_hook stale_afte",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38fd5b22-9590-4a1e-8262-49863c673aa5.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: giving up on the neurips.. we don't have a paper \u2014 turn 46 chetana_version: 0.1.0 atom_id: 38ff5ffb-c238-4cf8-9e17-1478eb1cf941 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:1499 captured: '2026-05-04T11:26:51.601410+00:00' captured_by: chet",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38ff5ffb-c238-4cf8-9e17-1478eb1cf941.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: <observed_from_primary_session> <what_happened>Bash</what_happened> <occurred_a\u2026 \u2014 turn 3 chetana_version: 0.1.0 atom_id: 3901fee1-a71d-4bd9-bea5-6e253e6caa0d type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/8f2a5fd3-aa55-4f9c-8ed9-4b427a8d9401.jsonl span: line:83 cap",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/3901fee1-a71d-4bd9-bea5-6e253e6caa0d.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: <observed_from_primary_session> <what_happened>exec_command</what_happened> <oc\u2026 \u2014 turn 6 chetana_version: 0.1.0 atom_id: 39032e64-939f-4de6-a340-67f72f6795cd type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/0c0f2460-91bc-4c97-a25c-6143192fdf5f.jsonl span: line:120 ca",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/39032e64-939f-4de6-a340-67f72f6795cd.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: 3 \u2014 turn 121 chetana_version: 0.1.0 atom_id: 39039139-e242-4156-9be4-3efd9395dab4 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:3822 captured: '2026-05-04T10:18:28.234486+00:00' captured_by: chetana_session_stop_hook stale_after: '2026-08-02",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/39039139-e242-4156-9be4-3efd9395dab4.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: can you do all that now please \u2014 turn 42 chetana_version: 0.1.0 atom_id: 390c39ff-e7f5-4dbd-a1c3-46e78e0f90b1 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:1429 captured: '2026-05-04T14:30:35.159083+00:00' captured_by: chetana_session_stop_h",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/390c39ff-e7f5-4dbd-a1c3-46e78e0f90b1.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: Hello memory agent, you are continuing to observe the primary Claude session. C\u2026 \u2014 turn 10 chetana_version: 0.1.0 atom_id: 390f23af-46eb-4ce3-a9b7-f392c8a5a0a4 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/f4236ca6-cc22-4f09-8570-ab772c079ab6.jsonl span: line:760 c",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/390f23af-46eb-4ce3-a9b7-f392c8a5a0a4.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: can you do all that now please \u2014 turn 41 chetana_version: 0.1.0 atom_id: 3910f458-182a-4bdf-8f57-1b9d0794150c type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:1412 captured: '2026-05-04T04:43:46.200702+00:00' captured_by: chetana_session_stop_h",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/3910f458-182a-4bdf-8f57-1b9d0794150c.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: <observed_from_primary_session> <what_happened>read_multiple_files</what_happen\u2026 \u2014 turn 3 chetana_version: 0.1.0 atom_id: 391303e8-73bc-4b36-a968-1e1828967391 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/95cbf406-4461-4a73-8251-83065e58c2bc.jsonl span: line:92 cap",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/391303e8-73bc-4b36-a968-1e1828967391.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: <observed_from_primary_session> <what_happened>write_stdin</what_happened> <occ\u2026 \u2014 turn 7 chetana_version: 0.1.0 atom_id: 3917a5b2-0772-4181-ae10-84fdd22772bc type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/ca5e3f83-1549-48fb-8550-bb81f10113b9.jsonl span: line:286 ca",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/3917a5b2-0772-4181-ae10-84fdd22772bc.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: <observed_from_primary_session> <what_happened>write_stdin</what_happened> <occ\u2026 \u2014 turn 13 chetana_version: 0.1.0 atom_id: 391bf5bc-5884-4d78-80e9-a2a522384c14 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/ca5e3f83-1549-48fb-8550-bb81f10113b9.jsonl span: line:503 c",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/391bf5bc-5884-4d78-80e9-a2a522384c14.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: <task-notification> <task-id>a4962bad0f8194f26</task-id> <tool-use-id>toolu_01X\u2026 \u2014 turn 8 chetana_version: 0.1.0 atom_id: 391f2789-74ba-4948-8887-b4f95182335c type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/e4cad60f-337b-4510-9c70-ea119ec7954b.jsonl span: line:305 captured: '2026-05-04T02:24:06.2",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/391f2789-74ba-4948-8887-b4f95182335c.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: <observed_from_primary_session> <what_happened>write_stdin</what_happened> <occ\u2026 \u2014 turn 2 chetana_version: 0.1.0 atom_id: 39229507-f602-4fd9-a00d-bf8946b553e5 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/1627332d-510b-414c-9ee0-6965cc03c882.jsonl span: line:40 cap",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/39229507-f602-4fd9-a00d-bf8946b553e5.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: This session is being continued from a previous conversation that ran out of co\u2026 \u2014 turn 14 chetana_version: 0.1.0 atom_id: 392a8ff9-ebeb-423b-86e4-0aad33755dd8 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/95cbf406-4461-4a73-8251-83065e58c2bc.jsonl span: line:969 c",
+        "matched_terms": [
+          "Chetana"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/392a8ff9-ebeb-423b-86e4-0aad33755dd8.md",
+        "tier": "staged",
+        "title": "Source turn"
+      }
+    ],
+    "index_query_terms": [
+      "Polsia",
+      "Cofounder",
+      "VentureCell",
+      "Operator OS",
+      "Darshan",
+      "external reader",
+      "Go evidence receipt",
+      "Chetana",
+      "MemoryKernel"
+    ],
+    "index_status": "available_truncated",
+    "indexed_count": 80,
+    "next_action": "Expand MemoryKernel read-through index coverage and query evals",
+    "quarantine_count": 5000,
+    "source_roots": [
+      "/Users/dhyana/.dharma/knowledge/staging",
+      "/Users/dhyana/.dharma/knowledge/wiki/concepts",
+      "/Users/dhyana/.dharma/knowledge/quarantine"
+    ],
+    "staged_count": 5000,
+    "status": "read_through_index_available",
+    "truncated": true,
+    "trusted_count": 1333
+  },
+  "next_actions": [
+    "Record one accepted, privacy-redacted external-reader Go receipt before external growth/comms autonomy.",
+    "Build a read-through MemoryKernel index over Chetana/wiki with source and promotion receipts."
+  ],
+  "schema_version": "dharma.venture_cell_operator_os.v0",
+  "status": "blocked_on_external_reader_gate",
+  "title": "The Thing They Are Competing For Is Not Just Your Attention",
+  "venture_cell_id": "DARSHAN"
+}

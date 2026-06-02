@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 
 from dharma_swarm.models import TaskPriority, TaskStatus
-from dharma_swarm.task_board import Task
+from dharma_swarm.task_board import Task, TaskBoard
 from dharma_swarm.venture_cell.darshan.bundle import create_bundle
 from dharma_swarm.venture_cell.darshan.schema import (
     DecisionDelta,
@@ -14,8 +15,10 @@ from dharma_swarm.venture_cell.darshan.schema import (
 from dharma_swarm.venture_cell.operator_os import (
     OperatorOSInputs,
     build_operator_projection,
+    load_live_operator_inputs,
     render_operator_daily_digest,
 )
+from dharma_swarm.venture_cell.operator_os.cli import render_operator_surface
 
 
 OBSERVED_AT = "2026-06-02T00:00:00Z"
@@ -85,6 +88,27 @@ def _attach_reader_event(bundle_path: Path, receipt_path: Path) -> None:
     )
 
 
+def _write_a2a_queue(state_root: Path, rows: list[dict[str, object]]) -> None:
+    queue = state_root / "a2a_bus" / "tasks" / "queue.jsonl"
+    queue.parent.mkdir(parents=True)
+    queue.write_text(
+        "\n".join(json.dumps(row, sort_keys=True) for row in rows) + "\n",
+        encoding="utf-8",
+    )
+
+
+async def _seed_task_board(db_path: Path) -> None:
+    db_path.parent.mkdir(parents=True)
+    board = TaskBoard(db_path)
+    await board.init_db()
+    await board.create(
+        "Operator OS live task",
+        priority=TaskPriority.NORMAL,
+        created_by="venturecell_operator_os_test",
+        metadata={"cell_id": "DARSHAN"},
+    )
+
+
 def test_projection_blocks_external_autonomy_without_reader_gate(tmp_path: Path) -> None:
     bundle = _bundle(tmp_path)
     trusted = tmp_path / "wiki" / "concepts"
@@ -104,8 +128,40 @@ def test_projection_blocks_external_autonomy_without_reader_gate(tmp_path: Path)
     assert projection.autonomy_level == "L0_read_only_plan"
     assert len(projection.departments) >= 8
     assert "darshan_external_reader_event_missing" in projection.gap_codes
-    assert any(dept.department_id == "growth" and dept.status == "blocked_on_external_reader_gate" for dept in projection.departments)
+    assert any(
+        dept.department_id == "growth" and dept.status == "blocked_on_external_reader_gate"
+        for dept in projection.departments
+    )
     assert any(item.item_id == "darshan.article.md" and item.status == "available" for item in projection.canvas)
+
+
+def test_live_loader_reads_injected_taskboard_and_a2a_state(tmp_path: Path) -> None:
+    state_root = tmp_path / "state"
+    task_db = state_root / "db" / "tasks.db"
+    asyncio.run(_seed_task_board(task_db))
+    _write_a2a_queue(
+        state_root,
+        [
+            {
+                "id": "a2a-live-1",
+                "from": "mission_control",
+                "to": "codex",
+                "status": "claimed",
+                "body": "Render Operator OS live projection",
+            }
+        ],
+    )
+
+    inputs = load_live_operator_inputs(
+        state_root=state_root,
+        task_db_path=task_db,
+        max_memory_scan=1,
+    )
+
+    assert len(inputs.task_board_tasks) == 1
+    assert inputs.task_board_tasks[0].title == "Operator OS live task"
+    assert inputs.a2a_tasks is not None
+    assert inputs.a2a_tasks[0]["id"] == "a2a-live-1"
 
 
 def test_projection_maps_reader_gate_taskboard_a2a_and_memory(tmp_path: Path) -> None:
@@ -150,7 +206,12 @@ def test_projection_maps_reader_gate_taskboard_a2a_and_memory(tmp_path: Path) ->
     assert projection.memory_kernel.status == "projection_available"
     assert projection.memory_kernel.staged_count == 1
     assert projection.memory_kernel.trusted_count == 1
-    assert any(gate.gate_id == "darshan.external_reader_go_receipts" and gate.decision == "allow" for gate in projection.gates)
+    assert projection.memory_kernel.index_status == "available"
+    assert projection.memory_kernel.indexed_count >= 2
+    assert any(
+        gate.gate_id == "darshan.external_reader_go_receipts" and gate.decision == "allow"
+        for gate in projection.gates
+    )
     assert any(item.item_id == "task_board.task-1" and item.status == "running" for item in projection.canvas)
     assert any(item.item_id == "a2a.a2a-1" and item.status == "claimed_open" for item in projection.canvas)
 
@@ -171,5 +232,39 @@ def test_operator_daily_digest_renders_structure_without_live_authority_claim(tm
     assert "# VentureCell Operator OS Digest: DARSHAN" in digest
     assert "## Departments" in digest
     assert "## Gates" in digest
+    assert "## Memory Kernel" in digest
     assert "`L0_read_only_plan`" in digest
     assert "autonomous external send" not in digest.lower()
+
+
+def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp_path: Path) -> None:
+    bundle = _bundle(tmp_path)
+    state_root = tmp_path / "state"
+    _write_a2a_queue(
+        state_root,
+        [
+            {
+                "id": "a2a-render-1",
+                "from": "planner",
+                "to": "codex",
+                "status": "pending",
+                "body": "Write local Operator OS digest",
+            }
+        ],
+    )
+
+    paths = render_operator_surface(
+        output_dir=tmp_path / "reports",
+        bundle_path=bundle,
+        state_root=state_root,
+        max_memory_scan=1,
+    )
+
+    projection = json.loads(paths["projection"].read_text(encoding="utf-8"))
+    digest = paths["digest"].read_text(encoding="utf-8")
+    memory_index = json.loads(paths["memory_index"].read_text(encoding="utf-8"))
+
+    assert projection["status"] == "blocked_on_external_reader_gate"
+    assert projection["autonomy_level"] == "L0_read_only_plan"
+    assert "# VentureCell Operator OS Digest: DARSHAN" in digest
+    assert "index_status" in memory_index

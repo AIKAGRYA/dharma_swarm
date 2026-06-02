@@ -6,6 +6,16 @@ from dharma_swarm.venture_cell.operator_os.daily_digest import (
     render_operator_daily_digest,
     write_operator_daily_digest,
 )
+from dharma_swarm.venture_cell.operator_os.live_loader import (
+    load_a2a_task_rows,
+    load_live_operator_inputs,
+    load_task_board_tasks,
+)
+from dharma_swarm.venture_cell.operator_os.memory_kernel import (
+    MemoryKernelIndexEntry,
+    MemoryKernelReadThroughIndex,
+    build_memory_kernel_index,
+)
 from dharma_swarm.venture_cell.operator_os.projection import (
     OperatorOSInputs,
     build_operator_projection,
@@ -21,11 +31,17 @@ from dharma_swarm.venture_cell.operator_os.schema import (
 __all__ = [
     "CanvasItem",
     "GateSummary",
+    "MemoryKernelIndexEntry",
+    "MemoryKernelReadThroughIndex",
     "MemoryKernelSnapshot",
     "OperatorDepartment",
     "OperatorOSInputs",
     "VentureCellOperatorProjection",
     "build_operator_projection",
+    "build_memory_kernel_index",
+    "load_a2a_task_rows",
+    "load_live_operator_inputs",
+    "load_task_board_tasks",
     "render_operator_daily_digest",
     "write_operator_daily_digest",
 ]

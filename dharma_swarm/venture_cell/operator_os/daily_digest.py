@@ -50,11 +50,18 @@ def render_operator_daily_digest(projection: VentureCellOperatorProjection) -> s
             f"- Trusted: `{memory.trusted_count}`",
             f"- Quarantine: `{memory.quarantine_count}`",
             f"- Truncated scan: `{memory.truncated}`",
-            "",
-            "## Daily Cycle",
-            "",
+            f"- Index: `{memory.index_status or 'not_built'}` with `{memory.indexed_count}` entries",
         ]
     )
+    if memory.index_entries:
+        lines.extend(["", "## Memory Index", ""])
+        for entry in memory.index_entries[:8]:
+            title = str(entry.get("title") or entry.get("path") or "untitled")
+            tier = str(entry.get("tier") or "unknown")
+            path = str(entry.get("path") or "")
+            lines.append(f"- `{tier}` {title}: `{path}`")
+
+    lines.extend(["", "## Daily Cycle", ""])
     for step in projection.daily_cycle:
         lines.append(f"- {step}")
 

@@ -1,0 +1,754 @@
+{
+  "evidence_refs": [
+    "/Users/dhyana/.dharma/knowledge/staging",
+    "/Users/dhyana/.dharma/knowledge/wiki/concepts",
+    "/Users/dhyana/.dharma/knowledge/quarantine"
+  ],
+  "gap_codes": [
+    "memory_kernel_index_truncated"
+  ],
+  "index_entries": [
+    {
+      "excerpt": "title: Operating Altitude Install Milestone \u2014 2026-04-28 chetana_version: 0.1.0 atom_id: 914140f9-a31c-4cc7-927c-543f1861ff16 type: framework para_class: P confidence: 0.95 source: - kind: note path: /Users/dhyana/.dharma/knowledge/staging/2026-04-28/altitude-install-milestone.md captured: '2026-04-28T12:22:06.027909+00:00' captured_by: claude-altitude-insta",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-04-28/914140f9-a31c-4cc7-927c-543f1861ff16.md",
+      "tier": "staged",
+      "title": "Operating Altitude Install \u2014 2026-04-28 Session Milestone"
+    },
+    {
+      "excerpt": "title: \"Operating Altitude Install \u2014 2026-04-28 Session Milestone\" confidence: 0.95 sources: - \"live session 2026-04-28 covering Xrully wiki upgrade + 10 deep recursive readings + altitude install\" - \"/Users/dhyana/.dharma/knowledge/wiki/_meta/recursive-readings/literature-pass/10-meta-presence-notes.md\" - \"/Users/dhyana/.dharma/knowledge/wiki/concepts/altit",
+      "matched_terms": [],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-04-28/altitude-install-milestone.md",
+      "tier": "staged",
+      "title": "Operating Altitude Install \u2014 2026-04-28 Session Milestone"
+    },
+    {
+      "excerpt": "title: <observed_from_primary_session> <what_happened>semantic_identifier_search</what\u2026 \u2014 turn 4 chetana_version: 0.1.0 atom_id: 37ce5747-0d10-45c6-890e-d4eb561b3547 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/184b9186-aae6-4a17-a018-2ce462c3cda7.jsonl span: line:151 ca",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/37ce5747-0d10-45c6-890e-d4eb561b3547.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: 'ok, here htey are: on Q1 decent, but Thinkodynamic director also might be a god\u2026 \u2014 turn 177' chetana_version: 0.1.0 atom_id: 37cecf90-7c3a-49e7-a81f-29d9fd1b4e6e type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:5375 captured: '2026-05-04T14:30",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/37cecf90-7c3a-49e7-a81f-29d9fd1b4e6e.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: <observed_from_primary_session> <what_happened>Bash</what_happened> <occurred_a\u2026 \u2014 turn 2 chetana_version: 0.1.0 atom_id: 37cf2d82-5d17-4544-8c07-7f7fa5e82a93 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/5af0ba34-fdf1-466a-b043-4ba57eb3cf1e.jsonl span: line:38 cap",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/37cf2d82-5d17-4544-8c07-7f7fa5e82a93.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: Hello memory agent, you are continuing to observe the primary Claude session. <\u2026 \u2014 turn 1 chetana_version: 0.1.0 atom_id: 37d0d131-f3fd-4a1d-8d1a-2ad7f6a93c8c type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/6dce14cb-4a2c-4d69-88d0-08a0fe1ac1f6.jsonl span: line:25 cap",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/37d0d131-f3fd-4a1d-8d1a-2ad7f6a93c8c.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: <observed_from_primary_session> <what_happened>write_stdin</what_happened> <occ\u2026 \u2014 turn 12 chetana_version: 0.1.0 atom_id: 37d23ce6-2148-4e9a-9eb9-a43b27d40cb2 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/ca5e3f83-1549-48fb-8550-bb81f10113b9.jsonl span: line:475 c",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/37d23ce6-2148-4e9a-9eb9-a43b27d40cb2.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: try them all \u2014 turn 30 chetana_version: 0.1.0 atom_id: 37deb3bd-c77c-4339-a85e-71afb750d1f7 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:939 captured: '2026-05-04T07:04:48.917616+00:00' captured_by: chetana_session_stop_hook stale_after: '2",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/37deb3bd-c77c-4339-a85e-71afb750d1f7.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: Hello memory agent, you are continuing to observe the primary Claude session. <\u2026 \u2014 turn 1 chetana_version: 0.1.0 atom_id: 37e214a4-ebea-4f35-b6f7-fc372844422a type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/f07923ce-8751-44ec-b613-fcf3f0ef9f00.jsonl span: line:21 cap",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/37e214a4-ebea-4f35-b6f7-fc372844422a.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: so, there has been some feature that is silently obesrveing every single claude\u2026 \u2014 turn 24 chetana_version: 0.1.0 atom_id: 37ef5063-13bd-4269-bdb6-0ad8a63dcfab type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:757 captured: '2026-05-04T04:47:21.",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/37ef5063-13bd-4269-bdb6-0ad8a63dcfab.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: <observed_from_primary_session> <what_happened>write_stdin</what_happened> <occ\u2026 \u2014 turn 5 chetana_version: 0.1.0 atom_id: 37f43382-90c9-4f57-9638-9d8a06297e2b type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/c586c4c4-36dd-417a-9d4c-21159e66ab7d.jsonl span: line:619 ca",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/37f43382-90c9-4f57-9638-9d8a06297e2b.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: and so... fuck I'm cookied.. you amek we want to commit suidice. \u2014 turn 126 chetana_version: 0.1.0 atom_id: 37fce089-6ceb-489d-8760-89c89df64ac0 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:4011 captured: '2026-05-04T14:02:33.911549+00:00' ",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/37fce089-6ceb-489d-8760-89c89df64ac0.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: Hello memory agent, you are continuing to observe the primary Claude session. <\u2026 \u2014 turn 1 chetana_version: 0.1.0 atom_id: 37fee675-6994-4f22-af15-fe52f2e0abec type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/2743b1a3-6301-4243-b4de-0e095966af6d.jsonl span: line:71 cap",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/37fee675-6994-4f22-af15-fe52f2e0abec.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: <observed_from_primary_session> <what_happened>write_stdin</what_happened> <occ\u2026 \u2014 turn 4 chetana_version: 0.1.0 atom_id: 38022885-040f-42b4-9590-3e332cfabbcf type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/de25d418-8989-47c2-89b0-b4433ee26087.jsonl span: line:240 ca",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38022885-040f-42b4-9590-3e332cfabbcf.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: This session is being continued from a previous conversation that ran out of co\u2026 \u2014 turn 15 chetana_version: 0.1.0 atom_id: 380a0b7d-c3a3-46d4-9158-1f75a582d457 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/5d05e0bd-ce7f-4232-8ef6-53e9bb347ce6.jsonl span: line:519 c",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/380a0b7d-c3a3-46d4-9158-1f75a582d457.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: <observed_from_primary_session> <what_happened>write_stdin</what_happened> <occ\u2026 \u2014 turn 8 chetana_version: 0.1.0 atom_id: 380db7dd-8395-486a-ac8b-422a9b2f13cd type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/28f7803f-e613-4319-b82d-b18303e38a10.jsonl span: line:200 ca",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/380db7dd-8395-486a-ac8b-422a9b2f13cd.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: we dont' have enough signal... \u2014 turn 47 chetana_version: 0.1.0 atom_id: 380ebffb-aec6-41bf-a0f0-2676f937f747 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:1511 captured: '2026-05-04T13:53:00.016799+00:00' captured_by: chetana_session_stop_h",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/380ebffb-aec6-41bf-a0f0-2676f937f747.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: can you give me a dozen verydetaield real world examples of the highets perform\u2026 \u2014 turn 128 chetana_version: 0.1.0 atom_id: 3816ba2c-b971-4ebf-b9d8-e250a2e32e42 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:4055 captured: '2026-05-04T14:02:3",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/3816ba2c-b971-4ebf-b9d8-e250a2e32e42.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: <observed_from_primary_session> <what_happened>Read</what_happened> <occurred_a\u2026 \u2014 turn 2 chetana_version: 0.1.0 atom_id: 381e543d-8f4c-4598-8c96-36af28eebf71 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/ee06fc9f-513b-492c-950c-8891673a8bb3.jsonl span: line:65 cap",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/381e543d-8f4c-4598-8c96-36af28eebf71.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: give me a small prompt to pass to codex with this included \u2014 turn 74 chetana_version: 0.1.0 atom_id: 38233e31-a630-4dec-b934-bb7a336f0366 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:2251 captured: '2026-05-04T05:11:03.915022+00:00' capture",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38233e31-a630-4dec-b934-bb7a336f0366.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: ok, given that now what? can you resrach all legeit methods for claude code sel\u2026 \u2014 turn 15 chetana_version: 0.1.0 atom_id: 3824f779-11a6-42c7-85b3-d838a8d2beeb type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/e4cad60f-337b-4510-9c70-ea119ec7954b.jsonl span: line:509 captured: '2026-05-04T02:18:37.",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/3824f779-11a6-42c7-85b3-d838a8d2beeb.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: Hello memory agent, you are continuing to observe the primary Claude session. <\u2026 \u2014 turn 11 chetana_version: 0.1.0 atom_id: 382db21e-e4b6-4a3a-9367-d91064d623b0 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/f4236ca6-cc22-4f09-8570-ab772c079ab6.jsonl span: line:954 c",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/382db21e-e4b6-4a3a-9367-d91064d623b0.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: so, there has been some feature that is silently obesrveing every single claude\u2026 \u2014 turn 22 chetana_version: 0.1.0 atom_id: 3832829e-8df6-43ca-973e-43565081b9d0 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/e4cad60f-337b-4510-9c70-ea119ec7954b.jsonl span: line:803 captured: '2026-05-04T02:18:37.",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/3832829e-8df6-43ca-973e-43565081b9d0.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: <observed_from_primary_session> <what_happened>exec_command</what_happened> <oc\u2026 \u2014 turn 14 chetana_version: 0.1.0 atom_id: 383c3fc7-f16f-49d8-949d-f6b4a56e362e type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/184b9186-aae6-4a17-a018-2ce462c3cda7.jsonl span: line:446 c",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/383c3fc7-f16f-49d8-949d-f6b4a56e362e.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: <observed_from_primary_session> <what_happened>write_stdin</what_happened> <occ\u2026 \u2014 turn 1 chetana_version: 0.1.0 atom_id: 38421df2-a2a7-4ef9-954f-dbec7b464e8f type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/a4804e4c-5d88-46b7-80b9-0e93bc19acea.jsonl span: line:79 cap",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38421df2-a2a7-4ef9-954f-dbec7b464e8f.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: yes codex is still working and I want you to disucss with him before we move fo\u2026 \u2014 turn 87 chetana_version: 0.1.0 atom_id: 3851bbf6-3200-497b-85e5-8af570645103 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:2732 captured: '2026-05-04T13:38:36",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/3851bbf6-3200-497b-85e5-8af570645103.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: Hello memory agent, you are continuing to observe the primary Claude session. <\u2026 \u2014 turn 1 chetana_version: 0.1.0 atom_id: 3851ecae-1065-430d-a79c-6fe224353cd5 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/6dce14cb-4a2c-4d69-88d0-08a0fe1ac1f6.jsonl span: line:25 cap",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/3851ecae-1065-430d-a79c-6fe224353cd5.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: try them all \u2014 turn 28 chetana_version: 0.1.0 atom_id: 3856ff7c-df7d-44c4-b52e-75fb1cbefb56 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:895 captured: '2026-05-04T07:03:32.737552+00:00' captured_by: chetana_session_stop_hook stale_after: '2",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/3856ff7c-df7d-44c4-b52e-75fb1cbefb56.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: what are you asking? \u2014 turn 66 chetana_version: 0.1.0 atom_id: 38620d25-390f-48dd-b049-88e79c7e42e0 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/fb04b8b1-58ab-4a33-85f8-bec03acc7fb6.jsonl span: line:2975 captured: '2026-05-03T16:24:10.851202+00:00' captured_by: chetana_session_stop_hook stale_",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38620d25-390f-48dd-b049-88e79c7e42e0.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: and so... fuck I'm cookied.. you amek we want to commit suidice. \u2014 turn 126 chetana_version: 0.1.0 atom_id: 386232e5-bc32-45ce-9c56-eb4ccec56974 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:4011 captured: '2026-05-04T07:04:49.845401+00:00' ",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/386232e5-bc32-45ce-9c56-eb4ccec56974.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: yes codex is still working and I want you to disucss with him before we move fo\u2026 \u2014 turn 88 chetana_version: 0.1.0 atom_id: 3863a527-3721-4b70-9f4a-7ae470196795 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:2740 captured: '2026-05-04T05:31:48",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/3863a527-3721-4b70-9f4a-7ae470196795.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: <observed_from_primary_session> <what_happened>write_stdin</what_happened> <occ\u2026 \u2014 turn 2 chetana_version: 0.1.0 atom_id: 3863ad81-42a8-44bb-b208-8cb9413edb7c type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/ca5e3f83-1549-48fb-8550-bb81f10113b9.jsonl span: line:113 ca",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/3863ad81-42a8-44bb-b208-8cb9413edb7c.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: <observed_from_primary_session> <what_happened>search_memory_graph</what_happen\u2026 \u2014 turn 12 chetana_version: 0.1.0 atom_id: 38640c68-9336-433d-9c54-82b14fdb594a type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/184b9186-aae6-4a17-a018-2ce462c3cda7.jsonl span: line:381 c",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38640c68-9336-433d-9c54-82b14fdb594a.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: try them all \u2014 turn 31 chetana_version: 0.1.0 atom_id: 3864360e-c2fe-4458-a831-6686aea2455d type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:973 captured: '2026-05-04T03:24:27.484127+00:00' captured_by: chetana_session_stop_hook stale_after: '2",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/3864360e-c2fe-4458-a831-6686aea2455d.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: ok, yes, i don't know, if we need to scrap yt. but yeah, bridge yor ucuretn udn\u2026 \u2014 turn 112 chetana_version: 0.1.0 atom_id: 386e74d7-6898-4406-8ab3-528516975ae9 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:3486 captured: '2026-05-04T04:36:4",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/386e74d7-6898-4406-8ab3-528516975ae9.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: 'Base directory for this skill: /Users/dhyana/.claude/skills/skill-genesis # Ski\u2026 \u2014 turn 6' chetana_version: 0.1.0 atom_id: 3871467d-975b-47cf-8f49-cc57a42715dc type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:228 captured: '2026-05-04T06:39:57",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/3871467d-975b-47cf-8f49-cc57a42715dc.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: this seems wayyy to generic. what tools and what context did you look at to fin\u2026 \u2014 turn 62 chetana_version: 0.1.0 atom_id: 3872c105-1d43-4530-983a-ff3b3a0815eb type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/e4cad60f-337b-4510-9c70-ea119ec7954b.jsonl span: line:2268 captured: '2026-05-04T02:35:25",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/3872c105-1d43-4530-983a-ff3b3a0815eb.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: <observed_from_primary_session> <what_happened>exec_command</what_happened> <oc\u2026 \u2014 turn 2 chetana_version: 0.1.0 atom_id: 38759ce4-4915-4d5b-a71f-e744527f5877 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/b9307c3c-0d53-470b-9da8-faf2ff26ee20.jsonl span: line:167 ca",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38759ce4-4915-4d5b-a71f-e744527f5877.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: <observed_from_primary_session> <what_happened>exec_command</what_happened> <oc\u2026 \u2014 turn 2 chetana_version: 0.1.0 atom_id: 38776bbc-d763-4eb2-bd3d-0d61bb1d24a1 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/5d05e0bd-ce7f-4232-8ef6-53e9bb347ce6.jsonl span: line:67 cap",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38776bbc-d763-4eb2-bd3d-0d61bb1d24a1.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: 'Base directory for this skill: /Users/dhyana/.claude/skills/skill-genesis # Ski\u2026 \u2014 turn 3' chetana_version: 0.1.0 atom_id: 3878e830-ae72-4f13-bf86-be6c394361b7 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/e4cad60f-337b-4510-9c70-ea119ec7954b.jsonl span: line:52 captured: '2026-05-04T02:07:17.",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/3878e830-ae72-4f13-bf86-be6c394361b7.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: <observed_from_primary_session> <what_happened>exec_command</what_happened> <oc\u2026 \u2014 turn 11 chetana_version: 0.1.0 atom_id: 387d5af9-514b-484c-97bd-1d66c5ae429d type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/ebc370b9-e97c-48a9-a800-f348997f89c9.jsonl span: line:237 c",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/387d5af9-514b-484c-97bd-1d66c5ae429d.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: ok, we're getting close, whatever memroy sysem that is loggin this, using JOHn'\u2026 \u2014 turn 103 chetana_version: 0.1.0 atom_id: 3893a03f-9c21-40ac-b365-60fb9413c8a2 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:3297 captured: '2026-05-04T03:52:1",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/3893a03f-9c21-40ac-b365-60fb9413c8a2.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: <observed_from_primary_session> <what_happened>exec_command</what_happened> <oc\u2026 \u2014 turn 6 chetana_version: 0.1.0 atom_id: 3899893a-986b-4502-b64f-82afd8627cc2 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/0c0f2460-91bc-4c97-a25c-6143192fdf5f.jsonl span: line:120 ca",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/3899893a-986b-4502-b64f-82afd8627cc2.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: <observed_from_primary_session> <what_happened>write_stdin</what_happened> <occ\u2026 \u2014 turn 6 chetana_version: 0.1.0 atom_id: 38a41102-fb44-41c5-88e9-48fa2d690426 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/184b9186-aae6-4a17-a018-2ce462c3cda7.jsonl span: line:198 ca",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38a41102-fb44-41c5-88e9-48fa2d690426.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: <observed_from_primary_session> <what_happened>update_plan</what_happened> <occ\u2026 \u2014 turn 3 chetana_version: 0.1.0 atom_id: 38b133d8-6933-4d9f-8d89-97e92e7eb40b type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/ebc370b9-e97c-48a9-a800-f348997f89c9.jsonl span: line:69 cap",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38b133d8-6933-4d9f-8d89-97e92e7eb40b.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: <task-notification> <task-id>r75ccbxcn</task-id> <task-type>remote_agent</task-\u2026 \u2014 turn 171 chetana_version: 0.1.0 atom_id: 38bb19a9-25e2-4b97-b9b2-88fa31bd6e12 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:5238 captured: '2026-05-04T14:02:3",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38bb19a9-25e2-4b97-b9b2-88fa31bd6e12.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: <observed_from_primary_session> <what_happened>write_file</what_happened> <occu\u2026 \u2014 turn 8 chetana_version: 0.1.0 atom_id: 38bcbe8e-0c9f-49de-aa2e-064f8816b4c7 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/1d18f98b-2335-47c1-9987-d92ac6fa892c.jsonl span: line:200 ca",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38bcbe8e-0c9f-49de-aa2e-064f8816b4c7.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: we need it 80% extraction. do everything you need to do to make it happen. this\u2026 \u2014 turn 66 chetana_version: 0.1.0 atom_id: 38be697d-3c21-404d-b43f-5fb81fdd0a5f type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/e4cad60f-337b-4510-9c70-ea119ec7954b.jsonl span: line:2476 captured: '2026-05-04T02:35:25",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38be697d-3c21-404d-b43f-5fb81fdd0a5f.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: <observed_from_primary_session> <what_happened>exec_command</what_happened> <oc\u2026 \u2014 turn 8 chetana_version: 0.1.0 atom_id: 38c045d6-7d94-458d-9290-7ec8ca25fcf9 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/c381d026-4c37-420b-9d8d-f9956deb6d2a.jsonl span: line:184 ca",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38c045d6-7d94-458d-9290-7ec8ca25fcf9.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: so, there has been some feature that is silently obesrveing every single claude\u2026 \u2014 turn 26 chetana_version: 0.1.0 atom_id: 38c1faac-7e74-4784-af1f-1aefc01c42cc type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:835 captured: '2026-05-04T03:24:27.",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38c1faac-7e74-4784-af1f-1aefc01c42cc.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: <observed_from_primary_session> <what_happened>exec_command</what_happened> <oc\u2026 \u2014 turn 8 chetana_version: 0.1.0 atom_id: 38c24d7c-8ab2-46b1-875e-b03ef4130064 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/c381d026-4c37-420b-9d8d-f9956deb6d2a.jsonl span: line:184 ca",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38c24d7c-8ab2-46b1-875e-b03ef4130064.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: 'Base directory for this skill: /Users/dhyana/.claude/skills/skill-genesis # Ski\u2026 \u2014 turn 7' chetana_version: 0.1.0 atom_id: 38c75465-5dde-4c8b-8635-bdc2cc21b28a type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/e4cad60f-337b-4510-9c70-ea119ec7954b.jsonl span: line:281 captured: '2026-05-04T02:07:17",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38c75465-5dde-4c8b-8635-bdc2cc21b28a.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: ok, given that now what? can you resrach all legeit methods for claude code sel\u2026 \u2014 turn 11 chetana_version: 0.1.0 atom_id: 38cb8787-1f68-40da-b7d8-923a88e3962e type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:302 captured: '2026-05-04T04:36:46.",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38cb8787-1f68-40da-b7d8-923a88e3962e.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: 'Base directory for this skill: /Users/dhyana/.claude/plugins/cache/superpowers-\u2026 \u2014 turn 76' chetana_version: 0.1.0 atom_id: 38cd4bb2-b9da-4896-b4bd-023fa532815e type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:2268 captured: '2026-05-04T03:52:",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38cd4bb2-b9da-4896-b4bd-023fa532815e.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: so, there has been some feature that is silently obesrveing every single claude\u2026 \u2014 turn 23 chetana_version: 0.1.0 atom_id: 38ceb1ff-115b-4a07-806e-f9d14c7eaf2f type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:719 captured: '2026-05-04T03:51:03.",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38ceb1ff-115b-4a07-806e-f9d14c7eaf2f.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: we need it 80% extraction. do everything you need to do to make it happen. this\u2026 \u2014 turn 63 chetana_version: 0.1.0 atom_id: 38df5af8-f290-4952-a259-5e6e11611066 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:2019 captured: '2026-05-04T05:08:22",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38df5af8-f290-4952-a259-5e6e11611066.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: <observed_from_primary_session> <what_happened>apply_patch</what_happened> <occ\u2026 \u2014 turn 4 chetana_version: 0.1.0 atom_id: 38e19205-9b82-4157-bea2-bd00ed53af89 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/5d05e0bd-ce7f-4232-8ef6-53e9bb347ce6.jsonl span: line:115 ca",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38e19205-9b82-4157-bea2-bd00ed53af89.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: <observed_from_primary_session> <what_happened>update_plan</what_happened> <occ\u2026 \u2014 turn 2 chetana_version: 0.1.0 atom_id: 38e1c553-2b8d-4866-a112-09eec9007a22 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/9aeddf2c-f0f4-4d6c-b54c-1cdc6c03df13.jsonl span: line:70 cap",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38e1c553-2b8d-4866-a112-09eec9007a22.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: <observed_from_primary_session> <what_happened>exec_command</what_happened> <oc\u2026 \u2014 turn 23 chetana_version: 0.1.0 atom_id: 38e49f44-5d82-4d33-ba69-9a5d20e76f70 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/ca5e3f83-1549-48fb-8550-bb81f10113b9.jsonl span: line:818 c",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38e49f44-5d82-4d33-ba69-9a5d20e76f70.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: <observed_from_primary_session> <what_happened>Read</what_happened> <occurred_a\u2026 \u2014 turn 3 chetana_version: 0.1.0 atom_id: 38e6b448-53f6-44e0-ae40-709cf80dc7be type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/fa51c846-1549-478e-a196-e034d55a8257.jsonl span: line:74 cap",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38e6b448-53f6-44e0-ae40-709cf80dc7be.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: <observed_from_primary_session> <what_happened>write_stdin</what_happened> <occ\u2026 \u2014 turn 14 chetana_version: 0.1.0 atom_id: 38e8bf5f-0e18-43f4-bdd5-02f24ddc7049 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/ca5e3f83-1549-48fb-8550-bb81f10113b9.jsonl span: line:519 c",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38e8bf5f-0e18-43f4-bdd5-02f24ddc7049.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: <observed_from_primary_session> <what_happened>read_multiple_files</what_happen\u2026 \u2014 turn 3 chetana_version: 0.1.0 atom_id: 38efefeb-70ef-45bf-a7f2-4887b237a8a4 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/95cbf406-4461-4a73-8251-83065e58c2bc.jsonl span: line:92 cap",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38efefeb-70ef-45bf-a7f2-4887b237a8a4.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: DO NOT COLLAPSE 5.13a or 514a into premature catch phraes definitions. JOHN HAT\u2026 \u2014 turn 148 chetana_version: 0.1.0 atom_id: 38f2c15f-eb4d-401c-8970-a2ec2e03ec4e type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:4620 captured: '2026-05-04T07:05:5",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38f2c15f-eb4d-401c-8970-a2ec2e03ec4e.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: <observed_from_primary_session> <what_happened>write_stdin</what_happened> <occ\u2026 \u2014 turn 2 chetana_version: 0.1.0 atom_id: 38f7ce34-ebcc-4c08-ac11-5d61820ff6ed type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/64bcf8b6-0062-4c2e-b0c2-53546b026653.jsonl span: line:58 cap",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38f7ce34-ebcc-4c08-ac11-5d61820ff6ed.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: <observed_from_primary_session> <what_happened>apply_patch</what_happened> <occ\u2026 \u2014 turn 10 chetana_version: 0.1.0 atom_id: 38f88635-8b62-4d5a-9fec-1f3799023ae8 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/5d05e0bd-ce7f-4232-8ef6-53e9bb347ce6.jsonl span: line:246 c",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38f88635-8b62-4d5a-9fec-1f3799023ae8.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: giving up on the neurips.. we don't have a paper \u2014 turn 46 chetana_version: 0.1.0 atom_id: 38f8c46d-3f05-4b45-b840-c5bf8b53ee82 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:1499 captured: '2026-05-04T03:24:27.508634+00:00' captured_by: chet",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38f8c46d-3f05-4b45-b840-c5bf8b53ee82.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: lclean it all up \u2014 turn 54 chetana_version: 0.1.0 atom_id: 38fd5b22-9590-4a1e-8262-49863c673aa5 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/e4cad60f-337b-4510-9c70-ea119ec7954b.jsonl span: line:2041 captured: '2026-05-04T02:07:17.543578+00:00' captured_by: chetana_session_stop_hook stale_afte",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38fd5b22-9590-4a1e-8262-49863c673aa5.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: giving up on the neurips.. we don't have a paper \u2014 turn 46 chetana_version: 0.1.0 atom_id: 38ff5ffb-c238-4cf8-9e17-1478eb1cf941 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:1499 captured: '2026-05-04T11:26:51.601410+00:00' captured_by: chet",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/38ff5ffb-c238-4cf8-9e17-1478eb1cf941.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: <observed_from_primary_session> <what_happened>Bash</what_happened> <occurred_a\u2026 \u2014 turn 3 chetana_version: 0.1.0 atom_id: 3901fee1-a71d-4bd9-bea5-6e253e6caa0d type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/8f2a5fd3-aa55-4f9c-8ed9-4b427a8d9401.jsonl span: line:83 cap",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/3901fee1-a71d-4bd9-bea5-6e253e6caa0d.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: <observed_from_primary_session> <what_happened>exec_command</what_happened> <oc\u2026 \u2014 turn 6 chetana_version: 0.1.0 atom_id: 39032e64-939f-4de6-a340-67f72f6795cd type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/0c0f2460-91bc-4c97-a25c-6143192fdf5f.jsonl span: line:120 ca",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/39032e64-939f-4de6-a340-67f72f6795cd.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: 3 \u2014 turn 121 chetana_version: 0.1.0 atom_id: 39039139-e242-4156-9be4-3efd9395dab4 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:3822 captured: '2026-05-04T10:18:28.234486+00:00' captured_by: chetana_session_stop_hook stale_after: '2026-08-02",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/39039139-e242-4156-9be4-3efd9395dab4.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: can you do all that now please \u2014 turn 42 chetana_version: 0.1.0 atom_id: 390c39ff-e7f5-4dbd-a1c3-46e78e0f90b1 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:1429 captured: '2026-05-04T14:30:35.159083+00:00' captured_by: chetana_session_stop_h",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/390c39ff-e7f5-4dbd-a1c3-46e78e0f90b1.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: Hello memory agent, you are continuing to observe the primary Claude session. C\u2026 \u2014 turn 10 chetana_version: 0.1.0 atom_id: 390f23af-46eb-4ce3-a9b7-f392c8a5a0a4 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/f4236ca6-cc22-4f09-8570-ab772c079ab6.jsonl span: line:760 c",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/390f23af-46eb-4ce3-a9b7-f392c8a5a0a4.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: can you do all that now please \u2014 turn 41 chetana_version: 0.1.0 atom_id: 3910f458-182a-4bdf-8f57-1b9d0794150c type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:1412 captured: '2026-05-04T04:43:46.200702+00:00' captured_by: chetana_session_stop_h",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/3910f458-182a-4bdf-8f57-1b9d0794150c.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: <observed_from_primary_session> <what_happened>read_multiple_files</what_happen\u2026 \u2014 turn 3 chetana_version: 0.1.0 atom_id: 391303e8-73bc-4b36-a968-1e1828967391 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/95cbf406-4461-4a73-8251-83065e58c2bc.jsonl span: line:92 cap",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/391303e8-73bc-4b36-a968-1e1828967391.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: <observed_from_primary_session> <what_happened>write_stdin</what_happened> <occ\u2026 \u2014 turn 7 chetana_version: 0.1.0 atom_id: 3917a5b2-0772-4181-ae10-84fdd22772bc type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/ca5e3f83-1549-48fb-8550-bb81f10113b9.jsonl span: line:286 ca",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/3917a5b2-0772-4181-ae10-84fdd22772bc.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: <observed_from_primary_session> <what_happened>write_stdin</what_happened> <occ\u2026 \u2014 turn 13 chetana_version: 0.1.0 atom_id: 391bf5bc-5884-4d78-80e9-a2a522384c14 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/ca5e3f83-1549-48fb-8550-bb81f10113b9.jsonl span: line:503 c",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/391bf5bc-5884-4d78-80e9-a2a522384c14.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: <task-notification> <task-id>a4962bad0f8194f26</task-id> <tool-use-id>toolu_01X\u2026 \u2014 turn 8 chetana_version: 0.1.0 atom_id: 391f2789-74ba-4948-8887-b4f95182335c type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/e4cad60f-337b-4510-9c70-ea119ec7954b.jsonl span: line:305 captured: '2026-05-04T02:24:06.2",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/391f2789-74ba-4948-8887-b4f95182335c.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: <observed_from_primary_session> <what_happened>write_stdin</what_happened> <occ\u2026 \u2014 turn 2 chetana_version: 0.1.0 atom_id: 39229507-f602-4fd9-a00d-bf8946b553e5 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/1627332d-510b-414c-9ee0-6965cc03c882.jsonl span: line:40 cap",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/39229507-f602-4fd9-a00d-bf8946b553e5.md",
+      "tier": "staged",
+      "title": "Source turn"
+    },
+    {
+      "excerpt": "title: This session is being continued from a previous conversation that ran out of co\u2026 \u2014 turn 14 chetana_version: 0.1.0 atom_id: 392a8ff9-ebeb-423b-86e4-0aad33755dd8 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/95cbf406-4461-4a73-8251-83065e58c2bc.jsonl span: line:969 c",
+      "matched_terms": [
+        "Chetana"
+      ],
+      "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/392a8ff9-ebeb-423b-86e4-0aad33755dd8.md",
+      "tier": "staged",
+      "title": "Source turn"
+    }
+  ],
+  "index_query_terms": [
+    "Polsia",
+    "Cofounder",
+    "VentureCell",
+    "Operator OS",
+    "Darshan",
+    "external reader",
+    "Go evidence receipt",
+    "Chetana",
+    "MemoryKernel"
+  ],
+  "index_status": "available_truncated",
+  "indexed_count": 80,
+  "next_action": "Expand MemoryKernel read-through index coverage and query evals",
+  "quarantine_count": 5000,
+  "source_roots": [
+    "/Users/dhyana/.dharma/knowledge/staging",
+    "/Users/dhyana/.dharma/knowledge/wiki/concepts",
+    "/Users/dhyana/.dharma/knowledge/quarantine"
+  ],
+  "staged_count": 5000,
+  "status": "read_through_index_available",
+  "truncated": true,
+  "trusted_count": 1333
+}

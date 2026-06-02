@@ -76,6 +76,10 @@ class MemoryKernelSnapshot:
     trusted_count: int = 0
     quarantine_count: int = 0
     truncated: bool = False
+    index_status: str = ""
+    indexed_count: int = 0
+    index_entries: tuple[dict[str, Any], ...] = ()
+    index_query_terms: tuple[str, ...] = ()
     source_roots: tuple[str, ...] = ()
     evidence_refs: tuple[str, ...] = ()
     gap_codes: tuple[str, ...] = ()
