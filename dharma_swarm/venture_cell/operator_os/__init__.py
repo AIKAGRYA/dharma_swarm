@@ -30,6 +30,7 @@ from dharma_swarm.venture_cell.operator_os.schema import (
     GateSummary,
     MemoryKernelSnapshot,
     OperatorDepartment,
+    OperatorNextActionPacket,
     VentureCellOperatorProjection,
 )
 
@@ -43,6 +44,7 @@ __all__ = [
     "MemoryKernelReadThroughIndex",
     "MemoryKernelSnapshot",
     "OperatorDepartment",
+    "OperatorNextActionPacket",
     "OperatorOSInputs",
     "VentureCellOperatorProjection",
     "build_operator_projection",

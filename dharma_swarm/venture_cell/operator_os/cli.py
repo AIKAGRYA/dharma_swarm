@@ -33,6 +33,11 @@ def _memory_query_eval_payload(projection: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _next_action_payload(projection: dict[str, Any]) -> dict[str, Any]:
+    packet = projection.get("next_action_packet")
+    return packet if isinstance(packet, dict) else {}
+
+
 def render_operator_surface(
     *,
     output_dir: Path,
@@ -85,11 +90,22 @@ def render_operator_surface(
         + "\n",
         encoding="utf-8",
     )
+    next_action_packet_path = output_dir / "operator_next_action_packet.json"
+    next_action_packet_path.write_text(
+        json.dumps(
+            _next_action_payload(projection.to_dict()),
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     return {
         "projection": projection_path,
         "digest": digest_path,
         "memory_index": memory_index_path,
         "memory_query_eval": memory_query_eval_path,
+        "next_action_packet": next_action_packet_path,
     }
 
 

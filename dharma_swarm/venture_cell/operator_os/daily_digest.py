@@ -39,6 +39,27 @@ def render_operator_daily_digest(projection: VentureCellOperatorProjection) -> s
             f"coherence `{gate.coherence_state}`; gaps `{gaps}`."
         )
 
+    packet = projection.next_action_packet
+    blockers = ", ".join(packet.blockers) if packet.blockers else "none"
+    blocked_departments = (
+        ", ".join(packet.blocked_departments) if packet.blocked_departments else "none"
+    )
+    lines.extend(
+        [
+            "",
+            "## Next Action Packet",
+            "",
+            f"- Decision: `{packet.decision}`",
+            f"- Owner: `{packet.owner_department}`",
+            f"- Next governed action: {packet.next_governed_action}",
+            f"- Blocked departments: `{blocked_departments}`",
+            f"- Required unblock artifact: {packet.required_unblock_artifact or 'none'}",
+            f"- Memory query evals: `{packet.memory_query_eval_status}` "
+            f"({packet.memory_query_eval_passed}/{packet.memory_query_eval_total})",
+            f"- Blockers: `{blockers}`",
+        ]
+    )
+
     memory = projection.memory_kernel
     lines.extend(
         [

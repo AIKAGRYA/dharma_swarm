@@ -1899,13 +1899,13 @@
       "next_action": "Continue bounded internal build work with receipts",
       "observed_state": "mission contract present",
       "raw": {
-        "admission_id": "admission_56629062f48740b0",
+        "admission_id": "admission_f5c81b6a04ad4740",
         "allowed_scope": [
           "dharma_swarm/venture_cell/",
           "tests/",
           "reports/venture_operator_os/"
         ],
-        "created_at": "2026-06-02T14:33:03.922083+00:00",
+        "created_at": "2026-06-02T14:45:03.425128+00:00",
         "decision": "allow",
         "expires_at": "",
         "metadata": {
@@ -1918,7 +1918,7 @@
         "reasons": [
           "all_required_controls_present"
         ],
-        "request_id": "admission_req_d0e0cb79b70f402c",
+        "request_id": "admission_req_a5d3219c9255460b",
         "required_receipts": []
       }
     }
@@ -2925,6 +2925,66 @@
     "status": "read_through_index_available",
     "truncated": true,
     "trusted_count": 1336
+  },
+  "next_action_packet": {
+    "autonomy_level": "L0_read_only_plan",
+    "blocked_departments": [
+      "growth",
+      "communications"
+    ],
+    "blockers": [
+      "darshan_external_reader_event_missing",
+      "memory_kernel_index_truncated",
+      "memory_kernel_query_eval_partial"
+    ],
+    "decision": "hold_external_authority",
+    "evidence_refs": [
+      "/Users/dhyana/.dharma/artifacts/venture_cell/DARSHAN/2026-05-26/the-thing-they-are-competing-for-is-not-just-your-attention",
+      "/Users/dhyana/.dharma/knowledge/staging",
+      "/Users/dhyana/.dharma/knowledge/wiki/concepts",
+      "/Users/dhyana/.dharma/knowledge/quarantine",
+      "dharma_swarm/venture_cell/operator_os/projection.py"
+    ],
+    "forbidden_actions": [
+      "external_outreach",
+      "spending",
+      "deployment",
+      "publishing",
+      "protected_merge",
+      "credential_mutation",
+      "live_external_authority"
+    ],
+    "gate_decisions": [
+      {
+        "coherence_state": "declared_only",
+        "decision": "block",
+        "gap_codes": [
+          "darshan_external_reader_event_missing"
+        ],
+        "gate_id": "darshan.external_reader_go_receipts",
+        "next_action": "Advance only after one accepted countable external-reader Go receipt"
+      },
+      {
+        "coherence_state": "bound",
+        "decision": "allow",
+        "gap_codes": [],
+        "gate_id": "operator_os.governed_work_admission",
+        "next_action": "Continue bounded internal build work with receipts"
+      }
+    ],
+    "memory_query_eval_passed": 0,
+    "memory_query_eval_status": "partial",
+    "memory_query_eval_total": 6,
+    "next_governed_action": "Record one accepted, privacy-redacted external-reader Go receipt before external growth/comms autonomy.",
+    "owner_department": "growth",
+    "packet_id": "darshan.operator_next_action",
+    "raw": {
+      "external_blocked": true,
+      "memory_partial": true,
+      "task_truth_missing": false
+    },
+    "required_unblock_artifact": "Accepted privacy-redacted external-reader Go evidence receipt linked to decision_delta.json.",
+    "status": "blocked_on_external_reader_gate"
   },
   "next_actions": [
     "Record one accepted, privacy-redacted external-reader Go receipt before external growth/comms autonomy.",

@@ -94,6 +94,31 @@ class MemoryKernelSnapshot:
 
 
 @dataclass(frozen=True)
+class OperatorNextActionPacket:
+    """One read-only packet that can be handed to an operator or ds-goal lane."""
+
+    packet_id: str
+    status: str
+    autonomy_level: str
+    owner_department: str
+    decision: str
+    next_governed_action: str
+    blockers: tuple[str, ...] = ()
+    blocked_departments: tuple[str, ...] = ()
+    required_unblock_artifact: str = ""
+    memory_query_eval_status: str = "not_run"
+    memory_query_eval_passed: int = 0
+    memory_query_eval_total: int = 0
+    gate_decisions: tuple[dict[str, Any], ...] = ()
+    evidence_refs: tuple[str, ...] = ()
+    forbidden_actions: tuple[str, ...] = ()
+    raw: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class VentureCellOperatorProjection:
     """The fused Operator OS projection for one VentureCell."""
 
@@ -108,6 +133,16 @@ class VentureCellOperatorProjection:
     gates: tuple[GateSummary, ...] = ()
     memory_kernel: MemoryKernelSnapshot = field(
         default_factory=lambda: MemoryKernelSnapshot(status="unknown")
+    )
+    next_action_packet: OperatorNextActionPacket = field(
+        default_factory=lambda: OperatorNextActionPacket(
+            packet_id="operator.next_action",
+            status="unknown",
+            autonomy_level="unknown",
+            owner_department="operations",
+            decision="inspect_projection",
+            next_governed_action="Inspect the current Operator OS projection.",
+        )
     )
     daily_cycle: tuple[str, ...] = ()
     evidence_refs: tuple[str, ...] = ()

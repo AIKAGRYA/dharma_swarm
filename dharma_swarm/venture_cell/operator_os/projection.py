@@ -27,6 +27,7 @@ from dharma_swarm.venture_cell.operator_os.schema import (
     GateSummary,
     MemoryKernelSnapshot,
     OperatorDepartment,
+    OperatorNextActionPacket,
     VentureCellOperatorProjection,
 )
 
@@ -77,6 +78,17 @@ def build_operator_projection(inputs: OperatorOSInputs | None = None) -> Venture
     autonomy_level = _autonomy_level(gate, admission, canvas)
     gaps = _gap_codes(bundle, gate, admission, memory, canvas)
     next_actions = _next_actions(gaps)
+    evidence_refs = tuple(ref for ref in _evidence_refs(bundle, gate, memory) if ref)
+    next_action_packet = _next_action_packet(
+        venture_cell_id=active.venture_cell_id,
+        status=status,
+        autonomy_level=autonomy_level,
+        gaps=gaps,
+        next_actions=next_actions,
+        gates=gates,
+        memory=memory,
+        evidence_refs=evidence_refs,
+    )
 
     return VentureCellOperatorProjection(
         venture_cell_id=active.venture_cell_id,
@@ -96,8 +108,9 @@ def build_operator_projection(inputs: OperatorOSInputs | None = None) -> Venture
         canvas=canvas,
         gates=gates,
         memory_kernel=memory,
+        next_action_packet=next_action_packet,
         daily_cycle=_daily_cycle(),
-        evidence_refs=tuple(ref for ref in _evidence_refs(bundle, gate, memory) if ref),
+        evidence_refs=evidence_refs,
         gap_codes=gaps,
         next_actions=next_actions,
     )
@@ -580,6 +593,91 @@ def _next_actions(gaps: Sequence[str]) -> tuple[str, ...]:
     if not actions:
         actions.append("Run the next bounded internal builder under governed admission and record receipts.")
     return tuple(actions)
+
+
+def _next_action_packet(
+    *,
+    venture_cell_id: str,
+    status: str,
+    autonomy_level: str,
+    gaps: Sequence[str],
+    next_actions: Sequence[str],
+    gates: Sequence[GateSummary],
+    memory: MemoryKernelSnapshot,
+    evidence_refs: Sequence[str],
+) -> OperatorNextActionPacket:
+    external_blocked = any("external_reader" in gap for gap in gaps)
+    memory_partial = any("memory_kernel" in gap for gap in gaps)
+    task_truth_missing = any(
+        gap in {"operator_os_task_board_projection_empty", "operator_os_a2a_projection_empty"}
+        for gap in gaps
+    )
+    if external_blocked:
+        owner_department = "growth"
+        decision = "hold_external_authority"
+        blocked_departments = ("growth", "communications")
+        required_unblock_artifact = (
+            "Accepted privacy-redacted external-reader Go evidence receipt linked to decision_delta.json."
+        )
+    elif memory_partial:
+        owner_department = "memory"
+        decision = "repair_memory_recall"
+        blocked_departments = ("memory",)
+        required_unblock_artifact = (
+            "Chetana/wiki source packet that satisfies MemoryKernel query evals without trusted promotion claims."
+        )
+    elif task_truth_missing:
+        owner_department = "operations"
+        decision = "attach_task_truth"
+        blocked_departments = ("operations", "engineering")
+        required_unblock_artifact = "TaskBoard rows and A2A closure receipts attached to the canvas."
+    else:
+        owner_department = "operations"
+        decision = "allow_reviewed_internal_work"
+        blocked_departments = ()
+        required_unblock_artifact = ""
+
+    return OperatorNextActionPacket(
+        packet_id=f"{venture_cell_id.lower()}.operator_next_action",
+        status=status,
+        autonomy_level=autonomy_level,
+        owner_department=owner_department,
+        decision=decision,
+        next_governed_action=next_actions[0]
+        if next_actions
+        else "Run the next bounded internal builder under governed admission and record receipts.",
+        blockers=tuple(gaps),
+        blocked_departments=blocked_departments,
+        required_unblock_artifact=required_unblock_artifact,
+        memory_query_eval_status=memory.query_eval_status,
+        memory_query_eval_passed=memory.query_eval_passed,
+        memory_query_eval_total=memory.query_eval_total,
+        gate_decisions=tuple(
+            {
+                "gate_id": gate.gate_id,
+                "decision": gate.decision,
+                "coherence_state": gate.coherence_state,
+                "gap_codes": gate.gap_codes,
+                "next_action": gate.next_action,
+            }
+            for gate in gates
+        ),
+        evidence_refs=tuple(evidence_refs),
+        forbidden_actions=(
+            "external_outreach",
+            "spending",
+            "deployment",
+            "publishing",
+            "protected_merge",
+            "credential_mutation",
+            "live_external_authority",
+        ),
+        raw={
+            "external_blocked": external_blocked,
+            "memory_partial": memory_partial,
+            "task_truth_missing": task_truth_missing,
+        },
+    )
 
 
 def _evidence_refs(

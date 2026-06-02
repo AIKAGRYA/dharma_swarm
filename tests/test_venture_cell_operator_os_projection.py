@@ -130,6 +130,17 @@ def test_projection_blocks_external_autonomy_without_reader_gate(tmp_path: Path)
 
     assert projection.status == "blocked_on_external_reader_gate"
     assert projection.autonomy_level == "L0_read_only_plan"
+    assert projection.next_action_packet.decision == "hold_external_authority"
+    assert projection.next_action_packet.owner_department == "growth"
+    assert projection.next_action_packet.blocked_departments == (
+        "growth",
+        "communications",
+    )
+    assert "darshan_external_reader_event_missing" in projection.next_action_packet.blockers
+    assert "external-reader Go evidence receipt" in (
+        projection.next_action_packet.required_unblock_artifact
+    )
+    assert "live_external_authority" in projection.next_action_packet.forbidden_actions
     assert len(projection.departments) >= 8
     assert "darshan_external_reader_event_missing" in projection.gap_codes
     assert any(
@@ -236,6 +247,8 @@ def test_operator_daily_digest_renders_structure_without_live_authority_claim(tm
     assert "# VentureCell Operator OS Digest: DARSHAN" in digest
     assert "## Departments" in digest
     assert "## Gates" in digest
+    assert "## Next Action Packet" in digest
+    assert "hold_external_authority" in digest
     assert "## Memory Kernel" in digest
     assert "`L0_read_only_plan`" in digest
     assert "autonomous external send" not in digest.lower()
@@ -270,14 +283,21 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     memory_query_eval = json.loads(
         paths["memory_query_eval"].read_text(encoding="utf-8")
     )
+    next_action_packet = json.loads(
+        paths["next_action_packet"].read_text(encoding="utf-8")
+    )
 
     assert projection["status"] == "blocked_on_external_reader_gate"
     assert projection["autonomy_level"] == "L0_read_only_plan"
+    assert projection["next_action_packet"]["decision"] == "hold_external_authority"
     assert "# VentureCell Operator OS Digest: DARSHAN" in digest
     assert "index_status" in memory_index
     assert "query_eval_status" in memory_index
     assert "query_eval_results" in memory_query_eval
     assert memory_query_eval["trusted_promotion_claimed"] is False
+    assert next_action_packet["decision"] == "hold_external_authority"
+    assert next_action_packet["blocked_departments"] == ["growth", "communications"]
+    assert "live_external_authority" in next_action_packet["forbidden_actions"]
 
 
 def test_memory_kernel_query_eval_distinguishes_tiers_and_provenance(tmp_path: Path) -> None:

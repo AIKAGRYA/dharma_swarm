@@ -92,6 +92,16 @@
 - `darshan.external_reader_go_receipts` decision `block`; coherence `declared_only`; gaps `darshan_external_reader_event_missing`.
 - `operator_os.governed_work_admission` decision `allow`; coherence `bound`; gaps `none`.
 
+## Next Action Packet
+
+- Decision: `hold_external_authority`
+- Owner: `growth`
+- Next governed action: Record one accepted, privacy-redacted external-reader Go receipt before external growth/comms autonomy.
+- Blocked departments: `growth, communications`
+- Required unblock artifact: Accepted privacy-redacted external-reader Go evidence receipt linked to decision_delta.json.
+- Memory query evals: `partial` (0/6)
+- Blockers: `darshan_external_reader_event_missing, memory_kernel_index_truncated, memory_kernel_query_eval_partial`
+
 ## Memory Kernel
 
 - Status: `read_through_index_available`
