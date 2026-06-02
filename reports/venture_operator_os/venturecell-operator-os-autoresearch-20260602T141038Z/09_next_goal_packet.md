@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-a8ff4c8f3684c4af`
-Current scoped HEAD before this packet: `3e4e0820 docs(operator-os): refresh substrate context`
+ds-goal progress receipt: `r-2094f1c27d8e0d40`
+Current scoped HEAD before this packet: `0039ff12 feat(operator-os): expose authority booleans`
 
 This packet is the handoff for the next bounded AutoResearch loop. It must be
 reviewed and updated in the final hour before reporter closure.
@@ -31,6 +31,8 @@ reviewed and updated in the final hour before reporter closure.
 - Manifest receipt inventory: present.
 - Gap triage packet: `external_blocked_with_local_followups`, with external
   reader as non-local blocker and MemoryKernel truncation as local maintenance.
+- Gap triage counts: total `2`, local `1`, external-authority-required `1`;
+  selector counts only.
 - Memory coverage packet: present; staging and quarantine roots are truncated,
   trusted and report-local roots are not truncated.
 - Memory coverage targets: staging and quarantine are the current local
@@ -53,7 +55,7 @@ reviewed and updated in the final hour before reporter closure.
   evidence remains visible.
 - Timebox refresh: current clock still below 8 hours.
 - Three-hour timebox proof: current clock still below 8 hours.
-- Last committed packet: periodic substrate refresh.
+- Last committed packet: explicit authority booleans.
 
 ## Next Goal
 
@@ -136,6 +138,8 @@ bounded targets:
    `operator_gap_triage_packet.json` now separates external-authority gaps from
    locally actionable maintenance gaps. Use it to pick local loops, but do not
    treat it as a gate-clearance or authority artifact.
+   Preserve count/list parity for `gap_count`,
+   `locally_actionable_count`, and `external_authority_required_count`.
 
 12. Memory coverage maintenance.
 
@@ -251,6 +255,7 @@ If the loop only changes a report packet, also run scoped `git diff --check`.
 - `32_timebox_three_hour_receipt.md`
 - `33_periodic_substrate_refresh_receipt.md`
 - `34_authority_boolean_receipt.md`
+- `35_gap_triage_counts_receipt.md`
 - `operator_os_projection.json`
 - `operator_completion_guard_packet.json`
 - `operator_next_action_packet.json`

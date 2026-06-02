@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-a8ff4c8f3684c4af`
-Current scoped HEAD before this packet: `3e4e0820 docs(operator-os): refresh substrate context`
+ds-goal progress receipt: `r-2094f1c27d8e0d40`
+Current scoped HEAD before this packet: `0039ff12 feat(operator-os): expose authority booleans`
 
 This audit is intentionally written before the final time window so the next
 agent has a concrete attack surface. It is not a completion certificate. The
@@ -42,6 +42,8 @@ updates, and terminal verification exist.
   but is still navigation only.
 - Gap triage packet reports `external_blocked_with_local_followups`, but is
   still only a local selector and not gate clearance.
+- Gap triage packet now exposes total/local/external gap counts, but counts are
+  selectors only and not proof that a blocker is solved.
 - Memory coverage packet identifies root-level truncation, but does not prove
   complete MemoryKernel coverage.
 - Memory coverage packet now lists truncated roles and local maintenance
@@ -126,6 +128,8 @@ Adversarial review:
 - Receipt inventory must not be used as a closure certificate.
 - Gap triage must not be used as authority, final proof, or external-reader GO
   clearance.
+- Gap triage counts must not be used as authority, final proof, or
+  external-reader GO clearance.
 - Memory coverage must not be used to claim complete recall or trusted Chetana
   promotion.
 - Memory coverage targets must not be used to claim that staging/quarantine
@@ -185,6 +189,7 @@ Queued:
 | Receipt inventory scope proves finality | scope/non-final markers are navigation only | false |
 | Admission redaction weakened gates | admission decision remains `allow` with reasons visible | false |
 | Gap triage clears the remaining blockers | `operator_gap_triage_packet.json` is `not_authority: true` | false |
+| Gap triage counts clear the remaining blockers | counts expose selector sizes only; external-reader count remains nonzero | false |
 | Memory coverage proves complete recall | staging and quarantine roots are still truncated | false |
 | Memory coverage targets resolve truncation | targets name staging/quarantine maintenance only | false |
 | Digest cap deletes noisy tasks | projection JSON still includes the full canvas | false |

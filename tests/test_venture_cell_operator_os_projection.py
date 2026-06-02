@@ -176,6 +176,13 @@ def test_projection_blocks_external_autonomy_without_reader_gate(tmp_path: Path)
     assert triage.decision == "external_blocked_with_local_followups"
     assert "darshan_external_reader_event_missing" in triage.external_authority_required_gaps
     assert "memory_kernel_query_eval_partial" in triage.locally_actionable_gaps
+    assert triage.external_authority_required_count == len(
+        triage.external_authority_required_gaps
+    )
+    assert triage.locally_actionable_count == len(triage.locally_actionable_gaps)
+    assert triage.gap_count == len(triage.gap_items)
+    assert triage.external_authority_required_count == 1
+    assert triage.locally_actionable_count >= 1
     assert triage.not_authority is True
     assert "fake_go_receipt_creation" in triage.forbidden_actions
     repair = projection.memory_kernel_repair_packet
@@ -490,6 +497,15 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert gap_triage_packet["decision"] == "external_blocked_with_local_followups"
     assert "darshan_external_reader_event_missing" in gap_triage_packet["external_authority_required_gaps"]
     assert "memory_kernel_index_truncated" in gap_triage_packet["locally_actionable_gaps"]
+    assert gap_triage_packet["external_authority_required_count"] == len(
+        gap_triage_packet["external_authority_required_gaps"]
+    )
+    assert gap_triage_packet["locally_actionable_count"] == len(
+        gap_triage_packet["locally_actionable_gaps"]
+    )
+    assert gap_triage_packet["gap_count"] == len(gap_triage_packet["gap_items"])
+    assert gap_triage_packet["external_authority_required_count"] == 1
+    assert gap_triage_packet["locally_actionable_count"] >= 1
     assert gap_triage_packet["not_authority"] is True
     assert "fake_go_receipt_creation" in gap_triage_packet["forbidden_actions"]
     assert completion_guard_packet["decision"] == "keep_reporter_open"

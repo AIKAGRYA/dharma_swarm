@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live verifier matrix, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-a8ff4c8f3684c4af`
-Current scoped HEAD before this packet: `3e4e0820 docs(operator-os): refresh substrate context`
+ds-goal progress receipt: `r-2094f1c27d8e0d40`
+Current scoped HEAD before this packet: `0039ff12 feat(operator-os): expose authority booleans`
 
 This matrix captures the current verification surface for future agents. It is
 not a final verifier matrix and must not be used to close the reporter task.
@@ -22,6 +22,8 @@ not a final verifier matrix and must not be used to close the reporter task.
   required.
 - Gap triage: passing; external-reader remains non-local blocker and
   MemoryKernel truncation remains local maintenance.
+- Gap triage counts: passing; total/local/external counts match the rendered
+  packet arrays and remain selectors only.
 - Memory coverage: passing; staging/quarantine roots are truncated and
   trusted/report-local roots are not truncated.
 - Memory coverage targets: passing; staging/quarantine are listed as local
@@ -45,7 +47,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 
 | Surface | Command or artifact | Current result | Verdict |
 |---|---|---|---|
-| Operator OS projection tests | `pytest -q tests/test_venture_cell_operator_os_projection.py` | `7 passed` | pass |
+| Operator OS projection tests | `pytest -q tests/test_venture_cell_operator_os_projection.py` | `9 passed` | pass |
 | Darshan external-reader gate slice | `pytest -q tests/test_darshan_external_reader_gate.py tests/test_control_surface.py -k "GoReceiptRows or external_reader"` | `11 passed, 74 deselected` | pass |
 | Governed admission/A2A/daily brief slice | `pytest -q tests/test_governed_work_admission.py tests/test_a2a_task_lifecycle.py tests/test_daily_operating_brief.py` | `31 passed` | pass |
 | Operator OS compile | `./.venv/bin/python -m compileall -q dharma_swarm/venture_cell/operator_os` | exit `0` | pass |
@@ -75,6 +77,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `authority_boundary_packet.json` | `local_read_only_external_blocked` | firewall view, not authority grant |
 | authority booleans | `external_authority_granted: false`; action ack required | denial guardrail |
 | `operator_gap_triage_packet.json` | `external_blocked_with_local_followups` | selector only, not authority or final proof |
+| gap triage counts | total `2`, local `1`, external-authority-required `1` | selector sizes only, not clearance |
 | `14_residual_risk_register.md` | live risk split | not a closure certificate |
 | `operator_os_artifact_manifest.json` | rendered locator | not proof of finality or authority |
 | manifest receipt summary | `receipt_count` + `latest_receipt_path` | navigation only |
@@ -131,6 +134,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `r-ade5bb8b586492b3` | keep | three-hour timebox proof |
 | `r-af82a796175a05dc` | keep | periodic substrate refresh |
 | `r-a8ff4c8f3684c4af` | keep | explicit authority booleans |
+| `r-2094f1c27d8e0d40` | keep | gap triage count selectors |
 
 ## Revert / Queue Ledger
 

@@ -3,9 +3,9 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live ledger, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-a8ff4c8f3684c4af`
+ds-goal progress receipt: `r-2094f1c27d8e0d40`
 Baseline: `1aca07a1 Add VentureCell Operator OS Level 70 surface`
-Current scoped HEAD before this packet: `3e4e0820 docs(operator-os): refresh substrate context`
+Current scoped HEAD before this packet: `0039ff12 feat(operator-os): expose authority booleans`
 
 This file is a living score ledger. It exists now so later agents do not
 reconstruct scores from memory. It must be reviewed and updated before final
@@ -48,6 +48,7 @@ reporter closure.
 | Loop 33 | `32_timebox_three_hour_receipt.md` | `r-ade5bb8b586492b3` | 100 | +0 | keep three-hour timebox proof |
 | Loop 34 | `33_periodic_substrate_refresh_receipt.md` | `r-af82a796175a05dc` | 100 | +0 | keep substrate refresh context |
 | Loop 35 | `34_authority_boolean_receipt.md` | `r-a8ff4c8f3684c4af` | 100 | +0 | keep explicit authority booleans |
+| Loop 36 | `35_gap_triage_counts_receipt.md` | `r-2094f1c27d8e0d40` | 100 | +0 | keep gap triage counts |
 
 ## Area History
 
@@ -87,6 +88,8 @@ audit with explicit evidence.
 - Gap triage packet: `external_blocked_with_local_followups`, with external
   reader as the non-local blocker and MemoryKernel truncation as local
   maintenance.
+- Gap triage counts: total `2`, local `1`, external-authority-required `1`;
+  selector counts only.
 - Memory coverage packet: present, with staging and quarantine roots marked
   truncated and trusted/report-local roots marked not truncated.
 - Memory coverage targets: staging and quarantine are listed as local
@@ -157,6 +160,8 @@ current evidence, not as a full-project proof.
   `operator_os_a2a_live_action_ack_proof_present` remain `false`.
 - Receipt inventory is an audit locator, not final proof.
 - Gap triage is a local selector and not authority or final proof.
+- Gap triage counts are selector sizes, not evidence that local or external
+  gaps are resolved.
 - Memory coverage packet explains truncation but does not clear the truncation
   gap or prove complete memory coverage.
 - Memory coverage targets identify where to work next, but do not resolve the

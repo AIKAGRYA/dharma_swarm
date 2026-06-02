@@ -208,6 +208,9 @@ class GapTriagePacket:
     gap_items: tuple[dict[str, Any], ...] = ()
     locally_actionable_gaps: tuple[str, ...] = ()
     external_authority_required_gaps: tuple[str, ...] = ()
+    gap_count: int = 0
+    locally_actionable_count: int = 0
+    external_authority_required_count: int = 0
     top_blocker: str = ""
     forbidden_actions: tuple[str, ...] = ()
     not_authority: bool = True

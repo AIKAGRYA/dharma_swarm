@@ -1,6 +1,7 @@
 {
   "autonomy_level": "L0_read_only_plan",
   "decision": "external_blocked_with_local_followups",
+  "external_authority_required_count": 1,
   "external_authority_required_gaps": [
     "darshan_external_reader_event_missing"
   ],
@@ -10,6 +11,7 @@
     "claim_live_nats_or_a2a_without_action_ack",
     "trusted_chetana_promotion_without_gates"
   ],
+  "gap_count": 2,
   "gap_items": [
     {
       "authority_scope": "external_reader_go_receipt_required",
@@ -46,6 +48,7 @@
       "severity": "maintenance"
     }
   ],
+  "locally_actionable_count": 1,
   "locally_actionable_gaps": [
     "memory_kernel_index_truncated"
   ],

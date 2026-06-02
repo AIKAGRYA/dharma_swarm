@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live packet, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-a8ff4c8f3684c4af`
-Current scoped HEAD before this packet: `3e4e0820 docs(operator-os): refresh substrate context`
+ds-goal progress receipt: `r-2094f1c27d8e0d40`
+Current scoped HEAD before this packet: `0039ff12 feat(operator-os): expose authority booleans`
 
 This packet captures durable learning from the run so far. It must be reviewed
 and updated during final closeout before the reporter task is closed.
@@ -126,6 +126,9 @@ and updated during final closeout before the reporter task is closed.
 
    - Future agents should use gap triage as a local loop selector. It does not
      clear gates, grant external authority, or certify final completion.
+   - Gap triage counts are machine-readable selector sizes. Count/list parity
+     helps routing, but a nonzero or zero count must still be interpreted
+     against the authority and GO packets.
 
 8. Memory coverage must identify root-level limits.
 

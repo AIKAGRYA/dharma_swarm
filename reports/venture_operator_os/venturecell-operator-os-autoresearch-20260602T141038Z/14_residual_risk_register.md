@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live risk register, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-a8ff4c8f3684c4af`
-Current scoped HEAD before this packet: `3e4e0820 docs(operator-os): refresh substrate context`
+ds-goal progress receipt: `r-2094f1c27d8e0d40`
+Current scoped HEAD before this packet: `0039ff12 feat(operator-os): expose authority booleans`
 
 This register separates current blockers, residual risks, and solved local
 claims. It exists to prevent false completion after a high live score.
@@ -36,6 +36,7 @@ claims. It exists to prevent false completion after a high live score.
 | Receipt inventory scope overclaim | manifest reports latest receipt name and scope markers | treat as navigation, not finality proof |
 | Admission redaction overclaim | governed admission raw redacts volatile id/time | ensure decision and reasons remain visible |
 | Gap triage overclaim | `operator_gap_triage_packet.json` separates local/external gaps | treat as loop selector, not authority or gate clearance |
+| Gap triage count overclaim | gap triage exposes total/local/external counts | treat as selector sizes, not solved-gap evidence |
 | Memory coverage overclaim | `memory_kernel_coverage_packet.json` exposes root coverage | treat as limit evidence, not complete memory coverage |
 | Memory coverage target overclaim | coverage packet lists staging/quarantine maintenance targets | treat as selectors, not repair proof |
 | Digest cap overclaim | `operator_os_digest.md` summarizes repeated canvas rows | use projection JSON for full evidence |
@@ -66,6 +67,7 @@ claims. It exists to prevent false completion after a high live score.
 | Liveness keys are action-specific | Operator OS NATS/A2A action ack fields are false | avoids substrate/authority conflation |
 | Receipt inventory renders | manifest lists run Markdown receipts | audit locator only |
 | Gap triage renders | external-reader non-local, MemoryKernel truncation local maintenance | selector only |
+| Gap triage counts render | total/local/external counts match packet arrays | selector sizes only |
 | Memory coverage renders | trusted/report-local roots not truncated; staging/quarantine truncated | coverage locator only |
 | Memory coverage targets render | staging/quarantine listed as maintenance targets | selector only |
 | Digest canvas summary renders | repeated task-board rows capped with omitted count | presentation only |

@@ -993,6 +993,9 @@ def _gap_triage_packet(
         gap_items=items,
         locally_actionable_gaps=locally_actionable,
         external_authority_required_gaps=external_required,
+        gap_count=len(items),
+        locally_actionable_count=len(locally_actionable),
+        external_authority_required_count=len(external_required),
         top_blocker=(external_required or locally_actionable or ("",))[0],
         forbidden_actions=(
             "external_outreach",
