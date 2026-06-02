@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live packet, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-2094f1c27d8e0d40`
-Current scoped HEAD before this packet: `0039ff12 feat(operator-os): expose authority booleans`
+ds-goal progress receipt: `r-3e318b30d3694ffa`
+Current scoped HEAD before this packet: `1779aa6c feat(operator-os): count gap triage lanes`
 
 This packet captures durable learning from the run so far. It must be reviewed
 and updated during final closeout before the reporter task is closed.
@@ -141,6 +141,8 @@ and updated during final closeout before the reporter task is closed.
    - The current staging and quarantine roots hit the scan cap.
    - The coverage packet now names staging and quarantine as
      `local_maintenance_targets`.
+   - The coverage packet now exposes root/truncated/untruncated/local-target
+     counts and explicitly sets `complete_coverage_claimed: false`.
    - The packet has `not_authority: true` and
      `trusted_promotion_claimed: false`.
 
@@ -151,6 +153,8 @@ and updated during final closeout before the reporter task is closed.
      prove complete memory coverage or trusted promotion.
    - Local maintenance targets are selectors, not proof that truncation was
      repaired.
+   - Coverage counts are routing metadata. They should speed local maintenance
+     selection, not create complete-recall or trusted-promotion claims.
 
 9. Human digest scanability must not mutate machine evidence.
 

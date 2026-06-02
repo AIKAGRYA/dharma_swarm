@@ -455,11 +455,30 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert memory_coverage_packet["schema"] == "dharma.venture_cell_operator_os.memory_coverage.v0"
     assert memory_coverage_packet["not_authority"] is True
     assert memory_coverage_packet["trusted_promotion_claimed"] is False
+    assert memory_coverage_packet["complete_coverage_claimed"] is False
     assert memory_coverage_packet["root_coverage"]
+    assert memory_coverage_packet["root_count"] == len(
+        memory_coverage_packet["root_coverage"]
+    )
+    assert memory_coverage_packet["truncated_root_count"] == len(
+        [
+            coverage
+            for coverage in memory_coverage_packet["root_coverage"]
+            if coverage["truncated"]
+        ]
+    )
+    assert memory_coverage_packet["untruncated_root_count"] == (
+        memory_coverage_packet["root_count"]
+        - memory_coverage_packet["truncated_root_count"]
+    )
     assert "truncated_roles" in memory_coverage_packet
     assert "local_maintenance_targets" in memory_coverage_packet
+    assert memory_coverage_packet["local_maintenance_target_count"] == len(
+        memory_coverage_packet["local_maintenance_targets"]
+    )
     if memory_coverage_packet["truncated"]:
         assert memory_coverage_packet["truncated_roles"]
+        assert memory_coverage_packet["truncated_root_count"] > 0
         assert all(
             target["gap"] == "memory_kernel_index_truncated"
             for target in memory_coverage_packet["local_maintenance_targets"]
@@ -541,6 +560,9 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert artifact_manifest["receipt_inventory_scope"] == "run_markdown_receipts_excluding_digest"
     assert artifact_manifest["receipt_inventory_not_final"] is True
     assert artifact_manifest["receipt_inventory_not_authority"] is True
+    assert artifact_manifest["memory_coverage_truncated_root_count"] == (
+        memory_coverage_packet["truncated_root_count"]
+    )
 
 
 def test_operator_surface_uses_report_local_memory_source_without_trusted_promotion(tmp_path: Path) -> None:

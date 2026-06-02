@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live verifier matrix, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-2094f1c27d8e0d40`
-Current scoped HEAD before this packet: `0039ff12 feat(operator-os): expose authority booleans`
+ds-goal progress receipt: `r-3e318b30d3694ffa`
+Current scoped HEAD before this packet: `1779aa6c feat(operator-os): count gap triage lanes`
 
 This matrix captures the current verification surface for future agents. It is
 not a final verifier matrix and must not be used to close the reporter task.
@@ -28,6 +28,8 @@ not a final verifier matrix and must not be used to close the reporter task.
   trusted/report-local roots are not truncated.
 - Memory coverage targets: passing; staging/quarantine are listed as local
   maintenance targets.
+- Memory coverage counts: passing; root/truncated/untruncated/local-target
+  counts match arrays and complete coverage is not claimed.
 - Digest canvas summary: passing; Markdown repeated rows capped while JSON
   projection rows remain complete.
 - Completion guard: passing; live `100/100` is explicitly non-final.
@@ -70,6 +72,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `memory_kernel_query_eval.json` | `pass` (`6/6`) | staged/report-local pass, not trusted promotion |
 | `memory_kernel_coverage_packet.json` | root coverage rendered | explains truncation, not complete coverage |
 | Memory coverage targets | staging/quarantine local maintenance targets | selectors only, not repair proof |
+| Memory coverage counts | roots `4`, truncated `2`, untruncated `2`, local targets `2` | routing metadata, not complete coverage |
 | `memory_kernel_repair_packet.json` | `no_repair_needed` | still forbids trusted promotion |
 | `darshan_go_gate_packet.json` | `block_external_authority` | accepted receipts empty |
 | `darshan_go_receipt_template.json` | `draft_template_not_evidence` | must not be stored as accepted receipt |
@@ -135,6 +138,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `r-af82a796175a05dc` | keep | periodic substrate refresh |
 | `r-a8ff4c8f3684c4af` | keep | explicit authority booleans |
 | `r-2094f1c27d8e0d40` | keep | gap triage count selectors |
+| `r-3e318b30d3694ffa` | keep | memory coverage count selectors |
 
 ## Revert / Queue Ledger
 

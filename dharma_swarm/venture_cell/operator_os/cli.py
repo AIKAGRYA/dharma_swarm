@@ -44,6 +44,16 @@ def _memory_coverage_payload(projection: dict[str, Any]) -> dict[str, Any]:
     truncated_roots = [
         coverage for coverage in root_coverage if bool(coverage.get("truncated"))
     ]
+    local_maintenance_targets = [
+        {
+            "role": str(coverage.get("role") or coverage.get("tier") or "unknown"),
+            "tier": str(coverage.get("tier") or "unknown"),
+            "root": str(coverage.get("root") or ""),
+            "gap": "memory_kernel_index_truncated",
+            "recommended_action": "add_query_specific_source_packet_or_increase_local_scan_budget",
+        }
+        for coverage in truncated_roots
+    ]
     return {
         "schema": "dharma.venture_cell_operator_os.memory_coverage.v0",
         "status": memory.get("status", "unknown"),
@@ -51,21 +61,17 @@ def _memory_coverage_payload(projection: dict[str, Any]) -> dict[str, Any]:
         "indexed_count": memory.get("indexed_count", 0),
         "source_roots": memory.get("source_roots", []),
         "root_coverage": root_coverage,
+        "root_count": len(root_coverage),
+        "truncated_root_count": len(truncated_roots),
+        "untruncated_root_count": len(root_coverage) - len(truncated_roots),
         "truncated_roles": [
             str(coverage.get("role") or coverage.get("tier") or "unknown")
             for coverage in truncated_roots
         ],
-        "local_maintenance_targets": [
-            {
-                "role": str(coverage.get("role") or coverage.get("tier") or "unknown"),
-                "tier": str(coverage.get("tier") or "unknown"),
-                "root": str(coverage.get("root") or ""),
-                "gap": "memory_kernel_index_truncated",
-                "recommended_action": "add_query_specific_source_packet_or_increase_local_scan_budget",
-            }
-            for coverage in truncated_roots
-        ],
+        "local_maintenance_targets": local_maintenance_targets,
+        "local_maintenance_target_count": len(local_maintenance_targets),
         "truncated": truncated,
+        "complete_coverage_claimed": False,
         "locally_actionable_gap": "memory_kernel_index_truncated" if truncated else "",
         "safe_next_action": (
             "Use root coverage to target local read-through maintenance without trusted promotion."
@@ -190,6 +196,9 @@ def _artifact_manifest_payload(
         "authority_decision": authority.get("decision", "unknown"),
         "gap_triage_decision": gap_triage.get("decision", "unknown"),
         "memory_coverage_truncated": memory_coverage.get("truncated", False),
+        "memory_coverage_truncated_root_count": memory_coverage.get(
+            "truncated_root_count", 0
+        ),
         "completion_guard_decision": completion_guard.get("decision", "unknown"),
         "not_final": completion_guard.get("not_final", True),
         "artifact_paths": {

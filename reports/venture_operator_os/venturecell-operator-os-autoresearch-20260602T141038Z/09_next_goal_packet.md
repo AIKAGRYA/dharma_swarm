@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-2094f1c27d8e0d40`
-Current scoped HEAD before this packet: `0039ff12 feat(operator-os): expose authority booleans`
+ds-goal progress receipt: `r-3e318b30d3694ffa`
+Current scoped HEAD before this packet: `1779aa6c feat(operator-os): count gap triage lanes`
 
 This packet is the handoff for the next bounded AutoResearch loop. It must be
 reviewed and updated in the final hour before reporter closure.
@@ -37,6 +37,8 @@ reviewed and updated in the final hour before reporter closure.
   trusted and report-local roots are not truncated.
 - Memory coverage targets: staging and quarantine are the current local
   maintenance targets.
+- Memory coverage counts: roots `4`, truncated roots `2`, untruncated roots
+  `2`, local maintenance targets `2`, complete coverage not claimed.
 - Digest canvas summary: present; Markdown caps repeated rows while JSON
   projection preserves full canvas data.
 - Completion guard packet: `keep_reporter_open`, `not_final: true`.
@@ -55,7 +57,7 @@ reviewed and updated in the final hour before reporter closure.
   evidence remains visible.
 - Timebox refresh: current clock still below 8 hours.
 - Three-hour timebox proof: current clock still below 8 hours.
-- Last committed packet: explicit authority booleans.
+- Last committed packet: gap triage count selectors.
 
 ## Next Goal
 
@@ -147,6 +149,8 @@ bounded targets:
    If another local memory loop is chosen, target staging/quarantine retrieval
    or query-specific coverage while preserving `trusted_promotion_claimed:
    false`.
+   Preserve count/list parity for root, truncated-root, untruncated-root, and
+   local-maintenance-target selectors.
 
 13. Digest scanability preservation.
 
@@ -256,6 +260,7 @@ If the loop only changes a report packet, also run scoped `git diff --check`.
 - `33_periodic_substrate_refresh_receipt.md`
 - `34_authority_boolean_receipt.md`
 - `35_gap_triage_counts_receipt.md`
+- `36_memory_coverage_counts_receipt.md`
 - `operator_os_projection.json`
 - `operator_completion_guard_packet.json`
 - `operator_next_action_packet.json`

@@ -1,6 +1,8 @@
 {
+  "complete_coverage_claimed": false,
   "index_status": "available_truncated",
   "indexed_count": 80,
+  "local_maintenance_target_count": 2,
   "local_maintenance_targets": [
     {
       "gap": "memory_kernel_index_truncated",
@@ -19,6 +21,7 @@
   ],
   "locally_actionable_gap": "memory_kernel_index_truncated",
   "not_authority": true,
+  "root_count": 4,
   "root_coverage": [
     {
       "entry_budget": 20,
@@ -43,7 +46,7 @@
       "indexed_count": 20,
       "role": "supplemental_staging",
       "root": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z",
-      "scanned_count": 38,
+      "scanned_count": 39,
       "tier": "staged",
       "truncated": false
     },
@@ -71,5 +74,7 @@
     "staging",
     "quarantine"
   ],
-  "trusted_promotion_claimed": false
+  "truncated_root_count": 2,
+  "trusted_promotion_claimed": false,
+  "untruncated_root_count": 2
 }
