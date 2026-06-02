@@ -31,6 +31,10 @@ from dharma_swarm.operator_core.control_surface_go import (  # noqa: F401
     _go_world_receipt_summary_rows,
 )
 from dharma_swarm.operator_core.control_surface_memory import memory_kernel_control_rows
+from dharma_swarm.operator_core.control_surface_live_ops import (  # noqa: F401
+    _live_ops_census_rows,
+    _rows_from_live_ops_census,
+)
 from dharma_swarm.operator_core.control_surface_models import (
     AUTHORITY_ROLES,
     COHERENCE_STATES,
@@ -933,10 +937,13 @@ def build_control_surface_rows(
     if rt_row is not None:
         rows.append(rt_row)
 
-    # L) MemoryKernel operator controls
+    # L) Live ops census (observed process/port/receipt projection)
+    rows.extend(_live_ops_census_rows(root))
+
+    # M) MemoryKernel operator controls
     rows.extend(memory_kernel_control_rows(root))
 
-    # M) Go receipts (optional)
+    # N) Go receipts (optional)
     rows.extend(_go_receipt_rows(root))
 
     # Apply human-decision policy with structured context
@@ -979,6 +986,7 @@ def build_control_surface_summary(
         "module_truth",
         "BROKEN_REGISTER.md",
         "runtime_state",
+        "live_ops_census",
         "go_sdk",
         "recursive_discovery_shadow",
         "MemoryKernel",
