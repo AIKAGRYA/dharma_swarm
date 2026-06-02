@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live packet, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-446364a1d4cbda18`
-Current scoped HEAD before this packet: `97f4927e feat(operator-os): summarize evidence refs`
+ds-goal progress receipt: `r-935763168301bf72`
+Current scoped HEAD before this packet: `740cfc5f refactor(operator-os): centralize summary sequence handling`
 
 This packet captures durable learning from the run so far. It must be reviewed
 and updated during final closeout before the reporter task is closed.
@@ -310,6 +310,8 @@ and updated during final closeout before the reporter task is closed.
      unless a selected loop requires those lanes.
    - Repeated onboard passes can refresh substrate awareness, but they must not
      replace packet-level authority checks.
+   - The latest refresh exits `0`, reports repo-wide NATS live contact, and
+     leaves Operator OS action-specific authority unchanged.
 
 12. Timebox truth must be concrete.
 
@@ -447,6 +449,7 @@ Metabolized rule:
 | `r-c65f0c7aa7f4ebdc` | `46_gate_summary_packet_receipt.md` | machine-readable gate summary packet |
 | `r-4eaef0bd4e7a0a85` | `47_evidence_summary_packet_receipt.md` | machine-readable evidence summary packet |
 | `r-446364a1d4cbda18` | `48_summary_helper_refactor_receipt.md` | summary renderer helper refactor |
+| `r-935763168301bf72` | `49_periodic_onboard_refresh_receipt.md` | periodic substrate refresh context |
 
 ## Current Read-Only Artifacts
 
@@ -498,6 +501,7 @@ Metabolized rule:
 - `46_gate_summary_packet_receipt.md`
 - `47_evidence_summary_packet_receipt.md`
 - `48_summary_helper_refactor_receipt.md`
+- `49_periodic_onboard_refresh_receipt.md`
 
 ## Do Not Metabolize As Done
 

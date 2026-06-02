@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live risk register, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-446364a1d4cbda18`
-Current scoped HEAD before this packet: `97f4927e feat(operator-os): summarize evidence refs`
+ds-goal progress receipt: `r-935763168301bf72`
+Current scoped HEAD before this packet: `740cfc5f refactor(operator-os): centralize summary sequence handling`
 
 This register separates current blockers, residual risks, and solved local
 claims. It exists to prevent false completion after a high live score.
@@ -55,6 +55,7 @@ claims. It exists to prevent false completion after a high live score.
 | Periodic onboard overclaim | `23_periodic_onboard_refresh_receipt.md` records substrate health | context only, not mission authority |
 | Periodic substrate refresh overclaim | `33_periodic_substrate_refresh_receipt.md` records substrate health | context only, not mission authority |
 | Latest periodic onboard overclaim | `42_periodic_onboard_refresh_receipt.md` records substrate health | context only, not mission authority |
+| Current periodic onboard overclaim | `49_periodic_onboard_refresh_receipt.md` records substrate health | context only, not mission authority |
 | Timebox stale claim | `24_timebox_status_receipt.md` records one clock snapshot | refresh before final-window claims |
 | Timebox refresh overclaim | `27_timebox_refresh_receipt.md` records another non-final clock snapshot | treat as progress evidence only |
 | Three-hour timebox overclaim | `32_timebox_three_hour_receipt.md` records another non-final clock snapshot | treat as progress evidence only |
@@ -93,6 +94,7 @@ claims. It exists to prevent false completion after a high live score.
 | Operator gate summary packet renders | gates `2`, allow `1`, block `1`; non-authority flags true/false as expected | routing metadata only |
 | Operator evidence summary packet renders | refs `6`, existing local `6`, absolute `4`, relative `2`; non-authority flags true/false as expected | locator metadata only |
 | Summary helper refactor preserves counts | focused projection test passes; gate/evidence counts unchanged | implementation hygiene only |
+| Periodic onboard refresh passes | `make onboard` and toolbelt exit `0` | substrate context only |
 | Completion guard renders | live score can be 100 without completion | false-final guard only |
 | Completion guard reporter policy renders | terminal receipt and verifier pass required | requirement checklist only |
 | Completion guard counts render | final/external/artifact/forbidden counts match arrays | audit metadata only |

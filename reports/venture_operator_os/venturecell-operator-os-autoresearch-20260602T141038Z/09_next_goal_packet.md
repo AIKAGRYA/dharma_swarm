@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-446364a1d4cbda18`
-Current scoped HEAD before this packet: `97f4927e feat(operator-os): summarize evidence refs`
+ds-goal progress receipt: `r-935763168301bf72`
+Current scoped HEAD before this packet: `740cfc5f refactor(operator-os): centralize summary sequence handling`
 
 This packet is the handoff for the next bounded AutoResearch loop. It must be
 reviewed and updated in the final hour before reporter closure.
@@ -54,6 +54,8 @@ reviewed and updated in the final hour before reporter closure.
   absolute `4`, relative `2`, not authority.
 - Summary helper refactor: present; tuple/list handling centralized with stable
   rendered counts.
+- Periodic onboard/toolbelt refresh: latest checks exit `0`; repo-wide NATS and
+  optional credential warnings remain context only.
 - Completion guard packet: `keep_reporter_open`, `not_final: true`.
 - Completion guard reporter policy: terminal receipt and complete verifier pass
   required.
@@ -78,7 +80,7 @@ reviewed and updated in the final hour before reporter closure.
 - Three-hour timebox proof: current clock still below 8 hours.
 - Active clock proof: current clock still below 8 hours.
 - Four-hour midpoint proof: current clock still below 8 hours.
-- Last committed packet: evidence summary packet.
+- Last committed packet: summary helper refactor.
 
 ## Next Goal
 
@@ -149,7 +151,7 @@ bounded targets:
    `16_periodic_onboard_receipt.md` now exists. Refresh onboarding/toolbelt
    evidence periodically, but do not treat repo-wide NATS liveness as
    mission-specific authority proof.
-   `42_periodic_onboard_refresh_receipt.md` is the latest refresh and remains
+   `49_periodic_onboard_refresh_receipt.md` is the latest refresh and remains
    context only.
 
 9. Liveness field discipline.
@@ -334,6 +336,7 @@ If the loop only changes a report packet, also run scoped `git diff --check`.
 - `46_gate_summary_packet_receipt.md`
 - `47_evidence_summary_packet_receipt.md`
 - `48_summary_helper_refactor_receipt.md`
+- `49_periodic_onboard_refresh_receipt.md`
 - `operator_os_projection.json`
 - `operator_canvas_summary_packet.json`
 - `operator_department_summary_packet.json`
