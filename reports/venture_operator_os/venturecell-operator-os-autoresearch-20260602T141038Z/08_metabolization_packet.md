@@ -989,3 +989,32 @@ Metabolized rule:
 
 - Future verifier matrices should separate local green checks, expected
   non-final blockers, unavailable tools, and authority gates in distinct rows.
+
+## Loop 57 Metabolization Note
+
+Hypothesis:
+
+If GO unblock readiness is stored as per-artifact resolution data, future agents
+can advance local inspection work while preserving the accepted-receipt boundary.
+
+Patch:
+
+- Added Darshan GO expected-local-artifact resolution rows and counts.
+- Mirrored readiness counts in the artifact manifest.
+- Added focused assertions against report-local and placeholder-only cases.
+
+Evaluation:
+
+- Focused Operator OS tests passed.
+- Live packet shows three existing local artifacts, no concrete missing local
+  artifact, one placeholder-only receipt artifact, and zero accepted receipts.
+
+Adversarial review:
+
+- The readiness packet is routing metadata only.
+- It must not be cited as accepted GO evidence or external authority.
+
+Metabolized rule:
+
+- Future GO work must keep local readiness, placeholder-only receipt paths, and
+  accepted external-reader receipts as separate states.

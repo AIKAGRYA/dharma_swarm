@@ -430,3 +430,25 @@ Queued:
 - Final update of score, metabolization, and next-goal packets.
 - True-time proof and final reporter closure only after verification.
    Artifact and summary-packet counts should also remain navigation-only.
+
+## Loop 57 Next Goal Addendum
+
+Current new evidence:
+
+- `56_go_unblock_artifact_readiness_receipt.md`
+- `darshan_go_unblock_packet.json`
+- `operator_os_artifact_manifest.json`
+
+Next safe loop targets:
+
+- Refresh the true-time proof when elapsed time reaches the six-hour mark.
+- Continue improving local read-only clarity around Darshan GO without outreach
+  or accepted-receipt fabrication.
+- Re-run the minimum verifier set before any commit.
+
+Still forbidden:
+
+- closing reporter early;
+- external outreach, publishing, handoff, spend, deploy, push, or merge;
+- treating local artifact readiness as GO acceptance;
+- claiming NATS/A2A action liveness without action-specific ack proof.

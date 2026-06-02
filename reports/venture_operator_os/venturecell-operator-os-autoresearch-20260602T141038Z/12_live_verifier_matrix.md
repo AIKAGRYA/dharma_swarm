@@ -262,3 +262,20 @@ Adversarial review:
 Keep / revert / queue:
 
 Decision: keep.
+
+## Loop 57 Verifier Addendum
+
+| Check | Result | Notes |
+|---|---|---|
+| Context+ structural scan | blocked | MCP transport closed; local smoke harness did not recognize `contextplus` target |
+| Focused Operator OS projection tests | pass | `pytest -q tests/test_venture_cell_operator_os_projection.py` |
+| Darshan/control GO slice | pass | `pytest -q tests/test_darshan_external_reader_gate.py tests/test_control_surface.py -k 'GoReceiptRows or external_reader'`; `11` passed, `74` deselected |
+| Governed/A2A/daily slice | pass | `pytest -q tests/test_governed_work_admission.py tests/test_a2a_task_lifecycle.py tests/test_daily_operating_brief.py`; `31` passed |
+| Operator OS compile | pass | `./.venv/bin/python -m compileall -q dharma_swarm/venture_cell/operator_os` |
+| Live render | pass | `./.venv/bin/python -m dharma_swarm.venture_cell.operator_os.cli --output-dir reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z` |
+| Scoped diff check | pass | `git diff --check -- dharma_swarm/venture_cell/operator_os tests/test_venture_cell_operator_os_projection.py` |
+| GO readiness count check | pass | existing `3`, concrete missing `0`, placeholder-only `1`, accepted receipts `0` |
+| Complete verifier | expected blocker | exit `3`; only blocker `task_not_closed:20260602-venturecell-operator-os-autoresearch-8h-t05-reporter` |
+
+This addendum is live verifier evidence only. It does not close the reporter and
+does not grant external authority.

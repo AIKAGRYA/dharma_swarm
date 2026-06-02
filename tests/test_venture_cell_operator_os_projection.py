@@ -581,6 +581,35 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert go_unblock_packet["expected_local_artifact_count"] == len(
         go_unblock_packet["expected_local_artifacts"]
     )
+    assert go_unblock_packet["expected_local_artifact_item_count"] == len(
+        go_unblock_packet["expected_local_artifact_items"]
+    )
+    assert go_unblock_packet["expected_local_artifact_all_local"] is True
+    assert go_unblock_packet["expected_local_artifact_existing_count"] == 3
+    assert go_unblock_packet["expected_local_artifact_missing_count"] == 0
+    assert go_unblock_packet["expected_local_artifact_pending_placeholder_count"] == 1
+    assert (
+        go_unblock_packet["expected_local_artifact_readiness"]
+        == "local_artifacts_present_except_go_receipt_placeholder"
+    )
+    expected_artifact_items = {
+        item["ref"]: item for item in go_unblock_packet["expected_local_artifact_items"]
+    }
+    assert expected_artifact_items["darshan_go_receipt_template.json"]["exists"] is True
+    assert (
+        expected_artifact_items["darshan_go_receipt_template.json"]["classification"]
+        == "report_local_path"
+    )
+    placeholder_items = [
+        item
+        for item in go_unblock_packet["expected_local_artifact_items"]
+        if item["contains_placeholder"]
+    ]
+    assert len(placeholder_items) == 1
+    assert (
+        placeholder_items[0]["resolution_status"]
+        == "placeholder_waits_for_accepted_go_receipt"
+    )
     assert go_unblock_packet["blocked_action_count"] == len(
         go_unblock_packet["blocked_actions"]
     )
@@ -780,6 +809,15 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert artifact_manifest["darshan_go_unblock_expected_local_artifact_count"] == (
         go_unblock_packet["expected_local_artifact_count"]
     )
+    assert artifact_manifest[
+        "darshan_go_unblock_expected_local_artifact_existing_count"
+    ] == go_unblock_packet["expected_local_artifact_existing_count"]
+    assert artifact_manifest[
+        "darshan_go_unblock_expected_local_artifact_missing_count"
+    ] == go_unblock_packet["expected_local_artifact_missing_count"]
+    assert artifact_manifest[
+        "darshan_go_unblock_expected_local_artifact_pending_placeholder_count"
+    ] == go_unblock_packet["expected_local_artifact_pending_placeholder_count"]
     assert artifact_manifest["darshan_go_unblock_blocked_action_count"] == (
         go_unblock_packet["blocked_action_count"]
     )

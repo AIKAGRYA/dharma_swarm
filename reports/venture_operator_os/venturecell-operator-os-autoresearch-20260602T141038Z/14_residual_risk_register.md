@@ -159,3 +159,19 @@ Queued:
 
 - Revisit this register in the true final window and remove only risks that are
   proven by fresh evidence.
+
+## Loop 57 Risk Addendum
+
+New residual risk:
+
+| Risk | Current evidence | Handling |
+|---|---|---|
+| GO artifact readiness overclaim | `darshan_go_unblock_packet.json` reports three existing expected local artifacts and one placeholder-only GO receipt artifact | treat as routing metadata only; accepted receipts remain `0` |
+
+New solved local claim:
+
+| Claim | Evidence | Boundary |
+|---|---|---|
+| GO expected local artifact readiness renders | focused tests pass and live packet reports existing `3`, concrete missing `0`, placeholder-only `1` | not accepted GO evidence and not external authority |
+
+Decision: keep the risk in the live register until final-window review.

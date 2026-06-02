@@ -12,6 +12,8 @@ from dharma_swarm.venture_cell.operator_os.daily_digest import write_operator_da
 from dharma_swarm.venture_cell.operator_os.live_loader import load_live_operator_inputs
 from dharma_swarm.venture_cell.operator_os.projection import build_operator_projection
 
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+
 
 def _sequence_items(value: Any) -> tuple[Any, ...]:
     return tuple(value) if isinstance(value, (list, tuple)) else ()
@@ -338,7 +340,69 @@ def _darshan_go_receipt_template_payload(projection: dict[str, Any]) -> dict[str
     return template if isinstance(template, dict) else {}
 
 
-def _darshan_go_unblock_payload(projection: dict[str, Any]) -> dict[str, Any]:
+def _expected_local_artifact_items(
+    refs: tuple[Any, ...],
+    *,
+    output_dir: Path | None = None,
+) -> list[dict[str, Any]]:
+    artifact_items: list[dict[str, Any]] = []
+    for ref_value in refs:
+        ref = str(ref_value or "").strip()
+        if not ref:
+            continue
+        path = Path(ref)
+        contains_placeholder = "<" in ref and ">" in ref
+        is_external_url = ref.startswith(("http://", "https://"))
+        classification = "external_url"
+        resolution_base = ""
+        resolved_path = ""
+        exists = False
+        parent_exists = False
+        if is_external_url:
+            resolution_status = "external_url_not_local_artifact"
+        else:
+            if path.is_absolute():
+                resolved = path
+                classification = "absolute_local_path"
+                resolution_base = "absolute"
+            elif output_dir is not None and path.name == ref:
+                resolved = output_dir / path
+                classification = "report_local_path"
+                resolution_base = "output_dir"
+            else:
+                resolved = _REPO_ROOT / path
+                classification = "repo_relative_path"
+                resolution_base = "repo_root"
+            resolved_path = str(resolved)
+            parent_exists = resolved.parent.exists()
+            exists = False if contains_placeholder else resolved.exists()
+            resolution_status = (
+                "placeholder_waits_for_accepted_go_receipt"
+                if contains_placeholder
+                else "exists"
+                if exists
+                else "missing"
+            )
+        artifact_items.append(
+            {
+                "ref": ref,
+                "classification": classification,
+                "resolution_base": resolution_base,
+                "resolved_path": resolved_path,
+                "contains_placeholder": contains_placeholder,
+                "parent_exists": parent_exists,
+                "exists": exists,
+                "resolution_status": resolution_status,
+            }
+        )
+    return artifact_items
+
+
+def _darshan_go_unblock_payload(
+    projection: dict[str, Any],
+    *,
+    output_dir: Path | None = None,
+) -> dict[str, Any]:
     go_gate = _darshan_go_gate_payload(projection)
     authority = _authority_boundary_payload(projection)
     accepted_receipts = _sequence_items(go_gate.get("accepted_receipts"))
@@ -348,6 +412,38 @@ def _darshan_go_unblock_payload(projection: dict[str, Any]) -> dict[str, Any]:
     required_receipt_fields = _sequence_items(go_gate.get("required_receipt_fields"))
     blocked_actions = _sequence_items(go_gate.get("blocked_actions"))
     blocked_departments = _sequence_items(go_gate.get("blocked_departments"))
+    expected_local_artifact_items = _expected_local_artifact_items(
+        expected_local_artifacts,
+        output_dir=output_dir,
+    )
+    existing_artifact_count = sum(
+        1 for item in expected_local_artifact_items if bool(item.get("exists"))
+    )
+    pending_placeholder_count = sum(
+        1
+        for item in expected_local_artifact_items
+        if bool(item.get("contains_placeholder"))
+    )
+    missing_artifact_count = sum(
+        1
+        for item in expected_local_artifact_items
+        if item.get("resolution_status") == "missing"
+    )
+    parent_exists_count = sum(
+        1 for item in expected_local_artifact_items if bool(item.get("parent_exists"))
+    )
+    external_artifact_count = sum(
+        1
+        for item in expected_local_artifact_items
+        if item.get("classification") == "external_url"
+    )
+    readiness = (
+        "missing_expected_local_artifacts"
+        if missing_artifact_count
+        else "local_artifacts_present_except_go_receipt_placeholder"
+        if pending_placeholder_count
+        else "all_expected_local_artifacts_present"
+    )
     return {
         "schema": "dharma.venture_cell_operator_os.darshan_go_unblock.v0",
         "status": projection.get("status", "unknown"),
@@ -364,6 +460,15 @@ def _darshan_go_unblock_payload(projection: dict[str, Any]) -> dict[str, Any]:
         "required_receipt_field_count": len(required_receipt_fields),
         "expected_local_artifacts": expected_local_artifacts,
         "expected_local_artifact_count": len(expected_local_artifacts),
+        "expected_local_artifact_items": expected_local_artifact_items,
+        "expected_local_artifact_item_count": len(expected_local_artifact_items),
+        "expected_local_artifact_existing_count": existing_artifact_count,
+        "expected_local_artifact_missing_count": missing_artifact_count,
+        "expected_local_artifact_pending_placeholder_count": pending_placeholder_count,
+        "expected_local_artifact_parent_exists_count": parent_exists_count,
+        "expected_local_artifact_external_ref_count": external_artifact_count,
+        "expected_local_artifact_all_local": external_artifact_count == 0,
+        "expected_local_artifact_readiness": readiness,
         "accepted_receipts": accepted_receipts,
         "accepted_receipt_count": len(accepted_receipts),
         "rejected_receipts": rejected_receipts,
@@ -595,7 +700,7 @@ def _artifact_manifest_payload(
 ) -> dict[str, Any]:
     memory = _memory_index_payload(projection)
     go_gate = _darshan_go_gate_payload(projection)
-    go_unblock = _darshan_go_unblock_payload(projection)
+    go_unblock = _darshan_go_unblock_payload(projection, output_dir=output_dir)
     authority = _authority_boundary_payload(projection)
     gap_triage = _gap_triage_payload(projection)
     memory_coverage = _memory_coverage_payload(projection)
@@ -630,6 +735,15 @@ def _artifact_manifest_payload(
         ),
         "darshan_go_unblock_expected_local_artifact_count": go_unblock.get(
             "expected_local_artifact_count", 0
+        ),
+        "darshan_go_unblock_expected_local_artifact_existing_count": go_unblock.get(
+            "expected_local_artifact_existing_count", 0
+        ),
+        "darshan_go_unblock_expected_local_artifact_missing_count": go_unblock.get(
+            "expected_local_artifact_missing_count", 0
+        ),
+        "darshan_go_unblock_expected_local_artifact_pending_placeholder_count": go_unblock.get(
+            "expected_local_artifact_pending_placeholder_count", 0
         ),
         "darshan_go_unblock_blocked_action_count": go_unblock.get(
             "blocked_action_count", 0
@@ -795,7 +909,7 @@ def render_operator_surface(
     darshan_go_unblock_packet_path = output_dir / "darshan_go_unblock_packet.json"
     darshan_go_unblock_packet_path.write_text(
         json.dumps(
-            _darshan_go_unblock_payload(projection.to_dict()),
+            _darshan_go_unblock_payload(projection.to_dict(), output_dir=output_dir),
             indent=2,
             sort_keys=True,
         )

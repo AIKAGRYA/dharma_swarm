@@ -17,7 +17,57 @@
   ],
   "darshan_go_decision": "block_external_authority",
   "decision": "wait_for_accepted_external_reader_go_receipt",
+  "expected_local_artifact_all_local": true,
   "expected_local_artifact_count": 4,
+  "expected_local_artifact_existing_count": 3,
+  "expected_local_artifact_external_ref_count": 0,
+  "expected_local_artifact_item_count": 4,
+  "expected_local_artifact_items": [
+    {
+      "classification": "absolute_local_path",
+      "contains_placeholder": false,
+      "exists": true,
+      "parent_exists": true,
+      "ref": "/Users/dhyana/.dharma/artifacts/venture_cell/DARSHAN/2026-05-26/the-thing-they-are-competing-for-is-not-just-your-attention/decision_delta.json",
+      "resolution_base": "absolute",
+      "resolution_status": "exists",
+      "resolved_path": "/Users/dhyana/.dharma/artifacts/venture_cell/DARSHAN/2026-05-26/the-thing-they-are-competing-for-is-not-just-your-attention/decision_delta.json"
+    },
+    {
+      "classification": "absolute_local_path",
+      "contains_placeholder": true,
+      "exists": false,
+      "parent_exists": false,
+      "ref": "/Users/dhyana/.dharma/artifacts/venture_cell/DARSHAN/2026-05-26/the-thing-they-are-competing-for-is-not-just-your-attention/receipts/<accepted-go-evidence-receipt>.json",
+      "resolution_base": "absolute",
+      "resolution_status": "placeholder_waits_for_accepted_go_receipt",
+      "resolved_path": "/Users/dhyana/.dharma/artifacts/venture_cell/DARSHAN/2026-05-26/the-thing-they-are-competing-for-is-not-just-your-attention/receipts/<accepted-go-evidence-receipt>.json"
+    },
+    {
+      "classification": "repo_relative_path",
+      "contains_placeholder": false,
+      "exists": true,
+      "parent_exists": true,
+      "ref": "dharma_swarm/venture_cell/darshan/external_reader_gate.py",
+      "resolution_base": "repo_root",
+      "resolution_status": "exists",
+      "resolved_path": "/Users/dhyana/dharma_swarm/dharma_swarm/venture_cell/darshan/external_reader_gate.py"
+    },
+    {
+      "classification": "report_local_path",
+      "contains_placeholder": false,
+      "exists": true,
+      "parent_exists": true,
+      "ref": "darshan_go_receipt_template.json",
+      "resolution_base": "output_dir",
+      "resolution_status": "exists",
+      "resolved_path": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/darshan_go_receipt_template.json"
+    }
+  ],
+  "expected_local_artifact_missing_count": 0,
+  "expected_local_artifact_parent_exists_count": 3,
+  "expected_local_artifact_pending_placeholder_count": 1,
+  "expected_local_artifact_readiness": "local_artifacts_present_except_go_receipt_placeholder",
   "expected_local_artifacts": [
     "/Users/dhyana/.dharma/artifacts/venture_cell/DARSHAN/2026-05-26/the-thing-they-are-competing-for-is-not-just-your-attention/decision_delta.json",
     "/Users/dhyana/.dharma/artifacts/venture_cell/DARSHAN/2026-05-26/the-thing-they-are-competing-for-is-not-just-your-attention/receipts/<accepted-go-evidence-receipt>.json",
