@@ -8,7 +8,7 @@ while nothing ever graduates to trusted.
 Promotion criteria (--auto-promote mode):
   1. type == "atomic" (compound atoms need manual review)
   2. confidence >= 0.5 (frontmatter field)
-  3. external review mark exists under knowledge/review_marks/
+  3. content-bound external review mark exists under knowledge/review_marks/
   4. File is valid markdown with YAML frontmatter
   5. Not quarantined (already in a separate dir)
 
@@ -178,7 +178,7 @@ def has_external_review_mark(src: Path) -> bool:
         return False
 
     expected_hash = str(mark.get("atom_sha256") or "").strip()
-    if expected_hash and expected_hash != _file_sha256(src):
+    if not expected_hash or expected_hash != _file_sha256(src):
         return False
     return True
 
@@ -245,6 +245,7 @@ def scan_staging(min_confidence: float) -> dict:
         "promotable": 0,
         "low_confidence": 0,
         "wrong_type": 0,
+        "missing_review": 0,
         "no_frontmatter": 0,
         "errors": 0,
     }
@@ -262,13 +263,21 @@ def scan_staging(min_confidence: float) -> dict:
             if meta is None:
                 stats["no_frontmatter"] += 1
                 continue
-            ok, reason = should_promote(meta, min_confidence)
+            ok, reason = should_promote(
+                meta,
+                min_confidence,
+                has_independent_review=has_external_review_mark(path),
+            )
             if ok:
                 stats["promotable"] += 1
             elif "confidence" in reason:
                 stats["low_confidence"] += 1
-            else:
+            elif "external review" in reason:
+                stats["missing_review"] += 1
+            elif "type" in reason:
                 stats["wrong_type"] += 1
+            else:
+                stats["errors"] += 1
         except Exception:
             stats["errors"] += 1
 
@@ -323,11 +332,12 @@ def main() -> int:
         print(json.dumps(stats, indent=2))
         logger.info(
             "Staging report: %d total, %d promotable, %d low-confidence, "
-            "%d wrong-type, %d no-frontmatter, %d errors",
+            "%d wrong-type, %d missing-review, %d no-frontmatter, %d errors",
             stats["total"],
             stats["promotable"],
             stats["low_confidence"],
             stats["wrong_type"],
+            stats["missing_review"],
             stats["no_frontmatter"],
             stats["errors"],
         )

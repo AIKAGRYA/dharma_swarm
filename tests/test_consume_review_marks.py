@@ -90,6 +90,7 @@ class TestExternalReviewMarks:
                     "decision": "approved",
                     "reviewer": "operator",
                     "reviewed_at": "2026-06-02T00:00:00Z",
+                    "atom_sha256": crm._file_sha256(atom),
                 }
             ),
             encoding="utf-8",
@@ -112,6 +113,35 @@ class TestExternalReviewMarks:
 
         monkeypatch.setattr(crm, "STAGING_DIR", staging)
         monkeypatch.setattr(crm, "REVIEW_MARK_DIR", review_marks)
+
+        assert crm.has_external_review_mark(atom) is False
+
+    def test_external_review_mark_rejects_missing_hash(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        staging = tmp_path / "staging"
+        review_marks = tmp_path / "review_marks"
+        staging.mkdir()
+        review_marks.mkdir()
+        atom = staging / "test.md"
+        atom.write_text(
+            "---\ntitle: X\ntype: atomic\nconfidence: 0.9\nreviewed: true\n---\nBody.",
+            encoding="utf-8",
+        )
+
+        monkeypatch.setattr(crm, "STAGING_DIR", staging)
+        monkeypatch.setattr(crm, "REVIEW_MARK_DIR", review_marks)
+        crm.review_mark_path(atom).write_text(
+            json.dumps(
+                {
+                    "path": "test.md",
+                    "decision": "approved",
+                    "reviewer": "operator",
+                    "reviewed_at": "2026-06-02T00:00:00Z",
+                }
+            ),
+            encoding="utf-8",
+        )
 
         assert crm.has_external_review_mark(atom) is False
 
@@ -144,6 +174,46 @@ class TestExternalReviewMarks:
         )
 
         assert crm.has_external_review_mark(atom) is False
+
+    def test_scan_staging_counts_external_review_marks(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        staging = tmp_path / "staging"
+        review_marks = tmp_path / "review_marks"
+        staging.mkdir()
+        review_marks.mkdir()
+        approved = staging / "approved.md"
+        unreviewed = staging / "unreviewed.md"
+        approved.write_text(
+            "---\ntitle: Approved\ntype: atomic\nconfidence: 0.9\nreviewed: true\n---\nBody.",
+            encoding="utf-8",
+        )
+        unreviewed.write_text(
+            "---\ntitle: Unreviewed\ntype: atomic\nconfidence: 0.9\nreviewed: true\n---\nBody.",
+            encoding="utf-8",
+        )
+
+        monkeypatch.setattr(crm, "STAGING_DIR", staging)
+        monkeypatch.setattr(crm, "REVIEW_MARK_DIR", review_marks)
+        crm.review_mark_path(approved).write_text(
+            json.dumps(
+                {
+                    "path": "approved.md",
+                    "decision": "approved",
+                    "reviewer": "operator",
+                    "reviewed_at": "2026-06-02T00:00:00Z",
+                    "atom_sha256": crm._file_sha256(approved),
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        stats = crm.scan_staging(min_confidence=0.5)
+
+        assert stats["total"] == 2
+        assert stats["promotable"] == 1
+        assert stats["missing_review"] == 1
+        assert stats["wrong_type"] == 0
 
 
 class TestPromoteAtom:
