@@ -175,6 +175,35 @@ def render_live_ops() -> None:
             print("  NOTE: dashboard prose may lag reality. Trust git log + this command.")
 
 
+def render_live_ops_cockpit() -> None:
+    section("LIVE OPS COCKPIT — READ-ONLY OPERATIONS CONTROL")
+    runbook = REPO_ROOT / "docs/ops/LIVE_OPS_COCKPIT.md"
+    census_script = REPO_ROOT / "scripts/runtime/live_ops_census.py"
+    cockpit_page = REPO_ROOT / "dashboard/src/app/dashboard/cockpit/page.tsx"
+    receipt = Path.home() / ".dharma/ops/live_process_census.json"
+    nats_spec = REPO_ROOT / "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md"
+    tmux_spec = REPO_ROOT / "docs/ops/TMUX_AGENT_SUBSTRATE.md"
+
+    print(f"  Runbook       : {'present' if runbook.exists() else 'missing'} docs/ops/LIVE_OPS_COCKPIT.md")
+    print(f"  Census script : {'present' if census_script.exists() else 'missing'} scripts/runtime/live_ops_census.py")
+    print(f"  Dashboard     : {'present' if cockpit_page.exists() else 'missing'} /dashboard/cockpit")
+    print(f"  NATS spec     : {'present' if nats_spec.exists() else 'missing'} docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md")
+    print(f"  tmux spec     : {'present' if tmux_spec.exists() else 'missing'} docs/ops/TMUX_AGENT_SUBSTRATE.md")
+    if receipt.exists():
+        try:
+            payload = json.loads(receipt.read_text(encoding="utf-8"))
+            summary = payload.get("summary", {})
+            print(f"  Receipt       : present {receipt}")
+            print(f"  Surfaces      : {summary.get('total', '?')} total; status={summary.get('by_status', {})}")
+            print(f"  Operator gates: {summary.get('human_authority_required', '?')} require John")
+            print(f"  VPS candidates: {summary.get('vps_candidates', '?')}")
+        except (OSError, json.JSONDecodeError):
+            print(f"  Receipt       : unreadable {receipt}")
+    else:
+        print("  Receipt       : missing — run python3 scripts/runtime/live_ops_census.py --write")
+    print("  Authority     : read-only; shows commands/policies but executes nothing")
+
+
 def render_manifest_health() -> None:
     section("SURFACE MANIFEST HEALTH (owner: ACTIVE_SURFACE_MANIFEST.yaml)")
     if not SURFACE_MANIFEST.exists():
@@ -540,6 +569,7 @@ def main() -> int:
     render_repo_state()
     render_active_track(evidence, track)
     render_live_ops()
+    render_live_ops_cockpit()
     render_manifest_health()
     render_broken_register()
     render_axioms()

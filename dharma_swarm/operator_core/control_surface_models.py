@@ -247,6 +247,8 @@ _HUMAN_DECISION_KEYWORDS = (
 
 
 def _needs_human_decision(row: ControlSurfaceRow) -> bool:
+    if "human_authority_required" in row.gap_codes:
+        return True
     if row.kind in ("runtime_store", "state_writer", "fleet") and row.authority_role == "incubating":
         return True
     if row.priority == "p0" and row.coherence_state in ("drifted", "unknown"):
@@ -278,7 +280,10 @@ def _build_human_decision_context(row: ControlSurfaceRow) -> HumanDecisionContex
     why_now = ""
     recommended_action = ""
 
-    if row.kind in ("runtime_store", "state_writer", "fleet") and row.authority_role == "incubating":
+    if "human_authority_required" in row.gap_codes:
+        why_now = "Surface is explicitly marked as requiring operator authority"
+        recommended_action = row.next_action or f"Review {row.label} before action"
+    elif row.kind in ("runtime_store", "state_writer", "fleet") and row.authority_role == "incubating":
         why_now = f"Incubating {row.kind} wants to go live"
         recommended_action = f"Review {row.label} and promote or archive"
     elif row.priority == "p0" and row.coherence_state == "drifted":

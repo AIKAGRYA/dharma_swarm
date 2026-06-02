@@ -52,6 +52,7 @@ def test_onboard_renders_required_sections():
         "DHARMA SWARM — AGENT ONBOARDING",
         "ACTIVE TRACK",
         "LIVE OPS SNAPSHOT",
+        "LIVE OPS COCKPIT",
         "SURFACE MANIFEST HEALTH",
         "BROKEN REGISTER",
         "LIVING AXIOMS",
