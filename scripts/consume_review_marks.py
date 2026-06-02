@@ -146,7 +146,6 @@ def promote_atom(src: Path, dst_dir: Path, dry_run: bool = False) -> bool:
     """
     rel = src.relative_to(STAGING_DIR)
     dst = dst_dir / rel
-    dst.parent.mkdir(parents=True, exist_ok=True)
 
     if dst.exists():
         # Dedup: if same filename exists in trusted, append a suffix
@@ -161,6 +160,7 @@ def promote_atom(src: Path, dst_dir: Path, dry_run: bool = False) -> bool:
         logger.info("  [DRY-RUN] would promote staging atom")
         return True
 
+    dst.parent.mkdir(parents=True, exist_ok=True)
     shutil.move(str(src), str(dst))
     return True
 

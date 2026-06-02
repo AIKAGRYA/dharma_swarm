@@ -29,6 +29,7 @@ Exit codes:
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
 import logging
 import os
@@ -71,6 +72,12 @@ HERMES_CAPABILITIES = frozenset({
     "inbox_delivery",
     "heartbeat",
 })
+
+
+def queue_lock_file() -> Path:
+    """Return the advisory lock file used for queue read-modify-write cycles."""
+
+    return QUEUE_FILE.with_suffix(QUEUE_FILE.suffix + ".lock")
 
 
 # ---------------------------------------------------------------------------
@@ -146,6 +153,19 @@ def poll_queue(dry_run: bool = False) -> list[dict[str, Any]]:
         logger.info("No queue file at %s — nothing to poll", QUEUE_FILE)
         return []
 
+    lock_path = queue_lock_file()
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with lock_path.open("a+", encoding="utf-8") as lock_file:
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+        try:
+            return _poll_queue_locked(dry_run=dry_run)
+        finally:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+
+
+def _poll_queue_locked(dry_run: bool = False) -> list[dict[str, Any]]:
+    """Poll and optionally rewrite the queue while the caller holds the lock."""
+
     try:
         lines = QUEUE_FILE.read_text(encoding="utf-8").splitlines()
     except OSError as exc:
@@ -197,28 +217,30 @@ def poll_queue(dry_run: bool = False) -> list[dict[str, Any]]:
             task.get("description", task.get("title", "untitled"))[:80],
         )
 
-    # Write back modified queue
+    # Write back modified queue. A failed write must not be reported as a
+    # successful claim: callers depend on claimed IDs as dispatch evidence.
     if modified and not dry_run:
+        new_lines = []
+        for raw_line, task in records:
+            if task is None:
+                new_lines.append(raw_line)
+            else:
+                new_lines.append(json.dumps(task, separators=(",", ":")))
+        tmp_fd, tmp_path = tempfile.mkstemp(
+            dir=str(QUEUE_FILE.parent),
+            suffix=".tmp",
+        )
         try:
-            new_lines = []
-            for raw_line, task in records:
-                if task is None:
-                    new_lines.append(raw_line)
-                else:
-                    new_lines.append(json.dumps(task, separators=(",", ":")))
-            tmp_fd, tmp_path = tempfile.mkstemp(
-                dir=str(QUEUE_FILE.parent),
-                suffix=".tmp",
-            )
             with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
                 f.write("\n".join(new_lines) + "\n")
             os.replace(tmp_path, str(QUEUE_FILE))
         except Exception as exc:
             logger.warning("Failed to write back queue: %s", exc)
             try:
-                os.unlink(tmp_path)  # type: ignore[possibly-undefined]
-            except (OSError, NameError):
+                os.unlink(tmp_path)
+            except OSError:
                 pass
+            raise
 
     return claimed
 
