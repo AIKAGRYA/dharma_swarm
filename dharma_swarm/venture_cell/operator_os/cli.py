@@ -13,6 +13,18 @@ from dharma_swarm.venture_cell.operator_os.live_loader import load_live_operator
 from dharma_swarm.venture_cell.operator_os.projection import build_operator_projection
 
 
+def _sequence_items(value: Any) -> tuple[Any, ...]:
+    return tuple(value) if isinstance(value, (list, tuple)) else ()
+
+
+def _dict_items(value: Any) -> list[dict[str, Any]]:
+    return [item for item in _sequence_items(value) if isinstance(item, dict)]
+
+
+def _sequence_count(value: Any) -> int:
+    return len(_sequence_items(value))
+
+
 def _memory_index_payload(projection: dict[str, Any]) -> dict[str, Any]:
     memory = projection.get("memory_kernel")
     return memory if isinstance(memory, dict) else {}
@@ -37,11 +49,7 @@ def _memory_query_eval_payload(projection: dict[str, Any]) -> dict[str, Any]:
 def _memory_coverage_payload(projection: dict[str, Any]) -> dict[str, Any]:
     memory = _memory_index_payload(projection)
     truncated = bool(memory.get("truncated"))
-    root_coverage = [
-        coverage
-        for coverage in memory.get("root_coverage", [])
-        if isinstance(coverage, dict)
-    ]
+    root_coverage = _dict_items(memory.get("root_coverage", []))
     truncated_roots = [
         coverage for coverage in root_coverage if bool(coverage.get("truncated"))
     ]
@@ -85,8 +93,7 @@ def _memory_coverage_payload(projection: dict[str, Any]) -> dict[str, Any]:
 
 
 def _canvas_summary_payload(projection: dict[str, Any]) -> dict[str, Any]:
-    raw_canvas = projection.get("canvas", [])
-    canvas = [item for item in raw_canvas if isinstance(item, dict)]
+    canvas = _dict_items(projection.get("canvas", []))
     status_counts = Counter(str(item.get("status") or "unknown") for item in canvas)
     owner_counts = Counter(
         str(item.get("owner_department") or "unassigned") for item in canvas
@@ -156,8 +163,7 @@ def _canvas_summary_payload(projection: dict[str, Any]) -> dict[str, Any]:
 
 
 def _department_summary_payload(projection: dict[str, Any]) -> dict[str, Any]:
-    raw_departments = projection.get("departments", [])
-    departments = [item for item in raw_departments if isinstance(item, dict)]
+    departments = _dict_items(projection.get("departments", []))
     status_counts = Counter(str(item.get("status") or "unknown") for item in departments)
     authority_mode_counts = Counter(
         str(item.get("authority_mode") or "unknown") for item in departments
@@ -179,11 +185,7 @@ def _department_summary_payload(projection: dict[str, Any]) -> dict[str, Any]:
             "label": str(item.get("label") or ""),
             "status": str(item.get("status") or "unknown"),
             "authority_mode": str(item.get("authority_mode") or "unknown"),
-            "evidence_ref_count": len(
-                item.get("evidence_refs", [])
-                if isinstance(item.get("evidence_refs"), (list, tuple))
-                else []
-            ),
+            "evidence_ref_count": _sequence_count(item.get("evidence_refs")),
         }
         for item in departments
     ]
@@ -212,8 +214,7 @@ def _department_summary_payload(projection: dict[str, Any]) -> dict[str, Any]:
 
 
 def _gate_summary_payload(projection: dict[str, Any]) -> dict[str, Any]:
-    raw_gates = projection.get("gates", [])
-    gates = [item for item in raw_gates if isinstance(item, dict)]
+    gates = _dict_items(projection.get("gates", []))
     decision_counts = Counter(str(item.get("decision") or "unknown") for item in gates)
     coherence_counts = Counter(
         str(item.get("coherence_state") or "unknown") for item in gates
@@ -224,9 +225,7 @@ def _gate_summary_payload(projection: dict[str, Any]) -> dict[str, Any]:
             "label": str(item.get("label") or ""),
             "decision": str(item.get("decision") or "unknown"),
             "coherence_state": str(item.get("coherence_state") or "unknown"),
-            "gap_codes": item.get("gap_codes", [])
-            if isinstance(item.get("gap_codes"), (list, tuple))
-            else [],
+            "gap_codes": _sequence_items(item.get("gap_codes")),
             "next_action": str(item.get("next_action") or ""),
         }
         for item in gates
@@ -238,16 +237,8 @@ def _gate_summary_payload(projection: dict[str, Any]) -> dict[str, Any]:
             "label": str(item.get("label") or ""),
             "decision": str(item.get("decision") or "unknown"),
             "coherence_state": str(item.get("coherence_state") or "unknown"),
-            "gap_count": len(
-                item.get("gap_codes", [])
-                if isinstance(item.get("gap_codes"), (list, tuple))
-                else []
-            ),
-            "evidence_ref_count": len(
-                item.get("evidence_refs", [])
-                if isinstance(item.get("evidence_refs"), (list, tuple))
-                else []
-            ),
+            "gap_count": _sequence_count(item.get("gap_codes")),
+            "evidence_ref_count": _sequence_count(item.get("evidence_refs")),
         }
         for item in gates
     ]
@@ -278,8 +269,11 @@ def _gate_summary_payload(projection: dict[str, Any]) -> dict[str, Any]:
 
 
 def _evidence_summary_payload(projection: dict[str, Any]) -> dict[str, Any]:
-    raw_refs = projection.get("evidence_refs", [])
-    refs = [str(ref) for ref in raw_refs if str(ref or "").strip()]
+    refs = [
+        str(ref)
+        for ref in _sequence_items(projection.get("evidence_refs", []))
+        if str(ref or "").strip()
+    ]
     evidence_items: list[dict[str, Any]] = []
     for ref in refs:
         path = Path(ref)

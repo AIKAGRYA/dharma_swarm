@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live verifier matrix, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-4eaef0bd4e7a0a85`
-Current scoped HEAD before this packet: `4cec2fc3 feat(operator-os): summarize gates`
+ds-goal progress receipt: `r-446364a1d4cbda18`
+Current scoped HEAD before this packet: `97f4927e feat(operator-os): summarize evidence refs`
 
 This matrix captures the current verification surface for future agents. It is
 not a final verifier matrix and must not be used to close the reporter task.
@@ -44,6 +44,8 @@ not a final verifier matrix and must not be used to close the reporter task.
   with non-authority flags.
 - Operator evidence summary packet: passing; evidence ref/locality counts
   render with non-authority flags.
+- Summary helper refactor: passing; focused tests pass and live packet counts
+  stay stable.
 - Completion guard: passing; live `100/100` is explicitly non-final.
 - Completion guard reporter policy: passing; terminal receipt and complete
   verifier pass required.
@@ -75,6 +77,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | Department summary packet | `operator_department_summary_packet.json` | departments `9`, blocked `2`, partial `2`; `not_authority: true` | pass |
 | Gate summary packet | `operator_gate_summary_packet.json` | gates `2`, allow `1`, block `1`; `not_authority: true` | pass |
 | Evidence summary packet | `operator_evidence_summary_packet.json` | refs `6`, existing local `6`, absolute `4`, relative `2`; `not_authority: true` | pass |
+| Summary helper refactor | `pytest -q tests/test_venture_cell_operator_os_projection.py`; render count checks | helper refactor preserves rendered counts | pass |
 | Periodic onboard | `make onboard` | exit `0` | pass, not mission authority |
 | Codex toolbelt | `bash scripts/runtime/codex_toolbelt_status.sh` | exit `0` with optional credential warnings | pass |
 | Latest periodic onboard/toolbelt | `make onboard`; `bash scripts/runtime/codex_toolbelt_status.sh` | both exit `0`; optional credential warnings | pass, not mission authority |
@@ -182,6 +185,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `r-fe4852c3b2a2a7c6` | keep | department summary packet |
 | `r-c65f0c7aa7f4ebdc` | keep | gate summary packet |
 | `r-4eaef0bd4e7a0a85` | keep | evidence summary packet |
+| `r-446364a1d4cbda18` | keep | summary helper refactor |
 
 ## Revert / Queue Ledger
 

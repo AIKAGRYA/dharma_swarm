@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live risk register, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-4eaef0bd4e7a0a85`
-Current scoped HEAD before this packet: `4cec2fc3 feat(operator-os): summarize gates`
+ds-goal progress receipt: `r-446364a1d4cbda18`
+Current scoped HEAD before this packet: `97f4927e feat(operator-os): summarize evidence refs`
 
 This register separates current blockers, residual risks, and solved local
 claims. It exists to prevent false completion after a high live score.
@@ -48,6 +48,7 @@ claims. It exists to prevent false completion after a high live score.
 | Department summary overclaim | `operator_department_summary_packet.json` exposes department/status/authority counts | treat as routing metadata, not authority or closure |
 | Gate summary overclaim | `operator_gate_summary_packet.json` exposes gate decision/coherence counts | treat as routing metadata, not authority or closure |
 | Evidence summary overclaim | `operator_evidence_summary_packet.json` exposes evidence reference counts | treat as locator metadata, not authority or closure |
+| Summary helper refactor regression | renderer helper changes could alter counts | focused tests and live count checks must pass before commit |
 | Completion guard overclaim | `operator_completion_guard_packet.json` says keep reporter open | guard only, not terminal receipt |
 | Completion guard policy overclaim | guard lists reporter closure requirements | treat as checklist, not closure evidence |
 | Completion guard count overclaim | guard exposes blocker/artifact/action counts | treat as audit metadata, not closure evidence |
@@ -91,6 +92,7 @@ claims. It exists to prevent false completion after a high live score.
 | Operator department summary packet renders | departments `9`, blocked `2`, partial `2`; non-authority flags true/false as expected | routing metadata only |
 | Operator gate summary packet renders | gates `2`, allow `1`, block `1`; non-authority flags true/false as expected | routing metadata only |
 | Operator evidence summary packet renders | refs `6`, existing local `6`, absolute `4`, relative `2`; non-authority flags true/false as expected | locator metadata only |
+| Summary helper refactor preserves counts | focused projection test passes; gate/evidence counts unchanged | implementation hygiene only |
 | Completion guard renders | live score can be 100 without completion | false-final guard only |
 | Completion guard reporter policy renders | terminal receipt and verifier pass required | requirement checklist only |
 | Completion guard counts render | final/external/artifact/forbidden counts match arrays | audit metadata only |

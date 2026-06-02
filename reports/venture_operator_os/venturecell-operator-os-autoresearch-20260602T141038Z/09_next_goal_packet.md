@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-4eaef0bd4e7a0a85`
-Current scoped HEAD before this packet: `4cec2fc3 feat(operator-os): summarize gates`
+ds-goal progress receipt: `r-446364a1d4cbda18`
+Current scoped HEAD before this packet: `97f4927e feat(operator-os): summarize evidence refs`
 
 This packet is the handoff for the next bounded AutoResearch loop. It must be
 reviewed and updated in the final hour before reporter closure.
@@ -52,6 +52,8 @@ reviewed and updated in the final hour before reporter closure.
   authority.
 - Operator evidence summary packet: present; refs `6`, existing local `6`,
   absolute `4`, relative `2`, not authority.
+- Summary helper refactor: present; tuple/list handling centralized with stable
+  rendered counts.
 - Completion guard packet: `keep_reporter_open`, `not_final: true`.
 - Completion guard reporter policy: terminal receipt and complete verifier pass
   required.
@@ -76,7 +78,7 @@ reviewed and updated in the final hour before reporter closure.
 - Three-hour timebox proof: current clock still below 8 hours.
 - Active clock proof: current clock still below 8 hours.
 - Four-hour midpoint proof: current clock still below 8 hours.
-- Last committed packet: gate summary packet.
+- Last committed packet: evidence summary packet.
 
 ## Next Goal
 
@@ -206,6 +208,12 @@ bounded targets:
    counts and local path classifications. Preserve its non-authority flags and
    use it to route locator inspection, not to replace referenced artifacts.
 
+13e. Summary helper preservation.
+
+   Renderer helpers now centralize tuple/list coercion for summary packets.
+   Future packet work should use those helpers and rerun focused tests plus
+   live render count checks.
+
 14. Completion guard preservation.
 
    `operator_completion_guard_packet.json` now makes false-final blockers
@@ -325,6 +333,7 @@ If the loop only changes a report packet, also run scoped `git diff --check`.
 - `45_department_summary_packet_receipt.md`
 - `46_gate_summary_packet_receipt.md`
 - `47_evidence_summary_packet_receipt.md`
+- `48_summary_helper_refactor_receipt.md`
 - `operator_os_projection.json`
 - `operator_canvas_summary_packet.json`
 - `operator_department_summary_packet.json`

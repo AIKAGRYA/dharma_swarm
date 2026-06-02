@@ -3,9 +3,9 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live ledger, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-4eaef0bd4e7a0a85`
+ds-goal progress receipt: `r-446364a1d4cbda18`
 Baseline: `1aca07a1 Add VentureCell Operator OS Level 70 surface`
-Current scoped HEAD before this packet: `4cec2fc3 feat(operator-os): summarize gates`
+Current scoped HEAD before this packet: `97f4927e feat(operator-os): summarize evidence refs`
 
 This file is a living score ledger. It exists now so later agents do not
 reconstruct scores from memory. It must be reviewed and updated before final
@@ -61,6 +61,7 @@ reporter closure.
 | Loop 46 | `45_department_summary_packet_receipt.md` | `r-fe4852c3b2a2a7c6` | 100 | +0 | keep department summary packet |
 | Loop 47 | `46_gate_summary_packet_receipt.md` | `r-c65f0c7aa7f4ebdc` | 100 | +0 | keep gate summary packet |
 | Loop 48 | `47_evidence_summary_packet_receipt.md` | `r-4eaef0bd4e7a0a85` | 100 | +0 | keep evidence summary packet |
+| Loop 49 | `48_summary_helper_refactor_receipt.md` | `r-446364a1d4cbda18` | 100 | +0 | keep summary helper refactor |
 
 ## Area History
 
@@ -121,6 +122,8 @@ audit with explicit evidence.
   `1`; counts are routing metadata only.
 - Operator evidence summary packet: refs `6`, existing local `6`, absolute
   `4`, relative `2`; counts are routing metadata only.
+- Summary helper refactor: focused projection test passes and rendered gate and
+  evidence counts remain stable.
 - Completion guard packet: `keep_reporter_open`, `not_final: true`, and
   live score can be `100` without completion.
 - Completion guard reporter policy: terminal reporter receipt and complete

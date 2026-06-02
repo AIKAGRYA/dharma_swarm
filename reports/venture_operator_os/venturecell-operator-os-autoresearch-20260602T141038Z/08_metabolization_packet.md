@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live packet, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-4eaef0bd4e7a0a85`
-Current scoped HEAD before this packet: `4cec2fc3 feat(operator-os): summarize gates`
+ds-goal progress receipt: `r-446364a1d4cbda18`
+Current scoped HEAD before this packet: `97f4927e feat(operator-os): summarize evidence refs`
 
 This packet captures durable learning from the run so far. It must be reviewed
 and updated during final closeout before the reporter task is closed.
@@ -246,6 +246,22 @@ and updated during final closeout before the reporter task is closed.
      replace direct inspection of referenced artifacts or gate-specific
      evidence semantics.
 
+9e. Summary renderer helpers should preserve packet semantics.
+
+   Evidence:
+
+   - `_sequence_items`, `_dict_items`, and `_sequence_count` now centralize
+     tuple/list handling in the renderer.
+   - `pytest -q tests/test_venture_cell_operator_os_projection.py` passed
+     after the refactor.
+   - Live render checks still report gates `2`, allow `1`, block `1`, evidence
+     refs `6`, and `not_authority: true`.
+
+   Metabolized rule:
+
+   - Refactors to packet renderers must prove count stability with focused
+     tests and live packet checks before being kept.
+
 10. Live score can be perfect before final completion.
 
    Evidence:
@@ -430,6 +446,7 @@ Metabolized rule:
 | `r-fe4852c3b2a2a7c6` | `45_department_summary_packet_receipt.md` | machine-readable department summary packet |
 | `r-c65f0c7aa7f4ebdc` | `46_gate_summary_packet_receipt.md` | machine-readable gate summary packet |
 | `r-4eaef0bd4e7a0a85` | `47_evidence_summary_packet_receipt.md` | machine-readable evidence summary packet |
+| `r-446364a1d4cbda18` | `48_summary_helper_refactor_receipt.md` | summary renderer helper refactor |
 
 ## Current Read-Only Artifacts
 
@@ -480,6 +497,7 @@ Metabolized rule:
 - `45_department_summary_packet_receipt.md`
 - `46_gate_summary_packet_receipt.md`
 - `47_evidence_summary_packet_receipt.md`
+- `48_summary_helper_refactor_receipt.md`
 
 ## Do Not Metabolize As Done
 
