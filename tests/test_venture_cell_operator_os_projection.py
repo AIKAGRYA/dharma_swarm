@@ -201,6 +201,10 @@ def test_projection_blocks_external_autonomy_without_reader_gate(tmp_path: Path)
     assert "payload.privacy_redacted" in go_gate.required_receipt_fields
     assert go_gate.blocked_departments == ("growth", "communications")
     assert "external_outreach" in go_gate.blocked_actions
+    assert go_gate.accepted_receipt_count == len(go_gate.accepted_receipts)
+    assert go_gate.rejected_receipt_count == len(go_gate.rejected_receipts)
+    assert go_gate.missing_receipt_count == len(go_gate.missing_receipts)
+    assert go_gate.accepted_receipt_count == 0
     assert "decision_delta.json" in " ".join(go_gate.expected_local_artifacts)
     assert go_gate.receipt_template["template_status"] == "draft_template_not_evidence"
     assert go_gate.receipt_template["not_receipt"] is True
@@ -312,6 +316,8 @@ def test_projection_maps_reader_gate_taskboard_a2a_and_memory(tmp_path: Path) ->
     assert any(item.item_id == "a2a.a2a-1" and item.status == "claimed_open" for item in projection.canvas)
     assert projection.darshan_go_gate_packet.decision == "gate_passed_reviewed_internal_only"
     assert projection.darshan_go_gate_packet.accepted_receipts == ("goev_reply_001",)
+    assert projection.darshan_go_gate_packet.accepted_receipt_count == 1
+    assert projection.darshan_go_gate_packet.missing_receipt_count == 0
     assert projection.darshan_go_gate_packet.blocked_actions == ()
 
 
@@ -497,6 +503,10 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert go_gate_packet["required_receipt_source"] == "darshan_external_reader"
     assert "payload.privacy_redacted" in go_gate_packet["required_receipt_fields"]
     assert "publishing" in go_gate_packet["blocked_actions"]
+    assert go_gate_packet["accepted_receipt_count"] == len(go_gate_packet["accepted_receipts"])
+    assert go_gate_packet["rejected_receipt_count"] == len(go_gate_packet["rejected_receipts"])
+    assert go_gate_packet["missing_receipt_count"] == len(go_gate_packet["missing_receipts"])
+    assert go_gate_packet["accepted_receipt_count"] == 0
     assert go_receipt_template["template_status"] == "draft_template_not_evidence"
     assert go_receipt_template["not_receipt"] is True
     assert go_receipt_template["receipt"]["status"] == "template_only_not_accepted"

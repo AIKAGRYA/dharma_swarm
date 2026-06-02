@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-db9c975774cfbdb2`
-Current scoped HEAD before this packet: `35c3e28a feat(operator-os): expose latest receipt id`
+ds-goal progress receipt: `r-11e562264d282a72`
+Current scoped HEAD before this packet: `d8cef6dc docs(operator-os): refresh active timebox`
 
 This packet is the handoff for the next bounded AutoResearch loop. It must be
 reviewed and updated in the final hour before reporter closure.
@@ -18,6 +18,7 @@ reviewed and updated in the final hour before reporter closure.
 - Reporter task: open by design.
 - MemoryKernel strict eval: `pass` (`6/6`) from report-local staged sources.
 - Darshan GO gate: `block_external_authority`, no accepted receipts.
+- Darshan GO receipt counts: accepted `0`, rejected `0`, missing `0`.
 - Darshan GO template: `draft_template_not_evidence`.
 - Darshan GO template accepted-receipt requirements: present, not evidence.
 - Live verifier matrix: present, not final.
@@ -60,7 +61,7 @@ reviewed and updated in the final hour before reporter closure.
 - Timebox refresh: current clock still below 8 hours.
 - Three-hour timebox proof: current clock still below 8 hours.
 - Active clock proof: current clock still below 8 hours.
-- Last committed packet: latest progress receipt id inventory.
+- Last committed packet: active non-final timebox proof.
 
 ## Next Goal
 
@@ -99,6 +100,8 @@ bounded targets:
    `darshan_go_receipt_template.json` now exists. If this area is touched
    again, keep it explicitly non-evidence and test that it cannot be confused
    with accepted GO receipts.
+   Preserve GO receipt count/list parity and do not treat counts as gate
+   clearance.
 
 4. Verifier matrix preservation.
 
@@ -268,6 +271,7 @@ If the loop only changes a report packet, also run scoped `git diff --check`.
 - `36_memory_coverage_counts_receipt.md`
 - `37_latest_progress_receipt_manifest_receipt.md`
 - `38_timebox_active_clock_receipt.md`
+- `39_go_receipt_counts_receipt.md`
 - `operator_os_projection.json`
 - `operator_completion_guard_packet.json`
 - `operator_next_action_packet.json`

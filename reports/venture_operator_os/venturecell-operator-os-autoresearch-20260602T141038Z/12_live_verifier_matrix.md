@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live verifier matrix, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-db9c975774cfbdb2`
-Current scoped HEAD before this packet: `35c3e28a feat(operator-os): expose latest receipt id`
+ds-goal progress receipt: `r-11e562264d282a72`
+Current scoped HEAD before this packet: `d8cef6dc docs(operator-os): refresh active timebox`
 
 This matrix captures the current verification surface for future agents. It is
 not a final verifier matrix and must not be used to close the reporter task.
@@ -15,6 +15,8 @@ not a final verifier matrix and must not be used to close the reporter task.
 - MemoryKernel strict eval: passing locally from report-local staged sources
   (`6/6`).
 - Darshan GO gate: blocked by design; no accepted receipts.
+- Darshan GO receipt counts: passing; accepted/rejected/missing counts mirror
+  arrays and accepted remains `0`.
 - Darshan GO receipt template: rendered, explicitly not evidence.
 - Darshan GO template requirements: rendered prerequisites, not acceptance.
 - External authority: blocked.
@@ -77,6 +79,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | Memory coverage counts | roots `4`, truncated `2`, untruncated `2`, local targets `2` | routing metadata, not complete coverage |
 | `memory_kernel_repair_packet.json` | `no_repair_needed` | still forbids trusted promotion |
 | `darshan_go_gate_packet.json` | `block_external_authority` | accepted receipts empty |
+| GO receipt counts | accepted `0`, rejected `0`, missing `0` | selectors only, not GO clearance |
 | `darshan_go_receipt_template.json` | `draft_template_not_evidence` | must not be stored as accepted receipt |
 | GO template requirements | source/schema/status/event/human/redaction prerequisites | guardrails only, not accepted receipt |
 | `authority_boundary_packet.json` | `local_read_only_external_blocked` | firewall view, not authority grant |
@@ -145,6 +148,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `r-3e318b30d3694ffa` | keep | memory coverage count selectors |
 | `r-7167e2551df4f45e` | keep | latest progress receipt id inventory |
 | `r-db9c975774cfbdb2` | keep | active non-final timebox proof |
+| `r-11e562264d282a72` | keep | GO receipt count selectors |
 
 ## Revert / Queue Ledger
 

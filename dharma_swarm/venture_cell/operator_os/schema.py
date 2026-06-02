@@ -139,6 +139,9 @@ class DarshanGoGatePacket:
     accepted_receipts: tuple[str, ...] = ()
     rejected_receipts: tuple[str, ...] = ()
     missing_receipts: tuple[str, ...] = ()
+    accepted_receipt_count: int = 0
+    rejected_receipt_count: int = 0
+    missing_receipt_count: int = 0
     event_uids: tuple[str, ...] = ()
     expected_local_artifacts: tuple[str, ...] = ()
     evidence_refs: tuple[str, ...] = ()

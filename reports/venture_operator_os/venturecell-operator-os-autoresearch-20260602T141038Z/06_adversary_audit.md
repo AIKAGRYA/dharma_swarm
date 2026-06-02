@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-db9c975774cfbdb2`
-Current scoped HEAD before this packet: `35c3e28a feat(operator-os): expose latest receipt id`
+ds-goal progress receipt: `r-11e562264d282a72`
+Current scoped HEAD before this packet: `d8cef6dc docs(operator-os): refresh active timebox`
 
 This audit is intentionally written before the final time window so the next
 agent has a concrete attack surface. It is not a completion certificate. The
@@ -23,6 +23,8 @@ updates, and terminal verification exist.
 - Autonomy level remains `L0_read_only_plan`.
 - Darshan GO gate decision remains `block_external_authority`.
 - Accepted Darshan GO receipts remain empty.
+- Darshan GO receipt counts are explicit: accepted `0`, rejected `0`, missing
+  `0`; counts do not clear the gate.
 - Darshan GO receipt template exists as `draft_template_not_evidence`.
 - Darshan GO receipt template now lists machine-readable accepted receipt
   requirements, but those requirements are not acceptance.
@@ -118,6 +120,7 @@ Adversarial review:
   memory coverage.
 - A GO gate packet with `decision: block_external_authority` is not GO
   acceptance.
+- GO receipt counts are not GO acceptance; accepted count remains `0`.
 - A GO receipt template is not an accepted GO receipt.
 - Accepted receipt requirements in the template are guardrails only, not gate
   clearance.
@@ -181,6 +184,7 @@ Queued:
 | Reporter can be closed now | ds-goal reporter task is open and complete verify fails | false |
 | Operator OS can act externally | `blocked_on_external_reader_gate`, `L0_read_only_plan` | false |
 | Darshan GO is accepted | accepted receipts are `[]` | false |
+| GO receipt counts clear the gate | accepted count is `0` and decision remains blocked | false |
 | GO template is evidence | template status is `draft_template_not_evidence` | false |
 | GO template requirements prove acceptance | requirements are prerequisites, not receipts | false |
 | MemoryKernel recall is trusted/complete | strict eval passes from staged report-local roots only | false |

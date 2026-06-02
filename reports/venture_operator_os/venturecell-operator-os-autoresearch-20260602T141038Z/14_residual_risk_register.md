@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live risk register, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-db9c975774cfbdb2`
-Current scoped HEAD before this packet: `35c3e28a feat(operator-os): expose latest receipt id`
+ds-goal progress receipt: `r-11e562264d282a72`
+Current scoped HEAD before this packet: `d8cef6dc docs(operator-os): refresh active timebox`
 
 This register separates current blockers, residual risks, and solved local
 claims. It exists to prevent false completion after a high live score.
@@ -26,6 +26,7 @@ claims. It exists to prevent false completion after a high live score.
 | Memory pass is report-local | `memory_kernel_query_eval.json` passes from staged report roots | do not call it trusted Chetana promotion |
 | Memory index truncated | `memory_kernel_index.json` reports truncated scan | do not claim complete memory coverage |
 | GO template misuse | `darshan_go_receipt_template.json` exists with accepted-receipt requirements | keep markers and treat requirements as prerequisites only |
+| GO receipt count overclaim | GO gate reports accepted/rejected/missing receipt counts | treat as selectors, not GO clearance |
 | Authority packet overclaim | `authority_boundary_packet.json` exists | treat as firewall view, not grant |
 | Authority boolean overclaim | authority packet has explicit external authority booleans | treat as denial guardrails, not grant |
 | Artifact manifest overclaim | `operator_os_artifact_manifest.json` exists | treat as locator, not proof of finality |
@@ -63,6 +64,7 @@ claims. It exists to prevent false completion after a high live score.
 | Memory strict eval passes | `6/6`, trusted promotion false | staged/report-local recall only |
 | GO template renders | `darshan_go_receipt_template.json` | not evidence |
 | GO template requirements render | accepted-receipt source/schema/status/event/human/redaction prerequisites | guardrails only |
+| GO receipt counts render | accepted/rejected/missing counts mirror arrays | selector only |
 | Authority packet renders | `local_read_only_external_blocked` | not authority grant |
 | Authority booleans render | external authority false; action ack required | denial guardrail only |
 | Artifact manifest renders | `not_authority: true` | locator/status packet only |

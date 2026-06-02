@@ -738,6 +738,9 @@ def _darshan_go_gate_packet(gate: GateSummary) -> DarshanGoGatePacket:
         )
     expected_artifacts.append("dharma_swarm/venture_cell/darshan/external_reader_gate.py")
     expected_artifacts.append("darshan_go_receipt_template.json")
+    accepted_receipts = tuple(str(value) for value in raw.get("accepted_receipts", []))
+    rejected_receipts = tuple(str(value) for value in raw.get("rejected_receipts", []))
+    missing_receipts = tuple(str(value) for value in raw.get("missing_receipts", []))
 
     return DarshanGoGatePacket(
         packet_id="darshan.external_reader_go_gate",
@@ -785,9 +788,12 @@ def _darshan_go_gate_packet(gate: GateSummary) -> DarshanGoGatePacket:
             "external_operator_handoff",
             "live_external_authority",
         ),
-        accepted_receipts=tuple(str(value) for value in raw.get("accepted_receipts", [])),
-        rejected_receipts=tuple(str(value) for value in raw.get("rejected_receipts", [])),
-        missing_receipts=tuple(str(value) for value in raw.get("missing_receipts", [])),
+        accepted_receipts=accepted_receipts,
+        rejected_receipts=rejected_receipts,
+        missing_receipts=missing_receipts,
+        accepted_receipt_count=len(accepted_receipts),
+        rejected_receipt_count=len(rejected_receipts),
+        missing_receipt_count=len(missing_receipts),
         event_uids=tuple(str(value) for value in raw.get("event_uids", [])),
         expected_local_artifacts=tuple(expected_artifacts),
         evidence_refs=tuple(ref for ref in gate.evidence_refs if ref),

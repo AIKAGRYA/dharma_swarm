@@ -1,4 +1,5 @@
 {
+  "accepted_receipt_count": 0,
   "accepted_receipts": [],
   "authority_boundary": "read_only_until_accepted_privacy_redacted_go_receipt",
   "blocked_actions": [
@@ -31,6 +32,7 @@
     "darshan_external_reader_event_missing"
   ],
   "gate_id": "darshan.external_reader_go_receipts",
+  "missing_receipt_count": 0,
   "missing_receipts": [],
   "next_governed_action": "Attach one ExternalReaderEvent with an accepted privacy-redacted GO evidence receipt.",
   "observed_state": "no reader events",
@@ -98,6 +100,7 @@
     "source": "darshan_external_reader",
     "template_status": "draft_template_not_evidence"
   },
+  "rejected_receipt_count": 0,
   "rejected_receipts": [],
   "required_receipt_fields": [
     "receipt_id",

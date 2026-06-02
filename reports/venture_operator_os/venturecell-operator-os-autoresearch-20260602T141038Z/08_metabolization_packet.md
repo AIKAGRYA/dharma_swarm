@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live packet, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-db9c975774cfbdb2`
-Current scoped HEAD before this packet: `35c3e28a feat(operator-os): expose latest receipt id`
+ds-goal progress receipt: `r-11e562264d282a72`
+Current scoped HEAD before this packet: `d8cef6dc docs(operator-os): refresh active timebox`
 
 This packet captures durable learning from the run so far. It must be reviewed
 and updated during final closeout before the reporter task is closed.
@@ -67,6 +67,7 @@ and updated during final closeout before the reporter task is closed.
    - The template now lists accepted receipt requirements for source, schema,
      status, source URL, event UID, human approval, and privacy redaction.
    - Accepted receipts are empty.
+   - GO receipt counts now expose accepted `0`, rejected `0`, and missing `0`.
    - Operator OS remains `blocked_on_external_reader_gate` and
      `L0_read_only_plan`.
 
@@ -79,6 +80,8 @@ and updated during final closeout before the reporter task is closed.
      and must never be stored as accepted without a real countable reader event.
    - Template requirements are prerequisites only; they are not a receipt and
      must not be used to bypass the external-reader gate.
+   - GO receipt counts are audit selectors only. They do not create acceptance
+     and must be read with the GO gate decision.
 
 5. Final score is not final just because the interim target passed `80/100`.
 

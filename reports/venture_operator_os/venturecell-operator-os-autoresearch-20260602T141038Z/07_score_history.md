@@ -3,9 +3,9 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live ledger, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-db9c975774cfbdb2`
+ds-goal progress receipt: `r-11e562264d282a72`
 Baseline: `1aca07a1 Add VentureCell Operator OS Level 70 surface`
-Current scoped HEAD before this packet: `35c3e28a feat(operator-os): expose latest receipt id`
+Current scoped HEAD before this packet: `d8cef6dc docs(operator-os): refresh active timebox`
 
 This file is a living score ledger. It exists now so later agents do not
 reconstruct scores from memory. It must be reviewed and updated before final
@@ -52,6 +52,7 @@ reporter closure.
 | Loop 37 | `36_memory_coverage_counts_receipt.md` | `r-3e318b30d3694ffa` | 100 | +0 | keep memory coverage counts |
 | Loop 38 | `37_latest_progress_receipt_manifest_receipt.md` | `r-7167e2551df4f45e` | 100 | +0 | keep latest progress receipt id inventory |
 | Loop 39 | `38_timebox_active_clock_receipt.md` | `r-db9c975774cfbdb2` | 100 | +0 | keep active non-final timebox proof |
+| Loop 40 | `39_go_receipt_counts_receipt.md` | `r-11e562264d282a72` | 100 | +0 | keep GO receipt count selectors |
 
 ## Area History
 
@@ -76,6 +77,7 @@ audit with explicit evidence.
 - Latest rendered Operator OS status: `blocked_on_external_reader_gate`.
 - Autonomy level: `L0_read_only_plan`.
 - Darshan GO gate: `block_external_authority`.
+- Darshan GO receipt counts: accepted `0`, rejected `0`, missing `0`.
 - Darshan GO receipt template: `draft_template_not_evidence`.
 - Darshan GO template accepted-receipt requirements: present, not acceptance.
 - Live verifier matrix: present, non-final.
@@ -152,6 +154,7 @@ current evidence, not as a full-project proof.
   from trusted Chetana promotion; final closeout must preserve that boundary.
 - Darshan remains blocked until a real accepted privacy-redacted external-reader
   GO evidence receipt exists.
+- GO receipt counts are selectors only; accepted count `0` preserves the block.
 - The GO template is not evidence and must not be stored as an accepted receipt
   without a real external-reader event.
 - GO template accepted-receipt requirements are prerequisites only; they do not
