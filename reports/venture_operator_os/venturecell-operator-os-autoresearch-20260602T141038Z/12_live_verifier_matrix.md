@@ -329,6 +329,22 @@ This review refreshes final markdown inputs only. It does not close the reporter
 This checkpoint proves final-window eligibility only. It does not close the
 reporter.
 
+## Loop 73 Final Verifier Matrix
+
+| Check | Result | Notes |
+|---|---|---|
+| Active goal clock | pass | elapsed `28821s`, threshold `28800s` |
+| Focused Operator OS projection tests | pass | `pytest -q tests/test_venture_cell_operator_os_projection.py`; `9` passed |
+| Darshan/control GO slice | pass | `pytest -q tests/test_darshan_external_reader_gate.py tests/test_control_surface.py -k 'GoReceiptRows or external_reader'`; `11` passed, `74` deselected |
+| Governed/A2A/daily slice | pass | `pytest -q tests/test_governed_work_admission.py tests/test_a2a_task_lifecycle.py tests/test_daily_operating_brief.py`; `31` passed |
+| Operator OS compile | pass | `./.venv/bin/python -m compileall -q dharma_swarm/venture_cell/operator_os` |
+| Live render | pass | final run directory rendered before reporter closure |
+| Scoped diff check | pass | scoped report/code path diff check passed |
+| Terminal reporter receipt | pass | `r-876132cf98f2aed5` |
+| Complete verifier after closure | pass | `complete_valid: true`, blockers `[]`, completed `5/5` |
+
+Mission verifier result: complete.
+
 ## Loop 63 Final-Window Preflight Addendum
 
 | Check | Result | Notes |

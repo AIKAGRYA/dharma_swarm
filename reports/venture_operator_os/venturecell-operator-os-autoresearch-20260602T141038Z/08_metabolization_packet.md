@@ -1417,3 +1417,28 @@ Metabolized rule:
 
 - Final-window eligibility and final closeout are separate states and must be
   recorded separately.
+
+## Loop 73 Final Metabolization
+
+Final lessons:
+
+- True elapsed time, terminal reporter receipt, and complete verifier pass must
+  be separate evidence items.
+- Conservative Operator OS preflight packets can remain non-authority even when
+  the ds-goal mission closes successfully.
+- GO templates, expected artifact readiness, and digest visibility are local
+  review aids, not accepted external-reader evidence.
+- Broad dirty work can coexist with scoped mission commits when every commit uses
+  explicit pathspecs.
+
+Chetana/wiki posture:
+
+- Safe to ingest as report-local mission history.
+- Not safe to promote as trusted Chetana memory without the existing trusted
+  promotion gates.
+
+Final handoff:
+
+- Start future work from `72_final_closeout_receipt.md` and
+  `operator_goal_truth_packet.json`.
+- Do not treat this mission as external authority.

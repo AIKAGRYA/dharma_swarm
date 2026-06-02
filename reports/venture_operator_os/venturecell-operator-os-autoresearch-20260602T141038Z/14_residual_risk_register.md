@@ -192,6 +192,27 @@ New solved local claim:
 
 Decision: keep the risk in the live register until final closeout review.
 
+## Loop 73 Final Risk Register
+
+Closed mission risks:
+
+| Risk | Final evidence | Final handling |
+|---|---|---|
+| Early closeout | elapsed `28821s` before reporter closure | closed for this mission |
+| Complete verifier blocker | post-closure verifier passed with blockers `[]` | closed for this mission |
+| Unscoped mission commit | all mission commits used explicit pathspecs | closed for this mission |
+
+Residual risks after mission close:
+
+| Risk | Evidence | Handling |
+|---|---|---|
+| External authority still absent | accepted GO receipt count remains `0` | require new authorized GO/external-reader workflow |
+| Conservative generated preflight still says non-final | preflight packet is a checklist artifact, not ds-goal truth | use ds-goal terminal receipt and complete verifier as mission closure truth |
+| Broad unrelated dirty work remains | repo status outside scoped paths remains dirty | preserve and avoid unrelated commits |
+
+Final decision: mission complete; residual risks require a new mission or human
+authority to address.
+
 ## Loop 72 Risk Addendum
 
 New residual risk:
