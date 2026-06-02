@@ -138,7 +138,13 @@
       "docs/archive/**",
       "docs/_archive/**",
       "docs/state/_archive/**",
-      "reports/governance/**"
+      "docs/research/**",
+      "docs/reports/**",
+      "reports/**",
+      "seams/**",
+      "dharma_swarm/inter_agent/**",
+      "inter_agent/**",
+      "docs/ops/**"
     ],
       "registered": [
         "AGENTS.md",
@@ -153,6 +159,7 @@
         "docs/governance/BUILD_SESSION_ENTRYPOINT.md",
         "docs/governance/COHERENCE_DELTA.md",
         "docs/governance/INTEGRATION_LANDING_ORDER.md",
+        "docs/governance/KAIZENOPS.md",
         "docs/governance/README.md",
         "docs/governance/SOVEREIGN_MANIFEST.md",
       "docs/MEGAFILE_INDEX.md",
