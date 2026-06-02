@@ -4,7 +4,7 @@ Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live packet, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
 ds-goal progress receipt: `r-b73f8ef857f710fd`
-Current scoped HEAD before this packet: `d0a8aaf4 docs(operator-os): add live verifier matrix`
+Current scoped HEAD before this packet: `b72f94ee feat(operator-os): add authority boundary packet`
 
 This packet captures durable learning from the run so far. It must be reviewed
 and updated during final closeout before the reporter task is closed.
@@ -119,8 +119,9 @@ and updated during final closeout before the reporter task is closed.
 | `0e810f5f` | `06_adversary_audit.md` | live adversary audit draft |
 | `0f58774d` | `10_memorykernel_report_source_packet.md` | report-local staged recall source and 6/6 eval pass |
 | `b7758b52` | `11_go_receipt_template_receipt.md` | safe Darshan GO receipt template, not evidence |
-| pending | `12_live_verifier_matrix.md` | live verification and patch ledger |
-| pending | `13_authority_boundary_receipt.md` | consolidated authority firewall packet |
+| `d0a8aaf4` | `12_live_verifier_matrix.md` | live verification and patch ledger |
+| `b72f94ee` | `13_authority_boundary_receipt.md` | consolidated authority firewall packet |
+| pending | `14_residual_risk_register.md` | explicit blocker and residual risk split |
 
 ## Current Read-Only Artifacts
 
@@ -137,6 +138,7 @@ and updated during final closeout before the reporter task is closed.
 - `11_go_receipt_template_receipt.md`
 - `12_live_verifier_matrix.md`
 - `13_authority_boundary_receipt.md`
+- `14_residual_risk_register.md`
 - `authority_boundary_packet.json`
 
 ## Do Not Metabolize As Done
@@ -149,6 +151,7 @@ These facts are explicitly not complete:
 - `darshan_go_receipt_template.json` is not evidence and must not be promoted
   into an accepted receipt without a real event.
 - `authority_boundary_packet.json` is a firewall view, not an authority grant.
+- `14_residual_risk_register.md` must be refreshed before final closure.
 - Reporter task is not closed.
 - The final adversarial audit and next-goal packet still require final-window
   review/update.
@@ -322,6 +325,35 @@ Metabolized rule:
 
 - Before any future operator action, inspect `authority_boundary_packet.json`
   and treat blocked actions as hard boundaries unless existing gates change.
+
+## Loop 15 Metabolization Note
+
+Hypothesis:
+
+If solved local claims and residual risks are split into a register, future
+agents can resume from the current state without false completion pressure.
+
+Patch:
+
+- Added `14_residual_risk_register.md`.
+- Separated blocking risks, non-blocking residual risks, and solved local
+  claims.
+
+Evaluation:
+
+- Cross-checked against current packets and autonomy-spine brief.
+- Reporter remains open and complete verification remains intentionally blocked.
+
+Adversarial review:
+
+- The register does not claim finality.
+- It preserves report-local MemoryKernel, non-evidence GO template, authority
+  firewall, Context+ unavailable, and dirty worktree risks.
+
+Metabolized rule:
+
+- Future agents should update the residual risk register after each meaningful
+  state change and before any final reporter closure.
 
 ## Loop 13 Metabolization Note
 

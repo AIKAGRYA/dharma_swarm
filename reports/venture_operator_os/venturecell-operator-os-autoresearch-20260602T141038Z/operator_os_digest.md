@@ -126,11 +126,11 @@
 ## Memory Kernel
 
 - Status: `read_through_index_available`
-- Staged: `5016`
+- Staged: `5017`
 - Trusted: `1336`
 - Quarantine: `5000`
 - Truncated scan: `True`
-- Index: `available_truncated` with `76` entries
+- Index: `available_truncated` with `77` entries
 - Query evals: `pass` (6/6)
 
 ## Memory Repair Packet

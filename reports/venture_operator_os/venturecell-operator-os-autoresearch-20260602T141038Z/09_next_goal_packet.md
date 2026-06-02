@@ -4,7 +4,7 @@ Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
 ds-goal progress receipt: `r-e5be506a66940367`
-Current scoped HEAD before this packet: `d0a8aaf4 docs(operator-os): add live verifier matrix`
+Current scoped HEAD before this packet: `b72f94ee feat(operator-os): add authority boundary packet`
 
 This packet is the handoff for the next bounded AutoResearch loop. It must be
 reviewed and updated in the final hour before reporter closure.
@@ -13,7 +13,7 @@ reviewed and updated in the final hour before reporter closure.
 
 - Operator OS status: `blocked_on_external_reader_gate`.
 - Autonomy level: `L0_read_only_plan`.
-- Score ledger: `92/100` live score, not final.
+- Score ledger: `93/100` live score, not final.
 - ds-goal mission state: `open=1 claimed=0 completed=4 failed=0 blocked=0 total=5`.
 - Reporter task: open by design.
 - MemoryKernel strict eval: `pass` (`6/6`) from report-local staged sources.
@@ -21,7 +21,8 @@ reviewed and updated in the final hour before reporter closure.
 - Darshan GO template: `draft_template_not_evidence`.
 - Live verifier matrix: present, not final.
 - Authority boundary: `local_read_only_external_blocked`.
-- Last committed packet: live verifier matrix.
+- Residual risk register: present, not final.
+- Last committed packet: authority boundary packet.
 
 ## Next Goal
 
@@ -73,7 +74,12 @@ bounded targets:
    derived from existing gates and must not use it as a grant of external
    authority.
 
-6. Final closeout only after true-time proof.
+6. Residual risk register maintenance.
+
+   `14_residual_risk_register.md` now exists. Update it after any meaningful
+   state change and before final reporter closure.
+
+7. Final closeout only after true-time proof.
 
    When elapsed time is actually in the final window, update:
 
@@ -127,6 +133,7 @@ If the loop only changes a report packet, also run scoped `git diff --check`.
 - `11_go_receipt_template_receipt.md`
 - `12_live_verifier_matrix.md`
 - `13_authority_boundary_receipt.md`
+- `14_residual_risk_register.md`
 - `operator_os_projection.json`
 - `operator_next_action_packet.json`
 - `darshan_go_gate_packet.json`

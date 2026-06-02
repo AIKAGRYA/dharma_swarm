@@ -5,7 +5,7 @@ Status: live ledger, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
 ds-goal progress receipt: `r-277a29c022e46fb6`
 Baseline: `1aca07a1 Add VentureCell Operator OS Level 70 surface`
-Current scoped HEAD before this packet: `d0a8aaf4 docs(operator-os): add live verifier matrix`
+Current scoped HEAD before this packet: `b72f94ee feat(operator-os): add authority boundary packet`
 
 This file is a living score ledger. It exists now so later agents do not
 reconstruct scores from memory. It must be reviewed and updated before final
@@ -26,7 +26,8 @@ reporter closure.
 | Loop 11 | `10_memorykernel_report_source_packet.md` | `0f58774d` | 87 | +3 | keep local staged recall pass |
 | Loop 12 | `11_go_receipt_template_receipt.md` | `b7758b52` | 89 | +2 | keep safe GO template |
 | Loop 13 | `12_live_verifier_matrix.md` | `d0a8aaf4` | 90 | +1 | keep live verifier matrix |
-| Loop 14 | `13_authority_boundary_receipt.md` | pending | 92 | +2 | keep authority firewall packet |
+| Loop 14 | `13_authority_boundary_receipt.md` | `b72f94ee` | 92 | +2 | keep authority firewall packet |
+| Loop 15 | `14_residual_risk_register.md` | pending | 93 | +1 | keep residual risk register |
 
 ## Area History
 
@@ -34,7 +35,7 @@ reporter closure.
 |---|---:|---:|---|
 | Operator clarity | 11 | 15 | next-action, GO gate, GO template, and authority packets expose blockers, owners, local allowances, and artifact shape |
 | Memory usefulness | 10 | 15 | report-local staged source root now passes strict eval `6/6` without trusted promotion |
-| Task truth | 8 | 12+ | progress receipts distinguish non-closing evidence from completion |
+| Task truth | 8 | 13 | progress receipts and residual risk register distinguish solved local claims, residual risks, and completion blockers |
 | Governance safety | 15 | 15 | external-reader, governed admission, Chetana, completion, and authority firewall gates preserved |
 | Iteration quality | 8 | 12+ | every loop has hypothesis, patch/rejection, evals, adversarial review, decision |
 | Product structure | 8 | 13 | Operator OS now emits next-action, GO gate, GO template, authority boundary, memory repair, and report-local recall packets |
@@ -54,6 +55,7 @@ audit with explicit evidence.
 - Darshan GO receipt template: `draft_template_not_evidence`.
 - Live verifier matrix: present, non-final.
 - Authority boundary packet: `local_read_only_external_blocked`.
+- Residual risk register: present, non-final.
 - MemoryKernel query eval: `pass` (`6/6`) from report-local staged roots.
 - MemoryKernel repair packet: `no_repair_needed`, with trusted promotion still forbidden.
 - ds-goal raw/reconciled counts: `open=1 claimed=0 completed=4 failed=0 blocked=0 total=5`.
@@ -90,6 +92,7 @@ current evidence, not as a full-project proof.
 - The GO template is not evidence and must not be stored as an accepted receipt
   without a real external-reader event.
 - Authority boundary packet is a firewall view, not an authority grant.
+- Residual risk register must be refreshed in the final window.
 - The reporter task must remain open until final artifacts and final
   verification prove the full contract.
 
@@ -125,6 +128,34 @@ Adversarial review:
 - This file originally recorded MemoryKernel `0/6`; later loop rows must be
   used for the current memory eval state.
 - This file does not close the reporter lane.
+
+Keep / revert / queue:
+
+Decision: keep.
+
+## Loop 15 Score Update
+
+Hypothesis:
+
+If residual risks are separated from solved local claims, future agents can
+continue without either duplicating solved work or closing prematurely.
+
+Patch:
+
+- Added `14_residual_risk_register.md`.
+- Split blocking risks, residual non-blocking risks, and solved local claims.
+
+Evaluation:
+
+- Cross-checked against current rendered packets and the latest autonomy-spine
+  brief.
+- Complete verification remains blocked by the open reporter task.
+
+Adversarial review:
+
+- The register does not reduce any gate.
+- It keeps MemoryKernel, GO template, authority packet, Context+, and dirty
+  worktree limitations explicit.
 
 Keep / revert / queue:
 
