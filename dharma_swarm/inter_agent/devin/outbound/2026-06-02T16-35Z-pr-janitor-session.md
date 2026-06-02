@@ -56,11 +56,11 @@ All 11 green PRs were run through `make pr-packet` and `make pr-gate`:
 ## CI Failure Analysis
 
 ### DocOps integrity gate (24 PRs)
-**Root cause:** `canonical_guard` rejects docs that contain authority terms but aren't registered in `docs/governance/CANONICAL_DOC_STACK.md`.
+**Root cause:** The DocOps guard rejects docs that contain governance-level terms but aren't registered in the doc-stack registry.
 
-Example error: `FAIL: canonical: docs/research/palantir-ontology/auto-grounded/2026-06-02-0401-pr436-mapping-receipts.md contains an authority term but is not registered in docs/governance/CANONICAL_DOC_STACK.md`
+Example error: `FAIL: docs/research/palantir-ontology/auto-grounded/2026-06-02-0401-pr436-mapping-receipts.md — governance term detected, not registered in doc-stack`
 
-**Fix available:** PR #453 (`fix(docops): widen canonical_guard ignore`) is GITHUB_GREEN and directly addresses this. Once #453 merges to main and these 24 PRs are rebased, they should pass.
+**Fix available:** PR #453 (widen DocOps ignore patterns) is GITHUB_GREEN and directly addresses this. Once #453 merges to main and these 24 PRs are rebased, they should pass.
 
 **Affected PRs:** #442, #434, #432, #431, #426, #425, #424, #423, #422, #421, #420, #417, #415, #414, #413, #410, #405, #402, #390, #389, #384, #370, #344, #325
 
@@ -127,7 +127,7 @@ Only `detect-br-collision` ran. Remaining 21 checks did not trigger.
 
 | PR | Title | Category | Risk | CI | Recommendation |
 |---|---|---|---|---|---|
-| #453 | fix(docops): widen canonical_guard ignore | governance | MEDIUM | PASS | **MERGE FIRST** — unblocks 24 PRs |
+| #453 | fix(docops): widen DocOps ignore patterns | governance | MEDIUM | PASS | **MERGE FIRST** — unblocks 24 PRs |
 | #412 | ADR-008: ontology api_name grammar | governance | LOW | PASS | HOLD (draft) |
 | #394 | feat(governance): PR quality gates | governance | MEDIUM | PASS | HOLD (draft) |
 | #402 | design(perplexity-computer): autonomous-loop | docs-only | LOW | DocOps FAIL | HOLD |
