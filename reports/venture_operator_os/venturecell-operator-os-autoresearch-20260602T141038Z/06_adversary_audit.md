@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-af82a796175a05dc`
-Current scoped HEAD before this packet: `e8e6aaeb docs(operator-os): record three-hour timebox`
+ds-goal progress receipt: `r-a8ff4c8f3684c4af`
+Current scoped HEAD before this packet: `3e4e0820 docs(operator-os): refresh substrate context`
 
 This audit is intentionally written before the final time window so the next
 agent has a concrete attack surface. It is not a completion certificate. The
@@ -28,6 +28,8 @@ updates, and terminal verification exist.
   requirements, but those requirements are not acceptance.
 - Live verifier matrix exists, but is not final.
 - Authority boundary packet exists and reports `local_read_only_external_blocked`.
+- Authority boundary packet now explicitly reports `external_authority_granted:
+  false` and `operator_os_action_ack_required: true`.
 - Residual risk register exists but is not final.
 - Artifact manifest exists and has `not_authority: true`.
 - Periodic onboard reports repo-wide NATS live contact, but no Operator
@@ -115,6 +117,8 @@ Adversarial review:
   artifacts remain incomplete.
 - A live verifier matrix is not final proof while the reporter task is open.
 - An authority boundary packet is not an authority grant.
+- An explicit `external_authority_granted: false` field is a guardrail, not a
+  new authority path.
 - A residual risk register is not a closure certificate.
 - An artifact manifest is not proof that artifacts are final or authoritative.
 - Repo-wide NATS liveness is not mission-specific authority proof.
@@ -171,6 +175,7 @@ Queued:
 | Score is final | live ledger only, final time window not reached | false |
 | Verifier matrix is final | `12_live_verifier_matrix.md` is marked live | false |
 | Authority boundary grants action | decision is `local_read_only_external_blocked` | false |
+| Authority boundary grants external authority | `external_authority_granted` is `false` | false |
 | Risk register proves completion | reporter is still open | false |
 | Artifact manifest grants authority | manifest has `not_authority: true` | false |
 | Onboard NATS liveness grants Operator OS authority | authority packet still blocks external action | false |

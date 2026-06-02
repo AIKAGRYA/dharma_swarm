@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-af82a796175a05dc`
-Current scoped HEAD before this packet: `e8e6aaeb docs(operator-os): record three-hour timebox`
+ds-goal progress receipt: `r-a8ff4c8f3684c4af`
+Current scoped HEAD before this packet: `3e4e0820 docs(operator-os): refresh substrate context`
 
 This packet is the handoff for the next bounded AutoResearch loop. It must be
 reviewed and updated in the final hour before reporter closure.
@@ -22,6 +22,8 @@ reviewed and updated in the final hour before reporter closure.
 - Darshan GO template accepted-receipt requirements: present, not evidence.
 - Live verifier matrix: present, not final.
 - Authority boundary: `local_read_only_external_blocked`.
+- Authority booleans: external authority not granted; Operator OS action ack
+  still required.
 - Residual risk register: present, not final.
 - Artifact manifest: present, not authority.
 - Periodic onboard: pass, with optional credential warnings.
@@ -51,7 +53,7 @@ reviewed and updated in the final hour before reporter closure.
   evidence remains visible.
 - Timebox refresh: current clock still below 8 hours.
 - Three-hour timebox proof: current clock still below 8 hours.
-- Last committed packet: three-hour timebox proof.
+- Last committed packet: periodic substrate refresh.
 
 ## Next Goal
 
@@ -248,6 +250,7 @@ If the loop only changes a report packet, also run scoped `git diff --check`.
 - `31_completion_guard_policy_receipt.md`
 - `32_timebox_three_hour_receipt.md`
 - `33_periodic_substrate_refresh_receipt.md`
+- `34_authority_boolean_receipt.md`
 - `operator_os_projection.json`
 - `operator_completion_guard_packet.json`
 - `operator_next_action_packet.json`

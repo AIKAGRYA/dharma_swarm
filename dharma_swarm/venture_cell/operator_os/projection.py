@@ -924,6 +924,8 @@ def _authority_boundary_packet(
             "no_fake_nats_a2a_liveness",
             "no_trusted_chetana_promotion_without_gates",
         ),
+        external_authority_granted=False,
+        operator_os_action_ack_required=True,
         liveness_claims={
             "operator_os_nats_action_ack_proof_present": False,
             "operator_os_a2a_live_action_ack_proof_present": False,

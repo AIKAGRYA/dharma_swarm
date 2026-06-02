@@ -186,6 +186,8 @@ class AuthorityBoundaryPacket:
     blocked_departments: tuple[str, ...] = ()
     required_unblock_artifacts: tuple[str, ...] = ()
     hard_boundaries: tuple[str, ...] = ()
+    external_authority_granted: bool = False
+    operator_os_action_ack_required: bool = True
     liveness_claims: dict[str, Any] = field(default_factory=dict)
     promotion_claims: dict[str, Any] = field(default_factory=dict)
     evidence_refs: tuple[str, ...] = ()

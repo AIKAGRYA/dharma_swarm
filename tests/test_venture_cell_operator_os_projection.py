@@ -163,6 +163,8 @@ def test_projection_blocks_external_autonomy_without_reader_gate(tmp_path: Path)
     assert "live_external_authority" in projection.next_action_packet.forbidden_actions
     authority = projection.authority_boundary_packet
     assert authority.decision == "local_read_only_external_blocked"
+    assert authority.external_authority_granted is False
+    assert authority.operator_os_action_ack_required is True
     assert "render_operator_os" in authority.allowed_local_actions
     assert "live_external_authority" in authority.blocked_actions
     assert "push" in authority.blocked_actions
@@ -480,6 +482,8 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert memory_repair_packet["raw"]["trusted_promotion_claimed"] is False
     assert "trusted_chetana_promotion" in memory_repair_packet["forbidden_actions"]
     assert authority_boundary_packet["decision"] == "local_read_only_external_blocked"
+    assert authority_boundary_packet["external_authority_granted"] is False
+    assert authority_boundary_packet["operator_os_action_ack_required"] is True
     assert authority_boundary_packet["liveness_claims"]["operator_os_nats_action_ack_proof_present"] is False
     assert authority_boundary_packet["liveness_claims"]["operator_os_a2a_live_action_ack_proof_present"] is False
     assert authority_boundary_packet["promotion_claims"]["trusted_chetana_promotion_claimed"] is False

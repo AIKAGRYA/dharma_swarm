@@ -3,9 +3,9 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live ledger, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-af82a796175a05dc`
+ds-goal progress receipt: `r-a8ff4c8f3684c4af`
 Baseline: `1aca07a1 Add VentureCell Operator OS Level 70 surface`
-Current scoped HEAD before this packet: `e8e6aaeb docs(operator-os): record three-hour timebox`
+Current scoped HEAD before this packet: `3e4e0820 docs(operator-os): refresh substrate context`
 
 This file is a living score ledger. It exists now so later agents do not
 reconstruct scores from memory. It must be reviewed and updated before final
@@ -47,6 +47,7 @@ reporter closure.
 | Loop 32 | `31_completion_guard_policy_receipt.md` | `r-43933ac6a5701ece` | 100 | +0 | keep completion guard policy |
 | Loop 33 | `32_timebox_three_hour_receipt.md` | `r-ade5bb8b586492b3` | 100 | +0 | keep three-hour timebox proof |
 | Loop 34 | `33_periodic_substrate_refresh_receipt.md` | `r-af82a796175a05dc` | 100 | +0 | keep substrate refresh context |
+| Loop 35 | `34_authority_boolean_receipt.md` | `r-a8ff4c8f3684c4af` | 100 | +0 | keep explicit authority booleans |
 
 ## Area History
 
@@ -75,6 +76,8 @@ audit with explicit evidence.
 - Darshan GO template accepted-receipt requirements: present, not acceptance.
 - Live verifier matrix: present, non-final.
 - Authority boundary packet: `local_read_only_external_blocked`.
+- Authority boundary booleans: `external_authority_granted: false` and
+  `operator_os_action_ack_required: true`.
 - Residual risk register: present, non-final.
 - Artifact manifest: present, non-authoritative.
 - Periodic onboard: `make onboard` and toolbelt status pass, with optional
@@ -144,6 +147,8 @@ current evidence, not as a full-project proof.
 - GO template accepted-receipt requirements are prerequisites only; they do not
   create an accepted receipt.
 - Authority boundary packet is a firewall view, not an authority grant.
+- Authority boundary booleans make the negative authority state explicit; they
+  do not grant action.
 - Residual risk register must be refreshed in the final window.
 - Artifact manifest is a locator/status packet, not authority.
 - Repo-wide NATS liveness from onboard is not action-specific Operator OS

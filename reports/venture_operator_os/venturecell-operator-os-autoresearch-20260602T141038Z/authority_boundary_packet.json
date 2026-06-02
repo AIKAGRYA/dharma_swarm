@@ -39,6 +39,7 @@
     "/Users/dhyana/.dharma/knowledge/quarantine",
     "dharma_swarm/venture_cell/operator_os/projection.py"
   ],
+  "external_authority_granted": false,
   "hard_boundaries": [
     "no_outreach",
     "no_spend",
@@ -55,6 +56,7 @@
     "operator_os_a2a_live_action_ack_proof_present": false,
     "operator_os_nats_action_ack_proof_present": false
   },
+  "operator_os_action_ack_required": true,
   "packet_id": "operator.authority_boundary",
   "promotion_claims": {
     "memory_eval_status": "pass",

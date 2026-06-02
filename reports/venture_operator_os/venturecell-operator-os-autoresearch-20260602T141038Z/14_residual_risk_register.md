@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live risk register, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-af82a796175a05dc`
-Current scoped HEAD before this packet: `e8e6aaeb docs(operator-os): record three-hour timebox`
+ds-goal progress receipt: `r-a8ff4c8f3684c4af`
+Current scoped HEAD before this packet: `3e4e0820 docs(operator-os): refresh substrate context`
 
 This register separates current blockers, residual risks, and solved local
 claims. It exists to prevent false completion after a high live score.
@@ -27,6 +27,7 @@ claims. It exists to prevent false completion after a high live score.
 | Memory index truncated | `memory_kernel_index.json` reports truncated scan | do not claim complete memory coverage |
 | GO template misuse | `darshan_go_receipt_template.json` exists with accepted-receipt requirements | keep markers and treat requirements as prerequisites only |
 | Authority packet overclaim | `authority_boundary_packet.json` exists | treat as firewall view, not grant |
+| Authority boolean overclaim | authority packet has explicit external authority booleans | treat as denial guardrails, not grant |
 | Artifact manifest overclaim | `operator_os_artifact_manifest.json` exists | treat as locator, not proof of finality |
 | Onboard NATS overclaim | `make onboard` reports repo-wide NATS live contact | do not treat as Operator OS action ack |
 | Liveness label regression | authority fields could become ambiguous again | keep Operator OS action-specific key names |
@@ -59,6 +60,7 @@ claims. It exists to prevent false completion after a high live score.
 | GO template renders | `darshan_go_receipt_template.json` | not evidence |
 | GO template requirements render | accepted-receipt source/schema/status/event/human/redaction prerequisites | guardrails only |
 | Authority packet renders | `local_read_only_external_blocked` | not authority grant |
+| Authority booleans render | external authority false; action ack required | denial guardrail only |
 | Artifact manifest renders | `not_authority: true` | locator/status packet only |
 | Periodic onboard passes | `make onboard` and toolbelt exit `0` | substrate context only |
 | Liveness keys are action-specific | Operator OS NATS/A2A action ack fields are false | avoids substrate/authority conflation |

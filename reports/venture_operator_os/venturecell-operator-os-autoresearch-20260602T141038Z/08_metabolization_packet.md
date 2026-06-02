@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live packet, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-af82a796175a05dc`
-Current scoped HEAD before this packet: `e8e6aaeb docs(operator-os): record three-hour timebox`
+ds-goal progress receipt: `r-a8ff4c8f3684c4af`
+Current scoped HEAD before this packet: `3e4e0820 docs(operator-os): refresh substrate context`
 
 This packet captures durable learning from the run so far. It must be reviewed
 and updated during final closeout before the reporter task is closed.
@@ -100,12 +100,16 @@ and updated during final closeout before the reporter task is closed.
    - `authority_boundary_packet.json` reports
      `local_read_only_external_blocked`.
    - NATS ack proof and A2A live ack proof are both `false`.
+   - `external_authority_granted` is now explicitly `false`.
+   - `operator_os_action_ack_required` is now explicitly `true`.
    - Trusted Chetana promotion remains `false`.
 
    Metabolized rule:
 
    - Future agents should read the authority boundary packet before acting.
      Local allowances do not imply external authority.
+   - Boolean authority fields should be treated as machine-readable denial
+     state unless a future, verified authority process changes them.
 
 7. Gap triage must separate local maintenance from external unblockers.
 
@@ -292,6 +296,7 @@ and updated during final closeout before the reporter task is closed.
 | `r-43933ac6a5701ece` | `31_completion_guard_policy_receipt.md` | explicit reporter closure policy in completion guard |
 | `r-ade5bb8b586492b3` | `32_timebox_three_hour_receipt.md` | three-hour non-final timebox proof |
 | `r-af82a796175a05dc` | `33_periodic_substrate_refresh_receipt.md` | repo-wide substrate refresh context |
+| `r-a8ff4c8f3684c4af` | `34_authority_boolean_receipt.md` | explicit external-authority denial booleans |
 
 ## Current Read-Only Artifacts
 
@@ -333,6 +338,7 @@ and updated during final closeout before the reporter task is closed.
 - `31_completion_guard_policy_receipt.md`
 - `32_timebox_three_hour_receipt.md`
 - `33_periodic_substrate_refresh_receipt.md`
+- `34_authority_boolean_receipt.md`
 
 ## Do Not Metabolize As Done
 
@@ -346,6 +352,7 @@ These facts are explicitly not complete:
 - GO template accepted-receipt requirements are guardrails, not proof of an
   accepted external-reader event.
 - `authority_boundary_packet.json` is a firewall view, not an authority grant.
+- Authority booleans are denial guardrails, not an authority grant.
 - `14_residual_risk_register.md` must be refreshed before final closure.
 - `operator_os_artifact_manifest.json` is a locator/status packet, not
   authority.

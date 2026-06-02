@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live verifier matrix, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-af82a796175a05dc`
-Current scoped HEAD before this packet: `e8e6aaeb docs(operator-os): record three-hour timebox`
+ds-goal progress receipt: `r-a8ff4c8f3684c4af`
+Current scoped HEAD before this packet: `3e4e0820 docs(operator-os): refresh substrate context`
 
 This matrix captures the current verification surface for future agents. It is
 not a final verifier matrix and must not be used to close the reporter task.
@@ -18,6 +18,8 @@ not a final verifier matrix and must not be used to close the reporter task.
 - Darshan GO receipt template: rendered, explicitly not evidence.
 - Darshan GO template requirements: rendered prerequisites, not acceptance.
 - External authority: blocked.
+- Authority booleans: passing; external authority false and action ack
+  required.
 - Gap triage: passing; external-reader remains non-local blocker and
   MemoryKernel truncation remains local maintenance.
 - Memory coverage: passing; staging/quarantine roots are truncated and
@@ -71,6 +73,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `darshan_go_receipt_template.json` | `draft_template_not_evidence` | must not be stored as accepted receipt |
 | GO template requirements | source/schema/status/event/human/redaction prerequisites | guardrails only, not accepted receipt |
 | `authority_boundary_packet.json` | `local_read_only_external_blocked` | firewall view, not authority grant |
+| authority booleans | `external_authority_granted: false`; action ack required | denial guardrail |
 | `operator_gap_triage_packet.json` | `external_blocked_with_local_followups` | selector only, not authority or final proof |
 | `14_residual_risk_register.md` | live risk split | not a closure certificate |
 | `operator_os_artifact_manifest.json` | rendered locator | not proof of finality or authority |
@@ -127,6 +130,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `r-43933ac6a5701ece` | keep | completion guard reporter policy |
 | `r-ade5bb8b586492b3` | keep | three-hour timebox proof |
 | `r-af82a796175a05dc` | keep | periodic substrate refresh |
+| `r-a8ff4c8f3684c4af` | keep | explicit authority booleans |
 
 ## Revert / Queue Ledger
 
