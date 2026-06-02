@@ -400,6 +400,45 @@ class TestActions:
             "Experiment",
             "Run",
             obj.id,
+            {"status": "running", "results": {"gpu": "A100"}},
+            runtime_state=runtime,
+            execution_identity=identity,
+            require_identity=True,
+        )
+
+        assert result.result == "success"
+        updated = registry.get_object(obj.id)
+        assert updated is not None
+        assert updated.properties["status"] == "running"
+        assert updated.properties["results"] == {"gpu": "A100"}
+        ledger = asyncio.run(runtime.get_run_ledger(identity.run_id))
+        receipt_types = [receipt.receipt_type for receipt in ledger["receipts"]]
+        assert "ontology_action_requested" in receipt_types
+        assert "ontology_action_applied" in receipt_types
+        applied = [
+            receipt for receipt in ledger["receipts"]
+            if receipt.receipt_type == "ontology_action_applied"
+        ]
+        assert applied[-1].payload["applied_updates"] == {
+            "status": "running",
+            "results": {"gpu": "A100"},
+        }
+
+    def test_execute_action_does_not_record_applied_without_declared_delta(
+        self,
+        registry: OntologyRegistry,
+        tmp_path: Path,
+    ) -> None:
+        obj, _ = registry.create_object("Experiment", {
+            "name": "test", "status": "designed",
+        })
+        runtime = RuntimeStateStore(tmp_path / "runtime.db")
+        identity = _identity(run_id="run-ontology-no-delta")
+
+        result = registry.execute_action(
+            "Experiment",
+            "Run",
+            obj.id,
             {"gpu": "A100"},
             runtime_state=runtime,
             execution_identity=identity,
@@ -407,10 +446,78 @@ class TestActions:
         )
 
         assert result.result == "success"
+        unchanged = registry.get_object(obj.id)
+        assert unchanged is not None
+        assert unchanged.properties["status"] == "designed"
         ledger = asyncio.run(runtime.get_run_ledger(identity.run_id))
-        receipt_types = [receipt.receipt_type for receipt in ledger["receipts"]]
-        assert "ontology_action_requested" in receipt_types
-        assert "ontology_action_applied" in receipt_types
+        assert all(
+            receipt.receipt_type != "ontology_action_applied"
+            for receipt in ledger["receipts"]
+        )
+
+    def test_execute_action_requires_approval_blocks_before_mutation(
+        self,
+        registry: OntologyRegistry,
+        tmp_path: Path,
+    ) -> None:
+        obj, _ = registry.create_object("Paper", {
+            "title": "test", "status": "drafting",
+        })
+        runtime = RuntimeStateStore(tmp_path / "runtime.db")
+        identity = _identity(run_id="run-ontology-approval-block")
+
+        result = registry.execute_action(
+            "Paper",
+            "Submit",
+            obj.id,
+            {"status": "submitted"},
+            runtime_state=runtime,
+            execution_identity=identity,
+            require_identity=True,
+        )
+
+        assert result.result == "blocked"
+        assert "requires approval" in result.error
+        unchanged = registry.get_object(obj.id)
+        assert unchanged is not None
+        assert unchanged.properties["status"] == "drafting"
+        ledger = asyncio.run(runtime.get_run_ledger(identity.run_id))
+        assert all(
+            receipt.receipt_type != "ontology_action_applied"
+            for receipt in ledger["receipts"]
+        )
+
+    def test_execute_action_requires_approval_allows_approved_mutation(
+        self,
+        registry: OntologyRegistry,
+        tmp_path: Path,
+    ) -> None:
+        obj, _ = registry.create_object("Paper", {
+            "title": "test", "status": "drafting",
+        })
+        runtime = RuntimeStateStore(tmp_path / "runtime.db")
+        identity = _identity(run_id="run-ontology-approved")
+
+        result = registry.execute_action(
+            "Paper",
+            "Submit",
+            obj.id,
+            {"status": "submitted", "approved": True},
+            runtime_state=runtime,
+            execution_identity=identity,
+            require_identity=True,
+        )
+
+        assert result.result == "success"
+        updated = registry.get_object(obj.id)
+        assert updated is not None
+        assert updated.properties["status"] == "submitted"
+        ledger = asyncio.run(runtime.get_run_ledger(identity.run_id))
+        applied = [
+            receipt for receipt in ledger["receipts"]
+            if receipt.receipt_type == "ontology_action_applied"
+        ]
+        assert applied[-1].payload["applied_updates"] == {"status": "submitted"}
 
     def test_execute_unknown_action(self, registry: OntologyRegistry) -> None:
         result = registry.execute_action("Experiment", "FakeAction", "id", {})

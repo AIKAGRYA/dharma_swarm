@@ -829,6 +829,26 @@ class OntologyRegistry:
                 },
             )
 
+        approval_value = params.get("approved", params.get("approval"))
+        approval_state = str(
+            params.get("approval_state", approval_value if approval_value is not None else "")
+        ).strip().lower()
+        approval_actor = str(params.get("approved_by", "")).strip()
+        approved_states = {
+            "approved", "allow", "allowed", "granted",
+            "pass", "passed", "true", "yes",
+        }
+        approval_present = (
+            approval_value is True
+            or approval_state in approved_states
+            or bool(approval_actor)
+        )
+        if action_def.requires_approval and not approval_present:
+            execution.result = "blocked"
+            execution.error = "action requires approval"
+            self._action_log.append(execution)
+            return execution
+
         # Telos gate check
         if action_def.telos_gates:
             unknown_gates = _unknown_declared_telos_gates(action_def.telos_gates)
@@ -903,19 +923,46 @@ class OntologyRegistry:
             self._action_log.append(execution)
             return execution
 
+        declared_updates = {
+            field: params[field]
+            for field in action_def.modifies
+            if field in params
+        }
+        missing_declared_updates = [field for field in action_def.modifies if field not in params]
+        applied_updates: dict[str, Any] = {}
+        if declared_updates:
+            updated_obj, mutation_errors = self.update_object(
+                object_id,
+                declared_updates,
+                updated_by=executed_by,
+            )
+            if mutation_errors:
+                execution.result = "failed"
+                execution.error = "action mutation failed: " + "; ".join(mutation_errors)
+                self._action_log.append(execution)
+                return execution
+            if updated_obj is not None:
+                applied_updates = {
+                    field: updated_obj.properties.get(field)
+                    for field in declared_updates
+                }
+
         execution.result = "success"
-        if identity is not None and runtime_state is not None:
+        if identity is not None and runtime_state is not None and applied_updates:
             runtime_state.record_ontology_action_receipt_sync(
                 identity,
                 action_name=action_name,
                 object_type=object_type,
                 object_id=object_id,
                 applied=True,
-                status="applied",
+                status="applied_partial" if action_def.creates else "applied",
                 payload={
                     "modifies": list(action_def.modifies),
                     "creates": list(action_def.creates),
                     "requires_approval": action_def.requires_approval,
+                    "applied_updates": applied_updates,
+                    "missing_modifies": missing_declared_updates,
+                    "unapplied_creates": list(action_def.creates),
                 },
             )
         self._action_log.append(execution)
