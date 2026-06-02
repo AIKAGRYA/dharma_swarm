@@ -272,6 +272,27 @@ Keep / revert / queue:
 
 Decision: keep.
 
+## Loop 71 Final-Hour Score Review
+
+Review status: final-hour refresh, not final closeout.
+
+Current score posture:
+
+- Live Operator OS score remains `100/100`.
+- Completion score remains non-final because the 8-hour threshold and terminal
+  reporter closure are not proven.
+- Darshan GO/external-reader authority remains blocked with accepted receipts
+  `0`.
+- Chetana trusted promotion remains unclaimed.
+
+Score interpretation:
+
+- The system is locally ready for final-window verification.
+- The mission is not complete until true `28800s` elapsed time, terminal
+  reporter receipt, and complete verifier pass exist.
+
+Decision: keep score as live/non-final.
+
 ## Loop 70 Score Update
 
 Hypothesis:

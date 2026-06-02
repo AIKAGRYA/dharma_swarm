@@ -579,3 +579,30 @@ Keep / revert / queue:
 Decision: keep.
 
 ds-goal progress receipt: `r-e89dfb6a5213c75f`
+
+## Loop 71 Final-Hour Adversary Review
+
+Review status: final-hour refresh, not final closeout.
+
+Claims still false:
+
+- Seven-hour proof equals eight-hour completion.
+- Refreshed markdown artifacts equal terminal proof.
+- Preflight sequence visibility equals sequence execution.
+- Repo-wide NATS/tmux readiness equals Operator OS action ack proof.
+- GO receipt templates or local artifact readiness equal accepted external
+  reader evidence.
+- Live score `100/100` equals mission completion.
+- Complete verifier can pass before terminal reporter closure.
+
+Current evidence:
+
+- Seven-hour checkpoint is proven.
+- Final threshold remains `28800s`.
+- Reporter remains open.
+- Complete verifier still has the expected open-reporter blocker.
+
+Verdict: keep all finality claims blocked until true-time proof, terminal
+reporter receipt, and complete verifier pass exist.
+
+ds-goal progress receipt: `r-2fabf875a2217267`

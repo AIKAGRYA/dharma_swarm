@@ -303,6 +303,17 @@ action-specific NATS/A2A ack and does not close the reporter.
 This checkpoint is non-final. It does not close the reporter or grant external
 authority.
 
+## Loop 71 Final-Hour Artifact Review Addendum
+
+| Check | Result | Notes |
+|---|---|---|
+| Seven-hour proof | pass | `69_timebox_seven_hour_receipt.md` records elapsed `25235s` |
+| Final markdown refresh | pass | `06`, `07`, `08`, and `09` report packets refreshed in Hour 7 |
+| Reporter closure | blocked | reporter remains open until true `28800s` and terminal receipt |
+| Complete verifier | expected blocker | remains blocked by open reporter until terminal closure |
+
+This review refreshes final markdown inputs only. It does not close the reporter.
+
 ## Loop 63 Final-Window Preflight Addendum
 
 | Check | Result | Notes |

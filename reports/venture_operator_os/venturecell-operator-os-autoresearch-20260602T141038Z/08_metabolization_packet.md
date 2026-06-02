@@ -1369,3 +1369,23 @@ Metabolized rule:
 
 - Late-run checkpoint receipts must state the final threshold and remaining time
   in the same receipt.
+
+## Loop 71 Final-Hour Metabolization Review
+
+Review status: final-hour refresh, not final closeout.
+
+Compounding rules preserved:
+
+- Final artifacts can be refreshed during Hour 7 but do not satisfy terminal
+  proof.
+- Report-local memory and digests remain staged/local context, not trusted
+  Chetana promotion.
+- GO templates and readiness packets remain non-evidence until a real accepted
+  external-reader receipt exists.
+- Complete verifier pass can only be claimed after legitimate reporter closure.
+
+Next-agent instruction:
+
+- Use the final-window preflight packet as the checklist.
+- Use this metabolization packet as local memory context only.
+- Do not promote anything to trusted memory without existing gates.

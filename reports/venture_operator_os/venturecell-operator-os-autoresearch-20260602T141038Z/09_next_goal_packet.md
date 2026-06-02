@@ -721,3 +721,28 @@ Still forbidden:
 - treating seven-hour proof as final proof;
 - closing reporter before true 8-hour and terminal-verifier proof;
 - external outreach, publishing, handoff, spend, deploy, push, or merge.
+
+## Loop 71 Next Goal Addendum
+
+Current new evidence:
+
+- `70_final_hour_artifact_review_receipt.md`
+- refreshed final-hour markdown artifacts:
+  - `06_adversary_audit.md`
+  - `07_score_history.md`
+  - `08_metabolization_packet.md`
+  - `09_next_goal_packet.md`
+
+Next safe loop targets:
+
+- Wait until elapsed time reaches at least `28800s`.
+- Then run the preflight command list from
+  `operator_final_window_preflight_packet.json`.
+- Only after true-time proof and final artifact review, record terminal reporter
+  receipt and rerun complete verification.
+
+Still forbidden:
+
+- treating final-hour artifact refresh as terminal proof;
+- closing reporter before true 8-hour and terminal-verifier proof;
+- external outreach, publishing, handoff, spend, deploy, push, or merge.

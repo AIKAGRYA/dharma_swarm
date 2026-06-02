@@ -176,6 +176,22 @@ New solved local claim:
 
 Decision: keep the risk in the live register until final-window review.
 
+## Loop 71 Risk Addendum
+
+New residual risk:
+
+| Risk | Current evidence | Handling |
+|---|---|---|
+| Final-hour refresh overclaim | required markdown artifacts refreshed after seven-hour proof | treat as final-window input only; require true time, terminal receipt, and complete verifier pass |
+
+New solved local claim:
+
+| Claim | Evidence | Boundary |
+|---|---|---|
+| Final-hour artifact review started | receipt `70_final_hour_artifact_review_receipt.md` and refreshed `06`-`09` packets | not final proof and not reporter closure |
+
+Decision: keep the risk in the live register until final closeout review.
+
 ## Loop 70 Risk Addendum
 
 New residual risk:
