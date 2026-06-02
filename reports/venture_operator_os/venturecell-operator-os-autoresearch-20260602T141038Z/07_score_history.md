@@ -272,6 +272,37 @@ Keep / revert / queue:
 
 Decision: keep.
 
+## Loop 59 Score Update
+
+Hypothesis:
+
+If template coverage is explicit, operator clarity improves because the
+non-evidence template can be inspected without overclaiming full receipt
+coverage.
+
+Patch:
+
+- Added template requirement coverage counts.
+- Mirrored the counts in the manifest and digest.
+- Added focused assertions for coverage `7/16` and uncovered required fields
+  `9`.
+
+Evaluation:
+
+- Focused Operator OS tests passed.
+- Live packet reports template requirement fields `7`, covered required fields
+  `7`, uncovered required fields `9`, and accepted receipts `0`.
+
+Adversarial review:
+
+- This is a non-authority clarity improvement.
+- Darshan GO remains blocked and external authority remains false.
+- Reporter remains open.
+
+Keep / revert / queue:
+
+Decision: keep.
+
 ## Loop 58 Score Update
 
 Hypothesis:

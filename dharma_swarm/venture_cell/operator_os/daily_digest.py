@@ -89,6 +89,21 @@ def render_operator_daily_digest(projection: VentureCellOperatorProjection) -> s
         for field in go_gate.required_receipt_fields
     )
     expected_local_artifact_count = len(go_gate.expected_local_artifacts)
+    accepted_receipt_requirements = go_gate.receipt_template.get(
+        "accepted_receipt_requirements"
+    )
+    template_requirement_fields = (
+        set(accepted_receipt_requirements)
+        if isinstance(accepted_receipt_requirements, dict)
+        else set()
+    )
+    template_requirement_covered_count = len(
+        [
+            field
+            for field in go_gate.required_receipt_fields
+            if field in template_requirement_fields
+        ]
+    )
     receipt_template_status = str(
         go_gate.receipt_template.get("template_status") or "not_rendered"
     )
@@ -106,6 +121,10 @@ def render_operator_daily_digest(projection: VentureCellOperatorProjection) -> s
             f"`{required_receipt_field_groups.get('top_level', 0)}`",
             "- Required payload receipt fields: "
             f"`{required_receipt_field_groups.get('payload', 0)}`",
+            "- Template requirement fields: "
+            f"`{len(template_requirement_fields)}`",
+            "- Required fields covered by template requirements: "
+            f"`{template_requirement_covered_count}`/`{required_receipt_field_count}`",
             f"- Accepted receipts: `{go_gate.accepted_receipt_count}`",
             f"- Countable events: `{', '.join(go_gate.countable_event_types)}`",
             f"- Blocked actions: `{blocked_actions}`",

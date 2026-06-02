@@ -1,5 +1,15 @@
 {
   "accepted_receipt_count": 0,
+  "accepted_receipt_requirement_field_count": 7,
+  "accepted_receipt_requirement_fields": [
+    "event_uid",
+    "payload.human_approved_contact",
+    "payload.privacy_redacted",
+    "schema_version",
+    "source",
+    "source_url",
+    "status"
+  ],
   "accepted_receipts": [],
   "authority_decision": "local_read_only_external_blocked",
   "autonomy_level": "L0_read_only_plan",
@@ -88,6 +98,7 @@
   "not_authority": true,
   "not_evidence": true,
   "not_receipt": true,
+  "receipt_template_status": "draft_template_not_evidence",
   "rejected_receipt_count": 0,
   "rejected_receipts": [],
   "required_receipt_field_count": 16,
@@ -122,6 +133,8 @@
       "group": "payload"
     }
   ],
+  "required_receipt_field_template_requirement_count": 7,
+  "required_receipt_field_without_template_requirement_count": 9,
   "required_receipt_fields": [
     "receipt_id",
     "correlation_id",
@@ -140,6 +153,26 @@
     "payload.human_approved_contact",
     "payload.privacy_redacted"
   ],
+  "required_receipt_fields_with_template_requirement": [
+    "source",
+    "source_url",
+    "event_uid",
+    "schema_version",
+    "status",
+    "payload.human_approved_contact",
+    "payload.privacy_redacted"
+  ],
+  "required_receipt_fields_without_template_requirement": [
+    "receipt_id",
+    "correlation_id",
+    "observed_at",
+    "content_hash",
+    "payload.artifact_id",
+    "payload.event_type",
+    "payload.reader_label",
+    "payload.contact_surface",
+    "payload.summary"
+  ],
   "required_receipt_other_nested_field_count": 0,
   "required_receipt_payload_field_count": 7,
   "required_receipt_schema": "go_evidence_receipt.v0",
@@ -153,6 +186,9 @@
   "safe_local_prework_count": 3,
   "schema": "dharma.venture_cell_operator_os.darshan_go_unblock.v0",
   "status": "blocked_on_external_reader_gate",
+  "template_requirement_coverage_complete": false,
+  "template_requirement_not_evidence": true,
+  "template_requirement_scope": "minimum_acceptance_requirements_not_full_receipt",
   "trusted_promotion_claimed": false,
   "why_external_reader_required": "Darshan cannot advance growth, communications, publishing, or external operator action from a draft artifact until a countable external reader event is linked to an accepted, privacy-redacted GO evidence receipt."
 }

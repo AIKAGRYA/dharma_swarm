@@ -367,6 +367,45 @@ def _required_receipt_field_groups(fields: tuple[Any, ...]) -> list[dict[str, An
     ]
 
 
+def _receipt_template_requirement_summary(
+    *,
+    go_gate: dict[str, Any],
+    required_receipt_fields: tuple[Any, ...],
+) -> dict[str, Any]:
+    receipt_template = go_gate.get("receipt_template")
+    template = receipt_template if isinstance(receipt_template, dict) else {}
+    raw_requirements = template.get("accepted_receipt_requirements")
+    requirements = raw_requirements if isinstance(raw_requirements, dict) else {}
+    requirement_fields = tuple(sorted(str(key) for key in requirements))
+    required_fields = tuple(
+        str(field_value or "").strip()
+        for field_value in required_receipt_fields
+        if str(field_value or "").strip()
+    )
+    covered_fields = tuple(
+        field for field in required_fields if field in requirement_fields
+    )
+    uncovered_fields = tuple(
+        field for field in required_fields if field not in requirement_fields
+    )
+    return {
+        "receipt_template_status": str(
+            template.get("template_status") or "not_rendered"
+        ),
+        "accepted_receipt_requirement_fields": requirement_fields,
+        "accepted_receipt_requirement_field_count": len(requirement_fields),
+        "required_receipt_fields_with_template_requirement": covered_fields,
+        "required_receipt_field_template_requirement_count": len(covered_fields),
+        "required_receipt_fields_without_template_requirement": uncovered_fields,
+        "required_receipt_field_without_template_requirement_count": len(
+            uncovered_fields
+        ),
+        "template_requirement_coverage_complete": not uncovered_fields,
+        "template_requirement_scope": "minimum_acceptance_requirements_not_full_receipt",
+        "template_requirement_not_evidence": True,
+    }
+
+
 def _expected_local_artifact_items(
     refs: tuple[Any, ...],
     *,
@@ -444,6 +483,10 @@ def _darshan_go_unblock_payload(
         str(item["group"]): int(item["field_count"])
         for item in required_receipt_field_groups
     }
+    template_requirement_summary = _receipt_template_requirement_summary(
+        go_gate=go_gate,
+        required_receipt_fields=required_receipt_fields,
+    )
     blocked_actions = _sequence_items(go_gate.get("blocked_actions"))
     blocked_departments = _sequence_items(go_gate.get("blocked_departments"))
     expected_local_artifact_items = _expected_local_artifact_items(
@@ -503,6 +546,7 @@ def _darshan_go_unblock_payload(
         "required_receipt_other_nested_field_count": required_receipt_field_counts.get(
             "other_nested", 0
         ),
+        **template_requirement_summary,
         "expected_local_artifacts": expected_local_artifacts,
         "expected_local_artifact_count": len(expected_local_artifacts),
         "expected_local_artifact_items": expected_local_artifact_items,
@@ -786,6 +830,15 @@ def _artifact_manifest_payload(
         ),
         "darshan_go_unblock_required_receipt_payload_field_count": go_unblock.get(
             "required_receipt_payload_field_count", 0
+        ),
+        "darshan_go_unblock_template_requirement_field_count": go_unblock.get(
+            "accepted_receipt_requirement_field_count", 0
+        ),
+        "darshan_go_unblock_template_requirement_covered_field_count": go_unblock.get(
+            "required_receipt_field_template_requirement_count", 0
+        ),
+        "darshan_go_unblock_template_requirement_uncovered_field_count": go_unblock.get(
+            "required_receipt_field_without_template_requirement_count", 0
         ),
         "darshan_go_unblock_expected_local_artifact_count": go_unblock.get(
             "expected_local_artifact_count", 0

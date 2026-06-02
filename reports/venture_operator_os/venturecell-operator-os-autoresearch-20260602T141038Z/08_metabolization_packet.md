@@ -1047,3 +1047,30 @@ Metabolized rule:
 - Future receipt-shape checks should validate envelope and payload fields
   separately, then stop before any authority claim unless an accepted real
   receipt exists.
+
+## Loop 59 Metabolization Note
+
+Hypothesis:
+
+If template coverage is explicit, future agents can distinguish acceptance
+requirements from a complete receipt body.
+
+Patch:
+
+- Added template coverage summary and manifest/digest mirrors.
+- Added tests for covered and uncovered required fields.
+
+Evaluation:
+
+- Focused Operator OS tests passed.
+- Live template coverage is `7/16`; accepted receipts remain `0`.
+
+Adversarial review:
+
+- Coverage summary is not evidence.
+- The template remains non-authoritative.
+
+Metabolized rule:
+
+- Future agents must cite template coverage as review scaffolding only; accepted
+  receipts still require a real event, human approval, and privacy redaction.

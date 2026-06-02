@@ -294,3 +294,18 @@ does not grant external authority.
 
 This addendum is live verifier evidence only. Complete verification still
 requires the full minimum verifier bundle and the reporter remains open.
+
+## Loop 59 Verifier Addendum
+
+| Check | Result | Notes |
+|---|---|---|
+| Focused Operator OS projection tests | pass | `pytest -q tests/test_venture_cell_operator_os_projection.py` |
+| Darshan/control GO slice | pass | `pytest -q tests/test_darshan_external_reader_gate.py tests/test_control_surface.py -k 'GoReceiptRows or external_reader'`; `11` passed, `74` deselected |
+| Governed/A2A/daily slice | pass | `pytest -q tests/test_governed_work_admission.py tests/test_a2a_task_lifecycle.py tests/test_daily_operating_brief.py`; `31` passed |
+| Operator OS compile | pass | `./.venv/bin/python -m compileall -q dharma_swarm/venture_cell/operator_os` |
+| Live render | pass | template coverage renders as `7` of `16`; uncovered required fields `9` |
+| Scoped diff check | pass | `git diff --check -- dharma_swarm/venture_cell/operator_os tests/test_venture_cell_operator_os_projection.py reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z` |
+| Complete verifier | expected blocker | exit `3`; only blocker `task_not_closed:20260602-venturecell-operator-os-autoresearch-8h-t05-reporter` |
+
+This addendum is live verifier evidence only. It does not close the reporter and
+does not grant external authority.

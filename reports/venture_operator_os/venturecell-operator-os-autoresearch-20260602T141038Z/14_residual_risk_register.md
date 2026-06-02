@@ -176,6 +176,22 @@ New solved local claim:
 
 Decision: keep the risk in the live register until final-window review.
 
+## Loop 59 Risk Addendum
+
+New residual risk:
+
+| Risk | Current evidence | Handling |
+|---|---|---|
+| Template coverage overclaim | template requirements cover `7` of `16` required fields | treat as review scaffolding only; accepted receipts remain `0` |
+
+New solved local claim:
+
+| Claim | Evidence | Boundary |
+|---|---|---|
+| Template requirement coverage renders | focused tests pass and live packet reports covered `7`, uncovered `9` | not a receipt body, accepted evidence, or authority |
+
+Decision: keep the risk in the live register until final-window review.
+
 ## Loop 58 Risk Addendum
 
 New residual risk:

@@ -69,6 +69,8 @@
 - Required receipt fields: `16`
 - Required top-level receipt fields: `9`
 - Required payload receipt fields: `7`
+- Template requirement fields: `7`
+- Required fields covered by template requirements: `7`/`16`
 - Accepted receipts: `0`
 - Countable events: `decision, inspection, read, reply`
 - Blocked actions: `external_outreach, publishing, external_operator_handoff, live_external_authority`
@@ -108,7 +110,7 @@
 ## Memory Kernel
 
 - Status: `read_through_index_available`
-- Staged: `5060`
+- Staged: `5061`
 - Trusted: `1336`
 - Quarantine: `5000`
 - Truncated scan: `True`
@@ -119,7 +121,7 @@
 
 - `trusted` `trusted`: scanned `1336`; indexed `20`/`20`; truncated `False`.
 - `staging` `staged`: scanned `5000`; indexed `20`/`20`; truncated `True`.
-- `supplemental_staging` `staged`: scanned `60`; indexed `20`/`20`; truncated `False`.
+- `supplemental_staging` `staged`: scanned `61`; indexed `20`/`20`; truncated `False`.
 - `quarantine` `quarantine`: scanned `5000`; indexed `20`/`20`; truncated `True`.
 
 ## Memory Repair Packet

@@ -320,3 +320,25 @@ Keep / revert / queue:
 Decision: keep.
 
 ds-goal progress receipt: `r-2217c07b1829a0ff`
+
+## Loop 59 Adversary Addendum
+
+New claim under attack: template requirement coverage means the template is a
+complete GO receipt body.
+
+Current evidence:
+
+- `darshan_go_unblock_packet.json` reports template requirement fields `7`,
+  covered required fields `7`, uncovered required fields `9`, and coverage
+  complete `false`.
+- Template status remains `draft_template_not_evidence`.
+- Accepted GO receipts remain `0`.
+
+Verdict: false. The template describes minimum acceptance constraints, not the
+complete receipt body and not accepted evidence.
+
+Keep / revert / queue:
+
+Decision: keep.
+
+ds-goal progress receipt: `r-500be60ed5f37f7c`
