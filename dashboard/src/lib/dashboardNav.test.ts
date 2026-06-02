@@ -12,14 +12,27 @@ function commandSection() {
 
 test("buildDashboardNavSections keeps the canonical operator deck contiguous near the top of COMMAND", () => {
   const items = commandSection().items;
+  const expectedLabels = [
+    "Overview",
+    "Cockpit",
+    "Control Surface",
+    ...CONTROL_PLANE_ROUTE_DECK.map((route) => route.label),
+    "Conv. Log",
+  ];
+  const expectedHrefs = [
+    "/dashboard",
+    "/dashboard/cockpit",
+    "/dashboard/control-surface",
+    ...CONTROL_PLANE_ROUTE_DECK.map((route) => route.href),
+  ];
 
   assert.deepEqual(
-    items.slice(0, 6).map((item) => item.label),
-    ["Overview", ...CONTROL_PLANE_ROUTE_DECK.map((route) => route.label), "Conv. Log"],
+    items.slice(0, expectedLabels.length).map((item) => item.label),
+    expectedLabels,
   );
   assert.deepEqual(
-    items.slice(0, 5).map((item) => item.href),
-    ["/dashboard", ...CONTROL_PLANE_ROUTE_DECK.map((route) => route.href)],
+    items.slice(0, expectedHrefs.length).map((item) => item.href),
+    expectedHrefs,
   );
 });
 

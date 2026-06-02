@@ -61,12 +61,16 @@ is **depth-on-demand**. Read it when you need it. Do not memorise a read order.
 | Architecture / invariants / axioms | `docs/governance/SOVEREIGN_MANIFEST.md`, `docs/doctrine/` | — |
 | Doc ownership | `docs/governance/CANONICAL_DOC_STACK.md` (this file) | — |
 | Anti-slop / repo-rule discipline | `docs/governance/ANTI_SLOP_RULES.md` + `.semgrep/dharma-anti-slop.yml` | — |
+| Internal live transport decision | `docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md` | A2A docs, runtime plans, onboarding output, Live Ops Cockpit |
+| Terminal persistence substrate | `docs/ops/TMUX_AGENT_SUBSTRATE.md` | tmux launchers, VPS recovery plans, onboarding output, Live Ops Cockpit |
+| Live ops cockpit workflow | `docs/ops/LIVE_OPS_COCKPIT.md` | dashboard cockpit route, control-surface rows, operator travel/restart triage |
 | PR coherence gate | `docs/governance/COHERENCE_DELTA.md` | PR template |
 | PR review / merge-control operations | `docs/ops/PR_REVIEW_CONTROL.md` | Merge Master Mike workflows, PR janitor playbook |
 | Action warrant | `docs/governance/FOURFOLD_ACTION_WARRANT.md` | — |
 | Agent onboarding (ops) | `docs/ops/AGENT_ONBOARDING.md`, `docs/ops/CODEX_TOOLBELT_ONBOARDING.md` | — |
 | Module-level what-does-what | `docs/architecture/NAVIGATION.md` | — |
 | Router/TaskBoard domain pinning | `docs/architecture/ROUTERS_AND_TASKBOARD.md` | — |
+| VentureCell portfolio (which cells exist, status, instrument, separation) | `docs/governance/VENTURE_CELL_PORTFOLIO.yaml` | per-cell `VENTURE_CELL_*.md` declarations defer to it |
 | Model / provider routing | `docs/architecture/MODEL_ROUTING_CANON.md` | root `MODEL_ROUTING_MAP.md` (archive pointer) |
 | Memory Kernel production bar | `docs/architecture/MEMORY_KERNEL_PROD_BAR.md` | MemoryLattice, MemoryPalace, projection stores, canon/promotion claims |
 | Perplexity Computer autonomous loop mode | `docs/agents/perplexity-computer/AUTONOMOUS_LOOP.md` | Perplexity Computer agent card loop-mode metadata and deployment notes |

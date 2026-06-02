@@ -16,6 +16,7 @@ import yaml
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+import dharma_swarm.operator_core.control_surface as control_surface
 from dharma_swarm.operator_core.control_surface import (
     COHERENCE_STATES,
     AgentHandoffPrompt,
@@ -313,6 +314,26 @@ class TestManifestIsNotObservedTruth:
 
         assert overview.coherence_state == "bound"
         assert overview.observed_state == "live"
+
+    def test_build_rows_appends_live_ops_projection(self, monkeypatch, tmp_repo: Path) -> None:
+        sentinel = ControlSurfaceRow(
+            id="live_ops.test",
+            kind="fleet",
+            label="Live Ops Sentinel",
+            authority_role="observed_authority",
+            declared_state="live",
+            desired_state="live",
+            observed_state="live",
+            coherence_state="bound",
+            priority="p0",
+            owner_module="scripts/runtime/live_ops_census.py",
+            truth_owner="live_ops_census",
+        )
+
+        monkeypatch.setattr(control_surface, "_live_ops_census_rows", lambda _root: [sentinel])
+
+        rows = build_control_surface_rows(repo_root=tmp_repo)
+        assert any(row.id == "live_ops.test" for row in rows)
 
 
 # ---------------------------------------------------------------------------
@@ -762,6 +783,65 @@ class TestDashboardControlSurfacePage:
         page = repo_root / "dashboard" / "src" / "app" / "dashboard" / "control-surface" / "page.tsx"
         assert page.exists(), f"control-surface page missing: {page}"
 
+    def test_cockpit_page_file_exists(self) -> None:
+        repo_root = Path(__file__).resolve().parent.parent
+        page = repo_root / "dashboard" / "src" / "app" / "dashboard" / "cockpit" / "page.tsx"
+        assert page.exists(), f"cockpit page missing: {page}"
+
+    def test_cockpit_aliases_control_surface_page(self) -> None:
+        repo_root = Path(__file__).resolve().parent.parent
+        page = repo_root / "dashboard" / "src" / "app" / "dashboard" / "cockpit" / "page.tsx"
+        text = page.read_text(encoding="utf-8")
+        assert 'export { default } from "../control-surface/page";' in text
+
+    def test_control_surface_renders_ops_runbook_panel(self) -> None:
+        repo_root = Path(__file__).resolve().parent.parent
+        page = repo_root / "dashboard" / "src" / "app" / "dashboard" / "control-surface" / "page.tsx"
+        text = page.read_text(encoding="utf-8")
+        assert "OpsRunbookPanel" in text
+        assert 'from "@/components/cockpit/OpsRunbookPanel"' in text
+        assert "<OpsRunbookPanel rows={rows} selectedRow={selectedRow} />" in text
+
+    def test_control_surface_page_does_not_import_shell_control(self) -> None:
+        repo_root = Path(__file__).resolve().parent.parent
+        page = repo_root / "dashboard" / "src" / "app" / "dashboard" / "control-surface" / "page.tsx"
+        text = page.read_text(encoding="utf-8")
+        assert "controlPlaneShell" not in text
+        assert "runCommand" not in text
+        assert "executeCommand" not in text
+
+    def test_ops_runbook_panel_is_display_only(self) -> None:
+        repo_root = Path(__file__).resolve().parent.parent
+        panel = repo_root / "dashboard" / "src" / "components" / "cockpit" / "OpsRunbookPanel.tsx"
+        text = panel.read_text(encoding="utf-8")
+        forbidden_tokens = [
+            "onClick",
+            "fetch(",
+            "window.",
+            "navigator.",
+            "child_process",
+            "controlPlaneShell",
+            "runCommand",
+            "executeCommand",
+            "exec(",
+            "spawn(",
+            "tracking-",
+            "rounded-xl",
+        ]
+        for token in forbidden_tokens:
+            assert token not in text
+        assert "restartCommand" in text
+        assert "stopPolicy" in text
+        assert "<code" in text
+        assert "break-words" in text
+
+    def test_static_dashboard_nav_links_cockpit(self) -> None:
+        repo_root = Path(__file__).resolve().parent.parent
+        nav = repo_root / "dashboard" / "src" / "lib" / "dashboardNav.ts"
+        text = nav.read_text(encoding="utf-8")
+        assert 'label: "Cockpit"' in text
+        assert 'href: "/dashboard/cockpit"' in text
+
     def test_control_surface_in_manifest_nav(self) -> None:
         repo_root = Path(__file__).resolve().parent.parent
         manifest = load_active_surface_manifest(repo_root)
@@ -772,6 +852,15 @@ class TestDashboardControlSurfacePage:
         assert "Control Surface" in all_items, (
             "Control Surface not in manifest dashboard_nav_sections"
         )
+
+    def test_cockpit_in_manifest_nav(self) -> None:
+        repo_root = Path(__file__).resolve().parent.parent
+        manifest = load_active_surface_manifest(repo_root)
+        nav_sections = manifest.get("dashboard_nav_sections", [])
+        all_items: list[str] = []
+        for section in nav_sections:
+            all_items.extend(section.get("items", []))
+        assert "Cockpit" in all_items, "Cockpit not in manifest dashboard_nav_sections"
 
 
 # ---------------------------------------------------------------------------

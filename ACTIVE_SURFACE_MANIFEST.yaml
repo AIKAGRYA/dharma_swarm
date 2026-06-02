@@ -93,6 +93,7 @@ dashboard_nav_sections:
   - label: COMMAND
     items:
       - Overview
+      - Cockpit
       - Control Surface
       - Command Post
       - Qwen Surgeon
@@ -190,6 +191,15 @@ health_check_registry:
 # Every dashboard page: desired state, observed-state checks, gap info.
 
 dashboard_surfaces:
+  - id: cockpit
+    label: "Cockpit"
+    route: /dashboard/cockpit
+    api_dependencies: [/api/control-surface/summary, /api/control-surface/rows]
+    status: live
+    health_check_ids: [dashboard_route_exists, api_router_registered]
+    priority: p0
+    next_action: null
+
   - id: control_surface
     label: "Control Surface"
     route: /dashboard/control-surface

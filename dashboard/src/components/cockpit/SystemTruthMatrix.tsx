@@ -71,11 +71,29 @@ const PRIORITY_COLORS: Record<string, string> = {
   backlog: colors.sumi[600],
 };
 
-type FilterKey = "all" | "needs_john" | "p0" | "drifted" | "broken_register" | "organs";
+type FilterKey =
+  | "all"
+  | "live"
+  | "stopped"
+  | "stale"
+  | "blocked"
+  | "needs_john"
+  | "vps_candidate"
+  | "heavy_local_load"
+  | "p0"
+  | "drifted"
+  | "broken_register"
+  | "organs";
 
 const FILTER_OPTIONS: { key: FilterKey; label: string }[] = [
   { key: "all", label: "All" },
+  { key: "live", label: "Live" },
+  { key: "stopped", label: "Stopped" },
+  { key: "stale", label: "Stale" },
+  { key: "blocked", label: "Blocked" },
   { key: "needs_john", label: "Needs John" },
+  { key: "vps_candidate", label: "VPS Candidate" },
+  { key: "heavy_local_load", label: "Heavy Local" },
   { key: "p0", label: "P0" },
   { key: "drifted", label: "Drifted" },
   { key: "broken_register", label: "Broken Register" },
@@ -84,8 +102,20 @@ const FILTER_OPTIONS: { key: FilterKey; label: string }[] = [
 
 function applyPreFilter(rows: ControlSurfaceRow[], filter: FilterKey): ControlSurfaceRow[] {
   switch (filter) {
+    case "live":
+      return rows.filter((r) => r.observed_state === "live");
+    case "stopped":
+      return rows.filter((r) => r.observed_state === "stopped");
+    case "stale":
+      return rows.filter((r) => r.observed_state === "stale");
+    case "blocked":
+      return rows.filter((r) => r.observed_state === "blocked");
     case "needs_john":
       return rows.filter((r) => r.human_decision_required);
+    case "vps_candidate":
+      return rows.filter((r) => r.gap_codes.includes("vps_candidate"));
+    case "heavy_local_load":
+      return rows.filter((r) => r.gap_codes.includes("heavy_local_load"));
     case "p0":
       return rows.filter((r) => r.priority === "p0");
     case "drifted":

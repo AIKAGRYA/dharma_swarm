@@ -21,6 +21,7 @@ import { NeedsJohnQueue } from "@/components/cockpit/NeedsJohnQueue";
 import { SystemTruthMatrix } from "@/components/cockpit/SystemTruthMatrix";
 import { EvidenceDrawer } from "@/components/cockpit/EvidenceDrawer";
 import { RuntimeRail } from "@/components/cockpit/RuntimeRail";
+import { OpsRunbookPanel } from "@/components/cockpit/OpsRunbookPanel";
 
 export default function OperatorCockpitPage() {
   const { rows, isLoading, error, refetch } = useControlSurfaceRows();
@@ -65,6 +66,8 @@ export default function OperatorCockpitPage() {
         onSelectRow={handleSelectRow}
         isLoading={isLoading}
       />
+
+      <OpsRunbookPanel rows={rows} selectedRow={selectedRow} />
 
       {/* Zones 2-5: Split layout */}
       <div className="flex flex-1 gap-0 overflow-hidden rounded-xl border border-sumi-700/30">

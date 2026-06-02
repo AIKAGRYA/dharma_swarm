@@ -51,6 +51,7 @@ export function buildDashboardNavSections(): DashboardNavSection[] {
       level: 1,
       items: [
         { label: "Overview", href: "/dashboard", icon: "LayoutDashboard", level: 1 },
+        { label: "Cockpit", href: "/dashboard/cockpit", icon: "Shield", level: 1 },
         { label: "Control Surface", href: "/dashboard/control-surface", icon: "Settings2", level: 1 },
         ...canonicalOperatorDeckItems(),
         { label: "Conv. Log", href: "/dashboard/log", icon: "MessageSquare", level: 1 },
