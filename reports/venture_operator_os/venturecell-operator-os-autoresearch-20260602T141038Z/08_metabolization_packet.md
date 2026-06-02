@@ -4,7 +4,7 @@ Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live packet, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
 ds-goal progress receipt: `r-b73f8ef857f710fd`
-Current scoped HEAD before this packet: `6a6401b0 docs(operator-os): add residual risk register`
+Current scoped HEAD before this packet: `66f7d8a3 feat(operator-os): add render artifact manifest`
 
 This packet captures durable learning from the run so far. It must be reviewed
 and updated during final closeout before the reporter task is closed.
@@ -122,7 +122,8 @@ and updated during final closeout before the reporter task is closed.
 | `d0a8aaf4` | `12_live_verifier_matrix.md` | live verification and patch ledger |
 | `b72f94ee` | `13_authority_boundary_receipt.md` | consolidated authority firewall packet |
 | `6a6401b0` | `14_residual_risk_register.md` | explicit blocker and residual risk split |
-| pending | `15_artifact_manifest_receipt.md` | rendered artifact manifest and status locator |
+| `66f7d8a3` | `15_artifact_manifest_receipt.md` | rendered artifact manifest and status locator |
+| pending | `16_periodic_onboard_receipt.md` | periodic onboard/toolbelt substrate check |
 
 ## Current Read-Only Artifacts
 
@@ -143,6 +144,7 @@ and updated during final closeout before the reporter task is closed.
 - `15_artifact_manifest_receipt.md`
 - `authority_boundary_packet.json`
 - `operator_os_artifact_manifest.json`
+- `16_periodic_onboard_receipt.md`
 
 ## Do Not Metabolize As Done
 
@@ -157,6 +159,8 @@ These facts are explicitly not complete:
 - `14_residual_risk_register.md` must be refreshed before final closure.
 - `operator_os_artifact_manifest.json` is a locator/status packet, not
   authority.
+- Repo-wide NATS liveness from `make onboard` is not action-specific Operator
+  OS authority proof.
 - Reporter task is not closed.
 - The final adversarial audit and next-goal packet still require final-window
   review/update.
@@ -388,6 +392,34 @@ Metabolized rule:
 
 - Future agents should start from `operator_os_artifact_manifest.json` to find
   rendered packets, then inspect the packets themselves for authority decisions.
+
+## Loop 17 Metabolization Note
+
+Hypothesis:
+
+If periodic onboard evidence is captured, future agents can distinguish
+substrate health from mission-specific authority.
+
+Patch:
+
+- Added `16_periodic_onboard_receipt.md`.
+- Recorded `make onboard` and Codex toolbelt status.
+
+Evaluation:
+
+- `make onboard` exited `0`.
+- `bash scripts/runtime/codex_toolbelt_status.sh` exited `0`.
+
+Adversarial review:
+
+- The onboard NATS live contact is repo-wide substrate evidence, not an
+  Operator OS action ack.
+- Optional credential warnings do not block local work.
+
+Metabolized rule:
+
+- Treat onboard substrate liveness as environmental context. Authority packets
+  still decide what this mission may do.
 
 ## Loop 13 Metabolization Note
 

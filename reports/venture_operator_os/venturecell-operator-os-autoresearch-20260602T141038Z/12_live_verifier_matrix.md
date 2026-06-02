@@ -29,6 +29,8 @@ not a final verifier matrix and must not be used to close the reporter task.
 | Governed admission/A2A/daily brief slice | `pytest -q tests/test_governed_work_admission.py tests/test_a2a_task_lifecycle.py tests/test_daily_operating_brief.py` | `31 passed` | pass |
 | Operator OS compile | `./.venv/bin/python -m compileall -q dharma_swarm/venture_cell/operator_os` | exit `0` | pass |
 | Operator OS render | `./.venv/bin/python -m dharma_swarm.venture_cell.operator_os.cli --output-dir reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z` | exit `0` | pass |
+| Periodic onboard | `make onboard` | exit `0` | pass, not mission authority |
+| Codex toolbelt | `bash scripts/runtime/codex_toolbelt_status.sh` | exit `0` with optional credential warnings | pass |
 | Scoped diff hygiene | `git diff --check -- dharma_swarm/venture_cell/operator_os tests/test_venture_cell_operator_os_projection.py reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z` | exit `0` | pass |
 | Complete ds-goal verifier | `./.venv/bin/python scripts/runtime/autonomy_spine.py verify --mission-id 20260602-venturecell-operator-os-autoresearch-8h --phase complete --json` | `task_not_closed:...t05-reporter` | expected non-final blocker |
 | Context+ static analysis | `mcp__contextplus.run_static_analysis` | `Transport closed` | tool unavailable |
@@ -46,6 +48,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `authority_boundary_packet.json` | `local_read_only_external_blocked` | firewall view, not authority grant |
 | `14_residual_risk_register.md` | live risk split | not a closure certificate |
 | `operator_os_artifact_manifest.json` | rendered locator | not proof of finality or authority |
+| `16_periodic_onboard_receipt.md` | onboard/toolbelt pass | repo-wide substrate context only |
 | `06_adversary_audit.md` | live draft | needs final-window review |
 | `07_score_history.md` | live score `89/100` | not final |
 | `08_metabolization_packet.md` | live packet | needs final-window review |
@@ -69,7 +72,8 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `b7758b52` | keep | Darshan GO receipt template |
 | `b72f94ee` | keep | authority boundary firewall packet |
 | `6a6401b0` | keep | residual risk register |
-| pending | keep | artifact manifest |
+| `66f7d8a3` | keep | artifact manifest |
+| pending | keep | periodic onboard receipt |
 
 ## Revert / Queue Ledger
 

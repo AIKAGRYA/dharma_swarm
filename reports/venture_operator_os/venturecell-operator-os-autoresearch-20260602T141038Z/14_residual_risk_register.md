@@ -28,6 +28,7 @@ claims. It exists to prevent false completion after a high live score.
 | GO template misuse | `darshan_go_receipt_template.json` exists | keep `draft_template_not_evidence` markers |
 | Authority packet overclaim | `authority_boundary_packet.json` exists | treat as firewall view, not grant |
 | Artifact manifest overclaim | `operator_os_artifact_manifest.json` exists | treat as locator, not proof of finality |
+| Onboard NATS overclaim | `make onboard` reports repo-wide NATS live contact | do not treat as Operator OS action ack |
 | Context+ unavailable | `Transport closed` during static analysis attempts | document unavailable, use deterministic fallback checks |
 | Repo has unrelated dirty work | broad dirty worktree outside this run | commit only explicit scoped pathspecs |
 
@@ -42,6 +43,7 @@ claims. It exists to prevent false completion after a high live score.
 | GO template renders | `darshan_go_receipt_template.json` | not evidence |
 | Authority packet renders | `local_read_only_external_blocked` | not authority grant |
 | Artifact manifest renders | `not_authority: true` | locator/status packet only |
+| Periodic onboard passes | `make onboard` and toolbelt exit `0` | substrate context only |
 
 ## Loop 15 Receipt
 

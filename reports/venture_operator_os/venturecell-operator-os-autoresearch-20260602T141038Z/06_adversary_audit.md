@@ -27,6 +27,8 @@ updates, and terminal verification exist.
 - Authority boundary packet exists and reports `local_read_only_external_blocked`.
 - Residual risk register exists but is not final.
 - Artifact manifest exists and has `not_authority: true`.
+- Periodic onboard reports repo-wide NATS live contact, but no Operator
+  OS-specific action ack.
 - MemoryKernel query eval now reports `pass` with `6/6` from report-local
   staged sources.
 - MemoryKernel repair now reports `no_repair_needed`; no trusted Chetana
@@ -84,6 +86,7 @@ Adversarial review:
 - An authority boundary packet is not an authority grant.
 - A residual risk register is not a closure certificate.
 - An artifact manifest is not proof that artifacts are final or authoritative.
+- Repo-wide NATS liveness is not mission-specific authority proof.
 - Unrelated staged work must not be included in commits for this run.
 
 Keep / revert / queue:
@@ -115,6 +118,7 @@ Queued:
 | Authority boundary grants action | decision is `local_read_only_external_blocked` | false |
 | Risk register proves completion | reporter is still open | false |
 | Artifact manifest grants authority | manifest has `not_authority: true` | false |
+| Onboard NATS liveness grants Operator OS authority | authority packet still blocks external action | false |
 | Broad dirty work is part of this packet | scoped report-only patch | false |
 
 ## Boundary Audit

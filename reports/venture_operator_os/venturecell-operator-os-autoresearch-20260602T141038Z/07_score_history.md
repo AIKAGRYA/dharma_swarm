@@ -5,7 +5,7 @@ Status: live ledger, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
 ds-goal progress receipt: `r-277a29c022e46fb6`
 Baseline: `1aca07a1 Add VentureCell Operator OS Level 70 surface`
-Current scoped HEAD before this packet: `6a6401b0 docs(operator-os): add residual risk register`
+Current scoped HEAD before this packet: `66f7d8a3 feat(operator-os): add render artifact manifest`
 
 This file is a living score ledger. It exists now so later agents do not
 reconstruct scores from memory. It must be reviewed and updated before final
@@ -28,7 +28,8 @@ reporter closure.
 | Loop 13 | `12_live_verifier_matrix.md` | `d0a8aaf4` | 90 | +1 | keep live verifier matrix |
 | Loop 14 | `13_authority_boundary_receipt.md` | `b72f94ee` | 92 | +2 | keep authority firewall packet |
 | Loop 15 | `14_residual_risk_register.md` | `6a6401b0` | 93 | +1 | keep residual risk register |
-| Loop 16 | `15_artifact_manifest_receipt.md` | pending | 94 | +1 | keep render artifact manifest |
+| Loop 16 | `15_artifact_manifest_receipt.md` | `66f7d8a3` | 94 | +1 | keep render artifact manifest |
+| Loop 17 | `16_periodic_onboard_receipt.md` | pending | 95 | +1 | keep periodic onboard evidence |
 
 ## Area History
 
@@ -40,7 +41,7 @@ reporter closure.
 | Governance safety | 15 | 15 | external-reader, governed admission, Chetana, completion, and authority firewall gates preserved |
 | Iteration quality | 8 | 12+ | every loop has hypothesis, patch/rejection, evals, adversarial review, decision |
 | Product structure | 8 | 14 | Operator OS now emits next-action, GO gate, GO template, authority boundary, manifest, memory repair, and report-local recall packets |
-| Tests/evals | 8 | 12 | fixed tests, report-local recall regression, eval artifacts, and live verifier matrix exist |
+| Tests/evals | 8 | 13 | fixed tests, report-local recall regression, eval artifacts, live verifier matrix, and periodic onboard evidence exist |
 | Metabolization | 2 | 5 | program kernel, receipts, packets, and this score ledger exist |
 
 The area history is intentionally qualitative after opening because later
@@ -58,6 +59,8 @@ audit with explicit evidence.
 - Authority boundary packet: `local_read_only_external_blocked`.
 - Residual risk register: present, non-final.
 - Artifact manifest: present, non-authoritative.
+- Periodic onboard: `make onboard` and toolbelt status pass, with optional
+  credential warnings.
 - MemoryKernel query eval: `pass` (`6/6`) from report-local staged roots.
 - MemoryKernel repair packet: `no_repair_needed`, with trusted promotion still forbidden.
 - ds-goal raw/reconciled counts: `open=1 claimed=0 completed=4 failed=0 blocked=0 total=5`.
@@ -96,6 +99,8 @@ current evidence, not as a full-project proof.
 - Authority boundary packet is a firewall view, not an authority grant.
 - Residual risk register must be refreshed in the final window.
 - Artifact manifest is a locator/status packet, not authority.
+- Repo-wide NATS liveness from onboard is not action-specific Operator OS
+  authority proof.
 - The reporter task must remain open until final artifacts and final
   verification prove the full contract.
 
@@ -131,6 +136,33 @@ Adversarial review:
 - This file originally recorded MemoryKernel `0/6`; later loop rows must be
   used for the current memory eval state.
 - This file does not close the reporter lane.
+
+Keep / revert / queue:
+
+Decision: keep.
+
+## Loop 17 Score Update
+
+Hypothesis:
+
+If periodic onboard evidence is recorded, future agents can separate repo-wide
+substrate health from mission-specific authority proof.
+
+Patch:
+
+- Added `16_periodic_onboard_receipt.md`.
+- Recorded `make onboard` and Codex toolbelt status.
+
+Evaluation:
+
+- `make onboard` exited `0`.
+- `bash scripts/runtime/codex_toolbelt_status.sh` exited `0`.
+
+Adversarial review:
+
+- Global NATS liveness is not Operator OS action-specific ack proof.
+- Dirty file count remains broad repo state, not this packet scope.
+- Reporter remains open because the true 8-hour contract is not complete.
 
 Keep / revert / queue:
 

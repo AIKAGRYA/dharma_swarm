@@ -2091,13 +2091,13 @@
       "next_action": "Continue bounded internal build work with receipts",
       "observed_state": "mission contract present",
       "raw": {
-        "admission_id": "admission_7b2d1af359514c88",
+        "admission_id": "admission_da8cedcbd72941d9",
         "allowed_scope": [
           "dharma_swarm/venture_cell/",
           "tests/",
           "reports/venture_operator_os/"
         ],
-        "created_at": "2026-06-02T15:48:18.570922+00:00",
+        "created_at": "2026-06-02T15:51:34.040943+00:00",
         "decision": "allow",
         "expires_at": "",
         "metadata": {
@@ -2110,7 +2110,7 @@
         "reasons": [
           "all_required_controls_present"
         ],
-        "request_id": "admission_req_9ea115b1d36a40a3",
+        "request_id": "admission_req_ca8298260f574a59",
         "required_receipts": []
       }
     }
@@ -2715,7 +2715,7 @@
         "title": "MemoryKernel Report Source Packet"
       },
       {
-        "excerpt": "# Metabolization Packet Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live packet, not final until the 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-b73f8ef857f710fd` Current scoped HEAD before this packet: `6a6401b0 docs(operator-os): add residual risk register` This",
+        "excerpt": "# Metabolization Packet Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live packet, not final until the 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-b73f8ef857f710fd` Current scoped HEAD before this packet: `66f7d8a3 feat(operator-os): add render artifact manifest` Th",
         "matched_terms": [
           "VentureCell",
           "Operator OS",
@@ -2784,7 +2784,7 @@
         "title": "Adversary Audit"
       },
       {
-        "excerpt": "# Next Goal Packet Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live draft, not final until the 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-e5be506a66940367` Current scoped HEAD before this packet: `6a6401b0 docs(operator-os): add residual risk register` This packe",
+        "excerpt": "# Next Goal Packet Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live draft, not final until the 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-e5be506a66940367` Current scoped HEAD before this packet: `66f7d8a3 feat(operator-os): add render artifact manifest` This pac",
         "matched_terms": [
           "VentureCell",
           "Operator OS",
@@ -2817,7 +2817,7 @@
         "title": "Program Kernel Receipt"
       },
       {
-        "excerpt": "# Score History Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live ledger, not final until the 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-277a29c022e46fb6` Baseline: `1aca07a1 Add VentureCell Operator OS Level 70 surface` Current scoped HEAD before this packet: `6a",
+        "excerpt": "# Score History Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live ledger, not final until the 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-277a29c022e46fb6` Baseline: `1aca07a1 Add VentureCell Operator OS Level 70 surface` Current scoped HEAD before this packet: `66",
         "matched_terms": [
           "VentureCell",
           "Operator OS",
@@ -2955,6 +2955,16 @@
         "path": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/04_goal_truth_receipt.md",
         "tier": "staged",
         "title": "Loop 04 ds-goal Truth Receipt"
+      },
+      {
+        "excerpt": "# Periodic Onboard Receipt Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live receipt, not final until the true 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-a20a2acce6d33e41` Current scoped HEAD before this packet: `66f7d8a3 feat(operator-os): add render artifact man",
+        "matched_terms": [
+          "VentureCell",
+          "Operator OS"
+        ],
+        "path": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/16_periodic_onboard_receipt.md",
+        "tier": "staged",
+        "title": "Periodic Onboard Receipt"
       },
       {
         "excerpt": "title: WOW OWOW OW, there is toally a strong wiki prpot, what do yo umean no wiki as i\u2026 \u2014 turn 5 chetana_version: 0.1.0 atom_id: 0e360da6-2296-46d5-881f-5ebd497be6f1 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/c74c67f4-49a2-453d-ab62-0be4ff41b768.jsonl span: line:179 captured: '2026-04-29T06:22:44.4",
@@ -3263,7 +3273,7 @@
       "external action approval"
     ],
     "index_status": "available_truncated",
-    "indexed_count": 78,
+    "indexed_count": 79,
     "next_action": "Expand MemoryKernel read-through index coverage and query evals",
     "quarantine_count": 5000,
     "query_eval_passed": 6,
@@ -3403,7 +3413,7 @@
       "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z",
       "/Users/dhyana/.dharma/knowledge/quarantine"
     ],
-    "staged_count": 5018,
+    "staged_count": 5019,
     "status": "read_through_index_available",
     "truncated": true,
     "trusted_count": 1336
