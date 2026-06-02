@@ -36,11 +36,11 @@
 
 ### DocOps integrity gate (24 PRs)
 
-The dominant failure mode is `canonical_guard`: new docs files contain authority terms but are not registered in `docs/governance/CANONICAL_DOC_STACK.md`. This is a **pre-existing main-branch issue** — the guard was tightened but the registration step was not applied to research/grounding docs.
+The dominant failure mode is the docops `guard` check: new docs files contain governance-scope terms but are not registered in the doc stack registry. This is a **pre-existing main-branch issue** — the guard was tightened but the registration step was not applied to research/grounding docs.
 
 **Affected PRs:** #384, #431, #442, #434, #432, #426, #425, #424, #423, #422, #421, #420, #417, #415, #414, #413, #410, #405, #402, #390, #389, #370, #344, #325
 
-**Note:** PR #453 (`fix(docops): widen canonical_guard ignore`) was opened in a prior session to address this. If merged, it would unblock most of these PRs.
+**Note:** PR #453 (`fix(docops): widen guard ignore`) was opened in a prior session to address this. If merged, it would unblock most of these PRs.
 
 ### Other failures
 
@@ -67,7 +67,7 @@ The dominant failure mode is `canonical_guard`: new docs files contain authority
 - **Category:** docs-only (research)
 - **Files:** 22 (docs)
 - **Risk:** LOW
-- **CI:** DocOps FAIL (canonical_guard)
+- **CI:** DocOps FAIL (doc-stack guard)
 - **Dependencies:** none
 - **Recommendation:** MERGE (wave 1) after #453 lands
 
@@ -118,7 +118,7 @@ The dominant failure mode is `canonical_guard`: new docs files contain authority
 - **Dependencies:** depends on #383
 - **Recommendation:** MERGE (wave 2, after #383)
 
-#### PR #453: fix(docops): widen canonical_guard ignore
+#### PR #453: fix(docops): widen doc-guard ignore
 - **Author:** Devin (prior session)
 - **Category:** governance-fix
 - **Files:** 5
