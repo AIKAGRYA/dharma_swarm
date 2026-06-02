@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live risk register, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-ade5bb8b586492b3`
-Current scoped HEAD before this packet: `cbfb5d57 feat(operator-os): clarify completion guard policy`
+ds-goal progress receipt: `r-af82a796175a05dc`
+Current scoped HEAD before this packet: `e8e6aaeb docs(operator-os): record three-hour timebox`
 
 This register separates current blockers, residual risks, and solved local
 claims. It exists to prevent false completion after a high live score.
@@ -41,6 +41,7 @@ claims. It exists to prevent false completion after a high live score.
 | Completion guard overclaim | `operator_completion_guard_packet.json` says keep reporter open | guard only, not terminal receipt |
 | Completion guard policy overclaim | guard lists reporter closure requirements | treat as checklist, not closure evidence |
 | Periodic onboard overclaim | `23_periodic_onboard_refresh_receipt.md` records substrate health | context only, not mission authority |
+| Periodic substrate refresh overclaim | `33_periodic_substrate_refresh_receipt.md` records substrate health | context only, not mission authority |
 | Timebox stale claim | `24_timebox_status_receipt.md` records one clock snapshot | refresh before final-window claims |
 | Timebox refresh overclaim | `27_timebox_refresh_receipt.md` records another non-final clock snapshot | treat as progress evidence only |
 | Three-hour timebox overclaim | `32_timebox_three_hour_receipt.md` records another non-final clock snapshot | treat as progress evidence only |
@@ -69,6 +70,7 @@ claims. It exists to prevent false completion after a high live score.
 | Completion guard renders | live score can be 100 without completion | false-final guard only |
 | Completion guard reporter policy renders | terminal receipt and verifier pass required | requirement checklist only |
 | Periodic onboard refresh passes | `make onboard` and toolbelt exit `0` | environment context only |
+| Periodic substrate refresh passes | `make onboard` and toolbelt exit `0` | environment context only |
 | Timebox status recorded | elapsed `8770s`, remaining `20030s` | non-final proof only |
 | Timebox refresh recorded | elapsed `9701s`, remaining `19099s` | non-final proof only |
 | Three-hour timebox recorded | elapsed `10982s`, remaining `17818s` | non-final proof only |

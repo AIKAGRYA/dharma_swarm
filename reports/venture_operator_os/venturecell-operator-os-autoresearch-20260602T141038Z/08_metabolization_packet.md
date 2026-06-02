@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live packet, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-ade5bb8b586492b3`
-Current scoped HEAD before this packet: `cbfb5d57 feat(operator-os): clarify completion guard policy`
+ds-goal progress receipt: `r-af82a796175a05dc`
+Current scoped HEAD before this packet: `e8e6aaeb docs(operator-os): record three-hour timebox`
 
 This packet captures durable learning from the run so far. It must be reviewed
 and updated during final closeout before the reporter task is closed.
@@ -188,6 +188,8 @@ and updated during final closeout before the reporter task is closed.
 
    - `23_periodic_onboard_refresh_receipt.md` records fresh `make onboard` and
      toolbelt passes.
+   - `33_periodic_substrate_refresh_receipt.md` records another `make onboard`
+     and toolbelt pass, with repo-wide NATS liveness treated as context only.
    - Onboard reports repo-wide NATS liveness, broad dirty worktree state, and
      active-track status.
    - Operator OS completion guard still says `keep_reporter_open`.
@@ -197,6 +199,8 @@ and updated during final closeout before the reporter task is closed.
    - Future agents may use onboard as substrate context. They must not convert
      repo-wide NATS, active-track, or toolbelt health into Operator OS external
      authority or reporter closure.
+   - Optional credential warnings are environment facts, not mission blockers
+     unless a selected loop requires those lanes.
 
 12. Timebox truth must be concrete.
 
@@ -287,6 +291,7 @@ and updated during final closeout before the reporter task is closed.
 | `r-c1ea4b97e1e794bc` | `30_manifest_inventory_scope_receipt.md` | receipt inventory scope and non-final markers |
 | `r-43933ac6a5701ece` | `31_completion_guard_policy_receipt.md` | explicit reporter closure policy in completion guard |
 | `r-ade5bb8b586492b3` | `32_timebox_three_hour_receipt.md` | three-hour non-final timebox proof |
+| `r-af82a796175a05dc` | `33_periodic_substrate_refresh_receipt.md` | repo-wide substrate refresh context |
 
 ## Current Read-Only Artifacts
 
@@ -327,6 +332,7 @@ and updated during final closeout before the reporter task is closed.
 - `30_manifest_inventory_scope_receipt.md`
 - `31_completion_guard_policy_receipt.md`
 - `32_timebox_three_hour_receipt.md`
+- `33_periodic_substrate_refresh_receipt.md`
 
 ## Do Not Metabolize As Done
 
@@ -358,6 +364,7 @@ These facts are explicitly not complete:
 - Completion guard is not a terminal reporter receipt.
 - Completion guard reporter policy is not reporter closure.
 - Onboard/toolbelt evidence is environment context only.
+- Periodic substrate refresh evidence is environment context only.
 - Timebox status is concrete evidence that final closure is still premature.
 - Timebox refresh is still non-final evidence, not a terminal receipt.
 - Three-hour timebox proof is still non-final evidence, not a terminal receipt.

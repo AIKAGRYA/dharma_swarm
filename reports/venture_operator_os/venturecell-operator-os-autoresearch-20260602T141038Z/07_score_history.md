@@ -3,9 +3,9 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live ledger, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-ade5bb8b586492b3`
+ds-goal progress receipt: `r-af82a796175a05dc`
 Baseline: `1aca07a1 Add VentureCell Operator OS Level 70 surface`
-Current scoped HEAD before this packet: `cbfb5d57 feat(operator-os): clarify completion guard policy`
+Current scoped HEAD before this packet: `e8e6aaeb docs(operator-os): record three-hour timebox`
 
 This file is a living score ledger. It exists now so later agents do not
 reconstruct scores from memory. It must be reviewed and updated before final
@@ -46,6 +46,7 @@ reporter closure.
 | Loop 31 | `30_manifest_inventory_scope_receipt.md` | `r-c1ea4b97e1e794bc` | 100 | +0 | keep manifest inventory scope |
 | Loop 32 | `31_completion_guard_policy_receipt.md` | `r-43933ac6a5701ece` | 100 | +0 | keep completion guard policy |
 | Loop 33 | `32_timebox_three_hour_receipt.md` | `r-ade5bb8b586492b3` | 100 | +0 | keep three-hour timebox proof |
+| Loop 34 | `33_periodic_substrate_refresh_receipt.md` | `r-af82a796175a05dc` | 100 | +0 | keep substrate refresh context |
 
 ## Area History
 
@@ -95,6 +96,8 @@ audit with explicit evidence.
   verifier pass required.
 - Periodic onboard refresh: `make onboard` and toolbelt pass; repo-wide NATS
   liveness remains substrate context only.
+- Periodic substrate refresh: `make onboard` and toolbelt pass; optional
+  credential warnings remain context only.
 - Timebox status: elapsed `10982s` (`3h 03m 02s`), remaining `17818s`
   (`4h 56m 58s`).
 - Manifest receipt summary: `receipt_count` and `latest_receipt_path` present,
@@ -159,6 +162,7 @@ current evidence, not as a full-project proof.
 - Completion guard reporter policy describes closure requirements but does not
   satisfy them.
 - Periodic onboard evidence is not Operator OS action authority.
+- Periodic substrate refresh evidence is not Operator OS action authority.
 - Timebox status proves the mission is not complete despite live score `100`.
 - Manifest receipt summary is an audit locator, not final proof.
 - Manifest inventory scope is navigation metadata, not terminal proof.
