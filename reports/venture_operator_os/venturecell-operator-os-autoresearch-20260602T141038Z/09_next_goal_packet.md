@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-85940de5357176e4`
-Current scoped HEAD before this packet: `29af0653 docs(operator-os): add timebox status receipt`
+ds-goal progress receipt: `r-b3e68b7947e399fa`
+Current scoped HEAD before this packet: `6cb63575 feat(operator-os): summarize manifest receipts`
 
 This packet is the handoff for the next bounded AutoResearch loop. It must be
 reviewed and updated in the final hour before reporter closure.
@@ -38,7 +38,9 @@ reviewed and updated in the final hour before reporter closure.
 - Timebox status: elapsed `8770s`, remaining `20030s`; mission not complete.
 - Manifest receipt summary: manifest has receipt count and latest receipt path,
   but remains `not_final: true`.
-- Last committed packet: timebox status.
+- Stable admission render: volatile admission id/time redacted; decision
+  evidence remains visible.
+- Last committed packet: manifest receipt summary.
 
 ## Next Goal
 
@@ -156,7 +158,12 @@ bounded targets:
    Use `receipt_count` and `latest_receipt_path` for navigation only. They are
    not terminal closure evidence.
 
-18. Final closeout only after true-time proof.
+18. Stable admission render preservation.
+
+   Preserve volatile field redaction unless the underlying admission policy
+   changes. Do not redact decisions or blockers.
+
+19. Final closeout only after true-time proof.
 
    When elapsed time is actually in the final window, update:
 
@@ -222,6 +229,7 @@ If the loop only changes a report packet, also run scoped `git diff --check`.
 - `23_periodic_onboard_refresh_receipt.md`
 - `24_timebox_status_receipt.md`
 - `25_manifest_receipt_summary_receipt.md`
+- `26_stable_admission_render_receipt.md`
 - `operator_os_projection.json`
 - `operator_completion_guard_packet.json`
 - `operator_next_action_packet.json`

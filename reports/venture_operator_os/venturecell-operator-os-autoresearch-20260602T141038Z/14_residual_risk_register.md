@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live risk register, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-85940de5357176e4`
-Current scoped HEAD before this packet: `29af0653 docs(operator-os): add timebox status receipt`
+ds-goal progress receipt: `r-b3e68b7947e399fa`
+Current scoped HEAD before this packet: `6cb63575 feat(operator-os): summarize manifest receipts`
 
 This register separates current blockers, residual risks, and solved local
 claims. It exists to prevent false completion after a high live score.
@@ -32,6 +32,7 @@ claims. It exists to prevent false completion after a high live score.
 | Liveness label regression | authority fields could become ambiguous again | keep Operator OS action-specific key names |
 | Receipt inventory overclaim | manifest lists receipt paths | treat as index, not completion proof |
 | Receipt summary overclaim | manifest reports count/latest receipt | treat as navigation, not completion proof |
+| Admission redaction overclaim | governed admission raw redacts volatile id/time | ensure decision and reasons remain visible |
 | Gap triage overclaim | `operator_gap_triage_packet.json` separates local/external gaps | treat as loop selector, not authority or gate clearance |
 | Memory coverage overclaim | `memory_kernel_coverage_packet.json` exposes root coverage | treat as limit evidence, not complete memory coverage |
 | Digest cap overclaim | `operator_os_digest.md` summarizes repeated canvas rows | use projection JSON for full evidence |
@@ -62,6 +63,7 @@ claims. It exists to prevent false completion after a high live score.
 | Periodic onboard refresh passes | `make onboard` and toolbelt exit `0` | environment context only |
 | Timebox status recorded | elapsed `8770s`, remaining `20030s` | non-final proof only |
 | Manifest receipt summary renders | receipt count and latest path present | audit locator only |
+| Admission render stable | volatile id/time redacted | diff hygiene only |
 
 ## Loop 15 Receipt
 

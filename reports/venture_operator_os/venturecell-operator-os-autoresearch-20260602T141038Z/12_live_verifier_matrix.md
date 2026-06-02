@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live verifier matrix, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-85940de5357176e4`
-Current scoped HEAD before this packet: `29af0653 docs(operator-os): add timebox status receipt`
+ds-goal progress receipt: `r-b3e68b7947e399fa`
+Current scoped HEAD before this packet: `6cb63575 feat(operator-os): summarize manifest receipts`
 
 This matrix captures the current verification surface for future agents. It is
 not a final verifier matrix and must not be used to close the reporter task.
@@ -27,6 +27,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 - Periodic onboard/toolbelt: passing, environment context only.
 - Timebox status: elapsed `8770s`, remaining `20030s`.
 - Manifest receipt summary: passing; count and latest receipt path rendered.
+- Stable admission render: passing; volatile id/time redacted, decision visible.
 - Complete ds-goal verification: expected fail on open reporter task.
 - Mission status: open.
 
@@ -62,6 +63,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `14_residual_risk_register.md` | live risk split | not a closure certificate |
 | `operator_os_artifact_manifest.json` | rendered locator | not proof of finality or authority |
 | manifest receipt summary | `receipt_count` + `latest_receipt_path` | navigation only |
+| governed admission raw | volatile id/time redacted | diff hygiene, not gate change |
 | `16_periodic_onboard_receipt.md` | onboard/toolbelt pass | repo-wide substrate context only |
 | `17_liveness_key_disambiguation_receipt.md` | action-specific liveness labels | prevents substrate/authority conflation |
 | `23_periodic_onboard_refresh_receipt.md` | onboard/toolbelt pass | substrate context only |
@@ -100,7 +102,8 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `1eaa0bd3` | keep | completion guard |
 | `c30b5b8f` | keep | periodic onboard refresh |
 | `29af0653` | keep | timebox status |
-| pending | keep | manifest receipt summary |
+| `6cb63575` | keep | manifest receipt summary |
+| `r-b3e68b7947e399fa` | keep | stable admission render |
 
 ## Revert / Queue Ledger
 

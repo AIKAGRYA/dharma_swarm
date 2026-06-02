@@ -283,6 +283,13 @@ def test_projection_maps_reader_gate_taskboard_a2a_and_memory(tmp_path: Path) ->
         gate.gate_id == "darshan.external_reader_go_receipts" and gate.decision == "allow"
         for gate in projection.gates
     )
+    admission_gate = next(
+        gate for gate in projection.gates if gate.gate_id == "operator_os.governed_work_admission"
+    )
+    assert admission_gate.raw["request_id"] == "operator_os.governed_work_admission.request"
+    assert admission_gate.raw["admission_id"] == "volatile_admission_id_redacted"
+    assert admission_gate.raw["created_at"] == "volatile_render_time_redacted"
+    assert admission_gate.raw["volatile_fields_redacted"] is True
     assert any(item.item_id == "task_board.task-1" and item.status == "running" for item in projection.canvas)
     assert any(item.item_id == "a2a.a2a-1" and item.status == "claimed_open" for item in projection.canvas)
     assert projection.darshan_go_gate_packet.decision == "gate_passed_reviewed_internal_only"

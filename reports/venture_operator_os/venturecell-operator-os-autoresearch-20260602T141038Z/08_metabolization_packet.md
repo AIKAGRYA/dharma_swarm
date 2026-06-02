@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live packet, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-85940de5357176e4`
-Current scoped HEAD before this packet: `29af0653 docs(operator-os): add timebox status receipt`
+ds-goal progress receipt: `r-b3e68b7947e399fa`
+Current scoped HEAD before this packet: `6cb63575 feat(operator-os): summarize manifest receipts`
 
 This packet captures durable learning from the run so far. It must be reviewed
 and updated during final closeout before the reporter task is closed.
@@ -212,6 +212,22 @@ and updated during final closeout before the reporter task is closed.
      treat count, latest receipt, or manifest presence as a terminal reporter
      receipt.
 
+14. Render stability should redact volatility without hiding decisions.
+
+   Evidence:
+
+   - `26_stable_admission_render_receipt.md` records stable admission raw
+     fields.
+   - Admission decision, reasons, allowed scope, and metadata remain visible.
+   - `admission_id` and `created_at` are explicitly redacted as volatile render
+     fields.
+
+   Metabolized rule:
+
+   - Redaction is acceptable for volatile render fields when the packet says so.
+     Do not redact policy decisions, blockers, reasons, receipts, or authority
+     boundaries.
+
 ## Committed Packets
 
 | Commit | Packet | Durable effect |
@@ -241,7 +257,8 @@ and updated during final closeout before the reporter task is closed.
 | `1eaa0bd3` | `22_completion_guard_receipt.md` | live-100 non-final completion guard |
 | `c30b5b8f` | `23_periodic_onboard_refresh_receipt.md` | periodic substrate refresh |
 | `29af0653` | `24_timebox_status_receipt.md` | concrete timebox status |
-| pending | `25_manifest_receipt_summary_receipt.md` | manifest receipt summary fields |
+| `6cb63575` | `25_manifest_receipt_summary_receipt.md` | manifest receipt summary fields |
+| `r-b3e68b7947e399fa` | `26_stable_admission_render_receipt.md` | stable governed-admission render |
 
 ## Current Read-Only Artifacts
 
@@ -275,6 +292,7 @@ and updated during final closeout before the reporter task is closed.
 - `23_periodic_onboard_refresh_receipt.md`
 - `24_timebox_status_receipt.md`
 - `25_manifest_receipt_summary_receipt.md`
+- `26_stable_admission_render_receipt.md`
 
 ## Do Not Metabolize As Done
 
@@ -303,6 +321,7 @@ These facts are explicitly not complete:
 - Onboard/toolbelt evidence is environment context only.
 - Timebox status is concrete evidence that final closure is still premature.
 - Manifest receipt summaries are navigation aids only.
+- Stable admission render is diff hygiene only, not a gate change.
 - Reporter task is not closed.
 - The final adversarial audit and next-goal packet still require final-window
   review/update.

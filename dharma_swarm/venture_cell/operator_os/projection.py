@@ -280,6 +280,7 @@ def _external_reader_gate(bundle_path: Path | None) -> GateSummary:
 def _work_admission_gate(inputs: OperatorOSInputs) -> GateSummary:
     admission = evaluate_governed_work_admission(
         GovernedWorkRequest(
+            request_id="operator_os.governed_work_admission.request",
             agent_uid="venturecell_operator_os",
             work_kind=WorkKind.LONG_RUNNING,
             intent="Run bounded VentureCell Operator OS build or planning work",
@@ -314,8 +315,16 @@ def _work_admission_gate(inputs: OperatorOSInputs) -> GateSummary:
             if admission.decision == "allow"
             else "Satisfy governed admission before widening autonomy"
         ),
-        raw=admission.model_dump(mode="json"),
+        raw=_stable_admission_raw(admission),
     )
+
+
+def _stable_admission_raw(admission: Any) -> dict[str, Any]:
+    raw = admission.model_dump(mode="json")
+    raw["admission_id"] = "volatile_admission_id_redacted"
+    raw["created_at"] = "volatile_render_time_redacted"
+    raw["volatile_fields_redacted"] = True
+    return raw
 
 
 def _department_roster(
