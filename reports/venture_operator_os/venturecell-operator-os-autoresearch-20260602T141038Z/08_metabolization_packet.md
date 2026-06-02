@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live packet, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-19efd39420cd789d`
-Current scoped HEAD before this packet: `5c6c057d docs(operator-os): record four-hour timebox`
+ds-goal progress receipt: `r-fe4852c3b2a2a7c6`
+Current scoped HEAD before this packet: `b9cc1557 feat(operator-os): summarize canvas lanes`
 
 This packet captures durable learning from the run so far. It must be reviewed
 and updated during final closeout before the reporter task is closed.
@@ -196,6 +196,22 @@ and updated during final closeout before the reporter task is closed.
      of `operator_os_projection.json`, Darshan GO evidence, or completion
      guard state.
 
+9b. Department summary packets are routing aids, not gate evidence.
+
+   Evidence:
+
+   - `operator_department_summary_packet.json` now renders department status
+     and authority-mode counts.
+   - `operator_os_artifact_manifest.json` now repeats department, blocked, and
+     partial department counts.
+   - The packet reports `not_authority: true`, `external_authority_granted:
+     false`, and `trusted_promotion_claimed: false`.
+
+   Metabolized rule:
+
+   - Department counts should speed department-level audit routing. They must
+     not replace gate evidence, department row inspection, or closure checks.
+
 10. Live score can be perfect before final completion.
 
    Evidence:
@@ -377,12 +393,14 @@ Metabolized rule:
 | `r-af82a796175a05dc` | `33_periodic_substrate_refresh_receipt.md` | repo-wide substrate refresh context |
 | `r-a8ff4c8f3684c4af` | `34_authority_boolean_receipt.md` | explicit external-authority denial booleans |
 | `r-19efd39420cd789d` | `44_canvas_summary_packet_receipt.md` | machine-readable canvas summary packet |
+| `r-fe4852c3b2a2a7c6` | `45_department_summary_packet_receipt.md` | machine-readable department summary packet |
 
 ## Current Read-Only Artifacts
 
 - `operator_os_projection.json`
 - `operator_os_digest.md`
 - `operator_canvas_summary_packet.json`
+- `operator_department_summary_packet.json`
 - `operator_completion_guard_packet.json`
 - `memory_kernel_index.json`
 - `memory_kernel_coverage_packet.json`
@@ -421,6 +439,7 @@ Metabolized rule:
 - `33_periodic_substrate_refresh_receipt.md`
 - `34_authority_boolean_receipt.md`
 - `44_canvas_summary_packet_receipt.md`
+- `45_department_summary_packet_receipt.md`
 
 ## Do Not Metabolize As Done
 

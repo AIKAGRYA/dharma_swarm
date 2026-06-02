@@ -155,6 +155,62 @@ def _canvas_summary_payload(projection: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _department_summary_payload(projection: dict[str, Any]) -> dict[str, Any]:
+    raw_departments = projection.get("departments", [])
+    departments = [item for item in raw_departments if isinstance(item, dict)]
+    status_counts = Counter(str(item.get("status") or "unknown") for item in departments)
+    authority_mode_counts = Counter(
+        str(item.get("authority_mode") or "unknown") for item in departments
+    )
+    blocked_departments = [
+        {
+            "department_id": str(item.get("department_id") or ""),
+            "label": str(item.get("label") or ""),
+            "status": str(item.get("status") or "unknown"),
+            "authority_mode": str(item.get("authority_mode") or "unknown"),
+            "next_action": str(item.get("next_action") or ""),
+        }
+        for item in departments
+        if str(item.get("status") or "").startswith("blocked")
+    ]
+    department_items = [
+        {
+            "department_id": str(item.get("department_id") or ""),
+            "label": str(item.get("label") or ""),
+            "status": str(item.get("status") or "unknown"),
+            "authority_mode": str(item.get("authority_mode") or "unknown"),
+            "evidence_ref_count": len(
+                item.get("evidence_refs", [])
+                if isinstance(item.get("evidence_refs"), list)
+                else []
+            ),
+        }
+        for item in departments
+    ]
+    return {
+        "schema": "dharma.venture_cell_operator_os.department_summary.v0",
+        "status": projection.get("status", "unknown"),
+        "autonomy_level": projection.get("autonomy_level", "unknown"),
+        "total_department_count": len(departments),
+        "department_items": department_items,
+        "status_counts": dict(sorted(status_counts.items())),
+        "status_count": len(status_counts),
+        "authority_mode_counts": dict(sorted(authority_mode_counts.items())),
+        "authority_mode_count": len(authority_mode_counts),
+        "blocked_departments": blocked_departments,
+        "blocked_department_count": len(blocked_departments),
+        "partial_department_count": int(status_counts.get("partial", 0)),
+        "safe_next_action": (
+            "Keep blocked departments internal until the required gate evidence exists."
+            if blocked_departments
+            else "Use department status counts as read-only operating context."
+        ),
+        "not_authority": True,
+        "external_authority_granted": False,
+        "trusted_promotion_claimed": False,
+    }
+
+
 def _next_action_payload(projection: dict[str, Any]) -> dict[str, Any]:
     packet = projection.get("next_action_packet")
     return packet if isinstance(packet, dict) else {}
@@ -271,6 +327,7 @@ def _artifact_manifest_payload(
     gap_triage = _gap_triage_payload(projection)
     memory_coverage = _memory_coverage_payload(projection)
     canvas_summary = _canvas_summary_payload(projection)
+    department_summary = _department_summary_payload(projection)
     completion_guard = _completion_guard_payload(projection)
     receipt_paths = [
         str(path)
@@ -296,6 +353,9 @@ def _artifact_manifest_payload(
         "canvas_item_count": canvas_summary.get("total_item_count", 0),
         "canvas_lane_count": canvas_summary.get("lane_count", 0),
         "canvas_blocked_item_count": canvas_summary.get("blocked_item_count", 0),
+        "department_count": department_summary.get("total_department_count", 0),
+        "department_blocked_count": department_summary.get("blocked_department_count", 0),
+        "department_partial_count": department_summary.get("partial_department_count", 0),
         "completion_guard_decision": completion_guard.get("decision", "unknown"),
         "not_final": completion_guard.get("not_final", True),
         "artifact_paths": {
@@ -453,6 +513,16 @@ def render_operator_surface(
         + "\n",
         encoding="utf-8",
     )
+    department_summary_path = output_dir / "operator_department_summary_packet.json"
+    department_summary_path.write_text(
+        json.dumps(
+            _department_summary_payload(projection.to_dict()),
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     completion_guard_path = output_dir / "operator_completion_guard_packet.json"
     completion_guard_path.write_text(
         json.dumps(
@@ -476,6 +546,7 @@ def render_operator_surface(
         "authority_boundary_packet": authority_boundary_packet_path,
         "gap_triage_packet": gap_triage_packet_path,
         "canvas_summary_packet": canvas_summary_path,
+        "department_summary_packet": department_summary_path,
         "completion_guard_packet": completion_guard_path,
     }
     artifact_manifest_path = output_dir / "operator_os_artifact_manifest.json"

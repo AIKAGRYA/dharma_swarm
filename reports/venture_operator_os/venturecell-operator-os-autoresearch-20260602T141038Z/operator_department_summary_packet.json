@@ -1,0 +1,110 @@
+{
+  "authority_mode_count": 7,
+  "authority_mode_counts": {
+    "default_deny": 1,
+    "draft_only": 1,
+    "human_approved_only": 2,
+    "read_only": 1,
+    "read_only_until_promoted": 1,
+    "review_required": 1,
+    "reviewed_internal": 2
+  },
+  "autonomy_level": "L0_read_only_plan",
+  "blocked_department_count": 2,
+  "blocked_departments": [
+    {
+      "authority_mode": "human_approved_only",
+      "department_id": "growth",
+      "label": "Growth",
+      "next_action": "Advance only after one accepted countable external-reader Go receipt",
+      "status": "blocked_on_external_reader_gate"
+    },
+    {
+      "authority_mode": "human_approved_only",
+      "department_id": "communications",
+      "label": "Communications",
+      "next_action": "Keep outreach as drafted/internal until a redacted Go receipt is accepted.",
+      "status": "blocked_on_external_reader_gate"
+    }
+  ],
+  "department_items": [
+    {
+      "authority_mode": "review_required",
+      "department_id": "strategy",
+      "evidence_ref_count": 0,
+      "label": "Strategy",
+      "status": "bound"
+    },
+    {
+      "authority_mode": "draft_only",
+      "department_id": "product",
+      "evidence_ref_count": 0,
+      "label": "Product Canvas",
+      "status": "bound"
+    },
+    {
+      "authority_mode": "reviewed_internal",
+      "department_id": "engineering",
+      "evidence_ref_count": 0,
+      "label": "Engineering",
+      "status": "partial"
+    },
+    {
+      "authority_mode": "human_approved_only",
+      "department_id": "growth",
+      "evidence_ref_count": 0,
+      "label": "Growth",
+      "status": "blocked_on_external_reader_gate"
+    },
+    {
+      "authority_mode": "human_approved_only",
+      "department_id": "communications",
+      "evidence_ref_count": 0,
+      "label": "Communications",
+      "status": "blocked_on_external_reader_gate"
+    },
+    {
+      "authority_mode": "reviewed_internal",
+      "department_id": "operations",
+      "evidence_ref_count": 0,
+      "label": "Operations",
+      "status": "partial"
+    },
+    {
+      "authority_mode": "read_only",
+      "department_id": "library",
+      "evidence_ref_count": 0,
+      "label": "Library",
+      "status": "bound"
+    },
+    {
+      "authority_mode": "read_only_until_promoted",
+      "department_id": "memory",
+      "evidence_ref_count": 0,
+      "label": "Memory Kernel",
+      "status": "read_only_projection"
+    },
+    {
+      "authority_mode": "default_deny",
+      "department_id": "governance",
+      "evidence_ref_count": 0,
+      "label": "Governance",
+      "status": "bound"
+    }
+  ],
+  "external_authority_granted": false,
+  "not_authority": true,
+  "partial_department_count": 2,
+  "safe_next_action": "Keep blocked departments internal until the required gate evidence exists.",
+  "schema": "dharma.venture_cell_operator_os.department_summary.v0",
+  "status": "blocked_on_external_reader_gate",
+  "status_count": 4,
+  "status_counts": {
+    "blocked_on_external_reader_gate": 2,
+    "bound": 4,
+    "partial": 2,
+    "read_only_projection": 1
+  },
+  "total_department_count": 9,
+  "trusted_promotion_claimed": false
+}

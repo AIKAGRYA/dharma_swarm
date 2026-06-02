@@ -464,6 +464,9 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     canvas_summary_packet = json.loads(
         paths["canvas_summary_packet"].read_text(encoding="utf-8")
     )
+    department_summary_packet = json.loads(
+        paths["department_summary_packet"].read_text(encoding="utf-8")
+    )
     completion_guard_packet = json.loads(
         paths["completion_guard_packet"].read_text(encoding="utf-8")
     )
@@ -578,6 +581,22 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert canvas_summary_packet["not_authority"] is True
     assert canvas_summary_packet["external_authority_granted"] is False
     assert canvas_summary_packet["trusted_promotion_claimed"] is False
+    assert (
+        department_summary_packet["schema"]
+        == "dharma.venture_cell_operator_os.department_summary.v0"
+    )
+    assert department_summary_packet["total_department_count"] == len(
+        projection["departments"]
+    )
+    assert department_summary_packet["blocked_department_count"] == len(
+        department_summary_packet["blocked_departments"]
+    )
+    assert department_summary_packet["blocked_department_count"] == 2
+    assert department_summary_packet["partial_department_count"] == 2
+    assert department_summary_packet["authority_mode_counts"]["human_approved_only"] == 2
+    assert department_summary_packet["not_authority"] is True
+    assert department_summary_packet["external_authority_granted"] is False
+    assert department_summary_packet["trusted_promotion_claimed"] is False
     assert completion_guard_packet["decision"] == "keep_reporter_open"
     assert completion_guard_packet["not_final"] is True
     assert completion_guard_packet["live_score_can_be_100_without_completion"] is True
@@ -615,6 +634,7 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert "gap_triage_packet" in artifact_manifest["artifact_paths"]
     assert "memory_coverage_packet" in artifact_manifest["artifact_paths"]
     assert "canvas_summary_packet" in artifact_manifest["artifact_paths"]
+    assert "department_summary_packet" in artifact_manifest["artifact_paths"]
     assert "completion_guard_packet" in artifact_manifest["artifact_paths"]
     assert str(report_dir / "00_opening_truth.md") in artifact_manifest["receipt_paths"]
     assert str(report_dir / "99_progress_receipt.md") in artifact_manifest["receipt_paths"]
@@ -638,6 +658,15 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert artifact_manifest["canvas_lane_count"] == canvas_summary_packet["lane_count"]
     assert artifact_manifest["canvas_blocked_item_count"] == (
         canvas_summary_packet["blocked_item_count"]
+    )
+    assert artifact_manifest["department_count"] == (
+        department_summary_packet["total_department_count"]
+    )
+    assert artifact_manifest["department_blocked_count"] == (
+        department_summary_packet["blocked_department_count"]
+    )
+    assert artifact_manifest["department_partial_count"] == (
+        department_summary_packet["partial_department_count"]
     )
 
 
