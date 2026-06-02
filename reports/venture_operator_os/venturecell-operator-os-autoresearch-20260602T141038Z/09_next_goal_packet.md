@@ -4,7 +4,7 @@ Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
 ds-goal progress receipt: `r-e5be506a66940367`
-Current scoped HEAD before this packet: `d91b3877 docs(operator-os): add periodic onboard receipt`
+Current scoped HEAD before this packet: `7370b48e feat(operator-os): disambiguate authority liveness proof`
 
 This packet is the handoff for the next bounded AutoResearch loop. It must be
 reviewed and updated in the final hour before reporter closure.
@@ -13,7 +13,7 @@ reviewed and updated in the final hour before reporter closure.
 
 - Operator OS status: `blocked_on_external_reader_gate`.
 - Autonomy level: `L0_read_only_plan`.
-- Score ledger: `96/100` live score, not final.
+- Score ledger: `97/100` live score, not final.
 - ds-goal mission state: `open=1 claimed=0 completed=4 failed=0 blocked=0 total=5`.
 - Reporter task: open by design.
 - MemoryKernel strict eval: `pass` (`6/6`) from report-local staged sources.
@@ -25,7 +25,8 @@ reviewed and updated in the final hour before reporter closure.
 - Artifact manifest: present, not authority.
 - Periodic onboard: pass, with optional credential warnings.
 - Operator OS action ack proof: false for NATS and A2A.
-- Last committed packet: periodic onboard receipt.
+- Manifest receipt inventory: present.
+- Last committed packet: liveness-key disambiguation.
 
 ## Next Goal
 
@@ -98,7 +99,12 @@ bounded targets:
    Keep authority liveness fields action-specific. Repo-wide substrate health
    must not be renamed into mission authority proof.
 
-10. Final closeout only after true-time proof.
+10. Manifest receipt inventory.
+
+   `operator_os_artifact_manifest.json` now lists receipt paths. Use it as an
+   index, not as proof that the receipts are final.
+
+11. Final closeout only after true-time proof.
 
    When elapsed time is actually in the final window, update:
 
@@ -156,6 +162,7 @@ If the loop only changes a report packet, also run scoped `git diff --check`.
 - `15_artifact_manifest_receipt.md`
 - `16_periodic_onboard_receipt.md`
 - `17_liveness_key_disambiguation_receipt.md`
+- `18_receipt_inventory_manifest_receipt.md`
 - `operator_os_projection.json`
 - `operator_next_action_packet.json`
 - `darshan_go_gate_packet.json`

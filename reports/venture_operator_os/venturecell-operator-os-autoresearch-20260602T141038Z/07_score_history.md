@@ -5,7 +5,7 @@ Status: live ledger, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
 ds-goal progress receipt: `r-277a29c022e46fb6`
 Baseline: `1aca07a1 Add VentureCell Operator OS Level 70 surface`
-Current scoped HEAD before this packet: `d91b3877 docs(operator-os): add periodic onboard receipt`
+Current scoped HEAD before this packet: `7370b48e feat(operator-os): disambiguate authority liveness proof`
 
 This file is a living score ledger. It exists now so later agents do not
 reconstruct scores from memory. It must be reviewed and updated before final
@@ -30,7 +30,8 @@ reporter closure.
 | Loop 15 | `14_residual_risk_register.md` | `6a6401b0` | 93 | +1 | keep residual risk register |
 | Loop 16 | `15_artifact_manifest_receipt.md` | `66f7d8a3` | 94 | +1 | keep render artifact manifest |
 | Loop 17 | `16_periodic_onboard_receipt.md` | `d91b3877` | 95 | +1 | keep periodic onboard evidence |
-| Loop 18 | `17_liveness_key_disambiguation_receipt.md` | pending | 96 | +1 | keep action-specific liveness fields |
+| Loop 18 | `17_liveness_key_disambiguation_receipt.md` | `7370b48e` | 96 | +1 | keep action-specific liveness fields |
+| Loop 19 | `18_receipt_inventory_manifest_receipt.md` | pending | 97 | +1 | keep receipt inventory manifest |
 
 ## Area History
 
@@ -43,7 +44,7 @@ reporter closure.
 | Iteration quality | 8 | 12+ | every loop has hypothesis, patch/rejection, evals, adversarial review, decision |
 | Product structure | 8 | 14 | Operator OS now emits next-action, GO gate, GO template, authority boundary, manifest, memory repair, and report-local recall packets |
 | Tests/evals | 8 | 13 | fixed tests, report-local recall regression, eval artifacts, live verifier matrix, and periodic onboard evidence exist |
-| Metabolization | 2 | 5 | program kernel, receipts, packets, and this score ledger exist |
+| Metabolization | 2 | 5 | program kernel, receipts, manifest inventory, packets, and this score ledger exist |
 
 The area history is intentionally qualitative after opening because later
 receipts reported aggregate score deltas instead of a full per-area table. Final
@@ -63,6 +64,7 @@ audit with explicit evidence.
 - Periodic onboard: `make onboard` and toolbelt status pass, with optional
   credential warnings.
 - Authority liveness fields are action-specific to Operator OS.
+- Artifact manifest includes run receipt inventory.
 - MemoryKernel query eval: `pass` (`6/6`) from report-local staged roots.
 - MemoryKernel repair packet: `no_repair_needed`, with trusted promotion still forbidden.
 - ds-goal raw/reconciled counts: `open=1 claimed=0 completed=4 failed=0 blocked=0 total=5`.
@@ -105,6 +107,7 @@ current evidence, not as a full-project proof.
   authority proof.
 - `operator_os_nats_action_ack_proof_present` and
   `operator_os_a2a_live_action_ack_proof_present` remain `false`.
+- Receipt inventory is an audit locator, not final proof.
 - The reporter task must remain open until final artifacts and final
   verification prove the full contract.
 
@@ -140,6 +143,35 @@ Adversarial review:
 - This file originally recorded MemoryKernel `0/6`; later loop rows must be
   used for the current memory eval state.
 - This file does not close the reporter lane.
+
+Keep / revert / queue:
+
+Decision: keep.
+
+## Loop 19 Score Update
+
+Hypothesis:
+
+If the artifact manifest includes run receipts, future agents can audit the
+loop chain from one rendered JSON entrypoint.
+
+Patch:
+
+- Added `receipt_paths` to the artifact manifest.
+- Added focused test coverage for receipt inventory.
+
+Evaluation:
+
+- `pytest -q tests/test_venture_cell_operator_os_projection.py` passed.
+- `./.venv/bin/python -m compileall -q dharma_swarm/venture_cell/operator_os`
+  passed.
+- The live render includes run receipt paths in
+  `operator_os_artifact_manifest.json`.
+
+Adversarial review:
+
+- The manifest remains non-authoritative.
+- Receipt inventory is not final proof while reporter remains open.
 
 Keep / revert / queue:
 

@@ -63,6 +63,7 @@ def _artifact_manifest_payload(
     *,
     projection: dict[str, Any],
     artifact_paths: dict[str, Path],
+    output_dir: Path,
 ) -> dict[str, Any]:
     memory = _memory_index_payload(projection)
     go_gate = _darshan_go_gate_payload(projection)
@@ -81,6 +82,11 @@ def _artifact_manifest_payload(
             for name, path in sorted(artifact_paths.items())
             if name != "artifact_manifest"
         },
+        "receipt_paths": [
+            str(path)
+            for path in sorted(output_dir.glob("*.md"))
+            if path.name != "operator_os_digest.md"
+        ],
         "not_authority": True,
     }
 
@@ -206,6 +212,7 @@ def render_operator_surface(
             _artifact_manifest_payload(
                 projection=projection.to_dict(),
                 artifact_paths=paths,
+                output_dir=output_dir,
             ),
             indent=2,
             sort_keys=True,

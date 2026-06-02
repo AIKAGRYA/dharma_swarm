@@ -126,7 +126,7 @@
 ## Memory Kernel
 
 - Status: `read_through_index_available`
-- Staged: `5020`
+- Staged: `5021`
 - Trusted: `1336`
 - Quarantine: `5000`
 - Truncated scan: `True`

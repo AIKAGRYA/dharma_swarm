@@ -4,7 +4,7 @@ Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live packet, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
 ds-goal progress receipt: `r-b73f8ef857f710fd`
-Current scoped HEAD before this packet: `d91b3877 docs(operator-os): add periodic onboard receipt`
+Current scoped HEAD before this packet: `7370b48e feat(operator-os): disambiguate authority liveness proof`
 
 This packet captures durable learning from the run so far. It must be reviewed
 and updated during final closeout before the reporter task is closed.
@@ -124,7 +124,8 @@ and updated during final closeout before the reporter task is closed.
 | `6a6401b0` | `14_residual_risk_register.md` | explicit blocker and residual risk split |
 | `66f7d8a3` | `15_artifact_manifest_receipt.md` | rendered artifact manifest and status locator |
 | `d91b3877` | `16_periodic_onboard_receipt.md` | periodic onboard/toolbelt substrate check |
-| pending | `17_liveness_key_disambiguation_receipt.md` | action-specific liveness field names |
+| `7370b48e` | `17_liveness_key_disambiguation_receipt.md` | action-specific liveness field names |
+| pending | `18_receipt_inventory_manifest_receipt.md` | manifest receipt inventory |
 
 ## Current Read-Only Artifacts
 
@@ -147,6 +148,7 @@ and updated during final closeout before the reporter task is closed.
 - `operator_os_artifact_manifest.json`
 - `16_periodic_onboard_receipt.md`
 - `17_liveness_key_disambiguation_receipt.md`
+- `18_receipt_inventory_manifest_receipt.md`
 
 ## Do Not Metabolize As Done
 
@@ -165,6 +167,7 @@ These facts are explicitly not complete:
   OS authority proof.
 - Authority liveness keys are action-specific and currently false for Operator
   OS NATS/A2A action ack proof.
+- Manifest receipt inventory is an audit locator, not final proof.
 - Reporter task is not closed.
 - The final adversarial audit and next-goal packet still require final-window
   review/update.
@@ -454,6 +457,34 @@ Metabolized rule:
 
 - Liveness fields in authority packets must identify the scope of proof. If the
   proof is only substrate-wide, do not name it as mission action authority.
+
+## Loop 19 Metabolization Note
+
+Hypothesis:
+
+If receipt inventory is rendered into the artifact manifest, future agents can
+start from file evidence instead of reconstructing receipt order manually.
+
+Patch:
+
+- Added `receipt_paths` to `operator_os_artifact_manifest.json`.
+- Added focused test coverage.
+
+Evaluation:
+
+- `pytest -q tests/test_venture_cell_operator_os_projection.py` passed.
+- `./.venv/bin/python -m compileall -q dharma_swarm/venture_cell/operator_os`
+  passed.
+
+Adversarial review:
+
+- The manifest remains `not_authority: true`.
+- Receipt inventory is a locator, not a completion certificate.
+
+Metabolized rule:
+
+- Future agents should use `operator_os_artifact_manifest.json` as the receipt
+  index, then inspect individual receipt files before making claims.
 
 ## Loop 13 Metabolization Note
 

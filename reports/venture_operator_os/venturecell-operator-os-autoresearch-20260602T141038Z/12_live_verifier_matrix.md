@@ -50,6 +50,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `operator_os_artifact_manifest.json` | rendered locator | not proof of finality or authority |
 | `16_periodic_onboard_receipt.md` | onboard/toolbelt pass | repo-wide substrate context only |
 | `17_liveness_key_disambiguation_receipt.md` | action-specific liveness labels | prevents substrate/authority conflation |
+| `18_receipt_inventory_manifest_receipt.md` | manifest receipt inventory | index only, not final proof |
 | `06_adversary_audit.md` | live draft | needs final-window review |
 | `07_score_history.md` | live score `89/100` | not final |
 | `08_metabolization_packet.md` | live packet | needs final-window review |
@@ -75,7 +76,8 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `6a6401b0` | keep | residual risk register |
 | `66f7d8a3` | keep | artifact manifest |
 | `d91b3877` | keep | periodic onboard receipt |
-| pending | keep | liveness key disambiguation |
+| `7370b48e` | keep | liveness key disambiguation |
+| pending | keep | receipt inventory manifest |
 
 ## Revert / Queue Ledger
 

@@ -30,6 +30,7 @@ updates, and terminal verification exist.
 - Periodic onboard reports repo-wide NATS live contact, but no Operator
   OS-specific action ack.
 - Operator OS NATS/A2A action ack proof fields are explicitly false.
+- Artifact manifest lists receipt paths, but is still not final proof.
 - MemoryKernel query eval now reports `pass` with `6/6` from report-local
   staged sources.
 - MemoryKernel repair now reports `no_repair_needed`; no trusted Chetana
@@ -89,6 +90,7 @@ Adversarial review:
 - An artifact manifest is not proof that artifacts are final or authoritative.
 - Repo-wide NATS liveness is not mission-specific authority proof.
 - Ambiguous liveness labels must not be used to imply action authority.
+- Receipt inventory must not be used as a closure certificate.
 - Unrelated staged work must not be included in commits for this run.
 
 Keep / revert / queue:
@@ -122,6 +124,7 @@ Queued:
 | Artifact manifest grants authority | manifest has `not_authority: true` | false |
 | Onboard NATS liveness grants Operator OS authority | authority packet still blocks external action | false |
 | Operator OS action ack exists | action-specific NATS/A2A fields are false | false |
+| Receipt inventory proves completion | manifest is an index and reporter is still open | false |
 | Broad dirty work is part of this packet | scoped report-only patch | false |
 
 ## Boundary Audit

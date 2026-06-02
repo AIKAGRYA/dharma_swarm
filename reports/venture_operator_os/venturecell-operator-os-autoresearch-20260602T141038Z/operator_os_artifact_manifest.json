@@ -17,6 +17,28 @@
   "memory_query_eval_status": "pass",
   "memory_query_eval_total": 6,
   "not_authority": true,
+  "receipt_paths": [
+    "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/00_opening_truth.md",
+    "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/01_program_kernel_receipt.md",
+    "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/02_memorykernel_eval_receipt.md",
+    "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/03_operator_surface_receipt.md",
+    "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/04_goal_truth_receipt.md",
+    "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/05_go_gate_receipt.md",
+    "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/06_adversary_audit.md",
+    "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/06_memorykernel_repair_receipt.md",
+    "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/07_score_history.md",
+    "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/08_metabolization_packet.md",
+    "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/09_next_goal_packet.md",
+    "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/10_memorykernel_report_source_packet.md",
+    "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/11_go_receipt_template_receipt.md",
+    "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/12_live_verifier_matrix.md",
+    "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/13_authority_boundary_receipt.md",
+    "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/14_residual_risk_register.md",
+    "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/15_artifact_manifest_receipt.md",
+    "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/16_periodic_onboard_receipt.md",
+    "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/17_liveness_key_disambiguation_receipt.md",
+    "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/18_receipt_inventory_manifest_receipt.md"
+  ],
   "schema": "dharma.venture_cell_operator_os.render_manifest.v0",
   "status": "blocked_on_external_reader_gate"
 }

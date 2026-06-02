@@ -317,6 +317,12 @@ def test_operator_daily_digest_renders_structure_without_live_authority_claim(tm
 def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp_path: Path) -> None:
     bundle = _bundle(tmp_path)
     state_root = tmp_path / "state"
+    report_dir = tmp_path / "reports"
+    report_dir.mkdir()
+    (report_dir / "00_opening_truth.md").write_text(
+        "# Opening Truth\n",
+        encoding="utf-8",
+    )
     _write_a2a_queue(
         state_root,
         [
@@ -331,7 +337,7 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     )
 
     paths = render_operator_surface(
-        output_dir=tmp_path / "reports",
+        output_dir=report_dir,
         bundle_path=bundle,
         state_root=state_root,
         max_memory_scan=1,
@@ -397,6 +403,8 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert artifact_manifest["not_authority"] is True
     assert "projection" in artifact_manifest["artifact_paths"]
     assert "authority_boundary_packet" in artifact_manifest["artifact_paths"]
+    assert str(report_dir / "00_opening_truth.md") in artifact_manifest["receipt_paths"]
+    assert str(report_dir / "operator_os_digest.md") not in artifact_manifest["receipt_paths"]
 
 
 def test_operator_surface_uses_report_local_memory_source_without_trusted_promotion(tmp_path: Path) -> None:
