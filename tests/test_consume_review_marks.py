@@ -100,3 +100,23 @@ class TestPromoteAtom:
         assert result is True
         assert atom.exists()  # Not moved
         assert not (trusted / "test.md").exists()
+
+    def test_dry_run_does_not_create_destination_parent(self, tmp_path: Path) -> None:
+        staging = tmp_path / "staging"
+        trusted = tmp_path / "trusted"
+        nested = staging / "nested"
+        nested.mkdir(parents=True)
+
+        atom = nested / "test.md"
+        atom.write_text("content")
+
+        original_staging = crm.STAGING_DIR
+        crm.STAGING_DIR = staging
+        try:
+            result = crm.promote_atom(atom, trusted, dry_run=True)
+        finally:
+            crm.STAGING_DIR = original_staging
+
+        assert result is True
+        assert atom.exists()
+        assert not trusted.exists()

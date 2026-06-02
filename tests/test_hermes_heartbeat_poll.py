@@ -51,3 +51,48 @@ def test_poll_queue_preserves_malformed_lines_when_claiming(
     assert rewritten_claimable["claimed_by"] == hermes.HERMES_AGENT_ID
     assert rewritten_claimable["status"] == "claimed"
     assert json.loads(lines[3]) == unsupported
+
+
+def test_poll_queue_uses_advisory_lock(monkeypatch, tmp_path: Path) -> None:
+    queue_file = tmp_path / "queue.jsonl"
+    queue_file.write_text("", encoding="utf-8")
+    calls: list[int] = []
+
+    def fake_flock(_fd: int, operation: int) -> None:
+        calls.append(operation)
+
+    monkeypatch.setattr(hermes, "QUEUE_FILE", queue_file)
+    monkeypatch.setattr(hermes.fcntl, "flock", fake_flock)
+
+    assert hermes.poll_queue(dry_run=False) == []
+    assert calls == [hermes.fcntl.LOCK_EX, hermes.fcntl.LOCK_UN]
+
+
+def test_poll_queue_write_failure_does_not_report_claim(
+    monkeypatch, tmp_path: Path
+) -> None:
+    queue_file = tmp_path / "queue.jsonl"
+    task = {
+        "id": "task-1",
+        "status": "pending",
+        "claimed_by": None,
+        "capability": "heartbeat",
+    }
+    queue_file.write_text(json.dumps(task) + "\n", encoding="utf-8")
+
+    def fail_replace(_src: str, _dst: str) -> None:
+        raise OSError("replace failed")
+
+    monkeypatch.setattr(hermes, "QUEUE_FILE", queue_file)
+    monkeypatch.setattr(hermes.os, "replace", fail_replace)
+
+    try:
+        hermes.poll_queue(dry_run=False)
+    except OSError as exc:
+        assert "replace failed" in str(exc)
+    else:
+        raise AssertionError("poll_queue should fail when claim writeback fails")
+
+    persisted = json.loads(queue_file.read_text(encoding="utf-8"))
+    assert persisted["status"] == "pending"
+    assert persisted["claimed_by"] is None
