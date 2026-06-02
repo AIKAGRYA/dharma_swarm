@@ -196,9 +196,13 @@ def _poll_queue_locked(dry_run: bool = False) -> list[dict[str, Any]]:
         if task.get("claimed_by") is not None:
             continue
 
-        # Check capability match
-        required_cap = task.get("capability", task.get("type", ""))
-        if required_cap and required_cap not in HERMES_CAPABILITIES:
+        # Check capability match. Missing/empty task type is not claimable:
+        # Hermes must only consume tasks with an explicit supported capability.
+        required_cap = task.get("capability") or task.get("type")
+        if not isinstance(required_cap, str) or not required_cap.strip():
+            continue
+        required_cap = required_cap.strip()
+        if required_cap not in HERMES_CAPABILITIES:
             continue
 
         # Claim it
