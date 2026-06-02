@@ -491,6 +491,12 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert completion_guard_packet["decision"] == "keep_reporter_open"
     assert completion_guard_packet["not_final"] is True
     assert completion_guard_packet["live_score_can_be_100_without_completion"] is True
+    assert completion_guard_packet["reporter_task_must_remain_open"] is True
+    assert completion_guard_packet["terminal_reporter_receipt_required"] is True
+    assert (
+        completion_guard_packet["complete_verifier_expected_blocker"]
+        == "reporter_task_not_closed_until_terminal_receipt"
+    )
     assert "true_8h_elapsed_time_not_proven" in completion_guard_packet["final_closure_blockers"]
     assert "treat_live_score_as_completion" in completion_guard_packet["forbidden_actions"]
     assert artifact_manifest["schema"] == "dharma.venture_cell_operator_os.render_manifest.v0"

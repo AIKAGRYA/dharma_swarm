@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-c1ea4b97e1e794bc`
-Current scoped HEAD before this packet: `660730cc feat(operator-os): add memory coverage targets`
+ds-goal progress receipt: `r-43933ac6a5701ece`
+Current scoped HEAD before this packet: `4b8d06ce feat(operator-os): mark manifest inventory scope`
 
 This packet is the handoff for the next bounded AutoResearch loop. It must be
 reviewed and updated in the final hour before reporter closure.
@@ -36,6 +36,8 @@ reviewed and updated in the final hour before reporter closure.
 - Digest canvas summary: present; Markdown caps repeated rows while JSON
   projection preserves full canvas data.
 - Completion guard packet: `keep_reporter_open`, `not_final: true`.
+- Completion guard reporter policy: terminal receipt and complete verifier pass
+  required.
 - Periodic onboard refresh: latest `make onboard` and toolbelt pass, with NATS
   liveness treated as repo-wide substrate context only.
 - Timebox status: elapsed `9701s`, remaining `19099s`; mission not complete.
@@ -46,7 +48,7 @@ reviewed and updated in the final hour before reporter closure.
 - Stable admission render: volatile admission id/time redacted; decision
   evidence remains visible.
 - Timebox refresh: current clock still below 8 hours.
-- Last committed packet: MemoryKernel coverage targets.
+- Last committed packet: manifest inventory scope.
 
 ## Next Goal
 
@@ -240,6 +242,7 @@ If the loop only changes a report packet, also run scoped `git diff --check`.
 - `28_go_template_requirements_receipt.md`
 - `29_memory_coverage_targets_receipt.md`
 - `30_manifest_inventory_scope_receipt.md`
+- `31_completion_guard_policy_receipt.md`
 - `operator_os_projection.json`
 - `operator_completion_guard_packet.json`
 - `operator_next_action_packet.json`

@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live verifier matrix, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-c1ea4b97e1e794bc`
-Current scoped HEAD before this packet: `660730cc feat(operator-os): add memory coverage targets`
+ds-goal progress receipt: `r-43933ac6a5701ece`
+Current scoped HEAD before this packet: `4b8d06ce feat(operator-os): mark manifest inventory scope`
 
 This matrix captures the current verification surface for future agents. It is
 not a final verifier matrix and must not be used to close the reporter task.
@@ -27,6 +27,8 @@ not a final verifier matrix and must not be used to close the reporter task.
 - Digest canvas summary: passing; Markdown repeated rows capped while JSON
   projection rows remain complete.
 - Completion guard: passing; live `100/100` is explicitly non-final.
+- Completion guard reporter policy: passing; terminal receipt and complete
+  verifier pass required.
 - Periodic onboard/toolbelt: passing, environment context only.
 - Timebox status: elapsed `9701s`, remaining `19099s`.
 - Manifest receipt summary: passing; count and latest receipt path rendered.
@@ -58,6 +60,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `operator_os_projection.json` | rendered current state | read-only projection only |
 | `operator_os_digest.md` | rendered current digest with canvas caps | presentation summary, not full evidence |
 | `operator_completion_guard_packet.json` | `keep_reporter_open` | finality guard, not terminal receipt |
+| completion guard reporter policy | terminal receipt and complete verifier pass required | requirements only, not closure |
 | `memory_kernel_query_eval.json` | `pass` (`6/6`) | staged/report-local pass, not trusted promotion |
 | `memory_kernel_coverage_packet.json` | root coverage rendered | explains truncation, not complete coverage |
 | Memory coverage targets | staging/quarantine local maintenance targets | selectors only, not repair proof |
@@ -117,6 +120,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `r-a158aa9cb20d8ba4` | keep | GO template requirements |
 | `r-875b5bb0c3e8a17a` | keep | memory coverage targets |
 | `r-c1ea4b97e1e794bc` | keep | manifest inventory scope |
+| `r-43933ac6a5701ece` | keep | completion guard reporter policy |
 
 ## Revert / Queue Ledger
 

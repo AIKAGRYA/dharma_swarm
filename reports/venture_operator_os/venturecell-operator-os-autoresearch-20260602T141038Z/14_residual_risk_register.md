@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live risk register, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-c1ea4b97e1e794bc`
-Current scoped HEAD before this packet: `660730cc feat(operator-os): add memory coverage targets`
+ds-goal progress receipt: `r-43933ac6a5701ece`
+Current scoped HEAD before this packet: `4b8d06ce feat(operator-os): mark manifest inventory scope`
 
 This register separates current blockers, residual risks, and solved local
 claims. It exists to prevent false completion after a high live score.
@@ -39,6 +39,7 @@ claims. It exists to prevent false completion after a high live score.
 | Memory coverage target overclaim | coverage packet lists staging/quarantine maintenance targets | treat as selectors, not repair proof |
 | Digest cap overclaim | `operator_os_digest.md` summarizes repeated canvas rows | use projection JSON for full evidence |
 | Completion guard overclaim | `operator_completion_guard_packet.json` says keep reporter open | guard only, not terminal receipt |
+| Completion guard policy overclaim | guard lists reporter closure requirements | treat as checklist, not closure evidence |
 | Periodic onboard overclaim | `23_periodic_onboard_refresh_receipt.md` records substrate health | context only, not mission authority |
 | Timebox stale claim | `24_timebox_status_receipt.md` records one clock snapshot | refresh before final-window claims |
 | Timebox refresh overclaim | `27_timebox_refresh_receipt.md` records another non-final clock snapshot | treat as progress evidence only |
@@ -65,6 +66,7 @@ claims. It exists to prevent false completion after a high live score.
 | Memory coverage targets render | staging/quarantine listed as maintenance targets | selector only |
 | Digest canvas summary renders | repeated task-board rows capped with omitted count | presentation only |
 | Completion guard renders | live score can be 100 without completion | false-final guard only |
+| Completion guard reporter policy renders | terminal receipt and verifier pass required | requirement checklist only |
 | Periodic onboard refresh passes | `make onboard` and toolbelt exit `0` | environment context only |
 | Timebox status recorded | elapsed `8770s`, remaining `20030s` | non-final proof only |
 | Timebox refresh recorded | elapsed `9701s`, remaining `19099s` | non-final proof only |

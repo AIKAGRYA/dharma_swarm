@@ -120,6 +120,13 @@ def _completion_guard_payload(projection: dict[str, Any]) -> dict[str, Any]:
         "autonomy_level": autonomy_level,
         "not_final": True,
         "live_score_can_be_100_without_completion": True,
+        "reporter_task_must_remain_open": True,
+        "terminal_reporter_receipt_required": True,
+        "complete_verifier_expected_blocker": "reporter_task_not_closed_until_terminal_receipt",
+        "reporter_closure_policy": (
+            "close only after true-time proof, final artifact review, "
+            "terminal reporter receipt, and complete verifier pass"
+        ),
         "final_closure_blockers": [
             "true_8h_elapsed_time_not_proven",
             "reporter_task_must_remain_open_until_terminal_receipt",

@@ -1,6 +1,7 @@
 {
   "authority_decision": "local_read_only_external_blocked",
   "autonomy_level": "L0_read_only_plan",
+  "complete_verifier_expected_blocker": "reporter_task_not_closed_until_terminal_receipt",
   "darshan_go_decision": "block_external_authority",
   "decision": "keep_reporter_open",
   "external_authority_blockers": [
@@ -24,6 +25,8 @@
   "live_score_can_be_100_without_completion": true,
   "not_authority": true,
   "not_final": true,
+  "reporter_closure_policy": "close only after true-time proof, final artifact review, terminal reporter receipt, and complete verifier pass",
+  "reporter_task_must_remain_open": true,
   "required_final_artifacts": [
     "06_adversary_audit.md",
     "07_score_history.md",
@@ -33,5 +36,6 @@
     "complete_verifier_pass_after_reporter_closure"
   ],
   "schema": "dharma.venture_cell_operator_os.completion_guard.v0",
-  "status": "blocked_on_external_reader_gate"
+  "status": "blocked_on_external_reader_gate",
+  "terminal_reporter_receipt_required": true
 }

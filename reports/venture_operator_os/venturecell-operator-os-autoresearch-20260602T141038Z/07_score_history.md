@@ -3,9 +3,9 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live ledger, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-c1ea4b97e1e794bc`
+ds-goal progress receipt: `r-43933ac6a5701ece`
 Baseline: `1aca07a1 Add VentureCell Operator OS Level 70 surface`
-Current scoped HEAD before this packet: `660730cc feat(operator-os): add memory coverage targets`
+Current scoped HEAD before this packet: `4b8d06ce feat(operator-os): mark manifest inventory scope`
 
 This file is a living score ledger. It exists now so later agents do not
 reconstruct scores from memory. It must be reviewed and updated before final
@@ -44,6 +44,7 @@ reporter closure.
 | Loop 29 | `28_go_template_requirements_receipt.md` | `r-a158aa9cb20d8ba4` | 100 | +0 | keep GO template requirements |
 | Loop 30 | `29_memory_coverage_targets_receipt.md` | `r-875b5bb0c3e8a17a` | 100 | +0 | keep memory coverage targets |
 | Loop 31 | `30_manifest_inventory_scope_receipt.md` | `r-c1ea4b97e1e794bc` | 100 | +0 | keep manifest inventory scope |
+| Loop 32 | `31_completion_guard_policy_receipt.md` | `r-43933ac6a5701ece` | 100 | +0 | keep completion guard policy |
 
 ## Area History
 
@@ -89,6 +90,8 @@ audit with explicit evidence.
   while the full projection retains all rows.
 - Completion guard packet: `keep_reporter_open`, `not_final: true`, and
   live score can be `100` without completion.
+- Completion guard reporter policy: terminal reporter receipt and complete
+  verifier pass required.
 - Periodic onboard refresh: `make onboard` and toolbelt pass; repo-wide NATS
   liveness remains substrate context only.
 - Timebox status: elapsed `9701s` (`2h 45m 01s`), remaining `19099s`
@@ -152,6 +155,8 @@ current evidence, not as a full-project proof.
 - Digest summarization is presentation-only and must not be treated as deletion
   or evidence filtering.
 - Completion guard must remain a guardrail, not a terminal completion receipt.
+- Completion guard reporter policy describes closure requirements but does not
+  satisfy them.
 - Periodic onboard evidence is not Operator OS action authority.
 - Timebox status proves the mission is not complete despite live score `100`.
 - Manifest receipt summary is an audit locator, not final proof.

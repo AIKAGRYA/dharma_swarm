@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live packet, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-c1ea4b97e1e794bc`
-Current scoped HEAD before this packet: `660730cc feat(operator-os): add memory coverage targets`
+ds-goal progress receipt: `r-43933ac6a5701ece`
+Current scoped HEAD before this packet: `4b8d06ce feat(operator-os): mark manifest inventory scope`
 
 This packet captures durable learning from the run so far. It must be reviewed
 and updated during final closeout before the reporter task is closed.
@@ -168,6 +168,9 @@ and updated during final closeout before the reporter task is closed.
    - `07_score_history.md` now reports live `100/100`.
    - `operator_completion_guard_packet.json` reports
      `live_score_can_be_100_without_completion: true`.
+   - The completion guard now reports `reporter_task_must_remain_open`,
+     `terminal_reporter_receipt_required`, and the expected complete-verifier
+     blocker.
    - Reporter remains open and complete verification still fails until terminal
      reporter closure.
 
@@ -176,6 +179,8 @@ and updated during final closeout before the reporter task is closed.
    - Future agents must treat score as quality evidence, not completion
      authority. Final closure still needs true-time proof, final artifact
      review, terminal reporter receipt, and a complete verifier pass.
+   - Reporter closure policy in the guard is a requirement checklist, not
+     closure evidence.
 
 11. Onboard is environment context, not mission authority.
 
@@ -278,6 +283,7 @@ and updated during final closeout before the reporter task is closed.
 | `r-a158aa9cb20d8ba4` | `28_go_template_requirements_receipt.md` | machine-readable GO template acceptance prerequisites |
 | `r-875b5bb0c3e8a17a` | `29_memory_coverage_targets_receipt.md` | local MemoryKernel coverage maintenance targets |
 | `r-c1ea4b97e1e794bc` | `30_manifest_inventory_scope_receipt.md` | receipt inventory scope and non-final markers |
+| `r-43933ac6a5701ece` | `31_completion_guard_policy_receipt.md` | explicit reporter closure policy in completion guard |
 
 ## Current Read-Only Artifacts
 
@@ -316,6 +322,7 @@ and updated during final closeout before the reporter task is closed.
 - `28_go_template_requirements_receipt.md`
 - `29_memory_coverage_targets_receipt.md`
 - `30_manifest_inventory_scope_receipt.md`
+- `31_completion_guard_policy_receipt.md`
 
 ## Do Not Metabolize As Done
 
@@ -345,6 +352,7 @@ These facts are explicitly not complete:
 - Digest canvas summarization is presentation-only and does not remove
   projection evidence.
 - Completion guard is not a terminal reporter receipt.
+- Completion guard reporter policy is not reporter closure.
 - Onboard/toolbelt evidence is environment context only.
 - Timebox status is concrete evidence that final closure is still premature.
 - Timebox refresh is still non-final evidence, not a terminal receipt.

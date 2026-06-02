@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-c1ea4b97e1e794bc`
-Current scoped HEAD before this packet: `660730cc feat(operator-os): add memory coverage targets`
+ds-goal progress receipt: `r-43933ac6a5701ece`
+Current scoped HEAD before this packet: `4b8d06ce feat(operator-os): mark manifest inventory scope`
 
 This audit is intentionally written before the final time window so the next
 agent has a concrete attack surface. It is not a completion certificate. The
@@ -46,6 +46,8 @@ updates, and terminal verification exist.
   holds full evidence and the cap is not filtering.
 - Completion guard says live `100/100` is not final and reporter must remain
   open.
+- Completion guard now exposes terminal reporter receipt policy and expected
+  complete-verifier blocker.
 - Periodic onboard/toolbelt pass, but this is environment context only.
 - Timebox status proves true elapsed time is incomplete.
 - Timebox refresh again proves true elapsed time is incomplete.
@@ -124,6 +126,7 @@ Adversarial review:
 - Digest row caps must not be used to hide evidence or claim a cleaner task
   state than projection JSON shows.
 - Completion guard must not be treated as a terminal reporter receipt.
+- Completion guard reporter policy must not be treated as reporter closure.
 - Periodic onboard must not be used to claim Operator OS action-specific NATS
   or A2A liveness.
 - Timebox status must be refreshed before final-window claims.
@@ -176,6 +179,7 @@ Queued:
 | Memory coverage targets resolve truncation | targets name staging/quarantine maintenance only | false |
 | Digest cap deletes noisy tasks | projection JSON still includes the full canvas | false |
 | Live 100 means complete | completion guard says `not_final: true` | false |
+| Completion guard policy closes reporter | policy requires terminal receipt and verifier pass | false |
 | Onboard NATS liveness proves Operator OS authority | authority packet still has action ack fields false | false |
 | Broad dirty work is part of this packet | scoped report-only patch | false |
 
