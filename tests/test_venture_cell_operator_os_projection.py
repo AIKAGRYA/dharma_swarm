@@ -470,6 +470,9 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     gate_summary_packet = json.loads(
         paths["gate_summary_packet"].read_text(encoding="utf-8")
     )
+    evidence_summary_packet = json.loads(
+        paths["evidence_summary_packet"].read_text(encoding="utf-8")
+    )
     completion_guard_packet = json.loads(
         paths["completion_guard_packet"].read_text(encoding="utf-8")
     )
@@ -613,6 +616,21 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert gate_summary_packet["not_authority"] is True
     assert gate_summary_packet["external_authority_granted"] is False
     assert gate_summary_packet["trusted_promotion_claimed"] is False
+    assert (
+        evidence_summary_packet["schema"]
+        == "dharma.venture_cell_operator_os.evidence_summary.v0"
+    )
+    assert evidence_summary_packet["total_evidence_ref_count"] == len(
+        projection["evidence_refs"]
+    )
+    assert evidence_summary_packet["total_evidence_ref_count"] == len(
+        evidence_summary_packet["evidence_items"]
+    )
+    assert evidence_summary_packet["existing_local_ref_count"] >= 1
+    assert evidence_summary_packet["absolute_ref_count"] >= 1
+    assert evidence_summary_packet["not_authority"] is True
+    assert evidence_summary_packet["external_authority_granted"] is False
+    assert evidence_summary_packet["trusted_promotion_claimed"] is False
     assert completion_guard_packet["decision"] == "keep_reporter_open"
     assert completion_guard_packet["not_final"] is True
     assert completion_guard_packet["live_score_can_be_100_without_completion"] is True
@@ -652,6 +670,7 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert "canvas_summary_packet" in artifact_manifest["artifact_paths"]
     assert "department_summary_packet" in artifact_manifest["artifact_paths"]
     assert "gate_summary_packet" in artifact_manifest["artifact_paths"]
+    assert "evidence_summary_packet" in artifact_manifest["artifact_paths"]
     assert "completion_guard_packet" in artifact_manifest["artifact_paths"]
     assert str(report_dir / "00_opening_truth.md") in artifact_manifest["receipt_paths"]
     assert str(report_dir / "99_progress_receipt.md") in artifact_manifest["receipt_paths"]
@@ -689,6 +708,18 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert artifact_manifest["gate_allow_count"] == gate_summary_packet["allow_gate_count"]
     assert artifact_manifest["gate_blocking_count"] == (
         gate_summary_packet["blocking_gate_count"]
+    )
+    assert artifact_manifest["evidence_ref_count"] == (
+        evidence_summary_packet["total_evidence_ref_count"]
+    )
+    assert artifact_manifest["existing_local_evidence_ref_count"] == (
+        evidence_summary_packet["existing_local_ref_count"]
+    )
+    assert artifact_manifest["absolute_evidence_ref_count"] == (
+        evidence_summary_packet["absolute_ref_count"]
+    )
+    assert artifact_manifest["relative_evidence_ref_count"] == (
+        evidence_summary_packet["relative_ref_count"]
     )
 
 

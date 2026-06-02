@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-c65f0c7aa7f4ebdc`
-Current scoped HEAD before this packet: `e455ec02 feat(operator-os): summarize departments`
+ds-goal progress receipt: `r-4eaef0bd4e7a0a85`
+Current scoped HEAD before this packet: `4cec2fc3 feat(operator-os): summarize gates`
 
 This packet is the handoff for the next bounded AutoResearch loop. It must be
 reviewed and updated in the final hour before reporter closure.
@@ -50,6 +50,8 @@ reviewed and updated in the final hour before reporter closure.
   partial `2`, not authority.
 - Operator gate summary packet: present; gates `2`, allow `1`, block `1`, not
   authority.
+- Operator evidence summary packet: present; refs `6`, existing local `6`,
+  absolute `4`, relative `2`, not authority.
 - Completion guard packet: `keep_reporter_open`, `not_final: true`.
 - Completion guard reporter policy: terminal receipt and complete verifier pass
   required.
@@ -74,7 +76,7 @@ reviewed and updated in the final hour before reporter closure.
 - Three-hour timebox proof: current clock still below 8 hours.
 - Active clock proof: current clock still below 8 hours.
 - Four-hour midpoint proof: current clock still below 8 hours.
-- Last committed packet: department summary packet.
+- Last committed packet: gate summary packet.
 
 ## Next Goal
 
@@ -198,6 +200,12 @@ bounded targets:
    counts. Preserve its non-authority flags and use it to route gate
    inspection, not to replace gate-specific evidence.
 
+13d. Evidence summary preservation.
+
+   `operator_evidence_summary_packet.json` now exposes evidence reference
+   counts and local path classifications. Preserve its non-authority flags and
+   use it to route locator inspection, not to replace referenced artifacts.
+
 14. Completion guard preservation.
 
    `operator_completion_guard_packet.json` now makes false-final blockers
@@ -316,10 +324,12 @@ If the loop only changes a report packet, also run scoped `git diff --check`.
 - `44_canvas_summary_packet_receipt.md`
 - `45_department_summary_packet_receipt.md`
 - `46_gate_summary_packet_receipt.md`
+- `47_evidence_summary_packet_receipt.md`
 - `operator_os_projection.json`
 - `operator_canvas_summary_packet.json`
 - `operator_department_summary_packet.json`
 - `operator_gate_summary_packet.json`
+- `operator_evidence_summary_packet.json`
 - `operator_completion_guard_packet.json`
 - `operator_next_action_packet.json`
 - `memory_kernel_coverage_packet.json`

@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-c65f0c7aa7f4ebdc`
-Current scoped HEAD before this packet: `e455ec02 feat(operator-os): summarize departments`
+ds-goal progress receipt: `r-4eaef0bd4e7a0a85`
+Current scoped HEAD before this packet: `4cec2fc3 feat(operator-os): summarize gates`
 
 This audit is intentionally written before the final time window so the next
 agent has a concrete attack surface. It is not a completion certificate. The
@@ -64,6 +64,8 @@ updates, and terminal verification exist.
 - Operator department summary packet now exposes department/status/authority
   counts as JSON, but it is marked `not_authority: true`.
 - Operator gate summary packet now exposes gate decision/coherence counts as
+  JSON, but it is marked `not_authority: true`.
+- Operator evidence summary packet now exposes evidence reference counts as
   JSON, but it is marked `not_authority: true`.
 - Completion guard says live `100/100` is not final and reporter must remain
   open.
@@ -229,6 +231,7 @@ Queued:
 | Canvas summary grants authority | `operator_canvas_summary_packet.json` is `not_authority: true` | false |
 | Department summary grants authority | `operator_department_summary_packet.json` is `not_authority: true` | false |
 | Gate summary grants authority | `operator_gate_summary_packet.json` is `not_authority: true` | false |
+| Evidence summary grants authority | `operator_evidence_summary_packet.json` is `not_authority: true` | false |
 | Live 100 means complete | completion guard says `not_final: true` | false |
 | Completion guard policy closes reporter | policy requires terminal receipt and verifier pass | false |
 | Completion guard counts close reporter | final blocker count remains nonzero and reporter is open | false |

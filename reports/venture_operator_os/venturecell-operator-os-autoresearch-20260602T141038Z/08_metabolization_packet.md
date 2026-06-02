@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live packet, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-c65f0c7aa7f4ebdc`
-Current scoped HEAD before this packet: `e455ec02 feat(operator-os): summarize departments`
+ds-goal progress receipt: `r-4eaef0bd4e7a0a85`
+Current scoped HEAD before this packet: `4cec2fc3 feat(operator-os): summarize gates`
 
 This packet captures durable learning from the run so far. It must be reviewed
 and updated during final closeout before the reporter task is closed.
@@ -229,6 +229,23 @@ and updated during final closeout before the reporter task is closed.
      inspection of `gap_codes`, gate-specific evidence, or authority-boundary
      packets.
 
+9d. Evidence summary packets are routing aids, not proof of authority.
+
+   Evidence:
+
+   - `operator_evidence_summary_packet.json` now renders evidence reference
+     counts and absolute/relative/local-existence splits.
+   - `operator_os_artifact_manifest.json` now repeats total, existing-local,
+     absolute, and relative evidence reference counts.
+   - The packet reports `not_authority: true`, `external_authority_granted:
+     false`, and `trusted_promotion_claimed: false`.
+
+   Metabolized rule:
+
+   - Evidence reference counts should speed locator audits. They must not
+     replace direct inspection of referenced artifacts or gate-specific
+     evidence semantics.
+
 10. Live score can be perfect before final completion.
 
    Evidence:
@@ -412,6 +429,7 @@ Metabolized rule:
 | `r-19efd39420cd789d` | `44_canvas_summary_packet_receipt.md` | machine-readable canvas summary packet |
 | `r-fe4852c3b2a2a7c6` | `45_department_summary_packet_receipt.md` | machine-readable department summary packet |
 | `r-c65f0c7aa7f4ebdc` | `46_gate_summary_packet_receipt.md` | machine-readable gate summary packet |
+| `r-4eaef0bd4e7a0a85` | `47_evidence_summary_packet_receipt.md` | machine-readable evidence summary packet |
 
 ## Current Read-Only Artifacts
 
@@ -420,6 +438,7 @@ Metabolized rule:
 - `operator_canvas_summary_packet.json`
 - `operator_department_summary_packet.json`
 - `operator_gate_summary_packet.json`
+- `operator_evidence_summary_packet.json`
 - `operator_completion_guard_packet.json`
 - `memory_kernel_index.json`
 - `memory_kernel_coverage_packet.json`
@@ -460,6 +479,7 @@ Metabolized rule:
 - `44_canvas_summary_packet_receipt.md`
 - `45_department_summary_packet_receipt.md`
 - `46_gate_summary_packet_receipt.md`
+- `47_evidence_summary_packet_receipt.md`
 
 ## Do Not Metabolize As Done
 

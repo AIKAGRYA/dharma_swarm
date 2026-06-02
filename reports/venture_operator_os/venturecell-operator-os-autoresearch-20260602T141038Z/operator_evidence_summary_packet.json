@@ -1,0 +1,52 @@
+{
+  "absolute_ref_count": 4,
+  "autonomy_level": "L0_read_only_plan",
+  "evidence_items": [
+    {
+      "classification": "absolute_local_path",
+      "exists": true,
+      "is_absolute": true,
+      "ref": "/Users/dhyana/.dharma/artifacts/venture_cell/DARSHAN/2026-05-26/the-thing-they-are-competing-for-is-not-just-your-attention"
+    },
+    {
+      "classification": "absolute_local_path",
+      "exists": true,
+      "is_absolute": true,
+      "ref": "/Users/dhyana/.dharma/knowledge/wiki/concepts"
+    },
+    {
+      "classification": "absolute_local_path",
+      "exists": true,
+      "is_absolute": true,
+      "ref": "/Users/dhyana/.dharma/knowledge/staging"
+    },
+    {
+      "classification": "relative_local_path",
+      "exists": true,
+      "is_absolute": false,
+      "ref": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z"
+    },
+    {
+      "classification": "absolute_local_path",
+      "exists": true,
+      "is_absolute": true,
+      "ref": "/Users/dhyana/.dharma/knowledge/quarantine"
+    },
+    {
+      "classification": "relative_local_path",
+      "exists": true,
+      "is_absolute": false,
+      "ref": "dharma_swarm/venture_cell/operator_os/projection.py"
+    }
+  ],
+  "existing_local_ref_count": 6,
+  "external_authority_granted": false,
+  "external_url_count": 0,
+  "not_authority": true,
+  "relative_ref_count": 2,
+  "safe_next_action": "Inspect evidence refs directly before using them in gate, authority, or finality claims.",
+  "schema": "dharma.venture_cell_operator_os.evidence_summary.v0",
+  "status": "blocked_on_external_reader_gate",
+  "total_evidence_ref_count": 6,
+  "trusted_promotion_claimed": false
+}

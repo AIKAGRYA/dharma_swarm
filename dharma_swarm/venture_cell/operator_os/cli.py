@@ -277,6 +277,57 @@ def _gate_summary_payload(projection: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _evidence_summary_payload(projection: dict[str, Any]) -> dict[str, Any]:
+    raw_refs = projection.get("evidence_refs", [])
+    refs = [str(ref) for ref in raw_refs if str(ref or "").strip()]
+    evidence_items: list[dict[str, Any]] = []
+    for ref in refs:
+        path = Path(ref)
+        is_external_url = ref.startswith(("http://", "https://"))
+        is_absolute = path.is_absolute()
+        exists = False if is_external_url else path.exists()
+        evidence_items.append(
+            {
+                "ref": ref,
+                "classification": (
+                    "external_url"
+                    if is_external_url
+                    else "absolute_local_path"
+                    if is_absolute
+                    else "relative_local_path"
+                ),
+                "is_absolute": is_absolute,
+                "exists": exists,
+            }
+        )
+    absolute_count = sum(1 for item in evidence_items if bool(item["is_absolute"]))
+    external_url_count = sum(
+        1 for item in evidence_items if item["classification"] == "external_url"
+    )
+    existing_local_count = sum(
+        1
+        for item in evidence_items
+        if item["classification"] != "external_url" and bool(item["exists"])
+    )
+    return {
+        "schema": "dharma.venture_cell_operator_os.evidence_summary.v0",
+        "status": projection.get("status", "unknown"),
+        "autonomy_level": projection.get("autonomy_level", "unknown"),
+        "total_evidence_ref_count": len(evidence_items),
+        "evidence_items": evidence_items,
+        "absolute_ref_count": absolute_count,
+        "relative_ref_count": len(evidence_items) - absolute_count - external_url_count,
+        "external_url_count": external_url_count,
+        "existing_local_ref_count": existing_local_count,
+        "safe_next_action": (
+            "Inspect evidence refs directly before using them in gate, authority, or finality claims."
+        ),
+        "not_authority": True,
+        "external_authority_granted": False,
+        "trusted_promotion_claimed": False,
+    }
+
+
 def _next_action_payload(projection: dict[str, Any]) -> dict[str, Any]:
     packet = projection.get("next_action_packet")
     return packet if isinstance(packet, dict) else {}
@@ -395,6 +446,7 @@ def _artifact_manifest_payload(
     canvas_summary = _canvas_summary_payload(projection)
     department_summary = _department_summary_payload(projection)
     gate_summary = _gate_summary_payload(projection)
+    evidence_summary = _evidence_summary_payload(projection)
     completion_guard = _completion_guard_payload(projection)
     receipt_paths = [
         str(path)
@@ -426,6 +478,12 @@ def _artifact_manifest_payload(
         "gate_count": gate_summary.get("total_gate_count", 0),
         "gate_allow_count": gate_summary.get("allow_gate_count", 0),
         "gate_blocking_count": gate_summary.get("blocking_gate_count", 0),
+        "evidence_ref_count": evidence_summary.get("total_evidence_ref_count", 0),
+        "existing_local_evidence_ref_count": evidence_summary.get(
+            "existing_local_ref_count", 0
+        ),
+        "absolute_evidence_ref_count": evidence_summary.get("absolute_ref_count", 0),
+        "relative_evidence_ref_count": evidence_summary.get("relative_ref_count", 0),
         "completion_guard_decision": completion_guard.get("decision", "unknown"),
         "not_final": completion_guard.get("not_final", True),
         "artifact_paths": {
@@ -603,6 +661,16 @@ def render_operator_surface(
         + "\n",
         encoding="utf-8",
     )
+    evidence_summary_path = output_dir / "operator_evidence_summary_packet.json"
+    evidence_summary_path.write_text(
+        json.dumps(
+            _evidence_summary_payload(projection.to_dict()),
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     completion_guard_path = output_dir / "operator_completion_guard_packet.json"
     completion_guard_path.write_text(
         json.dumps(
@@ -628,6 +696,7 @@ def render_operator_surface(
         "canvas_summary_packet": canvas_summary_path,
         "department_summary_packet": department_summary_path,
         "gate_summary_packet": gate_summary_path,
+        "evidence_summary_packet": evidence_summary_path,
         "completion_guard_packet": completion_guard_path,
     }
     artifact_manifest_path = output_dir / "operator_os_artifact_manifest.json"
