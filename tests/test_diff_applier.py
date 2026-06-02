@@ -11,6 +11,8 @@ from dharma_swarm.diff_applier import (
     DiffApplier,
     parse_unified_diff,
 )
+from dharma_swarm.runtime_state import RuntimeStateStore
+from dharma_swarm.spine.identity import ExecutionIdentity
 
 
 # ---------------------------------------------------------------------------
@@ -36,6 +38,22 @@ def _make_simple_diff(old_name: str = "a/hello.py", new_name: str = "b/hello.py"
     )
 
 
+def _identity(**overrides: str) -> ExecutionIdentity:
+    payload = {
+        "task_id": "task-diff-tollbooth",
+        "agent_id": "agent-diff-tollbooth",
+        "session_id": "session-diff-tollbooth",
+        "trace_id": "trace-diff-tollbooth",
+        "correlation_id": "corr-diff-tollbooth",
+        "run_id": "run-diff-tollbooth",
+        "claim_id": "claim-diff-tollbooth",
+        "idempotency_key": "idem-diff-tollbooth",
+        "proposal_id": "proposal-diff-tollbooth",
+    }
+    payload.update(overrides)
+    return ExecutionIdentity.new(**payload)
+
+
 # ---------------------------------------------------------------------------
 # 1. Apply simple single-file diff
 # ---------------------------------------------------------------------------
@@ -55,6 +73,47 @@ async def test_apply_simple_diff(tmp_path: Path):
     content = target.read_text()
     assert "new_value = 2" in content
     assert "old_value = 1" not in content
+
+
+@pytest.mark.asyncio
+async def test_apply_requires_identity_before_writing_when_required(tmp_path: Path):
+    """Required tollbooth mode must fail closed before mutating files."""
+    target = tmp_path / "hello.py"
+    original = "# header\nold_value = 1\n# footer\n"
+    target.write_text(original)
+
+    applier = DiffApplier(
+        workspace=tmp_path,
+        runtime_state=RuntimeStateStore(tmp_path / "runtime.db"),
+        require_identity=True,
+    )
+    result = await applier.apply(_make_simple_diff())
+
+    assert result.success is False
+    assert "requires ExecutionIdentity" in result.error
+    assert target.read_text() == original
+
+
+@pytest.mark.asyncio
+async def test_apply_records_self_mod_receipts_when_identity_present(tmp_path: Path):
+    """Diff application should emit self-mod apply receipts when wired to the spine."""
+    target = tmp_path / "hello.py"
+    target.write_text("# header\nold_value = 1\n# footer\n")
+    runtime = RuntimeStateStore(tmp_path / "runtime.db")
+    identity = _identity()
+
+    applier = DiffApplier(workspace=tmp_path, runtime_state=runtime, require_identity=True)
+    result = await applier.apply(_make_simple_diff(), execution_identity=identity)
+
+    assert result.success is True
+    ledger = await runtime.get_run_ledger(identity.run_id)
+    receipts = [
+        receipt
+        for receipt in ledger["receipts"]
+        if receipt.receipt_type == "self_mod_apply"
+    ]
+    assert [receipt.status for receipt in receipts] == ["requested", "applied"]
+    assert receipts[-1].payload["files"] == ["hello.py"]
 
 
 # ---------------------------------------------------------------------------
