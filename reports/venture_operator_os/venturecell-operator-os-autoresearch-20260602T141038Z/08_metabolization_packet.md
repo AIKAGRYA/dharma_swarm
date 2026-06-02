@@ -4,7 +4,7 @@ Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live packet, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
 ds-goal progress receipt: `r-b73f8ef857f710fd`
-Current scoped HEAD before this packet: `b72f94ee feat(operator-os): add authority boundary packet`
+Current scoped HEAD before this packet: `6a6401b0 docs(operator-os): add residual risk register`
 
 This packet captures durable learning from the run so far. It must be reviewed
 and updated during final closeout before the reporter task is closed.
@@ -121,7 +121,8 @@ and updated during final closeout before the reporter task is closed.
 | `b7758b52` | `11_go_receipt_template_receipt.md` | safe Darshan GO receipt template, not evidence |
 | `d0a8aaf4` | `12_live_verifier_matrix.md` | live verification and patch ledger |
 | `b72f94ee` | `13_authority_boundary_receipt.md` | consolidated authority firewall packet |
-| pending | `14_residual_risk_register.md` | explicit blocker and residual risk split |
+| `6a6401b0` | `14_residual_risk_register.md` | explicit blocker and residual risk split |
+| pending | `15_artifact_manifest_receipt.md` | rendered artifact manifest and status locator |
 
 ## Current Read-Only Artifacts
 
@@ -139,7 +140,9 @@ and updated during final closeout before the reporter task is closed.
 - `12_live_verifier_matrix.md`
 - `13_authority_boundary_receipt.md`
 - `14_residual_risk_register.md`
+- `15_artifact_manifest_receipt.md`
 - `authority_boundary_packet.json`
+- `operator_os_artifact_manifest.json`
 
 ## Do Not Metabolize As Done
 
@@ -152,6 +155,8 @@ These facts are explicitly not complete:
   into an accepted receipt without a real event.
 - `authority_boundary_packet.json` is a firewall view, not an authority grant.
 - `14_residual_risk_register.md` must be refreshed before final closure.
+- `operator_os_artifact_manifest.json` is a locator/status packet, not
+  authority.
 - Reporter task is not closed.
 - The final adversarial audit and next-goal packet still require final-window
   review/update.
@@ -354,6 +359,35 @@ Metabolized rule:
 
 - Future agents should update the residual risk register after each meaningful
   state change and before any final reporter closure.
+
+## Loop 16 Metabolization Note
+
+Hypothesis:
+
+If rendered artifacts are listed in one manifest, future agents can resume from
+file evidence rather than filename guessing.
+
+Patch:
+
+- Added `operator_os_artifact_manifest.json`.
+- Added focused tests for status fields and `not_authority`.
+
+Evaluation:
+
+- `pytest -q tests/test_venture_cell_operator_os_projection.py` passed.
+- `./.venv/bin/python -m compileall -q dharma_swarm/venture_cell/operator_os`
+  passed.
+- The manifest reports blocked status and local-only authority decision.
+
+Adversarial review:
+
+- The manifest is not an authority grant.
+- It records current blocked state and does not create new liveness evidence.
+
+Metabolized rule:
+
+- Future agents should start from `operator_os_artifact_manifest.json` to find
+  rendered packets, then inspect the packets themselves for authority decisions.
 
 ## Loop 13 Metabolization Note
 

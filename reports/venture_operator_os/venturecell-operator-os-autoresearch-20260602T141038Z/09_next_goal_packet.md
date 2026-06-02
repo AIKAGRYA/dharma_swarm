@@ -4,7 +4,7 @@ Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
 ds-goal progress receipt: `r-e5be506a66940367`
-Current scoped HEAD before this packet: `b72f94ee feat(operator-os): add authority boundary packet`
+Current scoped HEAD before this packet: `6a6401b0 docs(operator-os): add residual risk register`
 
 This packet is the handoff for the next bounded AutoResearch loop. It must be
 reviewed and updated in the final hour before reporter closure.
@@ -13,7 +13,7 @@ reviewed and updated in the final hour before reporter closure.
 
 - Operator OS status: `blocked_on_external_reader_gate`.
 - Autonomy level: `L0_read_only_plan`.
-- Score ledger: `93/100` live score, not final.
+- Score ledger: `94/100` live score, not final.
 - ds-goal mission state: `open=1 claimed=0 completed=4 failed=0 blocked=0 total=5`.
 - Reporter task: open by design.
 - MemoryKernel strict eval: `pass` (`6/6`) from report-local staged sources.
@@ -22,7 +22,8 @@ reviewed and updated in the final hour before reporter closure.
 - Live verifier matrix: present, not final.
 - Authority boundary: `local_read_only_external_blocked`.
 - Residual risk register: present, not final.
-- Last committed packet: authority boundary packet.
+- Artifact manifest: present, not authority.
+- Last committed packet: residual risk register.
 
 ## Next Goal
 
@@ -79,7 +80,12 @@ bounded targets:
    `14_residual_risk_register.md` now exists. Update it after any meaningful
    state change and before final reporter closure.
 
-7. Final closeout only after true-time proof.
+7. Artifact manifest maintenance.
+
+   `operator_os_artifact_manifest.json` now exists. Future render changes
+   should keep it current and non-authoritative.
+
+8. Final closeout only after true-time proof.
 
    When elapsed time is actually in the final window, update:
 
@@ -134,11 +140,13 @@ If the loop only changes a report packet, also run scoped `git diff --check`.
 - `12_live_verifier_matrix.md`
 - `13_authority_boundary_receipt.md`
 - `14_residual_risk_register.md`
+- `15_artifact_manifest_receipt.md`
 - `operator_os_projection.json`
 - `operator_next_action_packet.json`
 - `darshan_go_gate_packet.json`
 - `darshan_go_receipt_template.json`
 - `authority_boundary_packet.json`
+- `operator_os_artifact_manifest.json`
 - `memory_kernel_query_eval.json`
 - `memory_kernel_repair_packet.json`
 

@@ -1,0 +1,22 @@
+{
+  "artifact_paths": {
+    "authority_boundary_packet": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/authority_boundary_packet.json",
+    "darshan_go_gate_packet": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/darshan_go_gate_packet.json",
+    "darshan_go_receipt_template": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/darshan_go_receipt_template.json",
+    "digest": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/operator_os_digest.md",
+    "memory_index": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/memory_kernel_index.json",
+    "memory_kernel_repair_packet": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/memory_kernel_repair_packet.json",
+    "memory_query_eval": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/memory_kernel_query_eval.json",
+    "next_action_packet": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/operator_next_action_packet.json",
+    "projection": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/operator_os_projection.json"
+  },
+  "authority_decision": "local_read_only_external_blocked",
+  "autonomy_level": "L0_read_only_plan",
+  "darshan_go_decision": "block_external_authority",
+  "memory_query_eval_passed": 6,
+  "memory_query_eval_status": "pass",
+  "memory_query_eval_total": 6,
+  "not_authority": true,
+  "schema": "dharma.venture_cell_operator_os.render_manifest.v0",
+  "status": "blocked_on_external_reader_gate"
+}

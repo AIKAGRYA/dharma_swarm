@@ -358,6 +358,9 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     authority_boundary_packet = json.loads(
         paths["authority_boundary_packet"].read_text(encoding="utf-8")
     )
+    artifact_manifest = json.loads(
+        paths["artifact_manifest"].read_text(encoding="utf-8")
+    )
 
     assert projection["status"] == "blocked_on_external_reader_gate"
     assert projection["autonomy_level"] == "L0_read_only_plan"
@@ -387,6 +390,13 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert authority_boundary_packet["liveness_claims"]["nats_ack_proof_present"] is False
     assert authority_boundary_packet["liveness_claims"]["a2a_live_ack_proof_present"] is False
     assert authority_boundary_packet["promotion_claims"]["trusted_chetana_promotion_claimed"] is False
+    assert artifact_manifest["schema"] == "dharma.venture_cell_operator_os.render_manifest.v0"
+    assert artifact_manifest["status"] == "blocked_on_external_reader_gate"
+    assert artifact_manifest["darshan_go_decision"] == "block_external_authority"
+    assert artifact_manifest["authority_decision"] == "local_read_only_external_blocked"
+    assert artifact_manifest["not_authority"] is True
+    assert "projection" in artifact_manifest["artifact_paths"]
+    assert "authority_boundary_packet" in artifact_manifest["artifact_paths"]
 
 
 def test_operator_surface_uses_report_local_memory_source_without_trusted_promotion(tmp_path: Path) -> None:

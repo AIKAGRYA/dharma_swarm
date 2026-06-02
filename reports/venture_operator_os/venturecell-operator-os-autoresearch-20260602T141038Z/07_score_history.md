@@ -5,7 +5,7 @@ Status: live ledger, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
 ds-goal progress receipt: `r-277a29c022e46fb6`
 Baseline: `1aca07a1 Add VentureCell Operator OS Level 70 surface`
-Current scoped HEAD before this packet: `b72f94ee feat(operator-os): add authority boundary packet`
+Current scoped HEAD before this packet: `6a6401b0 docs(operator-os): add residual risk register`
 
 This file is a living score ledger. It exists now so later agents do not
 reconstruct scores from memory. It must be reviewed and updated before final
@@ -27,7 +27,8 @@ reporter closure.
 | Loop 12 | `11_go_receipt_template_receipt.md` | `b7758b52` | 89 | +2 | keep safe GO template |
 | Loop 13 | `12_live_verifier_matrix.md` | `d0a8aaf4` | 90 | +1 | keep live verifier matrix |
 | Loop 14 | `13_authority_boundary_receipt.md` | `b72f94ee` | 92 | +2 | keep authority firewall packet |
-| Loop 15 | `14_residual_risk_register.md` | pending | 93 | +1 | keep residual risk register |
+| Loop 15 | `14_residual_risk_register.md` | `6a6401b0` | 93 | +1 | keep residual risk register |
+| Loop 16 | `15_artifact_manifest_receipt.md` | pending | 94 | +1 | keep render artifact manifest |
 
 ## Area History
 
@@ -38,7 +39,7 @@ reporter closure.
 | Task truth | 8 | 13 | progress receipts and residual risk register distinguish solved local claims, residual risks, and completion blockers |
 | Governance safety | 15 | 15 | external-reader, governed admission, Chetana, completion, and authority firewall gates preserved |
 | Iteration quality | 8 | 12+ | every loop has hypothesis, patch/rejection, evals, adversarial review, decision |
-| Product structure | 8 | 13 | Operator OS now emits next-action, GO gate, GO template, authority boundary, memory repair, and report-local recall packets |
+| Product structure | 8 | 14 | Operator OS now emits next-action, GO gate, GO template, authority boundary, manifest, memory repair, and report-local recall packets |
 | Tests/evals | 8 | 12 | fixed tests, report-local recall regression, eval artifacts, and live verifier matrix exist |
 | Metabolization | 2 | 5 | program kernel, receipts, packets, and this score ledger exist |
 
@@ -56,6 +57,7 @@ audit with explicit evidence.
 - Live verifier matrix: present, non-final.
 - Authority boundary packet: `local_read_only_external_blocked`.
 - Residual risk register: present, non-final.
+- Artifact manifest: present, non-authoritative.
 - MemoryKernel query eval: `pass` (`6/6`) from report-local staged roots.
 - MemoryKernel repair packet: `no_repair_needed`, with trusted promotion still forbidden.
 - ds-goal raw/reconciled counts: `open=1 claimed=0 completed=4 failed=0 blocked=0 total=5`.
@@ -93,6 +95,7 @@ current evidence, not as a full-project proof.
   without a real external-reader event.
 - Authority boundary packet is a firewall view, not an authority grant.
 - Residual risk register must be refreshed in the final window.
+- Artifact manifest is a locator/status packet, not authority.
 - The reporter task must remain open until final artifacts and final
   verification prove the full contract.
 
@@ -128,6 +131,34 @@ Adversarial review:
 - This file originally recorded MemoryKernel `0/6`; later loop rows must be
   used for the current memory eval state.
 - This file does not close the reporter lane.
+
+Keep / revert / queue:
+
+Decision: keep.
+
+## Loop 16 Score Update
+
+Hypothesis:
+
+If the renderer emits an artifact manifest, future agents can locate the current
+Operator OS outputs and status fields without relying on conversation memory.
+
+Patch:
+
+- Added `operator_os_artifact_manifest.json`.
+- Added focused tests for manifest status fields and `not_authority`.
+
+Evaluation:
+
+- `pytest -q tests/test_venture_cell_operator_os_projection.py` passed.
+- `./.venv/bin/python -m compileall -q dharma_swarm/venture_cell/operator_os`
+  passed.
+- The CLI render produced `operator_os_artifact_manifest.json`.
+
+Adversarial review:
+
+- The manifest preserves blocked status and is not an authority grant.
+- Reporter remains open because the true 8-hour contract is not complete.
 
 Keep / revert / queue:
 

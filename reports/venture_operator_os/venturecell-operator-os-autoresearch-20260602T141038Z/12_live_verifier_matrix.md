@@ -45,6 +45,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `darshan_go_receipt_template.json` | `draft_template_not_evidence` | must not be stored as accepted receipt |
 | `authority_boundary_packet.json` | `local_read_only_external_blocked` | firewall view, not authority grant |
 | `14_residual_risk_register.md` | live risk split | not a closure certificate |
+| `operator_os_artifact_manifest.json` | rendered locator | not proof of finality or authority |
 | `06_adversary_audit.md` | live draft | needs final-window review |
 | `07_score_history.md` | live score `89/100` | not final |
 | `08_metabolization_packet.md` | live packet | needs final-window review |
@@ -67,7 +68,8 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `0f58774d` | keep | report-local staged MemoryKernel recall pass |
 | `b7758b52` | keep | Darshan GO receipt template |
 | `b72f94ee` | keep | authority boundary firewall packet |
-| pending | keep | residual risk register |
+| `6a6401b0` | keep | residual risk register |
+| pending | keep | artifact manifest |
 
 ## Revert / Queue Ledger
 

@@ -26,6 +26,7 @@ updates, and terminal verification exist.
 - Live verifier matrix exists, but is not final.
 - Authority boundary packet exists and reports `local_read_only_external_blocked`.
 - Residual risk register exists but is not final.
+- Artifact manifest exists and has `not_authority: true`.
 - MemoryKernel query eval now reports `pass` with `6/6` from report-local
   staged sources.
 - MemoryKernel repair now reports `no_repair_needed`; no trusted Chetana
@@ -82,6 +83,7 @@ Adversarial review:
 - A live verifier matrix is not final proof while the reporter task is open.
 - An authority boundary packet is not an authority grant.
 - A residual risk register is not a closure certificate.
+- An artifact manifest is not proof that artifacts are final or authoritative.
 - Unrelated staged work must not be included in commits for this run.
 
 Keep / revert / queue:
@@ -112,6 +114,7 @@ Queued:
 | Verifier matrix is final | `12_live_verifier_matrix.md` is marked live | false |
 | Authority boundary grants action | decision is `local_read_only_external_blocked` | false |
 | Risk register proves completion | reporter is still open | false |
+| Artifact manifest grants authority | manifest has `not_authority: true` | false |
 | Broad dirty work is part of this packet | scoped report-only patch | false |
 
 ## Boundary Audit

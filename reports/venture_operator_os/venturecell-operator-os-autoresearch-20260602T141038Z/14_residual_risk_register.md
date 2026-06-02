@@ -27,6 +27,7 @@ claims. It exists to prevent false completion after a high live score.
 | Memory index truncated | `memory_kernel_index.json` reports truncated scan | do not claim complete memory coverage |
 | GO template misuse | `darshan_go_receipt_template.json` exists | keep `draft_template_not_evidence` markers |
 | Authority packet overclaim | `authority_boundary_packet.json` exists | treat as firewall view, not grant |
+| Artifact manifest overclaim | `operator_os_artifact_manifest.json` exists | treat as locator, not proof of finality |
 | Context+ unavailable | `Transport closed` during static analysis attempts | document unavailable, use deterministic fallback checks |
 | Repo has unrelated dirty work | broad dirty worktree outside this run | commit only explicit scoped pathspecs |
 
@@ -40,6 +41,7 @@ claims. It exists to prevent false completion after a high live score.
 | Memory strict eval passes | `6/6`, trusted promotion false | staged/report-local recall only |
 | GO template renders | `darshan_go_receipt_template.json` | not evidence |
 | Authority packet renders | `local_read_only_external_blocked` | not authority grant |
+| Artifact manifest renders | `not_authority: true` | locator/status packet only |
 
 ## Loop 15 Receipt
 
