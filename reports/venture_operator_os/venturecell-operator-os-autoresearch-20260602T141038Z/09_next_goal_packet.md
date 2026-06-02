@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-4133b6ddf20bbaff`
-Current scoped HEAD before this packet: `c30b5b8f docs(operator-os): add periodic onboard refresh`
+ds-goal progress receipt: `r-85940de5357176e4`
+Current scoped HEAD before this packet: `29af0653 docs(operator-os): add timebox status receipt`
 
 This packet is the handoff for the next bounded AutoResearch loop. It must be
 reviewed and updated in the final hour before reporter closure.
@@ -36,7 +36,9 @@ reviewed and updated in the final hour before reporter closure.
 - Periodic onboard refresh: latest `make onboard` and toolbelt pass, with NATS
   liveness treated as repo-wide substrate context only.
 - Timebox status: elapsed `8770s`, remaining `20030s`; mission not complete.
-- Last committed packet: periodic onboard refresh.
+- Manifest receipt summary: manifest has receipt count and latest receipt path,
+  but remains `not_final: true`.
+- Last committed packet: timebox status.
 
 ## Next Goal
 
@@ -149,7 +151,12 @@ bounded targets:
    `24_timebox_status_receipt.md` records current elapsed and remaining time.
    Refresh it before any final-window work.
 
-17. Final closeout only after true-time proof.
+17. Manifest receipt summary preservation.
+
+   Use `receipt_count` and `latest_receipt_path` for navigation only. They are
+   not terminal closure evidence.
+
+18. Final closeout only after true-time proof.
 
    When elapsed time is actually in the final window, update:
 
@@ -214,6 +221,7 @@ If the loop only changes a report packet, also run scoped `git diff --check`.
 - `22_completion_guard_receipt.md`
 - `23_periodic_onboard_refresh_receipt.md`
 - `24_timebox_status_receipt.md`
+- `25_manifest_receipt_summary_receipt.md`
 - `operator_os_projection.json`
 - `operator_completion_guard_packet.json`
 - `operator_next_action_packet.json`

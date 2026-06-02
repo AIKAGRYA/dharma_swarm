@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-4133b6ddf20bbaff`
-Current scoped HEAD before this packet: `c30b5b8f docs(operator-os): add periodic onboard refresh`
+ds-goal progress receipt: `r-85940de5357176e4`
+Current scoped HEAD before this packet: `29af0653 docs(operator-os): add timebox status receipt`
 
 This audit is intentionally written before the final time window so the next
 agent has a concrete attack surface. It is not a completion certificate. The
@@ -42,6 +42,8 @@ updates, and terminal verification exist.
   open.
 - Periodic onboard/toolbelt pass, but this is environment context only.
 - Timebox status proves true elapsed time is incomplete.
+- Manifest receipt summary reports count and latest path, but this is
+  navigation only.
 - MemoryKernel query eval now reports `pass` with `6/6` from report-local
   staged sources.
 - MemoryKernel repair now reports `no_repair_needed`; no trusted Chetana
@@ -112,6 +114,8 @@ Adversarial review:
 - Periodic onboard must not be used to claim Operator OS action-specific NATS
   or A2A liveness.
 - Timebox status must be refreshed before final-window claims.
+- Receipt count and latest receipt path must not be used as terminal closure
+  evidence.
 - Unrelated staged work must not be included in commits for this run.
 
 Keep / revert / queue:
@@ -146,6 +150,7 @@ Queued:
 | Onboard NATS liveness grants Operator OS authority | authority packet still blocks external action | false |
 | Operator OS action ack exists | action-specific NATS/A2A fields are false | false |
 | Receipt inventory proves completion | manifest is an index and reporter is still open | false |
+| Latest receipt path means terminal receipt | manifest latest receipt is a progress receipt | false |
 | Gap triage clears the remaining blockers | `operator_gap_triage_packet.json` is `not_authority: true` | false |
 | Memory coverage proves complete recall | staging and quarantine roots are still truncated | false |
 | Digest cap deletes noisy tasks | projection JSON still includes the full canvas | false |

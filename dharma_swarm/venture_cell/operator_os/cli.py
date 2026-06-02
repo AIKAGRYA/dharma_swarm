@@ -144,6 +144,11 @@ def _artifact_manifest_payload(
     gap_triage = _gap_triage_payload(projection)
     memory_coverage = _memory_coverage_payload(projection)
     completion_guard = _completion_guard_payload(projection)
+    receipt_paths = [
+        str(path)
+        for path in sorted(output_dir.glob("*.md"))
+        if path.name != "operator_os_digest.md"
+    ]
     return {
         "schema": "dharma.venture_cell_operator_os.render_manifest.v0",
         "status": projection.get("status", "unknown"),
@@ -162,11 +167,9 @@ def _artifact_manifest_payload(
             for name, path in sorted(artifact_paths.items())
             if name != "artifact_manifest"
         },
-        "receipt_paths": [
-            str(path)
-            for path in sorted(output_dir.glob("*.md"))
-            if path.name != "operator_os_digest.md"
-        ],
+        "receipt_paths": receipt_paths,
+        "receipt_count": len(receipt_paths),
+        "latest_receipt_path": receipt_paths[-1] if receipt_paths else "",
         "not_authority": True,
     }
 

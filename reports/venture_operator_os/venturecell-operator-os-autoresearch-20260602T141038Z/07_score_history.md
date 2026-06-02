@@ -3,9 +3,9 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live ledger, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-4133b6ddf20bbaff`
+ds-goal progress receipt: `r-85940de5357176e4`
 Baseline: `1aca07a1 Add VentureCell Operator OS Level 70 surface`
-Current scoped HEAD before this packet: `c30b5b8f docs(operator-os): add periodic onboard refresh`
+Current scoped HEAD before this packet: `29af0653 docs(operator-os): add timebox status receipt`
 
 This file is a living score ledger. It exists now so later agents do not
 reconstruct scores from memory. It must be reviewed and updated before final
@@ -37,7 +37,8 @@ reporter closure.
 | Loop 22 | `21_digest_canvas_summary_receipt.md` | `71d5a87d` | 100 | +1 | keep digest canvas summary |
 | Loop 23 | `22_completion_guard_receipt.md` | `1eaa0bd3` | 100 | +0 | keep completion guard |
 | Loop 24 | `23_periodic_onboard_refresh_receipt.md` | `c30b5b8f` | 100 | +0 | keep periodic onboard refresh |
-| Loop 25 | `24_timebox_status_receipt.md` | pending | 100 | +0 | keep timebox status |
+| Loop 25 | `24_timebox_status_receipt.md` | `29af0653` | 100 | +0 | keep timebox status |
+| Loop 26 | `25_manifest_receipt_summary_receipt.md` | pending | 100 | +0 | keep manifest receipt summary |
 
 ## Area History
 
@@ -84,6 +85,8 @@ audit with explicit evidence.
   liveness remains substrate context only.
 - Timebox status: elapsed `8770s` (`2h 26m 10s`), remaining `20030s`
   (`5h 33m 50s`).
+- Manifest receipt summary: `receipt_count` and `latest_receipt_path` present,
+  with `not_final: true`.
 - MemoryKernel query eval: `pass` (`6/6`) from report-local staged roots.
 - MemoryKernel repair packet: `no_repair_needed`, with trusted promotion still forbidden.
 - ds-goal raw/reconciled counts: `open=1 claimed=0 completed=4 failed=0 blocked=0 total=5`.
@@ -135,6 +138,7 @@ current evidence, not as a full-project proof.
 - Completion guard must remain a guardrail, not a terminal completion receipt.
 - Periodic onboard evidence is not Operator OS action authority.
 - Timebox status proves the mission is not complete despite live score `100`.
+- Manifest receipt summary is an audit locator, not final proof.
 - The reporter task must remain open until final artifacts and final
   verification prove the full contract.
 
@@ -346,6 +350,33 @@ Adversarial review:
 
 - This proves the mission is not complete.
 - Completion guard remains correct.
+
+Keep / revert / queue:
+
+Decision: keep.
+
+## Loop 26 Score Update
+
+Hypothesis:
+
+If manifest receipt count and latest receipt path are explicit, future agents
+can navigate receipts faster without treating the manifest as closure proof.
+
+Patch:
+
+- Added `receipt_count` and `latest_receipt_path` to the artifact manifest.
+- Added focused test coverage.
+
+Evaluation:
+
+- `pytest -q tests/test_venture_cell_operator_os_projection.py` passed.
+- `./.venv/bin/python -m compileall -q dharma_swarm/venture_cell/operator_os`
+  passed.
+
+Adversarial review:
+
+- The manifest still reports `not_final: true`.
+- Receipt summaries do not close reporter.
 
 Keep / revert / queue:
 

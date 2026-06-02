@@ -2165,13 +2165,13 @@
       "next_action": "Continue bounded internal build work with receipts",
       "observed_state": "mission contract present",
       "raw": {
-        "admission_id": "admission_e4ccd37ecf4e4db9",
+        "admission_id": "admission_b752c85b609b43e6",
         "allowed_scope": [
           "dharma_swarm/venture_cell/",
           "tests/",
           "reports/venture_operator_os/"
         ],
-        "created_at": "2026-06-02T16:34:25.081554+00:00",
+        "created_at": "2026-06-02T16:38:42.507952+00:00",
         "decision": "allow",
         "expires_at": "",
         "metadata": {
@@ -2184,7 +2184,7 @@
         "reasons": [
           "all_required_controls_present"
         ],
-        "request_id": "admission_req_2ed87e59cb1b4e0a",
+        "request_id": "admission_req_d43d10f667e54a07",
         "required_receipts": []
       }
     }
@@ -2789,7 +2789,7 @@
         "title": "MemoryKernel Report Source Packet"
       },
       {
-        "excerpt": "# Next Goal Packet Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live draft, not final until the 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-4133b6ddf20bbaff` Current scoped HEAD before this packet: `c30b5b8f docs(operator-os): add periodic onboard refresh` This pac",
+        "excerpt": "# Next Goal Packet Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live draft, not final until the 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-85940de5357176e4` Current scoped HEAD before this packet: `29af0653 docs(operator-os): add timebox status receipt` This packe",
         "matched_terms": [
           "VentureCell",
           "Operator OS",
@@ -2808,7 +2808,7 @@
         "title": "Next Goal Packet"
       },
       {
-        "excerpt": "# Adversary Audit Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live draft, not final until the true 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-4133b6ddf20bbaff` Current scoped HEAD before this packet: `c30b5b8f docs(operator-os): add periodic onboard refresh` This",
+        "excerpt": "# Adversary Audit Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live draft, not final until the true 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-85940de5357176e4` Current scoped HEAD before this packet: `29af0653 docs(operator-os): add timebox status receipt` This a",
         "matched_terms": [
           "VentureCell",
           "Operator OS",
@@ -2826,7 +2826,7 @@
         "title": "Adversary Audit"
       },
       {
-        "excerpt": "# Metabolization Packet Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live packet, not final until the 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-4133b6ddf20bbaff` Current scoped HEAD before this packet: `c30b5b8f docs(operator-os): add periodic onboard refresh` Th",
+        "excerpt": "# Metabolization Packet Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live packet, not final until the 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-85940de5357176e4` Current scoped HEAD before this packet: `29af0653 docs(operator-os): add timebox status receipt` This",
         "matched_terms": [
           "VentureCell",
           "Operator OS",
@@ -2896,7 +2896,7 @@
         "title": "Loop 05 Darshan GO Gate Receipt"
       },
       {
-        "excerpt": "# Live Verifier Matrix Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live verifier matrix, not final until the true 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-4133b6ddf20bbaff` Current scoped HEAD before this packet: `c30b5b8f docs(operator-os): add periodic onboar",
+        "excerpt": "# Live Verifier Matrix Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live verifier matrix, not final until the true 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-85940de5357176e4` Current scoped HEAD before this packet: `29af0653 docs(operator-os): add timebox status ",
         "matched_terms": [
           "VentureCell",
           "Operator OS",
@@ -2929,7 +2929,7 @@
         "title": "Program Kernel Receipt"
       },
       {
-        "excerpt": "# Residual Risk Register Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live risk register, not final until the true 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-4133b6ddf20bbaff` Current scoped HEAD before this packet: `c30b5b8f docs(operator-os): add periodic onboar",
+        "excerpt": "# Residual Risk Register Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live risk register, not final until the true 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-85940de5357176e4` Current scoped HEAD before this packet: `29af0653 docs(operator-os): add timebox status ",
         "matched_terms": [
           "VentureCell",
           "Operator OS",
@@ -2976,7 +2976,7 @@
         "title": "Loop 06 MemoryKernel Repair Receipt"
       },
       {
-        "excerpt": "# Score History Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live ledger, not final until the 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-4133b6ddf20bbaff` Baseline: `1aca07a1 Add VentureCell Operator OS Level 70 surface` Current scoped HEAD before this packet: `c3",
+        "excerpt": "# Score History Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live ledger, not final until the 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-85940de5357176e4` Baseline: `1aca07a1 Add VentureCell Operator OS Level 70 surface` Current scoped HEAD before this packet: `29",
         "matched_terms": [
           "VentureCell",
           "Operator OS",
@@ -3535,7 +3535,7 @@
         "indexed_count": 20,
         "role": "supplemental_staging",
         "root": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z",
-        "scanned_count": 27,
+        "scanned_count": 28,
         "tier": "staged",
         "truncated": false
       },
@@ -3555,7 +3555,7 @@
       "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z",
       "/Users/dhyana/.dharma/knowledge/quarantine"
     ],
-    "staged_count": 5027,
+    "staged_count": 5028,
     "status": "read_through_index_available",
     "truncated": true,
     "trusted_count": 1336

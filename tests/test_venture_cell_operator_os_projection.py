@@ -479,6 +479,8 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert "completion_guard_packet" in artifact_manifest["artifact_paths"]
     assert str(report_dir / "00_opening_truth.md") in artifact_manifest["receipt_paths"]
     assert str(report_dir / "operator_os_digest.md") not in artifact_manifest["receipt_paths"]
+    assert artifact_manifest["receipt_count"] == len(artifact_manifest["receipt_paths"])
+    assert artifact_manifest["latest_receipt_path"] == str(report_dir / "00_opening_truth.md")
 
 
 def test_operator_surface_uses_report_local_memory_source_without_trusted_promotion(tmp_path: Path) -> None:
