@@ -364,3 +364,25 @@ Keep / revert / queue:
 Decision: keep.
 
 ds-goal progress receipt: `r-f1d421f33b5fb379`
+
+## Loop 61 Adversary Addendum
+
+New claim under attack: periodic substrate refresh grants Operator OS action
+authority.
+
+Current evidence:
+
+- `make onboard` passed and reports repo-wide NATS live contact.
+- Toolbelt status passed with optional Sourcebot/Postgres/GDrive credentials
+  unavailable.
+- Complete verifier still exits `3` with only the open reporter blocker.
+
+Verdict: false. Substrate status is local operating context only. It does not
+prove Operator OS action-specific NATS/A2A ack and does not authorize external
+work.
+
+Keep / revert / queue:
+
+Decision: keep.
+
+ds-goal progress receipt: `r-88e06b42dc1848bd`

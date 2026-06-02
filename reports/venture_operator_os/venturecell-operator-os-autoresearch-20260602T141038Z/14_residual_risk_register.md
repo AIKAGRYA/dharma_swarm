@@ -176,6 +176,22 @@ New solved local claim:
 
 Decision: keep the risk in the live register until final-window review.
 
+## Loop 61 Risk Addendum
+
+New residual risk:
+
+| Risk | Current evidence | Handling |
+|---|---|---|
+| Periodic status overclaim | `make onboard` reports repo-wide NATS live contact | treat as substrate context only; authority packet still decides mission action authority |
+
+New solved local claim:
+
+| Claim | Evidence | Boundary |
+|---|---|---|
+| Periodic status refresh recorded | brief, onboard, toolbelt, and complete verifier were run | does not close reporter and does not grant external authority |
+
+Decision: keep the risk in the live register until final-window review.
+
 ## Loop 60 Risk Addendum
 
 New residual risk:

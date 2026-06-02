@@ -1101,3 +1101,31 @@ Metabolized rule:
 
 - Future GO template work should preserve grouped coverage gaps as review
   metadata and never use them as a substitute for accepted evidence.
+
+## Loop 61 Metabolization Note
+
+Hypothesis:
+
+If periodic status refreshes are recorded as report-only receipts, future agents
+can benefit from fresh environment facts without confusing them for mission
+authority.
+
+Patch:
+
+- Added the periodic status refresh receipt.
+- Recorded brief, onboard, toolbelt, and complete-verifier outcomes.
+
+Evaluation:
+
+- Local status commands passed.
+- Complete verifier remains blocked only by the open reporter.
+
+Adversarial review:
+
+- Status refresh does not grant external authority.
+- Substrate liveness is not action-specific proof.
+
+Metabolized rule:
+
+- Future periodic refreshes must label substrate facts as context and keep
+  authority decisions in the Operator OS packets.

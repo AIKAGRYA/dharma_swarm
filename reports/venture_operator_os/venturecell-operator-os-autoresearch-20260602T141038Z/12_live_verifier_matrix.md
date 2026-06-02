@@ -280,6 +280,18 @@ Decision: keep.
 This addendum is live verifier evidence only. It does not close the reporter and
 does not grant external authority.
 
+## Loop 61 Periodic Status Addendum
+
+| Check | Result | Notes |
+|---|---|---|
+| Autonomy brief | pass | brief rendered for mission `20260602-venturecell-operator-os-autoresearch-8h` |
+| Onboard | pass | HEAD `8ce9bbaf`; branch ahead `110`, behind `179`; dirty files `557` |
+| Toolbelt | pass | GitNexus and Context+ configured; optional Sourcebot/Postgres/GDrive credentials unavailable |
+| Complete verifier | expected blocker | exit `3`; only blocker `task_not_closed:20260602-venturecell-operator-os-autoresearch-8h-t05-reporter` |
+
+This status addendum is environment context only. It does not prove Operator OS
+action-specific NATS/A2A ack and does not close the reporter.
+
 ## Loop 60 Verifier Addendum
 
 | Check | Result | Notes |

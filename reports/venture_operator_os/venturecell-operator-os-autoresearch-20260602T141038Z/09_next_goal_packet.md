@@ -518,3 +518,23 @@ Still forbidden:
 - using grouped template gaps as accepted evidence;
 - creating fake GO evidence receipts;
 - closing reporter before true-time and terminal-verifier proof.
+
+## Loop 61 Next Goal Addendum
+
+Current new evidence:
+
+- `60_periodic_status_refresh_receipt.md`
+- updated `12_live_verifier_matrix.md`
+
+Next safe loop targets:
+
+- Refresh six-hour timebox proof once elapsed time reaches `21600s`.
+- Keep complete verification blocked only by the open reporter until final
+  closeout.
+- Preserve substrate status as context only.
+
+Still forbidden:
+
+- treating repo-wide NATS contact as Operator OS action authority;
+- closing reporter before true-time and terminal-verifier proof;
+- external outreach, publishing, handoff, spend, deploy, push, or merge.
