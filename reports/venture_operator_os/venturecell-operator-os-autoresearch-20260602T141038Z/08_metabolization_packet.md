@@ -4,7 +4,7 @@ Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live packet, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
 ds-goal progress receipt: `r-b73f8ef857f710fd`
-Current scoped HEAD before this packet: `66f7d8a3 feat(operator-os): add render artifact manifest`
+Current scoped HEAD before this packet: `d91b3877 docs(operator-os): add periodic onboard receipt`
 
 This packet captures durable learning from the run so far. It must be reviewed
 and updated during final closeout before the reporter task is closed.
@@ -123,7 +123,8 @@ and updated during final closeout before the reporter task is closed.
 | `b72f94ee` | `13_authority_boundary_receipt.md` | consolidated authority firewall packet |
 | `6a6401b0` | `14_residual_risk_register.md` | explicit blocker and residual risk split |
 | `66f7d8a3` | `15_artifact_manifest_receipt.md` | rendered artifact manifest and status locator |
-| pending | `16_periodic_onboard_receipt.md` | periodic onboard/toolbelt substrate check |
+| `d91b3877` | `16_periodic_onboard_receipt.md` | periodic onboard/toolbelt substrate check |
+| pending | `17_liveness_key_disambiguation_receipt.md` | action-specific liveness field names |
 
 ## Current Read-Only Artifacts
 
@@ -145,6 +146,7 @@ and updated during final closeout before the reporter task is closed.
 - `authority_boundary_packet.json`
 - `operator_os_artifact_manifest.json`
 - `16_periodic_onboard_receipt.md`
+- `17_liveness_key_disambiguation_receipt.md`
 
 ## Do Not Metabolize As Done
 
@@ -161,6 +163,8 @@ These facts are explicitly not complete:
   authority.
 - Repo-wide NATS liveness from `make onboard` is not action-specific Operator
   OS authority proof.
+- Authority liveness keys are action-specific and currently false for Operator
+  OS NATS/A2A action ack proof.
 - Reporter task is not closed.
 - The final adversarial audit and next-goal packet still require final-window
   review/update.
@@ -420,6 +424,36 @@ Metabolized rule:
 
 - Treat onboard substrate liveness as environmental context. Authority packets
   still decide what this mission may do.
+
+## Loop 18 Metabolization Note
+
+Hypothesis:
+
+If liveness keys name Operator OS action proof explicitly, future agents will
+not confuse substrate health with mission authority.
+
+Patch:
+
+- Renamed authority liveness keys to
+  `operator_os_nats_action_ack_proof_present` and
+  `operator_os_a2a_live_action_ack_proof_present`.
+- Updated digest labels and tests.
+
+Evaluation:
+
+- `pytest -q tests/test_venture_cell_operator_os_projection.py` passed.
+- `./.venv/bin/python -m compileall -q dharma_swarm/venture_cell/operator_os`
+  passed.
+
+Adversarial review:
+
+- Repo-wide NATS live contact remains environmental context.
+- Operator OS action-specific ack proof remains false.
+
+Metabolized rule:
+
+- Liveness fields in authority packets must identify the scope of proof. If the
+  proof is only substrate-wide, do not name it as mission action authority.
 
 ## Loop 13 Metabolization Note
 

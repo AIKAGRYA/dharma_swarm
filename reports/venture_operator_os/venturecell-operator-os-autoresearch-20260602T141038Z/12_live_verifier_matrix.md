@@ -49,6 +49,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `14_residual_risk_register.md` | live risk split | not a closure certificate |
 | `operator_os_artifact_manifest.json` | rendered locator | not proof of finality or authority |
 | `16_periodic_onboard_receipt.md` | onboard/toolbelt pass | repo-wide substrate context only |
+| `17_liveness_key_disambiguation_receipt.md` | action-specific liveness labels | prevents substrate/authority conflation |
 | `06_adversary_audit.md` | live draft | needs final-window review |
 | `07_score_history.md` | live score `89/100` | not final |
 | `08_metabolization_packet.md` | live packet | needs final-window review |
@@ -73,7 +74,8 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `b72f94ee` | keep | authority boundary firewall packet |
 | `6a6401b0` | keep | residual risk register |
 | `66f7d8a3` | keep | artifact manifest |
-| pending | keep | periodic onboard receipt |
+| `d91b3877` | keep | periodic onboard receipt |
+| pending | keep | liveness key disambiguation |
 
 ## Revert / Queue Ledger
 

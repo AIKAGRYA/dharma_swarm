@@ -97,8 +97,8 @@
 - Decision: `local_read_only_external_blocked`
 - Allowed local actions: `read_local_artifacts, render_operator_os, run_focused_tests, append_non_closing_progress_receipts, prepare_non_evidence_templates`
 - Blocked actions: `external_outreach, spending, deployment, publishing, protected_merge, credential_mutation, live_external_authority, external_operator_handoff`
-- NATS ack proof: `False`
-- A2A live ack proof: `False`
+- Operator OS NATS action ack proof: `False`
+- Operator OS A2A live action ack proof: `False`
 - Trusted Chetana promotion claimed: `False`
 
 ## Darshan GO Gate
@@ -126,11 +126,11 @@
 ## Memory Kernel
 
 - Status: `read_through_index_available`
-- Staged: `5019`
+- Staged: `5020`
 - Trusted: `1336`
 - Quarantine: `5000`
 - Truncated scan: `True`
-- Index: `available_truncated` with `79` entries
+- Index: `available_truncated` with `80` entries
 - Query evals: `pass` (6/6)
 
 ## Memory Repair Packet

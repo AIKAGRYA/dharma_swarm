@@ -51,9 +51,9 @@
     "no_trusted_chetana_promotion_without_gates"
   ],
   "liveness_claims": {
-    "a2a_live_ack_proof_present": false,
     "filesystem_a2a_rows_are_evidence_only": true,
-    "nats_ack_proof_present": false
+    "operator_os_a2a_live_action_ack_proof_present": false,
+    "operator_os_nats_action_ack_proof_present": false
   },
   "packet_id": "operator.authority_boundary",
   "promotion_claims": {

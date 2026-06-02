@@ -40,6 +40,9 @@ Evaluation:
 Adversarial review:
 
 - Repo-wide NATS liveness is not action-specific Operator OS NATS proof.
+- Operator OS authority uses action-specific fields:
+  `operator_os_nats_action_ack_proof_present` and
+  `operator_os_a2a_live_action_ack_proof_present`.
 - A2A filesystem mirrors remain evidence, not live ack proof for this mission.
 - Optional credential warnings do not block local Operator OS work.
 - Dirty file count is broad repo state and must not be swept into commits.

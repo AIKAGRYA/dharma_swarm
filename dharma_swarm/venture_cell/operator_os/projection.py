@@ -895,8 +895,8 @@ def _authority_boundary_packet(
             "no_trusted_chetana_promotion_without_gates",
         ),
         liveness_claims={
-            "nats_ack_proof_present": False,
-            "a2a_live_ack_proof_present": False,
+            "operator_os_nats_action_ack_proof_present": False,
+            "operator_os_a2a_live_action_ack_proof_present": False,
             "filesystem_a2a_rows_are_evidence_only": True,
         },
         promotion_claims={

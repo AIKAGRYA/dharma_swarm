@@ -5,7 +5,7 @@ Status: live ledger, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
 ds-goal progress receipt: `r-277a29c022e46fb6`
 Baseline: `1aca07a1 Add VentureCell Operator OS Level 70 surface`
-Current scoped HEAD before this packet: `66f7d8a3 feat(operator-os): add render artifact manifest`
+Current scoped HEAD before this packet: `d91b3877 docs(operator-os): add periodic onboard receipt`
 
 This file is a living score ledger. It exists now so later agents do not
 reconstruct scores from memory. It must be reviewed and updated before final
@@ -29,7 +29,8 @@ reporter closure.
 | Loop 14 | `13_authority_boundary_receipt.md` | `b72f94ee` | 92 | +2 | keep authority firewall packet |
 | Loop 15 | `14_residual_risk_register.md` | `6a6401b0` | 93 | +1 | keep residual risk register |
 | Loop 16 | `15_artifact_manifest_receipt.md` | `66f7d8a3` | 94 | +1 | keep render artifact manifest |
-| Loop 17 | `16_periodic_onboard_receipt.md` | pending | 95 | +1 | keep periodic onboard evidence |
+| Loop 17 | `16_periodic_onboard_receipt.md` | `d91b3877` | 95 | +1 | keep periodic onboard evidence |
+| Loop 18 | `17_liveness_key_disambiguation_receipt.md` | pending | 96 | +1 | keep action-specific liveness fields |
 
 ## Area History
 
@@ -38,7 +39,7 @@ reporter closure.
 | Operator clarity | 11 | 15 | next-action, GO gate, GO template, and authority packets expose blockers, owners, local allowances, and artifact shape |
 | Memory usefulness | 10 | 15 | report-local staged source root now passes strict eval `6/6` without trusted promotion |
 | Task truth | 8 | 13 | progress receipts and residual risk register distinguish solved local claims, residual risks, and completion blockers |
-| Governance safety | 15 | 15 | external-reader, governed admission, Chetana, completion, and authority firewall gates preserved |
+| Governance safety | 15 | 15 | external-reader, governed admission, Chetana, completion, authority firewall, and action-specific liveness gates preserved |
 | Iteration quality | 8 | 12+ | every loop has hypothesis, patch/rejection, evals, adversarial review, decision |
 | Product structure | 8 | 14 | Operator OS now emits next-action, GO gate, GO template, authority boundary, manifest, memory repair, and report-local recall packets |
 | Tests/evals | 8 | 13 | fixed tests, report-local recall regression, eval artifacts, live verifier matrix, and periodic onboard evidence exist |
@@ -61,6 +62,7 @@ audit with explicit evidence.
 - Artifact manifest: present, non-authoritative.
 - Periodic onboard: `make onboard` and toolbelt status pass, with optional
   credential warnings.
+- Authority liveness fields are action-specific to Operator OS.
 - MemoryKernel query eval: `pass` (`6/6`) from report-local staged roots.
 - MemoryKernel repair packet: `no_repair_needed`, with trusted promotion still forbidden.
 - ds-goal raw/reconciled counts: `open=1 claimed=0 completed=4 failed=0 blocked=0 total=5`.
@@ -101,6 +103,8 @@ current evidence, not as a full-project proof.
 - Artifact manifest is a locator/status packet, not authority.
 - Repo-wide NATS liveness from onboard is not action-specific Operator OS
   authority proof.
+- `operator_os_nats_action_ack_proof_present` and
+  `operator_os_a2a_live_action_ack_proof_present` remain `false`.
 - The reporter task must remain open until final artifacts and final
   verification prove the full contract.
 
@@ -136,6 +140,34 @@ Adversarial review:
 - This file originally recorded MemoryKernel `0/6`; later loop rows must be
   used for the current memory eval state.
 - This file does not close the reporter lane.
+
+Keep / revert / queue:
+
+Decision: keep.
+
+## Loop 18 Score Update
+
+Hypothesis:
+
+If liveness fields are named as action-specific Operator OS proof, future
+agents will not confuse repo-wide NATS substrate health with mission authority.
+
+Patch:
+
+- Renamed authority liveness claims to action-specific keys.
+- Updated digest labels and focused tests.
+
+Evaluation:
+
+- `pytest -q tests/test_venture_cell_operator_os_projection.py` passed.
+- `./.venv/bin/python -m compileall -q dharma_swarm/venture_cell/operator_os`
+  passed.
+- The CLI render reports both Operator OS action ack fields as `false`.
+
+Adversarial review:
+
+- Repo-wide NATS liveness remains environmental context only.
+- Operator OS external authority remains blocked.
 
 Keep / revert / queue:
 

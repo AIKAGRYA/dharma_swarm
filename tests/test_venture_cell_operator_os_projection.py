@@ -166,8 +166,8 @@ def test_projection_blocks_external_autonomy_without_reader_gate(tmp_path: Path)
     assert "render_operator_os" in authority.allowed_local_actions
     assert "live_external_authority" in authority.blocked_actions
     assert "push" in authority.blocked_actions
-    assert authority.liveness_claims["nats_ack_proof_present"] is False
-    assert authority.liveness_claims["a2a_live_ack_proof_present"] is False
+    assert authority.liveness_claims["operator_os_nats_action_ack_proof_present"] is False
+    assert authority.liveness_claims["operator_os_a2a_live_action_ack_proof_present"] is False
     assert authority.liveness_claims["filesystem_a2a_rows_are_evidence_only"] is True
     assert authority.promotion_claims["trusted_chetana_promotion_claimed"] is False
     repair = projection.memory_kernel_repair_packet
@@ -387,8 +387,8 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert memory_repair_packet["raw"]["trusted_promotion_claimed"] is False
     assert "trusted_chetana_promotion" in memory_repair_packet["forbidden_actions"]
     assert authority_boundary_packet["decision"] == "local_read_only_external_blocked"
-    assert authority_boundary_packet["liveness_claims"]["nats_ack_proof_present"] is False
-    assert authority_boundary_packet["liveness_claims"]["a2a_live_ack_proof_present"] is False
+    assert authority_boundary_packet["liveness_claims"]["operator_os_nats_action_ack_proof_present"] is False
+    assert authority_boundary_packet["liveness_claims"]["operator_os_a2a_live_action_ack_proof_present"] is False
     assert authority_boundary_packet["promotion_claims"]["trusted_chetana_promotion_claimed"] is False
     assert artifact_manifest["schema"] == "dharma.venture_cell_operator_os.render_manifest.v0"
     assert artifact_manifest["status"] == "blocked_on_external_reader_gate"

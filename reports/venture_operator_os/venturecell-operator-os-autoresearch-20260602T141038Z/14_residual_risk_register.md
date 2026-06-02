@@ -29,6 +29,7 @@ claims. It exists to prevent false completion after a high live score.
 | Authority packet overclaim | `authority_boundary_packet.json` exists | treat as firewall view, not grant |
 | Artifact manifest overclaim | `operator_os_artifact_manifest.json` exists | treat as locator, not proof of finality |
 | Onboard NATS overclaim | `make onboard` reports repo-wide NATS live contact | do not treat as Operator OS action ack |
+| Liveness label regression | authority fields could become ambiguous again | keep Operator OS action-specific key names |
 | Context+ unavailable | `Transport closed` during static analysis attempts | document unavailable, use deterministic fallback checks |
 | Repo has unrelated dirty work | broad dirty worktree outside this run | commit only explicit scoped pathspecs |
 
@@ -44,6 +45,7 @@ claims. It exists to prevent false completion after a high live score.
 | Authority packet renders | `local_read_only_external_blocked` | not authority grant |
 | Artifact manifest renders | `not_authority: true` | locator/status packet only |
 | Periodic onboard passes | `make onboard` and toolbelt exit `0` | substrate context only |
+| Liveness keys are action-specific | Operator OS NATS/A2A action ack fields are false | avoids substrate/authority conflation |
 
 ## Loop 15 Receipt
 

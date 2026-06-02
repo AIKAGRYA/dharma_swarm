@@ -51,8 +51,10 @@ def render_operator_daily_digest(projection: VentureCellOperatorProjection) -> s
             f"- Decision: `{authority.decision}`",
             f"- Allowed local actions: `{', '.join(authority.allowed_local_actions)}`",
             f"- Blocked actions: `{blocked_authority_actions}`",
-            f"- NATS ack proof: `{authority.liveness_claims.get('nats_ack_proof_present', False)}`",
-            f"- A2A live ack proof: `{authority.liveness_claims.get('a2a_live_ack_proof_present', False)}`",
+            "- Operator OS NATS action ack proof: "
+            f"`{authority.liveness_claims.get('operator_os_nats_action_ack_proof_present', False)}`",
+            "- Operator OS A2A live action ack proof: "
+            f"`{authority.liveness_claims.get('operator_os_a2a_live_action_ack_proof_present', False)}`",
             f"- Trusted Chetana promotion claimed: `{authority.promotion_claims.get('trusted_chetana_promotion_claimed', False)}`",
         ]
     )
