@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-82ec224489746c03`
-Current scoped HEAD before this packet: `a3ca5bf3 feat(operator-os): stabilize admission render`
+ds-goal progress receipt: `r-a158aa9cb20d8ba4`
+Current scoped HEAD before this packet: `011d8dd4 docs(operator-os): refresh timebox status`
 
 This packet is the handoff for the next bounded AutoResearch loop. It must be
 reviewed and updated in the final hour before reporter closure.
@@ -19,6 +19,7 @@ reviewed and updated in the final hour before reporter closure.
 - MemoryKernel strict eval: `pass` (`6/6`) from report-local staged sources.
 - Darshan GO gate: `block_external_authority`, no accepted receipts.
 - Darshan GO template: `draft_template_not_evidence`.
+- Darshan GO template accepted-receipt requirements: present, not evidence.
 - Live verifier matrix: present, not final.
 - Authority boundary: `local_read_only_external_blocked`.
 - Residual risk register: present, not final.
@@ -41,7 +42,7 @@ reviewed and updated in the final hour before reporter closure.
 - Stable admission render: volatile admission id/time redacted; decision
   evidence remains visible.
 - Timebox refresh: current clock still below 8 hours.
-- Last committed packet: stable admission render.
+- Last committed packet: timebox refresh.
 
 ## Next Goal
 
@@ -232,6 +233,7 @@ If the loop only changes a report packet, also run scoped `git diff --check`.
 - `25_manifest_receipt_summary_receipt.md`
 - `26_stable_admission_render_receipt.md`
 - `27_timebox_refresh_receipt.md`
+- `28_go_template_requirements_receipt.md`
 - `operator_os_projection.json`
 - `operator_completion_guard_packet.json`
 - `operator_next_action_packet.json`

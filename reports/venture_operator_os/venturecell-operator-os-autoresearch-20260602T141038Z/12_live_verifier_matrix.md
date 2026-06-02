@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live verifier matrix, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-82ec224489746c03`
-Current scoped HEAD before this packet: `a3ca5bf3 feat(operator-os): stabilize admission render`
+ds-goal progress receipt: `r-a158aa9cb20d8ba4`
+Current scoped HEAD before this packet: `011d8dd4 docs(operator-os): refresh timebox status`
 
 This matrix captures the current verification surface for future agents. It is
 not a final verifier matrix and must not be used to close the reporter task.
@@ -16,6 +16,7 @@ not a final verifier matrix and must not be used to close the reporter task.
   (`6/6`).
 - Darshan GO gate: blocked by design; no accepted receipts.
 - Darshan GO receipt template: rendered, explicitly not evidence.
+- Darshan GO template requirements: rendered prerequisites, not acceptance.
 - External authority: blocked.
 - Gap triage: passing; external-reader remains non-local blocker and
   MemoryKernel truncation remains local maintenance.
@@ -58,6 +59,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `memory_kernel_repair_packet.json` | `no_repair_needed` | still forbids trusted promotion |
 | `darshan_go_gate_packet.json` | `block_external_authority` | accepted receipts empty |
 | `darshan_go_receipt_template.json` | `draft_template_not_evidence` | must not be stored as accepted receipt |
+| GO template requirements | source/schema/status/event/human/redaction prerequisites | guardrails only, not accepted receipt |
 | `authority_boundary_packet.json` | `local_read_only_external_blocked` | firewall view, not authority grant |
 | `operator_gap_triage_packet.json` | `external_blocked_with_local_followups` | selector only, not authority or final proof |
 | `14_residual_risk_register.md` | live risk split | not a closure certificate |
@@ -106,6 +108,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `6cb63575` | keep | manifest receipt summary |
 | `r-b3e68b7947e399fa` | keep | stable admission render |
 | `r-82ec224489746c03` | keep | timebox refresh |
+| `r-a158aa9cb20d8ba4` | keep | GO template requirements |
 
 ## Revert / Queue Ledger
 

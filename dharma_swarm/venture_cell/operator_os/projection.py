@@ -819,6 +819,15 @@ def _darshan_go_receipt_template(raw: Mapping[str, Any]) -> dict[str, Any]:
             "do_not_use_as_go_gate_evidence",
             "do_not_claim_live_authority",
         ],
+        "accepted_receipt_requirements": {
+            "status": "accepted",
+            "source": DARSHAN_READER_RECEIPT_SOURCE,
+            "schema_version": GO_EVIDENCE_SCHEMA_V0,
+            "source_url": "required_real_reader_event_url",
+            "event_uid": "required_real_reader_event_uid",
+            "payload.human_approved_contact": True,
+            "payload.privacy_redacted": True,
+        },
         "receipt": {
             "receipt_id": "<new-go-evidence-receipt-id>",
             "correlation_id": artifact_id,

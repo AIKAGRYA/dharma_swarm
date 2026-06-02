@@ -57,6 +57,15 @@
     "warnings": []
   },
   "receipt_template": {
+    "accepted_receipt_requirements": {
+      "event_uid": "required_real_reader_event_uid",
+      "payload.human_approved_contact": true,
+      "payload.privacy_redacted": true,
+      "schema_version": "go_evidence_receipt.v0",
+      "source": "darshan_external_reader",
+      "source_url": "required_real_reader_event_url",
+      "status": "accepted"
+    },
     "forbidden_use": [
       "do_not_store_as_accepted_receipt_without_real_event",
       "do_not_use_for_external_outreach",

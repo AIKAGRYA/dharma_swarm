@@ -197,6 +197,15 @@ def test_projection_blocks_external_autonomy_without_reader_gate(tmp_path: Path)
     assert go_gate.receipt_template["not_receipt"] is True
     assert go_gate.receipt_template["receipt"]["status"] == "template_only_not_accepted"
     assert "do_not_use_as_go_gate_evidence" in go_gate.receipt_template["forbidden_use"]
+    assert go_gate.receipt_template["accepted_receipt_requirements"] == {
+        "status": "accepted",
+        "source": "darshan_external_reader",
+        "schema_version": "go_evidence_receipt.v0",
+        "source_url": "required_real_reader_event_url",
+        "event_uid": "required_real_reader_event_uid",
+        "payload.human_approved_contact": True,
+        "payload.privacy_redacted": True,
+    }
     assert len(projection.departments) >= 8
     assert "darshan_external_reader_event_missing" in projection.gap_codes
     assert any(
@@ -452,6 +461,12 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert go_receipt_template["receipt"]["status"] == "template_only_not_accepted"
     assert go_receipt_template["receipt"]["source"] == "darshan_external_reader"
     assert "do_not_store_as_accepted_receipt_without_real_event" in go_receipt_template["forbidden_use"]
+    assert go_receipt_template["accepted_receipt_requirements"]["status"] == "accepted"
+    assert (
+        go_receipt_template["accepted_receipt_requirements"]["source_url"]
+        == "required_real_reader_event_url"
+    )
+    assert go_receipt_template["accepted_receipt_requirements"]["payload.privacy_redacted"] is True
     assert memory_repair_packet["decision"] == "queue_repair_without_promotion"
     assert memory_repair_packet["status"] == "queued"
     assert memory_repair_packet["raw"]["trusted_promotion_claimed"] is False

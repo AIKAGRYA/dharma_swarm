@@ -3,9 +3,9 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live ledger, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-82ec224489746c03`
+ds-goal progress receipt: `r-a158aa9cb20d8ba4`
 Baseline: `1aca07a1 Add VentureCell Operator OS Level 70 surface`
-Current scoped HEAD before this packet: `a3ca5bf3 feat(operator-os): stabilize admission render`
+Current scoped HEAD before this packet: `011d8dd4 docs(operator-os): refresh timebox status`
 
 This file is a living score ledger. It exists now so later agents do not
 reconstruct scores from memory. It must be reviewed and updated before final
@@ -41,6 +41,7 @@ reporter closure.
 | Loop 26 | `25_manifest_receipt_summary_receipt.md` | `6cb63575` | 100 | +0 | keep manifest receipt summary |
 | Loop 27 | `26_stable_admission_render_receipt.md` | `r-b3e68b7947e399fa` | 100 | +0 | keep stable admission render |
 | Loop 28 | `27_timebox_refresh_receipt.md` | `r-82ec224489746c03` | 100 | +0 | keep timebox refresh |
+| Loop 29 | `28_go_template_requirements_receipt.md` | `r-a158aa9cb20d8ba4` | 100 | +0 | keep GO template requirements |
 
 ## Area History
 
@@ -66,6 +67,7 @@ audit with explicit evidence.
 - Autonomy level: `L0_read_only_plan`.
 - Darshan GO gate: `block_external_authority`.
 - Darshan GO receipt template: `draft_template_not_evidence`.
+- Darshan GO template accepted-receipt requirements: present, not acceptance.
 - Live verifier matrix: present, non-final.
 - Authority boundary packet: `local_read_only_external_blocked`.
 - Residual risk register: present, non-final.
@@ -126,6 +128,8 @@ current evidence, not as a full-project proof.
   GO evidence receipt exists.
 - The GO template is not evidence and must not be stored as an accepted receipt
   without a real external-reader event.
+- GO template accepted-receipt requirements are prerequisites only; they do not
+  create an accepted receipt.
 - Authority boundary packet is a firewall view, not an authority grant.
 - Residual risk register must be refreshed in the final window.
 - Artifact manifest is a locator/status packet, not authority.

@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live packet, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-82ec224489746c03`
-Current scoped HEAD before this packet: `a3ca5bf3 feat(operator-os): stabilize admission render`
+ds-goal progress receipt: `r-a158aa9cb20d8ba4`
+Current scoped HEAD before this packet: `011d8dd4 docs(operator-os): refresh timebox status`
 
 This packet captures durable learning from the run so far. It must be reviewed
 and updated during final closeout before the reporter task is closed.
@@ -64,6 +64,8 @@ and updated during final closeout before the reporter task is closed.
    - `darshan_go_gate_packet.json` reports `decision: block_external_authority`.
    - `darshan_go_receipt_template.json` reports
      `draft_template_not_evidence`.
+   - The template now lists accepted receipt requirements for source, schema,
+     status, source URL, event UID, human approval, and privacy redaction.
    - Accepted receipts are empty.
    - Operator OS remains `blocked_on_external_reader_gate` and
      `L0_read_only_plan`.
@@ -75,6 +77,8 @@ and updated during final closeout before the reporter task is closed.
      receipt is linked to `decision_delta.json`.
    - A template can prepare the local artifact shape, but it is not GO evidence
      and must never be stored as accepted without a real countable reader event.
+   - Template requirements are prerequisites only; they are not a receipt and
+     must not be used to bypass the external-reader gate.
 
 5. Final score is not final just because the interim target passed `80/100`.
 
@@ -262,6 +266,7 @@ and updated during final closeout before the reporter task is closed.
 | `6cb63575` | `25_manifest_receipt_summary_receipt.md` | manifest receipt summary fields |
 | `r-b3e68b7947e399fa` | `26_stable_admission_render_receipt.md` | stable governed-admission render |
 | `r-82ec224489746c03` | `27_timebox_refresh_receipt.md` | refreshed non-final timebox status |
+| `r-a158aa9cb20d8ba4` | `28_go_template_requirements_receipt.md` | machine-readable GO template acceptance prerequisites |
 
 ## Current Read-Only Artifacts
 
@@ -297,6 +302,7 @@ and updated during final closeout before the reporter task is closed.
 - `25_manifest_receipt_summary_receipt.md`
 - `26_stable_admission_render_receipt.md`
 - `27_timebox_refresh_receipt.md`
+- `28_go_template_requirements_receipt.md`
 
 ## Do Not Metabolize As Done
 
@@ -307,6 +313,8 @@ These facts are explicitly not complete:
 - Darshan external-reader GO gate is not passing.
 - `darshan_go_receipt_template.json` is not evidence and must not be promoted
   into an accepted receipt without a real event.
+- GO template accepted-receipt requirements are guardrails, not proof of an
+  accepted external-reader event.
 - `authority_boundary_packet.json` is a firewall view, not an authority grant.
 - `14_residual_risk_register.md` must be refreshed before final closure.
 - `operator_os_artifact_manifest.json` is a locator/status packet, not

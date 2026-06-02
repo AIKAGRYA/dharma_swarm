@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-82ec224489746c03`
-Current scoped HEAD before this packet: `a3ca5bf3 feat(operator-os): stabilize admission render`
+ds-goal progress receipt: `r-a158aa9cb20d8ba4`
+Current scoped HEAD before this packet: `011d8dd4 docs(operator-os): refresh timebox status`
 
 This audit is intentionally written before the final time window so the next
 agent has a concrete attack surface. It is not a completion certificate. The
@@ -24,6 +24,8 @@ updates, and terminal verification exist.
 - Darshan GO gate decision remains `block_external_authority`.
 - Accepted Darshan GO receipts remain empty.
 - Darshan GO receipt template exists as `draft_template_not_evidence`.
+- Darshan GO receipt template now lists machine-readable accepted receipt
+  requirements, but those requirements are not acceptance.
 - Live verifier matrix exists, but is not final.
 - Authority boundary packet exists and reports `local_read_only_external_blocked`.
 - Residual risk register exists but is not final.
@@ -98,6 +100,8 @@ Adversarial review:
 - A GO gate packet with `decision: block_external_authority` is not GO
   acceptance.
 - A GO receipt template is not an accepted GO receipt.
+- Accepted receipt requirements in the template are guardrails only, not gate
+  clearance.
 - A score above `80/100` is not final while the contract clock and final
   artifacts remain incomplete.
 - A live verifier matrix is not final proof while the reporter task is open.
@@ -144,6 +148,7 @@ Queued:
 | Operator OS can act externally | `blocked_on_external_reader_gate`, `L0_read_only_plan` | false |
 | Darshan GO is accepted | accepted receipts are `[]` | false |
 | GO template is evidence | template status is `draft_template_not_evidence` | false |
+| GO template requirements prove acceptance | requirements are prerequisites, not receipts | false |
 | MemoryKernel recall is trusted/complete | strict eval passes from staged report-local roots only | false |
 | Chetana trusted promotion occurred | `trusted_promotion_claimed: false` | false |
 | NATS/A2A liveness is proven | no action-specific ack proof cited | false |
