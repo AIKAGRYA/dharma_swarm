@@ -1389,3 +1389,31 @@ Next-agent instruction:
 - Use the final-window preflight packet as the checklist.
 - Use this metabolization packet as local memory context only.
 - Do not promote anything to trusted memory without existing gates.
+
+## Loop 72 Metabolization Note
+
+Hypothesis:
+
+If the allowed final window is proven separately from final closure, future
+agents can act on final-window artifacts without conflating them with terminal
+mission completion.
+
+Patch:
+
+- Added the 7.5-hour timebox receipt.
+
+Evaluation:
+
+- Live goal elapsed time reached `27029s`; final threshold remains `28800s`.
+- Focused and supporting verifier slices passed.
+- Complete verifier remains blocked only by the open reporter.
+
+Adversarial review:
+
+- 7.5-hour proof opens final-window review posture only.
+- Reporter remains open.
+
+Metabolized rule:
+
+- Final-window eligibility and final closeout are separate states and must be
+  recorded separately.

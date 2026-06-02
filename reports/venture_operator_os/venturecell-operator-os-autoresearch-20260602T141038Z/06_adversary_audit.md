@@ -606,3 +606,24 @@ Verdict: keep all finality claims blocked until true-time proof, terminal
 reporter receipt, and complete verifier pass exist.
 
 ds-goal progress receipt: `r-2fabf875a2217267`
+
+## Loop 72 Adversary Addendum
+
+New claim under attack: 7.5-hour proof is equivalent to final 8-hour proof.
+
+Current evidence:
+
+- `get_goal` reports elapsed `27029s`.
+- 7.5-hour threshold is `27000s`.
+- Final threshold is `28800s`.
+- Remaining time is `1771s`.
+- Complete verifier still exits `3` with only the open reporter blocker.
+
+Verdict: false. This checkpoint proves the mission reached the allowed final
+window; it does not complete the 8-hour contract.
+
+Keep / revert / queue:
+
+Decision: keep.
+
+ds-goal progress receipt: `r-f83d2f932777d2bb`

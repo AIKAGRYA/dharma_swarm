@@ -293,6 +293,32 @@ Score interpretation:
 
 Decision: keep score as live/non-final.
 
+## Loop 72 Score Update
+
+Hypothesis:
+
+If the 7.5-hour checkpoint is captured as non-final proof, the final pass can
+distinguish allowed final-window work from completed final closeout.
+
+Patch:
+
+- Added a 7.5-hour timebox receipt and report addenda.
+
+Evaluation:
+
+- Live goal elapsed time reached `27029s`.
+- Focused Operator OS and support verifier slices passed.
+- Complete verifier remains blocked only by the open reporter.
+
+Adversarial review:
+
+- Live score remains `100/100`, but still non-final.
+- 7.5-hour proof is not the 8-hour contract.
+
+Keep / revert / queue:
+
+Decision: keep.
+
 ## Loop 70 Score Update
 
 Hypothesis:

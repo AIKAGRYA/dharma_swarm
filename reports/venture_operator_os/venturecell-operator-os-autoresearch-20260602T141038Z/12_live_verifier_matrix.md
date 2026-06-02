@@ -314,6 +314,21 @@ authority.
 
 This review refreshes final markdown inputs only. It does not close the reporter.
 
+## Loop 72 Seven-And-A-Half-Hour Timebox Addendum
+
+| Check | Result | Notes |
+|---|---|---|
+| Active goal clock | pass | elapsed `27029s`; 7.5-hour threshold `27000s`; final threshold `28800s`; remaining `1771s` |
+| Autonomy brief | pass | reporter remains open |
+| Focused Operator OS projection tests | pass | `pytest -q tests/test_venture_cell_operator_os_projection.py`; `9` passed |
+| Darshan/control GO slice | pass | `pytest -q tests/test_darshan_external_reader_gate.py tests/test_control_surface.py -k 'GoReceiptRows or external_reader'`; `11` passed, `74` deselected |
+| Governed/A2A/daily slice | pass | `pytest -q tests/test_governed_work_admission.py tests/test_a2a_task_lifecycle.py tests/test_daily_operating_brief.py`; `31` passed |
+| Operator OS compile | pass | `./.venv/bin/python -m compileall -q dharma_swarm/venture_cell/operator_os` |
+| Complete verifier | expected blocker | exit `3`; only blocker `task_not_closed:20260602-venturecell-operator-os-autoresearch-8h-t05-reporter` |
+
+This checkpoint proves final-window eligibility only. It does not close the
+reporter.
+
 ## Loop 63 Final-Window Preflight Addendum
 
 | Check | Result | Notes |

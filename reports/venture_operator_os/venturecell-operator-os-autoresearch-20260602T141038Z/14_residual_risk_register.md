@@ -192,6 +192,22 @@ New solved local claim:
 
 Decision: keep the risk in the live register until final closeout review.
 
+## Loop 72 Risk Addendum
+
+New residual risk:
+
+| Risk | Current evidence | Handling |
+|---|---|---|
+| Final-window eligibility overclaim | elapsed `27029s`, remaining `1771s` to final threshold | treat as eligibility only; wait for true `28800s` before terminal closure |
+
+New solved local claim:
+
+| Claim | Evidence | Boundary |
+|---|---|---|
+| 7.5-hour checkpoint reached | active goal elapsed time `27029s` | not final 8-hour proof |
+
+Decision: keep the risk in the live register until final closeout review.
+
 ## Loop 70 Risk Addendum
 
 New residual risk:

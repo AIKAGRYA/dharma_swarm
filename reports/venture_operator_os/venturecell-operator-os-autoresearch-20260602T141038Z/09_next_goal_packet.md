@@ -746,3 +746,24 @@ Still forbidden:
 - treating final-hour artifact refresh as terminal proof;
 - closing reporter before true 8-hour and terminal-verifier proof;
 - external outreach, publishing, handoff, spend, deploy, push, or merge.
+
+## Loop 72 Next Goal Addendum
+
+Current new evidence:
+
+- `71_timebox_seven_and_half_hour_receipt.md`
+- updated `12_live_verifier_matrix.md`
+
+Next safe loop targets:
+
+- Wait until elapsed time reaches at least `28800s`.
+- Run final preflight commands after true-time proof.
+- Record terminal reporter receipt only after final artifact review and true
+  time are satisfied.
+- Rerun complete verification after reporter closure.
+
+Still forbidden:
+
+- treating 7.5-hour proof as final proof;
+- closing reporter before true 8-hour and terminal-verifier proof;
+- external outreach, publishing, handoff, spend, deploy, push, or merge.
