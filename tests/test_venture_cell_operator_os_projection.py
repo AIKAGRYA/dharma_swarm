@@ -476,6 +476,9 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     completion_guard_packet = json.loads(
         paths["completion_guard_packet"].read_text(encoding="utf-8")
     )
+    goal_truth_packet = json.loads(
+        paths["goal_truth_packet"].read_text(encoding="utf-8")
+    )
     artifact_manifest = json.loads(
         paths["artifact_manifest"].read_text(encoding="utf-8")
     )
@@ -654,6 +657,33 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
         completion_guard_packet["forbidden_actions"]
     )
     assert "treat_live_score_as_completion" in completion_guard_packet["forbidden_actions"]
+    assert goal_truth_packet["schema"] == "dharma.venture_cell_operator_os.goal_truth.v0"
+    assert goal_truth_packet["truth_source"] == "report_directory_markdown_receipt_headers"
+    assert goal_truth_packet["receipt_count"] == len(goal_truth_packet["receipts"])
+    assert goal_truth_packet["receipt_count"] == 2
+    assert goal_truth_packet["progress_receipt_count"] == len(
+        goal_truth_packet["progress_receipt_ids"]
+    )
+    assert goal_truth_packet["progress_receipt_count"] == 1
+    assert goal_truth_packet["unique_progress_receipt_id_count"] == 1
+    assert goal_truth_packet["duplicate_progress_receipt_id_count"] == len(
+        goal_truth_packet["duplicate_progress_receipt_ids"]
+    )
+    assert goal_truth_packet["duplicate_progress_receipt_id_count"] == 0
+    assert goal_truth_packet["missing_progress_receipt_count"] == len(
+        goal_truth_packet["missing_progress_receipt_names"]
+    )
+    assert goal_truth_packet["missing_progress_receipt_names"] == [
+        "00_opening_truth.md"
+    ]
+    assert goal_truth_packet["all_receipts_have_progress_receipts"] is False
+    assert goal_truth_packet["latest_receipt_name"] == "99_progress_receipt.md"
+    assert goal_truth_packet["latest_progress_receipt_id"] == "r-test-progress"
+    assert goal_truth_packet["reporter_task_must_remain_open"] is True
+    assert goal_truth_packet["terminal_reporter_receipt_required"] is True
+    assert goal_truth_packet["complete_verifier_pass_claimed"] is False
+    assert goal_truth_packet["not_final"] is True
+    assert goal_truth_packet["not_authority"] is True
     assert artifact_manifest["schema"] == "dharma.venture_cell_operator_os.render_manifest.v0"
     assert artifact_manifest["status"] == "blocked_on_external_reader_gate"
     assert artifact_manifest["darshan_go_decision"] == "block_external_authority"
@@ -672,6 +702,7 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert "gate_summary_packet" in artifact_manifest["artifact_paths"]
     assert "evidence_summary_packet" in artifact_manifest["artifact_paths"]
     assert "completion_guard_packet" in artifact_manifest["artifact_paths"]
+    assert "goal_truth_packet" in artifact_manifest["artifact_paths"]
     assert str(report_dir / "00_opening_truth.md") in artifact_manifest["receipt_paths"]
     assert str(report_dir / "99_progress_receipt.md") in artifact_manifest["receipt_paths"]
     assert str(report_dir / "operator_os_digest.md") not in artifact_manifest["receipt_paths"]
@@ -704,6 +735,18 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     )
     assert artifact_manifest["summary_packet_count"] == len(
         artifact_manifest["summary_packet_names"]
+    )
+    assert artifact_manifest["goal_truth_progress_receipt_count"] == (
+        goal_truth_packet["progress_receipt_count"]
+    )
+    assert artifact_manifest["goal_truth_unique_progress_receipt_id_count"] == (
+        goal_truth_packet["unique_progress_receipt_id_count"]
+    )
+    assert artifact_manifest["goal_truth_missing_progress_receipt_count"] == (
+        goal_truth_packet["missing_progress_receipt_count"]
+    )
+    assert artifact_manifest["goal_truth_duplicate_progress_receipt_id_count"] == (
+        goal_truth_packet["duplicate_progress_receipt_id_count"]
     )
     assert "canvas_summary_packet" in artifact_manifest["summary_packet_names"]
     assert "department_summary_packet" in artifact_manifest["summary_packet_names"]

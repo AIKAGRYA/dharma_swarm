@@ -415,8 +415,18 @@ def _completion_guard_payload(projection: dict[str, Any]) -> dict[str, Any]:
 def _latest_progress_receipt_id(latest_receipt_path: str) -> str:
     if not latest_receipt_path:
         return ""
+    return _progress_receipt_id_from_path(Path(latest_receipt_path))
+
+
+def _receipt_markdown_paths(output_dir: Path) -> list[Path]:
+    return sorted(
+        path for path in output_dir.glob("*.md") if path.name != "operator_os_digest.md"
+    )
+
+
+def _progress_receipt_id_from_path(path: Path) -> str:
     try:
-        lines = Path(latest_receipt_path).read_text(encoding="utf-8").splitlines()
+        lines = path.read_text(encoding="utf-8").splitlines()
     except OSError:
         return ""
     prefix = "ds-goal progress receipt:"
@@ -424,6 +434,78 @@ def _latest_progress_receipt_id(latest_receipt_path: str) -> str:
         if line.startswith(prefix):
             return line.removeprefix(prefix).strip().strip("`")
     return ""
+
+
+def _goal_truth_payload(
+    *,
+    projection: dict[str, Any],
+    output_dir: Path,
+) -> dict[str, Any]:
+    receipt_items = []
+    for path in _receipt_markdown_paths(output_dir):
+        progress_receipt_id = _progress_receipt_id_from_path(path)
+        receipt_items.append(
+            {
+                "name": path.name,
+                "path": str(path),
+                "progress_receipt_id": progress_receipt_id,
+                "has_progress_receipt_id": bool(progress_receipt_id),
+            }
+        )
+
+    progress_receipt_ids = [
+        str(item["progress_receipt_id"])
+        for item in receipt_items
+        if item["has_progress_receipt_id"]
+    ]
+    progress_id_counts = Counter(progress_receipt_ids)
+    duplicate_progress_receipt_ids = [
+        receipt_id
+        for receipt_id, count in sorted(progress_id_counts.items())
+        if count > 1
+    ]
+    missing_progress_receipt_names = [
+        str(item["name"]) for item in receipt_items if not item["has_progress_receipt_id"]
+    ]
+    latest_receipt = receipt_items[-1] if receipt_items else {}
+    completion_guard = _completion_guard_payload(projection)
+
+    return {
+        "schema": "dharma.venture_cell_operator_os.goal_truth.v0",
+        "status": projection.get("status", "unknown"),
+        "autonomy_level": projection.get("autonomy_level", "unknown"),
+        "truth_source": "report_directory_markdown_receipt_headers",
+        "receipt_inventory_scope": "run_markdown_receipts_excluding_digest",
+        "receipts": receipt_items,
+        "receipt_count": len(receipt_items),
+        "progress_receipt_ids": progress_receipt_ids,
+        "progress_receipt_count": len(progress_receipt_ids),
+        "unique_progress_receipt_id_count": len(progress_id_counts),
+        "duplicate_progress_receipt_ids": duplicate_progress_receipt_ids,
+        "duplicate_progress_receipt_id_count": len(duplicate_progress_receipt_ids),
+        "missing_progress_receipt_names": missing_progress_receipt_names,
+        "missing_progress_receipt_count": len(missing_progress_receipt_names),
+        "all_receipts_have_progress_receipts": not missing_progress_receipt_names,
+        "latest_receipt_name": str(latest_receipt.get("name", "")),
+        "latest_receipt_path": str(latest_receipt.get("path", "")),
+        "latest_progress_receipt_id": str(
+            latest_receipt.get("progress_receipt_id", "")
+        ),
+        "receipt_chain_complete_claimed": False,
+        "reporter_task_policy": completion_guard.get("reporter_closure_policy", ""),
+        "reporter_task_must_remain_open": completion_guard.get(
+            "reporter_task_must_remain_open", True
+        ),
+        "terminal_reporter_receipt_required": completion_guard.get(
+            "terminal_reporter_receipt_required", True
+        ),
+        "complete_verifier_expected_blocker": completion_guard.get(
+            "complete_verifier_expected_blocker", ""
+        ),
+        "complete_verifier_pass_claimed": False,
+        "not_final": True,
+        "not_authority": True,
+    }
 
 
 def _artifact_manifest_payload(
@@ -442,11 +524,8 @@ def _artifact_manifest_payload(
     gate_summary = _gate_summary_payload(projection)
     evidence_summary = _evidence_summary_payload(projection)
     completion_guard = _completion_guard_payload(projection)
-    receipt_paths = [
-        str(path)
-        for path in sorted(output_dir.glob("*.md"))
-        if path.name != "operator_os_digest.md"
-    ]
+    goal_truth = _goal_truth_payload(projection=projection, output_dir=output_dir)
+    receipt_paths = [str(path) for path in _receipt_markdown_paths(output_dir)]
     latest_receipt_path = receipt_paths[-1] if receipt_paths else ""
     latest_progress_receipt_id = _latest_progress_receipt_id(latest_receipt_path)
     artifact_path_map = {
@@ -487,6 +566,18 @@ def _artifact_manifest_payload(
         "absolute_evidence_ref_count": evidence_summary.get("absolute_ref_count", 0),
         "relative_evidence_ref_count": evidence_summary.get("relative_ref_count", 0),
         "completion_guard_decision": completion_guard.get("decision", "unknown"),
+        "goal_truth_progress_receipt_count": goal_truth.get(
+            "progress_receipt_count", 0
+        ),
+        "goal_truth_unique_progress_receipt_id_count": goal_truth.get(
+            "unique_progress_receipt_id_count", 0
+        ),
+        "goal_truth_missing_progress_receipt_count": goal_truth.get(
+            "missing_progress_receipt_count", 0
+        ),
+        "goal_truth_duplicate_progress_receipt_id_count": goal_truth.get(
+            "duplicate_progress_receipt_id_count", 0
+        ),
         "not_final": completion_guard.get("not_final", True),
         "artifact_paths": artifact_path_map,
         "artifact_count": len(artifact_path_map),
@@ -688,6 +779,19 @@ def render_operator_surface(
         + "\n",
         encoding="utf-8",
     )
+    goal_truth_path = output_dir / "operator_goal_truth_packet.json"
+    goal_truth_path.write_text(
+        json.dumps(
+            _goal_truth_payload(
+                projection=projection.to_dict(),
+                output_dir=output_dir,
+            ),
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     paths = {
         "projection": projection_path,
         "digest": digest_path,
@@ -705,6 +809,7 @@ def render_operator_surface(
         "gate_summary_packet": gate_summary_path,
         "evidence_summary_packet": evidence_summary_path,
         "completion_guard_packet": completion_guard_path,
+        "goal_truth_packet": goal_truth_path,
     }
     artifact_manifest_path = output_dir / "operator_os_artifact_manifest.json"
     paths["artifact_manifest"] = artifact_manifest_path

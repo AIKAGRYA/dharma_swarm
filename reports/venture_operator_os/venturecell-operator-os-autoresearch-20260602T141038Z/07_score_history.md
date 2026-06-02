@@ -3,9 +3,9 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live ledger, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-802f88903e805cdb`
+ds-goal progress receipt: `r-0ee1f0865dd69047`
 Baseline: `1aca07a1 Add VentureCell Operator OS Level 70 surface`
-Current scoped HEAD before this packet: `6a44141a docs(operator-os): refresh onboard context`
+Current scoped HEAD before this packet: `957bb0c9 feat(operator-os): count rendered artifacts`
 
 This file is a living score ledger. It exists now so later agents do not
 reconstruct scores from memory. It must be reviewed and updated before final
@@ -64,6 +64,7 @@ reporter closure.
 | Loop 49 | `48_summary_helper_refactor_receipt.md` | `r-446364a1d4cbda18` | 100 | +0 | keep summary helper refactor |
 | Loop 50 | `49_periodic_onboard_refresh_receipt.md` | `r-935763168301bf72` | 100 | +0 | keep periodic substrate refresh |
 | Loop 51 | `50_manifest_artifact_counts_receipt.md` | `r-802f88903e805cdb` | 100 | +0 | keep manifest artifact counts |
+| Loop 52 | `51_goal_truth_packet_receipt.md` | `r-0ee1f0865dd69047` | 100 | +0 | keep goal-truth receipt chain |
 
 ## Area History
 
@@ -71,11 +72,11 @@ reporter closure.
 |---|---:|---:|---|
 | Operator clarity | 11 | 17 | next-action, GO gate, GO template, authority, and gap triage packets expose blockers, owners, local allowances, and artifact shape; digest canvas rows are capped with omitted counts |
 | Memory usefulness | 10 | 16 | report-local staged source root now passes strict eval `6/6` without trusted promotion; root coverage now identifies which roots are truncated |
-| Task truth | 8 | 13 | progress receipts and residual risk register distinguish solved local claims, residual risks, and completion blockers |
+| Task truth | 8 | 14 | progress receipts, residual risk register, and goal-truth packet distinguish solved local claims, residual risks, missing progress IDs, duplicate progress IDs, and completion blockers |
 | Governance safety | 15 | 15 | external-reader, governed admission, Chetana, completion, authority firewall, and action-specific liveness gates preserved |
 | Iteration quality | 8 | 12+ | every loop has hypothesis, patch/rejection, evals, adversarial review, decision |
-| Product structure | 8 | 16 | Operator OS now emits next-action, GO gate, GO template, authority boundary, gap triage, memory coverage, canvas summary, department summary, gate summary, evidence summary, manifest, memory repair, and report-local recall packets |
-| Tests/evals | 8 | 13 | fixed tests, report-local recall regression, eval artifacts, live verifier matrix, and periodic onboard evidence exist |
+| Product structure | 8 | 16 | Operator OS now emits next-action, GO gate, GO template, authority boundary, gap triage, memory coverage, canvas summary, department summary, gate summary, evidence summary, goal truth, manifest, memory repair, and report-local recall packets |
+| Tests/evals | 8 | 13 | fixed tests, report-local recall regression, goal-truth count parity, eval artifacts, live verifier matrix, and periodic onboard evidence exist |
 | Metabolization | 2 | 5 | program kernel, receipts, manifest inventory, packets, and this score ledger exist |
 
 The area history is intentionally qualitative after opening because later

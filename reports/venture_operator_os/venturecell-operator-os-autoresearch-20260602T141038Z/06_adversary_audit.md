@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-802f88903e805cdb`
-Current scoped HEAD before this packet: `6a44141a docs(operator-os): refresh onboard context`
+ds-goal progress receipt: `r-0ee1f0865dd69047`
+Current scoped HEAD before this packet: `957bb0c9 feat(operator-os): count rendered artifacts`
 
 This audit is intentionally written before the final time window so the next
 agent has a concrete attack surface. It is not a completion certificate. The
@@ -227,6 +227,8 @@ Queued:
 | Latest receipt path means terminal receipt | manifest latest receipt is a progress receipt | false |
 | Receipt inventory scope proves finality | scope/non-final markers are navigation only | false |
 | Latest progress receipt id proves completion | manifest marks it non-final and reporter remains open | false |
+| Goal truth receipt chain proves completion | packet has `receipt_chain_complete_claimed: false` and reporter remains open | false |
+| Goal truth duplicate progress id means multiple terminal receipts | duplicate id is shared summary-doc stamping, not terminal reporter closure | false |
 | Admission redaction weakened gates | admission decision remains `allow` with reasons visible | false |
 | Gap triage clears the remaining blockers | `operator_gap_triage_packet.json` is `not_authority: true` | false |
 | Gap triage counts clear the remaining blockers | counts expose selector sizes only; external-reader count remains nonzero | false |

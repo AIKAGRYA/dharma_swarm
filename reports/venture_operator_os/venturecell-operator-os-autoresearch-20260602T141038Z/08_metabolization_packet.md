@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live packet, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-802f88903e805cdb`
-Current scoped HEAD before this packet: `6a44141a docs(operator-os): refresh onboard context`
+ds-goal progress receipt: `r-0ee1f0865dd69047`
+Current scoped HEAD before this packet: `957bb0c9 feat(operator-os): count rendered artifacts`
 
 This packet captures durable learning from the run so far. It must be reviewed
 and updated during final closeout before the reporter task is closed.
@@ -377,6 +377,28 @@ and updated during final closeout before the reporter task is closed.
      Do not redact policy decisions, blockers, reasons, receipts, or authority
      boundaries.
 
+15. Goal-truth receipt chains are inventory, not closure.
+
+   Evidence:
+
+   - `operator_goal_truth_packet.json` now lists run Markdown receipts,
+     progress receipt ids, missing progress-id headers, duplicate progress ids,
+     and latest receipt metadata.
+   - The live packet reports receipts `53`, progress receipt ids `48`, unique
+     progress receipt ids `42`, missing progress ids `5`, and duplicate
+     progress id groups `1`.
+   - The duplicate progress id is the current Loop 52 progress receipt id,
+     which stamps the live summary docs and receipt together.
+   - The packet keeps `receipt_chain_complete_claimed: false`,
+     `complete_verifier_pass_claimed: false`, `not_final: true`, and
+     `not_authority: true`.
+
+   Metabolized rule:
+
+   - Future agents should use the goal-truth packet to audit receipt-chain
+     reliability. Missing or duplicate progress ids are routing signals, not
+     proof that the reporter task can close.
+
 ## Loop 45 Metabolization Note
 
 Hypothesis:
@@ -453,6 +475,7 @@ Metabolized rule:
 | `r-446364a1d4cbda18` | `48_summary_helper_refactor_receipt.md` | summary renderer helper refactor |
 | `r-935763168301bf72` | `49_periodic_onboard_refresh_receipt.md` | periodic substrate refresh context |
 | `r-802f88903e805cdb` | `50_manifest_artifact_counts_receipt.md` | manifest artifact inventory counts |
+| `r-0ee1f0865dd69047` | `51_goal_truth_packet_receipt.md` | goal-truth receipt-chain inventory |
 
 ## Current Read-Only Artifacts
 
@@ -463,6 +486,7 @@ Metabolized rule:
 - `operator_gate_summary_packet.json`
 - `operator_evidence_summary_packet.json`
 - `operator_completion_guard_packet.json`
+- `operator_goal_truth_packet.json`
 - `memory_kernel_index.json`
 - `memory_kernel_coverage_packet.json`
 - `memory_kernel_query_eval.json`
@@ -506,6 +530,7 @@ Metabolized rule:
 - `48_summary_helper_refactor_receipt.md`
 - `49_periodic_onboard_refresh_receipt.md`
 - `50_manifest_artifact_counts_receipt.md`
+- `51_goal_truth_packet_receipt.md`
 
 ## Do Not Metabolize As Done
 
@@ -546,6 +571,8 @@ These facts are explicitly not complete:
 - Four-hour midpoint proof is still non-final evidence, not a terminal receipt.
 - Manifest receipt summaries are navigation aids only.
 - Manifest inventory scope markers are navigation aids only.
+- Goal-truth receipt-chain summaries are audit routing only; missing or
+  duplicate progress ids do not close the reporter.
 - Stable admission render is diff hygiene only, not a gate change.
 - Reporter task is not closed.
 - The final adversarial audit and next-goal packet still require final-window

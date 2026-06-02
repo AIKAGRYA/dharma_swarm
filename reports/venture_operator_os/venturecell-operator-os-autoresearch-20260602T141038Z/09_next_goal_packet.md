@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-802f88903e805cdb`
-Current scoped HEAD before this packet: `6a44141a docs(operator-os): refresh onboard context`
+ds-goal progress receipt: `r-0ee1f0865dd69047`
+Current scoped HEAD before this packet: `957bb0c9 feat(operator-os): count rendered artifacts`
 
 This packet is the handoff for the next bounded AutoResearch loop. It must be
 reviewed and updated in the final hour before reporter closure.
@@ -76,6 +76,11 @@ reviewed and updated in the final hour before reporter closure.
   only.
 - Manifest latest progress receipt id: present; latest receipt id inventory is
   navigation only and not reporter closure.
+- Operator goal truth packet: present; receipts `53`, progress receipt ids
+  `48`, unique progress receipt ids `42`, missing progress ids `5`, duplicate
+  progress id groups `1`; inventory only.
+- Goal truth packet latest receipt: `51_goal_truth_packet_receipt.md` with
+  progress receipt `r-0ee1f0865dd69047`; not terminal closure.
 - Stable admission render: volatile admission id/time redacted; decision
   evidence remains visible.
 - Timebox refresh: current clock still below 8 hours.
@@ -217,6 +222,14 @@ bounded targets:
    Renderer helpers now centralize tuple/list coercion for summary packets.
    Future packet work should use those helpers and rerun focused tests plus
    live render count checks.
+
+13f. Goal truth receipt-chain preservation.
+
+   `operator_goal_truth_packet.json` now exposes receipt-chain counts, missing
+   progress-id headers, duplicate progress ids, latest receipt metadata, and
+   reporter closure policy. Use it to audit ds-goal/report reliability, not to
+   claim mission completion. Preserve count/list parity for receipts,
+   progress ids, missing progress ids, and duplicate progress ids.
 
 14. Completion guard preservation.
 
