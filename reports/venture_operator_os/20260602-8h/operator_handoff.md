@@ -31,6 +31,7 @@ Do not read this as product completion. Read it as mission-control repair:
 - `dharma_swarm/venture_cell/operator_os/`
 - `tests/test_venture_cell_operator_os_projection.py`
 - `reports/venture_operator_os/20260602-8h/operator_os_digest.md`
+- `docs/plans/2026-06-02-venturecell-operator-os-8h-autonomous-build-spec.md`
 
 ## What Changed In Direction
 
@@ -85,6 +86,10 @@ Wire this projection into one operator-facing receipt path:
 - digest artifact writer under `reports/venture_operator_os/`;
 - one CLI or control-surface row;
 - MemoryKernel read-through index spec or first implementation.
+
+The 8h+ Codex `/goal` master spec for that next run is:
+
+`docs/plans/2026-06-02-venturecell-operator-os-8h-autonomous-build-spec.md`
 
 ## Recommended Next Command
 
