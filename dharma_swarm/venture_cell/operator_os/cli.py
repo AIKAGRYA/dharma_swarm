@@ -449,6 +449,14 @@ def _artifact_manifest_payload(
     ]
     latest_receipt_path = receipt_paths[-1] if receipt_paths else ""
     latest_progress_receipt_id = _latest_progress_receipt_id(latest_receipt_path)
+    artifact_path_map = {
+        name: str(path)
+        for name, path in sorted(artifact_paths.items())
+        if name != "artifact_manifest"
+    }
+    summary_packet_names = [
+        name for name in sorted(artifact_path_map) if name.endswith("_summary_packet")
+    ]
     return {
         "schema": "dharma.venture_cell_operator_os.render_manifest.v0",
         "status": projection.get("status", "unknown"),
@@ -480,11 +488,16 @@ def _artifact_manifest_payload(
         "relative_evidence_ref_count": evidence_summary.get("relative_ref_count", 0),
         "completion_guard_decision": completion_guard.get("decision", "unknown"),
         "not_final": completion_guard.get("not_final", True),
-        "artifact_paths": {
-            name: str(path)
-            for name, path in sorted(artifact_paths.items())
-            if name != "artifact_manifest"
-        },
+        "artifact_paths": artifact_path_map,
+        "artifact_count": len(artifact_path_map),
+        "json_artifact_count": sum(
+            1 for path in artifact_path_map.values() if Path(path).suffix == ".json"
+        ),
+        "markdown_artifact_count": sum(
+            1 for path in artifact_path_map.values() if Path(path).suffix == ".md"
+        ),
+        "summary_packet_names": summary_packet_names,
+        "summary_packet_count": len(summary_packet_names),
         "receipt_paths": receipt_paths,
         "receipt_count": len(receipt_paths),
         "latest_receipt_path": latest_receipt_path,

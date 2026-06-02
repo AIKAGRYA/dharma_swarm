@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-935763168301bf72`
-Current scoped HEAD before this packet: `740cfc5f refactor(operator-os): centralize summary sequence handling`
+ds-goal progress receipt: `r-802f88903e805cdb`
+Current scoped HEAD before this packet: `6a44141a docs(operator-os): refresh onboard context`
 
 This audit is intentionally written before the final time window so the next
 agent has a concrete attack surface. It is not a completion certificate. The
@@ -71,6 +71,8 @@ updates, and terminal verification exist.
   rendered gate and evidence counts remain unchanged.
 - Periodic onboard/toolbelt refresh exits `0`; repo-wide NATS live contact and
   optional credential warnings remain substrate context only.
+- Artifact manifest now exposes artifact and summary-packet counts, but it
+  remains `not_authority: true`.
 - Completion guard says live `100/100` is not final and reporter must remain
   open.
 - Completion guard now exposes terminal reporter receipt policy and expected
@@ -238,6 +240,7 @@ Queued:
 | Evidence summary grants authority | `operator_evidence_summary_packet.json` is `not_authority: true` | false |
 | Summary helper refactor changes authority | rendered packets remain non-authority and counts are stable | false |
 | Periodic onboard refresh grants Operator OS authority | authority packet still requires action-specific ack proof | false |
+| Artifact count proves completion | manifest remains `not_final: true` and reporter is open | false |
 | Live 100 means complete | completion guard says `not_final: true` | false |
 | Completion guard policy closes reporter | policy requires terminal receipt and verifier pass | false |
 | Completion guard counts close reporter | final blocker count remains nonzero and reporter is open | false |

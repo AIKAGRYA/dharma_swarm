@@ -687,6 +687,28 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert artifact_manifest["receipt_inventory_scope"] == "run_markdown_receipts_excluding_digest"
     assert artifact_manifest["receipt_inventory_not_final"] is True
     assert artifact_manifest["receipt_inventory_not_authority"] is True
+    assert artifact_manifest["artifact_count"] == len(artifact_manifest["artifact_paths"])
+    assert artifact_manifest["json_artifact_count"] == len(
+        [
+            path
+            for path in artifact_manifest["artifact_paths"].values()
+            if Path(path).suffix == ".json"
+        ]
+    )
+    assert artifact_manifest["markdown_artifact_count"] == len(
+        [
+            path
+            for path in artifact_manifest["artifact_paths"].values()
+            if Path(path).suffix == ".md"
+        ]
+    )
+    assert artifact_manifest["summary_packet_count"] == len(
+        artifact_manifest["summary_packet_names"]
+    )
+    assert "canvas_summary_packet" in artifact_manifest["summary_packet_names"]
+    assert "department_summary_packet" in artifact_manifest["summary_packet_names"]
+    assert "gate_summary_packet" in artifact_manifest["summary_packet_names"]
+    assert "evidence_summary_packet" in artifact_manifest["summary_packet_names"]
     assert artifact_manifest["memory_coverage_truncated_root_count"] == (
         memory_coverage_packet["truncated_root_count"]
     )

@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live packet, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-935763168301bf72`
-Current scoped HEAD before this packet: `740cfc5f refactor(operator-os): centralize summary sequence handling`
+ds-goal progress receipt: `r-802f88903e805cdb`
+Current scoped HEAD before this packet: `6a44141a docs(operator-os): refresh onboard context`
 
 This packet captures durable learning from the run so far. It must be reviewed
 and updated during final closeout before the reporter task is closed.
@@ -354,6 +354,8 @@ and updated during final closeout before the reporter task is closed.
    - Future agents can use receipt summaries to navigate the run. They must not
      treat count, latest receipt, or manifest presence as a terminal reporter
      receipt.
+   - Artifact counts and summary-packet counts are inventory metadata only;
+     they do not reduce final-window requirements.
    - Inventory scope fields make the navigation boundary explicit; they do not
      reduce final-window requirements.
    - Latest progress receipt ids are freshness/navigation evidence only. They
@@ -450,6 +452,7 @@ Metabolized rule:
 | `r-4eaef0bd4e7a0a85` | `47_evidence_summary_packet_receipt.md` | machine-readable evidence summary packet |
 | `r-446364a1d4cbda18` | `48_summary_helper_refactor_receipt.md` | summary renderer helper refactor |
 | `r-935763168301bf72` | `49_periodic_onboard_refresh_receipt.md` | periodic substrate refresh context |
+| `r-802f88903e805cdb` | `50_manifest_artifact_counts_receipt.md` | manifest artifact inventory counts |
 
 ## Current Read-Only Artifacts
 
@@ -502,6 +505,7 @@ Metabolized rule:
 - `47_evidence_summary_packet_receipt.md`
 - `48_summary_helper_refactor_receipt.md`
 - `49_periodic_onboard_refresh_receipt.md`
+- `50_manifest_artifact_counts_receipt.md`
 
 ## Do Not Metabolize As Done
 

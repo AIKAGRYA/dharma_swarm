@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live risk register, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-935763168301bf72`
-Current scoped HEAD before this packet: `740cfc5f refactor(operator-os): centralize summary sequence handling`
+ds-goal progress receipt: `r-802f88903e805cdb`
+Current scoped HEAD before this packet: `6a44141a docs(operator-os): refresh onboard context`
 
 This register separates current blockers, residual risks, and solved local
 claims. It exists to prevent false completion after a high live score.
@@ -31,6 +31,7 @@ claims. It exists to prevent false completion after a high live score.
 | Authority boolean overclaim | authority packet has explicit external authority booleans | treat as denial guardrails, not grant |
 | Next-action count overclaim | next-action packet exposes blocker/department/gate/action counts | treat as handoff metadata, not grant |
 | Artifact manifest overclaim | `operator_os_artifact_manifest.json` exists | treat as locator, not proof of finality |
+| Artifact count overclaim | manifest exposes artifact and summary-packet counts | treat as inventory metadata, not finality |
 | Onboard NATS overclaim | `make onboard` reports repo-wide NATS live contact | do not treat as Operator OS action ack |
 | Liveness label regression | authority fields could become ambiguous again | keep Operator OS action-specific key names |
 | Receipt inventory overclaim | manifest lists receipt paths | treat as index, not completion proof |
@@ -79,6 +80,7 @@ claims. It exists to prevent false completion after a high live score.
 | Authority booleans render | external authority false; action ack required | denial guardrail only |
 | Next-action counts render | blocker/department/gate/forbidden counts match arrays | handoff metadata only |
 | Artifact manifest renders | `not_authority: true` | locator/status packet only |
+| Manifest artifact counts render | artifacts `16`, JSON `15`, Markdown `1`, summary packets `4` | inventory metadata only |
 | Periodic onboard passes | `make onboard` and toolbelt exit `0` | substrate context only |
 | Liveness keys are action-specific | Operator OS NATS/A2A action ack fields are false | avoids substrate/authority conflation |
 | Receipt inventory renders | manifest lists run Markdown receipts | audit locator only |

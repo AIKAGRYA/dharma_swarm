@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-935763168301bf72`
-Current scoped HEAD before this packet: `740cfc5f refactor(operator-os): centralize summary sequence handling`
+ds-goal progress receipt: `r-802f88903e805cdb`
+Current scoped HEAD before this packet: `6a44141a docs(operator-os): refresh onboard context`
 
 This packet is the handoff for the next bounded AutoResearch loop. It must be
 reviewed and updated in the final hour before reporter closure.
@@ -56,6 +56,8 @@ reviewed and updated in the final hour before reporter closure.
   rendered counts.
 - Periodic onboard/toolbelt refresh: latest checks exit `0`; repo-wide NATS and
   optional credential warnings remain context only.
+- Manifest artifact counts: artifacts `16`, JSON `15`, Markdown `1`, summary
+  packets `4`; inventory only.
 - Completion guard packet: `keep_reporter_open`, `not_final: true`.
 - Completion guard reporter policy: terminal receipt and complete verifier pass
   required.
@@ -80,7 +82,7 @@ reviewed and updated in the final hour before reporter closure.
 - Three-hour timebox proof: current clock still below 8 hours.
 - Active clock proof: current clock still below 8 hours.
 - Four-hour midpoint proof: current clock still below 8 hours.
-- Last committed packet: summary helper refactor.
+- Last committed packet: periodic onboard refresh.
 
 ## Next Goal
 
@@ -241,6 +243,8 @@ bounded targets:
    not terminal closure evidence.
    Use `latest_progress_receipt_id` the same way: it is freshness/navigation
    metadata, not terminal reporter closure.
+   Artifact and summary-packet counts are also navigation-only inventory
+   metadata.
 
 18. Stable admission render preservation.
 
@@ -337,6 +341,7 @@ If the loop only changes a report packet, also run scoped `git diff --check`.
 - `47_evidence_summary_packet_receipt.md`
 - `48_summary_helper_refactor_receipt.md`
 - `49_periodic_onboard_refresh_receipt.md`
+- `50_manifest_artifact_counts_receipt.md`
 - `operator_os_projection.json`
 - `operator_canvas_summary_packet.json`
 - `operator_department_summary_packet.json`
@@ -402,3 +407,4 @@ Queued:
 - Final adversarial audit update.
 - Final update of score, metabolization, and next-goal packets.
 - True-time proof and final reporter closure only after verification.
+   Artifact and summary-packet counts should also remain navigation-only.

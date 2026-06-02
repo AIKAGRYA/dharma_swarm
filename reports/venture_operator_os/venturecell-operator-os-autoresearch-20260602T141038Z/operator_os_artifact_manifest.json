@@ -1,5 +1,6 @@
 {
   "absolute_evidence_ref_count": 4,
+  "artifact_count": 16,
   "artifact_paths": {
     "authority_boundary_packet": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/authority_boundary_packet.json",
     "canvas_summary_packet": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/operator_canvas_summary_packet.json",
@@ -34,11 +35,13 @@
   "gate_allow_count": 1,
   "gate_blocking_count": 1,
   "gate_count": 2,
-  "latest_progress_receipt_id": "r-935763168301bf72",
+  "json_artifact_count": 15,
+  "latest_progress_receipt_id": "r-802f88903e805cdb",
   "latest_progress_receipt_id_not_final": true,
-  "latest_progress_receipt_id_source": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/49_periodic_onboard_refresh_receipt.md",
-  "latest_receipt_name": "49_periodic_onboard_refresh_receipt.md",
-  "latest_receipt_path": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/49_periodic_onboard_refresh_receipt.md",
+  "latest_progress_receipt_id_source": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/50_manifest_artifact_counts_receipt.md",
+  "latest_receipt_name": "50_manifest_artifact_counts_receipt.md",
+  "latest_receipt_path": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/50_manifest_artifact_counts_receipt.md",
+  "markdown_artifact_count": 1,
   "memory_coverage_truncated": true,
   "memory_coverage_truncated_root_count": 2,
   "memory_query_eval_passed": 6,
@@ -46,7 +49,7 @@
   "memory_query_eval_total": 6,
   "not_authority": true,
   "not_final": true,
-  "receipt_count": 51,
+  "receipt_count": 52,
   "receipt_inventory_has_progress_id": true,
   "receipt_inventory_not_authority": true,
   "receipt_inventory_not_final": true,
@@ -102,9 +105,17 @@
     "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/46_gate_summary_packet_receipt.md",
     "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/47_evidence_summary_packet_receipt.md",
     "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/48_summary_helper_refactor_receipt.md",
-    "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/49_periodic_onboard_refresh_receipt.md"
+    "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/49_periodic_onboard_refresh_receipt.md",
+    "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/50_manifest_artifact_counts_receipt.md"
   ],
   "relative_evidence_ref_count": 2,
   "schema": "dharma.venture_cell_operator_os.render_manifest.v0",
-  "status": "blocked_on_external_reader_gate"
+  "status": "blocked_on_external_reader_gate",
+  "summary_packet_count": 4,
+  "summary_packet_names": [
+    "canvas_summary_packet",
+    "department_summary_packet",
+    "evidence_summary_packet",
+    "gate_summary_packet"
+  ]
 }
