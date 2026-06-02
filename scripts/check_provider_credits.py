@@ -161,6 +161,12 @@ def main() -> int:
         action="store_true",
         help="Attempt cheap validation calls (not yet implemented)",
     )
+    parser.add_argument(
+        "--output",
+        type=str,
+        default=None,
+        help="Write output to this file instead of stdout (supports ~ expansion)",
+    )
     args = parser.parse_args()
 
     results = check_env_keys()
@@ -181,7 +187,14 @@ def main() -> int:
             },
             "providers": results,
         }
-        print(json.dumps(output, indent=2))
+        text = json.dumps(output, indent=2)
+        if args.output:
+            from pathlib import Path
+            out_path = Path(args.output).expanduser()
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            out_path.write_text(text + "\n", encoding="utf-8")
+        else:
+            print(text)
     else:
         print("=" * 60)
         print("PROVIDER CREDIT STATUS")
