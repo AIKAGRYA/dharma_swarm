@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live packet, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-772a578a521880f8`
-Current scoped HEAD before this packet: `256e2ce9 feat(operator-os): count next action lanes`
+ds-goal progress receipt: `r-3921119812771fd7`
+Current scoped HEAD before this packet: `aa4507cc docs(operator-os): refresh onboard context`
 
 This packet captures durable learning from the run so far. It must be reviewed
 and updated during final closeout before the reporter task is closed.
@@ -240,6 +240,8 @@ and updated during final closeout before the reporter task is closed.
      `17818s`.
    - `38_timebox_active_clock_receipt.md` records elapsed `12907s` and
      remaining `15893s`.
+   - `43_timebox_four_hour_receipt.md` records elapsed `14410s` and remaining
+     `14390s`.
    - Goal status remains `active`.
 
    Metabolized rule:
@@ -406,6 +408,7 @@ These facts are explicitly not complete:
 - Timebox refresh is still non-final evidence, not a terminal receipt.
 - Three-hour timebox proof is still non-final evidence, not a terminal receipt.
 - Active clock proof is still non-final evidence, not a terminal receipt.
+- Four-hour midpoint proof is still non-final evidence, not a terminal receipt.
 - Manifest receipt summaries are navigation aids only.
 - Manifest inventory scope markers are navigation aids only.
 - Stable admission render is diff hygiene only, not a gate change.

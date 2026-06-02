@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live risk register, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-772a578a521880f8`
-Current scoped HEAD before this packet: `256e2ce9 feat(operator-os): count next action lanes`
+ds-goal progress receipt: `r-3921119812771fd7`
+Current scoped HEAD before this packet: `aa4507cc docs(operator-os): refresh onboard context`
 
 This register separates current blockers, residual risks, and solved local
 claims. It exists to prevent false completion after a high live score.
@@ -13,7 +13,7 @@ claims. It exists to prevent false completion after a high live score.
 
 | Risk | Current evidence | Required resolution |
 |---|---|---|
-| True elapsed time incomplete | goal clock is `14138s`, under 8 hours | continue loops until true final window |
+| True elapsed time incomplete | goal clock is `14410s`, under 8 hours | continue loops until true final window |
 | Reporter task open | ds-goal `t05-reporter` remains open | close only after final artifacts and verification |
 | Complete verifier fails | `task_not_closed:...t05-reporter` | expected until reporter closure |
 | Darshan external authority blocked | `darshan_go_gate_packet.json` decision is `block_external_authority` | real accepted privacy-redacted external-reader GO receipt |
@@ -54,6 +54,7 @@ claims. It exists to prevent false completion after a high live score.
 | Timebox refresh overclaim | `27_timebox_refresh_receipt.md` records another non-final clock snapshot | treat as progress evidence only |
 | Three-hour timebox overclaim | `32_timebox_three_hour_receipt.md` records another non-final clock snapshot | treat as progress evidence only |
 | Active clock overclaim | `38_timebox_active_clock_receipt.md` records another non-final clock snapshot | treat as progress evidence only |
+| Four-hour timebox overclaim | `43_timebox_four_hour_receipt.md` records midpoint proof | treat as progress evidence only |
 | Context+ unavailable | `Transport closed` during static analysis attempts | document unavailable, use deterministic fallback checks |
 | Repo has unrelated dirty work | broad dirty worktree outside this run | commit only explicit scoped pathspecs |
 
@@ -92,6 +93,7 @@ claims. It exists to prevent false completion after a high live score.
 | Timebox refresh recorded | elapsed `9701s`, remaining `19099s` | non-final proof only |
 | Three-hour timebox recorded | elapsed `10982s`, remaining `17818s` | non-final proof only |
 | Active clock recorded | elapsed `12907s`, remaining `15893s` | non-final proof only |
+| Four-hour midpoint recorded | elapsed `14410s`, remaining `14390s` | non-final proof only |
 | Manifest receipt summary renders | receipt count and latest path present | audit locator only |
 | Manifest inventory scope renders | latest name and non-final/non-authority markers present | audit locator only |
 | Admission render stable | volatile id/time redacted | diff hygiene only |

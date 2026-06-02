@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-772a578a521880f8`
-Current scoped HEAD before this packet: `256e2ce9 feat(operator-os): count next action lanes`
+ds-goal progress receipt: `r-3921119812771fd7`
+Current scoped HEAD before this packet: `aa4507cc docs(operator-os): refresh onboard context`
 
 This audit is intentionally written before the final time window so the next
 agent has a concrete attack surface. It is not a completion certificate. The
@@ -13,8 +13,8 @@ updates, and terminal verification exist.
 
 ## Current Proven State
 
-- Goal clock remains well short of the 8-hour objective: elapsed `14138s`,
-  remaining `14662s`.
+- Goal clock is at the four-hour midpoint but still short of the 8-hour
+  objective: elapsed `14410s`, remaining `14390s`.
 - ds-goal remains open: `open=1 claimed=0 completed=4 failed=0 blocked=0 total=5`.
 - Reporter task remains open by design:
   `20260602-venturecell-operator-os-autoresearch-8h-t05-reporter`.
@@ -71,6 +71,7 @@ updates, and terminal verification exist.
 - Timebox refresh again proves true elapsed time is incomplete.
 - Three-hour timebox refresh proves the mission remains incomplete.
 - Active clock refresh proves the mission remains incomplete.
+- Four-hour midpoint proof confirms the mission remains incomplete.
 - Manifest receipt summary reports count and latest path, but this is
   navigation only.
 - Governed admission raw redacts volatile id/time, but decision and reasons
@@ -189,7 +190,7 @@ Queued:
 
 | Claim to attack | Current evidence | Verdict |
 |---|---|---|
-| The 8-hour mission is complete | Goal elapsed time is `14138s`, below `28800s` | false |
+| The 8-hour mission is complete | Goal elapsed time is `14410s`, below `28800s` | false |
 | Reporter can be closed now | ds-goal reporter task is open and complete verify fails | false |
 | Operator OS can act externally | `blocked_on_external_reader_gate`, `L0_read_only_plan` | false |
 | Next-action counts grant authority | decision remains `hold_external_authority` | false |

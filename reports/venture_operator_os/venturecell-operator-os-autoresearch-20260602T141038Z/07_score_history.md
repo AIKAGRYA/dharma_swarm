@@ -3,9 +3,9 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live ledger, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-772a578a521880f8`
+ds-goal progress receipt: `r-3921119812771fd7`
 Baseline: `1aca07a1 Add VentureCell Operator OS Level 70 surface`
-Current scoped HEAD before this packet: `256e2ce9 feat(operator-os): count next action lanes`
+Current scoped HEAD before this packet: `aa4507cc docs(operator-os): refresh onboard context`
 
 This file is a living score ledger. It exists now so later agents do not
 reconstruct scores from memory. It must be reviewed and updated before final
@@ -56,6 +56,7 @@ reporter closure.
 | Loop 41 | `40_completion_guard_counts_receipt.md` | `r-fe805b43c6bd347b` | 100 | +0 | keep completion guard counts |
 | Loop 42 | `41_next_action_counts_receipt.md` | `r-c58b7343ccbd2392` | 100 | +0 | keep next-action count selectors |
 | Loop 43 | `42_periodic_onboard_refresh_receipt.md` | `r-772a578a521880f8` | 100 | +0 | keep periodic onboard refresh context |
+| Loop 44 | `43_timebox_four_hour_receipt.md` | `r-3921119812771fd7` | 100 | +0 | keep four-hour non-final proof |
 
 ## Area History
 
@@ -118,8 +119,8 @@ audit with explicit evidence.
   NATS liveness remains substrate context only.
 - Periodic substrate refresh: `make onboard` and toolbelt pass; optional
   credential warnings remain context only.
-- Timebox status: elapsed `14138s` (`3h 55m 38s`), remaining `14662s`
-  (`4h 04m 22s`).
+- Timebox status: elapsed `14410s` (`4h 00m 10s`), remaining `14390s`
+  (`3h 59m 50s`).
 - Manifest receipt summary: `receipt_count` and `latest_receipt_path` present,
   with `not_final: true`.
 - Manifest inventory scope: latest receipt name and non-final/non-authority
@@ -204,6 +205,7 @@ current evidence, not as a full-project proof.
 - Timebox refresh is evidence that the mission remains active and incomplete.
 - Three-hour timebox proof confirms the mission remains active and incomplete.
 - Active clock proof confirms the mission remains active and incomplete.
+- Four-hour midpoint proof confirms the mission remains active and incomplete.
 - The reporter task must remain open until final artifacts and final
   verification prove the full contract.
 

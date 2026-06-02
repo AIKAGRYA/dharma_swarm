@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-772a578a521880f8`
-Current scoped HEAD before this packet: `256e2ce9 feat(operator-os): count next action lanes`
+ds-goal progress receipt: `r-3921119812771fd7`
+Current scoped HEAD before this packet: `aa4507cc docs(operator-os): refresh onboard context`
 
 This packet is the handoff for the next bounded AutoResearch loop. It must be
 reviewed and updated in the final hour before reporter closure.
@@ -55,7 +55,7 @@ reviewed and updated in the final hour before reporter closure.
   NATS liveness still repo-wide context only.
 - Latest periodic onboard refresh: `make onboard` and toolbelt pass, with NATS
   liveness still repo-wide context only.
-- Timebox status: elapsed `14138s`, remaining `14662s`; mission not complete.
+- Timebox status: elapsed `14410s`, remaining `14390s`; mission not complete.
 - Manifest receipt summary: manifest has receipt count and latest receipt path,
   but remains `not_final: true`.
 - Manifest inventory scope: scope/name/non-final markers present; navigation
@@ -67,7 +67,8 @@ reviewed and updated in the final hour before reporter closure.
 - Timebox refresh: current clock still below 8 hours.
 - Three-hour timebox proof: current clock still below 8 hours.
 - Active clock proof: current clock still below 8 hours.
-- Last committed packet: next-action count selectors.
+- Four-hour midpoint proof: current clock still below 8 hours.
+- Last committed packet: periodic onboard refresh context.
 
 ## Next Goal
 
@@ -287,6 +288,7 @@ If the loop only changes a report packet, also run scoped `git diff --check`.
 - `40_completion_guard_counts_receipt.md`
 - `41_next_action_counts_receipt.md`
 - `42_periodic_onboard_refresh_receipt.md`
+- `43_timebox_four_hour_receipt.md`
 - `operator_os_projection.json`
 - `operator_completion_guard_packet.json`
 - `operator_next_action_packet.json`

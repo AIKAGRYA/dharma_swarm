@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live verifier matrix, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-772a578a521880f8`
-Current scoped HEAD before this packet: `256e2ce9 feat(operator-os): count next action lanes`
+ds-goal progress receipt: `r-3921119812771fd7`
+Current scoped HEAD before this packet: `aa4507cc docs(operator-os): refresh onboard context`
 
 This matrix captures the current verification surface for future agents. It is
 not a final verifier matrix and must not be used to close the reporter task.
@@ -44,7 +44,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 - Periodic onboard/toolbelt: passing, environment context only.
 - Latest periodic onboard/toolbelt: passing, environment context only.
 - Periodic substrate refresh: passing, environment context only.
-- Timebox status: elapsed `14138s`, remaining `14662s`.
+- Timebox status: elapsed `14410s`, remaining `14390s`.
 - Manifest receipt summary: passing; count and latest receipt path rendered.
 - Manifest inventory scope: passing; latest receipt name and non-final markers
   rendered.
@@ -108,6 +108,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `27_timebox_refresh_receipt.md` | elapsed `9701s`, remaining `19099s` | proves still non-final |
 | `32_timebox_three_hour_receipt.md` | elapsed `10982s`, remaining `17818s` | proves still non-final |
 | `38_timebox_active_clock_receipt.md` | elapsed `12907s`, remaining `15893s` | proves still non-final |
+| `43_timebox_four_hour_receipt.md` | elapsed `14410s`, remaining `14390s` | proves still non-final |
 | `18_receipt_inventory_manifest_receipt.md` | manifest receipt inventory | index only, not final proof |
 | `06_adversary_audit.md` | live draft | needs final-window review |
 | `07_score_history.md` | live score `100/100` | not final |
@@ -160,6 +161,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `r-fe805b43c6bd347b` | keep | completion guard count selectors |
 | `r-c58b7343ccbd2392` | keep | next-action count selectors |
 | `r-772a578a521880f8` | keep | latest periodic onboard refresh context |
+| `r-3921119812771fd7` | keep | four-hour non-final timebox proof |
 
 ## Revert / Queue Ledger
 
