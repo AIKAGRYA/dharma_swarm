@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live risk register, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-3e318b30d3694ffa`
-Current scoped HEAD before this packet: `1779aa6c feat(operator-os): count gap triage lanes`
+ds-goal progress receipt: `r-7167e2551df4f45e`
+Current scoped HEAD before this packet: `0415f60c feat(operator-os): count memory coverage roots`
 
 This register separates current blockers, residual risks, and solved local
 claims. It exists to prevent false completion after a high live score.
@@ -34,6 +34,7 @@ claims. It exists to prevent false completion after a high live score.
 | Receipt inventory overclaim | manifest lists receipt paths | treat as index, not completion proof |
 | Receipt summary overclaim | manifest reports count/latest receipt | treat as navigation, not completion proof |
 | Receipt inventory scope overclaim | manifest reports latest receipt name and scope markers | treat as navigation, not finality proof |
+| Latest progress receipt id overclaim | manifest reports latest ds-goal receipt id | treat as navigation, not reporter closure |
 | Admission redaction overclaim | governed admission raw redacts volatile id/time | ensure decision and reasons remain visible |
 | Gap triage overclaim | `operator_gap_triage_packet.json` separates local/external gaps | treat as loop selector, not authority or gate clearance |
 | Gap triage count overclaim | gap triage exposes total/local/external counts | treat as selector sizes, not solved-gap evidence |
@@ -67,6 +68,7 @@ claims. It exists to prevent false completion after a high live score.
 | Periodic onboard passes | `make onboard` and toolbelt exit `0` | substrate context only |
 | Liveness keys are action-specific | Operator OS NATS/A2A action ack fields are false | avoids substrate/authority conflation |
 | Receipt inventory renders | manifest lists run Markdown receipts | audit locator only |
+| Latest progress receipt id renders | manifest reads ds-goal receipt id from latest receipt | navigation only |
 | Gap triage renders | external-reader non-local, MemoryKernel truncation local maintenance | selector only |
 | Gap triage counts render | total/local/external counts match packet arrays | selector sizes only |
 | Memory coverage renders | trusted/report-local roots not truncated; staging/quarantine truncated | coverage locator only |

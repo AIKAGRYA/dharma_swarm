@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-3e318b30d3694ffa`
-Current scoped HEAD before this packet: `1779aa6c feat(operator-os): count gap triage lanes`
+ds-goal progress receipt: `r-7167e2551df4f45e`
+Current scoped HEAD before this packet: `0415f60c feat(operator-os): count memory coverage roots`
 
 This audit is intentionally written before the final time window so the next
 agent has a concrete attack surface. It is not a completion certificate. The
@@ -40,6 +40,8 @@ updates, and terminal verification exist.
 - Artifact manifest lists receipt paths, but is still not final proof.
 - Artifact manifest now exposes receipt inventory scope and non-final markers,
   but is still navigation only.
+- Artifact manifest now exposes the latest progress receipt id from the latest
+  Markdown receipt, but it remains inventory metadata and not terminal closure.
 - Gap triage packet reports `external_blocked_with_local_followups`, but is
   still only a local selector and not gate clearance.
 - Gap triage packet now exposes total/local/external gap counts, but counts are
@@ -152,6 +154,8 @@ Adversarial review:
   evidence.
 - Receipt inventory scope and latest receipt name must not be used as terminal
   closure evidence.
+- Latest progress receipt id in the manifest must not be used as terminal
+  reporter closure evidence.
 - Admission redaction must not hide policy decisions, blockers, reasons, or
   authority boundaries.
 - Unrelated staged work must not be included in commits for this run.
@@ -192,6 +196,7 @@ Queued:
 | Receipt inventory proves completion | manifest is an index and reporter is still open | false |
 | Latest receipt path means terminal receipt | manifest latest receipt is a progress receipt | false |
 | Receipt inventory scope proves finality | scope/non-final markers are navigation only | false |
+| Latest progress receipt id proves completion | manifest marks it non-final and reporter remains open | false |
 | Admission redaction weakened gates | admission decision remains `allow` with reasons visible | false |
 | Gap triage clears the remaining blockers | `operator_gap_triage_packet.json` is `not_authority: true` | false |
 | Gap triage counts clear the remaining blockers | counts expose selector sizes only; external-reader count remains nonzero | false |

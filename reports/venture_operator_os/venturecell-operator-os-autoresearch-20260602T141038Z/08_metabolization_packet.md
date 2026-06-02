@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live packet, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-3e318b30d3694ffa`
-Current scoped HEAD before this packet: `1779aa6c feat(operator-os): count gap triage lanes`
+ds-goal progress receipt: `r-7167e2551df4f45e`
+Current scoped HEAD before this packet: `0415f60c feat(operator-os): count memory coverage roots`
 
 This packet captures durable learning from the run so far. It must be reviewed
 and updated during final closeout before the reporter task is closed.
@@ -239,6 +239,10 @@ and updated during final closeout before the reporter task is closed.
    - The manifest now includes `latest_receipt_name`,
      `receipt_inventory_scope`, `receipt_inventory_not_final`, and
      `receipt_inventory_not_authority`.
+   - The manifest now includes `latest_progress_receipt_id`,
+     `latest_progress_receipt_id_source`,
+     `receipt_inventory_has_progress_id`, and
+     `latest_progress_receipt_id_not_final`.
    - The same manifest still reports `not_final: true`.
 
    Metabolized rule:
@@ -248,6 +252,8 @@ and updated during final closeout before the reporter task is closed.
      receipt.
    - Inventory scope fields make the navigation boundary explicit; they do not
      reduce final-window requirements.
+   - Latest progress receipt ids are freshness/navigation evidence only. They
+     are not terminal reporter receipts.
 
 14. Render stability should redact volatility without hiding decisions.
 

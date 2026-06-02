@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-3e318b30d3694ffa`
-Current scoped HEAD before this packet: `1779aa6c feat(operator-os): count gap triage lanes`
+ds-goal progress receipt: `r-7167e2551df4f45e`
+Current scoped HEAD before this packet: `0415f60c feat(operator-os): count memory coverage roots`
 
 This packet is the handoff for the next bounded AutoResearch loop. It must be
 reviewed and updated in the final hour before reporter closure.
@@ -53,11 +53,13 @@ reviewed and updated in the final hour before reporter closure.
   but remains `not_final: true`.
 - Manifest inventory scope: scope/name/non-final markers present; navigation
   only.
+- Manifest latest progress receipt id: present; latest receipt id inventory is
+  navigation only and not reporter closure.
 - Stable admission render: volatile admission id/time redacted; decision
   evidence remains visible.
 - Timebox refresh: current clock still below 8 hours.
 - Three-hour timebox proof: current clock still below 8 hours.
-- Last committed packet: gap triage count selectors.
+- Last committed packet: memory coverage count selectors.
 
 ## Next Goal
 
@@ -178,6 +180,8 @@ bounded targets:
 
    Use `receipt_count` and `latest_receipt_path` for navigation only. They are
    not terminal closure evidence.
+   Use `latest_progress_receipt_id` the same way: it is freshness/navigation
+   metadata, not terminal reporter closure.
 
 18. Stable admission render preservation.
 
@@ -261,6 +265,7 @@ If the loop only changes a report packet, also run scoped `git diff --check`.
 - `34_authority_boolean_receipt.md`
 - `35_gap_triage_counts_receipt.md`
 - `36_memory_coverage_counts_receipt.md`
+- `37_latest_progress_receipt_manifest_receipt.md`
 - `operator_os_projection.json`
 - `operator_completion_guard_packet.json`
 - `operator_next_action_packet.json`

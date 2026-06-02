@@ -391,6 +391,11 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
         "# Opening Truth\n",
         encoding="utf-8",
     )
+    (report_dir / "99_progress_receipt.md").write_text(
+        "# Progress Receipt\n\n"
+        "ds-goal progress receipt: `r-test-progress`\n",
+        encoding="utf-8",
+    )
     _write_a2a_queue(
         state_root,
         [
@@ -553,10 +558,17 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert "memory_coverage_packet" in artifact_manifest["artifact_paths"]
     assert "completion_guard_packet" in artifact_manifest["artifact_paths"]
     assert str(report_dir / "00_opening_truth.md") in artifact_manifest["receipt_paths"]
+    assert str(report_dir / "99_progress_receipt.md") in artifact_manifest["receipt_paths"]
     assert str(report_dir / "operator_os_digest.md") not in artifact_manifest["receipt_paths"]
     assert artifact_manifest["receipt_count"] == len(artifact_manifest["receipt_paths"])
-    assert artifact_manifest["latest_receipt_path"] == str(report_dir / "00_opening_truth.md")
-    assert artifact_manifest["latest_receipt_name"] == "00_opening_truth.md"
+    assert artifact_manifest["latest_receipt_path"] == str(report_dir / "99_progress_receipt.md")
+    assert artifact_manifest["latest_receipt_name"] == "99_progress_receipt.md"
+    assert artifact_manifest["latest_progress_receipt_id"] == "r-test-progress"
+    assert artifact_manifest["latest_progress_receipt_id_source"] == str(
+        report_dir / "99_progress_receipt.md"
+    )
+    assert artifact_manifest["receipt_inventory_has_progress_id"] is True
+    assert artifact_manifest["latest_progress_receipt_id_not_final"] is True
     assert artifact_manifest["receipt_inventory_scope"] == "run_markdown_receipts_excluding_digest"
     assert artifact_manifest["receipt_inventory_not_final"] is True
     assert artifact_manifest["receipt_inventory_not_authority"] is True

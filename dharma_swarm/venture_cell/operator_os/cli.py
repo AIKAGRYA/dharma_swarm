@@ -167,6 +167,20 @@ def _completion_guard_payload(projection: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _latest_progress_receipt_id(latest_receipt_path: str) -> str:
+    if not latest_receipt_path:
+        return ""
+    try:
+        lines = Path(latest_receipt_path).read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return ""
+    prefix = "ds-goal progress receipt:"
+    for line in lines:
+        if line.startswith(prefix):
+            return line.removeprefix(prefix).strip().strip("`")
+    return ""
+
+
 def _artifact_manifest_payload(
     *,
     projection: dict[str, Any],
@@ -185,6 +199,7 @@ def _artifact_manifest_payload(
         if path.name != "operator_os_digest.md"
     ]
     latest_receipt_path = receipt_paths[-1] if receipt_paths else ""
+    latest_progress_receipt_id = _latest_progress_receipt_id(latest_receipt_path)
     return {
         "schema": "dharma.venture_cell_operator_os.render_manifest.v0",
         "status": projection.get("status", "unknown"),
@@ -210,6 +225,12 @@ def _artifact_manifest_payload(
         "receipt_count": len(receipt_paths),
         "latest_receipt_path": latest_receipt_path,
         "latest_receipt_name": Path(latest_receipt_path).name if latest_receipt_path else "",
+        "latest_progress_receipt_id": latest_progress_receipt_id,
+        "latest_progress_receipt_id_source": latest_receipt_path
+        if latest_progress_receipt_id
+        else "",
+        "receipt_inventory_has_progress_id": bool(latest_progress_receipt_id),
+        "latest_progress_receipt_id_not_final": True,
         "receipt_inventory_scope": "run_markdown_receipts_excluding_digest",
         "receipt_inventory_not_final": True,
         "receipt_inventory_not_authority": True,

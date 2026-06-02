@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live verifier matrix, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-3e318b30d3694ffa`
-Current scoped HEAD before this packet: `1779aa6c feat(operator-os): count gap triage lanes`
+ds-goal progress receipt: `r-7167e2551df4f45e`
+Current scoped HEAD before this packet: `0415f60c feat(operator-os): count memory coverage roots`
 
 This matrix captures the current verification surface for future agents. It is
 not a final verifier matrix and must not be used to close the reporter task.
@@ -41,6 +41,8 @@ not a final verifier matrix and must not be used to close the reporter task.
 - Manifest receipt summary: passing; count and latest receipt path rendered.
 - Manifest inventory scope: passing; latest receipt name and non-final markers
   rendered.
+- Manifest latest progress receipt id: passing; latest receipt id is rendered
+  and marked non-final.
 - Stable admission render: passing; volatile id/time redacted, decision visible.
 - Complete ds-goal verification: expected fail on open reporter task.
 - Mission status: open.
@@ -85,6 +87,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `operator_os_artifact_manifest.json` | rendered locator | not proof of finality or authority |
 | manifest receipt summary | `receipt_count` + `latest_receipt_path` | navigation only |
 | manifest inventory scope | `latest_receipt_name` + inventory scope markers | navigation only |
+| latest progress receipt id | latest receipt id source rendered with non-final marker | navigation only, not reporter closure |
 | governed admission raw | volatile id/time redacted | diff hygiene, not gate change |
 | `16_periodic_onboard_receipt.md` | onboard/toolbelt pass | repo-wide substrate context only |
 | `17_liveness_key_disambiguation_receipt.md` | action-specific liveness labels | prevents substrate/authority conflation |
@@ -139,6 +142,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `r-a8ff4c8f3684c4af` | keep | explicit authority booleans |
 | `r-2094f1c27d8e0d40` | keep | gap triage count selectors |
 | `r-3e318b30d3694ffa` | keep | memory coverage count selectors |
+| `r-7167e2551df4f45e` | keep | latest progress receipt id inventory |
 
 ## Revert / Queue Ledger
 

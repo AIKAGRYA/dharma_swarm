@@ -18,8 +18,11 @@
   "completion_guard_decision": "keep_reporter_open",
   "darshan_go_decision": "block_external_authority",
   "gap_triage_decision": "external_blocked_with_local_followups",
-  "latest_receipt_name": "36_memory_coverage_counts_receipt.md",
-  "latest_receipt_path": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/36_memory_coverage_counts_receipt.md",
+  "latest_progress_receipt_id": "r-7167e2551df4f45e",
+  "latest_progress_receipt_id_not_final": true,
+  "latest_progress_receipt_id_source": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/37_latest_progress_receipt_manifest_receipt.md",
+  "latest_receipt_name": "37_latest_progress_receipt_manifest_receipt.md",
+  "latest_receipt_path": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/37_latest_progress_receipt_manifest_receipt.md",
   "memory_coverage_truncated": true,
   "memory_coverage_truncated_root_count": 2,
   "memory_query_eval_passed": 6,
@@ -27,7 +30,8 @@
   "memory_query_eval_total": 6,
   "not_authority": true,
   "not_final": true,
-  "receipt_count": 38,
+  "receipt_count": 39,
+  "receipt_inventory_has_progress_id": true,
   "receipt_inventory_not_authority": true,
   "receipt_inventory_not_final": true,
   "receipt_inventory_scope": "run_markdown_receipts_excluding_digest",
@@ -69,7 +73,8 @@
     "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/33_periodic_substrate_refresh_receipt.md",
     "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/34_authority_boolean_receipt.md",
     "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/35_gap_triage_counts_receipt.md",
-    "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/36_memory_coverage_counts_receipt.md"
+    "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/36_memory_coverage_counts_receipt.md",
+    "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/37_latest_progress_receipt_manifest_receipt.md"
   ],
   "schema": "dharma.venture_cell_operator_os.render_manifest.v0",
   "status": "blocked_on_external_reader_gate"
