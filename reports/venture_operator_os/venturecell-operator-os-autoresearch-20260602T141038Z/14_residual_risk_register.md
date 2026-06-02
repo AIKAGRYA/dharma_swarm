@@ -175,3 +175,19 @@ New solved local claim:
 | GO expected local artifact readiness renders | focused tests pass and live packet reports existing `3`, concrete missing `0`, placeholder-only `1` | not accepted GO evidence and not external authority |
 
 Decision: keep the risk in the live register until final-window review.
+
+## Loop 58 Risk Addendum
+
+New residual risk:
+
+| Risk | Current evidence | Handling |
+|---|---|---|
+| GO field-group overclaim | required receipt fields are split into top-level `9` and payload `7` | treat as schema-shape guidance only; accepted receipts remain `0` |
+
+New solved local claim:
+
+| Claim | Evidence | Boundary |
+|---|---|---|
+| GO receipt field groups render | focused tests pass and live packet reports groups `2`, top-level `9`, payload `7` | not accepted evidence and not external authority |
+
+Decision: keep the risk in the live register until final-window review.

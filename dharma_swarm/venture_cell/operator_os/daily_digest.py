@@ -80,6 +80,14 @@ def render_operator_daily_digest(projection: VentureCellOperatorProjection) -> s
         ", ".join(go_gate.expected_local_artifacts) if go_gate.expected_local_artifacts else "none"
     )
     required_receipt_field_count = len(go_gate.required_receipt_fields)
+    required_receipt_field_groups = Counter(
+        "payload"
+        if field.startswith("payload.")
+        else "other_nested"
+        if "." in field
+        else "top_level"
+        for field in go_gate.required_receipt_fields
+    )
     expected_local_artifact_count = len(go_gate.expected_local_artifacts)
     receipt_template_status = str(
         go_gate.receipt_template.get("template_status") or "not_rendered"
@@ -94,6 +102,10 @@ def render_operator_daily_digest(projection: VentureCellOperatorProjection) -> s
             f"- Required source: `{go_gate.required_receipt_source}`",
             f"- Required schema: `{go_gate.required_receipt_schema}`",
             f"- Required receipt fields: `{required_receipt_field_count}`",
+            "- Required top-level receipt fields: "
+            f"`{required_receipt_field_groups.get('top_level', 0)}`",
+            "- Required payload receipt fields: "
+            f"`{required_receipt_field_groups.get('payload', 0)}`",
             f"- Accepted receipts: `{go_gate.accepted_receipt_count}`",
             f"- Countable events: `{', '.join(go_gate.countable_event_types)}`",
             f"- Blocked actions: `{blocked_actions}`",

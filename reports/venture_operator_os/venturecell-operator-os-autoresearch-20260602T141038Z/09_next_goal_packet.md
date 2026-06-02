@@ -452,3 +452,25 @@ Still forbidden:
 - external outreach, publishing, handoff, spend, deploy, push, or merge;
 - treating local artifact readiness as GO acceptance;
 - claiming NATS/A2A action liveness without action-specific ack proof.
+
+## Loop 58 Next Goal Addendum
+
+Current new evidence:
+
+- `57_go_receipt_field_groups_receipt.md`
+- `darshan_go_unblock_packet.json`
+- `operator_os_digest.md`
+- `operator_os_artifact_manifest.json`
+
+Next safe loop targets:
+
+- Refresh six-hour timebox proof once elapsed time reaches `21600s`.
+- Add no external-contact behavior; stay inside local receipt-shape and
+  operator-clarity improvements.
+- Keep complete verification blocked only by the open reporter task.
+
+Still forbidden:
+
+- using field groups as evidence acceptance;
+- creating fake GO evidence receipts;
+- closing reporter before true-time and terminal-verifier proof.

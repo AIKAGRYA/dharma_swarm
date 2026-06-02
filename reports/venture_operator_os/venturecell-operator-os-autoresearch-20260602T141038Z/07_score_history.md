@@ -272,6 +272,36 @@ Keep / revert / queue:
 
 Decision: keep.
 
+## Loop 58 Score Update
+
+Hypothesis:
+
+If the GO receipt schema is grouped into envelope and payload fields, operator
+clarity improves because future agents can validate a candidate receipt shape
+without treating shape review as evidence acceptance.
+
+Patch:
+
+- Added required receipt field groups and group counts.
+- Mirrored top-level and payload field counts in the manifest.
+- Added digest visibility for the same `9`/`7` split.
+
+Evaluation:
+
+- Focused Operator OS tests passed.
+- Live packet reports required fields `16`, groups `2`, top-level `9`, payload
+  `7`, and accepted receipts `0`.
+
+Adversarial review:
+
+- This is schema-shape clarity only.
+- Darshan GO remains blocked and external authority remains false.
+- Reporter remains open.
+
+Keep / revert / queue:
+
+Decision: keep.
+
 ## Loop 57 Score Update
 
 Hypothesis:

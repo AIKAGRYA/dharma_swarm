@@ -298,3 +298,25 @@ Keep / revert / queue:
 Decision: keep.
 
 ds-goal progress receipt: `r-94c5aa85930fb6de`
+
+## Loop 58 Adversary Addendum
+
+New claim under attack: grouping required GO receipt fields means the receipt
+gate is closer to accepted evidence.
+
+Current evidence:
+
+- `darshan_go_unblock_packet.json` reports `16` required fields split into `9`
+  top-level fields and `7` payload fields.
+- Accepted GO receipts remain `0`.
+- `not_receipt`, `not_evidence`, and `not_authority` remain `true`.
+
+Verdict: false. Field grouping is local schema-shape guidance only. It does not
+replace a real external-reader event, human approval, privacy redaction, or an
+accepted GO evidence receipt.
+
+Keep / revert / queue:
+
+Decision: keep.
+
+ds-goal progress receipt: `r-2217c07b1829a0ff`

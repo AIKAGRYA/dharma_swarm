@@ -91,6 +91,37 @@
   "rejected_receipt_count": 0,
   "rejected_receipts": [],
   "required_receipt_field_count": 16,
+  "required_receipt_field_group_count": 2,
+  "required_receipt_field_groups": [
+    {
+      "field_count": 9,
+      "fields": [
+        "receipt_id",
+        "correlation_id",
+        "source",
+        "source_url",
+        "observed_at",
+        "content_hash",
+        "event_uid",
+        "schema_version",
+        "status"
+      ],
+      "group": "top_level"
+    },
+    {
+      "field_count": 7,
+      "fields": [
+        "payload.artifact_id",
+        "payload.event_type",
+        "payload.reader_label",
+        "payload.contact_surface",
+        "payload.summary",
+        "payload.human_approved_contact",
+        "payload.privacy_redacted"
+      ],
+      "group": "payload"
+    }
+  ],
   "required_receipt_fields": [
     "receipt_id",
     "correlation_id",
@@ -109,8 +140,11 @@
     "payload.human_approved_contact",
     "payload.privacy_redacted"
   ],
+  "required_receipt_other_nested_field_count": 0,
+  "required_receipt_payload_field_count": 7,
   "required_receipt_schema": "go_evidence_receipt.v0",
   "required_receipt_source": "darshan_external_reader",
+  "required_receipt_top_level_field_count": 9,
   "safe_local_prework": [
     "inspect_expected_local_artifacts",
     "prepare_privacy_redacted_receipt_shape_only_after_real_event",

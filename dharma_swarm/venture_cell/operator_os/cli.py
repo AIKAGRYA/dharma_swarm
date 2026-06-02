@@ -340,6 +340,33 @@ def _darshan_go_receipt_template_payload(projection: dict[str, Any]) -> dict[str
     return template if isinstance(template, dict) else {}
 
 
+def _required_receipt_field_groups(fields: tuple[Any, ...]) -> list[dict[str, Any]]:
+    groups: dict[str, list[str]] = {
+        "top_level": [],
+        "payload": [],
+        "other_nested": [],
+    }
+    for field_value in fields:
+        field = str(field_value or "").strip()
+        if not field:
+            continue
+        if field.startswith("payload."):
+            groups["payload"].append(field)
+        elif "." in field:
+            groups["other_nested"].append(field)
+        else:
+            groups["top_level"].append(field)
+    return [
+        {
+            "group": group,
+            "field_count": len(values),
+            "fields": values,
+        }
+        for group, values in groups.items()
+        if values
+    ]
+
+
 def _expected_local_artifact_items(
     refs: tuple[Any, ...],
     *,
@@ -410,6 +437,13 @@ def _darshan_go_unblock_payload(
     missing_receipts = _sequence_items(go_gate.get("missing_receipts"))
     expected_local_artifacts = _sequence_items(go_gate.get("expected_local_artifacts"))
     required_receipt_fields = _sequence_items(go_gate.get("required_receipt_fields"))
+    required_receipt_field_groups = _required_receipt_field_groups(
+        required_receipt_fields
+    )
+    required_receipt_field_counts = {
+        str(item["group"]): int(item["field_count"])
+        for item in required_receipt_field_groups
+    }
     blocked_actions = _sequence_items(go_gate.get("blocked_actions"))
     blocked_departments = _sequence_items(go_gate.get("blocked_departments"))
     expected_local_artifact_items = _expected_local_artifact_items(
@@ -458,6 +492,17 @@ def _darshan_go_unblock_payload(
         "required_receipt_source": go_gate.get("required_receipt_source", ""),
         "required_receipt_fields": required_receipt_fields,
         "required_receipt_field_count": len(required_receipt_fields),
+        "required_receipt_field_groups": required_receipt_field_groups,
+        "required_receipt_field_group_count": len(required_receipt_field_groups),
+        "required_receipt_top_level_field_count": required_receipt_field_counts.get(
+            "top_level", 0
+        ),
+        "required_receipt_payload_field_count": required_receipt_field_counts.get(
+            "payload", 0
+        ),
+        "required_receipt_other_nested_field_count": required_receipt_field_counts.get(
+            "other_nested", 0
+        ),
         "expected_local_artifacts": expected_local_artifacts,
         "expected_local_artifact_count": len(expected_local_artifacts),
         "expected_local_artifact_items": expected_local_artifact_items,
@@ -732,6 +777,15 @@ def _artifact_manifest_payload(
         "darshan_go_unblock_decision": go_unblock.get("decision", "unknown"),
         "darshan_go_unblock_required_receipt_field_count": go_unblock.get(
             "required_receipt_field_count", 0
+        ),
+        "darshan_go_unblock_required_receipt_field_group_count": go_unblock.get(
+            "required_receipt_field_group_count", 0
+        ),
+        "darshan_go_unblock_required_receipt_top_level_field_count": go_unblock.get(
+            "required_receipt_top_level_field_count", 0
+        ),
+        "darshan_go_unblock_required_receipt_payload_field_count": go_unblock.get(
+            "required_receipt_payload_field_count", 0
         ),
         "darshan_go_unblock_expected_local_artifact_count": go_unblock.get(
             "expected_local_artifact_count", 0

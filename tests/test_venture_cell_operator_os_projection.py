@@ -355,6 +355,8 @@ def test_operator_daily_digest_renders_structure_without_live_authority_claim(tm
     assert "block_external_authority" in digest
     assert "draft_template_not_evidence" in digest
     assert "- Required receipt fields: `16`" in digest
+    assert "- Required top-level receipt fields: `9`" in digest
+    assert "- Required payload receipt fields: `7`" in digest
     assert "- Accepted receipts: `0`" in digest
     assert "- Expected local artifact count: `4`" in digest
     assert "darshan_go_unblock_packet.json" in digest
@@ -577,6 +579,16 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert go_unblock_packet["required_receipt_field_count"] == len(
         go_unblock_packet["required_receipt_fields"]
     )
+    assert go_unblock_packet["required_receipt_field_group_count"] == 2
+    assert go_unblock_packet["required_receipt_top_level_field_count"] == 9
+    assert go_unblock_packet["required_receipt_payload_field_count"] == 7
+    assert go_unblock_packet["required_receipt_other_nested_field_count"] == 0
+    required_field_groups = {
+        item["group"]: item for item in go_unblock_packet["required_receipt_field_groups"]
+    }
+    assert required_field_groups["top_level"]["field_count"] == 9
+    assert required_field_groups["payload"]["field_count"] == 7
+    assert "payload.privacy_redacted" in required_field_groups["payload"]["fields"]
     assert "payload.privacy_redacted" in go_unblock_packet["required_receipt_fields"]
     assert go_unblock_packet["expected_local_artifact_count"] == len(
         go_unblock_packet["expected_local_artifacts"]
@@ -806,6 +818,15 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert artifact_manifest["darshan_go_unblock_required_receipt_field_count"] == (
         go_unblock_packet["required_receipt_field_count"]
     )
+    assert artifact_manifest["darshan_go_unblock_required_receipt_field_group_count"] == (
+        go_unblock_packet["required_receipt_field_group_count"]
+    )
+    assert artifact_manifest[
+        "darshan_go_unblock_required_receipt_top_level_field_count"
+    ] == go_unblock_packet["required_receipt_top_level_field_count"]
+    assert artifact_manifest[
+        "darshan_go_unblock_required_receipt_payload_field_count"
+    ] == go_unblock_packet["required_receipt_payload_field_count"]
     assert artifact_manifest["darshan_go_unblock_expected_local_artifact_count"] == (
         go_unblock_packet["expected_local_artifact_count"]
     )

@@ -1018,3 +1018,32 @@ Metabolized rule:
 
 - Future GO work must keep local readiness, placeholder-only receipt paths, and
   accepted external-reader receipts as separate states.
+
+## Loop 58 Metabolization Note
+
+Hypothesis:
+
+If required receipt fields are grouped by envelope and payload, future receipt
+review can be more mechanical and less prone to authority overclaim.
+
+Patch:
+
+- Added field groups to the Darshan GO unblock packet.
+- Added manifest and digest mirrors for the top-level/payload split.
+- Added focused assertions for the `9`/`7` field split.
+
+Evaluation:
+
+- Focused Operator OS tests passed.
+- Live packet keeps accepted receipt count at `0`.
+
+Adversarial review:
+
+- Field grouping is not evidence and not authority.
+- The accepted-receipt gate remains unchanged.
+
+Metabolized rule:
+
+- Future receipt-shape checks should validate envelope and payload fields
+  separately, then stop before any authority claim unless an accepted real
+  receipt exists.
