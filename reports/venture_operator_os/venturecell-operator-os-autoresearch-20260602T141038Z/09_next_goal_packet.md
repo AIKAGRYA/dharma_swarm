@@ -558,3 +558,24 @@ Still forbidden:
 - treating six-hour proof as final proof;
 - closing reporter before true 8-hour and terminal-verifier proof;
 - external outreach, publishing, handoff, spend, deploy, push, or merge.
+
+## Loop 63 Next Goal Addendum
+
+Current new evidence:
+
+- `operator_final_window_preflight_packet.json`
+- `62_final_window_preflight_receipt.md`
+- updated `operator_os_artifact_manifest.json`
+
+Next safe loop targets:
+
+- Continue local review until elapsed time reaches `28800s`.
+- Refresh preflight only in the true final window.
+- Keep final closure blocked on terminal reporter receipt and complete verifier
+  pass.
+
+Still forbidden:
+
+- treating preflight as final proof;
+- claiming complete verifier pass before reporter closure;
+- including unrelated staged work in final commits.

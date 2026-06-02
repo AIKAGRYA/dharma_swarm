@@ -1,0 +1,70 @@
+{
+  "accepted_go_receipt_count": 0,
+  "autonomy_level": "L0_read_only_plan",
+  "complete_verifier_expected_blocker": "reporter_task_not_closed_until_terminal_receipt",
+  "complete_verifier_pass_claimed": false,
+  "decision": "wait_for_true_8h_and_terminal_reporter_receipt",
+  "external_authority_granted": false,
+  "final_closure_blocker_count": 4,
+  "final_closure_blockers": [
+    "true_8h_elapsed_time_not_proven",
+    "reporter_task_must_remain_open_until_terminal_receipt",
+    "complete_verifier_expected_to_fail_until_reporter_closure",
+    "final_adversary_score_metabolization_next_goal_review_required"
+  ],
+  "forbidden_action_count": 4,
+  "forbidden_actions": [
+    "close_reporter_before_true_8h",
+    "claim_complete_verifier_pass_before_reporter_closure",
+    "claim_external_authority_without_go_receipt",
+    "include_unrelated_staged_work"
+  ],
+  "latest_progress_receipt_id": "r-5e2e2a08b35ca258",
+  "latest_receipt_name": "62_final_window_preflight_receipt.md",
+  "not_authority": true,
+  "not_final": true,
+  "preflight_check_count": 5,
+  "preflight_checks": [
+    {
+      "check_id": "true_8h_elapsed_time",
+      "required_evidence": "active_goal_elapsed_time_at_least_28800s",
+      "status": "not_satisfied_by_this_packet"
+    },
+    {
+      "check_id": "terminal_reporter_receipt",
+      "required_evidence": "final_ds_goal_reporter_receipt",
+      "status": "not_satisfied_by_this_packet"
+    },
+    {
+      "check_id": "complete_verifier_pass",
+      "required_evidence": "complete_verifier_exit_zero_after_reporter_closure",
+      "status": "not_satisfied_by_this_packet"
+    },
+    {
+      "check_id": "external_authority_boundary",
+      "required_evidence": "accepted_go_receipt_or_explicit_final_blocker",
+      "status": "blocked_currently"
+    },
+    {
+      "check_id": "scoped_git_packet",
+      "required_evidence": "explicit_pathspec_commit_without_unrelated_work",
+      "status": "required_for_final_commit"
+    }
+  ],
+  "receipt_chain_complete_claimed": false,
+  "reporter_task_must_remain_open": true,
+  "required_elapsed_seconds": 28800,
+  "required_final_artifact_count": 6,
+  "required_final_artifacts": [
+    "06_adversary_audit.md",
+    "07_score_history.md",
+    "08_metabolization_packet.md",
+    "09_next_goal_packet.md",
+    "final_ds_goal_terminal_receipt",
+    "complete_verifier_pass_after_reporter_closure"
+  ],
+  "safe_next_action": "Continue local review and refresh this packet only in the final window.",
+  "schema": "dharma.venture_cell_operator_os.final_window_preflight.v0",
+  "status": "blocked_on_external_reader_gate",
+  "terminal_reporter_receipt_required": true
+}

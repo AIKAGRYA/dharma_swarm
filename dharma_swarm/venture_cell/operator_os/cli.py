@@ -806,6 +806,92 @@ def _goal_truth_payload(
     }
 
 
+def _final_window_preflight_payload(
+    *,
+    projection: dict[str, Any],
+    output_dir: Path,
+) -> dict[str, Any]:
+    completion_guard = _completion_guard_payload(projection)
+    goal_truth = _goal_truth_payload(projection=projection, output_dir=output_dir)
+    go_unblock = _darshan_go_unblock_payload(projection, output_dir=output_dir)
+    authority = _authority_boundary_payload(projection)
+    required_final_artifacts = _sequence_items(
+        completion_guard.get("required_final_artifacts")
+    )
+    final_closure_blockers = _sequence_items(
+        completion_guard.get("final_closure_blockers")
+    )
+    preflight_checks = [
+        {
+            "check_id": "true_8h_elapsed_time",
+            "required_evidence": "active_goal_elapsed_time_at_least_28800s",
+            "status": "not_satisfied_by_this_packet",
+        },
+        {
+            "check_id": "terminal_reporter_receipt",
+            "required_evidence": "final_ds_goal_reporter_receipt",
+            "status": "not_satisfied_by_this_packet",
+        },
+        {
+            "check_id": "complete_verifier_pass",
+            "required_evidence": "complete_verifier_exit_zero_after_reporter_closure",
+            "status": "not_satisfied_by_this_packet",
+        },
+        {
+            "check_id": "external_authority_boundary",
+            "required_evidence": "accepted_go_receipt_or_explicit_final_blocker",
+            "status": "blocked_currently",
+        },
+        {
+            "check_id": "scoped_git_packet",
+            "required_evidence": "explicit_pathspec_commit_without_unrelated_work",
+            "status": "required_for_final_commit",
+        },
+    ]
+    return {
+        "schema": "dharma.venture_cell_operator_os.final_window_preflight.v0",
+        "status": projection.get("status", "unknown"),
+        "autonomy_level": projection.get("autonomy_level", "unknown"),
+        "decision": "wait_for_true_8h_and_terminal_reporter_receipt",
+        "required_elapsed_seconds": 28800,
+        "reporter_task_must_remain_open": completion_guard.get(
+            "reporter_task_must_remain_open", True
+        ),
+        "terminal_reporter_receipt_required": completion_guard.get(
+            "terminal_reporter_receipt_required", True
+        ),
+        "complete_verifier_pass_claimed": False,
+        "complete_verifier_expected_blocker": completion_guard.get(
+            "complete_verifier_expected_blocker", ""
+        ),
+        "required_final_artifacts": required_final_artifacts,
+        "required_final_artifact_count": len(required_final_artifacts),
+        "final_closure_blockers": final_closure_blockers,
+        "final_closure_blocker_count": len(final_closure_blockers),
+        "preflight_checks": preflight_checks,
+        "preflight_check_count": len(preflight_checks),
+        "latest_receipt_name": goal_truth.get("latest_receipt_name", ""),
+        "latest_progress_receipt_id": goal_truth.get("latest_progress_receipt_id", ""),
+        "receipt_chain_complete_claimed": False,
+        "accepted_go_receipt_count": go_unblock.get("accepted_receipt_count", 0),
+        "external_authority_granted": authority.get(
+            "external_authority_granted", False
+        ),
+        "safe_next_action": (
+            "Continue local review and refresh this packet only in the final window."
+        ),
+        "forbidden_actions": [
+            "close_reporter_before_true_8h",
+            "claim_complete_verifier_pass_before_reporter_closure",
+            "claim_external_authority_without_go_receipt",
+            "include_unrelated_staged_work",
+        ],
+        "forbidden_action_count": 4,
+        "not_final": True,
+        "not_authority": True,
+    }
+
+
 def _artifact_manifest_payload(
     *,
     projection: dict[str, Any],
@@ -824,6 +910,10 @@ def _artifact_manifest_payload(
     evidence_summary = _evidence_summary_payload(projection)
     completion_guard = _completion_guard_payload(projection)
     goal_truth = _goal_truth_payload(projection=projection, output_dir=output_dir)
+    final_window_preflight = _final_window_preflight_payload(
+        projection=projection,
+        output_dir=output_dir,
+    )
     receipt_paths = [str(path) for path in _receipt_markdown_paths(output_dir)]
     latest_receipt_path = receipt_paths[-1] if receipt_paths else ""
     latest_progress_receipt_id = _latest_progress_receipt_id(latest_receipt_path)
@@ -908,6 +998,15 @@ def _artifact_manifest_payload(
         "absolute_evidence_ref_count": evidence_summary.get("absolute_ref_count", 0),
         "relative_evidence_ref_count": evidence_summary.get("relative_ref_count", 0),
         "completion_guard_decision": completion_guard.get("decision", "unknown"),
+        "final_window_preflight_decision": final_window_preflight.get(
+            "decision", "unknown"
+        ),
+        "final_window_preflight_check_count": final_window_preflight.get(
+            "preflight_check_count", 0
+        ),
+        "final_window_preflight_required_final_artifact_count": final_window_preflight.get(
+            "required_final_artifact_count", 0
+        ),
         "goal_truth_progress_receipt_count": goal_truth.get(
             "progress_receipt_count", 0
         ),
@@ -1147,6 +1246,19 @@ def render_operator_surface(
         + "\n",
         encoding="utf-8",
     )
+    final_window_preflight_path = output_dir / "operator_final_window_preflight_packet.json"
+    final_window_preflight_path.write_text(
+        json.dumps(
+            _final_window_preflight_payload(
+                projection=projection.to_dict(),
+                output_dir=output_dir,
+            ),
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     paths = {
         "projection": projection_path,
         "digest": digest_path,
@@ -1166,6 +1278,7 @@ def render_operator_surface(
         "evidence_summary_packet": evidence_summary_path,
         "completion_guard_packet": completion_guard_path,
         "goal_truth_packet": goal_truth_path,
+        "final_window_preflight_packet": final_window_preflight_path,
     }
     artifact_manifest_path = output_dir / "operator_os_artifact_manifest.json"
     paths["artifact_manifest"] = artifact_manifest_path

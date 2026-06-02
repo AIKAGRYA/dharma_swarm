@@ -1155,3 +1155,31 @@ Metabolized rule:
 
 - Intermediate timebox receipts must always include the final threshold and
   remaining seconds.
+
+## Loop 63 Metabolization Note
+
+Hypothesis:
+
+If final-window preflight is rendered before final closeout, future agents can
+use the checklist without inventing closure criteria.
+
+Patch:
+
+- Added final-window preflight JSON and manifest mirrors.
+- Added focused test coverage.
+
+Evaluation:
+
+- Focused Operator OS tests passed.
+- Live packet remains non-final and non-authority.
+
+Adversarial review:
+
+- Preflight is not closure.
+- Complete verifier pass is still not claimed.
+
+Metabolized rule:
+
+- Future final-window agents should use the preflight packet as a checklist and
+  must still prove true time, terminal reporter receipt, and complete verifier
+  pass.

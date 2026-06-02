@@ -272,6 +272,34 @@ Keep / revert / queue:
 
 Decision: keep.
 
+## Loop 63 Score Update
+
+Hypothesis:
+
+If final-window preflight is machine-readable, future-agent compounding improves
+because closure requirements are explicit before the final window.
+
+Patch:
+
+- Added final-window preflight packet.
+- Mirrored preflight decision and counts in the manifest.
+- Added focused tests.
+
+Evaluation:
+
+- Focused Operator OS tests passed.
+- Live preflight packet reports required elapsed seconds `28800` and checks `5`.
+
+Adversarial review:
+
+- This is not final proof.
+- Reporter remains open.
+- External authority remains false.
+
+Keep / revert / queue:
+
+Decision: keep.
+
 ## Loop 62 Score Update
 
 Hypothesis:

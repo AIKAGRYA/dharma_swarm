@@ -135,6 +135,8 @@
     {
       "item_count": 50,
       "item_ids": [
+        "task_board.6501c35cafd94a86",
+        "task_board.364c23f580484762",
         "task_board.0f82326bf0c44482",
         "task_board.d511df57665d44ba",
         "task_board.503881cdb12e455e",
@@ -182,9 +184,7 @@
         "task_board.46f07f675bcb4330",
         "task_board.eadac7a6981c4322",
         "task_board.ce3ddd729e434366",
-        "task_board.488f07326a314dd4",
-        "task_board.8b744db4ced04082",
-        "task_board.0ea9794709e248d6"
+        "task_board.488f07326a314dd4"
       ],
       "lane": "task_board",
       "owner_departments": [

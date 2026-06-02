@@ -176,6 +176,22 @@ New solved local claim:
 
 Decision: keep the risk in the live register until final-window review.
 
+## Loop 63 Risk Addendum
+
+New residual risk:
+
+| Risk | Current evidence | Handling |
+|---|---|---|
+| Preflight overclaim | `operator_final_window_preflight_packet.json` renders closure checklist | treat as checklist only; not final proof |
+
+New solved local claim:
+
+| Claim | Evidence | Boundary |
+|---|---|---|
+| Final-window preflight renders | focused tests pass and live packet has checks `5` | reporter remains open and 8-hour proof is still required |
+
+Decision: keep the risk in the live register until final-window review.
+
 ## Loop 62 Risk Addendum
 
 New residual risk:

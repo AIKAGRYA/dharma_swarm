@@ -255,6 +255,48 @@
       "evidence_refs": [
         "dharma_swarm/task_board.py"
       ],
+      "item_id": "task_board.6501c35cafd94a86",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "6501c35cafd94a86",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
+      "item_id": "task_board.364c23f580484762",
+      "lane": "task_board",
+      "owner_department": "engineering",
+      "raw": {
+        "assigned_to": null,
+        "created_by": "eval_harness",
+        "id": "364c23f580484762",
+        "metadata": {},
+        "priority": "low",
+        "status": "pending",
+        "title": "eval_probe_task"
+      },
+      "source_surface": "TaskBoard",
+      "status": "pending",
+      "title": "eval_probe_task"
+    },
+    {
+      "blocked_reason": "",
+      "evidence_refs": [
+        "dharma_swarm/task_board.py"
+      ],
       "item_id": "task_board.0f82326bf0c44482",
       "lane": "task_board",
       "owner_department": "engineering",
@@ -1249,48 +1291,6 @@
         "assigned_to": null,
         "created_by": "eval_harness",
         "id": "488f07326a314dd4",
-        "metadata": {},
-        "priority": "low",
-        "status": "pending",
-        "title": "eval_probe_task"
-      },
-      "source_surface": "TaskBoard",
-      "status": "pending",
-      "title": "eval_probe_task"
-    },
-    {
-      "blocked_reason": "",
-      "evidence_refs": [
-        "dharma_swarm/task_board.py"
-      ],
-      "item_id": "task_board.8b744db4ced04082",
-      "lane": "task_board",
-      "owner_department": "engineering",
-      "raw": {
-        "assigned_to": null,
-        "created_by": "eval_harness",
-        "id": "8b744db4ced04082",
-        "metadata": {},
-        "priority": "low",
-        "status": "pending",
-        "title": "eval_probe_task"
-      },
-      "source_surface": "TaskBoard",
-      "status": "pending",
-      "title": "eval_probe_task"
-    },
-    {
-      "blocked_reason": "",
-      "evidence_refs": [
-        "dharma_swarm/task_board.py"
-      ],
-      "item_id": "task_board.0ea9794709e248d6",
-      "lane": "task_board",
-      "owner_department": "engineering",
-      "raw": {
-        "assigned_to": null,
-        "created_by": "eval_harness",
-        "id": "0ea9794709e248d6",
         "metadata": {},
         "priority": "low",
         "status": "pending",
@@ -3555,7 +3555,7 @@
         "indexed_count": 20,
         "role": "supplemental_staging",
         "root": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z",
-        "scanned_count": 64,
+        "scanned_count": 65,
         "tier": "staged",
         "truncated": false
       },
@@ -3575,7 +3575,7 @@
       "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z",
       "/Users/dhyana/.dharma/knowledge/quarantine"
     ],
-    "staged_count": 5064,
+    "staged_count": 5065,
     "status": "read_through_index_available",
     "truncated": true,
     "trusted_count": 1343

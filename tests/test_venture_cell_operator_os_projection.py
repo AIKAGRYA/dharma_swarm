@@ -498,6 +498,9 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     goal_truth_packet = json.loads(
         paths["goal_truth_packet"].read_text(encoding="utf-8")
     )
+    final_window_preflight_packet = json.loads(
+        paths["final_window_preflight_packet"].read_text(encoding="utf-8")
+    )
     artifact_manifest = json.loads(
         paths["artifact_manifest"].read_text(encoding="utf-8")
     )
@@ -803,6 +806,34 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert goal_truth_packet["complete_verifier_pass_claimed"] is False
     assert goal_truth_packet["not_final"] is True
     assert goal_truth_packet["not_authority"] is True
+    assert (
+        final_window_preflight_packet["schema"]
+        == "dharma.venture_cell_operator_os.final_window_preflight.v0"
+    )
+    assert (
+        final_window_preflight_packet["decision"]
+        == "wait_for_true_8h_and_terminal_reporter_receipt"
+    )
+    assert final_window_preflight_packet["required_elapsed_seconds"] == 28800
+    assert final_window_preflight_packet["reporter_task_must_remain_open"] is True
+    assert final_window_preflight_packet["terminal_reporter_receipt_required"] is True
+    assert final_window_preflight_packet["complete_verifier_pass_claimed"] is False
+    assert final_window_preflight_packet["required_final_artifact_count"] == len(
+        final_window_preflight_packet["required_final_artifacts"]
+    )
+    assert final_window_preflight_packet["final_closure_blocker_count"] == len(
+        final_window_preflight_packet["final_closure_blockers"]
+    )
+    assert final_window_preflight_packet["preflight_check_count"] == len(
+        final_window_preflight_packet["preflight_checks"]
+    )
+    assert final_window_preflight_packet["preflight_check_count"] == 5
+    assert final_window_preflight_packet["latest_receipt_name"] == "99_progress_receipt.md"
+    assert final_window_preflight_packet["latest_progress_receipt_id"] == "r-test-progress"
+    assert final_window_preflight_packet["accepted_go_receipt_count"] == 0
+    assert final_window_preflight_packet["external_authority_granted"] is False
+    assert final_window_preflight_packet["not_final"] is True
+    assert final_window_preflight_packet["not_authority"] is True
     assert artifact_manifest["schema"] == "dharma.venture_cell_operator_os.render_manifest.v0"
     assert artifact_manifest["status"] == "blocked_on_external_reader_gate"
     assert artifact_manifest["darshan_go_decision"] == "block_external_authority"
@@ -823,6 +854,7 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert "evidence_summary_packet" in artifact_manifest["artifact_paths"]
     assert "completion_guard_packet" in artifact_manifest["artifact_paths"]
     assert "goal_truth_packet" in artifact_manifest["artifact_paths"]
+    assert "final_window_preflight_packet" in artifact_manifest["artifact_paths"]
     assert str(report_dir / "00_opening_truth.md") in artifact_manifest["receipt_paths"]
     assert str(report_dir / "99_progress_receipt.md") in artifact_manifest["receipt_paths"]
     assert str(report_dir / "operator_os_digest.md") not in artifact_manifest["receipt_paths"]
@@ -916,6 +948,15 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert artifact_manifest["goal_truth_duplicate_progress_receipt_group_count"] == (
         goal_truth_packet["duplicate_progress_receipt_group_count"]
     )
+    assert artifact_manifest["final_window_preflight_decision"] == (
+        final_window_preflight_packet["decision"]
+    )
+    assert artifact_manifest["final_window_preflight_check_count"] == (
+        final_window_preflight_packet["preflight_check_count"]
+    )
+    assert artifact_manifest[
+        "final_window_preflight_required_final_artifact_count"
+    ] == final_window_preflight_packet["required_final_artifact_count"]
     assert "canvas_summary_packet" in artifact_manifest["summary_packet_names"]
     assert "department_summary_packet" in artifact_manifest["summary_packet_names"]
     assert "gate_summary_packet" in artifact_manifest["summary_packet_names"]

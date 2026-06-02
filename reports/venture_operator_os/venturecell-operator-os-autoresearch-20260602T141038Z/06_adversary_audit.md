@@ -405,3 +405,24 @@ Keep / revert / queue:
 Decision: keep.
 
 ds-goal progress receipt: `r-03653d86821631f9`
+
+## Loop 63 Adversary Addendum
+
+New claim under attack: final-window preflight packet means final closeout is
+ready.
+
+Current evidence:
+
+- `operator_final_window_preflight_packet.json` decision is
+  `wait_for_true_8h_and_terminal_reporter_receipt`.
+- Required elapsed seconds are `28800`.
+- Preflight check count is `5`.
+- Accepted GO receipts remain `0`.
+
+Verdict: false. Preflight is a checklist and routing packet, not final proof.
+
+Keep / revert / queue:
+
+Decision: keep.
+
+ds-goal progress receipt: `r-5e2e2a08b35ca258`
