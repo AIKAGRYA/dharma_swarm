@@ -36,13 +36,35 @@ def _memory_query_eval_payload(projection: dict[str, Any]) -> dict[str, Any]:
 def _memory_coverage_payload(projection: dict[str, Any]) -> dict[str, Any]:
     memory = _memory_index_payload(projection)
     truncated = bool(memory.get("truncated"))
+    root_coverage = [
+        coverage
+        for coverage in memory.get("root_coverage", [])
+        if isinstance(coverage, dict)
+    ]
+    truncated_roots = [
+        coverage for coverage in root_coverage if bool(coverage.get("truncated"))
+    ]
     return {
         "schema": "dharma.venture_cell_operator_os.memory_coverage.v0",
         "status": memory.get("status", "unknown"),
         "index_status": memory.get("index_status", "not_built"),
         "indexed_count": memory.get("indexed_count", 0),
         "source_roots": memory.get("source_roots", []),
-        "root_coverage": memory.get("root_coverage", []),
+        "root_coverage": root_coverage,
+        "truncated_roles": [
+            str(coverage.get("role") or coverage.get("tier") or "unknown")
+            for coverage in truncated_roots
+        ],
+        "local_maintenance_targets": [
+            {
+                "role": str(coverage.get("role") or coverage.get("tier") or "unknown"),
+                "tier": str(coverage.get("tier") or "unknown"),
+                "root": str(coverage.get("root") or ""),
+                "gap": "memory_kernel_index_truncated",
+                "recommended_action": "add_query_specific_source_packet_or_increase_local_scan_budget",
+            }
+            for coverage in truncated_roots
+        ],
         "truncated": truncated,
         "locally_actionable_gap": "memory_kernel_index_truncated" if truncated else "",
         "safe_next_action": (

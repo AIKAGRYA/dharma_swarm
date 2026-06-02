@@ -1,6 +1,22 @@
 {
   "index_status": "available_truncated",
   "indexed_count": 80,
+  "local_maintenance_targets": [
+    {
+      "gap": "memory_kernel_index_truncated",
+      "recommended_action": "add_query_specific_source_packet_or_increase_local_scan_budget",
+      "role": "staging",
+      "root": "/Users/dhyana/.dharma/knowledge/staging",
+      "tier": "staged"
+    },
+    {
+      "gap": "memory_kernel_index_truncated",
+      "recommended_action": "add_query_specific_source_packet_or_increase_local_scan_budget",
+      "role": "quarantine",
+      "root": "/Users/dhyana/.dharma/knowledge/quarantine",
+      "tier": "quarantine"
+    }
+  ],
   "locally_actionable_gap": "memory_kernel_index_truncated",
   "not_authority": true,
   "root_coverage": [
@@ -27,7 +43,7 @@
       "indexed_count": 20,
       "role": "supplemental_staging",
       "root": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z",
-      "scanned_count": 31,
+      "scanned_count": 32,
       "tier": "staged",
       "truncated": false
     },
@@ -51,5 +67,9 @@
   ],
   "status": "read_through_index_available",
   "truncated": true,
+  "truncated_roles": [
+    "staging",
+    "quarantine"
+  ],
   "trusted_promotion_claimed": false
 }

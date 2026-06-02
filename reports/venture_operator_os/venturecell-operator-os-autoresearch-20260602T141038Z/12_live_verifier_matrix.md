@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live verifier matrix, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-a158aa9cb20d8ba4`
-Current scoped HEAD before this packet: `011d8dd4 docs(operator-os): refresh timebox status`
+ds-goal progress receipt: `r-875b5bb0c3e8a17a`
+Current scoped HEAD before this packet: `fd8e3453 feat(operator-os): harden go template requirements`
 
 This matrix captures the current verification surface for future agents. It is
 not a final verifier matrix and must not be used to close the reporter task.
@@ -22,6 +22,8 @@ not a final verifier matrix and must not be used to close the reporter task.
   MemoryKernel truncation remains local maintenance.
 - Memory coverage: passing; staging/quarantine roots are truncated and
   trusted/report-local roots are not truncated.
+- Memory coverage targets: passing; staging/quarantine are listed as local
+  maintenance targets.
 - Digest canvas summary: passing; Markdown repeated rows capped while JSON
   projection rows remain complete.
 - Completion guard: passing; live `100/100` is explicitly non-final.
@@ -56,6 +58,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `operator_completion_guard_packet.json` | `keep_reporter_open` | finality guard, not terminal receipt |
 | `memory_kernel_query_eval.json` | `pass` (`6/6`) | staged/report-local pass, not trusted promotion |
 | `memory_kernel_coverage_packet.json` | root coverage rendered | explains truncation, not complete coverage |
+| Memory coverage targets | staging/quarantine local maintenance targets | selectors only, not repair proof |
 | `memory_kernel_repair_packet.json` | `no_repair_needed` | still forbids trusted promotion |
 | `darshan_go_gate_packet.json` | `block_external_authority` | accepted receipts empty |
 | `darshan_go_receipt_template.json` | `draft_template_not_evidence` | must not be stored as accepted receipt |
@@ -109,6 +112,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `r-b3e68b7947e399fa` | keep | stable admission render |
 | `r-82ec224489746c03` | keep | timebox refresh |
 | `r-a158aa9cb20d8ba4` | keep | GO template requirements |
+| `r-875b5bb0c3e8a17a` | keep | memory coverage targets |
 
 ## Revert / Queue Ledger
 

@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-a158aa9cb20d8ba4`
-Current scoped HEAD before this packet: `011d8dd4 docs(operator-os): refresh timebox status`
+ds-goal progress receipt: `r-875b5bb0c3e8a17a`
+Current scoped HEAD before this packet: `fd8e3453 feat(operator-os): harden go template requirements`
 
 This audit is intentionally written before the final time window so the next
 agent has a concrete attack surface. It is not a completion certificate. The
@@ -38,6 +38,8 @@ updates, and terminal verification exist.
   still only a local selector and not gate clearance.
 - Memory coverage packet identifies root-level truncation, but does not prove
   complete MemoryKernel coverage.
+- Memory coverage packet now lists truncated roles and local maintenance
+  targets, but does not remove truncation.
 - Digest canvas summary caps repeated Markdown rows, but projection JSON still
   holds full evidence and the cap is not filtering.
 - Completion guard says live `100/100` is not final and reporter must remain
@@ -115,6 +117,8 @@ Adversarial review:
   clearance.
 - Memory coverage must not be used to claim complete recall or trusted Chetana
   promotion.
+- Memory coverage targets must not be used to claim that staging/quarantine
+  truncation is resolved.
 - Digest row caps must not be used to hide evidence or claim a cleaner task
   state than projection JSON shows.
 - Completion guard must not be treated as a terminal reporter receipt.
@@ -164,6 +168,7 @@ Queued:
 | Admission redaction weakened gates | admission decision remains `allow` with reasons visible | false |
 | Gap triage clears the remaining blockers | `operator_gap_triage_packet.json` is `not_authority: true` | false |
 | Memory coverage proves complete recall | staging and quarantine roots are still truncated | false |
+| Memory coverage targets resolve truncation | targets name staging/quarantine maintenance only | false |
 | Digest cap deletes noisy tasks | projection JSON still includes the full canvas | false |
 | Live 100 means complete | completion guard says `not_final: true` | false |
 | Onboard NATS liveness proves Operator OS authority | authority packet still has action ack fields false | false |

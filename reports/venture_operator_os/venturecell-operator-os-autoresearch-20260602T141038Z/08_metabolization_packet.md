@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live packet, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-a158aa9cb20d8ba4`
-Current scoped HEAD before this packet: `011d8dd4 docs(operator-os): refresh timebox status`
+ds-goal progress receipt: `r-875b5bb0c3e8a17a`
+Current scoped HEAD before this packet: `fd8e3453 feat(operator-os): harden go template requirements`
 
 This packet captures durable learning from the run so far. It must be reviewed
 and updated during final closeout before the reporter task is closed.
@@ -132,6 +132,8 @@ and updated during final closeout before the reporter task is closed.
    - The current trusted root and report-local supplemental root are not
      truncated.
    - The current staging and quarantine roots hit the scan cap.
+   - The coverage packet now names staging and quarantine as
+     `local_maintenance_targets`.
    - The packet has `not_authority: true` and
      `trusted_promotion_claimed: false`.
 
@@ -140,6 +142,8 @@ and updated during final closeout before the reporter task is closed.
    - Future memory loops should target specific truncated roots or
      query-specific retrieval. Coverage metadata explains limits; it does not
      prove complete memory coverage or trusted promotion.
+   - Local maintenance targets are selectors, not proof that truncation was
+     repaired.
 
 9. Human digest scanability must not mutate machine evidence.
 
@@ -267,6 +271,7 @@ and updated during final closeout before the reporter task is closed.
 | `r-b3e68b7947e399fa` | `26_stable_admission_render_receipt.md` | stable governed-admission render |
 | `r-82ec224489746c03` | `27_timebox_refresh_receipt.md` | refreshed non-final timebox status |
 | `r-a158aa9cb20d8ba4` | `28_go_template_requirements_receipt.md` | machine-readable GO template acceptance prerequisites |
+| `r-875b5bb0c3e8a17a` | `29_memory_coverage_targets_receipt.md` | local MemoryKernel coverage maintenance targets |
 
 ## Current Read-Only Artifacts
 
@@ -303,6 +308,7 @@ and updated during final closeout before the reporter task is closed.
 - `26_stable_admission_render_receipt.md`
 - `27_timebox_refresh_receipt.md`
 - `28_go_template_requirements_receipt.md`
+- `29_memory_coverage_targets_receipt.md`
 
 ## Do Not Metabolize As Done
 
@@ -327,6 +333,8 @@ These facts are explicitly not complete:
 - Gap triage is a local loop selector, not authority or final proof.
 - Memory coverage explains root truncation, not complete recall or trusted
   promotion.
+- Memory coverage targets explain where truncation remains; they do not repair
+  it.
 - Digest canvas summarization is presentation-only and does not remove
   projection evidence.
 - Completion guard is not a terminal reporter receipt.

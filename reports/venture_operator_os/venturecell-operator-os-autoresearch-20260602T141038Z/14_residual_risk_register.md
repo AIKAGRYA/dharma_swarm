@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live risk register, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-a158aa9cb20d8ba4`
-Current scoped HEAD before this packet: `011d8dd4 docs(operator-os): refresh timebox status`
+ds-goal progress receipt: `r-875b5bb0c3e8a17a`
+Current scoped HEAD before this packet: `fd8e3453 feat(operator-os): harden go template requirements`
 
 This register separates current blockers, residual risks, and solved local
 claims. It exists to prevent false completion after a high live score.
@@ -35,6 +35,7 @@ claims. It exists to prevent false completion after a high live score.
 | Admission redaction overclaim | governed admission raw redacts volatile id/time | ensure decision and reasons remain visible |
 | Gap triage overclaim | `operator_gap_triage_packet.json` separates local/external gaps | treat as loop selector, not authority or gate clearance |
 | Memory coverage overclaim | `memory_kernel_coverage_packet.json` exposes root coverage | treat as limit evidence, not complete memory coverage |
+| Memory coverage target overclaim | coverage packet lists staging/quarantine maintenance targets | treat as selectors, not repair proof |
 | Digest cap overclaim | `operator_os_digest.md` summarizes repeated canvas rows | use projection JSON for full evidence |
 | Completion guard overclaim | `operator_completion_guard_packet.json` says keep reporter open | guard only, not terminal receipt |
 | Periodic onboard overclaim | `23_periodic_onboard_refresh_receipt.md` records substrate health | context only, not mission authority |
@@ -60,6 +61,7 @@ claims. It exists to prevent false completion after a high live score.
 | Receipt inventory renders | manifest lists run Markdown receipts | audit locator only |
 | Gap triage renders | external-reader non-local, MemoryKernel truncation local maintenance | selector only |
 | Memory coverage renders | trusted/report-local roots not truncated; staging/quarantine truncated | coverage locator only |
+| Memory coverage targets render | staging/quarantine listed as maintenance targets | selector only |
 | Digest canvas summary renders | repeated task-board rows capped with omitted count | presentation only |
 | Completion guard renders | live score can be 100 without completion | false-final guard only |
 | Periodic onboard refresh passes | `make onboard` and toolbelt exit `0` | environment context only |

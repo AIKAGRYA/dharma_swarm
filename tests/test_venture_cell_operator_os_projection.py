@@ -447,6 +447,14 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert memory_coverage_packet["not_authority"] is True
     assert memory_coverage_packet["trusted_promotion_claimed"] is False
     assert memory_coverage_packet["root_coverage"]
+    assert "truncated_roles" in memory_coverage_packet
+    assert "local_maintenance_targets" in memory_coverage_packet
+    if memory_coverage_packet["truncated"]:
+        assert memory_coverage_packet["truncated_roles"]
+        assert all(
+            target["gap"] == "memory_kernel_index_truncated"
+            for target in memory_coverage_packet["local_maintenance_targets"]
+        )
     assert "query_eval_status" in memory_index
     assert "query_eval_results" in memory_query_eval
     assert memory_query_eval["trusted_promotion_claimed"] is False

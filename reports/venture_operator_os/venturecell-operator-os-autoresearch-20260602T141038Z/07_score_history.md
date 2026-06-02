@@ -3,9 +3,9 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live ledger, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-a158aa9cb20d8ba4`
+ds-goal progress receipt: `r-875b5bb0c3e8a17a`
 Baseline: `1aca07a1 Add VentureCell Operator OS Level 70 surface`
-Current scoped HEAD before this packet: `011d8dd4 docs(operator-os): refresh timebox status`
+Current scoped HEAD before this packet: `fd8e3453 feat(operator-os): harden go template requirements`
 
 This file is a living score ledger. It exists now so later agents do not
 reconstruct scores from memory. It must be reviewed and updated before final
@@ -42,6 +42,7 @@ reporter closure.
 | Loop 27 | `26_stable_admission_render_receipt.md` | `r-b3e68b7947e399fa` | 100 | +0 | keep stable admission render |
 | Loop 28 | `27_timebox_refresh_receipt.md` | `r-82ec224489746c03` | 100 | +0 | keep timebox refresh |
 | Loop 29 | `28_go_template_requirements_receipt.md` | `r-a158aa9cb20d8ba4` | 100 | +0 | keep GO template requirements |
+| Loop 30 | `29_memory_coverage_targets_receipt.md` | `r-875b5bb0c3e8a17a` | 100 | +0 | keep memory coverage targets |
 
 ## Area History
 
@@ -81,6 +82,8 @@ audit with explicit evidence.
   maintenance.
 - Memory coverage packet: present, with staging and quarantine roots marked
   truncated and trusted/report-local roots marked not truncated.
+- Memory coverage targets: staging and quarantine are listed as local
+  maintenance targets.
 - Digest canvas summary: presentation cap keeps the Markdown digest scannable
   while the full projection retains all rows.
 - Completion guard packet: `keep_reporter_open`, `not_final: true`, and
@@ -141,6 +144,8 @@ current evidence, not as a full-project proof.
 - Gap triage is a local selector and not authority or final proof.
 - Memory coverage packet explains truncation but does not clear the truncation
   gap or prove complete memory coverage.
+- Memory coverage targets identify where to work next, but do not resolve the
+  truncation gap.
 - Digest summarization is presentation-only and must not be treated as deletion
   or evidence filtering.
 - Completion guard must remain a guardrail, not a terminal completion receipt.
