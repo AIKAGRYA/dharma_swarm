@@ -834,6 +834,15 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
         final_window_preflight_packet["preflight_checks"]
     )
     assert final_window_preflight_packet["preflight_check_count"] == 5
+    assert final_window_preflight_packet["preflight_command_count"] == len(
+        final_window_preflight_packet["preflight_commands"]
+    )
+    assert final_window_preflight_packet["preflight_command_count"] == 7
+    preflight_command_ids = {
+        item["command_id"] for item in final_window_preflight_packet["preflight_commands"]
+    }
+    assert "goal_clock" in preflight_command_ids
+    assert "complete_verifier" in preflight_command_ids
     assert final_window_preflight_packet["latest_receipt_name"] == "99_progress_receipt.md"
     assert final_window_preflight_packet["latest_progress_receipt_id"] == "r-test-progress"
     assert final_window_preflight_packet["accepted_go_receipt_count"] == 0
@@ -959,6 +968,9 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     )
     assert artifact_manifest["final_window_preflight_check_count"] == (
         final_window_preflight_packet["preflight_check_count"]
+    )
+    assert artifact_manifest["final_window_preflight_command_count"] == (
+        final_window_preflight_packet["preflight_command_count"]
     )
     assert artifact_manifest[
         "final_window_preflight_required_final_artifact_count"

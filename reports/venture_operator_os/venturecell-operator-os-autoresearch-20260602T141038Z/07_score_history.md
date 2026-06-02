@@ -272,6 +272,33 @@ Keep / revert / queue:
 
 Decision: keep.
 
+## Loop 65 Score Update
+
+Hypothesis:
+
+If final-window commands are embedded in the preflight packet, future-agent
+compounding improves because the closure verifier is executable from one JSON
+artifact.
+
+Patch:
+
+- Added final-window command checklist and manifest count mirror.
+- Added focused assertions for command count and ids.
+
+Evaluation:
+
+- Focused Operator OS tests passed.
+- Live preflight packet reports command count `7`.
+
+Adversarial review:
+
+- Command checklist is not proof of command success.
+- Reporter remains open and final proof remains unclaimed.
+
+Keep / revert / queue:
+
+Decision: keep.
+
 ## Loop 64 Score Update
 
 Hypothesis:

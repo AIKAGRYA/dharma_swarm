@@ -447,3 +447,23 @@ Keep / revert / queue:
 Decision: keep.
 
 ds-goal progress receipt: `r-e6e0bdc502c62176`
+
+## Loop 65 Adversary Addendum
+
+New claim under attack: listing final-window commands means the commands have
+already passed in final mode.
+
+Current evidence:
+
+- `operator_final_window_preflight_packet.json` lists `7` commands.
+- The complete verifier expected result is exit zero only after terminal
+  reporter closure.
+- Reporter remains open.
+
+Verdict: false. Command listing is preparation, not execution or final proof.
+
+Keep / revert / queue:
+
+Decision: keep.
+
+ds-goal progress receipt: `r-98e140611af9f18e`

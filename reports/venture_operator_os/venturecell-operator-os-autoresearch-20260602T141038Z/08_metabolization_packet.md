@@ -1209,3 +1209,29 @@ Metabolized rule:
 
 - Human-facing summaries must repeat non-final markers when pointing at
   final-window artifacts.
+
+## Loop 65 Metabolization Note
+
+Hypothesis:
+
+If final-window commands are stored in the preflight packet, final agents can
+execute checks without relying on memory.
+
+Patch:
+
+- Added concrete preflight commands and command count mirror.
+
+Evaluation:
+
+- Focused Operator OS tests passed.
+- Live packet remains non-final.
+
+Adversarial review:
+
+- Listed commands are not executed final-window evidence.
+- Complete verifier pass remains unclaimed.
+
+Metabolized rule:
+
+- Command inventories must name expected results and must not be cited as proof
+  until the commands are run in the relevant window.

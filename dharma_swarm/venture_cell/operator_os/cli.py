@@ -848,6 +848,43 @@ def _final_window_preflight_payload(
             "status": "required_for_final_commit",
         },
     ]
+    preflight_commands = [
+        {
+            "command_id": "goal_clock",
+            "command": "get_goal",
+            "expected_result": "timeUsedSeconds >= 28800",
+        },
+        {
+            "command_id": "operator_projection_tests",
+            "command": "pytest -q tests/test_venture_cell_operator_os_projection.py",
+            "expected_result": "exit_zero",
+        },
+        {
+            "command_id": "darshan_control_slice",
+            "command": "pytest -q tests/test_darshan_external_reader_gate.py tests/test_control_surface.py -k 'GoReceiptRows or external_reader'",
+            "expected_result": "exit_zero",
+        },
+        {
+            "command_id": "governed_a2a_daily_slice",
+            "command": "pytest -q tests/test_governed_work_admission.py tests/test_a2a_task_lifecycle.py tests/test_daily_operating_brief.py",
+            "expected_result": "exit_zero",
+        },
+        {
+            "command_id": "operator_compile",
+            "command": "./.venv/bin/python -m compileall -q dharma_swarm/venture_cell/operator_os",
+            "expected_result": "exit_zero",
+        },
+        {
+            "command_id": "scoped_diff_check",
+            "command": "git diff --check -- dharma_swarm/venture_cell/operator_os tests/test_venture_cell_operator_os_projection.py reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z",
+            "expected_result": "exit_zero",
+        },
+        {
+            "command_id": "complete_verifier",
+            "command": "./.venv/bin/python scripts/runtime/autonomy_spine.py verify --mission-id 20260602-venturecell-operator-os-autoresearch-8h --phase complete --json",
+            "expected_result": "exit_zero_after_terminal_reporter_closure",
+        },
+    ]
     return {
         "schema": "dharma.venture_cell_operator_os.final_window_preflight.v0",
         "status": projection.get("status", "unknown"),
@@ -870,6 +907,8 @@ def _final_window_preflight_payload(
         "final_closure_blocker_count": len(final_closure_blockers),
         "preflight_checks": preflight_checks,
         "preflight_check_count": len(preflight_checks),
+        "preflight_commands": preflight_commands,
+        "preflight_command_count": len(preflight_commands),
         "latest_receipt_name": goal_truth.get("latest_receipt_name", ""),
         "latest_progress_receipt_id": goal_truth.get("latest_progress_receipt_id", ""),
         "receipt_chain_complete_claimed": False,
@@ -1003,6 +1042,9 @@ def _artifact_manifest_payload(
         ),
         "final_window_preflight_check_count": final_window_preflight.get(
             "preflight_check_count", 0
+        ),
+        "final_window_preflight_command_count": final_window_preflight.get(
+            "preflight_command_count", 0
         ),
         "final_window_preflight_required_final_artifact_count": final_window_preflight.get(
             "required_final_artifact_count", 0

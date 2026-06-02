@@ -176,6 +176,22 @@ New solved local claim:
 
 Decision: keep the risk in the live register until final-window review.
 
+## Loop 65 Risk Addendum
+
+New residual risk:
+
+| Risk | Current evidence | Handling |
+|---|---|---|
+| Command-list overclaim | preflight packet lists `7` final-window commands | treat as checklist only; run commands in the actual final window |
+
+New solved local claim:
+
+| Claim | Evidence | Boundary |
+|---|---|---|
+| Final preflight command checklist renders | focused tests pass and manifest mirrors command count `7` | not command execution proof |
+
+Decision: keep the risk in the live register until final-window review.
+
 ## Loop 64 Risk Addendum
 
 New residual risk:

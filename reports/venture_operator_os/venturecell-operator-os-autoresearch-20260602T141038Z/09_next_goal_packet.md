@@ -599,3 +599,22 @@ Still forbidden:
 - treating digest preflight text as final proof;
 - closing reporter early;
 - external outreach, publishing, handoff, spend, deploy, push, or merge.
+
+## Loop 65 Next Goal Addendum
+
+Current new evidence:
+
+- `64_final_preflight_commands_receipt.md`
+- updated `operator_final_window_preflight_packet.json`
+
+Next safe loop targets:
+
+- Continue local review until elapsed time reaches `28800s`.
+- Use preflight commands only as final-window checklist.
+- Keep complete verifier blocked by the open reporter until terminal closure.
+
+Still forbidden:
+
+- treating command listing as command execution;
+- claiming complete verifier pass before reporter closure;
+- including unrelated staged work in final commits.
