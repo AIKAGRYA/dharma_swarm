@@ -187,8 +187,58 @@
   "schema": "dharma.venture_cell_operator_os.darshan_go_unblock.v0",
   "status": "blocked_on_external_reader_gate",
   "template_requirement_coverage_complete": false,
+  "template_requirement_covered_field_group_count": 2,
+  "template_requirement_covered_field_groups": [
+    {
+      "field_count": 5,
+      "fields": [
+        "source",
+        "source_url",
+        "event_uid",
+        "schema_version",
+        "status"
+      ],
+      "group": "top_level"
+    },
+    {
+      "field_count": 2,
+      "fields": [
+        "payload.human_approved_contact",
+        "payload.privacy_redacted"
+      ],
+      "group": "payload"
+    }
+  ],
+  "template_requirement_covered_payload_field_count": 2,
+  "template_requirement_covered_top_level_field_count": 5,
   "template_requirement_not_evidence": true,
   "template_requirement_scope": "minimum_acceptance_requirements_not_full_receipt",
+  "template_requirement_uncovered_field_group_count": 2,
+  "template_requirement_uncovered_field_groups": [
+    {
+      "field_count": 4,
+      "fields": [
+        "receipt_id",
+        "correlation_id",
+        "observed_at",
+        "content_hash"
+      ],
+      "group": "top_level"
+    },
+    {
+      "field_count": 5,
+      "fields": [
+        "payload.artifact_id",
+        "payload.event_type",
+        "payload.reader_label",
+        "payload.contact_surface",
+        "payload.summary"
+      ],
+      "group": "payload"
+    }
+  ],
+  "template_requirement_uncovered_payload_field_count": 5,
+  "template_requirement_uncovered_top_level_field_count": 4,
   "trusted_promotion_claimed": false,
   "why_external_reader_required": "Darshan cannot advance growth, communications, publishing, or external operator action from a draft artifact until a countable external reader event is linked to an accepted, privacy-redacted GO evidence receipt."
 }

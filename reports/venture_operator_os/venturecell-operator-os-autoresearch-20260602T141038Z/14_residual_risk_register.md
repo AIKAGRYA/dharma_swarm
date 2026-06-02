@@ -176,6 +176,22 @@ New solved local claim:
 
 Decision: keep the risk in the live register until final-window review.
 
+## Loop 60 Risk Addendum
+
+New residual risk:
+
+| Risk | Current evidence | Handling |
+|---|---|---|
+| Grouped template gap overclaim | uncovered template requirement fields split into top-level `4` and payload `5` | treat as local review metadata only; accepted receipts remain `0` |
+
+New solved local claim:
+
+| Claim | Evidence | Boundary |
+|---|---|---|
+| Template gap groups render | focused tests pass and live packet reports covered `5/2`, uncovered `4/5` | not accepted evidence and not authority |
+
+Decision: keep the risk in the live register until final-window review.
+
 ## Loop 59 Risk Addendum
 
 New residual risk:

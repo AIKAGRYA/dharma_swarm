@@ -2485,19 +2485,6 @@
         "title": "Source turn"
       },
       {
-        "excerpt": "title: <observed_from_primary_session> <what_happened>Agent</what_happened> <occurred_\u2026 \u2014 turn 7 chetana_version: 0.1.0 atom_id: 3d73d892-d041-4d27-84f6-b70cabfb64a1 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana--claude-mem-observer-sessions/3ec041d6-bf10-474f-90fe-cbf73ea00187.jsonl span: line:123 ca",
-        "matched_terms": [
-          "Chetana",
-          "wiki",
-          "staged",
-          "trusted",
-          "quarantine"
-        ],
-        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/3d73d892-d041-4d27-84f6-b70cabfb64a1.md",
-        "tier": "staged",
-        "title": "Source turn"
-      },
-      {
         "excerpt": "title: <task-notification> <task-id>a4962bad0f8194f26</task-id> <tool-use-id>toolu_01X\u2026 \u2014 turn 9 chetana_version: 0.1.0 atom_id: 3f4037cd-f063-46a9-9f74-476f93f119f7 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:277 captured: '2026-05-04T13:37:37.4",
         "matched_terms": [
           "Chetana",
@@ -2741,6 +2728,19 @@
           "trusted"
         ],
         "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/8954fb55-b8ed-46f7-b3f5-ce39fab0e11f.md",
+        "tier": "staged",
+        "title": "Source turn"
+      },
+      {
+        "excerpt": "title: <task-notification> <task-id>a4962bad0f8194f26</task-id> <tool-use-id>toolu_01X\u2026 \u2014 turn 9 chetana_version: 0.1.0 atom_id: 8d6a60a8-edaf-4bec-ab81-fd562072531a type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/0bc1e45c-d642-4249-a4d6-6a5d9c53e0d4.jsonl span: line:277 captured: '2026-05-04T07:05:58.4",
+        "matched_terms": [
+          "Chetana",
+          "Execute",
+          "wiki",
+          "staged",
+          "trusted"
+        ],
+        "path": "/Users/dhyana/.dharma/knowledge/staging/2026-05-04/8d6a60a8-edaf-4bec-ab81-fd562072531a.md",
         "tier": "staged",
         "title": "Source turn"
       },
@@ -3537,7 +3537,7 @@
         "indexed_count": 20,
         "role": "trusted",
         "root": "/Users/dhyana/.dharma/knowledge/wiki/concepts",
-        "scanned_count": 1336,
+        "scanned_count": 1339,
         "tier": "trusted",
         "truncated": false
       },
@@ -3555,7 +3555,7 @@
         "indexed_count": 20,
         "role": "supplemental_staging",
         "root": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z",
-        "scanned_count": 61,
+        "scanned_count": 62,
         "tier": "staged",
         "truncated": false
       },
@@ -3575,10 +3575,10 @@
       "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z",
       "/Users/dhyana/.dharma/knowledge/quarantine"
     ],
-    "staged_count": 5061,
+    "staged_count": 5062,
     "status": "read_through_index_available",
     "truncated": true,
-    "trusted_count": 1336
+    "trusted_count": 1339
   },
   "memory_kernel_repair_packet": {
     "decision": "no_repair_needed",

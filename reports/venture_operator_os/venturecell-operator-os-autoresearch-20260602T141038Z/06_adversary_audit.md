@@ -342,3 +342,25 @@ Keep / revert / queue:
 Decision: keep.
 
 ds-goal progress receipt: `r-500be60ed5f37f7c`
+
+## Loop 60 Adversary Addendum
+
+New claim under attack: grouped template gaps are sufficient to produce or
+accept a GO receipt.
+
+Current evidence:
+
+- `darshan_go_unblock_packet.json` reports covered top-level `5`, covered
+  payload `2`, uncovered top-level `4`, and uncovered payload `5`.
+- Accepted GO receipts remain `0`.
+- The template remains non-evidence.
+
+Verdict: false. The split only tells future reviewers where the template's
+acceptance requirements are incomplete; it does not authorize receipt creation
+or acceptance.
+
+Keep / revert / queue:
+
+Decision: keep.
+
+ds-goal progress receipt: `r-f1d421f33b5fb379`

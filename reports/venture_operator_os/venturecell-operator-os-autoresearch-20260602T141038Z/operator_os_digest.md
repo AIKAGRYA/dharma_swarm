@@ -71,6 +71,8 @@
 - Required payload receipt fields: `7`
 - Template requirement fields: `7`
 - Required fields covered by template requirements: `7`/`16`
+- Template-uncovered top-level receipt fields: `4`
+- Template-uncovered payload receipt fields: `5`
 - Accepted receipts: `0`
 - Countable events: `decision, inspection, read, reply`
 - Blocked actions: `external_outreach, publishing, external_operator_handoff, live_external_authority`
@@ -110,8 +112,8 @@
 ## Memory Kernel
 
 - Status: `read_through_index_available`
-- Staged: `5061`
-- Trusted: `1336`
+- Staged: `5062`
+- Trusted: `1339`
 - Quarantine: `5000`
 - Truncated scan: `True`
 - Index: `available_truncated` with `80` entries
@@ -119,9 +121,9 @@
 
 ## Memory Coverage
 
-- `trusted` `trusted`: scanned `1336`; indexed `20`/`20`; truncated `False`.
+- `trusted` `trusted`: scanned `1339`; indexed `20`/`20`; truncated `False`.
 - `staging` `staged`: scanned `5000`; indexed `20`/`20`; truncated `True`.
-- `supplemental_staging` `staged`: scanned `61`; indexed `20`/`20`; truncated `False`.
+- `supplemental_staging` `staged`: scanned `62`; indexed `20`/`20`; truncated `False`.
 - `quarantine` `quarantine`: scanned `5000`; indexed `20`/`20`; truncated `True`.
 
 ## Memory Repair Packet
@@ -147,9 +149,9 @@
   - Source turn: `/Users/dhyana/.dharma/knowledge/wiki/concepts/mode-switch--progress-summary--------critical-tag-requirement---read-carefu----turn-5.md`
   - Source turn: `/Users/dhyana/.dharma/knowledge/wiki/concepts/mode-switch--progress-summary-----do-not-output--observation--tags--this-is----turn-1.md`
 - `staged` entries shown: `3`
-  - Source turn: `/Users/dhyana/.dharma/knowledge/staging/2026-05-04/3d73d892-d041-4d27-84f6-b70cabfb64a1.md`
   - Source turn: `/Users/dhyana/.dharma/knowledge/staging/2026-05-04/3f4037cd-f063-46a9-9f74-476f93f119f7.md`
   - Source turn: `/Users/dhyana/.dharma/knowledge/staging/2026-05-04/3fdd30a4-4c2b-4c27-b731-8e98adb7d084.md`
+  - Source turn: `/Users/dhyana/.dharma/knowledge/staging/2026-05-04/44cf7824-9e0b-41e2-abf7-33307408b3c2.md`
 - `quarantine` entries shown: `3`
   - Source turn: `/Users/dhyana/.dharma/knowledge/quarantine/collisions/2026-05-25/0e360da6-2296-46d5-881f-5ebd497be6f1.md`
   - Source turn: `/Users/dhyana/.dharma/knowledge/quarantine/collisions/2026-05-25/2fa6322f-f07e-4986-ade7-578df1bca7aa.md`

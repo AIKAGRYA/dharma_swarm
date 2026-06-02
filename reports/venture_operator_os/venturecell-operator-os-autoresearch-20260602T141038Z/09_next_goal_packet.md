@@ -497,3 +497,24 @@ Still forbidden:
 - creating fake GO evidence receipts;
 - external outreach, publishing, handoff, spend, deploy, push, merge, or
   reporter closure.
+
+## Loop 60 Next Goal Addendum
+
+Current new evidence:
+
+- `59_go_template_gap_groups_receipt.md`
+- `darshan_go_unblock_packet.json`
+- `operator_os_digest.md`
+- `operator_os_artifact_manifest.json`
+
+Next safe loop targets:
+
+- Refresh six-hour timebox proof once elapsed time reaches `21600s`.
+- Continue only local review-metadata improvements until then.
+- Keep all receipt acceptance, outreach, and publishing blocked.
+
+Still forbidden:
+
+- using grouped template gaps as accepted evidence;
+- creating fake GO evidence receipts;
+- closing reporter before true-time and terminal-verifier proof.

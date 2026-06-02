@@ -1074,3 +1074,30 @@ Metabolized rule:
 
 - Future agents must cite template coverage as review scaffolding only; accepted
   receipts still require a real event, human approval, and privacy redaction.
+
+## Loop 60 Metabolization Note
+
+Hypothesis:
+
+If template coverage gaps are grouped by envelope and payload fields, future
+agents can repair local review docs without weakening the external-reader gate.
+
+Patch:
+
+- Added covered/uncovered field groups and manifest/digest mirrors.
+- Added focused assertions for the grouped counts.
+
+Evaluation:
+
+- Focused Operator OS tests passed.
+- Live accepted receipt count remains `0`.
+
+Adversarial review:
+
+- Grouped gaps remain local metadata only.
+- No authority or receipt acceptance changed.
+
+Metabolized rule:
+
+- Future GO template work should preserve grouped coverage gaps as review
+  metadata and never use them as a substitute for accepted evidence.

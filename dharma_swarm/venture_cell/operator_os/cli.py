@@ -388,6 +388,15 @@ def _receipt_template_requirement_summary(
     uncovered_fields = tuple(
         field for field in required_fields if field not in requirement_fields
     )
+    covered_field_groups = _required_receipt_field_groups(covered_fields)
+    uncovered_field_groups = _required_receipt_field_groups(uncovered_fields)
+    covered_counts = {
+        str(item["group"]): int(item["field_count"]) for item in covered_field_groups
+    }
+    uncovered_counts = {
+        str(item["group"]): int(item["field_count"])
+        for item in uncovered_field_groups
+    }
     return {
         "receipt_template_status": str(
             template.get("template_status") or "not_rendered"
@@ -399,6 +408,22 @@ def _receipt_template_requirement_summary(
         "required_receipt_fields_without_template_requirement": uncovered_fields,
         "required_receipt_field_without_template_requirement_count": len(
             uncovered_fields
+        ),
+        "template_requirement_covered_field_groups": covered_field_groups,
+        "template_requirement_covered_field_group_count": len(covered_field_groups),
+        "template_requirement_uncovered_field_groups": uncovered_field_groups,
+        "template_requirement_uncovered_field_group_count": len(uncovered_field_groups),
+        "template_requirement_covered_top_level_field_count": covered_counts.get(
+            "top_level", 0
+        ),
+        "template_requirement_covered_payload_field_count": covered_counts.get(
+            "payload", 0
+        ),
+        "template_requirement_uncovered_top_level_field_count": uncovered_counts.get(
+            "top_level", 0
+        ),
+        "template_requirement_uncovered_payload_field_count": uncovered_counts.get(
+            "payload", 0
         ),
         "template_requirement_coverage_complete": not uncovered_fields,
         "template_requirement_scope": "minimum_acceptance_requirements_not_full_receipt",
@@ -839,6 +864,12 @@ def _artifact_manifest_payload(
         ),
         "darshan_go_unblock_template_requirement_uncovered_field_count": go_unblock.get(
             "required_receipt_field_without_template_requirement_count", 0
+        ),
+        "darshan_go_unblock_template_requirement_uncovered_top_level_field_count": go_unblock.get(
+            "template_requirement_uncovered_top_level_field_count", 0
+        ),
+        "darshan_go_unblock_template_requirement_uncovered_payload_field_count": go_unblock.get(
+            "template_requirement_uncovered_payload_field_count", 0
         ),
         "darshan_go_unblock_expected_local_artifact_count": go_unblock.get(
             "expected_local_artifact_count", 0

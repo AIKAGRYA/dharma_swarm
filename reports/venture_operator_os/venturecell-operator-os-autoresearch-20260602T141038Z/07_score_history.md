@@ -272,6 +272,34 @@ Keep / revert / queue:
 
 Decision: keep.
 
+## Loop 60 Score Update
+
+Hypothesis:
+
+If template coverage gaps are grouped, operator clarity improves because the
+remaining gap is actionable without becoming authority.
+
+Patch:
+
+- Added covered and uncovered field groups for template requirements.
+- Added manifest and digest mirrors for the uncovered top-level/payload split.
+- Added focused assertions for covered `5/2` and uncovered `4/5`.
+
+Evaluation:
+
+- Focused Operator OS tests passed.
+- Live packet reports accepted receipts `0`.
+
+Adversarial review:
+
+- This does not change gate status.
+- Darshan GO remains blocked and external authority remains false.
+- Reporter remains open.
+
+Keep / revert / queue:
+
+Decision: keep.
+
 ## Loop 59 Score Update
 
 Hypothesis:

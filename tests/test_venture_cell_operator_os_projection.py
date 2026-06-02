@@ -359,6 +359,8 @@ def test_operator_daily_digest_renders_structure_without_live_authority_claim(tm
     assert "- Required payload receipt fields: `7`" in digest
     assert "- Template requirement fields: `7`" in digest
     assert "- Required fields covered by template requirements: `7`/`16`" in digest
+    assert "- Template-uncovered top-level receipt fields: `4`" in digest
+    assert "- Template-uncovered payload receipt fields: `5`" in digest
     assert "- Accepted receipts: `0`" in digest
     assert "- Expected local artifact count: `4`" in digest
     assert "darshan_go_unblock_packet.json" in digest
@@ -595,6 +597,12 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert go_unblock_packet["accepted_receipt_requirement_field_count"] == 7
     assert go_unblock_packet["required_receipt_field_template_requirement_count"] == 7
     assert go_unblock_packet["required_receipt_field_without_template_requirement_count"] == 9
+    assert go_unblock_packet["template_requirement_covered_field_group_count"] == 2
+    assert go_unblock_packet["template_requirement_uncovered_field_group_count"] == 2
+    assert go_unblock_packet["template_requirement_covered_top_level_field_count"] == 5
+    assert go_unblock_packet["template_requirement_covered_payload_field_count"] == 2
+    assert go_unblock_packet["template_requirement_uncovered_top_level_field_count"] == 4
+    assert go_unblock_packet["template_requirement_uncovered_payload_field_count"] == 5
     assert go_unblock_packet["template_requirement_coverage_complete"] is False
     assert (
         go_unblock_packet["template_requirement_scope"]
@@ -854,6 +862,12 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert artifact_manifest[
         "darshan_go_unblock_template_requirement_uncovered_field_count"
     ] == go_unblock_packet["required_receipt_field_without_template_requirement_count"]
+    assert artifact_manifest[
+        "darshan_go_unblock_template_requirement_uncovered_top_level_field_count"
+    ] == go_unblock_packet["template_requirement_uncovered_top_level_field_count"]
+    assert artifact_manifest[
+        "darshan_go_unblock_template_requirement_uncovered_payload_field_count"
+    ] == go_unblock_packet["template_requirement_uncovered_payload_field_count"]
     assert artifact_manifest["darshan_go_unblock_expected_local_artifact_count"] == (
         go_unblock_packet["expected_local_artifact_count"]
     )
