@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-c58b7343ccbd2392`
-Current scoped HEAD before this packet: `3f535825 feat(operator-os): count completion blockers`
+ds-goal progress receipt: `r-772a578a521880f8`
+Current scoped HEAD before this packet: `256e2ce9 feat(operator-os): count next action lanes`
 
 This packet is the handoff for the next bounded AutoResearch loop. It must be
 reviewed and updated in the final hour before reporter closure.
@@ -53,7 +53,9 @@ reviewed and updated in the final hour before reporter closure.
   liveness treated as repo-wide substrate context only.
 - Periodic substrate refresh: latest `make onboard` and toolbelt pass, with
   NATS liveness still repo-wide context only.
-- Timebox status: elapsed `12907s`, remaining `15893s`; mission not complete.
+- Latest periodic onboard refresh: `make onboard` and toolbelt pass, with NATS
+  liveness still repo-wide context only.
+- Timebox status: elapsed `14138s`, remaining `14662s`; mission not complete.
 - Manifest receipt summary: manifest has receipt count and latest receipt path,
   but remains `not_final: true`.
 - Manifest inventory scope: scope/name/non-final markers present; navigation
@@ -65,7 +67,7 @@ reviewed and updated in the final hour before reporter closure.
 - Timebox refresh: current clock still below 8 hours.
 - Three-hour timebox proof: current clock still below 8 hours.
 - Active clock proof: current clock still below 8 hours.
-- Last committed packet: completion guard count selectors.
+- Last committed packet: next-action count selectors.
 
 ## Next Goal
 
@@ -136,6 +138,8 @@ bounded targets:
    `16_periodic_onboard_receipt.md` now exists. Refresh onboarding/toolbelt
    evidence periodically, but do not treat repo-wide NATS liveness as
    mission-specific authority proof.
+   `42_periodic_onboard_refresh_receipt.md` is the latest refresh and remains
+   context only.
 
 9. Liveness field discipline.
 
@@ -282,6 +286,7 @@ If the loop only changes a report packet, also run scoped `git diff --check`.
 - `39_go_receipt_counts_receipt.md`
 - `40_completion_guard_counts_receipt.md`
 - `41_next_action_counts_receipt.md`
+- `42_periodic_onboard_refresh_receipt.md`
 - `operator_os_projection.json`
 - `operator_completion_guard_packet.json`
 - `operator_next_action_packet.json`

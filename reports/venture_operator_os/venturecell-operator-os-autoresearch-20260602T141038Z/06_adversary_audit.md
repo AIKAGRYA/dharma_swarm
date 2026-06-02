@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-c58b7343ccbd2392`
-Current scoped HEAD before this packet: `3f535825 feat(operator-os): count completion blockers`
+ds-goal progress receipt: `r-772a578a521880f8`
+Current scoped HEAD before this packet: `256e2ce9 feat(operator-os): count next action lanes`
 
 This audit is intentionally written before the final time window so the next
 agent has a concrete attack surface. It is not a completion certificate. The
@@ -13,8 +13,8 @@ updates, and terminal verification exist.
 
 ## Current Proven State
 
-- Goal clock remains well short of the 8-hour objective: elapsed `12907s`,
-  remaining `15893s`.
+- Goal clock remains well short of the 8-hour objective: elapsed `14138s`,
+  remaining `14662s`.
 - ds-goal remains open: `open=1 claimed=0 completed=4 failed=0 blocked=0 total=5`.
 - Reporter task remains open by design:
   `20260602-venturecell-operator-os-autoresearch-8h-t05-reporter`.
@@ -66,6 +66,7 @@ updates, and terminal verification exist.
 - Completion guard now exposes final/external/artifact/forbidden counts, but
   still says `keep_reporter_open`.
 - Periodic onboard/toolbelt pass, but this is environment context only.
+- Latest periodic onboard/toolbelt pass, but this is environment context only.
 - Timebox status proves true elapsed time is incomplete.
 - Timebox refresh again proves true elapsed time is incomplete.
 - Three-hour timebox refresh proves the mission remains incomplete.
@@ -159,6 +160,8 @@ Adversarial review:
   or A2A liveness.
 - Periodic substrate refresh must not be used to claim Operator OS
   action-specific NATS or A2A liveness.
+- Latest periodic onboard refresh must not be used to claim Operator OS
+  action-specific NATS or A2A liveness.
 - Timebox status must be refreshed before final-window claims.
 - Receipt count and latest receipt path must not be used as terminal closure
   evidence.
@@ -186,7 +189,7 @@ Queued:
 
 | Claim to attack | Current evidence | Verdict |
 |---|---|---|
-| The 8-hour mission is complete | Goal elapsed time is `12907s`, below `28800s` | false |
+| The 8-hour mission is complete | Goal elapsed time is `14138s`, below `28800s` | false |
 | Reporter can be closed now | ds-goal reporter task is open and complete verify fails | false |
 | Operator OS can act externally | `blocked_on_external_reader_gate`, `L0_read_only_plan` | false |
 | Next-action counts grant authority | decision remains `hold_external_authority` | false |

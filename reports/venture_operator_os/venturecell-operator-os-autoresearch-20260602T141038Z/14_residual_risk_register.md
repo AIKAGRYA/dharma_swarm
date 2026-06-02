@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live risk register, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-c58b7343ccbd2392`
-Current scoped HEAD before this packet: `3f535825 feat(operator-os): count completion blockers`
+ds-goal progress receipt: `r-772a578a521880f8`
+Current scoped HEAD before this packet: `256e2ce9 feat(operator-os): count next action lanes`
 
 This register separates current blockers, residual risks, and solved local
 claims. It exists to prevent false completion after a high live score.
@@ -13,7 +13,7 @@ claims. It exists to prevent false completion after a high live score.
 
 | Risk | Current evidence | Required resolution |
 |---|---|---|
-| True elapsed time incomplete | goal clock is `12907s`, under 8 hours | continue loops until true final window |
+| True elapsed time incomplete | goal clock is `14138s`, under 8 hours | continue loops until true final window |
 | Reporter task open | ds-goal `t05-reporter` remains open | close only after final artifacts and verification |
 | Complete verifier fails | `task_not_closed:...t05-reporter` | expected until reporter closure |
 | Darshan external authority blocked | `darshan_go_gate_packet.json` decision is `block_external_authority` | real accepted privacy-redacted external-reader GO receipt |
@@ -49,6 +49,7 @@ claims. It exists to prevent false completion after a high live score.
 | Completion guard count overclaim | guard exposes blocker/artifact/action counts | treat as audit metadata, not closure evidence |
 | Periodic onboard overclaim | `23_periodic_onboard_refresh_receipt.md` records substrate health | context only, not mission authority |
 | Periodic substrate refresh overclaim | `33_periodic_substrate_refresh_receipt.md` records substrate health | context only, not mission authority |
+| Latest periodic onboard overclaim | `42_periodic_onboard_refresh_receipt.md` records substrate health | context only, not mission authority |
 | Timebox stale claim | `24_timebox_status_receipt.md` records one clock snapshot | refresh before final-window claims |
 | Timebox refresh overclaim | `27_timebox_refresh_receipt.md` records another non-final clock snapshot | treat as progress evidence only |
 | Three-hour timebox overclaim | `32_timebox_three_hour_receipt.md` records another non-final clock snapshot | treat as progress evidence only |
@@ -86,6 +87,7 @@ claims. It exists to prevent false completion after a high live score.
 | Completion guard counts render | final/external/artifact/forbidden counts match arrays | audit metadata only |
 | Periodic onboard refresh passes | `make onboard` and toolbelt exit `0` | environment context only |
 | Periodic substrate refresh passes | `make onboard` and toolbelt exit `0` | environment context only |
+| Latest periodic onboard refresh passes | `make onboard` and toolbelt exit `0` | environment context only |
 | Timebox status recorded | elapsed `8770s`, remaining `20030s` | non-final proof only |
 | Timebox refresh recorded | elapsed `9701s`, remaining `19099s` | non-final proof only |
 | Three-hour timebox recorded | elapsed `10982s`, remaining `17818s` | non-final proof only |

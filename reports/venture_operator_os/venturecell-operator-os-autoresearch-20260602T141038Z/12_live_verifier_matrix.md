@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live verifier matrix, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-c58b7343ccbd2392`
-Current scoped HEAD before this packet: `3f535825 feat(operator-os): count completion blockers`
+ds-goal progress receipt: `r-772a578a521880f8`
+Current scoped HEAD before this packet: `256e2ce9 feat(operator-os): count next action lanes`
 
 This matrix captures the current verification surface for future agents. It is
 not a final verifier matrix and must not be used to close the reporter task.
@@ -42,8 +42,9 @@ not a final verifier matrix and must not be used to close the reporter task.
 - Completion guard counts: passing; final/external/artifact/forbidden counts
   match arrays and remain non-final.
 - Periodic onboard/toolbelt: passing, environment context only.
+- Latest periodic onboard/toolbelt: passing, environment context only.
 - Periodic substrate refresh: passing, environment context only.
-- Timebox status: elapsed `12907s`, remaining `15893s`.
+- Timebox status: elapsed `14138s`, remaining `14662s`.
 - Manifest receipt summary: passing; count and latest receipt path rendered.
 - Manifest inventory scope: passing; latest receipt name and non-final markers
   rendered.
@@ -64,6 +65,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | Operator OS render | `./.venv/bin/python -m dharma_swarm.venture_cell.operator_os.cli --output-dir reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z` | exit `0` | pass |
 | Periodic onboard | `make onboard` | exit `0` | pass, not mission authority |
 | Codex toolbelt | `bash scripts/runtime/codex_toolbelt_status.sh` | exit `0` with optional credential warnings | pass |
+| Latest periodic onboard/toolbelt | `make onboard`; `bash scripts/runtime/codex_toolbelt_status.sh` | both exit `0`; optional credential warnings | pass, not mission authority |
 | Periodic substrate refresh | `make onboard`; `bash scripts/runtime/codex_toolbelt_status.sh` | both exit `0`; optional credential warnings | pass, not mission authority |
 | Scoped diff hygiene | `git diff --check -- dharma_swarm/venture_cell/operator_os tests/test_venture_cell_operator_os_projection.py reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z` | exit `0` | pass |
 | Complete ds-goal verifier | `./.venv/bin/python scripts/runtime/autonomy_spine.py verify --mission-id 20260602-venturecell-operator-os-autoresearch-8h --phase complete --json` | `task_not_closed:...t05-reporter` | expected non-final blocker |
@@ -157,6 +159,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `r-11e562264d282a72` | keep | GO receipt count selectors |
 | `r-fe805b43c6bd347b` | keep | completion guard count selectors |
 | `r-c58b7343ccbd2392` | keep | next-action count selectors |
+| `r-772a578a521880f8` | keep | latest periodic onboard refresh context |
 
 ## Revert / Queue Ledger
 

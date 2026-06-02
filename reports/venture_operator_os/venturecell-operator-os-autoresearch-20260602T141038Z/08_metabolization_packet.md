@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live packet, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-c58b7343ccbd2392`
-Current scoped HEAD before this packet: `3f535825 feat(operator-os): count completion blockers`
+ds-goal progress receipt: `r-772a578a521880f8`
+Current scoped HEAD before this packet: `256e2ce9 feat(operator-os): count next action lanes`
 
 This packet captures durable learning from the run so far. It must be reviewed
 and updated during final closeout before the reporter task is closed.
@@ -212,6 +212,8 @@ and updated during final closeout before the reporter task is closed.
      toolbelt passes.
    - `33_periodic_substrate_refresh_receipt.md` records another `make onboard`
      and toolbelt pass, with repo-wide NATS liveness treated as context only.
+   - `42_periodic_onboard_refresh_receipt.md` records another `make onboard`
+     and toolbelt pass, with repo-wide NATS liveness treated as context only.
    - Onboard reports repo-wide NATS liveness, broad dirty worktree state, and
      active-track status.
    - Operator OS completion guard still says `keep_reporter_open`.
@@ -223,6 +225,8 @@ and updated during final closeout before the reporter task is closed.
      authority or reporter closure.
    - Optional credential warnings are environment facts, not mission blockers
      unless a selected loop requires those lanes.
+   - Repeated onboard passes can refresh substrate awareness, but they must not
+     replace packet-level authority checks.
 
 12. Timebox truth must be concrete.
 
