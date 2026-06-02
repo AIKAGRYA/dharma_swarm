@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-11e562264d282a72`
-Current scoped HEAD before this packet: `d8cef6dc docs(operator-os): refresh active timebox`
+ds-goal progress receipt: `r-fe805b43c6bd347b`
+Current scoped HEAD before this packet: `b4bdaac6 feat(operator-os): count go receipts`
 
 This packet is the handoff for the next bounded AutoResearch loop. It must be
 reviewed and updated in the final hour before reporter closure.
@@ -45,6 +45,8 @@ reviewed and updated in the final hour before reporter closure.
 - Completion guard packet: `keep_reporter_open`, `not_final: true`.
 - Completion guard reporter policy: terminal receipt and complete verifier pass
   required.
+- Completion guard counts: final blockers `4`, external blockers `2`,
+  required final artifacts `6`, forbidden actions `6`; counts are non-final.
 - Periodic onboard refresh: latest `make onboard` and toolbelt pass, with NATS
   liveness treated as repo-wide substrate context only.
 - Periodic substrate refresh: latest `make onboard` and toolbelt pass, with
@@ -61,7 +63,7 @@ reviewed and updated in the final hour before reporter closure.
 - Timebox refresh: current clock still below 8 hours.
 - Three-hour timebox proof: current clock still below 8 hours.
 - Active clock proof: current clock still below 8 hours.
-- Last committed packet: active non-final timebox proof.
+- Last committed packet: GO receipt count selectors.
 
 ## Next Goal
 
@@ -168,6 +170,8 @@ bounded targets:
    `operator_completion_guard_packet.json` now makes false-final blockers
    machine-readable. Do not close the reporter while it says
    `keep_reporter_open`.
+   Preserve count/list parity for final blockers, external blockers, required
+   final artifacts, and forbidden actions.
 
 15. Periodic onboard refresh.
 
@@ -272,6 +276,7 @@ If the loop only changes a report packet, also run scoped `git diff --check`.
 - `37_latest_progress_receipt_manifest_receipt.md`
 - `38_timebox_active_clock_receipt.md`
 - `39_go_receipt_counts_receipt.md`
+- `40_completion_guard_counts_receipt.md`
 - `operator_os_projection.json`
 - `operator_completion_guard_packet.json`
 - `operator_next_action_packet.json`

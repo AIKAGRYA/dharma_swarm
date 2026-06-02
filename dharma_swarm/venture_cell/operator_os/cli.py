@@ -119,6 +119,32 @@ def _completion_guard_payload(projection: dict[str, Any]) -> dict[str, Any]:
     autonomy_level = str(projection.get("autonomy_level", "unknown"))
     go_gate = _darshan_go_gate_payload(projection)
     authority = _authority_boundary_payload(projection)
+    final_closure_blockers = [
+        "true_8h_elapsed_time_not_proven",
+        "reporter_task_must_remain_open_until_terminal_receipt",
+        "complete_verifier_expected_to_fail_until_reporter_closure",
+        "final_adversary_score_metabolization_next_goal_review_required",
+    ]
+    external_authority_blockers = [
+        "darshan_external_reader_gate_blocked",
+        "accepted_privacy_redacted_go_receipt_missing",
+    ] if go_gate.get("decision") == "block_external_authority" else []
+    required_final_artifacts = [
+        "06_adversary_audit.md",
+        "07_score_history.md",
+        "08_metabolization_packet.md",
+        "09_next_goal_packet.md",
+        "final_ds_goal_terminal_receipt",
+        "complete_verifier_pass_after_reporter_closure",
+    ]
+    forbidden_actions = [
+        "close_reporter_before_true_time_proof",
+        "treat_live_score_as_completion",
+        "claim_external_authority",
+        "fake_go_receipts",
+        "claim_nats_or_a2a_liveness_without_action_ack",
+        "trusted_chetana_promotion_without_gates",
+    ]
     return {
         "schema": "dharma.venture_cell_operator_os.completion_guard.v0",
         "decision": "keep_reporter_open",
@@ -133,36 +159,16 @@ def _completion_guard_payload(projection: dict[str, Any]) -> dict[str, Any]:
             "close only after true-time proof, final artifact review, "
             "terminal reporter receipt, and complete verifier pass"
         ),
-        "final_closure_blockers": [
-            "true_8h_elapsed_time_not_proven",
-            "reporter_task_must_remain_open_until_terminal_receipt",
-            "complete_verifier_expected_to_fail_until_reporter_closure",
-            "final_adversary_score_metabolization_next_goal_review_required",
-        ],
-        "external_authority_blockers": [
-            "darshan_external_reader_gate_blocked",
-            "accepted_privacy_redacted_go_receipt_missing",
-        ]
-        if go_gate.get("decision") == "block_external_authority"
-        else [],
+        "final_closure_blockers": final_closure_blockers,
+        "final_closure_blocker_count": len(final_closure_blockers),
+        "external_authority_blockers": external_authority_blockers,
+        "external_authority_blocker_count": len(external_authority_blockers),
         "authority_decision": authority.get("decision", "unknown"),
         "darshan_go_decision": go_gate.get("decision", "unknown"),
-        "required_final_artifacts": [
-            "06_adversary_audit.md",
-            "07_score_history.md",
-            "08_metabolization_packet.md",
-            "09_next_goal_packet.md",
-            "final_ds_goal_terminal_receipt",
-            "complete_verifier_pass_after_reporter_closure",
-        ],
-        "forbidden_actions": [
-            "close_reporter_before_true_time_proof",
-            "treat_live_score_as_completion",
-            "claim_external_authority",
-            "fake_go_receipts",
-            "claim_nats_or_a2a_liveness_without_action_ack",
-            "trusted_chetana_promotion_without_gates",
-        ],
+        "required_final_artifacts": required_final_artifacts,
+        "required_final_artifact_count": len(required_final_artifacts),
+        "forbidden_actions": forbidden_actions,
+        "forbidden_action_count": len(forbidden_actions),
         "not_authority": True,
     }
 

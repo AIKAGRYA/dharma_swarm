@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-11e562264d282a72`
-Current scoped HEAD before this packet: `d8cef6dc docs(operator-os): refresh active timebox`
+ds-goal progress receipt: `r-fe805b43c6bd347b`
+Current scoped HEAD before this packet: `b4bdaac6 feat(operator-os): count go receipts`
 
 This audit is intentionally written before the final time window so the next
 agent has a concrete attack surface. It is not a completion certificate. The
@@ -61,6 +61,8 @@ updates, and terminal verification exist.
   open.
 - Completion guard now exposes terminal reporter receipt policy and expected
   complete-verifier blocker.
+- Completion guard now exposes final/external/artifact/forbidden counts, but
+  still says `keep_reporter_open`.
 - Periodic onboard/toolbelt pass, but this is environment context only.
 - Timebox status proves true elapsed time is incomplete.
 - Timebox refresh again proves true elapsed time is incomplete.
@@ -149,6 +151,7 @@ Adversarial review:
   state than projection JSON shows.
 - Completion guard must not be treated as a terminal reporter receipt.
 - Completion guard reporter policy must not be treated as reporter closure.
+- Completion guard counts must not be treated as reporter closure.
 - Periodic onboard must not be used to claim Operator OS action-specific NATS
   or A2A liveness.
 - Periodic substrate refresh must not be used to claim Operator OS
@@ -211,6 +214,7 @@ Queued:
 | Digest cap deletes noisy tasks | projection JSON still includes the full canvas | false |
 | Live 100 means complete | completion guard says `not_final: true` | false |
 | Completion guard policy closes reporter | policy requires terminal receipt and verifier pass | false |
+| Completion guard counts close reporter | final blocker count remains nonzero and reporter is open | false |
 | Onboard NATS liveness proves Operator OS authority | authority packet still has action ack fields false | false |
 | Periodic substrate refresh proves Operator OS authority | repo-wide context only, action ack fields remain false | false |
 | Broad dirty work is part of this packet | scoped report-only patch | false |

@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live risk register, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-11e562264d282a72`
-Current scoped HEAD before this packet: `d8cef6dc docs(operator-os): refresh active timebox`
+ds-goal progress receipt: `r-fe805b43c6bd347b`
+Current scoped HEAD before this packet: `b4bdaac6 feat(operator-os): count go receipts`
 
 This register separates current blockers, residual risks, and solved local
 claims. It exists to prevent false completion after a high live score.
@@ -45,6 +45,7 @@ claims. It exists to prevent false completion after a high live score.
 | Digest cap overclaim | `operator_os_digest.md` summarizes repeated canvas rows | use projection JSON for full evidence |
 | Completion guard overclaim | `operator_completion_guard_packet.json` says keep reporter open | guard only, not terminal receipt |
 | Completion guard policy overclaim | guard lists reporter closure requirements | treat as checklist, not closure evidence |
+| Completion guard count overclaim | guard exposes blocker/artifact/action counts | treat as audit metadata, not closure evidence |
 | Periodic onboard overclaim | `23_periodic_onboard_refresh_receipt.md` records substrate health | context only, not mission authority |
 | Periodic substrate refresh overclaim | `33_periodic_substrate_refresh_receipt.md` records substrate health | context only, not mission authority |
 | Timebox stale claim | `24_timebox_status_receipt.md` records one clock snapshot | refresh before final-window claims |
@@ -80,6 +81,7 @@ claims. It exists to prevent false completion after a high live score.
 | Digest canvas summary renders | repeated task-board rows capped with omitted count | presentation only |
 | Completion guard renders | live score can be 100 without completion | false-final guard only |
 | Completion guard reporter policy renders | terminal receipt and verifier pass required | requirement checklist only |
+| Completion guard counts render | final/external/artifact/forbidden counts match arrays | audit metadata only |
 | Periodic onboard refresh passes | `make onboard` and toolbelt exit `0` | environment context only |
 | Periodic substrate refresh passes | `make onboard` and toolbelt exit `0` | environment context only |
 | Timebox status recorded | elapsed `8770s`, remaining `20030s` | non-final proof only |

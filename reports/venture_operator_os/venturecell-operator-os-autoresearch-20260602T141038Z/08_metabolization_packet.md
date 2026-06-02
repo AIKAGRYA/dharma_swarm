@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live packet, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-11e562264d282a72`
-Current scoped HEAD before this packet: `d8cef6dc docs(operator-os): refresh active timebox`
+ds-goal progress receipt: `r-fe805b43c6bd347b`
+Current scoped HEAD before this packet: `b4bdaac6 feat(operator-os): count go receipts`
 
 This packet captures durable learning from the run so far. It must be reviewed
 and updated during final closeout before the reporter task is closed.
@@ -185,6 +185,8 @@ and updated during final closeout before the reporter task is closed.
    - The completion guard now reports `reporter_task_must_remain_open`,
      `terminal_reporter_receipt_required`, and the expected complete-verifier
      blocker.
+   - The completion guard now reports final/external/artifact/forbidden count
+     selectors while keeping `not_final: true`.
    - Reporter remains open and complete verification still fails until terminal
      reporter closure.
 
@@ -195,6 +197,8 @@ and updated during final closeout before the reporter task is closed.
      review, terminal reporter receipt, and a complete verifier pass.
    - Reporter closure policy in the guard is a requirement checklist, not
      closure evidence.
+   - Completion guard counts are audit metadata only; they should speed
+     false-final review, not satisfy final closure.
 
 11. Onboard is environment context, not mission authority.
 

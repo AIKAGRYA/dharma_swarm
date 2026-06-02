@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live verifier matrix, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-11e562264d282a72`
-Current scoped HEAD before this packet: `d8cef6dc docs(operator-os): refresh active timebox`
+ds-goal progress receipt: `r-fe805b43c6bd347b`
+Current scoped HEAD before this packet: `b4bdaac6 feat(operator-os): count go receipts`
 
 This matrix captures the current verification surface for future agents. It is
 not a final verifier matrix and must not be used to close the reporter task.
@@ -37,6 +37,8 @@ not a final verifier matrix and must not be used to close the reporter task.
 - Completion guard: passing; live `100/100` is explicitly non-final.
 - Completion guard reporter policy: passing; terminal receipt and complete
   verifier pass required.
+- Completion guard counts: passing; final/external/artifact/forbidden counts
+  match arrays and remain non-final.
 - Periodic onboard/toolbelt: passing, environment context only.
 - Periodic substrate refresh: passing, environment context only.
 - Timebox status: elapsed `12907s`, remaining `15893s`.
@@ -73,6 +75,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `operator_os_digest.md` | rendered current digest with canvas caps | presentation summary, not full evidence |
 | `operator_completion_guard_packet.json` | `keep_reporter_open` | finality guard, not terminal receipt |
 | completion guard reporter policy | terminal receipt and complete verifier pass required | requirements only, not closure |
+| completion guard counts | final `4`, external `2`, artifacts `6`, forbidden `6` | guard metadata, not closure |
 | `memory_kernel_query_eval.json` | `pass` (`6/6`) | staged/report-local pass, not trusted promotion |
 | `memory_kernel_coverage_packet.json` | root coverage rendered | explains truncation, not complete coverage |
 | Memory coverage targets | staging/quarantine local maintenance targets | selectors only, not repair proof |
@@ -149,6 +152,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `r-7167e2551df4f45e` | keep | latest progress receipt id inventory |
 | `r-db9c975774cfbdb2` | keep | active non-final timebox proof |
 | `r-11e562264d282a72` | keep | GO receipt count selectors |
+| `r-fe805b43c6bd347b` | keep | completion guard count selectors |
 
 ## Revert / Queue Ledger
 

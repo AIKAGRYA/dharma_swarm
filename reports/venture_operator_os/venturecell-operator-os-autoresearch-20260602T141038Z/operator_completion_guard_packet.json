@@ -4,16 +4,19 @@
   "complete_verifier_expected_blocker": "reporter_task_not_closed_until_terminal_receipt",
   "darshan_go_decision": "block_external_authority",
   "decision": "keep_reporter_open",
+  "external_authority_blocker_count": 2,
   "external_authority_blockers": [
     "darshan_external_reader_gate_blocked",
     "accepted_privacy_redacted_go_receipt_missing"
   ],
+  "final_closure_blocker_count": 4,
   "final_closure_blockers": [
     "true_8h_elapsed_time_not_proven",
     "reporter_task_must_remain_open_until_terminal_receipt",
     "complete_verifier_expected_to_fail_until_reporter_closure",
     "final_adversary_score_metabolization_next_goal_review_required"
   ],
+  "forbidden_action_count": 6,
   "forbidden_actions": [
     "close_reporter_before_true_time_proof",
     "treat_live_score_as_completion",
@@ -27,6 +30,7 @@
   "not_final": true,
   "reporter_closure_policy": "close only after true-time proof, final artifact review, terminal reporter receipt, and complete verifier pass",
   "reporter_task_must_remain_open": true,
+  "required_final_artifact_count": 6,
   "required_final_artifacts": [
     "06_adversary_audit.md",
     "07_score_history.md",
