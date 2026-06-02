@@ -272,6 +272,32 @@ Keep / revert / queue:
 
 Decision: keep.
 
+## Loop 70 Score Update
+
+Hypothesis:
+
+If the seven-hour checkpoint is recorded as non-final proof, final-window work
+can start from an accurate clock boundary without closing early.
+
+Patch:
+
+- Added a seven-hour timebox receipt and report addenda.
+
+Evaluation:
+
+- Live goal elapsed time reached `25235s`.
+- Focused Operator OS and support verifier slices passed.
+- Complete verifier remains blocked only by the open reporter.
+
+Adversarial review:
+
+- Live score remains `100/100`, but still non-final.
+- Seven-hour proof is not the 8-hour contract.
+
+Keep / revert / queue:
+
+Decision: keep.
+
 ## Loop 69 Score Update
 
 Hypothesis:

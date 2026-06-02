@@ -701,3 +701,23 @@ Still forbidden:
 - treating substrate liveness as Operator OS action ack proof;
 - closing reporter before true time and terminal-verifier proof;
 - external outreach, publishing, handoff, spend, deploy, push, or merge.
+
+## Loop 70 Next Goal Addendum
+
+Current new evidence:
+
+- `69_timebox_seven_hour_receipt.md`
+- updated `12_live_verifier_matrix.md`
+
+Next safe loop targets:
+
+- Continue until elapsed time reaches at least `28800s`.
+- Prepare final-window artifact refresh without reporter closure.
+- Keep complete verification blocked only by the reporter until terminal closure
+  is legitimately reached.
+
+Still forbidden:
+
+- treating seven-hour proof as final proof;
+- closing reporter before true 8-hour and terminal-verifier proof;
+- external outreach, publishing, handoff, spend, deploy, push, or merge.

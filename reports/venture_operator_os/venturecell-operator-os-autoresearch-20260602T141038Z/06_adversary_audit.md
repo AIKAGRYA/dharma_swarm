@@ -559,3 +559,23 @@ Keep / revert / queue:
 Decision: keep.
 
 ds-goal progress receipt: `r-551bc10105aa00ea`
+
+## Loop 70 Adversary Addendum
+
+New claim under attack: seven-hour proof means the 8-hour contract is complete.
+
+Current evidence:
+
+- `get_goal` reports elapsed `25235s`.
+- Seven-hour threshold is `25200s`.
+- Final threshold is `28800s`.
+- Remaining time is `3565s`.
+- Complete verifier still exits `3` with only the open reporter blocker.
+
+Verdict: false. Seven-hour proof is a late-run checkpoint, not final completion.
+
+Keep / revert / queue:
+
+Decision: keep.
+
+ds-goal progress receipt: `r-e89dfb6a5213c75f`

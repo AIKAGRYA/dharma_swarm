@@ -176,6 +176,22 @@ New solved local claim:
 
 Decision: keep the risk in the live register until final-window review.
 
+## Loop 70 Risk Addendum
+
+New residual risk:
+
+| Risk | Current evidence | Handling |
+|---|---|---|
+| Seven-hour checkpoint overclaim | elapsed `25235s`, remaining `3565s` to final threshold | treat as checkpoint only; do not close reporter |
+
+New solved local claim:
+
+| Claim | Evidence | Boundary |
+|---|---|---|
+| Seven-hour checkpoint reached | active goal elapsed time `25235s` | not final 8-hour proof |
+
+Decision: keep the risk in the live register until final-window review.
+
 ## Loop 69 Risk Addendum
 
 New residual risk:

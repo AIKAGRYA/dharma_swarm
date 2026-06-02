@@ -1342,3 +1342,30 @@ Metabolized rule:
 
 - Periodic refreshes must separate substrate context from Operator OS authority
   and must repeat the reporter-open complete-verifier boundary.
+
+## Loop 70 Metabolization Note
+
+Hypothesis:
+
+If late-run timebox checkpoints include both elapsed and remaining seconds,
+future agents can avoid converting partial-time proof into final closure.
+
+Patch:
+
+- Added the seven-hour timebox receipt.
+
+Evaluation:
+
+- Live goal elapsed time reached `25235s`; final threshold remains `28800s`.
+- Focused and supporting verifier slices passed.
+- Complete verifier remains blocked only by the open reporter.
+
+Adversarial review:
+
+- Seven-hour proof is not final proof.
+- Reporter remains open.
+
+Metabolized rule:
+
+- Late-run checkpoint receipts must state the final threshold and remaining time
+  in the same receipt.

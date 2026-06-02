@@ -107,8 +107,8 @@
     "claim_external_authority_without_go_receipt",
     "include_unrelated_staged_work"
   ],
-  "latest_progress_receipt_id": "r-551bc10105aa00ea",
-  "latest_receipt_name": "68_periodic_status_refresh_receipt.md",
+  "latest_progress_receipt_id": "r-e89dfb6a5213c75f",
+  "latest_receipt_name": "69_timebox_seven_hour_receipt.md",
   "not_authority": true,
   "not_final": true,
   "preflight_check_count": 5,
