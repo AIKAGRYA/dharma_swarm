@@ -68,6 +68,23 @@ def test_poll_queue_uses_advisory_lock(monkeypatch, tmp_path: Path) -> None:
     assert calls == [hermes.fcntl.LOCK_EX, hermes.fcntl.LOCK_UN]
 
 
+def test_poll_queue_does_not_claim_task_without_capability_or_type(
+    monkeypatch, tmp_path: Path
+) -> None:
+    queue_file = tmp_path / "queue.jsonl"
+    task = {
+        "id": "task-1",
+        "status": "pending",
+        "claimed_by": None,
+        "description": "untyped task",
+    }
+    queue_file.write_text(json.dumps(task) + "\n", encoding="utf-8")
+    monkeypatch.setattr(hermes, "QUEUE_FILE", queue_file)
+
+    assert hermes.poll_queue(dry_run=False) == []
+    assert json.loads(queue_file.read_text(encoding="utf-8")) == task
+
+
 def test_poll_queue_write_failure_does_not_report_claim(
     monkeypatch, tmp_path: Path
 ) -> None:
