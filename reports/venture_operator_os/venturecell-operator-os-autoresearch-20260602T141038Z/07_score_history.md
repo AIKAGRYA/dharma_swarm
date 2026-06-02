@@ -3,9 +3,9 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live ledger, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-b3e68b7947e399fa`
+ds-goal progress receipt: `r-82ec224489746c03`
 Baseline: `1aca07a1 Add VentureCell Operator OS Level 70 surface`
-Current scoped HEAD before this packet: `6cb63575 feat(operator-os): summarize manifest receipts`
+Current scoped HEAD before this packet: `a3ca5bf3 feat(operator-os): stabilize admission render`
 
 This file is a living score ledger. It exists now so later agents do not
 reconstruct scores from memory. It must be reviewed and updated before final
@@ -40,6 +40,7 @@ reporter closure.
 | Loop 25 | `24_timebox_status_receipt.md` | `29af0653` | 100 | +0 | keep timebox status |
 | Loop 26 | `25_manifest_receipt_summary_receipt.md` | `6cb63575` | 100 | +0 | keep manifest receipt summary |
 | Loop 27 | `26_stable_admission_render_receipt.md` | `r-b3e68b7947e399fa` | 100 | +0 | keep stable admission render |
+| Loop 28 | `27_timebox_refresh_receipt.md` | `r-82ec224489746c03` | 100 | +0 | keep timebox refresh |
 
 ## Area History
 
@@ -84,8 +85,8 @@ audit with explicit evidence.
   live score can be `100` without completion.
 - Periodic onboard refresh: `make onboard` and toolbelt pass; repo-wide NATS
   liveness remains substrate context only.
-- Timebox status: elapsed `8770s` (`2h 26m 10s`), remaining `20030s`
-  (`5h 33m 50s`).
+- Timebox status: elapsed `9701s` (`2h 45m 01s`), remaining `19099s`
+  (`5h 18m 19s`).
 - Manifest receipt summary: `receipt_count` and `latest_receipt_path` present,
   with `not_final: true`.
 - Stable admission render: volatile admission id/time redacted while decision
@@ -143,6 +144,7 @@ current evidence, not as a full-project proof.
 - Timebox status proves the mission is not complete despite live score `100`.
 - Manifest receipt summary is an audit locator, not final proof.
 - Admission raw redaction is render hygiene, not admission policy change.
+- Timebox refresh is evidence that the mission remains active and incomplete.
 - The reporter task must remain open until final artifacts and final
   verification prove the full contract.
 

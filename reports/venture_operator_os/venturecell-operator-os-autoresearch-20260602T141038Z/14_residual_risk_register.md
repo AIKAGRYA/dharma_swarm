@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live risk register, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-b3e68b7947e399fa`
-Current scoped HEAD before this packet: `6cb63575 feat(operator-os): summarize manifest receipts`
+ds-goal progress receipt: `r-82ec224489746c03`
+Current scoped HEAD before this packet: `a3ca5bf3 feat(operator-os): stabilize admission render`
 
 This register separates current blockers, residual risks, and solved local
 claims. It exists to prevent false completion after a high live score.
@@ -13,7 +13,7 @@ claims. It exists to prevent false completion after a high live score.
 
 | Risk | Current evidence | Required resolution |
 |---|---|---|
-| True elapsed time incomplete | goal clock is `8770s`, under 8 hours | continue loops until true final window |
+| True elapsed time incomplete | goal clock is `9701s`, under 8 hours | continue loops until true final window |
 | Reporter task open | ds-goal `t05-reporter` remains open | close only after final artifacts and verification |
 | Complete verifier fails | `task_not_closed:...t05-reporter` | expected until reporter closure |
 | Darshan external authority blocked | `darshan_go_gate_packet.json` decision is `block_external_authority` | real accepted privacy-redacted external-reader GO receipt |
@@ -39,6 +39,7 @@ claims. It exists to prevent false completion after a high live score.
 | Completion guard overclaim | `operator_completion_guard_packet.json` says keep reporter open | guard only, not terminal receipt |
 | Periodic onboard overclaim | `23_periodic_onboard_refresh_receipt.md` records substrate health | context only, not mission authority |
 | Timebox stale claim | `24_timebox_status_receipt.md` records one clock snapshot | refresh before final-window claims |
+| Timebox refresh overclaim | `27_timebox_refresh_receipt.md` records another non-final clock snapshot | treat as progress evidence only |
 | Context+ unavailable | `Transport closed` during static analysis attempts | document unavailable, use deterministic fallback checks |
 | Repo has unrelated dirty work | broad dirty worktree outside this run | commit only explicit scoped pathspecs |
 
@@ -62,6 +63,7 @@ claims. It exists to prevent false completion after a high live score.
 | Completion guard renders | live score can be 100 without completion | false-final guard only |
 | Periodic onboard refresh passes | `make onboard` and toolbelt exit `0` | environment context only |
 | Timebox status recorded | elapsed `8770s`, remaining `20030s` | non-final proof only |
+| Timebox refresh recorded | elapsed `9701s`, remaining `19099s` | non-final proof only |
 | Manifest receipt summary renders | receipt count and latest path present | audit locator only |
 | Admission render stable | volatile id/time redacted | diff hygiene only |
 

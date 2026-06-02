@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live verifier matrix, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-b3e68b7947e399fa`
-Current scoped HEAD before this packet: `6cb63575 feat(operator-os): summarize manifest receipts`
+ds-goal progress receipt: `r-82ec224489746c03`
+Current scoped HEAD before this packet: `a3ca5bf3 feat(operator-os): stabilize admission render`
 
 This matrix captures the current verification surface for future agents. It is
 not a final verifier matrix and must not be used to close the reporter task.
@@ -25,7 +25,7 @@ not a final verifier matrix and must not be used to close the reporter task.
   projection rows remain complete.
 - Completion guard: passing; live `100/100` is explicitly non-final.
 - Periodic onboard/toolbelt: passing, environment context only.
-- Timebox status: elapsed `8770s`, remaining `20030s`.
+- Timebox status: elapsed `9701s`, remaining `19099s`.
 - Manifest receipt summary: passing; count and latest receipt path rendered.
 - Stable admission render: passing; volatile id/time redacted, decision visible.
 - Complete ds-goal verification: expected fail on open reporter task.
@@ -68,6 +68,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `17_liveness_key_disambiguation_receipt.md` | action-specific liveness labels | prevents substrate/authority conflation |
 | `23_periodic_onboard_refresh_receipt.md` | onboard/toolbelt pass | substrate context only |
 | `24_timebox_status_receipt.md` | elapsed `8770s`, remaining `20030s` | proves non-final timebox |
+| `27_timebox_refresh_receipt.md` | elapsed `9701s`, remaining `19099s` | proves still non-final |
 | `18_receipt_inventory_manifest_receipt.md` | manifest receipt inventory | index only, not final proof |
 | `06_adversary_audit.md` | live draft | needs final-window review |
 | `07_score_history.md` | live score `100/100` | not final |
@@ -104,6 +105,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `29af0653` | keep | timebox status |
 | `6cb63575` | keep | manifest receipt summary |
 | `r-b3e68b7947e399fa` | keep | stable admission render |
+| `r-82ec224489746c03` | keep | timebox refresh |
 
 ## Revert / Queue Ledger
 

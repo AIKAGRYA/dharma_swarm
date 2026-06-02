@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-b3e68b7947e399fa`
-Current scoped HEAD before this packet: `6cb63575 feat(operator-os): summarize manifest receipts`
+ds-goal progress receipt: `r-82ec224489746c03`
+Current scoped HEAD before this packet: `a3ca5bf3 feat(operator-os): stabilize admission render`
 
 This audit is intentionally written before the final time window so the next
 agent has a concrete attack surface. It is not a completion certificate. The
@@ -13,8 +13,8 @@ updates, and terminal verification exist.
 
 ## Current Proven State
 
-- Goal clock remains well short of the 8-hour objective: elapsed `8770s`,
-  remaining `20030s`.
+- Goal clock remains well short of the 8-hour objective: elapsed `9701s`,
+  remaining `19099s`.
 - ds-goal remains open: `open=1 claimed=0 completed=4 failed=0 blocked=0 total=5`.
 - Reporter task remains open by design:
   `20260602-venturecell-operator-os-autoresearch-8h-t05-reporter`.
@@ -42,6 +42,7 @@ updates, and terminal verification exist.
   open.
 - Periodic onboard/toolbelt pass, but this is environment context only.
 - Timebox status proves true elapsed time is incomplete.
+- Timebox refresh again proves true elapsed time is incomplete.
 - Manifest receipt summary reports count and latest path, but this is
   navigation only.
 - Governed admission raw redacts volatile id/time, but decision and reasons
@@ -138,7 +139,7 @@ Queued:
 
 | Claim to attack | Current evidence | Verdict |
 |---|---|---|
-| The 8-hour mission is complete | Goal elapsed time is `8770s`, below `28800s` | false |
+| The 8-hour mission is complete | Goal elapsed time is `9701s`, below `28800s` | false |
 | Reporter can be closed now | ds-goal reporter task is open and complete verify fails | false |
 | Operator OS can act externally | `blocked_on_external_reader_gate`, `L0_read_only_plan` | false |
 | Darshan GO is accepted | accepted receipts are `[]` | false |

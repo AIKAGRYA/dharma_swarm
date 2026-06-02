@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-b3e68b7947e399fa`
-Current scoped HEAD before this packet: `6cb63575 feat(operator-os): summarize manifest receipts`
+ds-goal progress receipt: `r-82ec224489746c03`
+Current scoped HEAD before this packet: `a3ca5bf3 feat(operator-os): stabilize admission render`
 
 This packet is the handoff for the next bounded AutoResearch loop. It must be
 reviewed and updated in the final hour before reporter closure.
@@ -35,12 +35,13 @@ reviewed and updated in the final hour before reporter closure.
 - Completion guard packet: `keep_reporter_open`, `not_final: true`.
 - Periodic onboard refresh: latest `make onboard` and toolbelt pass, with NATS
   liveness treated as repo-wide substrate context only.
-- Timebox status: elapsed `8770s`, remaining `20030s`; mission not complete.
+- Timebox status: elapsed `9701s`, remaining `19099s`; mission not complete.
 - Manifest receipt summary: manifest has receipt count and latest receipt path,
   but remains `not_final: true`.
 - Stable admission render: volatile admission id/time redacted; decision
   evidence remains visible.
-- Last committed packet: manifest receipt summary.
+- Timebox refresh: current clock still below 8 hours.
+- Last committed packet: stable admission render.
 
 ## Next Goal
 
@@ -230,6 +231,7 @@ If the loop only changes a report packet, also run scoped `git diff --check`.
 - `24_timebox_status_receipt.md`
 - `25_manifest_receipt_summary_receipt.md`
 - `26_stable_admission_render_receipt.md`
+- `27_timebox_refresh_receipt.md`
 - `operator_os_projection.json`
 - `operator_completion_guard_packet.json`
 - `operator_next_action_packet.json`
