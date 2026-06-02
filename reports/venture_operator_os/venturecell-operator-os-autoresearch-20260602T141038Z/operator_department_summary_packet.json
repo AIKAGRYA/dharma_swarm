@@ -31,63 +31,63 @@
     {
       "authority_mode": "review_required",
       "department_id": "strategy",
-      "evidence_ref_count": 0,
+      "evidence_ref_count": 1,
       "label": "Strategy",
       "status": "bound"
     },
     {
       "authority_mode": "draft_only",
       "department_id": "product",
-      "evidence_ref_count": 0,
+      "evidence_ref_count": 1,
       "label": "Product Canvas",
       "status": "bound"
     },
     {
       "authority_mode": "reviewed_internal",
       "department_id": "engineering",
-      "evidence_ref_count": 0,
+      "evidence_ref_count": 2,
       "label": "Engineering",
       "status": "partial"
     },
     {
       "authority_mode": "human_approved_only",
       "department_id": "growth",
-      "evidence_ref_count": 0,
+      "evidence_ref_count": 1,
       "label": "Growth",
       "status": "blocked_on_external_reader_gate"
     },
     {
       "authority_mode": "human_approved_only",
       "department_id": "communications",
-      "evidence_ref_count": 0,
+      "evidence_ref_count": 1,
       "label": "Communications",
       "status": "blocked_on_external_reader_gate"
     },
     {
       "authority_mode": "reviewed_internal",
       "department_id": "operations",
-      "evidence_ref_count": 0,
+      "evidence_ref_count": 2,
       "label": "Operations",
       "status": "partial"
     },
     {
       "authority_mode": "read_only",
       "department_id": "library",
-      "evidence_ref_count": 0,
+      "evidence_ref_count": 1,
       "label": "Library",
       "status": "bound"
     },
     {
       "authority_mode": "read_only_until_promoted",
       "department_id": "memory",
-      "evidence_ref_count": 0,
+      "evidence_ref_count": 4,
       "label": "Memory Kernel",
       "status": "read_only_projection"
     },
     {
       "authority_mode": "default_deny",
       "department_id": "governance",
-      "evidence_ref_count": 0,
+      "evidence_ref_count": 2,
       "label": "Governance",
       "status": "bound"
     }

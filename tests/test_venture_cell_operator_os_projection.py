@@ -467,6 +467,9 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     department_summary_packet = json.loads(
         paths["department_summary_packet"].read_text(encoding="utf-8")
     )
+    gate_summary_packet = json.loads(
+        paths["gate_summary_packet"].read_text(encoding="utf-8")
+    )
     completion_guard_packet = json.loads(
         paths["completion_guard_packet"].read_text(encoding="utf-8")
     )
@@ -597,6 +600,19 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert department_summary_packet["not_authority"] is True
     assert department_summary_packet["external_authority_granted"] is False
     assert department_summary_packet["trusted_promotion_claimed"] is False
+    assert gate_summary_packet["schema"] == "dharma.venture_cell_operator_os.gate_summary.v0"
+    assert gate_summary_packet["total_gate_count"] == len(projection["gates"])
+    assert gate_summary_packet["allow_gate_count"] == 1
+    assert gate_summary_packet["blocking_gate_count"] == len(
+        gate_summary_packet["blocking_gates"]
+    )
+    assert gate_summary_packet["blocking_gate_count"] == 1
+    assert gate_summary_packet["decision_counts"]["allow"] == 1
+    assert gate_summary_packet["decision_counts"]["block"] == 1
+    assert gate_summary_packet["total_gap_count"] >= 1
+    assert gate_summary_packet["not_authority"] is True
+    assert gate_summary_packet["external_authority_granted"] is False
+    assert gate_summary_packet["trusted_promotion_claimed"] is False
     assert completion_guard_packet["decision"] == "keep_reporter_open"
     assert completion_guard_packet["not_final"] is True
     assert completion_guard_packet["live_score_can_be_100_without_completion"] is True
@@ -635,6 +651,7 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert "memory_coverage_packet" in artifact_manifest["artifact_paths"]
     assert "canvas_summary_packet" in artifact_manifest["artifact_paths"]
     assert "department_summary_packet" in artifact_manifest["artifact_paths"]
+    assert "gate_summary_packet" in artifact_manifest["artifact_paths"]
     assert "completion_guard_packet" in artifact_manifest["artifact_paths"]
     assert str(report_dir / "00_opening_truth.md") in artifact_manifest["receipt_paths"]
     assert str(report_dir / "99_progress_receipt.md") in artifact_manifest["receipt_paths"]
@@ -667,6 +684,11 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     )
     assert artifact_manifest["department_partial_count"] == (
         department_summary_packet["partial_department_count"]
+    )
+    assert artifact_manifest["gate_count"] == gate_summary_packet["total_gate_count"]
+    assert artifact_manifest["gate_allow_count"] == gate_summary_packet["allow_gate_count"]
+    assert artifact_manifest["gate_blocking_count"] == (
+        gate_summary_packet["blocking_gate_count"]
     )
 
 

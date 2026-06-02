@@ -181,7 +181,7 @@ def _department_summary_payload(projection: dict[str, Any]) -> dict[str, Any]:
             "authority_mode": str(item.get("authority_mode") or "unknown"),
             "evidence_ref_count": len(
                 item.get("evidence_refs", [])
-                if isinstance(item.get("evidence_refs"), list)
+                if isinstance(item.get("evidence_refs"), (list, tuple))
                 else []
             ),
         }
@@ -204,6 +204,72 @@ def _department_summary_payload(projection: dict[str, Any]) -> dict[str, Any]:
             "Keep blocked departments internal until the required gate evidence exists."
             if blocked_departments
             else "Use department status counts as read-only operating context."
+        ),
+        "not_authority": True,
+        "external_authority_granted": False,
+        "trusted_promotion_claimed": False,
+    }
+
+
+def _gate_summary_payload(projection: dict[str, Any]) -> dict[str, Any]:
+    raw_gates = projection.get("gates", [])
+    gates = [item for item in raw_gates if isinstance(item, dict)]
+    decision_counts = Counter(str(item.get("decision") or "unknown") for item in gates)
+    coherence_counts = Counter(
+        str(item.get("coherence_state") or "unknown") for item in gates
+    )
+    blocking_gates = [
+        {
+            "gate_id": str(item.get("gate_id") or ""),
+            "label": str(item.get("label") or ""),
+            "decision": str(item.get("decision") or "unknown"),
+            "coherence_state": str(item.get("coherence_state") or "unknown"),
+            "gap_codes": item.get("gap_codes", [])
+            if isinstance(item.get("gap_codes"), (list, tuple))
+            else [],
+            "next_action": str(item.get("next_action") or ""),
+        }
+        for item in gates
+        if str(item.get("decision") or "unknown") != "allow"
+    ]
+    gate_items = [
+        {
+            "gate_id": str(item.get("gate_id") or ""),
+            "label": str(item.get("label") or ""),
+            "decision": str(item.get("decision") or "unknown"),
+            "coherence_state": str(item.get("coherence_state") or "unknown"),
+            "gap_count": len(
+                item.get("gap_codes", [])
+                if isinstance(item.get("gap_codes"), (list, tuple))
+                else []
+            ),
+            "evidence_ref_count": len(
+                item.get("evidence_refs", [])
+                if isinstance(item.get("evidence_refs"), (list, tuple))
+                else []
+            ),
+        }
+        for item in gates
+    ]
+    total_gap_count = sum(int(item["gap_count"]) for item in gate_items)
+    return {
+        "schema": "dharma.venture_cell_operator_os.gate_summary.v0",
+        "status": projection.get("status", "unknown"),
+        "autonomy_level": projection.get("autonomy_level", "unknown"),
+        "total_gate_count": len(gates),
+        "gate_items": gate_items,
+        "decision_counts": dict(sorted(decision_counts.items())),
+        "decision_count": len(decision_counts),
+        "coherence_counts": dict(sorted(coherence_counts.items())),
+        "coherence_count": len(coherence_counts),
+        "allow_gate_count": int(decision_counts.get("allow", 0)),
+        "blocking_gate_count": len(blocking_gates),
+        "blocking_gates": blocking_gates,
+        "total_gap_count": total_gap_count,
+        "safe_next_action": (
+            "Inspect blocking gates and required evidence before widening autonomy."
+            if blocking_gates
+            else "Use gate decision counts as read-only operating context."
         ),
         "not_authority": True,
         "external_authority_granted": False,
@@ -328,6 +394,7 @@ def _artifact_manifest_payload(
     memory_coverage = _memory_coverage_payload(projection)
     canvas_summary = _canvas_summary_payload(projection)
     department_summary = _department_summary_payload(projection)
+    gate_summary = _gate_summary_payload(projection)
     completion_guard = _completion_guard_payload(projection)
     receipt_paths = [
         str(path)
@@ -356,6 +423,9 @@ def _artifact_manifest_payload(
         "department_count": department_summary.get("total_department_count", 0),
         "department_blocked_count": department_summary.get("blocked_department_count", 0),
         "department_partial_count": department_summary.get("partial_department_count", 0),
+        "gate_count": gate_summary.get("total_gate_count", 0),
+        "gate_allow_count": gate_summary.get("allow_gate_count", 0),
+        "gate_blocking_count": gate_summary.get("blocking_gate_count", 0),
         "completion_guard_decision": completion_guard.get("decision", "unknown"),
         "not_final": completion_guard.get("not_final", True),
         "artifact_paths": {
@@ -523,6 +593,16 @@ def render_operator_surface(
         + "\n",
         encoding="utf-8",
     )
+    gate_summary_path = output_dir / "operator_gate_summary_packet.json"
+    gate_summary_path.write_text(
+        json.dumps(
+            _gate_summary_payload(projection.to_dict()),
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     completion_guard_path = output_dir / "operator_completion_guard_packet.json"
     completion_guard_path.write_text(
         json.dumps(
@@ -547,6 +627,7 @@ def render_operator_surface(
         "gap_triage_packet": gap_triage_packet_path,
         "canvas_summary_packet": canvas_summary_path,
         "department_summary_packet": department_summary_path,
+        "gate_summary_packet": gate_summary_path,
         "completion_guard_packet": completion_guard_path,
     }
     artifact_manifest_path = output_dir / "operator_os_artifact_manifest.json"

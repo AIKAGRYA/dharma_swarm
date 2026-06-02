@@ -3,9 +3,9 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live ledger, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-fe4852c3b2a2a7c6`
+ds-goal progress receipt: `r-c65f0c7aa7f4ebdc`
 Baseline: `1aca07a1 Add VentureCell Operator OS Level 70 surface`
-Current scoped HEAD before this packet: `b9cc1557 feat(operator-os): summarize canvas lanes`
+Current scoped HEAD before this packet: `e455ec02 feat(operator-os): summarize departments`
 
 This file is a living score ledger. It exists now so later agents do not
 reconstruct scores from memory. It must be reviewed and updated before final
@@ -59,6 +59,7 @@ reporter closure.
 | Loop 44 | `43_timebox_four_hour_receipt.md` | `r-3921119812771fd7` | 100 | +0 | keep four-hour non-final proof |
 | Loop 45 | `44_canvas_summary_packet_receipt.md` | `r-19efd39420cd789d` | 100 | +0 | keep canvas summary packet |
 | Loop 46 | `45_department_summary_packet_receipt.md` | `r-fe4852c3b2a2a7c6` | 100 | +0 | keep department summary packet |
+| Loop 47 | `46_gate_summary_packet_receipt.md` | `r-c65f0c7aa7f4ebdc` | 100 | +0 | keep gate summary packet |
 
 ## Area History
 
@@ -69,7 +70,7 @@ reporter closure.
 | Task truth | 8 | 13 | progress receipts and residual risk register distinguish solved local claims, residual risks, and completion blockers |
 | Governance safety | 15 | 15 | external-reader, governed admission, Chetana, completion, authority firewall, and action-specific liveness gates preserved |
 | Iteration quality | 8 | 12+ | every loop has hypothesis, patch/rejection, evals, adversarial review, decision |
-| Product structure | 8 | 16 | Operator OS now emits next-action, GO gate, GO template, authority boundary, gap triage, memory coverage, canvas summary, department summary, manifest, memory repair, and report-local recall packets |
+| Product structure | 8 | 16 | Operator OS now emits next-action, GO gate, GO template, authority boundary, gap triage, memory coverage, canvas summary, department summary, gate summary, manifest, memory repair, and report-local recall packets |
 | Tests/evals | 8 | 13 | fixed tests, report-local recall regression, eval artifacts, live verifier matrix, and periodic onboard evidence exist |
 | Metabolization | 2 | 5 | program kernel, receipts, manifest inventory, packets, and this score ledger exist |
 
@@ -115,6 +116,8 @@ audit with explicit evidence.
   counts are routing metadata only.
 - Operator department summary packet: departments `9`, blocked `2`, partial
   `2`; counts are routing metadata only.
+- Operator gate summary packet: gates `2`, allow `1`, block `1`, gate gaps
+  `1`; counts are routing metadata only.
 - Completion guard packet: `keep_reporter_open`, `not_final: true`, and
   live score can be `100` without completion.
 - Completion guard reporter policy: terminal reporter receipt and complete

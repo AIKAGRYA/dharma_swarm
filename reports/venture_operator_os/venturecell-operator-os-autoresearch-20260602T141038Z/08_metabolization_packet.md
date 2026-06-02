@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live packet, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-fe4852c3b2a2a7c6`
-Current scoped HEAD before this packet: `b9cc1557 feat(operator-os): summarize canvas lanes`
+ds-goal progress receipt: `r-c65f0c7aa7f4ebdc`
+Current scoped HEAD before this packet: `e455ec02 feat(operator-os): summarize departments`
 
 This packet captures durable learning from the run so far. It must be reviewed
 and updated during final closeout before the reporter task is closed.
@@ -212,6 +212,23 @@ and updated during final closeout before the reporter task is closed.
    - Department counts should speed department-level audit routing. They must
      not replace gate evidence, department row inspection, or closure checks.
 
+9c. Gate summary packets are routing aids, not gate evidence.
+
+   Evidence:
+
+   - `operator_gate_summary_packet.json` now renders gate decision and
+     coherence counts.
+   - `operator_os_artifact_manifest.json` now repeats gate, allow, and blocking
+     gate counts.
+   - The packet reports `not_authority: true`, `external_authority_granted:
+     false`, and `trusted_promotion_claimed: false`.
+
+   Metabolized rule:
+
+   - Gate counts should speed gate audit routing. They must not replace
+     inspection of `gap_codes`, gate-specific evidence, or authority-boundary
+     packets.
+
 10. Live score can be perfect before final completion.
 
    Evidence:
@@ -394,6 +411,7 @@ Metabolized rule:
 | `r-a8ff4c8f3684c4af` | `34_authority_boolean_receipt.md` | explicit external-authority denial booleans |
 | `r-19efd39420cd789d` | `44_canvas_summary_packet_receipt.md` | machine-readable canvas summary packet |
 | `r-fe4852c3b2a2a7c6` | `45_department_summary_packet_receipt.md` | machine-readable department summary packet |
+| `r-c65f0c7aa7f4ebdc` | `46_gate_summary_packet_receipt.md` | machine-readable gate summary packet |
 
 ## Current Read-Only Artifacts
 
@@ -401,6 +419,7 @@ Metabolized rule:
 - `operator_os_digest.md`
 - `operator_canvas_summary_packet.json`
 - `operator_department_summary_packet.json`
+- `operator_gate_summary_packet.json`
 - `operator_completion_guard_packet.json`
 - `memory_kernel_index.json`
 - `memory_kernel_coverage_packet.json`
@@ -440,6 +459,7 @@ Metabolized rule:
 - `34_authority_boolean_receipt.md`
 - `44_canvas_summary_packet_receipt.md`
 - `45_department_summary_packet_receipt.md`
+- `46_gate_summary_packet_receipt.md`
 
 ## Do Not Metabolize As Done
 

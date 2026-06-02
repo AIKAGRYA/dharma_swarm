@@ -1,0 +1,53 @@
+{
+  "allow_gate_count": 1,
+  "autonomy_level": "L0_read_only_plan",
+  "blocking_gate_count": 1,
+  "blocking_gates": [
+    {
+      "coherence_state": "declared_only",
+      "decision": "block",
+      "gap_codes": [
+        "darshan_external_reader_event_missing"
+      ],
+      "gate_id": "darshan.external_reader_go_receipts",
+      "label": "Darshan External Reader Go Receipt Gate",
+      "next_action": "Advance only after one accepted countable external-reader Go receipt"
+    }
+  ],
+  "coherence_count": 2,
+  "coherence_counts": {
+    "bound": 1,
+    "declared_only": 1
+  },
+  "decision_count": 2,
+  "decision_counts": {
+    "allow": 1,
+    "block": 1
+  },
+  "external_authority_granted": false,
+  "gate_items": [
+    {
+      "coherence_state": "declared_only",
+      "decision": "block",
+      "evidence_ref_count": 0,
+      "gap_count": 1,
+      "gate_id": "darshan.external_reader_go_receipts",
+      "label": "Darshan External Reader Go Receipt Gate"
+    },
+    {
+      "coherence_state": "bound",
+      "decision": "allow",
+      "evidence_ref_count": 1,
+      "gap_count": 0,
+      "gate_id": "operator_os.governed_work_admission",
+      "label": "Governed Work Admission"
+    }
+  ],
+  "not_authority": true,
+  "safe_next_action": "Inspect blocking gates and required evidence before widening autonomy.",
+  "schema": "dharma.venture_cell_operator_os.gate_summary.v0",
+  "status": "blocked_on_external_reader_gate",
+  "total_gap_count": 1,
+  "total_gate_count": 2,
+  "trusted_promotion_claimed": false
+}

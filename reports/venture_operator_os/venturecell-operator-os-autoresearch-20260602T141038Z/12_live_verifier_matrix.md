@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live verifier matrix, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-fe4852c3b2a2a7c6`
-Current scoped HEAD before this packet: `b9cc1557 feat(operator-os): summarize canvas lanes`
+ds-goal progress receipt: `r-c65f0c7aa7f4ebdc`
+Current scoped HEAD before this packet: `e455ec02 feat(operator-os): summarize departments`
 
 This matrix captures the current verification surface for future agents. It is
 not a final verifier matrix and must not be used to close the reporter task.
@@ -40,6 +40,8 @@ not a final verifier matrix and must not be used to close the reporter task.
   with non-authority flags.
 - Operator department summary packet: passing; department/status/authority
   counts render with non-authority flags.
+- Operator gate summary packet: passing; gate decision/coherence counts render
+  with non-authority flags.
 - Completion guard: passing; live `100/100` is explicitly non-final.
 - Completion guard reporter policy: passing; terminal receipt and complete
   verifier pass required.
@@ -69,6 +71,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | Operator OS render | `./.venv/bin/python -m dharma_swarm.venture_cell.operator_os.cli --output-dir reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z` | exit `0` | pass |
 | Canvas summary packet | `operator_canvas_summary_packet.json` | items `68`, lanes `9`, blocked items `1`; `not_authority: true` | pass |
 | Department summary packet | `operator_department_summary_packet.json` | departments `9`, blocked `2`, partial `2`; `not_authority: true` | pass |
+| Gate summary packet | `operator_gate_summary_packet.json` | gates `2`, allow `1`, block `1`; `not_authority: true` | pass |
 | Periodic onboard | `make onboard` | exit `0` | pass, not mission authority |
 | Codex toolbelt | `bash scripts/runtime/codex_toolbelt_status.sh` | exit `0` with optional credential warnings | pass |
 | Latest periodic onboard/toolbelt | `make onboard`; `bash scripts/runtime/codex_toolbelt_status.sh` | both exit `0`; optional credential warnings | pass, not mission authority |
@@ -84,6 +87,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `operator_os_projection.json` | rendered current state | read-only projection only |
 | `operator_canvas_summary_packet.json` | rendered canvas item/lane/status/owner counts | routing metadata, not authority |
 | `operator_department_summary_packet.json` | rendered department status/authority counts | routing metadata, not authority |
+| `operator_gate_summary_packet.json` | rendered gate decision/coherence counts | routing metadata, not authority |
 | next-action counts | blockers `2`, departments `2`, gates `2`, forbidden `7` | handoff metadata, not authority |
 | `operator_os_digest.md` | rendered current digest with canvas caps | presentation summary, not full evidence |
 | `operator_completion_guard_packet.json` | `keep_reporter_open` | finality guard, not terminal receipt |
@@ -172,6 +176,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `r-3921119812771fd7` | keep | four-hour non-final timebox proof |
 | `r-19efd39420cd789d` | keep | canvas summary packet |
 | `r-fe4852c3b2a2a7c6` | keep | department summary packet |
+| `r-c65f0c7aa7f4ebdc` | keep | gate summary packet |
 
 ## Revert / Queue Ledger
 

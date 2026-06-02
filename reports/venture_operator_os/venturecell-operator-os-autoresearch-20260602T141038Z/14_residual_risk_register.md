@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live risk register, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-fe4852c3b2a2a7c6`
-Current scoped HEAD before this packet: `b9cc1557 feat(operator-os): summarize canvas lanes`
+ds-goal progress receipt: `r-c65f0c7aa7f4ebdc`
+Current scoped HEAD before this packet: `e455ec02 feat(operator-os): summarize departments`
 
 This register separates current blockers, residual risks, and solved local
 claims. It exists to prevent false completion after a high live score.
@@ -46,6 +46,7 @@ claims. It exists to prevent false completion after a high live score.
 | Digest cap overclaim | `operator_os_digest.md` summarizes repeated canvas rows | use projection JSON for full evidence |
 | Canvas summary overclaim | `operator_canvas_summary_packet.json` exposes item/lane/status/owner counts | treat as routing metadata, not authority or closure |
 | Department summary overclaim | `operator_department_summary_packet.json` exposes department/status/authority counts | treat as routing metadata, not authority or closure |
+| Gate summary overclaim | `operator_gate_summary_packet.json` exposes gate decision/coherence counts | treat as routing metadata, not authority or closure |
 | Completion guard overclaim | `operator_completion_guard_packet.json` says keep reporter open | guard only, not terminal receipt |
 | Completion guard policy overclaim | guard lists reporter closure requirements | treat as checklist, not closure evidence |
 | Completion guard count overclaim | guard exposes blocker/artifact/action counts | treat as audit metadata, not closure evidence |
@@ -87,6 +88,7 @@ claims. It exists to prevent false completion after a high live score.
 | Digest canvas summary renders | repeated task-board rows capped with omitted count | presentation only |
 | Operator canvas summary packet renders | items `68`, lanes `9`, blocked items `1`; non-authority flags true/false as expected | routing metadata only |
 | Operator department summary packet renders | departments `9`, blocked `2`, partial `2`; non-authority flags true/false as expected | routing metadata only |
+| Operator gate summary packet renders | gates `2`, allow `1`, block `1`; non-authority flags true/false as expected | routing metadata only |
 | Completion guard renders | live score can be 100 without completion | false-final guard only |
 | Completion guard reporter policy renders | terminal receipt and verifier pass required | requirement checklist only |
 | Completion guard counts render | final/external/artifact/forbidden counts match arrays | audit metadata only |
