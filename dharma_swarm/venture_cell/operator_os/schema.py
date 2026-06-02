@@ -106,13 +106,17 @@ class OperatorNextActionPacket:
     next_governed_action: str
     blockers: tuple[str, ...] = ()
     blocked_departments: tuple[str, ...] = ()
+    blocker_count: int = 0
+    blocked_department_count: int = 0
     required_unblock_artifact: str = ""
     memory_query_eval_status: str = "not_run"
     memory_query_eval_passed: int = 0
     memory_query_eval_total: int = 0
     gate_decisions: tuple[dict[str, Any], ...] = ()
+    gate_decision_count: int = 0
     evidence_refs: tuple[str, ...] = ()
     forbidden_actions: tuple[str, ...] = ()
+    forbidden_action_count: int = 0
     raw: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:

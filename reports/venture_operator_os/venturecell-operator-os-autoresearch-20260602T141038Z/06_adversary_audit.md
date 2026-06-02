@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-fe805b43c6bd347b`
-Current scoped HEAD before this packet: `b4bdaac6 feat(operator-os): count go receipts`
+ds-goal progress receipt: `r-c58b7343ccbd2392`
+Current scoped HEAD before this packet: `3f535825 feat(operator-os): count completion blockers`
 
 This audit is intentionally written before the final time window so the next
 agent has a concrete attack surface. It is not a completion certificate. The
@@ -21,6 +21,8 @@ updates, and terminal verification exist.
 - Complete verification is expected to fail on the open reporter task.
 - Operator OS status remains `blocked_on_external_reader_gate`.
 - Autonomy level remains `L0_read_only_plan`.
+- Next-action packet still says `hold_external_authority` and now exposes
+  blocker/department/gate/forbidden-action counts.
 - Darshan GO gate decision remains `block_external_authority`.
 - Accepted Darshan GO receipts remain empty.
 - Darshan GO receipt counts are explicit: accepted `0`, rejected `0`, missing
@@ -117,6 +119,7 @@ Adversarial review:
 - A non-closing ds-goal progress receipt is evidence, not a terminal task
   completion receipt.
 - A rendered packet is not a live external authority event.
+- Next-action counts must not be used as authority or gate clearance.
 - Filesystem A2A rows are not live A2A/NATS ack proof.
 - A report-local MemoryKernel pass is not trusted Chetana promotion or complete
   memory coverage.
@@ -186,6 +189,7 @@ Queued:
 | The 8-hour mission is complete | Goal elapsed time is `12907s`, below `28800s` | false |
 | Reporter can be closed now | ds-goal reporter task is open and complete verify fails | false |
 | Operator OS can act externally | `blocked_on_external_reader_gate`, `L0_read_only_plan` | false |
+| Next-action counts grant authority | decision remains `hold_external_authority` | false |
 | Darshan GO is accepted | accepted receipts are `[]` | false |
 | GO receipt counts clear the gate | accepted count is `0` and decision remains blocked | false |
 | GO template is evidence | template status is `draft_template_not_evidence` | false |

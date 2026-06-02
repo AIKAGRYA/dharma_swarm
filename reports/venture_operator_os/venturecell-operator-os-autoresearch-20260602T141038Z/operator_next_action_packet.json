@@ -1,9 +1,11 @@
 {
   "autonomy_level": "L0_read_only_plan",
+  "blocked_department_count": 2,
   "blocked_departments": [
     "growth",
     "communications"
   ],
+  "blocker_count": 2,
   "blockers": [
     "darshan_external_reader_event_missing",
     "memory_kernel_index_truncated"
@@ -17,6 +19,7 @@
     "/Users/dhyana/.dharma/knowledge/quarantine",
     "dharma_swarm/venture_cell/operator_os/projection.py"
   ],
+  "forbidden_action_count": 7,
   "forbidden_actions": [
     "external_outreach",
     "spending",
@@ -26,6 +29,7 @@
     "credential_mutation",
     "live_external_authority"
   ],
+  "gate_decision_count": 2,
   "gate_decisions": [
     {
       "coherence_state": "declared_only",

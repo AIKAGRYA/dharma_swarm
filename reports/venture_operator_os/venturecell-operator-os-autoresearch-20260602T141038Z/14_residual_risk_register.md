@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live risk register, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-fe805b43c6bd347b`
-Current scoped HEAD before this packet: `b4bdaac6 feat(operator-os): count go receipts`
+ds-goal progress receipt: `r-c58b7343ccbd2392`
+Current scoped HEAD before this packet: `3f535825 feat(operator-os): count completion blockers`
 
 This register separates current blockers, residual risks, and solved local
 claims. It exists to prevent false completion after a high live score.
@@ -29,6 +29,7 @@ claims. It exists to prevent false completion after a high live score.
 | GO receipt count overclaim | GO gate reports accepted/rejected/missing receipt counts | treat as selectors, not GO clearance |
 | Authority packet overclaim | `authority_boundary_packet.json` exists | treat as firewall view, not grant |
 | Authority boolean overclaim | authority packet has explicit external authority booleans | treat as denial guardrails, not grant |
+| Next-action count overclaim | next-action packet exposes blocker/department/gate/action counts | treat as handoff metadata, not grant |
 | Artifact manifest overclaim | `operator_os_artifact_manifest.json` exists | treat as locator, not proof of finality |
 | Onboard NATS overclaim | `make onboard` reports repo-wide NATS live contact | do not treat as Operator OS action ack |
 | Liveness label regression | authority fields could become ambiguous again | keep Operator OS action-specific key names |
@@ -68,6 +69,7 @@ claims. It exists to prevent false completion after a high live score.
 | GO receipt counts render | accepted/rejected/missing counts mirror arrays | selector only |
 | Authority packet renders | `local_read_only_external_blocked` | not authority grant |
 | Authority booleans render | external authority false; action ack required | denial guardrail only |
+| Next-action counts render | blocker/department/gate/forbidden counts match arrays | handoff metadata only |
 | Artifact manifest renders | `not_authority: true` | locator/status packet only |
 | Periodic onboard passes | `make onboard` and toolbelt exit `0` | substrate context only |
 | Liveness keys are action-specific | Operator OS NATS/A2A action ack fields are false | avoids substrate/authority conflation |

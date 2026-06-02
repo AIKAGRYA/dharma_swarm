@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-fe805b43c6bd347b`
-Current scoped HEAD before this packet: `b4bdaac6 feat(operator-os): count go receipts`
+ds-goal progress receipt: `r-c58b7343ccbd2392`
+Current scoped HEAD before this packet: `3f535825 feat(operator-os): count completion blockers`
 
 This packet is the handoff for the next bounded AutoResearch loop. It must be
 reviewed and updated in the final hour before reporter closure.
@@ -25,6 +25,8 @@ reviewed and updated in the final hour before reporter closure.
 - Authority boundary: `local_read_only_external_blocked`.
 - Authority booleans: external authority not granted; Operator OS action ack
   still required.
+- Next-action counts: blockers `2`, blocked departments `2`, gate decisions
+  `2`, forbidden actions `7`; decision remains `hold_external_authority`.
 - Residual risk register: present, not final.
 - Artifact manifest: present, not authority.
 - Periodic onboard: pass, with optional credential warnings.
@@ -63,7 +65,7 @@ reviewed and updated in the final hour before reporter closure.
 - Timebox refresh: current clock still below 8 hours.
 - Three-hour timebox proof: current clock still below 8 hours.
 - Active clock proof: current clock still below 8 hours.
-- Last committed packet: GO receipt count selectors.
+- Last committed packet: completion guard count selectors.
 
 ## Next Goal
 
@@ -116,6 +118,8 @@ bounded targets:
    `authority_boundary_packet.json` now exists. Future loops should keep it
    derived from existing gates and must not use it as a grant of external
    authority.
+   Keep next-action counts as handoff metadata only; the decision field remains
+   authoritative for action posture.
 
 6. Residual risk register maintenance.
 
@@ -277,6 +281,7 @@ If the loop only changes a report packet, also run scoped `git diff --check`.
 - `38_timebox_active_clock_receipt.md`
 - `39_go_receipt_counts_receipt.md`
 - `40_completion_guard_counts_receipt.md`
+- `41_next_action_counts_receipt.md`
 - `operator_os_projection.json`
 - `operator_completion_guard_packet.json`
 - `operator_next_action_packet.json`

@@ -680,6 +680,26 @@ def _next_action_packet(
         decision = "allow_reviewed_internal_work"
         blocked_departments = ()
         required_unblock_artifact = ""
+    blockers = tuple(gaps)
+    gate_decisions = tuple(
+        {
+            "gate_id": gate.gate_id,
+            "decision": gate.decision,
+            "coherence_state": gate.coherence_state,
+            "gap_codes": gate.gap_codes,
+            "next_action": gate.next_action,
+        }
+        for gate in gates
+    )
+    forbidden_actions = (
+        "external_outreach",
+        "spending",
+        "deployment",
+        "publishing",
+        "protected_merge",
+        "credential_mutation",
+        "live_external_authority",
+    )
 
     return OperatorNextActionPacket(
         packet_id=f"{venture_cell_id.lower()}.operator_next_action",
@@ -690,32 +710,19 @@ def _next_action_packet(
         next_governed_action=next_actions[0]
         if next_actions
         else "Run the next bounded internal builder under governed admission and record receipts.",
-        blockers=tuple(gaps),
+        blockers=blockers,
         blocked_departments=blocked_departments,
+        blocker_count=len(blockers),
+        blocked_department_count=len(blocked_departments),
         required_unblock_artifact=required_unblock_artifact,
         memory_query_eval_status=memory.query_eval_status,
         memory_query_eval_passed=memory.query_eval_passed,
         memory_query_eval_total=memory.query_eval_total,
-        gate_decisions=tuple(
-            {
-                "gate_id": gate.gate_id,
-                "decision": gate.decision,
-                "coherence_state": gate.coherence_state,
-                "gap_codes": gate.gap_codes,
-                "next_action": gate.next_action,
-            }
-            for gate in gates
-        ),
+        gate_decisions=gate_decisions,
+        gate_decision_count=len(gate_decisions),
         evidence_refs=tuple(evidence_refs),
-        forbidden_actions=(
-            "external_outreach",
-            "spending",
-            "deployment",
-            "publishing",
-            "protected_merge",
-            "credential_mutation",
-            "live_external_authority",
-        ),
+        forbidden_actions=forbidden_actions,
+        forbidden_action_count=len(forbidden_actions),
         raw={
             "external_blocked": external_blocked,
             "memory_partial": memory_partial,

@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live packet, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-fe805b43c6bd347b`
-Current scoped HEAD before this packet: `b4bdaac6 feat(operator-os): count go receipts`
+ds-goal progress receipt: `r-c58b7343ccbd2392`
+Current scoped HEAD before this packet: `3f535825 feat(operator-os): count completion blockers`
 
 This packet captures durable learning from the run so far. It must be reviewed
 and updated during final closeout before the reporter task is closed.
@@ -36,6 +36,8 @@ and updated during final closeout before the reporter task is closed.
 
    - `operator_next_action_packet.json` holds owner, blockers, forbidden
      actions, autonomy level, and next governed action.
+   - The next-action packet now exposes blocker, blocked-department,
+     gate-decision, and forbidden-action counts.
    - `darshan_go_gate_packet.json` holds the exact GO receipt source/schema,
      blocked departments, blocked actions, and expected local artifacts.
 
@@ -43,6 +45,8 @@ and updated during final closeout before the reporter task is closed.
 
    - New Operator OS surfaces should derive packet-shaped handoffs from existing
      gates and receipts instead of creating new control planes.
+   - Next-action counts should speed handoff scanning; they are not authority
+     grants and must be read with the decision field.
 
 3. ds-goal progress must be distinguishable from task completion.
 

@@ -2807,7 +2807,7 @@
         "title": "MemoryKernel Report Source Packet"
       },
       {
-        "excerpt": "# Metabolization Packet Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live packet, not final until the 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-fe805b43c6bd347b` Current scoped HEAD before this packet: `b4bdaac6 feat(operator-os): count go receipts` This packet c",
+        "excerpt": "# Metabolization Packet Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live packet, not final until the 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-c58b7343ccbd2392` Current scoped HEAD before this packet: `3f535825 feat(operator-os): count completion blockers` This ",
         "matched_terms": [
           "VentureCell",
           "Operator OS",
@@ -2825,7 +2825,7 @@
         "title": "Metabolization Packet"
       },
       {
-        "excerpt": "# Next Goal Packet Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live draft, not final until the 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-fe805b43c6bd347b` Current scoped HEAD before this packet: `b4bdaac6 feat(operator-os): count go receipts` This packet is the ",
+        "excerpt": "# Next Goal Packet Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live draft, not final until the 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-c58b7343ccbd2392` Current scoped HEAD before this packet: `3f535825 feat(operator-os): count completion blockers` This packet",
         "matched_terms": [
           "VentureCell",
           "Operator OS",
@@ -2895,7 +2895,7 @@
         "title": "Loop 05 Darshan GO Gate Receipt"
       },
       {
-        "excerpt": "# Live Verifier Matrix Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live verifier matrix, not final until the true 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-fe805b43c6bd347b` Current scoped HEAD before this packet: `b4bdaac6 feat(operator-os): count go receipts` ",
+        "excerpt": "# Live Verifier Matrix Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live verifier matrix, not final until the true 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-c58b7343ccbd2392` Current scoped HEAD before this packet: `3f535825 feat(operator-os): count completion bl",
         "matched_terms": [
           "VentureCell",
           "Operator OS",
@@ -2912,7 +2912,7 @@
         "title": "Live Verifier Matrix"
       },
       {
-        "excerpt": "# Residual Risk Register Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live risk register, not final until the true 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-fe805b43c6bd347b` Current scoped HEAD before this packet: `b4bdaac6 feat(operator-os): count go receipts` ",
+        "excerpt": "# Residual Risk Register Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live risk register, not final until the true 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-c58b7343ccbd2392` Current scoped HEAD before this packet: `3f535825 feat(operator-os): count completion bl",
         "matched_terms": [
           "VentureCell",
           "Operator OS",
@@ -2977,7 +2977,7 @@
         "title": "Memory Coverage Counts Receipt"
       },
       {
-        "excerpt": "# Adversary Audit Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live draft, not final until the true 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-fe805b43c6bd347b` Current scoped HEAD before this packet: `b4bdaac6 feat(operator-os): count go receipts` This audit is i",
+        "excerpt": "# Adversary Audit Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live draft, not final until the true 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-c58b7343ccbd2392` Current scoped HEAD before this packet: `3f535825 feat(operator-os): count completion blockers` This au",
         "matched_terms": [
           "VentureCell",
           "Operator OS",
@@ -3557,7 +3557,7 @@
         "indexed_count": 20,
         "role": "supplemental_staging",
         "root": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z",
-        "scanned_count": 43,
+        "scanned_count": 44,
         "tier": "staged",
         "truncated": false
       },
@@ -3577,7 +3577,7 @@
       "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z",
       "/Users/dhyana/.dharma/knowledge/quarantine"
     ],
-    "staged_count": 5043,
+    "staged_count": 5044,
     "status": "read_through_index_available",
     "truncated": true,
     "trusted_count": 1336
@@ -3618,10 +3618,12 @@
   },
   "next_action_packet": {
     "autonomy_level": "L0_read_only_plan",
+    "blocked_department_count": 2,
     "blocked_departments": [
       "growth",
       "communications"
     ],
+    "blocker_count": 2,
     "blockers": [
       "darshan_external_reader_event_missing",
       "memory_kernel_index_truncated"
@@ -3635,6 +3637,7 @@
       "/Users/dhyana/.dharma/knowledge/quarantine",
       "dharma_swarm/venture_cell/operator_os/projection.py"
     ],
+    "forbidden_action_count": 7,
     "forbidden_actions": [
       "external_outreach",
       "spending",
@@ -3644,6 +3647,7 @@
       "credential_mutation",
       "live_external_authority"
     ],
+    "gate_decision_count": 2,
     "gate_decisions": [
       {
         "coherence_state": "declared_only",

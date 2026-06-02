@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live verifier matrix, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-fe805b43c6bd347b`
-Current scoped HEAD before this packet: `b4bdaac6 feat(operator-os): count go receipts`
+ds-goal progress receipt: `r-c58b7343ccbd2392`
+Current scoped HEAD before this packet: `3f535825 feat(operator-os): count completion blockers`
 
 This matrix captures the current verification surface for future agents. It is
 not a final verifier matrix and must not be used to close the reporter task.
@@ -12,6 +12,8 @@ not a final verifier matrix and must not be used to close the reporter task.
 ## Current Verdict
 
 - Operator OS local render: passing.
+- Next-action counts: passing; blocker/department/gate/forbidden counts match
+  arrays and decision remains `hold_external_authority`.
 - MemoryKernel strict eval: passing locally from report-local staged sources
   (`6/6`).
 - Darshan GO gate: blocked by design; no accepted receipts.
@@ -72,6 +74,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | Artifact | Current state | Risk |
 |---|---|---|
 | `operator_os_projection.json` | rendered current state | read-only projection only |
+| next-action counts | blockers `2`, departments `2`, gates `2`, forbidden `7` | handoff metadata, not authority |
 | `operator_os_digest.md` | rendered current digest with canvas caps | presentation summary, not full evidence |
 | `operator_completion_guard_packet.json` | `keep_reporter_open` | finality guard, not terminal receipt |
 | completion guard reporter policy | terminal receipt and complete verifier pass required | requirements only, not closure |
@@ -153,6 +156,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `r-db9c975774cfbdb2` | keep | active non-final timebox proof |
 | `r-11e562264d282a72` | keep | GO receipt count selectors |
 | `r-fe805b43c6bd347b` | keep | completion guard count selectors |
+| `r-c58b7343ccbd2392` | keep | next-action count selectors |
 
 ## Revert / Queue Ledger
 

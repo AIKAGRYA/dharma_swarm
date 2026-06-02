@@ -157,6 +157,18 @@ def test_projection_blocks_external_autonomy_without_reader_gate(tmp_path: Path)
         "communications",
     )
     assert "darshan_external_reader_event_missing" in projection.next_action_packet.blockers
+    assert projection.next_action_packet.blocker_count == len(
+        projection.next_action_packet.blockers
+    )
+    assert projection.next_action_packet.blocked_department_count == len(
+        projection.next_action_packet.blocked_departments
+    )
+    assert projection.next_action_packet.gate_decision_count == len(
+        projection.next_action_packet.gate_decisions
+    )
+    assert projection.next_action_packet.forbidden_action_count == len(
+        projection.next_action_packet.forbidden_actions
+    )
     assert "external-reader Go evidence receipt" in (
         projection.next_action_packet.required_unblock_artifact
     )
@@ -499,6 +511,16 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert memory_query_eval["trusted_promotion_claimed"] is False
     assert next_action_packet["decision"] == "hold_external_authority"
     assert next_action_packet["blocked_departments"] == ["growth", "communications"]
+    assert next_action_packet["blocker_count"] == len(next_action_packet["blockers"])
+    assert next_action_packet["blocked_department_count"] == len(
+        next_action_packet["blocked_departments"]
+    )
+    assert next_action_packet["gate_decision_count"] == len(
+        next_action_packet["gate_decisions"]
+    )
+    assert next_action_packet["forbidden_action_count"] == len(
+        next_action_packet["forbidden_actions"]
+    )
     assert "live_external_authority" in next_action_packet["forbidden_actions"]
     assert go_gate_packet["required_receipt_source"] == "darshan_external_reader"
     assert "payload.privacy_redacted" in go_gate_packet["required_receipt_fields"]
