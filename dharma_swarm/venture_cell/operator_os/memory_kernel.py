@@ -18,6 +18,37 @@ DEFAULT_QUERY_TERMS = (
     "MemoryKernel",
 )
 
+MEMORY_KERNEL_EVAL_QUERIES = (
+    "Polsia Cofounder VentureCell Operator OS",
+    "Darshan external reader gate Go evidence receipt",
+    "Go evidence receipt source_url event_uid accepted",
+    "Cofounder Canvas Library Plan Execute publishing",
+    "Chetana wiki memory kernel staged trusted quarantine",
+    "VentureCell autonomy ladder external action approval",
+)
+
+EVAL_QUERY_TERMS = tuple(
+    dict.fromkeys(
+        (
+            *DEFAULT_QUERY_TERMS,
+            "source_url",
+            "event_uid",
+            "accepted",
+            "Canvas",
+            "Library",
+            "Plan",
+            "Execute",
+            "publishing",
+            "wiki",
+            "staged",
+            "trusted",
+            "quarantine",
+            "autonomy ladder",
+            "external action approval",
+        )
+    )
+)
+
 
 @dataclass(frozen=True)
 class MemoryKernelIndexEntry:
@@ -54,6 +85,24 @@ class MemoryKernelQueryResult:
 
 
 @dataclass(frozen=True)
+class MemoryKernelQueryEval:
+    """Pass/fail eval wrapper for one MemoryKernel query."""
+
+    query: str
+    passed: bool
+    status: str
+    matched_count: int
+    tier_counts: dict[str, int] = field(default_factory=dict)
+    missing_terms: tuple[str, ...] = ()
+    source_refs: tuple[str, ...] = ()
+    trusted_promotion_claimed: bool = False
+    notes: tuple[str, ...] = ()
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class MemoryKernelReadThroughIndex:
     """Bounded read-through index over existing Chetana/wiki roots."""
 
@@ -64,7 +113,7 @@ class MemoryKernelReadThroughIndex:
     truncated: bool
     source_roots: tuple[str, ...]
     entries: tuple[MemoryKernelIndexEntry, ...] = ()
-    query_terms: tuple[str, ...] = DEFAULT_QUERY_TERMS
+    query_terms: tuple[str, ...] = EVAL_QUERY_TERMS
 
     @property
     def indexed_count(self) -> int:
@@ -217,6 +266,50 @@ def query_memory_kernel_index(
     )
 
 
+def evaluate_memory_kernel_queries(
+    index: MemoryKernelReadThroughIndex,
+    queries: Iterable[str] = MEMORY_KERNEL_EVAL_QUERIES,
+    *,
+    max_results: int = 3,
+) -> tuple[MemoryKernelQueryEval, ...]:
+    """Evaluate the program-kernel query prompts against one read-through index."""
+
+    evals: list[MemoryKernelQueryEval] = []
+    for query in tuple(queries):
+        result = query_memory_kernel_index(index, query, max_results=max_results)
+        source_refs = tuple(match.path for match in result.matches if match.path)
+        valid_tiers = all(
+            match.tier in {"trusted", "staged", "quarantine"}
+            for match in result.matches
+        )
+        passed = bool(
+            result.matches
+            and valid_tiers
+            and source_refs
+            and not result.missing_terms
+            and not result.trusted_promotion_claimed
+        )
+        notes = list(result.notes)
+        if not result.matches:
+            notes.append("no_query_match")
+        if result.missing_terms:
+            notes.append("query_terms_missing")
+        evals.append(
+            MemoryKernelQueryEval(
+                query=query,
+                passed=passed,
+                status=result.status,
+                matched_count=len(result.matches),
+                tier_counts=result.tier_counts,
+                missing_terms=result.missing_terms,
+                source_refs=source_refs,
+                trusted_promotion_claimed=result.trusted_promotion_claimed,
+                notes=tuple(dict.fromkeys(notes)),
+            )
+        )
+    return tuple(evals)
+
+
 def _scan_root(
     *,
     root: Path,
@@ -229,20 +322,21 @@ def _scan_root(
     if not resolved.exists():
         return 0, False, []
 
-    entries: list[MemoryKernelIndexEntry] = []
+    matched_entries: list[MemoryKernelIndexEntry] = []
+    fallback_entries: list[MemoryKernelIndexEntry] = []
     count = 0
     for path in sorted(resolved.rglob("*.md")):
         if not path.is_file():
             continue
         count += 1
-        if remaining > 0:
-            entry = _read_index_entry(path, tier=tier, terms=terms)
-            if entry.matched_terms or len(entries) < min(remaining, 8):
-                entries.append(entry)
-                remaining -= 1
+        entry = _read_index_entry(path, tier=tier, terms=terms)
+        if entry.matched_terms:
+            matched_entries.append(entry)
+        elif len(fallback_entries) < min(remaining, 8):
+            fallback_entries.append(entry)
         if count >= max_scan:
-            return count, True, entries
-    return count, False, entries
+            return count, True, _select_entries(matched_entries, fallback_entries, remaining)
+    return count, False, _select_entries(matched_entries, fallback_entries, remaining)
 
 
 def _tier_budgets(
@@ -257,6 +351,23 @@ def _tier_budgets(
         tier: base + (1 if index < remainder else 0)
         for index, (tier, _) in enumerate(roots)
     }
+
+
+def _select_entries(
+    matched_entries: list[MemoryKernelIndexEntry],
+    fallback_entries: list[MemoryKernelIndexEntry],
+    remaining: int,
+) -> list[MemoryKernelIndexEntry]:
+    if remaining <= 0:
+        return []
+    ranked = sorted(
+        matched_entries,
+        key=lambda entry: (-len(entry.matched_terms), entry.path),
+    )
+    selected = ranked[:remaining]
+    if len(selected) < remaining:
+        selected.extend(fallback_entries[: remaining - len(selected)])
+    return selected
 
 
 def _read_index_entry(path: Path, *, tier: str, terms: tuple[str, ...]) -> MemoryKernelIndexEntry:

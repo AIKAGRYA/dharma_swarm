@@ -13,9 +13,11 @@ from dharma_swarm.venture_cell.darshan.schema import (
     GoEvidenceReceiptRef,
 )
 from dharma_swarm.venture_cell.operator_os import (
+    MEMORY_KERNEL_EVAL_QUERIES,
     OperatorOSInputs,
     build_operator_projection,
     build_memory_kernel_index,
+    evaluate_memory_kernel_queries,
     load_live_operator_inputs,
     query_memory_kernel_index,
     render_operator_daily_digest,
@@ -265,11 +267,17 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     projection = json.loads(paths["projection"].read_text(encoding="utf-8"))
     digest = paths["digest"].read_text(encoding="utf-8")
     memory_index = json.loads(paths["memory_index"].read_text(encoding="utf-8"))
+    memory_query_eval = json.loads(
+        paths["memory_query_eval"].read_text(encoding="utf-8")
+    )
 
     assert projection["status"] == "blocked_on_external_reader_gate"
     assert projection["autonomy_level"] == "L0_read_only_plan"
     assert "# VentureCell Operator OS Digest: DARSHAN" in digest
     assert "index_status" in memory_index
+    assert "query_eval_status" in memory_index
+    assert "query_eval_results" in memory_query_eval
+    assert memory_query_eval["trusted_promotion_claimed"] is False
 
 
 def test_memory_kernel_query_eval_distinguishes_tiers_and_provenance(tmp_path: Path) -> None:
@@ -288,6 +296,17 @@ def test_memory_kernel_query_eval_distinguishes_tiers_and_provenance(tmp_path: P
         "# Darshan Go Gate\n"
         "Darshan external reader gate requires an accepted Go evidence receipt "
         "with source_url and event_uid.",
+        encoding="utf-8",
+    )
+    (staged / "venturecell-autonomy.md").write_text(
+        "# VentureCell Autonomy Ladder\n"
+        "VentureCell autonomy ladder keeps external action approval blocked "
+        "until governed evidence exists.",
+        encoding="utf-8",
+    )
+    (trusted / "memory-kernel.md").write_text(
+        "# Chetana Memory Kernel\n"
+        "Chetana wiki memory kernel distinguishes staged trusted quarantine tiers.",
         encoding="utf-8",
     )
     (quarantine / "polsia-raw.md").write_text(
@@ -332,6 +351,12 @@ def test_memory_kernel_query_eval_distinguishes_tiers_and_provenance(tmp_path: P
     assert trusted_result.tier_counts["trusted"] == 1
     assert all(match.tier == "trusted" for match in trusted_result.matches)
 
-    untrusted_only = index.query("Polsia quarantine provenance review", trusted_only=True)
+    untrusted_only = index.query("Polsia raw untrusted company claim", trusted_only=True)
     assert untrusted_only.status == "trusted_missing"
     assert "only_untrusted_matches_available" in untrusted_only.notes
+
+    evals = evaluate_memory_kernel_queries(index)
+    assert len(evals) == len(MEMORY_KERNEL_EVAL_QUERIES)
+    assert all(result.passed for result in evals)
+    assert all(result.source_refs for result in evals)
+    assert all(result.trusted_promotion_claimed is False for result in evals)

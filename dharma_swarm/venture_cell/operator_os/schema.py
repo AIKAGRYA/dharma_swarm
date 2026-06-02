@@ -80,6 +80,10 @@ class MemoryKernelSnapshot:
     indexed_count: int = 0
     index_entries: tuple[dict[str, Any], ...] = ()
     index_query_terms: tuple[str, ...] = ()
+    query_eval_results: tuple[dict[str, Any], ...] = ()
+    query_eval_passed: int = 0
+    query_eval_total: int = 0
+    query_eval_status: str = "not_run"
     source_roots: tuple[str, ...] = ()
     evidence_refs: tuple[str, ...] = ()
     gap_codes: tuple[str, ...] = ()

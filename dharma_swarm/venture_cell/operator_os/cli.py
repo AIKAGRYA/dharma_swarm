@@ -17,6 +17,22 @@ def _memory_index_payload(projection: dict[str, Any]) -> dict[str, Any]:
     return memory if isinstance(memory, dict) else {}
 
 
+def _memory_query_eval_payload(projection: dict[str, Any]) -> dict[str, Any]:
+    memory = _memory_index_payload(projection)
+    return {
+        "query_eval_status": memory.get("query_eval_status", "not_run"),
+        "query_eval_passed": memory.get("query_eval_passed", 0),
+        "query_eval_total": memory.get("query_eval_total", 0),
+        "query_eval_results": memory.get("query_eval_results", []),
+        "source_roots": memory.get("source_roots", []),
+        "trusted_promotion_claimed": any(
+            bool(result.get("trusted_promotion_claimed"))
+            for result in memory.get("query_eval_results", [])
+            if isinstance(result, dict)
+        ),
+    }
+
+
 def render_operator_surface(
     *,
     output_dir: Path,
@@ -59,10 +75,21 @@ def render_operator_surface(
         + "\n",
         encoding="utf-8",
     )
+    memory_query_eval_path = output_dir / "memory_kernel_query_eval.json"
+    memory_query_eval_path.write_text(
+        json.dumps(
+            _memory_query_eval_payload(projection.to_dict()),
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     return {
         "projection": projection_path,
         "digest": digest_path,
         "memory_index": memory_index_path,
+        "memory_query_eval": memory_query_eval_path,
     }
 
 

@@ -51,8 +51,20 @@ def render_operator_daily_digest(projection: VentureCellOperatorProjection) -> s
             f"- Quarantine: `{memory.quarantine_count}`",
             f"- Truncated scan: `{memory.truncated}`",
             f"- Index: `{memory.index_status or 'not_built'}` with `{memory.indexed_count}` entries",
+            f"- Query evals: `{memory.query_eval_status}` "
+            f"({memory.query_eval_passed}/{memory.query_eval_total})",
         ]
     )
+    if memory.query_eval_results:
+        lines.extend(["", "## Memory Query Evals", ""])
+        for result in memory.query_eval_results:
+            passed = "pass" if result.get("passed") else "fail"
+            missing = ", ".join(result.get("missing_terms") or ()) or "none"
+            lines.append(
+                f"- `{passed}` {result.get('query')}: "
+                f"`{result.get('status')}`; matches `{result.get('matched_count')}`; "
+                f"missing `{missing}`."
+            )
     if memory.index_entries:
         lines.extend(["", "## Memory Index", ""])
         for tier in ("trusted", "staged", "quarantine"):

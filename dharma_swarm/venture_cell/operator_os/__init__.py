@@ -12,10 +12,13 @@ from dharma_swarm.venture_cell.operator_os.live_loader import (
     load_task_board_tasks,
 )
 from dharma_swarm.venture_cell.operator_os.memory_kernel import (
+    MEMORY_KERNEL_EVAL_QUERIES,
     MemoryKernelIndexEntry,
+    MemoryKernelQueryEval,
     MemoryKernelQueryResult,
     MemoryKernelReadThroughIndex,
     build_memory_kernel_index,
+    evaluate_memory_kernel_queries,
     query_memory_kernel_index,
 )
 from dharma_swarm.venture_cell.operator_os.projection import (
@@ -33,7 +36,9 @@ from dharma_swarm.venture_cell.operator_os.schema import (
 __all__ = [
     "CanvasItem",
     "GateSummary",
+    "MEMORY_KERNEL_EVAL_QUERIES",
     "MemoryKernelIndexEntry",
+    "MemoryKernelQueryEval",
     "MemoryKernelQueryResult",
     "MemoryKernelReadThroughIndex",
     "MemoryKernelSnapshot",
@@ -42,6 +47,7 @@ __all__ = [
     "VentureCellOperatorProjection",
     "build_operator_projection",
     "build_memory_kernel_index",
+    "evaluate_memory_kernel_queries",
     "query_memory_kernel_index",
     "load_a2a_task_rows",
     "load_live_operator_inputs",

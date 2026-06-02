@@ -21,6 +21,7 @@ from dharma_swarm.venture_cell.darshan.external_reader_gate import (
 )
 from dharma_swarm.venture_cell.darshan.schema import DecisionDelta, PolsiaHandoff
 from dharma_swarm.venture_cell.operator_os.memory_kernel import build_memory_kernel_index
+from dharma_swarm.venture_cell.operator_os.memory_kernel import evaluate_memory_kernel_queries
 from dharma_swarm.venture_cell.operator_os.schema import (
     CanvasItem,
     GateSummary,
@@ -120,6 +121,7 @@ def build_memory_kernel_snapshot(
         quarantine_root=quarantine_root,
         max_scan=max_scan,
     )
+    query_evals = evaluate_memory_kernel_queries(index)
     staged_count = index.staged_count
     trusted_count = index.trusted_count
     quarantine_count = index.quarantine_count
@@ -138,6 +140,8 @@ def build_memory_kernel_snapshot(
         gap_codes.append("memory_kernel_index_truncated")
     else:
         status = "projection_available"
+    if query_evals and not all(result.passed for result in query_evals):
+        gap_codes.append("memory_kernel_query_eval_partial")
 
     return MemoryKernelSnapshot(
         status=status,
@@ -149,6 +153,16 @@ def build_memory_kernel_snapshot(
         indexed_count=index.indexed_count,
         index_entries=tuple(entry.to_dict() for entry in index.entries),
         index_query_terms=index.query_terms,
+        query_eval_results=tuple(result.to_dict() for result in query_evals),
+        query_eval_passed=sum(1 for result in query_evals if result.passed),
+        query_eval_total=len(query_evals),
+        query_eval_status=(
+            "pass"
+            if query_evals and all(result.passed for result in query_evals)
+            else "partial"
+            if query_evals
+            else "not_run"
+        ),
         source_roots=roots,
         evidence_refs=tuple(root for root in roots if Path(root).exists()),
         gap_codes=tuple(gap_codes),

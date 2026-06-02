@@ -100,21 +100,31 @@
 - Quarantine: `5000`
 - Truncated scan: `True`
 - Index: `available_truncated` with `80` entries
+- Query evals: `partial` (0/6)
+
+## Memory Query Evals
+
+- `fail` Polsia Cofounder VentureCell Operator OS: `available_truncated`; matches `3`; missing `cofounder, operator, os`.
+- `fail` Darshan external reader gate Go evidence receipt: `available_truncated`; matches `3`; missing `external, reader, gate, go, evidence, receipt`.
+- `fail` Go evidence receipt source_url event_uid accepted: `available_truncated`; matches `3`; missing `go, evidence, receipt, url, event, uid, accepted`.
+- `fail` Cofounder Canvas Library Plan Execute publishing: `available_truncated`; matches `3`; missing `cofounder, canvas, library, execute, publishing`.
+- `fail` Chetana wiki memory kernel staged trusted quarantine: `available_truncated`; matches `3`; missing `staged, quarantine`.
+- `fail` VentureCell autonomy ladder external action approval: `available_truncated`; matches `3`; missing `autonomy, ladder, external, action, approval`.
 
 ## Memory Index
 
 - `trusted` entries shown: `3`
-  - Source turn: `/Users/dhyana/.dharma/knowledge/wiki/concepts/3---turn-121.md`
-  - Source turn: `/Users/dhyana/.dharma/knowledge/wiki/concepts/3---turn-122.md`
-  - Source turn: `/Users/dhyana/.dharma/knowledge/wiki/concepts/3---turn-123.md`
+  - Lodestone Seed: Darshan Publication VentureCell: `/Users/dhyana/.dharma/knowledge/wiki/concepts/darshan-publication-venture-cell.md`
+  - Dharma Reward Forge Seed - Six-Agent Synthesis: `/Users/dhyana/.dharma/knowledge/wiki/concepts/dharma-reward-forge.md`
+  - Lodestone Seed: Long Now Temporal Attractor: `/Users/dhyana/.dharma/knowledge/wiki/concepts/long-now-temporal-attractor-for-dharma-swarm.md`
 - `staged` entries shown: `3`
-  - Operating Altitude Install — 2026-04-28 Session Milestone: `/Users/dhyana/.dharma/knowledge/staging/2026-04-28/914140f9-a31c-4cc7-927c-543f1861ff16.md`
-  - Operating Altitude Install — 2026-04-28 Session Milestone: `/Users/dhyana/.dharma/knowledge/staging/2026-04-28/altitude-install-milestone.md`
-  - Source turn: `/Users/dhyana/.dharma/knowledge/staging/2026-05-04/3af8f1c2-61ba-4afa-b8e2-23838c6d2468.md`
+  - Source turn: `/Users/dhyana/.dharma/knowledge/staging/2026-05-04/3b1884c7-f3f9-4416-8fc7-682c9631a390.md`
+  - Source turn: `/Users/dhyana/.dharma/knowledge/staging/2026-05-04/3bbc5da0-8714-44d3-86c1-bb3e03c6c848.md`
+  - Source turn: `/Users/dhyana/.dharma/knowledge/staging/2026-05-04/3c5a4608-939b-4f19-a7bd-c3446e2d9cf0.md`
 - `quarantine` entries shown: `3`
-  - Telos Gates: `/Users/dhyana/.dharma/knowledge/quarantine/2026-04-28/c538a37e-6e89-42b1-be1a-473ec4ebe7da.md`
-  - Source turn: `/Users/dhyana/.dharma/knowledge/quarantine/2026-05-23/057690cc-de18-4b84-b617-20441cb1a1e9.md`
-  - Source turn: `/Users/dhyana/.dharma/knowledge/quarantine/2026-05-23/0e743772-dc67-4957-91c7-d07c1d72d511.md`
+  - Source turn: `/Users/dhyana/.dharma/knowledge/quarantine/collisions/2026-05-27/018d281b-5e5b-45f0-b5e8-b5ef0bf82b57.md`
+  - Source turn: `/Users/dhyana/.dharma/knowledge/quarantine/collisions/2026-05-27/056f8843-2c18-4761-97c2-c898b7a10cab.md`
+  - Source turn: `/Users/dhyana/.dharma/knowledge/quarantine/collisions/2026-05-27/0599ca01-e7d8-4da0-9603-f3ab8e2dc7de.md`
 
 ## Daily Cycle
 
