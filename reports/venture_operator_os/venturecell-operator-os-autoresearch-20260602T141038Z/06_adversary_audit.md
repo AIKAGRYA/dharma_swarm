@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-afcc427129fd0bcb`
-Current scoped HEAD before this packet: `498c0786 feat(operator-os): add gap triage packet`
+ds-goal progress receipt: `r-0876eae2183f379c`
+Current scoped HEAD before this packet: `219078ec feat(operator-os): add memory coverage packet`
 
 This audit is intentionally written before the final time window so the next
 agent has a concrete attack surface. It is not a completion certificate. The
@@ -35,6 +35,8 @@ updates, and terminal verification exist.
   still only a local selector and not gate clearance.
 - Memory coverage packet identifies root-level truncation, but does not prove
   complete MemoryKernel coverage.
+- Digest canvas summary caps repeated Markdown rows, but projection JSON still
+  holds full evidence and the cap is not filtering.
 - MemoryKernel query eval now reports `pass` with `6/6` from report-local
   staged sources.
 - MemoryKernel repair now reports `no_repair_needed`; no trusted Chetana
@@ -99,6 +101,8 @@ Adversarial review:
   clearance.
 - Memory coverage must not be used to claim complete recall or trusted Chetana
   promotion.
+- Digest row caps must not be used to hide evidence or claim a cleaner task
+  state than projection JSON shows.
 - Unrelated staged work must not be included in commits for this run.
 
 Keep / revert / queue:
@@ -135,6 +139,7 @@ Queued:
 | Receipt inventory proves completion | manifest is an index and reporter is still open | false |
 | Gap triage clears the remaining blockers | `operator_gap_triage_packet.json` is `not_authority: true` | false |
 | Memory coverage proves complete recall | staging and quarantine roots are still truncated | false |
+| Digest cap deletes noisy tasks | projection JSON still includes the full canvas | false |
 | Broad dirty work is part of this packet | scoped report-only patch | false |
 
 ## Boundary Audit

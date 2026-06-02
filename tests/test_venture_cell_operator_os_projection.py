@@ -322,6 +322,38 @@ def test_operator_daily_digest_renders_structure_without_live_authority_claim(tm
     assert "autonomous external send" not in digest.lower()
 
 
+def test_operator_daily_digest_caps_repeated_canvas_lane_details(tmp_path: Path) -> None:
+    bundle = _bundle(tmp_path)
+    a2a_rows = tuple(
+        {
+            "id": f"a2a-{index}",
+            "from": "planner",
+            "to": "codex",
+            "status": "pending",
+            "body": f"Repeated canvas row {index}",
+        }
+        for index in range(12)
+    )
+
+    projection = build_operator_projection(
+        OperatorOSInputs(
+            bundle_path=bundle,
+            a2a_tasks=a2a_rows,
+            trusted_root=tmp_path / "trusted",
+            staging_root=tmp_path / "staging",
+            quarantine_root=tmp_path / "quarantine",
+        )
+    )
+
+    digest = render_operator_daily_digest(projection)
+
+    assert len([item for item in projection.canvas if item.lane == "a2a_queue"]) == 12
+    assert "Repeated canvas row 0" in digest
+    assert "Repeated canvas row 7" in digest
+    assert "Repeated canvas row 8" not in digest
+    assert "`a2a_queue` omitted items: `4` of `12` total." in digest
+
+
 def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp_path: Path) -> None:
     bundle = _bundle(tmp_path)
     state_root = tmp_path / "state"

@@ -39,53 +39,12 @@
 - `task_board` eval_probe_task: `pending`.
 - `task_board` eval_probe_task: `pending`.
 - `task_board` eval_probe_task: `pending`.
-- `task_board` eval_probe_task: `pending`.
-- `task_board` eval_probe_task: `pending`.
-- `task_board` eval_probe_task: `pending`.
-- `task_board` eval_probe_task: `pending`.
-- `task_board` eval_probe_task: `pending`.
-- `task_board` eval_probe_task: `pending`.
-- `task_board` eval_probe_task: `pending`.
-- `task_board` eval_probe_task: `pending`.
-- `task_board` eval_probe_task: `pending`.
-- `task_board` eval_probe_task: `pending`.
-- `task_board` eval_probe_task: `pending`.
-- `task_board` eval_probe_task: `pending`.
-- `task_board` eval_probe_task: `pending`.
-- `task_board` eval_probe_task: `pending`.
-- `task_board` eval_probe_task: `pending`.
-- `task_board` eval_probe_task: `pending`.
-- `task_board` eval_probe_task: `pending`.
-- `task_board` eval_probe_task: `pending`.
-- `task_board` eval_probe_task: `pending`.
-- `task_board` eval_probe_task: `pending`.
-- `task_board` eval_probe_task: `pending`.
-- `task_board` eval_probe_task: `pending`.
-- `task_board` eval_probe_task: `pending`.
-- `task_board` eval_probe_task: `pending`.
-- `task_board` eval_probe_task: `pending`.
-- `task_board` eval_probe_task: `pending`.
-- `task_board` eval_probe_task: `pending`.
-- `task_board` eval_probe_task: `pending`.
-- `task_board` eval_probe_task: `pending`.
-- `task_board` eval_probe_task: `pending`.
-- `task_board` eval_probe_task: `pending`.
-- `task_board` eval_probe_task: `pending`.
-- `task_board` eval_probe_task: `pending`.
-- `task_board` eval_probe_task: `pending`.
-- `task_board` eval_probe_task: `pending`.
-- `task_board` eval_probe_task: `pending`.
-- `task_board` eval_probe_task: `pending`.
-- `task_board` eval_probe_task: `pending`.
-- `task_board` eval_probe_task: `pending`.
-- `task_board` eval_probe_task: `pending`.
-- `task_board` eval_probe_task: `pending`.
-- `task_board` eval_probe_task: `pending`.
 - `a2a_queue` Fleet Health Collaboration — COLLECTOR role. Step 1: Collect current fleet metrics from ~/.dharma/a2a_bus/state/ for all: `completed_verified`.
 - `a2a_queue` Fleet Health Collaboration — ANALYST role. Step 1: Wait for hermes-m5 metrics artifact at ~/.dharma/a2a_bus/conjunction/: `completed_verified`.
 - `a2a_queue` Fleet Health Collaboration — ADVERSARIAL REVIEWER role. Step 1: Read codex_composer analysis at ~/.dharma/a2a_bus/conjun: `blocked_verified`.
 - `a2a_queue` Fleet Health Collaboration — INFRA AUDIT role (dharma_swarm internals ONLY). Step 1: Audit A2A bus infrastructure: verif: `blocked_verified`.
 - `a2a_queue` forge_council: (1) countersign v0.1.0 verifier_artifact (decorrelated); (2) build v0.1.1 transfer-gate in shadow per doc: `open_unclaimed`; blocked `a2a_task_not_terminal`.
+- `task_board` omitted items: `42` of `50` total.
 
 ## Gates
 
@@ -136,7 +95,7 @@
 ## Memory Kernel
 
 - Status: `read_through_index_available`
-- Staged: `5023`
+- Staged: `5024`
 - Trusted: `1336`
 - Quarantine: `5000`
 - Truncated scan: `True`
@@ -147,7 +106,7 @@
 
 - `trusted` `trusted`: scanned `1336`; indexed `20`/`20`; truncated `False`.
 - `staging` `staged`: scanned `5000`; indexed `20`/`20`; truncated `True`.
-- `supplemental_staging` `staged`: scanned `23`; indexed `20`/`20`; truncated `False`.
+- `supplemental_staging` `staged`: scanned `24`; indexed `20`/`20`; truncated `False`.
 - `quarantine` `quarantine`: scanned `5000`; indexed `20`/`20`; truncated `True`.
 
 ## Memory Repair Packet

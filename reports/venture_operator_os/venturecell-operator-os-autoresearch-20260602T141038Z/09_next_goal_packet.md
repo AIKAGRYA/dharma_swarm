@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-afcc427129fd0bcb`
-Current scoped HEAD before this packet: `498c0786 feat(operator-os): add gap triage packet`
+ds-goal progress receipt: `r-0876eae2183f379c`
+Current scoped HEAD before this packet: `219078ec feat(operator-os): add memory coverage packet`
 
 This packet is the handoff for the next bounded AutoResearch loop. It must be
 reviewed and updated in the final hour before reporter closure.
@@ -13,7 +13,7 @@ reviewed and updated in the final hour before reporter closure.
 
 - Operator OS status: `blocked_on_external_reader_gate`.
 - Autonomy level: `L0_read_only_plan`.
-- Score ledger: `99/100` live score, not final.
+- Score ledger: `100/100` live score, not final.
 - ds-goal mission state: `open=1 claimed=0 completed=4 failed=0 blocked=0 total=5`.
 - Reporter task: open by design.
 - MemoryKernel strict eval: `pass` (`6/6`) from report-local staged sources.
@@ -30,7 +30,9 @@ reviewed and updated in the final hour before reporter closure.
   reader as non-local blocker and MemoryKernel truncation as local maintenance.
 - Memory coverage packet: present; staging and quarantine roots are truncated,
   trusted and report-local roots are not truncated.
-- Last committed packet: gap triage packet.
+- Digest canvas summary: present; Markdown caps repeated rows while JSON
+  projection preserves full canvas data.
+- Last committed packet: MemoryKernel coverage packet.
 
 ## Next Goal
 
@@ -121,7 +123,12 @@ bounded targets:
    or query-specific coverage while preserving `trusted_promotion_claimed:
    false`.
 
-13. Final closeout only after true-time proof.
+13. Digest scanability preservation.
+
+   `operator_os_digest.md` now caps repeated canvas lane details. Treat that as
+   presentation only; use `operator_os_projection.json` for full evidence.
+
+14. Final closeout only after true-time proof.
 
    When elapsed time is actually in the final window, update:
 
@@ -182,6 +189,7 @@ If the loop only changes a report packet, also run scoped `git diff --check`.
 - `18_receipt_inventory_manifest_receipt.md`
 - `19_gap_triage_packet_receipt.md`
 - `20_memory_kernel_coverage_receipt.md`
+- `21_digest_canvas_summary_receipt.md`
 - `operator_os_projection.json`
 - `operator_next_action_packet.json`
 - `memory_kernel_coverage_packet.json`

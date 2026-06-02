@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live packet, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-afcc427129fd0bcb`
-Current scoped HEAD before this packet: `498c0786 feat(operator-os): add gap triage packet`
+ds-goal progress receipt: `r-0876eae2183f379c`
+Current scoped HEAD before this packet: `219078ec feat(operator-os): add memory coverage packet`
 
 This packet captures durable learning from the run so far. It must be reviewed
 and updated during final closeout before the reporter task is closed.
@@ -137,6 +137,22 @@ and updated during final closeout before the reporter task is closed.
      query-specific retrieval. Coverage metadata explains limits; it does not
      prove complete memory coverage or trusted promotion.
 
+9. Human digest scanability must not mutate machine evidence.
+
+   Evidence:
+
+   - `operator_os_digest.md` now caps repeated canvas lane details and renders
+     omitted-count rows.
+   - `operator_os_projection.json` still preserves the full canvas row set.
+   - The focused digest test proves repeated A2A rows are summarized only in
+     Markdown.
+
+   Metabolized rule:
+
+   - Human-facing summaries may compress repeated rows, but future agents must
+     read JSON packets for full evidence and must not treat summarization as
+     deletion, closure, or authority filtering.
+
 ## Committed Packets
 
 | Commit | Packet | Durable effect |
@@ -161,7 +177,8 @@ and updated during final closeout before the reporter task is closed.
 | `7370b48e` | `17_liveness_key_disambiguation_receipt.md` | action-specific liveness field names |
 | `47e4e044` | `18_receipt_inventory_manifest_receipt.md` | manifest receipt inventory |
 | `498c0786` | `19_gap_triage_packet_receipt.md` | local/external gap triage packet |
-| pending | `20_memory_kernel_coverage_receipt.md` | root-level MemoryKernel coverage packet |
+| `219078ec` | `20_memory_kernel_coverage_receipt.md` | root-level MemoryKernel coverage packet |
+| pending | `21_digest_canvas_summary_receipt.md` | presentation-only digest canvas summary |
 
 ## Current Read-Only Artifacts
 
@@ -189,6 +206,7 @@ and updated during final closeout before the reporter task is closed.
 - `18_receipt_inventory_manifest_receipt.md`
 - `19_gap_triage_packet_receipt.md`
 - `20_memory_kernel_coverage_receipt.md`
+- `21_digest_canvas_summary_receipt.md`
 
 ## Do Not Metabolize As Done
 
@@ -211,6 +229,8 @@ These facts are explicitly not complete:
 - Gap triage is a local loop selector, not authority or final proof.
 - Memory coverage explains root truncation, not complete recall or trusted
   promotion.
+- Digest canvas summarization is presentation-only and does not remove
+  projection evidence.
 - Reporter task is not closed.
 - The final adversarial audit and next-goal packet still require final-window
   review/update.

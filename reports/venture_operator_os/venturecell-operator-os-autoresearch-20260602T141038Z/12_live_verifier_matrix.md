@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live verifier matrix, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-afcc427129fd0bcb`
-Current scoped HEAD before this packet: `498c0786 feat(operator-os): add gap triage packet`
+ds-goal progress receipt: `r-0876eae2183f379c`
+Current scoped HEAD before this packet: `219078ec feat(operator-os): add memory coverage packet`
 
 This matrix captures the current verification surface for future agents. It is
 not a final verifier matrix and must not be used to close the reporter task.
@@ -21,6 +21,8 @@ not a final verifier matrix and must not be used to close the reporter task.
   MemoryKernel truncation remains local maintenance.
 - Memory coverage: passing; staging/quarantine roots are truncated and
   trusted/report-local roots are not truncated.
+- Digest canvas summary: passing; Markdown repeated rows capped while JSON
+  projection rows remain complete.
 - Complete ds-goal verification: expected fail on open reporter task.
 - Mission status: open.
 
@@ -44,7 +46,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | Artifact | Current state | Risk |
 |---|---|---|
 | `operator_os_projection.json` | rendered current state | read-only projection only |
-| `operator_os_digest.md` | rendered current digest | not external authority |
+| `operator_os_digest.md` | rendered current digest with canvas caps | presentation summary, not full evidence |
 | `memory_kernel_query_eval.json` | `pass` (`6/6`) | staged/report-local pass, not trusted promotion |
 | `memory_kernel_coverage_packet.json` | root coverage rendered | explains truncation, not complete coverage |
 | `memory_kernel_repair_packet.json` | `no_repair_needed` | still forbids trusted promotion |
@@ -58,7 +60,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `17_liveness_key_disambiguation_receipt.md` | action-specific liveness labels | prevents substrate/authority conflation |
 | `18_receipt_inventory_manifest_receipt.md` | manifest receipt inventory | index only, not final proof |
 | `06_adversary_audit.md` | live draft | needs final-window review |
-| `07_score_history.md` | live score `99/100` | not final |
+| `07_score_history.md` | live score `100/100` | not final |
 | `08_metabolization_packet.md` | live packet | needs final-window review |
 | `09_next_goal_packet.md` | live packet | needs final-window review |
 
@@ -85,7 +87,8 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `7370b48e` | keep | liveness key disambiguation |
 | `47e4e044` | keep | receipt inventory manifest |
 | `498c0786` | keep | gap triage packet |
-| pending | keep | MemoryKernel coverage packet |
+| `219078ec` | keep | MemoryKernel coverage packet |
+| pending | keep | digest canvas summary |
 
 ## Revert / Queue Ledger
 

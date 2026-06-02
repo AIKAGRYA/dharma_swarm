@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from collections import Counter, defaultdict
 from pathlib import Path
 
 from dharma_swarm.venture_cell.operator_os.schema import VentureCellOperatorProjection
+
+CANVAS_DETAIL_LIMIT_PER_LANE = 8
 
 
 def render_operator_daily_digest(projection: VentureCellOperatorProjection) -> str:
@@ -27,9 +30,21 @@ def render_operator_daily_digest(projection: VentureCellOperatorProjection) -> s
         )
 
     lines.extend(["", "## Canvas", ""])
+    lane_totals = Counter(item.lane for item in projection.canvas)
+    shown_by_lane: defaultdict[str, int] = defaultdict(int)
+    omitted_by_lane: defaultdict[str, int] = defaultdict(int)
     for item in projection.canvas:
+        if shown_by_lane[item.lane] >= CANVAS_DETAIL_LIMIT_PER_LANE:
+            omitted_by_lane[item.lane] += 1
+            continue
+        shown_by_lane[item.lane] += 1
         blocked = f"; blocked `{item.blocked_reason}`" if item.blocked_reason else ""
         lines.append(f"- `{item.lane}` {item.title}: `{item.status}`{blocked}.")
+    for lane in sorted(omitted_by_lane):
+        lines.append(
+            f"- `{lane}` omitted items: `{omitted_by_lane[lane]}` "
+            f"of `{lane_totals[lane]}` total."
+        )
 
     lines.extend(["", "## Gates", ""])
     for gate in projection.gates:
