@@ -42,7 +42,7 @@
 ## Recommended Merge Sequence
 
 ### Wave 1 — Priority Unblock
-- **#453** fix(docops): widen canonical_guard ignore (unblocks 24 CI-failing PRs)
+- **#453** fix(docops): widen docops-guard ignore (unblocks 24 CI-failing PRs)
 
 ### Wave 2 — Bug Fixes
 - **#383** fix(guardian): recognize @dataclass __init__ (closes 29 dupe issues)
