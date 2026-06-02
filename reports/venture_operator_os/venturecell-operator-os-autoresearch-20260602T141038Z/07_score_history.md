@@ -3,9 +3,9 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live ledger, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-7167e2551df4f45e`
+ds-goal progress receipt: `r-db9c975774cfbdb2`
 Baseline: `1aca07a1 Add VentureCell Operator OS Level 70 surface`
-Current scoped HEAD before this packet: `0415f60c feat(operator-os): count memory coverage roots`
+Current scoped HEAD before this packet: `35c3e28a feat(operator-os): expose latest receipt id`
 
 This file is a living score ledger. It exists now so later agents do not
 reconstruct scores from memory. It must be reviewed and updated before final
@@ -51,6 +51,7 @@ reporter closure.
 | Loop 36 | `35_gap_triage_counts_receipt.md` | `r-2094f1c27d8e0d40` | 100 | +0 | keep gap triage counts |
 | Loop 37 | `36_memory_coverage_counts_receipt.md` | `r-3e318b30d3694ffa` | 100 | +0 | keep memory coverage counts |
 | Loop 38 | `37_latest_progress_receipt_manifest_receipt.md` | `r-7167e2551df4f45e` | 100 | +0 | keep latest progress receipt id inventory |
+| Loop 39 | `38_timebox_active_clock_receipt.md` | `r-db9c975774cfbdb2` | 100 | +0 | keep active non-final timebox proof |
 
 ## Area History
 
@@ -108,8 +109,8 @@ audit with explicit evidence.
   liveness remains substrate context only.
 - Periodic substrate refresh: `make onboard` and toolbelt pass; optional
   credential warnings remain context only.
-- Timebox status: elapsed `10982s` (`3h 03m 02s`), remaining `17818s`
-  (`4h 56m 58s`).
+- Timebox status: elapsed `12907s` (`3h 35m 07s`), remaining `15893s`
+  (`4h 24m 53s`).
 - Manifest receipt summary: `receipt_count` and `latest_receipt_path` present,
   with `not_final: true`.
 - Manifest inventory scope: latest receipt name and non-final/non-authority
@@ -189,6 +190,7 @@ current evidence, not as a full-project proof.
 - Admission raw redaction is render hygiene, not admission policy change.
 - Timebox refresh is evidence that the mission remains active and incomplete.
 - Three-hour timebox proof confirms the mission remains active and incomplete.
+- Active clock proof confirms the mission remains active and incomplete.
 - The reporter task must remain open until final artifacts and final
   verification prove the full contract.
 

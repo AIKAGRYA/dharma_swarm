@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-7167e2551df4f45e`
-Current scoped HEAD before this packet: `0415f60c feat(operator-os): count memory coverage roots`
+ds-goal progress receipt: `r-db9c975774cfbdb2`
+Current scoped HEAD before this packet: `35c3e28a feat(operator-os): expose latest receipt id`
 
 This packet is the handoff for the next bounded AutoResearch loop. It must be
 reviewed and updated in the final hour before reporter closure.
@@ -48,7 +48,7 @@ reviewed and updated in the final hour before reporter closure.
   liveness treated as repo-wide substrate context only.
 - Periodic substrate refresh: latest `make onboard` and toolbelt pass, with
   NATS liveness still repo-wide context only.
-- Timebox status: elapsed `10982s`, remaining `17818s`; mission not complete.
+- Timebox status: elapsed `12907s`, remaining `15893s`; mission not complete.
 - Manifest receipt summary: manifest has receipt count and latest receipt path,
   but remains `not_final: true`.
 - Manifest inventory scope: scope/name/non-final markers present; navigation
@@ -59,7 +59,8 @@ reviewed and updated in the final hour before reporter closure.
   evidence remains visible.
 - Timebox refresh: current clock still below 8 hours.
 - Three-hour timebox proof: current clock still below 8 hours.
-- Last committed packet: memory coverage count selectors.
+- Active clock proof: current clock still below 8 hours.
+- Last committed packet: latest progress receipt id inventory.
 
 ## Next Goal
 
@@ -266,6 +267,7 @@ If the loop only changes a report packet, also run scoped `git diff --check`.
 - `35_gap_triage_counts_receipt.md`
 - `36_memory_coverage_counts_receipt.md`
 - `37_latest_progress_receipt_manifest_receipt.md`
+- `38_timebox_active_clock_receipt.md`
 - `operator_os_projection.json`
 - `operator_completion_guard_packet.json`
 - `operator_next_action_packet.json`

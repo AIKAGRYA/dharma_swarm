@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live verifier matrix, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-7167e2551df4f45e`
-Current scoped HEAD before this packet: `0415f60c feat(operator-os): count memory coverage roots`
+ds-goal progress receipt: `r-db9c975774cfbdb2`
+Current scoped HEAD before this packet: `35c3e28a feat(operator-os): expose latest receipt id`
 
 This matrix captures the current verification surface for future agents. It is
 not a final verifier matrix and must not be used to close the reporter task.
@@ -37,7 +37,7 @@ not a final verifier matrix and must not be used to close the reporter task.
   verifier pass required.
 - Periodic onboard/toolbelt: passing, environment context only.
 - Periodic substrate refresh: passing, environment context only.
-- Timebox status: elapsed `10982s`, remaining `17818s`.
+- Timebox status: elapsed `12907s`, remaining `15893s`.
 - Manifest receipt summary: passing; count and latest receipt path rendered.
 - Manifest inventory scope: passing; latest receipt name and non-final markers
   rendered.
@@ -96,6 +96,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `24_timebox_status_receipt.md` | elapsed `8770s`, remaining `20030s` | proves non-final timebox |
 | `27_timebox_refresh_receipt.md` | elapsed `9701s`, remaining `19099s` | proves still non-final |
 | `32_timebox_three_hour_receipt.md` | elapsed `10982s`, remaining `17818s` | proves still non-final |
+| `38_timebox_active_clock_receipt.md` | elapsed `12907s`, remaining `15893s` | proves still non-final |
 | `18_receipt_inventory_manifest_receipt.md` | manifest receipt inventory | index only, not final proof |
 | `06_adversary_audit.md` | live draft | needs final-window review |
 | `07_score_history.md` | live score `100/100` | not final |
@@ -143,6 +144,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `r-2094f1c27d8e0d40` | keep | gap triage count selectors |
 | `r-3e318b30d3694ffa` | keep | memory coverage count selectors |
 | `r-7167e2551df4f45e` | keep | latest progress receipt id inventory |
+| `r-db9c975774cfbdb2` | keep | active non-final timebox proof |
 
 ## Revert / Queue Ledger
 
