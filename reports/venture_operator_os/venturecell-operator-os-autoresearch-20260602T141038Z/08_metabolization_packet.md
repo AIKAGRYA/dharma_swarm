@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live packet, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-b73f8ef857f710fd`
-Current scoped HEAD before this packet: `7370b48e feat(operator-os): disambiguate authority liveness proof`
+ds-goal progress receipt: `r-41271dd7e888aa5e`
+Current scoped HEAD before this packet: `47e4e044 feat(operator-os): add receipt inventory to manifest`
 
 This packet captures durable learning from the run so far. It must be reviewed
 and updated during final closeout before the reporter task is closed.
@@ -103,6 +103,22 @@ and updated during final closeout before the reporter task is closed.
    - Future agents should read the authority boundary packet before acting.
      Local allowances do not imply external authority.
 
+7. Gap triage must separate local maintenance from external unblockers.
+
+   Evidence:
+
+   - `operator_gap_triage_packet.json` reports
+     `external_blocked_with_local_followups`.
+   - The Darshan external-reader gap is marked as requiring external authority.
+   - MemoryKernel truncation is marked as locally actionable maintenance.
+   - The packet has `not_authority: true` and forbids fake GO receipts, fake
+     NATS/A2A ack claims, and ungated trusted Chetana promotion.
+
+   Metabolized rule:
+
+   - Future agents should use gap triage as a local loop selector. It does not
+     clear gates, grant external authority, or certify final completion.
+
 ## Committed Packets
 
 | Commit | Packet | Durable effect |
@@ -125,7 +141,8 @@ and updated during final closeout before the reporter task is closed.
 | `66f7d8a3` | `15_artifact_manifest_receipt.md` | rendered artifact manifest and status locator |
 | `d91b3877` | `16_periodic_onboard_receipt.md` | periodic onboard/toolbelt substrate check |
 | `7370b48e` | `17_liveness_key_disambiguation_receipt.md` | action-specific liveness field names |
-| pending | `18_receipt_inventory_manifest_receipt.md` | manifest receipt inventory |
+| `47e4e044` | `18_receipt_inventory_manifest_receipt.md` | manifest receipt inventory |
+| pending | `19_gap_triage_packet_receipt.md` | local/external gap triage packet |
 
 ## Current Read-Only Artifacts
 
@@ -145,10 +162,12 @@ and updated during final closeout before the reporter task is closed.
 - `14_residual_risk_register.md`
 - `15_artifact_manifest_receipt.md`
 - `authority_boundary_packet.json`
+- `operator_gap_triage_packet.json`
 - `operator_os_artifact_manifest.json`
 - `16_periodic_onboard_receipt.md`
 - `17_liveness_key_disambiguation_receipt.md`
 - `18_receipt_inventory_manifest_receipt.md`
+- `19_gap_triage_packet_receipt.md`
 
 ## Do Not Metabolize As Done
 
@@ -168,6 +187,7 @@ These facts are explicitly not complete:
 - Authority liveness keys are action-specific and currently false for Operator
   OS NATS/A2A action ack proof.
 - Manifest receipt inventory is an audit locator, not final proof.
+- Gap triage is a local loop selector, not authority or final proof.
 - Reporter task is not closed.
 - The final adversarial audit and next-goal packet still require final-window
   review/update.
@@ -184,6 +204,7 @@ Start here:
 3. Read `07_score_history.md`.
 4. Inspect `operator_os_projection.json`, `memory_kernel_query_eval.json`,
    `memory_kernel_repair_packet.json`,
+   `operator_gap_triage_packet.json`,
    `10_memorykernel_report_source_packet.md`, and
    `darshan_go_gate_packet.json`.
    Inspect `darshan_go_receipt_template.json` only as a template, not as

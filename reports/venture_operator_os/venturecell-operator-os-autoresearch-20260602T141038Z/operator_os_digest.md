@@ -123,10 +123,20 @@
 - Memory query evals: `pass` (6/6)
 - Blockers: `darshan_external_reader_event_missing, memory_kernel_index_truncated`
 
+## Gap Triage
+
+- Decision: `external_blocked_with_local_followups`
+- Top blocker: `darshan_external_reader_event_missing`
+- External-authority gaps: `darshan_external_reader_event_missing`
+- Locally actionable gaps: `memory_kernel_index_truncated`
+- Not authority: `True`
+- `darshan_external_reader_event_missing` owner `growth`; severity `blocking`; local `False`; external `True`.
+- `memory_kernel_index_truncated` owner `memory`; severity `maintenance`; local `True`; external `False`.
+
 ## Memory Kernel
 
 - Status: `read_through_index_available`
-- Staged: `5021`
+- Staged: `5022`
 - Trusted: `1336`
 - Quarantine: `5000`
 - Truncated scan: `True`

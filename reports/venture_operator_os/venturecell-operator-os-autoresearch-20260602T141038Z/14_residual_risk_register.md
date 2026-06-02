@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live risk register, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-fed097888e1c7c68`
-Current scoped HEAD before this packet: `b72f94ee feat(operator-os): add authority boundary packet`
+ds-goal progress receipt: `r-41271dd7e888aa5e`
+Current scoped HEAD before this packet: `47e4e044 feat(operator-os): add receipt inventory to manifest`
 
 This register separates current blockers, residual risks, and solved local
 claims. It exists to prevent false completion after a high live score.
@@ -31,6 +31,7 @@ claims. It exists to prevent false completion after a high live score.
 | Onboard NATS overclaim | `make onboard` reports repo-wide NATS live contact | do not treat as Operator OS action ack |
 | Liveness label regression | authority fields could become ambiguous again | keep Operator OS action-specific key names |
 | Receipt inventory overclaim | manifest lists receipt paths | treat as index, not completion proof |
+| Gap triage overclaim | `operator_gap_triage_packet.json` separates local/external gaps | treat as loop selector, not authority or gate clearance |
 | Context+ unavailable | `Transport closed` during static analysis attempts | document unavailable, use deterministic fallback checks |
 | Repo has unrelated dirty work | broad dirty worktree outside this run | commit only explicit scoped pathspecs |
 
@@ -48,6 +49,7 @@ claims. It exists to prevent false completion after a high live score.
 | Periodic onboard passes | `make onboard` and toolbelt exit `0` | substrate context only |
 | Liveness keys are action-specific | Operator OS NATS/A2A action ack fields are false | avoids substrate/authority conflation |
 | Receipt inventory renders | manifest lists run Markdown receipts | audit locator only |
+| Gap triage renders | external-reader non-local, MemoryKernel truncation local maintenance | selector only |
 
 ## Loop 15 Receipt
 

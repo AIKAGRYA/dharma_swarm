@@ -170,6 +170,12 @@ def test_projection_blocks_external_autonomy_without_reader_gate(tmp_path: Path)
     assert authority.liveness_claims["operator_os_a2a_live_action_ack_proof_present"] is False
     assert authority.liveness_claims["filesystem_a2a_rows_are_evidence_only"] is True
     assert authority.promotion_claims["trusted_chetana_promotion_claimed"] is False
+    triage = projection.gap_triage_packet
+    assert triage.decision == "external_blocked_with_local_followups"
+    assert "darshan_external_reader_event_missing" in triage.external_authority_required_gaps
+    assert "memory_kernel_query_eval_partial" in triage.locally_actionable_gaps
+    assert triage.not_authority is True
+    assert "fake_go_receipt_creation" in triage.forbidden_actions
     repair = projection.memory_kernel_repair_packet
     assert repair.decision == "queue_repair_without_promotion"
     assert repair.status == "queued"
@@ -307,6 +313,8 @@ def test_operator_daily_digest_renders_structure_without_live_authority_claim(tm
     assert "draft_template_not_evidence" in digest
     assert "## Next Action Packet" in digest
     assert "hold_external_authority" in digest
+    assert "## Gap Triage" in digest
+    assert "external_blocked_with_local_followups" in digest
     assert "## Memory Kernel" in digest
     assert "## Memory Repair Packet" in digest
     assert "queue_repair_without_promotion" in digest
@@ -364,6 +372,9 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     authority_boundary_packet = json.loads(
         paths["authority_boundary_packet"].read_text(encoding="utf-8")
     )
+    gap_triage_packet = json.loads(
+        paths["gap_triage_packet"].read_text(encoding="utf-8")
+    )
     artifact_manifest = json.loads(
         paths["artifact_manifest"].read_text(encoding="utf-8")
     )
@@ -396,13 +407,20 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert authority_boundary_packet["liveness_claims"]["operator_os_nats_action_ack_proof_present"] is False
     assert authority_boundary_packet["liveness_claims"]["operator_os_a2a_live_action_ack_proof_present"] is False
     assert authority_boundary_packet["promotion_claims"]["trusted_chetana_promotion_claimed"] is False
+    assert gap_triage_packet["decision"] == "external_blocked_with_local_followups"
+    assert "darshan_external_reader_event_missing" in gap_triage_packet["external_authority_required_gaps"]
+    assert "memory_kernel_index_truncated" in gap_triage_packet["locally_actionable_gaps"]
+    assert gap_triage_packet["not_authority"] is True
+    assert "fake_go_receipt_creation" in gap_triage_packet["forbidden_actions"]
     assert artifact_manifest["schema"] == "dharma.venture_cell_operator_os.render_manifest.v0"
     assert artifact_manifest["status"] == "blocked_on_external_reader_gate"
     assert artifact_manifest["darshan_go_decision"] == "block_external_authority"
     assert artifact_manifest["authority_decision"] == "local_read_only_external_blocked"
+    assert artifact_manifest["gap_triage_decision"] == "external_blocked_with_local_followups"
     assert artifact_manifest["not_authority"] is True
     assert "projection" in artifact_manifest["artifact_paths"]
     assert "authority_boundary_packet" in artifact_manifest["artifact_paths"]
+    assert "gap_triage_packet" in artifact_manifest["artifact_paths"]
     assert str(report_dir / "00_opening_truth.md") in artifact_manifest["receipt_paths"]
     assert str(report_dir / "operator_os_digest.md") not in artifact_manifest["receipt_paths"]
 

@@ -30,6 +30,7 @@ from dharma_swarm.venture_cell.operator_os.schema import (
     CanvasItem,
     DarshanGoGatePacket,
     GateSummary,
+    GapTriagePacket,
     MemoryKernelSnapshot,
     MemoryKernelRepairPacket,
     OperatorDepartment,
@@ -107,6 +108,15 @@ def build_operator_projection(inputs: OperatorOSInputs | None = None) -> Venture
         memory_kernel_repair_packet=memory_kernel_repair_packet,
         evidence_refs=evidence_refs,
     )
+    gap_triage_packet = _gap_triage_packet(
+        status=status,
+        autonomy_level=autonomy_level,
+        gaps=gaps,
+        gates=gates,
+        memory=memory,
+        next_action_packet=next_action_packet,
+        darshan_go_gate_packet=darshan_go_gate_packet,
+    )
 
     return VentureCellOperatorProjection(
         venture_cell_id=active.venture_cell_id,
@@ -130,6 +140,7 @@ def build_operator_projection(inputs: OperatorOSInputs | None = None) -> Venture
         darshan_go_gate_packet=darshan_go_gate_packet,
         memory_kernel_repair_packet=memory_kernel_repair_packet,
         authority_boundary_packet=authority_boundary_packet,
+        gap_triage_packet=gap_triage_packet,
         daily_cycle=_daily_cycle(),
         evidence_refs=evidence_refs,
         gap_codes=gaps,
@@ -913,6 +924,146 @@ def _authority_boundary_packet(
             ),
         },
     )
+
+
+def _gap_triage_packet(
+    *,
+    status: str,
+    autonomy_level: str,
+    gaps: Sequence[str],
+    gates: Sequence[GateSummary],
+    memory: MemoryKernelSnapshot,
+    next_action_packet: OperatorNextActionPacket,
+    darshan_go_gate_packet: DarshanGoGatePacket,
+) -> GapTriagePacket:
+    items = tuple(
+        _gap_triage_item(
+            gap,
+            next_action_packet=next_action_packet,
+            darshan_go_gate_packet=darshan_go_gate_packet,
+            memory=memory,
+        )
+        for gap in gaps
+    )
+    locally_actionable = tuple(
+        str(item["gap_code"])
+        for item in items
+        if bool(item.get("can_progress_locally"))
+    )
+    external_required = tuple(
+        str(item["gap_code"])
+        for item in items
+        if bool(item.get("requires_external_authority"))
+    )
+    if external_required and locally_actionable:
+        decision = "external_blocked_with_local_followups"
+    elif external_required:
+        decision = "external_blocked"
+    elif locally_actionable:
+        decision = "local_gap_repair_available"
+    else:
+        decision = "no_open_gaps"
+
+    return GapTriagePacket(
+        packet_id="operator.gap_triage",
+        status=status,
+        autonomy_level=autonomy_level,
+        decision=decision,
+        gap_items=items,
+        locally_actionable_gaps=locally_actionable,
+        external_authority_required_gaps=external_required,
+        top_blocker=(external_required or locally_actionable or ("",))[0],
+        forbidden_actions=(
+            "external_outreach",
+            "fake_go_receipt_creation",
+            "claim_live_nats_or_a2a_without_action_ack",
+            "trusted_chetana_promotion_without_gates",
+        ),
+        not_authority=True,
+        raw={
+            "gate_decisions": tuple(
+                {
+                    "gate_id": gate.gate_id,
+                    "decision": gate.decision,
+                    "gap_codes": gate.gap_codes,
+                }
+                for gate in gates
+            ),
+            "memory_query_eval_status": memory.query_eval_status,
+            "darshan_go_decision": darshan_go_gate_packet.decision,
+        },
+    )
+
+
+def _gap_triage_item(
+    gap: str,
+    *,
+    next_action_packet: OperatorNextActionPacket,
+    darshan_go_gate_packet: DarshanGoGatePacket,
+    memory: MemoryKernelSnapshot,
+) -> dict[str, Any]:
+    if "external_reader" in gap:
+        return {
+            "gap_code": gap,
+            "owner_department": "growth",
+            "severity": "blocking",
+            "authority_scope": "external_reader_go_receipt_required",
+            "can_progress_locally": False,
+            "requires_external_authority": True,
+            "local_safe_action": (
+                "Keep growth and communications internal; prepare only non-evidence templates "
+                "and wait for a real human-approved, privacy-redacted reader event."
+            ),
+            "required_unblock_artifact": next_action_packet.required_unblock_artifact,
+            "evidence_refs": tuple(darshan_go_gate_packet.expected_local_artifacts),
+            "guardrail": "do_not_create_fake_receipt_or_contact_reader",
+        }
+    if gap.startswith("memory_kernel"):
+        severity = "maintenance" if memory.query_eval_status == "pass" else "blocking"
+        return {
+            "gap_code": gap,
+            "owner_department": "memory",
+            "severity": severity,
+            "authority_scope": "local_read_only_memory",
+            "can_progress_locally": True,
+            "requires_external_authority": False,
+            "local_safe_action": (
+                "Improve staged read-through coverage or eval evidence without trusted promotion."
+            ),
+            "required_unblock_artifact": (
+                "MemoryKernel coverage/eval receipt with trusted_promotion_claimed=false."
+            ),
+            "evidence_refs": memory.evidence_refs,
+            "guardrail": "do_not_mark_staged_or_quarantine_content_trusted",
+        }
+    if gap in {"operator_os_task_board_projection_empty", "operator_os_a2a_projection_empty"}:
+        return {
+            "gap_code": gap,
+            "owner_department": "operations",
+            "severity": "maintenance",
+            "authority_scope": "local_task_truth",
+            "can_progress_locally": True,
+            "requires_external_authority": False,
+            "local_safe_action": "Attach current local task/A2A evidence and keep filesystem rows evidence-only.",
+            "required_unblock_artifact": "TaskBoard rows or A2A closure receipts attached to the canvas.",
+            "evidence_refs": (
+                "dharma_swarm/task_board.py",
+                "dharma_swarm/operator_core/a2a_task_lifecycle.py",
+            ),
+            "guardrail": "do_not_claim_live_a2a_ack_from_filesystem_rows",
+        }
+    return {
+        "gap_code": gap,
+        "owner_department": "operations",
+        "severity": "inspect",
+        "authority_scope": "unknown",
+        "can_progress_locally": True,
+        "requires_external_authority": False,
+        "local_safe_action": "Inspect local evidence and write a bounded repair receipt before changing gates.",
+        "required_unblock_artifact": "Local verifier receipt that explains this gap.",
+        "evidence_refs": (),
+        "guardrail": "do_not_clear_gap_without_fresh_evidence",
+    }
 
 
 def _memory_kernel_repair_packet(memory: MemoryKernelSnapshot) -> MemoryKernelRepairPacket:

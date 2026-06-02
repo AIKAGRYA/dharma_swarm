@@ -105,6 +105,37 @@ def render_operator_daily_digest(projection: VentureCellOperatorProjection) -> s
         ]
     )
 
+    triage = projection.gap_triage_packet
+    local_gaps = (
+        ", ".join(triage.locally_actionable_gaps)
+        if triage.locally_actionable_gaps
+        else "none"
+    )
+    external_gaps = (
+        ", ".join(triage.external_authority_required_gaps)
+        if triage.external_authority_required_gaps
+        else "none"
+    )
+    lines.extend(
+        [
+            "",
+            "## Gap Triage",
+            "",
+            f"- Decision: `{triage.decision}`",
+            f"- Top blocker: `{triage.top_blocker or 'none'}`",
+            f"- External-authority gaps: `{external_gaps}`",
+            f"- Locally actionable gaps: `{local_gaps}`",
+            f"- Not authority: `{triage.not_authority}`",
+        ]
+    )
+    for item in triage.gap_items[:6]:
+        lines.append(
+            f"- `{item.get('gap_code')}` owner `{item.get('owner_department')}`; "
+            f"severity `{item.get('severity')}`; "
+            f"local `{item.get('can_progress_locally')}`; "
+            f"external `{item.get('requires_external_authority')}`."
+        )
+
     memory = projection.memory_kernel
     lines.extend(
         [

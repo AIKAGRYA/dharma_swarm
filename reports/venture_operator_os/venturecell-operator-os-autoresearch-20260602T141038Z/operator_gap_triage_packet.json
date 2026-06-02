@@ -1,0 +1,74 @@
+{
+  "autonomy_level": "L0_read_only_plan",
+  "decision": "external_blocked_with_local_followups",
+  "external_authority_required_gaps": [
+    "darshan_external_reader_event_missing"
+  ],
+  "forbidden_actions": [
+    "external_outreach",
+    "fake_go_receipt_creation",
+    "claim_live_nats_or_a2a_without_action_ack",
+    "trusted_chetana_promotion_without_gates"
+  ],
+  "gap_items": [
+    {
+      "authority_scope": "external_reader_go_receipt_required",
+      "can_progress_locally": false,
+      "evidence_refs": [
+        "/Users/dhyana/.dharma/artifacts/venture_cell/DARSHAN/2026-05-26/the-thing-they-are-competing-for-is-not-just-your-attention/decision_delta.json",
+        "/Users/dhyana/.dharma/artifacts/venture_cell/DARSHAN/2026-05-26/the-thing-they-are-competing-for-is-not-just-your-attention/receipts/<accepted-go-evidence-receipt>.json",
+        "dharma_swarm/venture_cell/darshan/external_reader_gate.py",
+        "darshan_go_receipt_template.json"
+      ],
+      "gap_code": "darshan_external_reader_event_missing",
+      "guardrail": "do_not_create_fake_receipt_or_contact_reader",
+      "local_safe_action": "Keep growth and communications internal; prepare only non-evidence templates and wait for a real human-approved, privacy-redacted reader event.",
+      "owner_department": "growth",
+      "required_unblock_artifact": "Accepted privacy-redacted external-reader Go evidence receipt linked to decision_delta.json.",
+      "requires_external_authority": true,
+      "severity": "blocking"
+    },
+    {
+      "authority_scope": "local_read_only_memory",
+      "can_progress_locally": true,
+      "evidence_refs": [
+        "/Users/dhyana/.dharma/knowledge/wiki/concepts",
+        "/Users/dhyana/.dharma/knowledge/staging",
+        "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z",
+        "/Users/dhyana/.dharma/knowledge/quarantine"
+      ],
+      "gap_code": "memory_kernel_index_truncated",
+      "guardrail": "do_not_mark_staged_or_quarantine_content_trusted",
+      "local_safe_action": "Improve staged read-through coverage or eval evidence without trusted promotion.",
+      "owner_department": "memory",
+      "required_unblock_artifact": "MemoryKernel coverage/eval receipt with trusted_promotion_claimed=false.",
+      "requires_external_authority": false,
+      "severity": "maintenance"
+    }
+  ],
+  "locally_actionable_gaps": [
+    "memory_kernel_index_truncated"
+  ],
+  "not_authority": true,
+  "packet_id": "operator.gap_triage",
+  "raw": {
+    "darshan_go_decision": "block_external_authority",
+    "gate_decisions": [
+      {
+        "decision": "block",
+        "gap_codes": [
+          "darshan_external_reader_event_missing"
+        ],
+        "gate_id": "darshan.external_reader_go_receipts"
+      },
+      {
+        "decision": "allow",
+        "gap_codes": [],
+        "gate_id": "operator_os.governed_work_admission"
+      }
+    ],
+    "memory_query_eval_status": "pass"
+  },
+  "status": "blocked_on_external_reader_gate",
+  "top_blocker": "darshan_external_reader_event_missing"
+}

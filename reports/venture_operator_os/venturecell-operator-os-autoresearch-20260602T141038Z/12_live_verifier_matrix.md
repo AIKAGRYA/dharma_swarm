@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live verifier matrix, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-6615f5b42d56dbfe`
-Current scoped HEAD before this packet: `b7758b52 feat(operator-os): add Darshan GO receipt template`
+ds-goal progress receipt: `r-41271dd7e888aa5e`
+Current scoped HEAD before this packet: `47e4e044 feat(operator-os): add receipt inventory to manifest`
 
 This matrix captures the current verification surface for future agents. It is
 not a final verifier matrix and must not be used to close the reporter task.
@@ -17,6 +17,8 @@ not a final verifier matrix and must not be used to close the reporter task.
 - Darshan GO gate: blocked by design; no accepted receipts.
 - Darshan GO receipt template: rendered, explicitly not evidence.
 - External authority: blocked.
+- Gap triage: passing; external-reader remains non-local blocker and
+  MemoryKernel truncation remains local maintenance.
 - Complete ds-goal verification: expected fail on open reporter task.
 - Mission status: open.
 
@@ -46,13 +48,14 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `darshan_go_gate_packet.json` | `block_external_authority` | accepted receipts empty |
 | `darshan_go_receipt_template.json` | `draft_template_not_evidence` | must not be stored as accepted receipt |
 | `authority_boundary_packet.json` | `local_read_only_external_blocked` | firewall view, not authority grant |
+| `operator_gap_triage_packet.json` | `external_blocked_with_local_followups` | selector only, not authority or final proof |
 | `14_residual_risk_register.md` | live risk split | not a closure certificate |
 | `operator_os_artifact_manifest.json` | rendered locator | not proof of finality or authority |
 | `16_periodic_onboard_receipt.md` | onboard/toolbelt pass | repo-wide substrate context only |
 | `17_liveness_key_disambiguation_receipt.md` | action-specific liveness labels | prevents substrate/authority conflation |
 | `18_receipt_inventory_manifest_receipt.md` | manifest receipt inventory | index only, not final proof |
 | `06_adversary_audit.md` | live draft | needs final-window review |
-| `07_score_history.md` | live score `89/100` | not final |
+| `07_score_history.md` | live score `98/100` | not final |
 | `08_metabolization_packet.md` | live packet | needs final-window review |
 | `09_next_goal_packet.md` | live packet | needs final-window review |
 
@@ -77,7 +80,8 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `66f7d8a3` | keep | artifact manifest |
 | `d91b3877` | keep | periodic onboard receipt |
 | `7370b48e` | keep | liveness key disambiguation |
-| pending | keep | receipt inventory manifest |
+| `47e4e044` | keep | receipt inventory manifest |
+| pending | keep | gap triage packet |
 
 ## Revert / Queue Ledger
 

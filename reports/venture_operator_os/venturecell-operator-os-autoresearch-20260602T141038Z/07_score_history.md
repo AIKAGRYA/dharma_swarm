@@ -3,9 +3,9 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live ledger, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-277a29c022e46fb6`
+ds-goal progress receipt: `r-41271dd7e888aa5e`
 Baseline: `1aca07a1 Add VentureCell Operator OS Level 70 surface`
-Current scoped HEAD before this packet: `7370b48e feat(operator-os): disambiguate authority liveness proof`
+Current scoped HEAD before this packet: `47e4e044 feat(operator-os): add receipt inventory to manifest`
 
 This file is a living score ledger. It exists now so later agents do not
 reconstruct scores from memory. It must be reviewed and updated before final
@@ -31,18 +31,19 @@ reporter closure.
 | Loop 16 | `15_artifact_manifest_receipt.md` | `66f7d8a3` | 94 | +1 | keep render artifact manifest |
 | Loop 17 | `16_periodic_onboard_receipt.md` | `d91b3877` | 95 | +1 | keep periodic onboard evidence |
 | Loop 18 | `17_liveness_key_disambiguation_receipt.md` | `7370b48e` | 96 | +1 | keep action-specific liveness fields |
-| Loop 19 | `18_receipt_inventory_manifest_receipt.md` | pending | 97 | +1 | keep receipt inventory manifest |
+| Loop 19 | `18_receipt_inventory_manifest_receipt.md` | `47e4e044` | 97 | +1 | keep receipt inventory manifest |
+| Loop 20 | `19_gap_triage_packet_receipt.md` | pending | 98 | +1 | keep gap triage packet |
 
 ## Area History
 
 | Area | Opening | Current | Evidence |
 |---|---:|---:|---|
-| Operator clarity | 11 | 15 | next-action, GO gate, GO template, and authority packets expose blockers, owners, local allowances, and artifact shape |
+| Operator clarity | 11 | 16 | next-action, GO gate, GO template, authority, and gap triage packets expose blockers, owners, local allowances, and artifact shape |
 | Memory usefulness | 10 | 15 | report-local staged source root now passes strict eval `6/6` without trusted promotion |
 | Task truth | 8 | 13 | progress receipts and residual risk register distinguish solved local claims, residual risks, and completion blockers |
 | Governance safety | 15 | 15 | external-reader, governed admission, Chetana, completion, authority firewall, and action-specific liveness gates preserved |
 | Iteration quality | 8 | 12+ | every loop has hypothesis, patch/rejection, evals, adversarial review, decision |
-| Product structure | 8 | 14 | Operator OS now emits next-action, GO gate, GO template, authority boundary, manifest, memory repair, and report-local recall packets |
+| Product structure | 8 | 15 | Operator OS now emits next-action, GO gate, GO template, authority boundary, gap triage, manifest, memory repair, and report-local recall packets |
 | Tests/evals | 8 | 13 | fixed tests, report-local recall regression, eval artifacts, live verifier matrix, and periodic onboard evidence exist |
 | Metabolization | 2 | 5 | program kernel, receipts, manifest inventory, packets, and this score ledger exist |
 
@@ -65,6 +66,9 @@ audit with explicit evidence.
   credential warnings.
 - Authority liveness fields are action-specific to Operator OS.
 - Artifact manifest includes run receipt inventory.
+- Gap triage packet: `external_blocked_with_local_followups`, with external
+  reader as the non-local blocker and MemoryKernel truncation as local
+  maintenance.
 - MemoryKernel query eval: `pass` (`6/6`) from report-local staged roots.
 - MemoryKernel repair packet: `no_repair_needed`, with trusted promotion still forbidden.
 - ds-goal raw/reconciled counts: `open=1 claimed=0 completed=4 failed=0 blocked=0 total=5`.
@@ -108,6 +112,7 @@ current evidence, not as a full-project proof.
 - `operator_os_nats_action_ack_proof_present` and
   `operator_os_a2a_live_action_ack_proof_present` remain `false`.
 - Receipt inventory is an audit locator, not final proof.
+- Gap triage is a local selector and not authority or final proof.
 - The reporter task must remain open until final artifacts and final
   verification prove the full contract.
 
@@ -143,6 +148,38 @@ Adversarial review:
 - This file originally recorded MemoryKernel `0/6`; later loop rows must be
   used for the current memory eval state.
 - This file does not close the reporter lane.
+
+Keep / revert / queue:
+
+Decision: keep.
+
+## Loop 20 Score Update
+
+Hypothesis:
+
+If a generated gap triage packet separates external-only blockers from local
+follow-ups, future agents can continue the mission without treating every gap
+as either terminal or externally actionable.
+
+Patch:
+
+- Added `operator_gap_triage_packet.json`.
+- Added a `Gap Triage` digest section and manifest decision field.
+- Added focused test coverage for non-authority semantics.
+
+Evaluation:
+
+- `pytest -q tests/test_venture_cell_operator_os_projection.py` passed.
+- `./.venv/bin/python -m compileall -q dharma_swarm/venture_cell/operator_os`
+  passed.
+- The live render reports external-reader as externally required and
+  MemoryKernel truncation as local maintenance.
+
+Adversarial review:
+
+- Gap triage does not clear the Darshan GO gate.
+- It forbids fake GO receipts, fake liveness claims, and ungated trusted
+  Chetana promotion.
 
 Keep / revert / queue:
 

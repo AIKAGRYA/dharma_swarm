@@ -195,6 +195,26 @@ class AuthorityBoundaryPacket:
 
 
 @dataclass(frozen=True)
+class GapTriagePacket:
+    """Read-only triage of projection gaps by owner and authority requirement."""
+
+    packet_id: str
+    status: str
+    autonomy_level: str
+    decision: str
+    gap_items: tuple[dict[str, Any], ...] = ()
+    locally_actionable_gaps: tuple[str, ...] = ()
+    external_authority_required_gaps: tuple[str, ...] = ()
+    top_blocker: str = ""
+    forbidden_actions: tuple[str, ...] = ()
+    not_authority: bool = True
+    raw: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class VentureCellOperatorProjection:
     """The fused Operator OS projection for one VentureCell."""
 
@@ -244,6 +264,14 @@ class VentureCellOperatorProjection:
     authority_boundary_packet: AuthorityBoundaryPacket = field(
         default_factory=lambda: AuthorityBoundaryPacket(
             packet_id="operator.authority_boundary",
+            status="unknown",
+            autonomy_level="unknown",
+            decision="inspect_projection",
+        )
+    )
+    gap_triage_packet: GapTriagePacket = field(
+        default_factory=lambda: GapTriagePacket(
+            packet_id="operator.gap_triage",
             status="unknown",
             autonomy_level="unknown",
             decision="inspect_projection",

@@ -59,6 +59,11 @@ def _authority_boundary_payload(projection: dict[str, Any]) -> dict[str, Any]:
     return packet if isinstance(packet, dict) else {}
 
 
+def _gap_triage_payload(projection: dict[str, Any]) -> dict[str, Any]:
+    packet = projection.get("gap_triage_packet")
+    return packet if isinstance(packet, dict) else {}
+
+
 def _artifact_manifest_payload(
     *,
     projection: dict[str, Any],
@@ -68,6 +73,7 @@ def _artifact_manifest_payload(
     memory = _memory_index_payload(projection)
     go_gate = _darshan_go_gate_payload(projection)
     authority = _authority_boundary_payload(projection)
+    gap_triage = _gap_triage_payload(projection)
     return {
         "schema": "dharma.venture_cell_operator_os.render_manifest.v0",
         "status": projection.get("status", "unknown"),
@@ -77,6 +83,7 @@ def _artifact_manifest_payload(
         "memory_query_eval_total": memory.get("query_eval_total", 0),
         "darshan_go_decision": go_gate.get("decision", "unknown"),
         "authority_decision": authority.get("decision", "unknown"),
+        "gap_triage_decision": gap_triage.get("decision", "unknown"),
         "artifact_paths": {
             name: str(path)
             for name, path in sorted(artifact_paths.items())
@@ -194,6 +201,16 @@ def render_operator_surface(
         + "\n",
         encoding="utf-8",
     )
+    gap_triage_packet_path = output_dir / "operator_gap_triage_packet.json"
+    gap_triage_packet_path.write_text(
+        json.dumps(
+            _gap_triage_payload(projection.to_dict()),
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     paths = {
         "projection": projection_path,
         "digest": digest_path,
@@ -204,6 +221,7 @@ def render_operator_surface(
         "darshan_go_receipt_template": darshan_go_receipt_template_path,
         "memory_kernel_repair_packet": memory_repair_packet_path,
         "authority_boundary_packet": authority_boundary_packet_path,
+        "gap_triage_packet": gap_triage_packet_path,
     }
     artifact_manifest_path = output_dir / "operator_os_artifact_manifest.json"
     paths["artifact_manifest"] = artifact_manifest_path
