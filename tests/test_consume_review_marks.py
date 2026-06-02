@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -38,32 +39,111 @@ class TestParseFrontmatter:
 class TestShouldPromote:
     def test_atomic_high_confidence(self) -> None:
         meta = crm.AtomMeta("atomic", 0.8, "T", [], "", reviewed=True)
-        ok, reason = crm.should_promote(meta, 0.5)
+        ok, reason = crm.should_promote(meta, 0.5, has_independent_review=True)
         assert ok is True
 
     def test_atomic_low_confidence(self) -> None:
         meta = crm.AtomMeta("atomic", 0.3, "T", [], "", reviewed=True)
-        ok, reason = crm.should_promote(meta, 0.5)
+        ok, reason = crm.should_promote(meta, 0.5, has_independent_review=True)
         assert ok is False
         assert "confidence" in reason
 
     def test_compound_type_rejected(self) -> None:
         meta = crm.AtomMeta("compound", 0.9, "T", [], "", reviewed=True)
-        ok, reason = crm.should_promote(meta, 0.5)
+        ok, reason = crm.should_promote(meta, 0.5, has_independent_review=True)
         assert ok is False
         assert "type" in reason
 
     def test_concept_type_rejected(self) -> None:
         meta = crm.AtomMeta("concept", 0.6, "T", [], "", reviewed=True)
-        ok, reason = crm.should_promote(meta, 0.5)
+        ok, reason = crm.should_promote(meta, 0.5, has_independent_review=True)
         assert ok is False
         assert "type" in reason
 
     def test_atomic_without_review_mark_rejected(self) -> None:
-        meta = crm.AtomMeta("atomic", 0.8, "T", [], "")
+        meta = crm.AtomMeta("atomic", 0.8, "T", [], "", reviewed=True)
         ok, reason = crm.should_promote(meta, 0.5)
         assert ok is False
-        assert "review" in reason
+        assert "external review" in reason
+
+
+class TestExternalReviewMarks:
+    def test_external_review_mark_approves_atom(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        staging = tmp_path / "staging"
+        review_marks = tmp_path / "review_marks"
+        staging.mkdir()
+        review_marks.mkdir()
+        atom = staging / "test.md"
+        atom.write_text(
+            "---\ntitle: X\ntype: atomic\nconfidence: 0.9\nreviewed: true\n---\nBody.",
+            encoding="utf-8",
+        )
+
+        monkeypatch.setattr(crm, "STAGING_DIR", staging)
+        monkeypatch.setattr(crm, "REVIEW_MARK_DIR", review_marks)
+        crm.review_mark_path(atom).write_text(
+            json.dumps(
+                {
+                    "path": "test.md",
+                    "decision": "approved",
+                    "reviewer": "operator",
+                    "reviewed_at": "2026-06-02T00:00:00Z",
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        assert crm.has_external_review_mark(atom) is True
+
+    def test_atom_local_reviewed_flag_is_not_authority(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        staging = tmp_path / "staging"
+        review_marks = tmp_path / "review_marks"
+        staging.mkdir()
+        review_marks.mkdir()
+        atom = staging / "test.md"
+        atom.write_text(
+            "---\ntitle: X\ntype: atomic\nconfidence: 0.9\nreviewed: true\n---\nBody.",
+            encoding="utf-8",
+        )
+
+        monkeypatch.setattr(crm, "STAGING_DIR", staging)
+        monkeypatch.setattr(crm, "REVIEW_MARK_DIR", review_marks)
+
+        assert crm.has_external_review_mark(atom) is False
+
+    def test_external_review_mark_rejects_hash_mismatch(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        staging = tmp_path / "staging"
+        review_marks = tmp_path / "review_marks"
+        staging.mkdir()
+        review_marks.mkdir()
+        atom = staging / "test.md"
+        atom.write_text(
+            "---\ntitle: X\ntype: atomic\nconfidence: 0.9\nreviewed: true\n---\nBody.",
+            encoding="utf-8",
+        )
+
+        monkeypatch.setattr(crm, "STAGING_DIR", staging)
+        monkeypatch.setattr(crm, "REVIEW_MARK_DIR", review_marks)
+        crm.review_mark_path(atom).write_text(
+            json.dumps(
+                {
+                    "path": "test.md",
+                    "decision": "approved",
+                    "reviewer": "operator",
+                    "reviewed_at": "2026-06-02T00:00:00Z",
+                    "atom_sha256": "not-the-current-hash",
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        assert crm.has_external_review_mark(atom) is False
 
 
 class TestPromoteAtom:

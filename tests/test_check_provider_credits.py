@@ -7,6 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 import check_provider_credits as cpc
+from dharma_swarm.api_keys import PROVIDER_API_KEY_ENV_KEYS
 
 
 def test_redact_log_excerpt_masks_common_secret_shapes() -> None:
@@ -23,6 +24,13 @@ def test_redact_log_excerpt_masks_common_secret_shapes() -> None:
     assert "token=abc123" not in redacted
     assert "user:password@" not in redacted
     assert "[REDACTED" in redacted
+
+
+def test_provider_registry_uses_canonical_api_key_registry() -> None:
+    assert {
+        provider: config["key_env"]
+        for provider, config in cpc.PROVIDERS.items()
+    } == PROVIDER_API_KEY_ENV_KEYS
 
 
 def test_scan_logs_redacts_credit_error_excerpts(monkeypatch, tmp_path: Path) -> None:
