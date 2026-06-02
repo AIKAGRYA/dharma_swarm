@@ -178,6 +178,10 @@ def test_projection_blocks_external_autonomy_without_reader_gate(tmp_path: Path)
     assert go_gate.blocked_departments == ("growth", "communications")
     assert "external_outreach" in go_gate.blocked_actions
     assert "decision_delta.json" in " ".join(go_gate.expected_local_artifacts)
+    assert go_gate.receipt_template["template_status"] == "draft_template_not_evidence"
+    assert go_gate.receipt_template["not_receipt"] is True
+    assert go_gate.receipt_template["receipt"]["status"] == "template_only_not_accepted"
+    assert "do_not_use_as_go_gate_evidence" in go_gate.receipt_template["forbidden_use"]
     assert len(projection.departments) >= 8
     assert "darshan_external_reader_event_missing" in projection.gap_codes
     assert any(
@@ -289,6 +293,7 @@ def test_operator_daily_digest_renders_structure_without_live_authority_claim(tm
     assert "## Gates" in digest
     assert "## Darshan GO Gate" in digest
     assert "block_external_authority" in digest
+    assert "draft_template_not_evidence" in digest
     assert "## Next Action Packet" in digest
     assert "hold_external_authority" in digest
     assert "## Memory Kernel" in digest
@@ -333,6 +338,9 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     go_gate_packet = json.loads(
         paths["darshan_go_gate_packet"].read_text(encoding="utf-8")
     )
+    go_receipt_template = json.loads(
+        paths["darshan_go_receipt_template"].read_text(encoding="utf-8")
+    )
     memory_repair_packet = json.loads(
         paths["memory_kernel_repair_packet"].read_text(encoding="utf-8")
     )
@@ -352,6 +360,11 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert go_gate_packet["required_receipt_source"] == "darshan_external_reader"
     assert "payload.privacy_redacted" in go_gate_packet["required_receipt_fields"]
     assert "publishing" in go_gate_packet["blocked_actions"]
+    assert go_receipt_template["template_status"] == "draft_template_not_evidence"
+    assert go_receipt_template["not_receipt"] is True
+    assert go_receipt_template["receipt"]["status"] == "template_only_not_accepted"
+    assert go_receipt_template["receipt"]["source"] == "darshan_external_reader"
+    assert "do_not_store_as_accepted_receipt_without_real_event" in go_receipt_template["forbidden_use"]
     assert memory_repair_packet["decision"] == "queue_repair_without_promotion"
     assert memory_repair_packet["status"] == "queued"
     assert memory_repair_packet["raw"]["trusted_promotion_claimed"] is False

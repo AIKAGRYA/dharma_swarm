@@ -5,7 +5,7 @@ Status: live ledger, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
 ds-goal progress receipt: `r-277a29c022e46fb6`
 Baseline: `1aca07a1 Add VentureCell Operator OS Level 70 surface`
-Current scoped HEAD before this packet: `0e810f5f docs(operator-os): add live adversary audit`
+Current scoped HEAD before this packet: `0f58774d feat(operator-os): add report-local memory recall`
 
 This file is a living score ledger. It exists now so later agents do not
 reconstruct scores from memory. It must be reviewed and updated before final
@@ -23,18 +23,19 @@ reporter closure.
 | Loop 05 | `05_go_gate_receipt.md` | `9e5f326e` | 83 | +3 | keep |
 | Loop 06 | `06_memorykernel_repair_receipt.md` | `bf2d237b` | 84 | +1 | keep |
 | Loop 10 | `06_adversary_audit.md` | `0e810f5f` | 84 | +0 | keep as false-green guard |
-| Loop 11 | `10_memorykernel_report_source_packet.md` | pending | 87 | +3 | keep local staged recall pass |
+| Loop 11 | `10_memorykernel_report_source_packet.md` | `0f58774d` | 87 | +3 | keep local staged recall pass |
+| Loop 12 | `11_go_receipt_template_receipt.md` | pending | 89 | +2 | keep safe GO template |
 
 ## Area History
 
 | Area | Opening | Current | Evidence |
 |---|---:|---:|---|
-| Operator clarity | 11 | 13+ | next-action packet and GO gate packet now expose blockers and owners |
+| Operator clarity | 11 | 14 | next-action, GO gate, and GO template packets expose blockers, owners, and exact local artifact shape |
 | Memory usefulness | 10 | 15 | report-local staged source root now passes strict eval `6/6` without trusted promotion |
 | Task truth | 8 | 12+ | progress receipts distinguish non-closing evidence from completion |
 | Governance safety | 15 | 15 | external-reader, governed admission, Chetana, and completion gates preserved |
 | Iteration quality | 8 | 12+ | every loop has hypothesis, patch/rejection, evals, adversarial review, decision |
-| Product structure | 8 | 11 | Operator OS now emits next-action, GO gate, memory repair, and report-local recall packets |
+| Product structure | 8 | 12 | Operator OS now emits next-action, GO gate, GO template, memory repair, and report-local recall packets |
 | Tests/evals | 8 | 11 | fixed tests, report-local recall regression, and eval artifacts exist for Operator OS and gate surfaces |
 | Metabolization | 2 | 5 | program kernel, receipts, packets, and this score ledger exist |
 
@@ -48,6 +49,7 @@ audit with explicit evidence.
 - Latest rendered Operator OS status: `blocked_on_external_reader_gate`.
 - Autonomy level: `L0_read_only_plan`.
 - Darshan GO gate: `block_external_authority`.
+- Darshan GO receipt template: `draft_template_not_evidence`.
 - MemoryKernel query eval: `pass` (`6/6`) from report-local staged roots.
 - MemoryKernel repair packet: `no_repair_needed`, with trusted promotion still forbidden.
 - ds-goal raw/reconciled counts: `open=1 claimed=0 completed=4 failed=0 blocked=0 total=5`.
@@ -81,6 +83,8 @@ current evidence, not as a full-project proof.
   from trusted Chetana promotion; final closeout must preserve that boundary.
 - Darshan remains blocked until a real accepted privacy-redacted external-reader
   GO evidence receipt exists.
+- The GO template is not evidence and must not be stored as an accepted receipt
+  without a real external-reader event.
 - The reporter task must remain open until final artifacts and final
   verification prove the full contract.
 
@@ -172,3 +176,44 @@ Queued:
 - Re-run the full minimum verification set before final closeout.
 - Preserve the report-local versus trusted-Chetana distinction in final docs.
 - Continue the mission until true elapsed-time proof exists.
+
+## Loop 12 Score Update
+
+Hypothesis:
+
+If the Darshan GO gate renders a receipt template that is visibly not evidence,
+future agents can prepare the exact local review artifact without creating fake
+GO acceptance.
+
+Patch:
+
+- Added a `receipt_template` payload to the Darshan GO gate packet.
+- Added `darshan_go_receipt_template.json` to the CLI render output.
+- Added digest visibility for the template status.
+- Added focused tests for the template's non-evidence markers.
+
+Evaluation:
+
+- `pytest -q tests/test_venture_cell_operator_os_projection.py` passed.
+- `./.venv/bin/python -m compileall -q dharma_swarm/venture_cell/operator_os`
+  passed.
+- The CLI render produced `darshan_go_receipt_template.json`.
+- The template reports `draft_template_not_evidence` and
+  `template_only_not_accepted`.
+
+Adversarial review:
+
+- The template cannot satisfy the Darshan external-reader gate.
+- Accepted receipts remain empty.
+- External outreach, publishing, handoff, and live authority remain blocked.
+- Reporter remains open because the true 8-hour contract is not complete.
+
+Keep / revert / queue:
+
+Decision: keep.
+
+Queued:
+
+- Use the template only after a real reader event, human approval, and privacy
+  redaction.
+- Continue the same mission until true elapsed-time proof exists.

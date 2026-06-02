@@ -4,7 +4,7 @@ Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live packet, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
 ds-goal progress receipt: `r-b73f8ef857f710fd`
-Current scoped HEAD before this packet: `0e810f5f docs(operator-os): add live adversary audit`
+Current scoped HEAD before this packet: `0f58774d feat(operator-os): add report-local memory recall`
 
 This packet captures durable learning from the run so far. It must be reviewed
 and updated during final closeout before the reporter task is closed.
@@ -62,6 +62,8 @@ and updated during final closeout before the reporter task is closed.
    Evidence:
 
    - `darshan_go_gate_packet.json` reports `decision: block_external_authority`.
+   - `darshan_go_receipt_template.json` reports
+     `draft_template_not_evidence`.
    - Accepted receipts are empty.
    - Operator OS remains `blocked_on_external_reader_gate` and
      `L0_read_only_plan`.
@@ -71,12 +73,14 @@ and updated during final closeout before the reporter task is closed.
    - Growth, communications, publishing, and external operator handoff stay
      blocked until a real accepted privacy-redacted external-reader GO evidence
      receipt is linked to `decision_delta.json`.
+   - A template can prepare the local artifact shape, but it is not GO evidence
+     and must never be stored as accepted without a real countable reader event.
 
 5. Final score is not final just because the interim target passed `80/100`.
 
    Evidence:
 
-   - `07_score_history.md` records progression from `66/100` to `87/100`.
+   - `07_score_history.md` records progression from `66/100` to `89/100`.
    - The goal clock has not reached a true 8-hour completion window.
    - Required final artifacts still need final review/update.
 
@@ -99,7 +103,8 @@ and updated during final closeout before the reporter task is closed.
 | `82682c30` | `08_metabolization_packet.md` | live metabolization packet |
 | `e9ea88c8` | `09_next_goal_packet.md` | live next-goal packet |
 | `0e810f5f` | `06_adversary_audit.md` | live adversary audit draft |
-| pending | `10_memorykernel_report_source_packet.md` | report-local staged recall source and 6/6 eval pass |
+| `0f58774d` | `10_memorykernel_report_source_packet.md` | report-local staged recall source and 6/6 eval pass |
+| pending | `11_go_receipt_template_receipt.md` | safe Darshan GO receipt template, not evidence |
 
 ## Current Read-Only Artifacts
 
@@ -109,6 +114,7 @@ and updated during final closeout before the reporter task is closed.
 - `memory_kernel_query_eval.json`
 - `operator_next_action_packet.json`
 - `darshan_go_gate_packet.json`
+- `darshan_go_receipt_template.json`
 - `memory_kernel_repair_packet.json`
 - `07_score_history.md`
 - `10_memorykernel_report_source_packet.md`
@@ -120,6 +126,8 @@ These facts are explicitly not complete:
 - MemoryKernel strict evals pass from report-local staged sources, but this is
   not trusted Chetana promotion or complete memory coverage.
 - Darshan external-reader GO gate is not passing.
+- `darshan_go_receipt_template.json` is not evidence and must not be promoted
+  into an accepted receipt without a real event.
 - Reporter task is not closed.
 - The final adversarial audit and next-goal packet still require final-window
   review/update.
@@ -138,6 +146,8 @@ Start here:
    `memory_kernel_repair_packet.json`,
    `10_memorykernel_report_source_packet.md`, and
    `darshan_go_gate_packet.json`.
+   Inspect `darshan_go_receipt_template.json` only as a template, not as
+   evidence.
 5. Run:
 
    ```bash
@@ -226,3 +236,37 @@ Metabolized rule:
 - Report-local source packets can be used as bounded MemoryKernel recall
   context during an AutoResearch run. Future agents must cite them as staged
   evidence and must not describe them as trusted Chetana memory.
+
+## Loop 12 Metabolization Note
+
+Hypothesis:
+
+If the Darshan GO receipt shape is rendered as a non-evidence template, future
+agents can prepare reviewed local artifacts without fabricating accepted GO
+receipts.
+
+Patch:
+
+- Added `receipt_template` to the Darshan GO gate packet.
+- Added `darshan_go_receipt_template.json` to the CLI render.
+- Added digest visibility and focused tests for the template status.
+
+Evaluation:
+
+- `pytest -q tests/test_venture_cell_operator_os_projection.py` passed.
+- `./.venv/bin/python -m compileall -q dharma_swarm/venture_cell/operator_os`
+  passed.
+- The CLI render produced a template with `not_receipt: true` and
+  `template_only_not_accepted`.
+
+Adversarial review:
+
+- The template does not unblock Darshan.
+- It forbids GO evidence use, live authority claims, and storing as accepted
+  without a real event.
+- Accepted receipts remain empty and reporter remains open.
+
+Metabolized rule:
+
+- Operator OS may render templates for future governed artifacts, but every
+  template must include explicit non-evidence markers and forbidden-use fields.

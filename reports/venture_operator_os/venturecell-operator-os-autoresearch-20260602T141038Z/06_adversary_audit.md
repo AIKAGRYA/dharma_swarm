@@ -22,6 +22,7 @@ updates, and terminal verification exist.
 - Autonomy level remains `L0_read_only_plan`.
 - Darshan GO gate decision remains `block_external_authority`.
 - Accepted Darshan GO receipts remain empty.
+- Darshan GO receipt template exists as `draft_template_not_evidence`.
 - MemoryKernel query eval now reports `pass` with `6/6` from report-local
   staged sources.
 - MemoryKernel repair now reports `no_repair_needed`; no trusted Chetana
@@ -72,6 +73,7 @@ Adversarial review:
   memory coverage.
 - A GO gate packet with `decision: block_external_authority` is not GO
   acceptance.
+- A GO receipt template is not an accepted GO receipt.
 - A score above `80/100` is not final while the contract clock and final
   artifacts remain incomplete.
 - Unrelated staged work must not be included in commits for this run.
@@ -96,6 +98,7 @@ Queued:
 | Reporter can be closed now | ds-goal reporter task is open and complete verify fails | false |
 | Operator OS can act externally | `blocked_on_external_reader_gate`, `L0_read_only_plan` | false |
 | Darshan GO is accepted | accepted receipts are `[]` | false |
+| GO template is evidence | template status is `draft_template_not_evidence` | false |
 | MemoryKernel recall is trusted/complete | strict eval passes from staged report-local roots only | false |
 | Chetana trusted promotion occurred | `trusted_promotion_claimed: false` | false |
 | NATS/A2A liveness is proven | no action-specific ack proof cited | false |

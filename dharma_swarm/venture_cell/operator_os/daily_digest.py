@@ -44,6 +44,9 @@ def render_operator_daily_digest(projection: VentureCellOperatorProjection) -> s
     expected_artifacts = (
         ", ".join(go_gate.expected_local_artifacts) if go_gate.expected_local_artifacts else "none"
     )
+    receipt_template_status = str(
+        go_gate.receipt_template.get("template_status") or "not_rendered"
+    )
     lines.extend(
         [
             "",
@@ -56,6 +59,7 @@ def render_operator_daily_digest(projection: VentureCellOperatorProjection) -> s
             f"- Countable events: `{', '.join(go_gate.countable_event_types)}`",
             f"- Blocked actions: `{blocked_actions}`",
             f"- Expected local artifacts: `{expected_artifacts}`",
+            f"- Receipt template: `{receipt_template_status}`",
             f"- Next governed action: {go_gate.next_governed_action}",
         ]
     )

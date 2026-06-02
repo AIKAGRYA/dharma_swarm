@@ -706,6 +706,7 @@ def _darshan_go_gate_packet(gate: GateSummary) -> DarshanGoGatePacket:
             ]
         )
     expected_artifacts.append("dharma_swarm/venture_cell/darshan/external_reader_gate.py")
+    expected_artifacts.append("darshan_go_receipt_template.json")
 
     return DarshanGoGatePacket(
         packet_id="darshan.external_reader_go_gate",
@@ -765,8 +766,49 @@ def _darshan_go_gate_packet(gate: GateSummary) -> DarshanGoGatePacket:
             else "Attach one ExternalReaderEvent with an accepted privacy-redacted GO evidence receipt."
         ),
         gap_codes=gate.gap_codes,
+        receipt_template=_darshan_go_receipt_template(raw),
         raw=raw,
     )
+
+
+def _darshan_go_receipt_template(raw: Mapping[str, Any]) -> dict[str, Any]:
+    artifact_id = str(raw.get("artifact_id") or "<darshan-artifact-id>")
+    return {
+        "template_status": "draft_template_not_evidence",
+        "not_receipt": True,
+        "required_schema": GO_EVIDENCE_SCHEMA_V0,
+        "source": DARSHAN_READER_RECEIPT_SOURCE,
+        "safe_use": (
+            "Use only after a real countable external-reader event exists, "
+            "human approval is recorded, and privacy redaction is complete."
+        ),
+        "forbidden_use": [
+            "do_not_store_as_accepted_receipt_without_real_event",
+            "do_not_use_for_external_outreach",
+            "do_not_use_as_go_gate_evidence",
+            "do_not_claim_live_authority",
+        ],
+        "receipt": {
+            "receipt_id": "<new-go-evidence-receipt-id>",
+            "correlation_id": artifact_id,
+            "source": DARSHAN_READER_RECEIPT_SOURCE,
+            "source_url": "<source-url-for-real-reader-event>",
+            "observed_at": "<iso8601-observed-at>",
+            "content_hash": "<sha256-content-hash>",
+            "event_uid": "<external-reader-event-uid>",
+            "schema_version": GO_EVIDENCE_SCHEMA_V0,
+            "status": "template_only_not_accepted",
+            "payload": {
+                "artifact_id": artifact_id,
+                "event_type": "<decision|inspection|read|reply>",
+                "reader_label": "<privacy-preserving-reader-label>",
+                "contact_surface": "<human-approved-contact-surface>",
+                "summary": "<privacy-redacted-event-summary>",
+                "human_approved_contact": "<true-only-after-review>",
+                "privacy_redacted": "<true-only-after-redaction>",
+            },
+        },
+    }
 
 
 def _memory_kernel_repair_packet(memory: MemoryKernelSnapshot) -> MemoryKernelRepairPacket:

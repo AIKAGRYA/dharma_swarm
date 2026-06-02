@@ -100,7 +100,8 @@
 - Required schema: `go_evidence_receipt.v0`
 - Countable events: `decision, inspection, read, reply`
 - Blocked actions: `external_outreach, publishing, external_operator_handoff, live_external_authority`
-- Expected local artifacts: `/Users/dhyana/.dharma/artifacts/venture_cell/DARSHAN/2026-05-26/the-thing-they-are-competing-for-is-not-just-your-attention/decision_delta.json, /Users/dhyana/.dharma/artifacts/venture_cell/DARSHAN/2026-05-26/the-thing-they-are-competing-for-is-not-just-your-attention/receipts/<accepted-go-evidence-receipt>.json, dharma_swarm/venture_cell/darshan/external_reader_gate.py`
+- Expected local artifacts: `/Users/dhyana/.dharma/artifacts/venture_cell/DARSHAN/2026-05-26/the-thing-they-are-competing-for-is-not-just-your-attention/decision_delta.json, /Users/dhyana/.dharma/artifacts/venture_cell/DARSHAN/2026-05-26/the-thing-they-are-competing-for-is-not-just-your-attention/receipts/<accepted-go-evidence-receipt>.json, dharma_swarm/venture_cell/darshan/external_reader_gate.py, darshan_go_receipt_template.json`
+- Receipt template: `draft_template_not_evidence`
 - Next governed action: Attach one ExternalReaderEvent with an accepted privacy-redacted GO evidence receipt.
 
 ## Next Action Packet
@@ -116,11 +117,11 @@
 ## Memory Kernel
 
 - Status: `read_through_index_available`
-- Staged: `5013`
+- Staged: `5014`
 - Trusted: `1336`
 - Quarantine: `5000`
 - Truncated scan: `True`
-- Index: `available_truncated` with `73` entries
+- Index: `available_truncated` with `74` entries
 - Query evals: `pass` (6/6)
 
 ## Memory Repair Packet

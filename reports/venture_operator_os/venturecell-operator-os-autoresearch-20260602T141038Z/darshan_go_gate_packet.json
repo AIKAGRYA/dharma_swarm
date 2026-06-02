@@ -24,7 +24,8 @@
   "expected_local_artifacts": [
     "/Users/dhyana/.dharma/artifacts/venture_cell/DARSHAN/2026-05-26/the-thing-they-are-competing-for-is-not-just-your-attention/decision_delta.json",
     "/Users/dhyana/.dharma/artifacts/venture_cell/DARSHAN/2026-05-26/the-thing-they-are-competing-for-is-not-just-your-attention/receipts/<accepted-go-evidence-receipt>.json",
-    "dharma_swarm/venture_cell/darshan/external_reader_gate.py"
+    "dharma_swarm/venture_cell/darshan/external_reader_gate.py",
+    "darshan_go_receipt_template.json"
   ],
   "gap_codes": [
     "darshan_external_reader_event_missing"
@@ -54,6 +55,39 @@
     "receipt_paths": [],
     "rejected_receipts": [],
     "warnings": []
+  },
+  "receipt_template": {
+    "forbidden_use": [
+      "do_not_store_as_accepted_receipt_without_real_event",
+      "do_not_use_for_external_outreach",
+      "do_not_use_as_go_gate_evidence",
+      "do_not_claim_live_authority"
+    ],
+    "not_receipt": true,
+    "receipt": {
+      "content_hash": "<sha256-content-hash>",
+      "correlation_id": "darshan-7302ff3a3a75",
+      "event_uid": "<external-reader-event-uid>",
+      "observed_at": "<iso8601-observed-at>",
+      "payload": {
+        "artifact_id": "darshan-7302ff3a3a75",
+        "contact_surface": "<human-approved-contact-surface>",
+        "event_type": "<decision|inspection|read|reply>",
+        "human_approved_contact": "<true-only-after-review>",
+        "privacy_redacted": "<true-only-after-redaction>",
+        "reader_label": "<privacy-preserving-reader-label>",
+        "summary": "<privacy-redacted-event-summary>"
+      },
+      "receipt_id": "<new-go-evidence-receipt-id>",
+      "schema_version": "go_evidence_receipt.v0",
+      "source": "darshan_external_reader",
+      "source_url": "<source-url-for-real-reader-event>",
+      "status": "template_only_not_accepted"
+    },
+    "required_schema": "go_evidence_receipt.v0",
+    "safe_use": "Use only after a real countable external-reader event exists, human approval is recorded, and privacy redaction is complete.",
+    "source": "darshan_external_reader",
+    "template_status": "draft_template_not_evidence"
   },
   "rejected_receipts": [],
   "required_receipt_fields": [
