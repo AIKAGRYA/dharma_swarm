@@ -598,7 +598,7 @@
       "title": "MemoryKernel Report Source Packet"
     },
     {
-      "excerpt": "# Next Goal Packet Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live draft, not final until the 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-875b5bb0c3e8a17a` Current scoped HEAD before this packet: `fd8e3453 feat(operator-os): harden go template requirements` This ",
+      "excerpt": "# Next Goal Packet Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live draft, not final until the 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-c1ea4b97e1e794bc` Current scoped HEAD before this packet: `660730cc feat(operator-os): add memory coverage targets` This pack",
       "matched_terms": [
         "VentureCell",
         "Operator OS",
@@ -617,7 +617,7 @@
       "title": "Next Goal Packet"
     },
     {
-      "excerpt": "# Adversary Audit Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live draft, not final until the true 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-875b5bb0c3e8a17a` Current scoped HEAD before this packet: `fd8e3453 feat(operator-os): harden go template requirements` T",
+      "excerpt": "# Adversary Audit Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live draft, not final until the true 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-c1ea4b97e1e794bc` Current scoped HEAD before this packet: `660730cc feat(operator-os): add memory coverage targets` This ",
       "matched_terms": [
         "VentureCell",
         "Operator OS",
@@ -635,7 +635,7 @@
       "title": "Adversary Audit"
     },
     {
-      "excerpt": "# Metabolization Packet Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live packet, not final until the 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-875b5bb0c3e8a17a` Current scoped HEAD before this packet: `fd8e3453 feat(operator-os): harden go template requirements`",
+      "excerpt": "# Metabolization Packet Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live packet, not final until the 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-c1ea4b97e1e794bc` Current scoped HEAD before this packet: `660730cc feat(operator-os): add memory coverage targets` Thi",
       "matched_terms": [
         "VentureCell",
         "Operator OS",
@@ -705,7 +705,7 @@
       "title": "Loop 05 Darshan GO Gate Receipt"
     },
     {
-      "excerpt": "# Live Verifier Matrix Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live verifier matrix, not final until the true 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-875b5bb0c3e8a17a` Current scoped HEAD before this packet: `fd8e3453 feat(operator-os): harden go template ",
+      "excerpt": "# Live Verifier Matrix Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live verifier matrix, not final until the true 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-c1ea4b97e1e794bc` Current scoped HEAD before this packet: `660730cc feat(operator-os): add memory coverage",
       "matched_terms": [
         "VentureCell",
         "Operator OS",
@@ -722,7 +722,7 @@
       "title": "Live Verifier Matrix"
     },
     {
-      "excerpt": "# Residual Risk Register Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live risk register, not final until the true 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-875b5bb0c3e8a17a` Current scoped HEAD before this packet: `fd8e3453 feat(operator-os): harden go template ",
+      "excerpt": "# Residual Risk Register Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live risk register, not final until the true 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-c1ea4b97e1e794bc` Current scoped HEAD before this packet: `660730cc feat(operator-os): add memory coverage",
       "matched_terms": [
         "VentureCell",
         "Operator OS",
@@ -801,7 +801,7 @@
       "title": "Authority Boundary Receipt"
     },
     {
-      "excerpt": "# Score History Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live ledger, not final until the 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-875b5bb0c3e8a17a` Baseline: `1aca07a1 Add VentureCell Operator OS Level 70 surface` Current scoped HEAD before this packet: `fd",
+      "excerpt": "# Score History Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live ledger, not final until the 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-c1ea4b97e1e794bc` Baseline: `1aca07a1 Add VentureCell Operator OS Level 70 surface` Current scoped HEAD before this packet: `66",
       "matched_terms": [
         "VentureCell",
         "Operator OS",
@@ -1347,7 +1347,7 @@
       "indexed_count": 20,
       "role": "supplemental_staging",
       "root": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z",
-      "scanned_count": 32,
+      "scanned_count": 33,
       "tier": "staged",
       "truncated": false
     },
@@ -1367,7 +1367,7 @@
     "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z",
     "/Users/dhyana/.dharma/knowledge/quarantine"
   ],
-  "staged_count": 5032,
+  "staged_count": 5033,
   "status": "read_through_index_available",
   "truncated": true,
   "trusted_count": 1336

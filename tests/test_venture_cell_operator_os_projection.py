@@ -511,6 +511,10 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert str(report_dir / "operator_os_digest.md") not in artifact_manifest["receipt_paths"]
     assert artifact_manifest["receipt_count"] == len(artifact_manifest["receipt_paths"])
     assert artifact_manifest["latest_receipt_path"] == str(report_dir / "00_opening_truth.md")
+    assert artifact_manifest["latest_receipt_name"] == "00_opening_truth.md"
+    assert artifact_manifest["receipt_inventory_scope"] == "run_markdown_receipts_excluding_digest"
+    assert artifact_manifest["receipt_inventory_not_final"] is True
+    assert artifact_manifest["receipt_inventory_not_authority"] is True
 
 
 def test_operator_surface_uses_report_local_memory_source_without_trusted_promotion(tmp_path: Path) -> None:

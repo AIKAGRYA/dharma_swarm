@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-875b5bb0c3e8a17a`
-Current scoped HEAD before this packet: `fd8e3453 feat(operator-os): harden go template requirements`
+ds-goal progress receipt: `r-c1ea4b97e1e794bc`
+Current scoped HEAD before this packet: `660730cc feat(operator-os): add memory coverage targets`
 
 This audit is intentionally written before the final time window so the next
 agent has a concrete attack surface. It is not a completion certificate. The
@@ -34,6 +34,8 @@ updates, and terminal verification exist.
   OS-specific action ack.
 - Operator OS NATS/A2A action ack proof fields are explicitly false.
 - Artifact manifest lists receipt paths, but is still not final proof.
+- Artifact manifest now exposes receipt inventory scope and non-final markers,
+  but is still navigation only.
 - Gap triage packet reports `external_blocked_with_local_followups`, but is
   still only a local selector and not gate clearance.
 - Memory coverage packet identifies root-level truncation, but does not prove
@@ -127,6 +129,8 @@ Adversarial review:
 - Timebox status must be refreshed before final-window claims.
 - Receipt count and latest receipt path must not be used as terminal closure
   evidence.
+- Receipt inventory scope and latest receipt name must not be used as terminal
+  closure evidence.
 - Admission redaction must not hide policy decisions, blockers, reasons, or
   authority boundaries.
 - Unrelated staged work must not be included in commits for this run.
@@ -165,6 +169,7 @@ Queued:
 | Operator OS action ack exists | action-specific NATS/A2A fields are false | false |
 | Receipt inventory proves completion | manifest is an index and reporter is still open | false |
 | Latest receipt path means terminal receipt | manifest latest receipt is a progress receipt | false |
+| Receipt inventory scope proves finality | scope/non-final markers are navigation only | false |
 | Admission redaction weakened gates | admission decision remains `allow` with reasons visible | false |
 | Gap triage clears the remaining blockers | `operator_gap_triage_packet.json` is `not_authority: true` | false |
 | Memory coverage proves complete recall | staging and quarantine roots are still truncated | false |

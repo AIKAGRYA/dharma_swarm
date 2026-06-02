@@ -171,6 +171,7 @@ def _artifact_manifest_payload(
         for path in sorted(output_dir.glob("*.md"))
         if path.name != "operator_os_digest.md"
     ]
+    latest_receipt_path = receipt_paths[-1] if receipt_paths else ""
     return {
         "schema": "dharma.venture_cell_operator_os.render_manifest.v0",
         "status": projection.get("status", "unknown"),
@@ -191,7 +192,11 @@ def _artifact_manifest_payload(
         },
         "receipt_paths": receipt_paths,
         "receipt_count": len(receipt_paths),
-        "latest_receipt_path": receipt_paths[-1] if receipt_paths else "",
+        "latest_receipt_path": latest_receipt_path,
+        "latest_receipt_name": Path(latest_receipt_path).name if latest_receipt_path else "",
+        "receipt_inventory_scope": "run_markdown_receipts_excluding_digest",
+        "receipt_inventory_not_final": True,
+        "receipt_inventory_not_authority": True,
         "not_authority": True,
     }
 

@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live packet, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-875b5bb0c3e8a17a`
-Current scoped HEAD before this packet: `fd8e3453 feat(operator-os): harden go template requirements`
+ds-goal progress receipt: `r-c1ea4b97e1e794bc`
+Current scoped HEAD before this packet: `660730cc feat(operator-os): add memory coverage targets`
 
 This packet captures durable learning from the run so far. It must be reviewed
 and updated during final closeout before the reporter task is closed.
@@ -214,6 +214,9 @@ and updated during final closeout before the reporter task is closed.
 
    - `operator_os_artifact_manifest.json` now includes `receipt_count` and
      `latest_receipt_path`.
+   - The manifest now includes `latest_receipt_name`,
+     `receipt_inventory_scope`, `receipt_inventory_not_final`, and
+     `receipt_inventory_not_authority`.
    - The same manifest still reports `not_final: true`.
 
    Metabolized rule:
@@ -221,6 +224,8 @@ and updated during final closeout before the reporter task is closed.
    - Future agents can use receipt summaries to navigate the run. They must not
      treat count, latest receipt, or manifest presence as a terminal reporter
      receipt.
+   - Inventory scope fields make the navigation boundary explicit; they do not
+     reduce final-window requirements.
 
 14. Render stability should redact volatility without hiding decisions.
 
@@ -272,6 +277,7 @@ and updated during final closeout before the reporter task is closed.
 | `r-82ec224489746c03` | `27_timebox_refresh_receipt.md` | refreshed non-final timebox status |
 | `r-a158aa9cb20d8ba4` | `28_go_template_requirements_receipt.md` | machine-readable GO template acceptance prerequisites |
 | `r-875b5bb0c3e8a17a` | `29_memory_coverage_targets_receipt.md` | local MemoryKernel coverage maintenance targets |
+| `r-c1ea4b97e1e794bc` | `30_manifest_inventory_scope_receipt.md` | receipt inventory scope and non-final markers |
 
 ## Current Read-Only Artifacts
 
@@ -309,6 +315,7 @@ and updated during final closeout before the reporter task is closed.
 - `27_timebox_refresh_receipt.md`
 - `28_go_template_requirements_receipt.md`
 - `29_memory_coverage_targets_receipt.md`
+- `30_manifest_inventory_scope_receipt.md`
 
 ## Do Not Metabolize As Done
 
@@ -342,6 +349,7 @@ These facts are explicitly not complete:
 - Timebox status is concrete evidence that final closure is still premature.
 - Timebox refresh is still non-final evidence, not a terminal receipt.
 - Manifest receipt summaries are navigation aids only.
+- Manifest inventory scope markers are navigation aids only.
 - Stable admission render is diff hygiene only, not a gate change.
 - Reporter task is not closed.
 - The final adversarial audit and next-goal packet still require final-window

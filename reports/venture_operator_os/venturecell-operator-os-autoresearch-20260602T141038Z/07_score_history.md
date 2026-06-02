@@ -3,9 +3,9 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live ledger, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-875b5bb0c3e8a17a`
+ds-goal progress receipt: `r-c1ea4b97e1e794bc`
 Baseline: `1aca07a1 Add VentureCell Operator OS Level 70 surface`
-Current scoped HEAD before this packet: `fd8e3453 feat(operator-os): harden go template requirements`
+Current scoped HEAD before this packet: `660730cc feat(operator-os): add memory coverage targets`
 
 This file is a living score ledger. It exists now so later agents do not
 reconstruct scores from memory. It must be reviewed and updated before final
@@ -43,6 +43,7 @@ reporter closure.
 | Loop 28 | `27_timebox_refresh_receipt.md` | `r-82ec224489746c03` | 100 | +0 | keep timebox refresh |
 | Loop 29 | `28_go_template_requirements_receipt.md` | `r-a158aa9cb20d8ba4` | 100 | +0 | keep GO template requirements |
 | Loop 30 | `29_memory_coverage_targets_receipt.md` | `r-875b5bb0c3e8a17a` | 100 | +0 | keep memory coverage targets |
+| Loop 31 | `30_manifest_inventory_scope_receipt.md` | `r-c1ea4b97e1e794bc` | 100 | +0 | keep manifest inventory scope |
 
 ## Area History
 
@@ -94,6 +95,8 @@ audit with explicit evidence.
   (`5h 18m 19s`).
 - Manifest receipt summary: `receipt_count` and `latest_receipt_path` present,
   with `not_final: true`.
+- Manifest inventory scope: latest receipt name and non-final/non-authority
+  inventory markers present.
 - Stable admission render: volatile admission id/time redacted while decision
   evidence remains visible.
 - MemoryKernel query eval: `pass` (`6/6`) from report-local staged roots.
@@ -152,6 +155,7 @@ current evidence, not as a full-project proof.
 - Periodic onboard evidence is not Operator OS action authority.
 - Timebox status proves the mission is not complete despite live score `100`.
 - Manifest receipt summary is an audit locator, not final proof.
+- Manifest inventory scope is navigation metadata, not terminal proof.
 - Admission raw redaction is render hygiene, not admission policy change.
 - Timebox refresh is evidence that the mission remains active and incomplete.
 - The reporter task must remain open until final artifacts and final

@@ -18,14 +18,18 @@
   "completion_guard_decision": "keep_reporter_open",
   "darshan_go_decision": "block_external_authority",
   "gap_triage_decision": "external_blocked_with_local_followups",
-  "latest_receipt_path": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/29_memory_coverage_targets_receipt.md",
+  "latest_receipt_name": "30_manifest_inventory_scope_receipt.md",
+  "latest_receipt_path": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/30_manifest_inventory_scope_receipt.md",
   "memory_coverage_truncated": true,
   "memory_query_eval_passed": 6,
   "memory_query_eval_status": "pass",
   "memory_query_eval_total": 6,
   "not_authority": true,
   "not_final": true,
-  "receipt_count": 31,
+  "receipt_count": 32,
+  "receipt_inventory_not_authority": true,
+  "receipt_inventory_not_final": true,
+  "receipt_inventory_scope": "run_markdown_receipts_excluding_digest",
   "receipt_paths": [
     "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/00_opening_truth.md",
     "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/01_program_kernel_receipt.md",
@@ -57,7 +61,8 @@
     "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/26_stable_admission_render_receipt.md",
     "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/27_timebox_refresh_receipt.md",
     "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/28_go_template_requirements_receipt.md",
-    "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/29_memory_coverage_targets_receipt.md"
+    "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/29_memory_coverage_targets_receipt.md",
+    "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/30_manifest_inventory_scope_receipt.md"
   ],
   "schema": "dharma.venture_cell_operator_os.render_manifest.v0",
   "status": "blocked_on_external_reader_gate"

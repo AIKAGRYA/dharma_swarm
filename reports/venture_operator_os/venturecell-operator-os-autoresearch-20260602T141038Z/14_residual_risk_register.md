@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live risk register, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-875b5bb0c3e8a17a`
-Current scoped HEAD before this packet: `fd8e3453 feat(operator-os): harden go template requirements`
+ds-goal progress receipt: `r-c1ea4b97e1e794bc`
+Current scoped HEAD before this packet: `660730cc feat(operator-os): add memory coverage targets`
 
 This register separates current blockers, residual risks, and solved local
 claims. It exists to prevent false completion after a high live score.
@@ -32,6 +32,7 @@ claims. It exists to prevent false completion after a high live score.
 | Liveness label regression | authority fields could become ambiguous again | keep Operator OS action-specific key names |
 | Receipt inventory overclaim | manifest lists receipt paths | treat as index, not completion proof |
 | Receipt summary overclaim | manifest reports count/latest receipt | treat as navigation, not completion proof |
+| Receipt inventory scope overclaim | manifest reports latest receipt name and scope markers | treat as navigation, not finality proof |
 | Admission redaction overclaim | governed admission raw redacts volatile id/time | ensure decision and reasons remain visible |
 | Gap triage overclaim | `operator_gap_triage_packet.json` separates local/external gaps | treat as loop selector, not authority or gate clearance |
 | Memory coverage overclaim | `memory_kernel_coverage_packet.json` exposes root coverage | treat as limit evidence, not complete memory coverage |
@@ -68,6 +69,7 @@ claims. It exists to prevent false completion after a high live score.
 | Timebox status recorded | elapsed `8770s`, remaining `20030s` | non-final proof only |
 | Timebox refresh recorded | elapsed `9701s`, remaining `19099s` | non-final proof only |
 | Manifest receipt summary renders | receipt count and latest path present | audit locator only |
+| Manifest inventory scope renders | latest name and non-final/non-authority markers present | audit locator only |
 | Admission render stable | volatile id/time redacted | diff hygiene only |
 
 ## Loop 15 Receipt

@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live verifier matrix, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-875b5bb0c3e8a17a`
-Current scoped HEAD before this packet: `fd8e3453 feat(operator-os): harden go template requirements`
+ds-goal progress receipt: `r-c1ea4b97e1e794bc`
+Current scoped HEAD before this packet: `660730cc feat(operator-os): add memory coverage targets`
 
 This matrix captures the current verification surface for future agents. It is
 not a final verifier matrix and must not be used to close the reporter task.
@@ -30,6 +30,8 @@ not a final verifier matrix and must not be used to close the reporter task.
 - Periodic onboard/toolbelt: passing, environment context only.
 - Timebox status: elapsed `9701s`, remaining `19099s`.
 - Manifest receipt summary: passing; count and latest receipt path rendered.
+- Manifest inventory scope: passing; latest receipt name and non-final markers
+  rendered.
 - Stable admission render: passing; volatile id/time redacted, decision visible.
 - Complete ds-goal verification: expected fail on open reporter task.
 - Mission status: open.
@@ -68,6 +70,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `14_residual_risk_register.md` | live risk split | not a closure certificate |
 | `operator_os_artifact_manifest.json` | rendered locator | not proof of finality or authority |
 | manifest receipt summary | `receipt_count` + `latest_receipt_path` | navigation only |
+| manifest inventory scope | `latest_receipt_name` + inventory scope markers | navigation only |
 | governed admission raw | volatile id/time redacted | diff hygiene, not gate change |
 | `16_periodic_onboard_receipt.md` | onboard/toolbelt pass | repo-wide substrate context only |
 | `17_liveness_key_disambiguation_receipt.md` | action-specific liveness labels | prevents substrate/authority conflation |
@@ -113,6 +116,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `r-82ec224489746c03` | keep | timebox refresh |
 | `r-a158aa9cb20d8ba4` | keep | GO template requirements |
 | `r-875b5bb0c3e8a17a` | keep | memory coverage targets |
+| `r-c1ea4b97e1e794bc` | keep | manifest inventory scope |
 
 ## Revert / Queue Ledger
 
