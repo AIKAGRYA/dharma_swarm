@@ -16,6 +16,10 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
+from dharma_swarm.runtime_state import RuntimeStateStore
+from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity
+from dharma_swarm.spine.tollbooth import require_execution_tollbooth
+
 logger = logging.getLogger(__name__)
 
 
@@ -176,13 +180,27 @@ class DiffApplier:
             Defaults to the current working directory.
     """
 
-    def __init__(self, workspace: Path | None = None) -> None:
+    def __init__(
+        self,
+        workspace: Path | None = None,
+        *,
+        runtime_state: RuntimeStateStore | None = None,
+        require_identity: bool = False,
+    ) -> None:
         self.workspace = (workspace or Path.cwd()).resolve()
+        self._runtime_state = runtime_state
+        self._require_identity = require_identity
 
     # -- public API ---------------------------------------------------------
 
     async def apply(
-        self, diff_text: str, dry_run: bool = False
+        self,
+        diff_text: str,
+        dry_run: bool = False,
+        *,
+        execution_identity: ExecutionIdentity | None = None,
+        require_identity: bool | None = None,
+        proposal_id: str = "",
     ) -> ApplyResult:
         """Parse and apply a unified diff.
 
@@ -212,6 +230,36 @@ class DiffApplier:
         if not patches:
             return ApplyResult(success=True)
 
+        effective_require = self._require_identity if require_identity is None else require_identity
+        identity: ExecutionIdentity | None = None
+        if not dry_run:
+            try:
+                identity = require_execution_tollbooth(
+                    execution_identity=execution_identity,
+                    runtime_state=self._runtime_state,
+                    surface="diff_applier",
+                    action="apply",
+                    require_identity=effective_require,
+                )
+            except MissingExecutionIdentity as exc:
+                return ApplyResult(success=False, error=str(exc))
+            if identity is not None and self._runtime_state is not None:
+                self._runtime_state.record_execution_identity_sync(
+                    identity,
+                    source="diff_applier.apply",
+                    metadata={"surface": "self_modification"},
+                )
+                self._runtime_state.record_self_mod_receipt_sync(
+                    identity,
+                    stage="apply",
+                    status="requested",
+                    proposal_id=proposal_id or identity.proposal_id,
+                    payload={
+                        "files": [patch.target_path for patch in patches],
+                        "dry_run": dry_run,
+                    },
+                )
+
         files_changed: list[str] = []
         backup_paths: dict[str, str] = {}
 
@@ -220,6 +268,14 @@ class DiffApplier:
 
             # Validate: if not a new file, the target must exist
             if not patch.is_new_file and not target.exists():
+                if identity is not None and self._runtime_state is not None:
+                    self._runtime_state.record_self_mod_receipt_sync(
+                        identity,
+                        stage="apply",
+                        status="failed",
+                        proposal_id=proposal_id or identity.proposal_id,
+                        payload={"file": patch.target_path, "error": "target_missing"},
+                    )
                 return ApplyResult(
                     success=False,
                     error=f"Target file does not exist: {patch.target_path}",
@@ -241,6 +297,14 @@ class DiffApplier:
             try:
                 self._apply_patch(target, patch)
             except Exception as exc:
+                if identity is not None and self._runtime_state is not None:
+                    self._runtime_state.record_self_mod_receipt_sync(
+                        identity,
+                        stage="apply",
+                        status="failed",
+                        proposal_id=proposal_id or identity.proposal_id,
+                        payload={"file": patch.target_path, "error": type(exc).__name__},
+                    )
                 return ApplyResult(
                     success=False,
                     error=f"Failed applying patch to {patch.target_path}: {exc}",
@@ -250,6 +314,14 @@ class DiffApplier:
 
             files_changed.append(patch.target_path)
 
+        if identity is not None and self._runtime_state is not None:
+            self._runtime_state.record_self_mod_receipt_sync(
+                identity,
+                stage="apply",
+                status="applied",
+                proposal_id=proposal_id or identity.proposal_id,
+                payload={"files": files_changed},
+            )
         return ApplyResult(
             success=True,
             files_changed=files_changed,
