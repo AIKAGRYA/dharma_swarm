@@ -886,6 +886,45 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     }
     assert "goal_clock" in preflight_command_ids
     assert "complete_verifier" in preflight_command_ids
+    assert final_window_preflight_packet["closure_sequence_count"] == len(
+        final_window_preflight_packet["closure_sequence"]
+    )
+    assert final_window_preflight_packet["closure_sequence_count"] == 5
+    assert final_window_preflight_packet[
+        "closure_sequence_before_reporter_count"
+    ] == 2
+    assert final_window_preflight_packet[
+        "closure_sequence_after_reporter_count"
+    ] == 2
+    assert final_window_preflight_packet[
+        "closure_sequence_terminal_proof_step_count"
+    ] == 2
+    assert final_window_preflight_packet[
+        "closure_sequence_closure_satisfied_count"
+    ] == 0
+    closure_step_ids = [
+        item["step_id"] for item in final_window_preflight_packet["closure_sequence"]
+    ]
+    assert closure_step_ids == [
+        "prove_true_8h_clock",
+        "refresh_final_review_artifacts",
+        "record_terminal_reporter_receipt",
+        "run_complete_verifier_after_reporter_closure",
+        "commit_scoped_final_packet",
+    ]
+    closure_steps = {
+        item["step_id"]: item
+        for item in final_window_preflight_packet["closure_sequence"]
+    }
+    assert closure_steps["prove_true_8h_clock"]["command_ids"] == ["goal_clock"]
+    assert closure_steps["record_terminal_reporter_receipt"]["terminal_proof"] is True
+    assert closure_steps["run_complete_verifier_after_reporter_closure"][
+        "after_reporter_closure"
+    ] is True
+    assert all(
+        item["satisfies_final_closure"] is False
+        for item in final_window_preflight_packet["closure_sequence"]
+    )
     assert final_window_preflight_packet["latest_receipt_name"] == "99_progress_receipt.md"
     assert final_window_preflight_packet["latest_progress_receipt_id"] == "r-test-progress"
     assert final_window_preflight_packet["accepted_go_receipt_count"] == 0
@@ -1046,6 +1085,21 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     ] == final_window_preflight_packet[
         "required_final_artifact_closure_satisfied_count"
     ]
+    assert artifact_manifest["final_window_preflight_closure_sequence_count"] == (
+        final_window_preflight_packet["closure_sequence_count"]
+    )
+    assert artifact_manifest[
+        "final_window_preflight_closure_sequence_before_reporter_count"
+    ] == final_window_preflight_packet["closure_sequence_before_reporter_count"]
+    assert artifact_manifest[
+        "final_window_preflight_closure_sequence_after_reporter_count"
+    ] == final_window_preflight_packet["closure_sequence_after_reporter_count"]
+    assert artifact_manifest[
+        "final_window_preflight_closure_sequence_terminal_proof_step_count"
+    ] == final_window_preflight_packet["closure_sequence_terminal_proof_step_count"]
+    assert artifact_manifest[
+        "final_window_preflight_closure_sequence_closure_satisfied_count"
+    ] == final_window_preflight_packet["closure_sequence_closure_satisfied_count"]
     assert "canvas_summary_packet" in artifact_manifest["summary_packet_names"]
     assert "department_summary_packet" in artifact_manifest["summary_packet_names"]
     assert "gate_summary_packet" in artifact_manifest["summary_packet_names"]

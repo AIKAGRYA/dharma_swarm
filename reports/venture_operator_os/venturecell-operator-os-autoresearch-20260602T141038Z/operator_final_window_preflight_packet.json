@@ -1,6 +1,94 @@
 {
   "accepted_go_receipt_count": 0,
   "autonomy_level": "L0_read_only_plan",
+  "closure_sequence": [
+    {
+      "after_reporter_closure": false,
+      "before_reporter_closure": true,
+      "command_ids": [
+        "goal_clock"
+      ],
+      "order": 1,
+      "required_artifacts": [],
+      "required_evidence": "goal_clock_timeUsedSeconds_at_least_28800",
+      "satisfies_final_closure": false,
+      "status": "not_satisfied_by_this_packet",
+      "step_id": "prove_true_8h_clock",
+      "terminal_proof": false
+    },
+    {
+      "after_reporter_closure": false,
+      "before_reporter_closure": true,
+      "command_ids": [
+        "operator_projection_tests",
+        "darshan_control_slice",
+        "governed_a2a_daily_slice",
+        "operator_compile",
+        "scoped_diff_check"
+      ],
+      "order": 2,
+      "required_artifacts": [
+        "06_adversary_audit.md",
+        "07_score_history.md",
+        "08_metabolization_packet.md",
+        "09_next_goal_packet.md"
+      ],
+      "required_evidence": "final_window_review_of_required_markdown_artifacts",
+      "satisfies_final_closure": false,
+      "status": "requires_final_window_refresh",
+      "step_id": "refresh_final_review_artifacts",
+      "terminal_proof": false
+    },
+    {
+      "after_reporter_closure": false,
+      "before_reporter_closure": false,
+      "command_ids": [],
+      "order": 3,
+      "required_artifacts": [
+        "final_ds_goal_terminal_receipt"
+      ],
+      "required_evidence": "final_ds_goal_reporter_receipt",
+      "satisfies_final_closure": false,
+      "status": "requires_terminal_reporter_receipt_after_true_time",
+      "step_id": "record_terminal_reporter_receipt",
+      "terminal_proof": true
+    },
+    {
+      "after_reporter_closure": true,
+      "before_reporter_closure": false,
+      "command_ids": [
+        "complete_verifier"
+      ],
+      "order": 4,
+      "required_artifacts": [
+        "complete_verifier_pass_after_reporter_closure"
+      ],
+      "required_evidence": "complete_verifier_exit_zero",
+      "satisfies_final_closure": false,
+      "status": "requires_post_reporter_verification",
+      "step_id": "run_complete_verifier_after_reporter_closure",
+      "terminal_proof": true
+    },
+    {
+      "after_reporter_closure": true,
+      "before_reporter_closure": false,
+      "command_ids": [
+        "scoped_diff_check"
+      ],
+      "order": 5,
+      "required_artifacts": [],
+      "required_evidence": "explicit_pathspec_commit_after_final_verification",
+      "satisfies_final_closure": false,
+      "status": "requires_scoped_commit_after_verification",
+      "step_id": "commit_scoped_final_packet",
+      "terminal_proof": false
+    }
+  ],
+  "closure_sequence_after_reporter_count": 2,
+  "closure_sequence_before_reporter_count": 2,
+  "closure_sequence_closure_satisfied_count": 0,
+  "closure_sequence_count": 5,
+  "closure_sequence_terminal_proof_step_count": 2,
   "complete_verifier_expected_blocker": "reporter_task_not_closed_until_terminal_receipt",
   "complete_verifier_pass_claimed": false,
   "decision": "wait_for_true_8h_and_terminal_reporter_receipt",
@@ -19,8 +107,8 @@
     "claim_external_authority_without_go_receipt",
     "include_unrelated_staged_work"
   ],
-  "latest_progress_receipt_id": "r-0cb6e10c9984ac6b",
-  "latest_receipt_name": "65_final_preflight_artifact_items_receipt.md",
+  "latest_progress_receipt_id": "r-44af85e140633aaf",
+  "latest_receipt_name": "66_final_preflight_closure_sequence_receipt.md",
   "not_authority": true,
   "not_final": true,
   "preflight_check_count": 5,

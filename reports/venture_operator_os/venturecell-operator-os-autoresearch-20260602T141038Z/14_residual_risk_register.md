@@ -176,6 +176,22 @@ New solved local claim:
 
 Decision: keep the risk in the live register until final-window review.
 
+## Loop 67 Risk Addendum
+
+New residual risk:
+
+| Risk | Current evidence | Handling |
+|---|---|---|
+| Closure-sequence overclaim | preflight packet reports five ordered closeout steps | treat sequence as order guidance only; require actual true-time, terminal receipt, and verifier evidence |
+
+New solved local claim:
+
+| Claim | Evidence | Boundary |
+|---|---|---|
+| Final closure sequence renders | focused tests pass and live packet reports sequence `5`, terminal-proof steps `2`, closure-satisfied `0` | not final proof and not reporter closure |
+
+Decision: keep the risk in the live register until final-window review.
+
 ## Loop 66 Risk Addendum
 
 New residual risk:

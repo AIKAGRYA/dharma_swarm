@@ -272,6 +272,35 @@ Keep / revert / queue:
 
 Decision: keep.
 
+## Loop 67 Score Update
+
+Hypothesis:
+
+If final closeout is ordered as a machine-readable sequence, the final agent can
+avoid performing terminal steps before true-time proof and artifact refresh.
+
+Patch:
+
+- Added a five-step closure sequence to the preflight packet.
+- Mirrored sequence counts in the manifest.
+- Added focused tests for sequence order and zero closure-satisfied state.
+
+Evaluation:
+
+- Focused Operator OS tests passed.
+- Supporting Darshan/control and governed/A2A/daily slices passed.
+- Operator OS compile passed.
+- Complete verifier remains blocked only by the open reporter.
+
+Adversarial review:
+
+- Live score remains `100/100`, but still non-final.
+- Closure ordering does not close the reporter or grant authority.
+
+Keep / revert / queue:
+
+Decision: keep.
+
 ## Loop 66 Score Update
 
 Hypothesis:

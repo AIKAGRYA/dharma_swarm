@@ -981,6 +981,79 @@ def _final_window_preflight_payload(
             "expected_result": "exit_zero_after_terminal_reporter_closure",
         },
     ]
+    closure_sequence = [
+        {
+            "order": 1,
+            "step_id": "prove_true_8h_clock",
+            "required_evidence": "goal_clock_timeUsedSeconds_at_least_28800",
+            "command_ids": ["goal_clock"],
+            "required_artifacts": [],
+            "status": "not_satisfied_by_this_packet",
+            "before_reporter_closure": True,
+            "after_reporter_closure": False,
+            "terminal_proof": False,
+            "satisfies_final_closure": False,
+        },
+        {
+            "order": 2,
+            "step_id": "refresh_final_review_artifacts",
+            "required_evidence": "final_window_review_of_required_markdown_artifacts",
+            "command_ids": [
+                "operator_projection_tests",
+                "darshan_control_slice",
+                "governed_a2a_daily_slice",
+                "operator_compile",
+                "scoped_diff_check",
+            ],
+            "required_artifacts": [
+                "06_adversary_audit.md",
+                "07_score_history.md",
+                "08_metabolization_packet.md",
+                "09_next_goal_packet.md",
+            ],
+            "status": "requires_final_window_refresh",
+            "before_reporter_closure": True,
+            "after_reporter_closure": False,
+            "terminal_proof": False,
+            "satisfies_final_closure": False,
+        },
+        {
+            "order": 3,
+            "step_id": "record_terminal_reporter_receipt",
+            "required_evidence": "final_ds_goal_reporter_receipt",
+            "command_ids": [],
+            "required_artifacts": ["final_ds_goal_terminal_receipt"],
+            "status": "requires_terminal_reporter_receipt_after_true_time",
+            "before_reporter_closure": False,
+            "after_reporter_closure": False,
+            "terminal_proof": True,
+            "satisfies_final_closure": False,
+        },
+        {
+            "order": 4,
+            "step_id": "run_complete_verifier_after_reporter_closure",
+            "required_evidence": "complete_verifier_exit_zero",
+            "command_ids": ["complete_verifier"],
+            "required_artifacts": ["complete_verifier_pass_after_reporter_closure"],
+            "status": "requires_post_reporter_verification",
+            "before_reporter_closure": False,
+            "after_reporter_closure": True,
+            "terminal_proof": True,
+            "satisfies_final_closure": False,
+        },
+        {
+            "order": 5,
+            "step_id": "commit_scoped_final_packet",
+            "required_evidence": "explicit_pathspec_commit_after_final_verification",
+            "command_ids": ["scoped_diff_check"],
+            "required_artifacts": [],
+            "status": "requires_scoped_commit_after_verification",
+            "before_reporter_closure": False,
+            "after_reporter_closure": True,
+            "terminal_proof": False,
+            "satisfies_final_closure": False,
+        },
+    ]
     return {
         "schema": "dharma.venture_cell_operator_os.final_window_preflight.v0",
         "status": projection.get("status", "unknown"),
@@ -1022,6 +1095,20 @@ def _final_window_preflight_payload(
         "preflight_check_count": len(preflight_checks),
         "preflight_commands": preflight_commands,
         "preflight_command_count": len(preflight_commands),
+        "closure_sequence": closure_sequence,
+        "closure_sequence_count": len(closure_sequence),
+        "closure_sequence_before_reporter_count": sum(
+            1 for item in closure_sequence if bool(item["before_reporter_closure"])
+        ),
+        "closure_sequence_after_reporter_count": sum(
+            1 for item in closure_sequence if bool(item["after_reporter_closure"])
+        ),
+        "closure_sequence_terminal_proof_step_count": sum(
+            1 for item in closure_sequence if bool(item["terminal_proof"])
+        ),
+        "closure_sequence_closure_satisfied_count": sum(
+            1 for item in closure_sequence if bool(item["satisfies_final_closure"])
+        ),
         "latest_receipt_name": goal_truth.get("latest_receipt_name", ""),
         "latest_progress_receipt_id": goal_truth.get("latest_progress_receipt_id", ""),
         "receipt_chain_complete_claimed": False,
@@ -1179,6 +1266,21 @@ def _artifact_manifest_payload(
         ),
         "final_window_preflight_required_final_artifact_closure_satisfied_count": final_window_preflight.get(
             "required_final_artifact_closure_satisfied_count", 0
+        ),
+        "final_window_preflight_closure_sequence_count": final_window_preflight.get(
+            "closure_sequence_count", 0
+        ),
+        "final_window_preflight_closure_sequence_before_reporter_count": final_window_preflight.get(
+            "closure_sequence_before_reporter_count", 0
+        ),
+        "final_window_preflight_closure_sequence_after_reporter_count": final_window_preflight.get(
+            "closure_sequence_after_reporter_count", 0
+        ),
+        "final_window_preflight_closure_sequence_terminal_proof_step_count": final_window_preflight.get(
+            "closure_sequence_terminal_proof_step_count", 0
+        ),
+        "final_window_preflight_closure_sequence_closure_satisfied_count": final_window_preflight.get(
+            "closure_sequence_closure_satisfied_count", 0
         ),
         "goal_truth_progress_receipt_count": goal_truth.get(
             "progress_receipt_count", 0

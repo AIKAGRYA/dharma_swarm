@@ -640,3 +640,24 @@ Still forbidden:
 - treating existing local draft files as final proof;
 - closing reporter before true time and terminal-verifier proof;
 - external outreach, publishing, handoff, spend, deploy, push, or merge.
+
+## Loop 67 Next Goal Addendum
+
+Current new evidence:
+
+- `66_final_preflight_closure_sequence_receipt.md`
+- updated `operator_final_window_preflight_packet.json`
+- updated `operator_os_artifact_manifest.json`
+
+Next safe loop targets:
+
+- Continue local review until elapsed time reaches `28800s`.
+- Use the closure sequence as order guidance only.
+- Keep true-time proof and final artifact refresh before terminal reporter
+  receipt, and keep complete verification after reporter closure.
+
+Still forbidden:
+
+- treating the sequence as execution proof;
+- closing reporter before true time and terminal-verifier proof;
+- external outreach, publishing, handoff, spend, deploy, push, or merge.

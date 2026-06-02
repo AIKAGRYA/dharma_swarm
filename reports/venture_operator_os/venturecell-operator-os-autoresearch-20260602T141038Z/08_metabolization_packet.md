@@ -1262,3 +1262,29 @@ Metabolized rule:
 
 - Final artifact inventories must distinguish local draft presence from
   terminal proof satisfaction.
+
+## Loop 67 Metabolization Note
+
+Hypothesis:
+
+If final closeout order is explicit, future agents can use the same terminal
+discipline without reconstructing it from scattered report prose.
+
+Patch:
+
+- Added closure sequence steps and manifest counters.
+
+Evaluation:
+
+- Focused and supporting verifier slices passed.
+- Live preflight reports `5` steps and `0` closure-satisfied steps.
+
+Adversarial review:
+
+- Sequence visibility is not sequence execution.
+- Reporter closure remains blocked until true time and terminal evidence.
+
+Metabolized rule:
+
+- Final-window packets must separate ordered instructions from proof that those
+  instructions have been executed.
