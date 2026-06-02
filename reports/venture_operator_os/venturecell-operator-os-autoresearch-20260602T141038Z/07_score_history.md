@@ -272,6 +272,33 @@ Keep / revert / queue:
 
 Decision: keep.
 
+## Loop 68 Score Update
+
+Hypothesis:
+
+If the digest exposes closure sequence counts, operator clarity improves without
+requiring JSON inspection.
+
+Patch:
+
+- Added final-window closure sequence counters to the digest.
+- Added focused digest assertions.
+
+Evaluation:
+
+- Focused Operator OS tests passed.
+- Supporting verifier slices and compile passed.
+- Complete verifier remains blocked only by the open reporter.
+
+Adversarial review:
+
+- Live score remains `100/100`, but still non-final.
+- Digest counters do not execute the sequence.
+
+Keep / revert / queue:
+
+Decision: keep.
+
 ## Loop 67 Score Update
 
 Hypothesis:

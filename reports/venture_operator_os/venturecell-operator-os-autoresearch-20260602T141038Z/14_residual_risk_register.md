@@ -176,6 +176,22 @@ New solved local claim:
 
 Decision: keep the risk in the live register until final-window review.
 
+## Loop 68 Risk Addendum
+
+New residual risk:
+
+| Risk | Current evidence | Handling |
+|---|---|---|
+| Digest counter overclaim | digest reports final-window closure sequence counts | treat counters as scanability metadata; require terminal proof before closure |
+
+New solved local claim:
+
+| Claim | Evidence | Boundary |
+|---|---|---|
+| Digest closure counters render | focused tests pass and digest shows steps `5`, terminal-proof `2`, closure-satisfied `0` | not final proof and not reporter closure |
+
+Decision: keep the risk in the live register until final-window review.
+
 ## Loop 67 Risk Addendum
 
 New residual risk:

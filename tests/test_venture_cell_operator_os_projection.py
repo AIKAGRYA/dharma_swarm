@@ -375,6 +375,9 @@ def test_operator_daily_digest_renders_structure_without_live_authority_claim(tm
     assert "## Final Window Preflight" in digest
     assert "- Required elapsed seconds: `28800`" in digest
     assert "- Required final artifacts: `6`" in digest
+    assert "- Closure sequence steps: `5`" in digest
+    assert "- Closure terminal-proof steps: `2`" in digest
+    assert "- Closure-satisfied steps: `0`" in digest
     assert "- Complete verifier pass claimed: `False`" in digest
     assert "operator_final_window_preflight_packet.json" in digest
     assert "(checklist only, not final proof)" in digest

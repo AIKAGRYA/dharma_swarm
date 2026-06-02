@@ -661,3 +661,23 @@ Still forbidden:
 - treating the sequence as execution proof;
 - closing reporter before true time and terminal-verifier proof;
 - external outreach, publishing, handoff, spend, deploy, push, or merge.
+
+## Loop 68 Next Goal Addendum
+
+Current new evidence:
+
+- `67_digest_closure_sequence_receipt.md`
+- updated `operator_os_digest.md`
+
+Next safe loop targets:
+
+- Continue local review until elapsed time reaches `28800s`.
+- Use the digest for quick scanability and the preflight packet for detailed
+  final-window ordering.
+- Preserve closure-satisfied count `0` until terminal evidence exists.
+
+Still forbidden:
+
+- treating digest counters as execution proof;
+- closing reporter before true time and terminal-verifier proof;
+- external outreach, publishing, handoff, spend, deploy, push, or merge.

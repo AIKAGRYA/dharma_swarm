@@ -8,6 +8,9 @@ from pathlib import Path
 from dharma_swarm.venture_cell.operator_os.schema import VentureCellOperatorProjection
 
 CANVAS_DETAIL_LIMIT_PER_LANE = 8
+FINAL_WINDOW_CLOSURE_SEQUENCE_COUNT = 5
+FINAL_WINDOW_TERMINAL_PROOF_STEP_COUNT = 2
+FINAL_WINDOW_CLOSURE_SATISFIED_COUNT = 0
 
 
 def render_operator_daily_digest(projection: VentureCellOperatorProjection) -> str:
@@ -234,6 +237,11 @@ def render_operator_daily_digest(projection: VentureCellOperatorProjection) -> s
             "",
             "- Required elapsed seconds: `28800`",
             f"- Required final artifacts: `{len(required_final_artifacts)}`",
+            f"- Closure sequence steps: `{FINAL_WINDOW_CLOSURE_SEQUENCE_COUNT}`",
+            "- Closure terminal-proof steps: "
+            f"`{FINAL_WINDOW_TERMINAL_PROOF_STEP_COUNT}`",
+            "- Closure-satisfied steps: "
+            f"`{FINAL_WINDOW_CLOSURE_SATISFIED_COUNT}`",
             "- Complete verifier pass claimed: `False`",
             "- Preflight packet: `operator_final_window_preflight_packet.json` "
             "(checklist only, not final proof)",

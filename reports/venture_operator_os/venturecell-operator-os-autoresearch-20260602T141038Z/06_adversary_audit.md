@@ -515,3 +515,24 @@ Keep / revert / queue:
 Decision: keep.
 
 ds-goal progress receipt: `r-44af85e140633aaf`
+
+## Loop 68 Adversary Addendum
+
+New claim under attack: digest closure counters mean closure steps have been
+executed.
+
+Current evidence:
+
+- `operator_os_digest.md` shows closure sequence steps `5`.
+- Terminal-proof steps are `2`.
+- Closure-satisfied steps are `0`.
+- Preflight pointer remains checklist-only, not final proof.
+
+Verdict: false. Digest counters are scanability metadata only and preserve the
+zero-satisfaction boundary.
+
+Keep / revert / queue:
+
+Decision: keep.
+
+ds-goal progress receipt: `r-274e30600044a4d0`

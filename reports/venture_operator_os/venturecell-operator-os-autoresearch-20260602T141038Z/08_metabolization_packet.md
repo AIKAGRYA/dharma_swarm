@@ -1288,3 +1288,30 @@ Metabolized rule:
 
 - Final-window packets must separate ordered instructions from proof that those
   instructions have been executed.
+
+## Loop 68 Metabolization Note
+
+Hypothesis:
+
+If operator-facing summaries repeat closure-satisfaction counts, future agents
+are less likely to mistake digest text for terminal proof.
+
+Patch:
+
+- Added closure sequence counters to the digest.
+
+Evaluation:
+
+- Focused and supporting verifier slices passed.
+- Live digest reports closure-satisfied steps `0`.
+
+Adversarial review:
+
+- Digest visibility remains presentation only.
+- Detailed sequence proof still lives in the preflight packet and terminal
+  verifier.
+
+Metabolized rule:
+
+- Human-facing summaries must expose zero-satisfaction state whenever they
+  surface final-window closure metadata.

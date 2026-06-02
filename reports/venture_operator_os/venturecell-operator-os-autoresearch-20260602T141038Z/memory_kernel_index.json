@@ -1346,7 +1346,7 @@
       "indexed_count": 20,
       "role": "supplemental_staging",
       "root": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z",
-      "scanned_count": 69,
+      "scanned_count": 70,
       "tier": "staged",
       "truncated": false
     },
@@ -1366,7 +1366,7 @@
     "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z",
     "/Users/dhyana/.dharma/knowledge/quarantine"
   ],
-  "staged_count": 5069,
+  "staged_count": 5070,
   "status": "read_through_index_available",
   "truncated": true,
   "trusted_count": 1343

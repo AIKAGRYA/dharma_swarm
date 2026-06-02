@@ -113,13 +113,16 @@
 
 - Required elapsed seconds: `28800`
 - Required final artifacts: `6`
+- Closure sequence steps: `5`
+- Closure terminal-proof steps: `2`
+- Closure-satisfied steps: `0`
 - Complete verifier pass claimed: `False`
 - Preflight packet: `operator_final_window_preflight_packet.json` (checklist only, not final proof)
 
 ## Memory Kernel
 
 - Status: `read_through_index_available`
-- Staged: `5069`
+- Staged: `5070`
 - Trusted: `1343`
 - Quarantine: `5000`
 - Truncated scan: `True`
@@ -130,7 +133,7 @@
 
 - `trusted` `trusted`: scanned `1343`; indexed `20`/`20`; truncated `False`.
 - `staging` `staged`: scanned `5000`; indexed `20`/`20`; truncated `True`.
-- `supplemental_staging` `staged`: scanned `69`; indexed `20`/`20`; truncated `False`.
+- `supplemental_staging` `staged`: scanned `70`; indexed `20`/`20`; truncated `False`.
 - `quarantine` `quarantine`: scanned `5000`; indexed `20`/`20`; truncated `True`.
 
 ## Memory Repair Packet
