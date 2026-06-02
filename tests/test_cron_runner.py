@@ -49,6 +49,22 @@ def test_shell_handler_runs_shlex_split_command_without_shell(tmp_path):
     assert "shell" not in kwargs
 
 
+def test_shell_handler_rejects_non_allowlisted_command(tmp_path):
+    with patch("subprocess.run") as mock_run:
+        result = execute_cron_job(
+            {
+                "id": "bad-shell",
+                "handler": "shell",
+                "shell_command": "python3 scripts/unowned.py --do-work",
+                "repo_root": str(tmp_path),
+            }
+        )
+
+    assert result.status == CronJobRunStatus.FAILED
+    assert "not allowlisted" in (result.error or "")
+    mock_run.assert_not_called()
+
+
 def test_run_cron_job_dispatches_headless_prompt():
     with patch("dharma_swarm.pulse.run_claude_headless", return_value="Mission pulse ok") as mock:
         success, output, error = run_cron_job(

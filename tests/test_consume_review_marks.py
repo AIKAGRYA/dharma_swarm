@@ -14,13 +14,14 @@ import consume_review_marks as crm
 
 class TestParseFrontmatter:
     def test_valid_atomic(self) -> None:
-        text = "---\ntitle: Test\ntype: atomic\nconfidence: 0.8\nconcepts: a, b\n---\nBody."
+        text = "---\ntitle: Test\ntype: atomic\nconfidence: 0.8\nconcepts: a, b\nreviewed: true\n---\nBody."
         meta = crm.parse_frontmatter(text)
         assert meta is not None
         assert meta.atom_type == "atomic"
         assert meta.confidence == 0.8
         assert meta.title == "Test"
         assert meta.concepts == ["a", "b"]
+        assert meta.reviewed is True
 
     def test_missing_frontmatter(self) -> None:
         text = "No frontmatter here."
@@ -36,27 +37,33 @@ class TestParseFrontmatter:
 
 class TestShouldPromote:
     def test_atomic_high_confidence(self) -> None:
-        meta = crm.AtomMeta("atomic", 0.8, "T", [], "")
+        meta = crm.AtomMeta("atomic", 0.8, "T", [], "", reviewed=True)
         ok, reason = crm.should_promote(meta, 0.5)
         assert ok is True
 
     def test_atomic_low_confidence(self) -> None:
-        meta = crm.AtomMeta("atomic", 0.3, "T", [], "")
+        meta = crm.AtomMeta("atomic", 0.3, "T", [], "", reviewed=True)
         ok, reason = crm.should_promote(meta, 0.5)
         assert ok is False
         assert "confidence" in reason
 
     def test_compound_type_rejected(self) -> None:
-        meta = crm.AtomMeta("compound", 0.9, "T", [], "")
+        meta = crm.AtomMeta("compound", 0.9, "T", [], "", reviewed=True)
         ok, reason = crm.should_promote(meta, 0.5)
         assert ok is False
         assert "type" in reason
 
     def test_concept_type_rejected(self) -> None:
-        meta = crm.AtomMeta("concept", 0.6, "T", [], "")
+        meta = crm.AtomMeta("concept", 0.6, "T", [], "", reviewed=True)
         ok, reason = crm.should_promote(meta, 0.5)
         assert ok is False
         assert "type" in reason
+
+    def test_atomic_without_review_mark_rejected(self) -> None:
+        meta = crm.AtomMeta("atomic", 0.8, "T", [], "")
+        ok, reason = crm.should_promote(meta, 0.5)
+        assert ok is False
+        assert "review" in reason
 
 
 class TestPromoteAtom:
@@ -67,7 +74,7 @@ class TestPromoteAtom:
         trusted.mkdir()
 
         atom = staging / "test.md"
-        atom.write_text("---\ntitle: X\ntype: atomic\nconfidence: 0.9\n---\nBody.")
+        atom.write_text("---\ntitle: X\ntype: atomic\nconfidence: 0.9\nreviewed: true\n---\nBody.")
 
         # Monkey-patch STAGING_DIR for the test
         original_staging = crm.STAGING_DIR
