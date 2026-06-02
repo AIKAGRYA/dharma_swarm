@@ -15,7 +15,9 @@ from dharma_swarm.venture_cell.darshan.schema import (
 from dharma_swarm.venture_cell.operator_os import (
     OperatorOSInputs,
     build_operator_projection,
+    build_memory_kernel_index,
     load_live_operator_inputs,
+    query_memory_kernel_index,
     render_operator_daily_digest,
 )
 from dharma_swarm.venture_cell.operator_os.cli import render_operator_surface
@@ -268,3 +270,68 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert projection["autonomy_level"] == "L0_read_only_plan"
     assert "# VentureCell Operator OS Digest: DARSHAN" in digest
     assert "index_status" in memory_index
+
+
+def test_memory_kernel_query_eval_distinguishes_tiers_and_provenance(tmp_path: Path) -> None:
+    trusted = tmp_path / "wiki" / "concepts"
+    staged = tmp_path / "staging"
+    quarantine = tmp_path / "quarantine"
+    trusted.mkdir(parents=True)
+    staged.mkdir(parents=True)
+    quarantine.mkdir(parents=True)
+    (trusted / "operator-os.md").write_text(
+        "# Operator OS\n"
+        "Cofounder Canvas Library Plan Execute publishing mapped to Dharma Swarm Operator OS.",
+        encoding="utf-8",
+    )
+    (staged / "darshan-go.md").write_text(
+        "# Darshan Go Gate\n"
+        "Darshan external reader gate requires an accepted Go evidence receipt "
+        "with source_url and event_uid.",
+        encoding="utf-8",
+    )
+    (quarantine / "polsia-raw.md").write_text(
+        "# Polsia Raw Note\n"
+        "Untrusted Polsia operator company claim kept in quarantine until provenance review.",
+        encoding="utf-8",
+    )
+
+    index = build_memory_kernel_index(
+        staging_root=staged,
+        trusted_root=trusted,
+        quarantine_root=quarantine,
+        max_scan=20,
+        max_entries=6,
+        query_terms=(
+            "Polsia",
+            "Cofounder",
+            "Darshan",
+            "external reader",
+            "Go evidence receipt",
+            "MemoryKernel",
+        ),
+    )
+
+    assert {entry.tier for entry in index.entries} == {"trusted", "staged", "quarantine"}
+
+    gate_result = query_memory_kernel_index(
+        index,
+        "Darshan external reader gate Go evidence receipt",
+    )
+    assert gate_result.status == "available"
+    assert gate_result.trusted_promotion_claimed is False
+    assert gate_result.matches[0].tier == "staged"
+    assert "source_url" in gate_result.matches[0].excerpt
+    assert gate_result.source_roots
+
+    trusted_result = index.query(
+        "Cofounder Canvas Library Plan Execute publishing",
+        trusted_only=True,
+    )
+    assert trusted_result.status == "available"
+    assert trusted_result.tier_counts["trusted"] == 1
+    assert all(match.tier == "trusted" for match in trusted_result.matches)
+
+    untrusted_only = index.query("Polsia quarantine provenance review", trusted_only=True)
+    assert untrusted_only.status == "trusted_missing"
+    assert "only_untrusted_matches_available" in untrusted_only.notes

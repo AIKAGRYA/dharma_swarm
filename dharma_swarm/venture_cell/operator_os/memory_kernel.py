@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -34,6 +34,26 @@ class MemoryKernelIndexEntry:
 
 
 @dataclass(frozen=True)
+class MemoryKernelQueryResult:
+    """Deterministic recall result over the read-through index."""
+
+    query: str
+    status: str
+    matches: tuple[MemoryKernelIndexEntry, ...] = ()
+    missing_terms: tuple[str, ...] = ()
+    tier_counts: dict[str, int] = field(default_factory=dict)
+    truncated: bool = False
+    source_roots: tuple[str, ...] = ()
+    trusted_promotion_claimed: bool = False
+    notes: tuple[str, ...] = ()
+
+    def to_dict(self) -> dict[str, Any]:
+        value = asdict(self)
+        value["matches"] = [match.to_dict() for match in self.matches]
+        return value
+
+
+@dataclass(frozen=True)
 class MemoryKernelReadThroughIndex:
     """Bounded read-through index over existing Chetana/wiki roots."""
 
@@ -55,6 +75,22 @@ class MemoryKernelReadThroughIndex:
         value["indexed_count"] = self.indexed_count
         return value
 
+    def query(
+        self,
+        query: str,
+        *,
+        max_results: int = 5,
+        trusted_only: bool = False,
+    ) -> MemoryKernelQueryResult:
+        """Evaluate one agent recall query without mutating Chetana state."""
+
+        return query_memory_kernel_index(
+            self,
+            query,
+            max_results=max_results,
+            trusted_only=trusted_only,
+        )
+
 
 def build_memory_kernel_index(
     *,
@@ -71,10 +107,11 @@ def build_memory_kernel_index(
         dict.fromkeys(str(term).strip() for term in query_terms if str(term).strip())
     )
     roots = (
-        ("staged", staging_root),
         ("trusted", trusted_root),
+        ("staged", staging_root),
         ("quarantine", quarantine_root),
     )
+    budgets = _tier_budgets(roots, max_entries)
     entries: list[MemoryKernelIndexEntry] = []
     counts = {"staged": 0, "trusted": 0, "quarantine": 0}
     truncated = False
@@ -85,7 +122,7 @@ def build_memory_kernel_index(
             tier=tier,
             terms=terms,
             max_scan=max_scan,
-            remaining=max(0, max_entries - len(entries)),
+            remaining=budgets[tier],
         )
         counts[tier] = count
         truncated = truncated or tier_truncated
@@ -107,6 +144,76 @@ def build_memory_kernel_index(
         source_roots=tuple(str(root) for _, root in roots),
         entries=tuple(entries),
         query_terms=terms,
+    )
+
+
+def query_memory_kernel_index(
+    index: MemoryKernelReadThroughIndex,
+    query: str,
+    *,
+    max_results: int = 5,
+    trusted_only: bool = False,
+) -> MemoryKernelQueryResult:
+    """Run a deterministic query over indexed entries with provenance intact."""
+
+    query_text = query.strip()
+    folded_query = query_text.casefold()
+    tokens = _query_tokens(query_text)
+    scored: list[tuple[int, int, str, MemoryKernelIndexEntry]] = []
+    candidate_matches: list[MemoryKernelIndexEntry] = []
+
+    for entry in index.entries:
+        haystack = _entry_haystack(entry)
+        token_hits = tuple(token for token in tokens if token in haystack)
+        configured_hits = tuple(
+            term
+            for term in index.query_terms
+            if term.casefold() in folded_query and term.casefold() in haystack
+        )
+        if not token_hits and not configured_hits:
+            continue
+        candidate_matches.append(entry)
+        if trusted_only and entry.tier != "trusted":
+            continue
+        score = (
+            len(token_hits) * 4
+            + len(configured_hits) * 2
+            + _tier_priority(entry.tier)
+        )
+        scored.append((-score, _tier_sort_order(entry.tier), entry.path, entry))
+
+    matches = tuple(row[3] for row in sorted(scored)[: max(0, max_results)])
+    matched_haystacks = " ".join(_entry_haystack(entry) for entry in matches)
+    missing_terms = tuple(token for token in tokens if token not in matched_haystacks)
+    tier_counts = {
+        tier: sum(1 for entry in matches if entry.tier == tier)
+        for tier in ("trusted", "staged", "quarantine")
+    }
+    notes: list[str] = []
+    if index.truncated:
+        notes.append("index_scan_truncated")
+    if trusted_only:
+        notes.append("trusted_only_query")
+    if candidate_matches and trusted_only and not matches:
+        status = "trusted_missing"
+        notes.append("only_untrusted_matches_available")
+    elif matches:
+        status = "available_truncated" if index.truncated else "available"
+    elif not index.entries:
+        status = "index_empty"
+    else:
+        status = "missing"
+
+    return MemoryKernelQueryResult(
+        query=query_text,
+        status=status,
+        matches=matches,
+        missing_terms=missing_terms,
+        tier_counts=tier_counts,
+        truncated=index.truncated,
+        source_roots=index.source_roots,
+        trusted_promotion_claimed=False,
+        notes=tuple(notes),
     )
 
 
@@ -136,6 +243,20 @@ def _scan_root(
         if count >= max_scan:
             return count, True, entries
     return count, False, entries
+
+
+def _tier_budgets(
+    roots: tuple[tuple[str, Path], ...],
+    max_entries: int,
+) -> dict[str, int]:
+    if max_entries <= 0:
+        return {tier: 0 for tier, _ in roots}
+    base = max_entries // len(roots)
+    remainder = max_entries % len(roots)
+    return {
+        tier: base + (1 if index < remainder else 0)
+        for index, (tier, _) in enumerate(roots)
+    }
 
 
 def _read_index_entry(path: Path, *, tier: str, terms: tuple[str, ...]) -> MemoryKernelIndexEntry:
@@ -176,3 +297,42 @@ def _excerpt(text: str) -> str:
         if line.strip() and not line.strip().startswith("---")
     ]
     return " ".join(lines)[:360]
+
+
+def _query_tokens(query: str) -> tuple[str, ...]:
+    raw = []
+    current: list[str] = []
+    for char in query.casefold():
+        if char.isalnum():
+            current.append(char)
+        elif current:
+            raw.append("".join(current))
+            current = []
+    if current:
+        raw.append("".join(current))
+    stop_words = {"and", "for", "the", "with", "what", "why", "how", "can"}
+    return tuple(
+        dict.fromkeys(
+            token for token in raw if token not in stop_words and len(token) >= 2
+        )
+    )
+
+
+def _entry_haystack(entry: MemoryKernelIndexEntry) -> str:
+    return " ".join(
+        (
+            entry.tier,
+            entry.path,
+            entry.title,
+            entry.excerpt,
+            " ".join(entry.matched_terms),
+        )
+    ).casefold()
+
+
+def _tier_priority(tier: str) -> int:
+    return {"trusted": 3, "staged": 2, "quarantine": 1}.get(tier, 0)
+
+
+def _tier_sort_order(tier: str) -> int:
+    return {"trusted": 0, "staged": 1, "quarantine": 2}.get(tier, 3)
