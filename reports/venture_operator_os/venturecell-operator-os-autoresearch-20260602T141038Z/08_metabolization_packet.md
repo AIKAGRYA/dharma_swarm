@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live packet, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-7b10153c5bd3f095`
-Current scoped HEAD before this packet: `1eaa0bd3 feat(operator-os): add completion guard packet`
+ds-goal progress receipt: `r-4133b6ddf20bbaff`
+Current scoped HEAD before this packet: `c30b5b8f docs(operator-os): add periodic onboard refresh`
 
 This packet captures durable learning from the run so far. It must be reviewed
 and updated during final closeout before the reporter task is closed.
@@ -185,6 +185,19 @@ and updated during final closeout before the reporter task is closed.
      repo-wide NATS, active-track, or toolbelt health into Operator OS external
      authority or reporter closure.
 
+12. Timebox truth must be concrete.
+
+   Evidence:
+
+   - `24_timebox_status_receipt.md` records elapsed `8770s` and remaining
+     `20030s`.
+   - Goal status remains `active`.
+
+   Metabolized rule:
+
+   - Future agents must cite concrete elapsed and remaining time before final
+     closure. A high score or green local checks do not satisfy the timebox.
+
 ## Committed Packets
 
 | Commit | Packet | Durable effect |
@@ -212,7 +225,8 @@ and updated during final closeout before the reporter task is closed.
 | `219078ec` | `20_memory_kernel_coverage_receipt.md` | root-level MemoryKernel coverage packet |
 | `71d5a87d` | `21_digest_canvas_summary_receipt.md` | presentation-only digest canvas summary |
 | `1eaa0bd3` | `22_completion_guard_receipt.md` | live-100 non-final completion guard |
-| pending | `23_periodic_onboard_refresh_receipt.md` | periodic substrate refresh |
+| `c30b5b8f` | `23_periodic_onboard_refresh_receipt.md` | periodic substrate refresh |
+| pending | `24_timebox_status_receipt.md` | concrete timebox status |
 
 ## Current Read-Only Artifacts
 
@@ -244,6 +258,7 @@ and updated during final closeout before the reporter task is closed.
 - `21_digest_canvas_summary_receipt.md`
 - `22_completion_guard_receipt.md`
 - `23_periodic_onboard_refresh_receipt.md`
+- `24_timebox_status_receipt.md`
 
 ## Do Not Metabolize As Done
 
@@ -270,6 +285,7 @@ These facts are explicitly not complete:
   projection evidence.
 - Completion guard is not a terminal reporter receipt.
 - Onboard/toolbelt evidence is environment context only.
+- Timebox status is concrete evidence that final closure is still premature.
 - Reporter task is not closed.
 - The final adversarial audit and next-goal packet still require final-window
   review/update.

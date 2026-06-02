@@ -3,9 +3,9 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live ledger, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-7b10153c5bd3f095`
+ds-goal progress receipt: `r-4133b6ddf20bbaff`
 Baseline: `1aca07a1 Add VentureCell Operator OS Level 70 surface`
-Current scoped HEAD before this packet: `1eaa0bd3 feat(operator-os): add completion guard packet`
+Current scoped HEAD before this packet: `c30b5b8f docs(operator-os): add periodic onboard refresh`
 
 This file is a living score ledger. It exists now so later agents do not
 reconstruct scores from memory. It must be reviewed and updated before final
@@ -36,7 +36,8 @@ reporter closure.
 | Loop 21 | `20_memory_kernel_coverage_receipt.md` | `219078ec` | 99 | +1 | keep MemoryKernel coverage packet |
 | Loop 22 | `21_digest_canvas_summary_receipt.md` | `71d5a87d` | 100 | +1 | keep digest canvas summary |
 | Loop 23 | `22_completion_guard_receipt.md` | `1eaa0bd3` | 100 | +0 | keep completion guard |
-| Loop 24 | `23_periodic_onboard_refresh_receipt.md` | pending | 100 | +0 | keep periodic onboard refresh |
+| Loop 24 | `23_periodic_onboard_refresh_receipt.md` | `c30b5b8f` | 100 | +0 | keep periodic onboard refresh |
+| Loop 25 | `24_timebox_status_receipt.md` | pending | 100 | +0 | keep timebox status |
 
 ## Area History
 
@@ -81,6 +82,8 @@ audit with explicit evidence.
   live score can be `100` without completion.
 - Periodic onboard refresh: `make onboard` and toolbelt pass; repo-wide NATS
   liveness remains substrate context only.
+- Timebox status: elapsed `8770s` (`2h 26m 10s`), remaining `20030s`
+  (`5h 33m 50s`).
 - MemoryKernel query eval: `pass` (`6/6`) from report-local staged roots.
 - MemoryKernel repair packet: `no_repair_needed`, with trusted promotion still forbidden.
 - ds-goal raw/reconciled counts: `open=1 claimed=0 completed=4 failed=0 blocked=0 total=5`.
@@ -131,6 +134,7 @@ current evidence, not as a full-project proof.
   or evidence filtering.
 - Completion guard must remain a guardrail, not a terminal completion receipt.
 - Periodic onboard evidence is not Operator OS action authority.
+- Timebox status proves the mission is not complete despite live score `100`.
 - The reporter task must remain open until final artifacts and final
   verification prove the full contract.
 
@@ -317,6 +321,31 @@ Adversarial review:
 - Repo-wide NATS liveness is not Operator OS action-specific ack proof.
 - Dirty files remain broad repo state.
 - This loop keeps score at `100/100` but still non-final.
+
+Keep / revert / queue:
+
+Decision: keep.
+
+## Loop 25 Score Update
+
+Hypothesis:
+
+If the remaining time is recorded concretely, future agents can audit why the
+reporter remains open despite live `100/100`.
+
+Patch:
+
+- Added `24_timebox_status_receipt.md`.
+
+Evaluation:
+
+- `get_goal` reported elapsed `8770s`.
+- Remaining time to the 8-hour target is `20030s`.
+
+Adversarial review:
+
+- This proves the mission is not complete.
+- Completion guard remains correct.
 
 Keep / revert / queue:
 

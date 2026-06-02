@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live verifier matrix, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-7b10153c5bd3f095`
-Current scoped HEAD before this packet: `1eaa0bd3 feat(operator-os): add completion guard packet`
+ds-goal progress receipt: `r-4133b6ddf20bbaff`
+Current scoped HEAD before this packet: `c30b5b8f docs(operator-os): add periodic onboard refresh`
 
 This matrix captures the current verification surface for future agents. It is
 not a final verifier matrix and must not be used to close the reporter task.
@@ -25,6 +25,7 @@ not a final verifier matrix and must not be used to close the reporter task.
   projection rows remain complete.
 - Completion guard: passing; live `100/100` is explicitly non-final.
 - Periodic onboard/toolbelt: passing, environment context only.
+- Timebox status: elapsed `8770s`, remaining `20030s`.
 - Complete ds-goal verification: expected fail on open reporter task.
 - Mission status: open.
 
@@ -62,6 +63,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `16_periodic_onboard_receipt.md` | onboard/toolbelt pass | repo-wide substrate context only |
 | `17_liveness_key_disambiguation_receipt.md` | action-specific liveness labels | prevents substrate/authority conflation |
 | `23_periodic_onboard_refresh_receipt.md` | onboard/toolbelt pass | substrate context only |
+| `24_timebox_status_receipt.md` | elapsed `8770s`, remaining `20030s` | proves non-final timebox |
 | `18_receipt_inventory_manifest_receipt.md` | manifest receipt inventory | index only, not final proof |
 | `06_adversary_audit.md` | live draft | needs final-window review |
 | `07_score_history.md` | live score `100/100` | not final |
@@ -94,7 +96,8 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `219078ec` | keep | MemoryKernel coverage packet |
 | `71d5a87d` | keep | digest canvas summary |
 | `1eaa0bd3` | keep | completion guard |
-| pending | keep | periodic onboard refresh |
+| `c30b5b8f` | keep | periodic onboard refresh |
+| pending | keep | timebox status |
 
 ## Revert / Queue Ledger
 
