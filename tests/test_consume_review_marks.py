@@ -127,3 +127,26 @@ class TestPromoteAtom:
         assert result is True
         assert atom.exists()
         assert not trusted.exists()
+
+    def test_main_dry_run_does_not_create_trusted_dir(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        staging = tmp_path / "staging"
+        trusted = tmp_path / "trusted"
+        log_path = tmp_path / "logs" / "consume_review_marks.jsonl"
+        staging.mkdir()
+
+        atom = staging / "test.md"
+        atom.write_text(
+            "---\ntitle: X\ntype: atomic\nconfidence: 0.9\nreviewed: true\n---\nBody.",
+            encoding="utf-8",
+        )
+
+        monkeypatch.setattr(crm, "STAGING_DIR", staging)
+        monkeypatch.setattr(crm, "TRUSTED_DIR", trusted)
+        monkeypatch.setattr(crm, "LOG_PATH", log_path)
+        monkeypatch.setattr(sys, "argv", ["consume_review_marks.py", "--dry-run"])
+
+        assert crm.main() == 0
+        assert atom.exists()
+        assert not trusted.exists()

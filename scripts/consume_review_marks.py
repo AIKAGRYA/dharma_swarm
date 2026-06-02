@@ -277,8 +277,8 @@ def main() -> int:
         parser.print_help()
         return 0
 
-    # Ensure target exists
-    TRUSTED_DIR.mkdir(parents=True, exist_ok=True)
+    if not args.dry_run:
+        TRUSTED_DIR.mkdir(parents=True, exist_ok=True)
 
     # Process staging
     promoted = 0
