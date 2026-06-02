@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live verifier matrix, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-43933ac6a5701ece`
-Current scoped HEAD before this packet: `4b8d06ce feat(operator-os): mark manifest inventory scope`
+ds-goal progress receipt: `r-ade5bb8b586492b3`
+Current scoped HEAD before this packet: `cbfb5d57 feat(operator-os): clarify completion guard policy`
 
 This matrix captures the current verification surface for future agents. It is
 not a final verifier matrix and must not be used to close the reporter task.
@@ -30,7 +30,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 - Completion guard reporter policy: passing; terminal receipt and complete
   verifier pass required.
 - Periodic onboard/toolbelt: passing, environment context only.
-- Timebox status: elapsed `9701s`, remaining `19099s`.
+- Timebox status: elapsed `10982s`, remaining `17818s`.
 - Manifest receipt summary: passing; count and latest receipt path rendered.
 - Manifest inventory scope: passing; latest receipt name and non-final markers
   rendered.
@@ -80,6 +80,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `23_periodic_onboard_refresh_receipt.md` | onboard/toolbelt pass | substrate context only |
 | `24_timebox_status_receipt.md` | elapsed `8770s`, remaining `20030s` | proves non-final timebox |
 | `27_timebox_refresh_receipt.md` | elapsed `9701s`, remaining `19099s` | proves still non-final |
+| `32_timebox_three_hour_receipt.md` | elapsed `10982s`, remaining `17818s` | proves still non-final |
 | `18_receipt_inventory_manifest_receipt.md` | manifest receipt inventory | index only, not final proof |
 | `06_adversary_audit.md` | live draft | needs final-window review |
 | `07_score_history.md` | live score `100/100` | not final |
@@ -121,6 +122,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `r-875b5bb0c3e8a17a` | keep | memory coverage targets |
 | `r-c1ea4b97e1e794bc` | keep | manifest inventory scope |
 | `r-43933ac6a5701ece` | keep | completion guard reporter policy |
+| `r-ade5bb8b586492b3` | keep | three-hour timebox proof |
 
 ## Revert / Queue Ledger
 

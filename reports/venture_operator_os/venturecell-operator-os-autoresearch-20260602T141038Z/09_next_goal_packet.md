@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-43933ac6a5701ece`
-Current scoped HEAD before this packet: `4b8d06ce feat(operator-os): mark manifest inventory scope`
+ds-goal progress receipt: `r-ade5bb8b586492b3`
+Current scoped HEAD before this packet: `cbfb5d57 feat(operator-os): clarify completion guard policy`
 
 This packet is the handoff for the next bounded AutoResearch loop. It must be
 reviewed and updated in the final hour before reporter closure.
@@ -40,7 +40,7 @@ reviewed and updated in the final hour before reporter closure.
   required.
 - Periodic onboard refresh: latest `make onboard` and toolbelt pass, with NATS
   liveness treated as repo-wide substrate context only.
-- Timebox status: elapsed `9701s`, remaining `19099s`; mission not complete.
+- Timebox status: elapsed `10982s`, remaining `17818s`; mission not complete.
 - Manifest receipt summary: manifest has receipt count and latest receipt path,
   but remains `not_final: true`.
 - Manifest inventory scope: scope/name/non-final markers present; navigation
@@ -48,7 +48,8 @@ reviewed and updated in the final hour before reporter closure.
 - Stable admission render: volatile admission id/time redacted; decision
   evidence remains visible.
 - Timebox refresh: current clock still below 8 hours.
-- Last committed packet: manifest inventory scope.
+- Three-hour timebox proof: current clock still below 8 hours.
+- Last committed packet: completion guard policy.
 
 ## Next Goal
 
@@ -243,6 +244,7 @@ If the loop only changes a report packet, also run scoped `git diff --check`.
 - `29_memory_coverage_targets_receipt.md`
 - `30_manifest_inventory_scope_receipt.md`
 - `31_completion_guard_policy_receipt.md`
+- `32_timebox_three_hour_receipt.md`
 - `operator_os_projection.json`
 - `operator_completion_guard_packet.json`
 - `operator_next_action_packet.json`
