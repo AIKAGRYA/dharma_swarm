@@ -176,6 +176,22 @@ New solved local claim:
 
 Decision: keep the risk in the live register until final-window review.
 
+## Loop 62 Risk Addendum
+
+New residual risk:
+
+| Risk | Current evidence | Handling |
+|---|---|---|
+| Six-hour checkpoint overclaim | elapsed `21615s`, remaining `7185s` | treat as intermediate proof only; do not close reporter |
+
+New solved local claim:
+
+| Claim | Evidence | Boundary |
+|---|---|---|
+| Six-hour checkpoint reached | active goal elapsed time `21615s` | not final 8-hour proof |
+
+Decision: keep the risk in the live register until final-window review.
+
 ## Loop 61 Risk Addendum
 
 New residual risk:

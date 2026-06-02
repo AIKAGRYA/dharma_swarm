@@ -1328,7 +1328,7 @@
       "indexed_count": 20,
       "role": "trusted",
       "root": "/Users/dhyana/.dharma/knowledge/wiki/concepts",
-      "scanned_count": 1342,
+      "scanned_count": 1343,
       "tier": "trusted",
       "truncated": false
     },
@@ -1346,7 +1346,7 @@
       "indexed_count": 20,
       "role": "supplemental_staging",
       "root": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z",
-      "scanned_count": 63,
+      "scanned_count": 64,
       "tier": "staged",
       "truncated": false
     },
@@ -1366,8 +1366,8 @@
     "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z",
     "/Users/dhyana/.dharma/knowledge/quarantine"
   ],
-  "staged_count": 5063,
+  "staged_count": 5064,
   "status": "read_through_index_available",
   "truncated": true,
-  "trusted_count": 1342
+  "trusted_count": 1343
 }

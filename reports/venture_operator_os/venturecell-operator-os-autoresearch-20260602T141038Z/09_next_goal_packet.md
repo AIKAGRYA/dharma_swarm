@@ -538,3 +538,23 @@ Still forbidden:
 - treating repo-wide NATS contact as Operator OS action authority;
 - closing reporter before true-time and terminal-verifier proof;
 - external outreach, publishing, handoff, spend, deploy, push, or merge.
+
+## Loop 62 Next Goal Addendum
+
+Current new evidence:
+
+- `61_timebox_six_hour_receipt.md`
+- updated `12_live_verifier_matrix.md`
+
+Next safe loop targets:
+
+- Continue local read-only/report-only improvement until elapsed time reaches
+  `28800s`.
+- Prepare final-window artifact review only after the true 8-hour threshold.
+- Keep complete verification blocked only by the open reporter.
+
+Still forbidden:
+
+- treating six-hour proof as final proof;
+- closing reporter before true 8-hour and terminal-verifier proof;
+- external outreach, publishing, handoff, spend, deploy, push, or merge.

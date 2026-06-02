@@ -1129,3 +1129,29 @@ Metabolized rule:
 
 - Future periodic refreshes must label substrate facts as context and keep
   authority decisions in the Operator OS packets.
+
+## Loop 62 Metabolization Note
+
+Hypothesis:
+
+If timebox receipts distinguish intermediate checkpoints from final proof,
+future agents are less likely to close the reporter early.
+
+Patch:
+
+- Added the six-hour timebox receipt with elapsed and remaining seconds.
+
+Evaluation:
+
+- Active goal elapsed time exceeded `21600s`.
+- Complete verifier remains blocked only by the open reporter.
+
+Adversarial review:
+
+- Six-hour proof is not final proof.
+- The 8-hour threshold remains unmet.
+
+Metabolized rule:
+
+- Intermediate timebox receipts must always include the final threshold and
+  remaining seconds.

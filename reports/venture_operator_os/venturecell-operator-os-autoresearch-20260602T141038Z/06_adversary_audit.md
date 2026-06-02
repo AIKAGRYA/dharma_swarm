@@ -386,3 +386,22 @@ Keep / revert / queue:
 Decision: keep.
 
 ds-goal progress receipt: `r-88e06b42dc1848bd`
+
+## Loop 62 Adversary Addendum
+
+New claim under attack: six-hour proof means the 8-hour contract is complete.
+
+Current evidence:
+
+- Active goal elapsed time is `21615s`.
+- The final threshold is `28800s`.
+- Remaining time is `7185s`.
+- Complete verifier still exits `3` with only the open reporter blocker.
+
+Verdict: false. Six-hour proof is a late-run checkpoint, not final completion.
+
+Keep / revert / queue:
+
+Decision: keep.
+
+ds-goal progress receipt: `r-03653d86821631f9`

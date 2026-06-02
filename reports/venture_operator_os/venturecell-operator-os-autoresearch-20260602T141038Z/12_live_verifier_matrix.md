@@ -292,6 +292,17 @@ does not grant external authority.
 This status addendum is environment context only. It does not prove Operator OS
 action-specific NATS/A2A ack and does not close the reporter.
 
+## Loop 62 Six-Hour Timebox Addendum
+
+| Check | Result | Notes |
+|---|---|---|
+| Active goal clock | pass | elapsed `21615s`; six-hour threshold `21600s`; final threshold `28800s`; remaining `7185s` |
+| Autonomy brief | pass | brief rendered for mission `20260602-venturecell-operator-os-autoresearch-8h` |
+| Complete verifier | expected blocker | exit `3`; only blocker `task_not_closed:20260602-venturecell-operator-os-autoresearch-8h-t05-reporter` |
+
+This checkpoint is non-final. It does not close the reporter or grant external
+authority.
+
 ## Loop 60 Verifier Addendum
 
 | Check | Result | Notes |
