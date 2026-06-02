@@ -8,8 +8,9 @@ while nothing ever graduates to trusted.
 Promotion criteria (--auto-promote mode):
   1. type == "atomic" (compound atoms need manual review)
   2. confidence >= 0.5 (frontmatter field)
-  3. File is valid markdown with YAML frontmatter
-  4. Not quarantined (already in a separate dir)
+  3. reviewed == true or review_status == approved/reviewed
+  4. File is valid markdown with YAML frontmatter
+  5. Not quarantined (already in a separate dir)
 
 Usage:
   # Dry run — show what would promote
@@ -83,6 +84,7 @@ class AtomMeta(NamedTuple):
     title: str
     concepts: list[str]
     raw_frontmatter: str
+    reviewed: bool = False
 
 
 def parse_frontmatter(text: str) -> AtomMeta | None:
@@ -112,6 +114,9 @@ def parse_frontmatter(text: str) -> AtomMeta | None:
     title = fields.get("title", fields.get("name", "untitled"))
     concepts_raw = fields.get("concepts", "")
     concepts = [c.strip() for c in concepts_raw.split(",") if c.strip()]
+    reviewed = fields.get("reviewed", "").lower() in {"1", "true", "yes", "approved"}
+    review_status = fields.get("review_status", "").lower()
+    reviewed = reviewed or review_status in {"approved", "reviewed"}
 
     return AtomMeta(
         atom_type=atom_type,
@@ -119,6 +124,7 @@ def parse_frontmatter(text: str) -> AtomMeta | None:
         title=title,
         concepts=concepts,
         raw_frontmatter=raw,
+        reviewed=reviewed,
     )
 
 
@@ -136,6 +142,8 @@ def should_promote(meta: AtomMeta, min_confidence: float) -> tuple[bool, str]:
         return False, f"type={meta.atom_type} not in {ALLOWED_TYPES}"
     if meta.confidence < min_confidence:
         return False, f"confidence={meta.confidence:.2f} < {min_confidence}"
+    if not meta.reviewed:
+        return False, "missing explicit review mark"
     return True, "meets criteria"
 
 

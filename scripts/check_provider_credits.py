@@ -69,12 +69,40 @@ CREDIT_ERROR_PATTERNS = [
     re.compile(r"402", re.IGNORECASE),
 ]
 
+SENSITIVE_LOG_PATTERNS = [
+    (
+        re.compile(r"(?i)(bearer\s+)[A-Za-z0-9._\-]+"),
+        r"\1[REDACTED]",
+    ),
+    (
+        re.compile(r"(?i)((?:api[_-]?key|token|secret|password)=)[^\s&]+"),
+        r"\1[REDACTED]",
+    ),
+    (
+        re.compile(r"\b(?:sk|gsk|csk|nvapi)[-_][A-Za-z0-9._-]{8,}"),
+        "[REDACTED_KEY]",
+    ),
+    (
+        re.compile(r"(https?://)([^/\s:@]+):([^/\s@]+)@"),
+        r"\1[REDACTED]@",
+    ),
+]
+
 DHARMA_HOME = Path(os.environ.get("DHARMA_HOME", Path.home() / ".dharma"))
 LOG_DIRS = [
     DHARMA_HOME / "logs",
     DHARMA_HOME / "sessions" / "logs",
     DHARMA_HOME / "cron" / "logs",
 ]
+
+
+def redact_log_excerpt(text: str, *, limit: int = 120) -> str:
+    """Redact likely credentials before persisting a diagnostic log excerpt."""
+
+    redacted = text
+    for pattern, replacement in SENSITIVE_LOG_PATTERNS:
+        redacted = pattern.sub(replacement, redacted)
+    return redacted[:limit]
 
 
 # ---------------------------------------------------------------------------
@@ -114,7 +142,7 @@ def scan_logs_for_credit_errors(results: dict[str, dict[str, Any]]) -> None:
                         for provider in results:
                             if provider.lower() in line.lower():
                                 results[provider]["credit_errors"].append(
-                                    f"{log_file.name}: {line[:120]}"
+                                    f"{log_file.name}: {redact_log_excerpt(line)}"
                                 )
                                 break
 
@@ -138,7 +166,7 @@ def scan_logs_for_credit_errors(results: dict[str, dict[str, Any]]) -> None:
                         provider_hit = entry.get("provider", "")
                         if provider_hit and provider_hit in results:
                             results[provider_hit]["credit_errors"].append(
-                                f"{log_file.name}: {msg[:120]}"
+                                f"{log_file.name}: {redact_log_excerpt(msg)}"
                             )
 
 
