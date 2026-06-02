@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live verifier matrix, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-0876eae2183f379c`
-Current scoped HEAD before this packet: `219078ec feat(operator-os): add memory coverage packet`
+ds-goal progress receipt: `r-1685242cb726a2f7`
+Current scoped HEAD before this packet: `71d5a87d feat(operator-os): summarize digest canvas overflow`
 
 This matrix captures the current verification surface for future agents. It is
 not a final verifier matrix and must not be used to close the reporter task.
@@ -23,6 +23,7 @@ not a final verifier matrix and must not be used to close the reporter task.
   trusted/report-local roots are not truncated.
 - Digest canvas summary: passing; Markdown repeated rows capped while JSON
   projection rows remain complete.
+- Completion guard: passing; live `100/100` is explicitly non-final.
 - Complete ds-goal verification: expected fail on open reporter task.
 - Mission status: open.
 
@@ -47,6 +48,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 |---|---|---|
 | `operator_os_projection.json` | rendered current state | read-only projection only |
 | `operator_os_digest.md` | rendered current digest with canvas caps | presentation summary, not full evidence |
+| `operator_completion_guard_packet.json` | `keep_reporter_open` | finality guard, not terminal receipt |
 | `memory_kernel_query_eval.json` | `pass` (`6/6`) | staged/report-local pass, not trusted promotion |
 | `memory_kernel_coverage_packet.json` | root coverage rendered | explains truncation, not complete coverage |
 | `memory_kernel_repair_packet.json` | `no_repair_needed` | still forbids trusted promotion |
@@ -88,7 +90,8 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `47e4e044` | keep | receipt inventory manifest |
 | `498c0786` | keep | gap triage packet |
 | `219078ec` | keep | MemoryKernel coverage packet |
-| pending | keep | digest canvas summary |
+| `71d5a87d` | keep | digest canvas summary |
+| pending | keep | completion guard |
 
 ## Revert / Queue Ledger
 

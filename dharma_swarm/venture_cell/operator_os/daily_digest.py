@@ -151,6 +151,18 @@ def render_operator_daily_digest(projection: VentureCellOperatorProjection) -> s
             f"external `{item.get('requires_external_authority')}`."
         )
 
+    lines.extend(
+        [
+            "",
+            "## Completion Guard",
+            "",
+            "- Decision: `keep_reporter_open`",
+            "- Not final: `True`",
+            "- Live score can be 100 without completion: `True`",
+            "- Required final proof: true-time proof, final artifact review, terminal reporter receipt, and complete verifier pass.",
+        ]
+    )
+
     memory = projection.memory_kernel
     lines.extend(
         [

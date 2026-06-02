@@ -315,6 +315,9 @@ def test_operator_daily_digest_renders_structure_without_live_authority_claim(tm
     assert "hold_external_authority" in digest
     assert "## Gap Triage" in digest
     assert "external_blocked_with_local_followups" in digest
+    assert "## Completion Guard" in digest
+    assert "keep_reporter_open" in digest
+    assert "Live score can be 100 without completion" in digest
     assert "## Memory Kernel" in digest
     assert "## Memory Repair Packet" in digest
     assert "queue_repair_without_promotion" in digest
@@ -410,6 +413,9 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     gap_triage_packet = json.loads(
         paths["gap_triage_packet"].read_text(encoding="utf-8")
     )
+    completion_guard_packet = json.loads(
+        paths["completion_guard_packet"].read_text(encoding="utf-8")
+    )
     artifact_manifest = json.loads(
         paths["artifact_manifest"].read_text(encoding="utf-8")
     )
@@ -452,17 +458,25 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert "memory_kernel_index_truncated" in gap_triage_packet["locally_actionable_gaps"]
     assert gap_triage_packet["not_authority"] is True
     assert "fake_go_receipt_creation" in gap_triage_packet["forbidden_actions"]
+    assert completion_guard_packet["decision"] == "keep_reporter_open"
+    assert completion_guard_packet["not_final"] is True
+    assert completion_guard_packet["live_score_can_be_100_without_completion"] is True
+    assert "true_8h_elapsed_time_not_proven" in completion_guard_packet["final_closure_blockers"]
+    assert "treat_live_score_as_completion" in completion_guard_packet["forbidden_actions"]
     assert artifact_manifest["schema"] == "dharma.venture_cell_operator_os.render_manifest.v0"
     assert artifact_manifest["status"] == "blocked_on_external_reader_gate"
     assert artifact_manifest["darshan_go_decision"] == "block_external_authority"
     assert artifact_manifest["authority_decision"] == "local_read_only_external_blocked"
     assert artifact_manifest["gap_triage_decision"] == "external_blocked_with_local_followups"
     assert "memory_coverage_truncated" in artifact_manifest
+    assert artifact_manifest["completion_guard_decision"] == "keep_reporter_open"
+    assert artifact_manifest["not_final"] is True
     assert artifact_manifest["not_authority"] is True
     assert "projection" in artifact_manifest["artifact_paths"]
     assert "authority_boundary_packet" in artifact_manifest["artifact_paths"]
     assert "gap_triage_packet" in artifact_manifest["artifact_paths"]
     assert "memory_coverage_packet" in artifact_manifest["artifact_paths"]
+    assert "completion_guard_packet" in artifact_manifest["artifact_paths"]
     assert str(report_dir / "00_opening_truth.md") in artifact_manifest["receipt_paths"]
     assert str(report_dir / "operator_os_digest.md") not in artifact_manifest["receipt_paths"]
 

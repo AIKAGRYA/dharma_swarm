@@ -92,10 +92,17 @@
 - `darshan_external_reader_event_missing` owner `growth`; severity `blocking`; local `False`; external `True`.
 - `memory_kernel_index_truncated` owner `memory`; severity `maintenance`; local `True`; external `False`.
 
+## Completion Guard
+
+- Decision: `keep_reporter_open`
+- Not final: `True`
+- Live score can be 100 without completion: `True`
+- Required final proof: true-time proof, final artifact review, terminal reporter receipt, and complete verifier pass.
+
 ## Memory Kernel
 
 - Status: `read_through_index_available`
-- Staged: `5024`
+- Staged: `5025`
 - Trusted: `1336`
 - Quarantine: `5000`
 - Truncated scan: `True`
@@ -106,7 +113,7 @@
 
 - `trusted` `trusted`: scanned `1336`; indexed `20`/`20`; truncated `False`.
 - `staging` `staged`: scanned `5000`; indexed `20`/`20`; truncated `True`.
-- `supplemental_staging` `staged`: scanned `24`; indexed `20`/`20`; truncated `False`.
+- `supplemental_staging` `staged`: scanned `25`; indexed `20`/`20`; truncated `False`.
 - `quarantine` `quarantine`: scanned `5000`; indexed `20`/`20`; truncated `True`.
 
 ## Memory Repair Packet

@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-0876eae2183f379c`
-Current scoped HEAD before this packet: `219078ec feat(operator-os): add memory coverage packet`
+ds-goal progress receipt: `r-1685242cb726a2f7`
+Current scoped HEAD before this packet: `71d5a87d feat(operator-os): summarize digest canvas overflow`
 
 This audit is intentionally written before the final time window so the next
 agent has a concrete attack surface. It is not a completion certificate. The
@@ -37,6 +37,8 @@ updates, and terminal verification exist.
   complete MemoryKernel coverage.
 - Digest canvas summary caps repeated Markdown rows, but projection JSON still
   holds full evidence and the cap is not filtering.
+- Completion guard says live `100/100` is not final and reporter must remain
+  open.
 - MemoryKernel query eval now reports `pass` with `6/6` from report-local
   staged sources.
 - MemoryKernel repair now reports `no_repair_needed`; no trusted Chetana
@@ -103,6 +105,7 @@ Adversarial review:
   promotion.
 - Digest row caps must not be used to hide evidence or claim a cleaner task
   state than projection JSON shows.
+- Completion guard must not be treated as a terminal reporter receipt.
 - Unrelated staged work must not be included in commits for this run.
 
 Keep / revert / queue:
@@ -140,6 +143,7 @@ Queued:
 | Gap triage clears the remaining blockers | `operator_gap_triage_packet.json` is `not_authority: true` | false |
 | Memory coverage proves complete recall | staging and quarantine roots are still truncated | false |
 | Digest cap deletes noisy tasks | projection JSON still includes the full canvas | false |
+| Live 100 means complete | completion guard says `not_final: true` | false |
 | Broad dirty work is part of this packet | scoped report-only patch | false |
 
 ## Boundary Audit

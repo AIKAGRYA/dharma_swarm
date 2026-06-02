@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live risk register, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-0876eae2183f379c`
-Current scoped HEAD before this packet: `219078ec feat(operator-os): add memory coverage packet`
+ds-goal progress receipt: `r-1685242cb726a2f7`
+Current scoped HEAD before this packet: `71d5a87d feat(operator-os): summarize digest canvas overflow`
 
 This register separates current blockers, residual risks, and solved local
 claims. It exists to prevent false completion after a high live score.
@@ -34,6 +34,7 @@ claims. It exists to prevent false completion after a high live score.
 | Gap triage overclaim | `operator_gap_triage_packet.json` separates local/external gaps | treat as loop selector, not authority or gate clearance |
 | Memory coverage overclaim | `memory_kernel_coverage_packet.json` exposes root coverage | treat as limit evidence, not complete memory coverage |
 | Digest cap overclaim | `operator_os_digest.md` summarizes repeated canvas rows | use projection JSON for full evidence |
+| Completion guard overclaim | `operator_completion_guard_packet.json` says keep reporter open | guard only, not terminal receipt |
 | Context+ unavailable | `Transport closed` during static analysis attempts | document unavailable, use deterministic fallback checks |
 | Repo has unrelated dirty work | broad dirty worktree outside this run | commit only explicit scoped pathspecs |
 
@@ -54,6 +55,7 @@ claims. It exists to prevent false completion after a high live score.
 | Gap triage renders | external-reader non-local, MemoryKernel truncation local maintenance | selector only |
 | Memory coverage renders | trusted/report-local roots not truncated; staging/quarantine truncated | coverage locator only |
 | Digest canvas summary renders | repeated task-board rows capped with omitted count | presentation only |
+| Completion guard renders | live score can be 100 without completion | false-final guard only |
 
 ## Loop 15 Receipt
 

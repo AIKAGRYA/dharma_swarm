@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-0876eae2183f379c`
-Current scoped HEAD before this packet: `219078ec feat(operator-os): add memory coverage packet`
+ds-goal progress receipt: `r-1685242cb726a2f7`
+Current scoped HEAD before this packet: `71d5a87d feat(operator-os): summarize digest canvas overflow`
 
 This packet is the handoff for the next bounded AutoResearch loop. It must be
 reviewed and updated in the final hour before reporter closure.
@@ -32,7 +32,8 @@ reviewed and updated in the final hour before reporter closure.
   trusted and report-local roots are not truncated.
 - Digest canvas summary: present; Markdown caps repeated rows while JSON
   projection preserves full canvas data.
-- Last committed packet: MemoryKernel coverage packet.
+- Completion guard packet: `keep_reporter_open`, `not_final: true`.
+- Last committed packet: digest canvas summary.
 
 ## Next Goal
 
@@ -128,7 +129,13 @@ bounded targets:
    `operator_os_digest.md` now caps repeated canvas lane details. Treat that as
    presentation only; use `operator_os_projection.json` for full evidence.
 
-14. Final closeout only after true-time proof.
+14. Completion guard preservation.
+
+   `operator_completion_guard_packet.json` now makes false-final blockers
+   machine-readable. Do not close the reporter while it says
+   `keep_reporter_open`.
+
+15. Final closeout only after true-time proof.
 
    When elapsed time is actually in the final window, update:
 
@@ -190,7 +197,9 @@ If the loop only changes a report packet, also run scoped `git diff --check`.
 - `19_gap_triage_packet_receipt.md`
 - `20_memory_kernel_coverage_receipt.md`
 - `21_digest_canvas_summary_receipt.md`
+- `22_completion_guard_receipt.md`
 - `operator_os_projection.json`
+- `operator_completion_guard_packet.json`
 - `operator_next_action_packet.json`
 - `memory_kernel_coverage_packet.json`
 - `operator_gap_triage_packet.json`

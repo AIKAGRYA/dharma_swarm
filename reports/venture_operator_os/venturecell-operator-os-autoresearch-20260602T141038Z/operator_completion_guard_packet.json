@@ -1,0 +1,37 @@
+{
+  "authority_decision": "local_read_only_external_blocked",
+  "autonomy_level": "L0_read_only_plan",
+  "darshan_go_decision": "block_external_authority",
+  "decision": "keep_reporter_open",
+  "external_authority_blockers": [
+    "darshan_external_reader_gate_blocked",
+    "accepted_privacy_redacted_go_receipt_missing"
+  ],
+  "final_closure_blockers": [
+    "true_8h_elapsed_time_not_proven",
+    "reporter_task_must_remain_open_until_terminal_receipt",
+    "complete_verifier_expected_to_fail_until_reporter_closure",
+    "final_adversary_score_metabolization_next_goal_review_required"
+  ],
+  "forbidden_actions": [
+    "close_reporter_before_true_time_proof",
+    "treat_live_score_as_completion",
+    "claim_external_authority",
+    "fake_go_receipts",
+    "claim_nats_or_a2a_liveness_without_action_ack",
+    "trusted_chetana_promotion_without_gates"
+  ],
+  "live_score_can_be_100_without_completion": true,
+  "not_authority": true,
+  "not_final": true,
+  "required_final_artifacts": [
+    "06_adversary_audit.md",
+    "07_score_history.md",
+    "08_metabolization_packet.md",
+    "09_next_goal_packet.md",
+    "final_ds_goal_terminal_receipt",
+    "complete_verifier_pass_after_reporter_closure"
+  ],
+  "schema": "dharma.venture_cell_operator_os.completion_guard.v0",
+  "status": "blocked_on_external_reader_gate"
+}

@@ -86,6 +86,52 @@ def _gap_triage_payload(projection: dict[str, Any]) -> dict[str, Any]:
     return packet if isinstance(packet, dict) else {}
 
 
+def _completion_guard_payload(projection: dict[str, Any]) -> dict[str, Any]:
+    status = str(projection.get("status", "unknown"))
+    autonomy_level = str(projection.get("autonomy_level", "unknown"))
+    go_gate = _darshan_go_gate_payload(projection)
+    authority = _authority_boundary_payload(projection)
+    return {
+        "schema": "dharma.venture_cell_operator_os.completion_guard.v0",
+        "decision": "keep_reporter_open",
+        "status": status,
+        "autonomy_level": autonomy_level,
+        "not_final": True,
+        "live_score_can_be_100_without_completion": True,
+        "final_closure_blockers": [
+            "true_8h_elapsed_time_not_proven",
+            "reporter_task_must_remain_open_until_terminal_receipt",
+            "complete_verifier_expected_to_fail_until_reporter_closure",
+            "final_adversary_score_metabolization_next_goal_review_required",
+        ],
+        "external_authority_blockers": [
+            "darshan_external_reader_gate_blocked",
+            "accepted_privacy_redacted_go_receipt_missing",
+        ]
+        if go_gate.get("decision") == "block_external_authority"
+        else [],
+        "authority_decision": authority.get("decision", "unknown"),
+        "darshan_go_decision": go_gate.get("decision", "unknown"),
+        "required_final_artifacts": [
+            "06_adversary_audit.md",
+            "07_score_history.md",
+            "08_metabolization_packet.md",
+            "09_next_goal_packet.md",
+            "final_ds_goal_terminal_receipt",
+            "complete_verifier_pass_after_reporter_closure",
+        ],
+        "forbidden_actions": [
+            "close_reporter_before_true_time_proof",
+            "treat_live_score_as_completion",
+            "claim_external_authority",
+            "fake_go_receipts",
+            "claim_nats_or_a2a_liveness_without_action_ack",
+            "trusted_chetana_promotion_without_gates",
+        ],
+        "not_authority": True,
+    }
+
+
 def _artifact_manifest_payload(
     *,
     projection: dict[str, Any],
@@ -97,6 +143,7 @@ def _artifact_manifest_payload(
     authority = _authority_boundary_payload(projection)
     gap_triage = _gap_triage_payload(projection)
     memory_coverage = _memory_coverage_payload(projection)
+    completion_guard = _completion_guard_payload(projection)
     return {
         "schema": "dharma.venture_cell_operator_os.render_manifest.v0",
         "status": projection.get("status", "unknown"),
@@ -108,6 +155,8 @@ def _artifact_manifest_payload(
         "authority_decision": authority.get("decision", "unknown"),
         "gap_triage_decision": gap_triage.get("decision", "unknown"),
         "memory_coverage_truncated": memory_coverage.get("truncated", False),
+        "completion_guard_decision": completion_guard.get("decision", "unknown"),
+        "not_final": completion_guard.get("not_final", True),
         "artifact_paths": {
             name: str(path)
             for name, path in sorted(artifact_paths.items())
@@ -245,6 +294,16 @@ def render_operator_surface(
         + "\n",
         encoding="utf-8",
     )
+    completion_guard_path = output_dir / "operator_completion_guard_packet.json"
+    completion_guard_path.write_text(
+        json.dumps(
+            _completion_guard_payload(projection.to_dict()),
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     paths = {
         "projection": projection_path,
         "digest": digest_path,
@@ -257,6 +316,7 @@ def render_operator_surface(
         "memory_kernel_repair_packet": memory_repair_packet_path,
         "authority_boundary_packet": authority_boundary_packet_path,
         "gap_triage_packet": gap_triage_packet_path,
+        "completion_guard_packet": completion_guard_path,
     }
     artifact_manifest_path = output_dir / "operator_os_artifact_manifest.json"
     paths["artifact_manifest"] = artifact_manifest_path
