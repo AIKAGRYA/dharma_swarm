@@ -7,6 +7,7 @@ summaries, then returns typed ``ControlSurfaceRow`` instances.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from dharma_swarm.operator_core.control_surface_models import ControlSurfaceRow
@@ -107,7 +108,96 @@ def _go_receipt_rows(repo_root: Path | None = None) -> list[ControlSurfaceRow]:
     )
 
     rows.extend(_go_world_receipt_summary_rows())
+    rows.extend(_darshan_external_reader_gate_rows())
     return rows
+
+
+def _darshan_external_reader_gate_rows(bundle_path: Path | None = None) -> list[ControlSurfaceRow]:
+    try:
+        from dharma_swarm.venture_cell.darshan.external_reader_gate import (
+            validate_external_reader_gate_summary,
+        )
+    except Exception as exc:
+        row = ControlSurfaceRow(
+            id="darshan.external_reader_go_receipts",
+            kind="venture_cell_gate",
+            label="Darshan External Reader Gate",
+            authority_role="gate",
+            declared_state="required",
+            desired_state="bound",
+            observed_state="gate import failed",
+            coherence_state="drifted",
+            priority="p0",
+            owner_module="dharma_swarm/venture_cell/darshan/external_reader_gate.py",
+            truth_owner="dharma_swarm/venture_cell/darshan/external_reader_gate.py",
+            gap_codes=["darshan_external_reader_gate_import_failed"],
+        )
+        row.add_evidence(
+            "go_receipt",
+            f"Darshan external reader gate import failed: {exc}",
+            status="error",
+            provenance_chain=["darshan", "go_sdk", "gate_import"],
+        )
+        row.add_source_ref(
+            "file",
+            "dharma_swarm/venture_cell/darshan/external_reader_gate.py",
+            exists=True,
+        )
+        return [row]
+
+    selected = bundle_path or _env_bundle_path()
+    summary = validate_external_reader_gate_summary(selected)
+    row = ControlSurfaceRow(
+        id="darshan.external_reader_go_receipts",
+        kind="venture_cell_gate",
+        label="Darshan External Reader Gate",
+        authority_role="gate",
+        declared_state="required",
+        desired_state="bound",
+        observed_state=str(summary["observed_state"]),
+        coherence_state=str(summary["coherence_state"]),
+        priority="p0" if not summary["pass_gate"] else "p1",
+        owner_module="dharma_swarm/venture_cell/darshan/external_reader_gate.py",
+        truth_owner="dharma_swarm/venture_cell/darshan/external_reader_gate.py",
+        freshness=str(summary.get("freshest_observed_at", "")),
+        gap_codes=[str(code) for code in summary["gap_codes"]],
+        next_action=(
+            "Record an accepted Go evidence receipt for a countable external reader event"
+            if not summary["pass_gate"]
+            else "Keep reader receipt linked to the Darshan decision delta"
+        ),
+        raw=summary,
+    )
+    row.add_evidence(
+        "go_receipt",
+        (
+            f"accepted={summary['accepted_receipts']} "
+            f"rejected={summary['rejected_receipts']} "
+            f"missing={summary['missing_receipts']}"
+        ),
+        status="present" if summary["pass_gate"] else "missing",
+        provenance_chain=["darshan", "go_sdk", "external_reader_gate"],
+    )
+    if summary.get("bundle_path"):
+        row.add_source_ref("file", str(summary["bundle_path"]), exists=True)
+        row.add_source_ref(
+            "file",
+            str(Path(str(summary["bundle_path"])) / "decision_delta.json"),
+            exists=True,
+        )
+    for path in summary.get("receipt_paths", []):
+        row.add_source_ref("file", str(path), exists=Path(str(path)).exists())
+    row.add_source_ref(
+        "file",
+        "dharma_swarm/venture_cell/darshan/external_reader_gate.py",
+        exists=True,
+    )
+    return [row]
+
+
+def _env_bundle_path() -> Path | None:
+    value = os.environ.get("DHARMA_DARSHAN_BUNDLE_PATH", "").strip()
+    return Path(value).expanduser() if value else None
 
 
 def _go_world_receipt_summary_rows() -> list[ControlSurfaceRow]:

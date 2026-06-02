@@ -27,7 +27,8 @@ from pydantic import BaseModel, Field, field_validator
 
 PARAClass = Literal["P", "A", "R", "Ar"]
 SourceKind = Literal[
-    "session", "webclip", "pdf", "note", "wiki_extract", "voice", "external", "synthesis"
+    "session", "webclip", "pdf", "note", "wiki_extract", "voice", "external", "synthesis",
+    "receipt",
 ]
 _SOURCE_KIND_VALUES = set(get_args(SourceKind))
 GateResult = Literal["ALLOW", "WARN", "BLOCK"]

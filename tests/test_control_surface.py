@@ -422,6 +422,7 @@ class TestGoReceiptRows:
             "go.github_ingestor",
             "go.world_signal_ingestor",
             "go.world_signal_receipts",
+            "darshan.external_reader_go_receipts",
         }
         assert (
             by_id["go.evidence_bridge"].owner_module
@@ -436,6 +437,7 @@ class TestGoReceiptRows:
             for row in rows
         )
         assert by_id["go.world_signal_receipts"].coherence_state == "declared_only"
+        assert by_id["darshan.external_reader_go_receipts"].kind == "venture_cell_gate"
 
 
 # ---------------------------------------------------------------------------

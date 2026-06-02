@@ -84,6 +84,14 @@ class ExternalOperatorTrack(str, Enum):
     BENCHMARK = "benchmark"
 
 
+class ExternalReaderEventType(str, Enum):
+    READ = "read"
+    REPLY = "reply"
+    INSPECTION = "inspection"
+    DECISION = "decision"
+    CONTACT_ATTEMPT = "contact_attempt"
+
+
 class SourceRecord(DarshanBaseModel):
     source_id: str = Field(default_factory=lambda: new_id("src"))
     canonical_url: str = ""
@@ -182,6 +190,35 @@ class GateDecisionLedger(DarshanBaseModel):
     gates: list[GateDecisionRecord] = Field(default_factory=list)
 
 
+class GoEvidenceReceiptRef(DarshanBaseModel):
+    receipt_path: str = ""
+    receipt_id: str = ""
+    correlation_id: str = ""
+    source: str = "darshan_external_reader"
+    source_url: str = ""
+    observed_at: str = ""
+    content_hash: str = ""
+    event_uid: str = ""
+    schema_version: str = "go_evidence_receipt.v0"
+    status: Literal["accepted", "rejected", "missing", "invalid"] = "missing"
+
+
+class ExternalReaderEvent(DarshanBaseModel):
+    event_id: str = Field(default_factory=lambda: new_id("reader"))
+    artifact_id: str
+    event_type: ExternalReaderEventType
+    reader_label: str = ""
+    reader_contact_hash: str = ""
+    contact_surface: str = ""
+    summary: str = ""
+    occurred_at: str = Field(default_factory=utc_now_iso)
+    human_approved_contact: bool = False
+    consent_public: bool = False
+    privacy_notes: list[str] = Field(default_factory=list)
+    go_receipt: GoEvidenceReceiptRef = Field(default_factory=GoEvidenceReceiptRef)
+    evidence_refs: list[str] = Field(default_factory=list)
+
+
 class DecisionDelta(DarshanBaseModel):
     artifact_id: str
     delta_summary: str = ""
@@ -192,6 +229,7 @@ class DecisionDelta(DarshanBaseModel):
     followup_owner: str = ""
     review_by: str = ""
     evidence_refs: list[str] = Field(default_factory=list)
+    external_reader_events: list[ExternalReaderEvent] = Field(default_factory=list)
 
 
 class PolsiaHandoff(DarshanBaseModel):

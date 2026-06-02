@@ -9,6 +9,12 @@ from dharma_swarm.venture_cell.darshan.bundle import (
     default_artifact_root,
     refresh_manifest,
     validate_bundle,
+    validate_bundle_for_done,
+)
+from dharma_swarm.venture_cell.darshan.external_reader_gate import (
+    ExternalReaderGateResult,
+    stage_accepted_external_reader_events,
+    validate_external_reader_gate,
 )
 from dharma_swarm.venture_cell.darshan.operator_log import (
     append_operator_observation,
@@ -35,9 +41,13 @@ __all__ = [
     "default_artifact_root",
     "default_operator_log_path",
     "default_polsia_log_path",
+    "ExternalReaderGateResult",
     "materialize_bundle",
     "read_operator_observations",
     "read_observations",
     "refresh_manifest",
+    "stage_accepted_external_reader_events",
     "validate_bundle",
+    "validate_bundle_for_done",
+    "validate_external_reader_gate",
 ]

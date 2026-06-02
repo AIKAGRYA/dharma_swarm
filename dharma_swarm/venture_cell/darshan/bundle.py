@@ -139,6 +139,29 @@ def validate_bundle(bundle_path: Path) -> BundleValidationResult:
     )
 
 
+def validate_bundle_for_done(bundle_path: Path) -> BundleValidationResult:
+    result = validate_bundle(bundle_path)
+    if not result.valid:
+        return result
+    from dharma_swarm.venture_cell.darshan.external_reader_gate import (
+        validate_external_reader_gate,
+    )
+
+    gate = validate_external_reader_gate(result.bundle_path)
+    errors = list(result.errors)
+    warnings = list(result.warnings)
+    warnings.extend(gate.warnings)
+    if not gate.pass_gate:
+        errors.extend(gate.errors or ["external_reader_gate_failed"])
+    return BundleValidationResult(
+        bundle_path=result.bundle_path,
+        valid=not errors,
+        errors=errors,
+        warnings=warnings,
+        manifest=result.manifest,
+    )
+
+
 def refresh_manifest(bundle_path: Path) -> BundleManifest:
     result = validate_bundle(bundle_path)
     if not result.valid:
