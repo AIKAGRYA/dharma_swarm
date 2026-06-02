@@ -173,6 +173,28 @@ class MemoryKernelRepairPacket:
 
 
 @dataclass(frozen=True)
+class AuthorityBoundaryPacket:
+    """Consolidated read-only authority firewall for the Operator OS."""
+
+    packet_id: str
+    status: str
+    autonomy_level: str
+    decision: str
+    allowed_local_actions: tuple[str, ...] = ()
+    blocked_actions: tuple[str, ...] = ()
+    blocked_departments: tuple[str, ...] = ()
+    required_unblock_artifacts: tuple[str, ...] = ()
+    hard_boundaries: tuple[str, ...] = ()
+    liveness_claims: dict[str, Any] = field(default_factory=dict)
+    promotion_claims: dict[str, Any] = field(default_factory=dict)
+    evidence_refs: tuple[str, ...] = ()
+    raw: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class VentureCellOperatorProjection:
     """The fused Operator OS projection for one VentureCell."""
 
@@ -217,6 +239,14 @@ class VentureCellOperatorProjection:
             status="not_run",
             decision="inspect_memory_eval",
             query_eval_status="not_run",
+        )
+    )
+    authority_boundary_packet: AuthorityBoundaryPacket = field(
+        default_factory=lambda: AuthorityBoundaryPacket(
+            packet_id="operator.authority_boundary",
+            status="unknown",
+            autonomy_level="unknown",
+            decision="inspect_projection",
         )
     )
     daily_cycle: tuple[str, ...] = ()

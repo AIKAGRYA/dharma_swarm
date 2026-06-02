@@ -39,6 +39,24 @@ def render_operator_daily_digest(projection: VentureCellOperatorProjection) -> s
             f"coherence `{gate.coherence_state}`; gaps `{gaps}`."
         )
 
+    authority = projection.authority_boundary_packet
+    blocked_authority_actions = (
+        ", ".join(authority.blocked_actions[:8]) if authority.blocked_actions else "none"
+    )
+    lines.extend(
+        [
+            "",
+            "## Authority Boundary",
+            "",
+            f"- Decision: `{authority.decision}`",
+            f"- Allowed local actions: `{', '.join(authority.allowed_local_actions)}`",
+            f"- Blocked actions: `{blocked_authority_actions}`",
+            f"- NATS ack proof: `{authority.liveness_claims.get('nats_ack_proof_present', False)}`",
+            f"- A2A live ack proof: `{authority.liveness_claims.get('a2a_live_ack_proof_present', False)}`",
+            f"- Trusted Chetana promotion claimed: `{authority.promotion_claims.get('trusted_chetana_promotion_claimed', False)}`",
+        ]
+    )
+
     go_gate = projection.darshan_go_gate_packet
     blocked_actions = ", ".join(go_gate.blocked_actions) if go_gate.blocked_actions else "none"
     expected_artifacts = (

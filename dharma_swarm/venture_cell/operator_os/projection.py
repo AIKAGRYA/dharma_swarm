@@ -26,6 +26,7 @@ from dharma_swarm.venture_cell.darshan.schema import DecisionDelta, PolsiaHandof
 from dharma_swarm.venture_cell.operator_os.memory_kernel import build_memory_kernel_index
 from dharma_swarm.venture_cell.operator_os.memory_kernel import evaluate_memory_kernel_queries
 from dharma_swarm.venture_cell.operator_os.schema import (
+    AuthorityBoundaryPacket,
     CanvasItem,
     DarshanGoGatePacket,
     GateSummary,
@@ -98,6 +99,14 @@ def build_operator_projection(inputs: OperatorOSInputs | None = None) -> Venture
     )
     darshan_go_gate_packet = _darshan_go_gate_packet(gate)
     memory_kernel_repair_packet = _memory_kernel_repair_packet(memory)
+    authority_boundary_packet = _authority_boundary_packet(
+        status=status,
+        autonomy_level=autonomy_level,
+        next_action_packet=next_action_packet,
+        darshan_go_gate_packet=darshan_go_gate_packet,
+        memory_kernel_repair_packet=memory_kernel_repair_packet,
+        evidence_refs=evidence_refs,
+    )
 
     return VentureCellOperatorProjection(
         venture_cell_id=active.venture_cell_id,
@@ -120,6 +129,7 @@ def build_operator_projection(inputs: OperatorOSInputs | None = None) -> Venture
         next_action_packet=next_action_packet,
         darshan_go_gate_packet=darshan_go_gate_packet,
         memory_kernel_repair_packet=memory_kernel_repair_packet,
+        authority_boundary_packet=authority_boundary_packet,
         daily_cycle=_daily_cycle(),
         evidence_refs=evidence_refs,
         gap_codes=gaps,
@@ -809,6 +819,100 @@ def _darshan_go_receipt_template(raw: Mapping[str, Any]) -> dict[str, Any]:
             },
         },
     }
+
+
+def _authority_boundary_packet(
+    *,
+    status: str,
+    autonomy_level: str,
+    next_action_packet: OperatorNextActionPacket,
+    darshan_go_gate_packet: DarshanGoGatePacket,
+    memory_kernel_repair_packet: MemoryKernelRepairPacket,
+    evidence_refs: tuple[str, ...],
+) -> AuthorityBoundaryPacket:
+    blocked_actions = tuple(
+        dict.fromkeys(
+            (
+                *next_action_packet.forbidden_actions,
+                *darshan_go_gate_packet.blocked_actions,
+                "push",
+                "merge",
+                "deploy",
+                "publish",
+                "spend",
+                "external_outreach_without_go_receipt",
+                "claim_nats_liveness_without_ack",
+                "claim_a2a_liveness_without_ack",
+                "trusted_chetana_promotion_without_gates",
+            )
+        )
+    )
+    required_unblock_artifacts = tuple(
+        item
+        for item in dict.fromkeys(
+            (
+                next_action_packet.required_unblock_artifact,
+                *darshan_go_gate_packet.expected_local_artifacts,
+            )
+        )
+        if item
+    )
+    trusted_promotion_claimed = bool(
+        memory_kernel_repair_packet.raw.get("trusted_promotion_claimed")
+        if isinstance(memory_kernel_repair_packet.raw, dict)
+        else False
+    )
+    external_blocked = bool(darshan_go_gate_packet.blocked_actions)
+    decision = (
+        "local_read_only_external_blocked"
+        if external_blocked or autonomy_level == "L0_read_only_plan"
+        else "reviewed_internal_only"
+    )
+    return AuthorityBoundaryPacket(
+        packet_id="operator.authority_boundary",
+        status=status,
+        autonomy_level=autonomy_level,
+        decision=decision,
+        allowed_local_actions=(
+            "read_local_artifacts",
+            "render_operator_os",
+            "run_focused_tests",
+            "append_non_closing_progress_receipts",
+            "prepare_non_evidence_templates",
+        ),
+        blocked_actions=blocked_actions,
+        blocked_departments=darshan_go_gate_packet.blocked_departments,
+        required_unblock_artifacts=required_unblock_artifacts,
+        hard_boundaries=(
+            "no_outreach",
+            "no_spend",
+            "no_deploy",
+            "no_publish",
+            "no_push",
+            "no_merge",
+            "no_live_external_authority",
+            "no_fake_nats_a2a_liveness",
+            "no_trusted_chetana_promotion_without_gates",
+        ),
+        liveness_claims={
+            "nats_ack_proof_present": False,
+            "a2a_live_ack_proof_present": False,
+            "filesystem_a2a_rows_are_evidence_only": True,
+        },
+        promotion_claims={
+            "trusted_chetana_promotion_claimed": trusted_promotion_claimed,
+            "memory_eval_status": memory_kernel_repair_packet.query_eval_status,
+        },
+        evidence_refs=evidence_refs,
+        raw={
+            "next_action_decision": next_action_packet.decision,
+            "darshan_go_decision": darshan_go_gate_packet.decision,
+            "accepted_go_receipts": darshan_go_gate_packet.accepted_receipts,
+            "go_template_status": darshan_go_gate_packet.receipt_template.get(
+                "template_status", ""
+            ),
+        },
+    )
 
 
 def _memory_kernel_repair_packet(memory: MemoryKernelSnapshot) -> MemoryKernelRepairPacket:

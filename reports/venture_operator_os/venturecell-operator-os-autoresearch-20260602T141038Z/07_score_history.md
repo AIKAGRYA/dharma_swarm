@@ -5,7 +5,7 @@ Status: live ledger, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
 ds-goal progress receipt: `r-277a29c022e46fb6`
 Baseline: `1aca07a1 Add VentureCell Operator OS Level 70 surface`
-Current scoped HEAD before this packet: `b7758b52 feat(operator-os): add Darshan GO receipt template`
+Current scoped HEAD before this packet: `d0a8aaf4 docs(operator-os): add live verifier matrix`
 
 This file is a living score ledger. It exists now so later agents do not
 reconstruct scores from memory. It must be reviewed and updated before final
@@ -25,18 +25,19 @@ reporter closure.
 | Loop 10 | `06_adversary_audit.md` | `0e810f5f` | 84 | +0 | keep as false-green guard |
 | Loop 11 | `10_memorykernel_report_source_packet.md` | `0f58774d` | 87 | +3 | keep local staged recall pass |
 | Loop 12 | `11_go_receipt_template_receipt.md` | `b7758b52` | 89 | +2 | keep safe GO template |
-| Loop 13 | `12_live_verifier_matrix.md` | pending | 90 | +1 | keep live verifier matrix |
+| Loop 13 | `12_live_verifier_matrix.md` | `d0a8aaf4` | 90 | +1 | keep live verifier matrix |
+| Loop 14 | `13_authority_boundary_receipt.md` | pending | 92 | +2 | keep authority firewall packet |
 
 ## Area History
 
 | Area | Opening | Current | Evidence |
 |---|---:|---:|---|
-| Operator clarity | 11 | 14 | next-action, GO gate, and GO template packets expose blockers, owners, and exact local artifact shape |
+| Operator clarity | 11 | 15 | next-action, GO gate, GO template, and authority packets expose blockers, owners, local allowances, and artifact shape |
 | Memory usefulness | 10 | 15 | report-local staged source root now passes strict eval `6/6` without trusted promotion |
 | Task truth | 8 | 12+ | progress receipts distinguish non-closing evidence from completion |
-| Governance safety | 15 | 15 | external-reader, governed admission, Chetana, and completion gates preserved |
+| Governance safety | 15 | 15 | external-reader, governed admission, Chetana, completion, and authority firewall gates preserved |
 | Iteration quality | 8 | 12+ | every loop has hypothesis, patch/rejection, evals, adversarial review, decision |
-| Product structure | 8 | 12 | Operator OS now emits next-action, GO gate, GO template, memory repair, and report-local recall packets |
+| Product structure | 8 | 13 | Operator OS now emits next-action, GO gate, GO template, authority boundary, memory repair, and report-local recall packets |
 | Tests/evals | 8 | 12 | fixed tests, report-local recall regression, eval artifacts, and live verifier matrix exist |
 | Metabolization | 2 | 5 | program kernel, receipts, packets, and this score ledger exist |
 
@@ -52,6 +53,7 @@ audit with explicit evidence.
 - Darshan GO gate: `block_external_authority`.
 - Darshan GO receipt template: `draft_template_not_evidence`.
 - Live verifier matrix: present, non-final.
+- Authority boundary packet: `local_read_only_external_blocked`.
 - MemoryKernel query eval: `pass` (`6/6`) from report-local staged roots.
 - MemoryKernel repair packet: `no_repair_needed`, with trusted promotion still forbidden.
 - ds-goal raw/reconciled counts: `open=1 claimed=0 completed=4 failed=0 blocked=0 total=5`.
@@ -87,6 +89,7 @@ current evidence, not as a full-project proof.
   GO evidence receipt exists.
 - The GO template is not evidence and must not be stored as an accepted receipt
   without a real external-reader event.
+- Authority boundary packet is a firewall view, not an authority grant.
 - The reporter task must remain open until final artifacts and final
   verification prove the full contract.
 
@@ -167,6 +170,38 @@ Adversarial review:
 - The index is still truncated, so final closeout must not claim complete
   memory coverage.
 - Darshan GO remains blocked and external authority remains forbidden.
+- Reporter remains open because the true 8-hour contract is not complete.
+
+Keep / revert / queue:
+
+Decision: keep.
+
+## Loop 14 Score Update
+
+Hypothesis:
+
+If the Operator OS emits a single authority boundary packet, future agents can
+avoid confusing local work allowances with external authority.
+
+Patch:
+
+- Added `AuthorityBoundaryPacket`.
+- Added `authority_boundary_packet.json` to the CLI render.
+- Added digest visibility and focused tests.
+
+Evaluation:
+
+- `pytest -q tests/test_venture_cell_operator_os_projection.py` passed.
+- `./.venv/bin/python -m compileall -q dharma_swarm/venture_cell/operator_os`
+  passed.
+- The CLI render produced `authority_boundary_packet.json` with
+  `local_read_only_external_blocked`.
+
+Adversarial review:
+
+- The packet derives from existing gates and does not create a control plane.
+- It keeps NATS/A2A liveness unproved, trusted Chetana promotion false, and
+  external authority blocked.
 - Reporter remains open because the true 8-hour contract is not complete.
 
 Keep / revert / queue:

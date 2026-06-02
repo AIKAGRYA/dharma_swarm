@@ -54,6 +54,11 @@ def _memory_repair_payload(projection: dict[str, Any]) -> dict[str, Any]:
     return packet if isinstance(packet, dict) else {}
 
 
+def _authority_boundary_payload(projection: dict[str, Any]) -> dict[str, Any]:
+    packet = projection.get("authority_boundary_packet")
+    return packet if isinstance(packet, dict) else {}
+
+
 def render_operator_surface(
     *,
     output_dir: Path,
@@ -147,6 +152,16 @@ def render_operator_surface(
         + "\n",
         encoding="utf-8",
     )
+    authority_boundary_packet_path = output_dir / "authority_boundary_packet.json"
+    authority_boundary_packet_path.write_text(
+        json.dumps(
+            _authority_boundary_payload(projection.to_dict()),
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     return {
         "projection": projection_path,
         "digest": digest_path,
@@ -156,6 +171,7 @@ def render_operator_surface(
         "darshan_go_gate_packet": darshan_go_gate_packet_path,
         "darshan_go_receipt_template": darshan_go_receipt_template_path,
         "memory_kernel_repair_packet": memory_repair_packet_path,
+        "authority_boundary_packet": authority_boundary_packet_path,
     }
 
 

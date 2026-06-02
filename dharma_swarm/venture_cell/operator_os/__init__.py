@@ -26,6 +26,7 @@ from dharma_swarm.venture_cell.operator_os.projection import (
     build_operator_projection,
 )
 from dharma_swarm.venture_cell.operator_os.schema import (
+    AuthorityBoundaryPacket,
     CanvasItem,
     DarshanGoGatePacket,
     GateSummary,
@@ -38,6 +39,7 @@ from dharma_swarm.venture_cell.operator_os.schema import (
 
 __all__ = [
     "CanvasItem",
+    "AuthorityBoundaryPacket",
     "DarshanGoGatePacket",
     "GateSummary",
     "MEMORY_KERNEL_EVAL_QUERIES",

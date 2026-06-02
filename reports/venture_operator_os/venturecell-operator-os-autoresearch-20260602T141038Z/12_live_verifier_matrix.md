@@ -43,6 +43,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `memory_kernel_repair_packet.json` | `no_repair_needed` | still forbids trusted promotion |
 | `darshan_go_gate_packet.json` | `block_external_authority` | accepted receipts empty |
 | `darshan_go_receipt_template.json` | `draft_template_not_evidence` | must not be stored as accepted receipt |
+| `authority_boundary_packet.json` | `local_read_only_external_blocked` | firewall view, not authority grant |
 | `06_adversary_audit.md` | live draft | needs final-window review |
 | `07_score_history.md` | live score `89/100` | not final |
 | `08_metabolization_packet.md` | live packet | needs final-window review |
@@ -64,6 +65,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `0e810f5f` | keep | live adversary audit |
 | `0f58774d` | keep | report-local staged MemoryKernel recall pass |
 | `b7758b52` | keep | Darshan GO receipt template |
+| pending | keep | authority boundary firewall packet |
 
 ## Revert / Queue Ledger
 

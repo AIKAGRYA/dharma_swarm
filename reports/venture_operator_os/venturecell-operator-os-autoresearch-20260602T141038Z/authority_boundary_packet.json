@@ -1,0 +1,77 @@
+{
+  "allowed_local_actions": [
+    "read_local_artifacts",
+    "render_operator_os",
+    "run_focused_tests",
+    "append_non_closing_progress_receipts",
+    "prepare_non_evidence_templates"
+  ],
+  "autonomy_level": "L0_read_only_plan",
+  "blocked_actions": [
+    "external_outreach",
+    "spending",
+    "deployment",
+    "publishing",
+    "protected_merge",
+    "credential_mutation",
+    "live_external_authority",
+    "external_operator_handoff",
+    "push",
+    "merge",
+    "deploy",
+    "publish",
+    "spend",
+    "external_outreach_without_go_receipt",
+    "claim_nats_liveness_without_ack",
+    "claim_a2a_liveness_without_ack",
+    "trusted_chetana_promotion_without_gates"
+  ],
+  "blocked_departments": [
+    "growth",
+    "communications"
+  ],
+  "decision": "local_read_only_external_blocked",
+  "evidence_refs": [
+    "/Users/dhyana/.dharma/artifacts/venture_cell/DARSHAN/2026-05-26/the-thing-they-are-competing-for-is-not-just-your-attention",
+    "/Users/dhyana/.dharma/knowledge/wiki/concepts",
+    "/Users/dhyana/.dharma/knowledge/staging",
+    "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z",
+    "/Users/dhyana/.dharma/knowledge/quarantine",
+    "dharma_swarm/venture_cell/operator_os/projection.py"
+  ],
+  "hard_boundaries": [
+    "no_outreach",
+    "no_spend",
+    "no_deploy",
+    "no_publish",
+    "no_push",
+    "no_merge",
+    "no_live_external_authority",
+    "no_fake_nats_a2a_liveness",
+    "no_trusted_chetana_promotion_without_gates"
+  ],
+  "liveness_claims": {
+    "a2a_live_ack_proof_present": false,
+    "filesystem_a2a_rows_are_evidence_only": true,
+    "nats_ack_proof_present": false
+  },
+  "packet_id": "operator.authority_boundary",
+  "promotion_claims": {
+    "memory_eval_status": "pass",
+    "trusted_chetana_promotion_claimed": false
+  },
+  "raw": {
+    "accepted_go_receipts": [],
+    "darshan_go_decision": "block_external_authority",
+    "go_template_status": "draft_template_not_evidence",
+    "next_action_decision": "hold_external_authority"
+  },
+  "required_unblock_artifacts": [
+    "Accepted privacy-redacted external-reader Go evidence receipt linked to decision_delta.json.",
+    "/Users/dhyana/.dharma/artifacts/venture_cell/DARSHAN/2026-05-26/the-thing-they-are-competing-for-is-not-just-your-attention/decision_delta.json",
+    "/Users/dhyana/.dharma/artifacts/venture_cell/DARSHAN/2026-05-26/the-thing-they-are-competing-for-is-not-just-your-attention/receipts/<accepted-go-evidence-receipt>.json",
+    "dharma_swarm/venture_cell/darshan/external_reader_gate.py",
+    "darshan_go_receipt_template.json"
+  ],
+  "status": "blocked_on_external_reader_gate"
+}

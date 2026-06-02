@@ -92,6 +92,15 @@
 - `darshan.external_reader_go_receipts` decision `block`; coherence `declared_only`; gaps `darshan_external_reader_event_missing`.
 - `operator_os.governed_work_admission` decision `allow`; coherence `bound`; gaps `none`.
 
+## Authority Boundary
+
+- Decision: `local_read_only_external_blocked`
+- Allowed local actions: `read_local_artifacts, render_operator_os, run_focused_tests, append_non_closing_progress_receipts, prepare_non_evidence_templates`
+- Blocked actions: `external_outreach, spending, deployment, publishing, protected_merge, credential_mutation, live_external_authority, external_operator_handoff`
+- NATS ack proof: `False`
+- A2A live ack proof: `False`
+- Trusted Chetana promotion claimed: `False`
+
 ## Darshan GO Gate
 
 - Decision: `block_external_authority`
@@ -117,11 +126,11 @@
 ## Memory Kernel
 
 - Status: `read_through_index_available`
-- Staged: `5015`
+- Staged: `5016`
 - Trusted: `1336`
 - Quarantine: `5000`
 - Truncated scan: `True`
-- Index: `available_truncated` with `75` entries
+- Index: `available_truncated` with `76` entries
 - Query evals: `pass` (6/6)
 
 ## Memory Repair Packet

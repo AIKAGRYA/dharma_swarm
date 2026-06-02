@@ -161,6 +161,15 @@ def test_projection_blocks_external_autonomy_without_reader_gate(tmp_path: Path)
         projection.next_action_packet.required_unblock_artifact
     )
     assert "live_external_authority" in projection.next_action_packet.forbidden_actions
+    authority = projection.authority_boundary_packet
+    assert authority.decision == "local_read_only_external_blocked"
+    assert "render_operator_os" in authority.allowed_local_actions
+    assert "live_external_authority" in authority.blocked_actions
+    assert "push" in authority.blocked_actions
+    assert authority.liveness_claims["nats_ack_proof_present"] is False
+    assert authority.liveness_claims["a2a_live_ack_proof_present"] is False
+    assert authority.liveness_claims["filesystem_a2a_rows_are_evidence_only"] is True
+    assert authority.promotion_claims["trusted_chetana_promotion_claimed"] is False
     repair = projection.memory_kernel_repair_packet
     assert repair.decision == "queue_repair_without_promotion"
     assert repair.status == "queued"
@@ -291,6 +300,8 @@ def test_operator_daily_digest_renders_structure_without_live_authority_claim(tm
     assert "# VentureCell Operator OS Digest: DARSHAN" in digest
     assert "## Departments" in digest
     assert "## Gates" in digest
+    assert "## Authority Boundary" in digest
+    assert "local_read_only_external_blocked" in digest
     assert "## Darshan GO Gate" in digest
     assert "block_external_authority" in digest
     assert "draft_template_not_evidence" in digest
@@ -344,6 +355,9 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     memory_repair_packet = json.loads(
         paths["memory_kernel_repair_packet"].read_text(encoding="utf-8")
     )
+    authority_boundary_packet = json.loads(
+        paths["authority_boundary_packet"].read_text(encoding="utf-8")
+    )
 
     assert projection["status"] == "blocked_on_external_reader_gate"
     assert projection["autonomy_level"] == "L0_read_only_plan"
@@ -369,6 +383,10 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert memory_repair_packet["status"] == "queued"
     assert memory_repair_packet["raw"]["trusted_promotion_claimed"] is False
     assert "trusted_chetana_promotion" in memory_repair_packet["forbidden_actions"]
+    assert authority_boundary_packet["decision"] == "local_read_only_external_blocked"
+    assert authority_boundary_packet["liveness_claims"]["nats_ack_proof_present"] is False
+    assert authority_boundary_packet["liveness_claims"]["a2a_live_ack_proof_present"] is False
+    assert authority_boundary_packet["promotion_claims"]["trusted_chetana_promotion_claimed"] is False
 
 
 def test_operator_surface_uses_report_local_memory_source_without_trusted_promotion(tmp_path: Path) -> None:

@@ -4,7 +4,7 @@ Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live packet, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
 ds-goal progress receipt: `r-b73f8ef857f710fd`
-Current scoped HEAD before this packet: `b7758b52 feat(operator-os): add Darshan GO receipt template`
+Current scoped HEAD before this packet: `d0a8aaf4 docs(operator-os): add live verifier matrix`
 
 This packet captures durable learning from the run so far. It must be reviewed
 and updated during final closeout before the reporter task is closed.
@@ -89,6 +89,20 @@ and updated during final closeout before the reporter task is closed.
    - Score must remain a live ledger until the final adversarial audit,
      metabolization update, next-goal packet, and reporter closure are complete.
 
+6. Authority boundary must be a packet, not an inference.
+
+   Evidence:
+
+   - `authority_boundary_packet.json` reports
+     `local_read_only_external_blocked`.
+   - NATS ack proof and A2A live ack proof are both `false`.
+   - Trusted Chetana promotion remains `false`.
+
+   Metabolized rule:
+
+   - Future agents should read the authority boundary packet before acting.
+     Local allowances do not imply external authority.
+
 ## Committed Packets
 
 | Commit | Packet | Durable effect |
@@ -106,6 +120,7 @@ and updated during final closeout before the reporter task is closed.
 | `0f58774d` | `10_memorykernel_report_source_packet.md` | report-local staged recall source and 6/6 eval pass |
 | `b7758b52` | `11_go_receipt_template_receipt.md` | safe Darshan GO receipt template, not evidence |
 | pending | `12_live_verifier_matrix.md` | live verification and patch ledger |
+| pending | `13_authority_boundary_receipt.md` | consolidated authority firewall packet |
 
 ## Current Read-Only Artifacts
 
@@ -121,6 +136,8 @@ and updated during final closeout before the reporter task is closed.
 - `10_memorykernel_report_source_packet.md`
 - `11_go_receipt_template_receipt.md`
 - `12_live_verifier_matrix.md`
+- `13_authority_boundary_receipt.md`
+- `authority_boundary_packet.json`
 
 ## Do Not Metabolize As Done
 
@@ -131,6 +148,7 @@ These facts are explicitly not complete:
 - Darshan external-reader GO gate is not passing.
 - `darshan_go_receipt_template.json` is not evidence and must not be promoted
   into an accepted receipt without a real event.
+- `authority_boundary_packet.json` is a firewall view, not an authority grant.
 - Reporter task is not closed.
 - The final adversarial audit and next-goal packet still require final-window
   review/update.
@@ -273,6 +291,37 @@ Metabolized rule:
 
 - Operator OS may render templates for future governed artifacts, but every
   template must include explicit non-evidence markers and forbidden-use fields.
+
+## Loop 14 Metabolization Note
+
+Hypothesis:
+
+If authority state is rendered as a single packet, future agents can avoid
+mistaking local work permission for external authority.
+
+Patch:
+
+- Added `AuthorityBoundaryPacket`.
+- Added `authority_boundary_packet.json` to the CLI render.
+- Added digest visibility and focused tests.
+
+Evaluation:
+
+- `pytest -q tests/test_venture_cell_operator_os_projection.py` passed.
+- `./.venv/bin/python -m compileall -q dharma_swarm/venture_cell/operator_os`
+  passed.
+- The packet reports `local_read_only_external_blocked`.
+
+Adversarial review:
+
+- It creates no new control plane and grants no authority.
+- It records NATS/A2A live ack proof as absent.
+- It keeps trusted Chetana promotion false.
+
+Metabolized rule:
+
+- Before any future operator action, inspect `authority_boundary_packet.json`
+  and treat blocked actions as hard boundaries unless existing gates change.
 
 ## Loop 13 Metabolization Note
 
