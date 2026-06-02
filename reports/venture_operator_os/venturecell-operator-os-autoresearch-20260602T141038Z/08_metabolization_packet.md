@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live packet, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-257787644e0f6723`
-Current scoped HEAD before this packet: `1f44b1c6 feat(operator-os): render goal truth packet`
+ds-goal progress receipt: `r-36c4e1eed5522c07`
+Current scoped HEAD before this packet: `10e7c51d docs(operator-os): record five-hour timebox`
 
 This packet captures durable learning from the run so far. It must be reviewed
 and updated during final closeout before the reporter task is closed.
@@ -401,6 +401,23 @@ and updated during final closeout before the reporter task is closed.
      reliability. Missing or duplicate progress ids are routing signals, not
      proof that the reporter task can close.
 
+16. Duplicate progress-id groups need member names.
+
+   Evidence:
+
+   - `operator_goal_truth_packet.json` now includes
+     `duplicate_progress_receipt_groups`.
+   - The live packet reports one duplicate group with member receipt names, so
+     future agents can identify shared summary-doc stamping without scraping
+     every Markdown header.
+   - The manifest mirrors `goal_truth_duplicate_progress_receipt_group_count`.
+
+   Metabolized rule:
+
+   - Duplicate progress-id groups are receipt-chain audit metadata. They expose
+     which files share a progress receipt id; they do not multiply terminal
+     receipts or close the reporter.
+
 ## Loop 45 Metabolization Note
 
 Hypothesis:
@@ -479,6 +496,7 @@ Metabolized rule:
 | `r-802f88903e805cdb` | `50_manifest_artifact_counts_receipt.md` | manifest artifact inventory counts |
 | `r-0ee1f0865dd69047` | `51_goal_truth_packet_receipt.md` | goal-truth receipt-chain inventory |
 | `r-257787644e0f6723` | `52_timebox_five_hour_receipt.md` | five-hour non-final timebox proof |
+| `r-36c4e1eed5522c07` | `53_goal_truth_duplicate_groups_receipt.md` | goal-truth duplicate group membership |
 
 ## Current Read-Only Artifacts
 
@@ -535,6 +553,7 @@ Metabolized rule:
 - `50_manifest_artifact_counts_receipt.md`
 - `51_goal_truth_packet_receipt.md`
 - `52_timebox_five_hour_receipt.md`
+- `53_goal_truth_duplicate_groups_receipt.md`
 
 ## Do Not Metabolize As Done
 
@@ -578,6 +597,8 @@ These facts are explicitly not complete:
 - Manifest inventory scope markers are navigation aids only.
 - Goal-truth receipt-chain summaries are audit routing only; missing or
   duplicate progress ids do not close the reporter.
+- Goal-truth duplicate group names are audit routing only; they do not multiply
+  terminal receipts.
 - Stable admission render is diff hygiene only, not a gate change.
 - Reporter task is not closed.
 - The final adversarial audit and next-goal packet still require final-window

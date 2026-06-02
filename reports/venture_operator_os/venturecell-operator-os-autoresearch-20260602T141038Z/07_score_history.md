@@ -3,9 +3,9 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live ledger, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-257787644e0f6723`
+ds-goal progress receipt: `r-36c4e1eed5522c07`
 Baseline: `1aca07a1 Add VentureCell Operator OS Level 70 surface`
-Current scoped HEAD before this packet: `1f44b1c6 feat(operator-os): render goal truth packet`
+Current scoped HEAD before this packet: `10e7c51d docs(operator-os): record five-hour timebox`
 
 This file is a living score ledger. It exists now so later agents do not
 reconstruct scores from memory. It must be reviewed and updated before final
@@ -66,6 +66,7 @@ reporter closure.
 | Loop 51 | `50_manifest_artifact_counts_receipt.md` | `r-802f88903e805cdb` | 100 | +0 | keep manifest artifact counts |
 | Loop 52 | `51_goal_truth_packet_receipt.md` | `r-0ee1f0865dd69047` | 100 | +0 | keep goal-truth receipt chain |
 | Loop 53 | `52_timebox_five_hour_receipt.md` | `r-257787644e0f6723` | 100 | +0 | keep five-hour non-final proof |
+| Loop 54 | `53_goal_truth_duplicate_groups_receipt.md` | `r-36c4e1eed5522c07` | 100 | +0 | keep goal-truth duplicate groups |
 
 ## Area History
 

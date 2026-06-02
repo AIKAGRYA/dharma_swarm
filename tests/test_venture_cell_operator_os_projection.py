@@ -414,6 +414,11 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
         "ds-goal progress receipt: `r-test-progress`\n",
         encoding="utf-8",
     )
+    (report_dir / "98_duplicate_progress_receipt.md").write_text(
+        "# Duplicate Progress Receipt\n\n"
+        "ds-goal progress receipt: `r-test-progress`\n",
+        encoding="utf-8",
+    )
     _write_a2a_queue(
         state_root,
         [
@@ -660,16 +665,30 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert goal_truth_packet["schema"] == "dharma.venture_cell_operator_os.goal_truth.v0"
     assert goal_truth_packet["truth_source"] == "report_directory_markdown_receipt_headers"
     assert goal_truth_packet["receipt_count"] == len(goal_truth_packet["receipts"])
-    assert goal_truth_packet["receipt_count"] == 2
+    assert goal_truth_packet["receipt_count"] == 3
     assert goal_truth_packet["progress_receipt_count"] == len(
         goal_truth_packet["progress_receipt_ids"]
     )
-    assert goal_truth_packet["progress_receipt_count"] == 1
+    assert goal_truth_packet["progress_receipt_count"] == 2
     assert goal_truth_packet["unique_progress_receipt_id_count"] == 1
+    assert goal_truth_packet["progress_receipt_id_counts"]["r-test-progress"] == 2
     assert goal_truth_packet["duplicate_progress_receipt_id_count"] == len(
         goal_truth_packet["duplicate_progress_receipt_ids"]
     )
-    assert goal_truth_packet["duplicate_progress_receipt_id_count"] == 0
+    assert goal_truth_packet["duplicate_progress_receipt_id_count"] == 1
+    assert goal_truth_packet["duplicate_progress_receipt_ids"] == ["r-test-progress"]
+    assert goal_truth_packet["duplicate_progress_receipt_group_count"] == len(
+        goal_truth_packet["duplicate_progress_receipt_groups"]
+    )
+    assert goal_truth_packet["duplicate_progress_receipt_group_count"] == 1
+    assert goal_truth_packet["duplicate_progress_receipt_groups"][0] == {
+        "progress_receipt_id": "r-test-progress",
+        "count": 2,
+        "receipt_names": [
+            "98_duplicate_progress_receipt.md",
+            "99_progress_receipt.md",
+        ],
+    }
     assert goal_truth_packet["missing_progress_receipt_count"] == len(
         goal_truth_packet["missing_progress_receipt_names"]
     )
@@ -747,6 +766,9 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     )
     assert artifact_manifest["goal_truth_duplicate_progress_receipt_id_count"] == (
         goal_truth_packet["duplicate_progress_receipt_id_count"]
+    )
+    assert artifact_manifest["goal_truth_duplicate_progress_receipt_group_count"] == (
+        goal_truth_packet["duplicate_progress_receipt_group_count"]
     )
     assert "canvas_summary_packet" in artifact_manifest["summary_packet_names"]
     assert "department_summary_packet" in artifact_manifest["summary_packet_names"]

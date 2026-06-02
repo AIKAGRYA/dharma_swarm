@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live verifier matrix, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-257787644e0f6723`
-Current scoped HEAD before this packet: `1f44b1c6 feat(operator-os): render goal truth packet`
+ds-goal progress receipt: `r-36c4e1eed5522c07`
+Current scoped HEAD before this packet: `10e7c51d docs(operator-os): record five-hour timebox`
 
 This matrix captures the current verification surface for future agents. It is
 not a final verifier matrix and must not be used to close the reporter task.
@@ -64,9 +64,10 @@ not a final verifier matrix and must not be used to close the reporter task.
   rendered.
 - Manifest latest progress receipt id: passing; latest receipt id is rendered
   and marked non-final.
-- Goal truth receipt chain: passing; receipts `54`, progress receipt ids `49`,
-  unique progress receipt ids `43`, missing progress ids `5`, duplicate
+- Goal truth receipt chain: passing; receipts `55`, progress receipt ids `50`,
+  unique progress receipt ids `44`, missing progress ids `5`, duplicate
   progress id groups `1`, and non-final markers render.
+- Goal truth duplicate groups: passing; duplicate group member names render.
 - Stable admission render: passing; volatile id/time redacted, decision visible.
 - Complete ds-goal verification: expected fail on open reporter task.
 - Mission status: open.
@@ -87,7 +88,8 @@ not a final verifier matrix and must not be used to close the reporter task.
 | Summary helper refactor | `pytest -q tests/test_venture_cell_operator_os_projection.py`; render count checks | helper refactor preserves rendered counts | pass |
 | Latest periodic onboard/toolbelt | `make onboard`; `bash scripts/runtime/codex_toolbelt_status.sh` | both exit `0`; optional credential warnings | pass, not mission authority |
 | Manifest artifact counts | `operator_os_artifact_manifest.json` | artifacts `16`, JSON `15`, Markdown `1`, summary packets `4` | pass, not finality |
-| Goal truth packet | `operator_goal_truth_packet.json` | receipts `54`, progress ids `49`, missing ids `5`, duplicate groups `1`; `not_final: true` | pass, not finality |
+| Goal truth packet | `operator_goal_truth_packet.json` | receipts `55`, progress ids `50`, missing ids `5`, duplicate groups `1`; `not_final: true` | pass, not finality |
+| Goal truth duplicate groups | `operator_goal_truth_packet.json` | duplicate group count `1`; member names rendered | pass, routing metadata only |
 | Periodic onboard | `make onboard` | exit `0` | pass, not mission authority |
 | Codex toolbelt | `bash scripts/runtime/codex_toolbelt_status.sh` | exit `0` with optional credential warnings | pass |
 | Latest periodic onboard/toolbelt | `make onboard`; `bash scripts/runtime/codex_toolbelt_status.sh` | both exit `0`; optional credential warnings | pass, not mission authority |
@@ -202,6 +204,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `r-802f88903e805cdb` | keep | manifest artifact counts |
 | `r-0ee1f0865dd69047` | keep | goal-truth receipt-chain inventory |
 | `r-257787644e0f6723` | keep | five-hour non-final timebox proof |
+| `r-36c4e1eed5522c07` | keep | goal-truth duplicate group membership |
 
 ## Revert / Queue Ledger
 

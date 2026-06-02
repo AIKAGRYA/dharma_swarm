@@ -458,11 +458,26 @@ def _goal_truth_payload(
         for item in receipt_items
         if item["has_progress_receipt_id"]
     ]
+    receipt_names_by_progress_id: dict[str, list[str]] = {}
+    for item in receipt_items:
+        progress_receipt_id = str(item["progress_receipt_id"])
+        if progress_receipt_id:
+            receipt_names_by_progress_id.setdefault(progress_receipt_id, []).append(
+                str(item["name"])
+            )
     progress_id_counts = Counter(progress_receipt_ids)
     duplicate_progress_receipt_ids = [
         receipt_id
         for receipt_id, count in sorted(progress_id_counts.items())
         if count > 1
+    ]
+    duplicate_progress_receipt_groups = [
+        {
+            "progress_receipt_id": receipt_id,
+            "count": int(progress_id_counts[receipt_id]),
+            "receipt_names": receipt_names_by_progress_id.get(receipt_id, []),
+        }
+        for receipt_id in duplicate_progress_receipt_ids
     ]
     missing_progress_receipt_names = [
         str(item["name"]) for item in receipt_items if not item["has_progress_receipt_id"]
@@ -479,10 +494,15 @@ def _goal_truth_payload(
         "receipts": receipt_items,
         "receipt_count": len(receipt_items),
         "progress_receipt_ids": progress_receipt_ids,
+        "progress_receipt_id_counts": dict(sorted(progress_id_counts.items())),
         "progress_receipt_count": len(progress_receipt_ids),
         "unique_progress_receipt_id_count": len(progress_id_counts),
         "duplicate_progress_receipt_ids": duplicate_progress_receipt_ids,
         "duplicate_progress_receipt_id_count": len(duplicate_progress_receipt_ids),
+        "duplicate_progress_receipt_groups": duplicate_progress_receipt_groups,
+        "duplicate_progress_receipt_group_count": len(
+            duplicate_progress_receipt_groups
+        ),
         "missing_progress_receipt_names": missing_progress_receipt_names,
         "missing_progress_receipt_count": len(missing_progress_receipt_names),
         "all_receipts_have_progress_receipts": not missing_progress_receipt_names,
@@ -577,6 +597,9 @@ def _artifact_manifest_payload(
         ),
         "goal_truth_duplicate_progress_receipt_id_count": goal_truth.get(
             "duplicate_progress_receipt_id_count", 0
+        ),
+        "goal_truth_duplicate_progress_receipt_group_count": goal_truth.get(
+            "duplicate_progress_receipt_group_count", 0
         ),
         "not_final": completion_guard.get("not_final", True),
         "artifact_paths": artifact_path_map,

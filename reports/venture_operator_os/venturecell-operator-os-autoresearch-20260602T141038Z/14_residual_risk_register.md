@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live risk register, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-257787644e0f6723`
-Current scoped HEAD before this packet: `1f44b1c6 feat(operator-os): render goal truth packet`
+ds-goal progress receipt: `r-36c4e1eed5522c07`
+Current scoped HEAD before this packet: `10e7c51d docs(operator-os): record five-hour timebox`
 
 This register separates current blockers, residual risks, and solved local
 claims. It exists to prevent false completion after a high live score.
@@ -40,6 +40,7 @@ claims. It exists to prevent false completion after a high live score.
 | Latest progress receipt id overclaim | manifest reports latest ds-goal receipt id | treat as navigation, not reporter closure |
 | Goal truth packet overclaim | `operator_goal_truth_packet.json` reports receipt-chain counts | treat as reliability inventory, not reporter closure |
 | Goal truth duplicate-id overclaim | packet reports duplicate progress id group for the current summary-doc stamp | treat as shared summary-doc stamping, not extra closure proof |
+| Goal truth duplicate-group overclaim | packet reports member names for duplicate progress ids | treat as audit routing, not terminal receipts |
 | Admission redaction overclaim | governed admission raw redacts volatile id/time | ensure decision and reasons remain visible |
 | Gap triage overclaim | `operator_gap_triage_packet.json` separates local/external gaps | treat as loop selector, not authority or gate clearance |
 | Gap triage count overclaim | gap triage exposes total/local/external counts | treat as selector sizes, not solved-gap evidence |
@@ -114,7 +115,8 @@ claims. It exists to prevent false completion after a high live score.
 | Five-hour timebox recorded | elapsed `18091s`, remaining `10809s` | non-final proof only |
 | Manifest receipt summary renders | receipt count and latest path present | audit locator only |
 | Manifest inventory scope renders | latest name and non-final/non-authority markers present | audit locator only |
-| Goal truth packet renders | receipts `54`, progress ids `49`, missing ids `5`, duplicate groups `1` | receipt-chain inventory only |
+| Goal truth packet renders | receipts `55`, progress ids `50`, missing ids `5`, duplicate groups `1` | receipt-chain inventory only |
+| Goal truth duplicate groups render | duplicate group count `1` with member names | receipt-chain routing only |
 | Admission render stable | volatile id/time redacted | diff hygiene only |
 
 ## Loop 15 Receipt
