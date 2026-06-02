@@ -39,6 +39,9 @@ from typing import Any, Callable
 
 from pydantic import BaseModel, Field
 
+from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity
+from dharma_swarm.spine.tollbooth import require_execution_tollbooth
+
 logger = logging.getLogger(__name__)
 
 _API_NAME_PATTERN = re.compile(r"^dharma\.([a-z][a-z0-9_]*)\.([A-Z][A-Za-z0-9]*)$")
@@ -768,6 +771,9 @@ class OntologyRegistry:
         params: dict[str, Any],
         executed_by: str = "system",
         gate_check: Callable[[str, dict[str, Any]], dict[str, str]] | None = None,
+        execution_identity: ExecutionIdentity | None = None,
+        runtime_state: Any | None = None,
+        require_identity: bool = False,
     ) -> ActionExecution:
         """Execute a typed action with telos gate checking.
 
@@ -794,6 +800,34 @@ class OntologyRegistry:
             execution.error = f"no action '{action_name}' for type '{object_type}'"
             self._action_log.append(execution)
             return execution
+
+        try:
+            identity = require_execution_tollbooth(
+                execution_identity=execution_identity,
+                runtime_state=runtime_state,
+                surface="ontology",
+                action=action_name,
+                require_identity=require_identity,
+            )
+        except MissingExecutionIdentity as exc:
+            execution.result = "blocked"
+            execution.error = str(exc)
+            self._action_log.append(execution)
+            return execution
+        if identity is not None and runtime_state is not None:
+            runtime_state.record_ontology_action_receipt_sync(
+                identity,
+                action_name=action_name,
+                object_type=object_type,
+                object_id=object_id,
+                applied=False,
+                status="requested",
+                payload={
+                    "modifies": list(action_def.modifies),
+                    "creates": list(action_def.creates),
+                    "requires_approval": action_def.requires_approval,
+                },
+            )
 
         # Telos gate check
         if action_def.telos_gates:
@@ -870,6 +904,20 @@ class OntologyRegistry:
             return execution
 
         execution.result = "success"
+        if identity is not None and runtime_state is not None:
+            runtime_state.record_ontology_action_receipt_sync(
+                identity,
+                action_name=action_name,
+                object_type=object_type,
+                object_id=object_id,
+                applied=True,
+                status="applied",
+                payload={
+                    "modifies": list(action_def.modifies),
+                    "creates": list(action_def.creates),
+                    "requires_approval": action_def.requires_approval,
+                },
+            )
         self._action_log.append(execution)
         return execution
 

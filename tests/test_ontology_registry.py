@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import tempfile
 from pathlib import Path
 
@@ -29,6 +30,8 @@ from dharma_swarm.ontology import (
     entity_context,
     entity_graph,
 )
+from dharma_swarm.runtime_state import RuntimeStateStore
+from dharma_swarm.spine.identity import ExecutionIdentity
 
 
 # ── Fixtures ────────────────────────────────────────────────────────
@@ -37,6 +40,21 @@ from dharma_swarm.ontology import (
 @pytest.fixture
 def registry() -> OntologyRegistry:
     return OntologyRegistry.create_dharma_registry()
+
+
+def _identity(**overrides: str) -> ExecutionIdentity:
+    payload = {
+        "task_id": "task-ontology-tollbooth",
+        "agent_id": "agent-ontology-tollbooth",
+        "session_id": "session-ontology-tollbooth",
+        "trace_id": "trace-ontology-tollbooth",
+        "correlation_id": "corr-ontology-tollbooth",
+        "run_id": "run-ontology-tollbooth",
+        "claim_id": "claim-ontology-tollbooth",
+        "idempotency_key": "idem-ontology-tollbooth",
+    }
+    payload.update(overrides)
+    return ExecutionIdentity.new(**payload)
 
 
 @pytest.fixture
@@ -344,6 +362,55 @@ class TestActions:
         })
         result = registry.execute_action("Experiment", "Run", obj.id, {"gpu": "A100"})
         assert result.result == "success"
+
+    def test_execute_action_requires_identity_when_tollbooth_required(
+        self,
+        registry: OntologyRegistry,
+        tmp_path: Path,
+    ) -> None:
+        obj, _ = registry.create_object("Experiment", {
+            "name": "test", "status": "designed",
+        })
+        runtime = RuntimeStateStore(tmp_path / "runtime.db")
+
+        result = registry.execute_action(
+            "Experiment",
+            "Run",
+            obj.id,
+            {"gpu": "A100"},
+            runtime_state=runtime,
+            require_identity=True,
+        )
+
+        assert result.result == "blocked"
+        assert "requires ExecutionIdentity" in result.error
+
+    def test_execute_action_records_ontology_receipts_when_identity_present(
+        self,
+        registry: OntologyRegistry,
+        tmp_path: Path,
+    ) -> None:
+        obj, _ = registry.create_object("Experiment", {
+            "name": "test", "status": "designed",
+        })
+        runtime = RuntimeStateStore(tmp_path / "runtime.db")
+        identity = _identity()
+
+        result = registry.execute_action(
+            "Experiment",
+            "Run",
+            obj.id,
+            {"gpu": "A100"},
+            runtime_state=runtime,
+            execution_identity=identity,
+            require_identity=True,
+        )
+
+        assert result.result == "success"
+        ledger = asyncio.run(runtime.get_run_ledger(identity.run_id))
+        receipt_types = [receipt.receipt_type for receipt in ledger["receipts"]]
+        assert "ontology_action_requested" in receipt_types
+        assert "ontology_action_applied" in receipt_types
 
     def test_execute_unknown_action(self, registry: OntologyRegistry) -> None:
         result = registry.execute_action("Experiment", "FakeAction", "id", {})
