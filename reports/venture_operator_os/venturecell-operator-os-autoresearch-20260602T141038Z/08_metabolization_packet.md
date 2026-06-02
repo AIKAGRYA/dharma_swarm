@@ -1235,3 +1235,30 @@ Metabolized rule:
 
 - Command inventories must name expected results and must not be cited as proof
   until the commands are run in the relevant window.
+
+## Loop 66 Metabolization Note
+
+Hypothesis:
+
+If final artifacts are itemized with proof type and satisfaction state, future
+agents can complete the final window from machine-readable evidence instead of
+conversation memory.
+
+Patch:
+
+- Added required final artifact items and manifest mirrors.
+
+Evaluation:
+
+- Focused and supporting verifier slices passed.
+- Live preflight reports `6` items and `0` closure-satisfied items.
+
+Adversarial review:
+
+- Present local files are not terminal proof.
+- Terminal-only proof items are still absent by design.
+
+Metabolized rule:
+
+- Final artifact inventories must distinguish local draft presence from
+  terminal proof satisfaction.

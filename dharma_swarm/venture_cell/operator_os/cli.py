@@ -806,6 +806,75 @@ def _goal_truth_payload(
     }
 
 
+def _required_final_artifact_items(
+    artifacts: tuple[Any, ...],
+    *,
+    output_dir: Path,
+) -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = []
+    for artifact_value in artifacts:
+        artifact = str(artifact_value or "").strip()
+        if not artifact:
+            continue
+        if artifact.endswith(".md"):
+            expected_path = output_dir / artifact
+            exists = expected_path.exists()
+            items.append(
+                {
+                    "artifact": artifact,
+                    "artifact_type": "run_markdown_file",
+                    "expected_path": str(expected_path),
+                    "exists": exists,
+                    "terminal_only": False,
+                    "requires_final_refresh": True,
+                    "satisfies_final_closure": False,
+                    "status": "present_needs_final_refresh"
+                    if exists
+                    else "missing_needs_creation",
+                }
+            )
+        elif artifact == "final_ds_goal_terminal_receipt":
+            items.append(
+                {
+                    "artifact": artifact,
+                    "artifact_type": "terminal_ds_goal_receipt",
+                    "expected_path": "",
+                    "exists": False,
+                    "terminal_only": True,
+                    "requires_final_refresh": False,
+                    "satisfies_final_closure": False,
+                    "status": "terminal_receipt_required_after_true_time",
+                }
+            )
+        elif artifact == "complete_verifier_pass_after_reporter_closure":
+            items.append(
+                {
+                    "artifact": artifact,
+                    "artifact_type": "terminal_verifier_state",
+                    "expected_path": "",
+                    "exists": False,
+                    "terminal_only": True,
+                    "requires_final_refresh": False,
+                    "satisfies_final_closure": False,
+                    "status": "verifier_pass_required_after_reporter_closure",
+                }
+            )
+        else:
+            items.append(
+                {
+                    "artifact": artifact,
+                    "artifact_type": "unknown_final_artifact",
+                    "expected_path": "",
+                    "exists": False,
+                    "terminal_only": False,
+                    "requires_final_refresh": True,
+                    "satisfies_final_closure": False,
+                    "status": "review_required",
+                }
+            )
+    return items
+
+
 def _final_window_preflight_payload(
     *,
     projection: dict[str, Any],
@@ -817,6 +886,33 @@ def _final_window_preflight_payload(
     authority = _authority_boundary_payload(projection)
     required_final_artifacts = _sequence_items(
         completion_guard.get("required_final_artifacts")
+    )
+    required_final_artifact_items = _required_final_artifact_items(
+        required_final_artifacts,
+        output_dir=output_dir,
+    )
+    required_final_artifact_terminal_only_count = sum(
+        1 for item in required_final_artifact_items if bool(item["terminal_only"])
+    )
+    required_final_artifact_local_markdown_count = sum(
+        1
+        for item in required_final_artifact_items
+        if item["artifact_type"] == "run_markdown_file"
+    )
+    required_final_artifact_existing_local_count = sum(
+        1
+        for item in required_final_artifact_items
+        if not item["terminal_only"] and bool(item["exists"])
+    )
+    required_final_artifact_refresh_required_count = sum(
+        1
+        for item in required_final_artifact_items
+        if bool(item["requires_final_refresh"])
+    )
+    required_final_artifact_closure_satisfied_count = sum(
+        1
+        for item in required_final_artifact_items
+        if bool(item["satisfies_final_closure"])
     )
     final_closure_blockers = _sequence_items(
         completion_guard.get("final_closure_blockers")
@@ -903,6 +999,23 @@ def _final_window_preflight_payload(
         ),
         "required_final_artifacts": required_final_artifacts,
         "required_final_artifact_count": len(required_final_artifacts),
+        "required_final_artifact_items": required_final_artifact_items,
+        "required_final_artifact_item_count": len(required_final_artifact_items),
+        "required_final_artifact_local_markdown_count": (
+            required_final_artifact_local_markdown_count
+        ),
+        "required_final_artifact_existing_local_count": (
+            required_final_artifact_existing_local_count
+        ),
+        "required_final_artifact_terminal_only_count": (
+            required_final_artifact_terminal_only_count
+        ),
+        "required_final_artifact_refresh_required_count": (
+            required_final_artifact_refresh_required_count
+        ),
+        "required_final_artifact_closure_satisfied_count": (
+            required_final_artifact_closure_satisfied_count
+        ),
         "final_closure_blockers": final_closure_blockers,
         "final_closure_blocker_count": len(final_closure_blockers),
         "preflight_checks": preflight_checks,
@@ -1048,6 +1161,24 @@ def _artifact_manifest_payload(
         ),
         "final_window_preflight_required_final_artifact_count": final_window_preflight.get(
             "required_final_artifact_count", 0
+        ),
+        "final_window_preflight_required_final_artifact_item_count": final_window_preflight.get(
+            "required_final_artifact_item_count", 0
+        ),
+        "final_window_preflight_required_final_artifact_local_markdown_count": final_window_preflight.get(
+            "required_final_artifact_local_markdown_count", 0
+        ),
+        "final_window_preflight_required_final_artifact_existing_local_count": final_window_preflight.get(
+            "required_final_artifact_existing_local_count", 0
+        ),
+        "final_window_preflight_required_final_artifact_terminal_only_count": final_window_preflight.get(
+            "required_final_artifact_terminal_only_count", 0
+        ),
+        "final_window_preflight_required_final_artifact_refresh_required_count": final_window_preflight.get(
+            "required_final_artifact_refresh_required_count", 0
+        ),
+        "final_window_preflight_required_final_artifact_closure_satisfied_count": final_window_preflight.get(
+            "required_final_artifact_closure_satisfied_count", 0
         ),
         "goal_truth_progress_receipt_count": goal_truth.get(
             "progress_receipt_count", 0

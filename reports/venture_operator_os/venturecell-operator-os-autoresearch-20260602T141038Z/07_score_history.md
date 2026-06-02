@@ -272,6 +272,37 @@ Keep / revert / queue:
 
 Decision: keep.
 
+## Loop 66 Score Update
+
+Hypothesis:
+
+If final-window artifact requirements are itemized by local and terminal proof
+type, the final agent can avoid confusing present draft files with closeout
+evidence.
+
+Patch:
+
+- Added final artifact itemization to the preflight packet.
+- Mirrored artifact-item counters in the manifest.
+- Added focused tests for count parity and zero closure-satisfied items.
+
+Evaluation:
+
+- Focused Operator OS tests passed.
+- Darshan/control and governed/A2A/daily slices passed.
+- Operator OS compile passed.
+- Complete verifier remains blocked only by the open reporter.
+
+Adversarial review:
+
+- Live score remains `100/100`, but still non-final.
+- This improves final-hour clarity and does not grant authority.
+- Existing local artifacts still require final-window refresh.
+
+Keep / revert / queue:
+
+Decision: keep.
+
 ## Loop 65 Score Update
 
 Hypothesis:

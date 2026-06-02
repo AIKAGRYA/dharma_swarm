@@ -618,3 +618,25 @@ Still forbidden:
 - treating command listing as command execution;
 - claiming complete verifier pass before reporter closure;
 - including unrelated staged work in final commits.
+
+## Loop 66 Next Goal Addendum
+
+Current new evidence:
+
+- `65_final_preflight_artifact_items_receipt.md`
+- updated `operator_final_window_preflight_packet.json`
+- updated `operator_os_artifact_manifest.json`
+
+Next safe loop targets:
+
+- Continue local review until elapsed time reaches `28800s`.
+- Treat the four existing final-review markdown artifacts as inputs that still
+  need true final-window refresh.
+- Treat the terminal ds-goal receipt and complete-verifier pass as terminal-only
+  proof requirements.
+
+Still forbidden:
+
+- treating existing local draft files as final proof;
+- closing reporter before true time and terminal-verifier proof;
+- external outreach, publishing, handoff, spend, deploy, push, or merge.

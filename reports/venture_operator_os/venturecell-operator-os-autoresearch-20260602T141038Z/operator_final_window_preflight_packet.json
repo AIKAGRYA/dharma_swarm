@@ -19,8 +19,8 @@
     "claim_external_authority_without_go_receipt",
     "include_unrelated_staged_work"
   ],
-  "latest_progress_receipt_id": "r-98e140611af9f18e",
-  "latest_receipt_name": "64_final_preflight_commands_receipt.md",
+  "latest_progress_receipt_id": "r-0cb6e10c9984ac6b",
+  "latest_receipt_name": "65_final_preflight_artifact_items_receipt.md",
   "not_authority": true,
   "not_final": true,
   "preflight_check_count": 5,
@@ -92,7 +92,75 @@
   "receipt_chain_complete_claimed": false,
   "reporter_task_must_remain_open": true,
   "required_elapsed_seconds": 28800,
+  "required_final_artifact_closure_satisfied_count": 0,
   "required_final_artifact_count": 6,
+  "required_final_artifact_existing_local_count": 4,
+  "required_final_artifact_item_count": 6,
+  "required_final_artifact_items": [
+    {
+      "artifact": "06_adversary_audit.md",
+      "artifact_type": "run_markdown_file",
+      "exists": true,
+      "expected_path": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/06_adversary_audit.md",
+      "requires_final_refresh": true,
+      "satisfies_final_closure": false,
+      "status": "present_needs_final_refresh",
+      "terminal_only": false
+    },
+    {
+      "artifact": "07_score_history.md",
+      "artifact_type": "run_markdown_file",
+      "exists": true,
+      "expected_path": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/07_score_history.md",
+      "requires_final_refresh": true,
+      "satisfies_final_closure": false,
+      "status": "present_needs_final_refresh",
+      "terminal_only": false
+    },
+    {
+      "artifact": "08_metabolization_packet.md",
+      "artifact_type": "run_markdown_file",
+      "exists": true,
+      "expected_path": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/08_metabolization_packet.md",
+      "requires_final_refresh": true,
+      "satisfies_final_closure": false,
+      "status": "present_needs_final_refresh",
+      "terminal_only": false
+    },
+    {
+      "artifact": "09_next_goal_packet.md",
+      "artifact_type": "run_markdown_file",
+      "exists": true,
+      "expected_path": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/09_next_goal_packet.md",
+      "requires_final_refresh": true,
+      "satisfies_final_closure": false,
+      "status": "present_needs_final_refresh",
+      "terminal_only": false
+    },
+    {
+      "artifact": "final_ds_goal_terminal_receipt",
+      "artifact_type": "terminal_ds_goal_receipt",
+      "exists": false,
+      "expected_path": "",
+      "requires_final_refresh": false,
+      "satisfies_final_closure": false,
+      "status": "terminal_receipt_required_after_true_time",
+      "terminal_only": true
+    },
+    {
+      "artifact": "complete_verifier_pass_after_reporter_closure",
+      "artifact_type": "terminal_verifier_state",
+      "exists": false,
+      "expected_path": "",
+      "requires_final_refresh": false,
+      "satisfies_final_closure": false,
+      "status": "verifier_pass_required_after_reporter_closure",
+      "terminal_only": true
+    }
+  ],
+  "required_final_artifact_local_markdown_count": 4,
+  "required_final_artifact_refresh_required_count": 4,
+  "required_final_artifact_terminal_only_count": 2,
   "required_final_artifacts": [
     "06_adversary_audit.md",
     "07_score_history.md",

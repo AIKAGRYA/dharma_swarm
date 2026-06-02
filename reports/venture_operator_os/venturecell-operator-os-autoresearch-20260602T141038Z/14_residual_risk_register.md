@@ -176,6 +176,22 @@ New solved local claim:
 
 Decision: keep the risk in the live register until final-window review.
 
+## Loop 66 Risk Addendum
+
+New residual risk:
+
+| Risk | Current evidence | Handling |
+|---|---|---|
+| Local draft overclaim | preflight packet reports four existing local final-review markdown artifacts | treat them as final-window inputs that still require refresh and terminal proof |
+
+New solved local claim:
+
+| Claim | Evidence | Boundary |
+|---|---|---|
+| Final artifact itemization renders | focused tests pass and live packet reports items `6`, local markdown `4`, terminal-only `2`, closure-satisfied `0` | not final proof and not reporter closure |
+
+Decision: keep the risk in the live register until final-window review.
+
 ## Loop 65 Risk Addendum
 
 New residual risk:

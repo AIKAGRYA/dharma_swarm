@@ -827,6 +827,49 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert final_window_preflight_packet["required_final_artifact_count"] == len(
         final_window_preflight_packet["required_final_artifacts"]
     )
+    assert final_window_preflight_packet["required_final_artifact_item_count"] == len(
+        final_window_preflight_packet["required_final_artifact_items"]
+    )
+    assert final_window_preflight_packet["required_final_artifact_item_count"] == 6
+    assert final_window_preflight_packet[
+        "required_final_artifact_local_markdown_count"
+    ] == 4
+    assert final_window_preflight_packet[
+        "required_final_artifact_existing_local_count"
+    ] == 0
+    assert final_window_preflight_packet[
+        "required_final_artifact_terminal_only_count"
+    ] == 2
+    assert final_window_preflight_packet[
+        "required_final_artifact_refresh_required_count"
+    ] == 4
+    assert final_window_preflight_packet[
+        "required_final_artifact_closure_satisfied_count"
+    ] == 0
+    preflight_artifact_items = {
+        item["artifact"]: item
+        for item in final_window_preflight_packet["required_final_artifact_items"]
+    }
+    assert preflight_artifact_items["06_adversary_audit.md"]["artifact_type"] == (
+        "run_markdown_file"
+    )
+    assert preflight_artifact_items["06_adversary_audit.md"]["exists"] is False
+    assert preflight_artifact_items["06_adversary_audit.md"][
+        "requires_final_refresh"
+    ] is True
+    assert preflight_artifact_items["06_adversary_audit.md"][
+        "satisfies_final_closure"
+    ] is False
+    assert preflight_artifact_items["final_ds_goal_terminal_receipt"][
+        "terminal_only"
+    ] is True
+    assert preflight_artifact_items["complete_verifier_pass_after_reporter_closure"][
+        "artifact_type"
+    ] == "terminal_verifier_state"
+    assert all(
+        item["satisfies_final_closure"] is False
+        for item in final_window_preflight_packet["required_final_artifact_items"]
+    )
     assert final_window_preflight_packet["final_closure_blocker_count"] == len(
         final_window_preflight_packet["final_closure_blockers"]
     )
@@ -975,6 +1018,34 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert artifact_manifest[
         "final_window_preflight_required_final_artifact_count"
     ] == final_window_preflight_packet["required_final_artifact_count"]
+    assert artifact_manifest[
+        "final_window_preflight_required_final_artifact_item_count"
+    ] == final_window_preflight_packet["required_final_artifact_item_count"]
+    assert artifact_manifest[
+        "final_window_preflight_required_final_artifact_local_markdown_count"
+    ] == final_window_preflight_packet[
+        "required_final_artifact_local_markdown_count"
+    ]
+    assert artifact_manifest[
+        "final_window_preflight_required_final_artifact_existing_local_count"
+    ] == final_window_preflight_packet[
+        "required_final_artifact_existing_local_count"
+    ]
+    assert artifact_manifest[
+        "final_window_preflight_required_final_artifact_terminal_only_count"
+    ] == final_window_preflight_packet[
+        "required_final_artifact_terminal_only_count"
+    ]
+    assert artifact_manifest[
+        "final_window_preflight_required_final_artifact_refresh_required_count"
+    ] == final_window_preflight_packet[
+        "required_final_artifact_refresh_required_count"
+    ]
+    assert artifact_manifest[
+        "final_window_preflight_required_final_artifact_closure_satisfied_count"
+    ] == final_window_preflight_packet[
+        "required_final_artifact_closure_satisfied_count"
+    ]
     assert "canvas_summary_packet" in artifact_manifest["summary_packet_names"]
     assert "department_summary_packet" in artifact_manifest["summary_packet_names"]
     assert "gate_summary_packet" in artifact_manifest["summary_packet_names"]

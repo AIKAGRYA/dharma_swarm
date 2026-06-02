@@ -467,3 +467,27 @@ Keep / revert / queue:
 Decision: keep.
 
 ds-goal progress receipt: `r-98e140611af9f18e`
+
+## Loop 66 Adversary Addendum
+
+New claim under attack: existing final-review markdown artifacts satisfy final
+closeout.
+
+Current evidence:
+
+- `operator_final_window_preflight_packet.json` itemizes `6` required final
+  artifacts.
+- Local markdown count is `4` and existing local count is `4`.
+- Terminal-only count is `2`.
+- Closure-satisfied count is `0`.
+- Reporter remains open.
+
+Verdict: false. Existing local review drafts are useful final-window inputs, not
+terminal proof. The terminal ds-goal receipt and complete-verifier pass still
+must be produced after true-time proof.
+
+Keep / revert / queue:
+
+Decision: keep.
+
+ds-goal progress receipt: `r-0cb6e10c9984ac6b`
