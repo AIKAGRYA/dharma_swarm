@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-6d39cead7335a6bb`
-Current scoped HEAD before this packet: `d426d12c feat(operator-os): detail goal truth duplicates`
+ds-goal progress receipt: `r-12e8775da2b8132f`
+Current scoped HEAD before this packet: `b6f9090b feat(operator-os): render darshan go unblock packet`
 
 This packet is the handoff for the next bounded AutoResearch loop. It must be
 reviewed and updated in the final hour before reporter closure.
@@ -24,6 +24,8 @@ reviewed and updated in the final hour before reporter closure.
 - Darshan GO unblock packet: present; required receipt fields `16`, expected
   local artifacts `4`, blocked actions `4`, blocked departments `2`, accepted
   receipts `0`, not evidence.
+- Digest GO unblock summary: present; required receipt fields `16`, accepted
+  receipts `0`, expected local artifact count `4`, requirements only.
 - Live verifier matrix: present, not final.
 - Authority boundary: `local_read_only_external_blocked`.
 - Authority booleans: external authority not granted; Operator OS action ack
@@ -79,13 +81,13 @@ reviewed and updated in the final hour before reporter closure.
   only.
 - Manifest latest progress receipt id: present; latest receipt id inventory is
   navigation only and not reporter closure.
-- Operator goal truth packet: present; receipts `56`, progress receipt ids
-  `51`, unique progress receipt ids `45`, missing progress ids `5`, duplicate
+- Operator goal truth packet: present; receipts `57`, progress receipt ids
+  `52`, unique progress receipt ids `46`, missing progress ids `5`, duplicate
   progress id groups `1`; inventory only.
 - Goal truth duplicate group details: present; group count `1`, member names
   rendered for receipt-chain audit only.
-- Goal truth packet latest receipt: `54_darshan_go_unblock_receipt.md` with
-  progress receipt `r-6d39cead7335a6bb`; not terminal closure.
+- Goal truth packet latest receipt: `55_digest_go_unblock_summary_receipt.md`
+  with progress receipt `r-12e8775da2b8132f`; not terminal closure.
 - Stable admission render: volatile admission id/time redacted; decision
   evidence remains visible.
 - Timebox refresh: current clock still below 8 hours.
@@ -94,7 +96,7 @@ reviewed and updated in the final hour before reporter closure.
 - Four-hour midpoint proof: current clock still below 8 hours.
 - Five-hour timebox proof: current clock still below 8 hours.
 - Last committed packet: periodic onboard refresh.
-- Last committed packet: goal-truth duplicate group membership.
+- Last committed packet: Darshan GO unblock requirements.
 
 ## Next Goal
 

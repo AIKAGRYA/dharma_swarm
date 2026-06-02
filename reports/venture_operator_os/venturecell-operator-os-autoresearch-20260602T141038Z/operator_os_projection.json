@@ -2807,7 +2807,7 @@
         "title": "MemoryKernel Report Source Packet"
       },
       {
-        "excerpt": "# Metabolization Packet Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live packet, not final until the 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-6d39cead7335a6bb` Current scoped HEAD before this packet: `d426d12c feat(operator-os): detail goal truth duplicates` Th",
+        "excerpt": "# Metabolization Packet Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live packet, not final until the 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-12e8775da2b8132f` Current scoped HEAD before this packet: `b6f9090b feat(operator-os): render darshan go unblock packet",
         "matched_terms": [
           "VentureCell",
           "Operator OS",
@@ -2825,7 +2825,7 @@
         "title": "Metabolization Packet"
       },
       {
-        "excerpt": "# Next Goal Packet Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live draft, not final until the 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-6d39cead7335a6bb` Current scoped HEAD before this packet: `d426d12c feat(operator-os): detail goal truth duplicates` This pac",
+        "excerpt": "# Next Goal Packet Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live draft, not final until the 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-12e8775da2b8132f` Current scoped HEAD before this packet: `b6f9090b feat(operator-os): render darshan go unblock packet` This",
         "matched_terms": [
           "VentureCell",
           "Operator OS",
@@ -2895,7 +2895,7 @@
         "title": "Loop 05 Darshan GO Gate Receipt"
       },
       {
-        "excerpt": "# Live Verifier Matrix Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live verifier matrix, not final until the true 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-6d39cead7335a6bb` Current scoped HEAD before this packet: `d426d12c feat(operator-os): detail goal truth d",
+        "excerpt": "# Live Verifier Matrix Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live verifier matrix, not final until the true 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-12e8775da2b8132f` Current scoped HEAD before this packet: `b6f9090b feat(operator-os): render darshan go u",
         "matched_terms": [
           "VentureCell",
           "Operator OS",
@@ -2960,7 +2960,7 @@
         "title": "Memory Coverage Counts Receipt"
       },
       {
-        "excerpt": "# Adversary Audit Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live draft, not final until the true 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-6d39cead7335a6bb` Current scoped HEAD before this packet: `d426d12c feat(operator-os): detail goal truth duplicates` This",
+        "excerpt": "# Adversary Audit Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live draft, not final until the true 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-12e8775da2b8132f` Current scoped HEAD before this packet: `b6f9090b feat(operator-os): render darshan go unblock packet` ",
         "matched_terms": [
           "VentureCell",
           "Operator OS",
@@ -3005,7 +3005,7 @@
         "title": "Authority Boundary Receipt"
       },
       {
-        "excerpt": "# Residual Risk Register Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live risk register, not final until the true 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-6d39cead7335a6bb` Current scoped HEAD before this packet: `d426d12c feat(operator-os): detail goal truth d",
+        "excerpt": "# Residual Risk Register Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live risk register, not final until the true 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-12e8775da2b8132f` Current scoped HEAD before this packet: `b6f9090b feat(operator-os): render darshan go u",
         "matched_terms": [
           "VentureCell",
           "Operator OS",
@@ -3033,6 +3033,20 @@
         "path": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/39_go_receipt_counts_receipt.md",
         "tier": "staged",
         "title": "GO Receipt Counts Receipt"
+      },
+      {
+        "excerpt": "# Score History Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live ledger, not final until the 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-12e8775da2b8132f` Baseline: `1aca07a1 Add VentureCell Operator OS Level 70 surface` Current scoped HEAD before this packet: `b6",
+        "matched_terms": [
+          "VentureCell",
+          "Operator OS",
+          "Darshan",
+          "MemoryKernel",
+          "Canvas",
+          "staged"
+        ],
+        "path": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/07_score_history.md",
+        "tier": "staged",
+        "title": "Score History"
       },
       {
         "excerpt": "# Artifact Manifest Receipt Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live packet, not final until the true 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-fc6ccc17c8ce64f2` Current scoped HEAD before this packet: `6a6401b0 docs(operator-os): add residual risk regis",
@@ -3075,20 +3089,6 @@
         "path": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/29_memory_coverage_targets_receipt.md",
         "tier": "staged",
         "title": "Memory Coverage Targets Receipt"
-      },
-      {
-        "excerpt": "# Periodic Substrate Refresh Receipt Run: `venturecell-operator-os-autoresearch-20260602T141038Z` Status: live packet, not final until the true 8-hour contract is closed Mission: `20260602-venturecell-operator-os-autoresearch-8h` ds-goal progress receipt: `r-af82a796175a05dc` Current scoped HEAD before this packet: `e8e6aaeb docs(operator-os): record three-h",
-        "matched_terms": [
-          "VentureCell",
-          "Operator OS",
-          "Darshan",
-          "external reader",
-          "Chetana",
-          "trusted"
-        ],
-        "path": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/33_periodic_substrate_refresh_receipt.md",
-        "tier": "staged",
-        "title": "Periodic Substrate Refresh Receipt"
       },
       {
         "excerpt": "title: WOW OWOW OW, there is toally a strong wiki prpot, what do yo umean no wiki as i\u2026 \u2014 turn 5 chetana_version: 0.1.0 atom_id: 0e360da6-2296-46d5-881f-5ebd497be6f1 type: atomic confidence: 0.5 source: - kind: session path: /Users/dhyana/.claude/projects/-Users-dhyana/c74c67f4-49a2-453d-ab62-0be4ff41b768.jsonl span: line:179 captured: '2026-04-29T06:22:44.4",
@@ -3555,7 +3555,7 @@
         "indexed_count": 20,
         "role": "supplemental_staging",
         "root": "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z",
-        "scanned_count": 57,
+        "scanned_count": 58,
         "tier": "staged",
         "truncated": false
       },
@@ -3575,7 +3575,7 @@
       "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z",
       "/Users/dhyana/.dharma/knowledge/quarantine"
     ],
-    "staged_count": 5057,
+    "staged_count": 5058,
     "status": "read_through_index_available",
     "truncated": true,
     "trusted_count": 1336

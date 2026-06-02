@@ -354,6 +354,11 @@ def test_operator_daily_digest_renders_structure_without_live_authority_claim(tm
     assert "## Darshan GO Gate" in digest
     assert "block_external_authority" in digest
     assert "draft_template_not_evidence" in digest
+    assert "- Required receipt fields: `16`" in digest
+    assert "- Accepted receipts: `0`" in digest
+    assert "- Expected local artifact count: `4`" in digest
+    assert "darshan_go_unblock_packet.json" in digest
+    assert "(requirements only, not evidence)" in digest
     assert "## Next Action Packet" in digest
     assert "hold_external_authority" in digest
     assert "## Gap Triage" in digest

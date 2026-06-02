@@ -79,6 +79,8 @@ def render_operator_daily_digest(projection: VentureCellOperatorProjection) -> s
     expected_artifacts = (
         ", ".join(go_gate.expected_local_artifacts) if go_gate.expected_local_artifacts else "none"
     )
+    required_receipt_field_count = len(go_gate.required_receipt_fields)
+    expected_local_artifact_count = len(go_gate.expected_local_artifacts)
     receipt_template_status = str(
         go_gate.receipt_template.get("template_status") or "not_rendered"
     )
@@ -91,10 +93,15 @@ def render_operator_daily_digest(projection: VentureCellOperatorProjection) -> s
             f"- Authority boundary: `{go_gate.authority_boundary}`",
             f"- Required source: `{go_gate.required_receipt_source}`",
             f"- Required schema: `{go_gate.required_receipt_schema}`",
+            f"- Required receipt fields: `{required_receipt_field_count}`",
+            f"- Accepted receipts: `{go_gate.accepted_receipt_count}`",
             f"- Countable events: `{', '.join(go_gate.countable_event_types)}`",
             f"- Blocked actions: `{blocked_actions}`",
+            f"- Expected local artifact count: `{expected_local_artifact_count}`",
             f"- Expected local artifacts: `{expected_artifacts}`",
             f"- Receipt template: `{receipt_template_status}`",
+            "- GO unblock packet: `darshan_go_unblock_packet.json` "
+            "(requirements only, not evidence)",
             f"- Next governed action: {go_gate.next_governed_action}",
         ]
     )

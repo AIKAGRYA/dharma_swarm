@@ -66,10 +66,14 @@
 - Authority boundary: `read_only_until_accepted_privacy_redacted_go_receipt`
 - Required source: `darshan_external_reader`
 - Required schema: `go_evidence_receipt.v0`
+- Required receipt fields: `16`
+- Accepted receipts: `0`
 - Countable events: `decision, inspection, read, reply`
 - Blocked actions: `external_outreach, publishing, external_operator_handoff, live_external_authority`
+- Expected local artifact count: `4`
 - Expected local artifacts: `/Users/dhyana/.dharma/artifacts/venture_cell/DARSHAN/2026-05-26/the-thing-they-are-competing-for-is-not-just-your-attention/decision_delta.json, /Users/dhyana/.dharma/artifacts/venture_cell/DARSHAN/2026-05-26/the-thing-they-are-competing-for-is-not-just-your-attention/receipts/<accepted-go-evidence-receipt>.json, dharma_swarm/venture_cell/darshan/external_reader_gate.py, darshan_go_receipt_template.json`
 - Receipt template: `draft_template_not_evidence`
+- GO unblock packet: `darshan_go_unblock_packet.json` (requirements only, not evidence)
 - Next governed action: Attach one ExternalReaderEvent with an accepted privacy-redacted GO evidence receipt.
 
 ## Next Action Packet
@@ -102,7 +106,7 @@
 ## Memory Kernel
 
 - Status: `read_through_index_available`
-- Staged: `5057`
+- Staged: `5058`
 - Trusted: `1336`
 - Quarantine: `5000`
 - Truncated scan: `True`
@@ -113,7 +117,7 @@
 
 - `trusted` `trusted`: scanned `1336`; indexed `20`/`20`; truncated `False`.
 - `staging` `staged`: scanned `5000`; indexed `20`/`20`; truncated `True`.
-- `supplemental_staging` `staged`: scanned `57`; indexed `20`/`20`; truncated `False`.
+- `supplemental_staging` `staged`: scanned `58`; indexed `20`/`20`; truncated `False`.
 - `quarantine` `quarantine`: scanned `5000`; indexed `20`/`20`; truncated `True`.
 
 ## Memory Repair Packet

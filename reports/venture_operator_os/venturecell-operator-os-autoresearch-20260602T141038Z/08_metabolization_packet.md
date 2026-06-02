@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live packet, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-6d39cead7335a6bb`
-Current scoped HEAD before this packet: `d426d12c feat(operator-os): detail goal truth duplicates`
+ds-goal progress receipt: `r-12e8775da2b8132f`
+Current scoped HEAD before this packet: `b6f9090b feat(operator-os): render darshan go unblock packet`
 
 This packet captures durable learning from the run so far. It must be reviewed
 and updated during final closeout before the reporter task is closed.
@@ -437,6 +437,20 @@ and updated during final closeout before the reporter task is closed.
      real artifact shape needed to unblock Growth/Comms; it does not create or
      accept GO evidence.
 
+18. The digest should show GO unblock counts without granting authority.
+
+   Evidence:
+
+   - `operator_os_digest.md` now shows required receipt fields `16`, accepted
+     receipts `0`, expected local artifact count `4`, and the
+     `darshan_go_unblock_packet.json` pointer as requirements-only.
+   - Focused digest assertions verify these strings.
+
+   Metabolized rule:
+
+   - Human-facing digest summaries can improve scanability, but they must keep
+     accepted receipt count and requirements-only language visible.
+
 ## Loop 45 Metabolization Note
 
 Hypothesis:
@@ -517,6 +531,7 @@ Metabolized rule:
 | `r-257787644e0f6723` | `52_timebox_five_hour_receipt.md` | five-hour non-final timebox proof |
 | `r-36c4e1eed5522c07` | `53_goal_truth_duplicate_groups_receipt.md` | goal-truth duplicate group membership |
 | `r-6d39cead7335a6bb` | `54_darshan_go_unblock_receipt.md` | Darshan GO unblock requirements packet |
+| `r-12e8775da2b8132f` | `55_digest_go_unblock_summary_receipt.md` | digest GO unblock requirements summary |
 
 ## Current Read-Only Artifacts
 
@@ -575,6 +590,7 @@ Metabolized rule:
 - `52_timebox_five_hour_receipt.md`
 - `53_goal_truth_duplicate_groups_receipt.md`
 - `54_darshan_go_unblock_receipt.md`
+- `55_digest_go_unblock_summary_receipt.md`
 
 ## Do Not Metabolize As Done
 
@@ -622,6 +638,8 @@ These facts are explicitly not complete:
   terminal receipts.
 - Darshan GO unblock requirements are local routing only; accepted receipts
   remain empty and external authority remains blocked.
+- Digest GO unblock summaries are presentation only; accepted receipts remain
+  empty and external authority remains blocked.
 - Stable admission render is diff hygiene only, not a gate change.
 - Reporter task is not closed.
 - The final adversarial audit and next-goal packet still require final-window
