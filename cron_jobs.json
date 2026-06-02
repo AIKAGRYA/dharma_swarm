@@ -335,7 +335,7 @@
       "minute": 0
     },
     "handler": "shell",
-    "shell_command": "python3 scripts/check_provider_credits.py --json > ~/.dharma/logs/provider_credits_latest.json",
+    "shell_command": "python3 scripts/check_provider_credits.py --json --output ~/.dharma/logs/provider_credits_latest.json",
     "enabled": true,
     "prompt": "Check all provider API keys for presence and credit exhaustion. Writes diagnostic to logs for operator review."
   }
