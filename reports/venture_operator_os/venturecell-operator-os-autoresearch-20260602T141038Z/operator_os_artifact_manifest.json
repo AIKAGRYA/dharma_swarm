@@ -48,7 +48,8 @@
     "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/19_gap_triage_packet_receipt.md",
     "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/20_memory_kernel_coverage_receipt.md",
     "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/21_digest_canvas_summary_receipt.md",
-    "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/22_completion_guard_receipt.md"
+    "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/22_completion_guard_receipt.md",
+    "reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z/23_periodic_onboard_refresh_receipt.md"
   ],
   "schema": "dharma.venture_cell_operator_os.render_manifest.v0",
   "status": "blocked_on_external_reader_gate"

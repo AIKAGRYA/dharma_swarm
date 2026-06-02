@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-1685242cb726a2f7`
-Current scoped HEAD before this packet: `71d5a87d feat(operator-os): summarize digest canvas overflow`
+ds-goal progress receipt: `r-7b10153c5bd3f095`
+Current scoped HEAD before this packet: `1eaa0bd3 feat(operator-os): add completion guard packet`
 
 This packet is the handoff for the next bounded AutoResearch loop. It must be
 reviewed and updated in the final hour before reporter closure.
@@ -33,7 +33,9 @@ reviewed and updated in the final hour before reporter closure.
 - Digest canvas summary: present; Markdown caps repeated rows while JSON
   projection preserves full canvas data.
 - Completion guard packet: `keep_reporter_open`, `not_final: true`.
-- Last committed packet: digest canvas summary.
+- Periodic onboard refresh: latest `make onboard` and toolbelt pass, with NATS
+  liveness treated as repo-wide substrate context only.
+- Last committed packet: completion guard.
 
 ## Next Goal
 
@@ -135,7 +137,13 @@ bounded targets:
    machine-readable. Do not close the reporter while it says
    `keep_reporter_open`.
 
-15. Final closeout only after true-time proof.
+15. Periodic onboard refresh.
+
+   `23_periodic_onboard_refresh_receipt.md` records current environment facts.
+   Use it as context only; do not use repo-wide NATS liveness as Operator OS
+   action authority.
+
+16. Final closeout only after true-time proof.
 
    When elapsed time is actually in the final window, update:
 
@@ -198,6 +206,7 @@ If the loop only changes a report packet, also run scoped `git diff --check`.
 - `20_memory_kernel_coverage_receipt.md`
 - `21_digest_canvas_summary_receipt.md`
 - `22_completion_guard_receipt.md`
+- `23_periodic_onboard_refresh_receipt.md`
 - `operator_os_projection.json`
 - `operator_completion_guard_packet.json`
 - `operator_next_action_packet.json`

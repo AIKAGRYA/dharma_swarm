@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live packet, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-1685242cb726a2f7`
-Current scoped HEAD before this packet: `71d5a87d feat(operator-os): summarize digest canvas overflow`
+ds-goal progress receipt: `r-7b10153c5bd3f095`
+Current scoped HEAD before this packet: `1eaa0bd3 feat(operator-os): add completion guard packet`
 
 This packet captures durable learning from the run so far. It must be reviewed
 and updated during final closeout before the reporter task is closed.
@@ -169,6 +169,22 @@ and updated during final closeout before the reporter task is closed.
      authority. Final closure still needs true-time proof, final artifact
      review, terminal reporter receipt, and a complete verifier pass.
 
+11. Onboard is environment context, not mission authority.
+
+   Evidence:
+
+   - `23_periodic_onboard_refresh_receipt.md` records fresh `make onboard` and
+     toolbelt passes.
+   - Onboard reports repo-wide NATS liveness, broad dirty worktree state, and
+     active-track status.
+   - Operator OS completion guard still says `keep_reporter_open`.
+
+   Metabolized rule:
+
+   - Future agents may use onboard as substrate context. They must not convert
+     repo-wide NATS, active-track, or toolbelt health into Operator OS external
+     authority or reporter closure.
+
 ## Committed Packets
 
 | Commit | Packet | Durable effect |
@@ -195,7 +211,8 @@ and updated during final closeout before the reporter task is closed.
 | `498c0786` | `19_gap_triage_packet_receipt.md` | local/external gap triage packet |
 | `219078ec` | `20_memory_kernel_coverage_receipt.md` | root-level MemoryKernel coverage packet |
 | `71d5a87d` | `21_digest_canvas_summary_receipt.md` | presentation-only digest canvas summary |
-| pending | `22_completion_guard_receipt.md` | live-100 non-final completion guard |
+| `1eaa0bd3` | `22_completion_guard_receipt.md` | live-100 non-final completion guard |
+| pending | `23_periodic_onboard_refresh_receipt.md` | periodic substrate refresh |
 
 ## Current Read-Only Artifacts
 
@@ -226,6 +243,7 @@ and updated during final closeout before the reporter task is closed.
 - `20_memory_kernel_coverage_receipt.md`
 - `21_digest_canvas_summary_receipt.md`
 - `22_completion_guard_receipt.md`
+- `23_periodic_onboard_refresh_receipt.md`
 
 ## Do Not Metabolize As Done
 
@@ -251,6 +269,7 @@ These facts are explicitly not complete:
 - Digest canvas summarization is presentation-only and does not remove
   projection evidence.
 - Completion guard is not a terminal reporter receipt.
+- Onboard/toolbelt evidence is environment context only.
 - Reporter task is not closed.
 - The final adversarial audit and next-goal packet still require final-window
   review/update.

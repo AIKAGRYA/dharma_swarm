@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-1685242cb726a2f7`
-Current scoped HEAD before this packet: `71d5a87d feat(operator-os): summarize digest canvas overflow`
+ds-goal progress receipt: `r-7b10153c5bd3f095`
+Current scoped HEAD before this packet: `1eaa0bd3 feat(operator-os): add completion guard packet`
 
 This audit is intentionally written before the final time window so the next
 agent has a concrete attack surface. It is not a completion certificate. The
@@ -39,6 +39,7 @@ updates, and terminal verification exist.
   holds full evidence and the cap is not filtering.
 - Completion guard says live `100/100` is not final and reporter must remain
   open.
+- Periodic onboard/toolbelt pass, but this is environment context only.
 - MemoryKernel query eval now reports `pass` with `6/6` from report-local
   staged sources.
 - MemoryKernel repair now reports `no_repair_needed`; no trusted Chetana
@@ -106,6 +107,8 @@ Adversarial review:
 - Digest row caps must not be used to hide evidence or claim a cleaner task
   state than projection JSON shows.
 - Completion guard must not be treated as a terminal reporter receipt.
+- Periodic onboard must not be used to claim Operator OS action-specific NATS
+  or A2A liveness.
 - Unrelated staged work must not be included in commits for this run.
 
 Keep / revert / queue:
@@ -144,6 +147,7 @@ Queued:
 | Memory coverage proves complete recall | staging and quarantine roots are still truncated | false |
 | Digest cap deletes noisy tasks | projection JSON still includes the full canvas | false |
 | Live 100 means complete | completion guard says `not_final: true` | false |
+| Onboard NATS liveness proves Operator OS authority | authority packet still has action ack fields false | false |
 | Broad dirty work is part of this packet | scoped report-only patch | false |
 
 ## Boundary Audit

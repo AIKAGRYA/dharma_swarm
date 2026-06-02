@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live risk register, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-1685242cb726a2f7`
-Current scoped HEAD before this packet: `71d5a87d feat(operator-os): summarize digest canvas overflow`
+ds-goal progress receipt: `r-7b10153c5bd3f095`
+Current scoped HEAD before this packet: `1eaa0bd3 feat(operator-os): add completion guard packet`
 
 This register separates current blockers, residual risks, and solved local
 claims. It exists to prevent false completion after a high live score.
@@ -35,6 +35,7 @@ claims. It exists to prevent false completion after a high live score.
 | Memory coverage overclaim | `memory_kernel_coverage_packet.json` exposes root coverage | treat as limit evidence, not complete memory coverage |
 | Digest cap overclaim | `operator_os_digest.md` summarizes repeated canvas rows | use projection JSON for full evidence |
 | Completion guard overclaim | `operator_completion_guard_packet.json` says keep reporter open | guard only, not terminal receipt |
+| Periodic onboard overclaim | `23_periodic_onboard_refresh_receipt.md` records substrate health | context only, not mission authority |
 | Context+ unavailable | `Transport closed` during static analysis attempts | document unavailable, use deterministic fallback checks |
 | Repo has unrelated dirty work | broad dirty worktree outside this run | commit only explicit scoped pathspecs |
 
@@ -56,6 +57,7 @@ claims. It exists to prevent false completion after a high live score.
 | Memory coverage renders | trusted/report-local roots not truncated; staging/quarantine truncated | coverage locator only |
 | Digest canvas summary renders | repeated task-board rows capped with omitted count | presentation only |
 | Completion guard renders | live score can be 100 without completion | false-final guard only |
+| Periodic onboard refresh passes | `make onboard` and toolbelt exit `0` | environment context only |
 
 ## Loop 15 Receipt
 
