@@ -47,7 +47,7 @@
 - **Category**: docs-only
 - **Files**: 3
 - **Risk**: LOW
-- **CI**: FAILING (DocOps canonical_guard)
+- **CI**: FAILING (DocOps doc-registry gate)
 - **Dependencies**: none
 - **Recommendation**: HOLD (DocOps fix needed)
 
@@ -87,7 +87,7 @@
 - **Category**: scaffold/governance
 - **Files**: 11
 - **Risk**: HIGH
-- **CI**: FAILING (DocOps canonical_guard)
+- **CI**: FAILING (DocOps doc-registry gate)
 - **Dependencies**: #388 stacked on this
 - **Recommendation**: HOLD (DocOps fix needed before merge)
 
@@ -105,7 +105,7 @@
 - **Category**: scaffold
 - **Files**: 7
 - **Risk**: MEDIUM
-- **CI**: FAILING (DocOps canonical_guard)
+- **CI**: FAILING (DocOps doc-registry gate)
 - **Dependencies**: should follow H1, H2
 - **Recommendation**: HOLD (DocOps fix needed)
 
@@ -114,7 +114,7 @@
 - **Category**: scaffold
 - **Files**: 5
 - **Risk**: MEDIUM
-- **CI**: FAILING (DocOps canonical_guard)
+- **CI**: FAILING (DocOps doc-registry gate)
 - **Dependencies**: should follow H3
 - **Recommendation**: HOLD (DocOps fix needed)
 
@@ -268,7 +268,7 @@ PRs #451–#457 are outbound reports from previous janitor sessions. Only the la
 7. **#332** → feat(ops): staging promote — GREEN, HIGH risk
 
 ### Blocked on DocOps
-21 PRs blocked on DocOps canonical_guard failures (files contain authority terms but aren't registered in CANONICAL_DOC_STACK.md). This is the #1 blocker for queue health.
+21 PRs blocked on DocOps doc-registry gate failures (files contain gov-scoped terms but aren't registered in the doc stack). This is the #1 blocker for queue health.
 
 ### Blocked on operator decisions
 - **#388**: Operator hold — needs restack per comment
@@ -283,7 +283,7 @@ PRs #451–#457 are outbound reports from previous janitor sessions. Only the la
 
 ## Blockers & Operator Decisions Needed
 
-1. **DocOps canonical_guard** is blocking 21 PRs. Files with authority terms need registration in CANONICAL_DOC_STACK.md, or the guard needs widening. This is the top priority for queue health.
+1. **DocOps doc-registry gate** is blocking 21 PRs. Files with gov-scoped terms need registration in the doc stack, or the guard needs widening. This is the top priority for queue health.
 2. **PR #388** has operator hold (restack directive from AmitabhainArunachala).
 3. **PR #391** (H5) has dashboard CI failure (npm lockfile mismatch).
 4. **PR #373** has incomplete CI (only 1 check ran).
