@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -80,6 +81,77 @@ def _memory_coverage_payload(projection: dict[str, Any]) -> dict[str, Any]:
         ),
         "trusted_promotion_claimed": False,
         "not_authority": True,
+    }
+
+
+def _canvas_summary_payload(projection: dict[str, Any]) -> dict[str, Any]:
+    raw_canvas = projection.get("canvas", [])
+    canvas = [item for item in raw_canvas if isinstance(item, dict)]
+    status_counts = Counter(str(item.get("status") or "unknown") for item in canvas)
+    owner_counts = Counter(
+        str(item.get("owner_department") or "unassigned") for item in canvas
+    )
+    lane_buckets: dict[str, list[dict[str, Any]]] = {}
+    for item in canvas:
+        lane = str(item.get("lane") or "unknown")
+        lane_buckets.setdefault(lane, []).append(item)
+
+    lanes = []
+    for lane, items in sorted(lane_buckets.items()):
+        lane_status_counts = Counter(
+            str(item.get("status") or "unknown") for item in items
+        )
+        lanes.append(
+            {
+                "lane": lane,
+                "item_count": len(items),
+                "status_counts": dict(sorted(lane_status_counts.items())),
+                "owner_departments": sorted(
+                    {
+                        str(item.get("owner_department") or "unassigned")
+                        for item in items
+                    }
+                ),
+                "item_ids": [
+                    str(item.get("item_id") or "")
+                    for item in items
+                    if str(item.get("item_id") or "")
+                ],
+            }
+        )
+
+    blocked_items = [
+        {
+            "item_id": str(item.get("item_id") or ""),
+            "lane": str(item.get("lane") or "unknown"),
+            "status": str(item.get("status") or "unknown"),
+            "owner_department": str(item.get("owner_department") or "unassigned"),
+            "blocked_reason": str(item.get("blocked_reason") or ""),
+        }
+        for item in canvas
+        if str(item.get("blocked_reason") or "")
+    ]
+
+    return {
+        "schema": "dharma.venture_cell_operator_os.canvas_summary.v0",
+        "status": projection.get("status", "unknown"),
+        "autonomy_level": projection.get("autonomy_level", "unknown"),
+        "total_item_count": len(canvas),
+        "lane_count": len(lanes),
+        "lanes": lanes,
+        "status_counts": dict(sorted(status_counts.items())),
+        "owner_department_counts": dict(sorted(owner_counts.items())),
+        "owner_department_count": len(owner_counts),
+        "blocked_items": blocked_items,
+        "blocked_item_count": len(blocked_items),
+        "safe_next_action": (
+            "Inspect blocked local canvas items before widening internal execution."
+            if blocked_items
+            else "Use canvas lane counts as read-only operating context."
+        ),
+        "not_authority": True,
+        "external_authority_granted": False,
+        "trusted_promotion_claimed": False,
     }
 
 
@@ -198,6 +270,7 @@ def _artifact_manifest_payload(
     authority = _authority_boundary_payload(projection)
     gap_triage = _gap_triage_payload(projection)
     memory_coverage = _memory_coverage_payload(projection)
+    canvas_summary = _canvas_summary_payload(projection)
     completion_guard = _completion_guard_payload(projection)
     receipt_paths = [
         str(path)
@@ -220,6 +293,9 @@ def _artifact_manifest_payload(
         "memory_coverage_truncated_root_count": memory_coverage.get(
             "truncated_root_count", 0
         ),
+        "canvas_item_count": canvas_summary.get("total_item_count", 0),
+        "canvas_lane_count": canvas_summary.get("lane_count", 0),
+        "canvas_blocked_item_count": canvas_summary.get("blocked_item_count", 0),
         "completion_guard_decision": completion_guard.get("decision", "unknown"),
         "not_final": completion_guard.get("not_final", True),
         "artifact_paths": {
@@ -367,6 +443,16 @@ def render_operator_surface(
         + "\n",
         encoding="utf-8",
     )
+    canvas_summary_path = output_dir / "operator_canvas_summary_packet.json"
+    canvas_summary_path.write_text(
+        json.dumps(
+            _canvas_summary_payload(projection.to_dict()),
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     completion_guard_path = output_dir / "operator_completion_guard_packet.json"
     completion_guard_path.write_text(
         json.dumps(
@@ -389,6 +475,7 @@ def render_operator_surface(
         "memory_kernel_repair_packet": memory_repair_packet_path,
         "authority_boundary_packet": authority_boundary_packet_path,
         "gap_triage_packet": gap_triage_packet_path,
+        "canvas_summary_packet": canvas_summary_path,
         "completion_guard_packet": completion_guard_path,
     }
     artifact_manifest_path = output_dir / "operator_os_artifact_manifest.json"

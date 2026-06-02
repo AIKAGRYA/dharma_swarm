@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-3921119812771fd7`
-Current scoped HEAD before this packet: `aa4507cc docs(operator-os): refresh onboard context`
+ds-goal progress receipt: `r-19efd39420cd789d`
+Current scoped HEAD before this packet: `5c6c057d docs(operator-os): record four-hour timebox`
 
 This audit is intentionally written before the final time window so the next
 agent has a concrete attack surface. It is not a completion certificate. The
@@ -59,6 +59,8 @@ updates, and terminal verification exist.
   coverage.
 - Digest canvas summary caps repeated Markdown rows, but projection JSON still
   holds full evidence and the cap is not filtering.
+- Operator canvas summary packet now exposes item/lane/status/owner counts as
+  JSON, but it is marked `not_authority: true`.
 - Completion guard says live `100/100` is not final and reporter must remain
   open.
 - Completion guard now exposes terminal reporter receipt policy and expected
@@ -220,6 +222,7 @@ Queued:
 | Memory coverage targets resolve truncation | targets name staging/quarantine maintenance only | false |
 | Memory coverage counts prove complete recall | `complete_coverage_claimed` is `false` and two roots remain truncated | false |
 | Digest cap deletes noisy tasks | projection JSON still includes the full canvas | false |
+| Canvas summary grants authority | `operator_canvas_summary_packet.json` is `not_authority: true` | false |
 | Live 100 means complete | completion guard says `not_final: true` | false |
 | Completion guard policy closes reporter | policy requires terminal receipt and verifier pass | false |
 | Completion guard counts close reporter | final blocker count remains nonzero and reporter is open | false |

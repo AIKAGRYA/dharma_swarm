@@ -461,6 +461,9 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     gap_triage_packet = json.loads(
         paths["gap_triage_packet"].read_text(encoding="utf-8")
     )
+    canvas_summary_packet = json.loads(
+        paths["canvas_summary_packet"].read_text(encoding="utf-8")
+    )
     completion_guard_packet = json.loads(
         paths["completion_guard_packet"].read_text(encoding="utf-8")
     )
@@ -564,6 +567,17 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert gap_triage_packet["locally_actionable_count"] >= 1
     assert gap_triage_packet["not_authority"] is True
     assert "fake_go_receipt_creation" in gap_triage_packet["forbidden_actions"]
+    assert canvas_summary_packet["schema"] == "dharma.venture_cell_operator_os.canvas_summary.v0"
+    assert canvas_summary_packet["total_item_count"] == len(projection["canvas"])
+    assert canvas_summary_packet["lane_count"] == len(canvas_summary_packet["lanes"])
+    assert canvas_summary_packet["blocked_item_count"] == len(
+        canvas_summary_packet["blocked_items"]
+    )
+    assert canvas_summary_packet["status_counts"]["available"] >= 1
+    assert canvas_summary_packet["owner_department_counts"]["communications"] >= 1
+    assert canvas_summary_packet["not_authority"] is True
+    assert canvas_summary_packet["external_authority_granted"] is False
+    assert canvas_summary_packet["trusted_promotion_claimed"] is False
     assert completion_guard_packet["decision"] == "keep_reporter_open"
     assert completion_guard_packet["not_final"] is True
     assert completion_guard_packet["live_score_can_be_100_without_completion"] is True
@@ -600,6 +614,7 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert "authority_boundary_packet" in artifact_manifest["artifact_paths"]
     assert "gap_triage_packet" in artifact_manifest["artifact_paths"]
     assert "memory_coverage_packet" in artifact_manifest["artifact_paths"]
+    assert "canvas_summary_packet" in artifact_manifest["artifact_paths"]
     assert "completion_guard_packet" in artifact_manifest["artifact_paths"]
     assert str(report_dir / "00_opening_truth.md") in artifact_manifest["receipt_paths"]
     assert str(report_dir / "99_progress_receipt.md") in artifact_manifest["receipt_paths"]
@@ -618,6 +633,11 @@ def test_operator_surface_renderer_writes_projection_digest_and_memory_index(tmp
     assert artifact_manifest["receipt_inventory_not_authority"] is True
     assert artifact_manifest["memory_coverage_truncated_root_count"] == (
         memory_coverage_packet["truncated_root_count"]
+    )
+    assert artifact_manifest["canvas_item_count"] == canvas_summary_packet["total_item_count"]
+    assert artifact_manifest["canvas_lane_count"] == canvas_summary_packet["lane_count"]
+    assert artifact_manifest["canvas_blocked_item_count"] == (
+        canvas_summary_packet["blocked_item_count"]
     )
 
 

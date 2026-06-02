@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live risk register, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-3921119812771fd7`
-Current scoped HEAD before this packet: `aa4507cc docs(operator-os): refresh onboard context`
+ds-goal progress receipt: `r-19efd39420cd789d`
+Current scoped HEAD before this packet: `5c6c057d docs(operator-os): record four-hour timebox`
 
 This register separates current blockers, residual risks, and solved local
 claims. It exists to prevent false completion after a high live score.
@@ -44,6 +44,7 @@ claims. It exists to prevent false completion after a high live score.
 | Memory coverage target overclaim | coverage packet lists staging/quarantine maintenance targets | treat as selectors, not repair proof |
 | Memory coverage count overclaim | coverage packet exposes root/truncated/local-target counts | treat as routing metadata, not complete coverage |
 | Digest cap overclaim | `operator_os_digest.md` summarizes repeated canvas rows | use projection JSON for full evidence |
+| Canvas summary overclaim | `operator_canvas_summary_packet.json` exposes item/lane/status/owner counts | treat as routing metadata, not authority or closure |
 | Completion guard overclaim | `operator_completion_guard_packet.json` says keep reporter open | guard only, not terminal receipt |
 | Completion guard policy overclaim | guard lists reporter closure requirements | treat as checklist, not closure evidence |
 | Completion guard count overclaim | guard exposes blocker/artifact/action counts | treat as audit metadata, not closure evidence |
@@ -83,6 +84,7 @@ claims. It exists to prevent false completion after a high live score.
 | Memory coverage targets render | staging/quarantine listed as maintenance targets | selector only |
 | Memory coverage counts render | root/truncated/untruncated/local-target counts match arrays | routing metadata only |
 | Digest canvas summary renders | repeated task-board rows capped with omitted count | presentation only |
+| Operator canvas summary packet renders | items `68`, lanes `9`, blocked items `1`; non-authority flags true/false as expected | routing metadata only |
 | Completion guard renders | live score can be 100 without completion | false-final guard only |
 | Completion guard reporter policy renders | terminal receipt and verifier pass required | requirement checklist only |
 | Completion guard counts render | final/external/artifact/forbidden counts match arrays | audit metadata only |

@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live verifier matrix, not final until the true 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-3921119812771fd7`
-Current scoped HEAD before this packet: `aa4507cc docs(operator-os): refresh onboard context`
+ds-goal progress receipt: `r-19efd39420cd789d`
+Current scoped HEAD before this packet: `5c6c057d docs(operator-os): record four-hour timebox`
 
 This matrix captures the current verification surface for future agents. It is
 not a final verifier matrix and must not be used to close the reporter task.
@@ -36,6 +36,8 @@ not a final verifier matrix and must not be used to close the reporter task.
   counts match arrays and complete coverage is not claimed.
 - Digest canvas summary: passing; Markdown repeated rows capped while JSON
   projection rows remain complete.
+- Operator canvas summary packet: passing; item/lane/status/owner counts render
+  with non-authority flags.
 - Completion guard: passing; live `100/100` is explicitly non-final.
 - Completion guard reporter policy: passing; terminal receipt and complete
   verifier pass required.
@@ -63,6 +65,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | Governed admission/A2A/daily brief slice | `pytest -q tests/test_governed_work_admission.py tests/test_a2a_task_lifecycle.py tests/test_daily_operating_brief.py` | `31 passed` | pass |
 | Operator OS compile | `./.venv/bin/python -m compileall -q dharma_swarm/venture_cell/operator_os` | exit `0` | pass |
 | Operator OS render | `./.venv/bin/python -m dharma_swarm.venture_cell.operator_os.cli --output-dir reports/venture_operator_os/venturecell-operator-os-autoresearch-20260602T141038Z` | exit `0` | pass |
+| Canvas summary packet | `operator_canvas_summary_packet.json` | items `68`, lanes `9`, blocked items `1`; `not_authority: true` | pass |
 | Periodic onboard | `make onboard` | exit `0` | pass, not mission authority |
 | Codex toolbelt | `bash scripts/runtime/codex_toolbelt_status.sh` | exit `0` with optional credential warnings | pass |
 | Latest periodic onboard/toolbelt | `make onboard`; `bash scripts/runtime/codex_toolbelt_status.sh` | both exit `0`; optional credential warnings | pass, not mission authority |
@@ -76,6 +79,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | Artifact | Current state | Risk |
 |---|---|---|
 | `operator_os_projection.json` | rendered current state | read-only projection only |
+| `operator_canvas_summary_packet.json` | rendered canvas item/lane/status/owner counts | routing metadata, not authority |
 | next-action counts | blockers `2`, departments `2`, gates `2`, forbidden `7` | handoff metadata, not authority |
 | `operator_os_digest.md` | rendered current digest with canvas caps | presentation summary, not full evidence |
 | `operator_completion_guard_packet.json` | `keep_reporter_open` | finality guard, not terminal receipt |
@@ -162,6 +166,7 @@ not a final verifier matrix and must not be used to close the reporter task.
 | `r-c58b7343ccbd2392` | keep | next-action count selectors |
 | `r-772a578a521880f8` | keep | latest periodic onboard refresh context |
 | `r-3921119812771fd7` | keep | four-hour non-final timebox proof |
+| `r-19efd39420cd789d` | keep | canvas summary packet |
 
 ## Revert / Queue Ledger
 

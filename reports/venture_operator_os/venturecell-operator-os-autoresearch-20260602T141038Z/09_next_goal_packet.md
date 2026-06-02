@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live draft, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-3921119812771fd7`
-Current scoped HEAD before this packet: `aa4507cc docs(operator-os): refresh onboard context`
+ds-goal progress receipt: `r-19efd39420cd789d`
+Current scoped HEAD before this packet: `5c6c057d docs(operator-os): record four-hour timebox`
 
 This packet is the handoff for the next bounded AutoResearch loop. It must be
 reviewed and updated in the final hour before reporter closure.
@@ -44,6 +44,8 @@ reviewed and updated in the final hour before reporter closure.
   `2`, local maintenance targets `2`, complete coverage not claimed.
 - Digest canvas summary: present; Markdown caps repeated rows while JSON
   projection preserves full canvas data.
+- Operator canvas summary packet: present; items `68`, lanes `9`, blocked
+  items `1`, not authority.
 - Completion guard packet: `keep_reporter_open`, `not_final: true`.
 - Completion guard reporter policy: terminal receipt and complete verifier pass
   required.
@@ -68,7 +70,7 @@ reviewed and updated in the final hour before reporter closure.
 - Three-hour timebox proof: current clock still below 8 hours.
 - Active clock proof: current clock still below 8 hours.
 - Four-hour midpoint proof: current clock still below 8 hours.
-- Last committed packet: periodic onboard refresh context.
+- Last committed packet: four-hour midpoint proof.
 
 ## Next Goal
 
@@ -173,6 +175,12 @@ bounded targets:
 
    `operator_os_digest.md` now caps repeated canvas lane details. Treat that as
    presentation only; use `operator_os_projection.json` for full evidence.
+
+13a. Canvas summary preservation.
+
+   `operator_canvas_summary_packet.json` now exposes canvas lane/status/owner
+   counts. Preserve its non-authority flags and use it to route inspection, not
+   to replace `operator_os_projection.json` or gate evidence.
 
 14. Completion guard preservation.
 
@@ -289,7 +297,9 @@ If the loop only changes a report packet, also run scoped `git diff --check`.
 - `41_next_action_counts_receipt.md`
 - `42_periodic_onboard_refresh_receipt.md`
 - `43_timebox_four_hour_receipt.md`
+- `44_canvas_summary_packet_receipt.md`
 - `operator_os_projection.json`
+- `operator_canvas_summary_packet.json`
 - `operator_completion_guard_packet.json`
 - `operator_next_action_packet.json`
 - `memory_kernel_coverage_packet.json`

@@ -1,0 +1,224 @@
+{
+  "autonomy_level": "L0_read_only_plan",
+  "blocked_item_count": 1,
+  "blocked_items": [
+    {
+      "blocked_reason": "a2a_task_not_terminal",
+      "item_id": "a2a.forge-v0.1-001",
+      "lane": "a2a_queue",
+      "owner_department": "codex_forgewright",
+      "status": "open_unclaimed"
+    }
+  ],
+  "external_authority_granted": false,
+  "lane_count": 9,
+  "lanes": [
+    {
+      "item_count": 5,
+      "item_ids": [
+        "a2a.collab:fleet-health-collab-20260528:collector:hermes-m5",
+        "a2a.collab:fleet-health-collab-20260528:analyst:codex_composer",
+        "a2a.collab:fleet-health-collab-20260528:reviewer:opus_composer",
+        "a2a.collab:fleet-health-collab-20260528:infra-audit:devin-roaming-2987d222",
+        "a2a.forge-v0.1-001"
+      ],
+      "lane": "a2a_queue",
+      "owner_departments": [
+        "codex_forgewright",
+        "engineering",
+        "opus_composer"
+      ],
+      "status_counts": {
+        "blocked_verified": 2,
+        "completed_verified": 2,
+        "open_unclaimed": 1
+      }
+    },
+    {
+      "item_count": 1,
+      "item_ids": [
+        "darshan.article.md"
+      ],
+      "lane": "artifact",
+      "owner_departments": [
+        "product"
+      ],
+      "status_counts": {
+        "available": 1
+      }
+    },
+    {
+      "item_count": 1,
+      "item_ids": [
+        "darshan.attention_ledger.json"
+      ],
+      "lane": "attention",
+      "owner_departments": [
+        "communications"
+      ],
+      "status_counts": {
+        "available": 1
+      }
+    },
+    {
+      "item_count": 1,
+      "item_ids": [
+        "darshan.claim_ledger.json"
+      ],
+      "lane": "claims",
+      "owner_departments": [
+        "library"
+      ],
+      "status_counts": {
+        "available": 1
+      }
+    },
+    {
+      "item_count": 1,
+      "item_ids": [
+        "darshan.decision_delta.json"
+      ],
+      "lane": "decisions",
+      "owner_departments": [
+        "strategy"
+      ],
+      "status_counts": {
+        "available": 1
+      }
+    },
+    {
+      "item_count": 1,
+      "item_ids": [
+        "darshan.gate_decisions.json"
+      ],
+      "lane": "gates",
+      "owner_departments": [
+        "governance"
+      ],
+      "status_counts": {
+        "available": 1
+      }
+    },
+    {
+      "item_count": 1,
+      "item_ids": [
+        "darshan.source_pack.json"
+      ],
+      "lane": "library",
+      "owner_departments": [
+        "library"
+      ],
+      "status_counts": {
+        "available": 1
+      }
+    },
+    {
+      "item_count": 7,
+      "item_ids": [
+        "darshan.polsia_handoff.json",
+        "darshan.polsia_handoff.30-day-operating-calendar",
+        "darshan.polsia_handoff.artifact-bundle-checklist",
+        "darshan.polsia_handoff.weekly-operating-review-template",
+        "darshan.polsia_handoff.50-person-first-reader-outreach-list",
+        "darshan.polsia_handoff.ops-board-statuses-from-idea-to-corrected-published",
+        "darshan.polsia_handoff.runbook-for-operating-darshan-season-0"
+      ],
+      "lane": "operator_handoff",
+      "owner_departments": [
+        "operations"
+      ],
+      "status_counts": {
+        "available": 1,
+        "requested": 6
+      }
+    },
+    {
+      "item_count": 50,
+      "item_ids": [
+        "task_board.503881cdb12e455e",
+        "task_board.2a79840d6fe04225",
+        "task_board.949b0ec39ab24f3f",
+        "task_board.42820b5f19d34c8c",
+        "task_board.c0357fb205db4a52",
+        "task_board.fb489f70cb494205",
+        "task_board.6f2dd8789a784706",
+        "task_board.0e7d7b1aa61844f0",
+        "task_board.98faf6e3597b4ddc",
+        "task_board.ba84ced9c7584fdc",
+        "task_board.216180fa0a31449e",
+        "task_board.b35b072452344aaa",
+        "task_board.7a7d5b802c4c41b5",
+        "task_board.6b825230fdab4078",
+        "task_board.e553722072bf4d00",
+        "task_board.0c079e22f1c147f6",
+        "task_board.18df4c53949644bd",
+        "task_board.4870c9dea2b041d9",
+        "task_board.00f788ba23a543cb",
+        "task_board.055ee7f8e4c94df5",
+        "task_board.6ad30f3080184892",
+        "task_board.41d5073c5cbf4e6c",
+        "task_board.b54367b3c4834365",
+        "task_board.bb13753c522342a1",
+        "task_board.71bcff6493414c55",
+        "task_board.91049bd931284bef",
+        "task_board.1b2b8a5291c94cc2",
+        "task_board.4acaab3fca544a28",
+        "task_board.14a632d7499d4740",
+        "task_board.e595fa7ece5f4007",
+        "task_board.3b33db13275945c7",
+        "task_board.65dddd5c10ee4bc5",
+        "task_board.8a739aaaae614580",
+        "task_board.edb65ce726054ec4",
+        "task_board.b688c7fd9bcc4e2b",
+        "task_board.3e654a0502d940db",
+        "task_board.43acfe27c10046c0",
+        "task_board.8fc987f9ed054b60",
+        "task_board.fed81b7409d54382",
+        "task_board.56152082decb44e4",
+        "task_board.aa7d79491a4e4b89",
+        "task_board.61cd3963ebd94b4e",
+        "task_board.46f07f675bcb4330",
+        "task_board.eadac7a6981c4322",
+        "task_board.ce3ddd729e434366",
+        "task_board.488f07326a314dd4",
+        "task_board.8b744db4ced04082",
+        "task_board.0ea9794709e248d6",
+        "task_board.ca204bcf65c64d1d",
+        "task_board.6f36236d56864e61"
+      ],
+      "lane": "task_board",
+      "owner_departments": [
+        "engineering"
+      ],
+      "status_counts": {
+        "pending": 50
+      }
+    }
+  ],
+  "not_authority": true,
+  "owner_department_count": 9,
+  "owner_department_counts": {
+    "codex_forgewright": 1,
+    "communications": 1,
+    "engineering": 53,
+    "governance": 1,
+    "library": 2,
+    "operations": 7,
+    "opus_composer": 1,
+    "product": 1,
+    "strategy": 1
+  },
+  "safe_next_action": "Inspect blocked local canvas items before widening internal execution.",
+  "schema": "dharma.venture_cell_operator_os.canvas_summary.v0",
+  "status": "blocked_on_external_reader_gate",
+  "status_counts": {
+    "available": 7,
+    "blocked_verified": 2,
+    "completed_verified": 2,
+    "open_unclaimed": 1,
+    "pending": 50,
+    "requested": 6
+  },
+  "total_item_count": 68,
+  "trusted_promotion_claimed": false
+}

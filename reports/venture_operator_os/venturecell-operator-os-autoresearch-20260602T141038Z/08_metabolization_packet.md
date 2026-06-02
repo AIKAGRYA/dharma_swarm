@@ -3,8 +3,8 @@
 Run: `venturecell-operator-os-autoresearch-20260602T141038Z`
 Status: live packet, not final until the 8-hour contract is closed
 Mission: `20260602-venturecell-operator-os-autoresearch-8h`
-ds-goal progress receipt: `r-3921119812771fd7`
-Current scoped HEAD before this packet: `aa4507cc docs(operator-os): refresh onboard context`
+ds-goal progress receipt: `r-19efd39420cd789d`
+Current scoped HEAD before this packet: `5c6c057d docs(operator-os): record four-hour timebox`
 
 This packet captures durable learning from the run so far. It must be reviewed
 and updated during final closeout before the reporter task is closed.
@@ -179,6 +179,23 @@ and updated during final closeout before the reporter task is closed.
      read JSON packets for full evidence and must not treat summarization as
      deletion, closure, or authority filtering.
 
+9a. Canvas summary packets are routing aids, not gate evidence.
+
+   Evidence:
+
+   - `operator_canvas_summary_packet.json` now renders canvas item, lane,
+     status, owner, and blocked-item counts.
+   - `operator_os_artifact_manifest.json` now repeats the canvas item, lane,
+     and blocked-item counts.
+   - The packet reports `not_authority: true`, `external_authority_granted:
+     false`, and `trusted_promotion_claimed: false`.
+
+   Metabolized rule:
+
+   - Canvas counts should speed audit routing. They must not replace inspection
+     of `operator_os_projection.json`, Darshan GO evidence, or completion
+     guard state.
+
 10. Live score can be perfect before final completion.
 
    Evidence:
@@ -290,6 +307,36 @@ and updated during final closeout before the reporter task is closed.
      Do not redact policy decisions, blockers, reasons, receipts, or authority
      boundaries.
 
+## Loop 45 Metabolization Note
+
+Hypothesis:
+
+If the canvas lane/status/owner counts are rendered as JSON, future agents can
+audit the Operator OS surface without scraping the Markdown digest or losing the
+full projection rows.
+
+Patch:
+
+- Added `operator_canvas_summary_packet.json`.
+- Added manifest-level canvas item, lane, and blocked-item counts.
+- Added focused renderer tests for count/list parity and non-authority flags.
+
+Evaluation:
+
+- `pytest -q tests/test_venture_cell_operator_os_projection.py` passed.
+- The live render reports canvas items `68`, lanes `9`, blocked items `1`.
+
+Adversarial review:
+
+- The packet is `not_authority: true`.
+- `external_authority_granted` remains `false`.
+- `trusted_promotion_claimed` remains `false`.
+
+Metabolized rule:
+
+- Canvas counts should speed audit routing, not replace row inspection or gate
+  evidence.
+
 ## Committed Packets
 
 | Commit | Packet | Durable effect |
@@ -329,11 +376,13 @@ and updated during final closeout before the reporter task is closed.
 | `r-ade5bb8b586492b3` | `32_timebox_three_hour_receipt.md` | three-hour non-final timebox proof |
 | `r-af82a796175a05dc` | `33_periodic_substrate_refresh_receipt.md` | repo-wide substrate refresh context |
 | `r-a8ff4c8f3684c4af` | `34_authority_boolean_receipt.md` | explicit external-authority denial booleans |
+| `r-19efd39420cd789d` | `44_canvas_summary_packet_receipt.md` | machine-readable canvas summary packet |
 
 ## Current Read-Only Artifacts
 
 - `operator_os_projection.json`
 - `operator_os_digest.md`
+- `operator_canvas_summary_packet.json`
 - `operator_completion_guard_packet.json`
 - `memory_kernel_index.json`
 - `memory_kernel_coverage_packet.json`
@@ -371,6 +420,7 @@ and updated during final closeout before the reporter task is closed.
 - `32_timebox_three_hour_receipt.md`
 - `33_periodic_substrate_refresh_receipt.md`
 - `34_authority_boolean_receipt.md`
+- `44_canvas_summary_packet_receipt.md`
 
 ## Do Not Metabolize As Done
 
