@@ -681,3 +681,23 @@ Still forbidden:
 - treating digest counters as execution proof;
 - closing reporter before true time and terminal-verifier proof;
 - external outreach, publishing, handoff, spend, deploy, push, or merge.
+
+## Loop 69 Next Goal Addendum
+
+Current new evidence:
+
+- `68_periodic_status_refresh_receipt.md`
+- updated `12_live_verifier_matrix.md`
+
+Next safe loop targets:
+
+- Continue local review until elapsed time reaches `28800s`.
+- Treat repo-wide NATS/tmux/toolbelt status as context only.
+- Keep complete verification blocked only by the reporter until terminal
+  closure is legitimately reached.
+
+Still forbidden:
+
+- treating substrate liveness as Operator OS action ack proof;
+- closing reporter before true time and terminal-verifier proof;
+- external outreach, publishing, handoff, spend, deploy, push, or merge.

@@ -176,6 +176,22 @@ New solved local claim:
 
 Decision: keep the risk in the live register until final-window review.
 
+## Loop 69 Risk Addendum
+
+New residual risk:
+
+| Risk | Current evidence | Handling |
+|---|---|---|
+| Substrate-context overclaim | onboard reports repo-wide NATS live contact and tmux readiness | treat as environment context only; require Operator OS action ack proof for authority |
+
+New solved local claim:
+
+| Claim | Evidence | Boundary |
+|---|---|---|
+| Periodic status refresh passes | onboard/toolbelt pass and verifier slices pass | not reporter closure, not GO evidence, not external authority |
+
+Decision: keep the risk in the live register until final-window review.
+
 ## Loop 68 Risk Addendum
 
 New residual risk:

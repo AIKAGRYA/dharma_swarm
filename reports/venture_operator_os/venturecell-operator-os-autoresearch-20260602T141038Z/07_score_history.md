@@ -272,6 +272,33 @@ Keep / revert / queue:
 
 Decision: keep.
 
+## Loop 69 Score Update
+
+Hypothesis:
+
+If current substrate and toolbelt facts are refreshed as context-only evidence,
+the final-window agent can reason from live state without widening authority.
+
+Patch:
+
+- Added a periodic status receipt and updated report ledgers.
+
+Evaluation:
+
+- Onboard and toolbelt checks passed.
+- Focused Operator OS and support verifier slices passed.
+- Complete verifier remains blocked only by the open reporter.
+
+Adversarial review:
+
+- Live score remains `100/100`, but still non-final.
+- Repo-wide NATS/tmux facts are not mission authority.
+- Dirty files remain broad; commits must stay scoped.
+
+Keep / revert / queue:
+
+Decision: keep.
+
 ## Loop 68 Score Update
 
 Hypothesis:

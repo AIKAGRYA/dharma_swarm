@@ -536,3 +536,26 @@ Keep / revert / queue:
 Decision: keep.
 
 ds-goal progress receipt: `r-274e30600044a4d0`
+
+## Loop 69 Adversary Addendum
+
+New claim under attack: repo-wide substrate refresh grants Operator OS action
+authority.
+
+Current evidence:
+
+- `make onboard` passed at HEAD `6122f53e4d`.
+- Onboard reports repo-wide NATS live contact and tmux substrate readiness.
+- Toolbelt status reports GitNexus/Context+ configured and optional
+  Sourcebot/Postgres/GDrive gates unavailable.
+- Complete verifier still exits `3` with only the open reporter blocker.
+
+Verdict: false. Status refresh is context only. It does not prove
+Operator-OS-specific action ack, does not satisfy Darshan GO, and does not close
+the reporter.
+
+Keep / revert / queue:
+
+Decision: keep.
+
+ds-goal progress receipt: `r-551bc10105aa00ea`

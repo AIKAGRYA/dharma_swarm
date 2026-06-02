@@ -1315,3 +1315,30 @@ Metabolized rule:
 
 - Human-facing summaries must expose zero-satisfaction state whenever they
   surface final-window closure metadata.
+
+## Loop 69 Metabolization Note
+
+Hypothesis:
+
+If periodic status checks are metabolized as context-only evidence, future
+agents can use fresh environment facts without weakening action gates.
+
+Patch:
+
+- Added a report-only periodic status receipt.
+
+Evaluation:
+
+- Onboard, toolbelt, focused tests, support verifier slices, and compile passed.
+- Complete verifier remains blocked only by the open reporter.
+
+Adversarial review:
+
+- Substrate health is not action-specific authority.
+- Optional credential warnings are toolbelt context, not blockers for local
+  Operator OS work.
+
+Metabolized rule:
+
+- Periodic refreshes must separate substrate context from Operator OS authority
+  and must repeat the reporter-open complete-verifier boundary.
