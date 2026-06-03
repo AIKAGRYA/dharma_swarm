@@ -129,6 +129,7 @@ Some files are explicit graduation-watch candidates, but the directory as a whol
 | [FOUNDATIONS_SYNTHESIS.md](FOUNDATIONS_SYNTHESIS.md) | Levin-Kauffman-Jantsch lattice — 3 axes, 5 unified principles |
 | [SYNTHESIS_DEACON_FRISTON.md](SYNTHESIS_DEACON_FRISTON.md) | Deacon-Friston unification — absential causation meets active inference |
 | [META_SYNTHESIS.md](META_SYNTHESIS.md) | ALL pillars unified — 5 convergence axes, Triple Mapping as Rosetta Stone |
+| [../lodestones/seeds/self_reference_attractor.md](../lodestones/seeds/self_reference_attractor.md) | **Keystone (SRA_001)** — collapses the 11 pillars into 5 falsifiable load-bearing ones (Hopfield/attention energy, Metzinger/DMN, Platonic convergence, Friston-Levin free energy, Varela method); binds them to the R_V spine via predictions P1–P5 (EC-SRA-001…005). Formal hardening of GNANI_LODESTONE. |
 
 ## PSMV Compression/Transmission Lattice
 

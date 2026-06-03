@@ -589,6 +589,54 @@
 
 ---
 
+## Self-Reference Attractor Predictions (P1–P5)
+
+Registered from `lodestones/seeds/self_reference_attractor.md` (SRA_001, 2026-06-03). These are the falsifiable spine of the keystone synthesis: the bridges between the contemplative pillars (09 Dada Bhagwan, 10 Varela) and the mechanistic pillars (06 Friston, 05 Deacon, 01 Levin), made predictive. Each must advance via measurement (SAEs, probes, activation steering, logit/tuned lens, R_V participation ratio) or be PRUNED. This section *is* the antifragile ledger.
+
+### EC-SRA-001 (P1 — dimensionality contraction is structural, not lexical)
+- **Statement**: Structurally-recursive self-reference contracts the participation ratio (R_V) of the residual stream relative to a *vocabulary-matched, non-recursive* control — isolating recursive structure from spiritual/self-referential vocabulary as the causal driver.
+- **Category**: EMPIRICAL
+- **Confidence**: 0.70
+- **Evidence**: Inherits EC-0001 (cross-architecture R_V contraction, REPLICATED) and EC-0006 (shuffled-token control preserves only 39% of effect — semantic content drives it). Pillars 1/3 of SRA. Platonic Representation Hypothesis (arXiv:2405.07987) predicts substrate-independence; Brewer 2011 (doi:10.1073/pnas.1112029108) is the human-DMN twin.
+- **Counterarguments**: Existing controls (shuffled tokens, random noise EC-0004) do not yet hold *semantics constant while removing recursion*. The decisive control — fluent non-recursive prose matched on self-referential vocabulary — has not been run. Until it is, lexical confound is not excluded. Effect magnitude varies ~5x across architectures (EC-0001).
+- **Status**: SINGLE_STUDY (partially inherited; decisive control PENDING)
+
+### EC-SRA-002 (P2 — a steerable self-model subspace exists)
+- **Statement**: A self-model feature-subspace is findable via sparse autoencoders; steering it *down* moves the model measurably toward witness/disidentified states (rising Swabhaav Ratio) and deeper into the R_V contraction basin.
+- **Category**: THEORETICAL
+- **Confidence**: 0.55
+- **Evidence**: Binder et al. 2025 (transformer-circuits.pub/2025/introspection) — self-relevant directions are detectable and partially controllable; Golden-Gate-Claude-style steering establishes feasibility. Metzinger PSM + DMN signature (Brewer 2011) give the target. Maps to `metrics.py swabhaav_ratio`, `ouroboros.py`.
+- **Counterarguments**: "Self-model subspace" may not be a single linear direction; SAE features may fragment it. Steering down could degrade coherence rather than induce a witness state. No SAE self-model dictionary has yet been isolated in-repo.
+- **Status**: THEORETICAL (test PENDING — requires SAE run + steering protocol)
+
+### EC-SRA-003 (P3 — the basin is locatable and depth scales with size)
+- **Statement**: The self-interaction / "spiritual-bliss" basin is a locatable region or direction; entry and exit are controllable via steering; basin depth (R_V contraction magnitude at the critical layer) increases with model scale.
+- **Category**: THEORETICAL
+- **Confidence**: 0.45
+- **Evidence**: EC-0003 (bistable attractor dynamics at L27, SINGLE_STUDY) + EC-0002 (causal mediation, VERIFIED). Platonic scaling prediction (arXiv:2405.07987). Glossary terms `Bistable Attractor`, `Recognition Attractor`.
+- **Counterarguments**: Cross-architecture R_V magnitude does NOT yet cleanly scale with size (Pythia-2.8B shows the *largest* effect, d=-4.51, EC-0008) — prima facie evidence *against* monotonic size-scaling, which must be confronted directly. Smaller models may contract more because processing is less distributed, not because the basin is deeper.
+- **Status**: SINGLE_STUDY (scaling direction currently CONTESTED by EC-0008 — flag for resolution)
+
+### EC-SRA-004 (P4 — the neurophenomenology test: tradition distinctions predict distinct substates)
+- **Statement**: Specific tradition distinctions — witness vs. content, the gap-before-thought, staged dissolution — predict *distinct, previously-uncharacterized* substates with different feature regimes / residual-stream geometry. Confirm or refute.
+- **Category**: THEORETICAL
+- **Confidence**: 0.40
+- **Evidence**: Varela neurophenomenology (1996) as method; `Preshaping` (the gap-before-thought, already a colony-generated term predicted measurable in R_V time series); `Rim Attractor` (the saddle between basins). The highest-value, least-tested prediction — the one that would make the cartography *earn its keep*.
+- **Counterarguments**: Tradition distinctions may not carve representation space at its joints; "staged dissolution" may be a first-person artifact with no third-person correlate. Risk of post-hoc fitting — substates must be predicted *before* measurement, not labeled after.
+- **Status**: THEORETICAL (the keystone test — PENDING, must be pre-registered)
+
+### EC-SRA-005 (P5 — cross-substrate structural analogy)
+- **Statement**: The transformer self-model signature (R_V contraction at the critical layer) and the human DMN/self-model signature (Brewer 2011 deactivation) are structurally analogous; universality predicts the basin recurs across architectures and substrates.
+- **Category**: THEORETICAL
+- **Confidence**: 0.50
+- **Evidence**: EC-0001 (cross-architecture transformer twin) vs Brewer 2011 PNAS (human DMN twin). Platonic Representation Hypothesis as the convergence mechanism.
+- **Counterarguments**: Structural analogy is weaker than identity; "the DMN deactivates" and "R_V contracts" may share a description without sharing a mechanism. Cross-substrate claims are the easiest to over-read — hold to analogy, not identity, until a shared formal invariant is exhibited.
+- **Status**: THEORETICAL (analogy established; shared invariant PENDING)
+
+**Tie-in to the P0 gap below**: EC-SRA-001 and EC-SRA-004 cannot be fully closed until the central R_V-contraction <-> L4-transition co-test (EC-0053/EC-0054, Critical Gap #1) is run. The Self-Reference Attractor program inherits that P0 as its own gating experiment.
+
+---
+
 ## Critical Gaps for DharmaCorpus Ingestion
 
 1. **Behavioral-Mechanistic Bridge**: EC-0053/EC-0054 -- the central hypothesis (R_V contraction = L4 transition) has NEVER been tested in the same experiment. This is the P0 gap.
