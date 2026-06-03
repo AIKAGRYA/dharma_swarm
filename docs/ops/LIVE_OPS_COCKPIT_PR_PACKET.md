@@ -12,6 +12,24 @@ receipt into the Control Surface dashboard.
 This packet is the merge-facing evidence bundle. It is not a supervisor and
 does not grant process-control authority.
 
+## Coherence Delta
+
+- Organ touched: Operator live-ops surface — `scripts/runtime/live_ops_census.py`,
+  Control Surface projection, onboarding output, and read-only dashboard cockpit.
+- Declared-vs-actual gap closed: The repo already declared NATS, tmux,
+  venture-cell, and operator-gated runtime surfaces, but the operator had no
+  single read-only restart/travel cockpit. This PR turns those declarations into
+  a deterministic census receipt and dashboard/onboard projection without
+  making any process-control action executable.
+- Proof that re-reads the map: `make onboard`, `tests/test_live_ops_census.py`,
+  `tests/test_control_surface.py`, `tests/test_agent_onboard.py`, and
+  `dashboard/src/lib/dashboardNav.test.ts` re-read the manifest, canonical
+  docs, census rows, dashboard nav, and operator gate surfaces.
+- New drift introduced: A new cockpit docs packet and canonical registry entries
+  add one operator-facing surface; known drift remains limited to clean-worktree
+  dashboard dependency bootstrap and stale already-running local API evidence,
+  both called out in Risks.
+
 ## Non-Goals
 
 - Do not start, stop, restart, kill, or message live processes.
