@@ -3,6 +3,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import dharma_swarm.cron_runner as cron_runner
 from dharma_swarm.cron_job_runtime import CronJobRunStatus
 from dharma_swarm.cron_runner import execute_cron_job, run_cron_job
 from dharma_swarm.models import LLMResponse, ProviderType
@@ -11,6 +12,7 @@ from dharma_swarm.runtime_provider import RuntimeProviderConfig
 
 def test_shell_handler_runs_shlex_split_command_without_shell(tmp_path):
     calls = []
+    repo_root = str(cron_runner.Path(cron_runner.__file__).resolve().parent.parent)
 
     class FakeProc:
         returncode = 0
@@ -45,7 +47,7 @@ def test_shell_handler_runs_shlex_split_command_without_shell(tmp_path):
         "--output",
         "~/.dharma/logs/provider_credits_latest.json",
     ]
-    assert kwargs["cwd"] == str(tmp_path)
+    assert kwargs["cwd"] == repo_root
     assert "shell" not in kwargs
 
 
@@ -459,9 +461,8 @@ def test_run_cron_job_dispatches_doctor_assurance():
 
 
 def test_run_cron_job_dispatches_system_map_populator(tmp_path):
-    script = tmp_path / "scripts" / "system_map_populator.py"
-    script.parent.mkdir()
-    script.write_text("print('ok')\n", encoding="utf-8")
+    repo_root = cron_runner.Path(cron_runner.__file__).resolve().parent.parent
+    script = repo_root / "scripts" / "system_map_populator.py"
     with patch(
         "subprocess.run",
         return_value=SimpleNamespace(returncode=0, stdout="Wrote reports/system_map/latest.json", stderr=""),
@@ -483,6 +484,7 @@ def test_run_cron_job_dispatches_system_map_populator(tmp_path):
     assert args[1] == str(script)
     assert ["--audit-dir", "/tmp/audit"] == args[2:4]
     assert ["--output", "/tmp/latest.json"] == args[4:6]
+    assert mock_run.call_args.kwargs["cwd"] == str(repo_root)
     assert mock_run.call_args.kwargs["timeout"] == 12
 
 

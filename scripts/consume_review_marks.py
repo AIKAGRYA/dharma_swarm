@@ -69,6 +69,17 @@ LOG_PATH = DHARMA_HOME / "logs" / "consume_review_marks.jsonl"
 
 DEFAULT_MIN_CONFIDENCE = 0.5
 ALLOWED_TYPES = {"atomic"}
+REVIEW_MARK_SCHEMA = "dharma.knowledge_review_mark.v1"
+TRUSTED_REVIEWERS = {
+    "operator",
+    "merge_master_mike",
+    "codex",
+    "claude",
+    "devin",
+    "hermes-m5",
+    "opus_composer",
+    "perplexity-computer",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -165,6 +176,8 @@ def has_external_review_mark(src: Path) -> bool:
     except (OSError, json.JSONDecodeError, ValueError):
         return False
 
+    if str(mark.get("schema") or "").strip() != REVIEW_MARK_SCHEMA:
+        return False
     decision = str(
         mark.get("decision") or mark.get("review_status") or mark.get("status") or ""
     ).strip().lower()
@@ -172,7 +185,8 @@ def has_external_review_mark(src: Path) -> bool:
         return False
     if str(mark.get("path") or "").strip() != rel:
         return False
-    if not str(mark.get("reviewer") or mark.get("reviewed_by") or "").strip():
+    reviewer = str(mark.get("reviewer") or mark.get("reviewed_by") or "").strip()
+    if reviewer not in TRUSTED_REVIEWERS:
         return False
     if not str(mark.get("reviewed_at") or mark.get("timestamp") or "").strip():
         return False
