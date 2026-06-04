@@ -15,6 +15,7 @@ import os
 import re
 import signal
 import shlex
+import ssl
 import subprocess
 import sys
 import time
@@ -88,6 +89,8 @@ class NATSConfig:
     user: str
     credential: str
     missing: tuple[str, ...]
+    ca_pem: str = ""
+    tls_hostname: str = ""
 
 
 def utc_now() -> str:
@@ -1445,11 +1448,32 @@ def _nats_config(env: dict[str, str], *, require_devin_secrets: bool) -> NATSCon
         or env.get("NATS_PASSWORD")
         or ""
     )
+    ca_pem = env.get("DEVIN_NATS_CA_PEM") or env.get("DHARMA_NATS_CA_PEM") or env.get("NATS_CA_PEM") or ""
+    tls_hostname = (
+        env.get("DEVIN_NATS_TLS_HOSTNAME")
+        or env.get("DHARMA_NATS_TLS_HOSTNAME")
+        or env.get("NATS_TLS_HOSTNAME")
+        or ""
+    )
     if require_devin_secrets:
         missing = [name for name in NATS_REQUIRED_SECRET_NAMES if not env.get(name)]
     else:
         missing = [] if endpoint else ["DEVIN_NATS_URL or DHARMA_NATS_URL or NATS_URL"]
-    return NATSConfig(endpoint=endpoint, user=user, credential=auth_value, missing=tuple(missing))
+    return NATSConfig(
+        endpoint=endpoint,
+        user=user,
+        credential=auth_value,
+        missing=tuple(missing),
+        ca_pem=_normalize_ca_pem(ca_pem),
+        tls_hostname=tls_hostname.strip(),
+    )
+
+
+def _normalize_ca_pem(value: str) -> str:
+    normalized = value.strip()
+    if "\\n" in normalized and "\n" not in normalized:
+        normalized = normalized.replace("\\n", "\n")
+    return normalized + "\n" if normalized and not normalized.endswith("\n") else normalized
 
 
 def _redacted_nats_config(config: NATSConfig) -> dict[str, Any]:
@@ -1457,8 +1481,22 @@ def _redacted_nats_config(config: NATSConfig) -> dict[str, Any]:
         "endpoint": config.endpoint,
         "has_user": bool(config.user),
         "has_auth_credential": bool(config.credential),
+        "has_ca_pem": bool(config.ca_pem),
+        "tls_hostname": config.tls_hostname,
+        "tls_trust": "custom_ca_pem" if config.ca_pem else "system_ca_store",
         "missing": list(config.missing),
     }
+
+
+def _nats_tls_kwargs(config: NATSConfig) -> dict[str, Any]:
+    kwargs: dict[str, Any] = {}
+    if config.ca_pem:
+        tls_context = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH)
+        tls_context.load_verify_locations(cadata=config.ca_pem)
+        kwargs["tls"] = tls_context
+    if config.tls_hostname:
+        kwargs["tls_hostname"] = config.tls_hostname
+    return kwargs
 
 
 def _a2a_target_for_subject(subject: str) -> str:
@@ -1601,6 +1639,7 @@ async def _publish_a2a_messages_async(
         connect_timeout=timeout_s,
         allow_reconnect=False,
         max_reconnect_attempts=0,
+        **_nats_tls_kwargs(config),
     )
     try:
         js = nc.jetstream()

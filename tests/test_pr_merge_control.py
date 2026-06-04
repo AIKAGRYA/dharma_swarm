@@ -329,6 +329,60 @@ def test_publish_a2a_fanout_session_blocks_when_required_secrets_missing(tmp_pat
     assert set(receipt["config"]["missing"]) == set(prc.NATS_REQUIRED_SECRET_NAMES)
 
 
+def test_nats_config_records_ca_pem_without_leaking_secret_material():
+    config = prc._nats_config(
+        {
+            "DEVIN_NATS_URL": "wss://nats.example.test:8443",
+            "DEVIN_NATS_USER": "devin",
+            "DEVIN_NATS_PW": "super-secret",
+            "DEVIN_NATS_CA_PEM": "-----BEGIN CERTIFICATE-----\\nabc\\n-----END CERTIFICATE-----",
+            "DEVIN_NATS_TLS_HOSTNAME": "nats.agni.example",
+        },
+        require_devin_secrets=True,
+    )
+
+    redacted = prc._redacted_nats_config(config)
+
+    assert config.ca_pem == "-----BEGIN CERTIFICATE-----\nabc\n-----END CERTIFICATE-----\n"
+    assert config.tls_hostname == "nats.agni.example"
+    assert redacted["has_ca_pem"] is True
+    assert redacted["tls_hostname"] == "nats.agni.example"
+    assert redacted["tls_trust"] == "custom_ca_pem"
+    assert "BEGIN CERTIFICATE" not in str(redacted)
+    assert "super-secret" not in str(redacted)
+
+
+def test_nats_tls_kwargs_loads_custom_ca_and_hostname(monkeypatch):
+    seen = {}
+
+    class FakeTLSContext:
+        def load_verify_locations(self, *, cadata):
+            seen["cadata"] = cadata
+
+    fake_context = FakeTLSContext()
+
+    def fake_create_default_context(*, purpose):
+        seen["purpose"] = purpose
+        return fake_context
+
+    monkeypatch.setattr(prc.ssl, "create_default_context", fake_create_default_context)
+    kwargs = prc._nats_tls_kwargs(
+        prc.NATSConfig(
+            endpoint="wss://nats.example.test:8443",
+            user="devin",
+            credential="credential",
+            missing=(),
+            ca_pem="-----BEGIN CERTIFICATE-----\nabc\n-----END CERTIFICATE-----\n",
+            tls_hostname="nats.agni.example",
+        )
+    )
+
+    assert kwargs["tls"] is fake_context
+    assert kwargs["tls_hostname"] == "nats.agni.example"
+    assert seen["purpose"] == prc.ssl.Purpose.SERVER_AUTH
+    assert seen["cadata"] == "-----BEGIN CERTIFICATE-----\nabc\n-----END CERTIFICATE-----\n"
+
+
 def test_publish_a2a_fanout_session_records_verified_acks_without_secret(tmp_path):
     seen = {}
 

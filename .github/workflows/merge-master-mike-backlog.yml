@@ -83,6 +83,8 @@ jobs:
           DEVIN_NATS_URL: ${{ secrets.DEVIN_NATS_URL }}
           DEVIN_NATS_USER: ${{ secrets.DEVIN_NATS_USER }}
           DEVIN_NATS_PW: ${{ secrets.DEVIN_NATS_PW }}
+          DEVIN_NATS_CA_PEM: ${{ secrets.DEVIN_NATS_CA_PEM }}
+          DEVIN_NATS_TLS_HOSTNAME: ${{ vars.DEVIN_NATS_TLS_HOSTNAME || secrets.DEVIN_NATS_TLS_HOSTNAME }}
           MODE: ${{ inputs.mode }}
           MAX_PRS: ${{ inputs.max_prs }}
           LIMIT: ${{ inputs.limit }}
