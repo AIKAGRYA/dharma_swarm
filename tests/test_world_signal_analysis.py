@@ -25,14 +25,20 @@ def test_two_independent_public_sources_promote() -> None:
     movement = board["movements"][0]
     assert movement["status"] == "promotion_ready"
     assert movement["independent_sources"] == 2
-    assert promotion_ready_signals(board)[0]["source"] == "world_zeitgeist"
+    assert movement["triage"]["decision"] == "promote"
+    assert set(movement["triage_tuple"]) == {"novelty", "telos_fit", "tractability", "source_confidence"}
+    promoted = promotion_ready_signals(board)[0]
+    assert promoted["source"] == "world_zeitgeist"
+    assert promoted["metadata"]["triage_tuple"]["telos_fit"] >= 0.45
 
 
 def test_operator_drop_with_url_promotes() -> None:
     board = build_world_signal_board([_row("op-1", "operator_drop", score=0.72)])
 
     assert board["movements"][0]["status"] == "promotion_ready"
-    assert board["movements"][0]["promotion_reason"] == "operator drop with concrete evidence URL/source"
+    assert board["movements"][0]["promotion_reason"] == (
+        "triage passed with operator drop and concrete evidence URL/source"
+    )
 
 
 def test_single_public_source_incubates_not_promotes() -> None:
@@ -41,6 +47,41 @@ def test_single_public_source_incubates_not_promotes() -> None:
     movement = board["movements"][0]
     assert movement["status"] == "incubating"
     assert movement["cascade_queries"]
+    assert movement["triage_tuple"]["source_confidence"] >= 0.55
+    assert not promotion_ready_signals(board)
+
+
+def test_low_telos_signal_is_rejected_even_with_source_count() -> None:
+    rows = [
+        _row("hn-coupon", "hacker_news", score=0.88),
+        _row("gh-coupon", "github", score=0.86),
+    ]
+    for row in rows:
+        row["title"] = "Casino coupon promo"
+        row["description"] = "Gambling coupon spam with no governed agent or research value."
+        row["keywords"] = ["casino", "coupon", "promo"]
+        row["metadata"] = {"movement_key": "casino coupon promo"}
+
+    board = build_world_signal_board(rows)
+
+    movement = board["movements"][0]
+    assert movement["status"] == "rejected"
+    assert movement["triage"]["decision"] == "reject"
+    assert "reject_keyword_match" in movement["triage"]["reasons"]
+    assert board["health"]["rejected"] == 1
+    assert not promotion_ready_signals(board)
+
+
+def test_operator_drop_without_evidence_incubates_as_insufficient_evidence() -> None:
+    row = _row("op-no-url", "operator_drop", score=0.92)
+    row["url"] = ""
+
+    board = build_world_signal_board([row])
+
+    movement = board["movements"][0]
+    assert movement["status"] == "incubating"
+    assert movement["triage"]["decision"] == "insufficient_evidence"
+    assert movement["promotion_reason"] == "triage needs more concrete source evidence"
     assert not promotion_ready_signals(board)
 
 
