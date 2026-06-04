@@ -153,6 +153,11 @@ def world_feed_row_from_signal_receipt(receipt: GoWorldReceipt) -> dict[str, Any
         raise GoWorldBridgeError(f"cannot project rejected receipt: {receipt.rejected_reason}")
 
     payload = receipt.payload
+    payload_metadata = (
+        dict(payload.get("metadata") or {})
+        if isinstance(payload.get("metadata"), dict)
+        else {}
+    )
     title = str(payload.get("title", "")).strip()
     category = str(payload.get("category", "opportunity")).strip() or "opportunity"
     score = _float(payload.get("relevance_score"))
@@ -164,6 +169,10 @@ def world_feed_row_from_signal_receipt(receipt: GoWorldReceipt) -> dict[str, Any
         "correlation_id": receipt.correlation_id,
         "content_hash": receipt.content_hash,
         "event_uid": receipt.event_uid,
+        "raw_source": str(payload.get("raw_source") or payload_metadata.get("raw_source") or ""),
+        "source_type": str(payload.get("source_type") or payload_metadata.get("source_type") or ""),
+        "url": str(payload.get("url") or payload_metadata.get("url") or receipt.source_url),
+        "movement_key": str(payload_metadata.get("movement_key") or ""),
         "raw_observation_event_uid": str(payload.get("raw_observation_event_uid", "")),
         "matched_terms": _string_list(payload.get("matched_terms")),
         "first_principles_questions": _string_list(
