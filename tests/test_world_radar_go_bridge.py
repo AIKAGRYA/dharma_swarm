@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 from dharma_swarm.world_radar import go_bridge as bridge
@@ -126,12 +127,313 @@ def test_no_fetch_pass_preserves_prior_radar_raw_observations(
     assert result.promotion_ready == 1
 
 
+
+def test_run_go_scout_plumbs_archive_flags(monkeypatch, tmp_path: Path) -> None:
+    state = tmp_path / ".dharma"
+    output_path = tmp_path / "observations.jsonl"
+    health_path = tmp_path / "health.json"
+    archive_dir = tmp_path / "archive"
+    url_file = tmp_path / "urls.txt"
+    url_file.write_text("https://cofounder.co/how-to/start\n", encoding="utf-8")
+    captured: dict[str, object] = {}
+
+    def fake_run(cmd, cwd, capture_output, text, timeout):  # type: ignore[no-untyped-def]
+        captured["cmd"] = cmd
+        _write_jsonl(output_path, [_signal("cofounder", score=0.91)])
+        health_path.write_text(
+            json.dumps(
+                {
+                    "successful_sources": 1,
+                    "failed_sources": 0,
+                    "archive_enabled": True,
+                    "archive_count": 2,
+                    "dedupe_count": 0,
+                    "archive_dir": str(archive_dir),
+                    "archive_index_path": str(archive_dir / "archive_index.jsonl"),
+                    "archive_replay_index_path": str(archive_dir / "replay_index.json"),
+                    "archive_manifest_path": str(archive_dir / "manifest.json"),
+                    "archive_discovered_count": 3,
+                    "archive_workers": 8,
+                    "archive_total_bytes": 1234,
+                    "archive_clean_text_count": 2,
+                    "archive_clean_text_bytes": 987,
+                    "archive_error_count": 1,
+                }
+            ),
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+
+    monkeypatch.setattr(bridge.subprocess, "run", fake_run)
+
+    rows, error, counts = bridge._run_go_scout(
+        state=state,
+        output_path=output_path,
+        health_path=health_path,
+        timeout_s=30,
+        archive=True,
+        archive_dir=archive_dir,
+        archive_urls=["https://cofounder.co/how-to/start"],
+        archive_url_files=[str(url_file)],
+        archive_source_specs=[str(tmp_path / "sourcespec.json")],
+        archive_max_bytes=123_456,
+        archive_max_pages=4,
+        archive_max_depth=0,
+        archive_same_domain=False,
+        archive_rate_limit_ms=250,
+        archive_robots=False,
+        archive_default_crawl_delay_ms=75,
+        archive_max_retries=3,
+        archive_retry_base_delay_ms=11,
+        archive_retry_max_delay_ms=99,
+        archive_max_fetch_duration_ms=1234,
+        archive_exclude=["app.cofounder.co"],
+        archive_workers=8,
+        archive_discover_llms=True,
+        archive_discover_sitemap=True,
+        archive_sitemap_max_urls=25,
+    )
+
+    cmd = captured["cmd"]
+    assert isinstance(cmd, list)
+    assert error is None
+    assert rows[0]["source"] == "cofounder"
+    assert counts["archive_enabled"] is True
+    assert counts["archive_count"] == 2
+    assert counts["archive_index_path"] == str(archive_dir / "archive_index.jsonl")
+    assert counts["archive_replay_index_path"] == str(archive_dir / "replay_index.json")
+    assert counts["archive_discovered_count"] == 3
+    assert counts["archive_workers"] == 8
+    assert counts["archive_total_bytes"] == 1234
+    assert counts["archive_clean_text_count"] == 2
+    assert counts["archive_clean_text_bytes"] == 987
+    assert counts["archive_error_count"] == 1
+    assert "--archive" in cmd
+    assert "--archive-discover-llms" in cmd
+    assert "--archive-discover-sitemap" in cmd
+    assert [cmd[idx + 1] for idx, item in enumerate(cmd) if item == "--archive-workers"] == ["8"]
+    assert [cmd[idx + 1] for idx, item in enumerate(cmd) if item == "--archive-sitemap-max-urls"] == ["25"]
+    assert [cmd[idx + 1] for idx, item in enumerate(cmd) if item == "--archive-max-bytes"] == ["123456"]
+    assert [cmd[idx + 1] for idx, item in enumerate(cmd) if item == "--archive-rate-limit-ms"] == ["250"]
+    assert "--archive-same-domain=false" in cmd
+    assert "--archive-robots=false" in cmd
+    assert [cmd[idx + 1] for idx, item in enumerate(cmd) if item == "--archive-default-crawl-delay-ms"] == ["75"]
+    assert [cmd[idx + 1] for idx, item in enumerate(cmd) if item == "--archive-max-retries"] == ["3"]
+    assert [cmd[idx + 1] for idx, item in enumerate(cmd) if item == "--archive-retry-base-delay-ms"] == ["11"]
+    assert [cmd[idx + 1] for idx, item in enumerate(cmd) if item == "--archive-retry-max-delay-ms"] == ["99"]
+    assert [cmd[idx + 1] for idx, item in enumerate(cmd) if item == "--archive-max-fetch-duration-ms"] == ["1234"]
+    assert [cmd[idx + 1] for idx, item in enumerate(cmd) if item == "--query-url"] == [
+        "https://cofounder.co/how-to/start"
+    ]
+    assert [cmd[idx + 1] for idx, item in enumerate(cmd) if item == "--query-url-file"] == [str(url_file)]
+    assert [cmd[idx + 1] for idx, item in enumerate(cmd) if item == "--source-spec"] == [str(tmp_path / "sourcespec.json")]
+    assert "app.cofounder.co" in cmd
+
+
+def test_world_radar_imports_go_archive_rows_as_untrusted_evidence(monkeypatch, tmp_path: Path) -> None:
+    state = tmp_path / ".dharma"
+    archive_dir = tmp_path / "archive"
+    archive_dir.mkdir()
+    clean = archive_dir / "clean.txt"
+    clean.write_text("Agent bounty public evidence with $50 payment signal.", encoding="utf-8")
+    body = archive_dir / "body.html"
+    body.write_text("<html><body>raw</body></html>", encoding="utf-8")
+    receipt = archive_dir / "receipt.json"
+    receipt.write_text(json.dumps({"receipt_id": "goarch_1", "run_id": "archive-run-1"}), encoding="utf-8")
+    index = archive_dir / "archive_index.jsonl"
+    _write_jsonl(
+        index,
+        [
+            {
+                "run_id": "archive-run-1",
+                "source_spec_id": "cashclaw-public-github",
+                "url": "https://github.com/example/repo/issues/1",
+                "canonical_url": "https://github.com/example/repo/issues/1",
+                "final_canonical_url": "https://github.com/example/repo/issues/1",
+                "title": "Agent bounty public evidence",
+                "source_kind": "html",
+                "content_hash": "sha256:" + "a" * 64,
+                "capture_status": "captured",
+                "body_path": str(body),
+                "receipt_path": str(receipt),
+                "clean_text_path": str(clean),
+                "robots_decision": "allowed",
+            }
+        ],
+    )
+
+    def fake_scout(**_kwargs):  # type: ignore[no-untyped-def]
+        return [], None, {
+            "successful_sources": 1,
+            "failed_sources": 0,
+            "archive_enabled": True,
+            "archive_count": 1,
+            "archive_index_path": str(index),
+            "archive_replay_index_path": str(archive_dir / "replay_index.json"),
+            "archive_manifest_path": str(archive_dir / "manifest.json"),
+            "archive_clean_text_count": 1,
+            "archive_clean_text_bytes": clean.stat().st_size,
+        }
+
+    monkeypatch.setattr(bridge, "_run_go_scout", fake_scout)
+    monkeypatch.setattr(bridge, "_run_go_ingestor", _fake_ingestor)
+
+    result = bridge.run_world_radar_go_once(state_dir=state, scout_fetch=True, scout_archive=True)
+
+    assert result.ok is True
+    assert result.archive_enabled is True
+    assert result.archive_clean_text_count == 1
+    raw_rows = _read_jsonl(state / "meta" / "world_radar" / "raw_observations.jsonl")
+    archive_rows = [row for row in raw_rows if row.get("source") == "go_archive"]
+    assert len(archive_rows) == 1
+    metadata = archive_rows[0]["metadata"]
+    assert isinstance(metadata, dict)
+    assert metadata["trust_state"] == "untrusted_capture"
+    assert metadata["authority"] == "evidence_only"
+    assert metadata["no_external_action"] is True
+    assert metadata["receipt_path"] == str(receipt)
+
+
+def test_run_go_ingestor_projects_current_run_receipts(monkeypatch, tmp_path: Path) -> None:
+    input_path = tmp_path / "raw.jsonl"
+    output_path = tmp_path / "signals.jsonl"
+    receipt_dir = tmp_path / "receipts"
+    _write_jsonl(input_path, [_signal("operator_drop", score=0.86)])
+    captured: dict[str, object] = {}
+
+    def fake_run(cmd, cwd, capture_output, text, timeout):  # type: ignore[no-untyped-def]
+        captured["cmd"] = cmd
+        corr = str(cmd[cmd.index("--correlation-id") + 1])
+        out_dir = Path(cmd[cmd.index("--receipt-dir") + 1])
+        out_dir.mkdir(parents=True)
+        _write_jsonl(output_path, [_signal("operator_drop", score=0.86)])
+        (out_dir / "goev_world_signal.json").write_text(
+            json.dumps(
+                {
+                    "receipt_id": "goev_world_signal",
+                    "correlation_id": corr,
+                    "source": "world_signal",
+                    "source_url": "https://example.com/operator_drop",
+                    "observed_at": "2026-05-09T00:00:00Z",
+                    "content_hash": "sha256:" + "a" * 64,
+                    "event_uid": "evt_world_signal",
+                    "schema_version": "go_evidence_receipt.v0",
+                    "status": "accepted",
+                    "payload": {
+                        "id": "sig-operator",
+                        "source": "world_scout",
+                        "raw_source": "operator_drop",
+                        "source_type": "operator_drop",
+                        "category": "company",
+                        "title": "SubQ managed agent runtime",
+                        "description": "Managed agent execution infrastructure signal.",
+                        "relevance_score": 0.86,
+                        "url": "https://example.com/operator_drop",
+                        "keywords": ["agentic", "runtime"],
+                        "observed_at": "2026-05-09T00:00:00Z",
+                        "metadata": {"movement_key": "subq managed agent runtime"},
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+
+    monkeypatch.setattr(bridge.subprocess, "run", fake_run)
+
+    rows, error = bridge._run_go_ingestor(
+        input_path=input_path,
+        output_path=output_path,
+        min_score=0.45,
+        timeout_s=30,
+        receipt_dir=receipt_dir,
+        correlation_id="corr-current-run",
+    )
+
+    cmd = captured["cmd"]
+    assert isinstance(cmd, list)
+    assert error is None
+    assert "--receipt-dir" in cmd
+    assert "--correlation-id" in cmd
+    assert rows[0]["source"] == "go_world_signal_receipt"
+    assert rows[0]["metadata"]["correlation_id"] == "corr-current-run"
+    assert rows[0]["metadata"]["raw_source"] == "operator_drop"
+
+
+def test_world_radar_writes_ingest_summary_and_cost_event(monkeypatch, tmp_path: Path) -> None:
+    state = tmp_path / ".dharma"
+    _write_jsonl(
+        state / "meta" / "world_operator_drops.jsonl",
+        [_signal("operator_drop", score=0.86)],
+    )
+    monkeypatch.setattr(bridge, "_run_go_ingestor", _fake_ingestor)
+
+    result = bridge.run_world_radar_go_once(state_dir=state, scout_fetch=False)
+
+    summary_path = state / "meta" / "world_radar" / "ingest_run_summary.json"
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    assert result.ingest_run_id == summary["run_id"]
+    assert result.ingest_summary_path == str(summary_path)
+    assert summary["schema_version"] == "world_radar_go_ingest_summary.v1"
+    assert summary["raw_count"] == 1
+    assert summary["signal_count"] == 1
+    assert summary["accepted_count"] == 1
+    assert summary["rejected_count"] == 0
+    assert summary["retry_count"] == 0
+    assert summary["byte_count"] > 0
+    assert summary["provisional_compute_units"] >= 1
+    assert summary["cost_model"] == "neutral_compute_unit_v0_no_usd"
+    assert summary["nats_receipt_transport"]["status"] == "disabled"
+
+    cost_rows = _read_jsonl(state / "meta" / "world_radar" / "ingest_cost_ledger.jsonl")
+    assert len(cost_rows) == 1
+    assert cost_rows[0]["schema_version"] == "world_radar_ingest_cost_event.v1"
+    assert cost_rows[0]["idempotency_key"] == result.ingest_run_id
+    assert cost_rows[0]["amount"] == summary["provisional_compute_units"]
+    assert cost_rows[0]["cost_usd"] == 0.0
+
+    health = json.loads((state / "meta" / "world_radar" / "world_radar_health.json").read_text(encoding="utf-8"))
+    assert health["ingest_summary_path"] == str(summary_path)
+    assert health["ingest_cost_ledger_path"] == str(state / "meta" / "world_radar" / "ingest_cost_ledger.jsonl")
+    assert health["nats_receipt_transport"]["status"] == "disabled"
+
+
+def test_record_ingest_cost_event_is_idempotent(tmp_path: Path) -> None:
+    ledger_path = tmp_path / "ingest_cost_ledger.jsonl"
+    summary = {
+        "run_id": "run-fixed",
+        "correlation_id": "run-fixed",
+        "provisional_compute_units": 7,
+        "source_count": 2,
+        "raw_count": 3,
+        "signal_count": 1,
+        "accepted_count": 1,
+        "rejected_count": 0,
+        "retry_count": 1,
+        "byte_count": 123,
+        "receipt_dir": str(tmp_path / "receipts"),
+        "summary_path": str(tmp_path / "summary.json"),
+    }
+
+    first = bridge._record_ingest_cost_event(ledger_path, summary)
+    second = bridge._record_ingest_cost_event(ledger_path, summary)
+
+    rows = _read_jsonl(ledger_path)
+    assert first is True
+    assert second is False
+    assert len(rows) == 1
+    assert rows[0]["event_id"] == "world_radar_ingest_cost:run-fixed"
+    assert rows[0]["amount"] == 7
+
+
 def _fake_ingestor(
     *,
     input_path: Path,
     output_path: Path,
     min_score: float,
     timeout_s: int,
+    receipt_dir: Path | None = None,
+    correlation_id: str = "",
 ) -> tuple[list[dict[str, object]], None]:
     rows = [
         row
