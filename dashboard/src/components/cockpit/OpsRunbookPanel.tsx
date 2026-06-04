@@ -3,6 +3,9 @@
 import {
   AlertTriangle,
   Battery,
+  FileText,
+  GitPullRequest,
+  ListChecks,
   Plane,
   Server,
   ShieldCheck,
@@ -10,6 +13,12 @@ import {
 } from "lucide-react";
 import type { ControlSurfaceRow } from "@/lib/types";
 import { colors } from "@/lib/theme";
+import {
+  decisionBucketForRow,
+  decisionBuckets,
+  proposalPreviewForRow,
+  type DecisionBucketKey,
+} from "./opsDecisionModel";
 
 interface OpsRunbookPanelProps {
   rows: ControlSurfaceRow[];
@@ -17,6 +26,17 @@ interface OpsRunbookPanelProps {
 }
 
 type FlightBucket = "keep" | "blocked" | "review" | "optional";
+
+const DECISION_BUCKET_COLORS: Record<DecisionBucketKey, string> = {
+  needs_john: colors.botan,
+  live_unauthorized: colors.bengara,
+  stale_refresh: colors.kinpaku,
+  blocked: colors.botan,
+  pr_queue: colors.aozora,
+  vps_candidates: colors.fuji,
+  heavy_local_load: colors.bengara,
+  other: colors.sumi[600],
+};
 
 const FLIGHT_SURFACE_ORDER = [
   "live_ops.substrate.dharma_daemon",
@@ -47,6 +67,32 @@ function bucketFor(row: ControlSurfaceRow): FlightBucket {
     return "optional";
   }
   return "review";
+}
+
+function DecisionBucketPill({
+  label,
+  count,
+  bucket,
+}: {
+  label: string;
+  count: number;
+  bucket: DecisionBucketKey;
+}) {
+  const color = DECISION_BUCKET_COLORS[bucket];
+  return (
+    <div
+      className="flex min-w-[132px] items-center justify-between gap-3 rounded-md border px-2 py-1.5"
+      style={{
+        borderColor: `color-mix(in srgb, ${color} 28%, transparent)`,
+        backgroundColor: `color-mix(in srgb, ${color} 8%, transparent)`,
+      }}
+    >
+      <span className="truncate text-[10px] font-medium uppercase text-sumi-400">{label}</span>
+      <span className="text-xs font-semibold tabular-nums" style={{ color }}>
+        {count}
+      </span>
+    </div>
+  );
 }
 
 function BucketBadge({ bucket }: { bucket: FlightBucket }) {
@@ -106,6 +152,9 @@ export function OpsRunbookPanel({ rows, selectedRow }: OpsRunbookPanelProps) {
   const stale = liveOpsRows.filter((row) => row.observed_state === "stale").length;
   const restartCommand = rawString(selectedRow, "restart_command");
   const stopPolicy = rawString(selectedRow, "stop_policy");
+  const buckets = decisionBuckets(rows).filter((bucket) => bucket.count > 0);
+  const selectedDecisionBucket = selectedRow ? decisionBucketForRow(selectedRow) : null;
+  const proposalPreview = proposalPreviewForRow(selectedRow);
 
   return (
     <section className="rounded-md border border-sumi-700/30 bg-sumi-950/60">
@@ -126,37 +175,50 @@ export function OpsRunbookPanel({ rows, selectedRow }: OpsRunbookPanelProps) {
       </div>
 
       <div className="grid gap-3 p-3 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="flex gap-2 overflow-x-auto">
-          {beforeFlightRows.map((row) => {
-            const bucket = bucketFor(row);
-            return (
-              <div
-                key={row.id}
-                className="min-w-[210px] rounded-md border border-sumi-800/50 bg-sumi-900/40 px-3 py-2"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <span className="line-clamp-1 text-xs font-medium text-sumi-200">{row.label}</span>
-                  <BucketBadge bucket={bucket} />
+        <div className="space-y-3 overflow-hidden">
+          <div className="flex flex-wrap gap-2">
+            {buckets.map((bucket) => (
+              <DecisionBucketPill
+                key={bucket.key}
+                bucket={bucket.key}
+                label={bucket.label}
+                count={bucket.count}
+              />
+            ))}
+          </div>
+
+          <div className="flex gap-2 overflow-x-auto">
+            {beforeFlightRows.map((row) => {
+              const bucket = bucketFor(row);
+              return (
+                <div
+                  key={row.id}
+                  className="min-w-[210px] rounded-md border border-sumi-800/50 bg-sumi-900/40 px-3 py-2"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="line-clamp-1 text-xs font-medium text-sumi-200">{row.label}</span>
+                    <BucketBadge bucket={bucket} />
+                  </div>
+                  <div className="mt-2 flex items-center gap-2 text-[10px] text-sumi-500">
+                    {bucket === "keep" && <ShieldCheck size={11} className="text-rokusho" />}
+                    {bucket === "blocked" && <AlertTriangle size={11} style={{ color: colors.botan }} />}
+                    {bucket === "review" && <Server size={11} style={{ color: colors.kinpaku }} />}
+                    {bucket === "optional" && <Battery size={11} className="text-sumi-500" />}
+                    <span className="capitalize">{row.observed_state || "unknown"}</span>
+                    <span>·</span>
+                    <span className="truncate">{row.next_action || row.desired_state || "inspect"}</span>
+                  </div>
                 </div>
-                <div className="mt-2 flex items-center gap-2 text-[10px] text-sumi-500">
-                  {bucket === "keep" && <ShieldCheck size={11} className="text-rokusho" />}
-                  {bucket === "blocked" && <AlertTriangle size={11} style={{ color: colors.botan }} />}
-                  {bucket === "review" && <Server size={11} style={{ color: colors.kinpaku }} />}
-                  {bucket === "optional" && <Battery size={11} className="text-sumi-500" />}
-                  <span className="capitalize">{row.observed_state || "unknown"}</span>
-                  <span>·</span>
-                  <span className="truncate">{row.next_action || row.desired_state || "inspect"}</span>
-                </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
 
         <div className="rounded-md border border-sumi-800/50 bg-sumi-900/40 px-3 py-2">
           <div className="flex items-center gap-2">
             <SquareTerminal size={13} className="text-aozora" />
             <span className="text-[10px] font-semibold uppercase text-sumi-500">
-              Read-only Runbook
+              Proposal Preview
             </span>
           </div>
           <div className="mt-2 space-y-2 text-[10px]">
@@ -165,15 +227,35 @@ export function OpsRunbookPanel({ rows, selectedRow }: OpsRunbookPanelProps) {
               <div className="mt-0.5 truncate text-xs text-sumi-200">{selectedRow?.label ?? "Select a row"}</div>
             </div>
             <div>
-              <div className="text-sumi-500">Command Text</div>
+              <div className="text-sumi-500">Decision Bucket</div>
+              <div className="mt-0.5 flex items-center gap-1.5 text-xs text-sumi-200">
+                <ListChecks size={11} className="text-aozora" />
+                {selectedDecisionBucket ? selectedDecisionBucket.replaceAll("_", " ") : "none"}
+              </div>
+            </div>
+            <div>
+              <div className="text-sumi-500">Packet Kind</div>
+              <div className="mt-0.5 flex items-center gap-1.5 text-xs text-sumi-200">
+                {proposalPreview?.kind.startsWith("pr_") ? (
+                  <GitPullRequest size={11} className="text-aozora" />
+                ) : (
+                  <FileText size={11} className="text-aozora" />
+                )}
+                {proposalPreview?.kind ?? "select row"}
+              </div>
+            </div>
+            <div>
+              <div className="text-sumi-500">Packet Text</div>
               <code className="mt-0.5 block whitespace-pre-wrap break-words rounded bg-sumi-950/70 px-2 py-1 text-aozora">
-                {restartCommand || "inspect row evidence first"}
+                {proposalPreview?.commandText || restartCommand || "inspect row evidence first"}
               </code>
             </div>
             <div>
-              <div className="text-sumi-500">Stop Policy</div>
+              <div className="text-sumi-500">Inline Execution</div>
               <code className="mt-0.5 block whitespace-pre-wrap break-words rounded bg-sumi-950/70 px-2 py-1 text-sumi-300">
-                {stopPolicy || "no policy declared"}
+                {proposalPreview?.forbiddenInlineExecution
+                  ? `forbidden · ${proposalPreview.sourceRefCount} source refs · ${proposalPreview.evidenceCount} evidence refs`
+                  : stopPolicy || "no packet selected"}
               </code>
             </div>
           </div>

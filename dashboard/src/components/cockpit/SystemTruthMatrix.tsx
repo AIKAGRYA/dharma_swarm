@@ -78,6 +78,8 @@ type FilterKey =
   | "stale"
   | "blocked"
   | "needs_john"
+  | "live_unauthorized"
+  | "pr_queue"
   | "vps_candidate"
   | "heavy_local_load"
   | "p0"
@@ -92,6 +94,8 @@ const FILTER_OPTIONS: { key: FilterKey; label: string }[] = [
   { key: "stale", label: "Stale" },
   { key: "blocked", label: "Blocked" },
   { key: "needs_john", label: "Needs John" },
+  { key: "live_unauthorized", label: "Live But Unauthorized" },
+  { key: "pr_queue", label: "PR Queue" },
   { key: "vps_candidate", label: "VPS Candidate" },
   { key: "heavy_local_load", label: "Heavy Local" },
   { key: "p0", label: "P0" },
@@ -112,6 +116,16 @@ function applyPreFilter(rows: ControlSurfaceRow[], filter: FilterKey): ControlSu
       return rows.filter((r) => r.observed_state === "blocked");
     case "needs_john":
       return rows.filter((r) => r.human_decision_required);
+    case "live_unauthorized":
+      return rows.filter(
+        (r) =>
+          r.observed_state === "healthy" &&
+          ["authority_tier:direct_probe", "authority_tier:projection_only", "authority_tier:mirror_only"].some(
+            (code) => r.gap_codes.includes(code),
+          ),
+      );
+    case "pr_queue":
+      return rows.filter((r) => r.kind === "pr_queue");
     case "vps_candidate":
       return rows.filter((r) => r.gap_codes.includes("vps_candidate"));
     case "heavy_local_load":
