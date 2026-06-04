@@ -209,7 +209,8 @@
       "docs/state/NEXT_PHASE_MAP.md",
       "docs/state/HOTLIST.md",
       "docs/state/CROSS_AGENT_INVENTORY.md",
-      "docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md"
+      "docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md",
+      "docs/research/VERIFIED_EXPERIMENT_LOOP_RFC.md"
     ]
   },
   "auto_sections": {
