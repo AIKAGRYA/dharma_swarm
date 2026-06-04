@@ -72,13 +72,6 @@ ALLOWED_TYPES = {"atomic"}
 REVIEW_MARK_SCHEMA = "dharma.knowledge_review_mark.v1"
 TRUSTED_REVIEWERS = {
     "operator",
-    "merge_master_mike",
-    "codex",
-    "claude",
-    "devin",
-    "hermes-m5",
-    "opus_composer",
-    "perplexity-computer",
 }
 
 
