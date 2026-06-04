@@ -345,11 +345,51 @@ def test_nats_config_records_ca_pem_without_leaking_secret_material():
 
     assert config.ca_pem == "-----BEGIN CERTIFICATE-----\nabc\n-----END CERTIFICATE-----\n"
     assert config.tls_hostname == "nats.agni.example"
+    assert config.credential_family == "devin"
     assert redacted["has_ca_pem"] is True
     assert redacted["tls_hostname"] == "nats.agni.example"
     assert redacted["tls_trust"] == "custom_ca_pem"
+    assert redacted["credential_family"] == "devin"
     assert "BEGIN CERTIFICATE" not in str(redacted)
     assert "super-secret" not in str(redacted)
+
+
+def test_nats_config_prefers_merge_master_mike_credentials():
+    config = prc._nats_config(
+        {
+            "MERGE_MASTER_MIKE_NATS_URL": "wss://mike-nats.example.test:8443",
+            "MERGE_MASTER_MIKE_NATS_USER": "merge_master_mike",
+            "MERGE_MASTER_MIKE_NATS_PW": "mike-secret",
+            "MERGE_MASTER_MIKE_NATS_CA_PEM": "-----BEGIN CERTIFICATE-----\\nmike\\n-----END CERTIFICATE-----",
+            "DEVIN_NATS_URL": "wss://devin-nats.example.test:8443",
+            "DEVIN_NATS_USER": "devin",
+            "DEVIN_NATS_PW": "devin-secret",
+            "DEVIN_NATS_CA_PEM": "-----BEGIN CERTIFICATE-----\\ndevin\\n-----END CERTIFICATE-----",
+        },
+        require_devin_secrets=True,
+    )
+
+    assert config.endpoint == "wss://mike-nats.example.test:8443"
+    assert config.user == "merge_master_mike"
+    assert config.credential == "mike-secret"
+    assert config.ca_pem == "-----BEGIN CERTIFICATE-----\nmike\n-----END CERTIFICATE-----\n"
+    assert config.credential_family == "merge_master_mike"
+    assert config.missing == ()
+
+
+def test_nats_config_requires_complete_mike_family_when_any_mike_secret_present():
+    config = prc._nats_config(
+        {
+            "MERGE_MASTER_MIKE_NATS_URL": "wss://mike-nats.example.test:8443",
+            "DEVIN_NATS_URL": "wss://devin-nats.example.test:8443",
+            "DEVIN_NATS_USER": "devin",
+            "DEVIN_NATS_PW": "devin-secret",
+        },
+        require_devin_secrets=True,
+    )
+
+    assert config.credential_family == "merge_master_mike"
+    assert set(config.missing) == {"MERGE_MASTER_MIKE_NATS_USER", "MERGE_MASTER_MIKE_NATS_PW"}
 
 
 def test_nats_tls_kwargs_loads_custom_ca_and_hostname(monkeypatch):
