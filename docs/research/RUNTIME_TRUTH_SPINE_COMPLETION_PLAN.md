@@ -19,7 +19,7 @@
 | `dharma_swarm/spine/tollbooth.py` | Fail-closed gate: require identity + RuntimeStateStore before side effects | Joined; small + deterministic | `ontology` (`require_execution_tollbooth`), opportunity_dispatcher | High — the promotion/gating chokepoint |
 | `dharma_swarm/spine/routing.py` | `RoutingDecision` canonical value object | Shape-only (7 routers not yet collapsed onto it) | `invoke` | Low-Med — adoption incomplete but non-blocking |
 | `dharma_swarm/spine/invoke.py` | The one blessed `invoke_agent` path (pass-through + receipt) | PR-A pass-through stage; not yet default invoker | spine internal | Med — full collapse (PR C+) deferred, acceptable |
-| `dharma_swarm/spine/persistence.py` | Single receipt sink → `delegation_runs.receipt_json`; idempotent column migration | Stable; writes to existing canonical store | spine internal | Med — relies on `delegation_runs` table presence |
+| `dharma_swarm/spine/persistence.py` | Projection-only helper targeting `delegation_runs.receipt_json`; idempotent column migration | Stable; 0 production callers; **not** a canonical runtime receipt writer | spine internal | Med — must not be promoted into a second `RuntimeReceipt` writer |
 
 Adjacent (in-scope dependents, not part of the 8-file core): `dharma_swarm/runtime_state.py` (RuntimeStateStore ledger), `dharma_swarm/runtime_lifecycle.py`, `dharma_swarm/a2a/a2a_server.py`, `dharma_swarm/message_bus.py`, `dharma_swarm/task_board.py`, `dharma_swarm/tool_registry.py`, `dharma_swarm/artifact_store.py`, `dharma_swarm/ontology.py`, `dharma_swarm/opportunity_dispatcher.py`, `dharma_swarm/diff_applier.py`, `dharma_swarm/revenue/spine.py`.
 
@@ -32,7 +32,7 @@ Adjacent (in-scope dependents, not part of the 8-file core): `dharma_swarm/runti
 | Invariant | Why required | Existing support | Missing support | Test needed |
 |---|---|---|---|---|
 | Canonical identity is the owner of truth | Every durable unit of work needs one join-key set; prevents silent renames | `ExecutionIdentity` frozen dataclass; `require_for_dispatch` | None critical; ensure no adapter generates identity at hard boundaries | Property test: identity round-trips through all adapter surfaces unchanged |
-| EvidenceReceipt creation + validation | One canonical artifact per dispatch attempt; basis of all later evidence | `EvidenceReceipt`, `to_otel_span`, `to_dict` | Validation of required-field completeness before persist | Test: receipt with missing trace_id rejected by persist path |
+| EvidenceReceipt creation + validation | One canonical in-flight artifact per dispatch attempt; basis of all later evidence | `EvidenceReceipt`, `to_otel_span`, `to_dict` | Validation of required-field completeness before association/projection/export | Test: receipt with missing trace_id rejected by association/projection path |
 | trace/correlation identity continuity | Cross-layer joins (A2A ↔ dispatch ↔ closure) must share one value | `correlation_id` = `trace_id` alias; doctrine in `__init__.py` | Enforcement that all 3 layers carry the same correlation value | Test: same correlation_id appears on receipts across layers a request traverses |
 | Cost/token attachment | Equal-budget comparison (Verified Loop dependency) | `input_tokens`/`output_tokens`/`cost_usd`/`latency_ms` on receipt | Guarantee these are populated on real dispatch, not just constructible | Test: live invoke path populates usage fields |
 | Tamper-evident history / Merkle interaction | Auditability of the run ledger | `runtime_state` receipt ledger; `merkle_log.py` | Confirm receipt ledger is (or chains to) tamper-evident store | Test: ledger tamper detection / hash continuity |
@@ -50,7 +50,7 @@ Adjacent (in-scope dependents, not part of the 8-file core): `dharma_swarm/runti
 |---|---|---|---|
 | All existing spine tests passing | ✅ Met (local) | 38 passed across the 7 spine test files; v2 report cites 159 suite-wide | Re-run in CI on the integration branch |
 | All import sites still valid | ✅ Met | 17 non-test import sites resolve; `__all__` exports intact | Add import-surface snapshot test to lock it |
-| EvidenceReceipt lifecycle documented | ◑ Partial | `receipt.py` docstrings + `__init__.py` closure-layer doctrine | Add a short `docs/` lifecycle note (create→persist→export) |
+| EvidenceReceipt lifecycle documented | ◑ Partial | `receipt.py` docstrings + `__init__.py` closure-layer doctrine | Add a short `docs/` lifecycle note (create→associate/project→export) |
 | Identity semantics documented | ◑ Partial | `identity.py` docstrings; correlation-spine doctrine | Document trace_id vs correlation_id rule in one place |
 | Provenance chain testable | ◑ Partial | fields exist; artifact adapter present | Add end-to-end provenance test (source→result) |
 | trace/correlation context stable | ✅ Met | alias enforced in receipt + identity | Add cross-layer continuity test |
@@ -84,7 +84,7 @@ Adjacent (in-scope dependents, not part of the 8-file core): `dharma_swarm/runti
 |---|---|---|---|
 | `tests/test_runtime_truth_spine_v1.py` | Core v1 invariants (identity, receipt shape) | ✅ Passing | — |
 | `tests/test_runtime_truth_spine_v2_adapters.py` | Adapter identity carry across surfaces | ✅ Passing | Per-surface branch coverage in `adapters.py` |
-| `tests/test_runtime_truth_spine_v2_evidence.py` | EvidenceReceipt creation/serialization | ✅ Passing | Required-field completeness on persist |
+| `tests/test_runtime_truth_spine_v2_evidence.py` | EvidenceReceipt creation/serialization | ✅ Passing | Required-field completeness before association/projection/export |
 | `tests/test_runtime_truth_spine_v2_tollbooth.py` | Fail-closed gating semantics | ✅ Passing | Extend to remaining non-joined surfaces |
 | `tests/test_runtime_truth_spine_adoption.py` | Adoption invariants | ✅ Passing | — |
 | `tests/test_spine_adoption_metric.py` | Metric script correctness | ✅ Passing | — |
@@ -131,7 +131,7 @@ Two apparently different findings were on the table:
 | 3 | Preserves cross-layer correlation identity |
 | 4 | Real dispatch path flows through `invoke_agent()` |
 | 5 | Exactly one `EvidenceReceipt` emitted per logical dispatch |
-| 6 | Receipt persisted / trace-linked / cost-token fields attached where available |
+| 6 | EvidenceReceipt associated to persisted `RuntimeReceipt` / trace-linked / cost-token fields attached where available |
 | 7 | Bypass guard active and allowlist shrinking to zero |
 
 ### Four axes of adoption (added post-#469)
@@ -141,20 +141,20 @@ A single per-module "level" hid an important distinction that #469 makes unavoid
 1. **Method-level adoption** — at least one method on the surface reaches the level (e.g. `submit_via_spine()` reaches L4–L5).
 2. **Module-level adoption** — the surface as a whole (its identity/correlation posture) reaches the level.
 3. **Default-path adoption** — the path callers hit *by default* reaches the level (the honest "is real traffic covered?" axis).
-4. **Persisted-receipt adoption** — the emitted receipt is actually persisted / trace-linked / cost-token attached (Level 6), not just constructed in memory.
+4. **Persisted-runtime association adoption** — the emitted in-flight `EvidenceReceipt` is associated to the persisted runtime receipt, trace-linked, and cost/token attached where available (Level 6), not just constructed in memory.
 
-The 75%/12-of-16 metric reflects **module-level** identity adoption (L2–L3). #469 is the first **method-level** L4–L5 datapoint, with **default-path** and **persisted-receipt** adoption still at zero.
+The 75%/12-of-16 metric reflects **module-level** identity adoption (L2–L3). #469 is the first **method-level** L4–L5 datapoint, with **default-path** and **persisted-runtime association** adoption still at zero.
 
 ### Per-surface / per-method mapping
 
 Evidence-based from inspection of `main` plus PR #469's branch. "Adoption level" is the **highest level reached by any path** on the surface; the four axis columns disambiguate where that level actually lands.
 
-| Surface / method | Adoption level | Method-level? | Default path? | Receipt emitted? | Receipt persisted? | Remaining gap |
+| Surface / method | Adoption level | Method-level? | Default path? | EvidenceReceipt emitted? | Runtime receipt associated? | Remaining gap |
 |---|---:|---|---|---|---|---|
-| `a2a/a2a_bridge.py` → `submit_via_spine()` *(new, #469)* | 5 | Yes (opt-in) | No | Yes — exactly one, tested | No | Make a default/blessed route; persist receipt; attach cost/token (L6) |
+| `a2a/a2a_bridge.py` → `submit_via_spine()` *(new, #469)* | 5 | Yes (opt-in) | No | Yes — exactly one, tested | No | Make a default/blessed route; prove association with the existing runtime receipt/projection if needed; attach cost/token (L6) |
 | `a2a/a2a_bridge.py` → `submit()` / default | 1 | n/a | Yes | No | No | Route default traffic through the spine path |
 | `a2a/a2a_server.py` | 3 | Partial | No | No | No | Dispatch through `invoke_agent`; emit one receipt |
-| `runtime_state.py` | 3 (+partial 7) | No | No | No (sink exists, unused) | No | Close legacy bypass (allowlist→0); wire `persist_receipt` |
+| `runtime_state.py` | 3 (+partial 7) | No | No | No (projection helper exists, unused) | No | Close legacy bypass (allowlist→0); keep `receipt_json` projection-only and prove single runtime owner |
 | `runtime_lifecycle.py` | 3 | No | No | No | No | Emit receipt on lifecycle dispatch |
 | `task_board.py` | 2 | No | No | No | No | Correlation continuity; receipt on claim dispatch |
 | `message_bus.py` | 2 | No | No | No | No | Correlation on send/consume; receipt |
@@ -164,14 +164,14 @@ Evidence-based from inspection of `main` plus PR #469's branch. "Adoption level"
 | `diff_applier.py` | 2 | No | No | No | No | Receipt on self-mod apply (proposal→apply→verify) |
 | `opportunity_dispatcher.py` | 2 | No | No | No | No | Correlation continuity; receipt on dispatch |
 | `agent_runner.py` | 0 | No | No | No | No | Adopt identity; route real agent runs through `invoke_agent` — **primary L4 target for Verified Loop** |
-| `orchestrator.py` | 0 (1 partial) | No | No | No | No | Adopt spine identity; dispatch through `invoke_agent`; emit + persist receipt — **primary L4 target for Verified Loop** |
+| `orchestrator.py` | 0 (1 partial) | No | No | No | No | Adopt spine identity; dispatch through `invoke_agent`; emit `EvidenceReceipt` and associate to a single runtime receipt — **primary L4 target for Verified Loop** |
 | `swarm.py` | 0 | No | No | No | No | Adopt identity at top-level swarm dispatch |
 
-**Key reading:** #469 proves the dispatch-ownership pattern works (method-level L5 with exactly-one-receipt under test), but **default-path** and **persisted-receipt** adoption are still zero across the fleet, and the surfaces the Verified Loop runs experiments through — `agent_runner.py`, `orchestrator.py`, `swarm.py` — remain **Level 0**.
+**Key reading:** #469 proves the dispatch-ownership pattern works (method-level L5 with exactly-one-receipt under test), but **default-path** and **persisted-runtime association** adoption are still zero across the fleet, and the surfaces the Verified Loop runs experiments through — `agent_runner.py`, `orchestrator.py`, `swarm.py` — remain **Level 0**.
 
 ### Explicit statement
 
-> **Adapter-ready adoption does not yet prove dispatch-owned EvidenceReceipt emission. PR #469 demonstrates method-level dispatch ownership on one opt-in A2A path (exactly one EvidenceReceipt, tested), but default-path and persisted-receipt adoption remain zero. Verified Experiment Loop runtime remains blocked until the dispatch surfaces used by experiments — at minimum `agent_runner.py`, `orchestrator.py`, and `swarm.py` — emit exactly one EvidenceReceipt per logical dispatch on their default path, and those receipts are persisted / trace-linked.**
+> **Adapter-ready adoption does not yet prove dispatch-owned EvidenceReceipt emission. PR #469 demonstrates method-level dispatch ownership on one opt-in A2A path (exactly one EvidenceReceipt, tested), but default-path and persisted-runtime association adoption remain zero. Verified Experiment Loop runtime remains blocked until the dispatch surfaces used by experiments — at minimum `agent_runner.py`, `orchestrator.py`, and `swarm.py` — emit exactly one EvidenceReceipt per logical dispatch on their default path, and those in-flight receipts are associated to a single persisted RuntimeReceipt / trace-linked without minting a second runtime receipt.**
 
 ---
 
