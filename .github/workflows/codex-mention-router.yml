@@ -1,58 +1,143 @@
-name: codex-mention-router
+name: merge-master-mike-router
 
 on:
   issue_comment:
     types: [created]
   pull_request_review_comment:
     types: [created]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: Pull request number for a deterministic Mike packet
+        required: true
+        type: string
+      merge_when_clean:
+        description: Ask Mike to arm auto-merge after the deterministic gate is clean
+        required: false
+        default: false
+        type: boolean
 
 permissions:
-  contents: read
+  checks: read
+  contents: write
   issues: write
   pull-requests: write
+  statuses: read
 
 jobs:
   route:
     if: >
       ${{
-        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association) &&
-        contains(github.event.comment.body, '@terminal-review') &&
-        (github.event_name == 'pull_request_review_comment' || github.event.issue.pull_request)
+        github.event_name == 'workflow_dispatch' ||
+        (
+          contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association) &&
+          (
+            contains(github.event.comment.body, '@merge-master-mike') ||
+            contains(github.event.comment.body, '@merge_master_mike') ||
+            contains(github.event.comment.body, '@mix-master-mike') ||
+            contains(github.event.comment.body, '@mix_master_mike') ||
+            contains(github.event.comment.body, '@MERGE_MASTER_MIKE') ||
+            contains(github.event.comment.body, '@mike') ||
+            contains(github.event.comment.body, '@terminal-review')
+          ) &&
+          (github.event_name == 'pull_request_review_comment' || github.event.issue.pull_request)
+        )
       }}
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
 
       - name: Determine PR number
         id: pr
         run: |
-          if [ -n "${PR_FROM_REVIEW:-}" ]; then
+          if [ -n "${PR_FROM_INPUT:-}" ]; then
+            echo "number=${PR_FROM_INPUT}" >> "${GITHUB_OUTPUT}"
+          elif [ -n "${PR_FROM_REVIEW:-}" ]; then
             echo "number=${PR_FROM_REVIEW}" >> "${GITHUB_OUTPUT}"
-          else
+          elif [ -n "${PR_FROM_ISSUE:-}" ]; then
             echo "number=${PR_FROM_ISSUE}" >> "${GITHUB_OUTPUT}"
+          else
+            echo "could not determine pull request number" >&2
+            exit 1
           fi
         env:
+          PR_FROM_INPUT: ${{ inputs.pr }}
           PR_FROM_ISSUE: ${{ github.event.issue.number }}
           PR_FROM_REVIEW: ${{ github.event.pull_request.number }}
 
-      - name: Run deterministic terminal-review packet
+      - name: Detect Mike command
+        id: command
+        run: |
+          set -euo pipefail
+          merge_when_clean=false
+          if [ "${EVENT_NAME}" = "workflow_dispatch" ] && [ "${MERGE_WHEN_CLEAN_INPUT:-false}" = "true" ]; then
+            merge_when_clean=true
+          else
+            body="$(printf '%s' "${COMMENT_BODY:-}" | tr '[:upper:]' '[:lower:]')"
+            case "${body}" in
+              *"merge when clean"*|*"auto merge when clean"*|*"automerge when clean"*)
+                merge_when_clean=true
+                ;;
+            esac
+          fi
+          echo "merge_when_clean=${merge_when_clean}" >> "${GITHUB_OUTPUT}"
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          MERGE_WHEN_CLEAN_INPUT: ${{ inputs.merge_when_clean }}
+
+      - name: Run deterministic Merge Master Mike packet
         id: review
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ steps.pr.outputs.number }}
+          MERGE_WHEN_CLEAN: ${{ steps.command.outputs.merge_when_clean }}
+          REQUIRED_REVIEWERS: copilot,claude,devin
+          MERGE_METHOD: squash
         run: |
           set -euo pipefail
           state_root="${RUNNER_TEMP}/dharma-pr-review"
           python3 scripts/runtime/pr_merge_control.py --state-root "${state_root}" packet --pr "${PR_NUMBER}"
+          packet_dir="$(find "${state_root}/pr-${PR_NUMBER}" -mindepth 1 -maxdepth 1 -type d | sort | tail -1)"
           set +e
-          python3 scripts/runtime/pr_merge_control.py --state-root "${state_root}" gate --pr "${PR_NUMBER}"
+          python3 scripts/runtime/pr_merge_control.py \
+            --state-root "${state_root}" \
+            gate \
+            --pr "${PR_NUMBER}" \
+            --packet-dir "${packet_dir}" \
+            --required-reviewers "${REQUIRED_REVIEWERS}"
           gate_exit="$?"
           set -e
-          python3 scripts/runtime/pr_merge_control.py --state-root "${state_root}" comment --pr "${PR_NUMBER}" --output "${RUNNER_TEMP}/terminal-review.md"
+          merge_exit=0
+          if [ "${MERGE_WHEN_CLEAN}" = "true" ]; then
+            set +e
+            python3 scripts/runtime/pr_merge_control.py \
+              --state-root "${state_root}" \
+              merge \
+              --pr "${PR_NUMBER}" \
+              --packet-dir "${packet_dir}" \
+              --required-reviewers "${REQUIRED_REVIEWERS}" \
+              --method "${MERGE_METHOD}" \
+              --auto \
+              --execute \
+              --confirm "merge-pr-${PR_NUMBER}"
+            merge_exit="$?"
+            set -e
+          fi
+          python3 scripts/runtime/pr_merge_control.py \
+            --state-root "${state_root}" \
+            comment \
+            --pr "${PR_NUMBER}" \
+            --packet-dir "${packet_dir}" \
+            --output "${RUNNER_TEMP}/merge-master-mike.md"
           echo "gate_exit=${gate_exit}" >> "${GITHUB_OUTPUT}"
+          echo "merge_exit=${merge_exit}" >> "${GITHUB_OUTPUT}"
 
-      - name: Post or update terminal-review comment
+      - name: Post or update Merge Master Mike comment
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ steps.pr.outputs.number }}
@@ -65,12 +150,14 @@ jobs:
           if [ -n "${existing}" ]; then
             gh api --method PATCH \
               "/repos/${GITHUB_REPOSITORY}/issues/comments/${existing}" \
-              -f body="$(cat "${RUNNER_TEMP}/terminal-review.md")"
+              -f body="$(cat "${RUNNER_TEMP}/merge-master-mike.md")"
           else
-            gh pr comment "${PR_NUMBER}" --body-file "${RUNNER_TEMP}/terminal-review.md"
+            gh pr comment "${PR_NUMBER}" --body-file "${RUNNER_TEMP}/merge-master-mike.md"
           fi
 
       - name: Summarize
         run: |
-          echo "terminal-review gate exit: ${{ steps.review.outputs.gate_exit }}"
-          cat "${RUNNER_TEMP}/terminal-review.md"
+          echo "merge-master-mike gate exit: ${{ steps.review.outputs.gate_exit }}"
+          echo "merge-master-mike merge requested: ${{ steps.command.outputs.merge_when_clean }}"
+          echo "merge-master-mike merge exit: ${{ steps.review.outputs.merge_exit }}"
+          cat "${RUNNER_TEMP}/merge-master-mike.md"

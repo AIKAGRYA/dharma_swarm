@@ -10,12 +10,9 @@ present.
 
 ## Why `@terminal-review` Was Brittle
 
-`.github/workflows/codex-mention-router.yml` now owns the GitHub-side
-`@terminal-review` response: it creates the same deterministic packet/gate
-summary comment that the local CLI prints. The older
-`scripts/codex_mention_bridge.py` remains a local webhook bridge for inbound
-experiments and now defaults to `@codex`, not `@terminal-review`. It is not the
-merge authority. PR Review Control is pull-based from the local operator
+`.github/workflows/codex-mention-router.yml` only forwards a GitHub comment to
+`CODEX_WEBHOOK_URL`. If that secret, token, or local bridge is down, the mention
+does nothing useful. PR Review Control is pull-based from the local operator
 machine: it asks GitHub for live state, writes packets under `~/.dharma`, and
 does not depend on inbound webhooks.
 
@@ -23,13 +20,79 @@ does not depend on inbound webhooks.
 
 ```bash
 make pr-queue
+make pr-mike
 make pr-packet PR=397
 make pr-reviewers
-make pr-run-codex PR=397 ARGS="--timeout-s 240"
-make pr-run-claude PR=397 ARGS="--timeout-s 240"
+make pr-run-codex PR=397
+make pr-run-claude PR=397
 make pr-gate PR=397
 make pr-merge PR=397 ARGS="--confirm merge-pr-397"
 ```
+
+## GitHub Comment Adapter
+
+`.github/workflows/codex-mention-router.yml` is the GitHub-hosted Merge Master
+Mike adapter. It runs from the default branch checkout, not from untrusted PR
+code, and can only merge when explicitly asked to `merge when clean` after the
+deterministic gate is clean.
+
+Call Mike from a PR comment or review-thread comment:
+
+```text
+@merge-master-mike
+@merge_master_mike
+@mix-master-mike
+@mix_master_mike
+@mike
+@terminal-review
+```
+
+The workflow also supports manual dispatch with a `pr` input from the GitHub
+Actions UI. The GitHub adapter does only this:
+
+1. create a deterministic packet for the PR;
+2. run the merge gate;
+3. optionally run Mike's guarded `gh pr merge --auto` path when the comment says
+   `merge when clean` or manual dispatch sets `merge_when_clean=true`;
+4. render and post or update the `<!-- dharma-pr-review-control:auto -->`
+   comment.
+
+It does not run local Codex or Claude reviewer processes, because the
+GitHub-hosted runner does not have the operator machine's tmux, NATS, Claude
+Code subscription session, Codex local session, or `~/.dharma` receipt nest. It
+also does not approve, push, mark human approval, resolve review threads, or
+bypass branch protection.
+
+Plain mentions are packet/gate/comment only. Conditional merge requires an
+explicit command:
+
+```text
+@mix_master_mike merge when clean
+```
+
+In that mode Mike still blocks unless required receipts such as
+`copilot_review_receipt.json`, `claude_review_receipt.json`, and
+`devin_review_receipt.json` are present and acceptable.
+
+Use the GitHub comment adapter for fast PR triage. Use the local persistent Mike
+lane for real dual-review fanout:
+
+```bash
+make pr-run-codex PR=397
+make pr-run-claude PR=397
+make pr-gate PR=397
+```
+
+For Devin-assisted queue cleanup, use the AGNI/NATS playbook:
+
+```text
+docs/ops/DEVIN_NATS_PR_JANITOR_PLAYBOOK.md
+```
+
+Devin is an evidence-only collaborator under `devin-roaming-2987d222`. His
+AGNI NATS lane is for live intent/dependency synthesis with Mike and the fleet;
+it does not grant merge, approval, push, comment, credential, or governance
+exception authority.
 
 `make pr-run-codex` uses `codex exec --ephemeral` with
 `model_reasoning_effort="medium"` by default so queue reviews do not inherit an
@@ -55,20 +118,114 @@ CLAUDE_REVIEW_COMMAND="/Users/dhyana/.npm-global/bin/claude -p" make pr-run-clau
 ```
 
 Reviewer runs are bounded. The default wall-clock timeout is 600 seconds, or
-`CODEX_REVIEW_TIMEOUT_SECONDS` / `CLAUDE_REVIEW_TIMEOUT_SECONDS` when set. To
-tighten one run:
+`DHARMA_PR_REVIEW_TIMEOUT_S` when set. To tighten one run:
 
 ```bash
 make pr-run-codex PR=397 ARGS="--timeout-s 120"
 make pr-run-claude PR=397 ARGS="--timeout-s 120"
 ```
 
-Use a live probe when auth says Claude is logged in but runtime/quota may be
-stale:
+## Merge Master Mike Fanout
+
+`make pr-mike` is the minimal CodeRabbit-like lane for Dharma Swarm. It reuses
+this PR Review Control surface rather than creating another control plane.
+
+Default run:
 
 ```bash
-make pr-reviewers ARGS="--live-probe --probe-timeout-s 20"
+make pr-mike
 ```
+
+That command:
+
+1. refreshes `make pr-queue`;
+2. selects up to three PRs in `GITHUB_GREEN_NEEDS_PACKET` or
+   `NEEDS_AGENT_REVIEW`;
+3. creates a packet for each selected PR;
+4. runs Codex and Claude reviewer lanes;
+5. runs the merge gate;
+6. writes a local GitHub-comment draft and a Mike receipt.
+
+Receipts land under:
+
+```text
+~/.dharma/pr_review/mike_fanout/<run-id>/
+  receipt.json
+  summary.md
+```
+
+Comment drafts land in each packet directory as `GITHUB_COMMENT.md`. The fanout
+does not post comments, merge, approve, push, or edit source.
+
+Useful bounded modes:
+
+```bash
+make pr-mike ARGS="--dry-run --max-prs 5"
+make pr-mike ARGS="--packet-only --max-prs 2"
+make pr-mike ARGS="--max-prs 1 --timeout-s 180"
+```
+
+If a reviewer hangs, fails to spawn, exits non-zero, or returns empty output,
+the runner writes a `BLOCKED` markdown artifact plus a JSON receipt. The merge
+gate treats that as a hard blocker until the reviewer is re-run cleanly.
+
+## Persistent Merge Master Mike
+
+`make pr-mike` is the PR-only fanout. `make mike-*` is the persistent Mike nest
+around that fanout. It adds wake receipts, action logs, status projection, tmux
+supervision, and a launchd-ready entrypoint without changing merge authority.
+
+Canonical local commands:
+
+```bash
+make mike-bootstrap
+make mike-wake
+make mike-status
+make mike-cycle ARGS="--cycle-mode dry-run --max-prs 5"
+make mike-cycle ARGS="--cycle-mode packet-only --max-prs 2"
+make mike-cycle ARGS="--cycle-mode review --max-prs 1 --timeout-s 600"
+make mike-tmux-start
+make mike-tmux-stop
+make mike-launchd-plist ARGS="--output ~/Library/LaunchAgents/com.dharma.merge-master-mike.plist"
+```
+
+The default persistent posture is `dry-run`. It refreshes queue truth and writes
+receipts without spending reviewer quota or touching GitHub. Promote a single
+cycle to `packet-only` when Mike should prepare review packets and merge gates.
+Promote to `review` only when Codex and Claude reviewer credentials are healthy
+and the operator wants a real dual-review attempt.
+
+When Claude credits or login are unavailable, do not fake a Claude receipt.
+Use an explicit backup reviewer receipt and record the reason in the gate:
+
+```bash
+make pr-gate PR=397 ARGS="--allow-backup-reviewer --backup-reviewers backup_opus,backup_gemini,backup_hermes --backup-reviewer-reason 'Claude Code subscription credits unavailable'"
+```
+
+The backup lane preserves the dual-review rule as Codex plus one independent
+strong reviewer. It only works when a named backup artifact such as
+`backup_opus_review.md` and `backup_opus_review_receipt.json` exists in the
+packet directory, the backup verdict is acceptable, and the reason for
+replacing Claude is written. High-risk and critical PRs still require
+`--human-approved`.
+
+Mike's local nest lives under:
+
+```text
+~/.dharma/external_agents/merge_master_mike/
+  nest/README.md
+  nest/COMMANDS.md
+  nest/delegation_lanes.json
+  nest/status.json
+  cycles/latest.json
+  logs/wake_receipts.jsonl
+  logs/action_log.jsonl
+```
+
+The nest is allowed to coordinate and recommend. It is allowed to merge only
+through the conditional clean-gate path. It is still forbidden from approving,
+pushing, editing source, marking human approval, bypassing branch protection, or
+posting GitHub comments without explicit operator authorization.
 
 `make pr-merge` is dry-run by default. It prints the `gh pr merge` command only
 after the gate passes. To execute, add `--execute` and the exact confirmation
@@ -78,8 +235,8 @@ token:
 make pr-merge PR=397 ARGS="--confirm merge-pr-397 --execute"
 ```
 
-High-risk and critical PRs require `--human-approved` plus
-`--human-approval-note` even when Codex and Claude both provide review receipts.
+High-risk and critical PRs require `--human-approved` even when Codex and Claude
+both provide review receipts.
 
 ## Receipt Layout
 
@@ -98,7 +255,9 @@ High-risk and critical PRs require `--human-approved` plus
       PROMPT_CODEX.md
       PROMPT_CLAUDE.md
       codex_review.md
+      codex_review_receipt.json
       claude_review.md
+      claude_review_receipt.json
       MERGE_GATE.json
       MERGE_GATE.md
 ```
@@ -113,28 +272,39 @@ start with broad repository scans.
 The gate blocks when any of these are true:
 
 - PR is draft.
-- PR head SHA changed since packet/review generation.
 - GitHub says the branch is not mergeable.
 - Any check is failing.
-- Check rollup is empty or contains an unknown conclusion.
 - Checks are pending, unless `--allow-pending` is explicitly passed.
 - GitHub review decision is `CHANGES_REQUESTED`.
 - Coherence Delta fields are missing or placeholders.
-- Review-thread lookup fails or review threads are unresolved.
-- `codex_review.md` / `codex_review_receipt.json` is missing, invalid, nonzero-exit, stale-head, or not an `APPROVE` verdict.
-- `claude_review.md` / `claude_review_receipt.json` is missing, invalid, nonzero-exit, stale-head, or not an `APPROVE` verdict.
-- A review receipt lacks the exact `## Verdict`, `## Findings`,
-  `## Missing Tests Or Proof`, and `## Merge Conditions` sections.
-- A review receipt is a shallow approval without concrete file/path evidence.
-- Risk is `HIGH` or `CRITICAL` and no `--human-approved` flag plus
-  `--human-approval-note` receipt is present.
+- Review threads are unresolved.
+  - `codex_review.md` or `claude_review.md` is missing.
+  - `codex_review_receipt.json` or `claude_review_receipt.json` is missing or invalid.
+- Claude is missing and `--allow-backup-reviewer` is absent.
+- Claude is missing, backup fallback is enabled, and no named backup reviewer
+  receipt is acceptable.
+- Backup fallback is enabled without `--backup-reviewer-reason`.
+  - Either reviewer timed out, failed to spawn, exited non-zero, or produced empty output.
+  - Either reviewer has verdict `REQUEST_CHANGES` or `BLOCKED`.
+- Either reviewer has verdict `NEEDS_HUMAN` and no `--human-approved` flag is present.
+- Either reviewer has an unknown or malformed verdict.
+- Risk is `HIGH` or `CRITICAL` and no `--human-approved` flag is present.
 
 ## Agent Contract
 
 Codex and Claude read the same `REVIEW_PACKET.md` and answer from their own
 fresh context. The generator of a change must not be the only evaluator of that
 change. Each review must put findings first, cite concrete file evidence, and
-state exact merge conditions.
+state exact merge conditions. The first section must be:
+
+```markdown
+## Verdict
+APPROVE
+```
+
+Allowed verdicts are `APPROVE`, `REQUEST_CHANGES`, `BLOCKED`, and
+`NEEDS_HUMAN`. The gate rejects placeholder verdict lines such as
+`APPROVE | REQUEST_CHANGES | BLOCKED | NEEDS_HUMAN`.
 
 ## Non-Interactive Claude Reviews
 

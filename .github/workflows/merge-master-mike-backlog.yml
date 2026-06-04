@@ -1,0 +1,137 @@
+name: merge-master-mike-backlog
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Backlog pass mode
+        required: true
+        default: packet-only
+        type: choice
+        options:
+          - packet-only
+          - dry-run
+      max_prs:
+        description: Maximum PRs to packetize or select
+        required: true
+        default: "5"
+        type: string
+      limit:
+        description: Open PRs to scan
+        required: true
+        default: "100"
+        type: string
+      statuses:
+        description: Queue statuses Mike may process
+        required: true
+        default: GITHUB_GREEN_NEEDS_PACKET,NEEDS_AGENT_REVIEW
+        type: string
+      required_reviewers:
+        description: Required reviewer receipt names before Mike may merge
+        required: true
+        default: copilot,claude,devin
+        type: string
+      merge_mode:
+        description: Mike merge authority mode
+        required: true
+        default: "off"
+        type: choice
+        options:
+          - "off"
+          - auto-when-clean
+      merge_method:
+        description: Merge method when merge_mode is auto-when-clean
+        required: true
+        default: squash
+        type: choice
+        options:
+          - squash
+          - merge
+          - rebase
+      nats_required:
+        description: Fail the run unless A2A NATS publish is JetStream-ack verified
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  checks: read
+  contents: write
+  pull-requests: write
+  statuses: read
+
+concurrency:
+  group: merge-master-mike-backlog
+  cancel-in-progress: false
+
+jobs:
+  backlog:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Install NATS client
+        run: python3 -m pip install 'nats-py>=2.9'
+
+      - name: Run Merge Master Mike backlog fanout
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEVIN_NATS_URL: ${{ secrets.DEVIN_NATS_URL }}
+          DEVIN_NATS_USER: ${{ secrets.DEVIN_NATS_USER }}
+          DEVIN_NATS_PW: ${{ secrets.DEVIN_NATS_PW }}
+          MODE: ${{ inputs.mode }}
+          MAX_PRS: ${{ inputs.max_prs }}
+          LIMIT: ${{ inputs.limit }}
+          STATUSES: ${{ inputs.statuses }}
+          REQUIRED_REVIEWERS: ${{ inputs.required_reviewers }}
+          MERGE_MODE: ${{ inputs.merge_mode }}
+          MERGE_METHOD: ${{ inputs.merge_method }}
+          NATS_REQUIRED: ${{ inputs.nats_required }}
+        run: |
+          set -euo pipefail
+          state_root="${RUNNER_TEMP}/dharma-pr-review"
+          args=(
+            --state-root "${state_root}"
+            fanout
+            --limit "${LIMIT}"
+            --max-prs "${MAX_PRS}"
+            --statuses "${STATUSES}"
+            --required-reviewers "${REQUIRED_REVIEWERS}"
+            --merge-mode "${MERGE_MODE}"
+            --merge-method "${MERGE_METHOD}"
+            --nats-session
+            --nats-timeout-s 8
+          )
+          if [ "${MODE}" = "dry-run" ]; then
+            args+=(--dry-run)
+          else
+            args+=(--packet-only)
+          fi
+          if [ "${NATS_REQUIRED}" = "true" ]; then
+            args+=(--nats-required)
+          fi
+          set +e
+          python3 scripts/runtime/pr_merge_control.py "${args[@]}"
+          exit_code="$?"
+          set -e
+          latest="$(find "${state_root}/mike_fanout" -name summary.md -type f | sort | tail -1 || true)"
+          if [ -n "${latest}" ]; then
+            {
+              echo "## Merge Master Mike Backlog"
+              echo
+              cat "${latest}"
+            } >> "${GITHUB_STEP_SUMMARY}"
+          fi
+          exit "${exit_code}"
+
+      - name: Upload Mike receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: merge-master-mike-pr-review
+          path: ${{ runner.temp }}/dharma-pr-review
+          if-no-files-found: warn
