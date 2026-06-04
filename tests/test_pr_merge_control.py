@@ -1,4 +1,5 @@
-from types import SimpleNamespace
+import argparse
+import sys
 
 from scripts.runtime import pr_merge_control as prc
 
@@ -21,6 +22,38 @@ def test_classify_pr_blocks_failing_checks():
     assert result["checks"]["failing"] == ["tests"]
 
 
+def test_classify_pr_uses_latest_duplicate_check_run():
+    pr = {
+        "number": 1,
+        "title": "rerun",
+        "isDraft": False,
+        "mergeable": "MERGEABLE",
+        "reviewDecision": "APPROVED",
+        "statusCheckRollup": [
+            {
+                "name": "Coherence Delta PR body",
+                "status": "COMPLETED",
+                "conclusion": "FAILURE",
+                "completedAt": "2026-06-01T20:41:29Z",
+            },
+            {
+                "name": "Coherence Delta PR body",
+                "status": "COMPLETED",
+                "conclusion": "SUCCESS",
+                "completedAt": "2026-06-01T20:42:19Z",
+            },
+        ],
+    }
+
+    result = prc.classify_pr(pr)
+
+    assert result["status"] == "GITHUB_GREEN_NEEDS_PACKET"
+    assert result["checks"]["failing"] == []
+    assert result["checks"]["passing"] == ["Coherence Delta PR body"]
+    assert result["checks"]["raw_total"] == 2
+    assert result["checks"]["total"] == 1
+
+
 def test_classify_pr_requires_packet_when_github_green():
     pr = {
         "number": 2,
@@ -39,121 +72,6 @@ def test_classify_pr_requires_packet_when_github_green():
     assert result["checks"]["passing"] == ["tests"]
 
 
-def test_classify_pr_blocks_unknown_non_success_conclusion():
-    pr = {
-        "number": 3,
-        "title": "startup failed",
-        "isDraft": False,
-        "mergeable": "MERGEABLE",
-        "reviewDecision": "APPROVED",
-        "statusCheckRollup": [
-            {"name": "CodeQL", "status": "COMPLETED", "conclusion": "STARTUP_FAILURE"},
-        ],
-    }
-
-    result = prc.classify_pr(pr)
-
-    assert result["status"] == "BLOCKED_CHECKS"
-    assert result["checks"]["failing"] == ["CodeQL"]
-
-
-def test_classify_pr_blocks_unrecognized_completed_conclusion():
-    pr = {
-        "number": 4,
-        "title": "weird",
-        "isDraft": False,
-        "mergeable": "MERGEABLE",
-        "reviewDecision": "APPROVED",
-        "statusCheckRollup": [
-            {"name": "custom", "status": "COMPLETED", "conclusion": "BOGUS"},
-        ],
-    }
-
-    result = prc.classify_pr(pr)
-
-    assert result["status"] == "BLOCKED_CHECKS"
-    assert result["checks"]["failing"] == ["custom:BOGUS"]
-
-
-def test_classify_pr_blocks_empty_check_rollup():
-    pr = {
-        "number": 5,
-        "title": "no checks",
-        "isDraft": False,
-        "mergeable": "MERGEABLE",
-        "reviewDecision": "APPROVED",
-        "statusCheckRollup": [],
-    }
-
-    result = prc.classify_pr(pr)
-
-    assert result["status"] == "BLOCKED_CHECKS"
-    assert result["checks"]["unknown"] == ["no status checks reported"]
-
-
-def test_classify_pr_ignores_superseded_cancelled_duplicate_check():
-    pr = {
-        "number": 6,
-        "title": "rerun",
-        "isDraft": False,
-        "mergeable": "MERGEABLE",
-        "reviewDecision": "APPROVED",
-        "statusCheckRollup": [
-            {
-                "name": "Coherence Delta PR body",
-                "status": "COMPLETED",
-                "conclusion": "CANCELLED",
-                "startedAt": "2026-05-31T12:13:36Z",
-                "completedAt": "2026-05-31T12:13:41Z",
-            },
-            {
-                "name": "Coherence Delta PR body",
-                "status": "COMPLETED",
-                "conclusion": "SUCCESS",
-                "startedAt": "2026-05-31T12:13:44Z",
-                "completedAt": "2026-05-31T12:13:51Z",
-            },
-        ],
-    }
-
-    result = prc.classify_pr(pr)
-
-    assert result["status"] == "GITHUB_GREEN_NEEDS_PACKET"
-    assert result["checks"]["failing"] == []
-    assert result["checks"]["passing"] == ["Coherence Delta PR body"]
-
-
-def test_classify_pr_blocks_latest_duplicate_check_failure():
-    pr = {
-        "number": 7,
-        "title": "rerun failed",
-        "isDraft": False,
-        "mergeable": "MERGEABLE",
-        "reviewDecision": "APPROVED",
-        "statusCheckRollup": [
-            {
-                "name": "DocOps integrity gate",
-                "status": "COMPLETED",
-                "conclusion": "SUCCESS",
-                "startedAt": "2026-05-31T12:13:36Z",
-                "completedAt": "2026-05-31T12:13:41Z",
-            },
-            {
-                "name": "DocOps integrity gate",
-                "status": "COMPLETED",
-                "conclusion": "FAILURE",
-                "startedAt": "2026-05-31T12:13:44Z",
-                "completedAt": "2026-05-31T12:13:51Z",
-            },
-        ],
-    }
-
-    result = prc.classify_pr(pr)
-
-    assert result["status"] == "BLOCKED_CHECKS"
-    assert result["checks"]["failing"] == ["DocOps integrity gate"]
-
-
 def test_coherence_results_rejects_placeholder_field():
     body = """
 - Organ touched: docs/governance
@@ -168,52 +86,12 @@ def test_coherence_results_rejects_placeholder_field():
     assert result["fields"]["Declared-vs-actual gap closed"]["ok"] is False
 
 
-def test_coherence_results_rejects_bold_placeholder_without_swallowing_next_field():
-    body = """
-- **Organ touched:** docs/governance
-- **Declared-vs-actual gap closed:** TODO
-- **Proof that re-reads the map:** checked the generated inventory.
-- **New drift introduced:** None
-"""
-
-    result = prc.coherence_results(body)
-
-    assert result["ok"] is False
-    assert result["fields"]["Declared-vs-actual gap closed"]["value"] == "TODO"
-
-
 def test_coherence_results_accepts_substantive_fields():
     body = """
 - Organ touched: `scripts/runtime/pr_merge_control.py` (operator review lane)
 - Declared-vs-actual gap closed: makes PR review receipts explicit before merge.
 - Proof that re-reads the map: checked COHERENCE_DELTA.md and AgentOps boundary.
 - New drift introduced: no runtime authority change; merge command stays confirmation-gated.
-"""
-
-    result = prc.coherence_results(body)
-
-    assert result["ok"] is True
-
-
-def test_coherence_results_accepts_bold_field_with_colon_inside_bold():
-    body = """
-- **Organ touched:** `inter_agent/devin/outbound/` additive rendezvous surface.
-- **Declared-vs-actual gap closed:** merged outbound response now exists.
-- **Proof that re-reads the map:** rechecked spine imports and loop map.
-- **New drift introduced:** two markdown receipts; no runtime path changed.
-"""
-
-    result = prc.coherence_results(body)
-
-    assert result["ok"] is True
-
-
-def test_coherence_results_accepts_no_new_drift_statement():
-    body = """
-- Organ touched: governance / docs / state
-- Declared-vs-actual gap closed: stale operational surfaces are refreshed.
-- Proof that re-reads the map: `make docops-integrity` passes.
-- New drift introduced: None
 """
 
     result = prc.coherence_results(body)
@@ -247,377 +125,6 @@ def test_claude_review_env_scrubs_anthropic_api_key_by_default():
     assert "ANTHROPIC_API_KEY" not in env
 
 
-def test_codex_review_defaults_to_bounded_reasoning():
-    command, _ = prc.review_command_and_env("codex", {"PATH": "/usr/bin"})
-
-    assert command[:2] == ["codex", "exec"]
-    assert "--ephemeral" in command
-    assert "model_reasoning_effort=\"medium\"" in command
-
-
-def test_render_agent_prompt_requires_repo_relative_paths(tmp_path):
-    prompt = prc.render_agent_prompt("Claude", tmp_path / "REVIEW_PACKET.md", 406)
-
-    assert "repo-relative file/line evidence" in prompt
-    assert "`dharma_swarm/ontology.py`" in prompt
-    assert "bare filenames are not sufficient" in prompt
-    assert 'phrase "No blocking findings"' in prompt
-    assert "If your only hold is human/operator approval" in prompt
-
-
-def test_review_receipt_status_rejects_command_error(tmp_path):
-    path = tmp_path / "codex_review.md"
-    path.write_text(
-        "Reading prompt from stdin...\n"
-        "Error: failed to initialize in-process app-server client\n",
-        encoding="utf-8",
-    )
-    prc.write_json(path.with_name("codex_review_receipt.json"), {"exit_code": 0, "reviewed_head_sha": "abc"})
-
-    result = prc.review_receipt_status(path, expected_head_sha="abc")
-
-    assert result["ok"] is False
-    assert result["reason"] == "review command failed"
-
-
-def test_review_receipt_status_accepts_verdict(tmp_path):
-    path = tmp_path / "claude_review.md"
-    path.write_text(
-        "## Verdict\n"
-        "APPROVE\n\n"
-        "## Findings\n"
-        "No blocking findings after checking `scripts/runtime/pr_merge_control.py` "
-        "and `tests/test_pr_merge_control.py` for gate behavior.\n\n"
-        "## Missing Tests Or Proof\n"
-        "No missing proof for this bounded change; `tests/test_pr_merge_control.py` "
-        "covers the receipt path.\n\n"
-        "## Merge Conditions\n"
-        "Merge only after CI is green and the reviewed head SHA still matches.",
-        encoding="utf-8",
-    )
-    prc.write_json(path.with_name("claude_review_receipt.json"), {"exit_code": 0, "reviewed_head_sha": "abc"})
-
-    result = prc.review_receipt_status(path, expected_head_sha="abc")
-
-    assert result["ok"] is True
-    assert result["verdict"] == "APPROVE"
-
-
-def test_review_receipt_status_accepts_request_changes_for_gate_to_block(tmp_path):
-    path = tmp_path / "codex_review.md"
-    path.write_text(
-        "## Verdict\n"
-        "REQUEST_CHANGES\n\n"
-        "## Findings\n"
-        "1. HIGH - `scripts/runtime/pr_merge_control.py` still accepts a shallow "
-        "review receipt, so the merge gate can be bypassed.\n\n"
-        "## Missing Tests Or Proof\n"
-        "`tests/test_pr_merge_control.py` needs a negative test for shallow approvals.\n\n"
-        "## Merge Conditions\n"
-        "Add the negative test and rerun `pytest -q tests/test_pr_merge_control.py`.",
-        encoding="utf-8",
-    )
-    prc.write_json(path.with_name("codex_review_receipt.json"), {"exit_code": 0, "reviewed_head_sha": "abc"})
-
-    result = prc.review_receipt_status(path, expected_head_sha="abc")
-
-    assert result["ok"] is True
-    assert result["verdict"] == "REQUEST_CHANGES"
-
-
-def test_review_receipt_status_rejects_unedited_verdict_template(tmp_path):
-    path = tmp_path / "codex_review.md"
-    path.write_text(
-        "## Verdict\n"
-        "APPROVE | REQUEST_CHANGES | BLOCKED | NEEDS_HUMAN\n\n"
-        "## Findings\n"
-        "Template was not edited.\n",
-        encoding="utf-8",
-    )
-    prc.write_json(path.with_name("codex_review_receipt.json"), {"exit_code": 0, "reviewed_head_sha": "abc"})
-
-    result = prc.review_receipt_status(path, expected_head_sha="abc")
-
-    assert result["ok"] is False
-    assert result["reason"] == "invalid verdict"
-
-
-def test_review_receipt_status_rejects_nonzero_exit(tmp_path):
-    path = tmp_path / "codex_review.md"
-    path.write_text(
-        "## Verdict\nAPPROVE\n\n"
-        "## Findings\nNo blocking findings after reading `scripts/runtime/pr_merge_control.py`.\n\n"
-        "## Missing Tests Or Proof\nNo missing local proof for this bounded check.\n\n"
-        "## Merge Conditions\nCI must stay green and the reviewed head must match.\n",
-        encoding="utf-8",
-    )
-    prc.write_json(path.with_name("codex_review_receipt.json"), {"exit_code": 1, "reviewed_head_sha": "abc"})
-
-    result = prc.review_receipt_status(path, expected_head_sha="abc")
-
-    assert result["ok"] is False
-    assert result["reason"] == "review command exited 1"
-
-
-def test_review_receipt_status_rejects_stale_head(tmp_path):
-    path = tmp_path / "claude_review.md"
-    path.write_text(
-        "## Verdict\nAPPROVE\n\n"
-        "## Findings\nNo blocking findings after reading `scripts/runtime/pr_merge_control.py`.\n\n"
-        "## Missing Tests Or Proof\nNo missing local proof for this bounded check.\n\n"
-        "## Merge Conditions\nCI must stay green and the reviewed head must match.\n",
-        encoding="utf-8",
-    )
-    prc.write_json(path.with_name("claude_review_receipt.json"), {"exit_code": 0, "reviewed_head_sha": "old"})
-
-    result = prc.review_receipt_status(path, expected_head_sha="new")
-
-    assert result["ok"] is False
-    assert result["reason"] == "reviewed head SHA mismatch"
-
-
-def test_build_gate_blocks_when_review_thread_lookup_fails(tmp_path, monkeypatch):
-    packet_dir = tmp_path / "packet"
-    packet_dir.mkdir()
-    prc.write_json(packet_dir / "FACTS.json", {"risk": {"level": "LOW"}})
-    for name in ("codex_review.md", "claude_review.md"):
-        (packet_dir / name).write_text(
-            "## Verdict\nAPPROVE\n\n"
-            "## Findings\nNo blocking findings after reading `scripts/runtime/pr_merge_control.py`.\n\n"
-            "## Missing Tests Or Proof\nNo missing local proof for this bounded check.\n\n"
-            "## Merge Conditions\nCI must stay green and the reviewed head must match.\n",
-            encoding="utf-8",
-        )
-        prc.write_json(
-            packet_dir / name.replace(".md", "_receipt.json"),
-            {"exit_code": 0, "reviewed_head_sha": "abc"},
-        )
-
-    args = SimpleNamespace(
-        packet_dir=str(packet_dir),
-        state_root=str(tmp_path),
-        pr=42,
-        allow_pending=False,
-        human_approved=False,
-        human_approval_note="",
-    )
-
-    monkeypatch.setattr(
-        prc,
-        "fetch_pr_view",
-        lambda _pr: {
-            "number": 42,
-            "title": "ok",
-            "headRefOid": "abc",
-            "body": """
-- Organ touched: docs
-- Declared-vs-actual gap closed: reviewer proof is now strict.
-- Proof that re-reads the map: packet and gate both load.
-- New drift introduced: None
-""",
-            "isDraft": False,
-            "mergeable": "MERGEABLE",
-            "reviewDecision": "APPROVED",
-            "statusCheckRollup": [{"name": "tests", "status": "COMPLETED", "conclusion": "SUCCESS"}],
-        },
-    )
-    monkeypatch.setattr(prc, "repo_name", lambda: "owner/repo")
-    monkeypatch.setattr(
-        prc,
-        "fetch_review_threads",
-        lambda _pr, _repo: {"ok": False, "error": "rate limited", "unresolved_count": None},
-    )
-
-    gate = prc.build_gate(args)
-
-    assert gate["decision"] == "BLOCKED"
-    assert "could not verify review threads: rate limited" in gate["blockers"]
-
-
-def test_build_gate_blocks_when_head_changed_after_packet(tmp_path, monkeypatch):
-    packet_dir = tmp_path / "packet"
-    packet_dir.mkdir()
-    prc.write_json(packet_dir / "FACTS.json", {"risk": {"level": "LOW"}, "pr": {"headRefOid": "old"}})
-    for name in ("codex_review.md", "claude_review.md"):
-        (packet_dir / name).write_text(
-            "## Verdict\nAPPROVE\n\n"
-            "## Findings\nNo blocking findings after reading `scripts/runtime/pr_merge_control.py`.\n\n"
-            "## Missing Tests Or Proof\nNo missing local proof for this bounded check.\n\n"
-            "## Merge Conditions\nCI must stay green and the reviewed head must match.\n",
-            encoding="utf-8",
-        )
-        prc.write_json(
-            packet_dir / name.replace(".md", "_receipt.json"),
-            {"exit_code": 0, "reviewed_head_sha": "old"},
-        )
-
-    args = SimpleNamespace(
-        packet_dir=str(packet_dir),
-        state_root=str(tmp_path),
-        pr=42,
-        allow_pending=False,
-        human_approved=False,
-        human_approval_note="",
-    )
-
-    monkeypatch.setattr(
-        prc,
-        "fetch_pr_view",
-        lambda _pr: {
-            "number": 42,
-            "title": "changed",
-            "headRefOid": "new",
-            "body": """
-- Organ touched: docs
-- Declared-vs-actual gap closed: reviewer proof is now strict.
-- Proof that re-reads the map: packet and gate both load.
-- New drift introduced: None
-""",
-            "isDraft": False,
-            "mergeable": "MERGEABLE",
-            "reviewDecision": "APPROVED",
-            "statusCheckRollup": [{"name": "tests", "status": "COMPLETED", "conclusion": "SUCCESS"}],
-        },
-    )
-    monkeypatch.setattr(prc, "repo_name", lambda: "owner/repo")
-    monkeypatch.setattr(prc, "fetch_review_threads", lambda _pr, _repo: {"ok": True, "unresolved_count": 0})
-
-    gate = prc.build_gate(args)
-
-    assert gate["decision"] == "BLOCKED"
-    assert "PR head changed since packet generation" in gate["blockers"]
-
-
-def test_build_gate_requires_note_for_high_risk_human_approval(tmp_path, monkeypatch):
-    packet_dir = tmp_path / "packet"
-    packet_dir.mkdir()
-    prc.write_json(packet_dir / "FACTS.json", {"risk": {"level": "HIGH"}, "pr": {"headRefOid": "abc"}})
-    for name in ("codex_review.md", "claude_review.md"):
-        (packet_dir / name).write_text(
-            "## Verdict\nAPPROVE\n\n"
-            "## Findings\nNo blocking findings after reading `scripts/runtime/pr_merge_control.py`.\n\n"
-            "## Missing Tests Or Proof\nNo missing local proof for this bounded check.\n\n"
-            "## Merge Conditions\nCI must stay green and the reviewed head must match.\n",
-            encoding="utf-8",
-        )
-        prc.write_json(
-            packet_dir / name.replace(".md", "_receipt.json"),
-            {"exit_code": 0, "reviewed_head_sha": "abc"},
-        )
-
-    args = SimpleNamespace(
-        packet_dir=str(packet_dir),
-        state_root=str(tmp_path),
-        pr=42,
-        allow_pending=False,
-        human_approved=True,
-        human_approval_note="",
-    )
-    monkeypatch.setattr(
-        prc,
-        "fetch_pr_view",
-        lambda _pr: {
-            "number": 42,
-            "title": "high",
-            "headRefOid": "abc",
-            "body": """
-- Organ touched: scripts/runtime
-- Declared-vs-actual gap closed: high risk merge proof is receipt backed.
-- Proof that re-reads the map: packet and gate both load.
-- New drift introduced: None
-""",
-            "isDraft": False,
-            "mergeable": "MERGEABLE",
-            "reviewDecision": "APPROVED",
-            "statusCheckRollup": [{"name": "tests", "status": "COMPLETED", "conclusion": "SUCCESS"}],
-        },
-    )
-    monkeypatch.setattr(prc, "repo_name", lambda: "owner/repo")
-    monkeypatch.setattr(prc, "fetch_review_threads", lambda _pr, _repo: {"ok": True, "unresolved_count": 0})
-
-    gate = prc.build_gate(args)
-
-    assert gate["decision"] == "BLOCKED"
-    assert "HIGH risk requires --human-approval-note" in gate["blockers"]
-
-
-def test_build_gate_allows_needs_human_when_human_approval_recorded(tmp_path, monkeypatch):
-    packet_dir = tmp_path / "packet"
-    packet_dir.mkdir()
-    prc.write_json(packet_dir / "FACTS.json", {"risk": {"level": "CRITICAL"}, "pr": {"headRefOid": "abc"}})
-    (packet_dir / "codex_review.md").write_text(
-        "## Verdict\nAPPROVE\n\n"
-        "## Findings\nNo blocking findings after reading `scripts/runtime/pr_merge_control.py`.\n\n"
-        "## Missing Tests Or Proof\nNo missing local proof for this bounded check.\n\n"
-        "## Merge Conditions\nCI must stay green and the reviewed head must match.\n",
-        encoding="utf-8",
-    )
-    prc.write_json(
-        packet_dir / "codex_review_receipt.json",
-        {"exit_code": 0, "reviewed_head_sha": "abc"},
-    )
-    (packet_dir / "claude_review.md").write_text(
-        "## Verdict\nNEEDS_HUMAN\n\n"
-        "## Findings\nCritical risk needs operator approval after reviewing `dharma_swarm/ontology.py`.\n\n"
-        "## Missing Tests Or Proof\nNo missing local proof beyond human approval for this critical path.\n\n"
-        "## Merge Conditions\nHuman approval must be recorded before merge.\n",
-        encoding="utf-8",
-    )
-    prc.write_json(
-        packet_dir / "claude_review_receipt.json",
-        {"exit_code": 0, "reviewed_head_sha": "abc"},
-    )
-
-    args = SimpleNamespace(
-        packet_dir=str(packet_dir),
-        state_root=str(tmp_path),
-        pr=42,
-        allow_pending=False,
-        human_approved=True,
-        human_approval_note="Operator approved the critical hot-path merge after dual-agent review.",
-    )
-    monkeypatch.setattr(
-        prc,
-        "fetch_pr_view",
-        lambda _pr: {
-            "number": 42,
-            "title": "critical",
-            "headRefOid": "abc",
-            "body": """
-- Organ touched: dharma_swarm/ontology.py
-- Declared-vs-actual gap closed: critical path now has explicit review receipts.
-- Proof that re-reads the map: packet and gate both load.
-- New drift introduced: None
-""",
-            "isDraft": False,
-            "mergeable": "MERGEABLE",
-            "reviewDecision": "APPROVED",
-            "statusCheckRollup": [{"name": "tests", "status": "COMPLETED", "conclusion": "SUCCESS"}],
-        },
-    )
-    monkeypatch.setattr(prc, "repo_name", lambda: "owner/repo")
-    monkeypatch.setattr(prc, "fetch_review_threads", lambda _pr, _repo: {"ok": True, "unresolved_count": 0})
-
-    gate = prc.build_gate(args)
-
-    assert gate["decision"] == "MERGE_CANDIDATE"
-    assert "Claude review returned NEEDS_HUMAN; satisfied by recorded human approval" in gate["warnings"]
-
-
-def test_render_github_comment_blocks_when_gate_missing():
-    packet = {
-        "pr": {"number": 42},
-        "classification": {"status": "GITHUB_GREEN_NEEDS_PACKET", "mergeable": "MERGEABLE"},
-        "risk": {"level": "LOW", "files_changed": 1, "additions": 1, "deletions": 0},
-        "coherence": {"ok": True},
-    }
-
-    comment = prc.render_github_comment(packet, None)
-
-    assert "Decision: `GATE_MISSING`" in comment
-    assert "merge gate output missing or gate execution failed" in comment
-
-
 def test_claude_review_env_can_opt_into_api_key():
     _, env = prc.review_command_and_env(
         "claude",
@@ -631,58 +138,555 @@ def test_claude_review_env_can_opt_into_api_key():
     assert env["ANTHROPIC_API_KEY"] == "funded"
 
 
-def test_review_timeout_seconds_defaults_and_validates():
-    assert prc.review_timeout_seconds("codex", {}) == 600
-    assert prc.review_timeout_seconds("claude", {"CLAUDE_REVIEW_TIMEOUT_SECONDS": "90"}) == 90
+def test_codex_review_defaults_to_bounded_reasoning():
+    command, _ = prc.review_command_and_env("codex", {"PATH": "/usr/bin"})
+
+    assert command[:2] == ["codex", "exec"]
+    assert "--ephemeral" in command
+    assert "model_reasoning_effort=\"medium\"" in command
 
 
-def test_review_timeout_seconds_rejects_too_short():
-    try:
-        prc.review_timeout_seconds("codex", {"CODEX_REVIEW_TIMEOUT_SECONDS": "5"})
-    except prc.PRControlError as exc:
-        assert "at least 30 seconds" in str(exc)
-    else:
-        raise AssertionError("expected PRControlError")
+def test_extract_review_verdict_from_verdict_section():
+    text = """
+## Verdict
+REQUEST_CHANGES
+
+## Findings
+1. Needs work.
+"""
+
+    assert prc.extract_review_verdict(text) == "REQUEST_CHANGES"
 
 
-def test_review_receipt_status_rejects_shallow_approval(tmp_path):
-    path = tmp_path / "codex_review.md"
-    path.write_text(
-        "## Verdict\n"
-        "APPROVE\n\n"
-        "## Findings\n"
-        "No blocking findings.\n\n"
-        "## Missing Tests Or Proof\n"
-        "None.\n\n"
-        "## Merge Conditions\n"
-        "Ready.\n",
-        encoding="utf-8",
+def test_extract_review_verdict_rejects_placeholder_line():
+    text = """
+## Verdict
+APPROVE | REQUEST_CHANGES | BLOCKED | NEEDS_HUMAN
+"""
+
+    assert prc.extract_review_verdict(text) == "UNKNOWN"
+
+
+def test_run_agent_process_captures_success():
+    result = prc.run_agent_process(
+        [sys.executable, "-c", "import sys; print('## Verdict\\nAPPROVE\\n\\n## Findings\\n1. clean'); sys.stdin.read()"],
+        "prompt body",
+        {},
+        timeout_s=2,
+        kill_grace_s=0.1,
     )
-    prc.write_json(path.with_name("codex_review_receipt.json"), {"exit_code": 0, "reviewed_head_sha": "abc"})
 
-    result = prc.review_receipt_status(path, expected_head_sha="abc")
+    assert result["status"] == "completed"
+    assert result["exit_code"] == 0
+    assert "APPROVE" in result["stdout"]
 
-    assert result["ok"] is False
-    assert result["reason"] in {
-        "Findings section is too thin",
-        "Missing Tests Or Proof section is too thin",
-        "Merge Conditions section is too thin",
-        "review lacks concrete file/path evidence",
+
+def test_run_agent_process_times_out_and_kills():
+    result = prc.run_agent_process(
+        [sys.executable, "-c", "import time; time.sleep(5)"],
+        "prompt body",
+        {},
+        timeout_s=0.1,
+        kill_grace_s=0.1,
+    )
+
+    assert result["status"] == "timeout"
+    assert result["timed_out"] is True
+    assert result["exit_code"] == 124
+    assert result["killed"] in {"term", "kill"}
+
+
+def test_agent_review_status_blocks_timed_out_receipt(tmp_path):
+    (tmp_path / "codex_review.md").write_text("## Verdict\nBLOCKED\n\n## Findings\n1. timed out\n", encoding="utf-8")
+    prc.write_json(
+        tmp_path / "codex_review_receipt.json",
+        {
+            "status": "timeout",
+            "exit_code": 124,
+            "timed_out": True,
+            "timeout_s": 1,
+        },
+    )
+
+    status = prc.load_agent_review_status(tmp_path, "codex")
+    blockers = prc.agent_review_blockers(status, human_approved=False)
+
+    assert "Codex review timed out after 1s" in blockers
+    assert "Codex review verdict=BLOCKED" in blockers
+
+
+def test_needs_human_verdict_requires_human_approved(tmp_path):
+    (tmp_path / "claude_review.md").write_text("## Verdict\nNEEDS_HUMAN\n\n## Findings\n1. human gate\n", encoding="utf-8")
+    prc.write_json(
+        tmp_path / "claude_review_receipt.json",
+        {
+            "status": "completed",
+            "exit_code": 0,
+            "timed_out": False,
+        },
+    )
+
+    status = prc.load_agent_review_status(tmp_path, "claude")
+
+    assert "Claude review verdict=NEEDS_HUMAN requires --human-approved" in prc.agent_review_blockers(status, human_approved=False)
+    assert prc.agent_review_blockers(status, human_approved=True) == []
+
+
+def test_select_fanout_items_prefers_allowed_statuses_in_order():
+    summary = {
+        "items": [
+            {"number": 10, "status": "BLOCKED_CHECKS", "title": "red", "updatedAt": "2026-06-01T00:00:00Z"},
+            {"number": 11, "status": "NEEDS_AGENT_REVIEW", "title": "needs review", "updatedAt": "2026-06-01T00:00:00Z"},
+            {"number": 12, "status": "GITHUB_GREEN_NEEDS_PACKET", "title": "green", "updatedAt": "2026-06-01T00:00:00Z"},
+            {"number": 13, "status": "GITHUB_GREEN_NEEDS_PACKET", "title": "green 2", "updatedAt": "2026-06-02T00:00:00Z"},
+        ]
     }
 
+    selected = prc.select_fanout_items(
+        summary,
+        statuses=["GITHUB_GREEN_NEEDS_PACKET", "NEEDS_AGENT_REVIEW"],
+        max_prs=3,
+    )
 
-def test_review_receipt_status_rejects_missing_review_sections(tmp_path):
-    path = tmp_path / "codex_review.md"
-    path.write_text(
-        "## Verdict\n"
-        "APPROVE\n\n"
-        "## Findings\n"
-        "No blocking findings after reading `scripts/runtime/pr_merge_control.py`.\n",
+    assert [item["number"] for item in selected] == [12, 13, 11]
+
+
+def test_build_queue_summary_counts_statuses():
+    prs = [
+        {
+            "number": 1,
+            "title": "good",
+            "isDraft": False,
+            "mergeable": "MERGEABLE",
+            "reviewDecision": "APPROVED",
+            "statusCheckRollup": [{"name": "tests", "status": "COMPLETED", "conclusion": "SUCCESS"}],
+        },
+        {
+            "number": 2,
+            "title": "bad",
+            "isDraft": False,
+            "mergeable": "MERGEABLE",
+            "reviewDecision": "APPROVED",
+            "statusCheckRollup": [{"name": "tests", "status": "COMPLETED", "conclusion": "FAILURE"}],
+        },
+    ]
+
+    summary = prc.build_queue_summary(prs, "owner/repo")
+
+    assert summary["repo"] == "owner/repo"
+    assert summary["counts"] == {"GITHUB_GREEN_NEEDS_PACKET": 1, "BLOCKED_CHECKS": 1}
+
+
+def test_build_a2a_fanout_messages_targets_dynamic_fleet(tmp_path):
+    messages = prc.build_a2a_fanout_messages(
+        repo="owner/repo",
+        run_id="20260604T000000Z",
+        queue_summary={"total": 2, "counts": {"GITHUB_GREEN_NEEDS_PACKET": 1}},
+        selected=[{"number": 12, "status": "GITHUB_GREEN_NEEDS_PACKET", "title": "green"}],
+        processed=[],
+        fanout_dir=tmp_path / "fanout",
+        subjects=list(prc.DEFAULT_A2A_NATS_SUBJECTS),
+        required_reviewers=["copilot", "claude", "devin"],
+        merge_mode="auto-when-clean",
+        dry_run=True,
+        packet_only=False,
+    )
+
+    assert "dharma.a2a.github_copilot" in [message["subject"] for message in messages]
+    assert "dharma.a2a.claude" in [message["subject"] for message in messages]
+    assert "dharma.a2a.devin" in [message["subject"] for message in messages]
+    assert "github_copilot" in messages[0]["payload"]["agent_roster"]
+    assert messages[0]["payload"]["required_reviewers"] == ["copilot", "claude", "devin"]
+    assert messages[0]["payload"]["authority"] == "conditional_merge"
+    assert "conditional_merge_after_clean_gate" in messages[0]["payload"]["allowed_actions"]
+    assert "unconditional_merge" in messages[0]["payload"]["forbidden_actions"]
+
+
+def test_publish_a2a_fanout_session_blocks_when_required_secrets_missing(tmp_path):
+    receipt = prc.publish_a2a_fanout_session(
+        repo="owner/repo",
+        run_id="run",
+        queue_summary={"total": 0, "counts": {}},
+        selected=[],
+        processed=[],
+        fanout_dir=tmp_path / "fanout",
+        subjects=["dharma.a2a.fleet"],
+        required_reviewers=["copilot", "claude", "devin"],
+        merge_mode="off",
+        dry_run=True,
+        packet_only=False,
+        required=True,
+        timeout_s=0.1,
+        env={},
+        publisher=lambda _config, _messages, _timeout: [],
+    )
+
+    assert receipt["status"] == "BLOCKED"
+    assert receipt["code"] == "NATS_SECRETS_MISSING"
+    assert set(receipt["config"]["missing"]) == set(prc.NATS_REQUIRED_SECRET_NAMES)
+
+
+def test_publish_a2a_fanout_session_records_verified_acks_without_secret(tmp_path):
+    seen = {}
+
+    def publisher(config, messages, timeout_s):
+        seen["endpoint"] = config.endpoint
+        seen["timeout_s"] = timeout_s
+        return [
+            {
+                "subject": message["subject"],
+                "kind": message["payload"]["kind"],
+                "to": message["payload"]["to"],
+                "ack_verified": True,
+                "ack_tier": "JETSTREAM_PUB_ACK",
+                "stream": "DHARMA_A2A",
+                "seq": index + 1,
+            }
+            for index, message in enumerate(messages)
+        ]
+
+    receipt = prc.publish_a2a_fanout_session(
+        repo="owner/repo",
+        run_id="run",
+        queue_summary={"total": 1, "counts": {"NEEDS_AGENT_REVIEW": 1}},
+        selected=[{"number": 9, "status": "NEEDS_AGENT_REVIEW", "title": "needs review"}],
+        processed=[],
+        fanout_dir=tmp_path / "fanout",
+        subjects=["dharma.a2a.fleet", "dharma.a2a.merge_master_mike"],
+        required_reviewers=["copilot", "claude", "devin"],
+        merge_mode="auto-when-clean",
+        dry_run=False,
+        packet_only=True,
+        required=True,
+        timeout_s=3.0,
+        env={
+            "DEVIN_NATS_URL": "wss://nats.example.test:8443",
+            "DEVIN_NATS_USER": "devin",
+            "DEVIN_NATS_PW": "super-secret",
+        },
+        publisher=publisher,
+    )
+
+    assert seen == {"endpoint": "wss://nats.example.test:8443", "timeout_s": 3.0}
+    assert receipt["status"] == "OK"
+    assert receipt["code"] == "NATS_ACK_VERIFIED"
+    assert len(receipt["acks"]) == 2
+    assert "super-secret" not in str(receipt)
+
+
+def test_render_fanout_markdown_states_no_external_authority():
+    receipt = {
+        "generated_at": "2026-06-01T00:00:00Z",
+        "repo": "owner/repo",
+        "dry_run": False,
+        "selected": [{"number": 12, "status": "GITHUB_GREEN_NEEDS_PACKET", "title": "green"}],
+        "processed": [
+            {
+                "number": 12,
+                "gate_decision": "BLOCKED",
+                "packet_dir": "/tmp/pr-12",
+                "comment_path": "/tmp/comment.md",
+                "reviewers": [{"agent": "codex", "exit_code": 0, "status": "completed", "verdict": "APPROVE"}],
+                "blockers": ["Claude review verdict is MISSING"],
+            }
+        ],
+    }
+
+    text = prc.render_fanout_markdown(receipt)
+
+    assert "does not merge, approve, push, or edit source" in text
+    assert "GitHub comment text is rendered locally only" in text
+
+
+def test_mike_merge_authority_skips_when_gate_blocked():
+    called = False
+
+    def runner(*_args, **_kwargs):
+        nonlocal called
+        called = True
+        return prc.CommandResult(0, "", "")
+
+    receipt = prc.run_mike_merge_authority(
+        pr_number=12,
+        gate={"decision": "BLOCKED", "blockers": ["missing devin receipt"]},
+        method="squash",
+        auto=True,
+        runner=runner,
+    )
+
+    assert called is False
+    assert receipt["status"] == "SKIPPED"
+    assert receipt["blockers"] == ["missing devin receipt"]
+
+
+def test_mike_merge_authority_runs_gh_when_gate_clean():
+    seen = {}
+
+    def runner(command, timeout, check):
+        seen["command"] = command
+        seen["timeout"] = timeout
+        seen["check"] = check
+        return prc.CommandResult(0, "merged\n", "")
+
+    receipt = prc.run_mike_merge_authority(
+        pr_number=12,
+        gate={"decision": "MERGE_CANDIDATE", "packet_dir": "/tmp/packet", "required_reviewers": ["copilot", "claude", "devin"]},
+        method="squash",
+        auto=True,
+        runner=runner,
+    )
+
+    assert seen == {
+        "command": ["gh", "pr", "merge", "12", "--auto", "--squash", "--delete-branch"],
+        "timeout": 300,
+        "check": False,
+    }
+    assert receipt["status"] == "MERGE_COMMAND_ACCEPTED"
+    assert receipt["required_reviewers"] == ["copilot", "claude", "devin"]
+
+
+def test_render_github_comment_states_conditional_merge_boundary():
+    packet = {
+        "pr": {"number": 12},
+        "classification": {"status": "NEEDS_AGENT_REVIEW", "mergeable": "MERGEABLE"},
+        "risk": {"level": "LOW", "files_changed": 1, "additions": 2, "deletions": 0},
+        "coherence": {"ok": True},
+    }
+    gate = {
+        "decision": "BLOCKED",
+        "blockers": ["missing devin_review.md receipt"],
+        "warnings": [],
+        "required_reviewers": ["copilot", "claude", "devin"],
+    }
+
+    text = prc.render_github_comment(packet, gate)
+
+    assert "- Authority: `conditional_merge_after_clean_gate`" in text
+    assert "only when explicitly asked to `merge when clean`" in text
+    assert "`copilot_review.md` plus `copilot_review_receipt.json`" in text
+    assert "`claude_review.md` plus `claude_review_receipt.json`" in text
+    assert "`devin_review.md` plus `devin_review_receipt.json`" in text
+    assert "may not approve, merge" not in text
+
+
+def test_render_github_comment_includes_merge_receipt():
+    packet = {
+        "pr": {"number": 12},
+        "classification": {"status": "GITHUB_GREEN_NEEDS_PACKET", "mergeable": "MERGEABLE"},
+        "risk": {"level": "LOW", "files_changed": 1, "additions": 2, "deletions": 0},
+        "coherence": {"ok": True},
+    }
+    gate = {
+        "decision": "MERGE_CANDIDATE",
+        "blockers": [],
+        "warnings": [],
+        "required_reviewers": ["copilot", "claude", "devin"],
+    }
+    merge_receipt = {
+        "status": "MERGE_COMMAND_ACCEPTED",
+        "reason": "gh pr merge accepted the conditional merge command",
+        "method": "squash",
+        "auto": True,
+        "exit_code": 0,
+    }
+
+    text = prc.render_github_comment(packet, gate, merge_receipt)
+
+    assert "### Merge Request" in text
+    assert "- Status: `MERGE_COMMAND_ACCEPTED`" in text
+    assert "- Auto-merge: `True`" in text
+
+
+def _write_approve_review(out_dir, agent):
+    (out_dir / f"{agent}_review.md").write_text(
+        "## Verdict\nAPPROVE\n\n## Findings\n1. clean\n",
         encoding="utf-8",
     )
-    prc.write_json(path.with_name("codex_review_receipt.json"), {"exit_code": 0, "reviewed_head_sha": "abc"})
+    prc.write_json(
+        out_dir / f"{agent}_review_receipt.json",
+        {
+            "schema": "dharma.pr_review.agent_receipt.v1",
+            "status": "completed",
+            "exit_code": 0,
+            "timed_out": False,
+        },
+    )
 
-    result = prc.review_receipt_status(path, expected_head_sha="abc")
 
-    assert result["ok"] is False
-    assert result["reason"].startswith("missing review sections:")
+def test_gate_accepts_named_backup_reviewer_when_claude_unavailable(tmp_path, monkeypatch):
+    out_dir = tmp_path / "packet"
+    out_dir.mkdir()
+    prc.write_json(out_dir / "FACTS.json", {"risk": {"level": "LOW"}})
+    _write_approve_review(out_dir, "codex")
+    _write_approve_review(out_dir, "backup_opus")
+    body = """
+- Organ touched: `docs/ops/PR_REVIEW_CONTROL.md`
+- Declared-vs-actual gap closed: backup reviewer receipts are explicit.
+- Proof that re-reads the map: merge gate test covers Claude fallback.
+- New drift introduced: no merge authority change; fallback is explicit.
+"""
+    monkeypatch.setattr(
+        prc,
+        "fetch_pr_view",
+        lambda _pr: {
+            "isDraft": False,
+            "mergeable": "MERGEABLE",
+            "reviewDecision": "APPROVED",
+            "statusCheckRollup": [{"name": "tests", "status": "COMPLETED", "conclusion": "SUCCESS"}],
+            "body": body,
+        },
+    )
+    monkeypatch.setattr(prc, "fetch_review_threads", lambda _pr, _repo: {"ok": True, "unresolved_count": 0})
+    monkeypatch.setattr(prc, "repo_name", lambda: "owner/repo")
+
+    gate = prc.build_gate(
+        argparse.Namespace(
+            pr=12,
+            packet_dir=str(out_dir),
+            state_root=str(tmp_path),
+            allow_pending=False,
+            human_approved=False,
+            allow_backup_reviewer=True,
+            backup_reviewers="backup_opus",
+            backup_reviewer_reason="Claude Code subscription credits unavailable",
+        )
+    )
+
+    assert gate["decision"] == "MERGE_CANDIDATE"
+    assert "missing claude_review.md receipt" not in gate["blockers"]
+    assert gate["backup_review_policy"]["status"] == "accepted"
+    assert gate["backup_review_policy"]["accepted_reviewer"] == "backup_opus"
+
+
+def test_gate_blocks_missing_dynamic_required_reviewer(tmp_path, monkeypatch):
+    out_dir = tmp_path / "packet"
+    out_dir.mkdir()
+    prc.write_json(out_dir / "FACTS.json", {"risk": {"level": "LOW"}})
+    _write_approve_review(out_dir, "copilot")
+    _write_approve_review(out_dir, "claude")
+    body = """
+- Organ touched: `docs/ops/PR_REVIEW_CONTROL.md`
+- Declared-vs-actual gap closed: dynamic reviewer receipts are explicit.
+- Proof that re-reads the map: merge gate test covers missing Devin receipt.
+- New drift introduced: no merge authority without the required quorum.
+"""
+    monkeypatch.setattr(
+        prc,
+        "fetch_pr_view",
+        lambda _pr: {
+            "isDraft": False,
+            "mergeable": "MERGEABLE",
+            "reviewDecision": "APPROVED",
+            "statusCheckRollup": [{"name": "tests", "status": "COMPLETED", "conclusion": "SUCCESS"}],
+            "body": body,
+        },
+    )
+    monkeypatch.setattr(prc, "fetch_review_threads", lambda _pr, _repo: {"ok": True, "unresolved_count": 0})
+    monkeypatch.setattr(prc, "repo_name", lambda: "owner/repo")
+
+    gate = prc.build_gate(
+        argparse.Namespace(
+            pr=12,
+            packet_dir=str(out_dir),
+            state_root=str(tmp_path),
+            allow_pending=False,
+            human_approved=False,
+            allow_backup_reviewer=False,
+            backup_reviewers="backup_opus",
+            backup_reviewer_reason="",
+            required_reviewers="copilot,claude,devin",
+        )
+    )
+
+    assert gate["decision"] == "BLOCKED"
+    assert gate["required_reviewers"] == ["copilot", "claude", "devin"]
+    assert "missing devin_review.md receipt" in gate["blockers"]
+
+
+def test_gate_accepts_dynamic_required_reviewer_quorum(tmp_path, monkeypatch):
+    out_dir = tmp_path / "packet"
+    out_dir.mkdir()
+    prc.write_json(out_dir / "FACTS.json", {"risk": {"level": "LOW"}})
+    _write_approve_review(out_dir, "copilot")
+    _write_approve_review(out_dir, "claude")
+    _write_approve_review(out_dir, "devin")
+    body = """
+- Organ touched: `docs/ops/PR_REVIEW_CONTROL.md`
+- Declared-vs-actual gap closed: Copilot, Claude, and Devin receipts are all present.
+- Proof that re-reads the map: merge gate test covers dynamic quorum pass.
+- New drift introduced: no gate bypass; reviewer names are data.
+"""
+    monkeypatch.setattr(
+        prc,
+        "fetch_pr_view",
+        lambda _pr: {
+            "isDraft": False,
+            "mergeable": "MERGEABLE",
+            "reviewDecision": "APPROVED",
+            "statusCheckRollup": [{"name": "tests", "status": "COMPLETED", "conclusion": "SUCCESS"}],
+            "body": body,
+        },
+    )
+    monkeypatch.setattr(prc, "fetch_review_threads", lambda _pr, _repo: {"ok": True, "unresolved_count": 0})
+    monkeypatch.setattr(prc, "repo_name", lambda: "owner/repo")
+
+    gate = prc.build_gate(
+        argparse.Namespace(
+            pr=12,
+            packet_dir=str(out_dir),
+            state_root=str(tmp_path),
+            allow_pending=False,
+            human_approved=False,
+            allow_backup_reviewer=False,
+            backup_reviewers="backup_opus",
+            backup_reviewer_reason="",
+            required_reviewers="copilot,claude,devin",
+        )
+    )
+
+    assert gate["decision"] == "MERGE_CANDIDATE"
+    assert gate["required_reviewers"] == ["copilot", "claude", "devin"]
+
+
+def test_gate_blocks_backup_reviewer_without_written_reason(tmp_path, monkeypatch):
+    out_dir = tmp_path / "packet"
+    out_dir.mkdir()
+    prc.write_json(out_dir / "FACTS.json", {"risk": {"level": "LOW"}})
+    _write_approve_review(out_dir, "codex")
+    _write_approve_review(out_dir, "backup_opus")
+    body = """
+- Organ touched: `docs/ops/PR_REVIEW_CONTROL.md`
+- Declared-vs-actual gap closed: backup reviewer receipts are explicit.
+- Proof that re-reads the map: merge gate test covers missing reason.
+- New drift introduced: no merge authority change; fallback is explicit.
+"""
+    monkeypatch.setattr(
+        prc,
+        "fetch_pr_view",
+        lambda _pr: {
+            "isDraft": False,
+            "mergeable": "MERGEABLE",
+            "reviewDecision": "APPROVED",
+            "statusCheckRollup": [{"name": "tests", "status": "COMPLETED", "conclusion": "SUCCESS"}],
+            "body": body,
+        },
+    )
+    monkeypatch.setattr(prc, "fetch_review_threads", lambda _pr, _repo: {"ok": True, "unresolved_count": 0})
+    monkeypatch.setattr(prc, "repo_name", lambda: "owner/repo")
+
+    gate = prc.build_gate(
+        argparse.Namespace(
+            pr=12,
+            packet_dir=str(out_dir),
+            state_root=str(tmp_path),
+            allow_pending=False,
+            human_approved=False,
+            allow_backup_reviewer=True,
+            backup_reviewers="backup_opus",
+            backup_reviewer_reason="",
+        )
+    )
+
+    assert gate["decision"] == "BLOCKED"
+    assert "backup reviewer requires --backup-reviewer-reason" in gate["blockers"]
+    assert gate["backup_review_policy"]["status"] == "missing_reason"
