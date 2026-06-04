@@ -80,6 +80,11 @@ jobs:
       - name: Run Merge Master Mike backlog fanout
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MERGE_MASTER_MIKE_NATS_URL: ${{ secrets.MERGE_MASTER_MIKE_NATS_URL }}
+          MERGE_MASTER_MIKE_NATS_USER: ${{ secrets.MERGE_MASTER_MIKE_NATS_USER }}
+          MERGE_MASTER_MIKE_NATS_PW: ${{ secrets.MERGE_MASTER_MIKE_NATS_PW }}
+          MERGE_MASTER_MIKE_NATS_CA_PEM: ${{ secrets.MERGE_MASTER_MIKE_NATS_CA_PEM }}
+          MERGE_MASTER_MIKE_NATS_TLS_HOSTNAME: ${{ vars.MERGE_MASTER_MIKE_NATS_TLS_HOSTNAME || secrets.MERGE_MASTER_MIKE_NATS_TLS_HOSTNAME }}
           DEVIN_NATS_URL: ${{ secrets.DEVIN_NATS_URL }}
           DEVIN_NATS_USER: ${{ secrets.DEVIN_NATS_USER }}
           DEVIN_NATS_PW: ${{ secrets.DEVIN_NATS_PW }}

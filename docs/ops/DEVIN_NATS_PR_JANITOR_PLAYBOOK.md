@@ -27,7 +27,15 @@ protected source, or bypass governance.
 Use secret storage. Do not paste credentials in PR comments, chat transcripts,
 docs, or committed files.
 
-Required secret names:
+Required AGNI NATS secret names for the GitHub-hosted Mike backlog workflow:
+
+```text
+MERGE_MASTER_MIKE_NATS_URL=wss://157.245.193.15:8443
+MERGE_MASTER_MIKE_NATS_USER=merge_master_mike
+MERGE_MASTER_MIKE_NATS_PW=<stored secret>
+```
+
+Compatibility fallback secret names for Devin-only lanes:
 
 ```text
 DEVIN_NATS_URL=wss://157.245.193.15:8443
@@ -38,20 +46,24 @@ DEVIN_NATS_PW=<stored secret>
 Optional TLS trust settings for GitHub-hosted runners:
 
 ```text
-DEVIN_NATS_CA_PEM=<PEM for the CA that signed the AGNI NATS certificate>
-DEVIN_NATS_TLS_HOSTNAME=<certificate DNS name, only if different from URL host>
+MERGE_MASTER_MIKE_NATS_CA_PEM=<PEM for the CA that signed the AGNI NATS certificate>
+MERGE_MASTER_MIKE_NATS_TLS_HOSTNAME=<certificate DNS name, only if different from URL host>
 ```
 
-Use `DEVIN_NATS_CA_PEM` when AGNI presents a private or self-signed
-certificate. Do not disable certificate verification for the Mike lane; either
-install a public TLS certificate on AGNI or provide the CA PEM as a repo secret.
+Use `MERGE_MASTER_MIKE_NATS_CA_PEM` when AGNI presents a private or self-signed
+certificate. The workflow also accepts `DEVIN_NATS_CA_PEM` as a fallback. Do not
+disable certificate verification for the Mike lane; either install a public TLS
+certificate on AGNI or provide the CA PEM as a repo secret.
 
 Installed surfaces:
 
 - Devin Cloud org secrets: `DEVIN_NATS_URL`, `DEVIN_NATS_USER`, `DEVIN_NATS_PW`
-- GitHub Actions repo secrets: `DEVIN_NATS_URL`, `DEVIN_NATS_USER`,
-  `DEVIN_NATS_PW`, and `DEVIN_NATS_CA_PEM` when AGNI uses a private CA
+- GitHub Actions repo secrets: `MERGE_MASTER_MIKE_NATS_URL`,
+  `MERGE_MASTER_MIKE_NATS_USER`, `MERGE_MASTER_MIKE_NATS_PW`, and
+  `DEVIN_NATS_CA_PEM` or `MERGE_MASTER_MIKE_NATS_CA_PEM` when AGNI uses a
+  private CA
 - AGNI root credential file: `/root/.dharma/nats/devin_cred.txt`
+- AGNI Mike credential file: `/root/.dharma/nats/merge_master_mike_cred.txt`
 
 ## AGNI NATS Contract
 
@@ -227,14 +239,16 @@ dharma.a2a.hermes
 dharma.a2a.perplexity
 ```
 
-The NATS receipt is fail-closed. If `DEVIN_NATS_URL`, `DEVIN_NATS_USER`, or
-`DEVIN_NATS_PW` is absent, the run records `NATS_SECRETS_MISSING` and exits
-non-zero when `nats_required=true`. If JetStream publish is not ack-verified,
-the run records `NATS_PUBLISH_FAILED` or `NATS_ACK_FAILED`; do not claim live
-fleet collaboration from that run. If the failure is
-`CERTIFICATE_VERIFY_FAILED`, add `DEVIN_NATS_CA_PEM` as a GitHub Actions repo
-secret or move AGNI behind a publicly trusted TLS certificate, then rerun the
-backlog workflow.
+The NATS receipt is fail-closed. If any `MERGE_MASTER_MIKE_NATS_*` secret is
+present, all three primary Mike secrets are required. If the Mike family is
+absent, the workflow falls back to the legacy `DEVIN_NATS_URL`,
+`DEVIN_NATS_USER`, and `DEVIN_NATS_PW` names. Missing required values record
+`NATS_SECRETS_MISSING` and exit non-zero when `nats_required=true`. If
+JetStream publish is not ack-verified, the run records `NATS_PUBLISH_FAILED` or
+`NATS_ACK_FAILED`; do not claim live fleet collaboration from that run. If the
+failure is `CERTIFICATE_VERIFY_FAILED`, add `MERGE_MASTER_MIKE_NATS_CA_PEM` or
+`DEVIN_NATS_CA_PEM` as a GitHub Actions repo secret, or move AGNI behind a
+publicly trusted TLS certificate, then rerun the backlog workflow.
 
 ## Fallbacks
 

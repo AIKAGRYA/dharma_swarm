@@ -51,7 +51,13 @@ DEFAULT_A2A_NATS_SUBJECTS = (
     "dharma.a2a.perplexity",
 )
 DEFAULT_REQUIRED_REVIEWERS = ("codex", "claude")
-NATS_REQUIRED_SECRET_NAMES = ("DEVIN_NATS_URL", "DEVIN_NATS_USER", "DEVIN_NATS_PW")
+MERGE_MASTER_MIKE_NATS_SECRET_NAMES = (
+    "MERGE_MASTER_MIKE_NATS_URL",
+    "MERGE_MASTER_MIKE_NATS_USER",
+    "MERGE_MASTER_MIKE_NATS_PW",
+)
+DEVIN_NATS_SECRET_NAMES = ("DEVIN_NATS_URL", "DEVIN_NATS_USER", "DEVIN_NATS_PW")
+NATS_REQUIRED_SECRET_NAMES = DEVIN_NATS_SECRET_NAMES
 MERGE_MODES = ("off", "auto-when-clean")
 HOT_PATH_PATTERNS = (
     ".github/",
@@ -91,6 +97,7 @@ class NATSConfig:
     missing: tuple[str, ...]
     ca_pem: str = ""
     tls_hostname: str = ""
+    credential_family: str = "devin"
 
 
 def utc_now() -> str:
@@ -1438,27 +1445,51 @@ def required_reviewer_agents(args: argparse.Namespace) -> list[str]:
 
 
 def _nats_config(env: dict[str, str], *, require_devin_secrets: bool) -> NATSConfig:
-    endpoint = env.get("DEVIN_NATS_URL") or env.get("DHARMA_NATS_URL") or env.get("NATS_URL") or ""
-    user = env.get("DEVIN_NATS_USER") or env.get("DHARMA_NATS_USER") or env.get("NATS_USER") or ""
+    mike_present = any(env.get(name) for name in MERGE_MASTER_MIKE_NATS_SECRET_NAMES)
+    credential_family = "merge_master_mike" if mike_present else "devin"
+    endpoint = (
+        env.get("MERGE_MASTER_MIKE_NATS_URL")
+        or env.get("DEVIN_NATS_URL")
+        or env.get("DHARMA_NATS_URL")
+        or env.get("NATS_URL")
+        or ""
+    )
+    user = (
+        env.get("MERGE_MASTER_MIKE_NATS_USER")
+        or env.get("DEVIN_NATS_USER")
+        or env.get("DHARMA_NATS_USER")
+        or env.get("NATS_USER")
+        or ""
+    )
     auth_value = (
-        env.get("DEVIN_NATS_PW")
+        env.get("MERGE_MASTER_MIKE_NATS_PW")
+        or env.get("MERGE_MASTER_MIKE_NATS_PASSWORD")
+        or env.get("DEVIN_NATS_PW")
         or env.get("DEVIN_NATS_PASSWORD")
         or env.get("DHARMA_NATS_PW")
         or env.get("DHARMA_NATS_PASSWORD")
         or env.get("NATS_PASSWORD")
         or ""
     )
-    ca_pem = env.get("DEVIN_NATS_CA_PEM") or env.get("DHARMA_NATS_CA_PEM") or env.get("NATS_CA_PEM") or ""
+    ca_pem = (
+        env.get("MERGE_MASTER_MIKE_NATS_CA_PEM")
+        or env.get("DEVIN_NATS_CA_PEM")
+        or env.get("DHARMA_NATS_CA_PEM")
+        or env.get("NATS_CA_PEM")
+        or ""
+    )
     tls_hostname = (
-        env.get("DEVIN_NATS_TLS_HOSTNAME")
+        env.get("MERGE_MASTER_MIKE_NATS_TLS_HOSTNAME")
+        or env.get("DEVIN_NATS_TLS_HOSTNAME")
         or env.get("DHARMA_NATS_TLS_HOSTNAME")
         or env.get("NATS_TLS_HOSTNAME")
         or ""
     )
     if require_devin_secrets:
-        missing = [name for name in NATS_REQUIRED_SECRET_NAMES if not env.get(name)]
+        required_names = MERGE_MASTER_MIKE_NATS_SECRET_NAMES if mike_present else DEVIN_NATS_SECRET_NAMES
+        missing = [name for name in required_names if not env.get(name)]
     else:
-        missing = [] if endpoint else ["DEVIN_NATS_URL or DHARMA_NATS_URL or NATS_URL"]
+        missing = [] if endpoint else ["MERGE_MASTER_MIKE_NATS_URL or DEVIN_NATS_URL or DHARMA_NATS_URL or NATS_URL"]
     return NATSConfig(
         endpoint=endpoint,
         user=user,
@@ -1466,6 +1497,7 @@ def _nats_config(env: dict[str, str], *, require_devin_secrets: bool) -> NATSCon
         missing=tuple(missing),
         ca_pem=_normalize_ca_pem(ca_pem),
         tls_hostname=tls_hostname.strip(),
+        credential_family=credential_family,
     )
 
 
@@ -1484,6 +1516,7 @@ def _redacted_nats_config(config: NATSConfig) -> dict[str, Any]:
         "has_ca_pem": bool(config.ca_pem),
         "tls_hostname": config.tls_hostname,
         "tls_trust": "custom_ca_pem" if config.ca_pem else "system_ca_store",
+        "credential_family": config.credential_family,
         "missing": list(config.missing),
     }
 
