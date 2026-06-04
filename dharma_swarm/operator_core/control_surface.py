@@ -35,6 +35,7 @@ from dharma_swarm.operator_core.control_surface_live_ops import (  # noqa: F401
     _live_ops_census_rows,
     _rows_from_live_ops_census,
 )
+from dharma_swarm.operator_core.control_surface_pr_queue import pr_queue_rows  # noqa: F401
 from dharma_swarm.operator_core.control_surface_models import (
     AUTHORITY_ROLES,
     COHERENCE_STATES,
@@ -940,10 +941,13 @@ def build_control_surface_rows(
     # L) Live ops census (observed process/port/receipt projection)
     rows.extend(_live_ops_census_rows(root))
 
-    # M) MemoryKernel operator controls
+    # M) PR queue receipt projection
+    rows.extend(pr_queue_rows())
+
+    # N) MemoryKernel operator controls
     rows.extend(memory_kernel_control_rows(root))
 
-    # N) Go receipts (optional)
+    # O) Go receipts (optional)
     rows.extend(_go_receipt_rows(root))
 
     # Apply human-decision policy with structured context

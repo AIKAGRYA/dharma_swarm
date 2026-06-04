@@ -287,6 +287,7 @@ def classify_pr(pr: dict[str, Any]) -> dict[str, Any]:
         "url": pr.get("url"),
         "author": (pr.get("author") or {}).get("login") if isinstance(pr.get("author"), dict) else pr.get("author"),
         "headRefName": pr.get("headRefName"),
+        "headRefOid": pr.get("headRefOid") or "",
         "baseRefName": pr.get("baseRefName"),
         "updatedAt": pr.get("updatedAt"),
         "mergeable": mergeable,
@@ -306,7 +307,7 @@ def fetch_open_prs(limit: int) -> list[dict[str, Any]]:
         "--limit",
         str(limit),
         "--json",
-        "number,title,author,headRefName,baseRefName,isDraft,mergeable,reviewDecision,statusCheckRollup,updatedAt,url",
+        "number,title,author,headRefName,headRefOid,baseRefName,isDraft,mergeable,reviewDecision,statusCheckRollup,updatedAt,url",
     ])
 
 
