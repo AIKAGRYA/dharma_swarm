@@ -1,6 +1,9 @@
 import argparse
+import asyncio
 import sys
+import time
 
+import pytest
 from scripts.runtime import pr_merge_control as prc
 
 
@@ -372,6 +375,26 @@ def test_publish_a2a_fanout_session_records_verified_acks_without_secret(tmp_pat
     assert receipt["code"] == "NATS_ACK_VERIFIED"
     assert len(receipt["acks"]) == 2
     assert "super-secret" not in str(receipt)
+
+
+def test_a2a_publisher_deadline_bounds_slow_publish(monkeypatch):
+    async def slow_publish(_config, _messages, _timeout_s):
+        await asyncio.sleep(0.2)
+        return []
+
+    monkeypatch.setattr(prc, "_publish_a2a_messages_async", slow_publish)
+    started = time.monotonic()
+
+    with pytest.raises(asyncio.TimeoutError):
+        asyncio.run(
+            prc._publish_a2a_messages_with_deadline(
+                prc.NATSConfig(endpoint="nats://example.invalid", user="agent", credential="credential", missing=()),
+                [{"subject": "dharma.a2a.fleet", "payload": {}}],
+                timeout_s=0.01,
+            )
+        )
+
+    assert time.monotonic() - started < 0.2
 
 
 def test_render_fanout_markdown_states_no_external_authority():

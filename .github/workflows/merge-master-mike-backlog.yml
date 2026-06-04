@@ -115,7 +115,7 @@ jobs:
             args+=(--nats-required)
           fi
           set +e
-          python3 scripts/runtime/pr_merge_control.py "${args[@]}"
+          python3 -u scripts/runtime/pr_merge_control.py "${args[@]}"
           exit_code="$?"
           set -e
           latest="$(find "${state_root}/mike_fanout" -name summary.md -type f | sort | tail -1 || true)"
