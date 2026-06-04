@@ -147,7 +147,7 @@ class TestExternalReviewMarks:
 
         assert crm.has_external_review_mark(atom) is False
 
-    def test_external_review_mark_rejects_untrusted_reviewer(
+    def test_external_review_mark_rejects_automation_reviewer(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
         staging = tmp_path / "staging"
@@ -168,7 +168,7 @@ class TestExternalReviewMarks:
                     "schema": crm.REVIEW_MARK_SCHEMA,
                     "path": "test.md",
                     "decision": "approved",
-                    "reviewer": "unknown-agent",
+                    "reviewer": "devin",
                     "reviewed_at": "2026-06-02T00:00:00Z",
                     "atom_sha256": crm._file_sha256(atom),
                 }
