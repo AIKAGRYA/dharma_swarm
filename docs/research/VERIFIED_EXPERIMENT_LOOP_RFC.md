@@ -38,7 +38,7 @@ VEL graduates and joins existing systems. It does not create a parallel experime
 | Existing system | Path | VEL concept it covers | Status |
 |---|---|---|---|
 | `recursive_discovery.py` | `dharma_swarm/recursive_discovery.py:78-160` | **Closest existing shadow Verified Experiment Loop.** Full bet→eval→candidate→experiment→witness→promotion chain with content-hashed receipts, recorded through `evaluation_registry` and observed in `control_surface.py`. | Graduate/extend — do not deprecate or supersede |
-| `RuntimeReceipt` + `IdempotencyRecord` | `dharma_swarm/runtime_state.py:632,650` | Canonical persisted runtime receipt with exactly-once substrate. `build_runtime_receipt()` already accepts `ExecutionIdentity` and auto-fills `idempotency_key`. | Canonical persistence target for spine receipts |
+| `RuntimeReceipt` + `IdempotencyRecord` | `dharma_swarm/runtime_state.py:632,650` | Canonical persisted runtime receipt + exactly-once substrate (`IdempotencyRecord` = `INSERT OR IGNORE`; `record_runtime_receipt` = `INSERT OR REPLACE`, overwrite-idempotent not exactly-once). On the A2A path both are already written by `A2AServer.submit()` (`a2a_server.py:369`). | Existing persisted receipt to **associate** spine evidence with — do not mint a second one (see §3.3a) |
 | `ExperimentRecord` / `ExperimentLog` | `dharma_swarm/experiment_log.py:16-88` | Append-only experiment log with `proposal_id`, `evidence_tier`, `promotion_state`. | Extend for VEL experiments — do not create new store |
 | `Hypothesis` / `_RESEARCH_THREAD` | `dharma_swarm/self_research.py:24`; `ontology.py:1190` | Research question / falsifiable claim pipeline. | Extend/wrap for BetCard — do not create standalone class |
 | `ArchiveEntry` / `EvolutionArchive` | `dharma_swarm/archive.py:135-289` | MAP-Elites archive with `FitnessScore` (9-dim), Merkle-chained. | Reuse for EvolutionCandidate storage |
@@ -111,7 +111,14 @@ All schemas below are **proposal-level pseudocode** (Pydantic-style), consistent
 
 `spine.EvidenceReceipt` is the canonical in-flight dispatch proof. `runtime_state.RuntimeReceipt` plus `IdempotencyRecord` is the canonical persisted runtime receipt and exactly-once substrate. `delegation_runs.receipt_json` may be used as a projection/cache for query convenience, but it is not the source of truth.
 
-`spine/persistence.py` should bridge `EvidenceReceipt → RuntimeReceipt` (map dispatch fields into a `RuntimeReceipt` via `build_runtime_receipt(identity, receipt_type="dispatch_evidence", payload=receipt.to_dict())` and persist through `record_runtime_receipt` / identity-derived writers). Its current `UPDATE delegation_runs SET receipt_json` behavior must **not** be treated as source of truth.
+**Anti-double-write rule (binding, see `RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md` §4):** for any path where an inner runtime layer already writes a `RuntimeReceipt`, the spine/VEL layer must **not** write a second `RuntimeReceipt`. It may only return the in-flight `EvidenceReceipt` and optionally write a projection/cache.
+
+The Verified Experiment Loop consumes spine `EvidenceReceipt`s and persisted `RuntimeReceipt`s. It must not create a second persistence path. For dispatch paths that **already** persist a `RuntimeReceipt`, VEL links the `EvidenceReceipt` to that existing `RuntimeReceipt` (shared `run_id` / deterministic `receipt_id`); it does not mint a new one. For paths that do **not** yet persist, adoption must happen at the single runtime owner of that path, never through a parallel writer.
+
+Concretely on the **A2A path**, the persisted `RuntimeReceipt` + `IdempotencyRecord` are **already** written by `A2AServer.submit()` (`a2a_server.py:369`), reached through `submit_via_spine()` → `invoke_agent()`. Therefore:
+- Do **not** make `spine/persistence.py` mint a `RuntimeReceipt` via `build_runtime_receipt(..., receipt_type="dispatch_evidence")` / `record_runtime_receipt` on this path — that would be a second `RuntimeReceipt` per dispatch (the double-write trap). `record_runtime_receipt` is `INSERT OR REPLACE` (overwrite-idempotent), not exactly-once; exactly-once is owned by `IdempotencyRecord` (`INSERT OR IGNORE`).
+- `spine/persistence.py:persist_receipt()` (0 production callers) is at most a **projection-only** helper that writes `delegation_runs.receipt_json` through the existing delegation-run writer; its `UPDATE delegation_runs SET receipt_json` behavior is **not** source of truth and must not be promoted to a canonical writer.
+- Invariant to hold: `count(runtime_receipts WHERE run_id = R) == 1` per A2A dispatch.
 
 ### 3.4 SwarmRun
 - **Existing owner:** `runtime_state.DelegationRun` (`runtime_state.py:510`).
@@ -400,7 +407,7 @@ Each arrow is one `EvidenceReceipt`; the whole chain shares one `correlation_id`
 | 1 | Held-out eval curation | Human-seeded, system-expanded, human-approved (§6) |
 | 2 | Budget source of truth | Hybrid: estimate for dev, billing where available, always log usage (§7) |
 | 3 | Promotion authority | Shadow auto-eval; human-gated runtime promotion; auto-archive only (§8) |
-| 4 | Where do BetCards persist? | Extend `Hypothesis` in existing experiment store; receipts bridge to `RuntimeReceipt` via `spine/persistence.py` |
+| 4 | Where do BetCards persist? | Extend `Hypothesis` in existing experiment store; on paths that already persist a `RuntimeReceipt` (A2A via `A2AServer.submit()`), associate the `EvidenceReceipt` to that existing receipt and optionally project into `delegation_runs.receipt_json` — do not mint a second `RuntimeReceipt` (§3.3a) |
 | 5 | Is EvolutionCandidate identity `proposal_id` or `run_id`? | `proposal_id` for the mutation; `run_id` for each shadow evaluation run |
 | 6 | Does the loop own its own store? | No — reuse `archive.py`, `experiment_log.py`, `decision_ontology.py`, `merkle_log.py` |
 | 7 | When can the loop start? | Only after Spine DoD: legacy bypass closed, adoption ≥ floor, mapping receipts landed |
