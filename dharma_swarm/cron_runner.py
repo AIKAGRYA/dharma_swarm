@@ -81,7 +81,7 @@ def _run_system_map_populator(job: dict[str, Any]) -> CronJobExecutionResult:
 
     import subprocess
 
-    repo_root = Path(str(job.get("repo_root") or Path(__file__).resolve().parent.parent))
+    repo_root = Path(__file__).resolve().parent.parent
     script = repo_root / "scripts" / "system_map_populator.py"
     if not script.exists():
         error = f"missing script: {script}"
@@ -133,7 +133,7 @@ def _run_shell_command(job: dict[str, Any]) -> CronJobExecutionResult:
             error=error,
         )
 
-    repo_root = Path(str(job.get("repo_root") or Path(__file__).resolve().parent.parent))
+    repo_root = Path(__file__).resolve().parent.parent
     timeout = _as_int(job.get("timeout_sec"), 120)
     args = shlex.split(shell_cmd)
     if not any(
