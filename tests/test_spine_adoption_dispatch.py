@@ -239,3 +239,32 @@ async def test_a2a_bridge_receipt_links_routing_decision(
     assert receipt.routing_decision_id is not None
     assert receipt.attributes["capability"] == "code_review"
     assert receipt.attributes["a2a_task_id"]
+
+
+# ---------------------------------------------------------------------------
+# 7. Bypass report script is importable and classifies correctly
+# ---------------------------------------------------------------------------
+
+
+def test_spine_bypass_report_classifies_known_sites():
+    """Bypass report must run without errors and find zero unknowns."""
+    # Import locally so test failure points at the script
+    import importlib.util
+    from pathlib import Path
+
+    spec = importlib.util.spec_from_file_location(
+        "spine_bypass_report",
+        Path(__file__).resolve().parents[1]
+        / "scripts"
+        / "governance"
+        / "spine_bypass_report.py",
+    )
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    entries = mod._scan_production_submits()
+    unknowns = [e for e in entries if e.classification == "unknown"]
+    assert unknowns == [], (
+        f"Bypass report found {len(unknowns)} unclassified .submit() site(s): "
+        + ", ".join(f"{e.file}:{e.line}" for e in unknowns)
+    )
