@@ -99,18 +99,27 @@ Adjacent (in-scope dependents, not part of the 8-file core): `dharma_swarm/runti
 
 ## Adoption Definition Reconciliation
 
-Two apparently different findings are on the table:
+> **Updated for PR #469 (`spine(adoption-slice-1): A2A bridge dispatches through invoke_agent()`, branch `devin/1780548631-spine-a2a-adoption`, open).** The first real dispatch-ownership path now exists. The model below is revised to distinguish *where* on the surface adoption lands.
+
+Two apparently different findings were on the table:
 
 - **Devin report:** Spine types are shipped, but **zero production dispatches flow through `invoke_agent()`**.
 - **This report:** Spine v2 is **75% joined-or-adapter-ready, 12/16 surfaces**.
 
-**These are not contradictory — they measure different things.** They are both correct under different definitions of "adoption." The 75% figure measures **identity adoption** (does a surface import the spine, and can it adapt/attach `ExecutionIdentity` and preserve correlation continuity?). The Devin finding measures **dispatch ownership** (does real execution flow through the one blessed `invoke_agent()` path and emit a canonical `EvidenceReceipt`?). The first is largely done; the second has not started. Verified by inspection of `main`:
+**These were never contradictory — they measure different things.** The 75% figure measures **identity adoption** (does a surface import the spine and adapt/attach `ExecutionIdentity` + preserve correlation continuity?). The Devin finding measures **dispatch ownership** (does real execution flow through the one blessed `invoke_agent()` path and emit a canonical `EvidenceReceipt`?). Before #469 the second had not started; #469 starts it on exactly one opt-in path.
 
-- `grep` for callers of `invoke_agent` outside `dharma_swarm/spine/` returns **zero** — no runtime surface dispatches through it.
-- `grep` for `EvidenceReceipt(` from `dharma_swarm.spine.receipt` at runtime surfaces returns **zero** — the only `EvidenceReceipt` constructors live in `operator_core/closure_v0.py` (a different closure-layer receipt, per the correlation-spine doctrine).
-- `persist_receipt` / `ensure_receipt_column` (`spine/persistence.py`) have **zero** callers — no spine receipt is persisted to `delegation_runs` at runtime yet.
+### What changed with #469
 
-So the spine's *identity substrate* is adopted, but its *dispatch + evidence substrate* is type-complete and unused. The 75% metric counts identity surfaces; it deliberately does **not** assert receipt emission.
+**Before #469:** no runtime caller of `invoke_agent()` anywhere; no runtime surface emitted a spine `EvidenceReceipt`.
+
+**After #469 (verified against the branch):**
+- `a2a/a2a_bridge.py` gains an **opt-in** `submit_via_spine()` that dispatches through `invoke_agent()` and returns **exactly one** `EvidenceReceipt` (one constructed per outcome branch: ok / failed / cancelled / dropped).
+- Exactly-one-receipt behavior is **tested** (`tests/test_spine_adoption_dispatch.py`: `test_a2a_bridge_dispatch_emits_exactly_one_evidence_receipt`, plus identity-preservation and failure-source tests).
+- The existing **default `A2AServer.submit()` / direct A2A paths still bypass the Spine** — `submit_via_spine()` is a new method, not the default route.
+- The receipt is **returned to the caller, not persisted** — no `persist_receipt` / `ensure_receipt_column` call in the new code.
+- Token/cost fields are deliberately left `None` (A2A dispatch does not yet carry provider token counts).
+- `orchestrator.py`, `agent_runner.py`, and `swarm.py` remain **Level 0** (no spine import).
+- **Verified Experiment Loop runtime remains blocked.**
 
 ### Adoption levels (explicit)
 
@@ -125,32 +134,44 @@ So the spine's *identity substrate* is adopted, but its *dispatch + evidence sub
 | 6 | Receipt persisted / trace-linked / cost-token fields attached where available |
 | 7 | Bypass guard active and allowlist shrinking to zero |
 
-### Per-surface mapping
+### Four axes of adoption (added post-#469)
 
-Levels below are evidence-based from inspection of `main`. The 75%/12-of-16 metric corresponds to surfaces reaching **Level 2–3**; **no surface has reached Level 4 or above.**
+A single per-module "level" hid an important distinction that #469 makes unavoidable: a module can reach Level 4–5 on *one method* while its *default path* still bypasses the Spine. Adoption must therefore be read on four axes:
 
-| Surface/module | Current adoption level | Evidence | Remaining gap | Owner / existing slice |
-|---|---:|---|---|---|
-| `a2a/a2a_bridge.py` | 0 | No spine import; no identity, receipt, or correlation refs | Import spine; attach identity at bridge boundary | Adapter saturation (Slice B family, #435) |
-| `a2a/a2a_server.py` | 3 | Spine import; 7 `ExecutionIdentity` refs; 3 `correlation_id` refs; no `invoke_agent`, no receipt | Route dispatch through `invoke_agent`; emit one receipt | Joined surface; dispatch ownership (PR C+/#427 follow-on) |
-| `runtime_state.py` | 3 (+ partial 7) | Spine import; 50 identity refs; 36 `correlation_id`; `RuntimeStateStore` ledger; legacy bypass guarded by `legacy_no_identity_allowed` flag (`:1700`,`:1845`) | Close legacy bypass (allowlist → 0); persist spine `EvidenceReceipt` | Slice A legacy bypass (#430) + persistence wiring |
-| `runtime_lifecycle.py` | 3 | Spine import; 12 identity refs; 14 `correlation_id`; no `invoke_agent`, no receipt | Emit receipt on lifecycle dispatch | Joined; dispatch ownership follow-on |
-| `task_board.py` | 2 | Spine import; 12 identity refs; 6 adapter calls; no correlation, no receipt | Preserve correlation; emit receipt on claim dispatch | Adapter-ready (Slice B, #435) |
-| `message_bus.py` | 2 | Spine import; 16 identity refs; 5 adapter calls; 1 correlation ref; no receipt | Correlation continuity on send/consume; receipt | Adapter-ready (Slice B, #435) |
-| `artifact_store.py` | 2 | Spine import; 18 identity refs; 4 adapter calls; no receipt | Provenance receipt on artifact record | Adapter-ready (Slice B/C, #435/#436) |
-| `tool_registry.py` | 2 | Spine import; 9 identity refs; 3 adapter calls; no tollbooth, no receipt | Tollbooth on side-effecting tool calls; receipt | Non-joined target `tool_registry_dispatch` |
-| `ontology.py` | 2 | Spine import; 3 identity refs; 2 tollbooth calls (`require_execution_tollbooth`); no receipt | Mapping receipt for ontology actions (generate-side) | Non-joined `ontology_action_tollbooth` (Slice C, #436) — **no refactor** |
-| `diff_applier.py` | 2 | Spine import; 4 identity refs; 2 tollbooth calls; no receipt | Receipt on self-mod apply (proposal→apply→verify) | Non-joined `self_modification_loop` |
-| `opportunity_dispatcher.py` | 2 | Spine import; 2 identity refs; 7 adapter calls; 4 correlation refs; no receipt | Receipt on dispatch; correlation continuity | Adapter-ready; `opportunity_refill_research_backend` |
-| `agent_runner.py` | 0 | No spine import; no identity/receipt/correlation | Adopt identity; route real agent runs through `invoke_agent` | **Primary Level-4 target for Verified Loop** |
-| `orchestrator.py` | 0 (1 partial) | No spine import; 6 `correlation_id` refs (ad-hoc, not spine-sourced) | Adopt spine identity; dispatch through `invoke_agent`; emit receipt | **Primary Level-4 target for Verified Loop** |
-| `swarm.py` | 0 | No spine import; no identity/receipt/correlation | Adopt identity at top-level swarm dispatch | Level-4 target (downstream) |
+1. **Method-level adoption** — at least one method on the surface reaches the level (e.g. `submit_via_spine()` reaches L4–L5).
+2. **Module-level adoption** — the surface as a whole (its identity/correlation posture) reaches the level.
+3. **Default-path adoption** — the path callers hit *by default* reaches the level (the honest "is real traffic covered?" axis).
+4. **Persisted-receipt adoption** — the emitted receipt is actually persisted / trace-linked / cost-token attached (Level 6), not just constructed in memory.
 
-**Key reading:** the surfaces the Verified Experiment Loop will actually run experiments through — `agent_runner.py`, `orchestrator.py`, `swarm.py` — are at **Level 0**. They do not yet import the spine, dispatch through `invoke_agent`, or emit receipts. This is exactly the dispatch-ownership gap the Devin report names.
+The 75%/12-of-16 metric reflects **module-level** identity adoption (L2–L3). #469 is the first **method-level** L4–L5 datapoint, with **default-path** and **persisted-receipt** adoption still at zero.
+
+### Per-surface / per-method mapping
+
+Evidence-based from inspection of `main` plus PR #469's branch. "Adoption level" is the **highest level reached by any path** on the surface; the four axis columns disambiguate where that level actually lands.
+
+| Surface / method | Adoption level | Method-level? | Default path? | Receipt emitted? | Receipt persisted? | Remaining gap |
+|---|---:|---|---|---|---|---|
+| `a2a/a2a_bridge.py` → `submit_via_spine()` *(new, #469)* | 5 | Yes (opt-in) | No | Yes — exactly one, tested | No | Make a default/blessed route; persist receipt; attach cost/token (L6) |
+| `a2a/a2a_bridge.py` → `submit()` / default | 1 | n/a | Yes | No | No | Route default traffic through the spine path |
+| `a2a/a2a_server.py` | 3 | Partial | No | No | No | Dispatch through `invoke_agent`; emit one receipt |
+| `runtime_state.py` | 3 (+partial 7) | No | No | No (sink exists, unused) | No | Close legacy bypass (allowlist→0); wire `persist_receipt` |
+| `runtime_lifecycle.py` | 3 | No | No | No | No | Emit receipt on lifecycle dispatch |
+| `task_board.py` | 2 | No | No | No | No | Correlation continuity; receipt on claim dispatch |
+| `message_bus.py` | 2 | No | No | No | No | Correlation on send/consume; receipt |
+| `artifact_store.py` | 2 | No | No | No | No | Provenance receipt on artifact record |
+| `tool_registry.py` | 2 | No | No | No | No | Tollbooth on side-effecting calls; receipt |
+| `ontology.py` | 2 | No | No | No | No | Mapping receipt for ontology actions — **no refactor** |
+| `diff_applier.py` | 2 | No | No | No | No | Receipt on self-mod apply (proposal→apply→verify) |
+| `opportunity_dispatcher.py` | 2 | No | No | No | No | Correlation continuity; receipt on dispatch |
+| `agent_runner.py` | 0 | No | No | No | No | Adopt identity; route real agent runs through `invoke_agent` — **primary L4 target for Verified Loop** |
+| `orchestrator.py` | 0 (1 partial) | No | No | No | No | Adopt spine identity; dispatch through `invoke_agent`; emit + persist receipt — **primary L4 target for Verified Loop** |
+| `swarm.py` | 0 | No | No | No | No | Adopt identity at top-level swarm dispatch |
+
+**Key reading:** #469 proves the dispatch-ownership pattern works (method-level L5 with exactly-one-receipt under test), but **default-path** and **persisted-receipt** adoption are still zero across the fleet, and the surfaces the Verified Loop runs experiments through — `agent_runner.py`, `orchestrator.py`, `swarm.py` — remain **Level 0**.
 
 ### Explicit statement
 
-> **Adapter-ready adoption does not yet prove dispatch-owned EvidenceReceipt emission. Verified Experiment Loop runtime remains blocked until the dispatch surfaces used by experiments emit exactly one EvidenceReceipt per logical dispatch.**
+> **Adapter-ready adoption does not yet prove dispatch-owned EvidenceReceipt emission. PR #469 demonstrates method-level dispatch ownership on one opt-in A2A path (exactly one EvidenceReceipt, tested), but default-path and persisted-receipt adoption remain zero. Verified Experiment Loop runtime remains blocked until the dispatch surfaces used by experiments — at minimum `agent_runner.py`, `orchestrator.py`, and `swarm.py` — emit exactly one EvidenceReceipt per logical dispatch on their default path, and those receipts are persisted / trace-linked.**
 
 ---
 
