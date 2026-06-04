@@ -35,11 +35,22 @@ DEVIN_NATS_USER=devin
 DEVIN_NATS_PW=<stored secret>
 ```
 
+Optional TLS trust settings for GitHub-hosted runners:
+
+```text
+DEVIN_NATS_CA_PEM=<PEM for the CA that signed the AGNI NATS certificate>
+DEVIN_NATS_TLS_HOSTNAME=<certificate DNS name, only if different from URL host>
+```
+
+Use `DEVIN_NATS_CA_PEM` when AGNI presents a private or self-signed
+certificate. Do not disable certificate verification for the Mike lane; either
+install a public TLS certificate on AGNI or provide the CA PEM as a repo secret.
+
 Installed surfaces:
 
 - Devin Cloud org secrets: `DEVIN_NATS_URL`, `DEVIN_NATS_USER`, `DEVIN_NATS_PW`
 - GitHub Actions repo secrets: `DEVIN_NATS_URL`, `DEVIN_NATS_USER`,
-  `DEVIN_NATS_PW`
+  `DEVIN_NATS_PW`, and `DEVIN_NATS_CA_PEM` when AGNI uses a private CA
 - AGNI root credential file: `/root/.dharma/nats/devin_cred.txt`
 
 ## AGNI NATS Contract
@@ -220,7 +231,10 @@ The NATS receipt is fail-closed. If `DEVIN_NATS_URL`, `DEVIN_NATS_USER`, or
 `DEVIN_NATS_PW` is absent, the run records `NATS_SECRETS_MISSING` and exits
 non-zero when `nats_required=true`. If JetStream publish is not ack-verified,
 the run records `NATS_PUBLISH_FAILED` or `NATS_ACK_FAILED`; do not claim live
-fleet collaboration from that run.
+fleet collaboration from that run. If the failure is
+`CERTIFICATE_VERIFY_FAILED`, add `DEVIN_NATS_CA_PEM` as a GitHub Actions repo
+secret or move AGNI behind a publicly trusted TLS certificate, then rerun the
+backlog workflow.
 
 ## Fallbacks
 
