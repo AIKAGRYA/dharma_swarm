@@ -1622,12 +1622,24 @@ async def _publish_a2a_messages_async(
         await nc.close()
 
 
+async def _publish_a2a_messages_with_deadline(
+    config: NATSConfig,
+    messages: list[dict[str, Any]],
+    timeout_s: float,
+) -> list[dict[str, Any]]:
+    overall_timeout_s = timeout_s * max(len(messages) + 2, 2)
+    return await asyncio.wait_for(
+        _publish_a2a_messages_async(config, messages, timeout_s),
+        timeout=overall_timeout_s,
+    )
+
+
 def default_a2a_nats_publisher(
     config: NATSConfig,
     messages: list[dict[str, Any]],
     timeout_s: float,
 ) -> list[dict[str, Any]]:
-    return asyncio.run(_publish_a2a_messages_async(config, messages, timeout_s))
+    return asyncio.run(_publish_a2a_messages_with_deadline(config, messages, timeout_s))
 
 
 A2ANatsPublisher = Callable[[NATSConfig, list[dict[str, Any]], float], list[dict[str, Any]]]
