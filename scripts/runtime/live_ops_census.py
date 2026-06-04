@@ -118,6 +118,41 @@ PORTS: dict[str, int] = {
     "dashboard_web": 3420,
 }
 
+LIVE_OPS_STATES: tuple[str, ...] = (
+    "healthy",
+    "quiet_expected",
+    "stopped_unexpected",
+    "stale",
+    "blocked",
+    "degraded",
+    "orphaned",
+    "respawned",
+    "mirror_only",
+    "projection_only",
+    "unknown",
+)
+
+AUTHORITY_TIERS: tuple[str, ...] = (
+    "declared_intent",
+    "direct_probe",
+    "receipt_backed",
+    "ack_backed",
+    "domain_receipted",
+    "mirror_only",
+    "human_required",
+)
+
+ACK_TIERS: tuple[str, ...] = (
+    "NONE",
+    "PORT_OPEN_ONLY",
+    "MIRROR_ONLY",
+    "RECEIPT_FILE_PRESENT",
+    "PUBLISH_ACCEPTED",
+    "DELIVERED_TO_CONSUMER",
+    "HANDLER_ACKED",
+    "DOMAIN_RECEIPTED",
+)
+
 
 def utc_now() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
@@ -263,6 +298,89 @@ def _freshest_existing(paths: list[Path | None]) -> Path | None:
     return max(existing, key=lambda path: path.stat().st_mtime)
 
 
+def _freshness_state(freshness: str, freshness_ttl_s: int) -> str:
+    if not freshness:
+        return "unknown"
+    age = _age_hours(freshness)
+    if age is None:
+        return "unknown"
+    return "stale" if age * 3600 > freshness_ttl_s else "fresh"
+
+
+def _authority_tier(
+    *,
+    surface_class: str,
+    status: str,
+    desired_state: str,
+    ack_tier: str,
+    human_authority_required: bool,
+    has_direct_probe: bool,
+) -> str:
+    if human_authority_required:
+        return "human_required"
+    if surface_class == "evidence" and "mirror" in desired_state:
+        return "mirror_only"
+    if ack_tier == "DOMAIN_RECEIPTED":
+        return "domain_receipted"
+    if ack_tier in {"DELIVERED_TO_CONSUMER", "HANDLER_ACKED"}:
+        return "ack_backed"
+    if ack_tier in {"PUBLISH_ACCEPTED", "RECEIPT_FILE_PRESENT"}:
+        return "receipt_backed"
+    if has_direct_probe or status == "live":
+        return "direct_probe"
+    return "declared_intent"
+
+
+def _operator_action_policy(surface_class: str, human_authority_required: bool) -> str:
+    if human_authority_required:
+        return "human_required_proposal_only"
+    if surface_class == "terminal":
+        return "terminal_persistence_only"
+    if surface_class == "evidence":
+        return "observe_only"
+    return "proposal_only"
+
+
+def _live_ops_state(
+    *,
+    surface_id: str,
+    surface_class: str,
+    status: str,
+    desired_state: str,
+    priority: str,
+    ack_tier: str,
+    freshness_state: str,
+) -> tuple[str, str]:
+    if surface_class == "evidence" and "mirror" in desired_state:
+        return "mirror_only", "filesystem mirror is evidence, not live-contact authority"
+    if surface_id == "transport.nats" and status == "live" and ack_tier not in {"HANDLER_ACKED", "DOMAIN_RECEIPTED"}:
+        return "degraded", "port/process evidence only; hot-contact ack not proven"
+    if surface_class == "evidence" and status == "live" and ack_tier not in {
+        "HANDLER_ACKED",
+        "DOMAIN_RECEIPTED",
+        "PUBLISH_ACCEPTED",
+        "DELIVERED_TO_CONSUMER",
+    }:
+        return "projection_only", "receipt/log file exists but handler/domain ack tier is not proven"
+    if freshness_state == "stale" and status == "live" and surface_class in {"mission", "remote", "revenue", "evidence"}:
+        return "stale", "latest evidence is older than the surface TTL"
+    if status == "live":
+        return "healthy", "direct observation matches desired live state"
+    if status == "blocked":
+        return "blocked", "surface is intentionally blocked pending authority or inputs"
+    if status == "stale":
+        return "stale", "latest evidence is stale"
+    if status == "degraded":
+        return "degraded", "surface is partially available or below expected proof tier"
+    if status == "stopped":
+        if desired_state.startswith("optional") or desired_state in {"operator-choice", "evidence-mirror-not-authority"}:
+            return "quiet_expected", "surface is optional or operator-choice and is currently quiet"
+        if priority == "p0" or desired_state in {"live", "supervised", "operator-mediated"}:
+            return "stopped_unexpected", "surface is expected live/supervised but no process or port was observed"
+        return "quiet_expected", "surface is not required to be live right now"
+    return "unknown", "insufficient evidence to classify lifecycle state"
+
+
 def _surface(
     *,
     surface_id: str,
@@ -283,14 +401,65 @@ def _surface(
     human_authority_required: bool = False,
     vps_candidate: bool = False,
     raw: dict[str, Any] | None = None,
+    state: str = "",
+    state_reason: str = "",
+    authority_tier: str = "",
+    freshness_ttl_s: int = 86400,
+    freshness_state: str = "",
+    last_observed_at: str = "",
+    last_success_at: str = "",
+    last_failure_at: str = "",
+    ack_tier: str = "NONE",
+    receipt_ref: str = "",
+    source_commit: str = "",
+    dirty_count: int | None = None,
+    operator_action_policy: str = "",
 ) -> dict[str, Any]:
     proc_rows = processes.get(process_key, []) if process_key and processes else []
     port = ports.get(process_key, {}) if process_key and ports else {}
+    has_direct_probe = bool(proc_rows or port.get("listening"))
+    freshness_state = freshness_state or _freshness_state(freshness, freshness_ttl_s)
+    state, derived_reason = (state, state_reason) if state else _live_ops_state(
+        surface_id=surface_id,
+        surface_class=surface_class,
+        status=status,
+        desired_state=desired_state,
+        priority=priority,
+        ack_tier=ack_tier,
+        freshness_state=freshness_state,
+    )
+    authority_tier = authority_tier or _authority_tier(
+        surface_class=surface_class,
+        status=status,
+        desired_state=desired_state,
+        ack_tier=ack_tier,
+        human_authority_required=human_authority_required,
+        has_direct_probe=has_direct_probe,
+    )
+    operator_action_policy = operator_action_policy or _operator_action_policy(surface_class, human_authority_required)
+    last_observed_at = last_observed_at or freshness
+    if not last_success_at and status == "live":
+        last_success_at = last_observed_at
+    if not last_failure_at and status in {"blocked", "stale", "degraded", "stopped"}:
+        last_failure_at = last_observed_at
     return {
         "id": surface_id,
         "label": label,
         "class": surface_class,
         "status": status,
+        "state": state,
+        "state_reason": state_reason or derived_reason,
+        "authority_tier": authority_tier,
+        "freshness_ttl_s": freshness_ttl_s,
+        "freshness_state": freshness_state,
+        "last_observed_at": last_observed_at,
+        "last_success_at": last_success_at,
+        "last_failure_at": last_failure_at,
+        "ack_tier": ack_tier,
+        "receipt_ref": receipt_ref,
+        "source_commit": source_commit,
+        "dirty_count": dirty_count,
+        "operator_action_policy": operator_action_policy,
         "desired_state": desired_state,
         "priority": priority,
         "freshness": freshness,
@@ -328,6 +497,8 @@ def build_live_ops_census(
     processes = processes if processes is not None else _process_snapshot(run_probes)
     ports = ports if ports is not None else _port_snapshot(run_probes)
     tmux = _tmux_sessions(run_probes)
+    generated_at = utc_now()
+    git_boundary = _git_boundary(root)
 
     forge_heartbeat = state / "forge_reality_arena_master" / "codex_overnight_heartbeat.json"
     forge_handoff = state / "forge_reality_arena_master" / "shared" / "codex_overnight_handoff.md"
@@ -422,6 +593,7 @@ def build_live_ops_census(
             process_key="nats",
             processes=processes,
             ports=ports,
+            ack_tier="PORT_OPEN_ONLY" if _live_if_process_or_port("nats", processes, ports) == "live" else "NONE",
             restart_command="make onboard  # verify; launcher is persistent layer owned",
             stop_policy="do-not-stop-if-A2A-needed",
         ),
@@ -456,6 +628,8 @@ def build_live_ops_census(
             authority_refs=["docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md"],
             priority="p1",
             freshness=_iso_mtime(latest_a2a_receipt or latest_a2a_message or a2a_queue),
+            ack_tier="MIRROR_ONLY",
+            receipt_ref=str(latest_a2a_receipt or latest_a2a_message or a2a_queue or ""),
             stop_policy="mirror-only; do not treat as live-contact authority",
             next_action="inspect NATS ack receipts for live-contact proof",
             raw={
@@ -481,6 +655,8 @@ def build_live_ops_census(
             authority_refs=["docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md"],
             priority="p0",
             freshness=_iso_mtime(freshest_nats_evidence or nats_log),
+            ack_tier="RECEIPT_FILE_PRESENT" if freshest_nats_evidence else "NONE",
+            receipt_ref=str(freshest_nats_evidence or ""),
             stop_policy="receipt-only; NATS process lifecycle remains operator-controlled",
             next_action="verify ack tier before claiming live contact",
             raw={
@@ -643,18 +819,24 @@ def build_live_ops_census(
             human_authority_required=True,
         ),
     ]
+    for surface in surfaces:
+        surface["last_observed_at"] = surface.get("last_observed_at") or surface.get("freshness") or generated_at
+        surface["source_commit"] = surface.get("source_commit") or git_boundary.get("head", "")
+        surface["dirty_count"] = git_boundary.get("dirty_count", 0) if surface.get("dirty_count") is None else surface["dirty_count"]
 
     counts = Counter(surface["status"] for surface in surfaces)
+    state_counts = Counter(surface["state"] for surface in surfaces)
     return {
         "schema_version": "live_ops_census.v1",
-        "generated_at": utc_now(),
+        "generated_at": generated_at,
         "repo_root": str(root),
         "state_root": str(state),
-        "git": _git_boundary(root),
+        "git": git_boundary,
         "authority_sources": sources,
         "summary": {
             "total": len(surfaces),
             "by_status": dict(sorted(counts.items())),
+            "by_state": dict(sorted(state_counts.items())),
             "human_authority_required": sum(1 for item in surfaces if item["human_authority_required"]),
             "vps_candidates": sum(1 for item in surfaces if item["vps_candidate"]),
         },

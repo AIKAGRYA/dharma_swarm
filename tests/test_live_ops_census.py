@@ -84,13 +84,22 @@ def test_live_ops_census_folds_in_canonical_sources(tmp_path: Path) -> None:
     surfaces = {surface["id"]: surface for surface in payload["surfaces"]}
     assert surfaces["substrate.dharma_daemon"]["status"] == "live"
     assert surfaces["transport.nats"]["status"] == "live"
+    assert surfaces["transport.nats"]["state"] == "degraded"
+    assert surfaces["transport.nats"]["authority_tier"] == "direct_probe"
+    assert surfaces["transport.nats"]["ack_tier"] == "PORT_OPEN_ONLY"
     assert surfaces["evidence.a2a_mirrors"]["status"] == "live"
+    assert surfaces["evidence.a2a_mirrors"]["state"] == "mirror_only"
+    assert surfaces["evidence.a2a_mirrors"]["authority_tier"] == "mirror_only"
     assert surfaces["evidence.a2a_mirrors"]["desired_state"] == "evidence-mirror-not-authority"
     assert surfaces["evidence.nats_receipts"]["status"] == "live"
+    assert surfaces["evidence.nats_receipts"]["state"] == "projection_only"
+    assert surfaces["evidence.nats_receipts"]["authority_tier"] == "receipt_backed"
     assert surfaces["evidence.nats_receipts"]["desired_state"] == "ack-receipt-evidence"
     assert surfaces["evidence.nats_receipts"]["raw"]["nats_live_receipt_exists"] is True
     assert surfaces["dashboard.local"]["status"] == "live"
     assert surfaces["revenue.cashclaw_gate"]["status"] == "blocked"
+    assert surfaces["revenue.cashclaw_gate"]["state"] == "blocked"
+    assert surfaces["revenue.cashclaw_gate"]["authority_tier"] == "human_required"
     assert surfaces["revenue.cashclaw_gate"]["human_authority_required"] is True
 
 
@@ -106,6 +115,19 @@ def test_live_ops_census_surface_contract_is_complete(tmp_path: Path) -> None:
         "label",
         "class",
         "status",
+        "state",
+        "state_reason",
+        "authority_tier",
+        "freshness_ttl_s",
+        "freshness_state",
+        "last_observed_at",
+        "last_success_at",
+        "last_failure_at",
+        "ack_tier",
+        "receipt_ref",
+        "source_commit",
+        "dirty_count",
+        "operator_action_policy",
         "desired_state",
         "priority",
         "evidence",
@@ -121,6 +143,14 @@ def test_live_ops_census_surface_contract_is_complete(tmp_path: Path) -> None:
     assert payload["summary"]["total"] == len(surfaces) == 15
     for surface in surfaces:
         assert required <= set(surface)
+        assert surface["state"]
+        assert surface["state_reason"]
+        assert surface["authority_tier"]
+        assert surface["freshness_state"] in {"fresh", "stale", "unknown"}
+        assert isinstance(surface["freshness_ttl_s"], int)
+        assert isinstance(surface["last_observed_at"], str)
+        assert isinstance(surface["dirty_count"], int)
+        assert isinstance(surface["operator_action_policy"], str)
         assert isinstance(surface["evidence"], list)
         assert isinstance(surface["authority_refs"], list)
         assert surface["authority_refs"], surface["id"]
@@ -141,6 +171,7 @@ def test_live_ops_census_surface_contract_is_complete(tmp_path: Path) -> None:
         "load.colima_openclaw",
     } <= human_authority_ids
     assert payload["summary"]["human_authority_required"] == len(human_authority_ids)
+    assert sum(payload["summary"]["by_state"].values()) == len(surfaces)
 
 
 def test_live_ops_census_projects_into_control_surface_rows(tmp_path: Path) -> None:
@@ -153,6 +184,11 @@ def test_live_ops_census_projects_into_control_surface_rows(tmp_path: Path) -> N
                 "label": "Revenue / CashClaw gate",
                 "class": "revenue",
                 "status": "blocked",
+                "state": "blocked",
+                "authority_tier": "human_required",
+                "freshness_state": "unknown",
+                "ack_tier": "NONE",
+                "operator_action_policy": "human_required_proposal_only",
                 "desired_state": "blocked-until-operator-approval",
                 "priority": "p0",
                 "evidence": ["state/revenue_wedge_last_state.json"],
@@ -172,6 +208,9 @@ def test_live_ops_census_projects_into_control_surface_rows(tmp_path: Path) -> N
     assert row.id == "live_ops.revenue.cashclaw_gate"
     assert row.kind == "fleet"
     assert row.coherence_state == "drifted"
+    assert row.observed_state == "blocked"
+    assert "live_ops_state:blocked" in row.gap_codes
+    assert "authority_tier:human_required" in row.gap_codes
     assert "human_authority_required" in row.gap_codes
     assert any(ref.path == "docs/governance/ACTIVE_TRACK.yaml" for ref in row.source_refs)
 
@@ -190,6 +229,11 @@ def test_live_ops_rows_preserve_operator_contract_fields(tmp_path: Path) -> None
                 "label": "AGNI remote watcher / trading",
                 "class": "remote",
                 "status": "stale",
+                "state": "stale",
+                "authority_tier": "human_required",
+                "freshness_state": "stale",
+                "ack_tier": "NONE",
+                "operator_action_policy": "human_required_proposal_only",
                 "desired_state": "remote-observed-or-blocked",
                 "priority": "p0",
                 "evidence": ["remote_nodes/agni/kaizen_agni_latest.json"],
@@ -206,6 +250,11 @@ def test_live_ops_rows_preserve_operator_contract_fields(tmp_path: Path) -> None
                 "label": "Colima / OpenClaw VM",
                 "class": "heavy",
                 "status": "live",
+                "state": "healthy",
+                "authority_tier": "human_required",
+                "freshness_state": "unknown",
+                "ack_tier": "NONE",
+                "operator_action_policy": "human_required_proposal_only",
                 "desired_state": "operator-choice",
                 "priority": "p2",
                 "evidence": ["colima-openclaw-secure"],
@@ -235,7 +284,7 @@ def test_live_ops_rows_preserve_operator_contract_fields(tmp_path: Path) -> None
     assert any(ev.source == "remote_nodes/agni/kaizen_agni_latest.json" for ev in agni.evidence)
 
     colima = rows["live_ops.load.colima_openclaw"]
-    assert colima.observed_state == "live"
+    assert colima.observed_state == "healthy"
     assert "heavy_local_load" in colima.gap_codes
     assert "human_authority_required" in colima.gap_codes
     assert colima.raw["restart_command"] == "colima start openclaw-secure"

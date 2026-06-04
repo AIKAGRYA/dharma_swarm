@@ -57,11 +57,14 @@ def _live_ops_census_payload(repo_root: Path | None = None) -> dict[str, Any]:
 
 def _live_ops_coherence(surface: dict[str, Any]) -> str:
     status = str(surface.get("status") or "unknown")
+    state = str(surface.get("state") or status)
     priority = str(surface.get("priority") or "unknown")
-    if status == "live":
+    if state == "healthy":
         return "bound"
-    if status in {"blocked", "stale"}:
+    if state in {"blocked", "stale", "stopped_unexpected", "degraded", "orphaned"}:
         return "drifted"
+    if state in {"quiet_expected", "mirror_only", "projection_only"}:
+        return "partial"
     if status == "stopped":
         return "drifted" if priority == "p0" else "partial"
     if status == "unknown":
@@ -78,8 +81,22 @@ def _rows_from_live_ops_census(
     for surface in payload.get("surfaces", []):
         sid = str(surface.get("id") or "unknown")
         status = str(surface.get("status") or "unknown")
+        state = str(surface.get("state") or status)
+        authority_tier = str(surface.get("authority_tier") or "declared_intent")
+        freshness_state = str(surface.get("freshness_state") or "unknown")
+        ack_tier = str(surface.get("ack_tier") or "NONE")
+        operator_action_policy = str(surface.get("operator_action_policy") or "proposal_only")
         gap_codes = [f"live_ops_status:{status}"]
-        if status != "live":
+        gap_codes.extend(
+            [
+                f"live_ops_state:{state}",
+                f"authority_tier:{authority_tier}",
+                f"freshness_state:{freshness_state}",
+                f"ack_tier:{ack_tier}",
+                f"operator_action_policy:{operator_action_policy}",
+            ]
+        )
+        if state != "healthy":
             gap_codes.append("live_ops_not_live")
         if surface.get("human_authority_required"):
             gap_codes.append("human_authority_required")
@@ -95,7 +112,7 @@ def _rows_from_live_ops_census(
             authority_role="observed_authority",
             declared_state=str(surface.get("desired_state") or ""),
             desired_state=str(surface.get("desired_state") or ""),
-            observed_state=status,
+            observed_state=state,
             coherence_state=_live_ops_coherence(surface),
             priority=str(surface.get("priority") or "unknown"),
             owner_module="scripts/runtime/live_ops_census.py",
