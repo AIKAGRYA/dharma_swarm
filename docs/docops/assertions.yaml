@@ -211,7 +211,7 @@
       "docs/state/CROSS_AGENT_INVENTORY.md",
       "docs/research/RUNTIME_TRUTH_SPINE_COMPLETION_PLAN.md",
       "docs/research/VERIFIED_EXPERIMENT_LOOP_RFC.md",
-      "docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md"
+      "docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md",
       "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md",
       "docs/ops/LIVE_OPS_COCKPIT.md",
       "docs/ops/LIVE_OPS_COCKPIT_PR_PACKET.md",
