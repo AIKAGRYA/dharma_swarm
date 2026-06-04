@@ -208,7 +208,8 @@
       "docs/agent_tasks/hermes_review_perplexity_computer_2026-05-30.md",
       "docs/state/NEXT_PHASE_MAP.md",
       "docs/state/HOTLIST.md",
-      "docs/state/CROSS_AGENT_INVENTORY.md"
+      "docs/state/CROSS_AGENT_INVENTORY.md",
+      "docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md"
     ]
   },
   "auto_sections": {
