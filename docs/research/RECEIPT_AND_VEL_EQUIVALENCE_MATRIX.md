@@ -1,20 +1,42 @@
 # Receipt & Experiment Loop Concept Equivalence Matrix
 
-> **Binding, docs-only reconciliation.** This document decides which existing repo object *owns* each Spine / Verified Experiment Loop (VEL) concept, so that no parallel systems are created. It implements no code, no persistence, no migrations, and changes no runtime behavior. It is the precondition gate for any further Spine-adoption or VEL code work.
->
-> Scope locks: no runtime code, no persistence implementation, no A2A default routing, no changes to `orchestrator.py` / `agent_runner.py` / `swarm.py`, no Spark Ingestor expansion, no Ontology refactor, no VEL runtime, no migrations, no dependencies.
->
-> Evidence base: `main` @ HEAD `3e46109` (PR #449 merge) + open PR branches `devin/1780548631-spine-a2a-adoption` (#469), `devin/1780551922-spine-a2a-hardening` (#470), `docs/runtime-truth-spine-plan-and-vel-rfc` (#468). Companion audit: `REPO_WIDE_WHEEL_REINVENTION_AUDIT.md`.
+> Canonical reconciliation doc (PR #471). Folds in the stronger content independently produced in PR #472 (Devin). All cited symbols verified against the codebase; the `benchmark_registry` reference was corrected from `BenchmarkEntry` to the actual `Benchmark` / `BenchmarkRegistry` (`benchmark_registry.py:27,37`).
+
+**Date:** 2026-06-04
+**Author:** Reconciliation audit (PR #471), folding in PR #472 (Devin), commissioned by @AmitabhainArunachala
+**Status:** BINDING — this document constrains future implementation choices
+**Doc type:** `ADR` — accepted decision record
+**Subordinate to:** `docs/governance/CANONICAL_DOC_STACK.md`, `CLAUDE.md`
+**Context:** Two independent audits (wheel-reinvention audit + Perplexity review)
+confirmed that PRs #469/#470 add a real missing seam, but also identified
+serious overlap between proposed VEL objects and existing repo systems.
+This matrix resolves every overlap with a binding reuse decision.
 
 ---
 
 ## 1. Executive Decision
 
-**#469/#470 are real missing dispatch/evidence-seam work — but all further persistence and object work must reuse existing systems.**
+**Are #469/#470 real missing-seam work or reinvention?**
 
-Verified on `main`: `spine.invoke_agent()` has zero non-test runtime callers, `persist_receipt()` / `ensure_receipt_column()` have zero callers, and the only runtime `EvidenceReceipt(...)` constructor is a *different* class in `operator_core/closure_v0.py`. So the spine dispatch+evidence layer was type-complete but unwired, and PR #469's opt-in `a2a_bridge.submit_via_spine()` is the first real `invoke_agent()` dispatch path that emits exactly one spine `EvidenceReceipt` (tested). PR #470's `spine_bypass_report.py` is likewise genuinely new (no pre-existing spine bypass guard). **That seam is not reinvention — keep it.**
+They are **real missing dispatch/evidence seam work**. Before PR #469, zero
+production code emitted `spine.EvidenceReceipt`. Before PR #469, zero
+production code called `invoke_agent()`. Before PR #470, zero bypass
+detection existed.
 
-However, the repo already contains the *persistence* and *object* substrate the VEL would otherwise re-derive: an append-only `runtime_state.RuntimeReceipt` ledger with an `IdempotencyRecord` exactly-once primitive and identity-derived writers; an append-only `experiment_log.ExperimentRecord`; a Merkle-chained `EvolutionArchive`; a full `decision_ontology.DecisionRecord`/`DecisionLog`; a memory-kernel promotion pipeline ending in `MemoryKernelReviewedCanonicalReceipt`; and — closest of all — `recursive_discovery.py`, a registered shadow Verified Experiment Loop. **Therefore: the dispatch seam continues; new persistence and new objects are frozen until they are expressed as reuse/extension of these owners (decided below).**
+However, **further persistence/object work must reuse existing systems**.
+The RFC (PR #468) proposes 10 new data objects. Eight of them have direct
+existing equivalents. Building them as new classes would reinvent
+infrastructure. This matrix binds each concept to its existing owner.
+
+**Facts established:**
+
+| Fact | Evidence |
+|---|---|
+| `invoke_agent()` had 0 production callers before PR #469 | `grep invoke_agent dharma_swarm/` — only spine/invoke.py definition and tests |
+| `persist_receipt()` has 0 production callers today | `grep persist_receipt dharma_swarm/` — only spine/persistence.py:50 definition |
+| `delegation_runs.receipt_json` column is already migrated in runtime_state.py | `runtime_state.py:424,467` — added via `ALTER TABLE` migration |
+| 5 distinct receipt families exist across 5 layers | See §3 Receipt Taxonomy |
+| `recursive_discovery.py` is the closest existing VEL prototype | 6 receipt subtypes covering limitation→eval→candidate→experiment→witness→promote |
 
 ---
 
@@ -22,104 +44,225 @@ However, the repo already contains the *persistence* and *object* substrate the 
 
 | VEL / Spine concept | Existing owner | Path | Reuse strategy | Do not create |
 |---|---|---|---|---|
-| **BetCard** | `Hypothesis` (+ `_RESEARCH_THREAD` ontology type) | `dharma_swarm/self_research.py:24`; `dharma_swarm/ontology.py:1190` | Extend `Hypothesis` with `success_criteria` / `kill_criteria` / budget ref; register the extension as `TypeStatus.EXPERIMENTAL` | A standalone `BetCard` Pydantic class or table |
-| **Experiment** | `ExperimentRecord` / `ExperimentLog` (append-only JSONL) | `dharma_swarm/experiment_log.py:16-88` | Add `held_out_eval_ref` + spine `correlation_id`/`trace_id` link fields to `ExperimentRecord` | A 4th `Experiment` class or a new experiment store |
-| **EvidenceReceipt** (dispatch proof) | `spine.receipt.EvidenceReceipt` | `dharma_swarm/spine/receipt.py:37` | This **is** the canonical dispatch-attempt artifact; VEL consumes it, links via `attributes["dharma.attr.*"]` | A subclass/fork of it; a fifth receipt class |
-| **RuntimeReceipt** (persisted runtime proof) | `runtime_state.RuntimeReceipt` + writers | `dharma_swarm/runtime_state.py:632`, `record_runtime_receipt` `:2915`, `record_receipt_for_identity` `:2398` | This **is** the canonical *persisted* receipt; spine receipts bridge into it (see §4) | A second persisted-receipt table/path |
-| **SwarmRun** | `DelegationRun` (run ledger) | `dharma_swarm/runtime_state.py:510` | Projection/aggregation over `DelegationRun` + child receipts; no materialized object | A new run table or run-ledger system |
-| **EvolutionCandidate** | `ArchiveEntry` / `EvolutionArchive` (+ `FitnessScore`) | `dharma_swarm/archive.py:135-289` | Store winners **and** losers in the existing MAP-Elites archive; reuse `FitnessScore` (9-dim) | A 7th "candidate" notion or a new candidate store |
-| **BenchmarkResult** | `GradeCard` / `auto_grade` + petri-dish result models | `dharma_swarm/auto_grade/models.py:14`; `experiments/petri_dish/models.py:106`; `dharma_swarm/quality_gates.py` | Cost-normalize an existing scorecard; record held-out-set hash on the result | A new scoring framework |
-| **LineageRecord** | `MerkleLog` (+ `EvolutionArchive` Merkle chain; `sakshi/provenance_log.py`) | `dharma_swarm/merkle_log.py:18`; `archive.py:300`; `sakshi/provenance_log.py:74` | Chain VEL records through the existing Merkle log; carry `parent_id`/`prev_hash` | A 6th provenance/lineage chain |
-| **DecisionRecord** | `decision_ontology.DecisionRecord` / `DecisionLog` | `dharma_swarm/decision_ontology.py:161-485` | Link a decision to its spine receipt ids + evidence; extend if a field is missing | A new decision log (there are already ≥7 decision objects) |
-| **AgentContribution** | `cost_tracker.CostEntry` / `llm_burn.LLMUsageSpan` / per-agent receipts | `dharma_swarm/cost_tracker.py:59`; `dharma_swarm/llm_burn.py:39` | Pure projection over per-agent `EvidenceReceipt`s + cost entries | A payment/credit object (reciprocity ledger integration deferred) |
-| **WikiUpdate** | `MemoryKernelReviewedCanonicalReceipt` (memory promotion pipeline) | `dharma_swarm/memory_kernel/promotion_gate.py:80`; `knowledge_ops/memory_promotion_*.py` | A proven learning = a memory-kernel reviewed canonical receipt, gated on evidence completeness | A new wiki/atom object |
-| **Cost / token budget** | `LLMUsageSpan` (measure) + `economic_spine.AgentBudget` (enforce) + `model_registry` (price) | `dharma_swarm/llm_burn.py:39`; `economic_spine.py:74`; `model_registry.py` | Populate receipt cost/token at the provider boundary; bind `Experiment.budget` to `economic_spine` | A new cost source at the A2A layer |
-| **Trace / correlation** | Spine `trace_id` = cross-layer `correlation_id` (correlation-spine doctrine) | `dharma_swarm/spine/__init__.py`; `spine/receipt.py:90-96` | One continuous `ExecutionIdentity`; reuse one trace store | A 4th trace store |
-| **Held-out eval** | petri-dish harness + `auto_grade`/`quality_gates` scoring | `experiments/petri_dish/harness.py`; `dharma_swarm/auto_grade/`; `quality_gates.py` | Reuse harness + scorers; **new** human-seeded sealed set stored **outside agent-readable repo paths**, versioned + hashed | Use of the embedded petri answer-key as "held-out" (it is in source) |
-| **Promotion gate** | `tollbooth` + `CanaryDecision` + `PromotionState`/`EvidenceTier` enums | `dharma_swarm/spine/tollbooth.py`; `canary.py:23`; `execution_profile.py:13-23` | Fail-closed `require_execution_tollbooth` + existing canary/quality gates; reuse the enums | A new promotion state machine |
+| BetCard | `Hypothesis` | `self_research.py:24` | Extend `Hypothesis` with `lifecycle_state`, `kill_criteria`, `spine_trace_id`, `experiment_ids`. Register as EXPERIMENTAL ontology type. | Standalone `BetCard` class |
+| Experiment | `ExperimentRecord` | `experiment_log.py:16` | Extend `ExperimentRecord` with `receipt_id`, `baseline_config`, `candidate_config`, `delta`, `confidence`, `budget_per_arm_tokens`. Write to existing `experiments.jsonl`. | New experiment store or class |
+| EvidenceReceipt (dispatch) | `spine.EvidenceReceipt` | `spine/receipt.py:37` | Already exists. This IS the dispatch proof. No extension needed. | Any dispatch-layer receipt |
+| EvidenceReceipt (closure) | `closure_v0.EvidenceReceipt` | `operator_core/closure_v0.py:63` | Keep as closure-layer receipt per correlation_spine doctrine. | Merging closure receipt into spine receipt |
+| RuntimeReceipt | `RuntimeReceipt` | `runtime_state.py:632` | Keep as canonical persisted runtime receipt. Bridge from spine receipt via `adapters.runtime_receipt_kwargs()`. | New runtime-level receipt |
+| SwarmRun | `DelegationRun` | `runtime_state.py:510` | Use `DelegationRun`. Persist receipt via `delegation_runs.receipt_json` column (already migrated). | Standalone `SwarmRun` class |
+| EvolutionCandidate | `ArchiveEntry` | `archive.py:135` | Use `ArchiveEntry`. Already has `fitness`, `parent_id`, `merkle_root`, `promotion_state`, `evidence_tier`. | Standalone `EvolutionCandidate` class |
+| BenchmarkResult | `GradeCard` | `auto_grade/models.py:14` | Use `GradeCard` for per-task quality. Use `Benchmark` from `benchmark_registry.py:27` for regression tracking. | Standalone `BenchmarkResult` class |
+| LineageRecord | `MerkleLog` + `ProvenanceChain` | `merkle_log.py:18`, `lineage.py:93` | Append receipt data to existing `MerkleLog`. Use `lineage.py` for DAG queries. | Standalone `LineageRecord` class |
+| DecisionRecord | `DecisionRecord` | `decision_ontology.py:161` | Use existing `DecisionRecord` for high-stakes experiment decisions. Use `CanaryDecision` enum for simple promote/rollback/defer. | New `DecisionRecord` class (same name, different module — collision) |
+| AgentContribution | `AgentScore` | `evaluator.py:252` | Use `AgentScore` (already has `runs`, `mean_quality`, `mean_efficiency`, `mean_latency`). | Standalone `AgentContribution` class |
+| WikiUpdate | `MemoryKernelPromotionDecision` | `promotion_gate.py:60` | Reuse 6-gate promotion pattern. | New wiki update class or promotion pipeline |
+| Cost/token budget | `CostEntry` / `log_cost()` | `cost_tracker.py:59,71` | Bridge `CostEntry` fields to `EvidenceReceipt` fields. `cost_tracker.py` remains budget source of truth. | New cost tracking system |
+| Trace/correlation | `CorrelationContext` | `correlation_context.py:53` | Spine reads `trace_id`/`proposal_id` from `CorrelationContext`. Continue using contextvars propagation. | New correlation mechanism |
+| Held-out eval | None exists | — | Must be built from scratch. Task IDs/metadata/rubrics in repo; full payloads + expected answers sealed outside agent-readable paths. | Agent-readable held-out task payloads |
+| Promotion gate | `CanaryDeployer` + `MemoryKernelPromotionDecision` pattern | `canary.py:70`, `promotion_gate.py:60` | Extend canary with receipt-linked evidence. Apply 6-gate pattern from memory kernel. | New standalone promotion system |
 
 ---
 
 ## 3. Receipt Taxonomy
 
-| Receipt type | Path | Layer | Purpose | Canonical? | Relationship to `spine.EvidenceReceipt` |
-|---|---|---|---|---|---|
-| `spine.receipt.EvidenceReceipt` | `dharma_swarm/spine/receipt.py:37` | Dispatch | One artifact per `invoke_agent()` dispatch attempt; OTel GenAI export | **Yes — canonical dispatch evidence** | Itself |
-| `operator_core/closure_v0.py` `EvidenceReceipt` | `dharma_swarm/operator_core/closure_v0.py:63` | Closure / proof | Test-exit proof: `success == (test_exit_code == 0)`, replay command | **Yes — canonical closure/test proof** (different concept) | **Name collision only.** Different class, different fields. Joined to spine by shared `correlation_id`, not by type |
-| `runtime_state.RuntimeReceipt` | `dharma_swarm/runtime_state.py:632` | Persistence / ledger | Append-only persisted side-effect record; carries `idempotency_key`, `side_effect_key`, `correlation_id`/`causation_id`/`parent_run_id` | **Yes — canonical persisted runtime receipt** | **Persistence target.** Spine `EvidenceReceipt` should be bridged into a `RuntimeReceipt` row (§4) |
-| `recursive_discovery.py` receipt family (`RecursiveReceipt`, `LimitationReceipt`, `GeneratedEvalReceipt`, `CandidateDiffReceipt`, `ExperimentResultReceipt`, `WitnessVerdictReceipt`, `PromotionDecisionReceipt`) | `dharma_swarm/recursive_discovery.py:78-160` | Shadow experiment loop | Records the full bet→eval→candidate→experiment→witness→promotion chain; content-hashed; recorded to EventLog + `evaluation_registry` artifact/fact stores | **Yes — canonical shadow experiment-loop proof** | **Closest VEL twin.** Its lifecycle should be the VEL lifecycle; each step should carry/reference a spine `EvidenceReceipt` once joined (§5) |
-| `MemoryKernelReviewedCanonicalReceipt` | `dharma_swarm/memory_kernel/promotion_gate.py:80` | Memory promotion | Proof that a learning passed multi-gate review and was promoted to canonical memory; digest + rollback ref + `human_approved` | **Yes — canonical memory-promotion proof** | The "WikiUpdate" terminal. Written only for decisions with complete receipt chains |
-| `operator_core/go_evidence_bridge.py` `GoEvidenceReceipt` | `dharma_swarm/operator_core/go_evidence_bridge.py:26` | Go-bridge | Evidence crossing the Go/Python operator boundary | No (bridge-local) | Adapter; not a competing canonical |
+Every receipt-like object in the repo:
 
-**Answers:**
-- **Canonical dispatch evidence:** `spine.receipt.EvidenceReceipt`.
-- **Canonical persisted runtime receipt:** `runtime_state.RuntimeReceipt` (with `IdempotencyRecord` for exactly-once).
-- **Canonical closure / test proof:** `operator_core/closure_v0.py` `EvidenceReceipt` (distinct concept; resolve the name collision in docs).
-- **Canonical memory-promotion proof:** `MemoryKernelReviewedCanonicalReceipt`.
-- **Canonical shadow experiment-loop proof:** the `recursive_discovery.py` `RecursiveReceipt` family.
+| Receipt type | Path | Layer | Purpose | Canonical? | Relationship to spine.EvidenceReceipt |
+|---|---|---|---|---|---|
+| `spine.EvidenceReceipt` | `spine/receipt.py:37` | Dispatch/invocation | One receipt per `invoke_agent()` call. Provider, model, tokens, cost, latency, status, routing. 20+ fields, frozen dataclass. | **Yes — canonical dispatch evidence** | Self |
+| `closure_v0.EvidenceReceipt` | `operator_core/closure_v0.py:63` | Test/acceptance | One receipt per closure execution. Exit code, files changed, duration, replay command. 8 fields, frozen dataclass. | **Yes — canonical closure/test proof** | Peer. Same correlation_id, different layer. Correlation_spine doctrine: "Receipts may differ by closure layer. Correlation identity must not." |
+| `RuntimeReceipt` | `runtime_state.py:632` | Runtime state | Generic receipt for any runtime event. receipt_type, status, run_id, trace_id, correlation_id, idempotency_key. 13 fields, frozen dataclass. | **Yes — canonical persisted runtime receipt** | Downstream. `adapters.runtime_receipt_kwargs()` bridges spine identity to RuntimeReceipt fields. |
+| `RecursiveReceipt` (6 subtypes) | `recursive_discovery.py:78` | Shadow self-improvement | limitation, generated_eval, candidate_diff, experiment_result, witness_verdict, promotion_decision. Pydantic BaseModel with content_hash. | **Yes — canonical shadow experiment proof** | Parallel. Different purpose (self-improvement loop). Could carry `spine_trace_id` in `metadata`. |
+| `MemoryKernelReviewedCanonicalReceipt` | `promotion_gate.py:80` | Memory promotion | Proof that a knowledge atom passed 6 required gates and was human-approved. | **Yes — canonical memory promotion proof** | Independent. Different domain. |
+| `MemoryKernelWriteReceipt` | `write_receipts.py:93` | Memory write | Proof that a memory write was policy-compliant. | Yes (memory write) | Independent |
+| `MemoryKernelBurnInReceipt` | `burn_in.py:23` | Memory burn-in | Proof of bulk memory initialization. | Yes (burn-in) | Independent |
+| `MemoryPromotionReceipt` | `memory_promotion_executor.py:93` | Memory promotion exec | Execution receipt for a completed promotion. | Yes (promotion exec) | Independent |
+| `GoWorldReceipt` | `world_radar/receipt_bridge.py:41` | World radar (Go) | Go-emitted evidence for world observations. | Yes (world observation) | Independent. Cross-language bridge. |
+| `GoEvidenceReceipt` | `go_evidence_bridge.py:26` | Go evidence (general) | Generic Go evidence parsed by Python bridge. | Yes (Go layer) | Independent |
+| `GoGitHubReceipt` | `go_github_bridge.py:48` | Go GitHub ops | Go-emitted GitHub operation receipts. | Yes (Go GitHub) | Independent |
+| `OnboardingReceipt` | `roaming_onboarding.py:101` | Onboarding | Agent onboarding proof. | Domain-specific | Independent |
+| `ReceiptRef` | `board/models.py:108` | Task board | Reference pointer to a receipt (any type). | No — ref only | Points to any receipt via ID |
+| `CommandReceipt` | `recursive_discovery.py:61` | Shadow self-improvement | One command execution within recursive discovery. | Sub-receipt | Child of RecursiveReceipt |
+
+**Canonical receipt answers:**
+
+| Question | Answer | Path |
+|---|---|---|
+| Which is canonical dispatch evidence? | `spine.EvidenceReceipt` | `spine/receipt.py:37` |
+| Which is canonical persisted runtime receipt? | `RuntimeReceipt` | `runtime_state.py:632` |
+| Which is closure/test proof? | `closure_v0.EvidenceReceipt` | `closure_v0.py:63` |
+| Which is memory promotion proof? | `MemoryKernelReviewedCanonicalReceipt` | `promotion_gate.py:80` |
+| Which is shadow experiment-loop proof? | `RecursiveReceipt` (6 subtypes) | `recursive_discovery.py:78` |
 
 ---
 
 ## 4. Persistence ADR
 
-**Status: Accepted (docs-only decision). Recommendation = Option C, implemented as a B-style bridge.** No code is written here.
+**Question:** Where should `spine.EvidenceReceipt` be persisted?
 
-| Option | Pros | Cons | Exactly-once support | Append-only? | Risk of duplicate system | Recommendation |
-|---|---|---|---|---|---|---|
-| **A** — Persist `EvidenceReceipt` into `delegation_runs.receipt_json` as source of truth | Minimal change; one column; co-located with the run | `UPDATE … WHERE task_id` is last-write-wins; one receipt per task; no per-attempt history; no idempotency | **No** (overwrites) | **No** | **High** — creates a second, weaker receipt store parallel to `RuntimeReceipt` | **Reject** as source of truth |
-| **B** — Persist `EvidenceReceipt` *through* `runtime_state.RuntimeReceipt` / `IdempotencyRecord` | Reuses the canonical append-only ledger; inherits exactly-once via `idempotency_key`; identity-derived (`build_runtime_receipt` takes `ExecutionIdentity`) | Requires a field mapping (dispatch fields → `RuntimeReceipt.payload`); slightly more wiring (future) | **Yes** (`IdempotencyRecord` + `record_idempotency_consumed`) | **Yes** | **Low** | **Accept as the mechanism** |
-| **C** — `RuntimeReceipt` canonical; `delegation_runs.receipt_json` is a projection/cache only | All of B's correctness; keeps a convenient denormalized read on the run row; clear source-of-truth boundary | Two representations to keep consistent (cache invalidation discipline) | **Yes** (truth lives in `RuntimeReceipt`) | **Yes** (truth side) | **Low** (as long as the blob is documented as non-authoritative) | **Accept as the architecture** |
+### Options evaluated
 
-**Decided architecture (matches the stated default preference; repo evidence supports it):**
-- `spine.EvidenceReceipt` is the **canonical dispatch proof** (in-memory artifact of one dispatch attempt).
-- `runtime_state.RuntimeReceipt` is the **canonical persisted runtime receipt** (append-only, idempotency-keyed source of truth).
-- `spine/persistence.py` should **bridge** `EvidenceReceipt → RuntimeReceipt` (map dispatch fields into a `RuntimeReceipt` via `build_runtime_receipt(identity, receipt_type="dispatch_evidence", payload=receipt.to_dict())` and persist through `record_runtime_receipt` / identity-derived writers). Its current `UPDATE delegation_runs SET receipt_json` behavior must **not** be treated as source of truth.
-- `delegation_runs.receipt_json` may remain a **projection/cache** for convenient run-row reads, explicitly documented as non-authoritative.
+| Option | Description |
+|---|---|
+| **A** | Persist `spine.EvidenceReceipt` JSON into `delegation_runs.receipt_json` directly via `spine/persistence.py` |
+| **B** | Persist through `RuntimeReceipt` / `IdempotencyRecord` — spine receipt is converted to RuntimeReceipt, RuntimeReceipt is the persisted form |
+| **C** | `delegation_runs.receipt_json` is a projection/cache; `RuntimeReceipt` remains the canonical persisted form; spine receipt is the canonical in-flight form |
 
-Supporting evidence: `runtime_state.build_runtime_receipt(...)` already accepts an `ExecutionIdentity` and auto-fills `idempotency_key=identity.idempotency_key` (`runtime_state.py:~2369-2393`); the spine `EvidenceReceipt` is identity-derived too — so the bridge is natural, not a fork.
+### Evaluation
+
+| Criterion | Option A | Option B | Option C |
+|---|---|---|---|
+| **Exactly-once support** | Weak — `UPDATE … SET receipt_json = ?` is idempotent (overwrites), not exactly-once. Would need `WHERE receipt_json IS NULL`. | Strong — `IdempotencyRecord` already tracks side-effect keys and prevents re-execution (`runtime_state.py:650`). | Strong — inherits from RuntimeReceipt's existing persistence guarantees. |
+| **Append-only?** | No — UPDATE overwrites. | Yes — RuntimeReceipt is INSERT-based via `INSERT … ON CONFLICT DO UPDATE`. | Yes — RuntimeReceipt path is append-friendly. Cache can be written once. |
+| **Risk of duplicate system** | Medium — creates a second persistence path alongside RuntimeReceipt. Two writers to `delegation_runs`. | Low — uses existing RuntimeReceipt path. Spine receipt is ephemeral/in-flight only. | **Lowest** — clear separation: spine owns in-flight evidence, RuntimeReceipt owns persistence, receipt_json is a convenience projection. |
+| **Query ergonomics** | Good — receipt_json is in the same row as run_id/task_id. | OK — RuntimeReceipt has payload dict but no typed fields for provider/model/tokens. | Good — receipt_json provides rich query surface; RuntimeReceipt provides persistence guarantees. |
+| **Implementation complexity** | Low — `spine/persistence.py` already written (6 lines). | Medium — need to extend `adapters.runtime_receipt_kwargs()` to carry full receipt JSON in payload. | Medium — need both RuntimeReceipt write + receipt_json projection, but each is simple. |
+
+### Decision
+
+**Option C — recommended.**
+
+Rationale:
+1. `spine.EvidenceReceipt` is the canonical in-flight dispatch proof. It is rich (20+ typed fields) and frozen.
+2. `RuntimeReceipt` is the canonical persisted runtime receipt. It is generic (payload dict) and already has exactly-once guarantees via `IdempotencyRecord`.
+3. `delegation_runs.receipt_json` is a projection/cache column (already migrated in `runtime_state.py:424,467`) that stores the full spine receipt JSON for query convenience.
+4. The bridge already exists: `adapters.runtime_receipt_kwargs()` converts spine identity to RuntimeReceipt fields. Extend it to also carry `receipt_json` in the payload.
+5. This avoids creating a second persistence writer — the existing `DurableRuntimeState` methods handle the actual SQLite write.
+
+**Persistence flow:**
+
+```
+invoke_agent() → EvidenceReceipt (in-flight, frozen)
+    ↓
+adapters.runtime_receipt_kwargs(receipt) → RuntimeReceipt fields + payload.receipt_json
+    ↓
+DurableRuntimeState.record_delegation_run(..., receipt_json=...) → delegation_runs row
+```
+
+**What not to do:**
+- Do not call `spine/persistence.py:persist_receipt()` directly from `submit_via_spine()`. Instead, let the existing `DurableRuntimeState` write flow handle it.
+- Do not create a second writer to `delegation_runs`. The existing async/sync write methods in `runtime_state.py:1608,1897` are the only writers.
 
 ---
 
 ## 5. Recursive Discovery Reconciliation
 
-**Decision: `recursive_discovery.py` is a *registered shadow prototype to graduate (extend), not deprecate*. The VEL should extend it; it should not be superseded by a parallel loop.**
+`recursive_discovery.py` (329 lines) is the closest existing prototype of the
+Verified Experiment Loop. It defines a complete shadow-mode pipeline:
 
-Findings (fact): it is not orphaned. It is recorded through `evaluation_registry.record_recursive_discovery_receipt()` (persists to artifact + memory-fact stores, `evaluation_registry.py:590-726`) and is a registered control surface observed in `operator_core/control_surface.py` (`:277-560`). It is explicitly shadow-only by design (records evidence + recommendations, never applies diffs). It already carries content-hash integrity, `parent_id`/`candidate_id` lineage, `cost_usd`, witness verdicts, and rollback pointers.
+```
+limitation → generated_eval → candidate_diff → experiment_result → witness_verdict → promotion_decision
+```
 
-- **Is it a prototype to graduate?** **Yes.** It is the most complete existing expression of the VEL lifecycle.
-- **Is it a shadow-only parallel loop to deprecate?** **No** — it is wired into evaluation_registry + control_surface; deprecating it would discard working, registered evidence plumbing.
-- **Should VEL extend it?** **Yes** — adopt its receipt taxonomy and recorder as the VEL's lifecycle backbone.
-- **Should VEL supersede it?** **No** — superseding would re-derive the same chain under new names.
-- **What to reuse:** the `RecursiveReceipt` family + `content_hash()` + `RecursiveDiscoveryRecorder` + the `evaluation_registry` recording path; the shadow-only/human-promotion discipline.
-- **What not to reuse:** do not keep it as a *separate* identity/correlation scheme — when graduated, each step must carry/reference a spine `ExecutionIdentity`/`EvidenceReceipt` so the chain joins the one correlation spine. Do not let it persist receipts to its own store *and* the VEL persist to another.
+### Concept mapping
 
 | recursive_discovery concept | VEL equivalent | Reuse / bridge / deprecate | Reason |
 |---|---|---|---|
-| `LimitationReceipt` | Bet rationale / problem statement (pre-BetCard) | Reuse | Already the "why we're spending budget" record |
-| `GeneratedEvalReceipt` | Held-out / generated eval registration | Reuse + bridge | Maps to BenchmarkResult eval refs; bind to sealed-set hash |
-| `CandidateDiffReceipt` | EvolutionCandidate (proposed mutation) | Bridge to `ArchiveEntry` | Candidate truth lives in `EvolutionArchive`; receipt references it |
-| `ExperimentResultReceipt` | Experiment run outcome | Bridge to `ExperimentRecord` | Experiment persistence is `experiment_log` |
-| `WitnessVerdictReceipt` | Gate / witness verdict | Reuse | Already models phased witness verdicts |
-| `PromotionDecisionReceipt` | DecisionRecord | Bridge to `decision_ontology` | Decision truth lives in `decision_ontology`; receipt references it |
-| `RecursiveReceipt.content_hash()` | LineageRecord hashing | Reuse / bridge to `merkle_log` | Avoid a second hashing scheme; chain via existing Merkle log |
-| `RecursiveDiscoveryRecorder` (EventLog) | VEL recorder | Reuse + join to spine identity | Keep the recorder; add `ExecutionIdentity`/spine receipt linkage |
+| `LimitationReceipt` | BetCard source event | **Bridge** — limitation discovery should feed `Hypothesis` extension (BetCard). | Limitation = "the system has gap X" → Hypothesis = "closing gap X improves metric Y". Natural feeder, not duplicate. |
+| `GeneratedEvalReceipt` | Experiment design step | **Bridge** — generated evals should become held-out eval task candidates (after human review). | VEL experiments need tasks. Recursive discovery generates tasks from limitations. Complementary. |
+| `CandidateDiffReceipt` | EvolutionCandidate | **Bridge** — candidate diffs should become `ArchiveEntry` items (existing evolution archive). | Both represent a proposed code change. ArchiveEntry already has fitness, merkle chain, parent_id. |
+| `ExperimentResultReceipt` | BenchmarkResult / Experiment result | **Bridge** — experiment results should be recorded as `ExperimentRecord` entries in existing `experiment_log.py`. | Same concept, different schema. ExperimentRecord already has `pass_rate`, `fitness`, `tokens_used`. |
+| `WitnessVerdictReceipt` | Promotion gate check | **Bridge** — witness verdicts map to the `CanaryDecision` pattern (promote/rollback/defer). | Witnesses check safety before promotion — same as canary evaluation. |
+| `PromotionDecisionReceipt` | DecisionRecord / CanaryDecision | **Bridge** — promotion decisions should use existing `CanaryDecision` enum + `DecisionRecord` structure. | Exact same concept: decide whether to promote, reject, or hold a candidate. |
+| `RecursiveDiscoveryRecorder` | VEL execution engine | **Preserve** — the recorder pattern (append to EventLog via RuntimeEnvelope) is the right persistence mechanism. | VEL execution should use the same EventLog append pattern, not create a new log. |
+| `shadow_fixture_receipts()` | VEL test fixtures | **Preserve** — useful as the prototype test fixture for VEL integration tests. | Already demonstrates the full pipeline in shadow mode. |
+
+### Verdict on recursive_discovery.py
+
+**It is a prototype to graduate, not a system to deprecate.**
+
+- Its receipt types map cleanly to VEL lifecycle stages.
+- Its `RecursiveDiscoveryRecorder` uses the existing `EventLog` + `RuntimeEnvelope` pattern — the correct persistence mechanism.
+- Its shadow-only design is correct for the current phase (no production mutations).
+- VEL should extend/wrap recursive_discovery, not supersede it.
+
+**What to reuse:**
+- `RecursiveReceipt` base schema (Pydantic, content_hash, stable_payload_hash)
+- `RecursiveDiscoveryRecorder` EventLog integration pattern
+- `WitnessVerdict` / `WitnessPhase` types
+- Shadow-only doctrine (no production mutations until human promotion)
+
+**What not to reuse:**
+- Do not create new receipt subtypes when existing objects serve the same role (e.g., do not create a VEL `ExperimentResultReceipt` when `ExperimentRecord` exists).
+- Do not create a second EventLog stream when the existing `recursive_discovery` stream works.
 
 ---
 
 ## 6. RFC #468 Required Changes
 
-The VEL RFC (`docs/research/VERIFIED_EXPERIMENT_LOOP_RFC.md`) is already reuse-disciplined but has gaps. Required docs-only edits before any VEL code PR:
+The following changes must be made to `docs/research/VERIFIED_EXPERIMENT_LOOP_RFC.md`
+before further implementation work begins:
 
-1. **Add a "Prior art in this repo" subsection for `recursive_discovery.py`** — state that it is the existing registered shadow VEL, that the VEL **extends** it (per §5), and list which receipts are reused/bridged.
-2. **Add a "Prior art" subsection for `runtime_state.RuntimeReceipt` / `IdempotencyRecord`** — state that this is the canonical persisted receipt and that spine `EvidenceReceipt` bridges into it (per §4), correcting the RFC's current implication that receipts persist via `spine/persistence.py` to `delegation_runs`.
-3. **Rewrite §3 object specs so every object reads "reuse/extend `X`"** rather than "new object." Specifically: BetCard → extend `Hypothesis`; Experiment → extend `ExperimentRecord`; EvolutionCandidate → reuse `ArchiveEntry`; DecisionRecord → reuse `decision_ontology.DecisionRecord`; LineageRecord → reuse `merkle_log`; WikiUpdate → reuse `MemoryKernelReviewedCanonicalReceipt`; SwarmRun → projection over `DelegationRun`.
-4. **State explicitly: no standalone `BetCard` class is to be implemented** until the reuse decision in §2 is accepted.
-5. **State explicitly: no new experiment store** is to be created (`ExperimentLog` is the store).
-6. **State explicitly: no new decision log** is to be created (`decision_ontology.DecisionLog` is the log).
-7. **State explicitly: no new lineage chain** is to be created (`merkle_log` / `EvolutionArchive` Merkle chain is the chain).
-8. **State explicitly: held-out eval payloads must not live in agent-readable repo paths** — the embedded petri-dish answer key (`experiments/petri_dish/dataset.py`) is disqualified as "held-out"; the sealed set lives outside the repo (or in an agent-inaccessible store), versioned + hashed, with the hash recorded on each `BenchmarkResult`.
+### 6.1 Add prior-art section for recursive_discovery.py
 
-These edits are additive and reversible; they do not change the RFC's design intent, only bind its objects to existing owners.
+After §1 (Thesis), add:
+
+```markdown
+## 1.1 Prior Art: recursive_discovery.py
+
+`dharma_swarm/recursive_discovery.py` (329 lines) implements a shadow-mode
+prototype of the Verified Experiment Loop. It defines 6 receipt subtypes
+covering the full limitation → eval → candidate → experiment → witness →
+promotion pipeline. VEL should extend and graduate this existing system,
+not replace it.
+
+Key reuse points:
+- `RecursiveReceipt` base schema (content_hash, Pydantic, EventLog integration)
+- `RecursiveDiscoveryRecorder` (append-only EventLog via RuntimeEnvelope)
+- `WitnessVerdict` / `WitnessPhase` types
+- Shadow-only doctrine (no production mutations without human approval)
+```
+
+### 6.2 Add prior-art section for RuntimeReceipt / IdempotencyRecord
+
+In §2 or §3, add:
+
+```markdown
+`runtime_state.RuntimeReceipt` (runtime_state.py:632) is the canonical
+persisted runtime receipt. `IdempotencyRecord` (runtime_state.py:650)
+provides exactly-once guarantees. EvidenceReceipt persistence must flow
+through RuntimeReceipt — see RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md §4.
+```
+
+### 6.3 Change §3 so every proposed object says "reuse/extend X"
+
+For each object in §3:
+
+| Object | Current §3 text | Required change |
+|---|---|---|
+| BetCard (§3.1) | Proposes standalone `BetCard` dataclass | Add: **"Implement as extension of `self_research.Hypothesis`. Do not create standalone `BetCard` class."** |
+| Experiment (§3.2) | Proposes standalone `Experiment` dataclass | Add: **"Implement as extension of `experiment_log.ExperimentRecord`. Write to existing `experiments.jsonl`. Do not create new experiment store."** |
+| SwarmRun (§3.4) | Proposes standalone `SwarmRun` dataclass | Add: **"Use existing `runtime_state.DelegationRun`. Persist spine receipt via `delegation_runs.receipt_json`. Do not create standalone `SwarmRun` class."** |
+| EvolutionCandidate (§3.5) | Proposes standalone `EvolutionCandidate` | Add: **"Use existing `archive.ArchiveEntry`. Do not create standalone `EvolutionCandidate` class."** |
+| BenchmarkResult (§3.6) | Proposes standalone `BenchmarkResult` | Add: **"Use existing `auto_grade.GradeCard` for per-task quality. Use `benchmark_registry.Benchmark` (`benchmark_registry.py:27`) for regression tracking. Do not create standalone `BenchmarkResult` class."** |
+| LineageRecord (§3.7) | Proposes standalone `LineageRecord` | Add: **"Use existing `merkle_log.MerkleLog` for tamper-evident chain. Use `lineage.ProvenanceChain` for DAG queries. Do not create standalone `LineageRecord` class."** |
+| DecisionRecord (§3.8) | Proposes standalone `DecisionRecord` | Add: **"Use existing `decision_ontology.DecisionRecord` (same name). Use `canary.CanaryDecision` for simple promote/rollback/defer. Do not create a second `DecisionRecord` class."** |
+| AgentContribution (§3.9) | Proposes standalone `AgentContribution` | Add: **"Use existing `evaluator.AgentScore`. Do not create standalone `AgentContribution` class."** |
+| WikiUpdate (§3.10) | Proposes standalone `WikiUpdate` | Add: **"Reuse `promotion_gate.MemoryKernelPromotionDecision` 6-gate pattern. Do not create standalone wiki update class."** |
+
+### 6.4 Clarify held-out eval constraint
+
+Update §6 to state explicitly:
+
+```markdown
+Held-out eval payloads MUST NOT live in agent-readable repo paths.
+In-repo: task IDs, metadata, schemas, rubrics, expected artifact types.
+Sealed/private: full task payloads and exact expected answers.
+If agents can read the payload, it is not held-out.
+```
+
+### 6.5 Add no-new-store constraints
+
+Add to §10 (What Not To Build Yet):
+
+```markdown
+- Do not create a standalone BetCard class (extend Hypothesis)
+- Do not create a new experiment store (extend ExperimentRecord)
+- Do not create a new decision log (use decision_ontology.DecisionRecord)
+- Do not create a new lineage chain (use MerkleLog + lineage.py)
+- Do not create a new persistence surface for EvidenceReceipt (use
+  RuntimeReceipt bridge + delegation_runs.receipt_json projection)
+```
 
 ---
 
@@ -127,58 +270,89 @@ These edits are additive and reversible; they do not change the RFC's design int
 
 | PR | Decision | Why | Required before next code PR |
 |---|---|---|---|
-| **#468** (docs: plan + RFC) | **Revise → merge** | Reuse-disciplined docs; the seam analysis is correct; only missing prior-art bindings | Apply §6 edits; reference this matrix |
-| **#469** (`submit_via_spine()` + exactly-one-receipt tests) | **Merge as opt-in** | First real `invoke_agent()` dispatch path; correctly returns (not persists) the receipt; correct layer for cost (`None` at A2A); tested | None blocking. Flag: do not let any surface treat `delegation_runs.receipt_json` as truth |
-| **#470** (bypass report + adoption audit + persistence proposal) | **Revise → merge** | `spine_bypass_report.py` is genuinely new and fits the `scripts/governance/` pattern; reversible CI check | Persistence *proposal* in the PR must adopt the §4 ADR (bridge to `RuntimeReceipt`), not propose a new sink |
+| **#468** (Spine plan + VEL RFC) | **Revise** | RFC §3 proposes 10 standalone objects without binding them to existing equivalents. Must add reuse constraints per §6 of this matrix before further implementation. | Apply changes from §6 above. |
+| **#469** (A2A submit_via_spine) | **Keep — already merged** | First production `invoke_agent()` caller. Not redundant. Adds genuinely missing dispatch-layer receipt seam. | None — merged. |
+| **#470** (Bypass report + adoption audit) | **Keep — already merged** | First bypass classification report. Not redundant. Warning-only, never fails CI. | None — merged. |
 
 ---
 
 ## 8. Next Safe Code PR, If Any
 
-**Recommended next code PR: none yet that touches persistence.** The only safe-to-start code work, once §6 edits and the §4 ADR are accepted, is the **persistence bridge** — and only then.
+**No code yet.**
 
-| Candidate | Verdict | Reason |
-|---|---|---|
-| A2A Level 6 persistence | **Allowed only after §4 ADR accepted** — then implement as the `EvidenceReceipt → RuntimeReceipt` bridge in `spine/persistence.py`, not a `delegation_runs` blob writer | The ADR resolves the disagreement; without it, this is the duplicate-system risk |
-| A2A default route behind feature flag | **Hold** | Default routing is explicitly out of scope this round; also needs the persistence bridge first so default traffic produces append-only receipts |
-| Orchestrator preflight seam map | **Allowed as docs-only** (read-only inspection → a map doc), not code | `orchestrator.py`/`agent_runner.py`/`swarm.py` are off-limits for code; a seam map is reversible and informs the next L4 target |
-| No code yet | **Default until §6 + §4 accepted** | Safest; this matrix + RFC revision must be agreed first |
+Before any implementation PR:
 
-**Binding constraint:** do **not** choose A2A Level 6 persistence until the §4 ADR is accepted by the operator.
+1. **Required:** Revise RFC (PR #468) per §6 of this matrix — bind every proposed object to its existing equivalent.
+2. **Required:** This matrix document must be merged or committed so the reuse decisions are discoverable.
+3. **Then:** The next safe code PR is **A2A Level 6 persistence** — but only because the Persistence ADR (§4) is now resolved: use RuntimeReceipt bridge + delegation_runs.receipt_json projection, not direct `spine/persistence.py` writes.
+
+The persistence PR scope would be:
+- Extend `adapters.runtime_receipt_kwargs()` to carry `receipt_json` in the payload dict.
+- Extend the existing `DurableRuntimeState.record_delegation_run()` to write `receipt_json` from the payload.
+- Add test: `test_delegation_run_persists_receipt_json`.
+- Do NOT add a second writer to delegation_runs.
+- Do NOT call `spine/persistence.py:persist_receipt()` from production code (it becomes dead code or a test utility).
 
 ---
 
 ## 9. Files Inspected
 
-| Path | Why |
-|---|---|
-| `dharma_swarm/spine/receipt.py` | Canonical dispatch receipt |
-| `dharma_swarm/spine/invoke.py` | `invoke_agent()` definition + caller check |
-| `dharma_swarm/spine/persistence.py` | Current persistence behavior (blob UPDATE) |
-| `dharma_swarm/spine/tollbooth.py` (ref) | Promotion-gate primitive |
-| `dharma_swarm/runtime_state.py` | `DelegationRun`, `RuntimeReceipt`, `IdempotencyRecord`, `build_runtime_receipt`, `record_runtime_receipt`, `record_receipt_for_identity`, `record_idempotency_consumed` |
-| `dharma_swarm/operator_core/closure_v0.py` | Second `EvidenceReceipt` (closure proof), `DarwinProposalCandidate`, `NextDecision` |
-| `dharma_swarm/recursive_discovery.py` | Shadow VEL receipt family + recorder |
-| `dharma_swarm/evaluation_registry.py` | `record_recursive_discovery_receipt` wiring |
-| `dharma_swarm/operator_core/control_surface.py` | recursive_discovery registered as control surface |
-| `dharma_swarm/experiment_log.py` | `ExperimentRecord` / `ExperimentLog` |
-| `dharma_swarm/archive.py` | `EvolutionArchive`, `ArchiveEntry`, `FitnessScore`, Merkle chain |
-| `dharma_swarm/merkle_log.py` | Standalone Merkle log |
-| `dharma_swarm/decision_ontology.py` | `DecisionRecord` / `DecisionLog` |
-| `dharma_swarm/canary.py`, `execution_profile.py` | Promotion gate + state enums |
-| `dharma_swarm/self_research.py` | `Hypothesis` / `Experiment` / `ExperimentResult` |
-| `dharma_swarm/ontology.py` | `TypeStatus` + registered ObjectTypes |
-| `dharma_swarm/memory_kernel/promotion_gate.py`, `knowledge_ops/memory_promotion_*.py`, `memory_decision_ledger.py` | Memory promotion → reviewed canonical receipt |
-| `dharma_swarm/cost_tracker.py`, `economic_spine.py`, `llm_burn.py`, `yoga_node.py` | Cost / token / budget |
-| `experiments/petri_dish/dataset.py`, `harness.py`, `models.py` | Held-out eval substrate + embedded answer-key finding |
-| `benchmarks/gauntlet.py`, `dharma_swarm/auto_grade/*`, `quality_gates.py` | Benchmark + scoring |
-| `docs/research/VERIFIED_EXPERIMENT_LOOP_RFC.md` (#468) | RFC reuse discipline + gaps |
-| PR branches #468/#469/#470 (`gh pr view`) | PR state/scope (all OPEN/unmerged; #470 stacks on #469) |
+| Path | Why inspected | Finding |
+|---|---|---|
+| `dharma_swarm/spine/receipt.py` | Spine EvidenceReceipt definition | 20+ field frozen dataclass; 1 production caller (a2a_bridge.submit_via_spine) |
+| `dharma_swarm/spine/invoke.py` | invoke_agent() definition | Thin pass-through; 1 production caller (a2a_bridge.submit_via_spine) |
+| `dharma_swarm/spine/persistence.py` | Receipt persistence | `persist_receipt()` defined, 0 callers; targets delegation_runs.receipt_json |
+| `dharma_swarm/spine/identity.py` | ExecutionIdentity | 15-field frozen dataclass; 29 import sites |
+| `dharma_swarm/spine/__init__.py` | Public API + correlation_spine doctrine | Documents 3-layer receipt architecture |
+| `dharma_swarm/spine/adapters.py` | Runtime receipt bridge | `runtime_receipt_kwargs()` bridges spine identity to RuntimeReceipt |
+| `dharma_swarm/operator_core/closure_v0.py` | Closure-layer EvidenceReceipt | Different class, 8 fields, test/acceptance layer |
+| `dharma_swarm/runtime_state.py` | DelegationRun, RuntimeReceipt, IdempotencyRecord, delegation_runs DDL | Lines 510 (DelegationRun), 632 (RuntimeReceipt), 650 (IdempotencyRecord), 62 (DDL), 424/467 (receipt_json migration) |
+| `dharma_swarm/recursive_discovery.py` | Shadow VEL prototype | 6 receipt subtypes, EventLog integration, shadow-only doctrine. 329 lines. |
+| `dharma_swarm/self_research.py` | Hypothesis / Experiment / ExperimentResult | 3 dataclasses; natural BetCard extension point |
+| `dharma_swarm/experiment_log.py` | ExperimentRecord + ExperimentLog | Pydantic model, append-only JSONL; natural experiment store |
+| `dharma_swarm/archive.py` | ArchiveEntry + FitnessScore | 9-dimensional fitness, Merkle chain, parent_id; natural EvolutionCandidate |
+| `dharma_swarm/decision_ontology.py` | DecisionRecord | Full typed model with evidence, challenges, reviews |
+| `dharma_swarm/canary.py` | CanaryDecision + CanaryDeployer | promote/rollback/defer enum; fitness-delta decisions |
+| `dharma_swarm/cost_tracker.py` | CostEntry + log_cost() | JSONL cost logging; model-based estimation |
+| `dharma_swarm/correlation_context.py` | CorrelationContext | Immutable, contextvars, trace_id/proposal_id/session_id |
+| `dharma_swarm/merkle_log.py` | MerkleLog | SHA-256 hash chain |
+| `dharma_swarm/lineage.py` | ProvenanceChain | SQLite-backed DAG |
+| `dharma_swarm/sakshi/provenance_log.py` | ProvenanceLog | Chain-integrity JSONL |
+| `dharma_swarm/engine/provenance.py` | ProvenanceLogger | Append-only JSONL per session |
+| `dharma_swarm/memory_kernel/promotion_gate.py` | MemoryKernelPromotionDecision + ReviewedCanonicalReceipt | 6 required gates, human-gated promotion |
+| `dharma_swarm/memory_kernel/write_receipts.py` | MemoryKernelWriteReceipt | Write-policy compliance receipt |
+| `dharma_swarm/memory_kernel/burn_in.py` | MemoryKernelBurnInReceipt | Bulk initialization receipt |
+| `dharma_swarm/knowledge_ops/memory_promotion_executor.py` | MemoryPromotionReceipt | Promotion execution receipt |
+| `dharma_swarm/knowledge_ops/memory_decision_ledger.py` | MemoryPromotionDecision + Ledger | Read-only decision validation |
+| `dharma_swarm/operator_core/world_radar/receipt_bridge.py` | GoWorldReceipt | Go-emitted world observation evidence |
+| `dharma_swarm/operator_core/go_evidence_bridge.py` | GoEvidenceReceipt | Generic Go evidence bridge |
+| `dharma_swarm/operator_core/go_github_bridge.py` | GoGitHubReceipt | Go GitHub operation receipt |
+| `dharma_swarm/roaming_onboarding.py` | OnboardingReceipt | Agent onboarding proof |
+| `dharma_swarm/board/models.py` | ReceiptRef | Receipt reference pointer |
+| `dharma_swarm/evaluator.py` | AgentScore / ModelScore | Quality evaluation with leaderboards |
+| `dharma_swarm/auto_grade/models.py` | GradeCard | 12-dimension quality scoring |
+| `dharma_swarm/benchmark_registry.py` | Benchmark + BenchmarkRegistry | Named benchmarks with regression detection |
+| `dharma_swarm/traces.py` | TraceStore + TraceEntry | File-backed trace store |
+| `dharma_swarm/a2a/a2a_bridge.py` | submit_via_spine() implementation | PR #469 code |
+| `dharma_swarm/a2a/a2a_server.py` | A2A server dispatch | submit() + _ensure_execution_identity() |
+| `dharma_swarm/yoga_node.py` | UsageTracker | In-memory daily token/dispatch counting |
+| `dharma_swarm/telemetry_plane.py` | RoutingDecisionRecord + PolicyDecisionRecord | Telemetry decision records |
+| `scripts/governance/spine_bypass_report.py` | PR #470 bypass report | Warning-only scan classifying server.submit() sites |
+| `docs/research/VERIFIED_EXPERIMENT_LOOP_RFC.md` | Current RFC text | 678 lines, 12 sections, 10 proposed objects |
 
 ---
 
 ## 10. Final Recommendation
 
-**Pause persistence (and all new VEL object creation) only — continue the dispatch seam.**
+**Continue Spine adoption. Pause persistence until RFC is revised.**
 
-Concretely: keep #469's `submit_via_spine()` and #470's bypass report (revise → merge per §7); freeze any new persisted-receipt store, any standalone VEL object, and any A2A default routing until (a) the §4 persistence ADR (`EvidenceReceipt → RuntimeReceipt` bridge; `delegation_runs.receipt_json` = cache only) is accepted, and (b) the §6 RFC edits binding every VEL object to an existing owner are merged. This is not "stop and redesign" (the seam is real and correct) and not "redirect into recursive_discovery" wholesale (the dispatch layer is genuinely new) — it is a targeted freeze on the one area where a second competing system would otherwise form: receipt persistence and object proliferation. The dispatch work proceeds; the duplication risk is contained by decision, not by halting progress.
+Specific sequence:
+
+1. **Now:** Commit this equivalence matrix. Revise RFC §3 per §6 above. Both are docs-only.
+2. **Then:** Implement A2A Level 6 persistence using Option C (RuntimeReceipt bridge + receipt_json projection). This is the next safe code PR because the persistence ADR is now resolved.
+3. **After that:** A2A default route behind feature flag (migrate `ingest_trishula_inbox()` → `submit_via_spine()`).
+4. **Do not** start orchestrator migration until A2A surface is fully adopted (all 4 bypass sites resolved).
+5. **Do not** create any standalone VEL objects (BetCard, SwarmRun, etc.) until RFC revision is merged.
+6. **Do not** build VEL runtime until spine adoption Level 6 is proven on at least the A2A surface.
+
+This is the minimum-reinvention path. Every existing system identified in the audit is preserved and reused. No parallel systems are created.
