@@ -75,7 +75,7 @@ jobs:
           persist-credentials: false
 
       - name: Install NATS client
-        run: python3 -m pip install 'nats-py>=2.9'
+        run: python3 -m pip install 'nats-py>=2.9' 'aiohttp>=3.9'
 
       - name: Run Merge Master Mike backlog fanout
         env:
