@@ -1,16 +1,12 @@
 {
   "name": "perplexity-computer",
-  "description": "Perplexity Computer roaming agent: cross-agent synthesizer / verdict reconciler / persistent-index keeper. Stage 1 external-evidence-only. Identity nest: docs/agents/perplexity-computer/.",
+  "description": "Perplexity Computer roaming agent: cross-agent synthesizer / verdict reconciler / persistent-index keeper. Stage 1 external-evidence-only. Identity nest: docs/agents/perplexity-computer/. Operates in wake-mode (operator-driven session) and loop-mode (NATS-attached, cron-driven, budget-bound) — both same agent, same SOUL, same authority. See AUTONOMOUS_LOOP.md.",
   "skills": [
     {
       "name": "synthesis",
       "description": "perplexity-computer capability: synthesis",
-      "input_modes": [
-        "text"
-      ],
-      "output_modes": [
-        "text"
-      ],
+      "input_modes": ["text"],
+      "output_modes": ["text"],
       "id": "synthesis",
       "tags": [],
       "examples": [],
@@ -19,12 +15,8 @@
     {
       "name": "verdict_reconciliation",
       "description": "perplexity-computer capability: verdict_reconciliation",
-      "input_modes": [
-        "text"
-      ],
-      "output_modes": [
-        "text"
-      ],
+      "input_modes": ["text"],
+      "output_modes": ["text"],
       "id": "verdict_reconciliation",
       "tags": [],
       "examples": [],
@@ -32,15 +24,31 @@
     },
     {
       "name": "persistent_agent_index",
-      "description": "perplexity-computer capability: persistent_agent_index",
-      "input_modes": [
-        "text"
-      ],
-      "output_modes": [
-        "text"
-      ],
+      "description": "perplexity-computer capability: persistent_agent_index (evidence contributor only; Hermes owns)",
+      "input_modes": ["text"],
+      "output_modes": ["text"],
       "id": "persistent_agent_index",
       "tags": [],
+      "examples": [],
+      "security_requirements": []
+    },
+    {
+      "name": "session_consolidation",
+      "description": "perplexity-computer capability: append-only consolidation of Perplexity session context into CONSOLIDATION_WIKI.md on a 6-hour cron (loop-mode)",
+      "input_modes": ["text"],
+      "output_modes": ["text"],
+      "id": "session_consolidation",
+      "tags": ["loop-mode", "cron"],
+      "examples": [],
+      "security_requirements": []
+    },
+    {
+      "name": "operator_query",
+      "description": "perplexity-computer capability: NATS front-door (dharma.a2a.perplexity) answers operator queries against the consolidation wiki plus live tool surface (loop-mode)",
+      "input_modes": ["text"],
+      "output_modes": ["text"],
+      "id": "operator_query",
+      "tags": ["loop-mode", "nats"],
       "examples": [],
       "security_requirements": []
     }
@@ -49,12 +57,8 @@
     {
       "name": "synthesis",
       "description": "perplexity-computer capability: synthesis",
-      "input_modes": [
-        "text"
-      ],
-      "output_modes": [
-        "text"
-      ],
+      "input_modes": ["text"],
+      "output_modes": ["text"],
       "id": "synthesis",
       "tags": [],
       "examples": [],
@@ -63,12 +67,8 @@
     {
       "name": "verdict_reconciliation",
       "description": "perplexity-computer capability: verdict_reconciliation",
-      "input_modes": [
-        "text"
-      ],
-      "output_modes": [
-        "text"
-      ],
+      "input_modes": ["text"],
+      "output_modes": ["text"],
       "id": "verdict_reconciliation",
       "tags": [],
       "examples": [],
@@ -76,38 +76,94 @@
     },
     {
       "name": "persistent_agent_index",
-      "description": "perplexity-computer capability: persistent_agent_index",
-      "input_modes": [
-        "text"
-      ],
-      "output_modes": [
-        "text"
-      ],
+      "description": "perplexity-computer capability: persistent_agent_index (evidence-only contributor)",
+      "input_modes": ["text"],
+      "output_modes": ["text"],
       "id": "persistent_agent_index",
       "tags": [],
       "examples": [],
       "security_requirements": []
+    },
+    {
+      "name": "session_consolidation",
+      "description": "perplexity-computer capability: session_consolidation (loop-mode cron)",
+      "input_modes": ["text"],
+      "output_modes": ["text"],
+      "id": "session_consolidation",
+      "tags": ["loop-mode", "cron"],
+      "examples": [],
+      "security_requirements": []
+    },
+    {
+      "name": "operator_query",
+      "description": "perplexity-computer capability: operator_query (loop-mode NATS front door)",
+      "input_modes": ["text"],
+      "output_modes": ["text"],
+      "id": "operator_query",
+      "tags": ["loop-mode", "nats"],
+      "examples": [],
+      "security_requirements": []
     }
   ],
-  "endpoint": "pending://manual",
-  "auth_type": "none",
-  "security_schemes": [],
+  "endpoint": "nats://dharma.a2a.perplexity",
+  "auth_type": "scoped-credential",
+  "security_schemes": [
+    {
+      "scheme_type": "APIKey",
+      "in_field": "header",
+      "name": "X-NATS-Scoped-User",
+      "description": "Scoped NATS user 'perplexity' on agni hub wss://157.245.193.15:8443; pub: dharma.a2a.perplexity; sub: dharma.a2a.claude, dharma.a2a.heartbeat",
+      "flows": {}
+    }
+  ],
   "signatures": [],
-  "supported_interfaces": [],
+  "supported_interfaces": [
+    {
+      "protocol": "nats",
+      "url": "wss://157.245.193.15:8443",
+      "subject_pub": "dharma.a2a.perplexity",
+      "subject_sub": "dharma.a2a.claude,dharma.a2a.heartbeat",
+      "stream": "DHARMA_A2A",
+      "consumer": "perplexity_inbox"
+    }
+  ],
   "extensions": [],
   "role": "external_evidence_worker",
   "model": "",
   "provider": "",
-  "status": "starting",
-  "version": "1.0",
+  "status": "live",
+  "version": "1.1",
   "created_at": "2026-05-30T02:11:00.121404+00:00",
-  "updated_at": "2026-05-30T02:11:00.121418+00:00",
+  "updated_at": "2026-05-31T15:40:00.000000+00:00",
   "metadata": {
     "agent_uid": "perplexity-computer",
     "harness": "perplexity_computer",
     "department": "synthesis",
     "squad_id": "general",
     "team_id": "dharma_swarm",
-    "registration_source": "docs/agents/perplexity-computer/SOUL.md"
+    "registration_source": "docs/agents/perplexity-computer/SOUL.md",
+    "loop_mode": {
+      "enabled": true,
+      "spec": "docs/agents/perplexity-computer/AUTONOMOUS_LOOP.md",
+      "heartbeat_subject": "dharma.a2a.heartbeat",
+      "heartbeat_cadence": "15m",
+      "consolidation_pattern": "karpathy_llm_wiki + openclaw_dreaming_gate + codex_deferred_write",
+      "consolidation_wiki_root": "docs/agents/perplexity-computer/wiki/",
+      "consolidation_cadence": "6h",
+      "consolidation_idle_gate": "6h",
+      "consolidation_promotion_threshold": 0.6,
+      "consolidation_promotion_cap_per_tick": 20,
+      "lint_cadence": "24h",
+      "consolidation_cron_host": "agni_vps_systemd_user_service",
+      "deployment_spec": "docs/agents/perplexity-computer/AGNI_DEPLOYMENT.md",
+      "budget_envelope": "full_operator_perplexity_allocation",
+      "kill_switches": [
+        "nats:dharma.a2a.perplexity payload kind=pause signed_by=operator",
+        "repo:docs/agents/perplexity-computer/PAUSED present on main",
+        "platform:delete cron from Perplexity UI",
+        "auto:4_consecutive_heartbeat_publish_failures"
+      ],
+      "acceptance_pending": true
+    }
   }
 }
