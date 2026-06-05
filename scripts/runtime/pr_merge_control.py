@@ -9,15 +9,20 @@ an operator passes an explicit confirmation token.
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import os
+import re
+import signal
 import shlex
+import ssl
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -28,15 +33,32 @@ REQUIRED_COHERENCE_FIELDS = (
     "Proof that re-reads the map",
     "New drift introduced",
 )
-BAD_CONCLUSIONS = {
-    "ACTION_REQUIRED",
-    "CANCELLED",
-    "FAILURE",
-    "STALE",
-    "STARTUP_FAILURE",
-    "TIMED_OUT",
-}
+BAD_CONCLUSIONS = {"FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED"}
 PASS_CONCLUSIONS = {"SUCCESS", "SKIPPED", "NEUTRAL"}
+REVIEW_VERDICTS = ("APPROVE", "REQUEST_CHANGES", "BLOCKED", "NEEDS_HUMAN")
+REVIEW_VERDICT_RE = re.compile(r"\b(APPROVE|REQUEST_CHANGES|BLOCKED|NEEDS_HUMAN)\b", re.IGNORECASE)
+DEFAULT_AGENT_TIMEOUT_S = 600.0
+DEFAULT_AGENT_KILL_GRACE_S = 5.0
+DEFAULT_FANOUT_STATUSES = ("GITHUB_GREEN_NEEDS_PACKET", "NEEDS_AGENT_REVIEW")
+DEFAULT_A2A_NATS_SUBJECTS = (
+    "dharma.a2a.fleet",
+    "dharma.a2a.merge_master_mike",
+    "dharma.a2a.github_copilot",
+    "dharma.a2a.claude",
+    "dharma.a2a.devin",
+    "dharma.a2a.codex",
+    "dharma.a2a.hermes",
+    "dharma.a2a.perplexity",
+)
+DEFAULT_REQUIRED_REVIEWERS = ("codex", "claude")
+MERGE_MASTER_MIKE_NATS_SECRET_NAMES = (
+    "MERGE_MASTER_MIKE_NATS_URL",
+    "MERGE_MASTER_MIKE_NATS_USER",
+    "MERGE_MASTER_MIKE_NATS_PW",
+)
+DEVIN_NATS_SECRET_NAMES = ("DEVIN_NATS_URL", "DEVIN_NATS_USER", "DEVIN_NATS_PW")
+NATS_REQUIRED_SECRET_NAMES = DEVIN_NATS_SECRET_NAMES
+MERGE_MODES = ("off", "auto-when-clean")
 HOT_PATH_PATTERNS = (
     ".github/",
     "api/",
@@ -54,29 +76,6 @@ HOT_PATH_PATTERNS = (
     "Makefile",
 )
 CLAUDE_REVIEW_DEFAULT_BIN = Path("/Users/dhyana/.npm-global/bin/claude")
-REQUIRED_REVIEW_SECTIONS = (
-    "Verdict",
-    "Findings",
-    "Missing Tests Or Proof",
-    "Merge Conditions",
-)
-REVIEW_TEMPLATE_MARKERS = (
-    "A single line containing exactly one of",
-    "Numbered findings with severity",
-    "Concrete gaps only",
-    "The exact conditions that must be true before merge",
-)
-REVIEW_EVIDENCE_RE = (
-    "Makefile",
-    ".github/",
-    "scripts/",
-    "tests/",
-    "docs/",
-    "dharma_swarm/",
-    "inter_agent/",
-    "api/",
-    "dashboard/",
-)
 
 
 class PRControlError(Exception):
@@ -88,6 +87,17 @@ class CommandResult:
     code: int
     stdout: str
     stderr: str
+
+
+@dataclass(frozen=True)
+class NATSConfig:
+    endpoint: str
+    user: str
+    credential: str
+    missing: tuple[str, ...]
+    ca_pem: str = ""
+    tls_hostname: str = ""
+    credential_family: str = "devin"
 
 
 def utc_now() -> str:
@@ -148,43 +158,72 @@ def load_json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def check_name(item: dict[str, Any]) -> str:
-    return str(item.get("name") or item.get("context") or item.get("workflowName") or "unnamed")
+def env_float(name: str, default: float) -> float:
+    raw = os.environ.get(name)
+    if not raw:
+        return default
+    try:
+        value = float(raw)
+    except ValueError:
+        return default
+    return value if value > 0 else default
 
 
-def latest_check_items(rollup: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Collapse duplicate check names to the newest reported check.
+def review_output_path(out_dir: Path, agent: str) -> Path:
+    if agent in {"codex", "claude"}:
+        return out_dir / f"{agent}_review.md"
+    return out_dir / f"{agent}_review.md"
 
-    GitHub can leave a cancelled superseded run in statusCheckRollup next to the
-    successful replacement for the same check name. Treating both as live makes
-    the queue disagree with `gh pr checks`.
-    """
 
-    latest: dict[str, tuple[tuple[str, str, int], dict[str, Any]]] = {}
-    for index, item in enumerate(rollup):
-        name = check_name(item)
-        key = (
-            str(item.get("completedAt") or ""),
-            str(item.get("startedAt") or ""),
-            index,
-        )
-        if name not in latest or key >= latest[name][0]:
-            latest[name] = (key, item)
-    return [payload for _, payload in latest.values()]
+def review_receipt_path(out_dir: Path, agent: str) -> Path:
+    return out_dir / f"{agent}_review_receipt.json"
+
+
+def review_label(agent: str) -> str:
+    labels = {
+        "copilot": "GitHub Copilot",
+        "github_copilot": "GitHub Copilot",
+        "codex": "Codex",
+        "claude": "Claude",
+        "devin": "Devin",
+        "devin-roaming-2987d222": "Devin",
+        "hermes": "Hermes",
+        "perplexity": "Perplexity",
+        "backup_opus": "Backup Opus",
+        "backup_gemini": "Backup Gemini",
+        "backup_hermes": "Backup Hermes",
+        "backup_perplexity": "Backup Perplexity",
+        "backup_warp_oz": "Backup Warp/Oz",
+    }
+    return labels.get(agent, agent.replace("_", " ").title())
+
+
+def backup_reviewer_agents(args: argparse.Namespace) -> list[str]:
+    raw = getattr(args, "backup_reviewers", "") or os.environ.get(
+        "DHARMA_PR_BACKUP_REVIEWERS",
+        "backup_opus,backup_gemini,backup_hermes,backup_perplexity",
+    )
+    return parse_csv_tokens(raw, default=("backup_opus", "backup_gemini", "backup_hermes", "backup_perplexity"))
 
 
 def check_rollup(pr: dict[str, Any]) -> dict[str, Any]:
     rollup = pr.get("statusCheckRollup") or []
+    latest_by_name: dict[str, tuple[tuple[str, int], dict[str, Any]]] = {}
+    for index, item in enumerate(rollup):
+        name = str(item.get("name") or item.get("context") or item.get("workflowName") or "unnamed")
+        timestamp = str(item.get("completedAt") or item.get("startedAt") or "")
+        current = latest_by_name.get(name)
+        key = (timestamp, index)
+        if current is None or key > current[0]:
+            latest_by_name[name] = (key, item)
+
     failing: list[str] = []
     pending: list[str] = []
     passing: list[str] = []
     unknown: list[str] = []
 
-    if not rollup:
-        unknown.append("no status checks reported")
-
-    for item in latest_check_items(rollup):
-        name = check_name(item)
+    for name, (_, item) in latest_by_name.items():
+        name = str(item.get("name") or item.get("context") or item.get("workflowName") or "unnamed")
         conclusion = str(item.get("conclusion") or "").upper()
         status = str(item.get("status") or "").upper()
         if conclusion in BAD_CONCLUSIONS:
@@ -194,12 +233,13 @@ def check_rollup(pr: dict[str, Any]) -> dict[str, Any]:
         elif conclusion in PASS_CONCLUSIONS:
             passing.append(name)
         elif conclusion:
-            failing.append(f"{name}:{conclusion}")
+            unknown.append(f"{name}:{conclusion}")
         else:
             unknown.append(name)
 
     return {
-        "total": len(rollup),
+        "total": len(latest_by_name),
+        "raw_total": len(rollup),
         "passing": passing,
         "failing": failing,
         "pending": pending,
@@ -222,9 +262,6 @@ def classify_pr(pr: dict[str, Any]) -> dict[str, Any]:
     elif checks["failing"]:
         reasons.append(f"{len(checks['failing'])} failing checks")
         status = "BLOCKED_CHECKS"
-    elif checks["unknown"]:
-        reasons.append(f"{len(checks['unknown'])} unknown check states")
-        status = "BLOCKED_CHECKS"
     elif review_decision == "CHANGES_REQUESTED":
         reasons.append("changes requested")
         status = "BLOCKED_REVIEW"
@@ -240,6 +277,9 @@ def classify_pr(pr: dict[str, Any]) -> dict[str, Any]:
     else:
         reasons.append("GitHub green; packet, dual review, and merge gate still required")
         status = "GITHUB_GREEN_NEEDS_PACKET"
+
+    if checks["unknown"]:
+        reasons.append(f"{len(checks['unknown'])} unknown check states")
 
     return {
         "number": pr.get("number"),
@@ -296,25 +336,29 @@ def render_queue_markdown(summary: dict[str, Any]) -> str:
 
 def cmd_queue(args: argparse.Namespace) -> int:
     prs = fetch_open_prs(args.limit)
+    summary = build_queue_summary(prs, repo_name())
+    out_dir = expand(args.state_root) / "queue"
+    write_json(out_dir / "latest.json", summary)
+    write_text(out_dir / "latest.md", render_queue_markdown(summary))
+    print(f"scanned={len(summary['items'])} output={out_dir / 'latest.md'}")
+    for status, count in sorted(summary["counts"].items()):
+        print(f"{status}: {count}")
+    return 0
+
+
+def build_queue_summary(prs: list[dict[str, Any]], repo: str) -> dict[str, Any]:
     items = [classify_pr(pr) for pr in prs]
     counts: dict[str, int] = {}
     for item in items:
         counts[item["status"]] = counts.get(item["status"], 0) + 1
-    summary = {
+    return {
         "schema": "dharma.pr_review.queue.v1",
         "generated_at": utc_now(),
-        "repo": repo_name(),
+        "repo": repo,
         "total": len(items),
         "counts": counts,
         "items": items,
     }
-    out_dir = expand(args.state_root) / "queue"
-    write_json(out_dir / "latest.json", summary)
-    write_text(out_dir / "latest.md", render_queue_markdown(summary))
-    print(f"scanned={len(items)} output={out_dir / 'latest.md'}")
-    for status, count in sorted(counts.items()):
-        print(f"{status}: {count}")
-    return 0
 
 
 def fetch_pr_view(pr_number: int) -> dict[str, Any]:
@@ -322,8 +366,8 @@ def fetch_pr_view(pr_number: int) -> dict[str, Any]:
         "pr",
         "view",
         str(pr_number),
-            "--json",
-            "number,title,body,author,baseRefName,headRefName,headRefOid,isDraft,mergeable,reviewDecision,statusCheckRollup,comments,commits,updatedAt,url",
+        "--json",
+        "number,title,body,author,baseRefName,headRefName,isDraft,mergeable,reviewDecision,statusCheckRollup,comments,commits,updatedAt,url",
     ])
 
 
@@ -333,17 +377,11 @@ def fetch_pr_files(pr_number: int, repo: str) -> list[dict[str, Any]]:
 
 def fetch_review_threads(pr_number: int, repo: str) -> dict[str, Any]:
     owner, name = repo.split("/", 1)
-    nodes: list[dict[str, Any]] = []
-    cursor = ""
     query = """
-    query($owner: String!, $name: String!, $number: Int!, $cursor: String) {
+    query($owner: String!, $name: String!, $number: Int!) {
       repository(owner: $owner, name: $name) {
         pullRequest(number: $number) {
-          reviewThreads(first: 100, after: $cursor) {
-            pageInfo {
-              hasNextPage
-              endCursor
-            }
+          reviewThreads(first: 100) {
             nodes {
               isResolved
               isOutdated
@@ -362,47 +400,33 @@ def fetch_review_threads(pr_number: int, repo: str) -> dict[str, Any]:
       }
     }
     """
-    while True:
-        result = run(
-            [
-                "gh",
-                "api",
-                "graphql",
-                "-f",
-                f"query={query}",
-                "-F",
-                f"owner={owner}",
-                "-F",
-                f"name={name}",
-                "-F",
-                f"number={pr_number}",
-                "-F",
-                f"cursor={cursor}",
-            ],
-            timeout=120,
-            check=False,
-        )
-        if result.code != 0:
-            return {"ok": False, "error": (result.stderr or result.stdout).strip(), "unresolved": None}
-        try:
-            payload = json.loads(result.stdout)
-        except json.JSONDecodeError:
-            return {"ok": False, "error": "GitHub GraphQL returned non-JSON output", "unresolved": None}
-        threads = (
-            payload.get("data", {})
-            .get("repository", {})
-            .get("pullRequest", {})
-            .get("reviewThreads", {})
-        )
-        if not isinstance(threads, dict):
-            return {"ok": False, "error": "GitHub GraphQL reviewThreads payload missing", "unresolved": None}
-        nodes.extend(threads.get("nodes") or [])
-        page_info = threads.get("pageInfo") or {}
-        if not page_info.get("hasNextPage"):
-            break
-        cursor = str(page_info.get("endCursor") or "")
-        if not cursor:
-            return {"ok": False, "error": "GitHub GraphQL reviewThreads pagination cursor missing", "unresolved": None}
+    result = run(
+        [
+            "gh",
+            "api",
+            "graphql",
+            "-f",
+            f"query={query}",
+            "-F",
+            f"owner={owner}",
+            "-F",
+            f"name={name}",
+            "-F",
+            f"number={pr_number}",
+        ],
+        timeout=120,
+        check=False,
+    )
+    if result.code != 0:
+        return {"ok": False, "error": (result.stderr or result.stdout).strip(), "unresolved": None}
+    payload = json.loads(result.stdout)
+    nodes = (
+        payload.get("data", {})
+        .get("repository", {})
+        .get("pullRequest", {})
+        .get("reviewThreads", {})
+        .get("nodes", [])
+    )
     unresolved = [
         node for node in nodes
         if not node.get("isResolved") and not node.get("isOutdated")
@@ -421,32 +445,14 @@ def fetch_pr_diff(pr_number: int) -> str:
 def coherence_results(body: str) -> dict[str, Any]:
     lines = body.splitlines()
     results: dict[str, dict[str, Any]] = {}
-    all_prefix_variants = tuple(
-        prefix
-        for known_field in REQUIRED_COHERENCE_FIELDS
-        for prefix in (
-            f"- {known_field}:",
-            f"* {known_field}:",
-            f"{known_field}:",
-            f"- **{known_field}**:",
-            f"- **{known_field}:**",
-            f"* **{known_field}**:",
-            f"* **{known_field}:**",
-            f"**{known_field}**:",
-            f"**{known_field}:**",
-        )
-    )
     for field in REQUIRED_COHERENCE_FIELDS:
         prefix_variants = (
             f"- {field}:",
             f"* {field}:",
             f"{field}:",
             f"- **{field}**:",
-            f"- **{field}:**",
             f"* **{field}**:",
-            f"* **{field}:**",
             f"**{field}**:",
-            f"**{field}:**",
         )
         value = None
         for index, line in enumerate(lines):
@@ -460,7 +466,9 @@ def coherence_results(body: str) -> dict[str, Any]:
                 next_stripped = next_line.strip()
                 if not next_stripped:
                     continue
-                if any(next_stripped.startswith(prefix) for prefix in all_prefix_variants):
+                if any(next_stripped.startswith(prefix) for prefix in prefix_variants):
+                    break
+                if any(next_stripped.startswith(f"- {other}:") or next_stripped.startswith(f"- **{other}**:") for other in REQUIRED_COHERENCE_FIELDS):
                     break
                 if next_stripped.startswith("#"):
                     break
@@ -468,10 +476,7 @@ def coherence_results(body: str) -> dict[str, Any]:
             value = "\n".join(part for part in [first, *tail] if part).strip()
             break
         normalized = (value or "").strip().lower().strip("`*_-. ")
-        placeholder_values = {"", "n/a", "na", "tbd", "todo", "unknown", "placeholder"}
-        if field != "New drift introduced":
-            placeholder_values.update({"none", "none yet"})
-        ok = bool(value) and normalized not in placeholder_values
+        ok = bool(value) and normalized not in {"", "n/a", "na", "none", "none yet", "tbd", "todo", "unknown", "placeholder"}
         results[field] = {"ok": ok, "value": value or "", "reason": "" if ok else "missing or placeholder"}
     return {"ok": all(item["ok"] for item in results.values()), "fields": results}
 
@@ -515,10 +520,8 @@ context is already prepared for you. Read:
 {packet_dir_path / "FACTS.json"}
 
 Then review the PR with a code-review stance: findings first, highest severity
-first, with repo-relative file/line evidence. Use full repository paths from
-the packet or diff such as `dharma_swarm/ontology.py` or
-`tests/test_ontology_telos_hardwire.py`; bare filenames are not sufficient for
-the merge gate. Do not approve from vibes. Do not merge. Do not modify files.
+first, with file/line evidence. Do not approve from vibes. Do not merge. Do not
+modify files.
 
 Keep tool use narrow: do not run broad repository searches, skill discovery, or
 indexing. Read only the packet, diff, and exact changed files needed to validate
@@ -538,7 +541,7 @@ Check:
 Return markdown with exactly:
 
 ## Verdict
-A single line containing exactly one of: APPROVE, REQUEST_CHANGES, BLOCKED, NEEDS_HUMAN.
+APPROVE | REQUEST_CHANGES | BLOCKED | NEEDS_HUMAN
 
 ## Findings
 Numbered findings with severity, evidence, and why it matters.
@@ -548,11 +551,6 @@ Concrete gaps only.
 
 ## Merge Conditions
 The exact conditions that must be true before merge.
-
-If your verdict is APPROVE, the Findings section must explicitly include the
-phrase "No blocking findings" and still cite repo-relative path evidence.
-If your only hold is human/operator approval for a high-risk PR, use
-NEEDS_HUMAN and describe the exact approval condition.
 """
 
 
@@ -595,22 +593,6 @@ def review_command_and_env(
         if model:
             command.extend(["--model", model])
     return command, env
-
-
-def review_timeout_seconds(agent: str, env: dict[str, str], override: int | None = None) -> int:
-    if override is not None:
-        if override < 30:
-            raise PRControlError("--timeout-s must be at least 30 seconds")
-        return override
-    key = "CLAUDE_REVIEW_TIMEOUT_SECONDS" if agent == "claude" else "CODEX_REVIEW_TIMEOUT_SECONDS"
-    raw = env.get(key, "600")
-    try:
-        timeout = int(raw)
-    except ValueError as exc:
-        raise PRControlError(f"{key} must be an integer number of seconds") from exc
-    if timeout < 30:
-        raise PRControlError(f"{key} must be at least 30 seconds")
-    return timeout
 
 
 def render_packet_markdown(packet: dict[str, Any]) -> str:
@@ -722,114 +704,215 @@ def has_review(path: Path) -> bool:
     return path.exists() and len(path.read_text(encoding="utf-8").strip()) >= 40
 
 
-def _review_sections(text: str) -> dict[str, str]:
-    sections: dict[str, list[str]] = {}
-    current: str | None = None
+def _single_review_verdict(text: str) -> str | None:
+    matches = [match.upper() for match in REVIEW_VERDICT_RE.findall(text)]
+    unique = sorted(set(matches))
+    if len(unique) == 1:
+        return unique[0]
+    return None
+
+
+def extract_review_verdict(text: str) -> str:
+    """Extract the required review verdict from the `## Verdict` section."""
+
+    in_verdict = False
     for line in text.splitlines():
         stripped = line.strip()
-        if stripped.startswith("## "):
-            heading = stripped[3:].strip()
-            current = heading
-            sections.setdefault(current, [])
+        if stripped.startswith("##"):
+            if in_verdict:
+                break
+            header = stripped.lstrip("#").strip().lower()
+            in_verdict = header.startswith("verdict")
+            if in_verdict:
+                verdict = _single_review_verdict(stripped)
+                if verdict:
+                    return verdict
             continue
-        if current:
-            sections.setdefault(current, []).append(line)
-    return {name: "\n".join(lines).strip() for name, lines in sections.items()}
+        if in_verdict:
+            verdict = _single_review_verdict(stripped)
+            if verdict:
+                return verdict
+    return "UNKNOWN"
 
 
-def _first_nonempty_line(text: str) -> str:
-    for line in text.splitlines():
-        stripped = line.strip()
-        if stripped:
-            return stripped
-    return ""
+def load_agent_review_status(out_dir: Path, agent: str) -> dict[str, Any]:
+    output_path = review_output_path(out_dir, agent)
+    receipt_path = review_receipt_path(out_dir, agent)
+    text = ""
+    if output_path.exists():
+        text = output_path.read_text(encoding="utf-8", errors="replace")
+
+    receipt: dict[str, Any] | None = None
+    receipt_error = ""
+    if receipt_path.exists():
+        try:
+            payload = load_json(receipt_path)
+            if isinstance(payload, dict):
+                receipt = payload
+            else:
+                receipt_error = "receipt JSON is not an object"
+        except (OSError, json.JSONDecodeError) as exc:
+            receipt_error = str(exc)
+
+    return {
+        "agent": agent,
+        "output": str(output_path),
+        "output_present": output_path.exists() and len(text.strip()) >= 40,
+        "receipt": str(receipt_path),
+        "receipt_present": receipt_path.exists(),
+        "receipt_valid": receipt is not None,
+        "receipt_error": receipt_error,
+        "receipt_status": receipt.get("status") if receipt else None,
+        "exit_code": receipt.get("exit_code") if receipt else None,
+        "timed_out": bool(receipt.get("timed_out")) if receipt else False,
+        "timeout_s": receipt.get("timeout_s") if receipt else None,
+        "duration_s": receipt.get("duration_s") if receipt else None,
+        "verdict": extract_review_verdict(text) if text.strip() else "MISSING",
+    }
 
 
-def _has_concrete_review_evidence(text: str) -> bool:
-    lowered = text.lower()
-    if "file/line evidence" in lowered or "no blocking findings." == text.strip().lower():
-        return False
-    return any(marker in text for marker in REVIEW_EVIDENCE_RE)
+def agent_review_blockers(status: dict[str, Any], *, human_approved: bool) -> list[str]:
+    agent = str(status["agent"])
+    title = review_label(agent)
+    blockers: list[str] = []
+
+    if not status["output_present"]:
+        blockers.append(f"missing {agent}_review.md receipt")
+    if not status["receipt_present"]:
+        blockers.append(f"missing {agent}_review_receipt.json")
+    elif not status["receipt_valid"]:
+        blockers.append(f"invalid {agent}_review_receipt.json: {status['receipt_error']}")
+    elif status["timed_out"] or status["receipt_status"] == "timeout":
+        blockers.append(f"{title} review timed out after {status.get('timeout_s')}s")
+    elif status["exit_code"] not in (0, "0"):
+        blockers.append(f"{title} review exited non-zero ({status['exit_code']})")
+
+    verdict = status["verdict"]
+    if verdict in {"MISSING", "UNKNOWN"}:
+        if status["output_present"]:
+            blockers.append(f"{title} review verdict is {verdict}")
+    elif verdict in {"REQUEST_CHANGES", "BLOCKED"}:
+        blockers.append(f"{title} review verdict={verdict}")
+    elif verdict == "NEEDS_HUMAN" and not human_approved:
+        blockers.append(f"{title} review verdict=NEEDS_HUMAN requires --human-approved")
+    return blockers
 
 
-def review_contract_status(text: str) -> dict[str, str]:
-    sections = _review_sections(text)
-    if "Verdict" not in sections:
-        return {"ok": "false", "verdict": "", "reason": "missing review sections: Verdict"}
-    verdict = _first_nonempty_line(sections["Verdict"]).strip("`*_-. ")
-    allowed = {"APPROVE", "REQUEST_CHANGES", "BLOCKED", "NEEDS_HUMAN"}
-    if verdict not in allowed:
-        return {"ok": "false", "verdict": verdict, "reason": "invalid verdict"}
-
-    missing = [name for name in REQUIRED_REVIEW_SECTIONS if name not in sections]
-    if missing:
-        return {"ok": "false", "verdict": verdict, "reason": f"missing review sections: {', '.join(missing)}"}
-
-    if any(marker in text for marker in REVIEW_TEMPLATE_MARKERS):
-        return {"ok": "false", "verdict": verdict, "reason": "review still contains prompt template text"}
-
-    for section in ("Findings", "Missing Tests Or Proof", "Merge Conditions"):
-        if len(sections[section].strip()) < 40:
-            return {"ok": "false", "verdict": verdict, "reason": f"{section} section is too thin"}
-
-    if not _has_concrete_review_evidence(text):
-        return {"ok": "false", "verdict": verdict, "reason": "review lacks concrete file/path evidence"}
-
-    if verdict == "APPROVE" and "No blocking findings" not in sections["Findings"]:
-        return {"ok": "false", "verdict": verdict, "reason": "APPROVE review must explicitly state no blocking findings"}
-
-    return {"ok": "true", "verdict": verdict, "reason": ""}
-
-
-def review_receipt_status(path: Path, *, expected_head_sha: str = "") -> dict[str, Any]:
-    if not has_review(path):
-        return {"ok": False, "verdict": "", "reason": "missing or too short", "reviewed_head_sha": ""}
-    receipt_path = path.with_name(path.stem.replace("_review", "_review_receipt") + ".json")
-    if not receipt_path.exists():
-        return {"ok": False, "verdict": "", "reason": "missing reviewer receipt JSON", "reviewed_head_sha": ""}
-    try:
-        receipt = load_json(receipt_path)
-    except (OSError, json.JSONDecodeError):
-        return {"ok": False, "verdict": "", "reason": "invalid reviewer receipt JSON", "reviewed_head_sha": ""}
-    reviewed_head_sha = str(receipt.get("reviewed_head_sha") or "")
-    if receipt.get("exit_code") != 0:
-        return {"ok": False, "verdict": "", "reason": f"review command exited {receipt.get('exit_code')}", "reviewed_head_sha": reviewed_head_sha}
-    if expected_head_sha and reviewed_head_sha != expected_head_sha:
-        return {"ok": False, "verdict": "", "reason": "reviewed head SHA mismatch", "reviewed_head_sha": reviewed_head_sha}
-    text = path.read_text(encoding="utf-8")
-    lowered = text.lower()
-    if "error:" in lowered or "failed to initialize" in lowered or "traceback" in lowered:
-        return {"ok": False, "verdict": "", "reason": "review command failed", "reviewed_head_sha": reviewed_head_sha}
-    contract = review_contract_status(text)
-    if contract["ok"] != "true":
-        return {
-            "ok": False,
-            "verdict": contract["verdict"],
-            "reason": contract["reason"],
-            "reviewed_head_sha": reviewed_head_sha,
-        }
-    return {"ok": True, "verdict": contract["verdict"], "reason": "", "reviewed_head_sha": reviewed_head_sha}
-
-
-def apply_review_gate(
-    blockers: list[str],
-    warnings: list[str],
+def run_agent_process(
+    command: list[str],
+    prompt: str,
+    env: dict[str, str],
     *,
-    name: str,
-    receipt: dict[str, Any],
-    review_file: str,
-    human_approved: bool,
-) -> None:
-    if not receipt["ok"]:
-        blockers.append(f"invalid {review_file} receipt: {receipt['reason']}")
-        return
-    verdict = receipt["verdict"]
-    if verdict == "APPROVE":
-        return
-    if verdict == "NEEDS_HUMAN" and human_approved:
-        warnings.append(f"{name} review returned NEEDS_HUMAN; satisfied by recorded human approval")
-        return
-    blockers.append(f"{review_file} verdict is {verdict}")
+    timeout_s: float,
+    kill_grace_s: float,
+) -> dict[str, Any]:
+    started = time.monotonic()
+    try:
+        proc = subprocess.Popen(
+            command,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            cwd=str(REPO_ROOT),
+            env=env,
+            start_new_session=True,
+        )
+    except FileNotFoundError as exc:
+        return {
+            "status": "spawn_failed",
+            "exit_code": 127,
+            "raw_return_code": 127,
+            "timed_out": False,
+            "killed": "none",
+            "stdout": "",
+            "stderr": str(exc),
+            "duration_s": round(time.monotonic() - started, 3),
+        }
+
+    try:
+        stdout, stderr = proc.communicate(input=prompt, timeout=timeout_s)
+        code = proc.returncode
+        status = "completed" if code == 0 else "failed"
+        timed_out = False
+        killed = "none"
+        raw_return_code = code
+    except subprocess.TimeoutExpired:
+        timed_out = True
+        status = "timeout"
+        killed = "term"
+        try:
+            os.killpg(proc.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+        try:
+            stdout, stderr = proc.communicate(timeout=kill_grace_s)
+        except subprocess.TimeoutExpired:
+            killed = "kill"
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            stdout, stderr = proc.communicate()
+        raw_return_code = proc.returncode
+        code = 124
+
+    return {
+        "status": status,
+        "exit_code": code,
+        "raw_return_code": raw_return_code,
+        "timed_out": timed_out,
+        "killed": killed,
+        "stdout": stdout or "",
+        "stderr": stderr or "",
+        "duration_s": round(time.monotonic() - started, 3),
+    }
+
+
+def trim_log(text: str, limit: int = 4000) -> str:
+    if len(text) <= limit:
+        return text
+    return text[:limit] + "\n...[truncated]...\n"
+
+
+def render_agent_failure_review(
+    agent: str,
+    *,
+    reason: str,
+    command: list[str],
+    timeout_s: float,
+    duration_s: float,
+    stdout: str,
+    stderr: str,
+) -> str:
+    return "\n".join([
+        "## Verdict",
+        "BLOCKED",
+        "",
+        "## Findings",
+        f"1. **BLOCKER**: {agent} review did not complete cleanly. Reason: `{reason}`.",
+        f"   Command: `{' '.join(shlex.quote(part) for part in command)}`.",
+        f"   Timeout: `{timeout_s}s`; duration: `{duration_s}s`.",
+        "",
+        "## Missing Tests Or Proof",
+        "- A complete reviewer artifact with an explicit `APPROVE`, `REQUEST_CHANGES`, `BLOCKED`, or `NEEDS_HUMAN` verdict.",
+        "",
+        "## Merge Conditions",
+        "- Re-run the reviewer successfully and regenerate `MERGE_GATE.md`.",
+        "",
+        "## Captured Stdout",
+        "",
+        "```text",
+        trim_log(stdout).strip(),
+        "```",
+        "",
+        "## Captured Stderr",
+        "",
+        "```text",
+        trim_log(stderr).strip(),
+        "```",
+        "",
+    ])
 
 
 def build_gate(args: argparse.Namespace) -> dict[str, Any]:
@@ -840,23 +923,15 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
     current_threads = fetch_review_threads(args.pr, repo)
     current_classification = classify_pr(current_pr)
     current_coherence = coherence_results(current_pr.get("body") or "")
-    packet_head_sha = str((original.get("pr") or {}).get("headRefOid") or "")
-    current_head_sha = str(current_pr.get("headRefOid") or "")
 
     blockers: list[str] = []
     warnings: list[str] = []
-    if not packet_head_sha:
-        blockers.append("packet is missing reviewed head SHA")
-    if current_head_sha and packet_head_sha and current_head_sha != packet_head_sha:
-        blockers.append("PR head changed since packet generation")
     if current_pr.get("isDraft"):
         blockers.append("PR is draft")
     if current_classification["mergeable"] != "MERGEABLE":
         blockers.append(f"mergeable={current_classification['mergeable']}")
     if current_classification["checks"]["failing"]:
         blockers.append(f"failing checks: {', '.join(current_classification['checks']['failing'])}")
-    if current_classification["checks"]["unknown"]:
-        blockers.append(f"unknown checks: {', '.join(current_classification['checks']['unknown'])}")
     if current_classification["checks"]["pending"] and not args.allow_pending:
         blockers.append(f"pending checks: {', '.join(current_classification['checks']['pending'])}")
     if current_classification["reviewDecision"] == "CHANGES_REQUESTED":
@@ -864,37 +939,67 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
     if not current_coherence["ok"]:
         blockers.append("Coherence Delta fields missing or placeholder")
     unresolved_count = current_threads.get("unresolved_count")
-    if not current_threads.get("ok"):
-        blockers.append(f"could not verify review threads: {current_threads.get('error') or 'unknown error'}")
     if unresolved_count:
         blockers.append(f"{unresolved_count} unresolved review threads")
 
-    codex_path = out_dir / "codex_review.md"
-    claude_path = out_dir / "claude_review.md"
-    codex_receipt = review_receipt_status(codex_path, expected_head_sha=current_head_sha)
-    claude_receipt = review_receipt_status(claude_path, expected_head_sha=current_head_sha)
-    apply_review_gate(
-        blockers,
-        warnings,
-        name="Codex",
-        receipt=codex_receipt,
-        review_file="codex_review.md",
-        human_approved=args.human_approved,
-    )
-    apply_review_gate(
-        blockers,
-        warnings,
-        name="Claude",
-        receipt=claude_receipt,
-        review_file="claude_review.md",
-        human_approved=args.human_approved,
-    )
+    required_reviewers = required_reviewer_agents(args)
+    review_statuses = {
+        agent: load_agent_review_status(out_dir, agent)
+        for agent in required_reviewers
+    }
+    backup_statuses = {
+        agent: load_agent_review_status(out_dir, agent)
+        for agent in backup_reviewer_agents(args)
+    }
+    claude_blockers: list[str] = []
+    for agent, status in review_statuses.items():
+        agent_blockers = agent_review_blockers(status, human_approved=args.human_approved)
+        if agent == "claude":
+            claude_blockers = agent_blockers
+        else:
+            blockers.extend(agent_blockers)
+
+    backup_policy = {
+        "enabled": bool(getattr(args, "allow_backup_reviewer", False)),
+        "reason": getattr(args, "backup_reviewer_reason", "") or "",
+        "replaces": "claude",
+        "reviewers": list(backup_statuses),
+        "accepted_reviewer": "",
+        "claude_blockers": claude_blockers,
+    }
+    if "claude" not in review_statuses:
+        backup_policy["status"] = "not_applicable"
+    elif not claude_blockers:
+        backup_policy["status"] = "not_needed"
+    elif not backup_policy["enabled"]:
+        backup_policy["status"] = "disabled"
+        blockers.extend(claude_blockers)
+    else:
+        accepted_backup = ""
+        for agent, status in backup_statuses.items():
+            if not agent_review_blockers(status, human_approved=args.human_approved):
+                accepted_backup = agent
+                break
+        if not accepted_backup:
+            backup_policy["status"] = "missing_or_blocked"
+            blockers.extend(claude_blockers)
+            blockers.append("no acceptable backup reviewer receipt present")
+        elif not backup_policy["reason"]:
+            backup_policy["status"] = "missing_reason"
+            blockers.append("backup reviewer requires --backup-reviewer-reason")
+        else:
+            backup_policy["status"] = "accepted"
+            backup_policy["accepted_reviewer"] = accepted_backup
+            warnings.append(
+                f"Claude review unavailable; accepted {review_label(accepted_backup)} backup reviewer because: {backup_policy['reason']}"
+            )
 
     original_risk = original.get("risk", {}).get("level", "UNKNOWN")
     if original_risk in {"HIGH", "CRITICAL"} and not args.human_approved:
         blockers.append(f"{original_risk} risk requires --human-approved")
-    if original_risk in {"HIGH", "CRITICAL"} and args.human_approved and not args.human_approval_note.strip():
-        blockers.append(f"{original_risk} risk requires --human-approval-note")
+    if current_classification["checks"]["unknown"]:
+        warnings.append(f"unknown checks: {', '.join(current_classification['checks']['unknown'])}")
+
     return {
         "schema": "dharma.pr_review.merge_gate.v1",
         "generated_at": utc_now(),
@@ -906,31 +1011,15 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
         "warnings": warnings,
         "classification": current_classification,
         "coherence": current_coherence,
+        "required_reviewers": required_reviewers,
         "review_threads": {
             "ok": current_threads.get("ok"),
             "unresolved_count": unresolved_count,
         },
-        "review_receipts": {
-            "codex": str(codex_path),
-            "codex_present": has_review(codex_path),
-            "codex_valid": codex_receipt["ok"],
-            "codex_verdict": codex_receipt["verdict"],
-            "codex_reviewed_head_sha": codex_receipt["reviewed_head_sha"],
-            "claude": str(claude_path),
-            "claude_present": has_review(claude_path),
-            "claude_valid": claude_receipt["ok"],
-            "claude_verdict": claude_receipt["verdict"],
-            "claude_reviewed_head_sha": claude_receipt["reviewed_head_sha"],
-        },
-        "head_sha": {
-            "packet": packet_head_sha,
-            "current": current_head_sha,
-        },
+        "review_receipts": review_statuses,
+        "backup_review_receipts": backup_statuses,
+        "backup_review_policy": backup_policy,
         "risk": original.get("risk", {}),
-        "human_approval": {
-            "approved": bool(args.human_approved),
-            "note": args.human_approval_note.strip(),
-        },
     }
 
 
@@ -942,6 +1031,7 @@ def render_gate_markdown(gate: dict[str, Any]) -> str:
         f"- Decision: `{gate['decision']}`",
         f"- Packet: `{gate['packet_dir']}`",
         f"- Risk: `{gate.get('risk', {}).get('level', 'UNKNOWN')}`",
+        f"- Required reviewers: `{', '.join(gate.get('required_reviewers', []))}`",
         "",
         "## Blockers",
         "",
@@ -957,32 +1047,53 @@ def render_gate_markdown(gate: dict[str, Any]) -> str:
         lines.append("- none")
     lines.extend(["", "## Review Receipts", ""])
     receipts = gate["review_receipts"]
-    lines.append(
-        f"- Codex: `{receipts['codex']}` present={receipts['codex_present']} "
-        f"valid={receipts['codex_valid']} verdict={receipts['codex_verdict'] or 'NONE'} "
-        f"head={receipts['codex_reviewed_head_sha'] or 'NONE'}"
-    )
-    lines.append(
-        f"- Claude: `{receipts['claude']}` present={receipts['claude_present']} "
-        f"valid={receipts['claude_valid']} verdict={receipts['claude_verdict'] or 'NONE'} "
-        f"head={receipts['claude_reviewed_head_sha'] or 'NONE'}"
-    )
+    for agent in receipts:
+        status = receipts[agent]
+        label = review_label(agent)
+        lines.append(
+            f"- {label}: output=`{status['output']}` output_present={status['output_present']} "
+            f"receipt=`{status['receipt']}` receipt_present={status['receipt_present']} "
+            f"receipt_status={status['receipt_status']} exit={status['exit_code']} "
+            f"timed_out={status['timed_out']} verdict={status['verdict']}"
+        )
+    backup_policy = gate.get("backup_review_policy") or {}
+    backup_receipts = gate.get("backup_review_receipts") or {}
+    if backup_receipts:
+        lines.extend(["", "## Backup Review Receipts", ""])
+        lines.append(
+            f"- Policy: enabled={backup_policy.get('enabled')} status={backup_policy.get('status')} "
+            f"accepted={backup_policy.get('accepted_reviewer') or '-'}"
+        )
+        if backup_policy.get("reason"):
+            lines.append(f"- Reason: {backup_policy['reason']}")
+        for agent, status in backup_receipts.items():
+            label = review_label(agent)
+            lines.append(
+                f"- {label}: output=`{status['output']}` output_present={status['output_present']} "
+                f"receipt=`{status['receipt']}` receipt_present={status['receipt_present']} "
+                f"receipt_status={status['receipt_status']} exit={status['exit_code']} "
+                f"timed_out={status['timed_out']} verdict={status['verdict']}"
+            )
     lines.append("")
     return "\n".join(lines)
 
 
-def render_github_comment(packet: dict[str, Any], gate: dict[str, Any] | None) -> str:
+def render_github_comment(
+    packet: dict[str, Any],
+    gate: dict[str, Any] | None,
+    merge_receipt: dict[str, Any] | None = None,
+) -> str:
     pr = packet["pr"]
     classification = packet["classification"]
     risk = packet["risk"]
     coherence = packet["coherence"]
-    decision = gate.get("decision") if gate else "GATE_MISSING"
-    blockers = gate.get("blockers", []) if gate else ["merge gate output missing or gate execution failed"]
+    decision = gate.get("decision") if gate else "PACKET_ONLY"
+    blockers = gate.get("blockers", []) if gate else []
     warnings = gate.get("warnings", []) if gate else []
 
     lines = [
         "<!-- dharma-pr-review-control:auto -->",
-        "## Dharma PR Review Control",
+        "## Merge Master Mike / Dharma PR Review Control",
         "",
         f"- PR: `#{pr['number']}`",
         f"- Decision: `{decision}`",
@@ -990,6 +1101,7 @@ def render_github_comment(packet: dict[str, Any], gate: dict[str, Any] | None) -
         f"- Mergeable: `{classification['mergeable']}`",
         f"- Risk: `{risk['level']}` ({risk['files_changed']} files, +{risk['additions']}/-{risk['deletions']})",
         f"- Coherence Delta: `{'pass' if coherence['ok'] else 'fail'}`",
+        "- Authority: `conditional_merge_after_clean_gate`",
         "",
         "### Blockers",
         "",
@@ -1003,26 +1115,95 @@ def render_github_comment(packet: dict[str, Any], gate: dict[str, Any] | None) -
         lines.extend(f"- {warning}" for warning in warnings)
     else:
         lines.append("- none")
+    if merge_receipt:
+        lines.extend([
+            "",
+            "### Merge Request",
+            "",
+            f"- Status: `{merge_receipt.get('status')}`",
+            f"- Reason: {merge_receipt.get('reason')}",
+            f"- Method: `{merge_receipt.get('method')}`",
+            f"- Auto-merge: `{merge_receipt.get('auto')}`",
+        ])
+        if merge_receipt.get("exit_code") is not None:
+            lines.append(f"- Exit code: `{merge_receipt.get('exit_code')}`")
+    required_reviewers = gate.get("required_reviewers", []) if gate else list(DEFAULT_REQUIRED_REVIEWERS)
     lines.extend([
         "",
-        "### Required Local Review Receipts",
+        "### Authority Boundary",
         "",
-        "Run these from the repo root on the operator machine:",
+        "- GitHub Action Mike may create packets, run deterministic gates, post this status comment, and run `gh pr merge --auto` only when explicitly asked to `merge when clean`.",
+        "- Mike may not approve PRs, push code, mark human approval, resolve review threads, or bypass branch protection.",
+        "- Branch protection and GitHub auto-merge remain enforcement layers after Mike's gate.",
+        "",
+        "### Required Review Receipts",
+        "",
+    ])
+    for reviewer in required_reviewers:
+        lines.append(f"- `{reviewer}_review.md` plus `{reviewer}_review_receipt.json`")
+    lines.extend([
+        "",
+        "### Local Commands",
         "",
         "```bash",
         f"make pr-packet PR={pr['number']}",
-        f"make pr-run-codex PR={pr['number']}",
-        f"make pr-run-claude PR={pr['number']}",
         f"make pr-gate PR={pr['number']}",
-        "```",
-        "",
-        "Merge remains local and confirmation-gated:",
-        "",
-        "```bash",
         f"make pr-merge PR={pr['number']} ARGS=\"--confirm merge-pr-{pr['number']}\"",
         "```",
     ])
     return "\n".join(lines) + "\n"
+
+
+def gh_merge_command(pr_number: int, *, method: str = "squash", auto: bool = True) -> list[str]:
+    cmd = ["gh", "pr", "merge", str(pr_number), f"--{method}", "--delete-branch"]
+    if auto:
+        cmd.insert(4, "--auto")
+    return cmd
+
+
+def run_mike_merge_authority(
+    *,
+    pr_number: int,
+    gate: dict[str, Any],
+    method: str,
+    auto: bool,
+    runner: Callable[..., CommandResult] = run,
+) -> dict[str, Any]:
+    command = gh_merge_command(pr_number, method=method, auto=auto)
+    receipt: dict[str, Any] = {
+        "schema": "dharma.pr_review.mike_merge_receipt.v1",
+        "generated_at": utc_now(),
+        "agent_uid": "merge_master_mike",
+        "authority": "conditional_merge",
+        "pr": pr_number,
+        "method": method,
+        "auto": auto,
+        "gate_decision": gate.get("decision"),
+        "gate_packet_dir": gate.get("packet_dir"),
+        "required_reviewers": gate.get("required_reviewers", []),
+        "risk": gate.get("risk", {}),
+        "command": command,
+        "status": "SKIPPED",
+        "reason": "gate decision is not MERGE_CANDIDATE",
+        "exit_code": None,
+        "stdout": "",
+        "stderr": "",
+    }
+    if gate.get("decision") != "MERGE_CANDIDATE":
+        receipt["blockers"] = gate.get("blockers", [])
+        return receipt
+
+    result = runner(command, timeout=300, check=False)
+    receipt["exit_code"] = result.code
+    receipt["stdout"] = result.stdout[-4000:]
+    receipt["stderr"] = result.stderr[-4000:]
+    if result.code == 0:
+        receipt["status"] = "MERGE_COMMAND_ACCEPTED"
+        receipt["reason"] = "gh pr merge accepted the conditional merge command"
+    else:
+        receipt["status"] = "MERGE_COMMAND_FAILED"
+        receipt["reason"] = "gh pr merge returned non-zero"
+    return receipt
 
 
 def cmd_gate(args: argparse.Namespace) -> int:
@@ -1043,7 +1224,9 @@ def cmd_comment(args: argparse.Namespace) -> int:
     packet = load_json(out_dir / "FACTS.json")
     gate_path = out_dir / "MERGE_GATE.json"
     gate = load_json(gate_path) if gate_path.exists() else None
-    comment = render_github_comment(packet, gate)
+    merge_path = out_dir / "MIKE_MERGE_RECEIPT.json"
+    merge_receipt = load_json(merge_path) if merge_path.exists() else None
+    comment = render_github_comment(packet, gate, merge_receipt)
     if args.output:
         write_text(expand(args.output), comment)
         print(args.output)
@@ -1073,45 +1256,28 @@ def cmd_reviewers(args: argparse.Namespace) -> int:
     claude_auth_ready = bool(isinstance(claude_payload, dict) and claude_payload.get("loggedIn"))
     claude_probe: dict[str, Any] | None = None
     if args.live_probe:
-        try:
-            probe = subprocess.run(
-                claude_command,
-                input="Reply with OK only.",
-                text=True,
-                capture_output=True,
-                cwd=str(REPO_ROOT),
-                env=claude_env,
-                timeout=args.probe_timeout_s,
-                check=False,
-            )
-            claude_probe = {
-                "status": "completed" if probe.returncode == 0 else "failed",
-                "exit_code": probe.returncode,
-                "timed_out": False,
-                "stdout_excerpt": (probe.stdout or "")[:500],
-                "stderr_excerpt": (probe.stderr or "")[:500],
-            }
-        except subprocess.TimeoutExpired as exc:
-            stdout = exc.stdout or ""
-            stderr = exc.stderr or ""
-            if isinstance(stdout, bytes):
-                stdout = stdout.decode("utf-8", errors="replace")
-            if isinstance(stderr, bytes):
-                stderr = stderr.decode("utf-8", errors="replace")
-            claude_probe = {
-                "status": "timeout",
-                "exit_code": 124,
-                "timed_out": True,
-                "stdout_excerpt": stdout[:500],
-                "stderr_excerpt": stderr[:500],
-            }
+        probe = run_agent_process(
+            claude_command,
+            "Reply with OK only.",
+            claude_env,
+            timeout_s=args.probe_timeout_s,
+            kill_grace_s=DEFAULT_AGENT_KILL_GRACE_S,
+        )
+        claude_probe = {
+            "status": probe["status"],
+            "exit_code": probe["exit_code"],
+            "timed_out": probe["timed_out"],
+            "duration_s": probe["duration_s"],
+            "stdout_excerpt": trim_log(probe["stdout"], 500),
+            "stderr_excerpt": trim_log(probe["stderr"], 500),
+        }
 
     result = {
         "schema": "dharma.pr_review.reviewers.v1",
         "generated_at": utc_now(),
         "claude": {
             "command": claude_command,
-            "credential_env_scrubbed": "ANTHROPIC_API_KEY" not in claude_env,
+            "anthropic_credential_env_scrubbed": "ANTHROPIC_API_KEY" not in claude_env,
             "auth_status_exit": claude_proc.returncode,
             "auth_status": claude_payload,
             "auth_ready": claude_auth_ready,
@@ -1128,7 +1294,7 @@ def cmd_reviewers(args: argparse.Namespace) -> int:
         return 0 if result["claude"]["ready"] else 2
 
     print(f"Claude command: {' '.join(claude_command)}")
-    print(f"Claude credential env scrubbed: {result['claude']['credential_env_scrubbed']}")
+    print(f"Claude credential env scrubbed: {result['claude']['anthropic_credential_env_scrubbed']}")
     print(f"Claude auth ready: {result['claude']['auth_ready']}")
     if claude_probe is None:
         print("Claude live probe: not run (use ARGS='--live-probe' to check quota/runtime)")
@@ -1164,80 +1330,743 @@ def cmd_merge(args: argparse.Namespace) -> int:
         return 2
     if not args.execute:
         print("decision=MERGE_CANDIDATE")
-        print(
-            "dry_run=true command="
-            f"gh pr merge {args.pr} --{args.method} --delete-branch "
-            f"--match-head-commit {gate['head_sha']['current']}"
+        command = gh_merge_command(args.pr, method=args.method, auto=args.auto)
+        print(f"dry_run=true command={' '.join(shlex.quote(part) for part in command)}")
+        write_json(
+            out_dir / "MIKE_MERGE_RECEIPT.json",
+            {
+                "schema": "dharma.pr_review.mike_merge_receipt.v1",
+                "generated_at": utc_now(),
+                "agent_uid": "merge_master_mike",
+                "authority": "conditional_merge",
+                "pr": args.pr,
+                "method": args.method,
+                "auto": args.auto,
+                "gate_decision": gate.get("decision"),
+                "required_reviewers": gate.get("required_reviewers", []),
+                "status": "DRY_RUN",
+                "command": command,
+            },
         )
         return 0
-    run(
-        [
-            "gh",
-            "pr",
-            "merge",
-            str(args.pr),
-            f"--{args.method}",
-            "--delete-branch",
-            "--match-head-commit",
-            gate["head_sha"]["current"],
-        ],
-        timeout=300,
+    merge_receipt = run_mike_merge_authority(
+        pr_number=args.pr,
+        gate=gate,
+        method=args.method,
+        auto=args.auto,
     )
-    print(f"merged=pr-{args.pr} method={args.method}")
-    return 0
+    write_json(out_dir / "MIKE_MERGE_RECEIPT.json", merge_receipt)
+    print(f"merge_status={merge_receipt['status']} pr={args.pr} method={args.method} auto={args.auto}")
+    return 0 if merge_receipt["status"] == "MERGE_COMMAND_ACCEPTED" else 2
 
 
 def cmd_run_agent(args: argparse.Namespace) -> int:
     out_dir = latest_or_arg_packet(args)
-    packet = load_json(out_dir / "FACTS.json")
-    reviewed_head_sha = str((packet.get("pr") or {}).get("headRefOid") or "")
     prompt_name = "PROMPT_CLAUDE.md" if args.agent == "claude" else "PROMPT_CODEX.md"
-    output_name = "claude_review.md" if args.agent == "claude" else "codex_review.md"
     prompt = (out_dir / prompt_name).read_text(encoding="utf-8")
     command, env = review_command_and_env(args.agent)
-    timeout = review_timeout_seconds(args.agent, env, args.timeout_s)
-    timed_out = False
-    try:
-        result = subprocess.run(
-            command,
-            input=prompt,
-            text=True,
-            capture_output=True,
-            cwd=str(REPO_ROOT),
-            env=env,
-            timeout=timeout,
-            check=False,
+    timeout_s = args.timeout_s if args.timeout_s is not None else env_float("DHARMA_PR_REVIEW_TIMEOUT_S", DEFAULT_AGENT_TIMEOUT_S)
+    kill_grace_s = args.kill_grace_s if args.kill_grace_s is not None else DEFAULT_AGENT_KILL_GRACE_S
+    result = run_agent_process(
+        command,
+        prompt,
+        env,
+        timeout_s=timeout_s,
+        kill_grace_s=kill_grace_s,
+    )
+    raw_output = (result["stdout"] or result["stderr"]).strip()
+    exit_code = int(result["exit_code"])
+    if result["timed_out"] or result["status"] == "spawn_failed":
+        review_text = render_agent_failure_review(
+            args.agent,
+            reason=result["status"],
+            command=command,
+            timeout_s=timeout_s,
+            duration_s=result["duration_s"],
+            stdout=result["stdout"],
+            stderr=result["stderr"],
         )
-        exit_code = result.returncode
-        output = result.stdout or result.stderr
-    except subprocess.TimeoutExpired as exc:
-        timed_out = True
-        exit_code = 124
-        stdout = exc.stdout or ""
-        stderr = exc.stderr or ""
-        if isinstance(stdout, bytes):
-            stdout = stdout.decode("utf-8", errors="replace")
-        if isinstance(stderr, bytes):
-            stderr = stderr.decode("utf-8", errors="replace")
-        output = (stdout or stderr).strip()
-        output = (output + "\n\n" if output else "") + f"ERROR: review command timed out after {timeout} seconds"
-    write_text(out_dir / output_name, output)
+    elif len(raw_output) < 40:
+        result["status"] = "empty_output"
+        exit_code = 2
+        result["exit_code"] = exit_code
+        review_text = render_agent_failure_review(
+            args.agent,
+            reason="empty_output",
+            command=command,
+            timeout_s=timeout_s,
+            duration_s=result["duration_s"],
+            stdout=result["stdout"],
+            stderr=result["stderr"],
+        )
+    else:
+        review_text = raw_output
+
+    output_path = review_output_path(out_dir, args.agent)
+    write_text(output_path, review_text)
     write_json(
-        out_dir / f"{args.agent}_review_receipt.json",
+        review_receipt_path(out_dir, args.agent),
         {
             "schema": "dharma.pr_review.agent_receipt.v1",
             "generated_at": utc_now(),
             "agent": args.agent,
             "command": command,
+            "status": result["status"],
             "exit_code": exit_code,
-            "timed_out": timed_out,
-            "timeout_seconds": timeout,
-            "reviewed_head_sha": reviewed_head_sha,
-            "output": str(out_dir / output_name),
+            "raw_return_code": result["raw_return_code"],
+            "timed_out": result["timed_out"],
+            "killed": result["killed"],
+            "timeout_s": timeout_s,
+            "kill_grace_s": kill_grace_s,
+            "duration_s": result["duration_s"],
+            "stdout_bytes": len(result["stdout"].encode("utf-8")),
+            "stderr_bytes": len(result["stderr"].encode("utf-8")),
+            "verdict": extract_review_verdict(review_text),
+            "output": str(output_path),
         },
     )
-    print(f"agent={args.agent} exit={exit_code} output={out_dir / output_name}")
+    print(
+        f"agent={args.agent} status={result['status']} exit={exit_code} "
+        f"timed_out={result['timed_out']} output={output_path}"
+    )
     return exit_code
+
+
+def parse_csv_tokens(value: str | None, *, default: tuple[str, ...]) -> list[str]:
+    if not value:
+        return list(default)
+    tokens = [item.strip() for item in value.split(",") if item.strip()]
+    return tokens or list(default)
+
+
+def required_reviewer_agents(args: argparse.Namespace) -> list[str]:
+    raw = getattr(args, "required_reviewers", "") or os.environ.get("DHARMA_PR_REQUIRED_REVIEWERS", "")
+    return parse_csv_tokens(raw, default=DEFAULT_REQUIRED_REVIEWERS)
+
+
+def _nats_config(env: dict[str, str], *, require_devin_secrets: bool) -> NATSConfig:
+    mike_present = any(env.get(name) for name in MERGE_MASTER_MIKE_NATS_SECRET_NAMES)
+    credential_family = "merge_master_mike" if mike_present else "devin"
+    endpoint = (
+        env.get("MERGE_MASTER_MIKE_NATS_URL")
+        or env.get("DEVIN_NATS_URL")
+        or env.get("DHARMA_NATS_URL")
+        or env.get("NATS_URL")
+        or ""
+    )
+    user = (
+        env.get("MERGE_MASTER_MIKE_NATS_USER")
+        or env.get("DEVIN_NATS_USER")
+        or env.get("DHARMA_NATS_USER")
+        or env.get("NATS_USER")
+        or ""
+    )
+    auth_value = (
+        env.get("MERGE_MASTER_MIKE_NATS_PW")
+        or env.get("MERGE_MASTER_MIKE_NATS_PASSWORD")
+        or env.get("DEVIN_NATS_PW")
+        or env.get("DEVIN_NATS_PASSWORD")
+        or env.get("DHARMA_NATS_PW")
+        or env.get("DHARMA_NATS_PASSWORD")
+        or env.get("NATS_PASSWORD")
+        or ""
+    )
+    ca_pem = (
+        env.get("MERGE_MASTER_MIKE_NATS_CA_PEM")
+        or env.get("DEVIN_NATS_CA_PEM")
+        or env.get("DHARMA_NATS_CA_PEM")
+        or env.get("NATS_CA_PEM")
+        or ""
+    )
+    tls_hostname = (
+        env.get("MERGE_MASTER_MIKE_NATS_TLS_HOSTNAME")
+        or env.get("DEVIN_NATS_TLS_HOSTNAME")
+        or env.get("DHARMA_NATS_TLS_HOSTNAME")
+        or env.get("NATS_TLS_HOSTNAME")
+        or ""
+    )
+    if require_devin_secrets:
+        required_names = MERGE_MASTER_MIKE_NATS_SECRET_NAMES if mike_present else DEVIN_NATS_SECRET_NAMES
+        missing = [name for name in required_names if not env.get(name)]
+    else:
+        missing = [] if endpoint else ["MERGE_MASTER_MIKE_NATS_URL or DEVIN_NATS_URL or DHARMA_NATS_URL or NATS_URL"]
+    return NATSConfig(
+        endpoint=endpoint,
+        user=user,
+        credential=auth_value,
+        missing=tuple(missing),
+        ca_pem=_normalize_ca_pem(ca_pem),
+        tls_hostname=tls_hostname.strip(),
+        credential_family=credential_family,
+    )
+
+
+def _normalize_ca_pem(value: str) -> str:
+    normalized = value.strip()
+    if "\\n" in normalized and "\n" not in normalized:
+        normalized = normalized.replace("\\n", "\n")
+    return normalized + "\n" if normalized and not normalized.endswith("\n") else normalized
+
+
+def _redacted_nats_config(config: NATSConfig) -> dict[str, Any]:
+    return {
+        "endpoint": config.endpoint,
+        "has_user": bool(config.user),
+        "has_auth_credential": bool(config.credential),
+        "has_ca_pem": bool(config.ca_pem),
+        "tls_hostname": config.tls_hostname,
+        "tls_trust": "custom_ca_pem" if config.ca_pem else "system_ca_store",
+        "credential_family": config.credential_family,
+        "missing": list(config.missing),
+    }
+
+
+def _nats_tls_kwargs(config: NATSConfig) -> dict[str, Any]:
+    kwargs: dict[str, Any] = {}
+    if config.ca_pem:
+        tls_context = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH)
+        tls_context.load_verify_locations(cadata=config.ca_pem)
+        kwargs["tls"] = tls_context
+    if config.tls_hostname:
+        kwargs["tls_hostname"] = config.tls_hostname
+    return kwargs
+
+
+def _a2a_target_for_subject(subject: str) -> str:
+    if subject == "dharma.a2a.fleet":
+        return "fleet"
+    if subject == "dharma.a2a.merge_master_mike":
+        return "merge_master_mike"
+    if subject == "dharma.a2a.github_copilot":
+        return "github_copilot"
+    if subject == "dharma.a2a.claude":
+        return "claude"
+    if subject == "dharma.a2a.devin":
+        return "devin-roaming-2987d222"
+    if subject == "dharma.a2a.codex":
+        return "codex"
+    if subject == "dharma.a2a.hermes":
+        return "hermes"
+    if subject == "dharma.a2a.perplexity":
+        return "perplexity"
+    return subject.rsplit(".", 1)[-1]
+
+
+def _a2a_kind_for_subject(subject: str) -> str:
+    if subject == "dharma.a2a.fleet":
+        return "pr_janitor_session_start"
+    if subject == "dharma.a2a.merge_master_mike":
+        return "pr_janitor_mike_fanout"
+    if subject == "dharma.a2a.github_copilot":
+        return "pr_janitor_copilot_review_request"
+    if subject == "dharma.a2a.claude":
+        return "pr_janitor_claude_review_request"
+    if subject == "dharma.a2a.devin":
+        return "pr_janitor_devin_coordination_request"
+    if subject == "dharma.a2a.codex":
+        return "pr_janitor_codex_verification_request"
+    if subject == "dharma.a2a.hermes":
+        return "pr_janitor_hermes_witness_request"
+    if subject == "dharma.a2a.perplexity":
+        return "pr_janitor_perplexity_research_request"
+    return "pr_janitor_coordination"
+
+
+def build_a2a_fanout_messages(
+    *,
+    repo: str,
+    run_id: str,
+    queue_summary: dict[str, Any],
+    selected: list[dict[str, Any]],
+    processed: list[dict[str, Any]],
+    fanout_dir: Path,
+    subjects: list[str],
+    required_reviewers: list[str],
+    merge_mode: str,
+    dry_run: bool,
+    packet_only: bool,
+) -> list[dict[str, Any]]:
+    selected_prs = [
+        {
+            "number": item.get("number"),
+            "status": item.get("status"),
+            "title": item.get("title"),
+            "url": item.get("url"),
+        }
+        for item in selected
+    ]
+    processed_prs = [
+        {
+            "number": item.get("number"),
+            "status": item.get("status"),
+            "gate_decision": item.get("gate_decision"),
+            "blockers": item.get("blockers", []),
+            "packet_dir": item.get("packet_dir"),
+        }
+        for item in processed
+    ]
+    common = {
+        "schema_version": "dharma.pr_review.a2a_nats_session.v1",
+        "timestamp": utc_now(),
+        "from": "github_actions_merge_master_mike",
+        "authority": "conditional_merge" if merge_mode == "auto-when-clean" else "external_worker_evidence_only",
+        "repo": repo,
+        "goal": (
+            "collaborative PR queue synthesis; conditional merge authority when gate-clean"
+            if merge_mode == "auto-when-clean"
+            else "collaborative PR queue synthesis; no merge authority"
+        ),
+        "run_id": run_id,
+        "dry_run": dry_run,
+        "packet_only": packet_only,
+        "merge_mode": merge_mode,
+        "queue_counts": queue_summary.get("counts", {}),
+        "queue_total": queue_summary.get("total"),
+        "required_reviewers": required_reviewers,
+        "agent_roster": [_a2a_target_for_subject(subject) for subject in subjects],
+        "selected_prs": selected_prs,
+        "processed_prs": processed_prs,
+        "receipt_path": str(fanout_dir / "receipt.json"),
+        "summary_path": str(fanout_dir / "summary.md"),
+        "allowed_actions": [
+            "inspect_pr_queue",
+            "create_review_packets",
+            "run_merge_gate",
+            "write_receipts",
+            "recommend_next_actions",
+            "conditional_merge_after_clean_gate" if merge_mode == "auto-when-clean" else "no_merge",
+        ],
+        "forbidden_actions": [
+            "unconditional_merge",
+            "approve_prs",
+            "push_code",
+            "mark_human_approval",
+            "resolve_review_threads",
+            "bypass_governance",
+        ],
+    }
+    return [
+        {
+            "subject": subject,
+            "payload": {
+                **common,
+                "kind": _a2a_kind_for_subject(subject),
+                "to": _a2a_target_for_subject(subject),
+            },
+        }
+        for subject in subjects
+    ]
+
+
+async def _publish_a2a_messages_async(
+    config: NATSConfig,
+    messages: list[dict[str, Any]],
+    timeout_s: float,
+) -> list[dict[str, Any]]:
+    import nats
+
+    nc = await nats.connect(
+        servers=[str(config.endpoint)],
+        user=config.user or None,
+        password=config.credential or None,
+        connect_timeout=timeout_s,
+        allow_reconnect=False,
+        max_reconnect_attempts=0,
+        **_nats_tls_kwargs(config),
+    )
+    try:
+        js = nc.jetstream()
+        rows: list[dict[str, Any]] = []
+        for message in messages:
+            data = json.dumps(message["payload"], sort_keys=True).encode("utf-8")
+            ack = await js.publish(str(message["subject"]), data, timeout=timeout_s)
+            rows.append({
+                "subject": message["subject"],
+                "kind": message["payload"].get("kind"),
+                "to": message["payload"].get("to"),
+                "ack_verified": True,
+                "ack_tier": "JETSTREAM_PUB_ACK",
+                "stream": ack.stream,
+                "seq": ack.seq,
+            })
+        return rows
+    finally:
+        await nc.close()
+
+
+async def _publish_a2a_messages_with_deadline(
+    config: NATSConfig,
+    messages: list[dict[str, Any]],
+    timeout_s: float,
+) -> list[dict[str, Any]]:
+    overall_timeout_s = timeout_s * max(len(messages) + 2, 2)
+    return await asyncio.wait_for(
+        _publish_a2a_messages_async(config, messages, timeout_s),
+        timeout=overall_timeout_s,
+    )
+
+
+def default_a2a_nats_publisher(
+    config: NATSConfig,
+    messages: list[dict[str, Any]],
+    timeout_s: float,
+) -> list[dict[str, Any]]:
+    return asyncio.run(_publish_a2a_messages_with_deadline(config, messages, timeout_s))
+
+
+A2ANatsPublisher = Callable[[NATSConfig, list[dict[str, Any]], float], list[dict[str, Any]]]
+
+
+def publish_a2a_fanout_session(
+    *,
+    repo: str,
+    run_id: str,
+    queue_summary: dict[str, Any],
+    selected: list[dict[str, Any]],
+    processed: list[dict[str, Any]],
+    fanout_dir: Path,
+    subjects: list[str],
+    required_reviewers: list[str],
+    merge_mode: str,
+    dry_run: bool,
+    packet_only: bool,
+    required: bool,
+    timeout_s: float,
+    env: dict[str, str] | None = None,
+    publisher: A2ANatsPublisher = default_a2a_nats_publisher,
+) -> dict[str, Any]:
+    config = _nats_config(dict(env or os.environ), require_devin_secrets=required)
+    messages = build_a2a_fanout_messages(
+        repo=repo,
+        run_id=run_id,
+        queue_summary=queue_summary,
+        selected=selected,
+        processed=processed,
+        fanout_dir=fanout_dir,
+        subjects=subjects,
+        required_reviewers=required_reviewers,
+        merge_mode=merge_mode,
+        dry_run=dry_run,
+        packet_only=packet_only,
+    )
+    receipt: dict[str, Any] = {
+        "schema": "dharma.pr_review.a2a_nats_receipt.v1",
+        "generated_at": utc_now(),
+        "repo": repo,
+        "run_id": run_id,
+        "required": required,
+        "config": _redacted_nats_config(config),
+        "subjects": subjects,
+        "messages": messages,
+        "status": "BLOCKED",
+        "code": "NATS_NOT_ATTEMPTED",
+        "ack_tier": "NONE",
+        "acks": [],
+    }
+    if config.missing:
+        receipt["code"] = "NATS_SECRETS_MISSING" if required else "NATS_ENDPOINT_MISSING"
+        receipt["reason"] = f"missing NATS configuration: {', '.join(config.missing)}"
+        return receipt
+
+    try:
+        acks = publisher(config, messages, timeout_s)
+    except Exception as exc:
+        receipt["code"] = "NATS_PUBLISH_FAILED"
+        receipt["reason"] = f"{type(exc).__name__}: {exc}"
+        return receipt
+
+    receipt["acks"] = acks
+    if acks and all(row.get("ack_verified") for row in acks):
+        receipt["status"] = "OK"
+        receipt["code"] = "NATS_ACK_VERIFIED"
+        receipt["ack_tier"] = "JETSTREAM_PUB_ACK"
+        receipt["reason"] = "all A2A PR janitor messages received JetStream publish acks"
+    else:
+        receipt["code"] = "NATS_ACK_FAILED"
+        receipt["reason"] = "one or more A2A PR janitor messages did not receive a verified ack"
+    return receipt
+
+
+def select_fanout_items(
+    summary: dict[str, Any],
+    *,
+    statuses: list[str],
+    max_prs: int,
+) -> list[dict[str, Any]]:
+    """Pick the next PRs Mike can review without changing repository state."""
+
+    status_rank = {status: index for index, status in enumerate(statuses)}
+    candidates = [
+        item
+        for item in summary.get("items", [])
+        if item.get("status") in status_rank
+    ]
+    candidates.sort(
+        key=lambda item: (
+            status_rank.get(str(item.get("status")), 999),
+            str(item.get("updatedAt") or ""),
+            int(item.get("number") or 0),
+        )
+    )
+    return candidates[:max(0, max_prs)]
+
+
+def render_fanout_markdown(receipt: dict[str, Any]) -> str:
+    lines = [
+        "# Merge Master Mike Fanout",
+        "",
+        f"- Generated: `{receipt['generated_at']}`",
+        f"- Repository: `{receipt['repo']}`",
+        f"- Dry run: `{receipt['dry_run']}`",
+        f"- Selected: `{len(receipt['selected'])}`",
+        f"- Processed: `{len(receipt['processed'])}`",
+        f"- Required reviewers: `{', '.join(receipt.get('required_reviewers', []))}`",
+        f"- Merge mode: `{receipt.get('merge_mode', 'off')}`",
+        "",
+        "## Selected",
+        "",
+    ]
+    if receipt["selected"]:
+        for item in receipt["selected"]:
+            lines.append(f"- `#{item['number']}` `{item['status']}` {item['title']}")
+    else:
+        lines.append("- none")
+    lines.extend(["", "## Processed", ""])
+    if receipt["processed"]:
+        for item in receipt["processed"]:
+            lines.append(
+                f"- `#{item['number']}` gate=`{item.get('gate_decision')}` "
+                f"packet=`{item.get('packet_dir')}` comment=`{item.get('comment_path')}`"
+            )
+            for reviewer in item.get("reviewers", []):
+                lines.append(
+                    f"  - {reviewer['agent']}: exit={reviewer['exit_code']} "
+                    f"status=`{reviewer['status']}` verdict=`{reviewer.get('verdict')}`"
+                )
+            if item.get("blockers"):
+                for blocker in item["blockers"]:
+                    lines.append(f"  - BLOCKER: {blocker}")
+            if item.get("merge"):
+                merge = item["merge"]
+                lines.append(
+                    f"  - merge: status=`{merge.get('status')}` method=`{merge.get('method')}` "
+                    f"auto=`{merge.get('auto')}` receipt=`{merge.get('receipt')}`"
+                )
+    else:
+        lines.append("- none")
+    lines.extend([
+        "",
+        "## Authority",
+        "",
+        "- GitHub comment text is rendered locally only; posting remains a separate explicit action.",
+        "- Merge is allowed only when `merge_mode=auto-when-clean` and the deterministic gate is clean.",
+        "",
+    ])
+    if receipt.get("merge_mode") == "auto-when-clean":
+        lines.insert(-1, "- This fanout may run Mike's conditional merge command after a clean gate.")
+    else:
+        lines.insert(-1, "- This fanout does not merge, approve, push, or edit source.")
+    if receipt.get("a2a_nats"):
+        nats = receipt["a2a_nats"]
+        lines.extend([
+            "## A2A NATS",
+            "",
+            f"- Status: `{nats.get('status')}`",
+            f"- Code: `{nats.get('code')}`",
+            f"- Ack tier: `{nats.get('ack_tier')}`",
+            f"- Receipt: `{nats.get('receipt_path')}`",
+            "",
+        ])
+    return "\n".join(lines)
+
+
+def cmd_fanout(args: argparse.Namespace) -> int:
+    root = expand(args.state_root)
+    repo = repo_name()
+    queue_summary = build_queue_summary(fetch_open_prs(args.limit), repo)
+    queue_dir = root / "queue"
+    write_json(queue_dir / "latest.json", queue_summary)
+    write_text(queue_dir / "latest.md", render_queue_markdown(queue_summary))
+
+    statuses = parse_csv_tokens(args.statuses, default=DEFAULT_FANOUT_STATUSES)
+    agents = parse_csv_tokens(args.agents, default=("codex", "claude"))
+    required_reviewers = required_reviewer_agents(args)
+    invalid_agents = sorted(set(agents) - {"codex", "claude"})
+    if invalid_agents:
+        raise PRControlError(f"unsupported fanout agent(s): {', '.join(invalid_agents)}")
+
+    selected = select_fanout_items(queue_summary, statuses=statuses, max_prs=args.max_prs)
+    run_id = stamp()
+    fanout_dir = root / "mike_fanout" / run_id
+    processed: list[dict[str, Any]] = []
+
+    for item in selected:
+        pr_number = int(item["number"])
+        if args.dry_run:
+            continue
+
+        packet_args = argparse.Namespace(state_root=str(root), pr=pr_number)
+        packet_code = cmd_packet(packet_args)
+        if packet_code != 0:
+            processed.append({
+                "number": pr_number,
+                "title": item.get("title"),
+                "status": item.get("status"),
+                "packet_status": "failed",
+                "packet_exit": packet_code,
+                "reviewers": [],
+                "gate_decision": "BLOCKED",
+                "blockers": [f"packet command exited {packet_code}"],
+            })
+            continue
+
+        out_dir = packet_dir(root, pr_number)
+        reviewer_rows: list[dict[str, Any]] = []
+        if not args.packet_only:
+            for agent in agents:
+                run_args = argparse.Namespace(
+                    state_root=str(root),
+                    pr=pr_number,
+                    packet_dir=str(out_dir),
+                    agent=agent,
+                    timeout_s=args.timeout_s,
+                    kill_grace_s=args.kill_grace_s,
+                )
+                exit_code = cmd_run_agent(run_args)
+                status = load_agent_review_status(out_dir, agent)
+                reviewer_rows.append({
+                    "agent": agent,
+                    "exit_code": exit_code,
+                    "status": status.get("receipt_status"),
+                    "timed_out": status.get("timed_out"),
+                    "duration_s": status.get("duration_s"),
+                    "verdict": status.get("verdict"),
+                    "output": status.get("output"),
+                    "receipt": status.get("receipt"),
+                })
+
+        gate_args = argparse.Namespace(
+            state_root=str(root),
+            pr=pr_number,
+            packet_dir=str(out_dir),
+            allow_pending=args.allow_pending,
+            human_approved=args.human_approved,
+            allow_backup_reviewer=args.allow_backup_reviewer,
+            backup_reviewers=args.backup_reviewers,
+            backup_reviewer_reason=args.backup_reviewer_reason,
+            required_reviewers=args.required_reviewers,
+        )
+        gate = build_gate(gate_args)
+        write_json(out_dir / "MERGE_GATE.json", gate)
+        write_text(out_dir / "MERGE_GATE.md", render_gate_markdown(gate))
+        packet = load_json(out_dir / "FACTS.json")
+        comment_path = out_dir / "GITHUB_COMMENT.md"
+        merge_summary: dict[str, Any] | None = None
+        merge_receipt: dict[str, Any] | None = None
+        if args.merge_mode == "auto-when-clean":
+            merge_receipt = run_mike_merge_authority(
+                pr_number=pr_number,
+                gate=gate,
+                method=args.merge_method,
+                auto=args.merge_auto,
+            )
+            write_json(out_dir / "MIKE_MERGE_RECEIPT.json", merge_receipt)
+            merge_summary = {
+                "status": merge_receipt.get("status"),
+                "reason": merge_receipt.get("reason"),
+                "method": merge_receipt.get("method"),
+                "auto": merge_receipt.get("auto"),
+                "receipt": str(out_dir / "MIKE_MERGE_RECEIPT.json"),
+                "exit_code": merge_receipt.get("exit_code"),
+            }
+        write_text(comment_path, render_github_comment(packet, gate, merge_receipt))
+        processed.append({
+            "number": pr_number,
+            "title": item.get("title"),
+            "status": item.get("status"),
+            "packet_dir": str(out_dir),
+            "reviewers": reviewer_rows,
+            "gate_decision": gate["decision"],
+            "blockers": gate["blockers"],
+            "warnings": gate["warnings"],
+            "comment_path": str(comment_path),
+            "merge": merge_summary,
+        })
+
+    receipt = {
+        "schema": "dharma.pr_review.mike_fanout.v1",
+        "generated_at": utc_now(),
+        "repo": repo,
+        "run_id": run_id,
+        "dry_run": args.dry_run,
+        "packet_only": args.packet_only,
+        "limit": args.limit,
+        "max_prs": args.max_prs,
+        "statuses": statuses,
+        "agents": agents,
+        "required_reviewers": required_reviewers,
+        "merge_mode": args.merge_mode,
+        "merge_method": args.merge_method,
+        "merge_auto": args.merge_auto,
+        "queue_path": str(queue_dir / "latest.json"),
+        "selected": selected,
+        "processed": processed,
+        "authority": {
+            "agent_uid": "merge_master_mike",
+            "can_merge": args.merge_mode == "auto-when-clean",
+            "merge_policy": "conditional_on_merge_gate_clean",
+            "can_approve_prs": False,
+            "can_push": False,
+            "can_edit_source": False,
+            "github_comment_posting": "not_performed",
+        },
+    }
+
+    if args.nats_session:
+        nats_subjects = parse_csv_tokens(args.nats_subjects, default=DEFAULT_A2A_NATS_SUBJECTS)
+        nats_receipt = publish_a2a_fanout_session(
+            repo=repo,
+            run_id=run_id,
+            queue_summary=queue_summary,
+            selected=selected,
+            processed=processed,
+            fanout_dir=fanout_dir,
+            subjects=nats_subjects,
+            required_reviewers=required_reviewers,
+            merge_mode=args.merge_mode,
+            dry_run=args.dry_run,
+            packet_only=args.packet_only,
+            required=args.nats_required,
+            timeout_s=args.nats_timeout_s,
+        )
+        nats_receipt_path = fanout_dir / "a2a_nats_receipt.json"
+        write_json(nats_receipt_path, nats_receipt)
+        receipt["a2a_nats"] = {
+            "status": nats_receipt.get("status"),
+            "code": nats_receipt.get("code"),
+            "ack_tier": nats_receipt.get("ack_tier"),
+            "subjects": nats_subjects,
+            "receipt_path": str(nats_receipt_path),
+        }
+
+    write_json(fanout_dir / "receipt.json", receipt)
+    write_text(fanout_dir / "summary.md", render_fanout_markdown(receipt))
+
+    print(f"mike_fanout={fanout_dir / 'summary.md'}")
+    print(f"selected={len(selected)} processed={len(processed)} dry_run={args.dry_run}")
+    if args.nats_session:
+        nats_summary = receipt.get("a2a_nats", {})
+        print(
+            f"a2a_nats={nats_summary.get('receipt_path')} "
+            f"status={nats_summary.get('status')} code={nats_summary.get('code')}"
+        )
+    for item in selected:
+        print(f"SELECTED #{item['number']} {item['status']} {item['title']}")
+    for item in processed:
+        print(f"PROCESSED #{item['number']} gate={item.get('gate_decision')} packet={item.get('packet_dir')}")
+    if args.nats_session and args.nats_required and receipt.get("a2a_nats", {}).get("status") != "OK":
+        return 3
+    return 0
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1245,9 +2074,66 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--state-root", default=str(DEFAULT_STATE_ROOT), help="Receipt root (default: ~/.dharma/pr_review)")
     sub = parser.add_subparsers(dest="command", required=True)
 
+    def add_backup_reviewer_flags(command: argparse.ArgumentParser) -> None:
+        command.add_argument(
+            "--allow-backup-reviewer",
+            action="store_true",
+            help="Allow one configured backup reviewer receipt to stand in when Claude is unavailable.",
+        )
+        command.add_argument(
+            "--backup-reviewers",
+            default=os.environ.get(
+                "DHARMA_PR_BACKUP_REVIEWERS",
+                "backup_opus,backup_gemini,backup_hermes,backup_perplexity",
+            ),
+            help="Comma-separated backup reviewer receipt names checked when --allow-backup-reviewer is set.",
+        )
+        command.add_argument(
+            "--backup-reviewer-reason",
+            default=os.environ.get("DHARMA_PR_BACKUP_REVIEWER_REASON", ""),
+            help="Required written reason when a backup reviewer replaces Claude.",
+        )
+
+    def add_reviewer_policy_flags(command: argparse.ArgumentParser) -> None:
+        command.add_argument(
+            "--required-reviewers",
+            default=os.environ.get("DHARMA_PR_REQUIRED_REVIEWERS", ",".join(DEFAULT_REQUIRED_REVIEWERS)),
+            help="Comma-separated required reviewer receipt names before merge.",
+        )
+
     queue = sub.add_parser("queue", help="Classify all open PRs")
     queue.add_argument("--limit", type=int, default=100)
     queue.set_defaults(func=cmd_queue)
+
+    fanout = sub.add_parser("fanout", help="Merge Master Mike PR packet -> reviewer -> gate fanout")
+    fanout.add_argument("--limit", type=int, default=100, help="Open PRs to scan before selection")
+    fanout.add_argument("--max-prs", type=int, default=3, help="Maximum PRs to process this run")
+    fanout.add_argument(
+        "--statuses",
+        default=",".join(DEFAULT_FANOUT_STATUSES),
+        help="Comma-separated queue statuses Mike may process",
+    )
+    fanout.add_argument("--agents", default="codex,claude", help="Comma-separated reviewer agents: codex,claude")
+    fanout.add_argument("--timeout-s", type=float, default=None, help="Reviewer wall-clock timeout")
+    fanout.add_argument("--kill-grace-s", type=float, default=DEFAULT_AGENT_KILL_GRACE_S)
+    fanout.add_argument("--allow-pending", action="store_true")
+    fanout.add_argument("--human-approved", action="store_true")
+    add_reviewer_policy_flags(fanout)
+    add_backup_reviewer_flags(fanout)
+    fanout.add_argument("--packet-only", action="store_true", help="Create packets and gates without reviewer fanout")
+    fanout.add_argument("--dry-run", action="store_true", help="Select PRs and write Mike receipt without processing them")
+    fanout.add_argument("--merge-mode", choices=MERGE_MODES, default="off", help="Mike merge authority mode")
+    fanout.add_argument("--merge-method", choices=("squash", "merge", "rebase"), default="squash")
+    fanout.add_argument("--no-merge-auto", dest="merge_auto", action="store_false", default=True)
+    fanout.add_argument("--nats-session", action="store_true", help="Publish a PR janitor session announcement to A2A NATS")
+    fanout.add_argument("--nats-required", action="store_true", help="Return non-zero if A2A NATS publish is not ack-verified")
+    fanout.add_argument("--nats-timeout-s", type=float, default=5.0, help="NATS connect/publish timeout")
+    fanout.add_argument(
+        "--nats-subjects",
+        default=",".join(DEFAULT_A2A_NATS_SUBJECTS),
+        help="Comma-separated A2A NATS subjects for PR janitor coordination",
+    )
+    fanout.set_defaults(func=cmd_fanout)
 
     packet = sub.add_parser("packet", help="Create a dual-agent review packet for one PR")
     packet.add_argument("--pr", type=int, required=True)
@@ -1258,7 +2144,8 @@ def build_parser() -> argparse.ArgumentParser:
     gate.add_argument("--packet-dir")
     gate.add_argument("--allow-pending", action="store_true")
     gate.add_argument("--human-approved", action="store_true")
-    gate.add_argument("--human-approval-note", default="")
+    add_reviewer_policy_flags(gate)
+    add_backup_reviewer_flags(gate)
     gate.set_defaults(func=cmd_gate)
 
     merge = sub.add_parser("merge", help="Dry-run or execute a gated merge")
@@ -1266,8 +2153,10 @@ def build_parser() -> argparse.ArgumentParser:
     merge.add_argument("--packet-dir")
     merge.add_argument("--allow-pending", action="store_true")
     merge.add_argument("--human-approved", action="store_true")
-    merge.add_argument("--human-approval-note", default="")
+    add_reviewer_policy_flags(merge)
+    add_backup_reviewer_flags(merge)
     merge.add_argument("--method", choices=("squash", "merge", "rebase"), default="squash")
+    merge.add_argument("--auto", action="store_true", help="Use gh pr merge --auto when executing")
     merge.add_argument("--confirm", required=True)
     merge.add_argument("--execute", action="store_true")
     merge.set_defaults(func=cmd_merge)
@@ -1281,14 +2170,15 @@ def build_parser() -> argparse.ArgumentParser:
     reviewers = sub.add_parser("reviewers", help="Check local reviewer command/auth readiness")
     reviewers.add_argument("--json", action="store_true")
     reviewers.add_argument("--live-probe", action="store_true", help="Run a tiny Claude command to catch quota/runtime failures")
-    reviewers.add_argument("--probe-timeout-s", type=int, default=45)
+    reviewers.add_argument("--probe-timeout-s", type=float, default=45.0)
     reviewers.set_defaults(func=cmd_reviewers)
 
     run_agent = sub.add_parser("run-agent", help="Run Codex or Claude against an existing packet")
     run_agent.add_argument("--pr", type=int, required=True)
     run_agent.add_argument("--packet-dir")
     run_agent.add_argument("--agent", choices=("codex", "claude"), required=True)
-    run_agent.add_argument("--timeout-s", type=int, default=None, help="Reviewer wall-clock timeout (default: reviewer env timeout or 600)")
+    run_agent.add_argument("--timeout-s", type=float, default=None, help="Reviewer wall-clock timeout (default: DHARMA_PR_REVIEW_TIMEOUT_S or 600)")
+    run_agent.add_argument("--kill-grace-s", type=float, default=DEFAULT_AGENT_KILL_GRACE_S, help="Seconds to wait after SIGTERM before SIGKILL")
     run_agent.set_defaults(func=cmd_run_agent)
 
     return parser
