@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from dharma_swarm.operator_core.closure_v0 import EvidenceReceipt, WorkPacket, record_evidence_receipt
+from dharma_swarm.operator_core.closure_v0 import ClosureEvidenceReceipt, WorkPacket, record_evidence_receipt
 from dharma_swarm.operator_core.operating_facts import AgentOpsRunFact
 
 
@@ -99,7 +99,7 @@ def closure_evidence_from_go_receipt(
     *,
     created_at: str,
     duration_ms: float = 0.0,
-) -> EvidenceReceipt:
+) -> ClosureEvidenceReceipt:
     """Project a Go sidecar receipt into closure_v0 evidence.
 
     Go stays outside the decision loop; Python performs the closure projection.

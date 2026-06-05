@@ -82,6 +82,12 @@ api_routers:
   - id: control_surface
     prefix: /api/control-surface
     module: api.routers.control_surface
+  - id: revenue
+    prefix: /api/revenue
+    module: api.routers.revenue
+  - id: fleet
+    prefix: /api/fleet
+    module: api.routers.fleet
 
 dashboard_nav_sections:
   - label: COMMAND
@@ -634,7 +640,7 @@ loops:
     act: "escalate to evolution engines"
     evaluate: "salience scoring"
     adapt: "adjust perception thresholds"
-    module: dharma_swarm/shakti_loop.py
+    module: dharma_swarm/shakti.py
     status: stub
     health_check_ids: [module_file_exists]
     priority: p2
