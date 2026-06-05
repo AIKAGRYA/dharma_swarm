@@ -51,7 +51,7 @@ on:
       nats_required:
         description: Fail the run unless A2A NATS publish is JetStream-ack verified
         required: true
-        default: true
+        default: false
         type: boolean
 
 permissions:

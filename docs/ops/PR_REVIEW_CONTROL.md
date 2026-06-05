@@ -87,10 +87,13 @@ For a PR-specific mention, the GitHub adapter does only this:
 
 When a comment asks for backlog work with language such as `all open PRs`,
 `open pull requests`, `backlog`, `queue`, or `PR cleanup`, the same router runs
-the backlog fanout path in packet-only mode for up to five PRs, publishes the
-A2A NATS session with Mike credentials, posts a fresh visible summary comment,
-and uploads the Mike receipts as a workflow artifact. This is still evidence
-fanout, not unconditional merge authority.
+the backlog fanout path in packet-only mode for up to five PRs, attempts the A2A
+NATS session with Mike credentials when configured, posts a fresh visible summary
+comment, and uploads the Mike receipts as a workflow artifact. This is still
+evidence fanout, not unconditional merge authority. The hosted comment adapter
+does not require NATS by default; set `MERGE_MASTER_MIKE_NATS_REQUIRED=true` as
+a repository variable only when the NATS secrets are configured and JetStream ack
+verification must hard-block the run.
 
 It does not run local Codex or Claude reviewer processes, because the
 GitHub-hosted runner does not have the operator machine's tmux, NATS, Claude
@@ -108,6 +111,21 @@ explicit command:
 In that mode Mike still blocks unless required receipts such as
 `copilot_review_receipt.json`, `claude_review_receipt.json`, and
 `devin_review_receipt.json` are present and acceptable.
+
+For hosted backlog triage, do not create another workflow. Use one of the
+existing entry points:
+
+```text
+@mix_master_mike backlog
+```
+
+or run GitHub Actions → `merge-master-mike-backlog` with:
+
+- `mode`: `packet-only`
+- `max_prs`: `5`
+- `merge_mode`: `off`
+- `nats_required`: `false`, unless NATS secrets are configured and hard
+  verification is desired
 
 Use the GitHub comment adapter for fast PR triage. Use the local persistent Mike
 lane for real dual-review fanout:

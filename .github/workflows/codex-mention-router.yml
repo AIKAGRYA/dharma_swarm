@@ -137,6 +137,7 @@ jobs:
           MERGE_MASTER_MIKE_NATS_PW: ${{ secrets.MERGE_MASTER_MIKE_NATS_PW }}
           MERGE_MASTER_MIKE_NATS_CA_PEM: ${{ secrets.MERGE_MASTER_MIKE_NATS_CA_PEM }}
           MERGE_MASTER_MIKE_NATS_TLS_HOSTNAME: ${{ vars.MERGE_MASTER_MIKE_NATS_TLS_HOSTNAME || secrets.MERGE_MASTER_MIKE_NATS_TLS_HOSTNAME }}
+          MERGE_MASTER_MIKE_NATS_REQUIRED: ${{ vars.MERGE_MASTER_MIKE_NATS_REQUIRED || 'false' }}
           DEVIN_NATS_URL: ${{ secrets.DEVIN_NATS_URL }}
           DEVIN_NATS_USER: ${{ secrets.DEVIN_NATS_USER }}
           DEVIN_NATS_PW: ${{ secrets.DEVIN_NATS_PW }}
@@ -166,9 +167,11 @@ jobs:
               --merge-method "${MERGE_METHOD}"
               --packet-only
               --nats-session
-              --nats-required
               --nats-timeout-s 8
             )
+            if [ "${MERGE_MASTER_MIKE_NATS_REQUIRED}" = "true" ]; then
+              args+=(--nats-required)
+            fi
             set +e
             python3 -u scripts/runtime/pr_merge_control.py "${args[@]}"
             request_exit="$?"
@@ -182,6 +185,7 @@ jobs:
               echo "- Trigger PR: \`#${PR_NUMBER}\`"
               echo "- Backlog mode: \`packet-only\`"
               echo "- Merge mode: \`${merge_mode}\`"
+              echo "- NATS required: \`${MERGE_MASTER_MIKE_NATS_REQUIRED}\`"
               echo "- Required reviewers: \`${REQUIRED_REVIEWERS}\`"
               echo "- Actions run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
               echo "- Exit code: \`${request_exit}\`"
