@@ -7,6 +7,8 @@ These tests guard that contract.
 from __future__ import annotations
 
 import importlib.util
+import hashlib
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -169,3 +171,51 @@ def test_onboard_does_not_write_to_owners():
     after = {p: digest(p) for p in owner_files}
     for p in owner_files:
         assert before[p] == after[p], f"agent_onboard.py must not mutate owner file {p}"
+
+
+def test_runtime_truth_render_is_read_only(tmp_path, monkeypatch, capsys):
+    """Runtime truth rows are projections and must not mutate owner files."""
+    mod = _load_module()
+    monkeypatch.setenv("DHARMA_STATE_DIR", str(tmp_path / "state"))
+
+    owner_files = [
+        REPO_ROOT / "docs/governance/ACTIVE_TRACK.yaml",
+        REPO_ROOT / "ACTIVE_SURFACE_MANIFEST.yaml",
+        REPO_ROOT / "tests/test_spine_persistence_invariant.py",
+    ]
+
+    def digest(path: Path) -> str | None:
+        if not path.exists():
+            return None
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+
+    before = {path: digest(path) for path in owner_files}
+    rows = mod.render_runtime_truth(
+        {
+            "active_track_id": "runtime-truth-reconciliation-2026-06",
+            "prerequisites_ok": True,
+            "shippable": False,
+            "completion_progress": {"passed": 5, "total": 11},
+            "criteria": [
+                {"id": "runtime_truth_packet_defined", "passed": True},
+                {"id": "onboard_runtime_truth_render", "passed": False},
+            ],
+        },
+        {"active_track": {"id": "runtime-truth-reconciliation-2026-06"}},
+    )
+    after = {path: digest(path) for path in owner_files}
+    output = capsys.readouterr().out
+    json_lines = [
+        json.loads(line.strip())
+        for line in output.splitlines()
+        if line.strip().startswith("{")
+    ]
+
+    assert before == after
+    assert "RUNTIME TRUTH PACKETS" in output
+    assert "Compact:" in output
+    assert "Machine rows (JSONL):" in output
+    assert rows == json_lines
+    assert any(row["surface_id"] == "runtime_state.store" for row in rows)
+    assert all(row["is_authoritative"] is False for row in rows)
+    assert all(row["is_projection"] is True for row in rows)

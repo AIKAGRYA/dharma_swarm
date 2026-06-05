@@ -48,6 +48,12 @@ from .operating_facts import (
 )
 from .routing_payloads import build_agent_routes_payload, build_routing_decision_payload
 from .runtime_payloads import build_runtime_snapshot_payload
+from .runtime_truth import (
+    connect_runtime_db_read_only,
+    runtime_db_path_from_env,
+    runtime_truth_packets_from_runtime_db,
+    summarize_runtime_truth_packets,
+)
 from .workspace_payloads import build_workspace_snapshot_payload
 from .session_payloads import build_session_catalog_payload, build_session_detail_payload
 from .session_store import SessionStore, cwd_matches
@@ -71,6 +77,8 @@ from .contracts import (
     PermissionResolutionKind,
     PermissionRisk,
     RuntimeHealth,
+    RuntimeTruthPacket,
+    RuntimeTruthState,
     WorkflowExecutionMode,
 )
 
@@ -113,6 +121,12 @@ __all__ = [
     "PermissionResolutionKind",
     "PermissionRisk",
     "RuntimeHealth",
+    "RuntimeTruthPacket",
+    "RuntimeTruthState",
+    "connect_runtime_db_read_only",
+    "runtime_db_path_from_env",
+    "runtime_truth_packets_from_runtime_db",
+    "summarize_runtime_truth_packets",
     "SessionStore",
     "WorkflowExecutionMode",
     "build_session_catalog",

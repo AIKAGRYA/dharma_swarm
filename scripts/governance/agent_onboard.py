@@ -77,6 +77,10 @@ def _today() -> date:
     return datetime.now(tz=timezone.utc).date()
 
 
+def _now_iso() -> str:
+    return datetime.now(tz=timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
 def _doc_staleness(doc_rel: str) -> tuple[int, str]:
     """Return (days_since_last_touch, last_commit_subject) for a doc."""
     last = git("log", "-1", "--format=%cI|%s", "--", doc_rel)
@@ -358,8 +362,11 @@ def render_spine_status() -> None:
     db_path = Path.home() / ".dharma" / "state" / "runtime.db"
     if db_path.exists():
         try:
-            import sqlite3
-            conn = sqlite3.connect(str(db_path))
+            from dharma_swarm.operator_core.runtime_truth import (
+                connect_runtime_db_read_only,
+            )
+
+            conn = connect_runtime_db_read_only(db_path)
             try:
                 cur = conn.cursor()
                 cur.execute("SELECT COUNT(*) FROM delegation_runs")
@@ -379,6 +386,199 @@ def render_spine_status() -> None:
             print(f"  (live DB unavailable: {type(exc).__name__})")
     else:
         print("  (runtime.db not present — no live stats)")
+
+
+def _runtime_db_path() -> Path:
+    state_dir = os.environ.get("DHARMA_STATE_DIR")
+    if state_dir:
+        return Path(state_dir).expanduser() / "runtime.db"
+    return Path.home() / ".dharma" / "state" / "runtime.db"
+
+
+def _runtime_truth_packets(
+    evidence: dict[str, Any] | None,
+    track: dict[str, Any],
+) -> list[Any]:
+    from dharma_swarm.operator_core.contracts import RuntimeTruthPacket, RuntimeTruthState
+    from dharma_swarm.operator_core.runtime_truth import (
+        runtime_truth_packets_from_runtime_db,
+    )
+
+    observed_at = _now_iso()
+    block = (track or {}).get("active_track") or {}
+    progress = (evidence or {}).get("completion_progress") or {}
+    passed = int(progress.get("passed") or 0)
+    total = int(progress.get("total") or 0)
+    criteria = (evidence or {}).get("criteria") or []
+    failed_ids = [
+        str(item.get("id"))
+        for item in criteria
+        if isinstance(item, dict) and not item.get("passed") and item.get("id")
+    ]
+    shippable = bool(evidence and evidence.get("shippable"))
+    prereqs_ok = bool(evidence and evidence.get("prerequisites_ok"))
+    active_track_id = str((evidence or {}).get("active_track_id") or block.get("id") or "unknown")
+
+    packets: list[Any] = [
+        RuntimeTruthPacket(
+            surface_id="governance.active_track",
+            kind="governance_projection",
+            observed_at=observed_at,
+            owner_surface="docs/governance/ACTIVE_TRACK.yaml",
+            source_kind="generated_evidence",
+            artifact_refs=[
+                str(EVIDENCE_JSON.relative_to(REPO_ROOT)),
+                "reports/governance/active_track_evidence.md",
+            ],
+            source_refs=[str(ACTIVE_TRACK.relative_to(REPO_ROOT))],
+            readiness_state=(
+                RuntimeTruthState.READY_BY_PROBE
+                if prereqs_ok
+                else RuntimeTruthState.NOT_READY_BY_PROBE
+            ),
+            progress_state=(
+                RuntimeTruthState.PROGRESSING_BY_ARTIFACT
+                if total and passed < total
+                else RuntimeTruthState.COMPLETED_BY_RECEIPT
+                if total and passed >= total
+                else RuntimeTruthState.UNKNOWN
+            ),
+            completion_state=(
+                RuntimeTruthState.COMPLETED_BY_RECEIPT
+                if shippable
+                else RuntimeTruthState.UNKNOWN
+            ),
+            authority_state=RuntimeTruthState.PROJECTION_ONLY,
+            source_state=RuntimeTruthState.OBSERVED if evidence else RuntimeTruthState.MISSING,
+            missing_machine_fields=[
+                "run_id",
+                "mission_id",
+                "correlation_id",
+                *[f"failed_criterion:{item}" for item in failed_ids],
+            ],
+            metadata={
+                "active_track_id": active_track_id,
+                "criteria_passed": passed,
+                "criteria_total": total,
+            },
+        )
+    ]
+
+    manifest_text = ""
+    if SURFACE_MANIFEST.exists():
+        manifest_text = SURFACE_MANIFEST.read_text(encoding="utf-8", errors="replace")
+    correlation_declared = "correlation_spine:" in manifest_text
+    packets.append(
+        RuntimeTruthPacket(
+            surface_id="correlation_spine.manifest",
+            kind="owner_manifest",
+            observed_at=observed_at,
+            owner_surface="ACTIVE_SURFACE_MANIFEST.yaml",
+            source_kind="repo_file_probe",
+            source_refs=[str(SURFACE_MANIFEST.relative_to(REPO_ROOT))],
+            readiness_state=(
+                RuntimeTruthState.READY_BY_PROBE
+                if correlation_declared
+                else RuntimeTruthState.NOT_READY_BY_PROBE
+            ),
+            authority_state=RuntimeTruthState.PROJECTION_ONLY,
+            source_state=(
+                RuntimeTruthState.OBSERVED
+                if correlation_declared
+                else RuntimeTruthState.MISSING
+            ),
+            probe_ok=correlation_declared,
+            missing_machine_fields=[] if correlation_declared else ["correlation_spine"],
+        )
+    )
+
+    runtime_db = _runtime_db_path()
+    packets.extend(
+        runtime_truth_packets_from_runtime_db(runtime_db, observed_at=observed_at)
+    )
+
+    invariant_test = REPO_ROOT / "tests/test_spine_persistence_invariant.py"
+    invariant_present = invariant_test.exists()
+    packets.append(
+        RuntimeTruthPacket(
+            surface_id="a2a.persistence_invariant",
+            kind="test_contract",
+            observed_at=observed_at,
+            owner_surface="tests/test_spine_persistence_invariant.py",
+            source_kind="repo_test_contract",
+            source_refs=[
+                "tests/test_spine_persistence_invariant.py",
+                "dharma_swarm/a2a/a2a_server.py",
+                "dharma_swarm/a2a/a2a_bridge.py",
+            ],
+            readiness_state=(
+                RuntimeTruthState.READY_BY_PROBE
+                if invariant_present
+                else RuntimeTruthState.NOT_READY_BY_PROBE
+            ),
+            completion_state=RuntimeTruthState.UNKNOWN,
+            evaluator_state=RuntimeTruthState.UNKNOWN,
+            authority_state=RuntimeTruthState.PROJECTION_ONLY,
+            probe_ok=invariant_present,
+            missing_machine_fields=[
+                "latest_test_run",
+                "latest_ci_run",
+            ] if invariant_present else ["test_contract"],
+        )
+    )
+
+    packets.append(
+        RuntimeTruthPacket(
+            surface_id="external.keystone_merge",
+            kind="external_truth",
+            observed_at=observed_at,
+            owner_surface="external_operator_state",
+            source_kind="external_gated",
+            source_refs=["external:abduznik/instrumation#98"],
+            authority_state=RuntimeTruthState.PROJECTION_ONLY,
+            external_state=RuntimeTruthState.EXTERNAL_GATED,
+            mutation_state=RuntimeTruthState.NO_MUTATION_OBSERVED,
+            probe_ok=None,
+            missing_machine_fields=[
+                "external_api_probe_result",
+                "proof_json_path",
+                "operator_authority_to_probe_external_state",
+            ],
+            metadata={"no_external_probe_performed": True},
+        )
+    )
+    return packets
+
+
+def render_runtime_truth(
+    evidence: dict[str, Any] | None,
+    track: dict[str, Any],
+) -> list[dict[str, Any]]:
+    from dharma_swarm.operator_core.runtime_truth import summarize_runtime_truth_packets
+
+    section("RUNTIME TRUTH PACKETS — read-only projection")
+    packets = _runtime_truth_packets(evidence, track)
+    rows = [packet.to_dict() for packet in packets]
+    summary = summarize_runtime_truth_packets(packets)
+    print("  Doctrine: packets project existing owners; this section is not authority.")
+    print(
+        "  Compact: "
+        f"runtime_db={summary.get('runtime_db') or 'unknown'}; "
+        f"latest_receipt={summary.get('latest_receipt') or 'none'}; "
+        f"run_id={summary.get('run_id') or 'missing'}; "
+        f"task_id={summary.get('task_id') or 'missing'}; "
+        f"heartbeat={summary.get('heartbeat') or 'unknown'}; "
+        f"progress={summary.get('progress') or 'unknown'}; "
+        f"completion={summary.get('completion') or 'unknown'}; "
+        f"retry={summary.get('retry') or 'unknown'}"
+    )
+    missing = summary.get("missing") or []
+    if missing:
+        print(f"  Missing machine fields: {', '.join(str(item) for item in missing)}")
+    print("  Machine rows (JSONL):")
+    for row in rows:
+        print(f"    {json.dumps(row, sort_keys=True)}")
+    return rows
 
 
 def render_decay_watch() -> None:
@@ -545,6 +745,7 @@ def main() -> int:
     render_axioms()
     render_recent_activity(track)
     render_spine_status()
+    render_runtime_truth(evidence, track)
     render_decay_watch()
     render_tooling_first()
     render_enforcement_and_depth()

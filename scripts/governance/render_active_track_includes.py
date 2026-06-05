@@ -89,7 +89,7 @@ def render_block(track: dict) -> str:
     if closed:
         lines.append("**Recently closed tracks:**")
         lines.append("")
-        for ct in closed[-3:]:  # last three
+        for ct in closed[:3]:  # newest three; closed_tracks is newest-first
             lines.append(
                 f"- `{ct.get('id')}` — {ct.get('name')} "
                 f"({ct.get('status')}, closed {ct.get('closed_at')})"

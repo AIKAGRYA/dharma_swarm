@@ -774,8 +774,11 @@ def _broken_register_rows(repo_root: Path | None = None) -> list[ControlSurfaceR
 # K) Runtime state adapter
 # ---------------------------------------------------------------------------
 
-def _runtime_state_row(repo_root: Path | None = None) -> ControlSurfaceRow | None:
-    db_path = Path.home() / ".dharma" / "state" / "runtime.db"
+def _runtime_state_row(
+    repo_root: Path | None = None,
+    runtime_db: Path | None = None,
+) -> ControlSurfaceRow | None:
+    db_path = runtime_db or Path.home() / ".dharma" / "state" / "runtime.db"
     if not db_path.exists():
         row = ControlSurfaceRow(
             id="runtime.state_db",
@@ -822,8 +825,9 @@ def _runtime_state_row(repo_root: Path | None = None) -> ControlSurfaceRow | Non
     row.add_source_ref("file", "dharma_swarm/runtime_state.py", exists=True)
 
     try:
-        import sqlite3
-        with sqlite3.connect(str(db_path)) as conn:
+        from dharma_swarm.operator_core.runtime_truth import connect_runtime_db_read_only
+
+        with connect_runtime_db_read_only(db_path) as conn:
             tables = [r[0] for r in conn.execute(
                 "SELECT name FROM sqlite_master WHERE type='table'"
             ).fetchall()]
@@ -839,6 +843,39 @@ def _runtime_state_row(repo_root: Path | None = None) -> ControlSurfaceRow | Non
                 status="present",
                 provenance_chain=["runtime_state", "table_count_query"],
             )
+            from dharma_swarm.operator_core.runtime_truth import (
+                runtime_truth_packets_from_runtime_db,
+                summarize_runtime_truth_packets,
+            )
+
+            packets = runtime_truth_packets_from_runtime_db(db_path)
+            packet_summary = summarize_runtime_truth_packets(packets)
+            row.raw["runtime_truth_packets"] = [packet.to_dict() for packet in packets]
+            row.raw["runtime_truth_summary"] = packet_summary
+            latest_receipt = packet_summary.get("latest_receipt")
+            if latest_receipt:
+                row.add_evidence(
+                    "db_probe",
+                    str(latest_receipt),
+                    status="present",
+                    provenance_chain=[
+                        "runtime_state",
+                        "sqlite_read_only_probe",
+                        "RuntimeTruthPacket",
+                    ],
+                )
+            else:
+                row.gap_codes.append("runtime_receipt_missing")
+                row.add_evidence(
+                    "db_probe",
+                    "latest runtime receipt missing",
+                    status="missing",
+                    provenance_chain=[
+                        "runtime_state",
+                        "sqlite_read_only_probe",
+                        "RuntimeTruthPacket",
+                    ],
+                )
     except Exception as exc:
         row.add_evidence(
             "db_probe", f"db query error: {exc}",
@@ -929,7 +966,7 @@ def build_control_surface_rows(
     rows.extend(_broken_register_rows(root))
 
     # K) Runtime state DB (observed)
-    rt_row = _runtime_state_row(root)
+    rt_row = _runtime_state_row(root, runtime_db=runtime_db)
     if rt_row is not None:
         rows.append(rt_row)
 
