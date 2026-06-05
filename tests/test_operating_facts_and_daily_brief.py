@@ -78,7 +78,11 @@ def test_load_agentops_run_facts_normalizes_report_shape(tmp_path: Path) -> None
     assert fact.scope_violations == ("api/main.py",)
 
 
-def test_organ_state_facts_project_declared_vs_observed_state(tmp_path: Path) -> None:
+def test_organ_state_facts_project_declared_vs_observed_state(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
     report_path = tmp_path / "reports" / "agentops" / "job-red" / "20260505" / "report.json"
     _write_json(
         report_path,
@@ -101,7 +105,7 @@ def test_organ_state_facts_project_declared_vs_observed_state(tmp_path: Path) ->
 
     assert states["agentops"].coherence_state == "drifted"
     assert states["kaizen_review"].coherence_state == "declared_only"
-    assert states["telic_value"].coherence_state == "unknown"
+    assert states["telic_value"].coherence_state == "declared_only"
     assert payload["organ_states"][0]["name"] == "agentops"
 
 
