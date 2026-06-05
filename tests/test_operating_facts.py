@@ -10,6 +10,7 @@ from dharma_swarm.operator_core.operating_facts import (
     build_operating_fact_bundle,
     bundle_to_dict,
     load_agentops_run_facts,
+    load_kaizen_review_facts,
     load_human_yds_rating_facts,
     organ_boundary_map,
     organ_state_facts,
@@ -72,7 +73,11 @@ def test_load_agentops_run_facts_normalizes_report_shape(tmp_path: Path) -> None
     assert fact.scope_violations == ("api/main.py",)
 
 
-def test_organ_state_facts_project_declared_vs_observed_state(tmp_path: Path) -> None:
+def test_organ_state_facts_project_declared_vs_observed_state(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
     report_path = tmp_path / "reports" / "agentops" / "job-red" / "20260505" / "report.json"
     _write_json(
         report_path,
@@ -124,6 +129,22 @@ def test_operating_fact_bundle_reads_all_organs_without_mutating(tmp_path: Path)
             "waste_patterns": [],
             "stop_doing_items": [],
             "playbook_update_candidates": ["Promote the green packet shape."],
+            "runtime_truth_summary": {
+                "jobs_with_refs": 1,
+                "jobs_without_refs": 0,
+                "ref_keys": ["trace_id", "receipt_refs", "identity_invariant_digest"],
+            },
+            "runtime_truth_refs": [
+                {
+                    "job_id": "job-green",
+                    "source_report": "report.json",
+                    "refs": {
+                        "trace_id": "trace-1",
+                        "receipt_refs": ["receipt://job-green"],
+                        "identity_invariant_digest": "identity-digest-1",
+                    },
+                }
+            ],
             "human_yds_rating": None,
         },
     )
@@ -156,9 +177,64 @@ def test_operating_fact_bundle_reads_all_organs_without_mutating(tmp_path: Path)
     assert bundle.missing_sources == ()
     assert bundle.agentops[0].commit_state == "commit_created"
     assert bundle.kaizen[0].next_recommendation == "request human YDS rating"
+    assert bundle.kaizen[0].runtime_truth_jobs_with_refs == 1
+    assert bundle.kaizen[0].receipt_refs == ("receipt://job-green",)
+    assert bundle.kaizen[0].correlation_ids == ("trace-1",)
+    assert bundle.kaizen[0].identity_invariant_digests == ("identity-digest-1",)
     assert bundle.human_yds[0].authoritative is True
     assert bundle.burn[0].total_cost_usd == 0.03
     assert bundle.revenue[0].keywords == ("wedge", "pricing")
+
+
+def test_kaizen_review_state_requires_runtime_truth_refs_to_be_bound(tmp_path: Path) -> None:
+    kaizen_root = tmp_path / "kaizen"
+    review_path = kaizen_root / "latest" / "kaizen_review.json"
+    _write_json(
+        review_path,
+        {
+            "jobs_reviewed": 1,
+            "next_work_packet_recommendation": "rerun with trace refs",
+            "runtime_truth_summary": {
+                "jobs_with_refs": 0,
+                "jobs_without_refs": 1,
+                "ref_keys": [],
+            },
+            "runtime_truth_refs": [],
+        },
+    )
+
+    reviews = load_kaizen_review_facts(kaizen_root)
+    states = {fact.name: fact for fact in organ_state_facts(OperatingFactBundle(kaizen=tuple(reviews)))}
+
+    assert states["kaizen_review"].coherence_state == "partial"
+    assert "not tied to runtime truth refs" in states["kaizen_review"].open_gap
+
+    _write_json(
+        review_path,
+        {
+            "jobs_reviewed": 1,
+            "next_work_packet_recommendation": "promote traced packet shape",
+            "runtime_truth_summary": {
+                "jobs_with_refs": 1,
+                "jobs_without_refs": 0,
+                "ref_keys": ["trace_id", "receipt_refs"],
+            },
+            "runtime_truth_refs": [
+                {
+                    "job_id": "job-green",
+                    "refs": {
+                        "trace_id": "trace-1",
+                        "receipt_refs": ["receipt://job-green"],
+                    },
+                }
+            ],
+        },
+    )
+    reviews = load_kaizen_review_facts(kaizen_root)
+    states = {fact.name: fact for fact in organ_state_facts(OperatingFactBundle(kaizen=tuple(reviews)))}
+
+    assert states["kaizen_review"].coherence_state == "bound"
+    assert "receipt://job-green" in states["kaizen_review"].evidence_refs
 
 
 def test_non_human_yds_records_are_advisory_only(tmp_path: Path) -> None:

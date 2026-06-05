@@ -8,7 +8,9 @@ It is intentionally narrow:
 - input: one or more AgentOps `report.json` files (or directories)
 - output: `kaizen_review.json` and `kaizen_review.md`
 - scope: local file processing only
-- no dashboard/API/runtime/ontology wiring
+- runtime truth: read-only trace, receipt, and identity references copied from
+  source AgentOps reports
+- no dashboard/API/runtime/ontology ownership
 
 ## Command
 
@@ -35,6 +37,16 @@ The review includes:
 - stop-doing items
 - playbook candidates
 - exactly one next-work-packet recommendation
+- runtime truth reference summary when the source reports include trace,
+  receipt, or identity refs
+
+## Runtime Truth Boundary
+
+KaizenReview may copy runtime truth references from AgentOps reports so the
+review can be traced back to execution evidence. It does not create receipt
+authority, claim NATS live contact, dispatch work, mutate ontology, or decide
+Forge fitness. Missing runtime refs make the review less bound to the runtime
+truth spine; invented refs are invalid.
 
 ## Human YDS Boundary
 

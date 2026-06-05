@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
+from dharma_swarm.operator_core.runtime_truth_refs import runtime_ref_values
 from dharma_swarm.operator_core.telic_value_reader import read_telic_value_summary
 
 
@@ -183,6 +184,12 @@ class KaizenReviewFact:
     waste_patterns: tuple[str, ...] = ()
     stop_doing_items: tuple[str, ...] = ()
     playbook_update_candidates: tuple[str, ...] = ()
+    runtime_truth_ref_keys: tuple[str, ...] = ()
+    runtime_truth_jobs_with_refs: int = 0
+    runtime_truth_jobs_without_refs: int = 0
+    receipt_refs: tuple[str, ...] = ()
+    correlation_ids: tuple[str, ...] = ()
+    identity_invariant_digests: tuple[str, ...] = ()
     has_human_yds_rating: bool = False
 
 
@@ -287,6 +294,9 @@ def load_agentops_run_facts(path: Path | None) -> list[AgentOpsRunFact]:
 def load_kaizen_review_facts(path: Path | None) -> list[KaizenReviewFact]:
     facts: list[KaizenReviewFact] = []
     for report_path, report in _json_reports(path, "kaizen_review.json"):
+        runtime_summary = report.get("runtime_truth_summary")
+        if not isinstance(runtime_summary, dict):
+            runtime_summary = {}
         facts.append(
             KaizenReviewFact(
                 source_path=report_path.as_posix(),
@@ -295,6 +305,14 @@ def load_kaizen_review_facts(path: Path | None) -> list[KaizenReviewFact]:
                 waste_patterns=_strings(report.get("waste_patterns")),
                 stop_doing_items=_strings(report.get("stop_doing_items")),
                 playbook_update_candidates=_strings(report.get("playbook_update_candidates")),
+                runtime_truth_ref_keys=_strings(runtime_summary.get("ref_keys")),
+                runtime_truth_jobs_with_refs=_int(runtime_summary.get("jobs_with_refs")),
+                runtime_truth_jobs_without_refs=_int(runtime_summary.get("jobs_without_refs")),
+                receipt_refs=runtime_ref_values(
+                    report, ("receipt_id", "receipt_hash", "receipt_refs", "runtime_receipt_refs")
+                ),
+                correlation_ids=runtime_ref_values(report, ("run_id", "trace_id", "correlation_id")),
+                identity_invariant_digests=runtime_ref_values(report, ("identity_invariant_digest",)),
                 has_human_yds_rating=bool(report.get("human_yds_rating")),
             )
         )
@@ -575,13 +593,34 @@ def _kaizen_organ_state(boundary: OrganBoundary, bundle: OperatingFactBundle) ->
             "KaizenReview has no report fact in this bundle",
             "run KaizenReview from a completed AgentOps report",
         )
-    evidence = tuple(review.source_path for review in bundle.kaizen)
-    if any(review.next_recommendation for review in bundle.kaizen):
+    evidence = tuple(
+        ref
+        for review in bundle.kaizen
+        for ref in (
+            review.source_path,
+            *review.receipt_refs,
+            *review.correlation_ids,
+            *review.identity_invariant_digests,
+        )
+        if ref
+    )
+    has_next = any(review.next_recommendation for review in bundle.kaizen)
+    has_runtime_refs = any(review.runtime_truth_jobs_with_refs for review in bundle.kaizen)
+    if has_next and has_runtime_refs:
         return _state(
             boundary,
-            observed_state="KaizenReview report includes next-packet recommendation",
+            observed_state="KaizenReview report includes next-packet recommendation and runtime truth refs",
             coherence_state="bound",
             evidence_refs=evidence,
+        )
+    if has_next:
+        return _state(
+            boundary,
+            observed_state="KaizenReview report includes next-packet recommendation without runtime truth refs",
+            coherence_state="partial",
+            evidence_refs=evidence,
+            open_gap="review feeds the next packet but is not tied to runtime truth refs",
+            next_packet_hint="rerun KaizenReview from AgentOps reports carrying trace, receipt, or identity refs",
         )
     return _state(
         boundary,

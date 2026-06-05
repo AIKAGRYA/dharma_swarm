@@ -87,6 +87,11 @@ def test_reads_kaizen_review_from_agentops_bridge_output(tmp_path: Path) -> None
                 "title": "KaizenReview for kaizen-v0",
                 "status": "recorded",
                 "quality_score": 0.82,
+                "runtime_truth_summary": {
+                    "jobs_with_refs": 1,
+                    "jobs_without_refs": 0,
+                    "ref_keys": ["trace_id", "receipt_refs"],
+                },
                 "human_yds_rating": None,
             }
         ),
@@ -98,7 +103,10 @@ def test_reads_kaizen_review_from_agentops_bridge_output(tmp_path: Path) -> None
     )
 
     rendered = render_markdown(brief)
-    assert "KaizenReview `KaizenReview for kaizen-v0` recorded, advisory score `0.82`." in rendered
+    assert (
+        "KaizenReview `KaizenReview for kaizen-v0` recorded, "
+        "advisory score `0.82`, runtime refs `1/1`."
+    ) in rendered
 
 
 def test_reads_human_yds_jsonl_rating_and_includes_it(tmp_path: Path) -> None:
