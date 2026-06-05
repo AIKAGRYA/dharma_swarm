@@ -44,7 +44,7 @@ jobs:
         )
       }}
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
@@ -74,6 +74,7 @@ jobs:
         run: |
           set -euo pipefail
           merge_when_clean=false
+          backlog_requested=false
           if [ "${EVENT_NAME}" = "workflow_dispatch" ] && [ "${MERGE_WHEN_CLEAN_INPUT:-false}" = "true" ]; then
             merge_when_clean=true
           else
@@ -83,81 +84,199 @@ jobs:
                 merge_when_clean=true
                 ;;
             esac
+            case "${body}" in
+              *"all open pr"*|*"all of the open pr"*|*"open pr"*|*"open pull request"*|*"all pr"*|*"all pull request"*|*"backlog"*|*"queue"*|*"pr cleanup"*|*"pull request cleanup"*|*"cleanly merged"*)
+                backlog_requested=true
+                ;;
+            esac
           fi
           echo "merge_when_clean=${merge_when_clean}" >> "${GITHUB_OUTPUT}"
+          echo "backlog_requested=${backlog_requested}" >> "${GITHUB_OUTPUT}"
         env:
           EVENT_NAME: ${{ github.event_name }}
           COMMENT_BODY: ${{ github.event.comment.body }}
           MERGE_WHEN_CLEAN_INPUT: ${{ inputs.merge_when_clean }}
 
-      - name: Run deterministic Merge Master Mike packet
-        id: review
+      - name: Post immediate Merge Master Mike acknowledgement
+        id: ack
+        if: ${{ github.event_name != 'workflow_dispatch' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          BACKLOG_REQUESTED: ${{ steps.command.outputs.backlog_requested }}
+          MERGE_WHEN_CLEAN: ${{ steps.command.outputs.merge_when_clean }}
+        run: |
+          set -euo pipefail
+          body="${RUNNER_TEMP}/merge-master-mike-ack.md"
+          {
+            echo "<!-- dharma-pr-review-control:ack-${GITHUB_RUN_ID} -->"
+            echo
+            echo "## Merge Master Mike Received This"
+            echo
+            echo "- PR: \`#${PR_NUMBER}\`"
+            echo "- Backlog requested: \`${BACKLOG_REQUESTED}\`"
+            echo "- Merge when clean requested: \`${MERGE_WHEN_CLEAN}\`"
+            echo "- Actions run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo
+            echo "I am preparing the packet/gate or backlog fanout now and will update this comment with the result."
+          } > "${body}"
+          url="$(gh pr comment "${PR_NUMBER}" --body-file "${body}")"
+          echo "comment_id=${url##*issuecomment-}" >> "${GITHUB_OUTPUT}"
+
+      - name: Run Merge Master Mike request
+        id: mike
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ steps.pr.outputs.number }}
           MERGE_WHEN_CLEAN: ${{ steps.command.outputs.merge_when_clean }}
+          BACKLOG_REQUESTED: ${{ steps.command.outputs.backlog_requested }}
           REQUIRED_REVIEWERS: copilot,claude,devin
           MERGE_METHOD: squash
+          MERGE_MASTER_MIKE_NATS_URL: ${{ secrets.MERGE_MASTER_MIKE_NATS_URL }}
+          MERGE_MASTER_MIKE_NATS_USER: ${{ secrets.MERGE_MASTER_MIKE_NATS_USER }}
+          MERGE_MASTER_MIKE_NATS_PW: ${{ secrets.MERGE_MASTER_MIKE_NATS_PW }}
+          MERGE_MASTER_MIKE_NATS_CA_PEM: ${{ secrets.MERGE_MASTER_MIKE_NATS_CA_PEM }}
+          MERGE_MASTER_MIKE_NATS_TLS_HOSTNAME: ${{ vars.MERGE_MASTER_MIKE_NATS_TLS_HOSTNAME || secrets.MERGE_MASTER_MIKE_NATS_TLS_HOSTNAME }}
+          DEVIN_NATS_URL: ${{ secrets.DEVIN_NATS_URL }}
+          DEVIN_NATS_USER: ${{ secrets.DEVIN_NATS_USER }}
+          DEVIN_NATS_PW: ${{ secrets.DEVIN_NATS_PW }}
+          DEVIN_NATS_CA_PEM: ${{ secrets.DEVIN_NATS_CA_PEM }}
+          DEVIN_NATS_TLS_HOSTNAME: ${{ vars.DEVIN_NATS_TLS_HOSTNAME || secrets.DEVIN_NATS_TLS_HOSTNAME }}
         run: |
           set -euo pipefail
           state_root="${RUNNER_TEMP}/dharma-pr-review"
-          python3 scripts/runtime/pr_merge_control.py --state-root "${state_root}" packet --pr "${PR_NUMBER}"
-          packet_dir="$(find "${state_root}/pr-${PR_NUMBER}" -mindepth 1 -maxdepth 1 -type d | sort | tail -1)"
-          set +e
-          python3 scripts/runtime/pr_merge_control.py \
-            --state-root "${state_root}" \
-            gate \
-            --pr "${PR_NUMBER}" \
-            --packet-dir "${packet_dir}" \
-            --required-reviewers "${REQUIRED_REVIEWERS}"
-          gate_exit="$?"
-          set -e
+          request_exit=0
+          gate_exit=0
           merge_exit=0
-          if [ "${MERGE_WHEN_CLEAN}" = "true" ]; then
+
+          if [ "${BACKLOG_REQUESTED}" = "true" ]; then
+            python3 -m pip install 'nats-py>=2.9' 'aiohttp>=3.9'
+            merge_mode=off
+            if [ "${MERGE_WHEN_CLEAN}" = "true" ]; then
+              merge_mode=auto-when-clean
+            fi
+            args=(
+              --state-root "${state_root}"
+              fanout
+              --limit 100
+              --max-prs 5
+              --statuses GITHUB_GREEN_NEEDS_PACKET,NEEDS_AGENT_REVIEW
+              --required-reviewers "${REQUIRED_REVIEWERS}"
+              --merge-mode "${merge_mode}"
+              --merge-method "${MERGE_METHOD}"
+              --packet-only
+              --nats-session
+              --nats-required
+              --nats-timeout-s 8
+            )
+            set +e
+            python3 -u scripts/runtime/pr_merge_control.py "${args[@]}"
+            request_exit="$?"
+            set -e
+            latest="$(find "${state_root}/mike_fanout" -name summary.md -type f | sort | tail -1 || true)"
+            {
+              echo "<!-- dharma-pr-review-control:run-${GITHUB_RUN_ID} -->"
+              echo
+              echo "## Merge Master Mike Backlog Request"
+              echo
+              echo "- Trigger PR: \`#${PR_NUMBER}\`"
+              echo "- Backlog mode: \`packet-only\`"
+              echo "- Merge mode: \`${merge_mode}\`"
+              echo "- Required reviewers: \`${REQUIRED_REVIEWERS}\`"
+              echo "- Actions run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+              echo "- Exit code: \`${request_exit}\`"
+              echo
+              if [ -n "${latest}" ]; then
+                cat "${latest}"
+              else
+                echo "No Mike fanout summary was written. Check the Actions run logs."
+              fi
+            } > "${RUNNER_TEMP}/merge-master-mike.md"
+          else
+            python3 scripts/runtime/pr_merge_control.py --state-root "${state_root}" packet --pr "${PR_NUMBER}"
+            packet_dir="$(find "${state_root}/pr-${PR_NUMBER}" -mindepth 1 -maxdepth 1 -type d | sort | tail -1)"
             set +e
             python3 scripts/runtime/pr_merge_control.py \
               --state-root "${state_root}" \
-              merge \
+              gate \
               --pr "${PR_NUMBER}" \
               --packet-dir "${packet_dir}" \
-              --required-reviewers "${REQUIRED_REVIEWERS}" \
-              --method "${MERGE_METHOD}" \
-              --auto \
-              --execute \
-              --confirm "merge-pr-${PR_NUMBER}"
-            merge_exit="$?"
+              --required-reviewers "${REQUIRED_REVIEWERS}"
+            gate_exit="$?"
             set -e
+            if [ "${MERGE_WHEN_CLEAN}" = "true" ]; then
+              set +e
+              python3 scripts/runtime/pr_merge_control.py \
+                --state-root "${state_root}" \
+                merge \
+                --pr "${PR_NUMBER}" \
+                --packet-dir "${packet_dir}" \
+                --required-reviewers "${REQUIRED_REVIEWERS}" \
+                --method "${MERGE_METHOD}" \
+                --auto \
+                --execute \
+                --confirm "merge-pr-${PR_NUMBER}"
+              merge_exit="$?"
+              set -e
+            fi
+            python3 scripts/runtime/pr_merge_control.py \
+              --state-root "${state_root}" \
+              comment \
+              --pr "${PR_NUMBER}" \
+              --packet-dir "${packet_dir}" \
+              --output "${RUNNER_TEMP}/merge-master-mike.md"
           fi
-          python3 scripts/runtime/pr_merge_control.py \
-            --state-root "${state_root}" \
-            comment \
-            --pr "${PR_NUMBER}" \
-            --packet-dir "${packet_dir}" \
-            --output "${RUNNER_TEMP}/merge-master-mike.md"
+          echo "request_exit=${request_exit}" >> "${GITHUB_OUTPUT}"
           echo "gate_exit=${gate_exit}" >> "${GITHUB_OUTPUT}"
           echo "merge_exit=${merge_exit}" >> "${GITHUB_OUTPUT}"
 
-      - name: Post or update Merge Master Mike comment
+      - name: Post Merge Master Mike comment
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ steps.pr.outputs.number }}
+          EVENT_NAME: ${{ github.event_name }}
+          ACK_COMMENT_ID: ${{ steps.ack.outputs.comment_id }}
         run: |
           set -euo pipefail
           marker="<!-- dharma-pr-review-control:auto -->"
-          existing="$(gh pr view "${PR_NUMBER}" --json comments \
-            --jq '.comments[] | select(.body | startswith("'"${marker}"'")) | .id' \
-            | head -1)"
-          if [ -n "${existing}" ]; then
-            gh api --method PATCH \
-              "/repos/${GITHUB_REPOSITORY}/issues/comments/${existing}" \
-              -f body="$(cat "${RUNNER_TEMP}/merge-master-mike.md")"
+          if [ "${EVENT_NAME}" != "workflow_dispatch" ]; then
+            if [ -n "${ACK_COMMENT_ID:-}" ]; then
+              gh api --method PATCH \
+                "/repos/${GITHUB_REPOSITORY}/issues/comments/${ACK_COMMENT_ID}" \
+                -f body="$(cat "${RUNNER_TEMP}/merge-master-mike.md")"
+            else
+              gh pr comment "${PR_NUMBER}" --body-file "${RUNNER_TEMP}/merge-master-mike.md"
+            fi
           else
-            gh pr comment "${PR_NUMBER}" --body-file "${RUNNER_TEMP}/merge-master-mike.md"
+            existing="$(gh pr view "${PR_NUMBER}" --json comments \
+              --jq '.comments[] | select(.body | startswith("'"${marker}"'")) | .id' \
+              | head -1)"
+            if [ -n "${existing}" ]; then
+              gh api --method PATCH \
+                "/repos/${GITHUB_REPOSITORY}/issues/comments/${existing}" \
+                -f body="$(cat "${RUNNER_TEMP}/merge-master-mike.md")"
+            else
+              gh pr comment "${PR_NUMBER}" --body-file "${RUNNER_TEMP}/merge-master-mike.md"
+            fi
           fi
 
       - name: Summarize
         run: |
-          echo "merge-master-mike gate exit: ${{ steps.review.outputs.gate_exit }}"
+          echo "merge-master-mike backlog requested: ${{ steps.command.outputs.backlog_requested }}"
+          echo "merge-master-mike request exit: ${{ steps.mike.outputs.request_exit }}"
+          echo "merge-master-mike gate exit: ${{ steps.mike.outputs.gate_exit }}"
           echo "merge-master-mike merge requested: ${{ steps.command.outputs.merge_when_clean }}"
-          echo "merge-master-mike merge exit: ${{ steps.review.outputs.merge_exit }}"
+          echo "merge-master-mike merge exit: ${{ steps.mike.outputs.merge_exit }}"
           cat "${RUNNER_TEMP}/merge-master-mike.md"
+
+      - name: Fail failed backlog infrastructure requests after posting
+        if: ${{ steps.command.outputs.backlog_requested == 'true' && steps.mike.outputs.request_exit != '0' }}
+        run: exit 1
+
+      - name: Upload Mike receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: merge-master-mike-router-${{ github.run_id }}
+          path: ${{ runner.temp }}/dharma-pr-review
+          if-no-files-found: warn
