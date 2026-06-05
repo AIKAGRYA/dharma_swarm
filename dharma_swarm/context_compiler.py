@@ -7,13 +7,9 @@ from pathlib import Path
 from typing import Any, Callable
 
 from dharma_swarm.context_compiler_utils import (
-    ContextSection,
-    approx_char_budget as _approx_char_budget,
-    canonical_json as _canonical_json,
-    context_scan_metadata as _context_scan_metadata,
-    dedupe_strings as _dedupe,
-    sha256_text as _sha256,
-    truncate_text as _truncate,
+    ContextSection, approx_char_budget as _approx_char_budget,
+    canonical_json as _canonical_json, context_scan_metadata as _context_scan_metadata,
+    dedupe_strings as _dedupe, sha256_text as _sha256, truncate_text as _truncate,
     utc_now as _utc_now,
 )
 from dharma_swarm.memory_lattice import MemoryLattice, MemoryRecallHit
@@ -25,15 +21,11 @@ from dharma_swarm.memory_kernel.context_compiler_shadow import (
     notify_memory_kernel_context_canary,
     run_memory_kernel_context_canary,
 )
+from dharma_swarm.memory_kernel.default_context import build_memory_kernel_default_context
 from dharma_swarm.provider_policy import ProviderPolicyRouter, ProviderRouteRequest
 from dharma_swarm.runtime_state import (
-    ArtifactRecord,
-    ContextBundleRecord,
-    DelegationRun,
-    MemoryFact,
-    RuntimeStateStore,
-    SessionState,
-    WorkspaceLease,
+    ArtifactRecord, ContextBundleRecord, DelegationRun, MemoryFact, RuntimeStateStore,
+    SessionState, WorkspaceLease,
 )
 
 logger = logging.getLogger(__name__)
@@ -53,13 +45,14 @@ class ContextCompiler:
         "Governance": 0.09,
         "Operator Intent": 0.10,
         "Task State": 0.10,
-        "Always-On Memory": 0.12,
-        "Relevant Knowledge": 0.10,  # Sprint 2: PlugMem knowledge block
-        "Recent Session": 0.09,
-        "Retrieved Recall": 0.09,
-        "Memory Palace": 0.09,
-        "Semantic Context": 0.05,
-        "Durable Facts": 0.08,
+        "Memory Kernel": 0.12,
+        "Always-On Memory": 0.09,
+        "Relevant Knowledge": 0.08,  # Sprint 2: PlugMem knowledge block
+        "Recent Session": 0.08,
+        "Retrieved Recall": 0.07,
+        "Memory Palace": 0.07,
+        "Semantic Context": 0.04,
+        "Durable Facts": 0.07,
         "Artifacts": 0.05,
         "Workspace": 0.04,
     }
@@ -73,6 +66,7 @@ class ContextCompiler:
         memory_palace: Any = None,
         graph_store: Any = None,
         knowledge_store: Any = None,
+        memory_kernel: Any = None,
     ) -> None:
         self.runtime_state = runtime_state
         self.memory_lattice = memory_lattice
@@ -80,6 +74,7 @@ class ContextCompiler:
         self.memory_palace = memory_palace
         self.graph_store = graph_store  # Phase 7b: semantic graph
         self.knowledge_store = knowledge_store  # Sprint 2: PlugMem knowledge store
+        self.memory_kernel = memory_kernel
         # Frozen snapshot cache: session_id -> ContextBundleRecord
         self._frozen_bundles: dict[str, ContextBundleRecord] = {}
 
@@ -126,9 +121,7 @@ class ContextCompiler:
         memory_kernel_shadow_surfaces: tuple[str, ...] = (),
         memory_kernel_shadow_callback: Callable[[object], object] | None = None,
     ) -> ContextBundleRecord:
-        # ── MemPO-style truncation ──────────────────────────────────
-        # When ENABLE_MEM_TRUNCATION is set and a previous_mem is provided,
-        # replace the full context assembly with a compact summary.
+        # Optional MemPO-style truncation can replace full assembly.
         import os as _os
         _mem_truncation = _os.getenv("ENABLE_MEM_TRUNCATION", "false").strip().lower()
         if (
@@ -279,6 +272,9 @@ class ContextCompiler:
             query=query,
             task_id=task_id,
         )
+        memory_kernel_section, memory_kernel_metadata = build_memory_kernel_default_context(
+            self.memory_kernel, recall_query=recall_query, token_budget=token_budget
+        )
         recall_hits = (
             await self.memory_lattice.recall(
                 recall_query,
@@ -324,6 +320,7 @@ class ContextCompiler:
             task_description=task_description,
             policy_constraints=policy_constraints or [],
             provider_request=provider_request,
+            memory_kernel_section=memory_kernel_section,
             always_on=always_on,
             recent_events=recent_events,
             recall_hits=recall_hits,
@@ -376,9 +373,7 @@ class ContextCompiler:
                     metadata=dict(canary.metadata),
                 ),
             ]
-            source_refs = _dedupe(
-                (*source_refs, *memory_kernel_context_source_refs(canary))
-            )
+            source_refs = _dedupe((*source_refs, *memory_kernel_context_source_refs(canary)))
         created_at = _utc_now()
         checksum = _sha256(
             _canonical_json(
@@ -392,6 +387,8 @@ class ContextCompiler:
             )
         )
         bundle_metadata = memory_kernel_context_metadata(metadata, canary)
+        if memory_kernel_metadata:
+            bundle_metadata["memory_kernel_default"] = memory_kernel_metadata
         bundle_metadata["context_scan"] = _context_scan_metadata(rendered_text)
         bundle = ContextBundleRecord(
             bundle_id=self.runtime_state.new_bundle_id(),
@@ -449,6 +446,7 @@ class ContextCompiler:
         task_description: str,
         policy_constraints: list[str],
         provider_request: ProviderRouteRequest | None,
+        memory_kernel_section: ContextSection | None,
         always_on: str,
         recent_events: list[dict[str, Any]],
         recall_hits: list[MemoryRecallHit],
@@ -532,6 +530,8 @@ class ContextCompiler:
                 )
             )
 
+        if memory_kernel_section is not None:
+            sections.append(memory_kernel_section)
         if always_on.strip():
             sections.append(
                 ContextSection(

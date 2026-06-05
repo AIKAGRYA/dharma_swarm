@@ -19,6 +19,7 @@ import hashlib
 import inspect
 import json
 import logging
+import os
 import re
 import time
 from datetime import datetime, timezone
@@ -915,13 +916,11 @@ class Orchestrator:
             meta["context_bundle_status"] = "missing_task"
             td.metadata["context_bundle_status"] = "missing_task"
             return meta
-
         store = self._runtime_lifecycle._runtime_state_store()
         if store is None:
             meta["context_bundle_status"] = "missing_runtime_state"
             td.metadata["context_bundle_status"] = "missing_runtime_state"
             return meta
-
         run_id = self._runtime_lifecycle.ensure_runtime_run_id(td)
         runtime_root = self._runtime_root()
         operator_intent = self._operator_intent_for_task(task, meta)
@@ -935,7 +934,11 @@ class Orchestrator:
         try:
             from dharma_swarm.context_compiler import ContextCompiler
             from dharma_swarm.memory_lattice import MemoryLattice
-
+            from dharma_swarm.memory_kernel.orchestrator_context import (
+                MEMORY_KERNEL_DISPATCH_KEYS,
+                build_orchestrator_memory_kernel,
+                memory_kernel_dispatch_metadata,
+            )
             lattice = MemoryLattice(
                 db_path=store.db_path,
                 event_log_dir=runtime_root / "events",
@@ -943,6 +946,7 @@ class Orchestrator:
             compiler = ContextCompiler(
                 runtime_state=store,
                 memory_lattice=lattice,
+                memory_kernel=build_orchestrator_memory_kernel(repo_root=Path.cwd()),
             )
             bundle = await compiler.compile_bundle(
                 session_id=self._ledger.session_id,
@@ -959,6 +963,7 @@ class Orchestrator:
                 },
                 workspace_root=runtime_root,
             )
+            meta.update(memory_kernel_dispatch_metadata(bundle.metadata))
         except Exception as exc:
             error = str(exc)[:300]
             meta["context_bundle_status"] = "failed"
@@ -979,7 +984,6 @@ class Orchestrator:
                     await lattice.close()
                 except Exception:
                     logger.debug("Memory lattice close failed", exc_info=True)
-
         bundle_id = bundle.bundle_id
         runtime_db_path = str(store.db_path)
         state_dir = str(runtime_root)
@@ -992,6 +996,9 @@ class Orchestrator:
         td.metadata["context_bundle_status"] = "attached"
         td.metadata["runtime_db_path"] = runtime_db_path
         td.metadata.setdefault("state_dir", state_dir)
+        for key in MEMORY_KERNEL_DISPATCH_KEYS:
+            if key in meta:
+                td.metadata[key] = meta[key]
         return meta
 
     @staticmethod
@@ -1050,10 +1057,8 @@ class Orchestrator:
     ) -> AgentState | None:
         if not idle_agents:
             return None
-
         preferred_names = self._task_preferred_agent_names(task)
         preferred_roles = self._task_preferred_roles(task)
-
         # Prefer exact agent-name routing when the task already knows its seats.
         name_matched: list[AgentState] = []
         if preferred_names:
@@ -1068,14 +1073,12 @@ class Orchestrator:
                     name_matched.append(agent)
                     seen.add(agent.id)
                     break
-
         # Collect ALL role-matched candidates (not just first match)
         role_matched: list[AgentState] = []
         for agent in idle_agents:
             role_value = str(getattr(agent.role, "value", agent.role)).lower()
             if any(role_value == p for p in preferred_roles):
                 role_matched.append(agent)
-
         # Pick from name-matched subset first, then role-matched subset, else all candidates.
         candidates = name_matched or role_matched or list(idle_agents)
 
@@ -1084,7 +1087,6 @@ class Orchestrator:
         if best is not None:
             idle_agents.remove(best)
             return best
-
         # Fitness-biased selection (feature-flagged, best-effort)
         best = self._fitness_biased_pick(candidates, task)
         if best is not None:
@@ -1115,7 +1117,6 @@ class Orchestrator:
         if len(candidates) <= 1:
             return candidates[0] if candidates else None
 
-        import os
         if os.getenv("ENABLE_EFE_ROUTING", "").lower() not in ("1", "true", "yes"):
             return None  # Falls through to fitness-biased or FIFO
 
@@ -1151,7 +1152,6 @@ class Orchestrator:
             return candidates[0] if candidates else None
 
         # Feature flag: ENABLE_FITNESS_ROUTING (default off until enough data)
-        import os
         if os.getenv("ENABLE_FITNESS_ROUTING", "").lower() not in ("1", "true", "yes"):
             return None  # Falls through to FIFO
 

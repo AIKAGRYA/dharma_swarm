@@ -3,6 +3,8 @@
 import asyncio
 import json
 import time
+from datetime import datetime, timezone
+
 import pytest
 
 from dharma_swarm.models import (
@@ -565,6 +567,81 @@ async def test_assign_dispatch_telos_block_marks_failed_and_skips_assignment(age
         and "TELOS BLOCK (dispatch)" in str(fields.get("result", ""))
         for task_id, fields in board.updates
     )
+
+
+@pytest.mark.asyncio
+async def test_attach_context_bundle_exposes_memory_kernel_metadata(
+    tmp_path,
+    monkeypatch,
+):
+    from dharma_swarm.runtime_state import ContextBundleRecord
+
+    class FakeMemoryLattice:
+        def __init__(self, **_kwargs):
+            pass
+
+        async def close(self):
+            pass
+
+    class FakeContextCompiler:
+        def __init__(self, **kwargs):
+            assert kwargs.get("memory_kernel") is not None
+
+        async def compile_bundle(self, **kwargs):
+            return ContextBundleRecord(
+                bundle_id="bnd_memory_kernel",
+                session_id=kwargs["session_id"],
+                task_id=kwargs["task_id"],
+                run_id=kwargs["run_id"],
+                token_budget=kwargs["token_budget"],
+                rendered_text="# DGC Context Bundle\n\n## Memory Kernel\nused",
+                sections=[{"name": "Memory Kernel"}],
+                source_refs=["memory_kernel:home.witness"],
+                checksum="checksum",
+                created_at=datetime.now(timezone.utc),
+                metadata={
+                    "memory_kernel_default": {
+                        "status": "used",
+                        "pack_id": "memory_context_pack:test",
+                        "admitted_count": 1,
+                        "omitted_count": 2,
+                        "warnings": ["preview_only_no_runtime_prompt_injection"],
+                    }
+                },
+            )
+
+    monkeypatch.setattr(
+        "dharma_swarm.memory_lattice.MemoryLattice",
+        FakeMemoryLattice,
+    )
+    monkeypatch.setattr(
+        "dharma_swarm.memory_kernel.MemoryKernel",
+        lambda *_args, **_kwargs: object(),
+    )
+    monkeypatch.setattr(
+        "dharma_swarm.context_compiler.ContextCompiler",
+        FakeContextCompiler,
+    )
+
+    board = MockTaskBoard()
+    task = Task(id="t-memory-kernel", title="Memory task", description="safe")
+    board.tasks = [task]
+    orch = Orchestrator(
+        task_board=board,
+        agent_pool=MockAgentPool(),
+        ledger_dir=tmp_path / "ledgers",
+        runtime_db_path=tmp_path / "runtime.db",
+    )
+    td = TaskDispatch(task_id=task.id, agent_id="a1")
+
+    meta = await orch._attach_context_bundle(task, td, {})
+
+    assert meta["context_bundle_status"] == "attached"
+    assert meta["memory_kernel_status"] == "used"
+    assert meta["memory_kernel_pack_id"] == "memory_context_pack:test"
+    assert meta["memory_kernel_admitted_count"] == 1
+    assert meta["memory_kernel_omitted_count"] == 2
+    assert td.metadata["memory_kernel_status"] == "used"
 
 
 @pytest.mark.asyncio
