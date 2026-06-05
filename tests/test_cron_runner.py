@@ -3,10 +3,68 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import dharma_swarm.cron_runner as cron_runner
 from dharma_swarm.cron_job_runtime import CronJobRunStatus
 from dharma_swarm.cron_runner import execute_cron_job, run_cron_job
 from dharma_swarm.models import LLMResponse, ProviderType
 from dharma_swarm.runtime_provider import RuntimeProviderConfig
+
+
+def test_shell_handler_runs_shlex_split_command_without_shell(tmp_path):
+    calls = []
+    repo_root = str(cron_runner.Path(cron_runner.__file__).resolve().parent.parent)
+
+    class FakeProc:
+        returncode = 0
+        stdout = "ok"
+        stderr = ""
+
+    def fake_run(args, **kwargs):
+        calls.append((args, kwargs))
+        return FakeProc()
+
+    with patch("subprocess.run", fake_run):
+        result = execute_cron_job(
+            {
+                "id": "provider-credit-check",
+                "handler": "shell",
+                "shell_command": (
+                    "python3 scripts/check_provider_credits.py --json "
+                    "--output ~/.dharma/logs/provider_credits_latest.json"
+                ),
+                "repo_root": str(tmp_path),
+            }
+        )
+
+    assert result.status == CronJobRunStatus.COMPLETED
+    assert result.output == "ok"
+    assert len(calls) == 1
+    args, kwargs = calls[0]
+    assert args == [
+        "python3",
+        "scripts/check_provider_credits.py",
+        "--json",
+        "--output",
+        "~/.dharma/logs/provider_credits_latest.json",
+    ]
+    assert kwargs["cwd"] == repo_root
+    assert "shell" not in kwargs
+
+
+def test_shell_handler_rejects_non_allowlisted_command(tmp_path):
+    with patch("subprocess.run") as mock_run:
+        result = execute_cron_job(
+            {
+                "id": "bad-shell",
+                "handler": "shell",
+                "shell_command": "python3 scripts/unowned.py --do-work",
+                "repo_root": str(tmp_path),
+            }
+        )
+
+    assert result.status == CronJobRunStatus.FAILED
+    assert "not allowlisted" in (result.error or "")
+    mock_run.assert_not_called()
 
 
 def test_run_cron_job_dispatches_headless_prompt():
@@ -403,9 +461,8 @@ def test_run_cron_job_dispatches_doctor_assurance():
 
 
 def test_run_cron_job_dispatches_system_map_populator(tmp_path):
-    script = tmp_path / "scripts" / "system_map_populator.py"
-    script.parent.mkdir()
-    script.write_text("print('ok')\n", encoding="utf-8")
+    repo_root = cron_runner.Path(cron_runner.__file__).resolve().parent.parent
+    script = repo_root / "scripts" / "system_map_populator.py"
     with patch(
         "subprocess.run",
         return_value=SimpleNamespace(returncode=0, stdout="Wrote reports/system_map/latest.json", stderr=""),
@@ -427,6 +484,7 @@ def test_run_cron_job_dispatches_system_map_populator(tmp_path):
     assert args[1] == str(script)
     assert ["--audit-dir", "/tmp/audit"] == args[2:4]
     assert ["--output", "/tmp/latest.json"] == args[4:6]
+    assert mock_run.call_args.kwargs["cwd"] == str(repo_root)
     assert mock_run.call_args.kwargs["timeout"] == 12
 
 
