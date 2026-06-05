@@ -105,7 +105,7 @@ Plain mentions are packet/gate/comment only. Conditional merge requires an
 explicit command:
 
 ```text
-@mix_master_mike merge when clean
+@merge_master_mike merge when clean
 ```
 
 In that mode Mike still blocks unless required receipts such as
@@ -116,7 +116,7 @@ For hosted backlog triage, do not create another workflow. Use one of the
 existing entry points:
 
 ```text
-@mix_master_mike backlog
+@merge_master_mike backlog
 ```
 
 or run GitHub Actions → `merge-master-mike-backlog` with:
