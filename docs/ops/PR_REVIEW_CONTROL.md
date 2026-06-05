@@ -16,10 +16,35 @@ does nothing useful. PR Review Control is pull-based from the local operator
 machine: it asks GitHub for live state, writes packets under `~/.dharma`, and
 does not depend on inbound webhooks.
 
+## CI Truth Contract
+
+`docs/governance/CI_TRUTH_CONTRACT.json` is the machine-readable CI membrane.
+It separates required checks from advisory checks, names the local repro
+command, assigns an owner, and states whether autofix is allowed.
+
+```bash
+make ci-truth ARGS="--pr 397"
+make ci-truth ARGS="--rollup-json /path/to/status-rollup.json"
+```
+
+Merge Master Mike consumes this contract in `make pr-packet`, `make pr-gate`,
+`make pr-mike`, and `make pr-merge`. Required CI entries block merge when they
+are missing, pending, failed, cancelled, timed out, or action-required.
+Advisory entries are reported as degraded warnings with repro commands; raw
+GitHub failing checks still block through the normal rollup gate.
+
+This keeps authority split cleanly:
+
+- ACI / CI truth contract defines what CI evidence means.
+- Merge Master Mike coordinates packets, reviewers, gates, comments, and
+  conditional clean-gate merge requests.
+- Branch protection remains the final GitHub enforcement layer.
+
 ## Commands
 
 ```bash
 make pr-queue
+make ci-truth ARGS="--pr 397"
 make pr-mike
 make pr-packet PR=397
 make pr-reviewers

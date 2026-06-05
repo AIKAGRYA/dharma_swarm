@@ -7,6 +7,13 @@ import pytest
 from scripts.runtime import pr_merge_control as prc
 
 
+def _ci_required_success_rollup():
+    return [
+        {"name": "DocOps integrity gate", "status": "COMPLETED", "conclusion": "SUCCESS"},
+        {"name": "Coherence Delta PR body", "status": "COMPLETED", "conclusion": "SUCCESS"},
+    ]
+
+
 def test_classify_pr_blocks_failing_checks():
     pr = {
         "number": 1,
@@ -630,6 +637,52 @@ def _write_approve_review(out_dir, agent):
     )
 
 
+def test_gate_blocks_missing_required_ci_truth(tmp_path, monkeypatch):
+    out_dir = tmp_path / "packet"
+    out_dir.mkdir()
+    prc.write_json(out_dir / "FACTS.json", {"risk": {"level": "LOW"}})
+    _write_approve_review(out_dir, "codex")
+    _write_approve_review(out_dir, "claude")
+    body = """
+- Organ touched: `scripts/runtime/pr_merge_control.py`
+- Declared-vs-actual gap closed: merge gate consumes the CI truth contract.
+- Proof that re-reads the map: test covers missing protected DocOps check.
+- New drift introduced: no merge authority change; gate gets stricter.
+"""
+    monkeypatch.setattr(
+        prc,
+        "fetch_pr_view",
+        lambda _pr: {
+            "isDraft": False,
+            "mergeable": "MERGEABLE",
+            "reviewDecision": "APPROVED",
+            "statusCheckRollup": [
+                {"name": "Coherence Delta PR body", "status": "COMPLETED", "conclusion": "SUCCESS"}
+            ],
+            "body": body,
+        },
+    )
+    monkeypatch.setattr(prc, "fetch_review_threads", lambda _pr, _repo: {"ok": True, "unresolved_count": 0})
+    monkeypatch.setattr(prc, "repo_name", lambda: "owner/repo")
+
+    gate = prc.build_gate(
+        argparse.Namespace(
+            pr=12,
+            packet_dir=str(out_dir),
+            state_root=str(tmp_path),
+            allow_pending=False,
+            human_approved=False,
+            allow_backup_reviewer=False,
+            backup_reviewers="backup_opus",
+            backup_reviewer_reason="",
+        )
+    )
+
+    assert gate["decision"] == "BLOCKED"
+    assert gate["ci_truth"]["verdict"] == "FAIL"
+    assert "required CI docops_integrity is MISSING; run `make docops-integrity`" in gate["blockers"]
+
+
 def test_gate_accepts_named_backup_reviewer_when_claude_unavailable(tmp_path, monkeypatch):
     out_dir = tmp_path / "packet"
     out_dir.mkdir()
@@ -649,7 +702,7 @@ def test_gate_accepts_named_backup_reviewer_when_claude_unavailable(tmp_path, mo
             "isDraft": False,
             "mergeable": "MERGEABLE",
             "reviewDecision": "APPROVED",
-            "statusCheckRollup": [{"name": "tests", "status": "COMPLETED", "conclusion": "SUCCESS"}],
+            "statusCheckRollup": _ci_required_success_rollup(),
             "body": body,
         },
     )
@@ -694,7 +747,7 @@ def test_gate_blocks_missing_dynamic_required_reviewer(tmp_path, monkeypatch):
             "isDraft": False,
             "mergeable": "MERGEABLE",
             "reviewDecision": "APPROVED",
-            "statusCheckRollup": [{"name": "tests", "status": "COMPLETED", "conclusion": "SUCCESS"}],
+            "statusCheckRollup": _ci_required_success_rollup(),
             "body": body,
         },
     )
@@ -740,7 +793,7 @@ def test_gate_accepts_dynamic_required_reviewer_quorum(tmp_path, monkeypatch):
             "isDraft": False,
             "mergeable": "MERGEABLE",
             "reviewDecision": "APPROVED",
-            "statusCheckRollup": [{"name": "tests", "status": "COMPLETED", "conclusion": "SUCCESS"}],
+            "statusCheckRollup": _ci_required_success_rollup(),
             "body": body,
         },
     )
@@ -784,7 +837,7 @@ def test_gate_blocks_backup_reviewer_without_written_reason(tmp_path, monkeypatc
             "isDraft": False,
             "mergeable": "MERGEABLE",
             "reviewDecision": "APPROVED",
-            "statusCheckRollup": [{"name": "tests", "status": "COMPLETED", "conclusion": "SUCCESS"}],
+            "statusCheckRollup": _ci_required_success_rollup(),
             "body": body,
         },
     )

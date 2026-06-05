@@ -24,6 +24,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
+try:
+    from scripts.runtime.ci_truth import DEFAULT_CONTRACT_PATH as DEFAULT_CI_TRUTH_CONTRACT
+    from scripts.runtime.ci_truth import evaluate_rollup as evaluate_ci_rollup
+    from scripts.runtime.ci_truth import load_contract as load_ci_truth_contract
+except ModuleNotFoundError:
+    from ci_truth import DEFAULT_CONTRACT_PATH as DEFAULT_CI_TRUTH_CONTRACT
+    from ci_truth import evaluate_rollup as evaluate_ci_rollup
+    from ci_truth import load_contract as load_ci_truth_contract
+
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_STATE_ROOT = Path("~/.dharma/pr_review")
@@ -156,6 +165,19 @@ def write_text(path: Path, text: str) -> None:
 
 def load_json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def ci_truth_contract_path(args: argparse.Namespace | None = None) -> Path:
+    configured = ""
+    if args is not None:
+        configured = getattr(args, "ci_truth_contract", "") or ""
+    configured = configured or os.environ.get("DHARMA_CI_TRUTH_CONTRACT", "")
+    return expand(configured) if configured else DEFAULT_CI_TRUTH_CONTRACT
+
+
+def ci_truth_for_pr(pr: dict[str, Any], args: argparse.Namespace | None = None) -> dict[str, Any]:
+    contract = load_ci_truth_contract(ci_truth_contract_path(args))
+    return evaluate_ci_rollup(pr.get("statusCheckRollup") or [], contract)
 
 
 def env_float(name: str, default: float) -> float:
@@ -599,6 +621,7 @@ def render_packet_markdown(packet: dict[str, Any]) -> str:
     pr = packet["pr"]
     risk = packet["risk"]
     checks = packet["classification"]["checks"]
+    ci_truth = packet.get("ci_truth") or {}
     lines = [
         f"# PR #{pr['number']} Review Packet",
         "",
@@ -611,6 +634,7 @@ def render_packet_markdown(packet: dict[str, Any]) -> str:
         f"- Review decision: `{packet['classification']['reviewDecision']}`",
         f"- Risk: `{risk['level']}` ({risk['files_changed']} files, +{risk['additions']}/-{risk['deletions']})",
         f"- Checks: passing={len(checks['passing'])} failing={len(checks['failing'])} pending={len(checks['pending'])} unknown={len(checks['unknown'])}",
+        f"- CI Truth: `{ci_truth.get('verdict', 'UNKNOWN')}`",
         f"- Coherence Delta: `{'pass' if packet['coherence']['ok'] else 'fail'}`",
         f"- Unresolved review threads: `{packet['review_threads'].get('unresolved_count')}`",
         "",
@@ -636,6 +660,18 @@ def render_packet_markdown(packet: dict[str, Any]) -> str:
         lines.extend(f"- {reason}" for reason in packet["classification"]["reasons"])
     else:
         lines.append("- no automatic blocker detected")
+    lines.extend(["", "## CI Truth", ""])
+    if ci_truth:
+        lines.append(f"- Verdict: `{ci_truth.get('verdict')}`")
+        lines.append(f"- Observed checks: `{ci_truth.get('observed_total')}` latest / `{ci_truth.get('raw_total')}` raw")
+        if ci_truth.get("merge_blockers"):
+            lines.extend(f"- BLOCKER: {blocker}" for blocker in ci_truth["merge_blockers"])
+        else:
+            lines.append("- Merge blockers: none")
+        if ci_truth.get("warnings"):
+            lines.extend(f"- Warning: {warning}" for warning in ci_truth["warnings"])
+    else:
+        lines.append("- not evaluated")
     lines.extend([
         "",
         "## Required Local Outputs",
@@ -670,6 +706,7 @@ def cmd_packet(args: argparse.Namespace) -> int:
     diff = fetch_pr_diff(args.pr)
     classification = classify_pr(pr)
     coherence = coherence_results(pr.get("body") or "")
+    ci_truth = ci_truth_for_pr(pr, args)
     risk = risk_from_files(files)
     out_dir = root / f"pr-{args.pr}" / stamp()
     packet = {
@@ -679,6 +716,7 @@ def cmd_packet(args: argparse.Namespace) -> int:
         "pr": pr,
         "classification": classification,
         "coherence": coherence,
+        "ci_truth": ci_truth,
         "risk": risk,
         "files": files,
         "review_threads": threads,
@@ -923,6 +961,7 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
     current_threads = fetch_review_threads(args.pr, repo)
     current_classification = classify_pr(current_pr)
     current_coherence = coherence_results(current_pr.get("body") or "")
+    current_ci_truth = ci_truth_for_pr(current_pr, args)
 
     blockers: list[str] = []
     warnings: list[str] = []
@@ -938,6 +977,8 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
         blockers.append("GitHub review decision is CHANGES_REQUESTED")
     if not current_coherence["ok"]:
         blockers.append("Coherence Delta fields missing or placeholder")
+    blockers.extend(current_ci_truth.get("merge_blockers", []))
+    warnings.extend(current_ci_truth.get("warnings", []))
     unresolved_count = current_threads.get("unresolved_count")
     if unresolved_count:
         blockers.append(f"{unresolved_count} unresolved review threads")
@@ -1011,6 +1052,7 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
         "warnings": warnings,
         "classification": current_classification,
         "coherence": current_coherence,
+        "ci_truth": current_ci_truth,
         "required_reviewers": required_reviewers,
         "review_threads": {
             "ok": current_threads.get("ok"),
@@ -1032,6 +1074,7 @@ def render_gate_markdown(gate: dict[str, Any]) -> str:
         f"- Packet: `{gate['packet_dir']}`",
         f"- Risk: `{gate.get('risk', {}).get('level', 'UNKNOWN')}`",
         f"- Required reviewers: `{', '.join(gate.get('required_reviewers', []))}`",
+        f"- CI Truth: `{gate.get('ci_truth', {}).get('verdict', 'UNKNOWN')}`",
         "",
         "## Blockers",
         "",
@@ -1045,6 +1088,19 @@ def render_gate_markdown(gate: dict[str, Any]) -> str:
         lines.extend(f"- {warning}" for warning in gate["warnings"])
     else:
         lines.append("- none")
+    ci_truth = gate.get("ci_truth") or {}
+    lines.extend(["", "## CI Truth", ""])
+    if ci_truth:
+        lines.append(f"- Verdict: `{ci_truth.get('verdict')}`")
+        lines.append(f"- Observed checks: `{ci_truth.get('observed_total')}` latest / `{ci_truth.get('raw_total')}` raw")
+        if ci_truth.get("merge_blockers"):
+            lines.extend(f"- Required blocker: {blocker}" for blocker in ci_truth["merge_blockers"])
+        else:
+            lines.append("- Required blockers: none")
+        if ci_truth.get("warnings"):
+            lines.extend(f"- Warning: {warning}" for warning in ci_truth["warnings"])
+    else:
+        lines.append("- not evaluated")
     lines.extend(["", "## Review Receipts", ""])
     receipts = gate["review_receipts"]
     for agent in receipts:
@@ -1090,6 +1146,7 @@ def render_github_comment(
     decision = gate.get("decision") if gate else "PACKET_ONLY"
     blockers = gate.get("blockers", []) if gate else []
     warnings = gate.get("warnings", []) if gate else []
+    ci_truth = (gate or packet).get("ci_truth", {})
 
     lines = [
         "<!-- dharma-pr-review-control:auto -->",
@@ -1100,6 +1157,7 @@ def render_github_comment(
         f"- Queue status: `{classification['status']}`",
         f"- Mergeable: `{classification['mergeable']}`",
         f"- Risk: `{risk['level']}` ({risk['files_changed']} files, +{risk['additions']}/-{risk['deletions']})",
+        f"- CI Truth: `{ci_truth.get('verdict', 'UNKNOWN')}`",
         f"- Coherence Delta: `{'pass' if coherence['ok'] else 'fail'}`",
         "- Authority: `conditional_merge_after_clean_gate`",
         "",
@@ -1905,7 +1963,11 @@ def cmd_fanout(args: argparse.Namespace) -> int:
         if args.dry_run:
             continue
 
-        packet_args = argparse.Namespace(state_root=str(root), pr=pr_number)
+        packet_args = argparse.Namespace(
+            state_root=str(root),
+            pr=pr_number,
+            ci_truth_contract=args.ci_truth_contract,
+        )
         packet_code = cmd_packet(packet_args)
         if packet_code != 0:
             processed.append({
@@ -1955,6 +2017,7 @@ def cmd_fanout(args: argparse.Namespace) -> int:
             backup_reviewers=args.backup_reviewers,
             backup_reviewer_reason=args.backup_reviewer_reason,
             required_reviewers=args.required_reviewers,
+            ci_truth_contract=args.ci_truth_contract,
         )
         gate = build_gate(gate_args)
         write_json(out_dir / "MERGE_GATE.json", gate)
@@ -2101,6 +2164,13 @@ def build_parser() -> argparse.ArgumentParser:
             help="Comma-separated required reviewer receipt names before merge.",
         )
 
+    def add_ci_truth_flags(command: argparse.ArgumentParser) -> None:
+        command.add_argument(
+            "--ci-truth-contract",
+            default=os.environ.get("DHARMA_CI_TRUTH_CONTRACT", str(DEFAULT_CI_TRUTH_CONTRACT)),
+            help="Path to the CI truth contract consumed by packet and merge-gate evaluation.",
+        )
+
     queue = sub.add_parser("queue", help="Classify all open PRs")
     queue.add_argument("--limit", type=int, default=100)
     queue.set_defaults(func=cmd_queue)
@@ -2120,6 +2190,7 @@ def build_parser() -> argparse.ArgumentParser:
     fanout.add_argument("--human-approved", action="store_true")
     add_reviewer_policy_flags(fanout)
     add_backup_reviewer_flags(fanout)
+    add_ci_truth_flags(fanout)
     fanout.add_argument("--packet-only", action="store_true", help="Create packets and gates without reviewer fanout")
     fanout.add_argument("--dry-run", action="store_true", help="Select PRs and write Mike receipt without processing them")
     fanout.add_argument("--merge-mode", choices=MERGE_MODES, default="off", help="Mike merge authority mode")
@@ -2137,6 +2208,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     packet = sub.add_parser("packet", help="Create a dual-agent review packet for one PR")
     packet.add_argument("--pr", type=int, required=True)
+    add_ci_truth_flags(packet)
     packet.set_defaults(func=cmd_packet)
 
     gate = sub.add_parser("gate", help="Run the merge gate for one PR")
@@ -2146,6 +2218,7 @@ def build_parser() -> argparse.ArgumentParser:
     gate.add_argument("--human-approved", action="store_true")
     add_reviewer_policy_flags(gate)
     add_backup_reviewer_flags(gate)
+    add_ci_truth_flags(gate)
     gate.set_defaults(func=cmd_gate)
 
     merge = sub.add_parser("merge", help="Dry-run or execute a gated merge")
@@ -2155,6 +2228,7 @@ def build_parser() -> argparse.ArgumentParser:
     merge.add_argument("--human-approved", action="store_true")
     add_reviewer_policy_flags(merge)
     add_backup_reviewer_flags(merge)
+    add_ci_truth_flags(merge)
     merge.add_argument("--method", choices=("squash", "merge", "rebase"), default="squash")
     merge.add_argument("--auto", action="store_true", help="Use gh pr merge --auto when executing")
     merge.add_argument("--confirm", required=True)
