@@ -162,7 +162,7 @@ obvious blocker; it is not merge permission. Typical ordering:
    clear.
 4. Keep large or doctrine-changing PRs out of batch merges.
 
-## 57-PR Portfolio Cleanup Wave
+## 58-PR Portfolio Cleanup Wave
 
 Snapshot date: 2026-06-05.
 
@@ -181,7 +181,8 @@ Use Mike as the execution gate:
 
 Immediate close batch:
 
-- Generated/report churn: #460, #462, #463, #464, #466, #467, #475, #483.
+- Generated/report churn: #460, #462, #463, #464, #466, #467, #475, #483,
+  #485.
 - PR janitor/session reports: #451, #452, #454, #455, #456, #457, #458, #459.
 - Superseded spine-adoption docs: #425, #426.
 - Duplicate/single Palantir auto-grounding reports unless selected for the
