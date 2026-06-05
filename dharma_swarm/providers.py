@@ -102,53 +102,65 @@ class LLMProvider(BaseProvider):
         yield  # type: ignore[misc]  # required for async generator signature
 
 
+def _mapping_from_sdk_object(value: Any) -> dict[str, Any] | None:
+    if isinstance(value, dict):
+        return value
+    for method_name in ("model_dump", "dict"):
+        method = getattr(value, method_name, None)
+        if not callable(method):
+            continue
+        try:
+            dumped = method()
+        except TypeError:
+            continue
+        if isinstance(dumped, dict):
+            return dumped
+    return None
+
+
+def _get_openai_compatible_field(value: Any, key: str) -> Any:
+    mapping = _mapping_from_sdk_object(value)
+    if mapping is not None and key in mapping:
+        return mapping.get(key)
+    return getattr(value, key, None)
+
+
 def _coerce_openrouter_text(value: Any) -> str:
+    if value is None:
+        return ""
     if isinstance(value, str):
         return value.strip()
     if isinstance(value, list):
         chunks: list[str] = []
         for item in value:
-            if isinstance(item, str):
-                text = item.strip()
-                if text:
-                    chunks.append(text)
-                continue
-            if isinstance(item, dict):
-                text = item.get("text") or item.get("content")
-                if isinstance(text, str) and text.strip():
-                    chunks.append(text.strip())
-                continue
-            text = getattr(item, "text", None) or getattr(item, "content", None)
-            if isinstance(text, str) and text.strip():
-                chunks.append(text.strip())
+            text = _coerce_openrouter_text(item)
+            if text:
+                chunks.append(text)
         return "\n".join(chunks).strip()
-    if isinstance(value, dict):
-        text = value.get("text") or value.get("content")
-        if isinstance(text, str):
-            return text.strip()
-    text = getattr(value, "text", None) or getattr(value, "content", None)
-    if isinstance(text, str):
-        return text.strip()
+    mapping = _mapping_from_sdk_object(value)
+    if mapping is not None:
+        for key in ("text", "content", "output_text"):
+            text = _coerce_openrouter_text(mapping.get(key))
+            if text:
+                return text
+        return ""
+    for key in ("text", "content", "output_text"):
+        text = _coerce_openrouter_text(getattr(value, key, None))
+        if text:
+            return text
     return ""
 
 
 def _extract_openai_compatible_message_text(message: Any) -> str:
-    if isinstance(message, dict):
-        content = _coerce_openrouter_text(message.get("content"))
-        if content:
-            return content
-        reasoning = _coerce_openrouter_text(message.get("reasoning"))
-        if reasoning:
-            return reasoning
-        return _coerce_openrouter_text(message.get("reasoning_details"))
-
-    content = _coerce_openrouter_text(getattr(message, "content", None))
+    content = _coerce_openrouter_text(_get_openai_compatible_field(message, "content"))
     if content:
         return content
-    reasoning = _coerce_openrouter_text(getattr(message, "reasoning", None))
+    reasoning = _coerce_openrouter_text(_get_openai_compatible_field(message, "reasoning"))
     if reasoning:
         return reasoning
-    return _coerce_openrouter_text(getattr(message, "reasoning_details", None))
+    return _coerce_openrouter_text(
+        _get_openai_compatible_field(message, "reasoning_details")
+    )
 
 
 def _extract_openrouter_message_text(message: Any) -> str:
@@ -329,11 +341,16 @@ class OpenAIProvider(LLMProvider):
         resp = await client.chat.completions.create(**kwargs)
         choice = resp.choices[0]
         msg = choice.message
-        tool_calls: list[dict[str, Any]] = [
-            {"id": tc.id, "name": tc.function.name,
-             "arguments": tc.function.arguments}
-            for tc in (msg.tool_calls or [])
-        ]
+        tool_calls: list[dict[str, Any]] = []
+        for tc in (_get_openai_compatible_field(msg, "tool_calls") or []):
+            fn = _get_openai_compatible_field(tc, "function") or {}
+            tool_calls.append(
+                {
+                    "id": _get_openai_compatible_field(tc, "id"),
+                    "name": _get_openai_compatible_field(fn, "name"),
+                    "arguments": _get_openai_compatible_field(fn, "arguments"),
+                }
+            )
         return LLMResponse(
             content=_extract_openai_compatible_message_text(msg), model=resp.model,
             usage={"prompt_tokens": resp.usage.prompt_tokens,

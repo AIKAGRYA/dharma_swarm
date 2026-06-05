@@ -36,6 +36,14 @@ class _DummyProvider:
         yield self.content
 
 
+class _Dumpable:
+    def __init__(self, payload: dict[str, object]) -> None:
+        self._payload = payload
+
+    def model_dump(self) -> dict[str, object]:
+        return self._payload
+
+
 def _mk_resp(
     content: str | None = "ok",
     *,
@@ -289,6 +297,33 @@ async def test_openai_provider_uses_max_tokens_for_non_gpt5_models(monkeypatch):
     assert kwargs["max_tokens"] == 32
     assert "max_completion_tokens" not in kwargs
     assert kwargs["temperature"] == req.temperature
+
+
+@pytest.mark.asyncio
+async def test_openai_provider_preserves_dumped_content_parts(monkeypatch):
+    p = OpenAIProvider(api_key="k")
+    req = LLMRequest(
+        model="gpt-4o",
+        messages=[{"role": "user", "content": "hi"}],
+    )
+
+    message = _Dumpable(
+        {
+            "content": [
+                _Dumpable({"type": "output_text", "text": "visible content"}),
+            ],
+            "tool_calls": None,
+        }
+    )
+    resp = _mk_resp(content=None)
+    resp.choices[0].message = message
+    client = AsyncMock()
+    client.chat.completions.create = AsyncMock(return_value=resp)
+    monkeypatch.setattr(p, "_client_or_raise", lambda: client)
+
+    out = await p.complete(req)
+
+    assert out.content == "visible content"
 
 
 @pytest.mark.asyncio

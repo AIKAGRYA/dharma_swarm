@@ -38,6 +38,12 @@ _LOCAL_FALLBACK_ERROR_MARKERS = (
     "unattended claude bare mode requires anthropic_api_key",
 )
 
+_ALLOWED_SHELL_COMMAND_PREFIXES = (
+    ("python3", "scripts/consume_review_marks.py"),
+    ("python3", "scripts/hermes_heartbeat_poll.py"),
+    ("python3", "scripts/check_provider_credits.py"),
+)
+
 
 def _as_int(value: Any, default: int) -> int:
     try:
@@ -75,7 +81,7 @@ def _run_system_map_populator(job: dict[str, Any]) -> CronJobExecutionResult:
 
     import subprocess
 
-    repo_root = Path(str(job.get("repo_root") or Path(__file__).resolve().parent.parent))
+    repo_root = Path(__file__).resolve().parent.parent
     script = repo_root / "scripts" / "system_map_populator.py"
     if not script.exists():
         error = f"missing script: {script}"
@@ -98,6 +104,72 @@ def _run_system_map_populator(job: dict[str, Any]) -> CronJobExecutionResult:
         timeout=_as_int(job.get("timeout_sec"), 60),
         cwd=str(repo_root),
     )
+    output_text = (proc.stdout or "").strip()
+    err = (proc.stderr or "").strip()
+    status = CronJobRunStatus.COMPLETED if proc.returncode == 0 else CronJobRunStatus.FAILED
+    return CronJobExecutionResult(
+        status=status,
+        output=output_text or "(no output)",
+        error=err if proc.returncode != 0 else "",
+    )
+
+
+def _run_shell_command(job: dict[str, Any]) -> CronJobExecutionResult:
+    """Run a shell command specified in the job's shell_command field.
+
+    The command is split via shlex (no shell=True) to avoid injection risks.
+    Commands come from cron_jobs.json and must match the operational allowlist.
+    """
+
+    import shlex
+    import subprocess
+
+    shell_cmd = str(job.get("shell_command", "")).strip()
+    if not shell_cmd:
+        error = "shell handler requires a 'shell_command' field"
+        return CronJobExecutionResult(
+            status=CronJobRunStatus.FAILED,
+            output=error,
+            error=error,
+        )
+
+    repo_root = Path(__file__).resolve().parent.parent
+    timeout = _as_int(job.get("timeout_sec"), 120)
+    args = shlex.split(shell_cmd)
+    if not any(
+        tuple(args[: len(prefix)]) == prefix
+        for prefix in _ALLOWED_SHELL_COMMAND_PREFIXES
+    ):
+        error = f"shell handler command is not allowlisted: {args[0] if args else '(empty)'}"
+        return CronJobExecutionResult(
+            status=CronJobRunStatus.FAILED,
+            output=error,
+            error=error,
+        )
+
+    try:
+        proc = subprocess.run(
+            args,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            cwd=str(repo_root),
+        )
+    except subprocess.TimeoutExpired:
+        error = f"shell command timed out after {timeout}s: {shell_cmd}"
+        return CronJobExecutionResult(
+            status=CronJobRunStatus.FAILED,
+            output="",
+            error=error,
+        )
+    except Exception as exc:
+        error = f"shell command failed to launch: {exc}"
+        return CronJobExecutionResult(
+            status=CronJobRunStatus.FAILED,
+            output="",
+            error=error,
+        )
+
     output_text = (proc.stdout or "").strip()
     err = (proc.stderr or "").strip()
     status = CronJobRunStatus.COMPLETED if proc.returncode == 0 else CronJobRunStatus.FAILED
@@ -807,6 +879,8 @@ def execute_cron_job(job: dict[str, Any]) -> CronJobExecutionResult:
         return _run_world_scout(job)
     if handler == "store_sync":
         return _run_store_sync(job)
+    if handler == "shell":
+        return _run_shell_command(job)
 
     error = f"Unsupported cron handler: {handler}"
     return CronJobExecutionResult(
