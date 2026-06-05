@@ -30,15 +30,24 @@ adjacent signals, and routed a concrete next artifact into the swarm."
 
 Primary state lives under `~/.dharma/meta/`:
 
-- `world_signal_board.json`: movement board with scores, source counts, status,
-  cascade queries, and strategic vision.
+- `world_signal_board.json`: movement board with scores, deterministic Idea
+  Spark triage tuples, source counts, status, cascade queries, and strategic
+  vision.
 - `world_signal_brief.md`: morning-readable summary.
 - `world_zeitgeist_inbox.jsonl`: promotion-ready movements for `zeitgeist.py`.
 - `zeitgeist.jsonl`: canonical external feed consumed by Shakti.
 - `world_operator_drops.jsonl`: operator-supplied public signals.
 - `world_radar/world_radar_health.json`: scan health and source failures.
+- `world_radar/ingest_run_summary.json`: latest Go ingest run summary with
+  source counts, accepted/rejected counts, bytes, retries, freshest receipt,
+  provisional compute units, and NATS transport status.
+- `world_radar/ingest_run_summaries.jsonl`: append-only run-summary history.
+- `world_radar/ingest_cost_ledger.jsonl`: append-only idempotent provisional
+  cost events. The unit is `neutral_compute_unit`; this is not USD pricing.
 - `world_radar/source_weights.json`: learned source priors.
 - `world_radar/incubations/*/{verify,connect,evolve}.{json,md}`: R&D workups.
+- `receipts/world_signals/*.json`: canonical Go evidence receipts. JSONL feeds
+  are derived projections; receipt files remain replay authority.
 
 Internal pressure lives separately:
 
@@ -93,6 +102,8 @@ python -m dharma_swarm.world_radar.cli drop \
 A movement becomes promotion-ready only when:
 
 - weighted score is at least `0.62`, and
+- deterministic Idea Spark v0 triage passes with the tuple
+  `novelty`, `telos_fit`, `tractability`, and `source_confidence`, and
 - it has either two independent public source families, or an operator drop with
   a concrete URL/source.
 
@@ -105,6 +116,9 @@ the movement.
 - Radar board, brief, health, inbox, and source-weight writes use tmp-then-rename
   persistence.
 - A world-radar lock serializes cron and orchestrator no-fetch passes.
+- Go ingest NATS projection is disabled unless `DHARMA_INGEST_NATS=1`; when
+  enabled it must report `ack_verified`, `ack_unverified`, or `unavailable`
+  using the existing NATS verifier surfaces. Receipt files remain authoritative.
 - Source-weight learning is event-idempotent through
   `world_radar/source_feedback_ledger.json`.
 - Recent `zeitgeist.jsonl` history is deduped for 14 days so repeated scans do
