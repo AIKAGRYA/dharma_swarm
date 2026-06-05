@@ -1,6 +1,6 @@
 # Active Track Evidence
 
-Generated: 2026-06-05T15:26:06+09:00
+Generated: 2026-06-05T14:16:15+00:00
 Track: `runtime-truth-reconciliation-2026-06`
 Prerequisites: **OK**
 Completion: **11/11**
