@@ -13,6 +13,8 @@ from typing import Any, Iterable
 
 PROMOTION_MIN_SCORE = 0.62
 INCUBATION_MIN_SCORE = 0.42
+TRIAGE_PROMOTION_MIN_SCORE = 0.62
+TRIAGE_INCUBATION_MIN_SCORE = 0.42
 DEFAULT_SOURCE_WEIGHTS = {
     "operator_drop": 1.0,
     "company_docs": 0.92,
@@ -23,6 +25,64 @@ DEFAULT_SOURCE_WEIGHTS = {
     "reddit": 0.58,
     "llm_scan": 0.5,
     "unknown": 0.45,
+}
+TELOS_KEYWORDS = {
+    "agent",
+    "agentic",
+    "automation",
+    "benchmark",
+    "computer-use",
+    "developer",
+    "evaluation",
+    "governance",
+    "infrastructure",
+    "memory",
+    "model",
+    "open source",
+    "orchestration",
+    "research",
+    "runtime",
+    "security",
+    "tool",
+    "workflow",
+}
+TRACTABILITY_KEYWORDS = {
+    "api",
+    "arxiv",
+    "benchmark",
+    "docs",
+    "execution",
+    "github",
+    "infrastructure",
+    "open source",
+    "paper",
+    "prototype",
+    "public",
+    "release",
+    "repo",
+    "runtime",
+    "tool",
+}
+NOVELTY_KEYWORDS = {
+    "benchmark",
+    "frontier",
+    "launch",
+    "new",
+    "paper",
+    "release",
+    "research",
+    "runtime",
+}
+REJECT_KEYWORDS = {
+    "adult",
+    "casino",
+    "coupon",
+    "gambling",
+    "malware",
+    "phishing",
+    "promo",
+    "scam",
+    "spam",
 }
 
 
@@ -50,8 +110,12 @@ def build_world_signal_board(
     return {
         "generated_at": timestamp,
         "promotion_rule": (
-            "score>=0.62 and either two independent public sources or "
-            "operator_drop plus concrete evidence URL/source"
+            "score>=0.62, deterministic Idea Spark triage passes, and either "
+            "two independent public sources or operator_drop plus concrete evidence URL/source"
+        ),
+        "triage_rule": (
+            "novelty, telos_fit, tractability, and source_confidence are "
+            "deterministic 0..1 scores; promotion requires triage_score>=0.62"
         ),
         "source_weights": weights,
         "health": {
@@ -60,6 +124,7 @@ def build_world_signal_board(
             "promotion_ready": sum(1 for item in movements if item["status"] == "promotion_ready"),
             "incubating": sum(1 for item in movements if item["status"] == "incubating"),
             "watchlist": sum(1 for item in movements if item["status"] == "watchlist"),
+            "rejected": sum(1 for item in movements if item["status"] == "rejected"),
         },
         "movements": movements,
     }
@@ -80,6 +145,8 @@ def promotion_ready_signals(board: dict[str, Any]) -> list[dict[str, Any]]:
                 "source_count": movement.get("independent_sources", 0),
                 "url": movement.get("primary_url", ""),
                 "raw_source": movement.get("primary_source", ""),
+                "triage": movement.get("triage", {}),
+                "triage_tuple": movement.get("triage_tuple", {}),
             }
         )
         rows.append(
@@ -304,7 +371,8 @@ def _movement_from_rows(
     operator_evidence = any(_is_operator_drop(row) and _has_concrete_evidence(row) for row in rows)
     public_sources = [source for source in sources if source != "operator_drop"]
     score = round(min(1.0, top_score + min(0.14, 0.04 * max(0, len(public_sources) - 1))), 3)
-    status, reason = _status_for(score, public_sources, operator_evidence)
+    triage = _idea_spark_triage(rows, weights=weights, public_sources=public_sources, operator_evidence=operator_evidence)
+    status, reason = _status_for(score, public_sources, operator_evidence, triage=triage)
     strategy = _strategic_vision(top, status=status)
     return {
         "movement_id": hashlib.sha256(key.encode("utf-8")).hexdigest()[:14],
@@ -313,6 +381,14 @@ def _movement_from_rows(
         "category": top["category"],
         "summary": top["description"] or top["title"],
         "weighted_score": score,
+        "triage_score": triage["triage_score"],
+        "triage": triage,
+        "triage_tuple": {
+            "novelty": triage["novelty"],
+            "telos_fit": triage["telos_fit"],
+            "tractability": triage["tractability"],
+            "source_confidence": triage["source_confidence"],
+        },
         "status": status,
         "promotion_reason": reason,
         "independent_sources": len(public_sources),
@@ -351,14 +427,162 @@ def _normalize_signal(row: dict[str, Any]) -> dict[str, Any] | None:
     }
 
 
-def _status_for(score: float, public_sources: list[str], operator_evidence: bool) -> tuple[str, str]:
-    if score >= PROMOTION_MIN_SCORE and (len(public_sources) >= 2 or operator_evidence):
+def _status_for(
+    score: float,
+    public_sources: list[str],
+    operator_evidence: bool,
+    *,
+    triage: dict[str, Any],
+) -> tuple[str, str]:
+    triage_decision = str(triage.get("decision") or "")
+    triage_reason = "; ".join(str(item) for item in triage.get("reasons", [])[:3])
+    if triage_decision == "reject":
+        return "rejected", triage_reason or "deterministic triage rejected"
+    if (
+        score >= PROMOTION_MIN_SCORE
+        and triage_decision == "promote"
+        and (len(public_sources) >= 2 or operator_evidence)
+    ):
         if len(public_sources) >= 2:
-            return "promotion_ready", "two independent public sources"
-        return "promotion_ready", "operator drop with concrete evidence URL/source"
-    if score >= INCUBATION_MIN_SCORE:
-        return "incubating", "needs scout cascade and R&D incubation"
+            return "promotion_ready", "triage passed with two independent public sources"
+        return "promotion_ready", "triage passed with operator drop and concrete evidence URL/source"
+    if score >= INCUBATION_MIN_SCORE or float(triage.get("triage_score", 0.0) or 0.0) >= TRIAGE_INCUBATION_MIN_SCORE:
+        if triage_decision == "insufficient_evidence":
+            return "incubating", "triage needs more concrete source evidence"
+        return "incubating", triage_reason or "needs scout cascade and R&D incubation"
     return "watchlist", "below promotion and incubation thresholds"
+
+
+def _idea_spark_triage(
+    rows: list[dict[str, Any]],
+    *,
+    weights: dict[str, float],
+    public_sources: list[str],
+    operator_evidence: bool,
+) -> dict[str, Any]:
+    text = _triage_text(rows)
+    novelty = _score_novelty(rows, text, public_sources)
+    telos_fit = _score_telos_fit(rows, text)
+    tractability = _score_tractability(rows, text)
+    source_confidence = _score_source_confidence(
+        rows,
+        weights=weights,
+        public_sources=public_sources,
+        operator_evidence=operator_evidence,
+    )
+    triage_score = round(
+        0.28 * novelty
+        + 0.32 * telos_fit
+        + 0.20 * tractability
+        + 0.20 * source_confidence,
+        3,
+    )
+    reasons: list[str] = []
+    if _keyword_hits(text, REJECT_KEYWORDS):
+        reasons.append("reject_keyword_match")
+    if telos_fit < 0.25:
+        reasons.append("telos_fit_below_floor")
+    if tractability < 0.25:
+        reasons.append("tractability_below_floor")
+    if source_confidence < 0.55:
+        reasons.append("source_confidence_insufficient")
+    if reasons and any(reason in reasons for reason in ("reject_keyword_match", "telos_fit_below_floor", "tractability_below_floor")):
+        decision = "reject"
+    elif source_confidence < 0.55:
+        decision = "insufficient_evidence"
+    elif (
+        triage_score >= TRIAGE_PROMOTION_MIN_SCORE
+        and novelty >= 0.45
+        and telos_fit >= 0.45
+        and tractability >= 0.45
+    ):
+        decision = "promote"
+        reasons.append("triage_score_passed")
+    elif triage_score >= TRIAGE_INCUBATION_MIN_SCORE:
+        decision = "incubate"
+        reasons.append("triage_score_incubate")
+    else:
+        decision = "watchlist"
+        reasons.append("triage_score_below_incubation")
+    return {
+        "schema_version": "idea_spark_triage.v0",
+        "decision": decision,
+        "novelty": novelty,
+        "telos_fit": telos_fit,
+        "tractability": tractability,
+        "source_confidence": source_confidence,
+        "triage_score": triage_score,
+        "reasons": _dedupe(reasons),
+    }
+
+
+def _score_novelty(rows: list[dict[str, Any]], text: str, public_sources: list[str]) -> float:
+    keywords = _merge_keywords(rows)
+    score = 0.3 + min(0.25, 0.04 * len(set(keywords)))
+    score += 0.08 if len(public_sources) >= 2 else 0.0
+    score += 0.08 if _keyword_hits(text, NOVELTY_KEYWORDS) else 0.0
+    score += 0.06 if any(_has_concrete_evidence(row) for row in rows) else 0.0
+    return round(min(1.0, score), 3)
+
+
+def _score_telos_fit(rows: list[dict[str, Any]], text: str) -> float:
+    score = 0.18 + min(0.58, 0.085 * len(_keyword_hits(text, TELOS_KEYWORDS)))
+    if any(row.get("category") in {"company", "tool_release", "benchmark", "research"} for row in rows):
+        score += 0.08
+    return round(min(1.0, score), 3)
+
+
+def _score_tractability(rows: list[dict[str, Any]], text: str) -> float:
+    score = 0.28
+    score += min(0.34, 0.075 * len(_keyword_hits(text, TRACTABILITY_KEYWORDS)))
+    score += 0.14 if any(_has_concrete_evidence(row) for row in rows) else 0.0
+    score += 0.08 if any(row.get("category") in {"company", "tool_release", "benchmark", "research"} for row in rows) else 0.0
+    return round(min(1.0, score), 3)
+
+
+def _score_source_confidence(
+    rows: list[dict[str, Any]],
+    *,
+    weights: dict[str, float],
+    public_sources: list[str],
+    operator_evidence: bool,
+) -> float:
+    row_sources = [_public_source(row) for row in rows if _public_source(row)]
+    if not row_sources:
+        return 0.0
+    avg_trust = sum(weights.get(source, DEFAULT_SOURCE_WEIGHTS.get(source, 0.45)) for source in row_sources) / len(row_sources)
+    score = 0.18 + min(0.24, 0.12 * len(public_sources)) + 0.28 * avg_trust
+    score += 0.18 if any(_has_concrete_evidence(row) for row in rows) else 0.0
+    score += 0.12 if operator_evidence else 0.0
+    return round(min(1.0, score), 3)
+
+
+def _triage_text(rows: list[dict[str, Any]]) -> str:
+    parts: list[str] = []
+    for row in rows:
+        parts.extend(
+            [
+                str(row.get("title") or ""),
+                str(row.get("description") or ""),
+                " ".join(str(item) for item in row.get("keywords", []) or []),
+                str(row.get("category") or ""),
+                str(row.get("source") or ""),
+                str(row.get("url") or ""),
+            ]
+        )
+    return " ".join(part.lower() for part in parts if part).strip()
+
+
+def _keyword_hits(text: str, keywords: set[str]) -> set[str]:
+    return {keyword for keyword in keywords if keyword in text}
+
+
+def _dedupe(values: list[str]) -> list[str]:
+    seen: list[str] = []
+    for value in values:
+        if value and value not in seen:
+            seen.append(value)
+    return seen
 
 
 def _row_score(row: dict[str, Any], weights: dict[str, float]) -> float:

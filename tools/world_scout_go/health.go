@@ -8,14 +8,28 @@ import (
 )
 
 type ScoutResult struct {
-	FetchEnabled        bool     `json:"fetch_enabled"`
-	ObservationCount    int      `json:"observation_count"`
-	SourceCount         int      `json:"source_count"`
-	SuccessfulSources   int      `json:"successful_sources"`
-	FailedSources       int      `json:"failed_sources"`
-	ConsecutiveFailures int      `json:"consecutive_failures"`
-	Errors              []string `json:"errors"`
-	CheckedAt           string   `json:"checked_at"`
+	FetchEnabled           bool     `json:"fetch_enabled"`
+	ArchiveEnabled         bool     `json:"archive_enabled"`
+	ObservationCount       int      `json:"observation_count"`
+	ArchiveCount           int      `json:"archive_count"`
+	DedupeCount            int      `json:"dedupe_count"`
+	ArchiveDir             string   `json:"archive_dir,omitempty"`
+	ArchiveIndexPath       string   `json:"archive_index_path,omitempty"`
+	ArchiveReplayIndexPath string   `json:"archive_replay_index_path,omitempty"`
+	ArchiveManifestPath    string   `json:"archive_manifest_path,omitempty"`
+	ArchiveDiscoveredCount int      `json:"archive_discovered_count"`
+	ArchiveWorkers         int      `json:"archive_workers"`
+	ArchiveTotalBytes      int64    `json:"archive_total_bytes"`
+	ArchiveCleanTextCount  int      `json:"archive_clean_text_count"`
+	ArchiveCleanTextBytes  int64    `json:"archive_clean_text_bytes"`
+	ArchiveErrorCount      int      `json:"archive_error_count"`
+	SourceCount            int      `json:"source_count"`
+	SuccessfulSources      int      `json:"successful_sources"`
+	FailedSources          int      `json:"failed_sources"`
+	RetryCount             int      `json:"retry_count"`
+	ConsecutiveFailures    int      `json:"consecutive_failures"`
+	Errors                 []string `json:"errors"`
+	CheckedAt              string   `json:"checked_at"`
 }
 
 func writeHealth(path string, result ScoutResult) error {

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -12,6 +13,10 @@ import (
 	"strings"
 	"time"
 )
+
+const scoutMaxAttempts = 3
+
+var scoutSleep = time.Sleep
 
 type Observation struct {
 	ID          string   `json:"id"`
@@ -26,33 +31,24 @@ type Observation struct {
 }
 
 func FetchSources(sources []Source) ([]Observation, ScoutResult, error) {
+	return FetchSourcesWithContext(context.Background(), sources)
+}
+
+func FetchSourcesWithContext(ctx context.Context, sources []Source) ([]Observation, ScoutResult, error) {
 	client := &http.Client{Timeout: 12 * time.Second}
+	return fetchSourcesWithClient(ctx, sources, client)
+}
+
+func fetchSourcesWithClient(ctx context.Context, sources []Source, client *http.Client) ([]Observation, ScoutResult, error) {
 	result := ScoutResult{FetchEnabled: true, SourceCount: len(sources)}
 	observations := []Observation{}
 	var errors []string
 	for _, source := range sources {
-		req, err := http.NewRequest(http.MethodGet, source.URL, nil)
+		body, retries, err := fetchSourceBytes(ctx, client, source)
+		result.RetryCount += retries
 		if err != nil {
 			result.FailedSources++
 			errors = append(errors, fmt.Sprintf("%s: %v", source.Name, err))
-			continue
-		}
-		req.Header.Set("User-Agent", "dharma-world-scout/1.0")
-		resp, err := client.Do(req)
-		if err != nil {
-			result.FailedSources++
-			errors = append(errors, fmt.Sprintf("%s: %v", source.Name, err))
-			continue
-		}
-		body, readErr := io.ReadAll(io.LimitReader(resp.Body, 300_000))
-		resp.Body.Close()
-		if readErr != nil || resp.StatusCode >= 400 {
-			result.FailedSources++
-			if readErr != nil {
-				errors = append(errors, fmt.Sprintf("%s: %v", source.Name, readErr))
-			} else {
-				errors = append(errors, fmt.Sprintf("%s: status %d", source.Name, resp.StatusCode))
-			}
 			continue
 		}
 		result.SuccessfulSources++
@@ -63,6 +59,86 @@ func FetchSources(sources []Source) ([]Observation, ScoutResult, error) {
 		return observations, result, fmt.Errorf("%s", strings.Join(errors, "; "))
 	}
 	return observations, result, nil
+}
+
+func fetchSourceBytes(ctx context.Context, client *http.Client, source Source) ([]byte, int, error) {
+	var lastErr error
+	retries := 0
+	for attempt := 1; attempt <= scoutMaxAttempts; attempt++ {
+		if err := ctx.Err(); err != nil {
+			return nil, retries, err
+		}
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, source.URL, nil)
+		if err != nil {
+			return nil, retries, err
+		}
+		req.Header.Set("User-Agent", "dharma-world-scout/1.0")
+		resp, err := client.Do(req)
+		if err != nil {
+			lastErr = err
+			if attempt < scoutMaxAttempts {
+				retries++
+				waitForRetry(ctx, scoutRetryDelay("", attempt))
+				continue
+			}
+			return nil, retries, err
+		}
+		body, readErr := io.ReadAll(io.LimitReader(resp.Body, 300_000))
+		resp.Body.Close()
+		if readErr != nil {
+			lastErr = readErr
+			if attempt < scoutMaxAttempts {
+				retries++
+				waitForRetry(ctx, scoutRetryDelay("", attempt))
+				continue
+			}
+			return nil, retries, readErr
+		}
+		if resp.StatusCode >= 400 {
+			lastErr = fmt.Errorf("status %d", resp.StatusCode)
+			if isRetryableStatus(resp.StatusCode) && attempt < scoutMaxAttempts {
+				retries++
+				waitForRetry(ctx, scoutRetryDelay(resp.Header.Get("Retry-After"), attempt))
+				continue
+			}
+			return nil, retries, lastErr
+		}
+		return body, retries, nil
+	}
+	return nil, retries, lastErr
+}
+
+func waitForRetry(ctx context.Context, delay time.Duration) {
+	if delay <= 0 {
+		return
+	}
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+	case <-timer.C:
+	}
+}
+
+func scoutRetryDelay(header string, attempt int) time.Duration {
+	if seconds, err := time.ParseDuration(strings.TrimSpace(header) + "s"); err == nil && seconds >= 0 {
+		return seconds
+	}
+	if when, err := http.ParseTime(strings.TrimSpace(header)); err == nil {
+		if delay := time.Until(when); delay > 0 {
+			return delay
+		}
+	}
+	return time.Duration(attempt*100) * time.Millisecond
+}
+
+func isRetryableStatus(status int) bool {
+	switch status {
+	case http.StatusTooManyRequests, http.StatusInternalServerError, http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
+		return true
+	default:
+		return false
+	}
 }
 
 func observationsFromBytes(source Source, body []byte) []Observation {

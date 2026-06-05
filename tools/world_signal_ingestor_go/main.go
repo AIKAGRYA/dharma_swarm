@@ -17,6 +17,8 @@ import (
 	"github.com/AmitabhainArunachala/dharma_swarm/tools/go_sdk/receipt"
 )
 
+const maxObservationLineBytes = 4 * 1024 * 1024
+
 type Observation struct {
 	ID          string   `json:"id"`
 	Source      string   `json:"source"`
@@ -47,6 +49,7 @@ func main() {
 	input := flag.String("input", "", "raw observation JSONL path")
 	output := flag.String("output", "", "normalized signal JSONL path")
 	minScore := flag.Float64("min-score", 0.45, "minimum relevance score")
+	receiptDir := flag.String("receipt-dir", "", "normal mode directory for per-signal receipt JSON files")
 	eventType := flag.String("event-type", "", "receipt mode event type")
 	sourceURL := flag.String("source-url", "", "receipt mode source URL")
 	correlationID := flag.String("correlation-id", "", "receipt mode correlation ID")
@@ -85,6 +88,16 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+	if *receiptDir != "" {
+		if *correlationID == "" {
+			fmt.Fprintln(os.Stderr, "--correlation-id is required when --receipt-dir is set")
+			os.Exit(2)
+		}
+		if err := writeSignalReceipts(*receiptDir, signals, *correlationID, *observedAt); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+	}
 }
 
 func writeReceipt(inputPath, outputPath, eventType, sourceURL, correlationID, observedAt string) error {
@@ -107,6 +120,36 @@ func writeReceipt(inputPath, outputPath, eventType, sourceURL, correlationID, ob
 		return err
 	}
 	return adaptErr
+}
+
+func writeSignalReceipts(receiptDir string, signals []Signal, correlationID, observedAt string) error {
+	if err := os.MkdirAll(receiptDir, 0o755); err != nil {
+		return err
+	}
+	for _, signal := range signals {
+		payload, err := json.Marshal(signal)
+		if err != nil {
+			return err
+		}
+		fixture := adaptercontract.Fixture{
+			CorrelationID: correlationID,
+			Source:        string(EventWorldSignal),
+			SourceURL:     first(signal.URL, "world_signal://"+signal.ID),
+			ObservedAt:    first(observedAt, signal.ObservedAt),
+			Payload:       json.RawMessage(payload),
+		}
+		r, adaptErr := Adapter{}.Adapt(context.Background(), fixture)
+		if adaptErr != nil && r.ReceiptID == "" {
+			return adaptErr
+		}
+		if adaptErr != nil {
+			return adaptErr
+		}
+		if err := receipt.Write(filepath.Join(receiptDir, r.ReceiptID+".json"), r); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func SignalFromObservation(obs Observation) Signal {
@@ -151,6 +194,7 @@ func readObservations(path string) ([]Observation, error) {
 	}
 	defer file.Close()
 	scanner := bufio.NewScanner(file)
+	scanner.Buffer(make([]byte, 64*1024), maxObservationLineBytes)
 	observations := []Observation{}
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
