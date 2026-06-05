@@ -24,7 +24,7 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 
-from dharma_swarm.api_keys import DASHBOARD_API_KEY_ENV
+from dharma_swarm.api_keys import DASHBOARD_API_KEY_ENV, normalize_env_aliases
 
 logger = logging.getLogger(__name__)
 
@@ -61,8 +61,8 @@ def _clear_operator_pid(pid: int | None = None) -> None:
 def _log_auth_mode() -> None:
     if _get_api_key() is None:
         logger.warning(
-            f"⚠ {DASHBOARD_API_KEY_ENV} not set — ALL API routes are open (dev mode). "
-            f"Set {DASHBOARD_API_KEY_ENV} in environment to enable Bearer auth."
+            "Dashboard API bearer auth is disabled because no auth secret is configured. "
+            "All API routes are open in dev mode."
         )
     else:
         logger.info("Bearer token auth enabled for /api/* routes.")
@@ -100,6 +100,11 @@ async def lifespan(app: FastAPI):
     logger.info("DHARMA COMMAND API starting...")
     operator_pid = os.getpid()
     _publish_operator_pid(operator_pid)
+
+    # Normalize dkeys/external env aliases before any provider resolution.
+    aliased = normalize_env_aliases()
+    if aliased:
+        logger.info("env alias normalization applied for %d configured credential(s)", len(aliased))
 
     from dharma_swarm.ontology_runtime import get_shared_registry
 
@@ -164,7 +169,7 @@ _PUBLIC_ROUTES: set[tuple[str, str]] = {
 
 _AUTH_FAILURE_RESPONSE = {
     "error": "unauthorized",
-    "detail": f"Invalid or missing API key. Set {DASHBOARD_API_KEY_ENV} env var and pass as 'Bearer <key>' header.",
+    "detail": "Invalid or missing API credential. Configure dashboard bearer auth and pass an Authorization header.",
 }
 
 
