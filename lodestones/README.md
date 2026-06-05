@@ -128,6 +128,8 @@ Documents that explicitly replace an old frame with a stronger one.
 
 Generative seed documents intended to spark future synthesis, architecture, or research directions.
 
+Keystone seed: `seeds/self_reference_attractor.md` (SRA_001) unifies the eleven `foundations/` pillars into five falsifiable load-bearing ones and binds them to the R_V empirical spine via predictions P1–P5 (registered in `foundations/EMPIRICAL_CLAIMS_REGISTRY.md` as EC-SRA-001…005; executed via `docs/research/self_reference_attractor/RESEARCH_PROGRAM.md`). It is the formal hardening of `GNANI_LODESTONE.md`.
+
 ## Handling Rule
 
 Use lodestones to orient decisions, not to impersonate settled canon.
