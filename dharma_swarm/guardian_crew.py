@@ -210,6 +210,24 @@ def _module_source_candidates(module_name: str, src_root: Path) -> list[Path]:
     return unique
 
 
+def _has_dataclass_decorator(class_node: ast.ClassDef) -> bool:
+    """Return True if ``class_node`` is decorated with ``@dataclass``.
+
+    Accepts ``@dataclass``, ``@dataclasses.dataclass``, ``@dataclass(...)``,
+    and ``@dataclasses.dataclass(...)``. The dataclass machinery synthesizes
+    ``__init__`` at decoration time, so the AUDITOR:method_exists AST walk
+    must treat these classes as having an implicit ``__init__``.
+    """
+    for dec in class_node.decorator_list:
+        # Unwrap dataclass(...) → look at the call target
+        target = dec.func if isinstance(dec, ast.Call) else dec
+        if isinstance(target, ast.Name) and target.id == "dataclass":
+            return True
+        if isinstance(target, ast.Attribute) and target.attr == "dataclass":
+            return True
+    return False
+
+
 async def run_auditor(src_root: Path) -> list[GuardianFinding]:
     """AUDITOR: Check import chains, method existence, and known contract violations."""
     findings: list[GuardianFinding] = []
@@ -270,6 +288,14 @@ async def run_auditor(src_root: Path) -> list[GuardianFinding]:
                 isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name == method_name
                 for n in ast.walk(class_node)
             )
+            # Dataclasses get __init__ synthesized at decoration time.
+            # @dataclass, @dataclasses.dataclass, and @dataclass(...) calls
+            # all qualify. Without this branch, every dataclass on the
+            # checklist is flagged as missing __init__ (false positive that
+            # produced 29+ duplicate GUARDIAN issues, e.g. #325-#353).
+            if method_name == "__init__" and not method_exists:
+                if _has_dataclass_decorator(class_node):
+                    method_exists = True
             if not method_exists:
                 findings.append(GuardianFinding(
                     severity=severity,
