@@ -25,6 +25,7 @@ state_dir:
   sakshi_provenance_log: "~/.dharma/sakshi/provenance_log.jsonl"
   env_override: "DHARMA_STATE_DIR"
   knowledge_staging: "~/.dharma/knowledge/staging"
+  knowledge_review_marks: "~/.dharma/knowledge/review_marks"
   knowledge_trusted: "~/.dharma/knowledge/wiki/concepts"
   knowledge_quarantine: "~/.dharma/knowledge/quarantine"
   agent_state_hermes: "~/.dharma/agents/hermes-m5/state.json"
