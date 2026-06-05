@@ -1,0 +1,185 @@
+{
+  "schema": "dharma.ci_truth_contract.v1",
+  "version": 1,
+  "description": "Machine-readable CI membrane consumed by local ACI tooling and Merge Master Mike. Required checks block merge when missing, pending, failed, cancelled, timed out, or action-required. Advisory checks are reported with local repro commands and may still block through GitHub's raw failing-check rollup.",
+  "required": [
+    {
+      "id": "docops_integrity",
+      "names": ["DocOps integrity gate"],
+      "owner": "docops",
+      "local_command": "make docops-integrity",
+      "failure_category": "doc_drift",
+      "autofix": "limited"
+    },
+    {
+      "id": "coherence_delta",
+      "names": ["Coherence Delta PR body"],
+      "owner": "governance",
+      "local_command": "python3 scripts/governance/check_pr_coherence_delta.py",
+      "failure_category": "pr_body_contract",
+      "autofix": "forbidden"
+    }
+  ],
+  "advisory": [
+    {
+      "id": "active_track",
+      "names": ["ACTIVE_TRACK governance gate"],
+      "owner": "governance",
+      "local_command": "python3 scripts/governance/check_track_status.py && python3 scripts/governance/render_active_track_includes.py --check",
+      "failure_category": "active_track_drift",
+      "autofix": "limited"
+    },
+    {
+      "id": "codeql_external",
+      "names": ["CodeQL"],
+      "owner": "security",
+      "local_command": "gh run view <run-id> --log",
+      "failure_category": "codeql",
+      "autofix": "forbidden"
+    },
+    {
+      "id": "codeql_python",
+      "names": ["codeql / python"],
+      "owner": "security",
+      "local_command": "gh run view <run-id> --log",
+      "failure_category": "codeql",
+      "autofix": "forbidden"
+    },
+    {
+      "id": "fourfold_warrant",
+      "names": ["Fourfold Shakti Warrant"],
+      "owner": "governance",
+      "local_command": "python3 scripts/governance/check_shakti_warrant.py --help",
+      "failure_category": "warrant",
+      "autofix": "forbidden"
+    },
+    {
+      "id": "module_budget",
+      "names": ["Rule 10 \u2014 module line budget"],
+      "owner": "architecture",
+      "local_command": "make module-budget",
+      "failure_category": "module_budget",
+      "autofix": "forbidden"
+    },
+    {
+      "id": "root_markdown_rule",
+      "names": ["Rule 8 \u2014 no new root markdown"],
+      "owner": "architecture",
+      "local_command": "gh pr diff <pr> --name-only",
+      "failure_category": "root_artifact_drift",
+      "autofix": "manual"
+    },
+    {
+      "id": "guardian_report_rule",
+      "names": ["Rule 9 \u2014 no GUARDIAN_REPORT.md outside reports/"],
+      "owner": "architecture",
+      "local_command": "gh pr diff <pr> --name-only",
+      "failure_category": "generated_artifact_leak",
+      "autofix": "manual"
+    },
+    {
+      "id": "test_hygiene",
+      "names": ["Rules 3 + 5 \u2014 test hygiene"],
+      "owner": "test_hygiene",
+      "local_command": "make test-hygiene",
+      "failure_category": "test_hygiene",
+      "autofix": "limited"
+    },
+    {
+      "id": "semgrep_workflow",
+      "names": ["semgrep"],
+      "owner": "security",
+      "local_command": "make semgrep",
+      "failure_category": "static_security",
+      "autofix": "forbidden"
+    },
+    {
+      "id": "semgrep_oss",
+      "names": ["Semgrep OSS"],
+      "owner": "security",
+      "local_command": "make semgrep",
+      "failure_category": "static_security",
+      "autofix": "forbidden"
+    },
+    {
+      "id": "dashboard",
+      "names": ["dashboard"],
+      "owner": "frontend",
+      "local_command": "make frontend-check",
+      "failure_category": "frontend_build",
+      "autofix": "manual"
+    },
+    {
+      "id": "collision_detect",
+      "names": ["detect-br-collision"],
+      "owner": "coordination",
+      "local_command": "gh pr view <pr> --json body,comments",
+      "failure_category": "broken_register_collision",
+      "autofix": "forbidden"
+    },
+    {
+      "id": "gauntlet_tier1",
+      "names": ["gauntlet-tier1"],
+      "owner": "runtime",
+      "local_command": "python3 -m pytest -q tests/test_telos_gates.py tests/test_stigmergy.py --tb=short",
+      "failure_category": "runtime_correctness",
+      "autofix": "manual"
+    },
+    {
+      "id": "gitleaks",
+      "names": ["gitleaks"],
+      "owner": "security",
+      "local_command": "make gitleaks",
+      "failure_category": "secret_scan",
+      "autofix": "forbidden"
+    },
+    {
+      "id": "go_adapter_contracts",
+      "names": ["go-adapter-contracts"],
+      "owner": "go",
+      "local_command": "make go-ci",
+      "failure_category": "go_contract",
+      "autofix": "manual"
+    },
+    {
+      "id": "go_evidence_ingestor",
+      "names": ["go-evidence-ingestor"],
+      "owner": "go",
+      "local_command": "make go-ci",
+      "failure_category": "go_contract",
+      "autofix": "manual"
+    },
+    {
+      "id": "syntax_imports",
+      "names": ["guardian-syntax-check"],
+      "owner": "runtime",
+      "local_command": "make syntax-check",
+      "failure_category": "syntax_or_import",
+      "autofix": "manual"
+    },
+    {
+      "id": "tests_py311",
+      "names": ["pytest (3.11)"],
+      "owner": "runtime",
+      "local_command": "make test",
+      "failure_category": "test_failure",
+      "autofix": "manual"
+    },
+    {
+      "id": "tests_py312",
+      "names": ["pytest (3.12)"],
+      "owner": "runtime",
+      "local_command": "make test",
+      "failure_category": "test_failure",
+      "autofix": "manual"
+    },
+    {
+      "id": "commit_lint",
+      "names": ["scan PR commit messages"],
+      "owner": "governance",
+      "local_command": "git log --format=%s origin/main..HEAD",
+      "failure_category": "commit_hygiene",
+      "autofix": "manual"
+    }
+  ]
+}
