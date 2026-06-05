@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "verified_at": "2026-06-04",
+  "verified_at": "2026-06-05",
   "ttl_days": 14,
   "assertions": [
     {
@@ -138,13 +138,7 @@
       "docs/archive/**",
       "docs/_archive/**",
       "docs/state/_archive/**",
-      "docs/research/**",
-      "docs/reports/**",
-      "reports/**",
-      "seams/**",
-      "dharma_swarm/inter_agent/**",
-      "inter_agent/**",
-      "docs/ops/**"
+      "reports/governance/**"
     ],
       "registered": [
         "AGENTS.md",
@@ -160,7 +154,6 @@
         "docs/governance/COHERENCE_DELTA.md",
         "docs/ops/PR_REVIEW_CONTROL.md",
         "docs/governance/INTEGRATION_LANDING_ORDER.md",
-        "docs/governance/KAIZENOPS.md",
         "docs/governance/README.md",
         "docs/governance/SOVEREIGN_MANIFEST.md",
       "docs/MEGAFILE_INDEX.md",
@@ -221,7 +214,7 @@
       "docs/state/CROSS_AGENT_INVENTORY.md",
       "docs/research/RUNTIME_TRUTH_SPINE_COMPLETION_PLAN.md",
       "docs/research/VERIFIED_EXPERIMENT_LOOP_RFC.md",
-      "docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md"
+      "docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md",
       "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md",
       "docs/ops/LIVE_OPS_COCKPIT.md",
       "docs/ops/LIVE_OPS_COCKPIT_PR_PACKET.md",
