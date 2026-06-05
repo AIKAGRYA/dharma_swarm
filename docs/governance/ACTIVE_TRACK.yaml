@@ -26,140 +26,146 @@ schema_version: 1
 # Active track (exactly one block with status=ACTIVE at any time)
 # ---------------------------------------------------------------------------
 active_track:
-  id: runtime-truth-spine-2026-06
-  name: Runtime Truth Spine — one invariant, one invocation path, one receipt
+  id: runtime-truth-reconciliation-2026-06
+  name: Runtime Truth Reconciliation — operator-visible truth packets
   status: ACTIVE
-  opened_at: "2026-05-28"
-  verified_at: "2026-05-28"
+  opened_at: "2026-06-04"
+  verified_at: "2026-06-04"
   ttl_days: 14
   owner: "@AmitabhainArunachala"
 
   description: |
-    Define the Runtime Truth Spine before expanding agent fabric. Three audits
-    (Perplexity, Codex, Devin) converged: dharma_swarm has accreted without a
-    spine. The fix is one invariant chain (Task + Runner + Claim + Context +
-    RoutingDecision + ProviderCall + EvidenceReceipt = safe execution path).
-    Every dispatch produces exactly one receipt. No more generic dispatch_dropoff.
+    The Runtime Truth Spine substrate is merged and shippable. This track moves
+    from substrate existence to read-only reconciliation: operator-visible
+    runtime truth packets that separate heartbeat, readiness, artifact progress,
+    completion, authority, projection/cache, mutation, and external-gated proof.
 
-    PR A.5 (governance convergence): the spine guard is fused into the existing
-    uplift_guards composition (no parallel CI workflow), each closure layer's
-    canonical receipt is declared in ACTIVE_SURFACE_MANIFEST.yaml under
-    correlation_spine, and ANTI_SLOP Rule 2 is extended with role vocabulary
-    so future receipts must declare their layer instead of growing a second
-    truth surface.
+    The track must not create a new truth store, daemon, receipt system, or
+    authority surface. It projects from existing owners only:
+    spine.EvidenceReceipt for in-flight dispatch proof, runtime_state.RuntimeReceipt
+    for persisted runtime receipts, IdempotencyRecord for exactly-once substrate,
+    and existing operator/onboard/control-surface rows for read-only rendering.
 
-    Doctrine line that must hold across all closure layers:
-      Receipts may differ by closure layer. Correlation identity must not.
-
-    Reference: docs/reports/CONVERGED_SEAM_AUDIT_RUNTIME_TRUTH_SPINE.md
-    A2A anchor: dharma_swarm/a2a/README.md (three-layer receipt architecture)
+    Doctrine line that must hold:
+      Read models project truth from owners; they do not become authority.
 
   surfaces:
-    - dharma_swarm/spine/**
-    - dharma_swarm/orchestrator.py
-    - dharma_swarm/agent_runner.py
+    - dharma_swarm/operator_core/contracts.py
+    - dharma_swarm/operator_core/control_surface_models.py
+    - dharma_swarm/operator_core/control_surface.py
+    - scripts/governance/agent_onboard.py
     - dharma_swarm/runtime_state.py
-    - tests/test_dispatch_dropoff_sources.py
-    - scripts/uplift_guards/check_spine_ownership.py
-    - ACTIVE_SURFACE_MANIFEST.yaml
-    - .semgrep/dharma-anti-slop.yml
+    - dharma_swarm/a2a/a2a_bridge.py
+    - dharma_swarm/a2a/a2a_server.py
+    - tests/test_agent_onboard.py
+    - tests/test_operator_core_contracts.py
+    - tests/test_spine_persistence_invariant.py
+    - tests/test_spine_adoption_dispatch.py
 
   prerequisites:
-    - id: converged_doctrine_exists
+    - id: runtime_spine_package_exists
       kind: file_exists
-      file: docs/reports/CONVERGED_SEAM_AUDIT_RUNTIME_TRUTH_SPINE.md
-    - id: a2a_tier1_merged
-      kind: file_contains
-      file: dharma_swarm/a2a/a2a_server.py
-      pattern: "A2ATaskStatus"
+      file: dharma_swarm/spine/__init__.py
+    - id: receipt_equivalence_matrix_exists
+      kind: file_exists
+      file: docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md
+    - id: a2a_persistence_invariant_tests_exist
+      kind: file_exists
+      file: tests/test_spine_persistence_invariant.py
 
   completion_criteria:
-    - id: spine_package_exists
+    - id: runtime_truth_packet_defined
+      kind: file_contains
+      file: dharma_swarm/operator_core/contracts.py
+      pattern: "class RuntimeTruthPacket"
+    - id: runtime_truth_axes_defined
+      kind: file_contains
+      file: dharma_swarm/operator_core/contracts.py
+      pattern: "class RuntimeTruthState"
+    - id: onboard_runtime_truth_render
+      kind: file_contains
+      file: scripts/governance/agent_onboard.py
+      pattern: "render_runtime_truth"
+    - id: onboard_runtime_truth_no_write_test
+      kind: file_contains
+      file: tests/test_agent_onboard.py
+      pattern: "test_runtime_truth_render_is_read_only"
+    - id: runtime_truth_packet_axis_test
+      kind: file_contains
+      file: tests/test_operator_core_contracts.py
+      pattern: "test_runtime_truth_packet_keeps_state_axes_separate"
+    - id: a2a_single_persistence_invariant
+      kind: file_contains
+      file: tests/test_spine_persistence_invariant.py
+      pattern: "test_submit_via_spine_retry_does_not_create_second_runtime_receipt"
+    - id: spine_bypass_report_exists
       kind: file_exists
-      file: dharma_swarm/spine/__init__.py
-    - id: evidence_receipt_defined
+      file: scripts/governance/spine_bypass_report.py
+    - id: receipt_json_projection_only_doc
       kind: file_contains
-      file: dharma_swarm/spine/receipt.py
-      pattern: "class EvidenceReceipt"
-    - id: routing_decision_defined
-      kind: file_contains
-      file: dharma_swarm/spine/routing.py
-      pattern: "class RoutingDecision"
-    - id: invoke_agent_defined
-      kind: file_contains
-      file: dharma_swarm/spine/invoke.py
-      pattern: "async def invoke_agent"
-    - id: spine_ownership_guard
-      kind: file_exists
-      file: scripts/uplift_guards/check_spine_ownership.py
-    - id: spine_guard_registered
-      kind: file_contains
-      file: scripts/uplift_guards/run_pre_commit.py
-      pattern: "check_spine_ownership"
-    - id: spine_doctrine_anchored
-      kind: file_contains
-      file: dharma_swarm/spine/__init__.py
-      pattern: "Correlation identity must not"
-    - id: correlation_spine_manifest_block
+      file: docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md
+      pattern: "projection/cache only"
+    - id: correlation_spine_manifest_still_declared
       kind: file_contains
       file: ACTIVE_SURFACE_MANIFEST.yaml
       pattern: "correlation_spine:"
-    - id: correlation_id_alias_present
+    - id: evidence_receipt_still_defined
       kind: file_contains
       file: dharma_swarm/spine/receipt.py
-      pattern: "dharma.correlation_id"
-    - id: onboard_renders_spine
-      kind: file_contains
-      file: scripts/governance/agent_onboard.py
-      pattern: "render_spine_status"
-    - id: anti_slop_role_vocabulary
-      kind: file_contains
-      file: docs/governance/ANTI_SLOP_RULES.md
-      pattern: "canonical-store"
-    - id: runtime_state_receipt_field
+      pattern: "class EvidenceReceipt"
+    - id: runtime_receipt_still_defined
       kind: file_contains
       file: dharma_swarm/runtime_state.py
-      pattern: "receipt_json"
-    - id: dropoff_tests_pass
-      kind: file_contains
-      file: tests/test_dispatch_dropoff_sources.py
-      pattern: "test_provider_failure_not_confused_with_dropoff"
+      pattern: "class RuntimeReceipt"
 
   non_goals:
-    - Do not decompose AgentRunner.run_task in this track (except where strictly necessary).
-    - Do not split providers.py into per-provider files yet.
-    - Do not rewrite SwarmManager.
-    - Do not introduce Redis, gRPC, or a new daemon as part of THIS track. (NATS substrate scoped out of this track but no longer globally prohibited as of doctrine amendment 2026-05-31; runs as a concurrent scoped track when opened, with non-overlapping surfaces.)
-    - Do not create a second event log or truth surface.
-    - Do not add another spiritual/metaphoric naming layer.
-    - Do not add a parallel spine-check CI workflow — the uplift_guards composition is the only entry point.
+    - Do not create a new daemon, database, event log, truth store, or receipt system.
+    - Do not mint a second RuntimeReceipt for A2A or paths with an inner runtime owner.
+    - Do not mutate external systems, live processes, archive fitness, payments, or gateways.
+    - Do not broadly refactor orchestrator.py, agent_runner.py, swarm.py, providers.py, or SwarmManager.
+    - Do not build Verified Experiment Loop runtime in this track.
+    - Do not create standalone BetCard, Experiment, SwarmRun, DecisionRecord, LineageRecord, WikiUpdate, or cost-tracker classes.
 
   next_items:
     - id: 1
-      what: "Define spine types (EvidenceReceipt, RoutingDecision, invoke_agent) — zero behavior change."
+      what: "Define the smallest read-only RuntimeTruthPacket contract in the existing operator_core owner."
       kind: code
       blocker: true
     - id: 2
-      what: "Wire A2A into the spine (invoke_agent becomes the only invocation path for A2A delegation)."
+      what: "Render compact runtime truth in make onboard without making onboard an authority surface."
       kind: code
       blocker: true
     - id: 3
-      what: "Collapse 7 routers to 2 on the spine rail."
-      kind: code
-      blocker: false
-    - id: 4
-      what: "Shard providers.py into per-provider files."
-      kind: code
-      blocker: false
-    - id: 5
-      what: "Decompose agent_runner.py run_task onto spine boundary."
-      kind: code
+      what: "Protect A2A single-persistence invariant while adding runtime truth projections."
+      kind: test
       blocker: false
 
 # ---------------------------------------------------------------------------
 # Closed tracks (history, append-only; do not edit prior entries)
 # ---------------------------------------------------------------------------
 closed_tracks:
+  - id: runtime-truth-spine-2026-06
+    name: Runtime Truth Spine — one invariant, one invocation path, one receipt
+    status: SHIPPED
+    opened_at: "2026-05-28"
+    closed_at: "2026-06-04"
+    closed_by: "codex/runtime-truth-spine-e2e-20260604T143553Z"
+    evidence:
+      - "reports/governance/active_track_evidence.md — completion criteria 13/13, shippable YES"
+      - "dharma_swarm/spine/__init__.py — Runtime Truth Spine package present"
+      - "dharma_swarm/spine/receipt.py — EvidenceReceipt defined"
+      - "dharma_swarm/spine/invoke.py — invoke_agent defined"
+      - "tests/test_spine_persistence_invariant.py — A2A single-persistence invariant test surface present"
+      - "scripts/governance/spine_bypass_report.py — A2A bypass report surface present"
+    superseded_by: runtime-truth-reconciliation-2026-06
+    notes: |
+      Substrate track closed after PRs #471, #468, and #470 landed. The next
+      track moves from substrate existence to read-only runtime truth
+      reconciliation. Receipt doctrine remains binding: EvidenceReceipt is
+      in-flight dispatch proof, RuntimeReceipt is persisted runtime proof,
+      IdempotencyRecord is the exactly-once substrate, and receipt_json is
+      projection/cache only.
+
   - id: trace-identity-coverage-2026-05
     name: Trace Identity Coverage — native propagation and soft coverage findings
     status: SUPERSEDED

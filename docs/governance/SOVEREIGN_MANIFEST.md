@@ -18,56 +18,48 @@
      Do not hand-edit. Run scripts/governance/render_active_track_includes.py
      after updating the YAML. -->
 
-**Active track:** Runtime Truth Spine — one invariant, one invocation path, one receipt
-**Track id:** `runtime-truth-spine-2026-06`
+**Active track:** Runtime Truth Reconciliation — operator-visible truth packets
+**Track id:** `runtime-truth-reconciliation-2026-06`
 **Status:** ACTIVE
-**Verified at:** 2026-05-28 (TTL 14 days)
+**Verified at:** 2026-06-04 (TTL 14 days)
 **Owner:** @AmitabhainArunachala
 
 **Description:**
 
-Define the Runtime Truth Spine before expanding agent fabric. Three audits
-(Perplexity, Codex, Devin) converged: dharma_swarm has accreted without a
-spine. The fix is one invariant chain (Task + Runner + Claim + Context +
-RoutingDecision + ProviderCall + EvidenceReceipt = safe execution path).
-Every dispatch produces exactly one receipt. No more generic dispatch_dropoff.
+The Runtime Truth Spine substrate is merged and shippable. This track moves
+from substrate existence to read-only reconciliation: operator-visible
+runtime truth packets that separate heartbeat, readiness, artifact progress,
+completion, authority, projection/cache, mutation, and external-gated proof.
 
-PR A.5 (governance convergence): the spine guard is fused into the existing
-uplift_guards composition (no parallel CI workflow), each closure layer's
-canonical receipt is declared in ACTIVE_SURFACE_MANIFEST.yaml under
-correlation_spine, and ANTI_SLOP Rule 2 is extended with role vocabulary
-so future receipts must declare their layer instead of growing a second
-truth surface.
+The track must not create a new truth store, daemon, receipt system, or
+authority surface. It projects from existing owners only:
+spine.EvidenceReceipt for in-flight dispatch proof, runtime_state.RuntimeReceipt
+for persisted runtime receipts, IdempotencyRecord for exactly-once substrate,
+and existing operator/onboard/control-surface rows for read-only rendering.
 
-Doctrine line that must hold across all closure layers:
-  Receipts may differ by closure layer. Correlation identity must not.
-
-Reference: docs/reports/CONVERGED_SEAM_AUDIT_RUNTIME_TRUTH_SPINE.md
-A2A anchor: dharma_swarm/a2a/README.md (three-layer receipt architecture)
+Doctrine line that must hold:
+  Read models project truth from owners; they do not become authority.
 
 **Next items on this track:**
 
-- [code] (blocker) Define spine types (EvidenceReceipt, RoutingDecision, invoke_agent) — zero behavior change.
-- [code] (blocker) Wire A2A into the spine (invoke_agent becomes the only invocation path for A2A delegation).
-- [code] Collapse 7 routers to 2 on the spine rail.
-- [code] Shard providers.py into per-provider files.
-- [code] Decompose agent_runner.py run_task onto spine boundary.
+- [code] (blocker) Define the smallest read-only RuntimeTruthPacket contract in the existing operator_core owner.
+- [code] (blocker) Render compact runtime truth in make onboard without making onboard an authority surface.
+- [test] Protect A2A single-persistence invariant while adding runtime truth projections.
 
 **Non-goals (do not work on these during this track):**
 
-- Do not decompose AgentRunner.run_task in this track (except where strictly necessary).
-- Do not split providers.py into per-provider files yet.
-- Do not rewrite SwarmManager.
-- Do not introduce Redis, gRPC, or a new daemon as part of THIS track. (NATS substrate scoped out of this track but no longer globally prohibited as of doctrine amendment 2026-05-31; runs as a concurrent scoped track when opened, with non-overlapping surfaces.)
-- Do not create a second event log or truth surface.
-- Do not add another spiritual/metaphoric naming layer.
-- Do not add a parallel spine-check CI workflow — the uplift_guards composition is the only entry point.
+- Do not create a new daemon, database, event log, truth store, or receipt system.
+- Do not mint a second RuntimeReceipt for A2A or paths with an inner runtime owner.
+- Do not mutate external systems, live processes, archive fitness, payments, or gateways.
+- Do not broadly refactor orchestrator.py, agent_runner.py, swarm.py, providers.py, or SwarmManager.
+- Do not build Verified Experiment Loop runtime in this track.
+- Do not create standalone BetCard, Experiment, SwarmRun, DecisionRecord, LineageRecord, WikiUpdate, or cost-tracker classes.
 
 **Recently closed tracks:**
 
-- `boardstore-facade-2026-05` — BoardStore Facade — unified task/state surface for multi-agent coordination (SHIPPED, closed 2026-05-20)
-- `cockpit-control-surface-2026-05` — Operator Cockpit v1 + Control-Surface contract hardening (SHIPPED, closed 2026-05-20)
-- `operator-brief-seam-2026-04` — Ontology-Native Operator Brief (first substrate-native seam) (SHIPPED, closed 2026-05-19)
+- `runtime-truth-spine-2026-06` — Runtime Truth Spine — one invariant, one invocation path, one receipt (SHIPPED, closed 2026-06-04)
+- `trace-identity-coverage-2026-05` — Trace Identity Coverage — native propagation and soft coverage findings (SUPERSEDED, closed 2026-05-28)
+- `trace-attractor-causal-spine-2026-05` — Trace Attractor Causal Spine — operator-visible trace packets (SHIPPED, closed 2026-05-21)
 
 For machine-readable status, see [`reports/governance/active_track_evidence.md`](../../reports/governance/active_track_evidence.md) (generated by `scripts/governance/check_track_status.py`).
 
@@ -80,7 +72,7 @@ For machine-readable status, see [`reports/governance/active_track_evidence.md`]
 These are immutable engineering laws for this repository. Violation = architectural regression.
 
 ### A1: NO FLAT-PACKAGE GROWTH
-The `dharma_swarm/` package currently has **389 files at its top level (58.9% of 661 total Python modules)** (V). No new .py file may be added to the top level. New modules must go into an appropriate subdirectory. Existing top-level files will be organized over time.
+The `dharma_swarm/` package currently has **389 files at its top level (58.7% of 663 total Python modules)** (V). No new .py file may be added to the top level. New modules must go into an appropriate subdirectory. Existing top-level files will be organized over time.
 
 ### A2: NO DUPLICATE IMPLEMENTATIONS
 Before creating a new file for routing, bridging, adapting, or orchestrating, check if one already exists. The repo currently has **24 bridge files** (V), **3 model_routing copies** (2 are identical, 1 is different) (V), **4 orchestrators** (V), **21 adapter files across 8 locations** (V), and **14 router files** (V). Do not add more without deprecating an existing one.
@@ -104,7 +96,7 @@ No single file should exceed 3,000 lines. Current violations (V):
 **148 files exceed 500 lines; 39 exceed 1,000; 7 exceed 3,000** (V). These must be decomposed over time, not grown further.
 
 ### A6: DOCS DECAY -- CHECK BEFORE CITING
-All numerical claims in docs become stale within weeks. Before citing module counts, test counts, or line counts from any doc (including this one), verify against the actual filesystem. See `REPO_GOVERNANCE_AUDIT.md` for the current staleness log. The current DocOps inventory reports **279 Markdown files containing at least one reserved trust-language term** (V). Treat these as authority-scope review candidates, not confirmed repo-wide authority.
+All numerical claims in docs become stale within weeks. Before citing module counts, test counts, or line counts from any doc (including this one), verify against the actual filesystem. See `REPO_GOVERNANCE_AUDIT.md` for the current staleness log. The current DocOps inventory reports **310 Markdown files containing at least one reserved trust-language term** (V). Treat these as authority-scope review candidates, not confirmed repo-wide authority.
 
 ### A7: NO CIRCULAR IMPORTS
 The repo has **9 verified circular dependency chains** (V). The worst:
@@ -115,25 +107,25 @@ The repo has **9 verified circular dependency chains** (V). The worst:
 All 9 cycles were independently confirmed with exact import lines. Most are mitigated by lazy imports but remain architectural debt. **New code must not create circular imports.**
 
 ### A8: FRONTMATTER DISCIPLINE
-Do not inject machine-readable YAML frontmatter into governance or architecture docs unless explicitly requested. Current state: **215 of 709 Markdown files start with YAML frontmatter; 15 of 25 docs/architecture Markdown files do so** (V). Long frontmatter remains an authority/noise risk even when the prose is useful.
+Do not inject machine-readable YAML frontmatter into governance or architecture docs unless explicitly requested. Current state: **216 of 771 Markdown files start with YAML frontmatter; 15 of 43 docs/architecture Markdown files do so** (V). Long frontmatter remains an authority/noise risk even when the prose is useful.
 
 ---
 
-## VERIFIED NUMBERS (2026-06-04 COUNT REFRESH)
+## VERIFIED NUMBERS (2026-06-05 COUNT REFRESH)
 
 These are the ground-truth metrics. All other documents citing different numbers are stale.
 
 | Metric | Value | Verification |
 |--------|-------|-------------|
-| Total Python modules | **662** | find dharma_swarm -name "*.py" -type f |
-| Top-level (flat) modules | **389 (59.0%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
-| Total Python LOC | **281,387** | wc -l across dharma_swarm Python modules |
+| Total Python modules | **663** | find dharma_swarm -name "*.py" -type f |
+| Top-level (flat) modules | **389 (58.7%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
+| Total Python LOC | **282,274** | wc -l across dharma_swarm Python modules |
 | Test files | **625** | find tests -name "*.py" -type f |
-| Test functions | **10,796 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Test functions | **10,804 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
 | Markdown files | **771** | find . -name "*.md" -type f |
-| Markdown total lines | **193,218** | wc -l across all .md |
+| Markdown total lines | **193,193** | wc -l across all .md |
 | Bridge files | **24** | find dharma_swarm -name "*bridge*.py" |
 | Adapter files | **21 across 8 locations** | find dharma_swarm -type f \| rg -i "adapter" |
 | Orchestrator files | **4** (6,034 LOC total) | find dharma_swarm -name "*orchestrat*" |

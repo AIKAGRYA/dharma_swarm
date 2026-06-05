@@ -1,109 +1,103 @@
 {
-  "generated_at": "2026-06-01T21:50:17+08:00",
-  "active_track_id": "runtime-truth-spine-2026-06",
+  "generated_at": "2026-06-05T15:26:06+09:00",
+  "active_track_id": "runtime-truth-reconciliation-2026-06",
   "shippable": true,
   "prerequisites_ok": true,
   "completion_progress": {
-    "passed": 13,
-    "total": 13
+    "passed": 11,
+    "total": 11
   },
   "criteria": [
     {
-      "id": "converged_doctrine_exists",
-      "kind": "file_exists",
-      "passed": true,
-      "detail": "docs/reports/CONVERGED_SEAM_AUDIT_RUNTIME_TRUTH_SPINE.md present"
-    },
-    {
-      "id": "a2a_tier1_merged",
-      "kind": "file_contains",
-      "passed": true,
-      "detail": "pattern 'A2ATaskStatus' found in dharma_swarm/a2a/a2a_server.py"
-    },
-    {
-      "id": "spine_package_exists",
+      "id": "runtime_spine_package_exists",
       "kind": "file_exists",
       "passed": true,
       "detail": "dharma_swarm/spine/__init__.py present"
     },
     {
-      "id": "evidence_receipt_defined",
-      "kind": "file_contains",
-      "passed": true,
-      "detail": "pattern 'class EvidenceReceipt' found in dharma_swarm/spine/receipt.py"
-    },
-    {
-      "id": "routing_decision_defined",
-      "kind": "file_contains",
-      "passed": true,
-      "detail": "pattern 'class RoutingDecision' found in dharma_swarm/spine/routing.py"
-    },
-    {
-      "id": "invoke_agent_defined",
-      "kind": "file_contains",
-      "passed": true,
-      "detail": "pattern 'async def invoke_agent' found in dharma_swarm/spine/invoke.py"
-    },
-    {
-      "id": "spine_ownership_guard",
+      "id": "receipt_equivalence_matrix_exists",
       "kind": "file_exists",
       "passed": true,
-      "detail": "scripts/uplift_guards/check_spine_ownership.py present"
+      "detail": "docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md present"
     },
     {
-      "id": "spine_guard_registered",
+      "id": "a2a_persistence_invariant_tests_exist",
+      "kind": "file_exists",
+      "passed": true,
+      "detail": "tests/test_spine_persistence_invariant.py present"
+    },
+    {
+      "id": "runtime_truth_packet_defined",
       "kind": "file_contains",
       "passed": true,
-      "detail": "pattern 'check_spine_ownership' found in scripts/uplift_guards/run_pre_commit.py"
+      "detail": "pattern 'class RuntimeTruthPacket' found in dharma_swarm/operator_core/contracts.py"
     },
     {
-      "id": "spine_doctrine_anchored",
+      "id": "runtime_truth_axes_defined",
       "kind": "file_contains",
       "passed": true,
-      "detail": "pattern 'Correlation identity must not' found in dharma_swarm/spine/__init__.py"
+      "detail": "pattern 'class RuntimeTruthState' found in dharma_swarm/operator_core/contracts.py"
     },
     {
-      "id": "correlation_spine_manifest_block",
+      "id": "onboard_runtime_truth_render",
+      "kind": "file_contains",
+      "passed": true,
+      "detail": "pattern 'render_runtime_truth' found in scripts/governance/agent_onboard.py"
+    },
+    {
+      "id": "onboard_runtime_truth_no_write_test",
+      "kind": "file_contains",
+      "passed": true,
+      "detail": "pattern 'test_runtime_truth_render_is_read_only' found in tests/test_agent_onboard.py"
+    },
+    {
+      "id": "runtime_truth_packet_axis_test",
+      "kind": "file_contains",
+      "passed": true,
+      "detail": "pattern 'test_runtime_truth_packet_keeps_state_axes_separate' found in tests/test_operator_core_contracts.py"
+    },
+    {
+      "id": "a2a_single_persistence_invariant",
+      "kind": "file_contains",
+      "passed": true,
+      "detail": "pattern 'test_submit_via_spine_retry_does_not_create_second_runtime_receipt' found in tests/test_spine_persistence_invariant.py"
+    },
+    {
+      "id": "spine_bypass_report_exists",
+      "kind": "file_exists",
+      "passed": true,
+      "detail": "scripts/governance/spine_bypass_report.py present"
+    },
+    {
+      "id": "receipt_json_projection_only_doc",
+      "kind": "file_contains",
+      "passed": true,
+      "detail": "pattern 'projection/cache only' found in docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md"
+    },
+    {
+      "id": "correlation_spine_manifest_still_declared",
       "kind": "file_contains",
       "passed": true,
       "detail": "pattern 'correlation_spine:' found in ACTIVE_SURFACE_MANIFEST.yaml"
     },
     {
-      "id": "correlation_id_alias_present",
+      "id": "evidence_receipt_still_defined",
       "kind": "file_contains",
       "passed": true,
-      "detail": "pattern 'dharma.correlation_id' found in dharma_swarm/spine/receipt.py"
+      "detail": "pattern 'class EvidenceReceipt' found in dharma_swarm/spine/receipt.py"
     },
     {
-      "id": "onboard_renders_spine",
+      "id": "runtime_receipt_still_defined",
       "kind": "file_contains",
       "passed": true,
-      "detail": "pattern 'render_spine_status' found in scripts/governance/agent_onboard.py"
-    },
-    {
-      "id": "anti_slop_role_vocabulary",
-      "kind": "file_contains",
-      "passed": true,
-      "detail": "pattern 'canonical-store' found in docs/governance/ANTI_SLOP_RULES.md"
-    },
-    {
-      "id": "runtime_state_receipt_field",
-      "kind": "file_contains",
-      "passed": true,
-      "detail": "pattern 'receipt_json' found in dharma_swarm/runtime_state.py"
-    },
-    {
-      "id": "dropoff_tests_pass",
-      "kind": "file_contains",
-      "passed": true,
-      "detail": "pattern 'test_provider_failure_not_confused_with_dropoff' found in tests/test_dispatch_dropoff_sources.py"
+      "detail": "pattern 'class RuntimeReceipt' found in dharma_swarm/runtime_state.py"
     }
   ],
   "findings": [
     {
       "severity": "INFO",
       "check": "track-shippable",
-      "message": "All 13 completion criteria pass. Track 'runtime-truth-spine-2026-06' is SHIPPABLE \u2014 close it and declare the next active track.",
+      "message": "All 11 completion criteria pass. Track 'runtime-truth-reconciliation-2026-06' is SHIPPABLE \u2014 close it and declare the next active track.",
       "criterion_id": null
     }
   ]
