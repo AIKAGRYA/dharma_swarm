@@ -62,6 +62,7 @@ is **depth-on-demand**. Read it when you need it. Do not memorise a read order.
 | Doc ownership | `docs/governance/CANONICAL_DOC_STACK.md` (this file) | — |
 | Anti-slop / repo-rule discipline | `docs/governance/ANTI_SLOP_RULES.md` + `.semgrep/dharma-anti-slop.yml` | — |
 | PR coherence gate | `docs/governance/COHERENCE_DELTA.md` | PR template |
+| PR review / merge-control operations | `docs/ops/PR_REVIEW_CONTROL.md` | Merge Master Mike workflows, PR janitor playbook |
 | Action warrant | `docs/governance/FOURFOLD_ACTION_WARRANT.md` | — |
 | Module-level what-does-what | `docs/architecture/NAVIGATION.md` | — |
 | Router/TaskBoard domain pinning | `docs/architecture/ROUTERS_AND_TASKBOARD.md` | — |

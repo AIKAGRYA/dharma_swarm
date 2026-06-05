@@ -158,6 +158,7 @@
         "docs/governance/ANTI_SLOP_RULES.md",
         "docs/governance/BUILD_SESSION_ENTRYPOINT.md",
         "docs/governance/COHERENCE_DELTA.md",
+        "docs/ops/PR_REVIEW_CONTROL.md",
         "docs/governance/INTEGRATION_LANDING_ORDER.md",
         "docs/governance/KAIZENOPS.md",
         "docs/governance/README.md",
