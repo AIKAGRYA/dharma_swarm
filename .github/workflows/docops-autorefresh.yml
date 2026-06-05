@@ -71,8 +71,8 @@ jobs:
               echo "workflow_dispatch requires the pr input" >&2
               exit 1
             fi
-            head_repo="$(gh pr view "${INPUT_PR}" --json headRepository --jq '.headRepository.nameWithOwner')"
-            head_ref="$(gh pr view "${INPUT_PR}" --json headRefName --jq '.headRefName')"
+            head_repo="$(gh pr view "${INPUT_PR}" --repo "${REPOSITORY}" --json headRepository --jq '.headRepository.nameWithOwner')"
+            head_ref="$(gh pr view "${INPUT_PR}" --repo "${REPOSITORY}" --json headRefName --jq '.headRefName')"
           fi
 
           if [ "${head_repo}" != "${REPOSITORY}" ]; then
