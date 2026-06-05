@@ -161,3 +161,49 @@ obvious blocker; it is not merge permission. Typical ordering:
 3. Packet high-risk PRs only after the active track and hot-path ownership are
    clear.
 4. Keep large or doctrine-changing PRs out of batch merges.
+
+## 57-PR Portfolio Cleanup Wave
+
+Snapshot date: 2026-06-05.
+
+The open-PR portfolio cleanup goal is entropy reduction with integrity, not
+maximal merging. Do not try to merge every open PR. Freeze new non-urgent
+research, report, generated, and feature PRs until the backlog is below the
+operator threshold.
+
+Use Mike as the execution gate:
+
+- `@mix_master_mike` for packet, gate, and cleanup comments.
+- `@mix_master_mike merge when clean` only for a PR already selected for merge.
+- Mike must keep merge authority conditional on clean mergeability, green CI,
+  DocOps/coherence pass, review receipts, conflict checks, and explicit human
+  approval where required.
+
+Immediate close batch:
+
+- Generated/report churn: #460, #462, #463, #464, #466, #467, #475, #483.
+- PR janitor/session reports: #451, #452, #454, #455, #456, #457, #458, #459.
+- Superseded spine-adoption docs: #425, #426.
+- Duplicate/single Palantir auto-grounding reports unless selected for the
+  canonical archive: #413, #415, #419, #420, #423, #424, #432, #434, #439,
+  #442.
+- Stale stacked docs: #373, unless #370 is retained and #373 is restacked.
+
+Hold for curated review:
+
+- DocOps unblocker: review #453; merge only if still required, otherwise close
+  as superseded.
+- Governance drafts: #325, #394, #412, #476.
+- Canonical research/archive candidates: #405, #410, #414, #422. Keep at most
+  one canonical bundle unless a maintainer explicitly accepts multiple archives.
+- Runtime/domain batches:
+  - Ops/runtime: #332, #465, #431, #344, #323.
+  - H-stack: #384, #388, #389, #390, #391.
+  - Guardian: #383, #392.
+  - Tests-only candidate: #450.
+  - Design/docs hold: #402, #461.
+
+For every retained runtime or governance PR, regenerate a fresh packet and
+verify base branch, mergeability, CI, DocOps/coherence, runtime test scope,
+overlap with current `main`, receipt freshness, and rollback path before any
+merge request is issued.
