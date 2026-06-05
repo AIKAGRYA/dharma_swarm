@@ -1,29 +1,28 @@
 # Active Track Evidence
 
-Generated: 2026-06-01T21:50:17+08:00
-Track: `runtime-truth-spine-2026-06`
+Generated: 2026-06-05T15:26:06+09:00
+Track: `runtime-truth-reconciliation-2026-06`
 Prerequisites: **OK**
-Completion: **13/13**
+Completion: **11/11**
 Shippable: **YES**
 
 ## Criteria
 
-- ✓ `converged_doctrine_exists` (file_exists) — docs/reports/CONVERGED_SEAM_AUDIT_RUNTIME_TRUTH_SPINE.md present
-- ✓ `a2a_tier1_merged` (file_contains) — pattern 'A2ATaskStatus' found in dharma_swarm/a2a/a2a_server.py
-- ✓ `spine_package_exists` (file_exists) — dharma_swarm/spine/__init__.py present
-- ✓ `evidence_receipt_defined` (file_contains) — pattern 'class EvidenceReceipt' found in dharma_swarm/spine/receipt.py
-- ✓ `routing_decision_defined` (file_contains) — pattern 'class RoutingDecision' found in dharma_swarm/spine/routing.py
-- ✓ `invoke_agent_defined` (file_contains) — pattern 'async def invoke_agent' found in dharma_swarm/spine/invoke.py
-- ✓ `spine_ownership_guard` (file_exists) — scripts/uplift_guards/check_spine_ownership.py present
-- ✓ `spine_guard_registered` (file_contains) — pattern 'check_spine_ownership' found in scripts/uplift_guards/run_pre_commit.py
-- ✓ `spine_doctrine_anchored` (file_contains) — pattern 'Correlation identity must not' found in dharma_swarm/spine/__init__.py
-- ✓ `correlation_spine_manifest_block` (file_contains) — pattern 'correlation_spine:' found in ACTIVE_SURFACE_MANIFEST.yaml
-- ✓ `correlation_id_alias_present` (file_contains) — pattern 'dharma.correlation_id' found in dharma_swarm/spine/receipt.py
-- ✓ `onboard_renders_spine` (file_contains) — pattern 'render_spine_status' found in scripts/governance/agent_onboard.py
-- ✓ `anti_slop_role_vocabulary` (file_contains) — pattern 'canonical-store' found in docs/governance/ANTI_SLOP_RULES.md
-- ✓ `runtime_state_receipt_field` (file_contains) — pattern 'receipt_json' found in dharma_swarm/runtime_state.py
-- ✓ `dropoff_tests_pass` (file_contains) — pattern 'test_provider_failure_not_confused_with_dropoff' found in tests/test_dispatch_dropoff_sources.py
+- ✓ `runtime_spine_package_exists` (file_exists) — dharma_swarm/spine/__init__.py present
+- ✓ `receipt_equivalence_matrix_exists` (file_exists) — docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md present
+- ✓ `a2a_persistence_invariant_tests_exist` (file_exists) — tests/test_spine_persistence_invariant.py present
+- ✓ `runtime_truth_packet_defined` (file_contains) — pattern 'class RuntimeTruthPacket' found in dharma_swarm/operator_core/contracts.py
+- ✓ `runtime_truth_axes_defined` (file_contains) — pattern 'class RuntimeTruthState' found in dharma_swarm/operator_core/contracts.py
+- ✓ `onboard_runtime_truth_render` (file_contains) — pattern 'render_runtime_truth' found in scripts/governance/agent_onboard.py
+- ✓ `onboard_runtime_truth_no_write_test` (file_contains) — pattern 'test_runtime_truth_render_is_read_only' found in tests/test_agent_onboard.py
+- ✓ `runtime_truth_packet_axis_test` (file_contains) — pattern 'test_runtime_truth_packet_keeps_state_axes_separate' found in tests/test_operator_core_contracts.py
+- ✓ `a2a_single_persistence_invariant` (file_contains) — pattern 'test_submit_via_spine_retry_does_not_create_second_runtime_receipt' found in tests/test_spine_persistence_invariant.py
+- ✓ `spine_bypass_report_exists` (file_exists) — scripts/governance/spine_bypass_report.py present
+- ✓ `receipt_json_projection_only_doc` (file_contains) — pattern 'projection/cache only' found in docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md
+- ✓ `correlation_spine_manifest_still_declared` (file_contains) — pattern 'correlation_spine:' found in ACTIVE_SURFACE_MANIFEST.yaml
+- ✓ `evidence_receipt_still_defined` (file_contains) — pattern 'class EvidenceReceipt' found in dharma_swarm/spine/receipt.py
+- ✓ `runtime_receipt_still_defined` (file_contains) — pattern 'class RuntimeReceipt' found in dharma_swarm/runtime_state.py
 
 ## Findings
 
-- **INFO** `track-shippable`: All 13 completion criteria pass. Track 'runtime-truth-spine-2026-06' is SHIPPABLE — close it and declare the next active track.
+- **INFO** `track-shippable`: All 11 completion criteria pass. Track 'runtime-truth-reconciliation-2026-06' is SHIPPABLE — close it and declare the next active track.

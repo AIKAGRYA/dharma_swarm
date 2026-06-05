@@ -6,6 +6,8 @@ Observed reality comes from code, runtime, evidence adapters — not YAML.
 
 from __future__ import annotations
 
+import hashlib
+import sqlite3
 import textwrap
 from pathlib import Path
 
@@ -168,6 +170,80 @@ def tmp_broken_register(tmp_path: Path) -> Path:
     return tmp_path
 
 
+def _write_control_surface_runtime_db(db_path: Path) -> None:
+    with sqlite3.connect(db_path) as conn:
+        conn.executescript(
+            """
+            CREATE TABLE runtime_receipts (
+                receipt_id TEXT PRIMARY KEY,
+                receipt_type TEXT NOT NULL,
+                run_id TEXT NOT NULL DEFAULT '',
+                task_id TEXT NOT NULL DEFAULT '',
+                trace_id TEXT NOT NULL DEFAULT '',
+                correlation_id TEXT NOT NULL DEFAULT '',
+                causation_id TEXT NOT NULL DEFAULT '',
+                parent_run_id TEXT NOT NULL DEFAULT '',
+                agent_id TEXT NOT NULL DEFAULT '',
+                idempotency_key TEXT NOT NULL DEFAULT '',
+                side_effect_key TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL,
+                payload_json TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL
+            );
+            CREATE TABLE idempotency_records (
+                idempotency_key TEXT NOT NULL,
+                side_effect_key TEXT NOT NULL,
+                run_id TEXT NOT NULL DEFAULT '',
+                task_id TEXT NOT NULL DEFAULT '',
+                trace_id TEXT NOT NULL DEFAULT '',
+                correlation_id TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL,
+                result_receipt_id TEXT NOT NULL DEFAULT '',
+                metadata_json TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (idempotency_key, side_effect_key)
+            );
+            """
+        )
+        conn.execute(
+            "INSERT INTO runtime_receipts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                "receipt-control-1",
+                "a2a_task",
+                "run-control-1",
+                "task-control-1",
+                "trace-control-1",
+                "corr-control-1",
+                "",
+                "",
+                "agent-control-1",
+                "idem-control-1",
+                "a2a.submit",
+                "completed",
+                "{}",
+                "2026-06-04T01:04:00+00:00",
+            ),
+        )
+        conn.execute(
+            "INSERT INTO idempotency_records VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                "idem-control-1",
+                "a2a.submit",
+                "run-control-1",
+                "task-control-1",
+                "trace-control-1",
+                "corr-control-1",
+                "completed",
+                "receipt-control-1",
+                "{}",
+                "2026-06-04T01:00:00+00:00",
+                "2026-06-04T01:04:00+00:00",
+            ),
+        )
+        conn.commit()
+
+
 # ---------------------------------------------------------------------------
 # Manifest loading
 # ---------------------------------------------------------------------------
@@ -264,6 +340,41 @@ class TestBrokenRegister:
         rows = _broken_register_rows(tmp_broken_register)
         br100 = [r for r in rows if "BR-100" in r.label][0]
         assert br100.priority == "p1"
+
+
+# ---------------------------------------------------------------------------
+# Runtime truth projection
+# ---------------------------------------------------------------------------
+
+
+class TestRuntimeTruthProjection:
+    def test_runtime_state_row_uses_explicit_runtime_db_projection(
+        self,
+        tmp_repo: Path,
+        tmp_path: Path,
+    ) -> None:
+        runtime_db = tmp_path / "runtime.db"
+        _write_control_surface_runtime_db(runtime_db)
+        before_hash = hashlib.sha256(runtime_db.read_bytes()).hexdigest()
+        before_sidecars = sorted(path.name for path in tmp_path.glob("runtime.db*"))
+
+        rows = build_control_surface_rows(repo_root=tmp_repo, runtime_db=runtime_db)
+        row = next(item for item in rows if item.id == "runtime.state_db")
+        after_hash = hashlib.sha256(runtime_db.read_bytes()).hexdigest()
+        after_sidecars = sorted(path.name for path in tmp_path.glob("runtime.db*"))
+
+        assert before_hash == after_hash
+        assert before_sidecars == after_sidecars == ["runtime.db"]
+        assert row.raw["runtime_truth_summary"]["latest_receipt"] == (
+            "runtime_receipts:receipt-control-1"
+        )
+        assert row.raw["runtime_truth_summary"]["run_id"] == "run-control-1"
+        assert any(
+            evidence.kind == "db_probe"
+            and evidence.source == "runtime_receipts:receipt-control-1"
+            and "RuntimeTruthPacket" in evidence.provenance_chain
+            for evidence in row.evidence
+        )
 
 
 # ---------------------------------------------------------------------------
