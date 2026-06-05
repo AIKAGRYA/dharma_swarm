@@ -72,6 +72,8 @@ is **depth-on-demand**. Read it when you need it. Do not memorise a read order.
 | Terminal protocol | `specs/DGC_TERMINAL_ARCHITECTURE_v1.1.md` | v1.0 is archived |
 | Constitutional rules | `specs/Dharma_Constitution_v0.md` | — |
 | Kernel immutability | `specs/KERNEL_CORE_SPEC.md` | — |
+| Foundations index | `foundations/INDEX.md` | Empirical-claims research and lodestone references |
+| Lodestone index | `lodestones/README.md` | Lodestone seed discoverability |
 | Onboarding megafile slots | `docs/MEGAFILE_INDEX.md` | individual slot files |
 | Audit trail | `docs/governance/REPO_GOVERNANCE_AUDIT.md` | — |
 | Work loops | `docs/governance/AGENTOPS.md`, `KAIZENOPS.md`, `DAILY_OPERATING_BRIEF.md`, `METABOLIC_CLOCK.md`, `HUMAN_YDS_LEDGER.md` | — |

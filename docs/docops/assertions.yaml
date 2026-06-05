@@ -214,6 +214,8 @@
       "docs/agents/perplexity-computer/CAPABILITIES.md",
       "docs/agent_tasks/devin_review_perplexity_computer_2026-05-30.md",
       "docs/agent_tasks/hermes_review_perplexity_computer_2026-05-30.md",
+      "foundations/INDEX.md",
+      "lodestones/README.md",
       "docs/state/NEXT_PHASE_MAP.md",
       "docs/state/HOTLIST.md",
       "docs/state/CROSS_AGENT_INVENTORY.md",
