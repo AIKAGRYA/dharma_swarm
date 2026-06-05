@@ -16,6 +16,10 @@ hints, and the doc-ownership map. If any prose in this file or any other
 doc disagrees with that output, trust the onboarding output and update the
 stale prose.
 
+For memory/context work, Memory Kernel is the canonical front door. Older
+memory surfaces remain subordinate evidence, projection, adapter, backend, or
+promotion-feed layers unless the Memory Kernel production bar says otherwise.
+
 ## Authority Model
 
 Do not infer authority from confident language.

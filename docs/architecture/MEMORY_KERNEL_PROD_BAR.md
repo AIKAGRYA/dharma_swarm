@@ -1,6 +1,6 @@
 # Memory Kernel Production Bar
 
-Status: pre-merge hardening contract
+Status: post-merge rollout contract
 Date: 2026-05-23
 
 ## Purpose
@@ -10,9 +10,9 @@ central database, and it is not allowed to become another competing memory
 surface.
 
 This document defines the bar for calling Memory Kernel production-integrated.
-The read-only/shadow release may merge before every item below is live, but no
-agent, dashboard, PR, or audit may describe the system as production memory
-unless these invariants hold.
+The read-only/shadow release has merged. The next rollout step is default
+runtime read-path use. No agent, dashboard, PR, or audit may describe the
+system as production memory unless these invariants hold.
 
 ## Production Meaning
 
@@ -93,11 +93,12 @@ Canonical memory requires a governed promotion path.
 - Vector, LanceDB, graph, retrieval feedback, routing memory, raw logs, and
   generated summaries cannot become canon by retrieval score alone.
 
-## Merge Boundary
+## Runtime Default Boundary
 
-The current Memory Kernel release may merge as read-only/shadow infrastructure
-when the readiness, writer sentinel, context eval, and focused tests pass.
+The current Memory Kernel release is allowed to become the default context
+read path when the readiness, writer sentinel, context eval, focused tests, and
+operator smoke checks pass.
 
-It must not be called full production memory until the default agent context
-path, write policy, Lattice/Palace subordination, and promotion gates are all
-enforced in runtime code.
+It must not be called full production memory until the write policy,
+Lattice/Palace subordination, and promotion gates are all enforced in runtime
+code.
