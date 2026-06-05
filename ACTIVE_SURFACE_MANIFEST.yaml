@@ -24,6 +24,14 @@ state_dir:
   board_event_log: "~/.dharma/board/event_log.sqlite3"
   sakshi_provenance_log: "~/.dharma/sakshi/provenance_log.jsonl"
   env_override: "DHARMA_STATE_DIR"
+  knowledge_staging: "~/.dharma/knowledge/staging"
+  knowledge_review_marks: "~/.dharma/knowledge/review_marks"
+  knowledge_trusted: "~/.dharma/knowledge/wiki/concepts"
+  knowledge_quarantine: "~/.dharma/knowledge/quarantine"
+  agent_state_hermes: "~/.dharma/agents/hermes-m5/state.json"
+  a2a_bus_queue: "~/.dharma/a2a_bus/queue.jsonl"
+  promote_log: "~/.dharma/logs/consume_review_marks.jsonl"
+  provider_credits_log: "~/.dharma/logs/provider_credits_latest.json"
 
 api_routers:
   - id: health
