@@ -48,14 +48,24 @@ Call Mike from a PR comment or review-thread comment:
 ```
 
 The workflow also supports manual dispatch with a `pr` input from the GitHub
-Actions UI. The GitHub adapter does only this:
+Actions UI. A normal PR comment mention always posts a fresh visible Mike
+comment; manual dispatch may update the stable
+`<!-- dharma-pr-review-control:auto -->` comment.
+
+For a PR-specific mention, the GitHub adapter does only this:
 
 1. create a deterministic packet for the PR;
 2. run the merge gate;
 3. optionally run Mike's guarded `gh pr merge --auto` path when the comment says
    `merge when clean` or manual dispatch sets `merge_when_clean=true`;
-4. render and post or update the `<!-- dharma-pr-review-control:auto -->`
-   comment.
+4. render and post the Mike status comment.
+
+When a comment asks for backlog work with language such as `all open PRs`,
+`open pull requests`, `backlog`, `queue`, or `PR cleanup`, the same router runs
+the backlog fanout path in packet-only mode for up to five PRs, publishes the
+A2A NATS session with Mike credentials, posts a fresh visible summary comment,
+and uploads the Mike receipts as a workflow artifact. This is still evidence
+fanout, not unconditional merge authority.
 
 It does not run local Codex or Claude reviewer processes, because the
 GitHub-hosted runner does not have the operator machine's tmux, NATS, Claude
