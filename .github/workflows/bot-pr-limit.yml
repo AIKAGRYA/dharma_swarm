@@ -1,0 +1,65 @@
+name: bot-pr-limit
+
+# Enforce a maximum number of open PRs per bot author.
+# Prevents bot integrations from flooding the repo with duplicate or
+# abandoned PRs. Human authors are exempt.
+#
+# Threshold: 3 open PRs per bot. Configurable via BOT_PR_LIMIT env var.
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  check-bot-pr-count:
+    name: Bot PR limit
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: contains(github.event.pull_request.user.login, '[bot]')
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      BOT_PR_LIMIT: "3"
+    steps:
+      - name: Count open PRs by this bot
+        id: count
+        env:
+          BOT_LOGIN: ${{ github.event.pull_request.user.login }}
+          THIS_PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          # Count open PRs by this bot author (excluding the current PR
+          # since it may already be counted).
+          count="$(gh pr list --repo "$GH_REPO" --state open \
+            --author "$BOT_LOGIN" --json number \
+            --jq "[.[] | select(.number != $THIS_PR)] | length")"
+          echo "open_count=${count}" >> "$GITHUB_OUTPUT"
+          echo "Bot $BOT_LOGIN has ${count} other open PRs (limit: $BOT_PR_LIMIT)"
+
+      - name: Fail if over limit
+        if: steps.count.outputs.open_count >= env.BOT_PR_LIMIT
+        env:
+          BOT_LOGIN: ${{ github.event.pull_request.user.login }}
+          OPEN_COUNT: ${{ steps.count.outputs.open_count }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          message="## ⛔ Bot PR limit exceeded
+
+          **$BOT_LOGIN** already has **$OPEN_COUNT open PRs** (limit: $BOT_PR_LIMIT).
+
+          Before opening new PRs, the bot must:
+          1. Close or merge existing open PRs
+          2. Close duplicate/superseded PRs with a link to the successor
+
+          See \`docs/governance/PR_QUALITY_GATES.md\` § Bot PR Proliferation Control.
+
+          *This check will pass once the bot's open PR count drops to $BOT_PR_LIMIT or below.*"
+
+          gh pr comment "$PR_NUMBER" --repo "$GH_REPO" --body "$message" || true
+          echo "::error::Bot $BOT_LOGIN has $OPEN_COUNT open PRs, exceeding the limit of $BOT_PR_LIMIT. Close existing PRs before opening new ones."
+          exit 1
