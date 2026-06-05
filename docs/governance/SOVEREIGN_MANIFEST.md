@@ -124,8 +124,8 @@ These are the ground-truth metrics. All other documents citing different numbers
 | Test functions | **10,879 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
-| Markdown files | **841** | find . -name "*.md" -type f |
-| Markdown total lines | **208,977** | wc -l across all .md |
+| Markdown files | **843** | find . -name "*.md" -type f |
+| Markdown total lines | **209,252** | wc -l across all .md |
 | Bridge files | **24** | find dharma_swarm -name "*bridge*.py" |
 | Adapter files | **21 across 8 locations** | find dharma_swarm -type f \| rg -i "adapter" |
 | Orchestrator files | **4** (6,034 LOC total) | find dharma_swarm -name "*orchestrat*" |

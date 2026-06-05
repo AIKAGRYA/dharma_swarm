@@ -9,7 +9,9 @@
     "lint": "eslint",
     "test:visual": "playwright test",
     "test:visual:ui": "playwright test --ui",
-    "test:visual:update": "playwright test --update-snapshots"
+    "test:visual:update": "playwright test --update-snapshots",
+    "gen:types": "openapi-typescript ${OPENAPI_URL:-http://127.0.0.1:8420/openapi.json} -o src/lib/api-generated.ts",
+    "gen:types:check": "openapi-typescript ${OPENAPI_URL:-http://127.0.0.1:8420/openapi.json} -o /tmp/api-generated.check.ts && diff -q src/lib/api-generated.ts /tmp/api-generated.check.ts"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.90.21",
@@ -41,6 +43,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
+    "openapi-typescript": "^7.4.4",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
