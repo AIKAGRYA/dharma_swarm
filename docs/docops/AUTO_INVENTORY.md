@@ -8,11 +8,11 @@ Do not hand-edit the generated block.
 |---|---:|
 | Dharma Python modules | 663 |
 | Top-level Dharma Python modules | 389 |
-| Dharma Python LOC | 282,365 |
-| Test files | 629 |
-| Test function occurrences | 10,837 |
-| Markdown files | 783 |
-| Markdown total lines | 194,344 |
+| Dharma Python LOC | 285,116 |
+| Test files | 642 |
+| Test function occurrences | 11,045 |
+| Markdown files | 868 |
+| Markdown total lines | 213,800 |
 | Bridge files | 24 |
 | Adapter files | 21 |
 | Orchestrator files | 4 |
