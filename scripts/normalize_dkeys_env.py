@@ -29,6 +29,21 @@ if _REPO_ROOT not in sys.path:
 from dharma_swarm.api_keys import ENV_ALIASES, normalize_env_aliases
 
 
+def _build_safe_export_lines() -> tuple[str, ...]:
+    lines: list[str] = []
+    for alias, canonical in ENV_ALIASES.items():
+        if alias == canonical:
+            continue
+        lines.append(
+            f"if [ -n \"${{{alias}:-}}\" ] && [ -z \"${{{canonical}:-}}\" ]; "
+            f"then export {canonical}=\"${{{alias}}}\"; fi"
+        )
+    return tuple(lines)
+
+
+_SAFE_EXPORT_LINES = _build_safe_export_lines()
+
+
 def _mask(value: str) -> str:
     if len(value) <= 4:
         return "***"
@@ -52,13 +67,8 @@ def main() -> None:
 
     if args.emit_exports:
         # Emit shell logic that copies values during eval without printing them.
-        for alias, canonical in ENV_ALIASES.items():
-            if alias == canonical:
-                continue
-            sys.stdout.write(
-                f"if [ -n \"${{{alias}:-}}\" ] && [ -z \"${{{canonical}:-}}\" ]; "
-                f"then export {canonical}=\"${{{alias}}}\"; fi\n"
-            )
+        for line in _SAFE_EXPORT_LINES:
+            sys.stdout.write(line + "\n")
         return
 
     applied = normalize_env_aliases(dry_run=not args.apply)
