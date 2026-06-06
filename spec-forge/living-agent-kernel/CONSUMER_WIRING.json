@@ -1,0 +1,91 @@
+{
+  "schema": "lak-e2e/consumer-wiring/v1",
+  "generated_at": "2026-06-06",
+  "title": "LivingAgentKernel — first real consumer wiring (PersistentAgent wake)",
+  "worktree": "/Users/dhyana/dharma_swarm_lak_e2e",
+  "branch": "lak-e2e",
+  "head_commit": "32fa22c5e",
+  "isolation": "ONLY this worktree was edited. /Users/dhyana/dharma_swarm and the other ~34 persistent_agent.py copies are untouched (grep for the flag in main returns 0). No push performed. No network/provider/payment/launchctl.",
+
+  "goal": "A real dharma_swarm PersistentAgent's wake cycle, when an OFF-by-default flag is enabled, routes through the LivingAgentKernel so the wake is governed (authority evaluated) and a tamper-evident kernel receipt is written per wake — while the agent still completes its normal task. Flag OFF = byte-identical current behavior.",
+
+  "flag": {
+    "name": "DHARMA_PERSISTENT_KERNEL_GOVERNANCE",
+    "type": "environment variable",
+    "default": "OFF (unset / any value not in the truthy set)",
+    "truthy_values": ["1", "true", "yes", "on"],
+    "case_insensitive": true,
+    "helper": "dharma_swarm/persistent_agent.py :: _persistent_kernel_governance_enabled()",
+    "idiom_reused": "Mirrors the existing DHARMA_OPERATOR_BRIEF_ENABLED env-flag idiom (cron_runner.py:743) and the broader os.environ.get('DHARMA_*', default-off) pattern (DHARMA_EVOLUTION_SHADOW, DHARMA_SELF_IMPROVE, JIKOKU_ENABLED). NO new config system was invented.",
+    "how_to_enable": "Set the environment variable in the process that runs the persistent agent daemon, e.g. `export DHARMA_PERSISTENT_KERNEL_GOVERNANCE=1` before launching the daemon/run_loop. Unset (or set to 0/false/no/off) to disable.",
+    "how_to_disable": "unset DHARMA_PERSISTENT_KERNEL_GOVERNANCE   (or export DHARMA_PERSISTENT_KERNEL_GOVERNANCE=0)"
+  },
+
+  "injection_point": {
+    "file": "/Users/dhyana/dharma_swarm_lak_e2e/dharma_swarm/persistent_agent.py",
+    "wake_method": "async def wake(self, injected_task: str | None = None) -> dict[str, Any]  (the 10-step conductor heartbeat)",
+    "sole_caller": "run_loop self-wake at persistent_agent.py:569 — `await self.wake(injected_task=injected)` (return value discarded). Verified: the ONLY caller of wake() in the repo.",
+    "where": "Step 8b — inserted AFTER step 8 (the agent's own ReAct execution: `agent_result = await self._agent.wake(task_text)`) and BEFORE step 9 (save learnings).",
+    "new_symbols": [
+      "_persistent_kernel_governance_enabled() — module-level flag helper, zero existing callers",
+      "PersistentAgent._govern_wake_via_kernel(task_text) — best-effort private method, zero existing callers"
+    ],
+    "diff_shape": "+73 lines, 0 deletions, single source file (dharma_swarm/persistent_agent.py). Purely additive: `import os`, the flag helper, a flag-gated `if` block inside wake(), and the new private method. ZERO existing runtime lines modified or removed.",
+    "seam_reused_verbatim": "build_persistent_wake_payload(self, task=task_text)  ->  kernel.normalize_wake_source('persistent_self_wake', payload)  ->  kernel.wake(envelope, lease_owner=self.name)  ->  kernel.closeback_source_wake(execution.wake_record, result, source_root=self.state_dir). KernelRunStore is rooted at self.state_dir/living_agent_kernel.",
+    "observe_plus_govern": "The agent's own task ALWAYS runs first (step 8) and is never replaced. Governance is best-effort: the ENTIRE _govern_wake_via_kernel body (including the lazy imports) is wrapped in `try/except Exception -> return None`, so a flag-ON wake can never break the agent. When ON it adds optional keys (kernel_governed / kernel_run_id / kernel_status) to the returned result_info; the run_loop caller discards that dict, so the contract change is invisible to consumers.",
+    "off_path": "When the env var is unset the gate is False, step 8b is skipped entirely, no kernel modules are imported (lazy imports live inside the gated method), and result_info gains no kernel_* keys. ~313ns short-circuit cost per wake at the 1800s interval — negligible."
+  },
+
+  "commits": {
+    "wiring_commit": {
+      "hash": "f6eee080f",
+      "message": "Wire PersistentAgent wake through LivingAgentKernel (flag-gated, default OFF) [impact-checked]",
+      "files": "dharma_swarm/persistent_agent.py (+73, -0)"
+    },
+    "test_commit": {
+      "hash": "32fa22c5e",
+      "message": "test(lak-e2e): flag-ON governed-wake proof via real PersistentAgent.wake()",
+      "files": "tests/test_living_agent_kernel_persistent_integration.py (+ flag-ON governed test + flag-OFF noop control)"
+    },
+    "skip_used": "SKIP=dharma-docops-integrity on git commit (per instruction). All substantive pre-commit guards (kernel-integrity, secrets/gitleaks, semgrep, contract-tests, test-hygiene, uplift/hot-path ACK) passed clean before the commit."
+  },
+
+  "regression_evidence": {
+    "pythonpath": "export PYTHONPATH=/Users/dhyana/dharma_swarm_lak_e2e (set for every run)",
+    "flag_off_persistent_suite": "python3 -m pytest tests/test_persistent_agent.py -q  ->  17 passed (unchanged from pre-change baseline — byte-identical behavior)",
+    "flag_off_combined": "python3 -m pytest tests/test_persistent_agent.py tests/test_living_agent_kernel_persistent_integration.py tests/test_living_agent_kernel.py -q  ->  72 passed",
+    "flag_on_governed_test": "tests/test_living_agent_kernel_persistent_integration.py::test_real_wake_method_flag_on_is_governed_and_agent_still_completes  ->  PASS. Drives the REAL PersistentAgent.wake() with the flag set; stubs ONLY the step-8 ReAct loop (AutonomousAgent.wake -> AgentResult) — the kernel seam is NEVER monkeypatched and there is no network. Asserts: (a) agent still completes (react awaited once with the task, result_info.success True, summary flows through); (b) governed (result_info carries kernel_governed / kernel_run_id / kernel_status); (c) durable tamper-evident receipts under the agent's OWN state_dir/living_agent_kernel (proof_ledger.jsonl + wake_ledger.jsonl rows keyed by run_id and agent_uid==agent.name, plus a self-wake witness receipt of schema dharma_living_agent_kernel_self_wake_receipt); (d) replay integrity — a fresh KernelRunStore(kernel_dir).replay_run(run_id) returns integrity_ok True with no errors.",
+    "flag_off_noop_control": "tests/test_living_agent_kernel_persistent_integration.py::test_flag_off_leaves_wake_ungoverned_and_writes_no_kernel_artifacts  ->  PASS. Proves flag-OFF writes ZERO kernel artifacts (state_dir/living_agent_kernel never created) and adds no kernel_* keys.",
+    "two_targeted_tests_isolated": "python3 -m pytest <flag_on> <flag_off> -q  ->  2 passed",
+    "independent_reverify": "Tests re-run by this scribe pass (17 / 72 / 2). Build-record broader runs: 207 passed, 2 skipped (full kernel suite); 85 passed (persistent+kernel+adapter)."
+  },
+
+  "reviews": [
+    {
+      "reviewer": "Adversarial Verifier (decorrelated reviewer #1, Opus 4.8)",
+      "verdict": "pass",
+      "off_is_noop": "Full diff is purely additive; zero existing runtime lines modified. Pre-change source = 17 passed; flag-OFF current = 17 passed (byte-identity). Broad flag-OFF gate: 239 passed, 5 skipped (unrelated docker). Flag-OFF control test proves no kernel dir created and no kernel_* keys.",
+      "on_governs": "Flag-ON drives the real wake() (only step-8 ReAct stubbed). Governance is real, not theater: forcing evaluate_authority to return 'block' flipped recorded kernel_status to 'blocked' with durable ledgers written. Receipt independently verified tamper-evident: proof-ledger entry_hash chain recomputes from disk via a from-scratch stable_payload_hash reimplementation; flipping one field breaks the chain; wake-ledger record_hash chain valid; self-wake witness receipt schema-versioned and bound to run_id+agent_uid.",
+      "probes": "Double-exec: agent ReAct invoked EXACTLY 1x under flag ON; kernel.wake is pure governance/ledger (no provider dispatch). Crash path: forced kernel.wake to raise -> swallowed, wake still success, no key leak. Deny/block path: forced authority='block' -> agent's own task still ran once, summary preserved, kernel_status='blocked' recorded — governance never hijacks. No probe broke it.",
+      "recommendation": "PASS — off=noop, on=governs-with-real-receipt, no probe broke it. No changes required."
+    },
+    {
+      "reviewer": "opus_composer (hot-path auditor / decorrelated reviewer #2)",
+      "verdict": "pass",
+      "off_is_noop": "No eager import (kernel + adapter modules absent from sys.modules after importing persistent_agent — both imports live inside the gated method). Short-circuit ~313ns/call. 72 passed flag-default-off; dedicated control test asserts no kernel_* keys AND state_dir/living_agent_kernel never created.",
+      "on_governs": "Flag-ON governs the real wake() and writes a real receipt: react awaited once with the task (agent still completes — observe+govern, not hijack); kernel_governed True with run_id and status in {completed, review}; durable proof_ledger + wake_ledger under state_dir/living_agent_kernel keyed by run_id+agent_uid; self-wake witness receipt in _witness_log; replay integrity_ok True with no errors. The kernel self-wake receipt and the step-10 WAKE witness row coexist append-only (both open in 'a' mode, 1x each, no overwrite).",
+      "probes": "Invariants/ordering PASS — block sits strictly between step 8 (ReAct) and step 9 (save learnings); agent task always executes first; wake() contract unchanged; sole caller run_loop:569 discards the return value so new keys cannot break consumers. Exception path PASS — entire method body (incl. lazy imports) under one try/except returning None; even ImportError swallowed. Cross-worktree PASS/NOTE — kernel seam modules + the flag-gated call site exist ONLY in lak-e2e (0 matches in main / lf5 / lf5_operator); no sibling persistent_agent.py modified; if cherry-picked to a worktree lacking the seam, flag-on gracefully no-ops via swallowed ImportError. Flag idiom PASS — reuses DHARMA_OPERATOR_BRIEF_ENABLED idiom; no new config system.",
+      "recommendation": "PASS — merge-ready as a hot-path change. Minimal, additive, default-off, cheaply short-circuited, respects wake ordering and the append-only witness path, cannot break the agent, introduces no coupling into sibling worktrees. Non-blocking follow-up: when promoting this wiring to other worktrees, promote the seam modules in the SAME commit so flag-on governs rather than silently no-ops."
+    }
+  ],
+  "both_verdicts": "Adversarial Verifier (Opus 4.8): PASS, opus_composer (hot-path auditor): PASS",
+
+  "activation_steps": [
+    "1. MERGE / PORT THE WIRING. The consumer wiring lives ONLY in the isolated worktree /Users/dhyana/dharma_swarm_lak_e2e (branch lak-e2e, commits f6eee080f + 32fa22c5e). To make a live production agent use it, port the additive change into the worktree that actually runs your persistent-agent daemon (e.g. /Users/dhyana/dharma_swarm). CRITICAL: that change depends on the LivingAgentKernel seam modules — dharma_swarm/operator_core/living_agent_kernel.py and living_agent_kernel_persistent_adapter.py — which currently exist ONLY in the lak-e2e worktree. You MUST bring those seam modules over in the SAME commit, otherwise flag-ON will silently no-op (the lazy ImportError is swallowed by design). Verify after porting: `export PYTHONPATH=<that-worktree> && python3 -m pytest tests/test_persistent_agent.py tests/test_living_agent_kernel_persistent_integration.py -q` should be green (flag still OFF = byte-identical).",
+    "2. SET THE FLAG ON THE DAEMON PROCESS. In the environment that launches the persistent-agent run_loop, set: `export DHARMA_PERSISTENT_KERNEL_GOVERNANCE=1` (truthy = 1/true/yes/on; anything else = OFF). Then start/restart the daemon. From that point, every PersistentAgent.wake() (self-wake from run_loop:569) routes through the kernel: authority is evaluated and a tamper-evident receipt (proof_ledger.jsonl + wake_ledger.jsonl + a self-wake witness receipt) is written per wake under that agent's own state_dir/living_agent_kernel, while the agent still completes its normal task. To turn it back off: `unset DHARMA_PERSISTENT_KERNEL_GOVERNANCE` (or set to 0) and restart — behavior reverts to byte-identical current."
+  ],
+
+  "honest_state": "SAFE to enable in this isolated worktree (lak-e2e) as-is: flag-OFF is proven byte-identical (additive-only diff, zero modified runtime lines, 17/72/239 passed across suites), and flag-ON is proven to GOVERN a real wake while the agent still completes its task — durable, tamper-evident, replay-verified receipts under the agent's own state_dir, with two decorrelated PASS reviews. PROVEN: (a) flag OFF = no-op (no import, no key, no dir, ~313ns gate); (b) flag ON governs the REAL wake() hot-path (kernel seam not monkeypatched; only the step-8 LLM ReAct call stubbed to avoid a provider hit); (c) authority is actually evaluated and changes the receipt (forced 'block' flips kernel_status to blocked); (d) receipts are tamper-evident (hash-chain independently recomputed from disk; tamper breaks the chain) and replay-verifiable; (e) observe+govern only — the agent's own task always runs first and is never replaced, and all kernel exceptions are swallowed so flag-ON cannot break the wake. NOT YET PROVEN / CAVEATS: (1) Live provider smoke — the flag-ON test stubs the LLM call (no network), so the seam has not run against a real live provider response under flag-ON; the OFF path is fully live. (2) Worktree drift — the wiring + seam exist only in lak-e2e; ~34 other persistent_agent.py copies (including /Users/dhyana/dharma_swarm) do not have it. Default-OFF makes this safe to defer, but step-1 porting MUST carry the seam modules too or flag-ON silently no-ops. (3) Per-wake cost when ON — each governed wake constructs a fresh LivingAgentKernel and writes 3 durable ledger files (real disk I/O); negligible at the 1800s wake interval but real. (4) Authority default is read-only/manual — a flag-ON wake whose payload requested apply_patch would be DENIED+recorded; the agent's own task already executed independently in step 8, so this only affects the receipt, never the agent's work. (5) Cross-host coordination is out of scope — kernel lease atomicity is single-machine (service flock, local-FS only). Bottom line: safe to enable; the one thing an operator should do before trusting it in production is a single live-provider flag-ON smoke run under approved budget to confirm a real LLM response also produces a clean governed receipt.",
+
+  "headline": "First real consumer wired: a live PersistentAgent's self-wake now routes through LivingAgentKernel under the OFF-by-default env flag DHARMA_PERSISTENT_KERNEL_GOVERNANCE — flag OFF is byte-identical (17/72/239 passed), flag ON governs the real wake and writes a tamper-evident, replay-verified per-wake receipt while the agent still completes its task; two decorrelated reviewers PASS; isolated to lak-e2e, no push, main untouched."
+}
