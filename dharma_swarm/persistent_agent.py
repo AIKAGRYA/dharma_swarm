@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -23,6 +24,21 @@ from dharma_swarm.autonomous_agent import AgentIdentity, AgentResult, Autonomous
 from dharma_swarm.models import AgentRole, ProviderType
 
 logger = logging.getLogger(__name__)
+
+
+def _persistent_kernel_governance_enabled() -> bool:
+    """Whether persistent-agent wakes route through LivingAgentKernel.
+
+    Default OFF. Mirrors the codebase env-flag idiom (e.g.
+    ``DHARMA_OPERATOR_BRIEF_ENABLED``). With the flag unset/falsey the wake
+    cycle is byte-identical to current behavior.
+    """
+    return os.environ.get("DHARMA_PERSISTENT_KERNEL_GOVERNANCE", "").lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -353,6 +369,18 @@ class PersistentAgent:
             # 8. Execute via AutonomousAgent ReAct loop
             agent_result: AgentResult = await self._agent.wake(task_text)
 
+            # 8b. Optional kernel governance (default OFF; observe+govern only).
+            # When DHARMA_PERSISTENT_KERNEL_GOVERNANCE is enabled the wake is
+            # routed through LivingAgentKernel to evaluate authority and write a
+            # tamper-evident receipt. It never replaces the agent's own task
+            # execution above, so flag-on cannot break the agent.
+            if _persistent_kernel_governance_enabled():
+                kernel_receipt = self._govern_wake_via_kernel(task_text)
+                if kernel_receipt is not None:
+                    result_info["kernel_governed"] = True
+                    result_info["kernel_run_id"] = kernel_receipt.get("run_id")
+                    result_info["kernel_status"] = kernel_receipt.get("status")
+
             # 9. Save learnings
             key_insight = self._extract_key_insight(agent_result.summary)
             await self._agent.memory.remember(
@@ -419,6 +447,51 @@ class PersistentAgent:
             return f"Follow up on observation: {mark.observation}"
 
         return "Review system state, check agent notes in ~/.dharma/shared/, report observations"
+
+    # -- Kernel governance (flag-gated, observe+govern) ------------------
+
+    def _govern_wake_via_kernel(self, task_text: str) -> dict[str, Any] | None:
+        """Route this wake through LivingAgentKernel for a governed receipt.
+
+        Reuses the proven persistent wake seam (build_persistent_wake_payload
+        -> normalize_wake_source -> wake -> closeback_source_wake) and writes a
+        tamper-evident receipt under the agent's own ``state_dir``. Best-effort:
+        any failure is logged and swallowed so flag-on cannot break the wake.
+        Returns a small dict of receipt facts, or ``None`` on failure.
+        """
+        try:
+            from dharma_swarm.operator_core.living_agent_kernel import (
+                KernelRunStore,
+                LivingAgentKernel,
+            )
+            from dharma_swarm.operator_core.living_agent_kernel_persistent_adapter import (
+                build_persistent_wake_payload,
+            )
+
+            kernel_dir = self.state_dir / "living_agent_kernel"
+            kernel = LivingAgentKernel(
+                store=KernelRunStore(kernel_dir),
+                workspace_root=self.state_dir,
+                persist=True,
+            )
+
+            payload = build_persistent_wake_payload(self, task=task_text)
+            envelope = kernel.normalize_wake_source("persistent_self_wake", payload)
+            execution = kernel.wake(envelope, lease_owner=self.name)
+            result = execution.result
+            kernel.closeback_source_wake(
+                execution.wake_record, result, source_root=self.state_dir
+            )
+            status = getattr(result, "status", None)
+            run_id = getattr(result, "run_id", None) or envelope.run_id
+            logger.debug(
+                "[%s] kernel-governed wake run_id=%s status=%s",
+                self.name, run_id, status,
+            )
+            return {"run_id": run_id, "status": status}
+        except Exception as e:  # observe+govern must never break the wake
+            logger.debug("[%s] kernel governance skipped: %s", self.name, e)
+            return None
 
     # -- Gate check ------------------------------------------------------
 
