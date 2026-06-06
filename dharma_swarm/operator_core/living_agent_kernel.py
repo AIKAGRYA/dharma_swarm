@@ -2537,6 +2537,36 @@ class LivingAgentKernel:
         if any(result.denial_reason == "tool_not_registered_in_kernel_v1" for result in tool_results):
             unsupported_claims.append("write_or_custom_tool_dispatch_not_implemented_in_v1")
 
+        from dharma_swarm.operator_core.living_agent_kernel_learning import commit_learning
+
+        learning_outcome = commit_learning(self.lesson_store, envelope, admission, status)
+        if learning_outcome.wrote:
+            learning_event_ref = learning_outcome.event_ref()
+            assert learning_event_ref is not None
+            event_refs.append(learning_event_ref)
+            # A learning record was actually written: drop the framing that
+            # asserts memory mutation is impossible for this run.
+            unsupported_claims = [
+                claim for claim in unsupported_claims if claim != "memory_read_projection_only"
+            ]
+            unsupported_claims.append("kernel_learning_limited_to_agent_lessons_ledger")
+        if self.persist:
+            for refusal in learning_outcome.refusals:
+                event_refs.append(
+                    self.store.append_event(
+                        envelope,
+                        suffix=f"500_learning_refused_{len(event_refs):02d}",
+                        event_type=RuntimeEventType.AUDIT_EVENT,
+                        payload={
+                            "gate": "living_agent_kernel.commit_learning",
+                            "result": "refused",
+                            "namespace": refusal.namespace,
+                            "reason": refusal.reason,
+                            "delta_hash": refusal.delta_hash,
+                        },
+                    )
+                )
+
         if self.persist:
             event_refs.append(
                 self.store.append_event(
