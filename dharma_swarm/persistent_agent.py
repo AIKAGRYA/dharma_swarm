@@ -488,7 +488,11 @@ class PersistentAgent:
             )
 
             kernel_dir = _persistent_kernel_store_dir(self.state_dir)
-            shared_store = "DHARMA_PERSISTENT_KERNEL_STORE_DIR" in os.environ
+            # Match _persistent_kernel_store_dir's truthiness exactly: an empty
+            # string is treated as UNSET (per-agent inline path), never as a
+            # shared store — otherwise the wake would enqueue into the per-agent
+            # store with no daemon draining it (silently stuck).
+            shared_store = bool(os.environ.get("DHARMA_PERSISTENT_KERNEL_STORE_DIR"))
             kernel = LivingAgentKernel(
                 store=KernelRunStore(kernel_dir),
                 workspace_root=self.state_dir,
