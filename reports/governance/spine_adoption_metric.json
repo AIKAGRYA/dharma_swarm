@@ -1,5 +1,5 @@
 {
-  "audit_sha": "aa5a8e82b0c9c0a36b9c6e3585b9bcd16f6fb296",
+  "audit_sha": "25510113e0301f0923c3cfb8427c208e9438f3c6",
   "classification_rule": "joined requires all joined evidence patterns; adapter-ready requires all adapter evidence patterns when joined is incomplete; quarantine and legacy require explicit source markers; missing means no tracked surface or insufficient evidence.",
   "classification_vocabulary": [
     "joined",
@@ -13,17 +13,7 @@
   "missing_doc_anchors": [],
   "source_status": "dirty",
   "source_status_entries": [
-    " M dharma_swarm/a2a/__init__.py",
-    " A dharma_swarm/a2a/nats_transport.py",
-    " M dharma_swarm/durable_execution.py",
-    " M dharma_swarm/opportunity_refill.py",
-    " M docs/docops/AUTO_INVENTORY.md",
-    " M docs/governance/SOVEREIGN_MANIFEST.md",
-    " M reports/governance/spine_adoption_metric.json",
-    " M scripts/docops/check_docops_integrity.py",
-    " M scripts/governance/spine_bypass_report.py",
-    " A tests/test_nats_transport.py",
-    " A tests/test_runtime_truth_spine_recovery.py"
+    " M reports/governance/spine_adoption_metric.json"
   ],
   "summary": {
     "adapter_ready_count": 4,
@@ -1788,5 +1778,5 @@
       "status": "legacy"
     }
   ],
-  "tracked_file_count": 2923
+  "tracked_file_count": 2924
 }
