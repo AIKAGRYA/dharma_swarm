@@ -1,5 +1,5 @@
 {
-  "audit_sha": "b3dbf94f00a0e7a72e23d5985cc34256c275f686",
+  "audit_sha": "aa5a8e82b0c9c0a36b9c6e3585b9bcd16f6fb296",
   "classification_rule": "joined requires all joined evidence patterns; adapter-ready requires all adapter evidence patterns when joined is incomplete; quarantine and legacy require explicit source markers; missing means no tracked surface or insufficient evidence.",
   "classification_vocabulary": [
     "joined",
@@ -14,14 +14,14 @@
   "source_status": "clean",
   "source_status_entries": [],
   "summary": {
-    "adapter_ready_count": 4,
-    "adoption_pct": 75.0,
+    "adapter_ready_count": 5,
+    "adoption_pct": 81.2,
     "joined_count": 8,
-    "joined_or_adapter_ready_count": 12,
-    "joined_or_adapter_ready_percent": 75.0,
+    "joined_or_adapter_ready_count": 13,
+    "joined_or_adapter_ready_percent": 81.2,
     "joined_percent": 50.0,
     "legacy_count": 2,
-    "missing_count": 1,
+    "missing_count": 0,
     "non_joined_surface_ids": [
       "tool_registry_dispatch",
       "ontology_action_tollbooth",
@@ -34,10 +34,10 @@
     ],
     "quarantine_count": 1,
     "status_counts": {
-      "adapter-ready": 4,
+      "adapter-ready": 5,
       "joined": 8,
       "legacy": 2,
-      "missing": 1,
+      "missing": 0,
       "quarantine": 1
     },
     "total_surfaces": 16
@@ -121,7 +121,7 @@
           "description": "runtime store symbol is present",
           "hits": [
             {
-              "line": 1048,
+              "line": 1061,
               "path": "dharma_swarm/runtime_state.py",
               "text": "class RuntimeStateStore:"
             }
@@ -141,7 +141,7 @@
           "description": "RuntimeStateStore type exists",
           "hits": [
             {
-              "line": 1048,
+              "line": 1061,
               "path": "dharma_swarm/runtime_state.py",
               "text": "class RuntimeStateStore:"
             }
@@ -193,7 +193,7 @@
           "description": "run ledger query exists",
           "hits": [
             {
-              "line": 3263,
+              "line": 3466,
               "path": "dharma_swarm/runtime_state.py",
               "text": "async def get_run_ledger(self, run_id: str) -> dict[str, Any]:"
             }
@@ -209,7 +209,7 @@
           "description": "legacy identity bypass flag is present",
           "hits": [
             {
-              "line": 893,
+              "line": 906,
               "path": "dharma_swarm/runtime_state.py",
               "text": "\"legacy_no_identity_allowed\": True,"
             }
@@ -416,7 +416,7 @@
           "description": "orchestrator has lifecycle adapter seam",
           "hits": [
             {
-              "line": 115,
+              "line": 116,
               "path": "dharma_swarm/orchestrator.py",
               "text": "self._runtime_lifecycle = RuntimeLifecycle(self._ledger)"
             }
@@ -521,7 +521,7 @@
           "description": "required identity option exists",
           "hits": [
             {
-              "line": 126,
+              "line": 132,
               "path": "dharma_swarm/message_bus.py",
               "text": "require_identity: bool = False,"
             }
@@ -534,7 +534,7 @@
           "description": "idempotency is checked before send/emit side effects",
           "hits": [
             {
-              "line": 241,
+              "line": 247,
               "path": "dharma_swarm/message_bus.py",
               "text": "should_execute = await self._runtime_state.try_begin_idempotent_side_effect("
             }
@@ -547,7 +547,7 @@
           "description": "idempotency completion is recorded",
           "hits": [
             {
-              "line": 274,
+              "line": 293,
               "path": "dharma_swarm/message_bus.py",
               "text": "await self._runtime_state.complete_idempotent_side_effect("
             }
@@ -560,7 +560,7 @@
           "description": "message consumption receipt exists",
           "hits": [
             {
-              "line": 837,
+              "line": 852,
               "path": "dharma_swarm/message_bus.py",
               "text": "receipt_type=\"message_consumed\","
             }
@@ -920,7 +920,7 @@
           "description": "ActionDef declares typed actions",
           "hits": [
             {
-              "line": 161,
+              "line": 164,
               "path": "dharma_swarm/ontology.py",
               "text": "class ActionDef(BaseModel):"
             }
@@ -933,7 +933,7 @@
           "description": "typed action execution chokepoint exists",
           "hits": [
             {
-              "line": 763,
+              "line": 766,
               "path": "dharma_swarm/ontology.py",
               "text": "def execute_action("
             }
@@ -946,7 +946,7 @@
           "description": "modifies contract is declared",
           "hits": [
             {
-              "line": 172,
+              "line": 175,
               "path": "dharma_swarm/ontology.py",
               "text": "modifies: list[str] = Field(default_factory=list)"
             }
@@ -959,7 +959,7 @@
           "description": "approval contract is declared",
           "hits": [
             {
-              "line": 174,
+              "line": 177,
               "path": "dharma_swarm/ontology.py",
               "text": "requires_approval: bool = False"
             }
@@ -977,9 +977,15 @@
       "joined_evidence": [
         {
           "description": "ontology actions receive execution identity",
-          "hits": [],
+          "hits": [
+            {
+              "line": 42,
+              "path": "dharma_swarm/ontology.py",
+              "text": "from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity"
+            }
+          ],
           "key": "identity_import",
-          "matched": false,
+          "matched": true,
           "regex": "ExecutionIdentity"
         },
         {
@@ -991,23 +997,41 @@
         },
         {
           "description": "ontology action receipts are recorded",
-          "hits": [],
+          "hits": [
+            {
+              "line": 818,
+              "path": "dharma_swarm/ontology.py",
+              "text": "runtime_state.record_ontology_action_receipt_sync("
+            }
+          ],
           "key": "ontology_receipt",
-          "matched": false,
+          "matched": true,
           "regex": "record_ontology_action_receipt"
         },
         {
           "description": "ActionDef.modifies is read at execution time",
-          "hits": [],
+          "hits": [
+            {
+              "line": 826,
+              "path": "dharma_swarm/ontology.py",
+              "text": "\"modifies\": list(action_def.modifies),"
+            }
+          ],
           "key": "modifies_enforced",
-          "matched": false,
+          "matched": true,
           "regex": "action_def\\.modifies"
         },
         {
           "description": "requires_approval is read at execution time",
-          "hits": [],
+          "hits": [
+            {
+              "line": 828,
+              "path": "dharma_swarm/ontology.py",
+              "text": "\"requires_approval\": action_def.requires_approval,"
+            }
+          ],
           "key": "approval_enforced",
-          "matched": false,
+          "matched": true,
           "regex": "action_def\\.requires_approval"
         }
       ],
@@ -1015,29 +1039,9 @@
       "legacy_evidence": [],
       "missing_joined_patterns": [
         {
-          "description": "ontology actions receive execution identity",
-          "key": "identity_import",
-          "regex": "ExecutionIdentity"
-        },
-        {
           "description": "ontology actions write to runtime ledger",
           "key": "runtime_store",
           "regex": "RuntimeStateStore"
-        },
-        {
-          "description": "ontology action receipts are recorded",
-          "key": "ontology_receipt",
-          "regex": "record_ontology_action_receipt"
-        },
-        {
-          "description": "ActionDef.modifies is read at execution time",
-          "key": "modifies_enforced",
-          "regex": "action_def\\.modifies"
-        },
-        {
-          "description": "requires_approval is read at execution time",
-          "key": "approval_enforced",
-          "regex": "action_def\\.requires_approval"
         }
       ],
       "path_patterns": [
@@ -1079,7 +1083,7 @@
           "description": "apply/test phase exists",
           "hits": [
             {
-              "line": 273,
+              "line": 345,
               "path": "dharma_swarm/diff_applier.py",
               "text": "async def apply_and_test("
             },
@@ -1127,23 +1131,41 @@
       "joined_evidence": [
         {
           "description": "self-modification receives execution identity",
-          "hits": [],
+          "hits": [
+            {
+              "line": 20,
+              "path": "dharma_swarm/diff_applier.py",
+              "text": "from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity"
+            }
+          ],
           "key": "identity_import",
-          "matched": false,
+          "matched": true,
           "regex": "ExecutionIdentity"
         },
         {
           "description": "self-modification writes to runtime ledger",
-          "hits": [],
+          "hits": [
+            {
+              "line": 19,
+              "path": "dharma_swarm/diff_applier.py",
+              "text": "from dharma_swarm.runtime_state import RuntimeStateStore"
+            }
+          ],
           "key": "runtime_store",
-          "matched": false,
+          "matched": true,
           "regex": "RuntimeStateStore"
         },
         {
           "description": "self-modification receipts are recorded",
-          "hits": [],
+          "hits": [
+            {
+              "line": 252,
+              "path": "dharma_swarm/diff_applier.py",
+              "text": "self._runtime_state.record_self_mod_receipt_sync("
+            }
+          ],
           "key": "self_mod_receipt",
-          "matched": false,
+          "matched": true,
           "regex": "record_self_mod_receipt"
         },
         {
@@ -1157,21 +1179,6 @@
       "label": "Self-modification propose/gate/apply/verify loop",
       "legacy_evidence": [],
       "missing_joined_patterns": [
-        {
-          "description": "self-modification receives execution identity",
-          "key": "identity_import",
-          "regex": "ExecutionIdentity"
-        },
-        {
-          "description": "self-modification writes to runtime ledger",
-          "key": "runtime_store",
-          "regex": "RuntimeStateStore"
-        },
-        {
-          "description": "self-modification receipts are recorded",
-          "key": "self_mod_receipt",
-          "regex": "record_self_mod_receipt"
-        },
         {
           "description": "apply path is idempotency-gated",
           "key": "begin_idempotent",
@@ -1427,21 +1434,46 @@
       "adapter_ready_evidence": [
         {
           "description": "NATS terms are present",
-          "hits": [],
+          "hits": [
+            {
+              "line": 1,
+              "path": "dharma_swarm/operator_core/nats_live_contact.py",
+              "text": "\"\"\"Real JetStream live-contact verifier."
+            },
+            {
+              "line": 1,
+              "path": "dharma_swarm/operator_core/nats_substrate_status.py",
+              "text": "\"\"\"NATS substrate status projection for operator-facing readiness claims."
+            }
+          ],
           "key": "nats_name_seen",
-          "matched": false,
+          "matched": true,
           "regex": "NATS|JetStream|nats"
         }
       ],
       "category": "event",
-      "files": [],
+      "files": [
+        "dharma_swarm/operator_core/nats_live_contact.py",
+        "dharma_swarm/operator_core/nats_substrate_status.py"
+      ],
       "id": "nats_jetstream_transport",
       "joined_evidence": [
         {
           "description": "NATS/JetStream client code exists",
-          "hits": [],
+          "hits": [
+            {
+              "line": 1,
+              "path": "dharma_swarm/operator_core/nats_live_contact.py",
+              "text": "\"\"\"Real JetStream live-contact verifier."
+            },
+            {
+              "line": 6,
+              "path": "dharma_swarm/operator_core/nats_substrate_status.py",
+              "text": "``nats_live_contact`` verifier for a real JetStream publish/consumer ack \u2014 that"
+            }
+          ],
           "key": "nats_client",
-          "matched": false,
+          "matched": true,
           "regex": "\\bnats\\b|JetStream"
         },
         {
@@ -1460,9 +1492,20 @@
         },
         {
           "description": "ack/nack contract is visible",
-          "hits": [],
+          "hits": [
+            {
+              "line": 4,
+              "path": "dharma_swarm/operator_core/nats_live_contact.py",
+              "text": "JetStream publish (and best-effort consumer ack) round-trip and only reports"
+            },
+            {
+              "line": 6,
+              "path": "dharma_swarm/operator_core/nats_substrate_status.py",
+              "text": "``nats_live_contact`` verifier for a real JetStream publish/consumer ack \u2014 that"
+            }
+          ],
           "key": "ack_contract",
-          "matched": false,
+          "matched": true,
           "regex": "\\back\\b|\\bnack\\b"
         }
       ],
@@ -1470,11 +1513,6 @@
       "legacy_evidence": [],
       "missing_joined_patterns": [
         {
-          "description": "NATS/JetStream client code exists",
-          "key": "nats_client",
-          "regex": "\\bnats\\b|JetStream"
-        },
-        {
           "description": "NATS events carry execution identity",
           "key": "identity_import",
           "regex": "ExecutionIdentity"
@@ -1483,11 +1521,6 @@
           "description": "NATS receiver is idempotency-gated",
           "key": "begin_idempotent",
           "regex": "try_begin_idempotent_side_effect"
-        },
-        {
-          "description": "ack/nack contract is visible",
-          "key": "ack_contract",
-          "regex": "\\back\\b|\\bnack\\b"
         }
       ],
       "path_patterns": [
@@ -1496,7 +1529,7 @@
       ],
       "priority": 8,
       "quarantine_evidence": [],
-      "status": "missing"
+      "status": "adapter-ready"
     },
     {
       "adapter_ready_evidence": [
@@ -1599,7 +1632,7 @@
           "description": "legacy bypass must stay explicit",
           "hits": [
             {
-              "line": 893,
+              "line": 906,
               "path": "dharma_swarm/runtime_state.py",
               "text": "\"legacy_no_identity_allowed\": True,"
             },
@@ -1639,35 +1672,6 @@
   ],
   "top_saturation_targets": [
     {
-      "category": "event",
-      "files": [],
-      "id": "nats_jetstream_transport",
-      "label": "NATS/JetStream event transport",
-      "missing_joined_patterns": [
-        {
-          "description": "NATS/JetStream client code exists",
-          "key": "nats_client",
-          "regex": "\\bnats\\b|JetStream"
-        },
-        {
-          "description": "NATS events carry execution identity",
-          "key": "identity_import",
-          "regex": "ExecutionIdentity"
-        },
-        {
-          "description": "NATS receiver is idempotency-gated",
-          "key": "begin_idempotent",
-          "regex": "try_begin_idempotent_side_effect"
-        },
-        {
-          "description": "ack/nack contract is visible",
-          "key": "ack_contract",
-          "regex": "\\back\\b|\\bnack\\b"
-        }
-      ],
-      "status": "missing"
-    },
-    {
       "category": "ontology",
       "files": [
         "dharma_swarm/ontology.py"
@@ -1676,29 +1680,9 @@
       "label": "Ontology typed action tollbooth",
       "missing_joined_patterns": [
         {
-          "description": "ontology actions receive execution identity",
-          "key": "identity_import",
-          "regex": "ExecutionIdentity"
-        },
-        {
           "description": "ontology actions write to runtime ledger",
           "key": "runtime_store",
           "regex": "RuntimeStateStore"
-        },
-        {
-          "description": "ontology action receipts are recorded",
-          "key": "ontology_receipt",
-          "regex": "record_ontology_action_receipt"
-        },
-        {
-          "description": "ActionDef.modifies is read at execution time",
-          "key": "modifies_enforced",
-          "regex": "action_def\\.modifies"
-        },
-        {
-          "description": "requires_approval is read at execution time",
-          "key": "approval_enforced",
-          "regex": "action_def\\.requires_approval"
         }
       ],
       "status": "adapter-ready"
@@ -1729,21 +1713,6 @@
       "id": "self_modification_loop",
       "label": "Self-modification propose/gate/apply/verify loop",
       "missing_joined_patterns": [
-        {
-          "description": "self-modification receives execution identity",
-          "key": "identity_import",
-          "regex": "ExecutionIdentity"
-        },
-        {
-          "description": "self-modification writes to runtime ledger",
-          "key": "runtime_store",
-          "regex": "RuntimeStateStore"
-        },
-        {
-          "description": "self-modification receipts are recorded",
-          "key": "self_mod_receipt",
-          "regex": "record_self_mod_receipt"
-        },
         {
           "description": "apply path is idempotency-gated",
           "key": "begin_idempotent",
@@ -1778,7 +1747,29 @@
         }
       ],
       "status": "adapter-ready"
+    },
+    {
+      "category": "event",
+      "files": [
+        "dharma_swarm/operator_core/nats_live_contact.py",
+        "dharma_swarm/operator_core/nats_substrate_status.py"
+      ],
+      "id": "nats_jetstream_transport",
+      "label": "NATS/JetStream event transport",
+      "missing_joined_patterns": [
+        {
+          "description": "NATS events carry execution identity",
+          "key": "identity_import",
+          "regex": "ExecutionIdentity"
+        },
+        {
+          "description": "NATS receiver is idempotency-gated",
+          "key": "begin_idempotent",
+          "regex": "try_begin_idempotent_side_effect"
+        }
+      ],
+      "status": "adapter-ready"
     }
   ],
-  "tracked_file_count": 2761
+  "tracked_file_count": 2920
 }
