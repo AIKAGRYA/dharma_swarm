@@ -1,5 +1,5 @@
 {
-  "audit_sha": "25510113e0301f0923c3cfb8427c208e9438f3c6",
+  "audit_sha": "4b86b8aef52f8df90707e0dbc13efa4b0f2f9ded",
   "classification_rule": "joined requires all joined evidence patterns; adapter-ready requires all adapter evidence patterns when joined is incomplete; quarantine and legacy require explicit source markers; missing means no tracked surface or insufficient evidence.",
   "classification_vocabulary": [
     "joined",
@@ -11,10 +11,8 @@
   "doc_anchor_status": "ok",
   "metric": "spine_adoption_metric",
   "missing_doc_anchors": [],
-  "source_status": "dirty",
-  "source_status_entries": [
-    " M reports/governance/spine_adoption_metric.json"
-  ],
+  "source_status": "clean",
+  "source_status_entries": [],
   "summary": {
     "adapter_ready_count": 4,
     "adoption_pct": 93.8,
