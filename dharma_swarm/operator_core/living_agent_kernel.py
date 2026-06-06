@@ -227,6 +227,28 @@ def _string_list(value: Any) -> list[str]:
     return [str(value)] if str(value) else []
 
 
+def _safe_own_skill_patterns(agent_uid: str, declared: list[str]) -> list[str]:
+    """Deterministic own-skill-file allowlist for ``agent_uid``.
+
+    Always includes the workspace-relative ``skills/<agent_uid>/`` root and any
+    explicitly declared own-skill files, with each declared entry re-validated
+    through :func:`_safe_diff_target` so a traversal or absolute path can never
+    widen the allowlist beyond the agent's own skill tree.
+    """
+
+    safe_uid = _safe_diff_target(agent_uid.strip())
+    patterns: list[str] = []
+    if safe_uid and "/" not in safe_uid:
+        patterns.append(f"skills/{safe_uid}/")
+    for raw in declared:
+        rel = _safe_diff_target(str(raw))
+        if not rel:
+            continue
+        if rel == f"skills/{safe_uid}" or rel.startswith(f"skills/{safe_uid}/"):
+            patterns.append(rel)
+    return _sorted_unique(patterns)
+
+
 def _first_text(payload: dict[str, Any], *keys: str, default: str = "") -> str:
     for key in keys:
         value = payload.get(key)
@@ -2366,6 +2388,11 @@ class LivingAgentKernel:
                 denial_reasons.pop("skill_promote", None)
         else:
             denial_reasons["skill_promote"] = "skill_promote_requires_self_evolution_or_promotion_authority"
+        if envelope.authority.work_kind == WorkKind.SELF_EVOLUTION and decision.decision == "allow":
+            visible.append("self_edit")
+            denial_reasons.pop("self_edit", None)
+        elif envelope.authority.work_kind != WorkKind.SELF_EVOLUTION:
+            denial_reasons["self_edit"] = "self_edit_requires_self_evolution_authority"
         if envelope.authority.protected_file_hits:
             denial_reasons["mutate_protected_files"] = "protected_file_hits"
         if envelope.authority.external_worker_authority == "external_worker_evidence_only":
@@ -2500,6 +2527,13 @@ class LivingAgentKernel:
             for result in tool_results
         ):
             unsupported_claims.append("skill_promote_applies_pre_existing_evidence_backed_promotion_only")
+        if any(
+            result.tool_name == "self_edit"
+            and result.status == "completed"
+            and result.output.get("mutation_mode") == "apply"
+            for result in tool_results
+        ):
+            unsupported_claims.append("self_edit_mutation_limited_to_own_skill_files_via_apply_patch_adapter")
         if any(result.denial_reason == "tool_not_registered_in_kernel_v1" for result in tool_results):
             unsupported_claims.append("write_or_custom_tool_dispatch_not_implemented_in_v1")
 
@@ -2606,6 +2640,8 @@ class LivingAgentKernel:
                 result = self._dispatch_memory_write(envelope, arguments)
             elif tool_name == "skill_promote":
                 result = self._dispatch_skill_promote(envelope, arguments)
+            elif tool_name == "self_edit":
+                result = self._dispatch_self_edit(envelope, arguments)
             else:
                 result = self.tool_registry.dispatch(tool_name=tool_name, arguments=arguments, context=context)
 
@@ -3035,6 +3071,151 @@ class LivingAgentKernel:
             },
         )
 
+    def _dispatch_self_edit(self, envelope: AgentRunEnvelope, arguments: dict[str, Any]) -> KernelToolResult:
+        if envelope.authority.work_kind != WorkKind.SELF_EVOLUTION:
+            return _tool_result(
+                run_id=envelope.run_id,
+                tool_name="self_edit",
+                status="denied",
+                arguments=arguments,
+                denial_reason="self_edit_requires_self_evolution_authority",
+            )
+        if not envelope.authority.mission_contract_present or not envelope.authority.workspace_lease_present:
+            return _tool_result(
+                run_id=envelope.run_id,
+                tool_name="self_edit",
+                status="denied",
+                arguments=arguments,
+                denial_reason="self_edit_requires_mission_contract_and_workspace_lease",
+            )
+        if envelope.authority.external_worker_authority == "external_worker_evidence_only":
+            return _tool_result(
+                run_id=envelope.run_id,
+                tool_name="self_edit",
+                status="denied",
+                arguments=arguments,
+                denial_reason="external_worker_evidence_only",
+            )
+
+        patch_text = str(arguments.get("patch") or arguments.get("diff") or "")
+        if not patch_text.strip():
+            return _tool_result(
+                run_id=envelope.run_id,
+                tool_name="self_edit",
+                status="failed",
+                arguments=arguments,
+                error="self_edit_requires_patch_or_diff",
+            )
+
+        declared = _string_list(
+            arguments.get("own_skill_files")
+            or envelope.authority.metadata.get("own_skill_files")
+            or envelope.memory.metadata.get("own_skill_files")
+        )
+        own_patterns = _safe_own_skill_patterns(envelope.agent_uid, declared)
+        if not own_patterns:
+            return _tool_result(
+                run_id=envelope.run_id,
+                tool_name="self_edit",
+                status="denied",
+                arguments=arguments,
+                denial_reason="self_edit_own_skill_root_unresolved",
+            )
+
+        try:
+            from dharma_swarm.diff_applier import parse_unified_diff
+
+            patches = parse_unified_diff(patch_text)
+        except Exception as exc:
+            return _tool_result(
+                run_id=envelope.run_id,
+                tool_name="self_edit",
+                status="failed",
+                arguments=arguments,
+                error=f"self_edit_parse_failed:{type(exc).__name__}:{exc}",
+            )
+
+        workspace = self.workspace_root.resolve()
+        for patch in patches:
+            target_rel = _safe_diff_target(patch.target_path)
+            if not target_rel:
+                return _tool_result(
+                    run_id=envelope.run_id,
+                    tool_name="self_edit",
+                    status="denied",
+                    arguments=arguments,
+                    denial_reason="self_edit_target_path_unsafe",
+                )
+            target = (workspace / target_rel).resolve()
+            if not target.is_relative_to(workspace) or not _path_matches_contract(
+                target, own_patterns, workspace_root=workspace
+            ):
+                return _tool_result(
+                    run_id=envelope.run_id,
+                    tool_name="self_edit",
+                    status="denied",
+                    arguments=arguments,
+                    denial_reason="self_edit_outside_own_skill_files",
+                )
+
+        delegate = envelope.model_copy(
+            update={
+                "authority": envelope.authority.model_copy(
+                    update={
+                        "work_kind": WorkKind.CODE_WRITE,
+                        "allowed_files": list(own_patterns),
+                    }
+                )
+            }
+        )
+        delegated = self._dispatch_apply_patch(delegate, arguments)
+        if delegated.status != "completed":
+            return _tool_result(
+                run_id=envelope.run_id,
+                tool_name="self_edit",
+                status=delegated.status,
+                arguments=arguments,
+                denial_reason=delegated.denial_reason,
+                error=delegated.error,
+                output={**dict(delegated.output), "delegated_to": "apply_patch"},
+            )
+
+        lesson_namespace = f"agent:{envelope.agent_uid}:lessons"
+        changed_files = list(delegated.output.get("files_changed") or [])
+        lesson_receipt = self.lesson_store.append_lesson(
+            envelope.agent_uid,
+            lesson_namespace,
+            f"self_edit applied to own skill files: {','.join(changed_files) or 'dry_run'} "
+            f"(mode={delegated.output.get('mutation_mode')})",
+            run_id=envelope.run_id,
+            provenance={
+                "kind": "self_edit",
+                "own_skill_patterns": own_patterns,
+                "files_changed": changed_files,
+                "mutation_mode": delegated.output.get("mutation_mode"),
+                "delegated_to": "apply_patch",
+                "source": envelope.trigger.source,
+                "mission_id": envelope.trigger.mission_id,
+                "task_id": envelope.trigger.task_id,
+                "correlation_id": envelope.trigger.correlation_id,
+                "parent_run_id": envelope.trigger.parent_run_id,
+            },
+        )
+
+        return _tool_result(
+            run_id=envelope.run_id,
+            tool_name="self_edit",
+            status="completed",
+            arguments=arguments,
+            output={
+                **dict(delegated.output),
+                "delegated_to": "apply_patch",
+                "own_skill_patterns": own_patterns,
+                "lesson_namespace": lesson_namespace,
+                "lesson_receipt_hash": lesson_receipt.entry_hash,
+            },
+        )
+
     @staticmethod
     def _run_diff_apply(coro: Any) -> Any:
         try:
@@ -3107,7 +3288,7 @@ class LivingAgentKernel:
     ) -> RuntimeTruthPacket:
         observed_tool_results = list(tool_results or [])
         live_mutation = any(
-            result.tool_name == "apply_patch"
+            result.tool_name in {"apply_patch", "self_edit"}
             and result.status == "completed"
             and result.output.get("mutation_mode") == "apply"
             and result.output.get("applied") is True
