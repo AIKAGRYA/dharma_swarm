@@ -41,6 +41,23 @@ def _persistent_kernel_governance_enabled() -> bool:
     }
 
 
+def _persistent_kernel_store_dir(state_dir: Path) -> Path:
+    """Where this agent's governed-wake kernel store is rooted.
+
+    Default = per-agent (``state_dir / "living_agent_kernel"``), UNCHANGED. When
+    ``DHARMA_PERSISTENT_KERNEL_STORE_DIR`` is set, multiple agents root their
+    KernelRunStore under ONE shared dir so they can coordinate through a single
+    governed store. Mirrors the env-var-as-path override idiom in
+    ``daemon_config.dharma_state_dir`` (env override, else default) — no new
+    mechanism. With the env var unset the returned path is byte-identical to the
+    historical default.
+    """
+    shared = os.environ.get("DHARMA_PERSISTENT_KERNEL_STORE_DIR")
+    if shared:
+        return Path(shared) / "living_agent_kernel"
+    return state_dir / "living_agent_kernel"
+
+
 # ---------------------------------------------------------------------------
 # Per-agent mini-cron
 # ---------------------------------------------------------------------------
@@ -380,6 +397,8 @@ class PersistentAgent:
                     result_info["kernel_governed"] = True
                     result_info["kernel_run_id"] = kernel_receipt.get("run_id")
                     result_info["kernel_status"] = kernel_receipt.get("status")
+                    if "wake_id" in kernel_receipt:
+                        result_info["kernel_wake_id"] = kernel_receipt["wake_id"]
 
             # 9. Save learnings
             key_insight = self._extract_key_insight(agent_result.summary)
@@ -468,7 +487,8 @@ class PersistentAgent:
                 build_persistent_wake_payload,
             )
 
-            kernel_dir = self.state_dir / "living_agent_kernel"
+            kernel_dir = _persistent_kernel_store_dir(self.state_dir)
+            shared_store = "DHARMA_PERSISTENT_KERNEL_STORE_DIR" in os.environ
             kernel = LivingAgentKernel(
                 store=KernelRunStore(kernel_dir),
                 workspace_root=self.state_dir,
@@ -476,6 +496,34 @@ class PersistentAgent:
             )
 
             payload = build_persistent_wake_payload(self, task=task_text)
+
+            if shared_store:
+                # Shared coordination store: ENQUEUE ONLY. The kernel's
+                # ``lease_next_wake`` is a non-atomic read-modify-write whose
+                # only concurrency guard is the service-layer flock in
+                # ``run_kernel_daemon_service``. Inline-draining a shared store
+                # here would race that single drainer and could double-lease, so
+                # the agent only appends its governed wake to the shared ledger
+                # (deterministic agent-scoped wake_id to avoid cross-agent
+                # collision) and the single flock-protected daemon service drains
+                # it exactly once under governance.
+                wake_id = (
+                    f"persistent_self_wake:{self.name}:{payload['correlation_id']}"
+                )
+                record = kernel.enqueue_source_wake(
+                    "persistent_self_wake", payload, wake_id=wake_id
+                )
+                logger.debug(
+                    "[%s] enqueued governed wake to shared store run_id=%s wake_id=%s",
+                    self.name, record.run_id, record.wake_id,
+                )
+                return {
+                    "run_id": record.run_id,
+                    "status": record.status,
+                    "wake_id": record.wake_id,
+                    "shared": True,
+                }
+
             envelope = kernel.normalize_wake_source("persistent_self_wake", payload)
             execution = kernel.wake(envelope, lease_owner=self.name)
             result = execution.result
