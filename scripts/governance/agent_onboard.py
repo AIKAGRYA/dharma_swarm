@@ -23,6 +23,7 @@ import os
 import re
 import subprocess
 import sys
+from collections import Counter
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -94,11 +95,126 @@ def _doc_staleness(doc_rel: str) -> tuple[int, str]:
     return ((_today() - when).days, subject)
 
 
+def _strip_ref_prefix(branch: str | None) -> str | None:
+    if not branch:
+        return None
+    prefix = "refs/heads/"
+    return branch[len(prefix):] if branch.startswith(prefix) else branch
+
+
+def _parse_worktree_porcelain(text: str) -> list[dict[str, Any]]:
+    worktrees: list[dict[str, Any]] = []
+    current: dict[str, Any] | None = None
+    for raw in text.splitlines():
+        line = raw.rstrip()
+        if not line:
+            if current is not None:
+                worktrees.append(current)
+                current = None
+            continue
+        if line.startswith("worktree "):
+            if current is not None:
+                worktrees.append(current)
+            current = {
+                "path": line[len("worktree "):].strip(),
+                "head": None,
+                "branch": None,
+                "detached": False,
+                "bare": False,
+                "locked": False,
+                "prunable": False,
+            }
+            continue
+        if current is None:
+            continue
+        if line.startswith("HEAD "):
+            current["head"] = line[len("HEAD "):].strip()
+        elif line.startswith("branch "):
+            current["branch"] = _strip_ref_prefix(line[len("branch "):].strip())
+        elif line == "detached":
+            current["detached"] = True
+        elif line == "bare":
+            current["bare"] = True
+        elif line.startswith("locked"):
+            current["locked"] = True
+        elif line.startswith("prunable"):
+            current["prunable"] = True
+    if current is not None:
+        worktrees.append(current)
+    return worktrees
+
+
+def _lane_family(label: str) -> str:
+    text = label.lower()
+    if "forge" in text or "arena" in text or "measurement" in text:
+        return "forge/measurement"
+    if "living_agent_kernel" in text or "living-agent-kernel" in text:
+        return "living-agent-kernel"
+    if "runtime-truth" in text or "runtime_truth" in text or "spine" in text:
+        return "runtime-truth/spine"
+    if "docops" in text or "governance" in text:
+        return "docops/governance"
+    if "capital" in text or "revenue" in text or "cash" in text:
+        return "capital/revenue"
+    if "pr" in text or "review" in text or "merge-master" in text:
+        return "pr/review/merge"
+    if "cleanup" in text or "repair" in text:
+        return "cleanup/repair"
+    if "goodworks" in text or "dgm" in text:
+        return "goodworks"
+    return "other"
+
+
+def _recent_local_branches(limit: int = 8) -> list[dict[str, str]]:
+    out = git(
+        "for-each-ref",
+        "--sort=-committerdate",
+        "--format=%(refname:short)|%(committerdate:short)|%(subject)",
+        "refs/heads",
+    )
+    branches: list[dict[str, str]] = []
+    for line in out.splitlines():
+        name, sep, rest = line.partition("|")
+        if not sep:
+            continue
+        date_s, _, subject = rest.partition("|")
+        branches.append({"name": name, "date": date_s, "subject": subject})
+        if len(branches) >= limit:
+            break
+    return branches
+
+
+def _work_lane_snapshot() -> dict[str, Any]:
+    worktree_text = git("worktree", "list", "--porcelain")
+    worktrees = _parse_worktree_porcelain(worktree_text) if worktree_text else []
+    for w in worktrees:
+        path = Path(str(w.get("path", "")))
+        w["exists"] = path.exists()
+        w["basename"] = path.name
+
+    branch_text = git("for-each-ref", "--format=%(refname:short)", "refs/heads")
+    local_branches = [line.strip() for line in branch_text.splitlines() if line.strip()]
+    worktree_labels = [
+        " ".join(
+            str(part) for part in (w.get("basename"), w.get("branch")) if part
+        )
+        for w in worktrees
+    ]
+    family_counts = Counter(_lane_family(label) for label in [*local_branches, *worktree_labels])
+    return {
+        "worktrees": worktrees,
+        "local_branch_count": len(local_branches),
+        "recent_branches": _recent_local_branches(),
+        "family_counts": family_counts,
+    }
+
+
+
 # ---------------------------------------------------------------------------
 # Section renderers (pure-ish; each returns nothing but prints)
 # ---------------------------------------------------------------------------
 
-def render_repo_state() -> None:
+def render_repo_state(*, fast: bool = False) -> None:
     section("DHARMA SWARM — AGENT ONBOARDING")
     branch = git("rev-parse", "--abbrev-ref", "HEAD") or "(detached)"
     sha = git("rev-parse", "--short=10", "HEAD")
@@ -106,8 +222,12 @@ def render_repo_state() -> None:
     # Divergence from origin/main, if known
     ahead = git("rev-list", "--count", "origin/main..HEAD")
     behind = git("rev-list", "--count", "HEAD..origin/main")
-    dirty = git("status", "--porcelain")
-    dirty_count = len([ln for ln in dirty.splitlines() if ln.strip()])
+    dirty_count: int | str
+    if fast:
+        dirty_count = "(skipped in fast mode)"
+    else:
+        dirty = git("status", "--porcelain")
+        dirty_count = len([ln for ln in dirty.splitlines() if ln.strip()])
 
     print(f"Branch       : {branch}")
     print(f"HEAD         : {sha}")
