@@ -33,6 +33,8 @@ are rejected by :func:`validate_sandbox_path`.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 from datetime import datetime, timezone
 from enum import Enum
@@ -102,6 +104,96 @@ class ExternalAgentStatus(str, Enum):
     PROVISIONAL = "provisional"
     SUSPENDED = "suspended"
     HISTORICAL = "historical"
+
+
+# ---------------------------------------------------------------------------
+# Identity invariant — the continuity anchor shared by every identity surface
+# ---------------------------------------------------------------------------
+
+IDENTITY_INVARIANT_SCHEMA_VERSION = "dharma_identity_invariant.v1"
+
+# The ordered tuple of fields that defines an agent's continuity. The digest is
+# computed over exactly these keys (schema_version is included). Any surface
+# that carries the identity (registration.json, identity_manifest.normalized,
+# living_agent.json, the a2a card metadata, the runtime.db row metadata) must
+# carry the same digest, or the agent's identity has drifted.
+IDENTITY_INVARIANT_DIGEST_FIELDS: tuple[str, ...] = (
+    "schema_version",
+    "agent_uid",
+    "authority_floor",
+    "memory_namespace",
+    "trace_identity",
+    "serial",
+    "created_at",
+)
+
+
+def compute_identity_invariant_digest(fields: dict[str, Any]) -> str:
+    """Recompute the canonical sha256 digest over the invariant tuple.
+
+    This is the *producer* that no existing surface owned: every persisted
+    record carried a ``digest`` value but nothing in-repo could recompute it,
+    so drift was undetectable. The canonical pre-image is the JSON object of
+    the :data:`IDENTITY_INVARIANT_DIGEST_FIELDS` keys serialised with
+    ``json.dumps(..., sort_keys=True)`` (the SDK default separators, i.e.
+    ``", "`` / ``": "``). The result is prefixed ``sha256:`` to match the
+    stored form.
+
+    Reproducing the pre-image exactly is load-bearing: it means the digest of
+    every already-registered agent stays stable, so this producer can *verify*
+    historical records rather than silently rewriting them.
+    """
+
+    payload = {key: fields[key] for key in IDENTITY_INVARIANT_DIGEST_FIELDS}
+    preimage = json.dumps(payload, sort_keys=True)
+    return "sha256:" + hashlib.sha256(preimage.encode("utf-8")).hexdigest()
+
+
+class IdentityInvariant(BaseModel):
+    """The owning type for an external worker's continuity anchor.
+
+    The seven fields below are the *only* facts that define identity across
+    embodiments: who (``agent_uid`` / ``serial``), the floor of authority that
+    may never be exceeded unattended (``authority_floor``), where memory and
+    traces are scoped (``memory_namespace`` / ``trace_identity``), and the birth
+    timestamp (``created_at``). ``digest`` is derived, never authored: it is
+    recomputed from the other fields and frozen so two surfaces can be compared
+    for drift by digest alone.
+    """
+
+    schema_version: str = IDENTITY_INVARIANT_SCHEMA_VERSION
+    agent_uid: str
+    authority_floor: str
+    memory_namespace: str
+    trace_identity: str
+    serial: str
+    created_at: str
+    digest: str = ""
+
+    @model_validator(mode="after")
+    def _seal_digest(self) -> "IdentityInvariant":
+        computed = compute_identity_invariant_digest(self.model_dump())
+        if self.digest and self.digest != computed:
+            raise ValueError(
+                "IdentityInvariant digest mismatch: stored "
+                f"{self.digest!r} != recomputed {computed!r}. The invariant "
+                "fields do not produce the stored digest — identity has drifted."
+            )
+        object.__setattr__(self, "digest", computed)
+        return self
+
+    def to_record(self) -> dict[str, Any]:
+        """Serialise in the canonical key order used by every persisted copy."""
+
+        ordered = {key: getattr(self, key) for key in IDENTITY_INVARIANT_DIGEST_FIELDS}
+        ordered["digest"] = self.digest
+        return ordered
+
+    @classmethod
+    def from_record(cls, record: dict[str, Any]) -> "IdentityInvariant":
+        """Load a persisted invariant and re-verify its digest on the way in."""
+
+        return cls(**{k: record.get(k) for k in (*IDENTITY_INVARIANT_DIGEST_FIELDS, "digest")})
 
 
 # ---------------------------------------------------------------------------
@@ -294,6 +386,33 @@ class ExternalRoamingWorker(BaseModel):
                 f"got {self.memory_namespace!r}"
             )
         return self
+
+    def serial(self) -> str:
+        """Canonical serial derived from the agent_uid (AGT-<UID>)."""
+
+        return f"AGT-{self.agent_uid.replace('-', '_').upper()}"
+
+    def to_identity_invariant(
+        self,
+        *,
+        created_at: str | None = None,
+    ) -> IdentityInvariant:
+        """Derive this record's continuity anchor.
+
+        ``created_at`` defaults to the record's own creation time so the digest
+        is stable across re-registrations of the same seat; pass an explicit
+        value only when reconciling against an already-persisted invariant whose
+        birth timestamp predates this record.
+        """
+
+        return IdentityInvariant(
+            agent_uid=self.agent_uid,
+            authority_floor=ExternalAgentAuthority.EXTERNAL_WORKER_EVIDENCE_ONLY.value,
+            memory_namespace=self.memory_namespace,
+            trace_identity=self.trace_identity,
+            serial=self.serial(),
+            created_at=created_at or self.created_at,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -493,18 +612,237 @@ def kimi_2_6_registration(
 KIMI_2_6_REGISTRATION = kimi_2_6_registration()
 
 
+# ---------------------------------------------------------------------------
+# Loader — read a persisted registration back into the typed schema
+# ---------------------------------------------------------------------------
+
+
+def load_external_worker(
+    agent_uid: str,
+    *,
+    dharma_home: Path | None = None,
+) -> ExternalRoamingWorker:
+    """Load ``external_agents/{agent_uid}/registration.json`` as a typed record.
+
+    This is the loader the schema lacked: the registration was written by
+    :func:`register_external_worker` but only ever read as raw JSON. Loading it
+    back through :class:`ExternalRoamingWorker` re-runs every validator
+    (authority floor, callsign shape, memory-namespace scoping), so a tampered
+    or drifted file fails loudly instead of being trusted blindly.
+    """
+
+    path = _record_path(
+        ExternalRoamingWorker.model_construct(agent_uid=agent_uid),  # path only
+        dharma_home,
+    )
+    if not path.exists():
+        raise FileNotFoundError(f"No registration.json for {agent_uid!r} at {path}")
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    raw.pop("identity_invariant", None)  # derived, not a constructor field
+    return ExternalRoamingWorker.model_validate(raw)
+
+
+# ---------------------------------------------------------------------------
+# verify_identity — assert every surface carries the same continuity anchor
+# ---------------------------------------------------------------------------
+
+
+def _dig(value: Any) -> str | None:
+    """Pull a digest out of either a nested invariant dict or a flat string."""
+
+    if isinstance(value, dict):
+        return value.get("digest")
+    if isinstance(value, str):
+        return value
+    return None
+
+
+def verify_identity(
+    agent_uid: str,
+    *,
+    dharma_home: Path | None = None,
+    telemetry_db_path: Path | None = None,
+) -> dict[str, Any]:
+    """Assert that every identity surface agrees on one continuity anchor.
+
+    Surfaces checked (each is OPTIONAL — absent surfaces are reported, not
+    failed, so this works for partially-onboarded agents):
+
+    - ``external_agents/{uid}/registration.json``        (canonical record)
+    - ``external_agents/{uid}/identity_invariant.json``  (flat invariant)
+    - ``external_agents/{uid}/identity_manifest.normalized.json``
+    - ``agents/{uid}/living_agent.json``                 (home dock)
+    - ``a2a/cards/{uid}.json``                            (A2A card)
+    - ``state/runtime.db`` ``agent_identity`` row metadata
+
+    Returns a report dict with ``ok`` (bool), the ``expected`` digest recomputed
+    from the canonical record, a per-surface ``surfaces`` map, and a list of
+    ``mismatches``. Raises nothing on drift — the caller decides what a failed
+    ``ok`` means. The canonical record's own digest is recomputed and compared
+    to its stored value first, so a self-inconsistent registration is caught.
+    """
+
+    home = dharma_home or _roaming_dharma_home()
+    base = home / "external_agents" / agent_uid
+    surfaces: dict[str, Any] = {}
+    mismatches: list[str] = []
+
+    # 1. Canonical record + recomputed expected digest.
+    worker = load_external_worker(agent_uid, dharma_home=home)
+    reg_raw = json.loads((base / "registration.json").read_text(encoding="utf-8"))
+    stored_inv = reg_raw.get("identity_invariant") or {}
+    created_at = stored_inv.get("created_at") or worker.created_at
+    expected = worker.to_identity_invariant(created_at=created_at)
+    expected_digest = expected.digest
+    surfaces["registration.json"] = {
+        "present": True,
+        "digest": _dig(stored_inv),
+        "role": reg_raw.get("role"),
+        "model_identity": reg_raw.get("model_identity"),
+        "memory_namespace": reg_raw.get("memory_namespace"),
+    }
+    if _dig(stored_inv) != expected_digest:
+        mismatches.append(
+            f"registration.json digest {_dig(stored_inv)!r} != recomputed "
+            f"{expected_digest!r}"
+        )
+
+    # Field-level coherence the digest does NOT cover (role/model live outside
+    # the invariant tuple but must still be consistent across surfaces).
+    expected_role = reg_raw.get("role")
+    expected_model = reg_raw.get("model_identity")
+    expected_ns = expected.memory_namespace
+
+    def _check_digest(label: str, payload: dict[str, Any], digest_value: Any) -> None:
+        d = _dig(digest_value)
+        surfaces[label] = {"present": True, "digest": d}
+        if d != expected_digest:
+            mismatches.append(f"{label} digest {d!r} != expected {expected_digest!r}")
+
+    # 2. Flat identity_invariant.json
+    inv_path = base / "identity_invariant.json"
+    if inv_path.exists():
+        flat = json.loads(inv_path.read_text(encoding="utf-8"))
+        _check_digest("identity_invariant.json", flat, flat.get("digest"))
+    else:
+        surfaces["identity_invariant.json"] = {"present": False}
+
+    # 3. Normalized manifest
+    man_path = base / "identity_manifest.normalized.json"
+    if man_path.exists():
+        man = json.loads(man_path.read_text(encoding="utf-8"))
+        _check_digest("identity_manifest.normalized.json", man, man.get("identity_invariant"))
+        if man.get("role") not in (None, expected_role):
+            mismatches.append(
+                f"manifest role {man.get('role')!r} != {expected_role!r}"
+            )
+        if man.get("model_identity") not in (None, expected_model):
+            mismatches.append(
+                f"manifest model {man.get('model_identity')!r} != {expected_model!r}"
+            )
+    else:
+        surfaces["identity_manifest.normalized.json"] = {"present": False}
+
+    # 4. Home dock living_agent.json
+    dock_path = home / "agents" / agent_uid / "living_agent.json"
+    if dock_path.exists():
+        dock = json.loads(dock_path.read_text(encoding="utf-8"))
+        dock_inv = dock.get("identity_invariant") or (dock.get("metadata") or {}).get(
+            "identity_invariant"
+        )
+        _check_digest("living_agent.json", dock, dock_inv)
+        dock_ns = dock.get("memory_namespace")
+        if dock_ns not in (None, expected_ns):
+            mismatches.append(
+                f"living_agent.json memory_namespace {dock_ns!r} != {expected_ns!r}"
+            )
+    else:
+        surfaces["living_agent.json"] = {"present": False}
+
+    # 5. A2A card
+    card_path = home / "a2a" / "cards" / f"{agent_uid}.json"
+    if card_path.exists():
+        card = json.loads(card_path.read_text(encoding="utf-8"))
+        card_meta = card.get("metadata") or {}
+        _check_digest("a2a_card", card, card_meta.get("identity_invariant"))
+        if card.get("role") not in (None, expected_role):
+            mismatches.append(f"a2a card role {card.get('role')!r} != {expected_role!r}")
+        if card.get("model") not in (None, expected_model):
+            mismatches.append(f"a2a card model {card.get('model')!r} != {expected_model!r}")
+    else:
+        surfaces["a2a_card"] = {"present": False}
+
+    # 6. runtime.db agent_identity row metadata
+    db_path = telemetry_db_path or (home / "state" / "runtime.db")
+    if db_path.exists():
+        import sqlite3
+
+        try:
+            conn = sqlite3.connect(str(db_path))
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(
+                "SELECT specialization, status, metadata_json FROM agent_identity"
+                " WHERE agent_id = ?",
+                (agent_uid,),
+            ).fetchone()
+            conn.close()
+        except sqlite3.Error as exc:  # pragma: no cover - defensive
+            row = None
+            surfaces["runtime_db"] = {"present": False, "error": str(exc)}
+        if row is not None:
+            meta = json.loads(row["metadata_json"] or "{}")
+            db_inv = meta.get("identity_invariant") or meta.get(
+                "identity_invariant_digest"
+            )
+            surfaces["runtime_db"] = {
+                "present": True,
+                "digest": _dig(db_inv),
+                "status": row["status"],
+                "specialization": row["specialization"],
+            }
+            if _dig(db_inv) != expected_digest:
+                mismatches.append(
+                    f"runtime_db digest {_dig(db_inv)!r} != expected "
+                    f"{expected_digest!r}"
+                )
+            if row["specialization"] not in (None, "", expected_role):
+                mismatches.append(
+                    f"runtime_db specialization {row['specialization']!r} != "
+                    f"{expected_role!r}"
+                )
+    else:
+        surfaces["runtime_db"] = {"present": False}
+
+    return {
+        "agent_uid": agent_uid,
+        "ok": not mismatches,
+        "expected_digest": expected_digest,
+        "expected_role": expected_role,
+        "expected_model": expected_model,
+        "expected_memory_namespace": expected_ns,
+        "surfaces": surfaces,
+        "mismatches": mismatches,
+    }
+
+
 __all__ = [
     "AutonomyPolicy",
     "ExternalAgentAuthority",
     "ExternalAgentStatus",
     "ExternalRoamingWorker",
     "FORBIDDEN_MUTATION_FILES",
+    "IDENTITY_INVARIANT_DIGEST_FIELDS",
+    "IDENTITY_INVARIANT_SCHEMA_VERSION",
+    "IdentityInvariant",
     "KIMI_2_6_REGISTRATION",
     "STAGE_1_ALLOWED_AUTHORITIES",
     "WorkspacePolicy",
     "assert_mutation_allowed",
+    "compute_identity_invariant_digest",
     "external_agent_sandbox_root",
     "kimi_2_6_registration",
+    "load_external_worker",
     "register_external_worker",
     "validate_sandbox_path",
+    "verify_identity",
 ]

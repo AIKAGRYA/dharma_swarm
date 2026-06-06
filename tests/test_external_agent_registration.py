@@ -12,15 +12,191 @@ from dharma_swarm.external_agent_registration import (
     ExternalAgentStatus,
     ExternalRoamingWorker,
     FORBIDDEN_MUTATION_FILES,
+    IDENTITY_INVARIANT_DIGEST_FIELDS,
+    IdentityInvariant,
     KIMI_2_6_REGISTRATION,
     STAGE_1_ALLOWED_AUTHORITIES,
     WorkspacePolicy,
     assert_mutation_allowed,
+    compute_identity_invariant_digest,
     external_agent_sandbox_root,
     kimi_2_6_registration,
+    load_external_worker,
     register_external_worker,
     validate_sandbox_path,
+    verify_identity,
 )
+
+
+# ---------------------------------------------------------------------------
+# Identity invariant — producer + verifier
+# ---------------------------------------------------------------------------
+
+# Ground-truth digest of the live opus_composer seat (frozen 2026-05-31).
+# The producer MUST reproduce this exactly so historical records verify rather
+# than being silently rewritten.
+_OPUS_INVARIANT_FIELDS = {
+    "schema_version": "dharma_identity_invariant.v1",
+    "agent_uid": "opus_composer",
+    "authority_floor": "external_worker_evidence_only",
+    "memory_namespace": "agent:opus_composer",
+    "trace_identity": "trace:opus_composer",
+    "serial": "AGT-OPUS_COMPOSER",
+    "created_at": "2026-05-31T17:02:33.129979+00:00",
+}
+_OPUS_DIGEST = (
+    "sha256:8b144f48c9ac2aced0fb80ea5a63bb77911107b1e01b979f4f87cfe69e5487cd"
+)
+
+
+def test_producer_reproduces_live_digest():
+    assert compute_identity_invariant_digest(_OPUS_INVARIANT_FIELDS) == _OPUS_DIGEST
+
+
+def test_identity_invariant_seals_digest():
+    inv = IdentityInvariant(**_OPUS_INVARIANT_FIELDS)
+    assert inv.digest == _OPUS_DIGEST
+    # round-trip
+    assert IdentityInvariant.from_record(inv.to_record()).digest == _OPUS_DIGEST
+    assert list(inv.to_record().keys()) == [*IDENTITY_INVARIANT_DIGEST_FIELDS, "digest"]
+
+
+def test_identity_invariant_rejects_tampered_digest():
+    with pytest.raises(ValueError, match="digest mismatch"):
+        IdentityInvariant(**_OPUS_INVARIANT_FIELDS, digest="sha256:deadbeef")
+
+
+def test_worker_derives_invariant(tmp_path):
+    worker = ExternalRoamingWorker(
+        agent_uid="opus_composer",
+        callsign="opus_composer",
+        display_name="Opus Composer",
+        harness="claude_code_headless",
+        model_identity="claude-opus-4-8",
+        role="lead_orchestrator",
+        squad_id="inner_circle",
+        workspace_policy=WorkspacePolicy(
+            sandbox_root=str(tmp_path / "external_agents" / "opus_composer"),
+        ),
+        memory_namespace="agent:opus_composer",
+        trace_identity="trace:opus_composer",
+    )
+    assert worker.serial() == "AGT-OPUS_COMPOSER"
+    inv = worker.to_identity_invariant(
+        created_at="2026-05-31T17:02:33.129979+00:00"
+    )
+    assert inv.digest == _OPUS_DIGEST
+
+
+@pytest.mark.asyncio
+async def test_verify_identity_round_trip_and_loader(tmp_path):
+    home = tmp_path / ".dharma"
+    worker = ExternalRoamingWorker(
+        agent_uid="opus_composer",
+        callsign="opus_composer",
+        display_name="Opus Composer",
+        harness="claude_code_headless",
+        model_identity="claude-opus-4-8",
+        role="lead_orchestrator",
+        squad_id="inner_circle",
+        workspace_policy=WorkspacePolicy(
+            sandbox_root=str(home / "external_agents" / "opus_composer"),
+        ),
+        memory_namespace="agent:opus_composer",
+        trace_identity="trace:opus_composer",
+    )
+    await register_external_worker(worker, dharma_home=home)
+
+    # Loader reads registration.json back through the schema (re-validates).
+    loaded = load_external_worker("opus_composer", dharma_home=home)
+    assert loaded.model_identity == "claude-opus-4-8"
+    assert loaded.role == "lead_orchestrator"
+    assert loaded.memory_namespace == "agent:opus_composer"
+
+    # Stamp the derived invariant onto registration.json + a flat copy + the
+    # card, exactly as the live reconciliation does, then verify coherence.
+    import json as _json
+
+    base = home / "external_agents" / "opus_composer"
+    reg = _json.loads((base / "registration.json").read_text())
+    inv = loaded.to_identity_invariant(created_at=reg["created_at"]).to_record()
+    reg["identity_invariant"] = inv
+    (base / "registration.json").write_text(_json.dumps(reg, indent=2))
+    (base / "identity_invariant.json").write_text(_json.dumps(inv, indent=2))
+
+    card_path = home / "a2a" / "cards" / "opus_composer.json"
+    card = _json.loads(card_path.read_text())
+    card.setdefault("metadata", {})["identity_invariant"] = inv
+    card["role"] = "lead_orchestrator"
+    card["model"] = "claude-opus-4-8"
+    card_path.write_text(_json.dumps(card, indent=2))
+
+    dock_path = home / "agents" / "opus_composer" / "living_agent.json"
+    dock = _json.loads(dock_path.read_text())
+    dock["identity_invariant"] = inv
+    dock_path.write_text(_json.dumps(dock, indent=2))
+
+    # Stamp the runtime.db row metadata (the canonical onboarding created it).
+    import sqlite3
+
+    db_path = home / "state" / "runtime.db"
+    conn = sqlite3.connect(str(db_path))
+    row = conn.execute(
+        "SELECT metadata_json FROM agent_identity WHERE agent_id='opus_composer'"
+    ).fetchone()
+    meta = _json.loads(row[0] or "{}")
+    meta["identity_invariant"] = inv
+    conn.execute(
+        "UPDATE agent_identity SET metadata_json=?, specialization=? "
+        "WHERE agent_id='opus_composer'",
+        (_json.dumps(meta), "lead_orchestrator"),
+    )
+    conn.commit()
+    conn.close()
+
+    report = verify_identity("opus_composer", dharma_home=home)
+    assert report["ok"], report["mismatches"]
+    assert report["expected_digest"] == report["surfaces"]["registration.json"]["digest"]
+    assert report["surfaces"]["a2a_card"]["digest"] == report["expected_digest"]
+    assert report["surfaces"]["living_agent.json"]["digest"] == report["expected_digest"]
+    assert report["surfaces"]["runtime_db"]["digest"] == report["expected_digest"]
+
+
+@pytest.mark.asyncio
+async def test_verify_identity_catches_drift(tmp_path):
+    home = tmp_path / ".dharma"
+    worker = ExternalRoamingWorker(
+        agent_uid="opus_composer",
+        callsign="opus_composer",
+        display_name="Opus Composer",
+        harness="claude_code_headless",
+        model_identity="claude-opus-4-8",
+        role="lead_orchestrator",
+        squad_id="inner_circle",
+        workspace_policy=WorkspacePolicy(
+            sandbox_root=str(home / "external_agents" / "opus_composer"),
+        ),
+        memory_namespace="agent:opus_composer",
+        trace_identity="trace:opus_composer",
+    )
+    await register_external_worker(worker, dharma_home=home)
+    import json as _json
+
+    base = home / "external_agents" / "opus_composer"
+    reg = _json.loads((base / "registration.json").read_text())
+    inv = worker.to_identity_invariant(created_at=reg["created_at"]).to_record()
+    reg["identity_invariant"] = inv
+    (base / "registration.json").write_text(_json.dumps(reg, indent=2))
+    # Inject a drifted role onto the a2a card.
+    card_path = home / "a2a" / "cards" / "opus_composer.json"
+    card = _json.loads(card_path.read_text())
+    card.setdefault("metadata", {})["identity_invariant"] = inv
+    card["role"] = "traverse-fix-wiring"  # the historical conflict
+    card_path.write_text(_json.dumps(card, indent=2))
+
+    report = verify_identity("opus_composer", dharma_home=home)
+    assert not report["ok"]
+    assert any("a2a card role" in m for m in report["mismatches"])
 
 
 # ---------------------------------------------------------------------------

@@ -1370,6 +1370,41 @@ def _task_file_path(task: Task) -> str:
     return f"task:{task.id}"
 
 
+def _verification_code_targets(task: Task) -> list[str]:
+    """Real code files a task touched, for D8 dual-audit verification.
+
+    Reuses the existing path-inference surfaces (``_required_artifact_paths``
+    for declared targets, ``_task_file_path`` for the inferred one) and keeps
+    only paths that (a) look like source code and (b) exist on disk -- so a
+    code task routes its self-verification through ``dual_audit`` while a
+    research/text task (no real file target) falls back to the structural
+    self-check. Returns absolute path strings; empty when there is nothing
+    auditable. Pure inference over existing helpers; no new metadata contract.
+    """
+    code_suffixes = {".py", ".ts", ".js", ".go", ".rs", ".java", ".kt"}
+    candidates: list[Path] = list(_required_artifact_paths(task))
+    inferred = _task_file_path(task)
+    if not inferred.startswith("task:"):
+        candidates.append(Path(inferred).expanduser())
+
+    out: list[str] = []
+    seen: set[str] = set()
+    for path in candidates:
+        try:
+            if path.suffix.lower() not in code_suffixes:
+                continue
+            if not path.is_file():
+                continue
+            norm = str(path.resolve())
+        except OSError:
+            continue
+        if norm in seen:
+            continue
+        seen.add(norm)
+        out.append(norm)
+    return out
+
+
 def _required_artifact_paths(task: Task) -> list[Path]:
     """Return required artifact paths declared in task metadata."""
     metadata = _task_metadata(task)
@@ -1732,11 +1767,84 @@ class AgentRunner:
             await mgr.share(key, content, tags=tags)
             return f"Shared '{key}' with swarm"
 
+        async def append_memory(key: str, content: str, scope: str = "working") -> str:
+            """Append text to one of your own memory blocks (in place).
+
+            Grows an existing block instead of minting a new key. Scope:
+            working, short_term, long_term. Creates the block if absent."""
+            s = MemoryScope(scope)
+            await mgr.append(key, content, scope=s)
+            return f"Appended to '{key}' in {scope}"
+
+        async def edit_memory(key: str, old: str, new: str, scope: str = "working") -> str:
+            """Surgically replace a substring inside one of your own memory
+            blocks. Pass old="" to append `new` at the end; pass new="" to
+            delete `old`. No-op if the block does not exist."""
+            s = MemoryScope(scope)
+            updated = await mgr.replace_block(key, old, new, scope=s)
+            if updated is None:
+                return f"No memory block '{key}' in {scope} to edit"
+            return f"Edited '{key}' in {scope}"
+
+        async def consolidate_memory() -> str:
+            """Run a sleep-time consolidation pass over your own memory:
+            expire stale entries, fold near-duplicate blocks, decay idle
+            working memory, and revive recently rediscovered blocks. Call this
+            to reorganize your memory rather than letting it grow unbounded."""
+            result = await mgr.sleep_consolidate()
+            return (
+                "Consolidated memory: "
+                f"{result['base_consolidated']} base, {result['merged']} merged, "
+                f"{result['decayed']} decayed, {result['revived']} revived"
+            )
+
+        async def learn_skill(skill: str, how_to: str) -> str:
+            """Accrue a reusable skill bound to your identity. `skill` is a
+            short capability name (e.g. "open a PR against a worktree"); `how_to`
+            is the procedure. Re-learning the same name refines it in place and
+            keeps its accrued reuse count. Skills persist across sessions and
+            surface in your self-model as accrued capabilities."""
+            mem = await mgr.learn_skill(skill, how_to)
+            return f"Learned skill '{mem.key}'"
+
+        async def recall_skill(task: str, limit: int = 5) -> str:
+            """Retrieve accrued skills relevant to a task. Recalling a skill for
+            a relevant task reinforces it (reuse is the reward signal), so the
+            skills you keep relying on rise in your capability profile."""
+            results = await mgr.recall_skill(task, limit=limit)
+            if not results:
+                return "No skills found for this task."
+            lines = [f"Found {len(results)} skills:"]
+            for m in results:
+                lines.append(f"  {m.key} (reused {m.access_count}x): {m.content[:200]}")
+            return "\n".join(lines)
+
+        async def verify_work(task_id: str, result: str, code_files: str = "") -> str:
+            """Self-verify a work product BEFORE marking it done. Pass the task
+            id, the result text, and optionally a comma-separated list of code
+            files you changed (these route through the dual-process Claude+Codex
+            audit; everything else gets a structural evidence check). Returns the
+            verdict; a 'failed' verdict means do NOT mark the work done yet."""
+            targets = [t.strip() for t in code_files.split(",") if t.strip()]
+            verdict = await mgr.verify_before_done(
+                task_id, result, code_targets=targets or None,
+            )
+            return (
+                f"verification {verdict['status']} ({verdict['mode']}): "
+                f"{verdict['reason']}"
+            )
+
         return {
             "remember": remember,
             "recall": recall,
             "forget": forget,
             "share": share,
+            "append_memory": append_memory,
+            "edit_memory": edit_memory,
+            "consolidate_memory": consolidate_memory,
+            "learn_skill": learn_skill,
+            "recall_skill": recall_skill,
+            "verify_work": verify_work,
         }
 
     async def _ensure_local_tool_sandbox(self, task: Task) -> None:
@@ -2867,6 +2975,33 @@ class AgentRunner:
         # Also record in advanced memory (SQLite-backed, Letta-inspired)
         if self._advanced_memory is not None:
             try:
+                # ── D8 verify-before-done ─────────────────────────────────
+                # Before this result is recorded as completed work, run the
+                # agent's self-verification step (reuses dual_audit for code
+                # work, structural evidence-check otherwise). The verdict is
+                # recorded into episodic memory + the dock last_receipt by the
+                # method itself; here we keep it best-effort and surface a
+                # warning when the agent's own work fails its own check, so a
+                # failed verification is visible rather than silently marked
+                # done. Isolated so a verifier problem never fails the task.
+                try:
+                    verdict = await self._advanced_memory.verify_before_done(
+                        task.id,
+                        result or "",
+                        code_targets=_verification_code_targets(task),
+                    )
+                    if verdict.get("status") == "failed":
+                        logger.warning(
+                            "Self-verification failed for %s/%s [%s]: %s",
+                            self._config.name, task.id,
+                            verdict.get("mode", "?"), verdict.get("reason", ""),
+                        )
+                except Exception as verr:
+                    logger.debug(
+                        "verify_before_done skipped for %s: %s",
+                        self._config.name, verr,
+                    )
+
                 await self._advanced_memory.remember(
                     key=f"task:{task.id}",
                     content=result[:500],
@@ -2874,7 +3009,25 @@ class AgentRunner:
                     ttl=86400,  # 24h TTL for task results
                 )
                 if self._state.tasks_completed % 5 == 0:
-                    await self._advanced_memory.consolidate()
+                    # Sleep-time pass: not just TTL/limit consolidation but the
+                    # decay/revive reorg (merge near-duplicates, decay idle
+                    # working blocks, revive rediscovered ones). The metabolic
+                    # analogue of the organism SleepTimeAgent / chetana clock,
+                    # run between this agent's task completions.
+                    await self._advanced_memory.sleep_consolidate()
+                    # Reflection step: after the store reorganises itself,
+                    # re-derive the agent's self-model from what it now holds
+                    # and (re)write self_model.md in its home dock. First run
+                    # performs the dock's required first write; later runs
+                    # update it from accrued memory. Best-effort and isolated
+                    # so a dock/IO problem can never fail task completion.
+                    try:
+                        await self._advanced_memory.reflect_self_model()
+                    except Exception as refl_exc:
+                        logger.debug(
+                            "Self-model reflection failed for %s: %s",
+                            self._config.name, refl_exc,
+                        )
             except Exception as exc:
                 logger.debug(
                     "Advanced memory record failed for %s: %s",
@@ -3238,10 +3391,15 @@ class AgentPool:
         except Exception:
             logger.debug("Constitutional enrichment skipped", exc_info=True)
 
-        # Auto-create advanced memory if not provided
+        # Auto-create advanced memory if not provided.
+        # Bind to the agent's declared memory_namespace when present so the
+        # store resolves to the same agent_id across sessions (identity
+        # continuity); fall back to config.name. resolve_agent_id() is a no-op
+        # for bare names, so this is backward-compatible.
         if advanced_memory is None:
             try:
-                advanced_memory = AgentMemoryManager(config.name)
+                namespace = config.metadata.get("memory_namespace") or config.name
+                advanced_memory = AgentMemoryManager.for_namespace(namespace)
             except Exception:
                 logger.debug("Auto-create advanced memory failed", exc_info=True)
 

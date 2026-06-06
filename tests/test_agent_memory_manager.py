@@ -19,6 +19,8 @@ _spec.loader.exec_module(_mod)
 AgentMemoryManager = _mod.AgentMemoryManager
 Memory = _mod.Memory
 Scope = _mod.Scope
+MemoryLane = _mod.MemoryLane
+COGNITIVE_LANES = _mod.COGNITIVE_LANES
 
 
 @pytest.fixture
@@ -438,3 +440,869 @@ def test_memory_is_expired():
     # TTL not expired
     mem_fresh = Memory(created_at=time.time(), ttl=9999)
     assert not mem_fresh.is_expired
+
+
+# ---------------------------------------------------------------------------
+# D2: Identity-namespace binding (cross-session persistent memory)
+# ---------------------------------------------------------------------------
+
+
+def test_resolve_agent_id_strips_prefix():
+    """agent:<uid> resolves to the bare uid."""
+    assert AgentMemoryManager.resolve_agent_id("agent:opus_composer") == "opus_composer"
+
+
+def test_resolve_agent_id_bare_passthrough():
+    """A bare uid resolves to itself (backward-compatible)."""
+    assert AgentMemoryManager.resolve_agent_id("opus_composer") == "opus_composer"
+    assert AgentMemoryManager.resolve_agent_id("operator") == "operator"
+
+
+def test_resolve_agent_id_folds_subscope():
+    """A sub-namespace folds onto the owning uid -> ONE store."""
+    assert AgentMemoryManager.resolve_agent_id("agent:opus_composer:planning") == "opus_composer"
+
+
+def test_resolve_agent_id_idempotent():
+    """resolve(resolve(x)) == resolve(x)."""
+    once = AgentMemoryManager.resolve_agent_id("agent:opus_composer")
+    assert AgentMemoryManager.resolve_agent_id(once) == once
+
+
+def test_resolve_agent_id_rejects_empty():
+    """Empty / whitespace / prefix-only namespaces are rejected."""
+    for bad in ("", "   ", "agent:"):
+        try:
+            AgentMemoryManager.resolve_agent_id(bad)
+        except ValueError:
+            continue
+        raise AssertionError(f"expected ValueError for {bad!r}")
+
+
+def test_for_namespace_binds_one_store(db_path):
+    """All identity forms of one agent resolve to the SAME store key."""
+    a = AgentMemoryManager.for_namespace("agent:opus_composer", db_path=db_path)
+    b = AgentMemoryManager.for_namespace("opus_composer", db_path=db_path)
+    c = AgentMemoryManager.for_namespace("agent:opus_composer:sub", db_path=db_path)
+    try:
+        assert a.agent_id == b.agent_id == c.agent_id == "opus_composer"
+    finally:
+        a.close()
+        b.close()
+        c.close()
+
+
+async def test_cross_session_recall_through_namespace(db_path):
+    """Learnings written via the namespace in one 'session' are recalled in a
+    later 'session' (a fresh manager instance bound by the same namespace)."""
+    # Session 1: write a learning via the prefixed namespace form.
+    sess1 = AgentMemoryManager.for_namespace("agent:opus_composer", db_path=db_path)
+    await sess1.remember(
+        "lesson:d2", "bind memory_namespace to one store", scope=Scope.LONG_TERM,
+    )
+    sess1.close()
+
+    # Session 2: a brand-new instance (and a different identity form) recalls it.
+    sess2 = AgentMemoryManager.for_namespace("opus_composer", db_path=db_path)
+    try:
+        by_key = await sess2.recall_by_key("lesson:d2", scope=Scope.LONG_TERM)
+        assert by_key is not None
+        assert by_key.content == "bind memory_namespace to one store"
+
+        hits = await sess2.recall("memory_namespace store", scope=Scope.LONG_TERM)
+        assert any(m.key == "lesson:d2" for m in hits)
+    finally:
+        sess2.close()
+
+
+# ---------------------------------------------------------------------------
+# D4: Episodic / semantic / procedural separation
+# ---------------------------------------------------------------------------
+
+
+async def test_default_lane_is_episodic(mgr):
+    """A memory stored without a lane defaults to EPISODIC (and the old API
+    signature still works -- backward compatible)."""
+    mem = await mgr.remember("evt", "the build went green", scope=Scope.WORKING)
+    assert mem.lane == MemoryLane.EPISODIC
+
+
+async def test_remember_types_each_lane(mgr):
+    """remember(lane=...) stores the requested cognitive type."""
+    ep = await mgr.remember("e", "ran the suite at 3pm", scope=Scope.SHORT_TERM, lane=MemoryLane.EPISODIC)
+    se = await mgr.remember("s", "L27 is the causal site", scope=Scope.LONG_TERM, lane=MemoryLane.SEMANTIC)
+    pr = await mgr.remember("p", "to ship: branch, test, PR", scope=Scope.LONG_TERM, lane=MemoryLane.PROCEDURAL)
+    assert ep.lane == MemoryLane.EPISODIC
+    assert se.lane == MemoryLane.SEMANTIC
+    assert pr.lane == MemoryLane.PROCEDURAL
+
+
+async def test_lane_accepts_string(mgr):
+    """A lane may be passed as a string and is coerced to the enum."""
+    mem = await mgr.remember("k", "v", scope=Scope.LONG_TERM, lane="semantic")
+    assert mem.lane == MemoryLane.SEMANTIC
+
+
+async def test_unknown_lane_falls_back_to_default(mgr):
+    """An out-of-set lane never raises; it falls back to EPISODIC."""
+    mem = await mgr.remember("k", "v", scope=Scope.WORKING, lane="reflection")
+    assert mem.lane == MemoryLane.EPISODIC  # reflection is not a cognitive lane here
+
+
+async def test_recall_filters_by_lane(mgr):
+    """recall(lane=...) returns only memories of that cognitive type."""
+    await mgr.remember("fact_rv", "R_V contracts at L27", scope=Scope.LONG_TERM, lane=MemoryLane.SEMANTIC)
+    await mgr.remember("did_rv", "I measured R_V today", scope=Scope.SHORT_TERM, lane=MemoryLane.EPISODIC)
+    await mgr.remember("how_rv", "R_V how-to: load model, patch L27", scope=Scope.LONG_TERM, lane=MemoryLane.PROCEDURAL)
+
+    sem = await mgr.recall("R_V", lane=MemoryLane.SEMANTIC, limit=10)
+    assert {m.key for m in sem} == {"fact_rv"}
+    assert all(m.lane == MemoryLane.SEMANTIC for m in sem)
+
+    proc = await mgr.recall_by_lane("R_V", MemoryLane.PROCEDURAL, limit=10)
+    assert {m.key for m in proc} == {"how_rv"}
+
+    epi = await mgr.recall("R_V", lane="episodic", limit=10)
+    assert {m.key for m in epi} == {"did_rv"}
+
+
+async def test_recall_all_lanes_when_unfiltered(mgr):
+    """recall() without a lane filter searches every cognitive lane."""
+    await mgr.remember("a", "R_V fact", scope=Scope.LONG_TERM, lane=MemoryLane.SEMANTIC)
+    await mgr.remember("b", "R_V episode", scope=Scope.SHORT_TERM, lane=MemoryLane.EPISODIC)
+    results = await mgr.recall("R_V", limit=10)
+    assert {m.key for m in results} == {"a", "b"}
+
+
+async def test_episodic_retrieval_is_recency_weighted(mgr):
+    """Two equally-matching EPISODIC memories: the most recently accessed ranks
+    first (episodic = recency-dominant)."""
+    await mgr.remember("old_evt", "deploy event alpha", scope=Scope.SHORT_TERM, lane=MemoryLane.EPISODIC)
+    await mgr.remember("new_evt", "deploy event alpha", scope=Scope.SHORT_TERM, lane=MemoryLane.EPISODIC)
+    # Make old_evt clearly older in accessed_at.
+    with mgr._lock:
+        conn = mgr._get_conn()
+        conn.execute(
+            "UPDATE memories SET accessed_at=? WHERE agent_id=? AND key='old_evt'",
+            (time.time() - 10_000, mgr.agent_id),
+        )
+        conn.commit()
+    results = await mgr.recall("deploy event", lane=MemoryLane.EPISODIC, limit=2)
+    assert results[0].key == "new_evt"
+
+
+async def test_semantic_retrieval_is_frequency_weighted(mgr):
+    """Two equally-matching SEMANTIC facts: the more-reused (higher access_count)
+    ranks first even if it was accessed less recently (semantic = reuse-dominant)."""
+    await mgr.remember("fact_a", "telos governs action", scope=Scope.LONG_TERM, lane=MemoryLane.SEMANTIC)
+    await mgr.remember("fact_b", "telos governs action", scope=Scope.LONG_TERM, lane=MemoryLane.SEMANTIC)
+    with mgr._lock:
+        conn = mgr._get_conn()
+        # fact_a: heavily reused but accessed long ago.
+        conn.execute(
+            "UPDATE memories SET access_count=50, accessed_at=? WHERE agent_id=? AND key='fact_a'",
+            (time.time() - 10_000, mgr.agent_id),
+        )
+        # fact_b: barely reused but accessed just now.
+        conn.execute(
+            "UPDATE memories SET access_count=0, accessed_at=? WHERE agent_id=? AND key='fact_b'",
+            (time.time(), mgr.agent_id),
+        )
+        conn.commit()
+    results = await mgr.recall("telos governs", lane=MemoryLane.SEMANTIC, limit=2)
+    assert results[0].key == "fact_a"  # reuse beats recency for semantic memory
+
+
+async def test_same_key_different_lanes_coexist_fresh_store(mgr):
+    """On a fresh store, the same key can hold distinct rows per lane
+    (type-appropriate storage), and each is retrievable by its lane."""
+    await mgr.remember("rv", "I ran R_V at noon", scope=Scope.LONG_TERM, lane=MemoryLane.EPISODIC)
+    await mgr.remember("rv", "R_V is a participation ratio", scope=Scope.LONG_TERM, lane=MemoryLane.SEMANTIC)
+
+    epi = await mgr.recall_by_lane("R_V", MemoryLane.EPISODIC, scope=Scope.LONG_TERM, limit=5)
+    sem = await mgr.recall_by_lane("participation R_V", MemoryLane.SEMANTIC, scope=Scope.LONG_TERM, limit=5)
+    assert any(m.content == "I ran R_V at noon" for m in epi)
+    assert any(m.content == "R_V is a participation ratio" for m in sem)
+
+
+async def test_convenience_methods(mgr):
+    """record_episode / learn_fact / learn_procedure store the right lanes
+    with sensible default scopes."""
+    e = await mgr.record_episode("e1", "session started")
+    f = await mgr.learn_fact("f1", "constraint enables emergence")
+    p = await mgr.learn_procedure("p1", "branch -> test -> PR")
+    assert (e.lane, e.scope) == (MemoryLane.EPISODIC, Scope.SHORT_TERM)
+    assert (f.lane, f.scope) == (MemoryLane.SEMANTIC, Scope.LONG_TERM)
+    assert (p.lane, p.scope) == (MemoryLane.PROCEDURAL, Scope.LONG_TERM)
+
+
+async def test_lane_counts_in_stats(mgr):
+    """get_stats() reports per-lane counts."""
+    await mgr.learn_fact("f1", "fact one")
+    await mgr.learn_fact("f2", "fact two")
+    await mgr.record_episode("e1", "event one")
+    await mgr.learn_procedure("p1", "how to one")
+
+    stats = await mgr.get_stats()
+    assert "lane_counts" in stats
+    assert stats["lane_counts"]["semantic"] == 2
+    assert stats["lane_counts"]["episodic"] == 1
+    assert stats["lane_counts"]["procedural"] == 1
+
+
+async def test_memory_to_dict_includes_lane(mgr):
+    """Memory.to_dict() serialises the lane."""
+    mem = await mgr.learn_fact("f", "a fact")
+    d = mem.to_dict()
+    assert d["lane"] == "semantic"
+
+
+async def test_consolidate_preserves_lane(mgr):
+    """A frequently-accessed PROCEDURAL short-term memory keeps its lane when
+    promoted to long-term by consolidate()."""
+    await mgr.remember("proc", "how to ship", scope=Scope.SHORT_TERM, lane=MemoryLane.PROCEDURAL)
+    with mgr._lock:
+        conn = mgr._get_conn()
+        conn.execute(
+            "UPDATE memories SET access_count=5, created_at=? WHERE agent_id=? AND key='proc'",
+            (time.time() - 7200, mgr.agent_id),
+        )
+        conn.commit()
+    await mgr.consolidate()
+    lt = await mgr.recall_by_key("proc", scope=Scope.LONG_TERM)
+    assert lt is not None
+    assert lt.lane == MemoryLane.PROCEDURAL
+
+
+async def test_lane_uses_canonical_kernel_enum():
+    """D4 reuses the canonical MemoryLane from memory_kernel.atoms (no parallel
+    enum). The cognitive set is exactly working/episodic/semantic/procedural."""
+    from dharma_swarm.memory_kernel.atoms import MemoryLane as KernelLane
+    assert MemoryLane is KernelLane
+    assert {l.value for l in COGNITIVE_LANES} == {
+        "working", "episodic", "semantic", "procedural",
+    }
+
+
+async def test_cross_session_typed_recall_through_namespace(db_path):
+    """A SEMANTIC fact written via the opus namespace in one session is recalled,
+    typed, through the same namespace in a later session (D4 bound to identity)."""
+    sess1 = AgentMemoryManager.for_namespace("agent:opus_composer", db_path=db_path)
+    await sess1.learn_fact("axiom:1", "self-reference creates identity")
+    await sess1.learn_procedure("howto:evolve", "modify substrate, not reports")
+    sess1.close()
+
+    sess2 = AgentMemoryManager.for_namespace("opus_composer", db_path=db_path)
+    try:
+        facts = await sess2.recall_by_lane("self reference identity", MemoryLane.SEMANTIC, limit=5)
+        assert any(m.key == "axiom:1" for m in facts)
+        # Procedural query for the same agent does not surface the semantic fact.
+        procs = await sess2.recall_by_lane("modify substrate", MemoryLane.PROCEDURAL, limit=5)
+        assert any(m.key == "howto:evolve" for m in procs)
+        assert all(m.lane == MemoryLane.PROCEDURAL for m in procs)
+    finally:
+        sess2.close()
+
+
+# ---------------------------------------------------------------------------
+# D3: Self-editing memory blocks (append / replace_block)
+# ---------------------------------------------------------------------------
+
+
+async def test_append_creates_block_when_absent(mgr):
+    """append() to a missing key behaves as a first write."""
+    mem = await mgr.append("notes", "first line", scope=Scope.WORKING)
+    assert mem.content == "first line"
+    got = await mgr.recall_by_key("notes", scope=Scope.WORKING)
+    assert got.content == "first line"
+
+
+async def test_append_grows_existing_block_in_place(mgr):
+    """append() concatenates onto the existing block, same key (no new row)."""
+    await mgr.remember("notes", "alpha", scope=Scope.WORKING)
+    await mgr.append("notes", "beta", scope=Scope.WORKING)
+    await mgr.append("notes", "gamma", scope=Scope.WORKING, sep=" | ")
+    got = await mgr.recall_by_key("notes", scope=Scope.WORKING)
+    assert got.content == "alpha\nbeta | gamma"
+    # Still one block, not three.
+    keys = await mgr.list_keys(scope=Scope.WORKING)
+    assert keys.count("notes") == 1
+
+
+async def test_append_preserves_lane(mgr):
+    """append() keeps the block's existing cognitive lane."""
+    await mgr.learn_procedure("howto", "step 1", scope=Scope.LONG_TERM)
+    await mgr.append("howto", "step 2", scope=Scope.LONG_TERM)
+    got = await mgr.recall_by_key("howto", scope=Scope.LONG_TERM)
+    assert got.lane == MemoryLane.PROCEDURAL
+    assert got.content == "step 1\nstep 2"
+
+
+async def test_append_rejects_shared(mgr):
+    """append() refuses SHARED scope (cross-agent, not an own block)."""
+    with pytest.raises(ValueError):
+        await mgr.append("k", "v", scope=Scope.SHARED)
+
+
+async def test_replace_block_substring(mgr):
+    """replace_block() surgically edits a substring in place."""
+    await mgr.remember("status", "build is RED on main", scope=Scope.WORKING)
+    updated = await mgr.replace_block("status", "RED", "GREEN", scope=Scope.WORKING)
+    assert updated.content == "build is GREEN on main"
+
+
+async def test_replace_block_delete_substring(mgr):
+    """replace_block() with new='' deletes the substring."""
+    await mgr.remember("note", "draft: ship it", scope=Scope.WORKING)
+    updated = await mgr.replace_block("note", "draft: ", "", scope=Scope.WORKING)
+    assert updated.content == "ship it"
+
+
+async def test_replace_block_empty_old_appends(mgr):
+    """replace_block() with old='' appends new at the end (Letta semantics)."""
+    await mgr.remember("note", "line1", scope=Scope.WORKING)
+    updated = await mgr.replace_block("note", "", " line2", scope=Scope.WORKING)
+    assert updated.content == "line1 line2"
+
+
+async def test_replace_block_missing_is_noop(mgr):
+    """replace_block() on a missing block returns None (no error)."""
+    result = await mgr.replace_block("ghost", "a", "b", scope=Scope.WORKING)
+    assert result is None
+
+
+# ---------------------------------------------------------------------------
+# D3: Sleep-time consolidation (decay / revive / merge)
+# ---------------------------------------------------------------------------
+
+
+async def test_sleep_consolidate_merges_near_duplicates(mgr):
+    """sleep_consolidate() folds near-duplicate blocks within (scope, lane)."""
+    await mgr.remember(
+        "obs_a", "the build pipeline is failing on the lint step", scope=Scope.WORKING
+    )
+    await mgr.remember(
+        "obs_b", "the build pipeline is failing on the lint step too", scope=Scope.WORKING
+    )
+    before = await mgr.get_stats()
+    assert before["working_count"] == 2
+
+    result = await mgr.sleep_consolidate(similarity_threshold=0.6)
+    assert result["merged"] >= 1
+
+    after = await mgr.get_stats()
+    assert after["working_count"] < before["working_count"]
+
+
+async def test_sleep_consolidate_keeps_distinct_blocks(mgr):
+    """Distinct blocks are NOT merged."""
+    await mgr.remember("a", "ship the R_V paper to NeurIPS", scope=Scope.WORKING)
+    await mgr.remember("b", "buy groceries on the way home", scope=Scope.WORKING)
+    result = await mgr.sleep_consolidate(similarity_threshold=0.6)
+    assert result["merged"] == 0
+    stats = await mgr.get_stats()
+    assert stats["working_count"] == 2
+
+
+async def test_sleep_consolidate_decays_idle_working(mgr):
+    """A long-idle, never-reused WORKING block is demoted to SHORT_TERM."""
+    await mgr.remember("stale", "old working note", scope=Scope.WORKING)
+    # Force it idle: accessed long ago, access_count stays 0.
+    with mgr._lock:
+        conn = mgr._get_conn()
+        conn.execute(
+            "UPDATE memories SET accessed_at=?, access_count=0 WHERE agent_id=? AND key='stale'",
+            (time.time() - 30 * 86400, mgr.agent_id),
+        )
+        conn.commit()
+
+    result = await mgr.sleep_consolidate(decay_idle_days=14.0)
+    assert result["decayed"] >= 1
+    assert await mgr.recall_by_key("stale", scope=Scope.WORKING) is None
+    assert await mgr.recall_by_key("stale", scope=Scope.SHORT_TERM) is not None
+
+
+async def test_sleep_consolidate_revives_rediscovered(mgr):
+    """A recently-accessed non-WORKING block is revived back into WORKING."""
+    await mgr.remember("rediscovered", "useful pattern", scope=Scope.LONG_TERM)
+    # Simulate a recent rediscovery: accessed just now, with a reuse hit.
+    with mgr._lock:
+        conn = mgr._get_conn()
+        conn.execute(
+            "UPDATE memories SET accessed_at=?, access_count=2 WHERE agent_id=? AND key='rediscovered'",
+            (time.time(), mgr.agent_id),
+        )
+        conn.commit()
+
+    result = await mgr.sleep_consolidate(revive_window_days=1.0)
+    assert result["revived"] >= 1
+    assert await mgr.recall_by_key("rediscovered", scope=Scope.WORKING) is not None
+
+
+async def test_sleep_consolidate_runs_base_consolidate(mgr):
+    """sleep_consolidate() still performs base TTL expiry (reuses consolidate)."""
+    await mgr.remember("ephemeral", "gone soon", scope=Scope.SHORT_TERM, ttl=1)
+    time.sleep(1.1)
+    result = await mgr.sleep_consolidate()
+    assert result["base_consolidated"] >= 1
+    assert await mgr.recall_by_key("ephemeral", scope=Scope.SHORT_TERM) is None
+
+
+async def test_sleep_consolidate_never_loses_content(mgr):
+    """Merge keeps the survivor's content; nothing is silently dropped."""
+    await mgr.remember("d1", "alpha beta gamma delta epsilon", scope=Scope.LONG_TERM)
+    await mgr.remember("d2", "alpha beta gamma delta epsilon zeta", scope=Scope.LONG_TERM)
+    await mgr.sleep_consolidate(similarity_threshold=0.6)
+    survivors = await mgr.recall("alpha beta gamma", scope=Scope.LONG_TERM, limit=5)
+    assert len(survivors) >= 1
+    assert any("alpha beta gamma delta epsilon" in m.content for m in survivors)
+
+
+# ---------------------------------------------------------------------------
+# 11. Reflection / self-model (D7)
+# ---------------------------------------------------------------------------
+
+
+async def test_reflect_self_model_first_write_creates_dock_file(db_path, tmp_path):
+    """First reflection performs the dock's required first write of self_model.md."""
+    dock_home = tmp_path / "dharma"
+    m = AgentMemoryManager.for_namespace("agent:opus_composer", db_path=db_path)
+    try:
+        path = dock_home / "agents" / "opus_composer" / "self_model.md"
+        assert not path.exists()
+        report = await m.reflect_self_model(dock_home=dock_home)
+        assert report["written"] is True
+        assert report["reflection_count"] == 1
+        assert path.exists()
+        text = path.read_text(encoding="utf-8")
+        assert "# Self-Model" in text
+        assert "reflection_count: 1" in text
+    finally:
+        m.close()
+
+
+async def test_reflect_self_model_reads_accrued_memory(db_path, tmp_path):
+    """The self-model is derived from accrued memory: facts and know-how surface."""
+    dock_home = tmp_path / "dharma"
+    m = AgentMemoryManager.for_namespace("agent:opus_composer", db_path=db_path)
+    try:
+        await m.remember(
+            "rv_site", "L5 residual is the primary causal site for R_V",
+            scope=Scope.LONG_TERM, lane=MemoryLane.SEMANTIC,
+        )
+        await m.remember(
+            "run_tests", "always run pytest before claiming a fix is done",
+            scope=Scope.LONG_TERM, lane=MemoryLane.PROCEDURAL,
+        )
+        report = await m.reflect_self_model(dock_home=dock_home)
+        text = Path(report["path"]).read_text(encoding="utf-8")
+        assert "What I know to be true" in text
+        assert "L5 residual" in text
+        assert "How I work" in text
+        assert "pytest" in text
+        assert "total memories: 2" in text
+    finally:
+        m.close()
+
+
+async def test_reflect_self_model_updates_across_runs(db_path, tmp_path):
+    """A later reflection updates from newly-accrued memory and bumps the count."""
+    dock_home = tmp_path / "dharma"
+    m = AgentMemoryManager.for_namespace("agent:opus_composer", db_path=db_path)
+    try:
+        await m.remember(
+            "fact_one", "the first established fact about my work",
+            scope=Scope.LONG_TERM, lane=MemoryLane.SEMANTIC,
+        )
+        r1 = await m.reflect_self_model(dock_home=dock_home)
+        assert r1["reflection_count"] == 1
+
+        # New learning accrues, then we reflect again (simulating a later run).
+        await m.remember(
+            "fact_two", "a second fact learned in a later run entirely",
+            scope=Scope.LONG_TERM, lane=MemoryLane.SEMANTIC,
+        )
+        r2 = await m.reflect_self_model(dock_home=dock_home)
+        assert r2["written"] is True
+        assert r2["reflection_count"] == 2
+        text = Path(r2["path"]).read_text(encoding="utf-8")
+        assert "fact_two" in text
+        assert "second fact learned in a later run" in text
+        assert "reflection_count: 2" in text
+    finally:
+        m.close()
+
+
+async def test_reflect_self_model_idempotent_on_unchanged_store(db_path, tmp_path):
+    """Re-reflecting over an unchanged store does not rewrite or bump the count."""
+    dock_home = tmp_path / "dharma"
+    m = AgentMemoryManager.for_namespace("agent:opus_composer", db_path=db_path)
+    try:
+        await m.remember(
+            "stable", "an unchanging established fact",
+            scope=Scope.LONG_TERM, lane=MemoryLane.SEMANTIC,
+        )
+        r1 = await m.reflect_self_model(dock_home=dock_home)
+        assert r1["written"] is True and r1["reflection_count"] == 1
+        r2 = await m.reflect_self_model(dock_home=dock_home)
+        assert r2["written"] is False
+        assert r2["reflection_count"] == 1  # unchanged substance => count held
+    finally:
+        m.close()
+
+
+async def test_reflect_self_model_uses_living_agent_identity(db_path, tmp_path):
+    """When a dock living_agent.json exists, its stable identity heads the file."""
+    import json as _json
+
+    dock_home = tmp_path / "dharma"
+    dock_dir = dock_home / "agents" / "opus_composer"
+    dock_dir.mkdir(parents=True, exist_ok=True)
+    (dock_dir / "living_agent.json").write_text(
+        _json.dumps({
+            "agent_uid": "opus_composer",
+            "callsign": "opus_composer",
+            "role": "lead_orchestrator",
+            "serial": "AGT-OPUS_COMPOSER",
+            "memory_namespace": "agent:opus_composer",
+            "current_embodiment": {"model": "claude-opus-4-8", "harness": "claude_code_headless"},
+            "identity_invariant": {"authority_floor": "external_worker_evidence_only"},
+        }),
+        encoding="utf-8",
+    )
+    m = AgentMemoryManager.for_namespace("agent:opus_composer", db_path=db_path)
+    try:
+        report = await m.reflect_self_model(dock_home=dock_home)
+        text = Path(report["path"]).read_text(encoding="utf-8")
+        assert "## Identity" in text
+        assert "lead_orchestrator" in text
+        assert "claude-opus-4-8" in text
+        assert "external_worker_evidence_only" in text
+    finally:
+        m.close()
+
+
+# ---------------------------------------------------------------------------
+# D5: Skill / capability accumulation (named, identity-bound procedures)
+# ---------------------------------------------------------------------------
+
+
+async def test_learn_skill_stores_procedural_under_skill_key(mgr):
+    """learn_skill stores a PROCEDURAL memory keyed skill:<name>, LONG_TERM."""
+    s = await mgr.learn_skill("open a PR against a worktree", "branch -> test -> gh pr create")
+    assert s.lane == MemoryLane.PROCEDURAL
+    assert s.scope == Scope.LONG_TERM
+    assert s.key == "skill:open a PR against a worktree"
+    assert s.content == "branch -> test -> gh pr create"
+
+
+async def test_learn_skill_normalises_already_prefixed_name(mgr):
+    """Passing an already-prefixed name does not double the prefix."""
+    s = await mgr.learn_skill("skill:run the suite", "pytest -q")
+    assert s.key == "skill:run the suite"
+
+
+async def test_learn_skill_rejects_empty_name(mgr):
+    with pytest.raises(ValueError):
+        await mgr.learn_skill("   ", "anything")
+
+
+async def test_recall_skill_retrieves_relevant_skill(mgr):
+    """A learned skill is retrieved on a relevant task; non-skill procedures and
+    irrelevant skills are excluded."""
+    await mgr.learn_skill("measure R_V", "load Mistral, patch L27, read residual")
+    await mgr.learn_skill("draft a paper section", "outline, cite, write, verify")
+    # A plain procedure (not a named skill) must NOT show up in a skills view.
+    await mgr.learn_procedure("misc_proc", "R_V trivia that is not a skill")
+
+    hits = await mgr.recall_skill("how do I measure R_V on Mistral", limit=5)
+    keys = {m.key for m in hits}
+    assert "skill:measure R_V" in keys
+    assert "skill:draft a paper section" not in keys
+    assert "misc_proc" not in keys  # plain procedure excluded from skills view
+
+
+async def test_recall_skill_reinforces_reuse(mgr):
+    """Recalling a skill for a relevant task bumps its reuse count (the reward
+    signal): reuse is how a useful skill rises in the capability profile."""
+    await mgr.learn_skill("ship a fix", "branch, test, PR, verify")
+    # accrued_skills reads via _top_lane_blocks, which does NOT perturb access
+    # stats -- the honest baseline (recall_by_key would itself touch the row).
+    before = (await mgr.accrued_skills())[0]
+    assert before.key == "skill:ship a fix"
+    assert before.access_count == 0
+
+    # Two relevant recalls: each is a reuse of the skill.
+    await mgr.recall_skill("how do I ship a fix", limit=5)
+    await mgr.recall_skill("ship the fix now", limit=5)
+
+    after = (await mgr.accrued_skills())[0]
+    assert after.access_count == before.access_count + 2  # exactly two reuses
+
+
+async def test_accrued_skills_ranks_by_reuse(mgr):
+    """accrued_skills enumerates the capability profile, most-reused first, and
+    excludes plain (non-skill) procedures."""
+    await mgr.learn_skill("rarely used", "...")
+    await mgr.learn_skill("workhorse", "the skill I lean on")
+    await mgr.learn_procedure("not_a_skill", "plain procedure, not a capability")
+    # Make 'workhorse' clearly the most-reused.
+    with mgr._lock:
+        conn = mgr._get_conn()
+        conn.execute(
+            "UPDATE memories SET access_count=42 WHERE agent_id=? AND key='skill:workhorse'",
+            (mgr.agent_id,),
+        )
+        conn.commit()
+
+    profile = await mgr.accrued_skills()
+    keys = [m.key for m in profile]
+    assert keys[0] == "skill:workhorse"  # reuse-ranked
+    assert "skill:rarely used" in keys
+    assert "not_a_skill" not in keys  # plain procedure is not a skill
+
+
+async def test_accrued_skills_min_uses_filter(mgr):
+    """min_uses filters to skills reused at least N times."""
+    await mgr.learn_skill("never reused", "...")
+    await mgr.learn_skill("seasoned", "...")
+    with mgr._lock:
+        conn = mgr._get_conn()
+        conn.execute(
+            "UPDATE memories SET access_count=5 WHERE agent_id=? AND key='skill:seasoned'",
+            (mgr.agent_id,),
+        )
+        conn.commit()
+    seasoned = await mgr.accrued_skills(min_uses=1)
+    assert {m.key for m in seasoned} == {"skill:seasoned"}
+    all_skills = await mgr.accrued_skills(min_uses=0)
+    assert {m.key for m in all_skills} == {"skill:seasoned", "skill:never reused"}
+
+
+async def test_skill_persists_and_is_retrieved_across_sessions(db_path):
+    """D5 acceptance: a skill learned in one session persists and is retrieved on
+    a relevant task in a later session (a fresh manager, same namespace)."""
+    # Session 1: opus learns a skill.
+    sess1 = AgentMemoryManager.for_namespace("agent:opus_composer", db_path=db_path)
+    await sess1.learn_skill(
+        "register an external roaming worker",
+        "load_external_worker -> verify_identity -> onboard_roaming_agent",
+    )
+    sess1.close()
+
+    # Session 2: a brand-new instance retrieves the skill for a relevant task.
+    sess2 = AgentMemoryManager.for_namespace("opus_composer", db_path=db_path)
+    try:
+        hits = await sess2.recall_skill("how do I register an external roaming worker", limit=5)
+        assert any(m.key == "skill:register an external roaming worker" for m in hits)
+        retrieved = next(m for m in hits if m.key == "skill:register an external roaming worker")
+        assert "onboard_roaming_agent" in retrieved.content
+        # The skill shows up in the accrued capability profile too.
+        profile = await sess2.accrued_skills()
+        assert any(m.key == "skill:register an external roaming worker" for m in profile)
+    finally:
+        sess2.close()
+
+
+async def test_reflect_self_model_surfaces_accrued_skills(db_path, tmp_path):
+    """Accrued skills bind to identity: they surface in the dock self-model as an
+    'Accrued skills' capability section with reuse counts, separate from plain
+    'How I work' procedures."""
+    dock_home = tmp_path / "dharma"
+    m = AgentMemoryManager.for_namespace("agent:opus_composer", db_path=db_path)
+    try:
+        await m.learn_skill("run the test suite", "pytest -q against the worktree")
+        await m.learn_procedure("plain_habit", "read the file before editing it")
+        # Give the skill some reuse so the count renders.
+        with m._lock:
+            conn = m._get_conn()
+            conn.execute(
+                "UPDATE memories SET access_count=7 WHERE agent_id=? AND key='skill:run the test suite'",
+                (m.agent_id,),
+            )
+            conn.commit()
+        report = await m.reflect_self_model(dock_home=dock_home)
+        text = Path(report["path"]).read_text(encoding="utf-8")
+        assert "## Accrued skills" in text
+        assert "run the test suite" in text
+        assert "reused 7x" in text
+        # Plain procedure lands under 'How I work', not in the skills section.
+        assert "## How I work" in text
+        assert "plain_habit" in text
+    finally:
+        m.close()
+
+
+# ---------------------------------------------------------------------------
+# D8. Verify-before-done (self-verification loop)
+# ---------------------------------------------------------------------------
+
+
+async def test_verify_before_done_passes_substantive_text(db_path):
+    """Non-code work with a substantive result verifies (structural mode)."""
+    m = AgentMemoryManager.for_namespace("agent:opus_composer", db_path=db_path)
+    try:
+        result = (
+            "I reviewed the module, traced the call path, and confirmed the "
+            "behaviour matches the contract. The change adds a bounded method "
+            "and a dock receipt writer, both isolated and best-effort. This is "
+            "a substantive completed work product comfortably past the short "
+            "non-result gate that the runtime uses to reject empty output."
+        )
+        assert len(result) > 200  # comfortably past the short-result gate
+        verdict = await m.verify_before_done("t-pass", result)
+        assert verdict["verified"] is True
+        assert verdict["status"] == "passed"
+        assert verdict["mode"] == "structural"
+    finally:
+        m.close()
+
+
+async def test_verify_before_done_fails_empty_result(db_path):
+    """An empty result is not completed work -> verification fails."""
+    m = AgentMemoryManager.for_namespace("agent:opus_composer", db_path=db_path)
+    try:
+        verdict = await m.verify_before_done("t-empty", "")
+        assert verdict["verified"] is False
+        assert verdict["status"] == "failed"
+        assert verdict["mode"] == "structural"
+    finally:
+        m.close()
+
+
+async def test_verify_before_done_fails_error_string(db_path):
+    """An error-prefixed result is caught and fails the verification gate."""
+    m = AgentMemoryManager.for_namespace("agent:opus_composer", db_path=db_path)
+    try:
+        verdict = await m.verify_before_done("t-err", "Error: API error: provider down")
+        assert verdict["verified"] is False
+        assert verdict["status"] == "failed"
+        assert "error" in verdict["reason"].lower()
+    finally:
+        m.close()
+
+
+async def test_verify_before_done_records_episode(db_path):
+    """The verdict is recorded as an episodic verification:<id> memory."""
+    m = AgentMemoryManager.for_namespace("agent:opus_composer", db_path=db_path)
+    try:
+        await m.verify_before_done(
+            "t-ep", "A genuine, substantive completed result that clears the gate."
+        )
+        rec = await m.recall_by_key("verification:t-ep")
+        assert rec is not None
+        assert rec.lane == MemoryLane.EPISODIC
+        assert "passed" in rec.content
+    finally:
+        m.close()
+
+
+async def test_verify_before_done_writes_dock_receipt(db_path, tmp_path):
+    """The latest verdict is mirrored to the dock last_receipt.json."""
+    import json
+
+    dock_home = tmp_path / "dharma"
+    m = AgentMemoryManager.for_namespace("agent:opus_composer", db_path=db_path)
+    try:
+        await m.verify_before_done(
+            "t-rcpt",
+            "A substantive completed result clearing the structural gate cleanly.",
+            dock_home=dock_home,
+        )
+        receipt = dock_home / "agents" / "opus_composer" / "last_receipt.json"
+        assert receipt.exists()
+        data = json.loads(receipt.read_text())
+        assert data["last_verification"]["task_id"] == "t-rcpt"
+        assert data["last_verification"]["status"] == "passed"
+    finally:
+        m.close()
+
+
+async def test_verify_receipt_preserves_existing_fields(db_path, tmp_path):
+    """Writing the verification verdict keeps any pre-existing receipt fields."""
+    import json
+
+    dock_home = tmp_path / "dharma"
+    dock_dir = dock_home / "agents" / "opus_composer"
+    dock_dir.mkdir(parents=True)
+    (dock_dir / "last_receipt.json").write_text(json.dumps({"last_wake": "2026-06-06"}))
+
+    m = AgentMemoryManager.for_namespace("agent:opus_composer", db_path=db_path)
+    try:
+        await m.verify_before_done(
+            "t-keep",
+            "Another substantive completed result that clears the gate cleanly.",
+            dock_home=dock_home,
+        )
+        data = json.loads((dock_dir / "last_receipt.json").read_text())
+        # Prior field preserved, verification added alongside it.
+        assert data["last_wake"] == "2026-06-06"
+        assert data["last_verification"]["task_id"] == "t-keep"
+    finally:
+        m.close()
+
+
+async def test_verify_before_done_code_clean_passes(db_path, monkeypatch):
+    """Code work routes through dual_audit; a clean audit verifies (mode=dual_audit)."""
+    import dharma_swarm.dual_audit as da
+
+    class _FakeReport:
+        agreements: list = []
+        claude_only: list = []
+        codex_only: list = []
+
+    class _FakeAudit:
+        def __init__(self, *a, **k):
+            pass
+
+        async def run(self, *targets):
+            return _FakeReport()
+
+    monkeypatch.setattr(da, "DualAudit", _FakeAudit)
+
+    m = AgentMemoryManager.for_namespace("agent:opus_composer", db_path=db_path)
+    try:
+        verdict = await m.verify_before_done(
+            "t-code-ok",
+            "Implemented the feature and ran the suite.",
+            code_targets=[str(_MOD_PATH)],
+        )
+        assert verdict["verified"] is True
+        assert verdict["mode"] == "dual_audit"
+    finally:
+        m.close()
+
+
+async def test_verify_before_done_code_blocking_fails(db_path, monkeypatch):
+    """A blocking finding both models agree on fails verification."""
+    import dharma_swarm.dual_audit as da
+
+    class _FakeReport:
+        agreements = [
+            {"severity": "critical", "location": "f.py:10", "title": "SQL injection"}
+        ]
+        claude_only: list = []
+        codex_only: list = []
+
+    class _FakeAudit:
+        def __init__(self, *a, **k):
+            pass
+
+        async def run(self, *targets):
+            return _FakeReport()
+
+    monkeypatch.setattr(da, "DualAudit", _FakeAudit)
+
+    m = AgentMemoryManager.for_namespace("agent:opus_composer", db_path=db_path)
+    try:
+        verdict = await m.verify_before_done(
+            "t-code-bad",
+            "Implemented the feature.",
+            code_targets=[str(_MOD_PATH)],
+        )
+        assert verdict["verified"] is False
+        assert verdict["status"] == "failed"
+        assert verdict["mode"] == "dual_audit"
+        assert verdict["blocking_findings"]
+    finally:
+        m.close()
