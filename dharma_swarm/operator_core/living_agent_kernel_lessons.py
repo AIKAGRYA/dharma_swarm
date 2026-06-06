@@ -123,6 +123,34 @@ class KernelLessonStore:
     def lessons(self, namespace: str) -> list[KernelLessonReceipt]:
         return [KernelLessonReceipt.model_validate(row) for row in _lesson_rows(self.namespace_path(namespace))]
 
+    def recent_valid_lessons(
+        self, namespace: str, *, limit: int = 5
+    ) -> list[KernelLessonReceipt]:
+        """The last ``limit`` lessons whose own ``entry_hash`` still verifies.
+
+        A read accessor for SAFE read-back: it re-derives each row's payload hash
+        (identical per-row check to ``verify_lesson_ledger``) and SKIPS any row
+        whose ``entry_hash`` does not match — a tampered/corrupted row is never
+        returned, so a caller injecting these into a downstream context cannot be
+        fed a forged lesson. Rows that fail Pydantic validation are skipped too.
+        Returns up to ``limit`` most-recent surviving rows in ledger order.
+        Never raises on a malformed ledger; a missing/empty file yields ``[]``.
+        """
+        if limit <= 0:
+            return []
+        survivors: list[KernelLessonReceipt] = []
+        for row in _lesson_rows(self.namespace_path(namespace)):
+            observed_hash = str(row.get("entry_hash") or "")
+            material = dict(row)
+            material["entry_hash"] = ""
+            if not observed_hash or observed_hash != stable_payload_hash(material):
+                continue
+            try:
+                survivors.append(KernelLessonReceipt.model_validate(row))
+            except Exception:
+                continue
+        return survivors[-limit:]
+
     def verify_lesson_ledger(self, namespace: str) -> tuple[bool, list[str]]:
         rows = _lesson_rows(self.namespace_path(namespace))
         if not rows:

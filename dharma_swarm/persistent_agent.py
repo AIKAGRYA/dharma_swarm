@@ -41,6 +41,25 @@ def _persistent_kernel_governance_enabled() -> bool:
     }
 
 
+def _persistent_kernel_lessons_readback_enabled() -> bool:
+    """Whether a governed wake READS its accumulated lessons back into context.
+
+    Default OFF, and a strict subset of governance: read-back only applies when
+    BOTH this flag AND ``DHARMA_PERSISTENT_KERNEL_GOVERNANCE`` are on. With this
+    flag unset the wake's ReAct input is byte-identical to current behavior — no
+    lesson is read, the task_text passed to ``self._agent.wake`` is unchanged.
+    Mirrors the existing env-flag idiom (same truthy set as governance).
+    """
+    if not _persistent_kernel_governance_enabled():
+        return False
+    return os.environ.get("DHARMA_PERSISTENT_KERNEL_LESSONS_READBACK", "").lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
 def _persistent_kernel_store_dir(state_dir: Path) -> Path:
     """Where this agent's governed-wake kernel store is rooted.
 
@@ -383,8 +402,23 @@ class PersistentAgent:
 
             # 7. (gate passed or warned)
 
+            # 7b. Optional lessons read-back (default OFF; requires governance ON).
+            # CLOSE THE LEARNING LOOP: before the agent runs its task, read this
+            # agent's OWN accumulated lessons (by agent_uid) from the durable
+            # hash-chained kernel lessons ledger and prepend a compact "Prior
+            # lessons:" preamble to the ReAct INPUT only. Best-effort: any failure
+            # (no ledger / empty / tamper / read error) yields no preamble and the
+            # agent proceeds with its normal task. The original ``task_text`` is
+            # preserved for governance (step 8b) + witness so those stay identical.
+            react_input = task_text
+            if _persistent_kernel_lessons_readback_enabled():
+                preamble = self._read_back_lessons_preamble()
+                if preamble:
+                    react_input = f"{preamble}\n\n{task_text}"
+                    result_info["lessons_injected"] = True
+
             # 8. Execute via AutonomousAgent ReAct loop
-            agent_result: AgentResult = await self._agent.wake(task_text)
+            agent_result: AgentResult = await self._agent.wake(react_input)
 
             # 8b. Optional kernel governance (default OFF; observe+govern only).
             # When DHARMA_PERSISTENT_KERNEL_GOVERNANCE is enabled the wake is
@@ -466,6 +500,47 @@ class PersistentAgent:
             return f"Follow up on observation: {mark.observation}"
 
         return "Review system state, check agent notes in ~/.dharma/shared/, report observations"
+
+    # -- Lessons read-back (flag-gated, best-effort) ---------------------
+
+    def _read_back_lessons_preamble(self, *, limit: int = 5) -> str:
+        """Read this agent's OWN accumulated lessons into a compact preamble.
+
+        Roots a ``KernelLessonStore`` at the SAME base dir the governed-wake path
+        writes to (``_persistent_kernel_store_dir(self.state_dir)``, or the shared
+        store when ``DHARMA_PERSISTENT_KERNEL_STORE_DIR`` is set), and reads the
+        agent-scoped namespace ``agent:{self.name}:lessons`` — the exact namespace
+        the LEARN executor writes to (``f"agent:{agent_uid}:lessons"``,
+        ``agent_uid == self.name``). Cross-agent isolation is by construction: a
+        different agent reads a different namespace file, and a shared store keeps
+        each agent's lessons in its own namespace-scoped file.
+
+        Tamper-safe: uses ``recent_valid_lessons`` which SKIPS any row whose
+        hash-chain entry_hash no longer verifies, so a corrupted ledger row is
+        never injected. Best-effort: returns ``""`` on any failure (no ledger,
+        empty, read error) so read-back can NEVER block or break the wake.
+        """
+        try:
+            from dharma_swarm.operator_core.living_agent_kernel_lessons import (
+                KernelLessonStore,
+            )
+
+            store = KernelLessonStore(_persistent_kernel_store_dir(self.state_dir))
+            namespace = f"agent:{self.name}:lessons"
+            receipts = store.recent_valid_lessons(namespace, limit=limit)
+            if not receipts:
+                return ""
+            lines = []
+            for receipt in receipts:
+                text = " ".join(str(receipt.delta_text or "").split())
+                if text:
+                    lines.append(f"- {text[:300]}")
+            if not lines:
+                return ""
+            return "Prior lessons:\n" + "\n".join(lines)
+        except Exception as e:  # read-back must never break the wake
+            logger.debug("[%s] lessons read-back skipped: %s", self.name, e)
+            return ""
 
     # -- Kernel governance (flag-gated, observe+govern) ------------------
 
