@@ -33,6 +33,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--daemon-id", default="living-agent-kernel", help="Daemon identity used for controls and leases.")
     parser.add_argument("--cycles", type=int, default=1, help="Number of cycles to run.")
     parser.add_argument("--forever", action="store_true", help="Run until stopped or interrupted.")
+    parser.add_argument(
+        "--allow-forever",
+        action="store_true",
+        help="Operator acknowledgement required to run unbounded with --forever.",
+    )
     parser.add_argument("--max-wakes", type=int, default=1, help="Maximum wakes per daemon cycle.")
     parser.add_argument("--lease-seconds", type=int, default=300, help="Wake lease duration.")
     parser.add_argument("--interval-seconds", type=int, default=60, help="Sleep between cycles and next-run projection.")
@@ -46,6 +51,13 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.forever and not args.allow_forever:
+        print(
+            "refused: --forever requires the explicit operator flag --allow-forever; "
+            "no daemon cycles were run.",
+            file=sys.stderr,
+        )
+        return 3
     result = run_kernel_daemon_service(
         store_dir=args.store_dir,
         workspace_root=args.workspace_root,
