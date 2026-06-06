@@ -1210,6 +1210,7 @@ class LivingAgentKernel:
         self.workspace_root = Path(workspace_root or Path.cwd()).expanduser().resolve()
         self.persist = persist
         self._lesson_store: "KernelLessonStore | None" = None
+        self._promotion_store: "KernelPromotionStore | None" = None
 
     @property
     def lesson_store(self) -> "KernelLessonStore":
@@ -1218,6 +1219,14 @@ class LivingAgentKernel:
 
             self._lesson_store = KernelLessonStore(self.store.base_dir)
         return self._lesson_store
+
+    @property
+    def promotion_store(self) -> "KernelPromotionStore":
+        if self._promotion_store is None:
+            from dharma_swarm.operator_core.living_agent_kernel_promotion import KernelPromotionStore
+
+            self._promotion_store = KernelPromotionStore(self.store.base_dir)
+        return self._promotion_store
 
     def evaluate_authority(self, envelope: AgentRunEnvelope) -> GovernedWorkAdmission:
         return evaluate_governed_work_admission(
@@ -2351,6 +2360,12 @@ class LivingAgentKernel:
         if envelope.authority.work_kind == WorkKind.SELF_EVOLUTION:
             for tool in SELF_EVOLUTION_TOOLS:
                 denial_reasons[tool] = f"authority_decision_{decision.decision}"
+        if envelope.authority.work_kind in {WorkKind.SELF_EVOLUTION, WorkKind.PROMOTION}:
+            if decision.decision == "allow":
+                visible.append("skill_promote")
+                denial_reasons.pop("skill_promote", None)
+        else:
+            denial_reasons["skill_promote"] = "skill_promote_requires_self_evolution_or_promotion_authority"
         if envelope.authority.protected_file_hits:
             denial_reasons["mutate_protected_files"] = "protected_file_hits"
         if envelope.authority.external_worker_authority == "external_worker_evidence_only":
@@ -2480,6 +2495,11 @@ class LivingAgentKernel:
             for result in tool_results
         ):
             unsupported_claims.append("memory_write_mutation_limited_to_agent_lessons_ledger")
+        if any(
+            result.tool_name == "skill_promote" and result.status == "completed"
+            for result in tool_results
+        ):
+            unsupported_claims.append("skill_promote_applies_pre_existing_evidence_backed_promotion_only")
         if any(result.denial_reason == "tool_not_registered_in_kernel_v1" for result in tool_results):
             unsupported_claims.append("write_or_custom_tool_dispatch_not_implemented_in_v1")
 
@@ -2584,6 +2604,8 @@ class LivingAgentKernel:
                 result = self._dispatch_apply_patch(envelope, arguments)
             elif tool_name == "memory_write":
                 result = self._dispatch_memory_write(envelope, arguments)
+            elif tool_name == "skill_promote":
+                result = self._dispatch_skill_promote(envelope, arguments)
             else:
                 result = self.tool_registry.dispatch(tool_name=tool_name, arguments=arguments, context=context)
 
@@ -2896,6 +2918,118 @@ class LivingAgentKernel:
                 "receipt_hash": receipt.entry_hash,
                 "ledger_sequence": receipt.ledger_sequence,
                 "previous_entry_hash": receipt.previous_entry_hash,
+                "provider_execution": False,
+                "subprocess_execution": False,
+            },
+        )
+
+    def _dispatch_skill_promote(self, envelope: AgentRunEnvelope, arguments: dict[str, Any]) -> KernelToolResult:
+        if envelope.authority.work_kind not in {WorkKind.SELF_EVOLUTION, WorkKind.PROMOTION}:
+            return _tool_result(
+                run_id=envelope.run_id,
+                tool_name="skill_promote",
+                status="denied",
+                arguments=arguments,
+                denial_reason="skill_promote_requires_self_evolution_or_promotion_authority",
+            )
+        if not envelope.authority.mission_contract_present or not envelope.authority.workspace_lease_present:
+            return _tool_result(
+                run_id=envelope.run_id,
+                tool_name="skill_promote",
+                status="denied",
+                arguments=arguments,
+                denial_reason="skill_promote_requires_mission_contract_and_workspace_lease",
+            )
+        if envelope.authority.external_worker_authority == "external_worker_evidence_only":
+            return _tool_result(
+                run_id=envelope.run_id,
+                tool_name="skill_promote",
+                status="denied",
+                arguments=arguments,
+                denial_reason="external_worker_evidence_only",
+            )
+
+        requested_level = str(arguments.get("level") or arguments.get("requested_level") or "worker").strip()
+        requested_tools = _string_list(arguments.get("tools") or arguments.get("requested_tools"))
+        requested_source = str(arguments.get("source") or envelope.trigger.source or "").strip()
+        store = self.promotion_store
+        admission = store.evaluate_worker_admission(
+            agent_uid=envelope.agent_uid,
+            requested_level=requested_level,  # type: ignore[arg-type]
+            source=requested_source,
+            requested_tools=requested_tools,
+            work_kind=envelope.authority.work_kind.value,  # type: ignore[arg-type]
+        )
+        backing = store.latest_for_agent(envelope.agent_uid)
+        evidence_ok = backing is not None and bool(backing.evidence_refs)
+        if admission.decision != "allowed" or not evidence_ok:
+            return _tool_result(
+                run_id=envelope.run_id,
+                tool_name="skill_promote",
+                status="denied",
+                arguments=arguments,
+                denial_reason="skill_promote_requires_evidence_backed_promotion",
+                error=";".join(admission.reasons) if admission.reasons else "promotion_evidence_refs_empty",
+            )
+
+        applied = store.append_promotion(
+            agent_uid=envelope.agent_uid,
+            level=backing.level,
+            status="promoted",
+            allowed_sources=list(backing.allowed_sources),
+            allowed_tools=list(backing.allowed_tools),
+            allowed_work_kinds=list(backing.allowed_work_kinds),
+            max_lease_seconds=backing.max_lease_seconds,
+            expires_at=backing.expires_at,
+            reviewer="living_agent_kernel",
+            reason="skill_promote_applied",
+            evidence_refs=[
+                {
+                    "kind": "kernel_promotion_receipt",
+                    "path": str(store.promotion_path),
+                    "record_hash": backing.record_hash,
+                },
+                *list(backing.evidence_refs),
+            ],
+            metadata={
+                "applied_via": "skill_promote",
+                "run_id": envelope.run_id,
+                "correlation_id": envelope.trigger.correlation_id,
+                "source_receipt_hash": backing.record_hash,
+            },
+        )
+
+        lesson_namespace = f"agent:{envelope.agent_uid}:lessons"
+        lesson_receipt = self.lesson_store.append_lesson(
+            envelope.agent_uid,
+            lesson_namespace,
+            f"promotion applied: level={applied.level} via skill_promote (evidence-backed)",
+            run_id=envelope.run_id,
+            provenance={
+                "kind": "skill_promote",
+                "promotion_level": applied.level,
+                "promotion_record_hash": applied.record_hash,
+                "source_receipt_hash": backing.record_hash,
+                "source": envelope.trigger.source,
+                "mission_id": envelope.trigger.mission_id,
+                "task_id": envelope.trigger.task_id,
+                "correlation_id": envelope.trigger.correlation_id,
+                "parent_run_id": envelope.trigger.parent_run_id,
+            },
+        )
+
+        return _tool_result(
+            run_id=envelope.run_id,
+            tool_name="skill_promote",
+            status="completed",
+            arguments=arguments,
+            output={
+                "agent_uid": applied.agent_uid,
+                "level": applied.level,
+                "promotion_record_hash": applied.record_hash,
+                "source_receipt_hash": backing.record_hash,
+                "lesson_namespace": lesson_namespace,
+                "lesson_receipt_hash": lesson_receipt.entry_hash,
                 "provider_execution": False,
                 "subprocess_execution": False,
             },
