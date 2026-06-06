@@ -60,6 +60,10 @@ _INTENTIONAL_BYPASS: dict[tuple[str, int], str] = {
         "_dispatch_local — in-process delegation, "
         "migration target after node_gateway"
     ),
+    ("dharma_swarm/a2a/nats_transport.py", 300): (
+        "consume_message — NATS ingress handoff after transport-level "
+        "ExecutionIdentity, idempotency, and ack/nack receipts"
+    ),
 }
 
 # Known non-production lines (docstring examples, etc.)
