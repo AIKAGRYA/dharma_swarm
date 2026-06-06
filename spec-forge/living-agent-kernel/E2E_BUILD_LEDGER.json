@@ -1,0 +1,113 @@
+{
+  "schema": "lak-e2e-build-ledger/v1",
+  "generated_at": "2026-06-06",
+  "worktree": "/Users/dhyana/dharma_swarm_lak_e2e",
+  "branch": "lak-e2e",
+  "head_commit": "efe7c7ccaedd3c82a0d354de698050ad61f14cc8",
+  "verifier_definitions": {
+    "confirmed_green": "An independent adversary built/ran the unit's real tests AND found no bypass; the invariant held.",
+    "committed": "Unit is committed on lak-e2e and its own tests pass at HEAD, but it has NOT cleared independent adversarial verification.",
+    "committed_bypass_found": "Committed and self-green, but an independent adversary found the test asserts an invariant it does not actually prove.",
+    "red": "Tests fail; worktree was reverted to last green.",
+    "not_built": "Unit not yet implemented."
+  },
+  "suite_evidence": {
+    "full_lak_metabolism_autonomy_suite": "114 passed, 2 skipped, 1 warning in 3.23s",
+    "matrix_unit_alone": "8 passed, 1 skipped, 1 warning in 0.32s",
+    "pythonpath": "PYTHONPATH=/Users/dhyana/dharma_swarm_lak_e2e (required: provider-CLI subprocess test imports dharma_swarm)"
+  },
+  "units": [
+    {
+      "unit_id": "wire-in-persistent-adapter",
+      "state": "confirmed_green",
+      "commit": "e0e3ce254",
+      "artifact": "dharma_swarm/operator_core/living_agent_kernel_persistent_adapter.py",
+      "note": "PersistentAgent -> kernel wake-payload adapter; dependency root of the WIRE-IN axis. Pre-committed + VERIFIED."
+    },
+    {
+      "unit_id": "wire-in-real-agent-governed-run",
+      "state": "confirmed_green",
+      "commit": "c9fe74186",
+      "artifact": "tests/test_living_agent_kernel_persistent_integration.py",
+      "note": "Real PersistentAgent governed end-to-end with durable receipts. Pre-committed + VERIFIED."
+    },
+    {
+      "unit_id": "metabolism-namespace-ledger",
+      "state": "confirmed_green",
+      "commit": "2742aaad8",
+      "artifact": "dharma_swarm/operator_core/living_agent_kernel_lessons.py",
+      "note": "KernelLessonStore: hash-chained per-agent learning ledger; append_lesson -> receipt with delta_hash. Pre-committed + VERIFIED. Dependency root for ALL metabolism + the LEARN executor."
+    },
+    {
+      "unit_id": "metabolism-memory-write-tool",
+      "state": "confirmed_green",
+      "commit": "426c2c678",
+      "artifact": "dharma_swarm/operator_core/living_agent_kernel.py (_dispatch_memory_write)",
+      "note": "memory_write executes a learning delta to agent's own :lessons namespace under CODE_WRITE+namespace authority. Round-2 verify_only verdict: confirmed_green by independent adversary (12 adversarial tests held: cross-namespace forgery, path traversal, evidence-only denial, tamper-evidence)."
+    },
+    {
+      "unit_id": "metabolism-skill-promote-tool",
+      "state": "confirmed_green",
+      "commit": "81eb13c4e",
+      "artifact": "dharma_swarm/operator_core/living_agent_kernel.py (_dispatch_skill_promote) + tests/test_living_agent_kernel_metabolism_skill_promote.py",
+      "note": "skill_promote executes only against a pre-existing operator-seeded evidence-backed KernelPromotionStore receipt; no mid-run self-promotion. Round-2 build verdict: confirmed_green."
+    },
+    {
+      "unit_id": "metabolism-self-edit-own-skill-files",
+      "state": "confirmed_green",
+      "commit": "ee1d44e95",
+      "artifact": "dharma_swarm/operator_core/living_agent_kernel.py (self_edit) + tests/test_living_agent_kernel_metabolism_self_edit.py",
+      "note": "self_edit as own-skill-files-only constrained delegation to apply_patch. Round-2 build verdict: confirmed_green."
+    },
+    {
+      "unit_id": "autonomy-e2e-learn-executor-namespace-write",
+      "state": "confirmed_green",
+      "commit": "effdcc271",
+      "artifact": "tests/test_living_agent_kernel_learning.py",
+      "note": "Automatic run-level LEARN hook consumes proposed_learning_delta into the lessons ledger. Round-2 build verdict: confirmed_green."
+    },
+    {
+      "unit_id": "autonomy-e2e-live-daemon-test-store-run",
+      "state": "confirmed_green",
+      "commit": "4c3763e16",
+      "artifact": "tests/test_living_agent_kernel_daemon_e2e.py",
+      "note": "First on-disk wake_ledger.jsonl + daemon_cycles.jsonl via a REAL subprocess daemon drain against a pre-seeded TEST store; prod-store run documented operator-gated only. Round-2 build verdict: confirmed_green."
+    },
+    {
+      "unit_id": "autonomy-e2e-apply-patch-dryrun-hardening",
+      "state": "confirmed_green",
+      "commit": "7d30d6c20",
+      "artifact": "tests/test_living_agent_kernel_apply_patch_dryrun.py",
+      "note": "apply_patch dry_run proven byte-identical non-mutating; full denial ladder exercised; live-apply tmp-only/operator-gated. Round-2 build verdict: confirmed_green."
+    },
+    {
+      "unit_id": "autonomy-e2e-multi-agent-coordination-matrix",
+      "state": "committed_bypass_found",
+      "commit": "efe7c7cca",
+      "artifact": "tests/test_living_agent_kernel_e2e_matrix.py (8 passed, 1 skipped)",
+      "verdict": "bypass_found",
+      "confirmed": false,
+      "bypass": "test_two_racing_drains_never_double_lease_any_wake simulates contention by having the PARENT test process hold the flock, then asserts the second drain bounces to status=lock_held with completed_cycles=0. The no-double-lease invariant is therefore only proven against a SERIALIZED winner that runs AFTER the lock is released (single 'leased' transition per wake_id). It does NOT prove the invariant under two genuinely concurrent OS daemon processes racing for the same wake. The lock-bounce is real; 'never double-lease under a real race' is asserted-not-proven.",
+      "verifier_recommendation": "Add a real-concurrency variant: spawn two actual subprocess daemons (multiprocessing/subprocess) against the same store with NO externally-held lock, let them race, then assert each wake_id has exactly one 'leased' ledger transition and attempt==1 across the merged ledger. If the lease primitive cannot guarantee single-lease under true OS-level contention (e.g. flock acquire/lease-write is not atomic across the lease boundary), that is a real kernel finding to surface, not a test to relax. Until that variant is green under a real race, keep this unit at committed_bypass_found, not confirmed_green. The other 7 matrix assertions (subset-authority subagent, mixed-queue single-drain, source closeback, evidence-only no-mutation, crash recovery, escalation-denied) are sound and independently valuable."
+    }
+  ],
+  "rollup": {
+    "confirmed_green": [
+      "wire-in-persistent-adapter",
+      "wire-in-real-agent-governed-run",
+      "metabolism-namespace-ledger",
+      "metabolism-memory-write-tool",
+      "metabolism-skill-promote-tool",
+      "metabolism-self-edit-own-skill-files",
+      "autonomy-e2e-learn-executor-namespace-write",
+      "autonomy-e2e-live-daemon-test-store-run",
+      "autonomy-e2e-apply-patch-dryrun-hardening"
+    ],
+    "committed_bypass_found": [
+      "autonomy-e2e-multi-agent-coordination-matrix"
+    ],
+    "red": [],
+    "not_built": []
+  },
+  "honest_state": "Nine of ten units are confirmed_green: an independent adversary built or ran each one's real tests and the gates held under forgery, traversal, evidence-only-denial, tamper-evidence, dry-run non-mutation, crash recovery, and on-disk ledger replay. The kernel genuinely LEARNS (hash-chained per-agent lessons ledger, automatic run-level LEARN hook), EVOLVES under governance (skill_promote gated on operator-seeded evidence; self_edit constrained to own-skill-files via the apply_patch denial ladder), HOLDS ITS OWN CONTEXT (durable wake/daemon-cycle ledgers that replay and verify from a fresh store), and runs single OR coordinated (a real subprocess daemon drains a mixed multi-agent queue end-to-end). The single unconfirmed unit is the capstone multi-agent matrix: it is committed and self-green, but its no-double-lease guarantee is asserted against a SERIALIZED winner (parent-held lock), not proven under two genuinely concurrent OS daemons racing the same wake — a real-concurrency variant is required before it earns confirmed_green. So: the metabolism and single-daemon autonomy axes are adversarially solid; the multi-agent COORDINATION-under-real-race claim is the one remaining honest gap between this kernel and a fully-proven 'extremely autonomous, single OR coordinated' Living vision."
+}
