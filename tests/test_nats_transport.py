@@ -74,6 +74,29 @@ class _FakeMessage:
         self.nacked += 1
 
 
+class _InspectingAckMessage(_FakeMessage):
+    def __init__(
+        self,
+        subject: str,
+        data: bytes,
+        *,
+        runtime: RuntimeStateStore,
+        run_id: str,
+    ) -> None:
+        super().__init__(subject, data)
+        self._runtime = runtime
+        self._run_id = run_id
+
+    async def ack(self) -> None:
+        ledger = await self._runtime.get_run_ledger(self._run_id)
+        assert any(
+            receipt.receipt_type == "nats_consume"
+            and receipt.status == "ack_intent"
+            for receipt in ledger["receipts"]
+        )
+        await super().ack()
+
+
 @pytest.mark.asyncio
 async def test_publish_task_records_identity_idempotency_and_ack_receipt(tmp_path: Path) -> None:
     runtime = RuntimeStateStore(tmp_path / "runtime.db")
@@ -141,7 +164,12 @@ async def test_consume_message_ack_records_receipt_and_dispatches(tmp_path: Path
     transport = A2ANatsTransport(runtime_state=runtime, server=server, jetstream=fake_js)
     task = _task(identity, task_id="a2a-consume")
     await transport.publish_task(task, identity=identity)
-    message = _FakeMessage("dharma.a2a.task.worker.probe", fake_js.published[0][1])
+    message = _InspectingAckMessage(
+        "dharma.a2a.task.worker.probe",
+        fake_js.published[0][1],
+        runtime=runtime,
+        run_id=identity.run_id,
+    )
 
     ack = await transport.consume_message(message)
 
@@ -151,6 +179,7 @@ async def test_consume_message_ack_records_receipt_and_dispatches(tmp_path: Path
     assert message.nacked == 0
     assert seen == ["a2a-consume"]
     ledger = await runtime.get_run_ledger(identity.run_id)
+    assert any(receipt.receipt_type == "nats_consume" and receipt.status == "ack_intent" for receipt in ledger["receipts"])
     assert any(receipt.receipt_type == "nats_consume" and receipt.status == "ack" for receipt in ledger["receipts"])
 
 
@@ -176,3 +205,36 @@ async def test_consume_message_nacks_when_handler_fails(tmp_path: Path) -> None:
     assert message.nacked == 1
     ledger = await runtime.get_run_ledger(identity.run_id)
     assert any(receipt.receipt_type == "nats_consume" and receipt.status == "nack" for receipt in ledger["receipts"])
+
+
+@pytest.mark.asyncio
+async def test_consume_message_does_not_nak_after_broker_ack(tmp_path: Path) -> None:
+    runtime = RuntimeStateStore(tmp_path / "runtime.db")
+    fake_js = _FakeJetStream()
+    identity = _identity(run_id="run-post-ack-error", idempotency_key="idem-post-ack-error")
+    server = A2AServer(runtime_state=runtime, persist=False, require_execution_identity=True)
+
+    def handler(task: A2ATask) -> A2ATask:
+        task.status = A2ATaskStatus.COMPLETED
+        return task
+
+    async def fail_complete(*args: object, **kwargs: object) -> object:
+        raise RuntimeError("runtime finalization failed")
+
+    server.register_handler("probe", handler)
+    transport = A2ANatsTransport(runtime_state=runtime, server=server, jetstream=fake_js)
+    await transport.publish_task(_task(identity, task_id="a2a-post-ack-error"), identity=identity)
+    transport.runtime_state.complete_idempotent_side_effect = fail_complete  # type: ignore[method-assign]
+    message = _FakeMessage("dharma.a2a.task.worker.probe", fake_js.published[0][1])
+
+    with pytest.raises(NatsTransportError, match="broker ack succeeded"):
+        await transport.consume_message(message)
+
+    assert message.acked == 1
+    assert message.nacked == 0
+    ledger = await runtime.get_run_ledger(identity.run_id)
+    assert any(
+        receipt.receipt_type == "nats_consume"
+        and receipt.status == "ack_finalization_error"
+        for receipt in ledger["receipts"]
+    )

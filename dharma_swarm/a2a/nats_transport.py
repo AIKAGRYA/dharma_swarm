@@ -279,7 +279,6 @@ class A2ANatsTransport:
             metadata=metadata,
             stale_after_seconds=self.config.idempotency_stale_after_s,
         ):
-            await _ack(message)
             receipt = await self.runtime_state.record_receipt_for_identity(
                 identity,
                 receipt_type="nats_consume",
@@ -287,6 +286,7 @@ class A2ANatsTransport:
                 side_effect_key=side_effect_key,
                 payload={**metadata, "action": "ack", "duplicate": True},
             )
+            await _ack(message)
             return NatsConsumeAck(
                 task_id=task.id,
                 subject=subject,
@@ -296,6 +296,7 @@ class A2ANatsTransport:
                 duplicate=True,
             )
 
+        broker_acked = False
         try:
             result = self.server.submit(task) if self.server is not None else task
             if result.status in {
@@ -304,7 +305,20 @@ class A2ANatsTransport:
                 A2ATaskStatus.CANCELLED,
             }:
                 raise NatsTransportError(result.error or f"A2A task ended {result.status.value}")
+            await self.runtime_state.record_receipt_for_identity(
+                identity,
+                receipt_type="nats_consume",
+                status="ack_intent",
+                side_effect_key=side_effect_key,
+                payload={
+                    **metadata,
+                    "action": "ack_intent",
+                    "a2a_status": result.status.value,
+                    "ack_contract": "consumer_ack_intent",
+                },
+            )
             await _ack(message)
+            broker_acked = True
             receipt = await self.runtime_state.record_receipt_for_identity(
                 identity,
                 receipt_type="nats_consume",
@@ -331,6 +345,17 @@ class A2ANatsTransport:
                 receipt_id=receipt.receipt_id,
             )
         except Exception as exc:
+            if broker_acked:
+                await self.runtime_state.record_receipt_for_identity(
+                    identity,
+                    receipt_type="nats_consume",
+                    status="ack_finalization_error",
+                    side_effect_key=side_effect_key,
+                    payload={**metadata, "action": "ack", "error": str(exc)},
+                )
+                raise NatsTransportError(
+                    f"NATS broker ack succeeded but runtime finalization failed: {exc}"
+                ) from exc
             await _nack(message)
             receipt = await self.runtime_state.record_receipt_for_identity(
                 identity,
