@@ -8,6 +8,7 @@ from pathlib import Path
 from dharma_swarm.models import LLMRequest, LLMResponse
 from dharma_swarm.operator_core.living_agent_kernel import (
     AgentRunEnvelope,
+    AuthorityPassport,
     KernelRunStore,
     KernelTask,
     LivingAgentKernel,
@@ -35,11 +36,13 @@ def _envelope(
     source: str = "manual",
     requested_tools: list[str] | None = None,
     tool_calls: list[dict] | None = None,
+    authority: AuthorityPassport | None = None,
 ) -> AgentRunEnvelope:
     return AgentRunEnvelope(
         agent_uid="promoted_agent",
         task=KernelTask(text=f"Provider wake {correlation_id}"),
         trigger=TriggerEnvelope(source=source, correlation_id=correlation_id),
+        authority=authority or AuthorityPassport(),
         memory=MemoryPlan(read_namespaces=["agent:promoted_agent:working"]),
         tool_request=ToolRequest(
             requested_tools=requested_tools or ["session_status"],
@@ -214,6 +217,98 @@ def test_provider_tool_boundary_records_context_only_tool_visibility(tmp_path):
     assert boundary.requested_tool_call_names == ["read_file"]
     assert boundary.denied_delegated_tools == ["read_file", "session_status"]
     assert boundary.context_visible_tools == ["read_file", "session_status"]
+
+
+def test_provider_tool_call_gate_executes_allowed_read_only_proposal_through_kernel(tmp_path):
+    store_dir = tmp_path / "kernel"
+    allowed_file = tmp_path / "allowed.txt"
+    allowed_file.write_text("kernel mediated provider proposal", encoding="utf-8")
+    _promote_provider_agent(store_dir)
+    kernel = LivingAgentKernel(store=KernelRunStore(store_dir), workspace_root=tmp_path)
+    kernel.enqueue_wake(
+        _envelope(
+            "proposal-read",
+            requested_tools=["read_file"],
+            authority=AuthorityPassport(allowed_files=["allowed.txt"]),
+        ),
+        wake_id="wake-proposal-read",
+    )
+    fixture_response = json.dumps(
+        {
+            "summary": "Provider proposes a kernel-mediated read.",
+            "kernel_tool_calls": [
+                {"name": "read_file", "arguments": {"path": "allowed.txt", "max_bytes": 64}},
+            ],
+        }
+    )
+
+    result = execute_provider_worker_cycle_sync(
+        store_dir=store_dir,
+        workspace_root=tmp_path,
+        worker_id="provider-worker",
+        agent_uid="promoted_agent",
+        provider="openrouter_free",
+        model="fixture-model",
+        allowed_sources=["manual"],
+        fixture_response=fixture_response,
+        now="2026-06-06T00:00:01Z",
+    )
+    latest = KernelRunStore(store_dir).latest_wake_records()["wake-proposal-read"]
+    gate = KernelProviderWorkerStore(store_dir).receipts()[0].tool_call_gate
+
+    assert result.status == "completed"
+    assert latest.status == "completed"
+    assert gate["provider_may_execute_tools"] is False
+    assert gate["decision"] == "kernel_executed"
+    assert gate["completed_tool_count"] == 1
+    assert gate["denied_tool_count"] == 0
+    assert gate["tool_results"][0]["tool_name"] == "read_file"
+    assert gate["tool_results"][0]["status"] == "completed"
+    assert "kernel mediated provider proposal" in gate["tool_results"][0]["output"]["content"]
+    assert latest.result_ref["payload_ref"]["tool_call_gate"]["kernel_run_ref"]["replay_ref"]["integrity_ok"] is True
+
+
+def test_provider_tool_call_gate_denies_write_proposal_and_marks_wake_review(tmp_path):
+    store_dir = tmp_path / "kernel"
+    _promote_provider_agent(store_dir)
+    kernel = LivingAgentKernel(store=KernelRunStore(store_dir), workspace_root=tmp_path)
+    kernel.enqueue_wake(
+        _envelope("proposal-write", requested_tools=["apply_patch"]),
+        wake_id="wake-proposal-write",
+    )
+    fixture_response = json.dumps(
+        {
+            "summary": "Provider proposes a write tool.",
+            "kernel_tool_calls": [
+                {"name": "apply_patch", "arguments": {"patch": "--- a/README.md\n+++ b/README.md\n"}},
+            ],
+        }
+    )
+
+    result = execute_provider_worker_cycle_sync(
+        store_dir=store_dir,
+        workspace_root=tmp_path,
+        worker_id="provider-worker",
+        agent_uid="promoted_agent",
+        provider="openrouter_free",
+        model="fixture-model",
+        allowed_sources=["manual"],
+        fixture_response=fixture_response,
+        now="2026-06-06T00:00:01Z",
+    )
+    latest = KernelRunStore(store_dir).latest_wake_records()["wake-proposal-write"]
+    gate = KernelProviderWorkerStore(store_dir).receipts()[0].tool_call_gate
+
+    assert result.status == "completed"
+    assert latest.status == "review"
+    assert gate["provider_may_execute_tools"] is False
+    assert gate["decision"] == "kernel_denied"
+    assert gate["completed_tool_count"] == 0
+    assert gate["denied_tool_count"] == 1
+    assert gate["tool_results"][0]["tool_name"] == "apply_patch"
+    assert gate["tool_results"][0]["status"] == "denied"
+    assert gate["tool_results"][0]["denial_reason"] == "write_tool_requires_code_write_authority"
+    assert latest.result_ref["payload_ref"]["tool_call_gate"]["decision"] == "kernel_denied"
 
 
 def test_promoted_provider_worker_executes_wake_with_fixture_response(tmp_path):

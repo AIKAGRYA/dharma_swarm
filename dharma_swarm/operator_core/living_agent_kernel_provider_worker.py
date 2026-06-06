@@ -21,6 +21,7 @@ from dharma_swarm.models import LLMRequest, LLMResponse, ProviderType
 from dharma_swarm.operator_core.living_agent_kernel import (
     DEFAULT_KERNEL_RUN_DIR,
     KernelWakeRecord,
+    LivingAgentKernel,
 )
 from dharma_swarm.operator_core.living_agent_kernel_promotion import (
     KernelPromotionAdmission,
@@ -53,6 +54,33 @@ class KernelProviderToolBoundary(BaseModel):
     reason: str = "provider_tool_calls_not_delegated"
 
 
+KernelProviderToolCallGateDecision = Literal[
+    "none",
+    "kernel_executed",
+    "kernel_denied",
+    "kernel_partial",
+    "kernel_failed",
+]
+
+
+class KernelProviderToolCallGate(BaseModel):
+    schema_version: str = "dharma_living_agent_kernel_provider_tool_call_gate.v1"
+    worker_id: str
+    agent_uid: str
+    wake_id: str
+    run_id: str
+    provider_may_execute_tools: bool = False
+    proposed_tool_calls: list[dict[str, Any]] = Field(default_factory=list)
+    tool_result_refs: list[dict[str, Any]] = Field(default_factory=list)
+    tool_results: list[dict[str, Any]] = Field(default_factory=list)
+    kernel_run_ref: dict[str, Any] = Field(default_factory=dict)
+    completed_tool_count: int = 0
+    denied_tool_count: int = 0
+    failed_tool_count: int = 0
+    decision: KernelProviderToolCallGateDecision = "none"
+    reason: str = "provider_did_not_propose_kernel_tool_calls"
+
+
 class KernelProviderWorkerReceipt(BaseModel):
     schema_version: str = "dharma_living_agent_kernel_provider_worker.v1"
     status: KernelProviderWorkerStatus
@@ -71,6 +99,7 @@ class KernelProviderWorkerReceipt(BaseModel):
     promotion_ref: dict[str, Any] = Field(default_factory=dict)
     lease_ref: dict[str, Any] = Field(default_factory=dict)
     tool_boundary: dict[str, Any] = Field(default_factory=dict)
+    tool_call_gate: dict[str, Any] = Field(default_factory=dict)
     error: str = ""
     created_at: str = Field(default_factory=utc_now)
     previous_record_hash: str = ""
@@ -185,6 +214,65 @@ def evaluate_provider_tool_boundary(
         delegated_tools=delegated_tools,
         denied_delegated_tools=[tool for tool in requested_tools if tool not in set(delegated_tools)],
         context_visible_tools=requested_tools,
+    )
+
+
+def execute_provider_tool_call_gate(
+    wake_record: KernelWakeRecord,
+    response: LLMResponse,
+    *,
+    worker_id: str,
+    agent_uid: str,
+    kernel: LivingAgentKernel,
+) -> KernelProviderToolCallGate:
+    proposed_calls = _provider_proposed_tool_calls(response.content)
+    if not proposed_calls:
+        return KernelProviderToolCallGate(
+            worker_id=worker_id,
+            agent_uid=agent_uid,
+            wake_id=wake_record.wake_id,
+            run_id=wake_record.run_id,
+        )
+
+    proposal_envelope = _provider_tool_call_envelope(wake_record, proposed_calls)
+    run_result = kernel.run(proposal_envelope)
+    tool_results = [result.model_dump(mode="json") for result in run_result.tool_results]
+    completed = sum(1 for result in run_result.tool_results if result.status == "completed")
+    denied = sum(1 for result in run_result.tool_results if result.status == "denied")
+    failed = sum(1 for result in run_result.tool_results if result.status == "failed")
+    if failed:
+        decision: KernelProviderToolCallGateDecision = "kernel_failed"
+        reason = "kernel_tool_call_failed"
+    elif completed and denied:
+        decision = "kernel_partial"
+        reason = "kernel_executed_some_provider_proposed_tool_calls"
+    elif completed:
+        decision = "kernel_executed"
+        reason = "kernel_executed_provider_proposed_tool_calls"
+    else:
+        decision = "kernel_denied"
+        reason = "kernel_denied_provider_proposed_tool_calls"
+    return KernelProviderToolCallGate(
+        worker_id=worker_id,
+        agent_uid=agent_uid,
+        wake_id=wake_record.wake_id,
+        run_id=wake_record.run_id,
+        proposed_tool_calls=proposed_calls,
+        tool_result_refs=list(run_result.proof_ledger_entry.tool_result_refs),
+        tool_results=tool_results,
+        kernel_run_ref={
+            "kind": "kernel_provider_tool_call_gate_run",
+            "run_id": run_result.run_id,
+            "status": run_result.status,
+            "replay_ref": dict(run_result.replay_ref),
+            "proof_entry_hash": run_result.proof_ledger_entry.entry_hash,
+            "tool_plan_hash": run_result.proof_ledger_entry.tool_plan_hash,
+        },
+        completed_tool_count=completed,
+        denied_tool_count=denied,
+        failed_tool_count=failed,
+        decision=decision,
+        reason=reason,
     )
 
 
@@ -445,8 +533,21 @@ async def execute_provider_worker_cycle(
             message=error,
         )
 
+    tool_call_gate = execute_provider_tool_call_gate(
+        wake,
+        response,
+        worker_id=worker_id,
+        agent_uid=agent_uid,
+        kernel=LivingAgentKernel(store=workers.kernel_store, workspace_root=workspace),
+    )
+    tool_call_gate_payload = tool_call_gate.model_dump(mode="json")
     response_hash = stable_payload_hash(response.model_dump(mode="json"))
     summary = _summary(response.content)
+    terminal_status: Literal["completed", "review", "blocked", "failed"] = "completed"
+    if tool_call_gate.decision in {"kernel_denied", "kernel_partial"}:
+        terminal_status = "review"
+    elif tool_call_gate.decision == "kernel_failed":
+        terminal_status = "failed"
     receipt = provider_store.append_receipt(
         KernelProviderWorkerReceipt(
             status="completed",
@@ -465,13 +566,14 @@ async def execute_provider_worker_cycle(
             promotion_ref=dict(source_admission.promotion_ref),
             lease_ref=lease_ref,
             tool_boundary=tool_boundary.model_dump(mode="json"),
+            tool_call_gate=tool_call_gate_payload,
             created_at=observed_at,
         )
     )
     worker_result = workers.complete_worker_wake(
         worker_id,
         wake.wake_id,
-        status="completed",
+        status=terminal_status,
         summary=summary,
         result_ref={
             "kind": "kernel_provider_worker_result",
@@ -483,18 +585,19 @@ async def execute_provider_worker_cycle(
             "provider_worker_receipt_hash": receipt.record_hash,
             "promotion_receipt_hash": str(source_admission.promotion_ref.get("record_hash") or ""),
             "tool_boundary": tool_boundary.model_dump(mode="json"),
+            "tool_call_gate": tool_call_gate_payload,
         },
         now=observed_at,
     )
     return KernelProviderWorkerCycleResult(
-        status="completed",
+        status="completed" if terminal_status != "failed" else "failed",
         worker_id=worker_id,
         agent_uid=agent_uid,
         admission=source_admission,
         lease_ref=lease_ref,
         provider_receipt_ref=_provider_receipt_ref(provider_store.provider_result_path, receipt.record_hash),
         worker_result_ref=_worker_result_ref(workers.result_path, worker_result),
-        message=summary,
+        message=summary if tool_call_gate.decision == "none" else f"{summary} ({tool_call_gate.reason})",
     )
 
 
@@ -605,6 +708,79 @@ def _sorted_unique(values: list[str] | tuple[str, ...]) -> list[str]:
     return sorted({str(value).strip() for value in values if str(value).strip()})
 
 
+def _provider_proposed_tool_calls(content: str) -> list[dict[str, Any]]:
+    payload = _provider_json_payload(content)
+    raw_calls = (
+        payload.get("kernel_tool_calls")
+        or payload.get("tool_calls")
+        or payload.get("requested_tool_calls")
+        or []
+    )
+    if not isinstance(raw_calls, list):
+        return []
+    proposed: list[dict[str, Any]] = []
+    for raw_call in raw_calls:
+        if not isinstance(raw_call, dict):
+            continue
+        name = str(raw_call.get("name") or raw_call.get("tool_name") or "").strip()
+        raw_arguments = raw_call.get("arguments", raw_call.get("args", {}))
+        arguments = raw_arguments if isinstance(raw_arguments, dict) else {}
+        proposed.append({"name": name, "arguments": arguments, "source": "provider_proposal"})
+    return proposed
+
+
+def _provider_json_payload(content: str) -> dict[str, Any]:
+    text = str(content or "").strip()
+    if not text:
+        return {}
+    candidates = [text]
+    if text.startswith("```") and text.endswith("```"):
+        lines = text.splitlines()
+        if len(lines) >= 3:
+            candidates.append("\n".join(lines[1:-1]).strip())
+    for candidate in candidates:
+        try:
+            payload = json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(payload, dict):
+            return payload
+    return {}
+
+
+def _provider_tool_call_envelope(
+    wake_record: KernelWakeRecord,
+    proposed_tool_calls: list[dict[str, Any]],
+) -> Any:
+    envelope = wake_record.envelope
+    proposed_names = [str(call.get("name") or call.get("tool_name") or "") for call in proposed_tool_calls]
+    tool_request = envelope.tool_request.model_copy(
+        deep=True,
+        update={
+            "requested_tools": _sorted_unique([*envelope.tool_request.requested_tools, *proposed_names]),
+            "tool_calls": proposed_tool_calls,
+            "metadata": {
+                **dict(envelope.tool_request.metadata),
+                "provider_tool_call_gate": True,
+                "provider_may_execute_tools": False,
+            },
+        },
+    )
+    return envelope.model_copy(
+        deep=True,
+        update={
+            "tool_request": tool_request,
+            "metadata": {
+                **dict(envelope.metadata),
+                "provider_tool_call_gate": {
+                    "wake_id": wake_record.wake_id,
+                    "provider_may_execute_tools": False,
+                },
+            },
+        },
+    )
+
+
 def _tool_call_names(tool_calls: list[dict[str, Any]]) -> list[str]:
     names: list[str] = []
     for call in tool_calls:
@@ -649,6 +825,8 @@ def _provider_receipt_ref(path: Path, record_hash: str) -> dict[str, Any]:
 
 
 __all__ = [
+    "KernelProviderToolCallGate",
+    "KernelProviderToolCallGateDecision",
     "KernelProviderToolBoundary",
     "KernelProviderWorkerCycleResult",
     "KernelProviderWorkerReceipt",
@@ -656,6 +834,7 @@ __all__ = [
     "KernelProviderWorkerStore",
     "build_provider_request",
     "evaluate_provider_tool_boundary",
+    "execute_provider_tool_call_gate",
     "execute_provider_worker_cycle",
     "execute_provider_worker_cycle_sync",
 ]
