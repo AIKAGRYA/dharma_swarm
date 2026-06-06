@@ -1,0 +1,29 @@
+{
+  "broker_snapshot_hash": "434df0c40d8299b5764a60cdde2bb29664093af24650bdaf00dcbbc76f6ddd59",
+  "broker_write_authority": false,
+  "clean": false,
+  "generated_at": "2026-06-05T15:10:20Z",
+  "kill_switch_engaged": true,
+  "ledger_snapshot_hash": "80e1c9fb7f0af0e918423a4b2862978a633dc8899527b5ba58444aa3069013ae",
+  "live_authority": false,
+  "live_readiness": 0,
+  "matched_order_count": 3,
+  "mismatches": [
+    {
+      "broker": "acked",
+      "client_order_id": "gbp-ddbc222ad2fc05c3b0178c7c",
+      "field": "status",
+      "local": "filled"
+    },
+    {
+      "broker": false,
+      "client_order_id": "gbp-ddbc222ad2fc05c3b0178c7c",
+      "field": "terminal",
+      "local": true
+    }
+  ],
+  "packet_type": "ReconciliationPacket",
+  "readiness_blocked": true,
+  "schema_version": "goal_b.reconciliation.v1",
+  "self_hash": "1796aa006f6133a4073c8108c0a4a4819c9ddad7ff668337bf0834d80d3908b8"
+}

@@ -1,0 +1,456 @@
+{
+  "authority": "evidence_only",
+  "blockers": [
+    "no_promotion_grade_provider",
+    "provider_gate_failed:point_in_time_safe",
+    "provider_gate_failed:corporate_actions_available",
+    "provider_gate_failed:delisted_symbols_available",
+    "provider_gate_failed:license_ref_present",
+    "provider_gate_failed:raw_payload_hashes_present",
+    "provider_gate_failed:normalized_dataset_hash_present",
+    "provider_gate_failed:feature_availability_timestamps_present",
+    "provider_gate_failed:promotion_grade"
+  ],
+  "broker_write_authority": false,
+  "canonical_provider": "",
+  "capital_permission": "none",
+  "clean": false,
+  "data_root_observed": "",
+  "generated_at": "2026-06-05T14:01:00Z",
+  "harness_run_id": "dharma-capital-lab-goal-a-alpha-evidence-12h-20260605T140100Z",
+  "live_authority": false,
+  "live_order_authority": false,
+  "live_readiness": 0,
+  "mission_id": "20260605T140100Z-dharma-capital-lab-goal-a-alpha-evidence-12h",
+  "packet_hash": "9b10875b3cccf326a3f6f4b2dd1f8cefc925dbd394b8646240dbbd279d46ce46",
+  "paper_only": true,
+  "promotion_grade_provider_count": 0,
+  "provider_count": 6,
+  "providers": [
+    {
+      "adjustment_policy": "subscription_tier_unproven",
+      "asset_classes": [
+        "equities",
+        "crypto"
+      ],
+      "blockers": [
+        "provider_gate_failed:point_in_time_safe",
+        "provider_gate_failed:corporate_actions_available",
+        "provider_gate_failed:delisted_symbols_available",
+        "provider_gate_failed:license_ref_present",
+        "provider_gate_failed:raw_payload_hashes_present",
+        "provider_gate_failed:normalized_dataset_hash_present",
+        "provider_gate_failed:feature_availability_timestamps_present",
+        "provider_gate_failed:promotion_grade"
+      ],
+      "config_aliases_present": {
+        "ALPACA_API_KEY": false,
+        "ALPACA_SECRET_KEY": false
+      },
+      "corporate_actions_available": false,
+      "data_dir_summary": {
+        "data/cache": {
+          "exists": false,
+          "file_count": 0,
+          "newest_mtime_utc": null
+        },
+        "data/realtime": {
+          "exists": false,
+          "file_count": 0,
+          "newest_mtime_utc": null
+        }
+      },
+      "delisted_symbols_available": false,
+      "expected_data_dirs": [
+        "data/cache",
+        "data/realtime"
+      ],
+      "feature_timestamp_receipts": [],
+      "feed_type": "bars_and_quotes_if_subscription_allows",
+      "known_limitations": [
+        "subscription_tier_not_proven",
+        "corporate_actions_not_proven",
+        "delisted_symbols_not_proven",
+        "point_in_time_lineage_not_proven"
+      ],
+      "license_ref": "",
+      "normalized_dataset_hash": "",
+      "point_in_time_safe": false,
+      "promotion_grade": false,
+      "provider_hash": "52fa2836f5d21413ef381e3b6a9a7877fb3b0aa9d42d53411a1d8b8cfa322bcc",
+      "provider_id": "alpaca_market_data",
+      "provider_tier": "tier1_plumbing_unverified_subscription",
+      "quality_receipts": [],
+      "raw_payload_hashes": {},
+      "redistribution_allowed": false,
+      "required_gates": {
+        "corporate_actions_available": false,
+        "delisted_symbols_available": false,
+        "feature_availability_timestamps_present": false,
+        "license_ref_present": false,
+        "normalized_dataset_hash_present": false,
+        "point_in_time_safe": false,
+        "promotion_grade": false,
+        "raw_payload_hashes_present": false,
+        "survivorship_not_survivors_only": true
+      },
+      "secret_aliases_used": [
+        "ALPACA_API_KEY",
+        "ALPACA_SECRET_KEY"
+      ],
+      "secret_value_recorded": false,
+      "survivorship_policy": "unproven"
+    },
+    {
+      "adjustment_policy": "unverified_public_adjustments",
+      "asset_classes": [
+        "equities"
+      ],
+      "blockers": [
+        "provider_gate_failed:point_in_time_safe",
+        "provider_gate_failed:survivorship_not_survivors_only",
+        "provider_gate_failed:corporate_actions_available",
+        "provider_gate_failed:delisted_symbols_available",
+        "provider_gate_failed:license_ref_present",
+        "provider_gate_failed:raw_payload_hashes_present",
+        "provider_gate_failed:normalized_dataset_hash_present",
+        "provider_gate_failed:feature_availability_timestamps_present",
+        "provider_gate_failed:promotion_grade"
+      ],
+      "config_aliases_present": {},
+      "corporate_actions_available": false,
+      "data_dir_summary": {
+        "data/cache": {
+          "exists": false,
+          "file_count": 0,
+          "newest_mtime_utc": null
+        }
+      },
+      "delisted_symbols_available": false,
+      "expected_data_dirs": [
+        "data/cache"
+      ],
+      "feature_timestamp_receipts": [],
+      "feed_type": "historical_bars",
+      "known_limitations": [
+        "license_not_promotion_grade",
+        "survivorship_not_controlled",
+        "point_in_time_not_proven"
+      ],
+      "license_ref": "",
+      "normalized_dataset_hash": "",
+      "point_in_time_safe": false,
+      "promotion_grade": false,
+      "provider_hash": "cebb4d27d058558912fbb0c4d1fe41114592a53b0ed7a8bf39dab4160beef476",
+      "provider_id": "yfinance_public_fallback",
+      "provider_tier": "tier1_public_fallback",
+      "quality_receipts": [],
+      "raw_payload_hashes": {},
+      "redistribution_allowed": false,
+      "required_gates": {
+        "corporate_actions_available": false,
+        "delisted_symbols_available": false,
+        "feature_availability_timestamps_present": false,
+        "license_ref_present": false,
+        "normalized_dataset_hash_present": false,
+        "point_in_time_safe": false,
+        "promotion_grade": false,
+        "raw_payload_hashes_present": false,
+        "survivorship_not_survivors_only": false
+      },
+      "secret_aliases_used": [],
+      "secret_value_recorded": false,
+      "survivorship_policy": "survivors_only_risk"
+    },
+    {
+      "adjustment_policy": "not_applicable_or_unproven",
+      "asset_classes": [
+        "crypto"
+      ],
+      "blockers": [
+        "provider_gate_failed:point_in_time_safe",
+        "provider_gate_failed:corporate_actions_available",
+        "provider_gate_failed:delisted_symbols_available",
+        "provider_gate_failed:license_ref_present",
+        "provider_gate_failed:raw_payload_hashes_present",
+        "provider_gate_failed:normalized_dataset_hash_present",
+        "provider_gate_failed:feature_availability_timestamps_present",
+        "provider_gate_failed:promotion_grade"
+      ],
+      "config_aliases_present": {
+        "BINANCE_API_KEY": false,
+        "BYBIT_API_KEY": false
+      },
+      "corporate_actions_available": false,
+      "data_dir_summary": {
+        "data/cache": {
+          "exists": false,
+          "file_count": 0,
+          "newest_mtime_utc": null
+        },
+        "data/realtime": {
+          "exists": false,
+          "file_count": 0,
+          "newest_mtime_utc": null
+        },
+        "data/signals": {
+          "exists": false,
+          "file_count": 0,
+          "newest_mtime_utc": null
+        }
+      },
+      "delisted_symbols_available": false,
+      "expected_data_dirs": [
+        "data/cache",
+        "data/realtime",
+        "data/signals"
+      ],
+      "feature_timestamp_receipts": [],
+      "feed_type": "public_or_cached_bars",
+      "known_limitations": [
+        "exchange_symbol_lifecycle_not_proven",
+        "raw_payload_hashes_required",
+        "normalized_dataset_hash_required"
+      ],
+      "license_ref": "",
+      "normalized_dataset_hash": "",
+      "point_in_time_safe": false,
+      "promotion_grade": false,
+      "provider_hash": "360e3afe7c7673634cdf1387a3eb0b5d3ee6b039984690f2a7182a943bffdf4a",
+      "provider_id": "crypto_exchange_public_cache",
+      "provider_tier": "tier1_crypto_plumbing",
+      "quality_receipts": [],
+      "raw_payload_hashes": {},
+      "redistribution_allowed": false,
+      "required_gates": {
+        "corporate_actions_available": false,
+        "delisted_symbols_available": false,
+        "feature_availability_timestamps_present": false,
+        "license_ref_present": false,
+        "normalized_dataset_hash_present": false,
+        "point_in_time_safe": false,
+        "promotion_grade": false,
+        "raw_payload_hashes_present": false,
+        "survivorship_not_survivors_only": true
+      },
+      "secret_aliases_used": [
+        "BINANCE_API_KEY",
+        "BYBIT_API_KEY"
+      ],
+      "secret_value_recorded": false,
+      "survivorship_policy": "exchange_symbol_lifecycle_unproven"
+    },
+    {
+      "adjustment_policy": "not_applicable",
+      "asset_classes": [
+        "prediction_markets"
+      ],
+      "blockers": [
+        "provider_gate_failed:point_in_time_safe",
+        "provider_gate_failed:corporate_actions_available",
+        "provider_gate_failed:delisted_symbols_available",
+        "provider_gate_failed:license_ref_present",
+        "provider_gate_failed:raw_payload_hashes_present",
+        "provider_gate_failed:normalized_dataset_hash_present",
+        "provider_gate_failed:feature_availability_timestamps_present",
+        "provider_gate_failed:promotion_grade"
+      ],
+      "config_aliases_present": {},
+      "corporate_actions_available": false,
+      "data_dir_summary": {
+        "data/polymarket": {
+          "exists": false,
+          "file_count": 0,
+          "newest_mtime_utc": null
+        }
+      },
+      "delisted_symbols_available": false,
+      "expected_data_dirs": [
+        "data/polymarket"
+      ],
+      "feature_timestamp_receipts": [],
+      "feed_type": "public_or_cached_event_markets",
+      "known_limitations": [
+        "not_equity_alpha_provider",
+        "event_lifecycle_lineage_not_proven"
+      ],
+      "license_ref": "",
+      "normalized_dataset_hash": "",
+      "point_in_time_safe": false,
+      "promotion_grade": false,
+      "provider_hash": "6e0f7604dfcafbf60cabe469d927c116c0743ab85b810cd842b76b19f0e6abd5",
+      "provider_id": "prediction_market_public_cache",
+      "provider_tier": "tier1_event_market_plumbing",
+      "quality_receipts": [],
+      "raw_payload_hashes": {},
+      "redistribution_allowed": false,
+      "required_gates": {
+        "corporate_actions_available": false,
+        "delisted_symbols_available": false,
+        "feature_availability_timestamps_present": false,
+        "license_ref_present": false,
+        "normalized_dataset_hash_present": false,
+        "point_in_time_safe": false,
+        "promotion_grade": false,
+        "raw_payload_hashes_present": false,
+        "survivorship_not_survivors_only": true
+      },
+      "secret_aliases_used": [],
+      "secret_value_recorded": false,
+      "survivorship_policy": "market_resolution_lifecycle_unproven"
+    },
+    {
+      "adjustment_policy": "not_applicable",
+      "asset_classes": [
+        "macro",
+        "rates"
+      ],
+      "blockers": [
+        "provider_gate_failed:point_in_time_safe",
+        "provider_gate_failed:corporate_actions_available",
+        "provider_gate_failed:delisted_symbols_available",
+        "provider_gate_failed:license_ref_present",
+        "provider_gate_failed:raw_payload_hashes_present",
+        "provider_gate_failed:normalized_dataset_hash_present",
+        "provider_gate_failed:feature_availability_timestamps_present",
+        "provider_gate_failed:promotion_grade"
+      ],
+      "config_aliases_present": {
+        "FRED_API_KEY": false
+      },
+      "corporate_actions_available": false,
+      "data_dir_summary": {
+        "data/cache": {
+          "exists": false,
+          "file_count": 0,
+          "newest_mtime_utc": null
+        },
+        "data/signals": {
+          "exists": false,
+          "file_count": 0,
+          "newest_mtime_utc": null
+        }
+      },
+      "delisted_symbols_available": false,
+      "expected_data_dirs": [
+        "data/cache",
+        "data/signals"
+      ],
+      "feature_timestamp_receipts": [],
+      "feed_type": "macro_time_series",
+      "known_limitations": [
+        "release_timestamp_lineage_required",
+        "revision_history_not_proven"
+      ],
+      "license_ref": "",
+      "normalized_dataset_hash": "",
+      "point_in_time_safe": false,
+      "promotion_grade": false,
+      "provider_hash": "91eea31e415a0d9ee307352001a1e0ad599060a985c286323ef256e9f7ac7999",
+      "provider_id": "fred_macro_cache",
+      "provider_tier": "tier1_macro_public_or_keyed_cache",
+      "quality_receipts": [],
+      "raw_payload_hashes": {},
+      "redistribution_allowed": false,
+      "required_gates": {
+        "corporate_actions_available": false,
+        "delisted_symbols_available": false,
+        "feature_availability_timestamps_present": false,
+        "license_ref_present": false,
+        "normalized_dataset_hash_present": false,
+        "point_in_time_safe": false,
+        "promotion_grade": false,
+        "raw_payload_hashes_present": false,
+        "survivorship_not_survivors_only": true
+      },
+      "secret_aliases_used": [
+        "FRED_API_KEY"
+      ],
+      "secret_value_recorded": false,
+      "survivorship_policy": "not_equity_universe"
+    },
+    {
+      "adjustment_policy": "requires_point_in_time_event_availability",
+      "asset_classes": [
+        "equities",
+        "event_signals"
+      ],
+      "blockers": [
+        "provider_gate_failed:point_in_time_safe",
+        "provider_gate_failed:corporate_actions_available",
+        "provider_gate_failed:delisted_symbols_available",
+        "provider_gate_failed:license_ref_present",
+        "provider_gate_failed:raw_payload_hashes_present",
+        "provider_gate_failed:normalized_dataset_hash_present",
+        "provider_gate_failed:feature_availability_timestamps_present",
+        "provider_gate_failed:promotion_grade"
+      ],
+      "config_aliases_present": {},
+      "corporate_actions_available": false,
+      "data_dir_summary": {
+        "data/insider": {
+          "exists": false,
+          "file_count": 0,
+          "newest_mtime_utc": null
+        },
+        "data/signals": {
+          "exists": false,
+          "file_count": 0,
+          "newest_mtime_utc": null
+        }
+      },
+      "delisted_symbols_available": false,
+      "expected_data_dirs": [
+        "data/insider",
+        "data/signals"
+      ],
+      "feature_timestamp_receipts": [],
+      "feed_type": "auxiliary_event_signals",
+      "known_limitations": [
+        "current_data_enrichment_trap_required",
+        "feature_timestamp_receipts_required"
+      ],
+      "license_ref": "",
+      "normalized_dataset_hash": "",
+      "point_in_time_safe": false,
+      "promotion_grade": false,
+      "provider_hash": "c532c08566b8ae52219b4716f32e5cef7be81fbcd5efb40f639d9ca0d4bb2f53",
+      "provider_id": "insider_signals_cache",
+      "provider_tier": "tier1_auxiliary_signal_cache",
+      "quality_receipts": [],
+      "raw_payload_hashes": {},
+      "redistribution_allowed": false,
+      "required_gates": {
+        "corporate_actions_available": false,
+        "delisted_symbols_available": false,
+        "feature_availability_timestamps_present": false,
+        "license_ref_present": false,
+        "normalized_dataset_hash_present": false,
+        "point_in_time_safe": false,
+        "promotion_grade": false,
+        "raw_payload_hashes_present": false,
+        "survivorship_not_survivors_only": true
+      },
+      "secret_aliases_used": [],
+      "secret_value_recorded": false,
+      "survivorship_policy": "issuer_universe_lineage_unproven"
+    }
+  ],
+  "required_promotion_gates": {
+    "corporate_actions_available": false,
+    "delisted_symbols_available": false,
+    "feature_availability_timestamps_present": false,
+    "license_ref_present": false,
+    "normalized_dataset_hash_present": false,
+    "point_in_time_safe": false,
+    "promotion_grade": false,
+    "raw_payload_hashes_present": false,
+    "survivorship_not_survivors_only": true
+  },
+  "run_id": "20260605T140100Z",
+  "schema_version": "dharma.capital_lab.alpha_evidence.v2.provider_readiness_packet",
+  "secret_value_recorded": false,
+  "secret_values_read": false,
+  "status": "blocked_provider_constraints",
+  "withdrawals_or_transfers": false
+}
