@@ -4,10 +4,11 @@
 This is the governance gate that prevents the failure mode where a prose
 "current track" pointer rots while work moves on. It does three things:
 
-  1. Verifies the active track block is well-formed (schema, exactly one ACTIVE).
+  1. Verifies the active tracks list is well-formed (schema, 1-10 ACTIVE).
   2. Evaluates each acceptance_criteria predicate against the filesystem
-     (and, when network is allowed, the GitHub API for PR merge status).
-  3. Checks TTL — fails if (today - verified_at) > ttl_days.
+     (and, when network is allowed, the GitHub API for PR merge status),
+     per active track.
+  3. Checks TTL per track — fails if (today - verified_at) > ttl_days.
 
 Outputs:
   - reports/governance/active_track_evidence.json  (machine readable)
@@ -34,7 +35,18 @@ from typing import Any
 
 ACTIVE_TRACK_PATH = Path("docs/governance/ACTIVE_TRACK.yaml")
 REPORTS_DIR = Path("reports/governance")
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+MAX_ACTIVE_TRACKS = 10
+
+
+def _primary_track(active_tracks: list[dict[str, Any]]) -> dict[str, Any]:
+    """Return the primary active track (primary:true marker, else first)."""
+    if not active_tracks:
+        return {}
+    for trk in active_tracks:
+        if isinstance(trk, dict) and trk.get("primary"):
+            return trk
+    return active_tracks[0]
 
 
 @dataclass
@@ -264,112 +276,157 @@ def run(args: argparse.Namespace) -> int:
                                 f"expected schema_version={SCHEMA_VERSION}, "
                                 f"got {track.get('schema_version')!r}"))
 
-    active = track.get("active_track")
-    if not active:
+    active_tracks = track.get("active_tracks") or []
+    if not isinstance(active_tracks, list):
+        active_tracks = []
+    if len(active_tracks) == 0:
         findings.append(Finding("ERROR", "no-active-track",
-                                "ACTIVE_TRACK.yaml has no active_track block. "
-                                "Declare the next track or close the previous one explicitly."))
+                                "ACTIVE_TRACK.yaml has no active_tracks. "
+                                "Declare at least one track (>=1 required) or close the previous one explicitly."))
+        emit_reports(findings, [], track)
+        return 2
+    if len(active_tracks) > MAX_ACTIVE_TRACKS:
+        findings.append(Finding("ERROR", "too-many-active-tracks",
+                                f"ACTIVE_TRACK.yaml declares {len(active_tracks)} active tracks "
+                                f"(cap is {MAX_ACTIVE_TRACKS}). Close some before opening more."))
         emit_reports(findings, [], track)
         return 2
 
-    # TTL check (future dates allowed for timezone tolerance)
-    ttl = int(active.get("ttl_days", 14))
-    age = days_since(str(active.get("verified_at", "")))
-    if age is None:
-        findings.append(Finding("ERROR", "verified-at-malformed",
-                                f"active_track.verified_at malformed: {active.get('verified_at')!r}"))
-    elif age > ttl:
-        findings.append(Finding(
-            "ERROR", "active-track-stale",
-            f"active_track.verified_at is {age} days old (ttl_days={ttl}). "
-            f"Re-verify and bump verified_at, or open a new track block."))
+    # Evaluate each active track independently. Findings are tagged with the
+    # track id so per-track results are distinguishable.
+    all_crit_results: list[CriterionResult] = []
+    track_reports: list[dict[str, Any]] = []
+    any_shippable = False
 
-    # Prerequisites (must be true now — failure means track is mis-declared)
-    prereq_results: list[CriterionResult] = []
-    for crit in active.get("prerequisites", []) or []:
-        prereq_results.append(evaluate_criterion(crit))
+    for trk in active_tracks:
+        tid = trk.get("id", "(unknown)")
 
-    prereq_failures = [c for c in prereq_results
-                       if not c.passed and c.kind in {"file_exists", "file_contains"}]
-    for c in prereq_failures:
-        findings.append(Finding(
-            "ERROR", f"prerequisite:{c.id}",
-            f"Prerequisite failed: {c.detail}. Active track is mis-declared — "
-            f"the work it claims to build on does not exist.",
-            criterion_id=c.id))
+        # TTL check (future dates allowed for timezone tolerance)
+        ttl = int(trk.get("ttl_days", 14))
+        age = days_since(str(trk.get("verified_at", "")))
+        if age is None:
+            findings.append(Finding("ERROR", "verified-at-malformed",
+                                    f"[{tid}] verified_at malformed: {trk.get('verified_at')!r}"))
+        elif age > ttl:
+            findings.append(Finding(
+                "ERROR", "active-track-stale",
+                f"[{tid}] verified_at is {age} days old (ttl_days={ttl}). "
+                f"Re-verify and bump verified_at, or close this track."))
 
-    # Completion criteria (will flip from false to true as the track lands)
-    completion_results: list[CriterionResult] = []
-    for crit in active.get("completion_criteria", []) or []:
-        completion_results.append(evaluate_criterion(crit))
+        # Prerequisites (must be true now — failure means track is mis-declared)
+        prereq_results: list[CriterionResult] = []
+        for crit in trk.get("prerequisites", []) or []:
+            prereq_results.append(evaluate_criterion(crit))
 
-    crit_results = prereq_results + completion_results
+        prereq_failures = [c for c in prereq_results
+                           if not c.passed and c.kind in {"file_exists", "file_contains"}]
+        for c in prereq_failures:
+            findings.append(Finding(
+                "ERROR", f"prerequisite:{c.id}",
+                f"[{tid}] Prerequisite failed: {c.detail}. Track is mis-declared — "
+                f"the work it claims to build on does not exist.",
+                criterion_id=c.id))
 
-    # Track is SHIPPABLE when prerequisites hold AND all completion criteria pass.
-    prereqs_ok = all(c.passed for c in prereq_results) if prereq_results else True
-    completion_ok = (all(c.passed for c in completion_results)
-                     if completion_results else False)
-    shippable = prereqs_ok and completion_ok and active.get("status") == "ACTIVE"
+        # Completion criteria (will flip from false to true as the track lands)
+        completion_results: list[CriterionResult] = []
+        for crit in trk.get("completion_criteria", []) or []:
+            completion_results.append(evaluate_criterion(crit))
 
-    if shippable:
-        findings.append(Finding(
-            "INFO", "track-shippable",
-            f"All {len(completion_results)} completion criteria pass. "
-            f"Track '{active.get('id')}' is SHIPPABLE — close it and declare the next active track."))
-    elif prereqs_ok and completion_results:
+        all_crit_results.extend(prereq_results)
+        all_crit_results.extend(completion_results)
+
+        # Track is SHIPPABLE when prerequisites hold AND all completion criteria pass.
+        prereqs_ok = all(c.passed for c in prereq_results) if prereq_results else True
+        completion_ok = (all(c.passed for c in completion_results)
+                         if completion_results else False)
+        shippable = prereqs_ok and completion_ok and trk.get("status") == "ACTIVE"
+        any_shippable = any_shippable or shippable
+
         passed = sum(1 for c in completion_results if c.passed)
-        findings.append(Finding(
-            "INFO", "track-in-progress",
-            f"{passed}/{len(completion_results)} completion criteria pass. "
-            f"Track '{active.get('id')}' is in progress."))
+        if shippable:
+            findings.append(Finding(
+                "INFO", "track-shippable",
+                f"[{tid}] All {len(completion_results)} completion criteria pass. "
+                f"Track is SHIPPABLE — close it or declare its successor."))
+        elif prereqs_ok and completion_results:
+            findings.append(Finding(
+                "INFO", "track-in-progress",
+                f"[{tid}] {passed}/{len(completion_results)} completion criteria pass. "
+                f"Track is in progress."))
 
-    emit_reports(findings, crit_results, track, shippable=shippable,
-                 prereqs_ok=prereqs_ok, completion_results=completion_results)
+        track_reports.append({
+            "id": tid,
+            "primary": bool(trk.get("primary")),
+            "status": trk.get("status"),
+            "shippable": shippable,
+            "prerequisites_ok": prereqs_ok,
+            "completion_progress": {"passed": passed, "total": len(completion_results)},
+            "criteria": [asdict(c) for c in (prereq_results + completion_results)],
+        })
+
+    emit_reports(findings, all_crit_results, track, track_reports=track_reports,
+                 any_shippable=any_shippable)
 
     has_errors = any(f.severity == "ERROR" for f in findings)
     return 1 if has_errors else 0
 
 
 def emit_reports(findings: list[Finding], crit_results: list[CriterionResult],
-                 track: dict[str, Any] | None, *, shippable: bool = False,
-                 prereqs_ok: bool = True,
-                 completion_results: list[CriterionResult] | None = None) -> None:
+                 track: dict[str, Any] | None, *,
+                 track_reports: list[dict[str, Any]] | None = None,
+                 any_shippable: bool = False) -> None:
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
-    completion_results = completion_results or []
+    track_reports = track_reports or []
+
+    active_tracks = (track or {}).get("active_tracks") or []
+    if not isinstance(active_tracks, list):
+        active_tracks = []
+    # Back-compat alias: top-level active_track_id is the PRIMARY track id
+    # (the item with primary:true, else first). Single-track consumers keep
+    # reading this field unchanged.
+    primary = _primary_track(active_tracks)
+    primary_id = primary.get("id")
 
     payload = {
         "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
-        "active_track_id": (track or {}).get("active_track", {}).get("id"),
+        # Back-compat alias for single-track consumers.
+        "active_track_id": primary_id,
         "coordination_model": (track or {}).get("parallel_lane_policy", {}),
-        "shippable": shippable,
-        "prerequisites_ok": prereqs_ok,
-        "completion_progress": {
-            "passed": sum(1 for c in completion_results if c.passed),
-            "total": len(completion_results),
-        },
+        # Per-track array (new in schema v2).
+        "active_tracks": track_reports,
+        "any_shippable": any_shippable,
         "criteria": [asdict(c) for c in crit_results],
         "findings": [asdict(f) for f in findings],
     }
     (REPORTS_DIR / "active_track_evidence.json").write_text(
         json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
+    coordination = payload["coordination_model"].get(
+        "model", "1-10 active tracks") if isinstance(payload["coordination_model"], dict) else "1-10 active tracks"
     md = ["# Active Track Evidence",
           "",
           f"Generated: {payload['generated_at']}",
-          f"Track: `{payload['active_track_id']}`",
-          f"Coordination: `{payload['coordination_model'].get('model', 'one active track')}`",
-          f"Prerequisites: **{'OK' if prereqs_ok else 'FAILED'}**",
-          f"Completion: **{payload['completion_progress']['passed']}/"
-          f"{payload['completion_progress']['total']}**",
-          f"Shippable: **{'YES' if shippable else 'no'}**",
+          f"Active tracks: **{len(track_reports)}** (primary: `{primary_id}`)",
+          f"Coordination: `{coordination}`",
           ""]
-    if crit_results:
-        md.append("## Criteria")
+    for tr in track_reports:
+        prog = tr.get("completion_progress", {"passed": 0, "total": 0})
+        primary_tag = " (primary)" if tr.get("primary") else ""
+        md.append(f"## Track `{tr.get('id')}`{primary_tag}")
         md.append("")
-        for c in crit_results:
-            mark = "✓" if c.passed else "✗"
-            md.append(f"- {mark} `{c.id}` ({c.kind}) — {c.detail}")
+        md.append(f"Status: {tr.get('status')}")
+        md.append(f"Prerequisites: **{'OK' if tr.get('prerequisites_ok') else 'FAILED'}**")
+        md.append(f"Completion: **{prog['passed']}/{prog['total']}**")
+        md.append(f"Shippable: **{'YES' if tr.get('shippable') else 'no'}**")
         md.append("")
+        criteria = tr.get("criteria") or []
+        if criteria:
+            md.append("### Criteria")
+            md.append("")
+            for c in criteria:
+                mark = "✓" if c.get("passed") else "✗"
+                md.append(f"- {mark} `{c.get('id')}` ({c.get('kind')}) — {c.get('detail')}")
+            md.append("")
     if findings:
         md.append("## Findings")
         md.append("")

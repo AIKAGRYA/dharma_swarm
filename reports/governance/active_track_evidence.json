@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-06T12:18:30+09:00",
+  "generated_at": "2026-06-06T13:02:34+09:00",
   "active_track_id": "goodworks-dgm-core-2026-05",
   "coordination_model": {
     "model": "one strategic active track; many coordinated work lanes",
@@ -16,12 +16,82 @@
     "root_worktree_policy": "The primary worktree may coordinate and write receipts, but broad implementation should move to an isolated lane when dirty pressure is high.",
     "cleanup_policy": "Prunable worktrees and stale branches are cleanup candidates only after receipt review; never delete unreviewed user work."
   },
-  "shippable": true,
-  "prerequisites_ok": true,
-  "completion_progress": {
-    "passed": 9,
-    "total": 9
-  },
+  "active_tracks": [
+    {
+      "id": "goodworks-dgm-core-2026-05",
+      "primary": true,
+      "status": "ACTIVE",
+      "shippable": true,
+      "prerequisites_ok": true,
+      "completion_progress": {
+        "passed": 9,
+        "total": 9
+      },
+      "criteria": [
+        {
+          "id": "command_plane_phase_1_closed",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'Command Plane Phase 1 shipped' found in docs/governance/ACTIVE_TRACK.yaml"
+        },
+        {
+          "id": "product_center_onboarding",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'telos-gated DGM Goodworks Intelligence Core' found in docs/ops/AGENT_ONBOARDING.md"
+        },
+        {
+          "id": "make_onboard_product_center",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'PRODUCT CENTER' found in scripts/governance/agent_onboard.py"
+        },
+        {
+          "id": "goodworks_api_registered",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'goodworks_dgm_router' found in api/main.py"
+        },
+        {
+          "id": "goodworks_manifest_registered",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'goodworks_dgm' found in ACTIVE_SURFACE_MANIFEST.yaml"
+        },
+        {
+          "id": "goodworks_dashboard_page",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "dashboard/src/app/dashboard/goodworks/page.tsx present"
+        },
+        {
+          "id": "goodworks_agent_tool",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'goodworks_dgm' found in api/chat_tools.py"
+        },
+        {
+          "id": "goodworks_tick_script",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "scripts/runtime/goodworks_dgm_tick.py present"
+        },
+        {
+          "id": "goodworks_seed_script",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "scripts/runtime/seed_goodworks_mrv.py present"
+        },
+        {
+          "id": "goodworks_tests",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "tests/test_goodworks_dgm.py present"
+        }
+      ]
+    }
+  ],
+  "any_shippable": true,
   "criteria": [
     {
       "id": "command_plane_phase_1_closed",
@@ -88,13 +158,13 @@
     {
       "severity": "ERROR",
       "check": "active-track-stale",
-      "message": "active_track.verified_at is 16 days old (ttl_days=14). Re-verify and bump verified_at, or open a new track block.",
+      "message": "[goodworks-dgm-core-2026-05] verified_at is 16 days old (ttl_days=14). Re-verify and bump verified_at, or close this track.",
       "criterion_id": null
     },
     {
       "severity": "INFO",
       "check": "track-shippable",
-      "message": "All 9 completion criteria pass. Track 'goodworks-dgm-core-2026-05' is SHIPPABLE \u2014 close it and declare the next active track.",
+      "message": "[goodworks-dgm-core-2026-05] All 9 completion criteria pass. Track is SHIPPABLE \u2014 close it or declare its successor.",
       "criterion_id": null
     }
   ]

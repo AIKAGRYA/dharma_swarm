@@ -43,13 +43,19 @@ def test_active_track_loads() -> None:
     from check_track_status import load_active_track  # type: ignore
 
     track = load_active_track(ACTIVE_TRACK)
-    assert track.get("schema_version") == 1
-    active = track.get("active_track")
-    assert active, "ACTIVE_TRACK.yaml must declare an active_track block."
-    assert active.get("id"), "active_track.id is required."
-    assert active.get("status") in {"ACTIVE", "SHIPPABLE"}, \
-        f"unexpected status: {active.get('status')!r}"
-    assert active.get("verified_at"), "active_track.verified_at is required."
+    assert track.get("schema_version") == 2
+    active_tracks = track.get("active_tracks")
+    assert isinstance(active_tracks, list), "ACTIVE_TRACK.yaml must declare active_tracks as a list."
+    assert 1 <= len(active_tracks) <= 10, \
+        f"1-10 active tracks required, got {len(active_tracks)}."
+    primaries = [t for t in active_tracks if t.get("primary")]
+    assert len(primaries) == 1, \
+        f"exactly one track must be marked primary, got {len(primaries)}."
+    for trk in active_tracks:
+        assert trk.get("id"), "each active track must have an id."
+        assert trk.get("status") in {"ACTIVE", "SHIPPABLE"}, \
+            f"unexpected status for {trk.get('id')!r}: {trk.get('status')!r}"
+        assert trk.get("verified_at"), f"{trk.get('id')!r} must have verified_at."
     lane_policy = track.get("parallel_lane_policy")
     assert lane_policy, "ACTIVE_TRACK.yaml must declare the parallel lane policy."
     assert lane_policy.get("allowed") is True
@@ -62,7 +68,20 @@ def test_check_track_status_runs() -> None:
     assert result.returncode == 0, result.stderr
     assert EVIDENCE.exists(), "evidence JSON must be written"
     payload = json.loads(EVIDENCE.read_text())
+    # Back-compat alias = primary track id.
     assert "active_track_id" in payload
+    assert payload["active_track_id"], "active_track_id alias must be the primary track id"
+    # New per-track array (schema v2).
+    assert isinstance(payload.get("active_tracks"), list)
+    assert 1 <= len(payload["active_tracks"]) <= 10
+    for tr in payload["active_tracks"]:
+        assert "id" in tr
+        assert "shippable" in tr
+        assert "prerequisites_ok" in tr
+        assert "completion_progress" in tr
+        assert isinstance(tr.get("criteria"), list)
+    # The alias must match one of the per-track ids (the primary).
+    assert payload["active_track_id"] in {tr["id"] for tr in payload["active_tracks"]}
     assert payload.get("coordination_model", {}).get("allowed") is True
     assert "criteria" in payload
     assert isinstance(payload["criteria"], list)

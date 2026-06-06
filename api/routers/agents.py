@@ -30,26 +30,65 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _read_active_track_id() -> str:
-    """Read active_track.id from ACTIVE_TRACK.yaml without a yaml dependency."""
+    """Read the PRIMARY active track id from ACTIVE_TRACK.yaml (no yaml dep).
+
+    Schema v2 stores `active_tracks:` as a list of track mappings. This scans
+    the list items under `active_tracks:` and returns the id of the item marked
+    `primary: true`; if none is marked, it returns the first item's id. The
+    return value is the single primary track id for back-compat with callers
+    that expect one active-track id string.
+    """
     try:
         text = (_REPO_ROOT / "docs" / "governance" / "ACTIVE_TRACK.yaml").read_text()
-        in_active_track = False
-        active_track_indent = 0
+        in_active_tracks = False
+        active_tracks_indent = 0
+        first_id = ""
+        cur_id = ""
+        cur_primary = False
+        primary_id = ""
+
+        def _flush() -> None:
+            nonlocal first_id, primary_id
+            if cur_id:
+                if not first_id:
+                    first_id = cur_id
+                if cur_primary and not primary_id:
+                    primary_id = cur_id
+
         for raw_line in text.splitlines():
             stripped = raw_line.strip()
             if not stripped or stripped.startswith("#"):
                 continue
             indent = len(raw_line) - len(raw_line.lstrip(" "))
-            if not in_active_track:
-                if stripped == "active_track:":
-                    in_active_track = True
-                    active_track_indent = indent
+            if not in_active_tracks:
+                if stripped == "active_tracks:":
+                    in_active_tracks = True
+                    active_tracks_indent = indent
                 continue
-            if indent <= active_track_indent:
-                return ""
-            if stripped.startswith("id:"):
-                return stripped.split(":", 1)[1].strip().strip("\"'")
-        return ""
+            # A top-level key at or below the container indent ends the list.
+            if indent <= active_tracks_indent:
+                _flush()
+                break
+            # New list item: `- id: ...` (or `- ` then nested keys).
+            if stripped.startswith("- "):
+                _flush()
+                cur_id = ""
+                cur_primary = False
+                item_body = stripped[2:].strip()
+                if item_body.startswith("id:"):
+                    cur_id = item_body.split(":", 1)[1].strip().strip("\"'")
+                elif item_body.startswith("primary:"):
+                    cur_primary = item_body.split(":", 1)[1].strip().lower() == "true"
+                continue
+            # Nested key inside the current list item.
+            if stripped.startswith("id:") and not cur_id:
+                cur_id = stripped.split(":", 1)[1].strip().strip("\"'")
+            elif stripped.startswith("primary:"):
+                cur_primary = stripped.split(":", 1)[1].strip().lower() == "true"
+        else:
+            _flush()
+
+        return primary_id or first_id
     except Exception:
         return ""
 

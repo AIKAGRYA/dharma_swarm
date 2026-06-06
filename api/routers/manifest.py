@@ -75,23 +75,8 @@ async def manifest_entity(entity_id: str) -> ApiResponse:
         return ApiResponse(data=None, error=str(e))
 
 
-def _parse_active_track() -> dict[str, Any]:
-    """Parse docs/governance/ACTIVE_TRACK.yaml using PyYAML.
-
-    Returns a flat projection of the active_track block: id, name, status,
-    verified_at, ttl_days, owner, description (first line only — body block
-    can be long), completion_criteria (list of id+kind), non_goals, and the
-    raw active_track dict for callers that want everything.
-    """
-    track_path = _REPO_ROOT / "docs" / "governance" / "ACTIVE_TRACK.yaml"
-    if not track_path.exists():
-        return {"error": "ACTIVE_TRACK.yaml not found", "path": str(track_path)}
-    try:
-        import yaml  # type: ignore
-        doc = yaml.safe_load(track_path.read_text(encoding="utf-8")) or {}
-    except Exception as e:  # noqa: BLE001
-        return {"error": f"yaml parse failed: {e}"}
-    track = doc.get("active_track") or {}
+def _project_track(track: dict[str, Any]) -> dict[str, Any]:
+    """Flat projection of a single track block."""
     description = track.get("description", "") or ""
     desc_short = description.strip().splitlines()[0] if description.strip() else None
     criteria = track.get("completion_criteria") or []
@@ -101,6 +86,7 @@ def _parse_active_track() -> dict[str, Any]:
     ]
     return {
         "id": track.get("id"),
+        "primary": bool(track.get("primary")),
         "name": track.get("name"),
         "status": track.get("status"),
         "verified_at": str(track.get("verified_at") or "") or None,
@@ -113,6 +99,42 @@ def _parse_active_track() -> dict[str, Any]:
         "non_goals": track.get("non_goals") or [],
         "companion_manifest": track.get("companion_manifest"),
     }
+
+
+def _parse_active_track() -> dict[str, Any]:
+    """Parse docs/governance/ACTIVE_TRACK.yaml using PyYAML (schema v2).
+
+    Schema v2 stores `active_tracks:` as a list (1-10 tracks). This returns a
+    new `active_tracks` array of flat per-track projections AND — for back-compat
+    with single-track consumers (e.g. dashboard useRepoTruth.ts, which reads the
+    flat id/name/status/... fields) — it spreads the PRIMARY track's flat keys at
+    the top level too. The primary is the item with `primary: true`, else the
+    first item.
+    """
+    track_path = _REPO_ROOT / "docs" / "governance" / "ACTIVE_TRACK.yaml"
+    if not track_path.exists():
+        return {"error": "ACTIVE_TRACK.yaml not found", "path": str(track_path)}
+    try:
+        import yaml  # type: ignore
+        doc = yaml.safe_load(track_path.read_text(encoding="utf-8")) or {}
+    except Exception as e:  # noqa: BLE001
+        return {"error": f"yaml parse failed: {e}"}
+
+    active_tracks = doc.get("active_tracks") or []
+    if not isinstance(active_tracks, list):
+        active_tracks = []
+    projected = [_project_track(t) for t in active_tracks if isinstance(t, dict)]
+
+    # Pick the primary (primary:true, else first).
+    primary = next((p for p in projected if p.get("primary")), None)
+    if primary is None and projected:
+        primary = projected[0]
+    primary = primary or {}
+
+    # Back-compat: spread primary's flat keys at top level; add active_tracks array.
+    result = dict(primary)
+    result["active_tracks"] = projected
+    return result
 
 
 @router.get("/active-track")

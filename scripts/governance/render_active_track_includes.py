@@ -44,8 +44,22 @@ MANAGED_FILES = [
 ]
 
 
+def _primary_track(active_tracks: list) -> dict:
+    """Return the primary active track (primary:true marker, else first)."""
+    if not active_tracks:
+        return {}
+    for trk in active_tracks:
+        if isinstance(trk, dict) and trk.get("primary"):
+            return trk
+    return active_tracks[0]
+
+
 def render_block(track: dict) -> str:
-    active = track.get("active_track") or {}
+    active_tracks = track.get("active_tracks") or []
+    if not isinstance(active_tracks, list):
+        active_tracks = []
+    active = _primary_track(active_tracks)
+    others = [t for t in active_tracks if t is not active]
     closed = track.get("closed_tracks") or []
     lines = [
         START,
@@ -54,7 +68,9 @@ def render_block(track: dict) -> str:
         "     Do not hand-edit. Run scripts/governance/render_active_track_includes.py",
         "     after updating the YAML. -->",
         "",
-        f"**Active track:** {active.get('name', '(none declared)')}",
+        f"**Active tracks:** {len(active_tracks)} (1-10 supported; primary shown below)",
+        "",
+        f"**Primary track:** {active.get('name', '(none declared)')}",
         f"**Track id:** `{active.get('id', '(none)')}`",
         f"**Status:** {active.get('status', 'UNKNOWN')}",
         f"**Verified at:** {active.get('verified_at', '(unset)')} "
@@ -84,6 +100,16 @@ def render_block(track: dict) -> str:
         lines.append("")
         for ng in non_goals:
             lines.append(f"- {ng.strip()}")
+        lines.append("")
+
+    if others:
+        lines.append("**Also active (coordinated concurrent tracks):**")
+        lines.append("")
+        for trk in others:
+            lines.append(
+                f"- `{trk.get('id', '(none)')}` — {trk.get('name', '')} "
+                f"({trk.get('status', 'UNKNOWN')})"
+            )
         lines.append("")
 
     if closed:

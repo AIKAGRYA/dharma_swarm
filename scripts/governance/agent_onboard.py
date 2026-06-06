@@ -261,41 +261,55 @@ def render_repo_state(*, fast: bool = False) -> None:
 
 def render_active_track(evidence: dict[str, Any] | None,
                         track: dict[str, Any]) -> None:
-    section("ACTIVE TRACK (owner: docs/governance/ACTIVE_TRACK.yaml)")
+    tracks = _active_tracks(track)
+    section(f"ACTIVE TRACKS ({len(tracks)}; 1-10; owner: docs/governance/ACTIVE_TRACK.yaml)")
     if not evidence:
         print("  WARNING: no active_track_evidence.json found.")
         print("  Run: python3 scripts/governance/check_track_status.py")
         return
 
-    block = (track or {}).get("active_track") or {}
-    print(f"  ID         : {evidence.get('active_track_id', '(unknown)')}")
-    if block.get("name"):
-        print(f"  Name       : {block['name']}")
-    if block.get("status"):
-        print(f"  Status     : {block['status']}")
-    if block.get("verified_at") and block.get("ttl_days"):
-        try:
-            verified = date.fromisoformat(str(block["verified_at"]))
-            age = (_today() - verified).days
-            ttl = int(block["ttl_days"])
-            remaining = ttl - age
-            tag = "OK" if remaining >= 0 else f"OVERDUE by {-remaining}d"
-            print(f"  TTL        : {age}/{ttl} days used ({tag})")
-        except (ValueError, TypeError):
-            pass
-    progress = evidence.get("completion_progress", {"passed": 0, "total": 0})
-    print(f"  Prereqs    : {'OK' if evidence.get('prerequisites_ok') else 'FAILED'}")
-    print(f"  Completion : {progress['passed']}/{progress['total']}")
-    shippable = evidence.get("shippable", False)
-    print(f"  Shippable  : {'YES — declare next track' if shippable else 'no'}")
+    # Map evidence per-track rows by id for fast lookup.
+    ev_by_id = {tr.get("id"): tr for tr in (evidence.get("active_tracks") or [])}
+    primary_id = evidence.get("active_track_id")
 
-    print()
-    print("  Acceptance criteria:")
-    for c in evidence.get("criteria", []):
-        mark = "✓" if c.get("passed") else "✗"
-        print(f"    {mark} [{c.get('kind')}] {c.get('id')}")
-        if not c.get("passed"):
-            print(f"        {c.get('detail', '')}")
+    if not tracks:
+        # Fall back to evidence rows if YAML parse yielded nothing.
+        tracks = [{"id": tr.get("id")} for tr in (evidence.get("active_tracks") or [])]
+
+    for block in tracks:
+        tid = block.get("id", "(unknown)")
+        primary_tag = " [PRIMARY]" if (block.get("primary") or tid == primary_id) else ""
+        print(f"  ID         : {tid}{primary_tag}")
+        if block.get("name"):
+            print(f"  Name       : {block['name']}")
+        if block.get("status"):
+            print(f"  Status     : {block['status']}")
+        if block.get("verified_at") and block.get("ttl_days"):
+            try:
+                verified = date.fromisoformat(str(block["verified_at"]))
+                age = (_today() - verified).days
+                ttl = int(block["ttl_days"])
+                remaining = ttl - age
+                tag = "OK" if remaining >= 0 else f"OVERDUE by {-remaining}d"
+                print(f"  TTL        : {age}/{ttl} days used ({tag})")
+            except (ValueError, TypeError):
+                pass
+        ev = ev_by_id.get(tid, {})
+        progress = ev.get("completion_progress", {"passed": 0, "total": 0})
+        print(f"  Prereqs    : {'OK' if ev.get('prerequisites_ok') else 'FAILED'}")
+        print(f"  Completion : {progress['passed']}/{progress['total']}")
+        shippable = ev.get("shippable", False)
+        print(f"  Shippable  : {'YES — declare next track' if shippable else 'no'}")
+
+        criteria = ev.get("criteria", [])
+        if criteria:
+            print("  Acceptance criteria:")
+            for c in criteria:
+                mark = "✓" if c.get("passed") else "✗"
+                print(f"    {mark} [{c.get('kind')}] {c.get('id')}")
+                if not c.get("passed"):
+                    print(f"        {c.get('detail', '')}")
+        print()
 
 
 def render_parallel_work_lanes(track: dict[str, Any], *, fast: bool = False) -> None:
@@ -492,7 +506,14 @@ def render_axioms() -> None:
 
 
 def render_recent_activity(track: dict[str, Any]) -> None:
-    surfaces = (track.get("active_track") or {}).get("surfaces", []) if track else []
+    # Union surfaces across all active tracks, preserving order and deduping.
+    surfaces: list[str] = []
+    seen: set[str] = set()
+    for trk in _active_tracks(track):
+        for surface in (trk.get("surfaces") or []):
+            if surface not in seen:
+                seen.add(surface)
+                surfaces.append(surface)
     if not surfaces:
         return
     section(f"RECENT TRACK ACTIVITY (last 14 days, {len(surfaces)} surfaces)")
@@ -704,6 +725,20 @@ def _load_track_yaml() -> dict[str, Any]:
         return {}
 
 
+def _active_tracks(track: dict[str, Any] | None) -> list[dict[str, Any]]:
+    tracks = (track or {}).get("active_tracks") or []
+    return tracks if isinstance(tracks, list) else []
+
+
+def _primary_track(track: dict[str, Any] | None) -> dict[str, Any]:
+    """Return the primary active track (primary:true marker, else first)."""
+    tracks = _active_tracks(track)
+    for trk in tracks:
+        if isinstance(trk, dict) and trk.get("primary"):
+            return trk
+    return tracks[0] if tracks else {}
+
+
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
@@ -734,26 +769,45 @@ def main(argv: list[str] | None = None) -> int:
     render_enforcement_and_depth()
 
     section("WHAT TO DO NEXT")
-    block = (track or {}).get("active_track") or {}
-    next_items = block.get("next_items", []) if block else []
-    prereqs_ok = bool(evidence and evidence.get("prerequisites_ok"))
-    shippable = bool(evidence and evidence.get("shippable"))
-    if not prereqs_ok:
-        print("  Prerequisites are failing. The active track is mis-declared.")
-        print("  Fix the YAML or re-open the previous track.")
-    elif shippable:
-        print("  All completion criteria pass. Close this track and declare the next.")
+    tracks = _active_tracks(track)
+    ev_by_id = {tr.get("id"): tr for tr in (evidence.get("active_tracks") or [])} if evidence else {}
+    # Across all active tracks: are prereqs failing anywhere? are all shippable?
+    any_prereq_failing = any(
+        not ev_by_id.get(trk.get("id"), {}).get("prerequisites_ok", True)
+        for trk in tracks
+    )
+    all_shippable = bool(tracks) and all(
+        ev_by_id.get(trk.get("id"), {}).get("shippable", False)
+        for trk in tracks
+    )
+    if any_prereq_failing:
+        print("  Prerequisites are failing on one or more active tracks (mis-declared).")
+        print("  Fix the YAML or re-open the relevant track.")
+    elif all_shippable:
+        print("  All completion criteria pass on every active track. Close the shippable ones.")
         print("  Edit docs/governance/ACTIVE_TRACK.yaml:")
-        print("    - move active_track block to closed_tracks")
-        print("    - declare the new active_track block")
+        print("    - move the shippable active_tracks item(s) to closed_tracks")
+        print("    - declare any successor track block(s)")
         print("  Run: python3 scripts/governance/render_active_track_includes.py")
-    elif next_items:
-        print("  Pick from next_items in ACTIVE_TRACK.yaml. Suggested order:")
-        for item in next_items[:5]:
-            tag = " (blocker)" if item.get("blocker") else ""
-            print(f"    - [{item.get('kind', '?')}]{tag} {item.get('what', '')[:80]}")
     else:
-        print("  No next_items declared. Add to ACTIVE_TRACK.yaml or pick from BR-* open items.")
+        printed_any = False
+        for trk in tracks:
+            next_items = trk.get("next_items", []) or []
+            ev = ev_by_id.get(trk.get("id"), {})
+            if ev.get("shippable"):
+                print(f"  [{trk.get('id')}] SHIPPABLE — close it and declare its successor.")
+                printed_any = True
+                continue
+            if not next_items:
+                continue
+            primary_tag = " [PRIMARY]" if trk.get("primary") else ""
+            print(f"  next_items for [{trk.get('id')}]{primary_tag}:")
+            for item in next_items[:5]:
+                tag = " (blocker)" if item.get("blocker") else ""
+                print(f"    - [{item.get('kind', '?')}]{tag} {item.get('what', '')[:80]}")
+            printed_any = True
+        if not printed_any:
+            print("  No next_items declared. Add to ACTIVE_TRACK.yaml or pick from BR-* open items.")
     print()
     print("=" * 72)
     print("SEE-ALSO LINKS")

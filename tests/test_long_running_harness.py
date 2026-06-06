@@ -22,11 +22,12 @@ def write_active_track(repo: Path) -> None:
     path.parent.mkdir(parents=True)
     path.write_text(
         """
-schema_version: 1
-active_track:
-  id: command-plane-phase-2-context-shell-2026-05
-  name: Command Plane Phase 2 Context Shell
-  status: ACTIVE
+schema_version: 2
+active_tracks:
+  - id: command-plane-phase-2-context-shell-2026-05
+    primary: true
+    name: Command Plane Phase 2 Context Shell
+    status: ACTIVE
 closed_tracks: []
 """.lstrip(),
         encoding="utf-8",

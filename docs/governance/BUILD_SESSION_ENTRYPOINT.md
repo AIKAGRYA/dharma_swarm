@@ -48,7 +48,9 @@ The governing principle behind whatever track is active: **one strategic seam, e
      Do not hand-edit. Run scripts/governance/render_active_track_includes.py
      after updating the YAML. -->
 
-**Active track:** Goodworks DGM Core — verifiable MRV loop and agent-first surface
+**Active tracks:** 1 (1-10 supported; primary shown below)
+
+**Primary track:** Goodworks DGM Core — verifiable MRV loop and agent-first surface
 **Track id:** `goodworks-dgm-core-2026-05`
 **Status:** ACTIVE
 **Verified at:** 2026-05-21 (TTL 14 days)

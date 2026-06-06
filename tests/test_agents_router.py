@@ -97,15 +97,38 @@ def test_read_active_track_id_parses_active_track_block(tmp_path, monkeypatch) -
                 "closed_tracks:",
                 "  - id: old-track",
                 "",
-                "active_track:",
-                "  id: goodworks-dgm-core-2026-05",
-                "  status: ACTIVE",
+                "active_tracks:",
+                "  - id: goodworks-dgm-core-2026-05",
+                "    primary: true",
+                "    status: ACTIVE",
             ]
         )
     )
     monkeypatch.setattr(agents_router, "_REPO_ROOT", tmp_path)
 
     assert agents_router._read_active_track_id() == "goodworks-dgm-core-2026-05"
+
+
+def test_read_active_track_id_returns_primary_from_multi_track(tmp_path, monkeypatch) -> None:
+    """With multiple active tracks, the primary (not just the first) is returned."""
+    governance_dir = tmp_path / "docs" / "governance"
+    governance_dir.mkdir(parents=True)
+    (governance_dir / "ACTIVE_TRACK.yaml").write_text(
+        "\n".join(
+            [
+                "active_tracks:",
+                "  - id: secondary-track",
+                "    status: ACTIVE",
+                "  - id: primary-track",
+                "    primary: true",
+                "    status: ACTIVE",
+                "closed_tracks: []",
+            ]
+        )
+    )
+    monkeypatch.setattr(agents_router, "_REPO_ROOT", tmp_path)
+
+    assert agents_router._read_active_track_id() == "primary-track"
 
 
 def test_list_agents_includes_identity_fields(monkeypatch, isolated_shared_ontology) -> None:

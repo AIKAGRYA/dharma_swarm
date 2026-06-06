@@ -1,13 +1,17 @@
 # Active Track Evidence
 
-Generated: 2026-06-06T12:18:30+09:00
-Track: `goodworks-dgm-core-2026-05`
+Generated: 2026-06-06T13:02:34+09:00
+Active tracks: **1** (primary: `goodworks-dgm-core-2026-05`)
 Coordination: `one strategic active track; many coordinated work lanes`
+
+## Track `goodworks-dgm-core-2026-05` (primary)
+
+Status: ACTIVE
 Prerequisites: **OK**
 Completion: **9/9**
 Shippable: **YES**
 
-## Criteria
+### Criteria
 
 - ✓ `command_plane_phase_1_closed` (file_contains) — pattern 'Command Plane Phase 1 shipped' found in docs/governance/ACTIVE_TRACK.yaml
 - ✓ `product_center_onboarding` (file_contains) — pattern 'telos-gated DGM Goodworks Intelligence Core' found in docs/ops/AGENT_ONBOARDING.md
@@ -22,5 +26,5 @@ Shippable: **YES**
 
 ## Findings
 
-- **ERROR** `active-track-stale`: active_track.verified_at is 16 days old (ttl_days=14). Re-verify and bump verified_at, or open a new track block.
-- **INFO** `track-shippable`: All 9 completion criteria pass. Track 'goodworks-dgm-core-2026-05' is SHIPPABLE — close it and declare the next active track.
+- **ERROR** `active-track-stale`: [goodworks-dgm-core-2026-05] verified_at is 16 days old (ttl_days=14). Re-verify and bump verified_at, or close this track.
+- **INFO** `track-shippable`: [goodworks-dgm-core-2026-05] All 9 completion criteria pass. Track is SHIPPABLE — close it or declare its successor.

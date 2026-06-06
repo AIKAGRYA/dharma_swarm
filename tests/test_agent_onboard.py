@@ -140,12 +140,18 @@ def test_broken_register_parser_missing_file(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 
 def test_active_track_evidence_is_consumed_when_present():
-    """When evidence JSON exists, the script must reference its ID."""
-    if not (REPO_ROOT / "reports/governance/active_track_evidence.json").exists():
+    """When evidence JSON exists, the script must reference the primary track id."""
+    if not (REPORT := REPO_ROOT / "reports/governance/active_track_evidence.json").exists():
         pytest.skip("evidence file not present in this checkout")
+    import json
+    primary_id = json.loads(REPORT.read_text()).get("active_track_id")
+    assert primary_id, "evidence JSON must carry the primary track id alias"
     result = _run_onboard()
-    # The active_track id from ACTIVE_TRACK.yaml should appear somewhere.
-    assert "cockpit-control-surface-2026-05" in result.stdout or "ACTIVE TRACK" in result.stdout
+    # The primary active track id should appear in the onboard output.
+    assert primary_id in result.stdout, (
+        f"expected primary track id {primary_id!r} in onboard stdout"
+    )
+    assert "ACTIVE TRACK" in result.stdout
 
 
 # ---------------------------------------------------------------------------

@@ -194,27 +194,53 @@ def append_jsonl(path: Path, payload: dict[str, Any]) -> None:
 
 
 def read_active_track(repo_root: Path) -> dict[str, str]:
+    """Bind the harness run to the PRIMARY active track.
+
+    Schema v2 stores `active_tracks:` as a list of 1-10 track mappings. The
+    PGE harness has semantic single-track coupling: a run.json carries exactly
+    one active_track. This binds to the PRIMARY track (the item with
+    `primary: true`, else the first item). A future goal->track selector may
+    override this (e.g. choose the track whose surfaces the goal touches);
+    until then, primary-binding preserves the historical single-track behavior.
+    """
     path = repo_root / "docs/governance/ACTIVE_TRACK.yaml"
     if not path.exists():
         return {"id": "unknown", "name": "unknown", "status": "unknown"}
-    active = False
-    result: dict[str, str] = {}
-    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
-        if line.startswith("active_track:"):
-            active = True
+
+    in_list = False
+    tracks: list[dict[str, str]] = []
+    cur: dict[str, str] | None = None
+    for raw in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        stripped = raw.strip()
+        if not stripped or stripped.startswith("#"):
             continue
-        if active and line and not line.startswith(" "):
+        indent = len(raw) - len(raw.lstrip(" "))
+        if not in_list:
+            if raw.startswith("active_tracks:"):
+                in_list = True
+            continue
+        # A new top-level key at column 0 ends the active_tracks list.
+        if indent == 0:
             break
-        if active:
-            stripped = line.strip()
-            for key in ("id", "name", "status"):
-                prefix = f"{key}:"
-                if stripped.startswith(prefix):
-                    result[key] = stripped[len(prefix):].strip().strip('"')
+        if stripped.startswith("- "):
+            cur = {}
+            tracks.append(cur)
+            body = stripped[2:].strip()
+            stripped = body  # may carry an inline `key: value`
+        if cur is not None and ":" in stripped:
+            key, _, val = stripped.partition(":")
+            key = key.strip()
+            if key in ("id", "name", "status", "primary"):
+                cur[key] = val.strip().strip('"').strip("'")
+
+    if not tracks:
+        return {"id": "unknown", "name": "unknown", "status": "unknown"}
+
+    primary = next((t for t in tracks if str(t.get("primary", "")).lower() == "true"), tracks[0])
     return {
-        "id": result.get("id", "unknown"),
-        "name": result.get("name", "unknown"),
-        "status": result.get("status", "unknown"),
+        "id": primary.get("id", "unknown"),
+        "name": primary.get("name", "unknown"),
+        "status": primary.get("status", "unknown"),
     }
 
 
