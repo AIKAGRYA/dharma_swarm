@@ -1,7 +1,8 @@
 # Active Track Evidence
 
-Generated: 2026-05-21T23:39:30+08:00
+Generated: 2026-06-06T13:03:57+09:00
 Track: `goodworks-dgm-core-2026-05`
+Coordination: `one strategic active track; many coordinated work lanes`
 Prerequisites: **OK**
 Completion: **9/9**
 Shippable: **YES**
@@ -21,4 +22,5 @@ Shippable: **YES**
 
 ## Findings
 
+- **ERROR** `active-track-stale`: active_track.verified_at is 16 days old (ttl_days=14). Re-verify and bump verified_at, or open a new track block.
 - **INFO** `track-shippable`: All 9 completion criteria pass. Track 'goodworks-dgm-core-2026-05' is SHIPPABLE — close it and declare the next active track.

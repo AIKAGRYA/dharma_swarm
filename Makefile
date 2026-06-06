@@ -1,9 +1,9 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts uplift-guards module-budget docops-integrity docops-report dashboard-install dashboard-lint dashboard-build dashboard-status terminal-check frontend-check context-quorum-status context-quorum-init context-quorum-check context-quorum-handoff context-quorum-protect long-harness-init long-harness-status long-harness-validate goodworks-dgm-seed goodworks-dgm-tick goodworks-dgm-status governance-all onboard install-command-plane-stack stack-status go-fmt-check go-test go-vet go-ci
+.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts uplift-guards module-budget module-coherence a2a-score-strict verify-quality-membrane docops-integrity docops-report dashboard-install dashboard-lint dashboard-build dashboard-status terminal-check frontend-check context-quorum-status context-quorum-init context-quorum-check context-quorum-handoff context-quorum-protect long-harness-init long-harness-status long-harness-validate goodworks-dgm-seed goodworks-dgm-tick goodworks-dgm-status governance-all onboard install-command-plane-stack stack-status go-fmt-check go-test go-vet go-ci
 
-PYTHON ?= python3
+PYTHON ?= $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
 GO ?= go
 GOFMT ?= gofmt
 SEMGREP ?= scripts/governance/run_semgrep_with_ca.sh
@@ -42,6 +42,9 @@ help:
 	@echo "  make governance-baseline Capture scanner baselines"
 	@echo "  make test-contracts Run governance contract tests"
 	@echo "  make uplift-guards Run uplift pre-commit guards"
+	@echo "  make module-coherence Run source-only module naming/coherence inventory"
+	@echo "  make a2a-score-strict Fail closed when live A2A queue readiness is degraded"
+	@echo "  make verify-quality-membrane Run deterministic anti-vibe quality membrane"
 	@echo "  make docops-integrity Run machine-verifiable documentation checks"
 	@echo "  make docops-report Generate local DocOps JSON/Markdown reports"
 	@echo "  make dashboard-install Install dashboard deps with CI-compatible peer handling"
@@ -59,7 +62,7 @@ help:
 	@echo "  make goodworks-dgm-seed Seed the local Goodworks MRV pilot ledger"
 	@echo "  make goodworks-dgm-tick Run one bounded Goodworks DGM dry-run tick"
 	@echo "  make goodworks-dgm-status Print Goodworks DGM status JSON"
-	@echo "  make onboard      Render current operating reality (active track, live ops, broken register, axioms)"
+	@echo "  make onboard      Render operating reality (active track, parallel lanes, dirty pressure, live ops)"
 	@echo "  make install-command-plane-stack  Install MCPs required by command-plane-redesign-2026-05 (idempotent)"
 	@echo "  make stack-status  Verify MCP servers for the command-plane stack"
 	@echo "  make go-ci        Run Go evidence sense-organ fmt/vet/test gates"
@@ -106,10 +109,10 @@ live:
 	TINY_ROUTER_BACKEND=heuristic dgc orchestrate-live
 
 test:
-	python -m pytest tests/ -q --tb=short -x -m "not slow and not docker and not network"
+	$(PYTHON) -m pytest tests/ -q --tb=short -x -m "not slow and not docker and not network"
 
 test-fast:
-	python -m pytest tests/ -q --tb=line -x --timeout=10
+	$(PYTHON) -m pytest tests/ -q --tb=line -x --timeout=10 -m "not slow and not docker and not network"
 
 lint:
 	ruff check dharma_swarm/ --select=E,F,W --ignore=E501
@@ -207,6 +210,15 @@ uplift-guards:
 module-budget:
 	$(PYTHON) scripts/governance/check_module_budget.py \
 		--base-ref origin/main --head-ref HEAD
+
+module-coherence:
+	$(PYTHON) scripts/governance/check_module_coherence.py --repo-root .
+
+a2a-score-strict:
+	$(PYTHON) scripts/governance/check_a2a_readiness.py --strict
+
+verify-quality-membrane:
+	$(PYTHON) scripts/governance/verify_quality_membrane.py --repo-root .
 
 docops-integrity:
 	$(PYTHON) scripts/docops/check_docops_integrity.py

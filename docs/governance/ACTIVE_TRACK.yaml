@@ -1,6 +1,6 @@
 # ACTIVE_TRACK.yaml
 #
-# THE ONLY PLACE where the current build track is declared.
+# THE ONLY PLACE where the current strategic build track is declared.
 #
 # Other governance docs (CLAUDE.md, SOVEREIGN_MANIFEST.md, BUILD_SESSION_ENTRYPOINT.md)
 # render their "current track" line from this file via the DOCOPS include
@@ -23,7 +23,10 @@
 schema_version: 1
 
 # ---------------------------------------------------------------------------
-# Active track (exactly one block with status=ACTIVE at any time)
+# Active track (exactly one strategic north-star block with status=ACTIVE at any time).
+# This is not a global mutex on implementation work. Parallel work lanes are
+# allowed when they are named, scoped, isolated, and receipted under
+# parallel_lane_policy below.
 # ---------------------------------------------------------------------------
 # Companion file (control-plane surface inventory; read alongside this track):
 #   ACTIVE_SURFACE_MANIFEST.yaml — declares api_routers, state_dir, dashboard_nav,
@@ -130,6 +133,26 @@ active_track:
       what: "Register the Goodworks DGM MCP server in Codex only if the operator wants this repo-local server globally exposed."
       kind: tooling
       blocker: false
+
+# ---------------------------------------------------------------------------
+# Parallel work lane policy
+# ---------------------------------------------------------------------------
+# The active track preserves strategic coherence; it does not deny the repo's
+# actual multi-agent, multi-worktree reality. Any parallel lane must declare
+# its scope and evidence trail so hygiene/integrity survive concurrency.
+parallel_lane_policy:
+  model: "one strategic active track; many coordinated work lanes"
+  allowed: true
+  strategic_track_role: "north-star, acceptance gates, non-goals, and authority boundaries"
+  lane_requirements:
+    - "Bind every new agent to the active strategic track or to an explicit exception lane."
+    - "Use an isolated worktree/branch or a ds-goal/AgentOps packet for implementation lanes."
+    - "Declare owner, branch/worktree, allowed surfaces, verification command, and receipt path before broad edits."
+    - "Do not write into unrelated dirty files; inspect existing changes before touching a modified file."
+    - "Record handoff/receipts before stopping; abandoned lanes must be marked stale or prunable."
+    - "Promotion requires tests/checks plus an explicit merge or closeout receipt."
+  root_worktree_policy: "The primary worktree may coordinate and write receipts, but broad implementation should move to an isolated lane when dirty pressure is high."
+  cleanup_policy: "Prunable worktrees and stale branches are cleanup candidates only after receipt review; never delete unreviewed user work."
 
 # ---------------------------------------------------------------------------
 # Closed tracks (history, append-only; do not edit prior entries)

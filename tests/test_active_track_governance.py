@@ -50,6 +50,10 @@ def test_active_track_loads() -> None:
     assert active.get("status") in {"ACTIVE", "SHIPPABLE"}, \
         f"unexpected status: {active.get('status')!r}"
     assert active.get("verified_at"), "active_track.verified_at is required."
+    lane_policy = track.get("parallel_lane_policy")
+    assert lane_policy, "ACTIVE_TRACK.yaml must declare the parallel lane policy."
+    assert lane_policy.get("allowed") is True
+    assert "strategic active track" in lane_policy.get("model", "")
 
 
 def test_check_track_status_runs() -> None:
@@ -59,6 +63,7 @@ def test_check_track_status_runs() -> None:
     assert EVIDENCE.exists(), "evidence JSON must be written"
     payload = json.loads(EVIDENCE.read_text())
     assert "active_track_id" in payload
+    assert payload.get("coordination_model", {}).get("allowed") is True
     assert "criteria" in payload
     assert isinstance(payload["criteria"], list)
 

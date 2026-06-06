@@ -1,6 +1,21 @@
 {
-  "generated_at": "2026-05-21T23:39:30+08:00",
+  "generated_at": "2026-06-06T13:03:57+09:00",
   "active_track_id": "goodworks-dgm-core-2026-05",
+  "coordination_model": {
+    "model": "one strategic active track; many coordinated work lanes",
+    "allowed": true,
+    "strategic_track_role": "north-star, acceptance gates, non-goals, and authority boundaries",
+    "lane_requirements": [
+      "Bind every new agent to the active strategic track or to an explicit exception lane.",
+      "Use an isolated worktree/branch or a ds-goal/AgentOps packet for implementation lanes.",
+      "Declare owner, branch/worktree, allowed surfaces, verification command, and receipt path before broad edits.",
+      "Do not write into unrelated dirty files; inspect existing changes before touching a modified file.",
+      "Record handoff/receipts before stopping; abandoned lanes must be marked stale or prunable.",
+      "Promotion requires tests/checks plus an explicit merge or closeout receipt."
+    ],
+    "root_worktree_policy": "The primary worktree may coordinate and write receipts, but broad implementation should move to an isolated lane when dirty pressure is high.",
+    "cleanup_policy": "Prunable worktrees and stale branches are cleanup candidates only after receipt review; never delete unreviewed user work."
+  },
   "shippable": true,
   "prerequisites_ok": true,
   "completion_progress": {
@@ -70,6 +85,12 @@
     }
   ],
   "findings": [
+    {
+      "severity": "ERROR",
+      "check": "active-track-stale",
+      "message": "active_track.verified_at is 16 days old (ttl_days=14). Re-verify and bump verified_at, or open a new track block.",
+      "criterion_id": null
+    },
     {
       "severity": "INFO",
       "check": "track-shippable",

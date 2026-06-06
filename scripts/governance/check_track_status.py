@@ -340,6 +340,7 @@ def emit_reports(findings: list[Finding], crit_results: list[CriterionResult],
     payload = {
         "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
         "active_track_id": (track or {}).get("active_track", {}).get("id"),
+        "coordination_model": (track or {}).get("parallel_lane_policy", {}),
         "shippable": shippable,
         "prerequisites_ok": prereqs_ok,
         "completion_progress": {
@@ -356,6 +357,7 @@ def emit_reports(findings: list[Finding], crit_results: list[CriterionResult],
           "",
           f"Generated: {payload['generated_at']}",
           f"Track: `{payload['active_track_id']}`",
+          f"Coordination: `{payload['coordination_model'].get('model', 'one active track')}`",
           f"Prerequisites: **{'OK' if prereqs_ok else 'FAILED'}**",
           f"Completion: **{payload['completion_progress']['passed']}/"
           f"{payload['completion_progress']['total']}**",

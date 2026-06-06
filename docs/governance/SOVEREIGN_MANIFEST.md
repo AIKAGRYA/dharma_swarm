@@ -10,7 +10,7 @@
 
 **Substrate-nativeness status**: The current runtime is ~10–15% ontology-native; ~85–90% of runtime work bypasses substrate. See [`reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md`](../../reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md) for the audit that established this estimate.
 
-**Active build track**: declared in [`ACTIVE_TRACK.yaml`](ACTIVE_TRACK.yaml) and surfaced by `make onboard`. Do not duplicate the track name in prose here — the YAML is the single source of intent. The governing principle: do not open additional tracks until the active seam ships.
+**Strategic active build track**: declared in [`ACTIVE_TRACK.yaml`](ACTIVE_TRACK.yaml) and surfaced by `make onboard`. Do not duplicate the track name in prose here — the YAML is the single source of intent. The governing principle: one strategic north-star track can coordinate many parallel implementation lanes, but every lane must be named, scoped, isolated where practical, verified, and receipted.
 
 <!-- ACTIVE_TRACK:START -->
 
@@ -114,11 +114,11 @@ These are the ground-truth metrics. All other documents citing different numbers
 | Top-level (flat) modules | **388 (56.2%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
 | Total Python LOC | **284,384** | wc -l across dharma_swarm Python modules |
 | Test files | **616** | find tests -name "*.py" -type f |
-| Test functions | **10,621 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Test functions | **10,622 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
 | Markdown files | **863** | find . -name "*.md" -type f |
-| Markdown total lines | **203,376** | wc -l across all .md |
+| Markdown total lines | **203,378** | wc -l across all .md |
 | Bridge files | **23** | find dharma_swarm -name "*bridge*.py" |
 | Adapter files | **18 across 7 locations** | find dharma_swarm -type f \| rg -i "adapter" |
 | Orchestrator files | **4** (6,034 LOC total) | find dharma_swarm -name "*orchestrat*" |

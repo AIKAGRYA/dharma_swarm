@@ -26,16 +26,23 @@ def _load_module():
     return mod
 
 
+def _run_onboard() -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [sys.executable, str(ONBOARD_SCRIPT), "--fast"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+
 # ---------------------------------------------------------------------------
 # End-to-end: the command must exit 0 even when state is stale
 # ---------------------------------------------------------------------------
 
 def test_onboard_exits_zero_in_repo():
     """agent_onboard.py must always exit 0; staleness is informational."""
-    result = subprocess.run(
-        [sys.executable, str(ONBOARD_SCRIPT)],
-        cwd=REPO_ROOT, capture_output=True, text=True, timeout=60,
-    )
+    result = _run_onboard()
     assert result.returncode == 0, (
         f"agent_onboard.py must never hard-gate (exit={result.returncode})\n"
         f"stdout tail:\n{result.stdout[-400:]}\nstderr tail:\n{result.stderr[-400:]}"
@@ -44,13 +51,11 @@ def test_onboard_exits_zero_in_repo():
 
 def test_onboard_renders_required_sections():
     """All owner-section headers must appear in the rendered output."""
-    result = subprocess.run(
-        [sys.executable, str(ONBOARD_SCRIPT)],
-        cwd=REPO_ROOT, capture_output=True, text=True, timeout=60,
-    )
+    result = _run_onboard()
     required = [
         "DHARMA SWARM — AGENT ONBOARDING",
         "ACTIVE TRACK",
+        "PARALLEL WORK LANES",
         "LIVE OPS SNAPSHOT",
         "SURFACE MANIFEST HEALTH",
         "BROKEN REGISTER",
@@ -64,12 +69,17 @@ def test_onboard_renders_required_sections():
         assert header in result.stdout, f"missing onboarding section: {header}"
 
 
+def test_onboard_renders_parallel_lane_reality():
+    """New agents must not confuse the strategic track with a one-lane repo."""
+    result = _run_onboard()
+    assert "one strategic active track; many coordinated work lanes" in result.stdout
+    assert "not a global mutex" in result.stdout
+    assert "lane requirements" in result.stdout.lower()
+
+
 def test_tooling_first_includes_wiki_and_memory():
     """The TOOLING-FIRST section must list wiki and memory MCP tools."""
-    result = subprocess.run(
-        [sys.executable, str(ONBOARD_SCRIPT)],
-        cwd=REPO_ROOT, capture_output=True, text=True, timeout=60,
-    )
+    result = _run_onboard()
     assert "wiki show" in result.stdout, "TOOLING-FIRST must mention wiki show"
     assert "wiki search" in result.stdout, "TOOLING-FIRST must mention wiki search"
     assert "memory MCP" in result.stdout, "TOOLING-FIRST must mention memory MCP"
@@ -133,10 +143,7 @@ def test_active_track_evidence_is_consumed_when_present():
     """When evidence JSON exists, the script must reference its ID."""
     if not (REPO_ROOT / "reports/governance/active_track_evidence.json").exists():
         pytest.skip("evidence file not present in this checkout")
-    result = subprocess.run(
-        [sys.executable, str(ONBOARD_SCRIPT)],
-        cwd=REPO_ROOT, capture_output=True, text=True, timeout=60,
-    )
+    result = _run_onboard()
     # The active_track id from ACTIVE_TRACK.yaml should appear somewhere.
     assert "cockpit-control-surface-2026-05" in result.stdout or "ACTIVE TRACK" in result.stdout
 
@@ -162,10 +169,7 @@ def test_onboard_does_not_write_to_owners():
         return hashlib.sha256(p.read_bytes()).hexdigest()
 
     before = {p: digest(p) for p in owner_files}
-    subprocess.run(
-        [sys.executable, str(ONBOARD_SCRIPT)],
-        cwd=REPO_ROOT, capture_output=True, text=True, timeout=60,
-    )
+    _run_onboard()
     after = {p: digest(p) for p in owner_files}
     for p in owner_files:
         assert before[p] == after[p], f"agent_onboard.py must not mutate owner file {p}"
