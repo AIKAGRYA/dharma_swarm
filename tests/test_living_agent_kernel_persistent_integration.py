@@ -279,3 +279,112 @@ def test_no_provider_client_and_no_writes_outside_tmp(tmp_path):
     assert (base / "proof_ledger.jsonl").resolve() in after
     assert (base / "wake_ledger.jsonl").resolve() in after
     assert agent._witness_log.resolve() in after
+
+
+# -- consumer wire-in: the REAL wake() path, flag-gated ---------------------
+#
+# Everything above drives the kernel seam DIRECTLY. The tests below drive the
+# real ``PersistentAgent.wake()`` hot-path method (the 10-step conductor
+# heartbeat) with the OFF-BY-DEFAULT flag ON, proving the consumer is wired:
+# the agent's own ReAct execution still runs AND the wake is governed through
+# the kernel, with durable tamper-evident receipts + replay integrity. The
+# ONLY thing stubbed is step 8 (the AutonomousAgent ReAct loop, which would
+# otherwise call a provider LLM) — the kernel seam itself is never monkeypatched
+# and no network is touched.
+
+
+def _stub_react_loop(agent: PersistentAgent, summary: str) -> "AsyncMock":
+    """Replace ONLY the AutonomousAgent ReAct loop (the provider-LLM step) with a
+    real ``AgentResult``. The PersistentAgent.wake() conductor and the kernel
+    governance seam run for real around it."""
+    from unittest.mock import AsyncMock
+
+    from dharma_swarm.autonomous_agent import AgentResult
+
+    react = AsyncMock(
+        return_value=AgentResult(
+            summary=summary, turns=2, tokens_in=11, tokens_out=7, tool_calls_made=0
+        )
+    )
+    agent._agent.wake = react  # type: ignore[method-assign]
+    return react
+
+
+def test_real_wake_method_flag_on_is_governed_and_agent_still_completes(tmp_path):
+    """The real ``PersistentAgent.wake()`` with the flag ON: the agent's own task
+    completes AND the wake is governed — a kernel run + durable proof/wake/witness
+    receipts with replay integrity, all under the agent's own state_dir."""
+    sys.modules.pop("anthropic", None)
+    sys.modules.pop("openai", None)
+
+    agent = _agent(tmp_path / "agent", name="conductor_wireon")
+    react = _stub_react_loop(agent, summary="surveyed control surface; 3 rows reconciled")
+
+    task = "investigate runtime drift in the control surface"
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setenv("DHARMA_PERSISTENT_KERNEL_GOVERNANCE", "1")
+        result_info = asyncio.run(agent.wake(injected_task=task))
+
+    # 1. the agent STILL COMPLETED its own task — observe+govern never replaces it.
+    react.assert_awaited_once_with(task)
+    assert result_info["success"] is True
+    assert result_info["task_source"] == "injected"
+    assert "surveyed control surface" in result_info["summary"]
+
+    # 2. the wake was GOVERNED — the flag-ON result carries kernel facts.
+    assert result_info["kernel_governed"] is True
+    run_id = result_info["kernel_run_id"]
+    assert run_id
+    assert result_info["kernel_status"] in ("completed", "review")
+    assert result_info["kernel_status"] != "failed"
+
+    # 3. durable, tamper-evident receipts live under the agent's OWN state_dir.
+    kernel_dir = agent.state_dir / "living_agent_kernel"
+    proof_rows = _read_jsonl(kernel_dir / "proof_ledger.jsonl")
+    proof = [r for r in proof_rows if r["run_id"] == run_id]
+    assert proof, "expected a durable proof-ledger entry for the governed run"
+    assert proof[0]["agent_uid"] == agent.name
+
+    wake_rows = _read_jsonl(kernel_dir / "wake_ledger.jsonl")
+    wake = [r for r in wake_rows if r["run_id"] == run_id]
+    assert wake, "expected a durable wake-ledger record for the governed run"
+    assert {r["envelope"]["agent_uid"] for r in wake} == {agent.name}
+
+    # the persistent-self-wake witness receipt landed in the agent's witness log.
+    witness_rows = _read_jsonl(agent._witness_log)
+    receipt = [
+        r for r in witness_rows
+        if r.get("run_id") == run_id
+        and r.get("schema_version", "").startswith("dharma_living_agent_kernel_self_wake_receipt")
+    ]
+    assert receipt, "expected a self-wake witness receipt for the governed run"
+    assert receipt[0]["agent_uid"] == agent.name
+    assert receipt[0]["status"] == result_info["kernel_status"]
+
+    # 4. REPLAY INTEGRITY re-read from disk (tamper-evident): a fresh store rooted
+    #    at the agent's kernel dir replays the run and verifies the proof+event
+    #    ledger hash chains.
+    store = KernelRunStore(kernel_dir)
+    replay = store.replay_run(run_id)
+    assert replay.integrity_ok is True
+    assert replay.integrity_errors == []
+    assert any(e.get("payload", {}).get("run_id") == run_id for e in replay.events)
+
+
+def test_flag_off_leaves_wake_ungoverned_and_writes_no_kernel_artifacts(tmp_path):
+    """Flag OFF (env unset): the real wake() completes the agent's task with NO
+    kernel governance keys and NO kernel artifacts written — byte-identical path."""
+    agent = _agent(tmp_path / "agent", name="conductor_off")
+    react = _stub_react_loop(agent, summary="quiet wake, nothing salient")
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.delenv("DHARMA_PERSISTENT_KERNEL_GOVERNANCE", raising=False)
+        result_info = asyncio.run(agent.wake(injected_task="routine survey"))
+
+    react.assert_awaited_once_with("routine survey")
+    assert result_info["success"] is True
+    assert "kernel_governed" not in result_info
+    assert "kernel_run_id" not in result_info
+    assert "kernel_status" not in result_info
+    # no kernel run-store directory was ever created under the agent's state_dir.
+    assert not (agent.state_dir / "living_agent_kernel").exists()
