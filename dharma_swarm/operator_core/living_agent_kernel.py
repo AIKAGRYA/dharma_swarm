@@ -53,7 +53,7 @@ KERNEL_EVENT_STREAM = "kernel_events"
 KERNEL_SOURCE = "operator_core.living_agent_kernel"
 
 READ_ONLY_TOOLS = ("memory_read", "read_file", "search_files", "session_status")
-WRITE_TOOLS = ("apply_patch", "compileall", "pytest")
+WRITE_TOOLS = ("apply_patch", "compileall", "pytest", "memory_write")
 DANGEROUS_TOOLS = ("deploy", "external_outreach", "payment", "publish", "push_merge")
 SELF_EVOLUTION_TOOLS = ("self_edit", "skill_promote")
 EVIDENCE_ONLY_DENIED_TOOLS = (
@@ -1209,6 +1209,15 @@ class LivingAgentKernel:
         self.tool_registry = tool_registry or KernelReadOnlyToolRegistry.default()
         self.workspace_root = Path(workspace_root or Path.cwd()).expanduser().resolve()
         self.persist = persist
+        self._lesson_store: "KernelLessonStore | None" = None
+
+    @property
+    def lesson_store(self) -> "KernelLessonStore":
+        if self._lesson_store is None:
+            from dharma_swarm.operator_core.living_agent_kernel_lessons import KernelLessonStore
+
+            self._lesson_store = KernelLessonStore(self.store.base_dir)
+        return self._lesson_store
 
     def evaluate_authority(self, envelope: AgentRunEnvelope) -> GovernedWorkAdmission:
         return evaluate_governed_work_admission(
@@ -2466,6 +2475,11 @@ class LivingAgentKernel:
             for result in tool_results
         ):
             unsupported_claims.append("write_tool_execution_limited_to_kernel_diff_adapter")
+        if any(
+            result.tool_name == "memory_write" and result.status == "completed"
+            for result in tool_results
+        ):
+            unsupported_claims.append("memory_write_mutation_limited_to_agent_lessons_ledger")
         if any(result.denial_reason == "tool_not_registered_in_kernel_v1" for result in tool_results):
             unsupported_claims.append("write_or_custom_tool_dispatch_not_implemented_in_v1")
 
@@ -2568,6 +2582,8 @@ class LivingAgentKernel:
                 )
             elif tool_name == "apply_patch":
                 result = self._dispatch_apply_patch(envelope, arguments)
+            elif tool_name == "memory_write":
+                result = self._dispatch_memory_write(envelope, arguments)
             else:
                 result = self.tool_registry.dispatch(tool_name=tool_name, arguments=arguments, context=context)
 
@@ -2779,6 +2795,107 @@ class LivingAgentKernel:
                 "files_changed": list(apply_result.files_changed),
                 "backup_paths": dict(apply_result.backup_paths),
                 "rollback_available": bool(apply_result.backup_paths),
+                "provider_execution": False,
+                "subprocess_execution": False,
+            },
+        )
+
+    def _dispatch_memory_write(self, envelope: AgentRunEnvelope, arguments: dict[str, Any]) -> KernelToolResult:
+        if envelope.authority.work_kind != WorkKind.CODE_WRITE:
+            return _tool_result(
+                run_id=envelope.run_id,
+                tool_name="memory_write",
+                status="denied",
+                arguments=arguments,
+                denial_reason="memory_write_requires_code_write_authority",
+            )
+        if not envelope.authority.mission_contract_present or not envelope.authority.workspace_lease_present:
+            return _tool_result(
+                run_id=envelope.run_id,
+                tool_name="memory_write",
+                status="denied",
+                arguments=arguments,
+                denial_reason="memory_write_requires_mission_contract_and_workspace_lease",
+            )
+        if envelope.authority.external_worker_authority == "external_worker_evidence_only":
+            return _tool_result(
+                run_id=envelope.run_id,
+                tool_name="memory_write",
+                status="denied",
+                arguments=arguments,
+                denial_reason="external_worker_evidence_only",
+            )
+        namespace = str(arguments.get("namespace") or "").strip()
+        if not namespace:
+            return _tool_result(
+                run_id=envelope.run_id,
+                tool_name="memory_write",
+                status="denied",
+                arguments=arguments,
+                denial_reason="memory_write_namespace_required",
+            )
+        if namespace not in envelope.memory.write_namespaces:
+            return _tool_result(
+                run_id=envelope.run_id,
+                tool_name="memory_write",
+                status="denied",
+                arguments=arguments,
+                denial_reason="memory_write_namespace_not_declared",
+            )
+        from dharma_swarm.operator_core.living_agent_kernel_lessons import EmptyLessonDeltaError
+
+        delta = str(arguments.get("delta") or "").strip() or str(envelope.memory.proposed_learning_delta or "").strip()
+        if not delta:
+            return _tool_result(
+                run_id=envelope.run_id,
+                tool_name="memory_write",
+                status="failed",
+                arguments=arguments,
+                error="memory_write_requires_delta_or_proposed_learning_delta",
+            )
+        try:
+            receipt = self.lesson_store.append_lesson(
+                envelope.agent_uid,
+                namespace,
+                delta,
+                run_id=envelope.run_id,
+                provenance={
+                    "source": envelope.trigger.source,
+                    "mission_id": envelope.trigger.mission_id,
+                    "task_id": envelope.trigger.task_id,
+                    "correlation_id": envelope.trigger.correlation_id,
+                    "parent_run_id": envelope.trigger.parent_run_id,
+                },
+            )
+        except EmptyLessonDeltaError:
+            return _tool_result(
+                run_id=envelope.run_id,
+                tool_name="memory_write",
+                status="failed",
+                arguments=arguments,
+                error="memory_write_requires_delta_or_proposed_learning_delta",
+            )
+        except ValueError as exc:
+            return _tool_result(
+                run_id=envelope.run_id,
+                tool_name="memory_write",
+                status="denied",
+                arguments=arguments,
+                denial_reason="memory_write_namespace_unsafe",
+                error=f"{type(exc).__name__}:{exc}",
+            )
+        return _tool_result(
+            run_id=envelope.run_id,
+            tool_name="memory_write",
+            status="completed",
+            arguments=arguments,
+            output={
+                "namespace": namespace,
+                "agent_uid": receipt.agent_uid,
+                "delta_hash": receipt.delta_hash,
+                "receipt_hash": receipt.entry_hash,
+                "ledger_sequence": receipt.ledger_sequence,
+                "previous_entry_hash": receipt.previous_entry_hash,
                 "provider_execution": False,
                 "subprocess_execution": False,
             },
