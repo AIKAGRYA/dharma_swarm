@@ -16,7 +16,7 @@ That command renders the current operating reality (active track, live ops, brok
 
 ## 0. What this repo is, in one paragraph
 
-dharma_swarm is a Python multi-agent orchestration runtime with a typed ontology, an immutable kernel, gated proposal flow, an append-only witness log, and an artifact/value loop. The substrates exist. The current failure mode is that most runtime work bypasses them. The current build track is to make one seam ontology-native end-to-end before generalising. Do not introduce new substrates. Wire existing ones.
+dharma_swarm is a Python multi-agent orchestration runtime with a typed ontology, an immutable kernel, gated proposal flow, an append-only witness log, and an artifact/value loop. The substrates exist. The current failure mode is that most runtime work bypasses them. The current strategic build track is the north-star seam and gate set; parallel implementation lanes are allowed only when they stay named, scoped, isolated where practical, verified, and receipted. Do not introduce new substrates. Wire existing ones.
 
 Current substrate-nativeness estimate (from audit): **~10–15% of runtime is ontology-native; ~85–90% bypasses substrate.** Goal of the current track: bring one user-visible seam to 100% native and prove it with tests.
 
@@ -40,7 +40,7 @@ If any of these contradict each other on numbers, trust SOVEREIGN_MANIFEST first
 
 The current build track is declared in [`ACTIVE_TRACK.yaml`](ACTIVE_TRACK.yaml) and surfaced by `make onboard`. **Do not duplicate the track name in prose here** — the YAML is the single source of intent, and any prose copy here will go stale.
 
-The governing principle behind whatever track is active: **one seam, end-to-end, with gates and witness load-bearing**, before any second seam. Do not start work on a parallel seam until the active track’s acceptance criteria pass (visible in the onboarding output) or a new track is declared in `ACTIVE_TRACK.yaml`. Cross-track work fragments the substrate-nativeness measurement and is the failure mode the audit flagged.
+The governing principle behind whatever track is active: **one strategic seam, end-to-end, with gates and witness load-bearing**, while implementation can proceed in multiple coordinated lanes. Do not treat `ACTIVE_TRACK.yaml` as a ban on parallel worktrees. Do treat it as the authority for non-goals, acceptance gates, and lane alignment. Any parallel lane must declare its owner/scope/worktree or ds-goal packet, avoid unrelated dirty files, and leave a receipt before stopping. Unreceipted cross-track work fragments the substrate-nativeness measurement and is the failure mode the audit flagged.
 
 <!-- ACTIVE_TRACK:START -->
 

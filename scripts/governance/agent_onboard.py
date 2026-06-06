@@ -23,6 +23,7 @@ import os
 import re
 import subprocess
 import sys
+from collections import Counter
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -113,11 +114,126 @@ def _doc_staleness(doc_rel: str) -> tuple[int, str]:
     return ((_today() - when).days, subject)
 
 
+def _strip_ref_prefix(branch: str | None) -> str | None:
+    if not branch:
+        return None
+    prefix = "refs/heads/"
+    return branch[len(prefix):] if branch.startswith(prefix) else branch
+
+
+def _parse_worktree_porcelain(text: str) -> list[dict[str, Any]]:
+    """Parse `git worktree list --porcelain` into small dictionaries."""
+    worktrees: list[dict[str, Any]] = []
+    current: dict[str, Any] | None = None
+    for raw in text.splitlines():
+        line = raw.rstrip()
+        if not line:
+            if current is not None:
+                worktrees.append(current)
+                current = None
+            continue
+        if line.startswith("worktree "):
+            if current is not None:
+                worktrees.append(current)
+            current = {
+                "path": line[len("worktree "):].strip(),
+                "head": None,
+                "branch": None,
+                "detached": False,
+                "bare": False,
+                "locked": False,
+                "prunable": False,
+            }
+            continue
+        if current is None:
+            continue
+        if line.startswith("HEAD "):
+            current["head"] = line[len("HEAD "):].strip()
+        elif line.startswith("branch "):
+            current["branch"] = _strip_ref_prefix(line[len("branch "):].strip())
+        elif line == "detached":
+            current["detached"] = True
+        elif line == "bare":
+            current["bare"] = True
+        elif line.startswith("locked"):
+            current["locked"] = True
+        elif line.startswith("prunable"):
+            current["prunable"] = True
+    if current is not None:
+        worktrees.append(current)
+    return worktrees
+
+
+def _lane_family(label: str) -> str:
+    text = label.lower()
+    if "forge" in text or "arena" in text or "measurement" in text:
+        return "forge/measurement"
+    if "living_agent_kernel" in text or "living-agent-kernel" in text:
+        return "living-agent-kernel"
+    if "runtime-truth" in text or "runtime_truth" in text or "spine" in text:
+        return "runtime-truth/spine"
+    if "docops" in text or "governance" in text:
+        return "docops/governance"
+    if "capital" in text or "revenue" in text or "cash" in text:
+        return "capital/revenue"
+    if "pr" in text or "review" in text or "merge-master" in text:
+        return "pr/review/merge"
+    if "cleanup" in text or "repair" in text:
+        return "cleanup/repair"
+    if "goodworks" in text or "dgm" in text:
+        return "goodworks"
+    return "other"
+
+
+def _recent_local_branches(limit: int = 8) -> list[dict[str, str]]:
+    out = git(
+        "for-each-ref",
+        "--sort=-committerdate",
+        "--format=%(refname:short)|%(committerdate:short)|%(subject)",
+        "refs/heads",
+    )
+    branches: list[dict[str, str]] = []
+    for line in out.splitlines():
+        name, sep, rest = line.partition("|")
+        if not sep:
+            continue
+        date_s, _, subject = rest.partition("|")
+        branches.append({"name": name, "date": date_s, "subject": subject})
+        if len(branches) >= limit:
+            break
+    return branches
+
+
+def _work_lane_snapshot() -> dict[str, Any]:
+    worktree_text = git("worktree", "list", "--porcelain")
+    worktrees = _parse_worktree_porcelain(worktree_text) if worktree_text else []
+    for w in worktrees:
+        path = Path(str(w.get("path", "")))
+        w["exists"] = path.exists()
+        w["basename"] = path.name
+
+    branch_text = git("for-each-ref", "--format=%(refname:short)", "refs/heads")
+    local_branches = [line.strip() for line in branch_text.splitlines() if line.strip()]
+    worktree_labels = [
+        " ".join(
+            str(part) for part in (w.get("basename"), w.get("branch")) if part
+        )
+        for w in worktrees
+    ]
+    family_counts = Counter(_lane_family(label) for label in [*local_branches, *worktree_labels])
+    return {
+        "worktrees": worktrees,
+        "local_branch_count": len(local_branches),
+        "recent_branches": _recent_local_branches(),
+        "family_counts": family_counts,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Section renderers (pure-ish; each returns nothing but prints)
 # ---------------------------------------------------------------------------
 
-def render_repo_state() -> None:
+def render_repo_state(*, fast: bool = False) -> None:
     section("DHARMA SWARM — AGENT ONBOARDING")
     branch = git("rev-parse", "--abbrev-ref", "HEAD") or "(detached)"
     sha = git("rev-parse", "--short=10", "HEAD")
@@ -125,8 +241,12 @@ def render_repo_state() -> None:
     # Divergence from origin/main, if known
     ahead = git("rev-list", "--count", "origin/main..HEAD")
     behind = git("rev-list", "--count", "HEAD..origin/main")
-    dirty = git("status", "--porcelain")
-    dirty_count = len([ln for ln in dirty.splitlines() if ln.strip()])
+    dirty_count: int | str
+    if fast:
+        dirty_count = "(skipped in fast mode)"
+    else:
+        dirty = git("status", "--porcelain")
+        dirty_count = len([ln for ln in dirty.splitlines() if ln.strip()])
 
     print(f"Branch       : {branch}")
     print(f"HEAD         : {sha}")
@@ -178,6 +298,78 @@ def render_active_track(evidence: dict[str, Any] | None,
             print(f"        {c.get('detail', '')}")
 
 
+def render_parallel_work_lanes(track: dict[str, Any], *, fast: bool = False) -> None:
+    section("PARALLEL WORK LANES (live git/worktree inventory)")
+    policy = (track or {}).get("parallel_lane_policy") or {}
+    model = policy.get("model") or "one strategic active track; many coordinated work lanes"
+    allowed = policy.get("allowed", True)
+    print(f"  Model      : {model}")
+    print(f"  Allowed    : {'yes' if allowed else 'no'}")
+    print("  Meaning    : ACTIVE_TRACK.yaml is the strategic north-star, not a global mutex.")
+    if policy.get("strategic_track_role"):
+        print(f"  Track role : {policy['strategic_track_role']}")
+
+    snapshot = _work_lane_snapshot()
+    worktrees = snapshot["worktrees"]
+    prunable = [w for w in worktrees if w.get("prunable")]
+    detached = [w for w in worktrees if w.get("detached")]
+    existing = [w for w in worktrees if w.get("exists")]
+
+    print()
+    print("  Local pressure:")
+    print(
+        f"    worktrees={len(worktrees)} existing={len(existing)} "
+        f"prunable={len(prunable)} detached={len(detached)} "
+        f"local_branches={snapshot['local_branch_count']}"
+    )
+    if snapshot["family_counts"]:
+        top = snapshot["family_counts"].most_common(8)
+        print("    lane families: " + ", ".join(f"{name}={count}" for name, count in top))
+
+    current = [
+        w for w in worktrees
+        if w.get("exists") and not w.get("prunable")
+    ][:8]
+    if current:
+        print()
+        print("  Active worktree sample:")
+        for w in current:
+            branch = w.get("branch") or ("(detached)" if w.get("detached") else "(unknown)")
+            head = str(w.get("head") or "")[:10]
+            print(f"    - {w.get('basename')}: {branch} @ {head}")
+
+    if prunable:
+        print()
+        print("  Cleanup candidates:")
+        for w in prunable[:6]:
+            branch = w.get("branch") or ("(detached)" if w.get("detached") else "(unknown)")
+            print(f"    - {w.get('path')} [{branch}]")
+        if len(prunable) > 6:
+            print(f"    ... {len(prunable) - 6} more prunable worktrees")
+        print("    Rule: review receipts before pruning; never delete unreviewed user work.")
+
+    if not fast and snapshot["recent_branches"]:
+        print()
+        print("  Recent local branches:")
+        for branch in snapshot["recent_branches"][:6]:
+            print(f"    - {branch['date']} {branch['name']}: {branch['subject'][:80]}")
+
+    print()
+    print("  Lane requirements:")
+    requirements = policy.get("lane_requirements") or [
+        "Bind work to the active strategic track or an explicit exception lane.",
+        "Use an isolated worktree/branch or ds-goal/AgentOps packet for implementation.",
+        "Declare owner, scope, verification, and receipt path before broad edits.",
+        "Do not write into unrelated dirty files.",
+    ]
+    for req in requirements[:8]:
+        print(f"    - {req}")
+    if policy.get("root_worktree_policy"):
+        print(f"  Root policy: {policy['root_worktree_policy']}")
+    if policy.get("cleanup_policy"):
+        print(f"  Cleanup    : {policy['cleanup_policy']}")
+
+
 def render_product_center() -> None:
     section("PRODUCT CENTER")
     print("  Dharma Swarm is a telos-gated DGM Goodworks Intelligence Core.")
@@ -209,7 +401,7 @@ def render_live_ops() -> None:
             print("  NOTE: dashboard prose may lag reality. Trust git log + this command.")
 
 
-def render_manifest_health() -> None:
+def render_manifest_health(*, fast: bool = False) -> None:
     section("SURFACE MANIFEST HEALTH (owner: ACTIVE_SURFACE_MANIFEST.yaml)")
     if not SURFACE_MANIFEST.exists():
         print("  MISSING — ACTIVE_SURFACE_MANIFEST.yaml not found")
@@ -218,6 +410,9 @@ def render_manifest_health() -> None:
     if days >= 0:
         tag = "stale" if days > SURFACE_MANIFEST_STALE_DAYS else "fresh"
         print(f"  Last git touch: {days}d ago ({tag})")
+    if fast:
+        print("  Health        : skipped in fast mode")
+        return
 
     # Try to call manifest_health.build_health_report() if importable
     try:
@@ -364,7 +559,7 @@ _TOOLING_PROBES: list[tuple[str, dict[str, str], str]] = [
 ]
 
 
-def render_tooling_first() -> None:
+def render_tooling_first(*, fast: bool = False) -> None:
     section("TOOLING-FIRST CONTEXT PASS")
     print("  Before grep/read-heavy investigation in dharma_swarm, prefer:")
     print("  - make onboard")
@@ -380,6 +575,9 @@ def render_tooling_first() -> None:
     print("  - memory MCP open_nodes / search_nodes   — cross-session graph (most-skipped tool)")
     print()
     print("  Tool availability on this machine:")
+    if fast:
+        print("    skipped in fast mode")
+        return
     for label, kwargs, hint in _TOOLING_PROBES:
         ok = _tool_available(**kwargs)
         mark = "✅" if ok else "❌"
@@ -510,24 +708,29 @@ def _load_track_yaml() -> dict[str, Any]:
 # Entry point
 # ---------------------------------------------------------------------------
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
+    args = argv if argv is not None else sys.argv[1:]
+    fast = "--fast" in args or os.environ.get("DHARMA_ONBOARD_FAST") == "1"
     os.chdir(REPO_ROOT)
-    _refresh_evidence()
+    if not fast:
+        _refresh_evidence()
     evidence = _load_evidence()
     track = _load_track_yaml()
 
-    render_repo_state()
+    render_repo_state(fast=fast)
     render_active_track(evidence, track)
+    render_parallel_work_lanes(track, fast=fast)
     render_product_center()
     render_live_ops()
-    render_manifest_health()
+    render_manifest_health(fast=fast)
     render_broken_register()
     render_axioms()
-    render_recent_activity(track)
-    render_decay_watch()
-    render_frontend_readiness()
-    render_context_quorum()
-    render_tooling_first()
+    if not fast:
+        render_recent_activity(track)
+        render_decay_watch()
+        render_frontend_readiness()
+        render_context_quorum()
+    render_tooling_first(fast=fast)
     render_enforcement_and_depth()
 
     section("WHAT TO DO NEXT")
