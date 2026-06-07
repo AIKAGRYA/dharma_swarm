@@ -118,6 +118,13 @@ def render_repo_state() -> None:
         print(f"vs origin/main: ahead {ahead_n}, behind {behind_n}")
     print(f"Dirty files  : {dirty_count}")
     print(f"Today (UTC)  : {_today().isoformat()}")
+    print()
+    print("Remember only: make onboard")
+    if dirty_count:
+        print("Next command : make agent-build-closeout  # before PR/merge handoff")
+    else:
+        print("Next command : make agent-build-preflight # before editing")
+    print("If unsure    : rerun make onboard; it repeats the next command")
 
 
 def render_active_track(evidence: dict[str, Any] | None,
@@ -754,6 +761,9 @@ def render_hygiene_system() -> None:
     latest = baselines[-1].relative_to(REPO_ROOT).as_posix() if baselines else "none yet"
     print(f"  Latest baseline: {latest}")
     print("  AI-agent governance: docs/governance/hygiene/AI_AGENT_GOVERNANCE.md")
+    print("  Deep-dive packet: reports/governance/anti_ai_slop_futureproof_deep_dive_2026-06-07.md")
+    print("  Control backlog: reports/governance/anti_ai_slop_control_backlog_2026-06-08.md")
+    print("  Scan snapshot: reports/governance/anti_ai_slop_scan_snapshot_2026-06-08.json")
     print("  Doctrine: AI-* signals are advisory until promoted through LIFECYCLE.md")
     print("  Run: make hygiene-audit   # non-blocking scan")
     print("  Run: make hygiene-check   # generated docs + pattern integrity")
