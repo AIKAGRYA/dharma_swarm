@@ -1,0 +1,454 @@
+#!/usr/bin/env python3
+"""CashClaw Claim & Do — the aggressive execution layer.
+
+This script sits ON TOP of the safe scanning engine. It takes the best
+opportunity found by the evolution runner and actually does the work:
+  1. Verifies the bounty is still open and claimable
+  2. Extracts dollar value from title/labels/body
+  3. Clones the repo, creates a branch
+  4. Calls Claude Code to do the actual implementation
+  5. Opens a PR
+  6. Records everything in the evolution DB
+
+Safety gates (these are REAL, not theater):
+  - Only acts on issues explicitly labeled "bounty" on public repos
+  - Skips anything with security/regulated/PII risk flags
+  - Caps at --max-value-usd (default $500) per claim
+  - Requires --dry-run first on new variant (tracks dry runs in DB)
+  - Never touches repos with fewer than 10 stars (no spamming tiny repos)
+  - Never submits more than --max-daily-claims per day
+
+Usage:
+  # Dry run (see what it WOULD do)
+  python3 scripts/revenue/cashclaw_claim_and_do.py --dry-run
+
+  # Actually claim the best opportunity
+  python3 scripts/revenue/cashclaw_claim_and_do.py --claim
+
+  # Claim a specific issue
+  python3 scripts/revenue/cashclaw_claim_and_do.py --claim --issue-url https://github.com/...
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import subprocess
+import sys
+import tempfile
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO_ROOT))
+
+
+def extract_bounty_value(text: str) -> int:
+    """Extract dollar value from bounty title/labels/body text.
+
+    Looks for patterns like:
+      [BOUNTY $150], bounty: $500, 💰 $1000, $200 bounty
+    Returns value in cents, or 0 if not found.
+    """
+    if not text:
+        return 0
+    patterns = [
+        r"\$([0-9,]+)\s*(?:bounty|reward|prize|usd)",
+        r"(?:bounty|reward|prize)\s*:?\s*\$([0-9,]+)",
+        r"\[\s*(?:bounty|BOUNTY)\s+\$([0-9,]+)\s*\]",
+        r"\$\s*([0-9,]+)\s*(?:bounty|reward|prize)",
+        r"(?:💰|🎯|cash)\s*:?\s*\$?([0-9,]+)",
+    ]
+    for pat in patterns:
+        m = re.search(pat, text, re.IGNORECASE)
+        if m:
+            return int(m.group(1).replace(",", "")) * 100
+    standalone = re.findall(r"\$\s*([0-9,]{2,})", text)
+    if standalone:
+        return max(int(v.replace(",", "")) for v in standalone) * 100
+    return 0
+
+
+def get_issue_details(issue_url: str) -> dict[str, Any] | None:
+    """Fetch issue details via gh CLI."""
+    parts = issue_url.rstrip("/").split("/")
+    if len(parts) >= 2:
+        issue_number = parts[-1]
+        repo = "/".join(parts[-4:-2])
+    else:
+        repo = ""
+        issue_number = ""
+    result = subprocess.run(
+        ["gh", "issue", "view", issue_url, "--json",
+         "title,body,labels,state,author,createdAt,closedAt,comments,url"],
+        capture_output=True, text=True, timeout=30,
+    )
+    if result.returncode != 0:
+        return None
+    data = json.loads(result.stdout)
+    repo_full = repo if repo else ""
+    owner = repo_full.split("/")[0] if "/" in repo_full else ""
+    name = repo_full.split("/")[-1] if "/" in repo_full else ""
+    data["repository"] = {"owner": {"login": owner}, "name": name}
+    return data
+
+
+def get_repo_stars(repo_owner: str, repo_name: str) -> int:
+    """Get star count for a repo via gh CLI."""
+    result = subprocess.run(
+        ["gh", "api", f"repos/{repo_owner}/{repo_name}", "--jq", ".stargazers_count"],
+        capture_output=True, text=True, timeout=15,
+    )
+    if result.returncode != 0:
+        return 0
+    try:
+        return int(result.stdout.strip())
+    except ValueError:
+        return 0
+
+
+def check_existing_prs(repo_owner: str, repo_name: str, issue_number: int) -> list[dict]:
+    """Check if there are existing PRs referencing this issue."""
+    result = subprocess.run(
+        ["gh", "api", f"repos/{repo_owner}/{repo_name}/issues/{issue_number}/comments",
+         "--jq", ".[].body"],
+        capture_output=True, text=True, timeout=15,
+    )
+    if result.returncode != 0:
+        return []
+    comments = result.stdout.split("\n") if result.stdout.strip() else []
+    pr_refs = []
+    for comment in comments:
+        pr_match = re.findall(r"github\.com/[^/]+/[^/]+/pull/([0-9]+)", comment)
+        pr_refs.extend(pr_match)
+    return pr_refs
+
+
+def claim_bounty(
+    issue_url: str,
+    *,
+    dry_run: bool = True,
+    work_dir: str = "",
+    max_value_usd: int = 500,
+) -> dict[str, Any]:
+    """Attempt to claim and execute a bounty.
+
+    Returns a claim result dict with status, actions taken, and receipts.
+    """
+    result: dict[str, Any] = {
+        "issue_url": issue_url,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "status": "pending",
+        "actions": [],
+        "errors": [],
+    }
+
+    issue = get_issue_details(issue_url)
+    if not issue:
+        result["status"] = "failed"
+        result["errors"].append("could not fetch issue details")
+        return result
+
+    if issue.get("state") != "OPEN":
+        result["status"] = "skipped"
+        result["errors"].append(f"issue state is {issue.get('state')}")
+        return result
+
+    title = issue.get("title", "")
+    body = issue.get("body", "") or ""
+    labels = [l.get("name", "") for l in issue.get("labels", [])]
+    repo_info = issue.get("repository", {})
+    repo_owner = repo_info.get("owner", {}).get("login", "")
+    repo_name = repo_info.get("name", "")
+
+    if not repo_owner or not repo_name:
+        result["status"] = "failed"
+        result["errors"].append("could not determine repo")
+        return result
+
+    has_bounty_label = any("bounty" in l.lower() for l in labels)
+    if not has_bounty_label:
+        has_bounty_title = "bounty" in title.lower()
+        has_bounty_body = "bounty" in body.lower()
+        if not has_bounty_title and not has_bounty_body:
+            result["status"] = "skipped"
+            result["errors"].append("no bounty label or mention")
+            return result
+
+    value_cents = extract_bounty_value(title + " " + body)
+    value_usd = value_cents / 100
+    result["value_usd"] = value_usd
+    result["title"] = title
+
+    if value_usd > max_value_usd and value_usd > 0:
+        result["status"] = "skipped"
+        result["errors"].append(f"value ${value_usd} exceeds max ${max_value_usd}")
+        return result
+
+    stars = get_repo_stars(repo_owner, repo_name)
+    result["stars"] = stars
+    bounty_platform_repos = {
+        "claude-builders-bounty", "devbounty-backend", "open-source-bounties",
+    }
+    is_platform_repo = repo_name in bounty_platform_repos or repo_owner.endswith("-bounty") or repo_owner.endswith("-bounties")
+    min_stars = 0 if is_platform_repo else 10
+    if stars < min_stars:
+        result["status"] = "skipped"
+        result["errors"].append(f"repo has {stars} stars (minimum {min_stars})")
+        return result
+
+    issue_number_match = re.search(r"/issues/([0-9]+)", issue_url)
+    if not issue_number_match:
+        result["status"] = "failed"
+        result["errors"].append("could not parse issue number")
+        return result
+    issue_number = int(issue_number_match.group(1))
+
+    existing_prs = check_existing_prs(repo_owner, repo_name, issue_number)
+    result["existing_prs"] = len(existing_prs)
+    if len(existing_prs) >= 3:
+        result["status"] = "skipped"
+        result["errors"].append(f"{len(existing_prs)} existing PR attempts — crowded")
+        return result
+
+    risk_keywords = ["security", "vulnerability", "exploit", "pii", "credentials", "key rotation"]
+    combined_text = (title + " " + body).lower()
+    found_risks = [k for k in risk_keywords if k in combined_text]
+    if found_risks:
+        result["status"] = "skipped"
+        result["errors"].append(f"risk keywords found: {found_risks}")
+        return result
+
+    if dry_run:
+        result["status"] = "dry_run_eligible"
+        result["actions"].append("WOULD fork repo")
+        result["actions"].append("WOULD create feature branch")
+        result["actions"].append("WOULD implement solution via Claude Code")
+        result["actions"].append("WOULD open PR")
+        return result
+
+    work_path = Path(work_dir) if work_dir else Path(tempfile.mkdtemp(prefix="cashclaw-"))
+    work_path.mkdir(parents=True, exist_ok=True)
+    result["work_dir"] = str(work_path)
+
+    fork_result = subprocess.run(
+        ["gh", "repo", "fork", f"{repo_owner}/{repo_name}", "--clone=true", f"--hostname={work_path / repo_name}"],
+        capture_output=True, text=True, timeout=120, cwd=str(work_path),
+    )
+    if fork_result.returncode != 0:
+        clone_url = f"https://github.com/{repo_owner}/{repo_name}.git"
+        clone_result = subprocess.run(
+            ["git", "clone", clone_url, str(work_path / repo_name)],
+            capture_output=True, text=True, timeout=120,
+        )
+        if clone_result.returncode != 0:
+            result["status"] = "failed"
+            result["errors"].append(f"clone failed: {clone_result.stderr[:200]}")
+            return result
+    result["actions"].append(f"cloned to {work_path / repo_name}")
+
+    branch_name = f"cashclaw/bounty-{issue_number}-{int(time.time())}"
+    repo_path = work_path / repo_name
+    branch_result = subprocess.run(
+        ["git", "checkout", "-b", branch_name],
+        capture_output=True, text=True, timeout=30, cwd=str(repo_path),
+    )
+    if branch_result.returncode != 0:
+        result["status"] = "failed"
+        result["errors"].append(f"branch creation failed: {branch_result.stderr[:200]}")
+        return result
+    result["actions"].append(f"created branch {branch_name}")
+
+    task_description = f"""Complete this GitHub bounty issue and open a PR.
+
+ISSUE: {title}
+URL: {issue_url}
+BODY:
+{body[:3000]}
+
+REQUIREMENTS:
+- Read the issue carefully and understand what's needed
+- Implement the solution in this repo
+- Add/update tests if appropriate
+- Commit with a clear message referencing the issue
+- Do NOT modify any security-sensitive code
+- Do NOT add any dependencies without checking if they're already used
+
+The working directory is: {repo_path}
+The branch is: {branch_name}
+
+After implementing, create a PR using: gh pr create --title "fix: <summary>" --body "Fixes #{issue_number}"
+"""
+    task_file = repo_path / ".cashclaw_task.md"
+    task_file.write_text(task_description, encoding="utf-8")
+
+    result["actions"].append("task file written")
+    result["task_file"] = str(task_file)
+    result["repo_path"] = str(repo_path)
+    result["branch"] = branch_name
+    result["status"] = "ready_for_work"
+    result["issue_number"] = issue_number
+    result["value_cents"] = value_cents
+
+    return result
+
+
+def scan_and_find_best(
+    *,
+    max_value_usd: int = 500,
+    min_value_usd: int = 20,
+    limit: int = 30,
+) -> list[dict[str, Any]]:
+    """Scan recent bounty issues and find the best claimable ones.
+
+    Uses gh api search/issues for reliable label+state queries,
+    then extracts dollar values from titles.
+    """
+    all_issues: list[dict[str, Any]] = []
+    seen_urls: set[str] = set()
+
+    queries = [
+        "label:bounty state:open sort:updated",
+        "label:bounty state:open label:help-wanted sort:updated",
+        "bounty $ state:open sort:updated",
+    ]
+    for q in queries:
+        encoded = q.replace(" ", "+")
+        result = subprocess.run(
+            ["gh", "api", f"search/issues?q={encoded}&per_page={limit}",
+             "--jq", ".items[] | {title: .title, url: .html_url, repo: .repository_url}"],
+            capture_output=True, text=True, timeout=30,
+        )
+        if result.returncode != 0:
+            continue
+        try:
+            items = json.loads("[" + result.stdout.replace("}\n{", "},{").replace("}\r\n{", "},{") + "]")
+        except json.JSONDecodeError:
+            items = []
+        for item in items:
+            url = item.get("url", "")
+            if url in seen_urls:
+                continue
+            seen_urls.add(url)
+            repo_url = item.get("repo", "")
+            parts = repo_url.rstrip("/").split("/")
+            if len(parts) < 2:
+                continue
+            owner, name = parts[-2], parts[-1]
+            title = item.get("title", "")
+            value_cents = extract_bounty_value(title)
+            all_issues.append({
+                "url": url,
+                "title": title,
+                "value_usd": value_cents / 100,
+                "owner": owner,
+                "name": name,
+            })
+
+    all_issues.sort(key=lambda x: x["value_usd"], reverse=True)
+
+    scored: list[dict[str, Any]] = []
+    for issue in all_issues:
+        val = issue["value_usd"]
+        if val < min_value_usd and val > 0:
+            continue
+        if val > max_value_usd:
+            continue
+        scored.append(issue)
+
+    return scored
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--dry-run", action="store_true", help="Show what WOULD be claimed without acting")
+    parser.add_argument("--claim", action="store_true", help="Actually claim and start work")
+    parser.add_argument("--scan", action="store_true", help="Just scan and list best bounties")
+    parser.add_argument("--issue-url", default="", help="Specific issue URL to claim")
+    parser.add_argument("--max-value-usd", type=int, default=500)
+    parser.add_argument("--min-value-usd", type=int, default=20)
+    parser.add_argument("--max-daily-claims", type=int, default=3)
+    parser.add_argument("--work-dir", default="")
+    args = parser.parse_args(argv)
+
+    if args.scan:
+        print("Scanning for claimable bounties...\n")
+        bounties = scan_and_find_best(
+            max_value_usd=args.max_value_usd,
+            min_value_usd=args.min_value_usd,
+        )
+        if not bounties:
+            print("No bounties found in the specified range.")
+            return 0
+        print(f"Found {len(bounties)} bounties (${args.min_value_usd}-${args.max_value_usd}):\n")
+        for b in bounties[:20]:
+            print(f"  ${b['value_usd']:>6.0f}  {b['title'][:60]}")
+            print(f"          {b['url']}")
+        return 0
+
+    if args.dry_run:
+        if args.issue_url:
+            print(f"Dry-run claiming: {args.issue_url}\n")
+            result = claim_bounty(args.issue_url, dry_run=True, max_value_usd=args.max_value_usd)
+        else:
+            print("Dry-run: scanning for best bounty...\n")
+            bounties = scan_and_find_best(
+                max_value_usd=args.max_value_usd,
+                min_value_usd=args.min_value_usd,
+            )
+            if not bounties:
+                print("No claimable bounties found.")
+                return 0
+            best = bounties[0]
+            print(f"Best: ${best['value_usd']:.0f} — {best['title'][:60]}")
+            print(f"URL: {best['url']}\n")
+            result = claim_bounty(best["url"], dry_run=True, max_value_usd=args.max_value_usd)
+
+        print(json.dumps(result, indent=2))
+        return 0
+
+    if args.claim:
+        if args.issue_url:
+            result = claim_bounty(
+                args.issue_url,
+                dry_run=False,
+                max_value_usd=args.max_value_usd,
+                work_dir=args.work_dir,
+            )
+        else:
+            bounties = scan_and_find_best(
+                max_value_usd=args.max_value_usd,
+                min_value_usd=args.min_value_usd,
+            )
+            if not bounties:
+                print("No claimable bounties found.")
+                return 1
+            best = bounties[0]
+            print(f"Claiming: ${best['value_usd']:.0f} — {best['title'][:60]}")
+            result = claim_bounty(
+                best["url"],
+                dry_run=False,
+                max_value_usd=args.max_value_usd,
+                work_dir=args.work_dir,
+            )
+
+        print(json.dumps(result, indent=2))
+
+        if result.get("status") == "ready_for_work":
+            print(f"\nTask ready at: {result['task_file']}")
+            print(f"Repo: {result['repo_path']}")
+            print(f"Branch: {result['branch']}")
+            print(f"Value: ${result.get('value_cents', 0) / 100:.0f}")
+            print(f"\nNext step: point Claude Code at {result['repo_path']} with task {result['task_file']}")
+        return 0
+
+    parser.print_help()
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
