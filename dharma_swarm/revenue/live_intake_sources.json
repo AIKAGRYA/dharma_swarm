@@ -1,0 +1,83 @@
+[
+  {
+    "source_config_id": "github-bounty-open-updated-v3",
+    "source_type": "github",
+    "url": "https://api.github.com/search/issues?q=label:bounty+state:open&sort=updated&order=desc&per_page=50",
+    "adapter_name": "github_search_api",
+    "host_allowlist": ["api.github.com"],
+    "network_enabled": true,
+    "freshness_window_hours": 24
+  },
+  {
+    "source_config_id": "github-bounty-algora",
+    "source_type": "github",
+    "url": "https://api.github.com/search/issues?q=label:bounty+state:open+org:algora-io&sort=updated&order=desc&per_page=50",
+    "adapter_name": "github_search_api",
+    "host_allowlist": ["api.github.com"],
+    "network_enabled": true,
+    "freshness_window_hours": 24
+  },
+  {
+    "source_config_id": "github-bounty-polar",
+    "source_type": "github",
+    "url": "https://api.github.com/search/issues?q=label:bounty+state:open+label:polar&sort=updated&order=desc&per_page=50",
+    "adapter_name": "github_search_api",
+    "host_allowlist": ["api.github.com"],
+    "network_enabled": true,
+    "freshness_window_hours": 24
+  },
+  {
+    "source_config_id": "github-bounty-fastapi",
+    "source_type": "github",
+    "url": "https://api.github.com/search/issues?q=label:bounty+state:open+repo:fastapi/fastapi&sort=updated&order=desc&per_page=50",
+    "adapter_name": "github_search_api",
+    "host_allowlist": ["api.github.com"],
+    "network_enabled": true,
+    "freshness_window_hours": 48
+  },
+  {
+    "source_config_id": "github-bounty-python-sdk",
+    "source_type": "github",
+    "url": "https://api.github.com/search/issues?q=label:bounty+state:open+label:python&sort=updated&order=desc&per_page=50",
+    "adapter_name": "github_search_api",
+    "host_allowlist": ["api.github.com"],
+    "network_enabled": true,
+    "freshness_window_hours": 48
+  },
+  {
+    "source_config_id": "github-bounty-good-first",
+    "source_type": "github",
+    "url": "https://api.github.com/search/issues?q=label:bounty+state:open+label:%22good+first+issue%22&sort=updated&order=desc&per_page=50",
+    "adapter_name": "github_search_api",
+    "host_allowlist": ["api.github.com"],
+    "network_enabled": true,
+    "freshness_window_hours": 72
+  },
+  {
+    "source_config_id": "github-bounty-security",
+    "source_type": "github",
+    "url": "https://api.github.com/search/issues?q=label:bounty+state:open+label:security&sort=updated&order=desc&per_page=50",
+    "adapter_name": "github_search_api",
+    "host_allowlist": ["api.github.com"],
+    "network_enabled": true,
+    "freshness_window_hours": 72
+  },
+  {
+    "source_config_id": "github-bounty-docs",
+    "source_type": "github",
+    "url": "https://api.github.com/search/issues?q=label:bounty+state:open+label:documentation&sort=updated&order=desc&per_page=50",
+    "adapter_name": "github_search_api",
+    "host_allowlist": ["api.github.com"],
+    "network_enabled": true,
+    "freshness_window_hours": 72
+  },
+  {
+    "source_config_id": "github-bounty-testing",
+    "source_type": "github",
+    "url": "https://api.github.com/search/issues?q=label:bounty+state:open+label:testing&sort=updated&order=desc&per_page=50",
+    "adapter_name": "github_search_api",
+    "host_allowlist": ["api.github.com"],
+    "network_enabled": true,
+    "freshness_window_hours": 72
+  }
+]
