@@ -1,0 +1,75 @@
+{
+  "$schema": "dharma_external_agent_registration_manifest.v1",
+  "schema_version": "dharma_external_agent_registration_manifest.v1",
+  "agent_uid": "qwen_code",
+  "callsign": "qwen-code",
+  "display_name": "Qwen Code",
+  "harness": "qwen_code_cli",
+  "model_identity": "alibaba/qwen-code-runtime",
+  "department": "engineering",
+  "role": "software_engineering_agent",
+  "squad_id": "external",
+  "team_id": "dharma_swarm",
+  "endpoint": "manual://qwen-code/cli",
+  "mailbox": "file://~/.dharma/external_agents/qwen_code/inbox",
+  "authority": "external_worker_evidence_only",
+  "autonomy_policy": {
+    "mode": "manual",
+    "requires_approval": true,
+    "can_approve_prs": false,
+    "can_write_source": false,
+    "can_mutate_meta_dharma": false,
+    "can_mutate_telos": false,
+    "can_mutate_dharma_kernel": false,
+    "can_mutate_dgm_protected": false,
+    "can_author_context_bundles": false,
+    "explicit_task_assignment_required": true
+  },
+  "workspace_policy": {
+    "sandbox_root": "~/.dharma/external_agents/qwen_code",
+    "repo_writes_allowed": false,
+    "canonical_dharma_dir_writes_allowed": false
+  },
+  "memory_namespace": "agent:qwen_code",
+  "trace_identity": "trace:qwen_code",
+  "status": "registered",
+  "notes": "Stage-1 evidence-only software engineering agent. Qwen Code CLI harness running Alibaba's Qwen model. Enters dharma_swarm as a persistent external agent capable of code reading, writing, refactoring, test execution, codebase exploration, shell execution, file operations, and multi-agent delegation. Does not write source or approve work without explicit operator assignment.",
+  "registration_source": "operator_request_2026_06_06_qwen_code_agent",
+  "capabilities": [
+    "software_engineering",
+    "code_reading",
+    "code_writing",
+    "code_refactoring",
+    "test_execution",
+    "codebase_exploration",
+    "shell_execution",
+    "file_operations",
+    "multi_agent_delegation",
+    "dharma_swarm_onboarding"
+  ],
+  "metadata": {
+    "operator": "dhyana",
+    "primary_repo": "/Users/dhyana/dharma_swarm",
+    "working_root": "/Users/dhyana",
+    "required_first_reads": [
+      "docs/ops/AGENT_ONBOARDING.md",
+      "docs/agents/PERSISTENT_AGENT_ONBOARDING_PACKET.md"
+    ],
+    "summon_phrase": "Call qwen-code",
+    "summon_contract": "Assume the qwen_code identity. Read your registration/home surfaces, then answer with evidence-backed software engineering guidance or dharma_swarm operational support. Do not edit repo files unless explicitly assigned.",
+    "automatic_authority_inheritance": false,
+    "llm_provider": "alibaba",
+    "llm_model_policy": "Qwen Code CLI runtime; verify per session"
+  },
+  "registration_desk": {
+    "require_own_system_interpretation": true,
+    "require_action_log": true,
+    "require_wake_receipts": false,
+    "ops_hooks": {
+      "canonical_onboarding": true,
+      "kaizen_ops_event": true,
+      "stigmergy_mark": true,
+      "agentops_contract": true
+    }
+  }
+}
