@@ -107,35 +107,67 @@ def query(
 
 
 def _query_wiki(text: str, *, limit: int) -> tuple[list[GraphHit], str | None]:
-    trusted = staging_mod.TRUSTED_DEFAULT
-    if not trusted.exists():
-        return [], f"trusted wiki root missing: {trusted}"
+    # W2 (2026-06-07; fairness-fixed 2026-06-08): query the trusted tier AND the
+    # governance-gated atoms/, mocs/, inter_agent/ dirs. concepts/ holds ~4900
+    # files; iterating it first under a single shared limit starved the smaller
+    # tiers (any query with >=limit concept matches returned zero atoms). Scan
+    # each root independently (capped at `limit`), then round-robin merge so every
+    # matching tier is represented near the top.
+    roots = [
+        staging_mod.TRUSTED_DEFAULT,                 # concepts/
+        staging_mod.WIKI_ROOT / "atoms",
+        staging_mod.WIKI_ROOT / "mocs",
+        staging_mod.WIKI_ROOT / "inter_agent",
+    ]
+    roots = [r for r in roots if r.exists()]
+    if not roots:
+        return [], f"no wiki roots present under {staging_mod.WIKI_ROOT}"
+    if not isinstance(text, str):
+        return [], "non-string query"
     needles = [part for part in text.lower().split() if part]
-    hits: list[GraphHit] = []
-    for path in sorted(trusted.glob("*.md")):
-        try:
-            raw = path.read_text(encoding="utf-8")
-        except OSError:
-            continue
-        haystack = raw.lower()
-        if needles and not all(needle in haystack for needle in needles):
-            continue
-        title = _extract_title(raw) or path.stem.replace("-", " ").title()
-        try:
-            rel = path.relative_to(staging_mod.WIKI_ROOT)
-        except ValueError:
-            rel = path
-        hits.append(
-            GraphHit(
-                source="wiki",
-                kind="page",
-                id=rel.as_posix(),
-                label=title,
-                payload={"path": str(path)},
+    if not needles:
+        # Empty/whitespace query: all(... for needle in []) is True, which would
+        # match every file. Treat as a no-op rather than flooding the results.
+        return [], "empty query"
+
+    def _scan(root):
+        found: list[GraphHit] = []
+        for path in sorted(root.rglob("*.md")):
+            try:
+                raw = path.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                continue
+            haystack = raw.lower()
+            if not all(needle in haystack for needle in needles):
+                continue
+            title = _extract_title(raw) or path.stem.replace("-", " ").title()
+            try:
+                rel = path.relative_to(staging_mod.WIKI_ROOT)
+            except ValueError:
+                rel = path
+            found.append(
+                GraphHit(
+                    source="wiki",
+                    kind="page",
+                    id=rel.as_posix(),
+                    label=title,
+                    payload={"path": str(path)},
+                )
             )
-        )
-        if len(hits) >= limit:
-            break
+            if len(found) >= limit:
+                break
+        return found
+
+    per_root = [_scan(root) for root in roots]
+    hits: list[GraphHit] = []
+    depth = 0
+    while len(hits) < limit and any(depth < len(found) for found in per_root):
+        for found in per_root:
+            if depth < len(found):
+                hits.append(found[depth])
+                if len(hits) >= limit:
+                    break
+        depth += 1
     return hits, None
 
 
