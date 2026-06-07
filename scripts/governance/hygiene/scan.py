@@ -21,10 +21,8 @@ DEFAULT_OUTPUT_DIR = Path("docs/governance/hygiene/baselines")
 
 def run_detector(command: str, repo_root: Path, timeout: int) -> tuple[int, str]:
     result = subprocess.run(
-        command,
+        ["/bin/bash", "-lc", command],
         cwd=repo_root,
-        shell=True,
-        executable="/bin/bash",
         capture_output=True,
         text=True,
         timeout=timeout,
