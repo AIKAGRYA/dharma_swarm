@@ -1,0 +1,15 @@
+{
+  "result_id": "cycle-v0-broad-9fd802ca-20260607T145023105139Z",
+  "variant_id": "v0-broad-9fd802ca",
+  "cycle_timestamp": "2026-06-07T14:50:35.017525+00:00",
+  "opportunities_found": 10,
+  "opportunities_above_threshold": 10,
+  "opportunities_submitted": 0,
+  "revenue_earned_cents": 0,
+  "cost_cents": 0,
+  "top_opportunity_value_cents": 0,
+  "avg_score": 93.0,
+  "sources_hit": 212,
+  "errors": 0,
+  "notes": "variant=broad gen=0"
+}

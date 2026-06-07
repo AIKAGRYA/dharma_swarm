@@ -1,0 +1,76 @@
+[
+  {
+    "score": 85,
+    "title": "[BOUNTY $100] HOOK: Pre-tool-use hook that blocks destructive bash commands",
+    "buyer": "claude-builders-bounty/claude-builders-bounty",
+    "value_cents": 0,
+    "risks": [
+      "security_or_bug_bounty"
+    ]
+  },
+  {
+    "score": 85,
+    "title": "Approval Risk Auditor",
+    "buyer": "daydreamsai/agent-bounties",
+    "value_cents": 0,
+    "risks": [
+      "payment_or_wallet_action"
+    ]
+  },
+  {
+    "score": 83,
+    "title": "Cause a CVM exception! (200 Gold)",
+    "buyer": "Convex-Dev/bounties",
+    "value_cents": 0,
+    "risks": []
+  },
+  {
+    "score": 83,
+    "title": "Add an option to mark any of your contact as untrusted",
+    "buyer": "status-im/status-legacy",
+    "value_cents": 0,
+    "risks": []
+  },
+  {
+    "score": 83,
+    "title": "Make Code Review of Namecoin fork to Doichain Node (C/C++)",
+    "buyer": "Doichain/dapp",
+    "value_cents": 0,
+    "risks": []
+  },
+  {
+    "score": 83,
+    "title": "Security: RPC-API-CALL sendrawtransaction needs validation",
+    "buyer": "Doichain/dapp",
+    "value_cents": 0,
+    "risks": []
+  },
+  {
+    "score": 83,
+    "title": "Reduce docker images size of doichain/dapp",
+    "buyer": "Doichain/dapp",
+    "value_cents": 0,
+    "risks": []
+  },
+  {
+    "score": 83,
+    "title": "SSL - REST- Communication between dApps",
+    "buyer": "Doichain/dapp",
+    "value_cents": 0,
+    "risks": []
+  },
+  {
+    "score": 83,
+    "title": "Modify Basic DOI Test before sending out DOI - if Alice sent 0,04 DOI transaction.",
+    "buyer": "Doichain/dapp",
+    "value_cents": 0,
+    "risks": []
+  },
+  {
+    "score": 83,
+    "title": "revoke permission specification and compromised privateKeys approach",
+    "buyer": "Doichain/dapp",
+    "value_cents": 0,
+    "risks": []
+  }
+]

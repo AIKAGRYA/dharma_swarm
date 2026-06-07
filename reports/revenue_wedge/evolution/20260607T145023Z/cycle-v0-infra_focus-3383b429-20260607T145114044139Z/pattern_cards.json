@@ -1,0 +1,1183 @@
+[
+  {
+    "buyer_pain": "## \ud83d\udcb0 Bounty: $100 \u2014 powered by [Opire](https://opire.dev)  ## Description Create a Claude Code `pre-tool-use` hook in Python or bash that intercepts dangerous bash commands before they are executed.  ## Acceptance Criter",
+    "buyer_segment": "claude-builders-bounty/claude-builders-bounty",
+    "confidence": 0.7,
+    "content_hash": "sha256:95867293d68b8bdc859660707c77110a6ab1c544b997a0c3f33412661431961f",
+    "delivery_window_hours": 72,
+    "dharma_experiment": "Prepare a draft-only work plan and local deliverable scaffold for this named request: satisfy source acceptance criteria (Create a Claude Code `pre-tool-use` hook in Python or bash that intercepts; [ ] Hook follows Claude Code hooks format (`~/.claude/hooks/`); [ ] Blocks these patterns: `rm -rf`, `DROP TABLE`, `git push --force`,; `TRUNCATE`, `DELETE FROM` without a WHERE clause); do not claim, comment, bid, submit, or request payment without an Operator Revenue Lease.",
+    "evidence_refs": [
+      "https://github.com/claude-builders-bounty/claude-builders-bounty/issues/3"
+    ],
+    "extraction_method": "structured_parse",
+    "fetched_at": "2026-06-07T14:51:19.172425+00:00",
+    "freshness": "fresh",
+    "license_risk": "unknown",
+    "no_external_side_effects": true,
+    "pattern_card_id": "lipattern_b997a0c3f33412661431961f",
+    "pricing_evidence": [
+      "mentions price $100",
+      "mentions price $100",
+      "mentions price $100"
+    ],
+    "revenue_evidence": [
+      "mentions bounty"
+    ],
+    "risks": [
+      "security_or_bug_bounty"
+    ],
+    "schema_version": "cashclaw_live_pattern_card.v1",
+    "source_item_ids": [
+      "liitem_89b98053082f8a0ddafb9123"
+    ],
+    "source_type": "github",
+    "terms_risk": "unknown",
+    "tool_stack": [
+      "Codex",
+      "pytest",
+      "repo scanner",
+      "markdown report",
+      "named-demand verification"
+    ],
+    "url": "https://github.com/claude-builders-bounty/claude-builders-bounty/issues/3",
+    "what_is_being_built": "[BOUNTY $100] HOOK: Pre-tool-use hook that blocks destructive bash commands"
+  },
+  {
+    "buyer_pain": "## Summary Fuzz the `/attest/submit` endpoint with malformed payloads and produce a structured report separating handled validation failures from actual server-side bugs.  ## Why This Matters This bounty is a fast securi",
+    "buyer_segment": "Scottcjn/rustchain-bounties",
+    "confidence": 0.55,
+    "content_hash": "sha256:d83ccda6b23da263d6c37e10211ab26a151dbd34edd179c21d9d896edeb06ac9",
+    "delivery_window_hours": 72,
+    "dharma_experiment": "Prepare a draft-only work plan and local deliverable scaffold for this named request: satisfy source acceptance criteria ([ ] at least 100 malformed or adversarial payloads are tested; [ ] payload categories include missing fields, wrong types, oversized input, and injection-style attempts; [ ] report distinguishes expected 400-class validation failures from 500-class bugs or worse; [ ] findings are presented in a structured format maintainers can review quickly); do not claim, comment, bid, submit, or request payment without an Operator Revenue Lease.",
+    "evidence_refs": [
+      "https://github.com/Scottcjn/rustchain-bounties/issues/1112"
+    ],
+    "extraction_method": "structured_parse",
+    "fetched_at": "2026-06-07T14:51:19.172741+00:00",
+    "freshness": "fresh",
+    "license_risk": "unknown",
+    "no_external_side_effects": true,
+    "pattern_card_id": "lipattern_edd179c21d9d896edeb06ac9",
+    "pricing_evidence": [],
+    "revenue_evidence": [
+      "mentions bounty"
+    ],
+    "risks": [
+      "non_cash_or_token_reward",
+      "security_or_bug_bounty"
+    ],
+    "schema_version": "cashclaw_live_pattern_card.v1",
+    "source_item_ids": [
+      "liitem_6e603b2a4205bf60c7b46b7c"
+    ],
+    "source_type": "github",
+    "terms_risk": "unknown",
+    "tool_stack": [
+      "Codex",
+      "pytest",
+      "repo scanner",
+      "markdown report",
+      "named-demand verification"
+    ],
+    "url": "https://github.com/Scottcjn/rustchain-bounties/issues/1112",
+    "what_is_being_built": "[BOUNTY: 10 RTC] Fuzz the /attest/submit Endpoint"
+  },
+  {
+    "buyer_pain": "## Purpose Flag unlimited or stale ERC-20 / NFT approvals and build revoke calls.  ## Specification  **Job:** Detect risky approvals and output safe revocation data.  **Inputs:** - `wallet` - Wallet address to audit - `c",
+    "buyer_segment": "daydreamsai/agent-bounties",
+    "confidence": 0.7,
+    "content_hash": "sha256:81b736911726f9db141d1c2cff39b0e23c9d3b7543140e400248a738af6d19e3",
+    "delivery_window_hours": 72,
+    "dharma_experiment": "Prepare a draft-only work plan and local deliverable scaffold for this named request: satisfy source acceptance criteria (\u2705 Matches Etherscan approval data for top tokens; \u2705 Identifies unlimited and stale approvals; \u2705 Provides valid revocation transaction data; \u2705 **Must be deployed on a domain and reachable via x402); do not claim, comment, bid, submit, or request payment without an Operator Revenue Lease.",
+    "evidence_refs": [
+      "https://github.com/daydreamsai/agent-bounties/issues/5"
+    ],
+    "extraction_method": "structured_parse",
+    "fetched_at": "2026-06-07T14:51:19.172949+00:00",
+    "freshness": "fresh",
+    "license_risk": "unknown",
+    "no_external_side_effects": true,
+    "pattern_card_id": "lipattern_43140e400248a738af6d19e3",
+    "pricing_evidence": [
+      "mentions price $1000"
+    ],
+    "revenue_evidence": [
+      "mentions bounty"
+    ],
+    "risks": [
+      "payment_or_wallet_action"
+    ],
+    "schema_version": "cashclaw_live_pattern_card.v1",
+    "source_item_ids": [
+      "liitem_d4d9f4e238d748cefad6d7b4"
+    ],
+    "source_type": "github",
+    "terms_risk": "unknown",
+    "tool_stack": [
+      "Codex",
+      "pytest",
+      "repo scanner",
+      "markdown report",
+      "named-demand verification"
+    ],
+    "url": "https://github.com/daydreamsai/agent-bounties/issues/5",
+    "what_is_being_built": "Approval Risk Auditor"
+  },
+  {
+    "buyer_pain": "## Bounty Overview  Build note-level locking for the warpSpeed Notes experience using biometrics, device authentication, or a user-defined PIN.  This bounty gives users a private vault inside Notes. Users should be able ",
+    "buyer_segment": "warpspeedopen-source/warpspeed-bounties",
+    "confidence": 0.7,
+    "content_hash": "sha256:76737c5ed9b9ff1fa142a5e9aefddb146a86b6d41ec1bfb8bb72d28fcd044371",
+    "delivery_window_hours": 72,
+    "dharma_experiment": "Prepare a draft-only work plan and local deliverable scaffold for this named request: satisfy source acceptance criteria (## View Full Bounty Details & Sign Up); do not claim, comment, bid, submit, or request payment without an Operator Revenue Lease.",
+    "evidence_refs": [
+      "https://github.com/warpspeedopen-source/warpspeed-bounties/issues/7"
+    ],
+    "extraction_method": "structured_parse",
+    "fetched_at": "2026-06-07T14:51:19.173179+00:00",
+    "freshness": "fresh",
+    "license_risk": "unknown",
+    "no_external_side_effects": true,
+    "pattern_card_id": "lipattern_1ec1bfb8bb72d28fcd044371",
+    "pricing_evidence": [
+      "mentions price $660",
+      "mentions price $660\n\n",
+      "mentions price $660\n\n"
+    ],
+    "revenue_evidence": [
+      "mentions paid",
+      "mentions bounty"
+    ],
+    "risks": [
+      "auth_or_sensitive_security",
+      "requires_signup_or_credentials"
+    ],
+    "schema_version": "cashclaw_live_pattern_card.v1",
+    "source_item_ids": [
+      "liitem_f39a40c63d0ae752b7c70c0b"
+    ],
+    "source_type": "github",
+    "terms_risk": "unknown",
+    "tool_stack": [
+      "Codex",
+      "pytest",
+      "repo scanner",
+      "markdown report",
+      "named-demand verification"
+    ],
+    "url": "https://github.com/warpspeedopen-source/warpspeed-bounties/issues/7",
+    "what_is_being_built": "[PAID BOUNTY - $660] Note Locking - Biometrics/PIN"
+  },
+  {
+    "buyer_pain": "## Overview  RustChain is migrating from an account-based balance model to a full UTXO (Unspent Transaction Output) model. **Phase 1+2 just landed** in [`39bf02b`](https://github.com/Scottcjn/Rustchain/commit/39bf02b).  ",
+    "buyer_segment": "Scottcjn/rustchain-bounties",
+    "confidence": 0.7,
+    "content_hash": "sha256:6e27d525407f6ba4f9c8a95d33b060a446c76068431faf5dabadf926c196bf6b",
+    "delivery_window_hours": 72,
+    "dharma_experiment": "Prepare a draft-only work plan and local deliverable scaffold for this named request: produce a task-specific local patch, docs update, or report for `[BOUNTY] Red Team UTXO Implementation \u2014 Find Bugs, Earn RTC (50-200 RTC)`; do not claim, comment, bid, submit, or request payment without an Operator Revenue Lease.",
+    "evidence_refs": [
+      "https://github.com/Scottcjn/rustchain-bounties/issues/2819"
+    ],
+    "extraction_method": "structured_parse",
+    "fetched_at": "2026-06-07T14:51:19.173394+00:00",
+    "freshness": "fresh",
+    "license_risk": "unknown",
+    "no_external_side_effects": true,
+    "pattern_card_id": "lipattern_431faf5dabadf926c196bf6b",
+    "pricing_evidence": [
+      "mentions price $0.10"
+    ],
+    "revenue_evidence": [
+      "mentions paid",
+      "mentions bounty"
+    ],
+    "risks": [
+      "non_cash_or_token_reward",
+      "payment_or_wallet_action",
+      "security_or_bug_bounty"
+    ],
+    "schema_version": "cashclaw_live_pattern_card.v1",
+    "source_item_ids": [
+      "liitem_3cdc23f3eb5a9e2070fc63bb"
+    ],
+    "source_type": "github",
+    "terms_risk": "unknown",
+    "tool_stack": [
+      "Codex",
+      "pytest",
+      "repo scanner",
+      "markdown report",
+      "named-demand verification"
+    ],
+    "url": "https://github.com/Scottcjn/rustchain-bounties/issues/2819",
+    "what_is_being_built": "[BOUNTY] Red Team UTXO Implementation \u2014 Find Bugs, Earn RTC (50-200 RTC)"
+  },
+  {
+    "buyer_pain": "Target bounty: Scottcjn/rustchain-bounties#66 Reporter: eunseobchoi Prepared patch branch: bounty-66-x402-hardening Prepared patch commit: bb9975d Local artifact: /home/user/bounty-submissions/rustchain-66/SECURITY_REPOR",
+    "buyer_segment": "eunseobchoi/NIPS26_A_CV2024",
+    "confidence": 0.55,
+    "content_hash": "sha256:29aba398f1ae2ffc4482c160852f6754b590770aa90537c70078d64bbb33e38d",
+    "delivery_window_hours": 72,
+    "dharma_experiment": "Prepare a draft-only work plan and local deliverable scaffold for this named request: produce a task-specific local patch, docs update, or report for `RustChain #66 x402 bounty: report and patch ready, direct target write blocked`; do not claim, comment, bid, submit, or request payment without an Operator Revenue Lease.",
+    "evidence_refs": [
+      "https://github.com/eunseobchoi/NIPS26_A_CV2024/issues/5"
+    ],
+    "extraction_method": "structured_parse",
+    "fetched_at": "2026-06-07T14:51:19.173560+00:00",
+    "freshness": "fresh",
+    "license_risk": "unknown",
+    "no_external_side_effects": true,
+    "pattern_card_id": "lipattern_a90537c70078d64bbb33e38d",
+    "pricing_evidence": [],
+    "revenue_evidence": [
+      "mentions client",
+      "mentions bounty"
+    ],
+    "risks": [
+      "security_or_bug_bounty"
+    ],
+    "schema_version": "cashclaw_live_pattern_card.v1",
+    "source_item_ids": [
+      "liitem_4e29ccb4444152ca791fb1a8"
+    ],
+    "source_type": "github",
+    "terms_risk": "unknown",
+    "tool_stack": [
+      "Codex",
+      "pytest",
+      "repo scanner",
+      "markdown report",
+      "named-demand verification"
+    ],
+    "url": "https://github.com/eunseobchoi/NIPS26_A_CV2024/issues/5",
+    "what_is_being_built": "RustChain #66 x402 bounty: report and patch ready, direct target write blocked"
+  },
+  {
+    "buyer_pain": "Wave: PrivacyLayer ZK Wave 2 Issue Key: ZK-073 Area: withdraw Priority: High Drips Complexity: High ## Summary Recipient binding is not the only mismatch. Relayer handling still mixes zero-field sentinels, decoded addres",
+    "buyer_segment": "ANAVHEOBA/PrivacyLayer",
+    "confidence": 0.55,
+    "content_hash": "sha256:0c0697fb545184906681b7d930f6fe7fd20773edf1b5e1b8c6db2f7ba7ca0d8e",
+    "delivery_window_hours": 72,
+    "dharma_experiment": "Prepare a draft-only work plan and local deliverable scaffold for this named request: satisfy source acceptance criteria (Relayer handling no longer depends on ad hoc zero-address assumptions in multiple modules.; The contract accepts only relayer encodings that the SDK can produce canonically.; Regression tests distinguish absent relayer from malformed relayer cleanly.); do not claim, comment, bid, submit, or request payment without an Operator Revenue Lease.",
+    "evidence_refs": [
+      "https://github.com/ANAVHEOBA/PrivacyLayer/issues/349"
+    ],
+    "extraction_method": "structured_parse",
+    "fetched_at": "2026-06-07T14:51:19.173769+00:00",
+    "freshness": "fresh",
+    "license_risk": "unknown",
+    "no_external_side_effects": true,
+    "pattern_card_id": "lipattern_f1b5e1b8c6db2f7ba7ca0d8e",
+    "pricing_evidence": [],
+    "revenue_evidence": [
+      "mentions bounty"
+    ],
+    "risks": [
+      "payment_or_wallet_action"
+    ],
+    "schema_version": "cashclaw_live_pattern_card.v1",
+    "source_item_ids": [
+      "liitem_826696187ef24dbf627e5bd8"
+    ],
+    "source_type": "github",
+    "terms_risk": "unknown",
+    "tool_stack": [
+      "Codex",
+      "pytest",
+      "repo scanner",
+      "markdown report",
+      "named-demand verification"
+    ],
+    "url": "https://github.com/ANAVHEOBA/PrivacyLayer/issues/349",
+    "what_is_being_built": "ZK-073: Redesign relayer binding and zero-relayer semantics across SDK and contract code"
+  },
+  {
+    "buyer_pain": "Wave: PrivacyLayer ZK Wave 2 Issue Key: ZK-072 Area: withdraw Priority: High Drips Complexity: High ## Summary The SDK currently hashes Stellar addresses into fields while the contract tries to decode a concrete address ",
+    "buyer_segment": "ANAVHEOBA/PrivacyLayer",
+    "confidence": 0.55,
+    "content_hash": "sha256:cc6cbeafef8936e0cfe321bb1e84a0e2a4cfd7f8deb17a7d3485a3709af78508",
+    "delivery_window_hours": 72,
+    "dharma_experiment": "Prepare a draft-only work plan and local deliverable scaffold for this named request: satisfy source acceptance criteria (Add negative tests for mismatched recipient argument versus proof-bound recipient commitment.; The contract no longer attempts to reconstruct an address from an irreversible hash format.; SDK witness generation and contract verification agree on recipient binding rules.; Cross-stack tests show the wrong recipient is rejected deterministically.); do not claim, comment, bid, submit, or request payment without an Operator Revenue Lease.",
+    "evidence_refs": [
+      "https://github.com/ANAVHEOBA/PrivacyLayer/issues/348"
+    ],
+    "extraction_method": "structured_parse",
+    "fetched_at": "2026-06-07T14:51:19.173969+00:00",
+    "freshness": "fresh",
+    "license_risk": "unknown",
+    "no_external_side_effects": true,
+    "pattern_card_id": "lipattern_deb17a7d3485a3709af78508",
+    "pricing_evidence": [],
+    "revenue_evidence": [
+      "mentions bounty"
+    ],
+    "risks": [
+      "payment_or_wallet_action"
+    ],
+    "schema_version": "cashclaw_live_pattern_card.v1",
+    "source_item_ids": [
+      "liitem_9ed4bf64ccde6350d1af01c5"
+    ],
+    "source_type": "github",
+    "terms_risk": "unknown",
+    "tool_stack": [
+      "Codex",
+      "pytest",
+      "repo scanner",
+      "markdown report",
+      "named-demand verification"
+    ],
+    "url": "https://github.com/ANAVHEOBA/PrivacyLayer/issues/348",
+    "what_is_being_built": "ZK-072: Replace lossy recipient decoding with a verifiable address-binding strategy"
+  },
+  {
+    "buyer_pain": "## Bounty reference  Target: claude-builders-bounty/claude-builders-bounty#3  The bounty requires a target PR and `/opire try` issue workflow. I cannot complete those direct upstream steps from this environment because G",
+    "buyer_segment": "eunseobchoi/NIPS26_A_CV2024",
+    "confidence": 0.55,
+    "content_hash": "sha256:1164e422f0ce26e2b1e84a376ee269ccfa2b557d3da907cd1f423ca00f42cb4b",
+    "delivery_window_hours": 72,
+    "dharma_experiment": "Prepare a draft-only work plan and local deliverable scaffold for this named request: produce a task-specific local patch, docs update, or report for `Claude Builders #3 patch artifact: destructive Bash PreToolUse hook`; do not claim, comment, bid, submit, or request payment without an Operator Revenue Lease.",
+    "evidence_refs": [
+      "https://github.com/eunseobchoi/NIPS26_A_CV2024/issues/9"
+    ],
+    "extraction_method": "structured_parse",
+    "fetched_at": "2026-06-07T14:51:19.174132+00:00",
+    "freshness": "fresh",
+    "license_risk": "unknown",
+    "no_external_side_effects": true,
+    "pattern_card_id": "lipattern_3da907cd1f423ca00f42cb4b",
+    "pricing_evidence": [],
+    "revenue_evidence": [
+      "mentions bounty"
+    ],
+    "risks": [
+      "auth_or_sensitive_security",
+      "security_or_bug_bounty"
+    ],
+    "schema_version": "cashclaw_live_pattern_card.v1",
+    "source_item_ids": [
+      "liitem_302987aaeb39590d57ec4fde"
+    ],
+    "source_type": "github",
+    "terms_risk": "unknown",
+    "tool_stack": [
+      "Codex",
+      "pytest",
+      "repo scanner",
+      "markdown report",
+      "named-demand verification"
+    ],
+    "url": "https://github.com/eunseobchoi/NIPS26_A_CV2024/issues/9",
+    "what_is_being_built": "Claude Builders #3 patch artifact: destructive Bash PreToolUse hook"
+  },
+  {
+    "buyer_pain": "## Bounty reference  Target: Human-Connection/Human-Connection#1832  The issue is labeled `security`, `bounty`, and `:moneybag:\u20ac10`. I cannot open a direct upstream PR from this environment because GitHub CLI/user authen",
+    "buyer_segment": "eunseobchoi/NIPS26_A_CV2024",
+    "confidence": 0.55,
+    "content_hash": "sha256:c3aabdd3394284774646faa6d8691c13ed61b2f4b3d6c726b0ec5e4c0cf96fa6",
+    "delivery_window_hours": 72,
+    "dharma_experiment": "Prepare a draft-only work plan and local deliverable scaffold for this named request: produce a task-specific local patch, docs update, or report for `Human-Connection #1832 patch artifact: hide email existence disclosure`; do not claim, comment, bid, submit, or request payment without an Operator Revenue Lease.",
+    "evidence_refs": [
+      "https://github.com/eunseobchoi/NIPS26_A_CV2024/issues/10"
+    ],
+    "extraction_method": "structured_parse",
+    "fetched_at": "2026-06-07T14:51:19.174305+00:00",
+    "freshness": "fresh",
+    "license_risk": "unknown",
+    "no_external_side_effects": true,
+    "pattern_card_id": "lipattern_b3d6c726b0ec5e4c0cf96fa6",
+    "pricing_evidence": [],
+    "revenue_evidence": [
+      "mentions bounty"
+    ],
+    "risks": [
+      "auth_or_sensitive_security",
+      "requires_signup_or_credentials",
+      "security_or_bug_bounty"
+    ],
+    "schema_version": "cashclaw_live_pattern_card.v1",
+    "source_item_ids": [
+      "liitem_f605ccd4ed16419638782c92"
+    ],
+    "source_type": "github",
+    "terms_risk": "unknown",
+    "tool_stack": [
+      "Codex",
+      "pytest",
+      "repo scanner",
+      "markdown report",
+      "named-demand verification"
+    ],
+    "url": "https://github.com/eunseobchoi/NIPS26_A_CV2024/issues/10",
+    "what_is_being_built": "Human-Connection #1832 patch artifact: hide email existence disclosure"
+  },
+  {
+    "buyer_pain": "## Bounty/security reference  Target: IntersectMBO/UPLC-CAPE#187  The public issue asks maintainers to address GHSA-4rp3-v4vj-q537 and includes acceptance criteria to remove submission-local `cape-tests.json` precedence,",
+    "buyer_segment": "eunseobchoi/NIPS26_A_CV2024",
+    "confidence": 0.55,
+    "content_hash": "sha256:75ec5fad0a758f67b912b616583bc8c3bfe51d8dc109d38c7816e751586d2bee",
+    "delivery_window_hours": 72,
+    "dharma_experiment": "Prepare a draft-only work plan and local deliverable scaffold for this named request: satisfy source acceptance criteria (I cannot open a direct upstream PR from this environment because GitHub CLI authentication/fork creation is unavailable and the connector cannot write to target repositories.); do not claim, comment, bid, submit, or request payment without an Operator Revenue Lease.",
+    "evidence_refs": [
+      "https://github.com/eunseobchoi/NIPS26_A_CV2024/issues/8"
+    ],
+    "extraction_method": "structured_parse",
+    "fetched_at": "2026-06-07T14:51:19.174478+00:00",
+    "freshness": "fresh",
+    "license_risk": "unknown",
+    "no_external_side_effects": true,
+    "pattern_card_id": "lipattern_c109d38c7816e751586d2bee",
+    "pricing_evidence": [],
+    "revenue_evidence": [
+      "mentions bounty"
+    ],
+    "risks": [
+      "auth_or_sensitive_security",
+      "security_or_bug_bounty"
+    ],
+    "schema_version": "cashclaw_live_pattern_card.v1",
+    "source_item_ids": [
+      "liitem_1630ca6c1a7e213411ab34b4"
+    ],
+    "source_type": "github",
+    "terms_risk": "unknown",
+    "tool_stack": [
+      "Codex",
+      "pytest",
+      "repo scanner",
+      "markdown report",
+      "named-demand verification"
+    ],
+    "url": "https://github.com/eunseobchoi/NIPS26_A_CV2024/issues/8",
+    "what_is_being_built": "UPLC-CAPE #187 security patch: reject submission-local cape-tests.json"
+  },
+  {
+    "buyer_pain": "The goal of this bounty is to compromise the Actor security model. Convex depends on a security model such that the only code that should be executed in the Actor's context is code deployed or permitted to be executed by",
+    "buyer_segment": "Convex-Dev/bounties",
+    "confidence": 0.55,
+    "content_hash": "sha256:787ac8e39ca374196868472f0e9b7bc7880c23377e85438139e2b66e557fe3c8",
+    "delivery_window_hours": 48,
+    "dharma_experiment": "Prepare a draft-only work plan and local deliverable scaffold for this named request: produce a task-specific local patch, docs update, or report for `Subvert Actor security (500 Gold)`; do not claim, comment, bid, submit, or request payment without an Operator Revenue Lease.",
+    "evidence_refs": [
+      "https://github.com/Convex-Dev/bounties/issues/3"
+    ],
+    "extraction_method": "structured_parse",
+    "fetched_at": "2026-06-07T14:51:19.174596+00:00",
+    "freshness": "fresh",
+    "license_risk": "unknown",
+    "no_external_side_effects": true,
+    "pattern_card_id": "lipattern_7e85438139e2b66e557fe3c8",
+    "pricing_evidence": [],
+    "revenue_evidence": [
+      "mentions bounty"
+    ],
+    "risks": [
+      "security_or_bug_bounty"
+    ],
+    "schema_version": "cashclaw_live_pattern_card.v1",
+    "source_item_ids": [
+      "liitem_75f1ef814c9eed738b9acab0"
+    ],
+    "source_type": "github",
+    "terms_risk": "unknown",
+    "tool_stack": [
+      "public web sources",
+      "pricing extractor",
+      "matrix builder",
+      "brief writer",
+      "named-demand verification"
+    ],
+    "url": "https://github.com/Convex-Dev/bounties/issues/3",
+    "what_is_being_built": "Subvert Actor security (500 Gold)"
+  },
+  {
+    "buyer_pain": "Under normal circumstances, the CVM should never throw an exception when executing CVM code.\r \r - Must be caused by invoking valid CVM code in a valid Context (e.g. via `Context.execute(op)`)\r - Must result in a Java exc",
+    "buyer_segment": "Convex-Dev/bounties",
+    "confidence": 0.75,
+    "content_hash": "sha256:590d59f48dca99710583f70650486ca692b45d777394a20b9f2160bffa766749",
+    "delivery_window_hours": 72,
+    "dharma_experiment": "Prepare a draft-only work plan and local deliverable scaffold for this named request: produce a task-specific local patch, docs update, or report for `Cause a CVM exception! (200 Gold)`; do not claim, comment, bid, submit, or request payment without an Operator Revenue Lease.",
+    "evidence_refs": [
+      "https://github.com/Convex-Dev/bounties/issues/6"
+    ],
+    "extraction_method": "structured_parse",
+    "fetched_at": "2026-06-07T14:51:19.174710+00:00",
+    "freshness": "fresh",
+    "license_risk": "unknown",
+    "no_external_side_effects": true,
+    "pattern_card_id": "lipattern_7394a20b9f2160bffa766749",
+    "pricing_evidence": [],
+    "revenue_evidence": [
+      "mentions bounty"
+    ],
+    "risks": [],
+    "schema_version": "cashclaw_live_pattern_card.v1",
+    "source_item_ids": [
+      "liitem_3fcd20ed0bc051393009a645"
+    ],
+    "source_type": "github",
+    "terms_risk": "unknown",
+    "tool_stack": [
+      "Codex",
+      "pytest",
+      "repo scanner",
+      "markdown report",
+      "named-demand verification"
+    ],
+    "url": "https://github.com/Convex-Dev/bounties/issues/6",
+    "what_is_being_built": "Cause a CVM exception! (200 Gold)"
+  },
+  {
+    "buyer_pain": "The objective of this bounty is to steal at least one copper coin from any Account on the Convex test network *without knowledge of the account's private key*.\r \r Requirements:\r - Must exploit a technical or security fla",
+    "buyer_segment": "Convex-Dev/bounties",
+    "confidence": 0.55,
+    "content_hash": "sha256:510075e90fed72ea6416827df43f4afd55304536bd8a39cf2c8d4e4ecc39062b",
+    "delivery_window_hours": 48,
+    "dharma_experiment": "Prepare a draft-only work plan and local deliverable scaffold for this named request: produce a task-specific local patch, docs update, or report for `Steal a copper coin! (500 Gold)`; do not claim, comment, bid, submit, or request payment without an Operator Revenue Lease.",
+    "evidence_refs": [
+      "https://github.com/Convex-Dev/bounties/issues/2"
+    ],
+    "extraction_method": "structured_parse",
+    "fetched_at": "2026-06-07T14:51:19.174817+00:00",
+    "freshness": "fresh",
+    "license_risk": "unknown",
+    "no_external_side_effects": true,
+    "pattern_card_id": "lipattern_bd8a39cf2c8d4e4ecc39062b",
+    "pricing_evidence": [],
+    "revenue_evidence": [
+      "mentions bounty"
+    ],
+    "risks": [
+      "security_or_bug_bounty"
+    ],
+    "schema_version": "cashclaw_live_pattern_card.v1",
+    "source_item_ids": [
+      "liitem_fd3e510ab31ebc324cef298e"
+    ],
+    "source_type": "github",
+    "terms_risk": "unknown",
+    "tool_stack": [
+      "public web sources",
+      "pricing extractor",
+      "matrix builder",
+      "brief writer",
+      "named-demand verification"
+    ],
+    "url": "https://github.com/Convex-Dev/bounties/issues/2",
+    "what_is_being_built": "Steal a copper coin! (500 Gold)"
+  },
+  {
+    "buyer_pain": "## :bug: Bugreport\r <!-- Describe your issue in detail. Include screenshots if needed. Give us as much information as possible. Use a clear and concise description of what the bug is.-->\r \r When you change your email add",
+    "buyer_segment": "Human-Connection/Human-Connection",
+    "confidence": 0.55,
+    "content_hash": "sha256:485a3cbc25ec3854cc077da9860c27e438a51313a837ebc8de71a157f7221929",
+    "delivery_window_hours": 72,
+    "dharma_experiment": "Prepare a draft-only work plan and local deliverable scaffold for this named request: produce a task-specific local patch, docs update, or report for `\ud83d\udc1b [Bug] Unnecessary disclosure if email address exists`; do not claim, comment, bid, submit, or request payment without an Operator Revenue Lease.",
+    "evidence_refs": [
+      "https://github.com/Human-Connection/Human-Connection/issues/1832"
+    ],
+    "extraction_method": "structured_parse",
+    "fetched_at": "2026-06-07T14:51:19.174948+00:00",
+    "freshness": "fresh",
+    "license_risk": "unknown",
+    "no_external_side_effects": true,
+    "pattern_card_id": "lipattern_a837ebc8de71a157f7221929",
+    "pricing_evidence": [],
+    "revenue_evidence": [
+      "mentions bounty"
+    ],
+    "risks": [
+      "auth_or_sensitive_security"
+    ],
+    "schema_version": "cashclaw_live_pattern_card.v1",
+    "source_item_ids": [
+      "liitem_257a8128aae24e2822f3cac4"
+    ],
+    "source_type": "github",
+    "terms_risk": "unknown",
+    "tool_stack": [
+      "Codex",
+      "pytest",
+      "repo scanner",
+      "markdown report",
+      "named-demand verification"
+    ],
+    "url": "https://github.com/Human-Connection/Human-Connection/issues/1832",
+    "what_is_being_built": "\ud83d\udc1b [Bug] Unnecessary disclosure if email address exists"
+  },
+  {
+    "buyer_pain": "## Bounty reference  Target: Doichain/dapp#116  The original issue is labeled as a security/bounty/help-wanted item, but both `Doichain/dapp` and `Doichain/meteor-api` are archived and read-only, so I cannot open a direc",
+    "buyer_segment": "eunseobchoi/NIPS26_A_CV2024",
+    "confidence": 0.55,
+    "content_hash": "sha256:6cdae4ff05145b488f4c437cfe0d00191b8a07bbb724b72d676fba8668261a42",
+    "delivery_window_hours": 72,
+    "dharma_experiment": "Prepare a draft-only work plan and local deliverable scaffold for this named request: produce a task-specific local patch, docs update, or report for `Doichain #116 security patch: bound sendrawtransaction body parameters`; do not claim, comment, bid, submit, or request payment without an Operator Revenue Lease.",
+    "evidence_refs": [
+      "https://github.com/eunseobchoi/NIPS26_A_CV2024/issues/7"
+    ],
+    "extraction_method": "structured_parse",
+    "fetched_at": "2026-06-07T14:51:19.175113+00:00",
+    "freshness": "fresh",
+    "license_risk": "unknown",
+    "no_external_side_effects": true,
+    "pattern_card_id": "lipattern_b724b72d676fba8668261a42",
+    "pricing_evidence": [],
+    "revenue_evidence": [
+      "mentions bounty"
+    ],
+    "risks": [
+      "security_or_bug_bounty"
+    ],
+    "schema_version": "cashclaw_live_pattern_card.v1",
+    "source_item_ids": [
+      "liitem_42f92b8a11fffd6f70bd096f"
+    ],
+    "source_type": "github",
+    "terms_risk": "unknown",
+    "tool_stack": [
+      "Codex",
+      "pytest",
+      "repo scanner",
+      "markdown report",
+      "named-demand verification"
+    ],
+    "url": "https://github.com/eunseobchoi/NIPS26_A_CV2024/issues/7",
+    "what_is_being_built": "Doichain #116 security patch: bound sendrawtransaction body parameters"
+  },
+  {
+    "buyer_pain": "Target bounty: Scottcjn/rustchain-bounties#2819 Reporter: eunseobchoi Prepared patch branch: bounty-2819-utxo-redteam Prepared patch commit: 1bf133d60db0016099b73dd45e49da8bd11f5316 Local artifact: /home/user/bounty-subm",
+    "buyer_segment": "eunseobchoi/NIPS26_A_CV2024",
+    "confidence": 0.55,
+    "content_hash": "sha256:b58639acd9277746d89ca8f21d8ebb05b2007e2001ec23612c6ebc6db2b4f60e",
+    "delivery_window_hours": 72,
+    "dharma_experiment": "Prepare a draft-only work plan and local deliverable scaffold for this named request: produce a task-specific local patch, docs update, or report for `RustChain #2819 UTXO red-team finding: malformed field validation hardening`; do not claim, comment, bid, submit, or request payment without an Operator Revenue Lease.",
+    "evidence_refs": [
+      "https://github.com/eunseobchoi/NIPS26_A_CV2024/issues/4"
+    ],
+    "extraction_method": "structured_parse",
+    "fetched_at": "2026-06-07T14:51:19.175305+00:00",
+    "freshness": "fresh",
+    "license_risk": "unknown",
+    "no_external_side_effects": true,
+    "pattern_card_id": "lipattern_01ec23612c6ebc6db2b4f60e",
+    "pricing_evidence": [],
+    "revenue_evidence": [
+      "mentions client",
+      "mentions bounty"
+    ],
+    "risks": [
+      "security_or_bug_bounty"
+    ],
+    "schema_version": "cashclaw_live_pattern_card.v1",
+    "source_item_ids": [
+      "liitem_e21edd30e5b3690fe738b0d0"
+    ],
+    "source_type": "github",
+    "terms_risk": "unknown",
+    "tool_stack": [
+      "Codex",
+      "pytest",
+      "repo scanner",
+      "markdown report",
+      "named-demand verification"
+    ],
+    "url": "https://github.com/eunseobchoi/NIPS26_A_CV2024/issues/4",
+    "what_is_being_built": "RustChain #2819 UTXO red-team finding: malformed field validation hardening"
+  },
+  {
+    "buyer_pain": "Target bounty: Scottcjn/rustchain-bounties#1112 Reporter: eunseobchoi Public report artifact: https://github.com/eunseobchoi/NIPS26_A_CV2024/blob/main/bounty-artifacts/rustchain-1112/ATTEST_SUBMIT_FUZZ_REPORT.md Artifact",
+    "buyer_segment": "eunseobchoi/NIPS26_A_CV2024",
+    "confidence": 0.55,
+    "content_hash": "sha256:1a69c1b2086e1f81b9d5d92522f5e9b9849db80bdc8c982d3b387b0181c53a3f",
+    "delivery_window_hours": 72,
+    "dharma_experiment": "Prepare a draft-only work plan and local deliverable scaffold for this named request: produce a task-specific local patch, docs update, or report for `RustChain #1112 /attest/submit fuzzing proof: 160 local adversarial cases`; do not claim, comment, bid, submit, or request payment without an Operator Revenue Lease.",
+    "evidence_refs": [
+      "https://github.com/eunseobchoi/NIPS26_A_CV2024/issues/6"
+    ],
+    "extraction_method": "structured_parse",
+    "fetched_at": "2026-06-07T14:51:19.175451+00:00",
+    "freshness": "fresh",
+    "license_risk": "unknown",
+    "no_external_side_effects": true,
+    "pattern_card_id": "lipattern_dc8c982d3b387b0181c53a3f",
+    "pricing_evidence": [],
+    "revenue_evidence": [
+      "mentions client",
+      "mentions bounty"
+    ],
+    "risks": [
+      "security_or_bug_bounty"
+    ],
+    "schema_version": "cashclaw_live_pattern_card.v1",
+    "source_item_ids": [
+      "liitem_381b21a0650ea51bc794ffeb"
+    ],
+    "source_type": "github",
+    "terms_risk": "unknown",
+    "tool_stack": [
+      "Codex",
+      "pytest",
+      "repo scanner",
+      "markdown report",
+      "named-demand verification"
+    ],
+    "url": "https://github.com/eunseobchoi/NIPS26_A_CV2024/issues/6",
+    "what_is_being_built": "RustChain #1112 /attest/submit fuzzing proof: 160 local adversarial cases"
+  },
+  {
+    "buyer_pain": "## Feature Description This enhancement focuses on adding robust security measures to protect scraped data and ensure compliance. Given the sensitive nature of social media data, implementing end-to-end encryption and mo",
+    "buyer_segment": "nitininhouse/X-twitter-trends-scrapping",
+    "confidence": 0.55,
+    "content_hash": "sha256:fdfa8e4ca1fac27c8178f35a6743d697baa85747ecef61c93fc9cd9fe0d0b721",
+    "delivery_window_hours": 72,
+    "dharma_experiment": "Prepare a draft-only work plan and local deliverable scaffold for this named request: satisfy source acceptance criteria ([ ] All scraped data is encrypted using AES-256 or equivalent; [ ] Security logs track all data access attempts and changes; [ ] No vulnerabilities detected in security audit using tools like Bandit or Snyk); do not claim, comment, bid, submit, or request payment without an Operator Revenue Lease.",
+    "evidence_refs": [
+      "https://github.com/nitininhouse/X-twitter-trends-scrapping/issues/1"
+    ],
+    "extraction_method": "structured_parse",
+    "fetched_at": "2026-06-07T14:51:19.175580+00:00",
+    "freshness": "fresh",
+    "license_risk": "unknown",
+    "no_external_side_effects": true,
+    "pattern_card_id": "lipattern_ecef61c93fc9cd9fe0d0b721",
+    "pricing_evidence": [],
+    "revenue_evidence": [
+      "mentions bounty"
+    ],
+    "risks": [
+      "auth_or_sensitive_security",
+      "security_or_bug_bounty"
+    ],
+    "schema_version": "cashclaw_live_pattern_card.v1",
+    "source_item_ids": [
+      "liitem_6e3dc02ac6508100e10c1d65"
+    ],
+    "source_type": "github",
+    "terms_risk": "unknown",
+    "tool_stack": [
+      "Codex",
+      "pytest",
+      "repo scanner",
+      "markdown report",
+      "named-demand verification"
+    ],
+    "url": "https://github.com/nitininhouse/X-twitter-trends-scrapping/issues/1",
+    "what_is_being_built": "Implement Enhanced Security Features for X/Twitter Scraping Tool"
+  },
+  {
+    "buyer_pain": "# ProfitHolder contract\r \r Contract with DividendToken BURNER_ROLE (deployed to mainnet).\r \r ## todo\r \r * [ ] `balanceOf(address)` view function need to calculate total amount of holder PROFIT tokens:\r   * [ ] on address",
+    "buyer_segment": "stabilitydao/inception-contracts",
+    "confidence": 0.55,
+    "content_hash": "sha256:8de85b81dc107e7483d5716011677193b80248090dc63dd4a02f016cf94b7d1a",
+    "delivery_window_hours": 48,
+    "dharma_experiment": "Prepare a draft-only work plan and local deliverable scaffold for this named request: produce a task-specific local patch, docs update, or report for `[0.1 eth, 1000 PROFIT] ProfitHolder and SDIV burns`; do not claim, comment, bid, submit, or request payment without an Operator Revenue Lease.",
+    "evidence_refs": [
+      "https://github.com/stabilitydao/inception-contracts/issues/21"
+    ],
+    "extraction_method": "structured_parse",
+    "fetched_at": "2026-06-07T14:51:19.175693+00:00",
+    "freshness": "fresh",
+    "license_risk": "unknown",
+    "no_external_side_effects": true,
+    "pattern_card_id": "lipattern_0dc63dd4a02f016cf94b7d1a",
+    "pricing_evidence": [],
+    "revenue_evidence": [
+      "mentions bounty"
+    ],
+    "risks": [
+      "security_or_bug_bounty"
+    ],
+    "schema_version": "cashclaw_live_pattern_card.v1",
+    "source_item_ids": [
+      "liitem_5420f26df16621d96f07296d"
+    ],
+    "source_type": "github",
+    "terms_risk": "unknown",
+    "tool_stack": [
+      "public web sources",
+      "pricing extractor",
+      "matrix builder",
+      "brief writer",
+      "named-demand verification"
+    ],
+    "url": "https://github.com/stabilitydao/inception-contracts/issues/21",
+    "what_is_being_built": "[0.1 eth, 1000 PROFIT] ProfitHolder and SDIV burns"
+  },
+  {
+    "buyer_pain": "# Feature Issue  [comment]: # (Please replace ... with your information. Remove < and >)  ### User Story  As a user, I want to be able to `Mark a contact as untrusted` **so that** so that the next time I enter the chat w",
+    "buyer_segment": "status-im/status-legacy",
+    "confidence": 0.75,
+    "content_hash": "sha256:8b282fa92bd2619596cfc72b21ef550e27a2a12bb20b41fb27f10a425d83b671",
+    "delivery_window_hours": 72,
+    "dharma_experiment": "Prepare a draft-only work plan and local deliverable scaffold for this named request: satisfy source acceptance criteria (1. The new option `Mark as untrusted` should appear before the option `Block user`, as shown in the [screenshot](https://github.com/user-attachments/assets/9b980472-7eae-44e5-bd35-; 2. There's a thin line dividing destructive actions, this should be implemented (see in [Figma](https://www.figma.com/design/apCsJHT8J58JXbJD2igtbd/Context-Drawers-for-Mobile?node-; 3. The new `Mark as untrusted` option should appear in context menus of any contact, group member, etc. All places where `Block user` appears.; 4. After pressing on `Mark as untrusted`, the bottom sheet in [Figma](https://www.figma.com/design/apCsJHT8J58JXbJD2igtbd/Context-Drawers-for-Mobile?node-id=1219-176276&t=10haPMCUJ); do not claim, comment, bid, submit, or request payment without an Operator Revenue Lease.",
+    "evidence_refs": [
+      "https://github.com/status-im/status-legacy/issues/21393"
+    ],
+    "extraction_method": "structured_parse",
+    "fetched_at": "2026-06-07T14:51:19.175855+00:00",
+    "freshness": "fresh",
+    "license_risk": "unknown",
+    "no_external_side_effects": true,
+    "pattern_card_id": "lipattern_b20b41fb27f10a425d83b671",
+    "pricing_evidence": [],
+    "revenue_evidence": [
+      "mentions client",
+      "mentions bounty"
+    ],
+    "risks": [],
+    "schema_version": "cashclaw_live_pattern_card.v1",
+    "source_item_ids": [
+      "liitem_e94316584edd334b6cdce709"
+    ],
+    "source_type": "github",
+    "terms_risk": "unknown",
+    "tool_stack": [
+      "Codex",
+      "pytest",
+      "repo scanner",
+      "markdown report",
+      "named-demand verification"
+    ],
+    "url": "https://github.com/status-im/status-legacy/issues/21393",
+    "what_is_being_built": "Add an option to mark any of your contact as untrusted"
+  },
+  {
+    "buyer_pain": "# Bug Report  #### Actual behavior  When user deletes his account with biometry `on` and then restores it with biometry `off` then we get still bio `on`  #### Expected behavior   Biometrics should not be cached and if it",
+    "buyer_segment": "status-im/status-legacy",
+    "confidence": 0.55,
+    "content_hash": "sha256:cd3dcfd371ccc26dd9c9e85de1ba6cdccf238da96d920252e38387fc13f684a2",
+    "delivery_window_hours": 72,
+    "dharma_experiment": "Prepare a draft-only work plan and local deliverable scaffold for this named request: produce a task-specific local patch, docs update, or report for `Biometry is ON by default after user restore his profile and skip biometrics step`; do not claim, comment, bid, submit, or request payment without an Operator Revenue Lease.",
+    "evidence_refs": [
+      "https://github.com/status-im/status-legacy/issues/21842"
+    ],
+    "extraction_method": "structured_parse",
+    "fetched_at": "2026-06-07T14:51:19.175967+00:00",
+    "freshness": "fresh",
+    "license_risk": "unknown",
+    "no_external_side_effects": true,
+    "pattern_card_id": "lipattern_6d920252e38387fc13f684a2",
+    "pricing_evidence": [],
+    "revenue_evidence": [
+      "mentions bounty"
+    ],
+    "risks": [
+      "auth_or_sensitive_security"
+    ],
+    "schema_version": "cashclaw_live_pattern_card.v1",
+    "source_item_ids": [
+      "liitem_51edf1dfa5a99b4f107d67f7"
+    ],
+    "source_type": "github",
+    "terms_risk": "unknown",
+    "tool_stack": [
+      "Codex",
+      "pytest",
+      "repo scanner",
+      "markdown report",
+      "named-demand verification"
+    ],
+    "url": "https://github.com/status-im/status-legacy/issues/21842",
+    "what_is_being_built": "Biometry is ON by default after user restore his profile and skip biometrics step"
+  },
+  {
+    "buyer_pain": "Since we forked Namecoin to Doichain, we didn't have the chance of finding a competent person to review our fork from an external perspective and from other blockchain professionals.\r \r We are looking for a competent blo",
+    "buyer_segment": "Doichain/dapp",
+    "confidence": 0.75,
+    "content_hash": "sha256:8c8cdafcd3a2a4a4388b5a671c7cf1f4a3bd83ee2b7e32fb465de9cd767fdca2",
+    "delivery_window_hours": 48,
+    "dharma_experiment": "Prepare a draft-only work plan and local deliverable scaffold for this named request: produce a task-specific local patch, docs update, or report for `Make Code Review of Namecoin fork to Doichain Node (C/C++)`; do not claim, comment, bid, submit, or request payment without an Operator Revenue Lease.",
+    "evidence_refs": [
+      "https://github.com/Doichain/dapp/issues/100"
+    ],
+    "extraction_method": "structured_parse",
+    "fetched_at": "2026-06-07T14:51:19.176096+00:00",
+    "freshness": "fresh",
+    "license_risk": "unknown",
+    "no_external_side_effects": true,
+    "pattern_card_id": "lipattern_2b7e32fb465de9cd767fdca2",
+    "pricing_evidence": [],
+    "revenue_evidence": [
+      "mentions bounty"
+    ],
+    "risks": [],
+    "schema_version": "cashclaw_live_pattern_card.v1",
+    "source_item_ids": [
+      "liitem_a47013240e9b4fbc0fcf71f5"
+    ],
+    "source_type": "github",
+    "terms_risk": "unknown",
+    "tool_stack": [
+      "public web sources",
+      "pricing extractor",
+      "matrix builder",
+      "brief writer",
+      "named-demand verification"
+    ],
+    "url": "https://github.com/Doichain/dapp/issues/100",
+    "what_is_being_built": "Make Code Review of Namecoin fork to Doichain Node (C/C++)"
+  },
+  {
+    "buyer_pain": "The current state of prototype implementation has revealed the possibility that one can request DOI email permissions for \"TO anyone and FROM anyone\". \r \r Example: \r **malicious Carl** could request and potentially hold ",
+    "buyer_segment": "Doichain/dapp",
+    "confidence": 0.55,
+    "content_hash": "sha256:56c26becd98b02c81dc1674c3394c75ff28505b89fa8de205e78a1ecf91e60e8",
+    "delivery_window_hours": 36,
+    "dharma_experiment": "Prepare a draft-only work plan and local deliverable scaffold for this named request: satisfy source acceptance criteria (Add call JSON-RPC-API \"/email/verify\" (verifySenderEmail) (takes an email address) internally it calls meteor-doichain-api function verifySenderEmail, which uses this email-address); do not claim, comment, bid, submit, or request payment without an Operator Revenue Lease.",
+    "evidence_refs": [
+      "https://github.com/Doichain/dapp/issues/114"
+    ],
+    "extraction_method": "structured_parse",
+    "fetched_at": "2026-06-07T14:51:19.176267+00:00",
+    "freshness": "fresh",
+    "license_risk": "unknown",
+    "no_external_side_effects": true,
+    "pattern_card_id": "lipattern_9fa8de205e78a1ecf91e60e8",
+    "pricing_evidence": [],
+    "revenue_evidence": [
+      "mentions bounty"
+    ],
+    "risks": [
+      "payment_or_wallet_action"
+    ],
+    "schema_version": "cashclaw_live_pattern_card.v1",
+    "source_item_ids": [
+      "liitem_8274c18edad1e16f6d83b357"
+    ],
+    "source_type": "github",
+    "terms_risk": "unknown",
+    "tool_stack": [
+      "source adapters",
+      "dedupe",
+      "spreadsheet export",
+      "receipt ledger",
+      "named-demand verification"
+    ],
+    "url": "https://github.com/Doichain/dapp/issues/114",
+    "what_is_being_built": "Verified DOI-Email"
+  },
+  {
+    "buyer_pain": "When calling RPC-API sendrawtransaction please validate and limit the data given over the body parameters to prevent dDoS attacks.\r \r This RPC-Call is located in:\r **meteor-api package:** https://github.com/Doichain/mete",
+    "buyer_segment": "Doichain/dapp",
+    "confidence": 0.75,
+    "content_hash": "sha256:f79e217efe745028b005a21580e83007d138fd7d37bf4d41e4f80c0d7cc84972",
+    "delivery_window_hours": 72,
+    "dharma_experiment": "Prepare a draft-only work plan and local deliverable scaffold for this named request: produce a task-specific local patch, docs update, or report for `Security: RPC-API-CALL sendrawtransaction needs validation`; do not claim, comment, bid, submit, or request payment without an Operator Revenue Lease.",
+    "evidence_refs": [
+      "https://github.com/Doichain/dapp/issues/116"
+    ],
+    "extraction_method": "structured_parse",
+    "fetched_at": "2026-06-07T14:51:19.176378+00:00",
+    "freshness": "fresh",
+    "license_risk": "unknown",
+    "no_external_side_effects": true,
+    "pattern_card_id": "lipattern_37bf4d41e4f80c0d7cc84972",
+    "pricing_evidence": [],
+    "revenue_evidence": [
+      "mentions bounty"
+    ],
+    "risks": [],
+    "schema_version": "cashclaw_live_pattern_card.v1",
+    "source_item_ids": [
+      "liitem_d12e30eab5aff7b33dd41911"
+    ],
+    "source_type": "github",
+    "terms_risk": "unknown",
+    "tool_stack": [
+      "Codex",
+      "pytest",
+      "repo scanner",
+      "markdown report",
+      "named-demand verification"
+    ],
+    "url": "https://github.com/Doichain/dapp/issues/116",
+    "what_is_being_built": "Security: RPC-API-CALL sendrawtransaction needs validation"
+  },
+  {
+    "buyer_pain": "Based of the analyzis of https://github.com/Doichain/dapp/issues/139 \r please create new improved Dockerfile in order to reduce the docker image size. \r Please use branch 0.0.9!   Labels: enhancement, help wanted, good f",
+    "buyer_segment": "Doichain/dapp",
+    "confidence": 0.75,
+    "content_hash": "sha256:755d950e24571d81bd0b1d99d27d554e9f82e31f5a2339a3efa850a2d29fa9c3",
+    "delivery_window_hours": 72,
+    "dharma_experiment": "Prepare a draft-only work plan and local deliverable scaffold for this named request: produce a task-specific local patch, docs update, or report for `Reduce docker images size of doichain/dapp`; do not claim, comment, bid, submit, or request payment without an Operator Revenue Lease.",
+    "evidence_refs": [
+      "https://github.com/Doichain/dapp/issues/141"
+    ],
+    "extraction_method": "structured_parse",
+    "fetched_at": "2026-06-07T14:51:19.176484+00:00",
+    "freshness": "fresh",
+    "license_risk": "unknown",
+    "no_external_side_effects": true,
+    "pattern_card_id": "lipattern_5a2339a3efa850a2d29fa9c3",
+    "pricing_evidence": [],
+    "revenue_evidence": [
+      "mentions bounty"
+    ],
+    "risks": [],
+    "schema_version": "cashclaw_live_pattern_card.v1",
+    "source_item_ids": [
+      "liitem_86d1d745d84f008162f21b4c"
+    ],
+    "source_type": "github",
+    "terms_risk": "unknown",
+    "tool_stack": [
+      "Codex",
+      "pytest",
+      "repo scanner",
+      "markdown report",
+      "named-demand verification"
+    ],
+    "url": "https://github.com/Doichain/dapp/issues/141",
+    "what_is_being_built": "Reduce docker images size of doichain/dapp"
+  },
+  {
+    "buyer_pain": "Doichain dApps are communicating with each other over REST-HTTP. \r Please write a Test where SSL is getting simulated too. Labels: bug, enhancement, help wanted, security, test, bounty",
+    "buyer_segment": "Doichain/dapp",
+    "confidence": 0.75,
+    "content_hash": "sha256:7f60ffed2c9bc6322167a7298b2d50ebffcb5569f9a7833c6d9d31fe090849b0",
+    "delivery_window_hours": 48,
+    "dharma_experiment": "Prepare a draft-only work plan and local deliverable scaffold for this named request: produce a task-specific local patch, docs update, or report for `SSL - REST- Communication between dApps`; do not claim, comment, bid, submit, or request payment without an Operator Revenue Lease.",
+    "evidence_refs": [
+      "https://github.com/Doichain/dapp/issues/68"
+    ],
+    "extraction_method": "structured_parse",
+    "fetched_at": "2026-06-07T14:51:19.176633+00:00",
+    "freshness": "fresh",
+    "license_risk": "unknown",
+    "no_external_side_effects": true,
+    "pattern_card_id": "lipattern_f9a7833c6d9d31fe090849b0",
+    "pricing_evidence": [],
+    "revenue_evidence": [
+      "mentions bounty"
+    ],
+    "risks": [],
+    "schema_version": "cashclaw_live_pattern_card.v1",
+    "source_item_ids": [
+      "liitem_2cb52284c128ce68f8b1c335"
+    ],
+    "source_type": "github",
+    "terms_risk": "unknown",
+    "tool_stack": [
+      "public web sources",
+      "pricing extractor",
+      "matrix builder",
+      "brief writer",
+      "named-demand verification"
+    ],
+    "url": "https://github.com/Doichain/dapp/issues/68",
+    "what_is_being_built": "SSL - REST- Communication between dApps"
+  },
+  {
+    "buyer_pain": "Please see https://bounties.doichain.org/ how to apply for Doichain bounties. Labels: good first issue, security, test, bounty",
+    "buyer_segment": "Doichain/dapp",
+    "confidence": 0.75,
+    "content_hash": "sha256:04f08fc5a2434ec985727a94b24cbedf6edf14349d511244fbf4c472b0faeb23",
+    "delivery_window_hours": 72,
+    "dharma_experiment": "Prepare a draft-only work plan and local deliverable scaffold for this named request: produce a task-specific local patch, docs update, or report for `Modify Basic DOI Test before sending out DOI - if Alice sent 0,04 DOI transaction.`; do not claim, comment, bid, submit, or request payment without an Operator Revenue Lease.",
+    "evidence_refs": [
+      "https://github.com/Doichain/dapp/issues/56"
+    ],
+    "extraction_method": "structured_parse",
+    "fetched_at": "2026-06-07T14:51:19.176773+00:00",
+    "freshness": "fresh",
+    "license_risk": "unknown",
+    "no_external_side_effects": true,
+    "pattern_card_id": "lipattern_9d511244fbf4c472b0faeb23",
+    "pricing_evidence": [],
+    "revenue_evidence": [
+      "mentions bounty"
+    ],
+    "risks": [],
+    "schema_version": "cashclaw_live_pattern_card.v1",
+    "source_item_ids": [
+      "liitem_ea2aba149db9c8b823e7adbf"
+    ],
+    "source_type": "github",
+    "terms_risk": "unknown",
+    "tool_stack": [
+      "Codex",
+      "pytest",
+      "repo scanner",
+      "markdown report",
+      "named-demand verification"
+    ],
+    "url": "https://github.com/Doichain/dapp/issues/56",
+    "what_is_being_built": "Modify Basic DOI Test before sending out DOI - if Alice sent 0,04 DOI transaction."
+  },
+  {
+    "buyer_pain": "when a DOI (permission) was given, so far it stays with the ownership of Bob (email provider), which is correct and should NOT be changed.\r \r in case Peter (the recipient) wants to revoke a permission he should browse hi",
+    "buyer_segment": "Doichain/dapp",
+    "confidence": 0.75,
+    "content_hash": "sha256:dd32f9934710356c14e16d1f0ab9310d459b38f5d9388e90db1c0c3c26cca1f5",
+    "delivery_window_hours": 48,
+    "dharma_experiment": "Prepare a draft-only work plan and local deliverable scaffold for this named request: produce a task-specific local patch, docs update, or report for `revoke permission specification and compromised privateKeys approach`; do not claim, comment, bid, submit, or request payment without an Operator Revenue Lease.",
+    "evidence_refs": [
+      "https://github.com/Doichain/dapp/issues/58"
+    ],
+    "extraction_method": "structured_parse",
+    "fetched_at": "2026-06-07T14:51:19.176930+00:00",
+    "freshness": "fresh",
+    "license_risk": "unknown",
+    "no_external_side_effects": true,
+    "pattern_card_id": "lipattern_d9388e90db1c0c3c26cca1f5",
+    "pricing_evidence": [],
+    "revenue_evidence": [
+      "mentions bounty"
+    ],
+    "risks": [],
+    "schema_version": "cashclaw_live_pattern_card.v1",
+    "source_item_ids": [
+      "liitem_076881be42d8e0efa819b233"
+    ],
+    "source_type": "github",
+    "terms_risk": "unknown",
+    "tool_stack": [
+      "public web sources",
+      "pricing extractor",
+      "matrix builder",
+      "brief writer",
+      "named-demand verification"
+    ],
+    "url": "https://github.com/Doichain/dapp/issues/58",
+    "what_is_being_built": "revoke permission specification and compromised privateKeys approach"
+  },
+  {
+    "buyer_pain": "so far new dApp users use all the standard wallet (account) via rpc. \r it should be possible to use more then one account. \r \r Each user should use his own account provided by the Doichain Node.\r See explanation how acco",
+    "buyer_segment": "Doichain/dapp",
+    "confidence": 0.55,
+    "content_hash": "sha256:cdc44a2188be96a492648f84f848184892e7ff36bd992fe44f47d81d931af5c5",
+    "delivery_window_hours": 48,
+    "dharma_experiment": "Prepare a draft-only work plan and local deliverable scaffold for this named request: produce a task-specific local patch, docs update, or report for `dApp user should use their own wallet`; do not claim, comment, bid, submit, or request payment without an Operator Revenue Lease.",
+    "evidence_refs": [
+      "https://github.com/Doichain/dapp/issues/71"
+    ],
+    "extraction_method": "structured_parse",
+    "fetched_at": "2026-06-07T14:51:19.177086+00:00",
+    "freshness": "fresh",
+    "license_risk": "unknown",
+    "no_external_side_effects": true,
+    "pattern_card_id": "lipattern_bd992fe44f47d81d931af5c5",
+    "pricing_evidence": [],
+    "revenue_evidence": [
+      "mentions bounty"
+    ],
+    "risks": [
+      "payment_or_wallet_action"
+    ],
+    "schema_version": "cashclaw_live_pattern_card.v1",
+    "source_item_ids": [
+      "liitem_85051ec46e711b6a8809ff51"
+    ],
+    "source_type": "github",
+    "terms_risk": "unknown",
+    "tool_stack": [
+      "public web sources",
+      "pricing extractor",
+      "matrix builder",
+      "brief writer",
+      "named-demand verification"
+    ],
+    "url": "https://github.com/Doichain/dapp/issues/71",
+    "what_is_being_built": "dApp user should use their own wallet"
+  }
+]

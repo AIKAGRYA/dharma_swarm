@@ -1,0 +1,15 @@
+{
+  "result_id": "cycle-v0-infra_focus-3383b429-20260607T145114044139Z",
+  "variant_id": "v0-infra_focus-3383b429",
+  "cycle_timestamp": "2026-06-07T14:51:20.229272+00:00",
+  "opportunities_found": 10,
+  "opportunities_above_threshold": 2,
+  "opportunities_submitted": 0,
+  "revenue_earned_cents": 0,
+  "cost_cents": 0,
+  "top_opportunity_value_cents": 0,
+  "avg_score": 83.4,
+  "sources_hit": 30,
+  "errors": 5,
+  "notes": "variant=infra_focus gen=0"
+}
