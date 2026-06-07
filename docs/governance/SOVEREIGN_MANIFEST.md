@@ -209,6 +209,7 @@ These are the ground-truth metrics. All other documents citing different numbers
   - FORBIDDEN: Must NOT import from Runtime, Intelligence, or Evolution domains
 - **Boundary Status**: **PASS** (V) -- no violations found
 - **Notes for Agents**: `dharma_kernel.py` is SHA-256 signed. Do not modify. Gates are added via `GateRegistry.propose()`, not by editing `telos_gates.py` directly. Parent `~/CLAUDE.md` says "10 axioms" -- this is WRONG; actual count is 25.
+- **Named operator role (merge authority)**: **Merge Master Mike (MMM)** is the registered conditional-merge coordinator agent for this domain. Charter: [`MMM_CHARTER.md`](MMM_CHARTER.md). Operational manual: [`../ops/PR_REVIEW_CONTROL.md`](../ops/PR_REVIEW_CONTROL.md). Registration: [`../../examples/agents/merge_master_mike.registration.json`](../../examples/agents/merge_master_mike.registration.json).
 
 ### Domain 3: Runtime Core (S1 Operations + S2 Coordination)
 

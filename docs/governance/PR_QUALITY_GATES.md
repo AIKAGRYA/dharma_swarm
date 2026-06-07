@@ -64,6 +64,17 @@ Practical consequence for authors and reviewers:
 
 ---
 
+## MMM Merge Protocol (pointer)
+
+The merge authority charter for **Merge Master Mike** (conditional-merge
+coordinator) is [`MMM_CHARTER.md`](MMM_CHARTER.md). Operational commands and
+the gate logic MMM uses to evaluate whether a PR is mergeable live in
+[`../ops/PR_REVIEW_CONTROL.md`](../ops/PR_REVIEW_CONTROL.md). Every gate in
+this document is a precondition MMM checks; none of them are sufficient on
+their own.
+
+---
+
 ## 2. Bot PR Proliferation Control
 
 ### Rule: Max open PRs per bot author
