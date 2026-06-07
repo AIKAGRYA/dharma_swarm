@@ -12,7 +12,7 @@ Do not hand-edit the generated block.
 | Test files | 642 |
 | Test function occurrences | 11,045 |
 | Markdown files | 861 |
-| Markdown total lines | 213,197 |
+| Markdown total lines | 213,225 |
 | Bridge files | 24 |
 | Adapter files | 21 |
 | Orchestrator files | 5 |
