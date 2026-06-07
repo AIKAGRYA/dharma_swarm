@@ -162,6 +162,7 @@
         "docs/governance/hygiene/AI_AGENT_GOVERNANCE.md",
         "docs/governance/hygiene/CATALOGUE.md",
         "docs/governance/hygiene/AUDIT_PROMPT.md",
+        "docs/governance/VIBE_CODE_HYGIENE.md",
         "docs/governance/BUILD_SESSION_ENTRYPOINT.md",
         "docs/governance/COHERENCE_DELTA.md",
         "docs/ops/PR_REVIEW_CONTROL.md",
