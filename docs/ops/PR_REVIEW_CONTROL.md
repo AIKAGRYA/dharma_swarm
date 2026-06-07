@@ -112,6 +112,34 @@ In that mode Mike still blocks unless required receipts such as
 `copilot_review_receipt.json`, `claude_review_receipt.json`, and
 `devin_review_receipt.json` are present and acceptable.
 
+## Merge Hygiene Quorum
+
+Merge Master Mike is the final repo-hygiene arbiter, but Mike should not turn
+every PR into the same three-agent ceremony. The hygiene layer in
+[`docs/governance/hygiene/`](../governance/hygiene/README.md) defines both
+ordinary `VC-*` code-quality signals and `AI-*` agent-governance signals. Mike
+uses those signals to ask final merge questions about fake verification,
+instruction trust, dependency provenance, gate gaming, architecture drift, and
+maintainer burden.
+
+Reviewer receipts should be risk-tiered:
+
+| Profile | Use when | Required evidence |
+|---|---|---|
+| `docs-low` | docs-only or generated hygiene updates with green CI | CI, Coherence Delta, Mike packet |
+| `code-low` | small non-runtime code change | CI, Coherence Delta, Mike packet, one independent review |
+| `runtime-medium` | runtime, governance, memory, provider, or workflow surface | CI, Coherence Delta, Mike packet, two independent reviews |
+| `governance-high` | merge authority, security, dependencies, gates, memory promotion, or public claims | CI, Coherence Delta, Mike packet, two independent reviews, human approval |
+| `repair-needed` | implementation or conflict repair is actually needed | add Devin or another repair receipt |
+
+Devin is not a default passive reviewer. Devin is a repair and integration lane.
+Require a Devin receipt when Devin performed or verified repair work, not merely
+because a PR exists.
+
+Hosted backlog comments remain `packet-only` by default. They should surface
+which quorum profile appears appropriate, then leave real reviewer execution to
+the local operator lane or to a deliberately assigned external worker.
+
 For hosted backlog triage, do not create another workflow. Use one of the
 existing entry points:
 

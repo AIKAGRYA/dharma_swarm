@@ -1,0 +1,17 @@
+{
+  "id": "VC-I1",
+  "title": "Missing idempotency",
+  "cluster": "I",
+  "cluster_title": "Distributed Systems Correctness",
+  "severity": "distributed",
+  "stage": "observed",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "Message or task handlers do not dedupe retries or replayed inputs.",
+  "why_it_hurts": "A retry can duplicate writes, payments, receipts, or side effects.",
+  "detector": {"type": "manual", "rationale": "Review handlers for message_id, nonce, IdempotencyRecord, or existing spine persistence usage."},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["What prevents this handler from doing the side effect twice?"]
+}

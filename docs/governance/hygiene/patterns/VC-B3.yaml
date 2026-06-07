@@ -1,0 +1,17 @@
+{
+  "id": "VC-B3",
+  "title": "Stale changelog theater",
+  "cluster": "B",
+  "cluster_title": "Documentation Pollution",
+  "severity": "structural",
+  "stage": "observed",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "Changelog entries are updated ritually without matching the actual git diff.",
+  "why_it_hurts": "Release readers inherit a story that code history cannot defend.",
+  "detector": {"type": "manual", "rationale": "Requires comparing changelog entries with commit and PR diffs."},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["Can every changelog claim be traced to a diff or issue?"]
+}

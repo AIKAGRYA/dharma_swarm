@@ -1,0 +1,17 @@
+{
+  "id": "VC-E1",
+  "title": "Missing input validation",
+  "cluster": "E",
+  "cluster_title": "Security Regressions",
+  "severity": "security",
+  "stage": "observed",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "User input flows into paths, queries, prompts, or shell commands without validation.",
+  "why_it_hurts": "Feature code becomes an injection or traversal path.",
+  "detector": {"type": "external", "command": "bandit -r dharma_swarm api scripts", "target": "triage all new validation findings"},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["Where is untrusted input validated before it reaches a sensitive sink?"]
+}

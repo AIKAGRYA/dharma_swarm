@@ -1,0 +1,17 @@
+{
+  "id": "AI-H1",
+  "title": "Architecture budget bypass",
+  "cluster": "H",
+  "cluster_title": "Architecture Budget",
+  "severity": "structural",
+  "stage": "advisory",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "A PR passes tests while increasing god files, lateral imports, circular imports, duplicated helpers, unused abstractions, or layer-crossing calls.",
+  "why_it_hurts": "Working patches can still make the repo harder to understand, extend, and safely review.",
+  "detector": {"type": "command", "command": "python3 scripts/governance/check_module_budget.py --base-ref origin/main --head-ref HEAD || true", "target": "module budget drift is visible before merge"},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["https://arxiv.org/abs/2507.09089", "initial-field-guide"],
+  "audit_questions": ["Does this patch worsen module size, dependency direction, or abstraction count even if tests pass?", "What was deleted, collapsed, or simplified to offset new complexity?"]
+}

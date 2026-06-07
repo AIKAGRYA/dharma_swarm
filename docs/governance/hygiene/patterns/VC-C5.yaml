@@ -1,0 +1,17 @@
+{
+  "id": "VC-C5",
+  "title": "Dependency inversion collapse",
+  "cluster": "C",
+  "cluster_title": "Architectural Drift",
+  "severity": "structural",
+  "stage": "observed",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "High-level modules import low-level concrete classes instead of depending on contracts.",
+  "why_it_hurts": "Substitution and testing become harder while concrete details leak upward.",
+  "detector": {"type": "manual", "rationale": "Requires import-graph review of changed module boundaries."},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["Could the high-level caller depend on a contract or existing facade instead?"]
+}

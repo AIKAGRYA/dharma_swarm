@@ -1,0 +1,17 @@
+{
+  "id": "VC-H1",
+  "title": "N plus one query generation",
+  "cluster": "H",
+  "cluster_title": "Performance Regressions",
+  "severity": "performance",
+  "stage": "observed",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "A database or network query is placed inside a loop without batching or caching.",
+  "why_it_hurts": "A small happy-path test hides production-scale cost.",
+  "detector": {"type": "manual", "rationale": "Review query and network calls near loops in changed files."},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["Does any loop call a database, model, network, or subprocess boundary?"]
+}

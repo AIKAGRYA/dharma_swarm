@@ -1,0 +1,17 @@
+{
+  "id": "AI-D1",
+  "title": "Unproven dependency provenance",
+  "cluster": "D",
+  "cluster_title": "Dependency Provenance",
+  "severity": "security",
+  "stage": "advisory",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "A new package or external tool is accepted because an AI suggested it, without registry, publisher, age, license, usage, or necessity evidence.",
+  "why_it_hurts": "Package hallucination and slopsquatting can turn a plausible dependency name into a supply-chain compromise.",
+  "detector": {"type": "command", "command": "git diff --name-only origin/main...HEAD | rg '(^pyproject\\.toml$|^requirements.*\\.txt$|^package\\.json$|^bun\\.lockb$|^package-lock\\.json$|^pnpm-lock\\.yaml$|^uv\\.lock$|^go\\.mod$|^Cargo\\.toml$)' || true", "target": "dependency file changes include provenance evidence in the PR body or packet"},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["https://arxiv.org/abs/2406.10279", "https://owasp.org/www-project-top-10-for-large-language-model-applications/"],
+  "audit_questions": ["What proves every new dependency exists on the real registry and is mature enough for this repo?", "Why were stdlib or existing dependencies insufficient?"]
+}

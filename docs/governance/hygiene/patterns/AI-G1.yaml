@@ -1,0 +1,17 @@
+{
+  "id": "AI-G1",
+  "title": "Visible-gate gaming",
+  "cluster": "G",
+  "cluster_title": "Gate Gaming Defense",
+  "severity": "correctness",
+  "stage": "advisory",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "An agent optimizes only to visible checks while weakening the real invariant, skipping negative tests, or updating tests without proving they fail before the fix.",
+  "why_it_hurts": "CI passes while the repo loses behavioral coverage and future maintainers inherit false certainty.",
+  "detector": {"type": "command", "command": "git diff --name-only origin/main...HEAD | rg '(^tests/|^\\.github/workflows/|^scripts/governance/)' || true", "target": "test or gate changes include a negative-control or before/after rationale when risk is medium or higher"},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["https://arxiv.org/abs/2605.24298", "https://csrc.nist.gov/pubs/sp/800/218/final"],
+  "audit_questions": ["Did any changed test fail before the fix, or is there a clear reason that a negative-control run is infeasible?", "Are holdout, mutation, or randomized consistency checks needed for this surface?"]
+}

@@ -1,0 +1,17 @@
+{
+  "id": "VC-C4",
+  "title": "God file emergence",
+  "cluster": "C",
+  "cluster_title": "Architectural Drift",
+  "severity": "structural",
+  "stage": "advisory",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "Large files keep absorbing unrelated behavior because local context makes additions feel natural.",
+  "why_it_hurts": "Review, testing, and ownership become too broad to reason about.",
+  "detector": {"type": "command", "command": "find dharma_swarm api scripts -name '*.py' -not -path '*/__pycache__/*' -print0 | xargs -0 wc -l | sort -rn | head -20", "target": "new growth respects module budget rule"},
+  "enforcement": {"rule": "docs/governance/ANTI_SLOP_RULES.md#rule-10", "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["Did this change add lines to a grandfathered module, and what extraction would shrink it next?"]
+}

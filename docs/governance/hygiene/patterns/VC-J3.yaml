@@ -1,0 +1,17 @@
+{
+  "id": "VC-J3",
+  "title": "Partial implementation syndrome",
+  "cluster": "J",
+  "cluster_title": "Spec Implementation Drift",
+  "severity": "correctness",
+  "stage": "measured",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "Stubs, TODO-implement markers, or NotImplementedError leak into live surfaces.",
+  "why_it_hurts": "Scaffolding looks like implementation until a runtime path hits it.",
+  "detector": {"type": "command", "command": "printf 'not_implemented='; rg -n 'raise NotImplementedError' dharma_swarm api scripts | wc -l; printf 'todo_implement='; rg -n 'TODO.*implement|FIXME.*implement' dharma_swarm api scripts | wc -l", "target": "live stubs remain near zero"},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["Is every stub isolated from live paths and tracked with an owner?"]
+}

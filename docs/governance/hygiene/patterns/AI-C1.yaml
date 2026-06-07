@@ -1,0 +1,17 @@
+{
+  "id": "AI-C1",
+  "title": "Same-PR gate weakening",
+  "cluster": "C",
+  "cluster_title": "Gate Authority",
+  "severity": "security",
+  "stage": "advisory",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "A PR weakens or rewrites the gate, workflow, or test that decides whether that same PR can merge.",
+  "why_it_hurts": "An agent can make its own evaluator easier while shipping unrelated behavior, defeating the purpose of the merge gate.",
+  "detector": {"type": "command", "command": "git diff --name-only origin/main...HEAD | rg '(^\\.github/workflows/|^scripts/governance/|^scripts/runtime/pr_merge_control.py|^tests/test_.*gate|^docs/governance/)' || true", "target": "gate changes are reviewed as governance-only or paired with old/new behavior receipts"},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["https://csrc.nist.gov/pubs/sp/800/218/final", "https://owasp.org/www-project-mcp-top-10/"],
+  "audit_questions": ["Does this PR alter the gate that validates itself?", "If a gate changes, is the PR governance-only with old/new behavior comparison and reviewer signoff?"]
+}

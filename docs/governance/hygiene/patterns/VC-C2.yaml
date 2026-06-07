@@ -1,0 +1,17 @@
+{
+  "id": "VC-C2",
+  "title": "Interface archaeology",
+  "cluster": "C",
+  "cluster_title": "Architectural Drift",
+  "severity": "structural",
+  "stage": "measured",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "Multiple versions of the same concept coexist as legacy, new, old, refactored, or temporary interfaces.",
+  "why_it_hurts": "Callers drift between generations of the same abstraction.",
+  "detector": {"type": "command", "command": "rg -n '^class .*(V[0-9]|New|Old|Refactored|Legacy|Tmp|Deprecated)' dharma_swarm api scripts | rg -v 'Veracode|Version' | wc -l", "target": "all versioned names are intentional and scoped"},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["Is this a migration with a removal plan or just a second name for the same concept?"]
+}

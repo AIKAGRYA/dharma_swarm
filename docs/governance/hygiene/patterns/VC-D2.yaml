@@ -1,0 +1,17 @@
+{
+  "id": "VC-D2",
+  "title": "Dependency explosion",
+  "cluster": "D",
+  "cluster_title": "Phantom Dependencies",
+  "severity": "structural",
+  "stage": "observed",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "Each task pulls in a new library even when existing dependencies can solve it.",
+  "why_it_hurts": "Install, security, and upgrade burdens grow for local convenience.",
+  "detector": {"type": "command", "command": "find . -maxdepth 3 -name 'requirements*.txt' -o -name 'package.json' -o -name 'pyproject.toml' | sort", "target": "dependency surfaces are reviewed on any change"},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["Which existing dependency or stdlib API was considered before adding a new package?"]
+}

@@ -1,7 +1,7 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts uplift-guards module-budget docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all spine-check onboard status go-fmt-check go-test go-vet go-ci
+.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all spine-check onboard status go-fmt-check go-test go-vet go-ci
 
 PYTHON ?= python3
 REPO_PYTHON ?= PYTHONPATH=. $(PYTHON)
@@ -44,6 +44,8 @@ help:
 	@echo "  make governance-baseline Capture scanner baselines"
 	@echo "  make test-contracts Run governance contract tests"
 	@echo "  make uplift-guards Run uplift pre-commit guards"
+	@echo "  make hygiene-audit Run non-blocking vibe-code hygiene scan"
+	@echo "  make hygiene-check Verify hygiene catalogue/generated docs integrity"
 	@echo "  make docops-integrity Run machine-verifiable documentation checks"
 	@echo "  make docops-report Generate local DocOps JSON/Markdown reports"
 	@echo "  make ci-truth ARGS='--pr 123' Evaluate GitHub checks against the CI truth contract"
@@ -210,8 +212,15 @@ module-budget:
 	$(PYTHON) scripts/governance/check_module_budget.py \
 		--base-ref origin/main --head-ref HEAD
 
+hygiene-audit:
+	scripts/governance/hygiene/scan.sh
+
+hygiene-check:
+	$(PYTHON) scripts/governance/hygiene/check_hygiene_integrity.py
+
 docops-integrity:
 	$(PYTHON) scripts/docops/check_docops_integrity.py
+	$(PYTHON) scripts/governance/hygiene/check_hygiene_integrity.py
 
 docops-report:
 	@mkdir -p reports/docops
@@ -219,6 +228,7 @@ docops-report:
 		--report-json reports/docops/check.json \
 		--inventory-json reports/docops/corpus_inventory.json \
 		--inventory-markdown reports/docops/corpus_inventory.md
+	$(PYTHON) scripts/governance/hygiene/check_hygiene_integrity.py
 
 ci-truth:
 	$(PYTHON) scripts/runtime/ci_truth.py $${ARGS:-}

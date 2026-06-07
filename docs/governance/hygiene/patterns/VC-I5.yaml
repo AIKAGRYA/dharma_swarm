@@ -1,0 +1,17 @@
+{
+  "id": "VC-I5",
+  "title": "Incorrect error propagation",
+  "cluster": "I",
+  "cluster_title": "Distributed Systems Correctness",
+  "severity": "correctness",
+  "stage": "measured",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "Async or distributed error chains swallow, double-wrap, or misclassify failures.",
+  "why_it_hurts": "Supervisors cannot distinguish retryable failure from successful completion.",
+  "detector": {"type": "command", "command": "rg -n -A1 'except Exception:|except:' dharma_swarm api scripts | rg 'pass$' | wc -l", "target": "bare pass after except trends to zero"},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["Where does this exception get logged, re-raised, classified, or receipted?"]
+}

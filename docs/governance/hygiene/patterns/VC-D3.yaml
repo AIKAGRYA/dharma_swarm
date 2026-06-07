@@ -1,0 +1,17 @@
+{
+  "id": "VC-D3",
+  "title": "Stale dependency pinning",
+  "cluster": "D",
+  "cluster_title": "Phantom Dependencies",
+  "severity": "security",
+  "stage": "measured",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "Dependencies are pinned without a rationale or update path.",
+  "why_it_hurts": "Known vulnerabilities or incompatibilities remain hidden behind old pins.",
+  "detector": {"type": "command", "command": "for r in $(find . -maxdepth 3 -name 'requirements*.txt' -not -path './.git/*' | head -10); do total=$(rg -n '^[A-Za-z]' $r | wc -l); unpinned=$(rg -n '^[A-Za-z][A-Za-z0-9_-]*$' $r | wc -l); printf '%s total=%s unpinned=%s\\n' $r $total $unpinned; done", "target": "all pins have rationale during dependency changes"},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["Why is each changed dependency pinned or unpinned?"]
+}

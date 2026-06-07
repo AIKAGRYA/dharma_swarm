@@ -1,0 +1,17 @@
+{
+  "id": "VC-G3",
+  "title": "Feature scope creep",
+  "cluster": "G",
+  "cluster_title": "Agent-Loop Pathologies",
+  "severity": "operational",
+  "stage": "observed",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "An agent solves more than the request, mixing unrelated features, refactors, and docs.",
+  "why_it_hurts": "Review cannot distinguish the needed change from opportunistic churn.",
+  "detector": {"type": "manual", "rationale": "Compare changed files and diff size against the stated objective."},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["Which changed files are outside the requested scope, and why must they stay?"]
+}

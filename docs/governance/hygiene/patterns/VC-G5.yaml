@@ -1,0 +1,17 @@
+{
+  "id": "VC-G5",
+  "title": "Commit message fabrication",
+  "cluster": "G",
+  "cluster_title": "Agent-Loop Pathologies",
+  "severity": "operational",
+  "stage": "measured",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "Commit messages claim work the diff does not prove or use low-information labels.",
+  "why_it_hurts": "History becomes a story rather than evidence.",
+  "detector": {"type": "command", "command": "git log --oneline -200 | rg -i '^[a-f0-9]+ (fix|update|improve|wip|stuff|things)( |$)' | wc -l", "target": "low-information commits remain zero or justified"},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["Does the commit title match the actual diff and verification performed?"]
+}

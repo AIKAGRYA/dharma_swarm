@@ -1,0 +1,17 @@
+{
+  "id": "VC-A4",
+  "title": "Spec-tautology tests",
+  "cluster": "A",
+  "cluster_title": "Test Theater",
+  "severity": "correctness",
+  "stage": "observed",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "Tests mirror implementation line by line instead of expressing an independent behavioral contract.",
+  "why_it_hurts": "Any refactor breaks the test while real behavior regressions can still pass.",
+  "detector": {"type": "manual", "rationale": "Requires code-review comparison of test assertions against implementation shape."},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["Could this test survive a behavior-preserving refactor?"]
+}

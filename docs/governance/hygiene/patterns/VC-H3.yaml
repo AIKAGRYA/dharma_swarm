@@ -1,0 +1,17 @@
+{
+  "id": "VC-H3",
+  "title": "Unnecessary serialization",
+  "cluster": "H",
+  "cluster_title": "Performance Regressions",
+  "severity": "performance",
+  "stage": "measured",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "Code serializes and deserializes data immediately without crossing a real boundary.",
+  "why_it_hurts": "It adds cost and hides type mistakes behind strings.",
+  "detector": {"type": "command", "command": "rg -n 'json[.]loads[(].*json[.]dumps|json[.]dumps[(].*json[.]loads' dharma_swarm api scripts | wc -l", "target": "round-trip serialization stays rare and justified"},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["Is this serialization crossing an external boundary or just hiding an in-memory type issue?"]
+}

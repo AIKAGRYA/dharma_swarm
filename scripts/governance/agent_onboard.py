@@ -718,6 +718,45 @@ def render_pr_hygiene() -> None:
         print("  (gh CLI unavailable — cannot check open PR count)")
 
 
+def render_hygiene_system() -> None:
+    section("HYGIENE SYSTEM (owner: docs/governance/hygiene/)")
+    root = REPO_ROOT / "docs/governance/hygiene"
+    pattern_dir = root / "patterns"
+    patterns = []
+    for path in sorted(pattern_dir.glob("VC-*.yaml")):
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        patterns.append(payload)
+
+    stage_counts: dict[str, int] = {}
+    for pattern in patterns:
+        stage = str(pattern.get("stage", "unknown"))
+        stage_counts[stage] = stage_counts.get(stage, 0) + 1
+
+    if patterns:
+        summary = ", ".join(f"{stage}={count}" for stage, count in sorted(stage_counts.items()))
+        print(f"  Patterns: {len(patterns)} ({summary})")
+    else:
+        print("  Patterns: missing or unreadable")
+
+    baselines = sorted((root / "baselines").glob("*.txt"))
+    latest = baselines[-1].relative_to(REPO_ROOT).as_posix() if baselines else "none yet"
+    print(f"  Latest baseline: {latest}")
+    print("  Run: make hygiene-audit   # non-blocking scan")
+    print("  Run: make hygiene-check   # generated docs + pattern integrity")
+
+    surfaced = [
+        pattern for pattern in patterns
+        if pattern.get("stage") in {"advisory", "enforced"}
+    ][:5]
+    if surfaced:
+        print("  Active review signals:")
+        for pattern in surfaced:
+            print(f"    - {pattern.get('id')}: {pattern.get('title')} ({pattern.get('stage')})")
+
+
 def render_enforcement_and_depth() -> None:
     section("ENFORCEMENT (run before opening a PR)")
     print("  make docops-integrity      # documentation invariants")
@@ -815,6 +854,7 @@ def main() -> int:
     render_spine_status()
     render_runtime_truth(evidence, track)
     render_pr_hygiene()
+    render_hygiene_system()
     render_decay_watch()
     render_tooling_first()
     render_enforcement_and_depth()

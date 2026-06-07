@@ -1,0 +1,17 @@
+{
+  "id": "VC-H4",
+  "title": "Over-engineered abstraction tax",
+  "cluster": "H",
+  "cluster_title": "Performance Regressions",
+  "severity": "performance",
+  "stage": "observed",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "Wrappers around wrappers add call overhead and cognitive overhead without reducing real complexity.",
+  "why_it_hurts": "The system pays runtime and review cost for indirection.",
+  "detector": {"type": "manual", "rationale": "Requires profiling or call-chain review in hotspots."},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["What complexity does this abstraction remove, and what caller count justifies it?"]
+}
