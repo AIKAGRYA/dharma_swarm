@@ -780,3 +780,124 @@ def test_has_dataclass_decorator_recognizes_forms() -> None:
         assert _has_dataclass_decorator(class_node) is expected, (
             f"Mismatch on: {src!r} — expected {expected}"
         )
+
+
+def test_has_pydantic_base_recognizes_forms() -> None:
+    """_has_pydantic_base recognizes BaseModel and pydantic.BaseModel."""
+    import ast as _ast
+    from dharma_swarm.guardian_crew import _has_pydantic_base
+
+    cases = [
+        ("class A(BaseModel): pass", True),
+        ("class A(pydantic.BaseModel): pass", True),
+        ("class A(PydanticBaseModel): pass", True),
+        ("class A(SomethingElse): pass", False),
+        ("class A: pass", False),
+    ]
+    for src, expected in cases:
+        tree = _ast.parse(src)
+        class_node = next(n for n in tree.body if isinstance(n, _ast.ClassDef))
+        assert _has_pydantic_base(class_node) is expected, (
+            f"Mismatch on: {src!r} — expected {expected}"
+        )
+
+
+def test_has_attrs_decorator_recognizes_forms() -> None:
+    """_has_attrs_decorator recognizes attr/attrs spellings."""
+    import ast as _ast
+    from dharma_swarm.guardian_crew import _has_attrs_decorator
+
+    cases = [
+        ("@attr.s\nclass A: pass", True),
+        ("@attr.s(auto_attribs=True)\nclass A: pass", True),
+        ("@attrs.define\nclass A: pass", True),
+        ("@attrs.frozen\nclass A: pass", True),
+        ("@define\nclass A: pass", True),
+        ("class A: pass", False),
+        ("@dataclass\nclass A: pass", False),
+    ]
+    for src, expected in cases:
+        tree = _ast.parse(src)
+        class_node = next(n for n in tree.body if isinstance(n, _ast.ClassDef))
+        assert _has_attrs_decorator(class_node) is expected, (
+            f"Mismatch on: {src!r} — expected {expected}"
+        )
+
+
+def test_has_synthesized_init_umbrella() -> None:
+    """_has_synthesized_init is true for any framework that auto-generates __init__."""
+    import ast as _ast
+    from dharma_swarm.guardian_crew import _has_synthesized_init
+
+    cases = [
+        ("@dataclass\nclass A: pass", True),
+        ("class A(BaseModel): pass", True),
+        ("@attrs.define\nclass A: pass", True),
+        ("class A: pass", False),
+        ("class A(SomeRandomBase): pass", False),
+    ]
+    for src, expected in cases:
+        tree = _ast.parse(src)
+        class_node = next(n for n in tree.body if isinstance(n, _ast.ClassDef))
+        assert _has_synthesized_init(class_node) is expected, (
+            f"Mismatch on: {src!r} — expected {expected}"
+        )
+
+
+def test_method_existence_checks_never_lists_dunder_init() -> None:
+    """Defensive: ``__init__`` rows in ``_METHOD_EXISTENCE_CHECKS`` are forbidden.
+
+    They produce the duplicate-issue storm because every class inherits
+    ``object.__init__`` and several frameworks synthesize it. Any new row
+    must check a real method (or use a signature-aware helper).
+    """
+    from dharma_swarm.guardian_crew import _METHOD_EXISTENCE_CHECKS
+
+    offenders = [
+        (mod, cls, meth, sev)
+        for (mod, cls, meth, sev) in _METHOD_EXISTENCE_CHECKS
+        if meth == "__init__"
+    ]
+    assert offenders == [], (
+        "_METHOD_EXISTENCE_CHECKS must not contain ``__init__`` rows. "
+        f"Offenders: {offenders}. See issues #222-#511 for the storm this prevents."
+    )
+
+
+def test_missing_init_finding_downgraded_to_warning(tmp_path: Path) -> None:
+    """Defense in depth: a missing-__init__ finding is never BLOCKER.
+
+    Even if a future contributor re-adds an ``__init__`` row to
+    ``_METHOD_EXISTENCE_CHECKS``, the call-site downgrade guarantees the
+    finding never reaches GitHub-issue creation.
+    """
+    import asyncio
+    from dharma_swarm.guardian_crew import (
+        _METHOD_EXISTENCE_CHECKS,
+        run_auditor,
+    )
+
+    # Inject a synthetic BLOCKER row targeting a class with no explicit __init__
+    # and no recognized decorator (object.__init__ inherited).
+    fake_module = tmp_path / "dharma_swarm" / "fake_module_for_init_test.py"
+    fake_module.parent.mkdir(parents=True, exist_ok=True)
+    fake_module.write_text("class WithoutInit:\n    pass\n", encoding="utf-8")
+
+    _METHOD_EXISTENCE_CHECKS.append(
+        ("dharma_swarm.fake_module_for_init_test", "WithoutInit", "__init__", "BLOCKER")
+    )
+    try:
+        findings = asyncio.run(run_auditor(tmp_path / "irrelevant_state"))
+        init_findings = [
+            f for f in findings
+            if f.check == "AUDITOR:method_exists"
+            and "WithoutInit" in f.title
+            and "__init__" in f.title
+        ]
+        # Either the finding is absent (file not located) or it's WARNING.
+        for f in init_findings:
+            assert f.severity == "WARNING", (
+                f"missing __init__ must downgrade to WARNING, got {f.severity}"
+            )
+    finally:
+        _METHOD_EXISTENCE_CHECKS.pop()
