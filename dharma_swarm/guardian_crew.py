@@ -315,11 +315,24 @@ async def run_auditor(src_root: Path) -> list[GuardianFinding]:
         candidates = _module_source_candidates(module_name, src_root)
         found_file = next((p for p in candidates if p.exists()), None)
         if found_file is None:
+            # Stale-worktree guard: a daemon pointed at a stale or incomplete
+            # ``src_root`` will see every module as missing and file BLOCKERs
+            # for files that exist on main. That is a daemon-deployment bug,
+            # not a code bug. Downgrade to WARNING so it never reaches
+            # ``_create_issue_if_needed``. See issues #20-#511 (PalaceQuery)
+            # and the 10 ``File not found for ...`` siblings closed alongside
+            # PR #520. The legitimate ``module is genuinely missing on main``
+            # signal is still surfaced via the syntax-scan pass below and the
+            # import-existence pass above.
             findings.append(GuardianFinding(
-                severity=severity,
+                severity="WARNING",
                 check="AUDITOR:method_exists",
                 title=f"File not found for {module_name}",
-                detail=f"Tried: {[str(c) for c in candidates]}",
+                detail=(
+                    f"Tried: {[str(c) for c in candidates]}. If this fires on a "
+                    "deployed daemon, restart it from a fresh checkout; the live "
+                    "src_root is stale."
+                ),
             ))
             continue
 
@@ -330,8 +343,11 @@ async def run_auditor(src_root: Path) -> list[GuardianFinding]:
                 None,
             )
             if class_node is None:
+                # Same stale-worktree concern: AST may be from a stale file
+                # in which the class was renamed/added later. The import-check
+                # pass already covers "module legitimately broken". Downgrade.
                 findings.append(GuardianFinding(
-                    severity=severity,
+                    severity="WARNING",
                     check="AUDITOR:method_exists",
                     title=f"Class {class_name} not found in {found_file.name}",
                     detail=f"Module {module_name} exists but class {class_name} is missing",

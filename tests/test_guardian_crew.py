@@ -864,6 +864,35 @@ def test_method_existence_checks_never_lists_dunder_init() -> None:
     )
 
 
+def test_stale_src_root_emits_warning_not_blocker(tmp_path: Path) -> None:
+    """A stale/empty src_root must produce WARNING, not BLOCKER, findings.
+
+    Regression: 10+ ``[GUARDIAN] File not found for dharma_swarm.evolution``
+    issues (closed alongside #520) were filed because the live daemon's
+    ``src_root`` pointed at an incomplete worktree. The file existed on main;
+    the daemon's checkout was stale. That is a deployment bug, not a code
+    bug, and must never produce GitHub-issue BLOCKERs.
+    """
+    import asyncio
+    from dharma_swarm.guardian_crew import run_auditor
+
+    empty_src_root = tmp_path / "empty_repo"
+    empty_src_root.mkdir()
+
+    findings = asyncio.run(run_auditor(empty_src_root))
+
+    file_not_found = [
+        f for f in findings
+        if f.check == "AUDITOR:method_exists"
+        and f.title.startswith("File not found for ")
+    ]
+    blockers = [f for f in file_not_found if f.severity == "BLOCKER"]
+    assert blockers == [], (
+        "File-not-found findings must downgrade to WARNING so a stale-checkout "
+        f"daemon cannot file BLOCKERs. Got BLOCKERs: {[f.title for f in blockers]}"
+    )
+
+
 def test_missing_init_finding_downgraded_to_warning(tmp_path: Path) -> None:
     """Defense in depth: a missing-__init__ finding is never BLOCKER.
 
