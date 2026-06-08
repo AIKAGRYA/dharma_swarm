@@ -40,7 +40,8 @@
 #      and reconciles each track's criteria against repo reality. A track flips
 #      to SHIPPABLE when its prerequisites hold and all completion criteria pass.
 #   3. Close a track by moving its block to closed_tracks (append-only).
-#      CI warns if the portfolio is empty for more than 7 days.
+#      CI warns immediately when the portfolio has zero ACTIVE tracks
+#      (min_active_grace_days is advisory operator guidance, not auto-enforced).
 #   4. Stale claims (TTL exceeded, no re-verification) raise a finding until
 #      re-verified (bump verified_at) or retired.
 #
@@ -78,7 +79,7 @@ track_policy:
   min_active: 1             # floor — single-track default holds until a 2nd is opened
   max_active: 10            # hard ceiling — focus protection; CI ERROR above this
   warn_active: 5            # soft signal — "you're spreading thin"; CI WARN above this
-  min_active_grace_days: 7  # CI WARN if zero ACTIVE tracks for longer than this
+  min_active_grace_days: 7  # advisory: how long an empty portfolio is tolerable (empty warns immediately; not auto-enforced)
   allow_active_active_conflict: false  # two ACTIVE tracks joined by conflicts_with => ERROR
   surface_overlap: warn     # two ACTIVE tracks sharing an owned surface => WARN (coordinate)
 

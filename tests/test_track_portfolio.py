@@ -231,6 +231,14 @@ def test_stdlib_parser_matches_pyyaml_on_real_file() -> None:
         assert len(a.get("completion_criteria") or []) == len(b.get("completion_criteria") or [])
 
 
+def test_scalar_flow_list_matches_pyyaml_incl_quoted_comma() -> None:
+    """Stdlib `_scalar` must parse inline flow lists the same as PyYAML,
+    including quoted elements that contain commas (round-3 regression guard)."""
+    import yaml
+    for src in ('k: []', 'k: [a, b]', 'k: [1, 2]', 'k: ["a,b", c]'):
+        assert _parse_minimal_yaml(src)["k"] == yaml.safe_load(src)["k"], src
+
+
 def test_disjoint_surfaces_no_overlap() -> None:
     tracks = [
         _track("a", owned_surfaces=["pkg/x/**"]),

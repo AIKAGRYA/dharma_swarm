@@ -175,7 +175,25 @@ def _parse_minimal_yaml(text: str) -> dict[str, Any]:
             return {}
         if s.startswith("[") and s.endswith("]"):
             inner = s[1:-1].strip()
-            return [_scalar(x) for x in inner.split(",")] if inner else []
+            if not inner:
+                return []
+            # Split on commas that are not inside quotes (so `["a,b", c]`
+            # stays two elements, matching PyYAML).
+            parts: list[str] = []
+            buf: list[str] = []
+            dq = sq = False
+            for ch in inner:
+                if ch == '"' and not sq:
+                    dq = not dq
+                elif ch == "'" and not dq:
+                    sq = not sq
+                if ch == "," and not dq and not sq:
+                    parts.append("".join(buf))
+                    buf = []
+                else:
+                    buf.append(ch)
+            parts.append("".join(buf))
+            return [_scalar(p.strip()) for p in parts]
         if s.lower() in {"true", "false"}:
             return s.lower() == "true"
         if s.lower() in {"null", "~", ""}:
