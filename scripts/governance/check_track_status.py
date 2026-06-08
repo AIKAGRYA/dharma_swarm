@@ -331,6 +331,11 @@ def normalize_portfolio(track: dict[str, Any] | None) -> dict[str, Any]:
             "max_active": int(policy.get("max_active", 10)),
             "warn_active": int(policy.get("warn_active", 5)),
             "min_active_grace_days": int(policy.get("min_active_grace_days", 7)),
+            # Explicit "not CI-enforced" tombstone so downstream JSON consumers
+            # (dashboard, dgc, agent_onboard) can render "advisory" without
+            # re-deriving it from the schema. Default False = the grace is
+            # advisory operator guidance, not auto-failed by CI.
+            "min_active_grace_enforced": bool(policy.get("min_active_grace_enforced", False)),
             "allow_active_active_conflict": bool(policy.get("allow_active_active_conflict", False)),
             "surface_overlap": str(policy.get("surface_overlap", "warn")),
             "model": policy.get("model", "1..N co-equal active tracks; WIP-limited typed graph"),
@@ -359,8 +364,38 @@ def validate_portfolio_graph(p: dict[str, Any], findings: list[Finding]) -> None
     tracks = p["active_tracks"]
     policy = p["track_policy"]
     spine_ids = {o.get("id") for o in p["spine_objectives"] if o.get("id")}
-    known_ids = {t.get("id") for t in tracks} | {t.get("id") for t in p["closed_tracks"]}
+    # known_ids is intentionally permissive (mapping `.get` only) so closed_tracks
+    # shape findings below — not a KeyError here — surface the actual problem.
+    known_ids = (
+        {t.get("id") for t in tracks if isinstance(t, dict)}
+        | {ct.get("id") for ct in p["closed_tracks"] if isinstance(ct, dict)}
+    )
     active = [t for t in tracks if _is_active(t)]
+
+    # closed_tracks shape — same edge/serves invariants we hold for active
+    # tracks, so a malformed closed entry can't silently break edge
+    # resolution above. We only ERROR on hard schema breaks (non-dict, no id,
+    # serves not in spine); status drift is left for the active path.
+    for ct in p["closed_tracks"]:
+        if not isinstance(ct, dict):
+            findings.append(Finding("ERROR", "closed-track-shape",
+                f"closed_tracks entry is not a mapping: {ct!r}"))
+            continue
+        ctid = ct.get("id")
+        if not ctid:
+            findings.append(Finding("ERROR", "closed-track-shape",
+                "closed_tracks entry missing required `id`."))
+            continue
+        for kind in EDGE_KINDS:
+            for tgt in ct.get(kind) or []:
+                if tgt not in known_ids:
+                    findings.append(Finding("ERROR", f"edge-unresolved:{ctid}",
+                        f"Closed track '{ctid}' {kind} -> '{tgt}', which is not a declared track."))
+        cserves = ct.get("serves")
+        if spine_ids and cserves is not None and cserves not in spine_ids:
+            findings.append(Finding("ERROR", f"spine-unresolved:{ctid}",
+                f"Closed track '{ctid}' serves unknown spine objective '{cserves}'. "
+                f"Known: {sorted(spine_ids)}"))
 
     # WIP limit — focus as flow discipline, not a mutex.
     n = len(active)
@@ -436,7 +471,16 @@ def validate_portfolio_graph(p: dict[str, Any], findings: list[Finding]) -> None
 
 
 def detect_dependency_cycle(tracks: list[dict[str, Any]], findings: list[Finding]) -> None:
-    """Three-colour DFS over depends_on edges; emit the actual cycle path."""
+    """Three-colour DFS over depends_on edges; emit the actual cycle path.
+
+    Recursion bound: the recursive `dfs` depth is bounded by the number of
+    declared tracks, which is in turn capped by `track_policy.max_active`
+    (default 10, hard ceiling enforced by `validate_portfolio_graph`). For
+    portfolios near that ceiling we stay well under Python's default 1000-
+    frame recursion limit, so no explicit `sys.setrecursionlimit` bump is
+    needed. If `max_active` is ever raised above a few hundred, convert this
+    to an explicit iterative DFS to keep the guarantee.
+    """
     graph: dict[str, list[str]] = {
         str(t.get("id")): [str(d) for d in (t.get("depends_on") or [])] for t in tracks}
     ids = set(graph)

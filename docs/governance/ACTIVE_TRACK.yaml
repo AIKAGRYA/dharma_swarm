@@ -80,6 +80,7 @@ track_policy:
   max_active: 10            # hard ceiling — focus protection; CI ERROR above this
   warn_active: 5            # soft signal — "you're spreading thin"; CI WARN above this
   min_active_grace_days: 7  # advisory: how long an empty portfolio is tolerable (empty warns immediately; not auto-enforced)
+  min_active_grace_enforced: false  # explicit tombstone: grace is advisory, NOT auto-failed by CI (downstream JSON consumers read this directly)
   allow_active_active_conflict: false  # two ACTIVE tracks joined by conflicts_with => ERROR
   surface_overlap: warn     # two ACTIVE tracks sharing an owned surface => WARN (coordinate)
 

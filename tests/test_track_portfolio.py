@@ -248,3 +248,89 @@ def test_disjoint_surfaces_no_overlap() -> None:
     findings: list[Finding] = []
     validate_portfolio_graph(p, findings)
     assert not any(f.check.startswith("surface-overlap") for f in findings)
+
+
+# --- defensive: parser must not crash on nested flow lists ------------------
+
+def test_scalar_nested_flow_list_degrades_gracefully() -> None:
+    """Nested inline flow lists like `k: [[a, b], c]` are intentionally NOT
+    supported by the stdlib fallback (PyYAML handles them; we don't).
+    What we DO promise is that the parser never crashes on them: it must
+    return *something* (even if the inner list is degraded to a string), so
+    the checker can still surface other findings instead of stack-tracing.
+    Real nested structures should use block style anyway."""
+    src = "k: [[a, b], c]"
+    out = _parse_minimal_yaml(src)        # must not raise
+    assert "k" in out
+    assert isinstance(out["k"], list)     # we got a list, not a crash
+    # And the same input through the full normalize pipeline must also survive.
+    raw = {"schema_version": 2, "active_tracks": [{"id": "a", "depends_on": out["k"]}]}
+    p = normalize_portfolio(raw)
+    assert p["active_tracks"][0]["id"] == "a"
+
+
+# --- closed_tracks shape validation -----------------------------------------
+
+def test_closed_track_non_dict_is_error() -> None:
+    p = _portfolio([_track("a")], closed=["not-a-dict"])  # type: ignore[list-item]
+    findings: list[Finding] = []
+    validate_portfolio_graph(p, findings)
+    assert any(f.check == "closed-track-shape" and f.severity == "ERROR" for f in findings)
+
+
+def test_closed_track_missing_id_is_error() -> None:
+    p = _portfolio([_track("a")], closed=[{"status": "CLOSED"}])
+    findings: list[Finding] = []
+    validate_portfolio_graph(p, findings)
+    assert any(f.check == "closed-track-shape" and f.severity == "ERROR" for f in findings)
+
+
+def test_closed_track_unresolved_edge_is_error() -> None:
+    p = _portfolio(
+        [_track("a")],
+        closed=[{"id": "old", "status": "CLOSED", "depends_on": ["ghost"]}],
+    )
+    findings: list[Finding] = []
+    validate_portfolio_graph(p, findings)
+    assert any(
+        f.check == "edge-unresolved:old" and f.severity == "ERROR" for f in findings
+    )
+
+
+def test_closed_track_bad_spine_serves_is_error() -> None:
+    p = _portfolio(
+        [_track("a")],
+        spine=[{"id": "obj-a", "name": "A"}],
+        closed=[{"id": "old", "status": "CLOSED", "serves": "obj-ghost"}],
+    )
+    findings: list[Finding] = []
+    validate_portfolio_graph(p, findings)
+    assert any(
+        f.check == "spine-unresolved:old" and f.severity == "ERROR" for f in findings
+    )
+
+
+def test_closed_track_well_formed_is_silent() -> None:
+    p = _portfolio(
+        [_track("a")],
+        spine=[{"id": "obj-a", "name": "A"}],
+        closed=[{"id": "old", "status": "CLOSED", "serves": "obj-a"}],
+    )
+    findings: list[Finding] = []
+    validate_portfolio_graph(p, findings)
+    assert not any(f.check == "closed-track-shape" for f in findings)
+    assert not any(f.check.startswith("edge-unresolved:old") for f in findings)
+
+
+# --- track_policy explicit tombstone field ----------------------------------
+
+def test_track_policy_grace_enforced_default_is_false() -> None:
+    """Downstream JSON consumers must see `min_active_grace_enforced` as a
+    first-class field (default False = advisory), not have to infer it."""
+    p = _portfolio([_track("a")])
+    assert p["track_policy"]["min_active_grace_enforced"] is False
+
+
+def test_track_policy_grace_enforced_pass_through() -> None:
+    p = _portfolio([_track("a")], policy={"min_active_grace_enforced": True})
+    assert p["track_policy"]["min_active_grace_enforced"] is True
