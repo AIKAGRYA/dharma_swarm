@@ -788,7 +788,15 @@ def _load_track_yaml() -> dict[str, Any]:
     sys.path.insert(0, str(Path(__file__).parent))
     try:
         from check_track_status import load_active_track  # type: ignore
-        return load_active_track(ACTIVE_TRACK) or {}
+        track = load_active_track(ACTIVE_TRACK) or {}
+        # v2 portfolio back-compat: legacy onboard sections read the singular
+        # `active_track`. Synthesize it as the primary (first) active track so
+        # those sections keep rendering. The full portfolio is in `active_tracks`.
+        if "active_track" not in track and track.get("active_tracks"):
+            tracks = [t for t in track["active_tracks"] if t]
+            if tracks:
+                track["active_track"] = tracks[0]
+        return track
     except Exception:
         return {}
 

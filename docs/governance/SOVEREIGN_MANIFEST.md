@@ -18,13 +18,21 @@
      Do not hand-edit. Run scripts/governance/render_active_track_includes.py
      after updating the YAML. -->
 
-**Active track:** Runtime Truth Reconciliation — operator-visible truth packets
-**Track id:** `runtime-truth-reconciliation-2026-06`
-**Status:** ACTIVE
-**Verified at:** 2026-06-04 (TTL 14 days)
-**Owner:** @AmitabhainArunachala
+**Active portfolio:** 2 co-equal track(s) (WIP warn 5, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
 
-**Description:**
+**Spine objectives (each track serves one):**
+
+- `substrate-nativeness` — Substrate nativeness — runtime flows through the ontology/spine, not around it (covered)
+- `revenue-external-humans-served` — Revenue & external humans served — value leaves the house and someone acts on it (**no active track**)
+- `research-depth` — Research depth — the contemplative-mechanistic bridge (R_V, geometric lens) deepens (**no active track**)
+
+### Runtime Truth Reconciliation — operator-visible truth packets
+
+**Track id:** `runtime-truth-reconciliation-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-04 (TTL 14 days)
+**Relations:** complements: runtime-truth-nats-2026-06
+**Owns surfaces:** dharma_swarm/operator_core/**, scripts/governance/agent_onboard.py, dharma_swarm/runtime_state.py
+**Moves vital signs:** quality_gates, memory_persistence
 
 The Runtime Truth Spine substrate is merged and shippable. This track moves
 from substrate existence to read-only reconciliation: operator-visible
@@ -40,13 +48,13 @@ and existing operator/onboard/control-surface rows for read-only rendering.
 Doctrine line that must hold:
   Read models project truth from owners; they do not become authority.
 
-**Next items on this track:**
+**Next items:**
 
 - [code] (blocker) Define the smallest read-only RuntimeTruthPacket contract in the existing operator_core owner.
 - [code] (blocker) Render compact runtime truth in make onboard without making onboard an authority surface.
 - [test] Protect A2A single-persistence invariant while adding runtime truth projections.
 
-**Non-goals (do not work on these during this track):**
+**Non-goals:**
 
 - Do not create a new daemon, database, event log, truth store, or receipt system.
 - Do not mint a second RuntimeReceipt for A2A or paths with an inner runtime owner.
@@ -54,6 +62,34 @@ Doctrine line that must hold:
 - Do not broadly refactor orchestrator.py, agent_runner.py, swarm.py, providers.py, or SwarmManager.
 - Do not build Verified Experiment Loop runtime in this track.
 - Do not create standalone BetCard, Experiment, SwarmRun, DecisionRecord, LineageRecord, WikiUpdate, or cost-tracker classes.
+
+### Runtime Truth NATS — internal live transport for A2A dispatch
+
+**Track id:** `runtime-truth-nats-2026-06` · **Status:** ACTIVE · **Owner:** @codex
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-07 (TTL 21 days)
+**Relations:** complements: runtime-truth-reconciliation-2026-06
+**Owns surfaces:** docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md, dharma_swarm/a2a/a2a_nats_contact.py, dharma_swarm/a2a/a2a_core_contact.py
+**Moves vital signs:** tool_coverage
+
+The concurrent Codex transport lane. NATS was scoped out of the global
+prohibition by the 2026-05-31 doctrine amendment and runs as a concurrent
+scoped track with non-overlapping surfaces (transport layer only). This
+track wires the internal live transport so A2A dispatch can travel at
+broker speed, distinct from the reconciliation lane's read-model surfaces.
+
+Surface separation is the safety boundary: this track owns the NATS
+transport contact modules and the master spec; it does not touch the
+operator_core read models the reconciliation lane owns.
+
+**Next items:**
+
+- [code] Confirm NATS transport contact modules are wired and receipted end-to-end.
+
+**Non-goals:**
+
+- Do not introduce Redis or gRPC as part of this track.
+- Do not touch the operator_core read-model surfaces owned by the reconciliation lane.
+- Do not add a parallel spine-check CI workflow.
 
 **Recently closed tracks:**
 
@@ -120,12 +156,12 @@ These are the ground-truth metrics. All other documents citing different numbers
 | Total Python modules | **674** | find dharma_swarm -name "*.py" -type f |
 | Top-level (flat) modules | **391 (58.7%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
 | Total Python LOC | **285,749** | wc -l across dharma_swarm Python modules |
-| Test files | **644** | find tests -name "*.py" -type f |
-| Test functions | **11,053 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Test files | **645** | find tests -name "*.py" -type f |
+| Test functions | **11,071 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
 | Markdown files | **861** | find . -name "*.md" -type f |
-| Markdown total lines | **213,225** | wc -l across all .md |
+| Markdown total lines | **213,353** | wc -l across all .md |
 | Bridge files | **24** | find dharma_swarm -name "*bridge*.py" |
 | Adapter files | **21 across 8 locations** | find dharma_swarm -type f \| rg -i "adapter" |
 | Orchestrator files | **4** (6,034 LOC total) | find dharma_swarm -name "*orchestrat*" |
