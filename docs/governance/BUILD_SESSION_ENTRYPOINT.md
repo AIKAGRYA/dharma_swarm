@@ -16,9 +16,9 @@ That command renders the current operating reality (active track, live ops, brok
 
 ## 0. What this repo is, in one paragraph
 
-dharma_swarm is a Python multi-agent orchestration runtime with a typed ontology, an immutable kernel, gated proposal flow, an append-only witness log, and an artifact/value loop. The substrates exist. The current failure mode is that most runtime work bypasses them. The current build track is to make one seam ontology-native end-to-end before generalising. Do not introduce new substrates. Wire existing ones.
+dharma_swarm is a Python multi-agent orchestration runtime with a typed ontology, an immutable kernel, gated proposal flow, an append-only witness log, and an artifact/value loop. The substrates exist. The current failure mode is that most runtime work bypasses them. Each active build track makes one seam ontology-native end-to-end; the active build portfolio (1–N co-equal, surface-disjoint tracks) is declared in [`ACTIVE_TRACK.yaml`](ACTIVE_TRACK.yaml) and surfaced by `make onboard`. Do not introduce new substrates. Wire existing ones.
 
-Current substrate-nativeness estimate (from audit): **~10–15% of runtime is ontology-native; ~85–90% bypasses substrate.** Goal of the current track: bring one user-visible seam to 100% native and prove it with tests.
+Current substrate-nativeness estimate (from audit): **~10–15% of runtime is ontology-native; ~85–90% bypasses substrate.** Each track's goal: bring its seam to 100% native and prove it with tests, surface-disjoint from sibling tracks.
 
 ---
 
@@ -162,19 +162,19 @@ These are direct from `SOVEREIGN_MANIFEST.md` axioms and the audit's "do not bui
 
 ---
 
-## 5. What success on the current track looks like
+## 5. What "done" looks like for a seam track (template)
 
-The operator-brief seam is done when all of the following hold simultaneously, and a single test asserts each:
+Each track defines its own acceptance criteria in `ACTIVE_TRACK.yaml` (`completion_criteria:`), enforced by `scripts/governance/check_track_status.py`. The pattern below — taken from the historical operator-brief seam as a worked **example**, not the current track — is the shape a substrate-native seam track should aim for; adapt it per track:
 
-1. A `KnowledgeArtifact` row of subtype `operator_brief` is created on each scheduler tick by the canonical path.
-2. That artifact has links to at least one `WitnessLog`, one `ActionProposal`, one `GateDecisionRecord` per applied gate (BHED_GNAN, STEELMAN, DOGMA_DRIFT, CONSENT), one `Outcome`, and one `ValueEvent`.
-3. The four gates above are evaluated for the brief, and a BLOCK on any one prevents artifact materialisation. The block is itself witnessed.
-4. No code path produces an operator brief by writing JSON to disk without going through the ontology and gates.
+1. The seam's artifact is created on the canonical path (e.g. a `KnowledgeArtifact` row on each scheduler tick), never by a side path.
+2. That artifact links to its witness/proposal/gate-decision/outcome/value rows (e.g. `WitnessLog`, `ActionProposal`, one `GateDecisionRecord` per applied gate, `Outcome`, `ValueEvent`).
+3. The applied gates are evaluated, and a BLOCK on any one prevents materialisation. The block is itself witnessed.
+4. No code path produces the artifact by writing JSON to disk without going through the ontology and gates.
 5. A failing gate or missing input produces a visible error artifact, not silent success.
-6. The seam runs from a single scheduler entry in `cron_jobs.json` and a single new module under `dharma_swarm/` (in an existing subdirectory, not the flat top level).
+6. The seam runs from a single scheduler entry and a single new module under `dharma_swarm/` (in an existing subdirectory, not the flat top level).
 7. The seam adds zero new bridges, routers, adapters, ledgers, or memory stores.
 
-When all seven are tested and passing, the substrate-nativeness estimate moves measurably and the next track can open.
+When a track's `completion_criteria` all pass, the substrate-nativeness estimate moves measurably; that track flips SHIPPABLE and can close while sibling tracks keep running.
 
 ---
 
