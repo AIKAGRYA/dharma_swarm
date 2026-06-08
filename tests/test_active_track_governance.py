@@ -95,6 +95,6 @@ def test_onboard_command_succeeds() -> None:
     result = _run(ONBOARD_SCRIPT)
     # Return code may be 1 if prereqs fail; that's a real signal, not a test failure.
     # We just check the command produced the structural sections.
-    assert "ACTIVE TRACK" in result.stdout
+    assert "ACTIVE PORTFOLIO" in result.stdout
     assert "LIVING AXIOMS" in result.stdout
     assert "WHAT TO DO NEXT" in result.stdout

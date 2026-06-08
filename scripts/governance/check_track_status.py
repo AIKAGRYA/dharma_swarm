@@ -4,7 +4,8 @@
 This is the governance gate that prevents the failure mode where a prose
 "current track" pointer rots while work moves on. It does three things:
 
-  1. Verifies the active track block is well-formed (schema, exactly one ACTIVE).
+  1. Verifies the track portfolio is well-formed (schema; 1..max_active
+     co-equal active tracks; spine/edge/cycle/conflict/surface invariants).
   2. Evaluates each acceptance_criteria predicate against the filesystem
      (and, when network is allowed, the GitHub API for PR merge status).
   3. Checks TTL — fails if (today - verified_at) > ttl_days.
