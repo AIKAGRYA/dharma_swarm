@@ -1,5 +1,5 @@
 {
-  "audit_sha": "4b86b8aef52f8df90707e0dbc13efa4b0f2f9ded",
+  "audit_sha": "9362e4efe24278c95ebe9b5a6c50775385acd67c",
   "classification_rule": "joined requires all joined evidence patterns; adapter-ready requires all adapter evidence patterns when joined is incomplete; quarantine and legacy require explicit source markers; missing means no tracked surface or insufficient evidence.",
   "classification_vocabulary": [
     "joined",
@@ -1776,5 +1776,5 @@
       "status": "legacy"
     }
   ],
-  "tracked_file_count": 2924
+  "tracked_file_count": 2925
 }
