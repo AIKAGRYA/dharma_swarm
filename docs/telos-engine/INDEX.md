@@ -23,7 +23,7 @@ Raw NDJSON model outputs were previously checked into `.raw-outputs/` (21 files,
 `metabolize-unreferenced-artifacts` hygiene pass: nothing in the repo references
 them, and they are runtime artifacts rather than authored documentation. The
 synthesized vision documents (`01_SATTVA_VISION.md` through `09_WHERE_IT_SITS.md`)
-are the durable result of those agent runs and remain canonical.
+are the durable result of those agent runs and remain the authorised reference.
 
 If a future packet needs to cite a specific output, promote a curated excerpt
 into a tracked `.md` rather than re-importing the raw NDJSON. The path is
