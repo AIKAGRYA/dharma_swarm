@@ -64,12 +64,32 @@ def _open_prs() -> list[dict]:
 
 
 def _parse_active_track() -> dict[str, str]:
-    """Extract key fields from ACTIVE_TRACK.yaml (nested under active_track:)."""
+    """Extract key fields for the primary active track from ACTIVE_TRACK.yaml.
+
+    Handles both schemas: v2 (`active_tracks:` list) and v1 (singular
+    `active_track:`) via the shared normalizer. For v2 portfolios it returns the
+    primary (first ACTIVE) track plus an `active_count` of how many tracks are
+    live, so `make status` reflects the portfolio rather than a single slot.
+    """
     info: dict[str, str] = {}
     if not ACTIVE_TRACK.exists():
         return info
+    try:
+        sys.path.insert(0, str(REPO_ROOT / "scripts/governance"))
+        from check_track_status import load_active_track, normalize_portfolio  # type: ignore
+        p = normalize_portfolio(load_active_track(ACTIVE_TRACK))
+        primary = p.get("primary") or {}
+        for key in ("id", "status", "name", "verified_at", "owner"):
+            if primary.get(key) is not None:
+                info[key] = str(primary[key])
+        info["active_count"] = str(len([t for t in p["active_tracks"]
+                                        if str(t.get("status", "")).upper() in {"ACTIVE", "SHIPPABLE"}]))
+        if info.get("id"):
+            return info
+    except Exception:
+        pass
+    # Fallback: legacy regex (v1 indented-under-active_track fields).
     text = ACTIVE_TRACK.read_text()
-    # Fields are indented under active_track:
     for key in ("id", "status", "name", "verified_at", "owner"):
         m = re.search(rf"^\s+{key}:\s*(.+)$", text, re.MULTILINE)
         if m:

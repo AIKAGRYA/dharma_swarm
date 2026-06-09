@@ -52,7 +52,7 @@ def test_onboard_renders_required_sections():
     )
     required = [
         "DHARMA SWARM — AGENT ONBOARDING",
-        "ACTIVE TRACK",
+        "ACTIVE PORTFOLIO",
         "LIVE OPS SNAPSHOT",
         "LIVE OPS COCKPIT",
         "SURFACE MANIFEST HEALTH",
@@ -169,8 +169,9 @@ def test_active_track_evidence_is_consumed_when_present():
         [sys.executable, str(ONBOARD_SCRIPT)],
         cwd=REPO_ROOT, capture_output=True, text=True, timeout=60,
     )
-    # The active_track id from ACTIVE_TRACK.yaml should appear somewhere.
-    assert "cockpit-control-surface-2026-05" in result.stdout or "ACTIVE TRACK" in result.stdout
+    # The active portfolio section must render (id is data-dependent, so assert
+    # the section header rather than a hard-coded track id).
+    assert "ACTIVE PORTFOLIO" in result.stdout
 
 
 # ---------------------------------------------------------------------------

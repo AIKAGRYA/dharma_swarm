@@ -40,16 +40,24 @@ def test_active_track_yaml_exists() -> None:
 
 def test_active_track_loads() -> None:
     sys.path.insert(0, str(REPO_ROOT / "scripts/governance"))
-    from check_track_status import load_active_track  # type: ignore
+    from check_track_status import (  # type: ignore
+        load_active_track, normalize_portfolio, SUPPORTED_SCHEMA_VERSIONS)
 
     track = load_active_track(ACTIVE_TRACK)
-    assert track.get("schema_version") == 1
-    active = track.get("active_track")
-    assert active, "ACTIVE_TRACK.yaml must declare an active_track block."
-    assert active.get("id"), "active_track.id is required."
-    assert active.get("status") in {"ACTIVE", "SHIPPABLE"}, \
-        f"unexpected status: {active.get('status')!r}"
-    assert active.get("verified_at"), "active_track.verified_at is required."
+    assert track.get("schema_version") in SUPPORTED_SCHEMA_VERSIONS
+    p = normalize_portfolio(track)
+    assert p["active_tracks"], "ACTIVE_TRACK.yaml must declare at least one active track."
+    for t in p["active_tracks"]:
+        assert t.get("id"), "every track requires an id."
+        assert t.get("status") in {"ACTIVE", "SHIPPABLE"}, \
+            f"unexpected status: {t.get('status')!r}"
+        assert t.get("verified_at"), f"{t.get('id')} requires verified_at."
+    # v2: every active track must serve a declared spine objective.
+    spine_ids = {o.get("id") for o in p["spine_objectives"]}
+    if spine_ids:
+        for t in p["active_tracks"]:
+            assert t.get("serves") in spine_ids, \
+                f"{t.get('id')} serves '{t.get('serves')}' not in spine objectives {sorted(spine_ids)}"
 
 
 def test_check_track_status_runs() -> None:
@@ -87,6 +95,6 @@ def test_onboard_command_succeeds() -> None:
     result = _run(ONBOARD_SCRIPT)
     # Return code may be 1 if prereqs fail; that's a real signal, not a test failure.
     # We just check the command produced the structural sections.
-    assert "ACTIVE TRACK" in result.stdout
+    assert "ACTIVE PORTFOLIO" in result.stdout
     assert "LIVING AXIOMS" in result.stdout
     assert "WHAT TO DO NEXT" in result.stdout
