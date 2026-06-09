@@ -1,0 +1,17 @@
+{
+  "id": "AI-I1",
+  "title": "Unexplainable high-risk diff",
+  "cluster": "I",
+  "cluster_title": "Human Comprehension Gate",
+  "severity": "operational",
+  "stage": "advisory",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "A high-risk change reaches merge without a plain-language explanation of diff intent, invariants, failure modes, and rollback.",
+  "why_it_hurts": "If no reviewer can explain the change, no reviewer can own its production failure modes.",
+  "detector": {"type": "manual", "rationale": "Comprehension quality is evaluated in the PR body, Mike packet, and reviewer receipts."},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["https://csrc.nist.gov/pubs/sp/800/218/final", "https://arxiv.org/abs/2507.09089"],
+  "audit_questions": ["Can a reviewer explain the diff, invariants, failure modes, and rollback without rereading the whole patch?", "If this is high risk, where is the human-approved comprehension note?"]
+}

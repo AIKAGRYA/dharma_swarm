@@ -1,0 +1,17 @@
+{
+  "id": "VC-K2",
+  "title": "Inconsistent error vocabulary",
+  "cluster": "K",
+  "cluster_title": "Naming and Identity Confusion",
+  "severity": "correctness",
+  "stage": "observed",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "RuntimeError, ValueError, custom exceptions, and bare Exception are used for the same condition.",
+  "why_it_hurts": "Callers cannot reliably catch, retry, or classify failures.",
+  "detector": {"type": "manual", "rationale": "Review changed module exception vocabulary against local conventions."},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["What exception class should represent this failure across the module?"]
+}

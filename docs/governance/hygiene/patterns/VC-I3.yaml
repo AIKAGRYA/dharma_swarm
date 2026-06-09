@@ -1,0 +1,17 @@
+{
+  "id": "VC-I3",
+  "title": "Non-atomic multi-step operations",
+  "cluster": "I",
+  "cluster_title": "Distributed Systems Correctness",
+  "severity": "distributed",
+  "stage": "observed",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "Two or more writes that must succeed together run without a transaction, saga, or compensation path.",
+  "why_it_hurts": "Partial success creates state that no layer owns.",
+  "detector": {"type": "manual", "rationale": "Review changed persistence and dispatch paths for multiple writes."},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["If the second write fails, what restores or records the first write?"]
+}

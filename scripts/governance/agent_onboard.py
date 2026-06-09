@@ -118,6 +118,13 @@ def render_repo_state() -> None:
         print(f"vs origin/main: ahead {ahead_n}, behind {behind_n}")
     print(f"Dirty files  : {dirty_count}")
     print(f"Today (UTC)  : {_today().isoformat()}")
+    print()
+    print("Remember only: make onboard")
+    if dirty_count:
+        print("Next command : make agent-build-closeout  # before PR/merge handoff")
+    else:
+        print("Next command : make agent-build-preflight # before editing")
+    print("If unsure    : rerun make onboard; it repeats the next command")
 
 
 def render_active_track(evidence: dict[str, Any] | None,
@@ -716,7 +723,7 @@ def render_pr_hygiene() -> None:
     print("    - Duplicate-intent bot PRs: detected by title-prefix matching")
     print()
     print("  Before opening a PR:")
-    print("    1. Run: make governance-all")
+    print("    1. Run: make agent-build-closeout")
     print("    2. Check for existing PRs on same topic:")
     print("       gh pr list --state open --search '<your topic>'")
     print("    3. Fill all PR template sections (Why, Surface, Coherence Delta, ...)")
@@ -743,8 +750,70 @@ def render_pr_hygiene() -> None:
         print("  (gh CLI unavailable — cannot check open PR count)")
 
 
+def render_hygiene_system() -> None:
+    section("HYGIENE SYSTEM (owner: docs/governance/hygiene/)")
+    root = REPO_ROOT / "docs/governance/hygiene"
+    pattern_dir = root / "patterns"
+    patterns = []
+    for path in sorted(pattern_dir.glob("*.yaml")):
+        if not (path.name.startswith("VC-") or path.name.startswith("AI-")):
+            continue
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        patterns.append(payload)
+
+    stage_counts: dict[str, int] = {}
+    namespace_counts: dict[str, int] = {}
+    for pattern in patterns:
+        stage = str(pattern.get("stage", "unknown"))
+        stage_counts[stage] = stage_counts.get(stage, 0) + 1
+        pattern_id = str(pattern.get("id", "UNKNOWN"))
+        namespace = pattern_id.split("-", 1)[0]
+        namespace_counts[namespace] = namespace_counts.get(namespace, 0) + 1
+
+    if patterns:
+        summary = ", ".join(f"{stage}={count}" for stage, count in sorted(stage_counts.items()))
+        namespaces = ", ".join(
+            f"{namespace}={count}" for namespace, count in sorted(namespace_counts.items())
+        )
+        print(f"  Patterns: {len(patterns)} ({namespaces}; {summary})")
+    else:
+        print("  Patterns: missing or unreadable")
+
+    baselines = sorted((root / "baselines").glob("*.txt"))
+    latest = baselines[-1].relative_to(REPO_ROOT).as_posix() if baselines else "none yet"
+    print(f"  Latest baseline: {latest}")
+    print("  AI-agent governance: docs/governance/hygiene/AI_AGENT_GOVERNANCE.md")
+    print("  Deep-dive packet: reports/governance/anti_ai_slop_futureproof_deep_dive_2026-06-07.md")
+    print("  Control backlog: reports/governance/anti_ai_slop_control_backlog_2026-06-08.md")
+    print("  Scan snapshot: reports/governance/anti_ai_slop_scan_snapshot_2026-06-08.json")
+    print("  Doctrine: AI-* signals are advisory until promoted through LIFECYCLE.md")
+    print("  Run: make hygiene-audit   # non-blocking scan")
+    print("  Run: make hygiene-check   # generated docs + pattern integrity")
+    print("  Run: make agent-build-preflight   # start an agent build session")
+    print("  Run: make agent-build-closeout    # close an agent build before PR handoff")
+
+    for label, prefix in (
+        ("AI-agent review signals", "AI-"),
+        ("Code hygiene review signals", "VC-"),
+    ):
+        surfaced = [
+            pattern for pattern in patterns
+            if str(pattern.get("id", "")).startswith(prefix)
+            and pattern.get("stage") in {"advisory", "enforced"}
+        ][:5]
+        if surfaced:
+            print(f"  {label}:")
+            for pattern in surfaced:
+                print(f"    - {pattern.get('id')}: {pattern.get('title')} ({pattern.get('stage')})")
+
+
 def render_enforcement_and_depth() -> None:
     section("ENFORCEMENT (run before opening a PR)")
+    print("  make agent-build-preflight # onboarding + hygiene integrity at session start")
+    print("  make agent-build-closeout  # no-write hygiene scan + full governance bundle")
     print("  make docops-integrity      # documentation invariants")
     print("  make governance-all        # full governance gate bundle")
     print("  python3 scripts/governance/check_track_status.py")
@@ -752,6 +821,7 @@ def render_enforcement_and_depth() -> None:
     section("DEPTH POINTERS (read on demand, not in order)")
     print("  Repo rules & behaviour : CLAUDE.md, AGENTS.md, docs/AGENTS.md")
     print("  Anti-slop rules        : docs/governance/ANTI_SLOP_RULES.md")
+    print("  AI-agent hygiene       : docs/governance/hygiene/AI_AGENT_GOVERNANCE.md")
     print("  Doc ownership map      : docs/governance/CANONICAL_DOC_STACK.md")
     print("  Architecture/doctrine  : docs/governance/SOVEREIGN_MANIFEST.md, docs/doctrine/")
     print("  Coherence Delta        : docs/governance/COHERENCE_DELTA.md")
@@ -848,6 +918,7 @@ def main() -> int:
     render_spine_status()
     render_runtime_truth(evidence, track)
     render_pr_hygiene()
+    render_hygiene_system()
     render_decay_watch()
     render_tooling_first()
     render_enforcement_and_depth()

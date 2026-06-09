@@ -1,0 +1,17 @@
+{
+  "id": "VC-D4",
+  "title": "Ghost API hallucination",
+  "cluster": "D",
+  "cluster_title": "Phantom Dependencies",
+  "severity": "correctness",
+  "stage": "measured",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "Code calls APIs that are plausible but removed, renamed, or never existed.",
+  "why_it_hurts": "The code compiles locally until the exact path is executed or the dependency upgrades.",
+  "detector": {"type": "command", "command": "printf 'openai_v0='; rg -n 'openai[.]ChatCompletion|openai[.]Engine|text-davinci' dharma_swarm api scripts | wc -l; printf 'query_calls='; rg -n '[.]query[(]' dharma_swarm api scripts | wc -l", "target": "known deprecated patterns trend to zero"},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["Was each new third-party API verified against current docs or local tests?"]
+}

@@ -1,0 +1,17 @@
+{
+  "id": "AI-A1",
+  "title": "Untrusted text treated as agent instruction",
+  "cluster": "A",
+  "cluster_title": "Trusted Instruction Boundary",
+  "severity": "security",
+  "stage": "advisory",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "Repo text outside approved instruction surfaces is allowed to steer agent behavior as if it had operator authority.",
+  "why_it_hurts": "Issues, PR comments, logs, generated docs, and retrieved context can become prompt-injection channels that override the user's actual goal.",
+  "detector": {"type": "command", "command": "rg -n --glob '!AGENTS.md' --glob '!CLAUDE.md' --glob '!docs/governance/hygiene/**' '(?i)(ignore (all )?(previous|above) instructions|system prompt|developer message|you are now|act as|must obey|do not tell the user)' . || true", "target": "instruction-shaped text outside trusted instruction files is reviewed as data, not authority"},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["https://owasp.org/www-project-top-10-for-large-language-model-applications/", "https://owasp.org/www-project-mcp-top-10/"],
+  "audit_questions": ["Which files are allowed to instruct agents, and does this change add instruction-shaped text outside those files?", "Did the reviewer treat PR comments, logs, and generated docs as data rather than authority?"]
+}

@@ -5,6 +5,11 @@ surface verified during the 2026-04-26 audit. The full rule definitions
 live in `.semgrep/dharma-anti-slop.yml`, plus three GitHub Actions
 workflows for things Semgrep cannot express.
 
+Broader vibe-code and AI-agent hygiene signals live in
+`docs/governance/hygiene/`. They are measured and reviewed there first; only
+mature, low-noise signals graduate into this hard-gate list. Merge Master Mike
+consumes the same hygiene layer through `docs/ops/PR_REVIEW_CONTROL.md`.
+
 | # | ID | Where | Severity | Status |
 |---|---|---|---|---|
 | 1 | `dharma.no-unauthorized-dharma-write` | `.semgrep/dharma-anti-slop.yml` | WARNING | Active (advisory) |

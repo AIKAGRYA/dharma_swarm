@@ -1,0 +1,17 @@
+{
+  "id": "VC-B4",
+  "title": "Comment-to-code ratio inversion",
+  "cluster": "B",
+  "cluster_title": "Documentation Pollution",
+  "severity": "structural",
+  "stage": "measured",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "Comments restate obvious code instead of explaining decisions or invariants.",
+  "why_it_hurts": "Noise makes meaningful comments harder to notice.",
+  "detector": {"type": "command", "command": "rg -n '# (set|sets|increment|increments|return|returns|create|creates|call|calls) ' dharma_swarm api scripts | wc -l", "target": "sample and reduce low-information comments"},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["Do new comments explain why, not merely what?"]
+}

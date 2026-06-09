@@ -1,0 +1,17 @@
+{
+  "id": "VC-I2",
+  "title": "Missing observability",
+  "cluster": "I",
+  "cluster_title": "Distributed Systems Correctness",
+  "severity": "distributed",
+  "stage": "observed",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "Error paths return, pass, or continue without logs, metrics, or receipts.",
+  "why_it_hurts": "The system fails quietly and future agents chase symptoms.",
+  "detector": {"type": "manual", "rationale": "Review changed error paths for logging, metrics, receipts, or explicit re-raise."},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["What evidence will exist when this path fails in production?"]
+}

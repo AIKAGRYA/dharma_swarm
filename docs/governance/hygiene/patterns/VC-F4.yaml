@@ -1,0 +1,17 @@
+{
+  "id": "VC-F4",
+  "title": "Deprecated API recall",
+  "cluster": "F",
+  "cluster_title": "Context-Window Artifacts",
+  "severity": "correctness",
+  "stage": "measured",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "The model recalls an API that was current in training data but is stale now.",
+  "why_it_hurts": "Generated code is plausible but incompatible with current dependencies.",
+  "detector": {"type": "command", "command": "rg -n 'openai[.]ChatCompletion|openai[.]Engine|text-davinci|langchain[.]llms' dharma_swarm api scripts | wc -l", "target": "known stale API patterns trend to zero"},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["Was the library API checked against current docs before coding?"]
+}

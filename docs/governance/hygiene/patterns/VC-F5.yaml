@@ -1,0 +1,17 @@
+{
+  "id": "VC-F5",
+  "title": "Naming entropy",
+  "cluster": "F",
+  "cluster_title": "Context-Window Artifacts",
+  "severity": "structural",
+  "stage": "measured",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "Generic function names such as data, info, process, handle, do, or run appear where domain names should exist.",
+  "why_it_hurts": "Search, ownership, and error messages become less informative over time.",
+  "detector": {"type": "command", "command": "rg -n '^def (data|info|stuff|thing|process|handle|do|run)[(]' dharma_swarm api scripts | wc -l", "target": "generic function names remain rare and justified"},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["Could each new function name tell a future agent the domain concept it owns?"]
+}

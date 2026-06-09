@@ -1,0 +1,17 @@
+{
+  "id": "VC-J1",
+  "title": "Cognitive debt",
+  "cluster": "J",
+  "cluster_title": "Spec Implementation Drift",
+  "severity": "operational",
+  "stage": "observed",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "The maintainer or agent can no longer explain a module because generated code outpaced understanding.",
+  "why_it_hurts": "Future fixes become guesswork hidden behind confident prose.",
+  "detector": {"type": "manual", "rationale": "Reviewer asks for a plain-language explanation of changed ownership and invariants."},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["Can the author explain the changed module without rereading it line by line?"]
+}

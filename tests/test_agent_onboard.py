@@ -59,6 +59,7 @@ def test_onboard_renders_required_sections():
         "BROKEN REGISTER",
         "LIVING AXIOMS",
         "TOOLING-FIRST CONTEXT PASS",
+        "HYGIENE SYSTEM",
         "ENFORCEMENT",
         "DEPTH POINTERS",
         "WHAT TO DO NEXT",
@@ -77,6 +78,34 @@ def test_tooling_first_includes_wiki_and_memory():
     assert "wiki search" in result.stdout, "TOOLING-FIRST must mention wiki search"
     assert "memory MCP" in result.stdout, "TOOLING-FIRST must mention memory MCP"
     assert "Tool availability" in result.stdout, "TOOLING-FIRST must probe tool availability"
+
+
+def test_onboard_prints_single_command_memory():
+    """The first screen must make make onboard the only command to remember."""
+    result = subprocess.run(
+        [sys.executable, str(ONBOARD_SCRIPT)],
+        cwd=REPO_ROOT, capture_output=True, text=True, timeout=60,
+    )
+    assert "Remember only: make onboard" in result.stdout
+    assert "Next command : make agent-build-" in result.stdout
+    assert "If unsure    : rerun make onboard" in result.stdout
+
+
+def test_onboard_surfaces_ai_hygiene_tranche():
+    """The front door must surface AI-agent hygiene, not only VC-* signals."""
+    result = subprocess.run(
+        [sys.executable, str(ONBOARD_SCRIPT)],
+        cwd=REPO_ROOT, capture_output=True, text=True, timeout=60,
+    )
+    assert "AI-agent governance" in result.stdout
+    assert "AI_AGENT_GOVERNANCE.md" in result.stdout
+    assert "anti_ai_slop_futureproof_deep_dive_2026-06-07.md" in result.stdout
+    assert "anti_ai_slop_control_backlog_2026-06-08.md" in result.stdout
+    assert "anti_ai_slop_scan_snapshot_2026-06-08.json" in result.stdout
+    assert "AI-agent review signals" in result.stdout
+    assert "AI-A1" in result.stdout
+    assert "agent-build-preflight" in result.stdout
+    assert "agent-build-closeout" in result.stdout
 
 
 # ---------------------------------------------------------------------------

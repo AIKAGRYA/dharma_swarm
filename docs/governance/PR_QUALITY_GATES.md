@@ -111,15 +111,18 @@ Every agent or contributor must:
 
 1. **Run `make onboard`** at session start to see the current operating
    reality (active track, live ops, broken register, PR hygiene summary)
-2. **Run `make governance-all`** before opening any PR. You do not need to
+2. **Run `make agent-build-preflight`** before implementation work when the
+   session will edit code, docs, tests, workflows, or governance surfaces.
+3. **Run `make agent-build-closeout`** before opening any PR. This runs a
+   no-worktree hygiene scan plus `make governance-all`. You do not need to
    hand-refresh DocOps counts — the `docops-autorefresh.yml` feeder reconciles
    them on the first CI run (see §1, "Self-healing DocOps counts").
-3. **Check for existing open PRs** on the same topic before opening a new one:
+4. **Check for existing open PRs** on the same topic before opening a new one:
    ```bash
    gh pr list --state open --search "<your topic keywords>"
    ```
-4. **Fill the PR template completely** — all sections must have content
-5. **Mark WIP/scaffold PRs as drafts** — use `[SHELVED]` prefix for
+5. **Fill the PR template completely** — all sections must have content
+6. **Mark WIP/scaffold PRs as drafts** — use `[SHELVED]` prefix for
    intentionally paused work
 
 ### Bot-specific rules

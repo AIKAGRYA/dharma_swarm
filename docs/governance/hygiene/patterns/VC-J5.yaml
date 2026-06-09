@@ -1,0 +1,17 @@
+{
+  "id": "VC-J5",
+  "title": "Schema drift",
+  "cluster": "J",
+  "cluster_title": "Spec Implementation Drift",
+  "severity": "correctness",
+  "stage": "observed",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "Code, migrations, serialized receipts, or database schemas disagree about a record shape.",
+  "why_it_hurts": "Readers and writers silently fork the truth about durable state.",
+  "detector": {"type": "manual", "rationale": "Compare changed models, schema registry entries, migrations, and fixture receipts."},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["Which schema owner was updated and which backward-compat path was tested?"]
+}

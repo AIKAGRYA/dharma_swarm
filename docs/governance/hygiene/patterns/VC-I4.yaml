@@ -1,0 +1,17 @@
+{
+  "id": "VC-I4",
+  "title": "Race-prone shared state",
+  "cluster": "I",
+  "cluster_title": "Distributed Systems Correctness",
+  "severity": "distributed",
+  "stage": "measured",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "Long-lived objects mutate shared state without a lock, queue, or ownership boundary.",
+  "why_it_hurts": "Concurrent loops can corrupt counters, caches, and runtime state.",
+  "detector": {"type": "command", "command": "printf 'self_mutations='; rg -n 'self[.][a-z_]+\\s*[+]=' dharma_swarm api scripts | wc -l; printf 'locks='; rg -n 'asyncio[.]Lock|threading[.]Lock|trio[.]Lock' dharma_swarm api scripts | wc -l", "target": "shared-state mutations are audited in long-lived classes"},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["Which task owns this state, and what prevents concurrent mutation?"]
+}
