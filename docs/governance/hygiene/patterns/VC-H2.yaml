@@ -1,0 +1,17 @@
+{
+  "id": "VC-H2",
+  "title": "Synchronous blocking in async contexts",
+  "cluster": "H",
+  "cluster_title": "Performance Regressions",
+  "severity": "performance",
+  "stage": "advisory",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "Async functions call time.sleep, requests, or subprocess.run directly.",
+  "why_it_hurts": "One slow operation blocks the event loop and starves unrelated work.",
+  "detector": {"type": "command", "command": "python3 scripts/governance/hygiene/sync_in_async.py", "target": "confirmed sync-in-async sites trend to zero"},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["Did any async function add blocking sleep, requests, or subprocess calls?"]
+}

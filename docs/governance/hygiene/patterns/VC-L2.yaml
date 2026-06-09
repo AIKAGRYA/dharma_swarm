@@ -1,0 +1,17 @@
+{
+  "id": "VC-L2",
+  "title": "Library monoculture",
+  "cluster": "L",
+  "cluster_title": "Open-Source and Ecosystem Degradation",
+  "severity": "structural",
+  "stage": "observed",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "Designs converge on common model-sampled patterns without considering the repo's actual needs.",
+  "why_it_hurts": "The system loses local taste, constraints, and differentiated architecture.",
+  "detector": {"type": "manual", "rationale": "Review design notes for explicit local constraints and rejected alternatives."},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["What local repo constraint shaped this design instead of a generic template?"]
+}

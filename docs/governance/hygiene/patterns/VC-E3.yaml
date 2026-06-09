@@ -1,0 +1,17 @@
+{
+  "id": "VC-E3",
+  "title": "Missing authorization checks",
+  "cluster": "E",
+  "cluster_title": "Security Regressions",
+  "severity": "security",
+  "stage": "observed",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "Route handlers return or mutate data without proving caller authority.",
+  "why_it_hurts": "A working endpoint can become a data exposure path.",
+  "detector": {"type": "manual", "rationale": "Requires route-by-route review against auth middleware and authority checks."},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["What code proves the caller is allowed to perform this action?"]
+}

@@ -118,38 +118,70 @@ def render_repo_state() -> None:
         print(f"vs origin/main: ahead {ahead_n}, behind {behind_n}")
     print(f"Dirty files  : {dirty_count}")
     print(f"Today (UTC)  : {_today().isoformat()}")
+    print()
+    print("Remember only: make onboard")
+    if dirty_count:
+        print("Next command : make agent-build-closeout  # before PR/merge handoff")
+    else:
+        print("Next command : make agent-build-preflight # before editing")
+    print("If unsure    : rerun make onboard; it repeats the next command")
 
 
 def render_active_track(evidence: dict[str, Any] | None,
                         track: dict[str, Any]) -> None:
-    section("ACTIVE TRACK (owner: docs/governance/ACTIVE_TRACK.yaml)")
+    section("ACTIVE PORTFOLIO (owner: docs/governance/ACTIVE_TRACK.yaml)")
     if not evidence:
         print("  WARNING: no active_track_evidence.json found.")
         print("  Run: python3 scripts/governance/check_track_status.py")
         return
 
+    # v2: a portfolio of 1..N co-equal active tracks. Render them all, not just
+    # the primary — so an agent never reads "there is one active track".
+    active_tracks = evidence.get("active_tracks")
+    summary = evidence.get("portfolio_summary") or {}
+    if active_tracks:
+        n = summary.get("active", len(active_tracks))
+        print(f"  {n} co-equal active track(s) "
+              f"(WIP warn {summary.get('warn_active')}, max {summary.get('max_active')}). "
+              "A new project is a NEW TRACK here, not a violation.")
+        coverage = evidence.get("spine_coverage") or {}
+        if coverage:
+            covered = [k for k, v in coverage.items() if v]
+            gaps = [k for k, v in coverage.items() if not v]
+            print(f"  Spine coverage: {', '.join(covered) or '(none)'}"
+                  + (f"  ·  GAPS (no active track): {', '.join(gaps)}" if gaps else ""))
+        for t in active_tracks:
+            cp = t.get("completion_progress", {"passed": 0, "total": 0})
+            flag = "SHIPPABLE" if t.get("shippable") else f"{cp['passed']}/{cp['total']}"
+            print()
+            print(f"  • {t.get('id')}  [{t.get('status')}]  serves={t.get('serves')}  ({flag})")
+            edges = [f"{k}={t.get(k)}" for k in ("complements", "depends_on", "conflicts_with") if t.get(k)]
+            if edges:
+                print(f"      {'  '.join(edges)}")
+            for c in t.get("criteria", []):
+                mark = "✓" if c.get("passed") else "✗"
+                line = f"      {mark} [{c.get('kind')}] {c.get('id')}"
+                print(line if c.get("passed") else line + f"  — {c.get('detail', '')}")
+        print()
+        print("  To OPEN A NEW TRACK (when the operator proposes a project): add an entry")
+        print("  under `active_tracks:` in docs/governance/ACTIVE_TRACK.yaml with serves:")
+        print("  <spine objective>, owned_surfaces:, and acceptance criteria; then run")
+        print("  `python3 scripts/governance/render_active_track_includes.py`. Up to "
+              f"{summary.get('max_active', 10)} may run concurrently with non-overlapping surfaces.")
+        return
+
+    # v1 back-compat: single active_track block.
     block = (track or {}).get("active_track") or {}
     print(f"  ID         : {evidence.get('active_track_id', '(unknown)')}")
     if block.get("name"):
         print(f"  Name       : {block['name']}")
     if block.get("status"):
         print(f"  Status     : {block['status']}")
-    if block.get("verified_at") and block.get("ttl_days"):
-        try:
-            verified = date.fromisoformat(str(block["verified_at"]))
-            age = (_today() - verified).days
-            ttl = int(block["ttl_days"])
-            remaining = ttl - age
-            tag = "OK" if remaining >= 0 else f"OVERDUE by {-remaining}d"
-            print(f"  TTL        : {age}/{ttl} days used ({tag})")
-        except (ValueError, TypeError):
-            pass
     progress = evidence.get("completion_progress", {"passed": 0, "total": 0})
     print(f"  Prereqs    : {'OK' if evidence.get('prerequisites_ok') else 'FAILED'}")
     print(f"  Completion : {progress['passed']}/{progress['total']}")
     shippable = evidence.get("shippable", False)
-    print(f"  Shippable  : {'YES — declare next track' if shippable else 'no'}")
-
+    print(f"  Shippable  : {'YES' if shippable else 'no'}")
     print()
     print("  Acceptance criteria:")
     for c in evidence.get("criteria", []):
@@ -691,7 +723,7 @@ def render_pr_hygiene() -> None:
     print("    - Duplicate-intent bot PRs: detected by title-prefix matching")
     print()
     print("  Before opening a PR:")
-    print("    1. Run: make governance-all")
+    print("    1. Run: make agent-build-closeout")
     print("    2. Check for existing PRs on same topic:")
     print("       gh pr list --state open --search '<your topic>'")
     print("    3. Fill all PR template sections (Why, Surface, Coherence Delta, ...)")
@@ -718,8 +750,70 @@ def render_pr_hygiene() -> None:
         print("  (gh CLI unavailable — cannot check open PR count)")
 
 
+def render_hygiene_system() -> None:
+    section("HYGIENE SYSTEM (owner: docs/governance/hygiene/)")
+    root = REPO_ROOT / "docs/governance/hygiene"
+    pattern_dir = root / "patterns"
+    patterns = []
+    for path in sorted(pattern_dir.glob("*.yaml")):
+        if not (path.name.startswith("VC-") or path.name.startswith("AI-")):
+            continue
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        patterns.append(payload)
+
+    stage_counts: dict[str, int] = {}
+    namespace_counts: dict[str, int] = {}
+    for pattern in patterns:
+        stage = str(pattern.get("stage", "unknown"))
+        stage_counts[stage] = stage_counts.get(stage, 0) + 1
+        pattern_id = str(pattern.get("id", "UNKNOWN"))
+        namespace = pattern_id.split("-", 1)[0]
+        namespace_counts[namespace] = namespace_counts.get(namespace, 0) + 1
+
+    if patterns:
+        summary = ", ".join(f"{stage}={count}" for stage, count in sorted(stage_counts.items()))
+        namespaces = ", ".join(
+            f"{namespace}={count}" for namespace, count in sorted(namespace_counts.items())
+        )
+        print(f"  Patterns: {len(patterns)} ({namespaces}; {summary})")
+    else:
+        print("  Patterns: missing or unreadable")
+
+    baselines = sorted((root / "baselines").glob("*.txt"))
+    latest = baselines[-1].relative_to(REPO_ROOT).as_posix() if baselines else "none yet"
+    print(f"  Latest baseline: {latest}")
+    print("  AI-agent governance: docs/governance/hygiene/AI_AGENT_GOVERNANCE.md")
+    print("  Deep-dive packet: reports/governance/anti_ai_slop_futureproof_deep_dive_2026-06-07.md")
+    print("  Control backlog: reports/governance/anti_ai_slop_control_backlog_2026-06-08.md")
+    print("  Scan snapshot: reports/governance/anti_ai_slop_scan_snapshot_2026-06-08.json")
+    print("  Doctrine: AI-* signals are advisory until promoted through LIFECYCLE.md")
+    print("  Run: make hygiene-audit   # non-blocking scan")
+    print("  Run: make hygiene-check   # generated docs + pattern integrity")
+    print("  Run: make agent-build-preflight   # start an agent build session")
+    print("  Run: make agent-build-closeout    # close an agent build before PR handoff")
+
+    for label, prefix in (
+        ("AI-agent review signals", "AI-"),
+        ("Code hygiene review signals", "VC-"),
+    ):
+        surfaced = [
+            pattern for pattern in patterns
+            if str(pattern.get("id", "")).startswith(prefix)
+            and pattern.get("stage") in {"advisory", "enforced"}
+        ][:5]
+        if surfaced:
+            print(f"  {label}:")
+            for pattern in surfaced:
+                print(f"    - {pattern.get('id')}: {pattern.get('title')} ({pattern.get('stage')})")
+
+
 def render_enforcement_and_depth() -> None:
     section("ENFORCEMENT (run before opening a PR)")
+    print("  make agent-build-preflight # onboarding + hygiene integrity at session start")
+    print("  make agent-build-closeout  # no-write hygiene scan + full governance bundle")
     print("  make docops-integrity      # documentation invariants")
     print("  make governance-all        # full governance gate bundle")
     print("  python3 scripts/governance/check_track_status.py")
@@ -727,6 +821,7 @@ def render_enforcement_and_depth() -> None:
     section("DEPTH POINTERS (read on demand, not in order)")
     print("  Repo rules & behaviour : CLAUDE.md, AGENTS.md, docs/AGENTS.md")
     print("  Anti-slop rules        : docs/governance/ANTI_SLOP_RULES.md")
+    print("  AI-agent hygiene       : docs/governance/hygiene/AI_AGENT_GOVERNANCE.md")
     print("  Doc ownership map      : docs/governance/CANONICAL_DOC_STACK.md")
     print("  Architecture/doctrine  : docs/governance/SOVEREIGN_MANIFEST.md, docs/doctrine/")
     print("  Coherence Delta        : docs/governance/COHERENCE_DELTA.md")
@@ -788,7 +883,15 @@ def _load_track_yaml() -> dict[str, Any]:
     sys.path.insert(0, str(Path(__file__).parent))
     try:
         from check_track_status import load_active_track  # type: ignore
-        return load_active_track(ACTIVE_TRACK) or {}
+        track = load_active_track(ACTIVE_TRACK) or {}
+        # v2 portfolio back-compat: legacy onboard sections read the singular
+        # `active_track`. Synthesize it as the primary (first) active track so
+        # those sections keep rendering. The full portfolio is in `active_tracks`.
+        if "active_track" not in track and track.get("active_tracks"):
+            tracks = [t for t in track["active_tracks"] if t]
+            if tracks:
+                track["active_track"] = tracks[0]
+        return track
     except Exception:
         return {}
 
@@ -815,32 +918,36 @@ def main() -> int:
     render_spine_status()
     render_runtime_truth(evidence, track)
     render_pr_hygiene()
+    render_hygiene_system()
     render_decay_watch()
     render_tooling_first()
     render_enforcement_and_depth()
     render_drift_triage()
 
     section("WHAT TO DO NEXT")
+    # Portfolio-aware: an operator proposing a new project should OPEN A TRACK,
+    # never be told it "violates the active track".
+    active_tracks = (evidence or {}).get("active_tracks") or []
     block = (track or {}).get("active_track") or {}
     next_items = block.get("next_items", []) if block else []
     prereqs_ok = bool(evidence and evidence.get("prerequisites_ok"))
-    shippable = bool(evidence and evidence.get("shippable"))
+    shippable_ids = [t.get("id") for t in active_tracks if t.get("shippable")]
+
+    print("  If the operator proposes a NEW project: open a new track (see the")
+    print("  ACTIVE PORTFOLIO section above for how) — do NOT treat it as a")
+    print("  violation of an existing track. Concurrency is allowed up to the WIP limit.")
+    print()
     if not prereqs_ok:
-        print("  Prerequisites are failing. The active track is mis-declared.")
-        print("  Fix the YAML or re-open the previous track.")
-    elif shippable:
-        print("  All completion criteria pass. Close this track and declare the next.")
-        print("  Edit docs/governance/ACTIVE_TRACK.yaml:")
-        print("    - move active_track block to closed_tracks")
-        print("    - declare the new active_track block")
-        print("  Run: python3 scripts/governance/render_active_track_includes.py")
-    elif next_items:
-        print("  Pick from next_items in ACTIVE_TRACK.yaml. Suggested order:")
+        print("  A track's prerequisites are failing — it is mis-declared. Fix the YAML.")
+    if shippable_ids:
+        print(f"  Shippable now: {', '.join(shippable_ids)} — move each to closed_tracks")
+        print("  (the other active tracks keep running), then run")
+        print("  python3 scripts/governance/render_active_track_includes.py")
+    if next_items:
+        print("  Or continue an active track — next_items (primary track):")
         for item in next_items[:5]:
             tag = " (blocker)" if item.get("blocker") else ""
             print(f"    - [{item.get('kind', '?')}]{tag} {item.get('what', '')[:80]}")
-    else:
-        print("  No next_items declared. Add to ACTIVE_TRACK.yaml or pick from BR-* open items.")
     print()
     print("  Reminder: this command renders the owners; it does not own any fact.")
     print("  When in doubt: trust the filesystem, git log, and ACTIVE_TRACK.yaml.")

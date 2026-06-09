@@ -1,0 +1,17 @@
+{
+  "id": "VC-J2",
+  "title": "Intent drift",
+  "cluster": "J",
+  "cluster_title": "Spec Implementation Drift",
+  "severity": "correctness",
+  "stage": "observed",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "Function descriptions, docs, or specs no longer match runtime behavior.",
+  "why_it_hurts": "Agents follow the doc and break the code, or preserve the code and violate the doc.",
+  "detector": {"type": "manual", "rationale": "Sample changed docstrings and docs against implementation."},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["Which changed prose was verified against runtime behavior?"]
+}

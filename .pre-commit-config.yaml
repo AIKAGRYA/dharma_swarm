@@ -45,6 +45,13 @@ repos:
         pass_filenames: false
         always_run: true
         stages: [pre-commit]
+      - id: dharma-hygiene-integrity
+        name: dharma hygiene integrity
+        entry: python3 scripts/governance/hygiene/check_hygiene_integrity.py
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
       - id: dharma-manifest-check
         name: dharma manifest check (ACTIVE_SURFACE_MANIFEST ↔ repo reality)
         entry: python3 tools/manifest_check.py

@@ -1,0 +1,17 @@
+{
+  "id": "VC-G4",
+  "title": "Non-deterministic test chasing",
+  "cluster": "G",
+  "cluster_title": "Agent-Loop Pathologies",
+  "severity": "correctness",
+  "stage": "measured",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "Tests use sleeps instead of deterministic synchronization or polling.",
+  "why_it_hurts": "The suite becomes slower and still flaky.",
+  "detector": {"type": "command", "command": "rg -n 'time[.]sleep|asyncio[.]sleep' tests | wc -l", "target": "sleep calls in tests trend down"},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["Could each new sleep be replaced with an event, fake clock, or bounded poll?"]
+}

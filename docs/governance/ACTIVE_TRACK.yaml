@@ -1,144 +1,294 @@
 # ACTIVE_TRACK.yaml
 #
-# THE ONLY PLACE where the current build track is declared.
+# THE PLACE where the current build PORTFOLIO is declared.
+#
+# This is the Intent layer of the Three-Layer SSoT model (CANONICAL_DOC_STACK.md):
+#   Intent  -> ACTIVE_TRACK.yaml          (what we are working on now)   <-- this file
+#   Surface -> ACTIVE_SURFACE_MANIFEST.yaml (what exists in the codebase)
+#   State   -> docs/state/LIVE_OPS_DASHBOARD.md (+ git) (what is live now)
+# It coheres with the 5-file "live status" family rendered by `make onboard`
+# (see the `family:` block below).
+#
+# Schema v2 — PORTFOLIO MODEL (multi-track).
+# ---------------------------------------------------------------------------
+# v1 declared exactly ONE active_track and treated everything else as a
+# subordinate "lane". That single privileged slot is what made every new
+# project read as a violation. v2 replaces it with a small TYPED GRAPH of
+# 1..N co-equal active tracks (a WIP-limited portfolio), each of which:
+#   - serves: ONE spine objective         (how it ties to the main spine)
+#   - declares typed edges to siblings    (complements / depends_on / conflicts_with)
+#   - owns explicit surfaces              (the no-global-mutex coordination plane)
+#   - moves named vital signs             (what live-status dimensions it improves)
+# A new project is a NEW NODE, never a violation. Focus is preserved as a
+# WIP limit (track_policy.max_active), not as a mutex.
+#
+# Backward compatibility: tools that still read the singular `active_track`
+# key get a synthesized projection = the primary (first) ACTIVE track. The
+# checker/renderer/onboard read `active_tracks`; the singular is a compat shim.
 #
 # Other governance docs (CLAUDE.md, SOVEREIGN_MANIFEST.md, BUILD_SESSION_ENTRYPOINT.md)
-# render their "current track" line from this file via the DOCOPS include
-# mechanism (scripts/docops/render_includes.py). Do not hand-write the track
-# name into any other file.
+# render their "current track(s)" block from this file via
+# scripts/governance/render_active_track_includes.py. Do not hand-write track
+# names into any other file.
 #
 # Lifecycle:
-#   1. A new track is opened by declaring it here with status=ACTIVE,
-#      acceptance criteria, and TTL.
-#   2. CI runs scripts/governance/check_track_status.py on every PR.
-#      When all acceptance criteria evaluate true, status flips to SHIPPABLE
-#      (via the active_track_evidence.json artifact, not by editing this file).
-#   3. The next operator closes the track by moving its block to history
-#      and declaring the next track ACTIVE. CI fails any PR that leaves the
-#      repo with zero ACTIVE tracks for more than 7 days.
-#   4. Stale claims (TTL exceeded with no re-verification) raise a CI failure
-#      until either re-verified (bump verified_at) or retired.
+#   1. Open a track by adding an entry to active_tracks with status=ACTIVE,
+#      a spine objective (serves), acceptance criteria, owned_surfaces, and TTL.
+#   2. CI runs scripts/governance/check_track_status.py on every PR. It
+#      validates the graph (edges resolve, no dependency cycle, no active-active
+#      conflict, WIP within limit, every track serves a real spine objective)
+#      and reconciles each track's criteria against repo reality. A track flips
+#      to SHIPPABLE when its prerequisites hold and all completion criteria pass.
+#   3. Close a track by moving its block to closed_tracks (append-only).
+#      CI warns immediately when the portfolio has zero ACTIVE tracks
+#      (min_active_grace_days is advisory operator guidance, not auto-enforced).
+#   4. Stale claims (TTL exceeded, no re-verification) raise a finding until
+#      re-verified (bump verified_at) or retired.
 #
-# Schema version: 1
-schema_version: 1
+# Schema version: 2
+schema_version: 2
 
 # ---------------------------------------------------------------------------
-# Active track (exactly one block with status=ACTIVE at any time)
+# SPINE OBJECTIVES — the backbone every track ties into (OKR-style; keep to 2-4).
+# Each active track MUST `serves:` exactly one of these ids. Grounded in
+# SOVEREIGN_MANIFEST.md (telos hierarchy: Jagat Kalyan -> SIS -> organs).
 # ---------------------------------------------------------------------------
-active_track:
-  id: runtime-truth-reconciliation-2026-06
-  name: Runtime Truth Reconciliation — operator-visible truth packets
-  status: ACTIVE
-  opened_at: "2026-06-04"
-  verified_at: "2026-06-04"
-  ttl_days: 14
-  owner: "@AmitabhainArunachala"
+spine_objectives:
+  - id: substrate-nativeness
+    name: Substrate nativeness — runtime flows through the ontology/spine, not around it
+    ref: docs/governance/SOVEREIGN_MANIFEST.md
+    measure: "~10-15% native today; target 30%+ (reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md)"
+  - id: revenue-external-humans-served
+    name: Revenue & external humans served — value leaves the house and someone acts on it
+    ref: docs/governance/VENTURE_CELL_PORTFOLIO.yaml
+    measure: "external humans who read/replied/acted; first cash receipt"
+  - id: research-depth
+    name: Research depth — the contemplative-mechanistic bridge (R_V, geometric lens) deepens
+    ref: docs/governance/SOVEREIGN_MANIFEST.md
+    measure: "verified MI results; paper-grade claims"
 
-  description: |
-    The Runtime Truth Spine substrate is merged and shippable. This track moves
-    from substrate existence to read-only reconciliation: operator-visible
-    runtime truth packets that separate heartbeat, readiness, artifact progress,
-    completion, authority, projection/cache, mutation, and external-gated proof.
+# ---------------------------------------------------------------------------
+# TRACK POLICY — focus as a WIP limit, not a mutex (Kanban / flow).
+# This is the `track_policy` the SOVEREIGN_MANIFEST doctrine amendment refers to
+# (min_active..max_active concurrent tracks). Concurrency is authorized, not
+# mandated: the floor is 1, the ceiling is 10, and opening beyond the floor is
+# operator discretion gated on non-overlap (owned_surfaces), not agent count.
+# ---------------------------------------------------------------------------
+track_policy:
+  model: "1..N co-equal active tracks; typed graph; WIP-limited; surface-owned"
+  min_active: 1             # floor — single-track default holds until a 2nd is opened
+  max_active: 10            # hard ceiling — focus protection; CI ERROR above this
+  warn_active: 5            # soft signal — "you're spreading thin"; CI WARN above this
+  min_active_grace_days: 7  # advisory: how long an empty portfolio is tolerable (empty warns immediately; not auto-enforced)
+  min_active_grace_enforced: false  # explicit tombstone: grace is advisory, NOT auto-failed by CI (downstream JSON consumers read this directly)
+  allow_active_active_conflict: false  # two ACTIVE tracks joined by conflicts_with => ERROR
+  surface_overlap: warn     # two ACTIVE tracks sharing an owned surface => WARN (coordinate)
 
-    The track must not create a new truth store, daemon, receipt system, or
-    authority surface. It projects from existing owners only:
-    spine.EvidenceReceipt for in-flight dispatch proof, runtime_state.RuntimeReceipt
-    for persisted runtime receipts, IdempotencyRecord for exactly-once substrate,
-    and existing operator/onboard/control-surface rows for read-only rendering.
+# ---------------------------------------------------------------------------
+# LIVE-STATUS FAMILY — the 5-file family `make onboard` reads to render live
+# status. This Intent layer must stay coherent with these owners.
+# ---------------------------------------------------------------------------
+family:
+  intent: docs/governance/ACTIVE_TRACK.yaml
+  surface: ACTIVE_SURFACE_MANIFEST.yaml
+  state: docs/state/LIVE_OPS_DASHBOARD.md
+  breakage: docs/state/BROKEN_REGISTER.md
+  doctrine: docs/governance/SOVEREIGN_MANIFEST.md
 
-    Doctrine line that must hold:
-      Read models project truth from owners; they do not become authority.
+# ---------------------------------------------------------------------------
+# VITAL SIGNS — swappable reference to the live repo-health dimensions shown on
+# the dashboard. Tracks declare which of these they `moves_vital_signs:`.
+# Default source = the Harness Audit scorecard (dashboard /dashboard/audit).
+# To change the set, edit `dimensions` here in ONE place — tracks reference by id.
+# ---------------------------------------------------------------------------
+vital_signs:
+  source: dharma_swarm/harness_audit.py
+  dashboard_route: /dashboard/audit
+  dimensions:
+    - tool_coverage
+    - context_efficiency
+    - quality_gates
+    - memory_persistence
+    - eval_coverage
+    - security_guardrails
+    - cost_efficiency
 
-  surfaces:
-    - dharma_swarm/operator_core/contracts.py
-    - dharma_swarm/operator_core/control_surface_models.py
-    - dharma_swarm/operator_core/control_surface.py
-    - scripts/governance/agent_onboard.py
-    - dharma_swarm/runtime_state.py
-    - dharma_swarm/a2a/a2a_bridge.py
-    - dharma_swarm/a2a/a2a_server.py
-    - tests/test_agent_onboard.py
-    - tests/test_operator_core_contracts.py
-    - tests/test_spine_persistence_invariant.py
-    - tests/test_spine_adoption_dispatch.py
+# ---------------------------------------------------------------------------
+# ACTIVE TRACKS — 1..max_active co-equal peers (a typed graph).
+# Track fields:
+#   id, name, status (ACTIVE|SHIPPABLE), opened_at, verified_at, ttl_days, owner
+#   serves:           <spine_objective id>      (required; how it ties to the spine)
+#   complements:      [<track id>, ...]         (soft synergy, surface-disjoint peers)
+#   depends_on:       [<track id>, ...]         (hard ordering; must form a DAG)
+#   conflicts_with:   [<track id>, ...]         (shared surface; not both ACTIVE)
+#   owned_surfaces:   [<glob>, ...]             (coordination plane; overlap => WARN)
+#   moves_vital_signs:[<vital_sign id>, ...]    (which live-status dims it improves)
+#   prerequisites / completion_criteria / non_goals / next_items  (as in v1)
+# ---------------------------------------------------------------------------
+active_tracks:
+  - id: runtime-truth-reconciliation-2026-06
+    name: Runtime Truth Reconciliation — operator-visible truth packets
+    status: ACTIVE
+    opened_at: "2026-06-04"
+    verified_at: "2026-06-04"
+    ttl_days: 14
+    owner: "@AmitabhainArunachala"
+    serves: substrate-nativeness
+    complements:
+      - runtime-truth-nats-2026-06
+    owned_surfaces:
+      - dharma_swarm/operator_core/**
+      - scripts/governance/agent_onboard.py
+      - dharma_swarm/runtime_state.py
+    moves_vital_signs:
+      - quality_gates
+      - memory_persistence
 
-  prerequisites:
-    - id: runtime_spine_package_exists
-      kind: file_exists
-      file: dharma_swarm/spine/__init__.py
-    - id: receipt_equivalence_matrix_exists
-      kind: file_exists
-      file: docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md
-    - id: a2a_persistence_invariant_tests_exist
-      kind: file_exists
-      file: tests/test_spine_persistence_invariant.py
+    description: |
+      The Runtime Truth Spine substrate is merged and shippable. This track moves
+      from substrate existence to read-only reconciliation: operator-visible
+      runtime truth packets that separate heartbeat, readiness, artifact progress,
+      completion, authority, projection/cache, mutation, and external-gated proof.
 
-  completion_criteria:
-    - id: runtime_truth_packet_defined
-      kind: file_contains
-      file: dharma_swarm/operator_core/contracts.py
-      pattern: "class RuntimeTruthPacket"
-    - id: runtime_truth_axes_defined
-      kind: file_contains
-      file: dharma_swarm/operator_core/contracts.py
-      pattern: "class RuntimeTruthState"
-    - id: onboard_runtime_truth_render
-      kind: file_contains
-      file: scripts/governance/agent_onboard.py
-      pattern: "render_runtime_truth"
-    - id: onboard_runtime_truth_no_write_test
-      kind: file_contains
-      file: tests/test_agent_onboard.py
-      pattern: "test_runtime_truth_render_is_read_only"
-    - id: runtime_truth_packet_axis_test
-      kind: file_contains
-      file: tests/test_operator_core_contracts.py
-      pattern: "test_runtime_truth_packet_keeps_state_axes_separate"
-    - id: a2a_single_persistence_invariant
-      kind: file_contains
-      file: tests/test_spine_persistence_invariant.py
-      pattern: "test_submit_via_spine_retry_does_not_create_second_runtime_receipt"
-    - id: spine_bypass_report_exists
-      kind: file_exists
-      file: scripts/governance/spine_bypass_report.py
-    - id: receipt_json_projection_only_doc
-      kind: file_contains
-      file: docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md
-      pattern: "projection/cache only"
-    - id: correlation_spine_manifest_still_declared
-      kind: file_contains
-      file: ACTIVE_SURFACE_MANIFEST.yaml
-      pattern: "correlation_spine:"
-    - id: evidence_receipt_still_defined
-      kind: file_contains
-      file: dharma_swarm/spine/receipt.py
-      pattern: "class EvidenceReceipt"
-    - id: runtime_receipt_still_defined
-      kind: file_contains
-      file: dharma_swarm/runtime_state.py
-      pattern: "class RuntimeReceipt"
+      The track must not create a new truth store, daemon, receipt system, or
+      authority surface. It projects from existing owners only:
+      spine.EvidenceReceipt for in-flight dispatch proof, runtime_state.RuntimeReceipt
+      for persisted runtime receipts, IdempotencyRecord for exactly-once substrate,
+      and existing operator/onboard/control-surface rows for read-only rendering.
 
-  non_goals:
-    - Do not create a new daemon, database, event log, truth store, or receipt system.
-    - Do not mint a second RuntimeReceipt for A2A or paths with an inner runtime owner.
-    - Do not mutate external systems, live processes, archive fitness, payments, or gateways.
-    - Do not broadly refactor orchestrator.py, agent_runner.py, swarm.py, providers.py, or SwarmManager.
-    - Do not build Verified Experiment Loop runtime in this track.
-    - Do not create standalone BetCard, Experiment, SwarmRun, DecisionRecord, LineageRecord, WikiUpdate, or cost-tracker classes.
+      Doctrine line that must hold:
+        Read models project truth from owners; they do not become authority.
 
-  next_items:
-    - id: 1
-      what: "Define the smallest read-only RuntimeTruthPacket contract in the existing operator_core owner."
-      kind: code
-      blocker: true
-    - id: 2
-      what: "Render compact runtime truth in make onboard without making onboard an authority surface."
-      kind: code
-      blocker: true
-    - id: 3
-      what: "Protect A2A single-persistence invariant while adding runtime truth projections."
-      kind: test
-      blocker: false
+    prerequisites:
+      - id: runtime_spine_package_exists
+        kind: file_exists
+        file: dharma_swarm/spine/__init__.py
+      - id: receipt_equivalence_matrix_exists
+        kind: file_exists
+        file: docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md
+      - id: a2a_persistence_invariant_tests_exist
+        kind: file_exists
+        file: tests/test_spine_persistence_invariant.py
+
+    completion_criteria:
+      - id: runtime_truth_packet_defined
+        kind: file_contains
+        file: dharma_swarm/operator_core/contracts.py
+        pattern: "class RuntimeTruthPacket"
+      - id: runtime_truth_axes_defined
+        kind: file_contains
+        file: dharma_swarm/operator_core/contracts.py
+        pattern: "class RuntimeTruthState"
+      - id: onboard_runtime_truth_render
+        kind: file_contains
+        file: scripts/governance/agent_onboard.py
+        pattern: "render_runtime_truth"
+      - id: onboard_runtime_truth_no_write_test
+        kind: file_contains
+        file: tests/test_agent_onboard.py
+        pattern: "test_runtime_truth_render_is_read_only"
+      - id: runtime_truth_packet_axis_test
+        kind: file_contains
+        file: tests/test_operator_core_contracts.py
+        pattern: "test_runtime_truth_packet_keeps_state_axes_separate"
+      - id: a2a_single_persistence_invariant
+        kind: file_contains
+        file: tests/test_spine_persistence_invariant.py
+        pattern: "test_submit_via_spine_retry_does_not_create_second_runtime_receipt"
+      - id: spine_bypass_report_exists
+        kind: file_exists
+        file: scripts/governance/spine_bypass_report.py
+      - id: receipt_json_projection_only_doc
+        kind: file_contains
+        file: docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md
+        pattern: "projection/cache only"
+      - id: correlation_spine_manifest_still_declared
+        kind: file_contains
+        file: ACTIVE_SURFACE_MANIFEST.yaml
+        pattern: "correlation_spine:"
+      - id: evidence_receipt_still_defined
+        kind: file_contains
+        file: dharma_swarm/spine/receipt.py
+        pattern: "class EvidenceReceipt"
+      - id: runtime_receipt_still_defined
+        kind: file_contains
+        file: dharma_swarm/runtime_state.py
+        pattern: "class RuntimeReceipt"
+
+    non_goals:
+      - Do not create a new daemon, database, event log, truth store, or receipt system.
+      - Do not mint a second RuntimeReceipt for A2A or paths with an inner runtime owner.
+      - Do not mutate external systems, live processes, archive fitness, payments, or gateways.
+      - Do not broadly refactor orchestrator.py, agent_runner.py, swarm.py, providers.py, or SwarmManager.
+      - Do not build Verified Experiment Loop runtime in this track.
+      - Do not create standalone BetCard, Experiment, SwarmRun, DecisionRecord, LineageRecord, WikiUpdate, or cost-tracker classes.
+
+    next_items:
+      - id: 1
+        what: "Define the smallest read-only RuntimeTruthPacket contract in the existing operator_core owner."
+        kind: code
+        blocker: true
+      - id: 2
+        what: "Render compact runtime truth in make onboard without making onboard an authority surface."
+        kind: code
+        blocker: true
+      - id: 3
+        what: "Protect A2A single-persistence invariant while adding runtime truth projections."
+        kind: test
+        blocker: false
+
+  - id: runtime-truth-nats-2026-06
+    name: Runtime Truth NATS — internal live transport for A2A dispatch
+    status: ACTIVE
+    opened_at: "2026-06-06"
+    verified_at: "2026-06-07"
+    ttl_days: 21
+    owner: "@codex"
+    serves: substrate-nativeness
+    complements:
+      - runtime-truth-reconciliation-2026-06
+    owned_surfaces:
+      - docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md
+      - dharma_swarm/a2a/a2a_nats_contact.py
+      - dharma_swarm/a2a/a2a_core_contact.py
+    moves_vital_signs:
+      - tool_coverage
+
+    description: |
+      The concurrent Codex transport lane. NATS was scoped out of the global
+      prohibition by the 2026-05-31 doctrine amendment and runs as a concurrent
+      scoped track with non-overlapping surfaces (transport layer only). This
+      track wires the internal live transport so A2A dispatch can travel at
+      broker speed, distinct from the reconciliation lane's read-model surfaces.
+
+      Surface separation is the safety boundary: this track owns the NATS
+      transport contact modules and the master spec; it does not touch the
+      operator_core read models the reconciliation lane owns.
+
+    prerequisites:
+      - id: nats_master_spec_exists
+        kind: file_exists
+        file: docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md
+
+    completion_criteria:
+      - id: nats_master_spec_present
+        kind: file_exists
+        file: docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md
+      - id: nats_transport_landed
+        kind: file_contains
+        file: docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md
+        pattern: "NATS"
+
+    non_goals:
+      - Do not introduce Redis or gRPC as part of this track.
+      - Do not touch the operator_core read-model surfaces owned by the reconciliation lane.
+      - Do not add a parallel spine-check CI workflow.
+
+    next_items:
+      - id: 1
+        what: "Confirm NATS transport contact modules are wired and receipted end-to-end."
+        kind: code
+        blocker: false
 
 # ---------------------------------------------------------------------------
 # Closed tracks (history, append-only; do not edit prior entries)
@@ -267,4 +417,4 @@ closed_tracks:
 # Distinct from the active track. Owned by SOVEREIGN_MANIFEST.md.
 # Listed here only for cross-reference; do not duplicate the text.
 # ---------------------------------------------------------------------------
-living_axioms_ref: docs/governance/SOVEREIGN_MANIFEST.md#global-axioms
+living_axioms_ref: "docs/governance/SOVEREIGN_MANIFEST.md#global-axioms"

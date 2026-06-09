@@ -25,6 +25,9 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from dharma_swarm.runtime_state import RuntimeStateStore
+from dharma_swarm.spine.identity import ExecutionIdentity
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_WORKFLOW_DIR = Path(
@@ -98,12 +101,16 @@ class DurableWorkflow:
         self,
         workflow_id: str,
         persist_dir: Path | None = None,
+        runtime_state: RuntimeStateStore | None = None,
+        execution_identity: ExecutionIdentity | None = None,
     ) -> None:
         self.workflow_id = workflow_id
         self._persist_dir = persist_dir or DEFAULT_WORKFLOW_DIR / workflow_id
         self._steps: dict[str, WorkflowStep] = {}
         self._order: list[str] = []  # insertion order for deterministic iteration
         self._created_at: str = _utc_now_iso()
+        self._runtime_state = runtime_state
+        self._execution_identity = execution_identity
 
     # -- Step registration ---------------------------------------------------
 
@@ -244,6 +251,14 @@ class DurableWorkflow:
             raise
 
         logger.debug("Checkpointed workflow %s to %s", self.workflow_id, target)
+        self._record_runtime_receipt(
+            "checkpointed",
+            {
+                "workflow_id": self.workflow_id,
+                "checkpoint_path": str(target),
+                "step_count": len(self._steps),
+            },
+        )
         return target
 
     @classmethod
@@ -305,6 +320,29 @@ class DurableWorkflow:
         for step in self._steps.values():
             counts[step.status.value] += 1
         return counts
+
+    def _record_runtime_receipt(self, status: str, payload: dict[str, Any]) -> None:
+        """Record checkpoint state in RuntimeStateStore when identity is provided."""
+        if self._runtime_state is None or self._execution_identity is None:
+            return
+        identity = self._execution_identity.require_for_dispatch()
+        side_effect_key = f"workflow_checkpoint:{self.workflow_id}"
+        try:
+            self._runtime_state.record_execution_identity_sync(
+                identity,
+                source="durable_execution.workflow",
+                metadata={"workflow_id": self.workflow_id},
+            )
+            receipt = self._runtime_state.build_runtime_receipt(
+                identity,
+                receipt_type="workflow_checkpoint",
+                status=status,
+                side_effect_key=side_effect_key,
+                payload=payload,
+            )
+            self._runtime_state.record_runtime_receipt_sync(receipt)
+        except Exception:
+            logger.debug("Runtime workflow checkpoint receipt failed", exc_info=True)
 
     @property
     def steps(self) -> list[WorkflowStep]:

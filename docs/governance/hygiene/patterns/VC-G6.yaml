@@ -1,0 +1,17 @@
+{
+  "id": "VC-G6",
+  "title": "Agent sycophancy",
+  "cluster": "G",
+  "cluster_title": "Agent-Loop Pathologies",
+  "severity": "operational",
+  "stage": "observed",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "The agent accepts the operator framing when it should test assumptions or push back.",
+  "why_it_hurts": "Bad premises turn into confident implementation.",
+  "detector": {"type": "manual", "rationale": "Operator-side review: ask for the strongest counterargument before high-risk changes."},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["What is the strongest reason this requested approach could be wrong?"]
+}

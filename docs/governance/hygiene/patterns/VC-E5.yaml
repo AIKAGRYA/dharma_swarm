@@ -1,0 +1,17 @@
+{
+  "id": "VC-E5",
+  "title": "Prompt injection surface",
+  "cluster": "E",
+  "cluster_title": "Security Regressions",
+  "severity": "security",
+  "stage": "measured",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "Untrusted user, message, query, input, or prompt text is interpolated into model instructions without a boundary marker.",
+  "why_it_hurts": "The prompt can become a control channel for adversarial content.",
+  "detector": {"type": "command", "command": "rg -n 'f[\"'\"'].*[{](user|message|query|input|prompt)' dharma_swarm api scripts | rg -i 'system|instruction|completion|chat|prompt' | wc -l", "target": "manual triage for every hit"},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["Where are untrusted prompt fragments delimited, escaped, or summarized?"]
+}

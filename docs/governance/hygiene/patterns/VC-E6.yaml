@@ -1,0 +1,17 @@
+{
+  "id": "VC-E6",
+  "title": "Overprivileged database access",
+  "cluster": "E",
+  "cluster_title": "Security Regressions",
+  "severity": "security",
+  "stage": "observed",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "Application code connects as an admin or owner account when a narrower role would do.",
+  "why_it_hurts": "A local injection or bug gains more authority than the workflow requires.",
+  "detector": {"type": "manual", "rationale": "Requires connection-string and deployment-role review."},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["What least-privilege role does this database path use?"]
+}

@@ -1,0 +1,17 @@
+{
+  "id": "VC-F1",
+  "title": "Amnesiac refactoring",
+  "cluster": "F",
+  "cluster_title": "Context-Window Artifacts",
+  "severity": "structural",
+  "stage": "observed",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "A refactor in one module breaks unseen modules because the agent operated on a narrow context window.",
+  "why_it_hurts": "The patch is locally coherent but globally brittle.",
+  "detector": {"type": "manual", "rationale": "Use GitNexus impact and tests across affected boundaries before refactors."},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["What upstream and downstream callers were checked before this refactor?"]
+}

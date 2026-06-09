@@ -1,0 +1,17 @@
+{
+  "id": "AI-J1",
+  "title": "Multi-agent consensus without independent evidence",
+  "cluster": "J",
+  "cluster_title": "Multi-Agent Disagreement",
+  "severity": "operational",
+  "stage": "advisory",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "Several AI reviewers agree without separate roles, fresh context, reproduced commands, or explicit disagreement analysis.",
+  "why_it_hurts": "Consensus between models can amplify shared blind spots while looking like stronger evidence than it is.",
+  "detector": {"type": "manual", "rationale": "Reviewer independence requires reading receipt provenance, role assignment, and command evidence."},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["https://arxiv.org/abs/2605.24298", "https://owasp.org/www-project-mcp-top-10/"],
+  "audit_questions": ["Did reviewers operate independently with different roles, or did they echo the same packet and conclusion?", "Which claim was reproduced by command evidence rather than agreement?"]
+}

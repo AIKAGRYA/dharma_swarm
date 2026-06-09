@@ -1,0 +1,17 @@
+{
+  "id": "VC-D5",
+  "title": "Cross-ecosystem name borrowing",
+  "cluster": "D",
+  "cluster_title": "Phantom Dependencies",
+  "severity": "security",
+  "stage": "observed",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "A package name from one ecosystem is imported in another because the model confused naming conventions.",
+  "why_it_hurts": "A malicious or irrelevant package can be installed under a familiar name.",
+  "detector": {"type": "manual", "rationale": "Review lockfile additions for ecosystem mismatch and suspicious names."},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["Does each package name belong to the ecosystem where it was added?"]
+}

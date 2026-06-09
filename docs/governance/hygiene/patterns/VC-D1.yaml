@@ -1,0 +1,17 @@
+{
+  "id": "VC-D1",
+  "title": "Slopsquatting",
+  "cluster": "D",
+  "cluster_title": "Phantom Dependencies",
+  "severity": "security",
+  "stage": "observed",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "A plausible package name is hallucinated and may be registered by an attacker.",
+  "why_it_hurts": "Dependency installation can become supply-chain compromise.",
+  "detector": {"type": "manual", "rationale": "Review every new dependency against package registry age, publisher, and download history."},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["What registry evidence proves each new dependency is real, mature, and intended?"]
+}

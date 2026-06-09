@@ -1,0 +1,17 @@
+{
+  "id": "VC-L1",
+  "title": "AI PR spam",
+  "cluster": "L",
+  "cluster_title": "Open-Source and Ecosystem Degradation",
+  "severity": "operational",
+  "stage": "advisory",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "Drive-by generated PRs look plausible but consume maintainer time without grounded intent.",
+  "why_it_hurts": "Review bandwidth becomes the bottleneck and real work waits.",
+  "detector": {"type": "command", "command": "gh pr list --state open --json number,title,author --jq 'length' 2>/dev/null || printf 'gh unavailable\\n'", "target": "open bot PR count and duplicate intent stay bounded"},
+  "enforcement": {"rule": ".github/workflows/bot-pr-limit.yml", "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["Is there already an open PR with the same intent?"]
+}

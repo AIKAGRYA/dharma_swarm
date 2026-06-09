@@ -44,6 +44,7 @@ jobs:
           fi
 
           python3 scripts/docops/check_docops_integrity.py "${args[@]}"
+          python3 scripts/governance/hygiene/check_hygiene_integrity.py
 
       - name: Write non-blocking corpus inventory
         if: always()

@@ -1,0 +1,17 @@
+{
+  "id": "VC-F3",
+  "title": "Context contamination",
+  "cluster": "F",
+  "cluster_title": "Context-Window Artifacts",
+  "severity": "operational",
+  "stage": "observed",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "A long agent session drags conclusions from a previous task into unrelated files.",
+  "why_it_hurts": "PRs become hard to review because unrelated changes look intentional.",
+  "detector": {"type": "manual", "rationale": "Review PR diff scope against the stated task and changed-file set."},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["Which touched files are unrelated to the explicit objective, and why are they included?"]
+}

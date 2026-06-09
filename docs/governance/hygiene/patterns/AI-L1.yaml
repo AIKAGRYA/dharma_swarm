@@ -1,0 +1,17 @@
+{
+  "id": "AI-L1",
+  "title": "Maintainer burden pollution",
+  "cluster": "L",
+  "cluster_title": "Maintainer Burden Admission",
+  "severity": "operational",
+  "stage": "advisory",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "AI-generated issues, PRs, or security reports enter the repo without reproduction steps, failing test or exploit proof, affected version, and minimal patch or concrete trace.",
+  "why_it_hurts": "The repo becomes its own slop inbox: maintainers spend time disproving plausible but low-evidence work.",
+  "detector": {"type": "manual", "rationale": "Maintainer burden is judged from issue and PR body quality before assigning agents or requesting review."},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["https://arxiv.org/abs/2601.15494", "https://arxiv.org/abs/2507.09089"],
+  "audit_questions": ["Does this AI-generated issue or PR include reproduction steps, affected version, and minimal concrete trace?", "Is review burden lower after this change than before it?"]
+}

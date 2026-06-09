@@ -1,0 +1,17 @@
+{
+  "id": "AI-F1",
+  "title": "Memory or context poisoning",
+  "cluster": "F",
+  "cluster_title": "Prompt and Memory Poisoning",
+  "severity": "security",
+  "stage": "advisory",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "Persistent memory, context bundles, or agent onboarding packets absorb unverified claims from comments, generated artifacts, or retrieved text.",
+  "why_it_hurts": "A false or malicious claim can persist across future sessions and silently bias later agents.",
+  "detector": {"type": "command", "command": "git diff --name-only origin/main...HEAD | rg '(^docs/agents/|^docs/onboarding/|^reports/.*/memory|^\\.agents/|memory|context)' || true", "target": "memory-affecting changes carry source paths and verification status"},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["https://owasp.org/www-project-mcp-top-10/", "https://owasp.org/www-project-top-10-for-large-language-model-applications/"],
+  "audit_questions": ["Which new memory or context entries came from verified source paths?", "Can any untrusted PR text or generated log become durable instruction for a future agent?"]
+}

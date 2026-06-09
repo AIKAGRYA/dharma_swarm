@@ -1,0 +1,17 @@
+{
+  "id": "VC-E2",
+  "title": "Hardcoded credentials",
+  "cluster": "E",
+  "cluster_title": "Security Regressions",
+  "severity": "security",
+  "stage": "measured",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "Literal API keys, passwords, or tokens appear in source.",
+  "why_it_hurts": "Secrets can leak through commits, logs, or generated artifacts.",
+  "detector": {"type": "command", "command": "rg -n 'API_KEY\\s*=\\s*[\"'\"'][A-Za-z0-9_-]{20,}|password\\s*=\\s*[\"'\"'][^\"'\"']{8,}' dharma_swarm api scripts | rg -v 'example|placeholder|YOUR_|FAKE_|EXAMPLE|os[.]environ|getenv|test_' | wc -l", "target": "zero suspicious literal credentials"},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["Could any literal secret-like value be moved to environment or fixture data?"]
+}
