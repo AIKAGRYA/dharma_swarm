@@ -118,12 +118,21 @@ _KNOWN_CONTRACTS: list[tuple[str, str, str, str]] = [
     ("swarm.py", "samvara.current_power", "needs None guard before .value", "DEGRADED"),
 ]
 
-# Methods that must exist on their respective classes
+# Methods that must exist on their respective classes.
+#
+# IMPORTANT: do NOT list ``__init__`` here. ``__init__`` is auto-synthesized
+# by ``@dataclass``, by ``pydantic.BaseModel``, by ``attrs``, and by Python
+# itself (object.__init__ always exists). An AST-walk check that hunts for
+# an explicit FunctionDef named ``__init__`` is therefore meaningless and
+# was the direct cause of the ``[GUARDIAN] PalaceQuery.__init__() missing``
+# duplicate-issue storm (issues #222-#511, ~70+ false BLOCKERs). The contract
+# you actually want to assert lives in the keyword-argument signature, not
+# the existence of the symbol. Add real signature checks via a dedicated
+# helper if needed; do NOT add ``__init__`` rows here.
 _METHOD_EXISTENCE_CHECKS: list[tuple[str, str, str, str]] = [
     # (module, class_name, method_name, severity)
     ("dharma_swarm.memory_palace", "MemoryPalace", "recall", "BLOCKER"),
     ("dharma_swarm.memory_palace", "MemoryPalace", "ingest", "BLOCKER"),
-    ("dharma_swarm.memory_palace", "PalaceQuery", "__init__", "BLOCKER"),
     ("dharma_swarm.evolution", "DarwinEngine", "auto_evolve", "BLOCKER"),
     ("dharma_swarm.evolution", "DarwinEngine", "apply_diff_and_test", "BLOCKER"),
     ("dharma_swarm.archaeology_ingestion", "ArchaeologyIngestionDaemon", "run_once", "BLOCKER"),
@@ -210,6 +219,53 @@ def _module_source_candidates(module_name: str, src_root: Path) -> list[Path]:
     return unique
 
 
+def _has_pydantic_base(class_node: ast.ClassDef) -> bool:
+    """Return True if ``class_node`` inherits from ``BaseModel`` / ``pydantic.BaseModel``.
+
+    Pydantic synthesizes ``__init__`` from declared fields, exactly like
+    ``@dataclass``. AST cannot resolve the MRO, so we match by base-class
+    name only. False positives here are harmless — they only suppress an
+    AUDITOR:method_exists finding that was already meaningless.
+    """
+    for base in class_node.bases:
+        target = base.func if isinstance(base, ast.Call) else base
+        if isinstance(target, ast.Name) and target.id in {"BaseModel", "PydanticBaseModel"}:
+            return True
+        if isinstance(target, ast.Attribute) and target.attr in {"BaseModel", "PydanticBaseModel"}:
+            return True
+    return False
+
+
+def _has_attrs_decorator(class_node: ast.ClassDef) -> bool:
+    """Return True if ``class_node`` is decorated with ``@attr.s`` / ``@attrs.define``.
+
+    Both ``attr`` and ``attrs`` synthesize ``__init__``.
+    """
+    for dec in class_node.decorator_list:
+        target = dec.func if isinstance(dec, ast.Call) else dec
+        if isinstance(target, ast.Name) and target.id in {"define", "frozen", "mutable", "attrs"}:
+            return True
+        if isinstance(target, ast.Attribute) and target.attr in {
+            "s", "define", "frozen", "mutable", "attrs", "attributes",
+        }:
+            return True
+    return False
+
+
+def _has_synthesized_init(class_node: ast.ClassDef) -> bool:
+    """Umbrella: any framework that auto-generates ``__init__``.
+
+    Centralizes the "this class has a real __init__ even though the AST
+    shows no FunctionDef named __init__" decision. Add new frameworks here
+    rather than scattering checks through ``run_auditor``.
+    """
+    return (
+        _has_dataclass_decorator(class_node)
+        or _has_pydantic_base(class_node)
+        or _has_attrs_decorator(class_node)
+    )
+
+
 def _has_dataclass_decorator(class_node: ast.ClassDef) -> bool:
     """Return True if ``class_node`` is decorated with ``@dataclass``.
 
@@ -259,11 +315,24 @@ async def run_auditor(src_root: Path) -> list[GuardianFinding]:
         candidates = _module_source_candidates(module_name, src_root)
         found_file = next((p for p in candidates if p.exists()), None)
         if found_file is None:
+            # Stale-worktree guard: a daemon pointed at a stale or incomplete
+            # ``src_root`` will see every module as missing and file BLOCKERs
+            # for files that exist on main. That is a daemon-deployment bug,
+            # not a code bug. Downgrade to WARNING so it never reaches
+            # ``_create_issue_if_needed``. See issues #20-#511 (PalaceQuery)
+            # and the 10 ``File not found for ...`` siblings closed alongside
+            # PR #520. The legitimate ``module is genuinely missing on main``
+            # signal is still surfaced via the syntax-scan pass below and the
+            # import-existence pass above.
             findings.append(GuardianFinding(
-                severity=severity,
+                severity="WARNING",
                 check="AUDITOR:method_exists",
                 title=f"File not found for {module_name}",
-                detail=f"Tried: {[str(c) for c in candidates]}",
+                detail=(
+                    f"Tried: {[str(c) for c in candidates]}. If this fires on a "
+                    "deployed daemon, restart it from a fresh checkout; the live "
+                    "src_root is stale."
+                ),
             ))
             continue
 
@@ -274,8 +343,11 @@ async def run_auditor(src_root: Path) -> list[GuardianFinding]:
                 None,
             )
             if class_node is None:
+                # Same stale-worktree concern: AST may be from a stale file
+                # in which the class was renamed/added later. The import-check
+                # pass already covers "module legitimately broken". Downgrade.
                 findings.append(GuardianFinding(
-                    severity=severity,
+                    severity="WARNING",
                     check="AUDITOR:method_exists",
                     title=f"Class {class_name} not found in {found_file.name}",
                     detail=f"Module {module_name} exists but class {class_name} is missing",
@@ -294,11 +366,20 @@ async def run_auditor(src_root: Path) -> list[GuardianFinding]:
             # checklist is flagged as missing __init__ (false positive that
             # produced 29+ duplicate GUARDIAN issues, e.g. #325-#353).
             if method_name == "__init__" and not method_exists:
-                if _has_dataclass_decorator(class_node):
+                if _has_synthesized_init(class_node):
                     method_exists = True
             if not method_exists:
+                # Defense in depth: NEVER emit a BLOCKER for a missing
+                # ``__init__``. Every Python class inherits ``object.__init__``,
+                # and frameworks (dataclass, pydantic, attrs) synthesize one
+                # we cannot detect via AST alone. Downgrade to WARNING so it
+                # cannot reach ``_create_issue_if_needed`` and spam GitHub.
+                # See issues #222-#511 for the storm this prevents.
+                effective_severity = (
+                    "WARNING" if method_name == "__init__" else severity
+                )
                 findings.append(GuardianFinding(
-                    severity=severity,
+                    severity=effective_severity,
                     check="AUDITOR:method_exists",
                     title=f"{class_name}.{method_name}() missing in {found_file.name}",
                     detail=f"Class {class_name} exists but method {method_name} is not defined",

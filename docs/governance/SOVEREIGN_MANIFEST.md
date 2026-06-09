@@ -2,11 +2,11 @@
 
 **Purpose**: This document is the absolute ground truth for the dharma_swarm repository. All AI agents, regardless of model or tab, MUST ingest, comprehend, and adhere to this context before outputting a single line of code.
 
-**Generated**: 2026-04-04 | Count refresh: 2026-06-07 filesystem verification
+**Generated**: 2026-04-04 | Count refresh: 2026-06-09 filesystem verification
 **Prior audit**: 2026-04-04 | 5-model convergent audit (Claude, DeepSeek, GPT-OSS, Codex, RUFLO)
 **Authority**: This file + `CLAUDE.md` are the two canonical governance surfaces. When they conflict, `CLAUDE.md` wins on behavioral rules; this file wins on architectural truth.
 
-**Verification method**: Count-sensitive claims below were refreshed against the filesystem on 2026-06-07. Architecture prose still reflects the 2026-04-04 audit unless specifically marked otherwise. Recheck counts before citing them in future work.
+**Verification method**: Count-sensitive claims below were refreshed against the filesystem on 2026-06-09. Architecture prose still reflects the 2026-04-04 audit unless specifically marked otherwise. Recheck counts before citing them in future work.
 
 **Substrate-nativeness status**: The current runtime is ~10–15% ontology-native; ~85–90% of runtime work bypasses substrate. See [`reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md`](../../reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md) for the audit that established this estimate.
 
@@ -147,7 +147,7 @@ Do not inject machine-readable YAML frontmatter into governance or architecture 
 
 ---
 
-## VERIFIED NUMBERS (2026-06-07 COUNT REFRESH)
+## VERIFIED NUMBERS (2026-06-09 COUNT REFRESH)
 
 These are the ground-truth metrics. All other documents citing different numbers are stale.
 
@@ -155,9 +155,9 @@ These are the ground-truth metrics. All other documents citing different numbers
 |--------|-------|-------------|
 | Total Python modules | **674** | find dharma_swarm -name "*.py" -type f |
 | Top-level (flat) modules | **391 (58.7%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
-| Total Python LOC | **285,749** | wc -l across dharma_swarm Python modules |
+| Total Python LOC | **285,830** | wc -l across dharma_swarm Python modules |
 | Test files | **646** | find tests -name "*.py" -type f |
-| Test functions | **11,085 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Test functions | **11,091 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
 | Markdown files | **870** | find . -name "*.md" -type f |
