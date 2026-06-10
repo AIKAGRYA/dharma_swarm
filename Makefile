@@ -316,6 +316,20 @@ spine-check:
 onboard:
 	$(PYTHON) scripts/governance/agent_onboard.py
 
+# Targets long documented in CLAUDE.md/README but previously missing from
+# this Makefile (claims-vs-reality fix, Honest Spine v2 Phase 0).
+xray:
+	$(PYTHON) scripts/repo_xray.py
+
+test-smoke:
+	$(PYTHON) -m pytest tests/ -q -m "not slow and not docker and not network" -x --timeout=120
+
+test-all:
+	$(PYTHON) -m pytest tests/ -q
+
+lint:
+	$(PYTHON) -m ruff check dharma_swarm/ api/ scripts/
+
 # Quick cross-agent state snapshot: active track, open PRs, stale items,
 # broken register, hotlist. Any agent on any platform can run this.
 status:

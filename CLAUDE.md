@@ -104,6 +104,36 @@ For machine-readable status, see [`reports/governance/active_track_evidence.md`]
 
 <!-- ACTIVE_TRACK:END -->
 
+## Reality Check (2026-06-10 — Honest Spine v2; verify before trusting any claim below this line)
+
+This file accreted AI-written claims faster than verification. Until the
+instruction-layer consolidation completes, treat claims in this file as one of:
+
+- **VERIFIED** — backed by a receipt, test, or measurement you can re-run.
+- **ASPIRATION** — design intent; the code may not do this yet.
+
+Known verified facts that override older prose in this file:
+
+1. **The Transcendence Principle is an unvalidated hypothesis here, not an
+   operating fact.** The only completed lift measurement (2026-06-06, run
+   `20260606T0900-rerun-openai-ollama-zai` under
+   `reports/forge/swarm-evolution-arena-v0-measurement/`)
+   was **-0.10** (swarm below best single model; n=3, low power). Literature
+   (Self-MoA arXiv:2502.00674, MAST arXiv:2503.13657) predicts exactly this
+   for mixed free-model rosters. Do not cite the principle as established.
+2. **The evolution archive epoch before 2026-06-10 is untrusted.** ~11,164
+   records, 98.96% with no code change, 0% lineage, `status="applied"`
+   without application. Do not present archive counts as evolution evidence.
+3. **Fitness authority:** only external ACTED receipts via the transfer-aware
+   gate may ever set `ArchiveEntry.fitness` (Forge Council invariant). Dense
+   benchmark/eval scores are training signal, never fitness.
+4. **A fix is not live until the executing worktree contains it.** Check the
+   RUNTIME PROVENANCE section of `make onboard`. 84+ worktrees exist; live
+   daemons have been observed running 312-dirty-file uncommitted code.
+5. **Plan/todo files may contain false "completed" statuses** (verified
+   2026-06-10: three falsely-completed items in the debt-audit plan).
+   Verify in code before trusting any completion claim, including this file's.
+
 ## Behavioral Rules (Always Enforced)
 
 - Do what has been asked; nothing more, nothing less
