@@ -1,4 +1,9 @@
-"""MAP-Elites style diversity archive for solution variants.
+"""DORMANT (sunset 2026-07-11 — Honest Spine v2 Phase A audit 2026-06-10).
+
+Verified: 0 production importers; persist file never created (live MAP-Elites is archive.MAPElitesGrid). If unrevived by the sunset date, delete this module
+and its tests; restore from git tag pre-spine-v2 if ever needed.
+
+MAP-Elites style diversity archive for solution variants.
 
 Maintains a grid of solutions indexed by behavioral properties, not just
 performance. Each cell holds the best solution for that behavioral niche.

@@ -1,4 +1,9 @@
-"""Subconscious Layer v2 — Autonomous Dream Intelligence.
+"""DORMANT (sunset 2026-07-11 — Honest Spine v2 Phase A audit 2026-06-10).
+
+Verified: 0 production importers; dream_associations.jsonl never created. If unrevived by the sunset date, delete this module
+and its tests; restore from git tag pre-spine-v2 if ever needed.
+
+Subconscious Layer v2 — Autonomous Dream Intelligence.
 
 A fundamentally different mode of reading and association:
 - High temperature (1.2-1.4) for lateral thinking

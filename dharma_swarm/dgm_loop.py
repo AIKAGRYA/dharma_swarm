@@ -1,4 +1,9 @@
-"""DGM Loop — Real Darwin Gödel Machine evolution for DHARMA SWARM.
+"""DORMANT (sunset 2026-07-11 — Honest Spine v2 Phase A audit 2026-06-10).
+
+Verified: no production instantiation; shadow-locked by guardian BLOCKER. If unrevived by the sunset date, delete this module
+and its tests; restore from git tag pre-spine-v2 if ever needed.
+
+DGM Loop — Real Darwin Gödel Machine evolution for DHARMA SWARM.
 
 This module closes the gap identified in WHAT_IT_WANTS_TO_BECOME.md:
     "The Darwin Engine produces diffs. Those diffs are stored in an

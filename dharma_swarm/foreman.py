@@ -1,4 +1,9 @@
-"""Foreman — Focused Quality Forge.
+"""DORMANT (sunset 2026-07-11 — Honest Spine v2 Phase A audit 2026-06-10).
+
+Verified: ~/.dharma/foreman/ state dir empty; importers reference but never run it. If unrevived by the sunset date, delete this module
+and its tests; restore from git tag pre-spine-v2 if ever needed.
+
+Foreman — Focused Quality Forge.
 
 Not a portfolio manager. A tireless quality hammer for a small set of projects.
 Each cycle: SCAN → FIND WEAKEST → IMPROVE → VALIDATE → RECORD.

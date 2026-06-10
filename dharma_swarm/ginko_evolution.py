@@ -1,4 +1,9 @@
-"""Ginko Evolution -- Darwin Engine prompt evolution for the Dharmic Quant fleet.
+"""DORMANT (sunset 2026-07-11 — Honest Spine v2 Phase A audit 2026-06-10).
+
+Verified: no tournament_history or predictions state ever created. If unrevived by the sunset date, delete this module
+and its tests; restore from git tag pre-spine-v2 if ever needed.
+
+Ginko Evolution -- Darwin Engine prompt evolution for the Dharmic Quant fleet.
 
 Bridges the DarwinEngine's evolutionary selection logic to the Ginko agent
 fleet's prompt system.  Every 30 days (configurable), a tournament ranks all
