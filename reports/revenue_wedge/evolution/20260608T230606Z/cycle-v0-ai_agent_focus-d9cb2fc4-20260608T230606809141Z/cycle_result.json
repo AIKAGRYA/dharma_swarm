@@ -1,0 +1,15 @@
+{
+  "result_id": "cycle-v0-ai_agent_focus-d9cb2fc4-20260608T230606809141Z",
+  "variant_id": "v0-ai_agent_focus-d9cb2fc4",
+  "cycle_timestamp": "2026-06-08T23:06:06.810338+00:00",
+  "opportunities_found": 0,
+  "opportunities_above_threshold": 0,
+  "opportunities_submitted": 0,
+  "revenue_earned_cents": 0,
+  "cost_cents": 0,
+  "top_opportunity_value_cents": 0,
+  "avg_score": 0.0,
+  "sources_hit": 0,
+  "errors": 9,
+  "notes": "variant=ai_agent_focus gen=0"
+}

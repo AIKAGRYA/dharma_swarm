@@ -1,0 +1,15 @@
+{
+  "result_id": "cycle-v0-fastapi_focus-e383bd26-20260610T032158543580Z",
+  "variant_id": "v0-fastapi_focus-e383bd26",
+  "cycle_timestamp": "2026-06-10T03:21:58.544456+00:00",
+  "opportunities_found": 0,
+  "opportunities_above_threshold": 0,
+  "opportunities_submitted": 0,
+  "revenue_earned_cents": 0,
+  "cost_cents": 0,
+  "top_opportunity_value_cents": 0,
+  "avg_score": 0.0,
+  "sources_hit": 0,
+  "errors": 9,
+  "notes": "variant=fastapi_focus gen=0"
+}

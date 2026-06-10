@@ -1,0 +1,15 @@
+{
+  "result_id": "cycle-v0-docs_focus-54e1cda6-20260609T071111382488Z",
+  "variant_id": "v0-docs_focus-54e1cda6",
+  "cycle_timestamp": "2026-06-09T07:11:11.386162+00:00",
+  "opportunities_found": 0,
+  "opportunities_above_threshold": 0,
+  "opportunities_submitted": 0,
+  "revenue_earned_cents": 0,
+  "cost_cents": 0,
+  "top_opportunity_value_cents": 0,
+  "avg_score": 0.0,
+  "sources_hit": 0,
+  "errors": 9,
+  "notes": "variant=docs_focus gen=0"
+}

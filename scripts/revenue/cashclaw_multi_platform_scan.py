@@ -30,13 +30,12 @@ def extract_value(text):
         r'\$\s*([\d,]+(?:\.\d+)?)',
         r'(\d+)\s*USD',
         r'(\d+)\s*USDC?',
-        r'\[(\d+)\$\]\n        r'\\[(\d+)\$\\]',
-        r'bounty[:\s]+\$?([\d,]+)',
+        r'\[\\]',
     ]
     for p in patterns:
         m = re.search(p, text, re.IGNORECASE)
         if m:
-            return int(m.group(1).replace(',', ''))
+            return int(float(m.group(1).replace(',', '')))
     return 0
 
 def scan_github_bounties():
