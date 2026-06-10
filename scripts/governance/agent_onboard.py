@@ -230,6 +230,48 @@ def render_runtime_provenance() -> None:
     print("  Rule: a fix is not live until the executing worktree contains it.")
 
 
+def render_truth_loop_freshness() -> None:
+    """Dead-man check: truth-critical loops must leave fresh evidence on disk.
+
+    The Forge didn't fail because of a missing API key — it failed because
+    nothing noticed it stopped. This section makes silence loud. No daemon,
+    no new store: pure mtime reads at onboard time.
+    """
+    section("TRUTH-LOOP FRESHNESS — silence is a finding (threshold 24h)")
+    from datetime import datetime as _dt
+
+    home = Path.home()
+    checks: list[tuple[str, Path, str]] = [
+        ("self_improve cycles", home / ".dharma" / "self_improve", "cycle_*.json"),
+        ("convergence_forge nightly", home / ".dharma" / "cron_logs" / "convergence_forge", "*.log"),
+        ("evolution archive", home / ".dharma" / "evolution", "archive.jsonl"),
+        ("spine receipts (runtime db)", home / ".dharma" / "state", "runtime.db"),
+    ]
+    now = _dt.now().timestamp()
+    stale_threshold = 24 * 3600
+    any_stale = False
+    for label, directory, pattern in checks:
+        try:
+            newest = max(
+                (p.stat().st_mtime for p in directory.glob(pattern)),
+                default=None,
+            )
+        except OSError:
+            newest = None
+        if newest is None:
+            print(f"  !! {label}: NO EVIDENCE FILES at {directory}/{pattern}")
+            any_stale = True
+            continue
+        age_h = (now - newest) / 3600
+        if age_h > stale_threshold / 3600:
+            print(f"  !! {label}: SILENT for {age_h:.0f}h — investigate before trusting any claim it makes")
+            any_stale = True
+        else:
+            print(f"  ok {label}: fresh ({age_h:.1f}h ago)")
+    if any_stale:
+        print("  RULE: a loop that stopped emitting is not 'probably fine' — it is unmeasured.")
+
+
 def render_live_ops_cockpit() -> None:
     section("LIVE OPS COCKPIT — READ-ONLY OPERATIONS CONTROL")
     runbook = REPO_ROOT / "docs/ops/LIVE_OPS_COCKPIT.md"
@@ -930,6 +972,7 @@ def main() -> int:
     render_active_track(evidence, track)
     render_live_ops()
     render_runtime_provenance()
+    render_truth_loop_freshness()
     render_live_ops_cockpit()
     render_manifest_health()
     render_broken_register()
