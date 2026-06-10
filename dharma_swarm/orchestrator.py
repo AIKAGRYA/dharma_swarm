@@ -2119,10 +2119,12 @@ class Orchestrator:
                     pool_agents_sample = list(agents_result[:3])
             except Exception:
                 logger.debug("Pool agent sample failed", exc_info=True)
+        # Names only — full AgentState reprs at INFO were the bulk of a
+        # 162MB swarm.err.
         logger.info(
             "_assign_dispatch(%s): runner=%s task=%s pool_agents=%s",
             td.task_id[:8], bool(runner), bool(task),
-            pool_agents_sample,
+            [getattr(a, "name", getattr(a, "id", "?")) for a in pool_agents_sample],
         )
         if runner and task:
             run_meta = self._task_meta(task)
