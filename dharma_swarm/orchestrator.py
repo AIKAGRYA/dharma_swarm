@@ -2235,20 +2235,29 @@ class Orchestrator:
         self._last_evidence_receipt = receipt
         td.metadata["evidence_receipt_id"] = str(receipt.receipt_id)
         # Persist to delegation_runs.receipt_json — the operator-witnessable record
-        # (GATE 1 watches this column). Without this write the receipt exists only
-        # in memory and "exactly one receipt per dispatch" is unfalsifiable.
+        # (GATE 1 watches this column; orchestrator-surface witness — the A2A
+        # surface persists via RuntimeReceipt instead, see spine/persistence.py).
+        # CRITICAL: write to the SAME store record_delegation_run used (the
+        # configurable store db_path, not a hardcoded default) — writer and
+        # witnessed column must be the same file by construction. persist_receipt
+        # raises on a 0-row match so a missing row cannot masquerade as success.
         # Fail-open: a persistence error must never break dispatch (receipt stays
-        # in memory; the gap shows up as a non-incrementing witness count).
+        # in memory; the gap shows up as a warning + non-incrementing witness).
         try:
             import aiosqlite
 
-            from dharma_swarm.runtime_state import DEFAULT_RUNTIME_DB
             from dharma_swarm.spine.persistence import (
                 ensure_receipt_column,
                 persist_receipt,
             )
 
-            async with aiosqlite.connect(DEFAULT_RUNTIME_DB) as _receipt_db:
+            _store = self._runtime_lifecycle._runtime_state_store()
+            _db_path = getattr(_store, "db_path", None)
+            if _db_path is None:
+                raise RuntimeError(
+                    "no runtime-state store available for receipt persistence"
+                )
+            async with aiosqlite.connect(_db_path) as _receipt_db:
                 await ensure_receipt_column(_receipt_db)
                 await persist_receipt(receipt, _receipt_db)
         except Exception:

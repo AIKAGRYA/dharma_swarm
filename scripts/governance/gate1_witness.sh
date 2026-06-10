@@ -5,6 +5,12 @@
 # EvidenceReceipt fire on the live orchestrator dispatch chokepoint (#557).
 # Test-green does not clear this gate. An observed receipt does.
 #
+# SCOPE: receipt_json is the ORCHESTRATOR-surface witness column. A2A-surface
+# dispatches persist canonically via RuntimeReceipt and leave receipt_json
+# empty — an empty blob on an A2A row is success, NOT a failed gate (see
+# spine/persistence.py + tests/test_spine_persistence_invariant.py inv. 7).
+# This gate counts only flagged ORCHESTRATOR dispatches.
+#
 # Usage:
 #   bash scripts/governance/gate1_witness.sh          # show receipt count + instructions
 #   bash scripts/governance/gate1_witness.sh --watch  # poll until a new receipt lands, then print it

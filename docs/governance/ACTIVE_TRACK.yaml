@@ -358,9 +358,10 @@ active_tracks:
       - id: bypass_allowlist_empty
         kind: file_contains
         file: scripts/governance/spine_bypass_report.py
-        pattern: "_INTENTIONAL_BYPASS: dict[tuple[str, int], str] = {}"
-        # The real allowlist construct (4 entries today). Passes only when the
-        # dict is drained to literal {} — i.e. zero intentional bypass sites.
+        pattern: '_INTENTIONAL_BYPASS: dict\[tuple\[str, int\], str\] = \{\s*\}'
+        # Regex (checker re.search): matches the DRAINED dict only — `= {}` on
+        # one line or `= {\n}` — never the populated multi-line form (5 entries
+        # today). Passes exactly when zero intentional bypass sites remain.
       - id: adoption_narrative_docs
         kind: file_exists
         file: docs/architecture/SPINE_ADOPTION_NARRATIVE.md
