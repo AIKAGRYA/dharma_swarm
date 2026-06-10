@@ -17,6 +17,8 @@ from dharma_swarm.evolution import (
     Proposal,
     _paths_from_unified_diff,
 )
+from dharma_swarm.event_log import EventLog
+from dharma_swarm.recursive_discovery import EVENT_STREAM, RECEIPT_TYPES
 from dharma_swarm.landscape import BasinType, LandscapeProbe
 from dharma_swarm.meta_evolution import MetaParameters
 from dharma_swarm.experiment_log import ExperimentRecord
@@ -1984,6 +1986,38 @@ async def test_apply_sealed_packet_shadow_archives_without_apply(
     assert stored.test_results["sealed_packet"]["files_changed"] == [
         "dharma_swarm/safe_leaf.py"
     ]
+
+
+async def test_apply_sealed_packet_can_record_recursive_receipts(
+    engine,
+    tmp_path,
+    monkeypatch,
+):
+    root = tmp_path / "dryrun"
+    _write_sealed_packet(root, diff_text=_safe_diff())
+    event_log = EventLog(tmp_path / "events")
+
+    async def fail_apply(*args, **kwargs):
+        del args, kwargs
+        raise AssertionError("shadow sealed packet must not apply diffs")
+
+    monkeypatch.setattr(engine, "apply_diff_and_test", fail_apply)
+
+    result = await engine.apply_sealed_packet(
+        root,
+        shadow=True,
+        proof_timeout=5.0,
+        halt_path=tmp_path / "missing-halt",
+        recursive_session_id="sess-sealed",
+        recursive_task_id="task-sealed",
+        recursive_event_log=event_log,
+    )
+    rows = event_log.read_envelopes(stream=EVENT_STREAM)
+
+    assert result.accepted is True
+    assert len(result.recursive_receipt_ids) == len(RECEIPT_TYPES)
+    assert result.recursive_trace_id is not None
+    assert {row["payload"]["receipt_type"] for row in rows} == set(RECEIPT_TYPES)
 
 
 async def test_apply_sealed_packet_live_calls_apply_after_guards(
