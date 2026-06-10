@@ -197,6 +197,14 @@ class SealedPacketApplyResult(BaseModel):
     test_results: dict[str, Any] = Field(default_factory=dict)
 
 
+PROTECTED_EVOLUTION_DIFF_TARGETS = frozenset({
+    "telos_gates.py",
+    "dharma_kernel.py",
+    "evolution.py",
+    "config.py",
+})
+
+
 class EvolutionPlan(BaseModel):
     """Planner output consumed by execution loops."""
 
@@ -1415,6 +1423,7 @@ class DarwinEngine:
                 action=proposal.description,
                 content=proposal.diff,
                 tool_name="darwin_executor",
+                trust_mode="external_strict",
                 think_phase="before_write",
                 reflection=proposal.think_notes or proposal.description,
                 max_reroutes=self._max_reflection_reroutes,
@@ -2402,6 +2411,37 @@ class DarwinEngine:
 
             # Apply diff (if present) then sandbox test
             if proposal.diff.strip():
+                protected_targets = [
+                    path
+                    for path in _paths_from_unified_diff(proposal.diff)
+                    if Path(path).name in PROTECTED_EVOLUTION_DIFF_TARGETS
+                ]
+                if protected_targets:
+                    proposal.status = EvolutionStatus.REJECTED
+                    proposal.gate_reason = (
+                        "Protected evolution diff target refused before apply: "
+                        + ", ".join(protected_targets)
+                    )
+                    await self._trip_circuit_breaker_if_needed(
+                        proposal=proposal,
+                        failure_streaks=failure_streaks,
+                        cycle=result,
+                    )
+                    continue
+
+                if proposal.gate_decision != GateDecision.ALLOW.value:
+                    proposal.status = EvolutionStatus.REJECTED
+                    proposal.gate_reason = (
+                        "Non-shadow diff apply requires ALLOW gate decision; "
+                        f"got {proposal.gate_decision or 'unknown'}"
+                    )
+                    await self._trip_circuit_breaker_if_needed(
+                        proposal=proposal,
+                        failure_streaks=failure_streaks,
+                        cycle=result,
+                    )
+                    continue
+
                 proposal, test_results = await self.apply_diff_and_test(
                     proposal,
                     test_command=target.test_command or test_command,

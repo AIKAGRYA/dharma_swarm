@@ -1,10 +1,10 @@
 {
-  "generated_at": "2026-05-23T13:53:14+00:00",
+  "generated_at": "2026-05-28T11:09:43+08:00",
   "active_track_id": "trace-identity-coverage-2026-05",
-  "shippable": false,
+  "shippable": true,
   "prerequisites_ok": true,
   "completion_progress": {
-    "passed": 5,
+    "passed": 6,
     "total": 6
   },
   "criteria": [
@@ -59,15 +59,15 @@
     {
       "id": "hard_gate_policy_adr",
       "kind": "file_exists",
-      "passed": false,
-      "detail": "docs/architecture/adr/0002-trace-coverage-gate.md MISSING"
+      "passed": true,
+      "detail": "docs/architecture/adr/0002-trace-coverage-gate.md present"
     }
   ],
   "findings": [
     {
       "severity": "INFO",
-      "check": "track-in-progress",
-      "message": "5/6 completion criteria pass. Track 'trace-identity-coverage-2026-05' is in progress.",
+      "check": "track-shippable",
+      "message": "All 6 completion criteria pass. Track 'trace-identity-coverage-2026-05' is SHIPPABLE \u2014 close it and declare the next active track.",
       "criterion_id": null
     }
   ]

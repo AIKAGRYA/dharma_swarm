@@ -12,7 +12,7 @@ import logging
 import re
 import shutil
 from dataclasses import dataclass, field
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 from pydantic import BaseModel
 
@@ -83,10 +83,11 @@ _HUNK_RE = re.compile(
 
 
 def _strip_prefix(path: str) -> str:
-    """Remove leading ``a/`` or ``b/`` prefix from diff paths."""
-    if path.startswith(("a/", "b/")):
-        return path[2:]
-    return path
+    """Remove diff prefixes and metadata from a path header."""
+    clean = path.strip().split("\t", 1)[0]
+    if clean.startswith(("a/", "b/")):
+        return clean[2:]
+    return clean
 
 
 # ---------------------------------------------------------------------------
@@ -179,6 +180,27 @@ class DiffApplier:
     def __init__(self, workspace: Path | None = None) -> None:
         self.workspace = (workspace or Path.cwd()).resolve()
 
+    def _resolve_target(self, diff_path: str) -> Path:
+        """Resolve a diff target under the workspace, rejecting escape paths."""
+        relative_path = Path(diff_path)
+        windows_path = PureWindowsPath(diff_path)
+        if (
+            relative_path.is_absolute()
+            or windows_path.drive
+            or windows_path.root
+            or ".." in relative_path.parts
+            or ".." in windows_path.parts
+        ):
+            raise ValueError(f"Unsafe diff target path: {diff_path}")
+
+        target = (self.workspace / relative_path).resolve()
+        try:
+            target.relative_to(self.workspace)
+        except ValueError as exc:
+            raise ValueError(f"Unsafe diff target path: {diff_path}") from exc
+
+        return target
+
     # -- public API ---------------------------------------------------------
 
     async def apply(
@@ -216,7 +238,15 @@ class DiffApplier:
         backup_paths: dict[str, str] = {}
 
         for patch in patches:
-            target = self.workspace / patch.target_path
+            try:
+                target = self._resolve_target(patch.target_path)
+            except ValueError as exc:
+                return ApplyResult(
+                    success=False,
+                    error=str(exc),
+                    files_changed=files_changed,
+                    backup_paths=backup_paths,
+                )
 
             # Validate: if not a new file, the target must exist
             if not patch.is_new_file and not target.exists():

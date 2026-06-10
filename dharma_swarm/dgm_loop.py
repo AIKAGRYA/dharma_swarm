@@ -270,6 +270,12 @@ class DGMLoop:
         state_dir: DHARMA state directory (~/.dharma).
         novelty_pressure: 0.0=exploit, 1.0=explore. 0.7 matches Sakana DGM.
         shadow_mode: If True, propose but don't apply diffs. Env var override.
+        source_root: Root directory for relative source files. Defaults to the
+            runtime DHARMA SWARM source checkout.
+        provider: Optional provider instance for tests or controlled runs.
+            Defaults to OpenRouter when OPENROUTER_API_KEY is set.
+        test_command: Optional command passed to DarwinEngine.auto_evolve().
+            Defaults to DarwinEngine's runtime test command when omitted.
     """
 
     def __init__(
@@ -278,10 +284,15 @@ class DGMLoop:
         state_dir: Path | None = None,
         novelty_pressure: float = 0.7,
         shadow_mode: bool | None = None,
+        source_root: Path | str | None = None,
+        provider: Any | None = None,
+        test_command: str | None = None,
     ) -> None:
         self._engine = engine
         self._state_dir = state_dir or dharma_state_dir()
         self._novelty_pressure = novelty_pressure
+        self._provider = provider
+        self._test_command = test_command
 
         import os
         if shadow_mode is None:
@@ -292,13 +303,17 @@ class DGMLoop:
         else:
             self._shadow_mode = shadow_mode
 
-        self._src_root = Path.home() / "dharma_swarm" / "dharma_swarm"
+        if source_root is None:
+            self._src_root = Path.home() / "dharma_swarm" / "dharma_swarm"
+        else:
+            self._src_root = Path(source_root).expanduser()
 
     async def run_one_generation(
         self,
         source_file: Path | str | None = None,
         fitness_context: str = "",
         timeout: float = 90.0,
+        test_command: str | None = None,
     ) -> DGMResult:
         """Run one DGM generation: sample parent → propose → gate → apply → benchmark → archive.
 
@@ -307,6 +322,7 @@ class DGMLoop:
             fitness_context: Human-readable context for the fitness function
                 (e.g. "last 10 tasks: 7 completed, 3 timed out — optimize retry logic").
             timeout: Sandbox test timeout in seconds.
+            test_command: Optional per-call test command passed to auto_evolve().
 
         Returns:
             DGMResult with full lineage, fitness delta, and application status.
@@ -372,11 +388,12 @@ class DGMLoop:
 
         # Step 4: Run auto_evolve with the selected source file and parent context
         try:
-            from dharma_swarm.providers import OpenRouterProvider
             import os as _os
 
-            provider = None
-            if _os.environ.get("OPENROUTER_API_KEY"):
+            provider = self._provider
+            if provider is None and _os.environ.get("OPENROUTER_API_KEY"):
+                from dharma_swarm.providers import OpenRouterProvider
+
                 provider = OpenRouterProvider()
 
             if provider is None:
@@ -384,13 +401,20 @@ class DGMLoop:
                 result.duration_seconds = time.monotonic() - start
                 return result
 
-            evo_result = await self._engine.auto_evolve(
-                provider=provider,
-                source_files=[source_path],
-                shadow=self._shadow_mode,
-                timeout=timeout,
-                context=full_context,
+            auto_evolve_kwargs = {
+                "provider": provider,
+                "source_files": [source_path],
+                "shadow": self._shadow_mode,
+                "timeout": timeout,
+                "context": full_context,
+            }
+            effective_test_command = (
+                test_command if test_command is not None else self._test_command
             )
+            if effective_test_command is not None:
+                auto_evolve_kwargs["test_command"] = effective_test_command
+
+            evo_result = await self._engine.auto_evolve(**auto_evolve_kwargs)
 
             result.proposals_submitted = evo_result.proposals_submitted
             result.proposals_gated = evo_result.proposals_gated

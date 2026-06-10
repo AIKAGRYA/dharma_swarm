@@ -8,6 +8,7 @@ Validates:
 - ingest_shared_research: missing dir, no files, with markdown
 - ingest_stigmergy_marks: missing file, below threshold, above threshold
 - ingest_task_completions: missing file, valid entries
+- ArchaeologyIngestionDaemon: real VectorStore-backed canary pass
 """
 
 from __future__ import annotations
@@ -19,6 +20,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from dharma_swarm.archaeology_ingestion import (
+    ArchaeologyIngestionDaemon,
     MemoryHit,
     _truncate,
     _utc_iso,
@@ -26,6 +28,7 @@ from dharma_swarm.archaeology_ingestion import (
     ingest_shared_research,
     ingest_stigmergy_marks,
     ingest_task_completions,
+    query_archaeology,
 )
 
 
@@ -212,3 +215,109 @@ class TestIngestTaskCompletions:
         palace.ingest = AsyncMock(side_effect=["d1", "d2"])
         result = await ingest_task_completions(palace, tmp_path)
         assert result == 2
+
+
+# ---------------------------------------------------------------------------
+# ArchaeologyIngestionDaemon canary
+# ---------------------------------------------------------------------------
+
+
+class TestArchaeologyIngestionDaemonCanary:
+    @pytest.mark.asyncio
+    async def test_run_once_indexes_all_streams_into_vector_store(self, tmp_path):
+        evo_dir = tmp_path / "evolution"
+        shared_dir = tmp_path / "shared"
+        stig_dir = tmp_path / "stigmergy"
+        tasks_dir = tmp_path / "tasks"
+        for directory in [evo_dir, shared_dir, stig_dir, tasks_dir]:
+            directory.mkdir()
+
+        evolution_entry = {
+            "id": "canary-evo-1",
+            "component": "provider_router.py",
+            "status": "applied",
+            "timestamp": "2026-05-28T00:00:00+00:00",
+            "diff": "+ cobalt canary vector store provider timeout repair",
+            "fitness": {
+                "weighted": 0.91,
+                "correctness": 0.94,
+                "dharmic_alignment": 0.89,
+            },
+            "test_results": {"pytest": "passed"},
+        }
+        (evo_dir / "archive.jsonl").write_text(json.dumps(evolution_entry), encoding="utf-8")
+
+        (shared_dir / "canary_research.md").write_text(
+            "# Canary Research\n\n"
+            "Cobalt canary archaeology research confirms vector store retrieval.",
+            encoding="utf-8",
+        )
+
+        high_salience_mark = {
+            "id": "canary-mark-1",
+            "salience": 0.93,
+            "channel": "canary",
+            "observation": "Cobalt canary stigmergy mark survived ingestion.",
+            "agent": "archaeology-canary",
+        }
+        low_salience_mark = {
+            "id": "canary-mark-low",
+            "salience": 0.2,
+            "channel": "canary",
+            "observation": "This low salience mark should not be ingested.",
+            "agent": "archaeology-canary",
+        }
+        (stig_dir / "marks.jsonl").write_text(
+            "\n".join(json.dumps(mark) for mark in [high_salience_mark, low_salience_mark]),
+            encoding="utf-8",
+        )
+
+        task_completion = {
+            "id": "canary-task-1",
+            "title": "Complete archaeology vector store canary",
+            "status": "completed",
+            "agent_id": "archaeology-canary",
+            "completed_at": "2026-05-28T00:01:00+00:00",
+            "result_summary": "Cobalt canary verifier completed query archaeology hit checks.",
+        }
+        (tasks_dir / "completed.jsonl").write_text(
+            json.dumps(task_completion),
+            encoding="utf-8",
+        )
+
+        daemon = ArchaeologyIngestionDaemon(state_dir=tmp_path, interval_seconds=1)
+        counts = await daemon.run_once()
+
+        assert counts == {
+            "evolution_archive": 1,
+            "shared_research": 1,
+            "stigmergy_marks": 1,
+            "task_completions": 1,
+        }
+
+        from dharma_swarm.vector_store import VectorStore
+
+        stats = VectorStore(state_dir=tmp_path).stats()
+        assert stats["total_documents"] == 4
+        assert stats["valid_documents"] == 4
+        assert stats["by_layer"] == {
+            "development": 2,
+            "meta": 1,
+            "session": 1,
+        }
+
+        lessons_path = tmp_path / "meta" / "lessons_learned.md"
+        assert lessons_path.exists()
+        assert "# DHARMA SWARM Lessons Learned" in lessons_path.read_text(encoding="utf-8")
+
+        hits = await query_archaeology(
+            "cobalt canary vector store provider timeout",
+            state_dir=tmp_path,
+            top_k=5,
+        )
+        hit_text = "\n".join(hit.content for hit in hits)
+        hit_sources = {hit.source for hit in hits}
+
+        assert len(hits) >= 2
+        assert "Cobalt canary" in hit_text or "cobalt canary" in hit_text
+        assert "evolution_archive:canary-evo-1" in hit_sources

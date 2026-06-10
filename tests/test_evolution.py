@@ -667,6 +667,20 @@ async def test_gate_check_review_proposal(engine):
     assert result.gate_decision == GateDecision.REVIEW.value
 
 
+async def test_gate_check_uses_external_strict_for_security_intents(engine):
+    p = _safe_proposal(
+        description="disable tls validation for faster provider calls",
+        diff="",
+        think_notes=_THINK_NOTES_SAFE,
+    )
+
+    result = await engine.gate_check(p)
+
+    assert result.status == EvolutionStatus.REJECTED
+    assert result.gate_decision == GateDecision.BLOCK.value
+    assert "Strict security intent detected" in result.gate_reason
+
+
 async def test_gate_check_logs_trace(engine):
     p = _safe_proposal()
     await engine.gate_check(p)
@@ -1894,6 +1908,69 @@ async def test_run_cycle_with_sandbox(engine):
     assert result.proposals_archived >= 1
     latest = await engine.archive.get_latest(n=2)
     assert all(entry.promotion_state == "local_pass" for entry in latest)
+
+
+@pytest.mark.asyncio
+async def test_run_cycle_with_sandbox_refuses_review_diff_before_apply(engine):
+    """REVIEW is advisory for no-diff evaluation, but not enough to apply a diff."""
+    proposal = _review_proposal(
+        diff=(
+            "--- a/ops.py\n"
+            "+++ b/ops.py\n"
+            "@@ -1 +1 @@\n"
+            "-old\n"
+            "+new\n"
+        )
+    )
+
+    async def fail_apply(*_args, **_kwargs):
+        raise AssertionError("REVIEW-gated diffs must not be applied")
+
+    engine.apply_diff_and_test = fail_apply
+
+    result = await engine.run_cycle_with_sandbox(
+        [proposal], test_command=_proof_command(), timeout=5.0
+    )
+
+    assert result.proposals_submitted == 1
+    assert result.proposals_gated == 1
+    assert result.proposals_archived == 0
+    assert proposal.status == EvolutionStatus.REJECTED
+    assert "requires ALLOW" in proposal.gate_reason
+    assert "review" in proposal.gate_reason.lower()
+
+
+@pytest.mark.asyncio
+async def test_run_cycle_with_sandbox_refuses_protected_diff_target_before_apply(
+    engine,
+):
+    """Boundary files require explicit human review outside autonomous DGM apply."""
+    proposal = _safe_proposal(
+        component="dharma_swarm/telos_gates.py",
+        diff=(
+            "--- a/dharma_swarm/telos_gates.py\n"
+            "+++ b/dharma_swarm/telos_gates.py\n"
+            "@@ -1 +1 @@\n"
+            "-old\n"
+            "+new\n"
+        ),
+    )
+
+    async def fail_apply(*_args, **_kwargs):
+        raise AssertionError("Protected evolution targets must not be applied")
+
+    engine.apply_diff_and_test = fail_apply
+
+    result = await engine.run_cycle_with_sandbox(
+        [proposal], test_command=_proof_command(), timeout=5.0
+    )
+
+    assert result.proposals_submitted == 1
+    assert result.proposals_gated == 1
+    assert result.proposals_archived == 0
+    assert proposal.status == EvolutionStatus.REJECTED
+    assert "Protected evolution diff target refused" in proposal.gate_reason
+    assert "dharma_swarm/telos_gates.py" in proposal.gate_reason
 
 
 async def test_apply_sealed_packet_kill_switch_refuses(engine, tmp_path):

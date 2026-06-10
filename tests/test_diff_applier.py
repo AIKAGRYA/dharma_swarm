@@ -57,6 +57,25 @@ async def test_apply_simple_diff(tmp_path: Path):
     assert "old_value = 1" not in content
 
 
+@pytest.mark.asyncio
+async def test_diff_headers_with_tab_metadata_apply_to_target(tmp_path: Path):
+    """Git-style timestamp metadata in diff headers should not become path text."""
+    target = tmp_path / "hello.py"
+    target.write_text("# header\nold_value = 1\n# footer\n")
+
+    applier = DiffApplier(workspace=tmp_path)
+    result = await applier.apply(
+        _make_simple_diff(
+            old_name="a/hello.py\t2026-05-28 00:00:00",
+            new_name="b/hello.py\t2026-05-28 00:00:00",
+        )
+    )
+
+    assert result.success is True
+    assert result.files_changed == ["hello.py"]
+    assert "new_value = 2" in target.read_text()
+
+
 # ---------------------------------------------------------------------------
 # 2. Apply multi-file diff
 # ---------------------------------------------------------------------------
@@ -235,7 +254,80 @@ async def test_new_file_creation(tmp_path: Path):
 
 
 # ---------------------------------------------------------------------------
-# 9. Empty diff returns success with no changes
+# 9. Unsafe diff targets are rejected
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_absolute_diff_target_rejected(tmp_path: Path):
+    """Absolute diff targets should not be applied."""
+    outside_target = tmp_path / "absolute.py"
+    diff = (
+        "--- /dev/null\n"
+        f"+++ {outside_target}\n"
+        "@@ -0,0 +1,1 @@\n"
+        "+unsafe = True\n"
+    )
+    applier = DiffApplier(workspace=tmp_path)
+    result = await applier.apply(diff)
+
+    assert result.success is False
+    assert "Unsafe diff target path" in result.error
+    assert not outside_target.exists()
+
+
+@pytest.mark.asyncio
+async def test_parent_traversal_diff_target_rejected(tmp_path: Path):
+    """Diff targets containing '..' should not escape the workspace."""
+    outside_target = tmp_path.parent / "outside.py"
+    diff = (
+        "--- /dev/null\n"
+        "+++ b/../outside.py\n"
+        "@@ -0,0 +1,1 @@\n"
+        "+unsafe = True\n"
+    )
+    applier = DiffApplier(workspace=tmp_path)
+    result = await applier.apply(diff)
+
+    assert result.success is False
+    assert "Unsafe diff target path" in result.error
+    assert not outside_target.exists()
+
+
+@pytest.mark.asyncio
+async def test_windows_drive_diff_target_rejected(tmp_path: Path):
+    """Windows absolute drive targets should not be applied on any platform."""
+    diff = (
+        "--- /dev/null\n"
+        "+++ C:\\temp\\outside.py\n"
+        "@@ -0,0 +1,1 @@\n"
+        "+unsafe = True\n"
+    )
+    applier = DiffApplier(workspace=tmp_path)
+    result = await applier.apply(diff)
+
+    assert result.success is False
+    assert "Unsafe diff target path" in result.error
+
+
+@pytest.mark.asyncio
+async def test_windows_rooted_diff_target_rejected(tmp_path: Path):
+    """Windows rooted paths should not be treated as workspace-relative names."""
+    diff = (
+        "--- /dev/null\n"
+        "+++ \\temp\\outside.py\n"
+        "@@ -0,0 +1,1 @@\n"
+        "+unsafe = True\n"
+    )
+    applier = DiffApplier(workspace=tmp_path)
+    result = await applier.apply(diff)
+
+    assert result.success is False
+    assert "Unsafe diff target path" in result.error
+
+
+# ---------------------------------------------------------------------------
+# 10. Empty diff returns success with no changes
 # ---------------------------------------------------------------------------
 
 
@@ -251,7 +343,7 @@ async def test_empty_diff(tmp_path: Path):
 
 
 # ---------------------------------------------------------------------------
-# 10. Backup paths are correct
+# 11. Backup paths are correct
 # ---------------------------------------------------------------------------
 
 
@@ -274,7 +366,7 @@ async def test_backup_paths_correct(tmp_path: Path):
 
 
 # ---------------------------------------------------------------------------
-# 11. Multi-hunk diff applies correctly
+# 12. Multi-hunk diff applies correctly
 # ---------------------------------------------------------------------------
 
 
@@ -313,7 +405,7 @@ async def test_multi_hunk_diff(tmp_path: Path):
 
 
 # ---------------------------------------------------------------------------
-# 12. Timeout handling for test command
+# 13. Timeout handling for test command
 # ---------------------------------------------------------------------------
 
 
