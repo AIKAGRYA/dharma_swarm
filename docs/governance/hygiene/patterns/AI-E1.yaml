@@ -1,0 +1,17 @@
+{
+  "id": "AI-E1",
+  "title": "Autonomous task without admission contract",
+  "cluster": "E",
+  "cluster_title": "Task Admission",
+  "severity": "operational",
+  "stage": "advisory",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "An autonomous agent starts work without declaring objective, non-goals, allowed touch set, expected blast radius, verification command, rollback path, and no-change criteria.",
+  "why_it_hurts": "The agent can expand scope until the PR becomes hard to review, hard to revert, or impossible to judge against the original need.",
+  "detector": {"type": "manual", "rationale": "Admission quality is semantic; reviewers inspect PR body, work packet, or issue assignment before allowing autonomous fanout."},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["https://csrc.nist.gov/pubs/sp/800/218/a/final", "https://arxiv.org/abs/2507.09089"],
+  "audit_questions": ["Where is the task admission contract for this autonomous work?", "What would make this task a no-change task instead of a code-changing task?"]
+}

@@ -326,12 +326,32 @@ class EvolutionArchive:
                     continue
 
     async def _append_line(self, entry: ArchiveEntry) -> None:
-        """Append a single JSONL line to the archive file."""
-        import aiofiles
+        """Append a single JSONL line to the archive file.
+
+        Uses an exclusive OS advisory lock (fcntl.flock LOCK_EX) so concurrent
+        writers across processes — e.g. a DGM evolution run and the live
+        orchestrate-live daemon — cannot interleave and corrupt the JSONL.
+        asyncio/in-process locks do not protect across processes; flock does.
+        (WS2 single-writer hardening, 2026-06-09.)
+        """
+        import asyncio
+        import fcntl
+        import os
 
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        async with aiofiles.open(self.path, "a") as f:
-            await f.write(entry.model_dump_json() + "\n")
+        line = entry.model_dump_json() + "\n"
+
+        def _locked_append() -> None:
+            with open(self.path, "a", encoding="utf-8") as f:
+                fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+                try:
+                    f.write(line)
+                    f.flush()
+                    os.fsync(f.fileno())
+                finally:
+                    fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+
+        await asyncio.to_thread(_locked_append)
 
     async def _rewrite(self) -> None:
         """Rewrite the full archive (needed after in-place mutations)."""

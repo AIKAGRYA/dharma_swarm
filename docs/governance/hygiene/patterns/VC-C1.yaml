@@ -1,0 +1,17 @@
+{
+  "id": "VC-C1",
+  "title": "Layer bleed",
+  "cluster": "C",
+  "cluster_title": "Architectural Drift",
+  "severity": "structural",
+  "stage": "observed",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "Routing, persistence, orchestration, and business logic cross boundaries without an explicit adapter.",
+  "why_it_hurts": "Local convenience erases architecture until later changes become risky.",
+  "detector": {"type": "manual", "rationale": "Requires import-graph or GitNexus review against the module boundary being changed."},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["Which layer owns this behavior, and which adapter crosses the boundary?"]
+}

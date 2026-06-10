@@ -318,6 +318,8 @@ class Orchestrator:
                             task.id, agent.id,
                             c.constraint_name, c.verdict.value, c.reason,
                         )
+                    # Return agent to available pool before skipping
+                    available.append(agent)
                     continue  # skip this task, try next
 
             td = TaskDispatch(
@@ -1946,6 +1948,7 @@ class Orchestrator:
             requirement_refs=[f"task:{td.task_id}", f"agent:{td.agent_id}"],
         )
         logger.info("_assign_dispatch(%s): gate=%.2fs total=%.2fs", td.task_id[:8], _adt.monotonic() - _gate_t0, _adt.monotonic() - _ad0)
+        logger.info("_assign_dispatch(%s): gate_decision=%s reason=%s", td.task_id[:8], gate.result.decision.value, gate.result.reason[:80] if gate.result.reason else "none")
 
         # Yield after sync gate check so other coroutines can progress
         await asyncio.sleep(0)
@@ -2161,6 +2164,80 @@ class Orchestrator:
 
         logger.info("Dispatched task %s -> agent %s", td.task_id, td.agent_id)
 
+    async def _run_task_via_spine(
+        self, runner: Any, task: Task, td: TaskDispatch, timeout_seconds: float
+    ) -> Any:
+        """WS3: execute ``runner.run_task(task)`` through the spine's one blessed
+        path (``invoke_agent``), emitting exactly one ``EvidenceReceipt`` per
+        dispatch. Mirrors ``a2a_bridge.submit_via_spine``: the real execution
+        runs inside the invoker, the result is captured for downstream use, and
+        any exception is re-raised so the caller's timeout/failure handling is
+        unchanged. Gated by ``DHARMA_SPINE_DISPATCH=1`` (default OFF)."""
+        from datetime import datetime, timezone
+        from dharma_swarm.spine.invoke import invoke_agent
+        from dharma_swarm.spine.receipt import EvidenceReceipt
+        from dharma_swarm.spine.routing import RoutingDecision
+
+        ident = td.metadata.get("execution_identity")
+        ident = ident if isinstance(ident, dict) else {}
+        routing = RoutingDecision(
+            agent_id=td.agent_id,
+            reason=f"orchestrator dispatch: {getattr(td.topology, 'value', 'dispatch')}",
+            router_name="orchestrator_dispatch",
+            context_id=str(ident.get("session_id", "") or ""),
+            task_id=td.task_id,
+        )
+        started = datetime.now(timezone.utc)
+        captured: dict[str, Any] = {}
+
+        async def _orch_invoker(
+            task: dict[str, Any], agent_id: str, context_id: str, routing: RoutingDecision
+        ) -> EvidenceReceipt:
+            status, err_source, err_detail = "ok", "none", None
+            try:
+                captured["result"] = await asyncio.wait_for(
+                    runner.run_task(captured["_task_obj"]), timeout=timeout_seconds
+                )
+            except asyncio.TimeoutError as exc:
+                captured["exc"] = exc
+                status, err_source, err_detail = "timeout", "timeout", "run_task timed out"
+            except Exception as exc:  # noqa: BLE001 — re-raised below; receipt records it
+                captured["exc"] = exc
+                status, err_source, err_detail = "failed", "internal_error", str(exc)
+            finished = datetime.now(timezone.utc)
+            return EvidenceReceipt(
+                trace_id=str(ident.get("trace_id", "") or ""),
+                context_id=context_id,
+                task_id=td.task_id,
+                agent_id=agent_id,
+                provider="orchestrator",
+                operation="invoke_agent",
+                provider_attempted=True,
+                status=status,
+                error_source=err_source,
+                error_detail=err_detail,
+                started_at=started,
+                finished_at=finished,
+                latency_ms=int((finished - started).total_seconds() * 1000),
+                routing_decision_id=routing.decision_id,
+                attributes={"router": "orchestrator_dispatch"},
+            )
+
+        captured["_task_obj"] = task
+        receipt = await invoke_agent(
+            task={"id": td.task_id, "agent_id": td.agent_id},
+            agent_id=td.agent_id,
+            context_id=routing.context_id,
+            routing=routing,
+            invoker=_orch_invoker,
+        )
+        # Observable for the verifier + downstream truth packets (no new store).
+        self._last_evidence_receipt = receipt
+        td.metadata["evidence_receipt_id"] = str(receipt.receipt_id)
+        if "exc" in captured:
+            raise captured["exc"]
+        return captured["result"]
+
     async def _execute_task(self, runner: Any, task: Task, td: TaskDispatch) -> None:
         """Run agent.run_task() in background, update board on completion/failure."""
         # Yield immediately so the dispatching coroutine can finish its loop
@@ -2209,10 +2286,17 @@ class Orchestrator:
                 task=task,
                 status="running",
             )
-            result = await asyncio.wait_for(
-                runner.run_task(task),
-                timeout=timeout_seconds,
-            )
+            if os.environ.get("DHARMA_SPINE_DISPATCH") == "1":
+                # WS3: route execution through the Runtime Truth Spine's one
+                # blessed path (invoke_agent), emitting exactly one EvidenceReceipt.
+                # Default OFF: when unset, the direct call below is byte-identical
+                # to prior behavior. Preserves timeout + exception semantics.
+                result = await self._run_task_via_spine(runner, task, td, timeout_seconds)
+            else:
+                result = await asyncio.wait_for(
+                    runner.run_task(task),
+                    timeout=timeout_seconds,
+                )
             try:
                 from dharma_swarm.mission_contract import (
                     honors_checkpoint_passed,

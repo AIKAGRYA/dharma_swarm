@@ -11,6 +11,20 @@ make onboard
 
 `make onboard` is read-only. It prints the live Codex/MCP toolbelt status, branch/dirty-tree state, and links to the highest-value docs.
 
+For a build session, use the explicit preflight and closeout targets around
+the actual implementation work:
+
+```bash
+make agent-build-preflight
+# make the smallest scoped change and run the task-specific test
+make agent-build-closeout
+```
+
+`make agent-build-preflight` runs onboarding plus hygiene integrity. `make
+agent-build-closeout` writes a no-worktree hygiene receipt to `/tmp` and runs
+the full governance bundle. `make onboard` alone is orientation, not proof that
+the build is clean.
+
 GitHub-only agents cannot see local credentials, `dkeys`, or live process environment. Do not conclude "no LLM provider is configured" from repository contents alone; that claim requires a current local `make onboard`, `dkeys list`, `python -m dharma_swarm.api_key_audit --no-agentic`, or `/api/chat/status` check from the operator machine.
 
 ## First Five Minutes
@@ -75,7 +89,8 @@ Sourcegraph Enterprise MCP is not a dependency. Sourcegraph, GDrive, and Postgre
 5. Before modifying a shared symbol, check impact/blast radius.
 6. Make the smallest scoped change.
 7. Run the relevant test or read-only status script.
-8. Update the owning doc only if the change alters durable truth.
+8. Run `make agent-build-closeout` before PR handoff.
+9. Update the owning doc only if the change alters durable truth.
 
 ## Handoff Prompt
 

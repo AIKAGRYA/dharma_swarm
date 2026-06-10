@@ -16,9 +16,9 @@ That command renders the current operating reality (active track, live ops, brok
 
 ## 0. What this repo is, in one paragraph
 
-dharma_swarm is a Python multi-agent orchestration runtime with a typed ontology, an immutable kernel, gated proposal flow, an append-only witness log, and an artifact/value loop. The substrates exist. The current failure mode is that most runtime work bypasses them. The current build track is to make one seam ontology-native end-to-end before generalising. Do not introduce new substrates. Wire existing ones.
+dharma_swarm is a Python multi-agent orchestration runtime with a typed ontology, an immutable kernel, gated proposal flow, an append-only witness log, and an artifact/value loop. The substrates exist. The current failure mode is that most runtime work bypasses them. Each active build track makes one seam ontology-native end-to-end; the active build portfolio (1–N co-equal, surface-disjoint tracks) is declared in [`ACTIVE_TRACK.yaml`](ACTIVE_TRACK.yaml) and surfaced by `make onboard`. Do not introduce new substrates. Wire existing ones.
 
-Current substrate-nativeness estimate (from audit): **~10–15% of runtime is ontology-native; ~85–90% bypasses substrate.** Goal of the current track: bring one user-visible seam to 100% native and prove it with tests.
+Current substrate-nativeness estimate (from audit): **~10–15% of runtime is ontology-native; ~85–90% bypasses substrate.** Each track's goal: bring its seam to 100% native and prove it with tests, surface-disjoint from sibling tracks.
 
 ---
 
@@ -40,7 +40,7 @@ If any of these contradict each other on numbers, trust SOVEREIGN_MANIFEST first
 
 The current build track is declared in [`ACTIVE_TRACK.yaml`](ACTIVE_TRACK.yaml) and surfaced by `make onboard`. **Do not duplicate the track name in prose here** — the YAML is the single source of intent, and any prose copy here will go stale.
 
-The governing principle behind whatever track is active: **one seam, end-to-end, with gates and witness load-bearing**, before any second seam. Do not start work on a parallel seam until the active track’s acceptance criteria pass (visible in the onboarding output) or a new track is declared in `ACTIVE_TRACK.yaml`. Cross-track work fragments the substrate-nativeness measurement and is the failure mode the audit flagged.
+The governing principle: each track ships **one seam, end-to-end, with gates and witness load-bearing**. Multiple co-equal tracks may run concurrently (up to `track_policy.max_active`) as long as they have **non-overlapping `owned_surfaces`** — that surface-disjointness, not a single-track mutex, is what keeps the substrate-nativeness measurement clean. When the operator proposes a new project, **declare a new track** under `active_tracks:` in `ACTIVE_TRACK.yaml` (with `serves:`, `owned_surfaces:`, acceptance criteria) — a new project is a new track, not a violation. The failure mode the audit flagged is *undeclared, surface-overlapping* cross-track work, which CI now flags as a conflict — not concurrency itself.
 
 <!-- ACTIVE_TRACK:START -->
 
@@ -48,63 +48,121 @@ The governing principle behind whatever track is active: **one seam, end-to-end,
      Do not hand-edit. Run scripts/governance/render_active_track_includes.py
      after updating the YAML. -->
 
-**Active track:** Runtime Truth Spine — Adoption (god objects flow through invoke_agent)
-**Track id:** `runtime-truth-spine-adoption-2026-06`
-**Status:** ACTIVE
-**Verified at:** 2026-06-06 (TTL 21 days)
-**Owner:** @AmitabhainArunachala
+**Active portfolio:** 3 co-equal track(s) (WIP warn 5, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
 
-**Coordination model:** one strategic active track; many coordinated work lanes
-**Parallel lanes allowed:** yes
-**Strategic track role:** north-star, acceptance gates, non-goals, and authority boundaries
+**Spine objectives (each track serves one):**
 
-**Parallel lane rule:** Declare owner, branch/worktree or packet, allowed surfaces, verification command, and receipt path before broad edits.
+- `substrate-nativeness` — Substrate nativeness — runtime flows through the ontology/spine, not around it (covered)
+- `revenue-external-humans-served` — Revenue & external humans served — value leaves the house and someone acts on it (**no active track**)
+- `research-depth` — Research depth — the contemplative-mechanistic bridge (R_V, geometric lens) deepens (**no active track**)
 
-**Lane requirements:**
+### Runtime Truth Reconciliation — operator-visible truth packets
 
-- Bind every new agent to the active strategic track or to an explicit exception lane.
-- Use an isolated worktree/branch or a ds-goal/AgentOps packet for implementation lanes.
-- Declare owner, branch/worktree, allowed surfaces, verification command, and receipt path before broad edits.
-- Do not write into unrelated dirty files; inspect existing changes before touching a modified file.
-- Record handoff/receipts before stopping; abandoned lanes must be marked stale or prunable.
-- Promotion requires tests/checks plus an explicit merge or closeout receipt.
+**Track id:** `runtime-truth-reconciliation-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-04 (TTL 14 days)
+**Relations:** complements: runtime-truth-nats-2026-06
+**Owns surfaces:** dharma_swarm/operator_core/**, scripts/governance/agent_onboard.py, dharma_swarm/runtime_state.py
+**Moves vital signs:** quality_gates, memory_persistence
 
-For the current local/PR lane map, run `make lane-map` and read `reports/governance/parallel_lane_map.md`.
+The Runtime Truth Spine substrate is merged and shippable. This track moves
+from substrate existence to read-only reconciliation: operator-visible
+runtime truth packets that separate heartbeat, readiness, artifact progress,
+completion, authority, projection/cache, mutation, and external-gated proof.
 
-**Description:**
+The track must not create a new truth store, daemon, receipt system, or
+authority surface. It projects from existing owners only:
+spine.EvidenceReceipt for in-flight dispatch proof, runtime_state.RuntimeReceipt
+for persisted runtime receipts, IdempotencyRecord for exactly-once substrate,
+and existing operator/onboard/control-surface rows for read-only rendering.
+
+Doctrine line that must hold:
+  Read models project truth from owners; they do not become authority.
+
+**Next items:**
+
+- [code] (blocker) Define the smallest read-only RuntimeTruthPacket contract in the existing operator_core owner.
+- [code] (blocker) Render compact runtime truth in make onboard without making onboard an authority surface.
+- [test] Protect A2A single-persistence invariant while adding runtime truth projections.
+
+**Non-goals:**
+
+- Do not create a new daemon, database, event log, truth store, or receipt system.
+- Do not mint a second RuntimeReceipt for A2A or paths with an inner runtime owner.
+- Do not mutate external systems, live processes, archive fitness, payments, or gateways.
+- Do not broadly refactor orchestrator.py, agent_runner.py, swarm.py, providers.py, or SwarmManager.
+- Do not build Verified Experiment Loop runtime in this track.
+- Do not create standalone BetCard, Experiment, SwarmRun, DecisionRecord, LineageRecord, WikiUpdate, or cost-tracker classes.
+
+### Runtime Truth NATS — internal live transport for A2A dispatch
+
+**Track id:** `runtime-truth-nats-2026-06` · **Status:** ACTIVE · **Owner:** @codex
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-07 (TTL 21 days)
+**Relations:** complements: runtime-truth-reconciliation-2026-06
+**Owns surfaces:** docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md, dharma_swarm/a2a/a2a_nats_contact.py, dharma_swarm/a2a/a2a_core_contact.py
+**Moves vital signs:** tool_coverage
+
+The concurrent Codex transport lane. NATS was scoped out of the global
+prohibition by the 2026-05-31 doctrine amendment and runs as a concurrent
+scoped track with non-overlapping surfaces (transport layer only). This
+track wires the internal live transport so A2A dispatch can travel at
+broker speed, distinct from the reconciliation lane's read-model surfaces.
+
+Surface separation is the safety boundary: this track owns the NATS
+transport contact modules and the master spec; it does not touch the
+operator_core read models the reconciliation lane owns.
+
+**Next items:**
+
+- [code] Confirm NATS transport contact modules are wired and receipted end-to-end.
+
+**Non-goals:**
+
+- Do not introduce Redis or gRPC as part of this track.
+- Do not touch the operator_core read-model surfaces owned by the reconciliation lane.
+- Do not add a parallel spine-check CI workflow.
+
+### Runtime Truth Spine — Adoption (god objects flow through invoke_agent)
+
+**Track id:** `runtime-truth-spine-adoption-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-10 (TTL 21 days)
+**Relations:** complements: runtime-truth-reconciliation-2026-06, runtime-truth-nats-2026-06
+**Owns surfaces:** dharma_swarm/spine/**, dharma_swarm/a2a/a2a_bridge.py, dharma_swarm/orchestrator.py, dharma_swarm/agent_runner.py, scripts/uplift_guards/check_spine_ownership.py
+**Moves vital signs:** quality_gates, tool_coverage
 
 spine-adoption ships end-to-end: every production dispatch flows through
 invoke_agent() and emits exactly one EvidenceReceipt. This track migrates
 the god objects (agent_runner.py, orchestrator.py, a2a_bridge.py) onto
 the shipped spine substrate. Target: 3 production callers outside the
-spine package, zero bypass paths.
+spine package, zero bypass paths. Substrate-nativeness moves toward 30%+.
 
-Substrate-nativeness moves from ~10-15% to ~30%+. This track operates
-concurrently with nats-substrate-2026-06 (Codex lane) under the
-parallel_lane_policy. Surface separation: spine adoption touches dispatch
-call sites; NATS work touches transport layer.
+Ported 2026-06-10 from the v1 declaration (opened 2026-06-06 on the
+qwen/spine-adoption lane, commit c28951d5b, which closed reconciliation
+in v1) into the v2 portfolio while merging origin/main. In the v2
+multi-track model it runs as a co-equal peer of the reconciliation and
+NATS lanes rather than requiring their closure; reconciliation's open
+status is main's standing declaration and is left to the operator.
 
-**Next items on this track:**
+**Next items:**
 
-- [code] (blocker) Migrate a2a/a2a_bridge.py dispatch through invoke_agent(). Cleanest layer, highest leverage.
-- [code] (blocker) Migrate orchestrator.py dispatch through invoke_agent() behind feature flag.
+- [code] (blocker) Wire a2a_bridge.submit_via_spine into production dispatch (ingest_trishula_inbox bypass at a2a_bridge.py:307 — Slice 2 per scripts/governance/spine_bypass_report.py).
+- [code] (blocker) orchestrator.py dispatch through invoke_agent behind DHARMA_SPINE_DISPATCH (landed via #557; operator confirms one live EvidenceReceipt on a real dispatch = GATE 1).
 - [code] (blocker) Migrate agent_runner.py run_task through invoke_agent(). Largest surface, last.
-- [code] (blocker) Enable bypass-guard allow-list-at-zero in uplift_guards CI.
+- [code] (blocker) Drain the intentional-bypass allowlist (node_gateway submit endpoints, a2a_client._dispatch_local) and enable allow-list-at-zero in uplift_guards CI.
 - [docs] Author docs/architecture/SPINE_ADOPTION_NARRATIVE.md
 
-**Non-goals (do not work on these during this track):**
+**Non-goals:**
 
 - Do not create new spine sub-modules. Adopt invoke/receipt/routing/persistence.
 - Do not decompose agent_runner.run_task beyond invoke_agent() routing.
 - Do not change EvidenceReceipt schema; adopt shipped types unchanged.
-- Do not introduce NATS, Redis, or gRPC in this track.
+- Do not introduce NATS, Redis, or gRPC in this track (transport belongs to the NATS lane).
 - Do not broadly refactor swarm.py, providers.py, or SwarmManager.
 
 **Recently closed tracks:**
 
-- `runtime-truth-reconciliation-2026-06` — Runtime Truth Reconciliation — operator-visible truth packets (SHIPPED, closed 2026-06-06)
 - `runtime-truth-spine-2026-06` — Runtime Truth Spine — one invariant, one invocation path, one receipt (SHIPPED, closed 2026-06-04)
 - `trace-identity-coverage-2026-05` — Trace Identity Coverage — native propagation and soft coverage findings (SUPERSEDED, closed 2026-05-28)
+- `trace-attractor-causal-spine-2026-05` — Trace Attractor Causal Spine — operator-visible trace packets (SHIPPED, closed 2026-05-21)
 
 For machine-readable status, see [`reports/governance/active_track_evidence.md`](../../reports/governance/active_track_evidence.md) (generated by `scripts/governance/check_track_status.py`).
 
@@ -141,19 +199,19 @@ These are direct from `SOVEREIGN_MANIFEST.md` axioms and the audit's "do not bui
 
 ---
 
-## 5. What success on the current track looks like
+## 5. What "done" looks like for a seam track (template)
 
-The operator-brief seam is done when all of the following hold simultaneously, and a single test asserts each:
+Each track defines its own acceptance criteria in `ACTIVE_TRACK.yaml` (`completion_criteria:`), enforced by `scripts/governance/check_track_status.py`. The pattern below — taken from the historical operator-brief seam as a worked **example**, not the current track — is the shape a substrate-native seam track should aim for; adapt it per track:
 
-1. A `KnowledgeArtifact` row of subtype `operator_brief` is created on each scheduler tick by the canonical path.
-2. That artifact has links to at least one `WitnessLog`, one `ActionProposal`, one `GateDecisionRecord` per applied gate (BHED_GNAN, STEELMAN, DOGMA_DRIFT, CONSENT), one `Outcome`, and one `ValueEvent`.
-3. The four gates above are evaluated for the brief, and a BLOCK on any one prevents artifact materialisation. The block is itself witnessed.
-4. No code path produces an operator brief by writing JSON to disk without going through the ontology and gates.
+1. The seam's artifact is created on the canonical path (e.g. a `KnowledgeArtifact` row on each scheduler tick), never by a side path.
+2. That artifact links to its witness/proposal/gate-decision/outcome/value rows (e.g. `WitnessLog`, `ActionProposal`, one `GateDecisionRecord` per applied gate, `Outcome`, `ValueEvent`).
+3. The applied gates are evaluated, and a BLOCK on any one prevents materialisation. The block is itself witnessed.
+4. No code path produces the artifact by writing JSON to disk without going through the ontology and gates.
 5. A failing gate or missing input produces a visible error artifact, not silent success.
-6. The seam runs from a single scheduler entry in `cron_jobs.json` and a single new module under `dharma_swarm/` (in an existing subdirectory, not the flat top level).
+6. The seam runs from a single scheduler entry and a single new module under `dharma_swarm/` (in an existing subdirectory, not the flat top level).
 7. The seam adds zero new bridges, routers, adapters, ledgers, or memory stores.
 
-When all seven are tested and passing, the substrate-nativeness estimate moves measurably and the next track can open.
+When a track's `completion_criteria` all pass, the substrate-nativeness estimate moves measurably; that track flips SHIPPABLE and can close while sibling tracks keep running.
 
 ---
 

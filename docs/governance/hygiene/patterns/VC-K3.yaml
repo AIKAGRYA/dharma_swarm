@@ -1,0 +1,17 @@
+{
+  "id": "VC-K3",
+  "title": "Identifier shadowing",
+  "cluster": "K",
+  "cluster_title": "Naming and Identity Confusion",
+  "severity": "structural",
+  "stage": "measured",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "Builtins such as list, dict, id, type, or input are reused as local identifiers.",
+  "why_it_hurts": "Debugging and generated edits become more error-prone.",
+  "detector": {"type": "command", "command": "rg -n '\\b(list|dict|id|type|input)\\s*=' dharma_swarm api scripts | wc -l", "target": "builtin shadowing trends down or is justified"},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["Could this identifier be domain-specific instead of shadowing a builtin?"]
+}

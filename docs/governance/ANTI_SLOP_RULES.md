@@ -5,6 +5,11 @@ surface verified during the 2026-04-26 audit. The full rule definitions
 live in `.semgrep/dharma-anti-slop.yml`, plus three GitHub Actions
 workflows for things Semgrep cannot express.
 
+Broader vibe-code and AI-agent hygiene signals live in
+`docs/governance/hygiene/`. They are measured and reviewed there first; only
+mature, low-noise signals graduate into this hard-gate list. Merge Master Mike
+consumes the same hygiene layer through `docs/ops/PR_REVIEW_CONTROL.md`.
+
 | # | ID | Where | Severity | Status |
 |---|---|---|---|---|
 | 1 | `dharma.no-unauthorized-dharma-write` | `.semgrep/dharma-anti-slop.yml` | WARNING | Active (advisory) |
@@ -153,3 +158,63 @@ on a draft PR and observing the failure.
 3. Re-run `semgrep --test .semgrep/tests/` and the strict gate.
 4. Optionally extend Rule 2 (`no-new-substrate`) to ERROR after observing
    for a few PRs — pattern detection accuracy is harder for that rule.
+
+---
+
+## Addendum — Vibe-Code Audit Cross-Reference (2026-06-07)
+
+**Author:** Devin (Cognition AI) — session `7c5c93b8`
+**Source:** [`reports/audits/vibe_code_audit_2026-06-07.md`](../../reports/audits/vibe_code_audit_2026-06-07.md)
+
+The 60-question vibe-code audit (2026-06-07) validated the 10 anti-slop rules
+and surfaced additional signals that intersect with existing governance:
+
+### Rule 10 — grandfathered module gap
+
+Five modules exceed 1,000 LOC but are **absent from the grandfathered list**:
+
+| Module | LOC (2026-06-07) |
+|---|---|
+| `runtime_state.py` | 3,796 |
+| `ontology.py` | 2,416 |
+| `orchestrate_live.py` | 2,257 |
+| `operator_bridge.py` | 1,819 |
+| `tui_legacy.py` | 1,795 |
+
+These should either be added to the `GRANDFATHERED` dict in
+`scripts/governance/check_module_budget.py` with decomposition tracking
+issues, or decomposed before the next module-budget CI enforcement pass.
+
+### Candidate new rule — `dharma.no-duplicate-time-helpers`
+
+76 separate `_utc_now()` / `utc_now()` / `_now()` definitions exist across
+the codebase (audit Q29). This is the single largest DRY violation and a
+prime candidate for a new anti-slop rule:
+
+- **Scope:** flag any `def` matching `_?utc_now|_?now` that returns
+  `datetime` or `str` outside a canonical `_time.py` module.
+- **Enforcement:** Semgrep pattern or custom script.
+- **Prerequisite:** extract to a shared module first, then gate.
+
+### Axiom A7 — existing import cycles
+
+11 import cycles exist (audit Q13), including a 9-module cycle through the
+ontology/revenue/lineage subsystem. Axiom A7 ("no new circular imports")
+prevents growth but does not track or retire existing cycles. Suggest
+adding the top 5 cycles to the Broken Register.
+
+### Cross-reference to audit findings
+
+| Anti-slop rule | Audit question | Status |
+|---|---|---|
+| Rule 1 (`no-unauthorized-dharma-write`) | Q24 (eval/exec) | clean |
+| Rule 2 (`no-new-substrate`) | Q23 (SQL interp) | 41 sites, most with `noqa` |
+| Rule 3 (`test-no-default-state`) | Q2 (weak assertions) | 254 weak-only tests |
+| Rule 4 (`scripts-no-git-add-all`) | — | not re-audited |
+| Rule 5 (`tests-no-dgc-subprocess`) | — | not re-audited |
+| Rule 6 (`providers-canonical`) | — | not re-audited |
+| Rule 8 (`no-root-markdown`) | Q9 (dead links) | 390 dead links |
+| Rule 10 (`module-line-budget`) | Q12 (>1000 LOC) | 5 unlisted modules |
+| Axiom A7 (no new cycles) | Q13 (import cycles) | 11 existing cycles |
+
+*Signed: Devin (Cognition AI) — 2026-06-07T12:50Z*

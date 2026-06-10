@@ -1,7 +1,7 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts uplift-guards module-budget docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all spine-check onboard status go-fmt-check go-test go-vet go-ci
+.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agent-build-preflight agent-build-closeout spine-check onboard status go-fmt-check go-test go-vet go-ci
 
 PYTHON ?= python3
 REPO_PYTHON ?= PYTHONPATH=. $(PYTHON)
@@ -44,6 +44,8 @@ help:
 	@echo "  make governance-baseline Capture scanner baselines"
 	@echo "  make test-contracts Run governance contract tests"
 	@echo "  make uplift-guards Run uplift pre-commit guards"
+	@echo "  make hygiene-audit Run non-blocking vibe-code hygiene scan"
+	@echo "  make hygiene-check Verify hygiene catalogue/generated docs integrity"
 	@echo "  make docops-integrity Run machine-verifiable documentation checks"
 	@echo "  make docops-report Generate local DocOps JSON/Markdown reports"
 	@echo "  make ci-truth ARGS='--pr 123' Evaluate GitHub checks against the CI truth contract"
@@ -63,6 +65,8 @@ help:
 	@echo "  make memory-kernel-full-power-preflight Run M2-M5 governed live preflight"
 	@echo "  make operator-prod-smoke Run fast read-only operator production smoke"
 	@echo "  make onboard      Render current operating reality (active track, live ops, broken register, axioms)"
+	@echo "  make agent-build-preflight Run onboarding + hygiene integrity before agent work"
+	@echo "  make agent-build-closeout Run hygiene scan + full governance bundle after agent work"
 	@echo "  make status       Quick cross-agent state snapshot (PRs, stale, hotlist, track)"
 	@echo "  make go-ci        Run Go evidence sense-organ fmt/vet/test gates"
 	@echo ""
@@ -210,8 +214,15 @@ module-budget:
 	$(PYTHON) scripts/governance/check_module_budget.py \
 		--base-ref origin/main --head-ref HEAD
 
+hygiene-audit:
+	scripts/governance/hygiene/scan.sh
+
+hygiene-check:
+	$(PYTHON) scripts/governance/hygiene/check_hygiene_integrity.py
+
 docops-integrity:
 	$(PYTHON) scripts/docops/check_docops_integrity.py
+	$(PYTHON) scripts/governance/hygiene/check_hygiene_integrity.py
 
 docops-report:
 	@mkdir -p reports/docops
@@ -219,6 +230,7 @@ docops-report:
 		--report-json reports/docops/check.json \
 		--inventory-json reports/docops/corpus_inventory.json \
 		--inventory-markdown reports/docops/corpus_inventory.md
+	$(PYTHON) scripts/governance/hygiene/check_hygiene_integrity.py
 
 ci-truth:
 	$(PYTHON) scripts/runtime/ci_truth.py $${ARGS:-}
@@ -285,6 +297,14 @@ operator-prod-smoke:
 # dependency — running it once via uplift-guards is enough. The standalone
 # `make spine-check` target stays as an operator-convenience alias only.
 governance-all: semgrep gitleaks test-hygiene test-contracts uplift-guards module-budget docops-integrity
+
+agent-build-preflight: onboard hygiene-check
+	@printf "\nAgent build preflight complete. Use the task route from make onboard; close out with: make agent-build-closeout\n"
+
+agent-build-closeout:
+	$(PYTHON) scripts/governance/hygiene/scan.py --output /tmp/dharma-hygiene-audit.txt
+	$(MAKE) governance-all
+	@printf "\nAgent build closeout complete. Hygiene audit receipt: /tmp/dharma-hygiene-audit.txt\n"
 
 spine-check:
 	$(PYTHON) -m scripts.uplift_guards.check_spine_ownership

@@ -1,0 +1,17 @@
+{
+  "id": "VC-C3",
+  "title": "Scaffolding mountain",
+  "cluster": "C",
+  "cluster_title": "Architectural Drift",
+  "severity": "structural",
+  "stage": "observed",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "Tiny abstractions accumulate to make tests or agents easier while no production caller needs them.",
+  "why_it_hurts": "The repo pays maintenance cost for structure that carries no product invariant.",
+  "detector": {"type": "manual", "rationale": "Requires caller count and review of single-use classes or files under 50 LOC."},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["What production caller needs this abstraction today?"]
+}

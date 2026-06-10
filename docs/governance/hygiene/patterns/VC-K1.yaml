@@ -1,0 +1,17 @@
+{
+  "id": "VC-K1",
+  "title": "Namespace pollution",
+  "cluster": "K",
+  "cluster_title": "Naming and Identity Confusion",
+  "severity": "structural",
+  "stage": "measured",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "Glob imports or broad re-exports make ownership and call sites hard to trace.",
+  "why_it_hurts": "Agents cannot reliably find where behavior enters the module graph.",
+  "detector": {"type": "command", "command": "printf 'glob_imports='; rg -n 'from .* import [*]' dharma_swarm api scripts tests | wc -l; printf 'large_inits='; find dharma_swarm -name '__init__.py' -print0 | xargs -0 wc -l | sort -rn | head -10", "target": "glob imports are zero outside intentional compatibility modules"},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["Does this export make ownership clearer or blur it?"]
+}

@@ -1,0 +1,48 @@
+{
+  "receipt": "runtime_truth_nats_recovery_20260606",
+  "created_at": "2026-06-06T01:44:13.966041+00:00",
+  "base_ref": "origin/main",
+  "base_sha": "aa5a8e82b0c9c0a36b9c6e3585b9bcd16f6fb296",
+  "recovery_audit": {
+    "old_worktree_path": "/private/tmp/runtime-truth-projector-v1-20260605",
+    "old_worktree_present": false,
+    "reachable_commit_with_nats_transport": false,
+    "reachable_commit_with_test_nats_transport": false,
+    "stash_with_named_missing_files": false,
+    "conclusion": "Earlier runtime-projector PR landed, but the final NATS adapter files were not present on main or the remote branch. This branch reconstructs the missing slice from current origin/main."
+  },
+  "implemented_surfaces": [
+    "dharma_swarm/a2a/nats_transport.py",
+    "tests/test_nats_transport.py",
+    "dharma_swarm/opportunity_refill.py",
+    "dharma_swarm/durable_execution.py",
+    "tests/test_runtime_truth_spine_recovery.py",
+    "reports/governance/spine_adoption_metric.json"
+  ],
+  "claim_boundary": {
+    "runtime_truth_spine_adoption_pct": 93.8,
+    "joined_or_adapter_ready_surfaces": "15/16",
+    "only_non_adopted_surface": "legacy_no_identity_escape_hatch",
+    "production_adapter_contract": true,
+    "live_nats_ack_claimed": true
+  },
+  "live_nats_ack_evidence": {
+    "ack_verified": true,
+    "code": "NATS_LIVE",
+    "ack_tier": "DELIVERED_TO_CONSUMER",
+    "stream": "DHARMA_LIVE_PROBE_d83c04cf3d",
+    "seq": 1,
+    "verified_by": "nats_live_contact",
+    "endpoint": "nats://127.0.0.1:4222",
+    "rtt_ms": 96,
+    "reason": "JetStream DELIVERED_TO_CONSUMER ack verified: stream=DHARMA_LIVE_PROBE_d83c04cf3d seq=1 rtt=96ms"
+  },
+  "verification": [
+    "pytest -q tests/test_nats_transport.py tests/test_runtime_truth_spine_recovery.py tests/test_nats_live_contact.py tests/test_runtime_truth_spine_adoption.py tests/test_runtime_state_invariants.py tests/test_durable_execution.py tests/test_authority_revenue_loop.py tests/test_runtime_truth_spine_v2_evidence.py tests/test_runtime_truth_spine_v2_adapters.py tests/test_spine_adoption_dispatch.py tests/test_spine_mapping_receipts.py",
+    "ruff check dharma_swarm/a2a/nats_transport.py dharma_swarm/opportunity_refill.py dharma_swarm/durable_execution.py tests/test_nats_transport.py tests/test_runtime_truth_spine_recovery.py scripts/governance/spine_bypass_report.py scripts/docops/check_docops_integrity.py",
+    "make docops-integrity",
+    "python tools/spine_adoption_metric.py --output reports/governance/spine_adoption_metric.json --fail-below-adoption 90",
+    "python -m dharma_swarm.operator_core.nats_live_contact --write-receipt --timeout 2.0",
+    "git diff --check"
+  ]
+}

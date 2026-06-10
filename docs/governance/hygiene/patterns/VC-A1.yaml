@@ -1,0 +1,17 @@
+{
+  "id": "VC-A1",
+  "title": "Happy-path tunnel vision",
+  "cluster": "A",
+  "cluster_title": "Test Theater",
+  "severity": "correctness",
+  "stage": "measured",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "Tests cover success paths while exception, timeout, and partial-failure paths remain untested.",
+  "why_it_hurts": "Coverage looks healthy while the behavior that breaks in production is unguarded.",
+  "detector": {"type": "command", "command": "printf 'positive='; rg -n 'assert ' tests | rg -v 'raises|Exception|Error' | wc -l; printf 'exception='; rg -n 'pytest.raises|assertRaises|with pytest.raises' tests | wc -l", "target": "positive-to-exception ratio under 15:1"},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["What failure paths does this change add, and where are they tested?"]
+}

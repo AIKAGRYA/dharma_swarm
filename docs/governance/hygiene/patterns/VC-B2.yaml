@@ -1,0 +1,17 @@
+{
+  "id": "VC-B2",
+  "title": "Phantom docstrings",
+  "cluster": "B",
+  "cluster_title": "Documentation Pollution",
+  "severity": "structural",
+  "stage": "measured",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "Docstrings are saturated across functions but are not audited against actual behavior.",
+  "why_it_hurts": "The doc surface grows faster than anyone can verify.",
+  "detector": {"type": "command", "command": "printf 'defs='; rg -n '^(async def|def|    async def|    def) ' dharma_swarm api scripts | wc -l; printf 'triple_quotes='; rg -n '\"\"\"' dharma_swarm api scripts | wc -l", "target": "sample high-docstring files during audits"},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["Which docstrings changed, and were they checked against implementation?"]
+}

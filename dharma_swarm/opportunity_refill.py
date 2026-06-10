@@ -29,10 +29,11 @@ from pydantic import BaseModel, Field
 
 from dharma_swarm.opportunity_dispatcher import (
     OPPORTUNITY_STAGES,
-    DispatchResult,
     OpportunityDispatcher,
 )
 from dharma_swarm.daemon_config import dharma_state_dir
+from dharma_swarm.runtime_state import RuntimeStateStore, _new_id
+from dharma_swarm.spine.identity import ExecutionIdentity
 
 logger = logging.getLogger(__name__)
 
@@ -94,14 +95,19 @@ class OpportunityRefill:
         economic_engine: Any | None = None,
         telemetry_store: Any | None = None,
         output_dir: Path | None = None,
+        runtime_state: RuntimeStateStore | None = None,
     ) -> None:
         self._telic_seam = telic_seam
         self._economic_engine = economic_engine
         self._telemetry_store = telemetry_store
+        self._runtime_state = runtime_state
         self._dispatcher = dispatcher or OpportunityDispatcher(
+            state_store=runtime_state,
             telic_seam=telic_seam,
             economic_engine=economic_engine,
         )
+        if self._runtime_state is None:
+            self._runtime_state = getattr(self._dispatcher, "_store", None)
         self._output_dir = output_dir or (dharma_state_dir() / "revenue_packets")
         self._output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -115,7 +121,11 @@ class OpportunityRefill:
             opportunity_type=row.type,
         )
 
+        trace_id = str(row.metadata.get("trace_id") or _new_id("trace"))
+        correlation_id = str(row.metadata.get("correlation_id") or trace_id)
         opp_dict = row.model_dump()
+        opp_dict["trace_id"] = trace_id
+        opp_dict["correlation_id"] = correlation_id
         dispatch_results = self._dispatcher.dispatch_opportunity_sync(opp_dict)
 
         stage_results: list[StageResult] = []
@@ -149,6 +159,7 @@ class OpportunityRefill:
             total_cost += stage_cost
 
             self._record_economic_telemetry(sr, row)
+            self._record_runtime_stage_receipt(sr, row, trace_id=trace_id, correlation_id=correlation_id)
             stage_results.append(sr)
 
         result.stages = stage_results
@@ -187,7 +198,7 @@ class OpportunityRefill:
 
         try:
             from dharma_swarm.autoresearch_loop import AutoResearchLoop
-            loop = AutoResearchLoop()
+            AutoResearchLoop()
             sr.status = "completed"
             sr.completed_at = datetime.now(timezone.utc).isoformat()
         except Exception as exc:
@@ -246,6 +257,62 @@ class OpportunityRefill:
                 )
             except Exception:
                 logger.debug("Telemetry plane record failed", exc_info=True)
+
+    def _record_runtime_stage_receipt(
+        self,
+        sr: StageResult,
+        row: OpportunityRow,
+        *,
+        trace_id: str,
+        correlation_id: str,
+    ) -> None:
+        """Record the refill wrapper's own stage observation in runtime truth."""
+        if self._runtime_state is None or not sr.task_id or not sr.run_id or not sr.claim_id:
+            return
+        identity = ExecutionIdentity.new(
+            task_id=sr.task_id,
+            agent_id="opportunity_agent",
+            session_id=str(getattr(self._dispatcher, "_session_id", "") or ""),
+            trace_id=trace_id,
+            correlation_id=correlation_id,
+            causation_id=f"opportunity_refill:{row.id}:{sr.stage}",
+            run_id=sr.run_id,
+            claim_id=sr.claim_id,
+            idempotency_key=f"idem_{sr.run_id}",
+            proposal_id=sr.proposal_id,
+            metadata={
+                "source": "opportunity_refill",
+                "opportunity_id": row.id,
+                "opportunity_type": row.type,
+                "stage": sr.stage,
+            },
+        )
+        payload = {
+            "opportunity_id": row.id,
+            "opportunity_type": row.type,
+            "stage": sr.stage,
+            "status": sr.status,
+            "quarantined": sr.quarantined,
+            "provider_cost_usd": sr.provider_cost_usd,
+            "net_value_usd": sr.net_value_usd,
+            "artifact_path": sr.artifact_path,
+            "error": sr.error,
+        }
+        try:
+            self._runtime_state.record_execution_identity_sync(
+                identity,
+                source="opportunity_refill",
+                metadata=payload,
+            )
+            self._runtime_state.record_receipt_for_identity_sync(
+                identity,
+                receipt_type="opportunity_refill_stage",
+                status=sr.status,
+                side_effect_key=f"opportunity_refill:{row.id}:{sr.stage}",
+                payload=payload,
+            )
+        except Exception:
+            logger.debug("Runtime stage receipt record failed", exc_info=True)
 
     def _write_revenue_packet(
         self,

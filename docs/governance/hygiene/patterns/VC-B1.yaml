@@ -1,0 +1,17 @@
+{
+  "id": "VC-B1",
+  "title": "Hallucinated README features",
+  "cluster": "B",
+  "cluster_title": "Documentation Pollution",
+  "severity": "structural",
+  "stage": "measured",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "README language claims planned or unsupported behavior as if it exists.",
+  "why_it_hurts": "Agents and users build on false capability assumptions.",
+  "detector": {"type": "command", "command": "rg -n 'coming soon|planned|will be|future support|in the future' README.md docs/governance docs/ops | wc -l", "target": "zero unsupported forward-looking claims in first-read docs"},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["Does every claimed feature have a code path, command, or receipt?"]
+}

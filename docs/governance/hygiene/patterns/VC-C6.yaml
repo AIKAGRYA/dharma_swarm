@@ -1,0 +1,17 @@
+{
+  "id": "VC-C6",
+  "title": "Circular import accumulation",
+  "cluster": "C",
+  "cluster_title": "Architectural Drift",
+  "severity": "structural",
+  "stage": "measured",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "Sibling modules import each other until import order becomes part of runtime behavior.",
+  "why_it_hurts": "Small moves trigger startup failures or hidden side effects.",
+  "detector": {"type": "command", "command": "for f in dharma_swarm/*.py; do c=$(rg -n '^from dharma_swarm|^from [.]' \"$f\" | wc -l); test \"$c\" -gt 20 && printf '%s %s\\n' \"$f\" \"$c\"; done", "target": "root modules with more than 20 internal imports are audited"},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["Did this import create a new lateral dependency or close one?"]
+}

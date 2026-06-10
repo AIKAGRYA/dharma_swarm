@@ -29,7 +29,9 @@ from pathlib import Path
 
 # Re-use the YAML loader from check_track_status so we stay stdlib-only.
 sys.path.insert(0, str(Path(__file__).parent))
-from check_track_status import load_active_track, ACTIVE_TRACK_PATH  # noqa: E402
+from check_track_status import (  # noqa: E402
+    load_active_track, ACTIVE_TRACK_PATH, normalize_portfolio, _is_active,
+)
 
 START = "<!-- ACTIVE_TRACK:START -->"
 END = "<!-- ACTIVE_TRACK:END -->"
@@ -44,9 +46,64 @@ MANAGED_FILES = [
 ]
 
 
+def _render_one_track(t: dict, lines: list) -> None:
+    """Render a single track's block into `lines` (used per active track)."""
+    lines.append(f"### {t.get('name', '(unnamed)')}")
+    lines.append("")
+    lines.append(f"**Track id:** `{t.get('id', '(none)')}` · "
+                 f"**Status:** {t.get('status', 'UNKNOWN')} · "
+                 f"**Owner:** {t.get('owner', '(unset)')}")
+    lines.append(f"**Serves spine objective:** `{t.get('serves', '(none)')}` · "
+                 f"**Verified at:** {t.get('verified_at', '(unset)')} "
+                 f"(TTL {t.get('ttl_days', 14)} days)")
+    edges = []
+    for kind in ("complements", "depends_on", "conflicts_with"):
+        vals = t.get(kind) or []
+        if vals:
+            edges.append(f"{kind}: {', '.join(str(v) for v in vals)}")
+    if edges:
+        lines.append(f"**Relations:** {' · '.join(edges)}")
+    owned = t.get("owned_surfaces") or []
+    if owned:
+        lines.append(f"**Owns surfaces:** {', '.join(str(s) for s in owned)}")
+    moves = t.get("moves_vital_signs") or []
+    if moves:
+        lines.append(f"**Moves vital signs:** {', '.join(str(s) for s in moves)}")
+    lines.append("")
+    desc = (t.get("description") or "").strip()
+    if desc:
+        lines.extend(desc.splitlines())
+        lines.append("")
+    next_items = t.get("next_items") or []
+    if next_items:
+        lines.append("**Next items:**")
+        lines.append("")
+        for item in next_items:
+            tag = " (blocker)" if item.get("blocker") else ""
+            lines.append(f"- [{item.get('kind', '?')}]{tag} {str(item.get('what', '')).strip()}")
+        lines.append("")
+    non_goals = t.get("non_goals") or []
+    if non_goals:
+        lines.append("**Non-goals:**")
+        lines.append("")
+        for ng in non_goals:
+            lines.append(f"- {str(ng).strip()}")
+        lines.append("")
+
+
 def render_block(track: dict) -> str:
-    active = track.get("active_track") or {}
-    closed = track.get("closed_tracks") or []
+    """Render the managed governance block from the track portfolio.
+
+    Works for both schemas: normalize_portfolio adapts v1 (singular
+    active_track) into a one-track portfolio, so this renders either.
+    """
+    p = normalize_portfolio(track)
+    tracks = p["active_tracks"]
+    active = [t for t in tracks if _is_active(t)]
+    policy = p["track_policy"]
+    spine = p["spine_objectives"]
+    closed = p["closed_tracks"]
+
     lines = [
         START,
         "",
@@ -54,37 +111,28 @@ def render_block(track: dict) -> str:
         "     Do not hand-edit. Run scripts/governance/render_active_track_includes.py",
         "     after updating the YAML. -->",
         "",
-        f"**Active track:** {active.get('name', '(none declared)')}",
-        f"**Track id:** `{active.get('id', '(none)')}`",
-        f"**Status:** {active.get('status', 'UNKNOWN')}",
-        f"**Verified at:** {active.get('verified_at', '(unset)')} "
-        f"(TTL {active.get('ttl_days', 14)} days)",
-        f"**Owner:** {active.get('owner', '(unset)')}",
-        "",
-        "**Description:**",
+        f"**Active portfolio:** {len(active)} co-equal track(s) "
+        f"(WIP warn {policy.get('warn_active')}, max {policy.get('max_active')}). "
+        "A new project is a new track here, not a violation — "
+        f"model: {policy.get('model')}.",
         "",
     ]
-    desc = (active.get("description") or "").strip()
-    if desc:
-        lines.extend(desc.splitlines())
+
+    if spine:
+        served = {t.get("serves") for t in active}
+        lines.append("**Spine objectives (each track serves one):**")
+        lines.append("")
+        for o in spine:
+            oid = o.get("id")
+            mark = "covered" if oid in served else "**no active track**"
+            lines.append(f"- `{oid}` — {o.get('name', '')} ({mark})")
         lines.append("")
 
-    next_items = active.get("next_items") or []
-    if next_items:
-        lines.append("**Next items on this track:**")
+    if not tracks:
+        lines.append("**Active track:** (none declared)")
         lines.append("")
-        for item in next_items:
-            tag = " (blocker)" if item.get("blocker") else ""
-            lines.append(f"- [{item.get('kind', '?')}]{tag} {item.get('what', '').strip()}")
-        lines.append("")
-
-    non_goals = active.get("non_goals") or []
-    if non_goals:
-        lines.append("**Non-goals (do not work on these during this track):**")
-        lines.append("")
-        for ng in non_goals:
-            lines.append(f"- {ng.strip()}")
-        lines.append("")
+    for t in tracks:
+        _render_one_track(t, lines)
 
     if closed:
         lines.append("**Recently closed tracks:**")
