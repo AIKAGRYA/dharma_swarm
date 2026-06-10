@@ -48,48 +48,63 @@ The governing principle behind whatever track is active: **one seam, end-to-end,
      Do not hand-edit. Run scripts/governance/render_active_track_includes.py
      after updating the YAML. -->
 
-**Active track:** Runtime Truth Reconciliation — operator-visible truth packets
-**Track id:** `runtime-truth-reconciliation-2026-06`
+**Active track:** Runtime Truth Spine — Adoption (god objects flow through invoke_agent)
+**Track id:** `runtime-truth-spine-adoption-2026-06`
 **Status:** ACTIVE
-**Verified at:** 2026-06-04 (TTL 14 days)
+**Verified at:** 2026-06-06 (TTL 21 days)
 **Owner:** @AmitabhainArunachala
+
+**Coordination model:** one strategic active track; many coordinated work lanes
+**Parallel lanes allowed:** yes
+**Strategic track role:** north-star, acceptance gates, non-goals, and authority boundaries
+
+**Parallel lane rule:** Declare owner, branch/worktree or packet, allowed surfaces, verification command, and receipt path before broad edits.
+
+**Lane requirements:**
+
+- Bind every new agent to the active strategic track or to an explicit exception lane.
+- Use an isolated worktree/branch or a ds-goal/AgentOps packet for implementation lanes.
+- Declare owner, branch/worktree, allowed surfaces, verification command, and receipt path before broad edits.
+- Do not write into unrelated dirty files; inspect existing changes before touching a modified file.
+- Record handoff/receipts before stopping; abandoned lanes must be marked stale or prunable.
+- Promotion requires tests/checks plus an explicit merge or closeout receipt.
+
+For the current local/PR lane map, run `make lane-map` and read `reports/governance/parallel_lane_map.md`.
 
 **Description:**
 
-The Runtime Truth Spine substrate is merged and shippable. This track moves
-from substrate existence to read-only reconciliation: operator-visible
-runtime truth packets that separate heartbeat, readiness, artifact progress,
-completion, authority, projection/cache, mutation, and external-gated proof.
+spine-adoption ships end-to-end: every production dispatch flows through
+invoke_agent() and emits exactly one EvidenceReceipt. This track migrates
+the god objects (agent_runner.py, orchestrator.py, a2a_bridge.py) onto
+the shipped spine substrate. Target: 3 production callers outside the
+spine package, zero bypass paths.
 
-The track must not create a new truth store, daemon, receipt system, or
-authority surface. It projects from existing owners only:
-spine.EvidenceReceipt for in-flight dispatch proof, runtime_state.RuntimeReceipt
-for persisted runtime receipts, IdempotencyRecord for exactly-once substrate,
-and existing operator/onboard/control-surface rows for read-only rendering.
-
-Doctrine line that must hold:
-  Read models project truth from owners; they do not become authority.
+Substrate-nativeness moves from ~10-15% to ~30%+. This track operates
+concurrently with nats-substrate-2026-06 (Codex lane) under the
+parallel_lane_policy. Surface separation: spine adoption touches dispatch
+call sites; NATS work touches transport layer.
 
 **Next items on this track:**
 
-- [code] (blocker) Define the smallest read-only RuntimeTruthPacket contract in the existing operator_core owner.
-- [code] (blocker) Render compact runtime truth in make onboard without making onboard an authority surface.
-- [test] Protect A2A single-persistence invariant while adding runtime truth projections.
+- [code] (blocker) Migrate a2a/a2a_bridge.py dispatch through invoke_agent(). Cleanest layer, highest leverage.
+- [code] (blocker) Migrate orchestrator.py dispatch through invoke_agent() behind feature flag.
+- [code] (blocker) Migrate agent_runner.py run_task through invoke_agent(). Largest surface, last.
+- [code] (blocker) Enable bypass-guard allow-list-at-zero in uplift_guards CI.
+- [docs] Author docs/architecture/SPINE_ADOPTION_NARRATIVE.md
 
 **Non-goals (do not work on these during this track):**
 
-- Do not create a new daemon, database, event log, truth store, or receipt system.
-- Do not mint a second RuntimeReceipt for A2A or paths with an inner runtime owner.
-- Do not mutate external systems, live processes, archive fitness, payments, or gateways.
-- Do not broadly refactor orchestrator.py, agent_runner.py, swarm.py, providers.py, or SwarmManager.
-- Do not build Verified Experiment Loop runtime in this track.
-- Do not create standalone BetCard, Experiment, SwarmRun, DecisionRecord, LineageRecord, WikiUpdate, or cost-tracker classes.
+- Do not create new spine sub-modules. Adopt invoke/receipt/routing/persistence.
+- Do not decompose agent_runner.run_task beyond invoke_agent() routing.
+- Do not change EvidenceReceipt schema; adopt shipped types unchanged.
+- Do not introduce NATS, Redis, or gRPC in this track.
+- Do not broadly refactor swarm.py, providers.py, or SwarmManager.
 
 **Recently closed tracks:**
 
+- `runtime-truth-reconciliation-2026-06` — Runtime Truth Reconciliation — operator-visible truth packets (SHIPPED, closed 2026-06-06)
 - `runtime-truth-spine-2026-06` — Runtime Truth Spine — one invariant, one invocation path, one receipt (SHIPPED, closed 2026-06-04)
 - `trace-identity-coverage-2026-05` — Trace Identity Coverage — native propagation and soft coverage findings (SUPERSEDED, closed 2026-05-28)
-- `trace-attractor-causal-spine-2026-05` — Trace Attractor Causal Spine — operator-visible trace packets (SHIPPED, closed 2026-05-21)
 
 For machine-readable status, see [`reports/governance/active_track_evidence.md`](../../reports/governance/active_track_evidence.md) (generated by `scripts/governance/check_track_status.py`).
 

@@ -57,6 +57,8 @@ reports/psmv_hyperfiles_20260313/graphs/*.json
 reports/memory_kernel/
 reports/docops/
 reports/system_map/latest.json
+reports/revenue_wedge/
+reports/forge/
 results.tsv
 run.log
 synthesizer_memory.json

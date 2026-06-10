@@ -16,6 +16,7 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -34,6 +35,11 @@ IGNORE_DIR_NAMES = {
 IGNORE_REL_PATTERNS = (
     "AGENTS.md",
     "reports/docops/**",
+    # Machine-generated loop/forge output (gitignored 2026-06-10; 500k+ files).
+    # Runtime metabolism, not repo docs — excluded so doc metrics measure the
+    # genome (code + curated docs), not the fleet's report exhaust.
+    "reports/revenue_wedge/**",
+    "reports/forge/**",
 )
 AUTHORITY_TERMS = (
     "source of truth",
@@ -71,10 +77,28 @@ def repo_relative(path: Path, repo_root: Path) -> str:
     return path.resolve().relative_to(repo_root.resolve()).as_posix()
 
 
+@lru_cache(maxsize=8)
+def git_tracked_paths(repo_root: str) -> frozenset[str] | None:
+    try:
+        result = subprocess.run(
+            ["git", "ls-files", "-z"],
+            cwd=repo_root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    return frozenset(path for path in result.stdout.split("\0") if path)
+
+
 def is_ignored(path: Path, repo_root: Path) -> bool:
     rel = path.resolve().relative_to(repo_root.resolve())
     rel_parts = rel.parts
     rel_text = rel.as_posix()
+    tracked = git_tracked_paths(str(repo_root.resolve()))
+    if tracked is not None and rel_text not in tracked:
+        return True
     if any(fnmatch.fnmatch(rel_text, pattern) for pattern in IGNORE_REL_PATTERNS):
         return True
     return any(part in IGNORE_DIR_NAMES for part in rel_parts)

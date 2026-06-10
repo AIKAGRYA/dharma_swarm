@@ -188,7 +188,14 @@ def check_file_contains(file_path: str, pattern: str) -> CriterionResult:
         return CriterionResult(id="", kind="file_contains", passed=False,
                                 detail=f"{file_path} missing")
     text = path.read_text(encoding="utf-8", errors="ignore")
-    found = bool(re.search(pattern, text))
+    try:
+        found = bool(re.search(pattern, text))
+    except re.error:
+        # The criterion pattern is authored as a literal marker but contains
+        # regex metacharacters (e.g. "BYPASS_ALLOWLIST = []", where "[]" is an
+        # unterminated character class). Fall back to a plain substring match so
+        # one literal pattern can't crash the entire track-status gate.
+        found = pattern in text
     return CriterionResult(
         id="", kind="file_contains", passed=found,
         detail=f"pattern {pattern!r} {'found' if found else 'NOT FOUND'} in {file_path}",
