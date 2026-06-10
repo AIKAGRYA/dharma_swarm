@@ -792,3 +792,89 @@ async def test_ollama_stream_yields_chunks(monkeypatch):
     monkeypatch.setattr("dharma_swarm.providers.httpx.AsyncClient", lambda timeout: _Client())
     chunks = [chunk async for chunk in provider.stream(req)]
     assert chunks == ["A", "B"]
+
+
+# ---------------------------------------------------------------------------
+# Regression: content-drop on OpenAI-compatible sibling providers (Loop 1).
+# Reasoning-only or list-typed message content must never collapse to "".
+# Fixed in Honest Spine v2 Phase 0; previously only OpenAIProvider was routed
+# through _extract_openai_compatible_message_text.
+# ---------------------------------------------------------------------------
+
+from dharma_swarm.providers import (  # noqa: E402
+    ChutesProvider,
+    FireworksProvider,
+    GoogleAIProvider,
+    MistralProvider,
+    SambaNovaProvider,
+    SiliconFlowProvider,
+    TogetherProvider,
+    _extract_openai_compatible_message_text,
+)
+
+_SIBLING_PROVIDERS = [
+    SiliconFlowProvider,
+    TogetherProvider,
+    FireworksProvider,
+    GoogleAIProvider,
+    SambaNovaProvider,
+    MistralProvider,
+    ChutesProvider,
+]
+
+
+def _reasoning_only_resp() -> SimpleNamespace:
+    return _mk_resp(content=None, reasoning="the reasoned answer")
+
+
+def _list_content_resp() -> SimpleNamespace:
+    return SimpleNamespace(
+        model="m",
+        usage=SimpleNamespace(prompt_tokens=1, completion_tokens=2, total_tokens=3),
+        choices=[SimpleNamespace(
+            message=SimpleNamespace(
+                content=[{"type": "text", "text": "part one"},
+                         {"type": "text", "text": "part two"}],
+                reasoning=None,
+                reasoning_details=None,
+                tool_calls=None,
+            ),
+            finish_reason="stop",
+        )],
+    )
+
+
+def _fake_client(resp: SimpleNamespace) -> SimpleNamespace:
+    return SimpleNamespace(
+        chat=SimpleNamespace(
+            completions=SimpleNamespace(create=AsyncMock(return_value=resp)),
+        ),
+    )
+
+
+@pytest.mark.parametrize("provider_cls", _SIBLING_PROVIDERS)
+def test_sibling_provider_reasoning_only_content_not_dropped(provider_cls) -> None:
+    provider = provider_cls(api_key="test-key")
+    provider._client = _fake_client(_reasoning_only_resp())
+    req = LLMRequest(messages=[{"role": "user", "content": "hi"}], model="m")
+    resp = asyncio.run(provider.complete(req))
+    assert resp.content == "the reasoned answer"
+
+
+@pytest.mark.parametrize("provider_cls", _SIBLING_PROVIDERS)
+def test_sibling_provider_list_content_not_dropped(provider_cls) -> None:
+    provider = provider_cls(api_key="test-key")
+    provider._client = _fake_client(_list_content_resp())
+    req = LLMRequest(messages=[{"role": "user", "content": "hi"}], model="m")
+    resp = asyncio.run(provider.complete(req))
+    assert "part one" in resp.content and "part two" in resp.content
+
+
+def test_extractor_handles_plain_dict_message() -> None:
+    # NVIDIA NIM and providers_extended parse raw JSON dicts, not SDK objects.
+    assert _extract_openai_compatible_message_text(
+        {"content": None, "reasoning": "dict reasoning"}
+    ) == "dict reasoning"
+    assert _extract_openai_compatible_message_text(
+        {"content": [{"type": "text", "text": "dict list"}]}
+    ) == "dict list"
