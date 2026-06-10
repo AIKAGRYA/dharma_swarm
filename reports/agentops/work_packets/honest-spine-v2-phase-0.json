@@ -70,7 +70,11 @@
     "smoke_suite": "make test-smoke — result recorded in phase_0_smoke field below after run",
     "governance_hooks": "all pre-commit hooks (contract tests, uplift guards, docops, manifest, gitleaks, semgrep) passed on every commit"
   },
-  "phase_0_smoke": "PENDING — running at packet write time; operator: re-run `make test-smoke` in the lane worktree to verify",
+  "phase_0_smoke": "528 passed, 3 skipped, 1 failed (test_agentic_autonomy_bundle — depended on a file that existed only uncommitted in the operator worktree; ported + fixed in commit e6396856c)",
+  "pre_existing_main_failures_not_from_this_lane": [
+    "tests/test_orchestrator.py::test_route_next hangs >60s on pristine origin/main dc72312f0 (passes in 5s at older commit 2c88e6cd3 — regression introduced between those commits; bisect evidence 2026-06-11)",
+    "tests/test_spine_adoption_metric.py::test_nats_is_scoped_out fails on pristine origin/main dc72312f0 (nats surface reports 'joined', expected missing/quarantine)"
+  ],
   "not_done_in_phase_0": [
     "~/CLAUDE.md (home-level) consolidation — operator must be present",
     "ACTIVE_TRACK.yaml updates — operator-owned governance surface",
