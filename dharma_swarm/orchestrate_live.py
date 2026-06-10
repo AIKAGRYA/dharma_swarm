@@ -528,6 +528,30 @@ async def run_evolution_loop(shutdown_event: asyncio.Event) -> None:
                      f"avg={sum(live_fitness_scores)/len(live_fitness_scores):.3f} "
                      f"max={max(live_fitness_scores):.3f}")
 
+            # --- EVAL VERDICT GATE: check overnight verdict before evolving ---
+            # (Honest Spine v2 Phase A: this block previously lived AFTER the
+            # first use of _evo_allowed below, so every cycle raised
+            # UnboundLocalError into the loop's broad except — the
+            # meta-evolution feed had been silently dead. F821 baseline hit.)
+            _evo_allowed = True
+            _verdict_file = (
+                STATE_DIR / "overnight"
+                / datetime.now(timezone.utc).strftime("%Y-%m-%d") / "verdict.json"
+            )
+            try:
+                import json as _vj
+                if _verdict_file.exists():
+                    _vdata = _vj.loads(_verdict_file.read_text())
+                    _v = _vdata.get("verdict", "")
+                    if _v == "rollback":
+                        _evo_allowed = False
+                        _log("evolution", "PAUSED: overnight ROLLBACK verdict — skipping auto_evolve")
+                    elif _v == "hold":
+                        # On HOLD, only allow shadow mode
+                        _log("evolution", "CONSTRAINED: overnight HOLD verdict — forcing shadow mode")
+            except Exception:
+                pass
+
             # Feed meta-evolution with observed fitness.
             # Only submit a synthetic result on cycles where auto_evolve
             # does NOT run (every 3rd cycle calls auto_evolve which feeds
@@ -569,24 +593,6 @@ async def run_evolution_loop(shutdown_event: asyncio.Event) -> None:
                     if _anomaly_data:
                         _anomaly_types = [a.get("type", "?") for a in _anomaly_data]
                         _log("evolution", f"Health context: {', '.join(_anomaly_types)}")
-            except Exception:
-                pass
-
-            # --- EVAL VERDICT GATE: check overnight verdict before evolving ---
-            _evo_allowed = True
-            try:
-                import json as _vj
-                _verdict_dir = STATE_DIR / "overnight" / datetime.now(timezone.utc).strftime("%Y-%m-%d")
-                _verdict_file = _verdict_dir / "verdict.json"
-                if _verdict_file.exists():
-                    _vdata = _vj.loads(_verdict_file.read_text())
-                    _v = _vdata.get("verdict", "")
-                    if _v == "rollback":
-                        _evo_allowed = False
-                        _log("evolution", "PAUSED: overnight ROLLBACK verdict — skipping auto_evolve")
-                    elif _v == "hold":
-                        # On HOLD, only allow shadow mode
-                        _log("evolution", "CONSTRAINED: overnight HOLD verdict — forcing shadow mode")
             except Exception:
                 pass
 
@@ -825,7 +831,7 @@ async def run_health_loop(shutdown_event: asyncio.Event) -> None:
 
 async def run_living_layers(
     shutdown_event: asyncio.Event,
-    stigmergy_store: "StigmergyStore | None" = None,
+    stigmergy_store: "Any | None" = None,
 ) -> None:
     """Living layers — stigmergy decay, shakti perception, subconscious dreams."""
     _log("living", f"Starting (interval={LIVING_INTERVAL}s)")
@@ -1336,7 +1342,17 @@ async def run_free_evolution_grind(shutdown_event: asyncio.Event) -> None:
 
             # Phase 4: Run evolution cycle via DarwinEngine.run_cycle
             # (takes proposals directly — no LLM needed for proposal gen)
-            result = await engine.run_cycle(proposals)
+            # Honest Spine v2 Phase A: grind probes and observation-derived
+            # proposals carry no diff — archiving them was pure theater
+            # (the dominant writer behind the 11k-record narrative epoch).
+            # Only diff-bearing proposals reach the engine; the LLM branch
+            # below (auto_evolve) remains the real evolution path.
+            proposals = [p for p in proposals if p.diff.strip()]
+            if not proposals:
+                _log("grind", "No diff-bearing proposals this cycle; skipping run_cycle (theater writer disabled)")
+                result = None
+            else:
+                result = await engine.run_cycle(proposals)
 
             # Phase 4b: LLM-powered evolution via Qwen3-coder:free (every 5th cycle)
             # This uses auto_evolve with free coding models for deeper mutations
@@ -1358,34 +1374,41 @@ async def run_free_evolution_grind(shutdown_event: asyncio.Event) -> None:
                             timeout=30.0,
                             context=f"Grind cycle {cycle_count}, hunger={hunger:.2f}",
                         )
-                        if llm_result.best_fitness > result.best_fitness:
+                        if result is None or llm_result.best_fitness > result.best_fitness:
                             result = llm_result  # Use the better result
                             _log("grind", f"LLM result: fitness={llm_result.best_fitness:.3f} (better)")
                 except Exception as _llm_err:
                     _log("grind", f"LLM evolve error: {_llm_err}")
 
-            # Phase 5: Feed to meta-evolution
-            meta_result = meta_engine.observe_cycle_result(result)
+            if result is None:
+                # Theater writer disabled and no LLM cycle ran: nothing real
+                # happened, so nothing is fed to meta-evolution or logged as
+                # fitness. Honest idle beats narrated progress. (Falls through
+                # to the adaptive sleep below — never spins.)
+                _log("grind", f"Cycle {cycle_count}: idle (no diff-bearing work)")
+            else:
+                # Phase 5: Feed to meta-evolution
+                meta_result = meta_engine.observe_cycle_result(result)
 
-            # Track improvement
-            if result.best_fitness > last_best_fitness + 0.01:
-                last_best_fitness = result.best_fitness
-                last_improvement_time = __import__("time").time()
+                # Track improvement
+                if result.best_fitness > last_best_fitness + 0.01:
+                    last_best_fitness = result.best_fitness
+                    last_improvement_time = __import__("time").time()
 
-            # Phase 5: Log
-            meta_note = ""
-            if meta_result is not None:
-                if meta_result.evolved_parameters:
-                    meta_note = f" | META EVOLVED (mf={meta_result.meta_fitness:.3f})"
-                else:
-                    meta_note = f" | meta ok (mf={meta_result.meta_fitness:.3f})"
+                # Phase 5: Log
+                meta_note = ""
+                if meta_result is not None:
+                    if meta_result.evolved_parameters:
+                        meta_note = f" | META EVOLVED (mf={meta_result.meta_fitness:.3f})"
+                    else:
+                        meta_note = f" | meta ok (mf={meta_result.meta_fitness:.3f})"
 
-            _log(
-                "grind",
-                f"Cycle {cycle_count}: hunger={hunger:.2f} interval={interval:.0f}s "
-                f"proposals={len(proposals)} fitness={result.best_fitness:.3f} "
-                f"archived={result.proposals_archived}{meta_note}",
-            )
+                _log(
+                    "grind",
+                    f"Cycle {cycle_count}: hunger={hunger:.2f} interval={interval:.0f}s "
+                    f"proposals={len(proposals)} fitness={result.best_fitness:.3f} "
+                    f"archived={result.proposals_archived}{meta_note}",
+                )
 
         except Exception as exc:
             _log("grind", f"Cycle {cycle_count} error: {exc}")

@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from collections import Counter
 from datetime import datetime, timezone
 from enum import Enum
@@ -774,6 +775,21 @@ class AutoProposer:
             logger.warning("AutoProposer propose phase failed: %s", exc)
             await self._log_jsonl(self._cycles_file, cycle_log)
             return cycle_log
+
+        # Honest Spine v2 Phase A: description-only proposals were the main
+        # archive-theater writer (503 proposals, zero diffs). Submitting to
+        # the engine without a diff archives narration, not evolution.
+        # Observations + proposal records above are still logged; only the
+        # archive write is withheld. Opt back in: DHARMA_AUTOPROPOSER_SUBMIT=1.
+        if os.environ.get("DHARMA_AUTOPROPOSER_SUBMIT") != "1":
+            proposals = [p for p in proposals if p.diff.strip()]
+            if cycle_log.proposals_generated and not proposals:
+                logger.info(
+                    "AutoProposer: %d description-only proposal(s) withheld "
+                    "from archive (no diff; set DHARMA_AUTOPROPOSER_SUBMIT=1 "
+                    "to restore legacy behavior)",
+                    cycle_log.proposals_generated,
+                )
 
         if not proposals:
             logger.debug("AutoProposer: no proposals generated this cycle")

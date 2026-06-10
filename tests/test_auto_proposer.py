@@ -465,8 +465,14 @@ class TestCycle:
         assert cycle_log.proposals_submitted == 0
         engine.run_cycle.assert_not_called()
 
-    def test_cycle_unhealthy_system(self, tmp_path):
-        """Unhealthy system should produce and submit proposals."""
+    def test_cycle_unhealthy_system(self, tmp_path, monkeypatch):
+        """Unhealthy system should produce and submit proposals.
+
+        Submission of description-only proposals is legacy behavior now
+        gated behind DHARMA_AUTOPROPOSER_SUBMIT (Honest Spine v2 Phase A);
+        this test opts in to verify the submission mechanics.
+        """
+        monkeypatch.setenv("DHARMA_AUTOPROPOSER_SUBMIT", "1")
         report = _make_health_report(mean_fitness=0.15, failure_rate=0.4)
         proposer, engine, _, _ = _make_proposer(tmp_path, health_report=report)
 
@@ -475,6 +481,16 @@ class TestCycle:
         assert cycle_log.observations_collected > 0
         assert cycle_log.proposals_generated > 0
         engine.run_cycle.assert_called_once()
+
+    def test_cycle_withholds_description_only_proposals_by_default(self, tmp_path):
+        """Honest default: proposals with no diff never reach the archive."""
+        report = _make_health_report(mean_fitness=0.15, failure_rate=0.4)
+        proposer, engine, _, _ = _make_proposer(tmp_path, health_report=report)
+
+        cycle_log = _run(proposer.cycle())
+
+        assert cycle_log.proposals_generated > 0
+        engine.run_cycle.assert_not_called()
 
     def test_cycle_logs_to_files(self, tmp_path):
         """Cycle should produce JSONL log files."""
@@ -488,8 +504,9 @@ class TestCycle:
         # Check that at least the cycles log exists
         assert (log_dir / "cycles.jsonl").exists()
 
-    def test_cycle_resilient_to_engine_failure(self, tmp_path):
+    def test_cycle_resilient_to_engine_failure(self, tmp_path, monkeypatch):
         """If DarwinEngine.run_cycle fails, cycle should still complete."""
+        monkeypatch.setenv("DHARMA_AUTOPROPOSER_SUBMIT", "1")
         report = _make_health_report(mean_fitness=0.15)
         proposer, engine, _, _ = _make_proposer(tmp_path, health_report=report)
         engine.run_cycle = AsyncMock(side_effect=RuntimeError("engine exploded"))
@@ -517,8 +534,9 @@ class TestCycle:
 class TestGateIntegration:
     """Test that proposals go through the Darwin Engine's gate pipeline."""
 
-    def test_proposals_submitted_via_run_cycle(self, tmp_path):
+    def test_proposals_submitted_via_run_cycle(self, tmp_path, monkeypatch):
         """Proposals should be submitted via engine.run_cycle which includes gate_check."""
+        monkeypatch.setenv("DHARMA_AUTOPROPOSER_SUBMIT", "1")
         report = _make_health_report(mean_fitness=0.1)
         proposer, engine, _, _ = _make_proposer(tmp_path, health_report=report)
 
