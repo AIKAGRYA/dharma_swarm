@@ -31,6 +31,13 @@ The doctrine line: **a dispatch that produced no receipt did not happen, and a
 receipt that no operator can observe is not proof.** Receipts must land in a
 store the operator can query without trusting any agent's claim.
 
+Surface split (two persistence regimes, one doctrine): the **orchestrator**
+surface persists its receipt into `delegation_runs.receipt_json` (the column
+GATE 1 watches); the **A2A** surface persists canonically via `RuntimeReceipt`
++ `IdempotencyRecord` and leaves `receipt_json` empty — an empty blob on an A2A
+row is success, not failure (see `spine/persistence.py` and
+`tests/test_spine_persistence_invariant.py` invariant 7).
+
 ## Adoption state (verified, not narrated)
 
 | Surface | State | Mechanism |

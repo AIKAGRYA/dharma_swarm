@@ -30,7 +30,8 @@ show_new() {
     ORDER BY rowid DESC LIMIT 3" 2>/dev/null
   echo ""
   echo "receipt_json sha256 (latest):"
-  sqlite3 "${DB}" "SELECT receipt_json FROM delegation_runs WHERE receipt_json IS NOT NULL ORDER BY rowid DESC LIMIT 1" 2>/dev/null | shasum -a 256 | cut -c1-16
+  SHOW_SHA=$(sqlite3 "${DB}" "SELECT receipt_json FROM delegation_runs WHERE receipt_json IS NOT NULL ORDER BY rowid DESC LIMIT 1" 2>/dev/null | shasum -a 256 2>/dev/null | cut -c1-16)
+  echo "${SHOW_SHA:-UNAVAILABLE (sqlite3/shasum failed)}"
 }
 
 C=$(count)
