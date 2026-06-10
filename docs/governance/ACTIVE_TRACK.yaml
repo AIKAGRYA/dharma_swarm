@@ -83,15 +83,15 @@ active_track:
     - id: a2a_bridge_calls_spine
       kind: file_contains
       file: dharma_swarm/a2a/a2a_bridge.py
-      pattern: "from dharma_swarm.spine import"
+      pattern: "from dharma_swarm.spine"
     - id: orchestrator_calls_spine
       kind: file_contains
       file: dharma_swarm/orchestrator.py
-      pattern: "from dharma_swarm.spine import"
+      pattern: "from dharma_swarm.spine"
     - id: agent_runner_calls_spine
       kind: file_contains
       file: dharma_swarm/agent_runner.py
-      pattern: "from dharma_swarm.spine import"
+      pattern: "from dharma_swarm.spine"
     - id: dispatch_emits_evidence_receipt
       kind: file_contains
       file: tests/test_spine_adoption_dispatch.py
