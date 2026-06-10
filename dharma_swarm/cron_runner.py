@@ -514,6 +514,9 @@ def _run_headless_prompt(job: dict[str, Any]) -> tuple[bool, str, str | None]:
         prompt=prompt,
         timeout=_as_int(job.get("timeout_sec"), 600),
         model=str(job.get("model", "")).strip() or None,
+        # Non-bare: Max-plan OAuth (operator P0.2, 2026-06-10); bare mode
+        # hard-requires ANTHROPIC_API_KEY, which daemon lanes do not carry.
+        bare=False,
     )
     success = not result.startswith(("ERROR:", "TIMEOUT:", "Error (rc="))
     header = f"# Cron Job: {job.get('name', job.get('id', 'unnamed'))}\n\n"

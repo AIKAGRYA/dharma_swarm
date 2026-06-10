@@ -943,10 +943,18 @@ class Orchestrator:
                 db_path=store.db_path,
                 event_log_dir=runtime_root / "events",
             )
+            # Census costs ~0.9s; rebuilding it per dispatch contributed to
+            # the serialized bundle leg breaching the 45s tick budget.
+            kernel = getattr(self, "_memory_kernel_cache", None)
+            if kernel is None:
+                kernel = await asyncio.to_thread(
+                    lambda: build_orchestrator_memory_kernel(repo_root=Path.cwd())
+                )
+                self._memory_kernel_cache = kernel
             compiler = ContextCompiler(
                 runtime_state=store,
                 memory_lattice=lattice,
-                memory_kernel=build_orchestrator_memory_kernel(repo_root=Path.cwd()),
+                memory_kernel=kernel,
             )
             bundle = await compiler.compile_bundle(
                 session_id=self._ledger.session_id,
@@ -2004,7 +2012,10 @@ class Orchestrator:
         claim_meta = self._prepare_claim(task_for_gate, td)
         self._runtime_lifecycle.ensure_execution_identity(td, task=task_for_gate)
         claim_meta = await self._attach_context_bundle(task_for_gate, td, claim_meta)
-        claim_meta = self._attach_latent_gold(task_for_gate, claim_meta)
+        # Sync sqlite over the 2.3GB memory plane (~1.5s) — keep it off the loop.
+        claim_meta = await asyncio.to_thread(
+            self._attach_latent_gold, task_for_gate, claim_meta
+        )
         if task_for_gate is not None:
             task_for_gate.metadata = dict(claim_meta)
         if proposal_id is not None:
@@ -2045,6 +2056,9 @@ class Orchestrator:
                 body=f"You have been assigned task {td.task_id}.",
             ))
         logger.info("_assign_dispatch(%s): bus_send=%.2fs", td.task_id[:8], _adt.monotonic() - _pe_t2)
+        # Cumulative count survives tick cancellation — the per-tick counter
+        # read 0 for two weeks while real dispatches landed (H02 P1).
+        self._dispatched_cumulative = getattr(self, "_dispatched_cumulative", 0) + 1
         self._record_task_event(
             "dispatch_assigned",
             task_id=td.task_id,

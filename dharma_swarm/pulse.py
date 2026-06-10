@@ -367,7 +367,9 @@ def pulse(config: DaemonConfig | None = None) -> str:
         think_phase="before_complete",
         reflection=(
             f"Thread={thread}. Prompt assembled from memory, manifest, and inbox. "
-            "Validate safety and continue with bounded action."
+            "Risk: the pulse model may produce off-task output; bounded by "
+            "timeout and circuit breaker. Rollback: a pulse is read-mostly — "
+            "on failure the breaker pauses the lane and the thread rotates."
         ),
         max_reroutes=1,
         requirement_refs=[f"thread:{thread}", "daemon:pulse"],
@@ -526,7 +528,9 @@ def _check_and_run_cron_jobs(cfg: DaemonConfig | None = None) -> None:
             think_phase="before_complete",
             reflection=(
                 f"Cron job {job_id} scheduled as {schedule_label}. "
-                "Validate safety and bounded execution."
+                "Risk: job may fail or overrun; bounded by per-job timeout. "
+                "Rollback: failed jobs are logged and retried next schedule, "
+                "no irreversible side effects at launch time."
             ),
             max_reroutes=1,
             requirement_refs=[f"cron:{job_id}"],

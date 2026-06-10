@@ -827,7 +827,10 @@ class ContextCompiler:
         for path in candidates[:6]:
             try:
                 refs.append(str(path))
-                snippet = path.read_text(errors="ignore")[:180].replace("\n", " ")
+                # Bounded read: read_text() here once pulled a 1.5GB jsonl
+                # into the daemon to take 180 chars.
+                with path.open("r", errors="ignore") as fh:
+                    snippet = fh.read(180).replace("\n", " ")
             except Exception:
                 snippet = ""
             lines.append(f"- {path.name}: {snippet}")

@@ -2341,6 +2341,7 @@ class SwarmManager:
         # When Gnani holds, skip orchestrator dispatch — no new task execution
         activity: dict = {}
         _orch_t0 = _time.monotonic()
+        _dispatched_pre = getattr(self._orchestrator, "_dispatched_cumulative", 0)
         try:
             if not gnani_holds:
                 activity = await asyncio.wait_for(
@@ -2355,6 +2356,12 @@ class SwarmManager:
                 )
         except asyncio.TimeoutError:
             logger.warning("orchestrator.tick timed out after 45s")
+            # Dispatches that landed before the cancellation are real —
+            # report them; this counter read 0 for two weeks while work flowed.
+            result["dispatched"] = (
+                getattr(self._orchestrator, "_dispatched_cumulative", 0)
+                - _dispatched_pre
+            )
         _orch_dur = _time.monotonic() - _orch_t0
         if _orch_dur > 5.0:
             logger.warning("orchestrator.tick took %.1fs", _orch_dur)
