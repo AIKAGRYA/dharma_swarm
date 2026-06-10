@@ -2,8 +2,9 @@
 
 **Track:** `runtime-truth-spine-adoption-2026-06` (ACTIVE_TRACK.yaml, v2 portfolio)
 **Spine objective:** substrate-nativeness
-**Status at writing (2026-06-11):** 5/7 completion criteria; the receipt path is
-wired and test-proven; GATE 1 (operator-witnessed live receipt) not yet cleared.
+**Status at writing (2026-06-11):** 5/8 completion criteria; the receipt path is
+wired and test-proven; GATE 1 (operator-witnessed live receipt) not yet cleared —
+and is itself the 8th completion criterion, so the track cannot ship without it.
 
 ## What the spine is
 
@@ -45,8 +46,8 @@ nats_transport). The track completes when that dict drains to `{}`.
 
 ## How completion is measured (and why the criteria look like this)
 
-`scripts/governance/check_track_status.py` evaluates the 7 criteria in
-ACTIVE_TRACK.yaml. Two deserve explanation:
+`scripts/governance/check_track_status.py` evaluates the 8 criteria in
+ACTIVE_TRACK.yaml. Three deserve explanation:
 
 - `dispatch_emits_evidence_receipt` / `zero_dropoff_sources` point at named
   tests in `tests/test_spine_adoption_dispatch.py`. The tests are the real
@@ -56,8 +57,15 @@ ACTIVE_TRACK.yaml. Two deserve explanation:
   rotted (every declared site must still match a scanned site exactly).
 - `bypass_allowlist_empty` matches the literal drained form of
   `_INTENTIONAL_BYPASS` — it can only pass when the last bypass is migrated.
+- `gate1_witnessed` requires `reports/governance/GATE1_WITNESSED.md`, written
+  only by `gate1_witness.sh --watch` at the moment the operator observes a live
+  receipt land (freshness-guarded baseline; the receipt's sha16 is recorded and
+  checkable against the DB). This wires the non-proxy gate into completion —
+  the track cannot flip SHIPPABLE on file/test proxies alone. Known limitation,
+  by design: `file_exists` can be hand-written, but the sha makes fabrication an
+  auditable lie rather than a satisfied proxy.
 
-These are proxies. The non-proxy gate is below.
+The other seven are proxies. The non-proxy gate is below.
 
 ## GATE 1 — the operator-witnessed receipt
 

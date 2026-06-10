@@ -38,6 +38,18 @@ if [[ "${C}" == "ERR" ]]; then echo "FAIL: cannot read ${DB}"; exit 1; fi
 
 if [[ "${1:-}" == "--watch" ]]; then
   BASE=$(cat "${BASELINE_FILE}" 2>/dev/null || echo "${C}")
+  # FRESHNESS GUARD: a persisted baseline already below the current count means
+  # receipts accrued since it was set (another session, another lane) — watching
+  # against it would fire instantly WITHOUT a live dispatch, stamping a "witnessed
+  # just now" the data can't back. Reset to current so this watch can only trigger
+  # on a receipt that lands AFTER it started.
+  if [[ "${C}" -gt "${BASE}" ]]; then
+    echo "WARN: baseline ${BASE} is stale (current=${C} already exceeds it) — resetting baseline to ${C}."
+    echo "      This watch will only fire on a receipt landing AFTER now. Run your flagged dispatch."
+    BASE="${C}"
+    echo "${BASE}" > "${BASELINE_FILE}"
+  fi
+  WATCH_STARTED=$(date -u +%Y-%m-%dT%H:%M:%SZ)
   echo "watching for a receipt beyond baseline=${BASE} (current=${C}); Ctrl-C to stop"
   while :; do
     N=$(count)
@@ -53,18 +65,28 @@ if [[ "${1:-}" == "--watch" ]]; then
       # telling an auditable lie, not satisfying a proxy.
       ART="$(cd "$(dirname "$0")/../.." && pwd)/reports/governance/GATE1_WITNESSED.md"
       mkdir -p "$(dirname "${ART}")"
-      LATEST_SHA=$(sqlite3 "${DB}" "SELECT receipt_json FROM delegation_runs WHERE receipt_json IS NOT NULL ORDER BY rowid DESC LIMIT 1" 2>/dev/null | shasum -a 256 | cut -c1-16)
+      LATEST_SHA=$(sqlite3 "${DB}" "SELECT receipt_json FROM delegation_runs WHERE receipt_json IS NOT NULL ORDER BY rowid DESC LIMIT 1" 2>/dev/null | shasum -a 256 2>/dev/null | cut -c1-16)
+      [[ -z "${LATEST_SHA}" ]] && LATEST_SHA="UNAVAILABLE (sqlite3/shasum failed — verify manually before trusting this artifact)"
       {
         echo "# GATE 1 — operator-witnessed EvidenceReceipt"
         echo ""
         echo "- witnessed_at: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        echo "- watch_started: ${WATCH_STARTED}  (the count moved AFTER this — freshness-guarded)"
         echo "- receipt_count: ${BASE} -> ${N}"
         echo "- latest_receipt_json_sha256_16: ${LATEST_SHA}"
         echo "- db: ${DB}"
         echo ""
-        echo "Written by gate1_witness.sh --watch at the moment the count moved."
+        echo "Written by gate1_witness.sh --watch the moment the count moved past a"
+        echo "freshness-guarded baseline (stale baselines are reset at watch start, and"
+        echo "the baseline advances on success so a re-run cannot re-trigger)."
         echo "Verify anytime: sqlite3 '${DB}' \"SELECT COUNT(*) FROM delegation_runs WHERE receipt_json IS NOT NULL\""
+        echo ""
+        echo "LIMITATION (by design, documented): file_exists is the criterion, so this"
+        echo "file CAN be hand-written — but the sha16 is checkable against the DB row,"
+        echo "so fabrication is an auditable lie, not a satisfied proxy."
       } > "${ART}"
+      # Advance the baseline so a re-run of --watch cannot re-trigger on this receipt.
+      echo "${N}" > "${BASELINE_FILE}"
       echo "witness artifact written: ${ART} (commit it to flip the gate1_witnessed criterion)"
       exit 0
     fi
