@@ -64,6 +64,7 @@ is **depth-on-demand**. Read it when you need it. Do not memorise a read order.
 | Action warrant | `docs/governance/FOURFOLD_ACTION_WARRANT.md` | — |
 | Module-level what-does-what | `docs/architecture/NAVIGATION.md` | — |
 | Model / provider routing | `docs/architecture/MODEL_ROUTING_CANON.md` | root `MODEL_ROUTING_MAP.md` (archive pointer) |
+| Multi-agent substrate architecture | `docs/architecture/SWARM_SUBSTRATE.md` | depth-on-demand spec; does not own live state |
 | Terminal protocol | `specs/DGC_TERMINAL_ARCHITECTURE_v1.1.md` | v1.0 is archived |
 | Constitutional rules | `specs/Dharma_Constitution_v0.md` | — |
 | Kernel immutability | `specs/KERNEL_CORE_SPEC.md` | — |
