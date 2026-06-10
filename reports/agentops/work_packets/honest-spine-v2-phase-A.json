@@ -1,0 +1,41 @@
+{
+  "packet": "honest-spine-v2-phase-A",
+  "lane": "honest-spine-v2",
+  "owner": "operator (Dhyana) + Fable 5 session agent",
+  "branch": "honest-spine-v2",
+  "worktree": "/Users/dhyana/worktrees/dharma_swarm_honest_spine_v2",
+  "date": "2026-06-11",
+  "phase": "A — archive boundary + subtraction + truth surfaces",
+  "status": "complete_pending_operator_review",
+  "anti_theater_clause": "this packet certifies only the commits and verifier outputs listed; no claims beyond them",
+  "commits": [
+    {"sha": "e6396856c", "what": "archive fitness boundary: entry_type {observation,fitness} + fitness_authority {eval_harness,operator_external_receipt}; fitness without diff+authority rejected; honest status (applied requires diff, else evaluated); meta_evolution auto_apply default OFF; untrusted_epoch excluded from selection; +8 boundary tests"},
+    {"sha": "e3d2000a4", "what": "tombstone migration APPLIED: 11,158/11,239 archive records marked untrusted_epoch; backup at ~/.dharma/evolution/archive.pre_tombstone_20260610T161840Z.jsonl"},
+    {"sha": "2e7b46394", "what": "DHARMA_SPINE_DISPATCH default ON (opt-out =0); EvidenceReceipt persisted to delegation_runs.receipt_json (persist_receipt had zero callers; fill was 0/3495)"},
+    {"sha": "6cf869979", "what": "theater writers disabled: AutoProposer description-only proposals withheld (opt back: DHARMA_AUTOPROPOSER_SUBMIT=1); grind no-diff probes never reach run_cycle; LLM auto_evolve branch unchanged. BONUS REAL BUG: _evo_allowed used before definition — meta-evolution feed had silently crashed every cycle (UnboundLocalError into broad except); fixed"},
+    {"sha": "160259fdf", "what": "TRUTH-LOOP FRESHNESS dead-man section in make onboard: self_improve / convergence_forge / evolution archive / spine receipt db, 24h threshold, no daemon"},
+    {"sha": "6557caef2", "what": "subtraction: terminal_adapters/claude.py DELETED (21,960 bytes, imported nonexistent modules, zero importers); sunset headers (2026-07-11) on subconscious_v2, diversity_archive, ginko_evolution, dgm_loop, foreman"}
+  ],
+  "verifiers": {
+    "archive_boundary": "tests/test_archive.py 42 passed incl. 8 new adversarial boundary tests (fitness-without-diff REJECTED, model-judged authority REJECTED, tombstoned epoch unselectable)",
+    "evolution_suites": "test_evolution + test_meta_evolution + test_selector + test_archive: 183 passed",
+    "auto_proposer": "33 passed (1 new test pins honest default; 3 opt into legacy via env)",
+    "orchestrate_live": "16 passed, 1 deselected (pre-existing main failure)",
+    "spine_suites": "98 + 3 passed",
+    "tombstone_disk_verify": "11,158/11,239 records carry untrusted_epoch=true (json scan)"
+  },
+  "pre_existing_main_failures_catalogued": [
+    "test_orchestrator.py::test_route_next — hangs >60s on pristine dc72312f0",
+    "test_spine_adoption_metric.py::test_nats_is_scoped_out — fails on pristine dc72312f0",
+    "test_orchestrate_live.py::test_orchestrate_restarts_failed_task — fails on pristine dc72312f0"
+  ],
+  "bytes_removed": 21960,
+  "sunset_date_for_dormant_scaffolds": "2026-07-11",
+  "behavior_changes_operator_should_know": [
+    "Spine dispatch receipts now DEFAULT ON for any process started from this branch (opt out: DHARMA_SPINE_DISPATCH=0)",
+    "AutoProposer + grind loop will stop fattening the archive: expect archive growth to drop to near zero except real LLM evolution cycles — this is correct, not breakage",
+    "dgc evolve trend and any dashboard reading the archive will show the tombstoned epoch unless they filter; numbers will look starkly smaller — that is the honest reading",
+    "meta-evolution feed now actually runs each cycle (it never did before); meta_archive growth pattern may change"
+  ],
+  "next_gate": "operator review of lane diff + this receipt, then Phase B (EvolutionReceipt + dgm-consumes-receipt-wire, the Forge Council's declared 5th packet)"
+}
