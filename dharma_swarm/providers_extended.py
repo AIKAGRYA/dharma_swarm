@@ -26,7 +26,7 @@ from dharma_swarm.api_keys import (
 from dharma_swarm.model_hierarchy import default_model as canonical_default_model
 from dharma_swarm.models import LLMRequest, LLMResponse
 from dharma_swarm.models import ProviderType
-from dharma_swarm.providers import LLMProvider
+from dharma_swarm.providers import LLMProvider, _extract_openai_compatible_message_text
 
 
 class OllamaProvider(LLMProvider):
