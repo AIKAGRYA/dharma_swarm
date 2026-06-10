@@ -2257,7 +2257,12 @@ class Orchestrator:
                 raise RuntimeError(
                     "no runtime-state store available for receipt persistence"
                 )
-            async with aiosqlite.connect(_db_path) as _receipt_db:
+            # Explicit, SHORT lock budget: the interpreter default busy_timeout is
+            # 5000ms, which would stall this dispatch coroutine up to ~5s when a
+            # sync fleet writer holds the WAL write lock (empirically reproduced).
+            # 2s bounds the tail latency; a stuck writer fails open in bounded time.
+            async with aiosqlite.connect(_db_path, timeout=2.0) as _receipt_db:
+                await _receipt_db.execute("PRAGMA busy_timeout=2000")
                 await ensure_receipt_column(_receipt_db)
                 await persist_receipt(receipt, _receipt_db)
         except Exception:

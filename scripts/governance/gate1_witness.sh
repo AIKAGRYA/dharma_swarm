@@ -47,6 +47,25 @@ if [[ "${1:-}" == "--watch" ]]; then
       show_new "${BASE}"
       echo ""
       echo "GATE 1 CLEARED if the receipt above corresponds to the dispatch you just ran."
+      # Write the witness artifact (a completion criterion requires this file —
+      # the track cannot flip SHIPPABLE without an operator-witnessed receipt).
+      # The hash is checkable against the DB: an agent fabricating this file is
+      # telling an auditable lie, not satisfying a proxy.
+      ART="$(cd "$(dirname "$0")/../.." && pwd)/reports/governance/GATE1_WITNESSED.md"
+      mkdir -p "$(dirname "${ART}")"
+      LATEST_SHA=$(sqlite3 "${DB}" "SELECT receipt_json FROM delegation_runs WHERE receipt_json IS NOT NULL ORDER BY rowid DESC LIMIT 1" 2>/dev/null | shasum -a 256 | cut -c1-16)
+      {
+        echo "# GATE 1 — operator-witnessed EvidenceReceipt"
+        echo ""
+        echo "- witnessed_at: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        echo "- receipt_count: ${BASE} -> ${N}"
+        echo "- latest_receipt_json_sha256_16: ${LATEST_SHA}"
+        echo "- db: ${DB}"
+        echo ""
+        echo "Written by gate1_witness.sh --watch at the moment the count moved."
+        echo "Verify anytime: sqlite3 '${DB}' \"SELECT COUNT(*) FROM delegation_runs WHERE receipt_json IS NOT NULL\""
+      } > "${ART}"
+      echo "witness artifact written: ${ART} (commit it to flip the gate1_witnessed criterion)"
       exit 0
     fi
     sleep 5

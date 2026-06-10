@@ -338,15 +338,15 @@ active_tracks:
       - id: a2a_bridge_calls_spine
         kind: file_contains
         file: dharma_swarm/a2a/a2a_bridge.py
-        pattern: "from dharma_swarm.spine"
+        pattern: '(?m)^\s*from dharma_swarm\.spine'
       - id: orchestrator_calls_spine
         kind: file_contains
         file: dharma_swarm/orchestrator.py
-        pattern: "from dharma_swarm.spine"
+        pattern: '(?m)^\s*from dharma_swarm\.spine'
       - id: agent_runner_calls_spine
         kind: file_contains
         file: dharma_swarm/agent_runner.py
-        pattern: "from dharma_swarm.spine"
+        pattern: '(?m)^\s*from dharma_swarm\.spine'
       - id: dispatch_emits_evidence_receipt
         kind: file_contains
         file: tests/test_spine_adoption_dispatch.py
@@ -358,13 +358,20 @@ active_tracks:
       - id: bypass_allowlist_empty
         kind: file_contains
         file: scripts/governance/spine_bypass_report.py
-        pattern: '_INTENTIONAL_BYPASS: dict\[tuple\[str, int\], str\] = \{\s*\}'
+        pattern: '(?m)^_INTENTIONAL_BYPASS: dict\[tuple\[str, int\], str\] = \{\s*\}'
         # Regex (checker re.search): matches the DRAINED dict only — `= {}` on
         # one line or `= {\n}` — never the populated multi-line form (5 entries
         # today). Passes exactly when zero intentional bypass sites remain.
       - id: adoption_narrative_docs
         kind: file_exists
         file: docs/architecture/SPINE_ADOPTION_NARRATIVE.md
+      - id: gate1_witnessed
+        kind: file_exists
+        file: reports/governance/GATE1_WITNESSED.md
+        # Written ONLY by gate1_witness.sh --watch at the moment the operator
+        # observes a live receipt land (count moves; sha16 of the receipt JSON
+        # recorded, checkable against the DB). Wires the non-proxy gate into
+        # completion: the track cannot flip SHIPPABLE on file/test proxies alone.
 
     non_goals:
       - Do not create new spine sub-modules. Adopt invoke/receipt/routing/persistence.
