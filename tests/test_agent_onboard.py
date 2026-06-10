@@ -20,6 +20,14 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 ONBOARD_SCRIPT = REPO_ROOT / "scripts/governance/agent_onboard.py"
 
 
+@pytest.fixture(autouse=True)
+def _isolate_ops_dir(tmp_path, monkeypatch):
+    """Every test (incl. subprocess runs, which inherit os.environ) writes
+    its machine receipt to a tmp dir — never the live fleet receipt at
+    ~/.dharma/ops/onboard_receipt.json that hermes-m5/loops consume."""
+    monkeypatch.setenv("DHARMA_OPS_DIR", str(tmp_path / "ops"))
+
+
 def _load_module():
     """Import agent_onboard.py without executing main()."""
     spec = importlib.util.spec_from_file_location("agent_onboard", ONBOARD_SCRIPT)
@@ -182,15 +190,21 @@ def test_active_track_evidence_is_consumed_when_present():
 # The onboarding command must not own any fact
 # ---------------------------------------------------------------------------
 
-def test_onboard_does_not_write_to_owners():
-    """Run the script and ensure none of the owner files are mutated."""
-    import hashlib
+def test_onboard_does_not_write_to_owners(tmp_path):
+    """Run the script and ensure none of the owner files are mutated.
 
+    AGENT_ONBOARD_NO_REFRESH=1 disables the (intentional, documented)
+    evidence regeneration so this test can also assert the GENERATED
+    evidence files stay untouched — onboard itself writes nothing in-repo;
+    only the check_track_status.py owner may, when refresh is allowed.
+    """
     owner_files = [
         REPO_ROOT / "docs/governance/ACTIVE_TRACK.yaml",
         REPO_ROOT / "docs/state/LIVE_OPS_DASHBOARD.md",
         REPO_ROOT / "docs/state/BROKEN_REGISTER.md",
         REPO_ROOT / "ACTIVE_SURFACE_MANIFEST.yaml",
+        REPO_ROOT / "reports/governance/active_track_evidence.json",
+        REPO_ROOT / "reports/governance/track_portfolio.json",
     ]
 
     def digest(p: Path) -> str | None:
@@ -202,6 +216,8 @@ def test_onboard_does_not_write_to_owners():
     subprocess.run(
         [sys.executable, str(ONBOARD_SCRIPT)],
         cwd=REPO_ROOT, capture_output=True, text=True, timeout=60,
+        env={**os.environ, "AGENT_ONBOARD_NO_REFRESH": "1",
+             "DHARMA_OPS_DIR": str(tmp_path)},
     )
     after = {p: digest(p) for p in owner_files}
     for p in owner_files:
@@ -307,6 +323,24 @@ def test_receipt_is_written_outside_the_repo(tmp_path):
 # ---------------------------------------------------------------------------
 # v2 portfolio correctness (the regressions that shipped silently with #555)
 # ---------------------------------------------------------------------------
+
+def test_malformed_evidence_degrades_instead_of_crashing(tmp_path, monkeypatch):
+    """Valid-JSON-but-garbage evidence (e.g. a partial parallel write) must
+    degrade — the exit-0 doctrine covers exactly this stale-state class."""
+    mod = _load_module()
+    bad = tmp_path / "evidence.json"
+    bad.write_text(json.dumps({"active_tracks": [None, "oops", {"id": "ok", "shippable": False}]}),
+                   encoding="utf-8")
+    monkeypatch.setattr(mod, "EVIDENCE_JSON", bad)
+    evidence = mod._load_evidence()
+    assert evidence == {"active_tracks": [{"id": "ok", "shippable": False}]}
+    # And the downstream consumers survive raw garbage fed directly.
+    assert mod._collect_next_items({"active_tracks": [None, "oops"]}, {}) == []
+    payload = mod._receipt_payload({}, {}, [], [None, {"number": 1}],
+                                   {"active_tracks": [None]}, {})
+    json.dumps(payload)  # must be serializable
+    assert payload["open_prs"] == [{"number": 1, "title": None, "isDraft": None}]
+
 
 def test_collect_next_items_skips_shippable_tracks():
     """next_items must come from UNSHIPPED tracks — a shippable track's

@@ -19,6 +19,13 @@ Every run also tees a machine-readable receipt to
 agents (hermes-m5, loops, VPS workers) can consume operating reality
 without executing this script. The receipt is a projection, not authority.
 
+Write behavior: this command never writes owner files. When the generated
+evidence (reports/governance/active_track_evidence.json) is missing or
+older than 60 minutes, it invokes check_track_status.py — the evidence
+OWNER — which regenerates the tracked evidence reports (this can dirty
+the working tree, same as the governance loop does). Suppress with
+AGENT_ONBOARD_NO_REFRESH=1 or --fast; force with AGENT_ONBOARD_REFRESH=1.
+
 Exit code: always 0 on stale state. Warnings are surfaced inline. No CI
 gate depends on this command — it is informational. Hard gates live in
 scripts/governance/check_track_status.py, scripts/docops/, and the
@@ -185,7 +192,7 @@ def _lane_family(label: str) -> str:
         return "docops/governance"
     if "capital" in text or "revenue" in text or "cash" in text:
         return "capital/revenue"
-    if "pr" in text or "review" in text or "merge-master" in text:
+    if re.search(r"(?:^|[-_/])pr(?:[-_/\d]|$)", text) or "review" in text or "merge-master" in text:
         return "pr/review/merge"
     if "cleanup" in text or "repair" in text:
         return "cleanup/repair"
@@ -365,7 +372,9 @@ def _evidence_age_minutes(evidence: dict[str, Any] | None) -> float | None:
         return None
     if when.tzinfo is None:
         when = when.replace(tzinfo=timezone.utc)
-    return (datetime.now(tz=timezone.utc) - when).total_seconds() / 60.0
+    # Clamp: a future generated_at (clock skew) must not render a giant
+    # negative age — treat as 0 (fresh).
+    return max(0.0, (datetime.now(tz=timezone.utc) - when).total_seconds() / 60.0)
 
 
 def render_active_track(evidence: dict[str, Any] | None,
@@ -1240,9 +1249,19 @@ def _load_evidence() -> dict[str, Any] | None:
     if not EVIDENCE_JSON.exists():
         return None
     try:
-        return json.loads(EVIDENCE_JSON.read_text(encoding="utf-8"))
+        data = json.loads(EVIDENCE_JSON.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
         return None
+    if not isinstance(data, dict):
+        return None
+    # Shape-normalize: a partial write by a parallel check_track_status run
+    # can yield valid JSON with garbage entries — degrade, never crash.
+    tracks = data.get("active_tracks")
+    if isinstance(tracks, list):
+        data["active_tracks"] = [t for t in tracks if isinstance(t, dict)]
+    elif tracks is not None:
+        data["active_tracks"] = []
+    return data
 
 
 def _refresh_evidence() -> None:
@@ -1258,7 +1277,9 @@ def _refresh_evidence() -> None:
 
 
 def _load_track_yaml() -> dict[str, Any]:
-    sys.path.insert(0, str(Path(__file__).parent))
+    here = str(Path(__file__).parent)
+    if here not in sys.path:
+        sys.path.insert(0, here)
     try:
         from check_track_status import load_active_track  # type: ignore
         track = load_active_track(ACTIVE_TRACK) or {}
@@ -1285,7 +1306,11 @@ def _collect_next_items(
     the first track happened to be shippable. Pull from every active track
     that still has failing criteria; fall back to v1.
     """
-    ev_tracks = {t.get("id"): t for t in ((evidence or {}).get("active_tracks") or [])}
+    ev_tracks = {
+        t.get("id"): t
+        for t in ((evidence or {}).get("active_tracks") or [])
+        if isinstance(t, dict)
+    }
     yaml_tracks = (track or {}).get("active_tracks") or []
     if not yaml_tracks and (track or {}).get("active_track"):
         yaml_tracks = [track["active_track"]]
@@ -1312,12 +1337,13 @@ def _write_receipt(payload: dict[str, Any]) -> Path | None:
         ops = _ops_dir()
         ops.mkdir(parents=True, exist_ok=True)
         target = ops / ONBOARD_RECEIPT_NAME
-        tmp = target.with_suffix(".json.tmp")
+        tmp = target.with_suffix(f".{os.getpid()}.tmp")  # unique per writer: concurrent runs never race on one tmp
         tmp.write_text(json.dumps(payload, sort_keys=True, indent=1), encoding="utf-8")
         tmp.replace(target)
         return target
-    except OSError as exc:
-        print(f"  (could not write onboard receipt: {exc})")
+    except Exception as exc:  # OSError, or TypeError from an unserializable value
+        # stderr, never stdout: --json consumers must always get clean JSON.
+        print(f"(could not write onboard receipt: {type(exc).__name__}: {exc})", file=sys.stderr)
         return None
 
 
@@ -1334,6 +1360,10 @@ def main(argv: list[str] | None = None) -> int:
                         help="print the machine receipt JSON to stdout instead of prose")
     parser.add_argument("--no-net", action="store_true",
                         help="skip network calls (gh pr list)")
+    # Deliberate exception to always-exit-0: an UNRECOGNIZED FLAG exits 2
+    # (argparse default, usage on stderr, stdout empty). The exit-0 contract
+    # covers stale STATE; silently proceeding on a typo'd flag would mask
+    # broken automation — e.g. '--fasy' running a 30s full pass as exit 0.
     args = parser.parse_args(argv)
     net = not (args.fast or args.no_net)
 
@@ -1457,10 +1487,13 @@ def _receipt_payload(
                     "serves": t.get("serves"),
                     "shippable": t.get("shippable"),
                     "failing_criteria": [
-                        c.get("id") for c in t.get("criteria", []) if not c.get("passed")
+                        c.get("id")
+                        for c in (t.get("criteria") if isinstance(t.get("criteria"), list) else []) or []
+                        if isinstance(c, dict) and not c.get("passed")
                     ],
                 }
                 for t in active_tracks
+                if isinstance(t, dict)
             ],
         },
         "next_items": _collect_next_items(evidence, track)[:10],
@@ -1469,7 +1502,7 @@ def _receipt_payload(
         },
         "open_prs": [
             {"number": p.get("number"), "title": p.get("title"),
-             "isDraft": p.get("isDraft")} for p in prs
+             "isDraft": p.get("isDraft")} for p in prs if isinstance(p, dict)
         ],
         "runtime_truth_packets": rows,
     }
