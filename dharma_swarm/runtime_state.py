@@ -382,12 +382,18 @@ def _parse_dt(raw: str | None) -> datetime | None:
 
 
 def _apply_connection_pragmas_sync(db: sqlite3.Connection) -> None:
+    # busy_timeout first: without it, concurrent writers (orchestrator settle
+    # vs cron daemon) fail instantly with "database is locked" instead of
+    # waiting out a sub-second WAL write (H02 P3.6, first concurrent
+    # completions in two weeks hit this immediately).
+    db.execute("PRAGMA busy_timeout=5000")
     db.execute("PRAGMA journal_mode=WAL")
     db.execute("PRAGMA foreign_keys=ON")
     db.execute("PRAGMA synchronous=NORMAL")
 
 
 async def _apply_connection_pragmas_async(db: aiosqlite.Connection) -> None:
+    await db.execute("PRAGMA busy_timeout=5000")
     await db.execute("PRAGMA journal_mode=WAL")
     await db.execute("PRAGMA foreign_keys=ON")
     await db.execute("PRAGMA synchronous=NORMAL")
