@@ -1940,7 +1940,9 @@ class Orchestrator:
             think_phase="before_write",
             reflection=(
                 f"Dispatching task {td.task_id} to agent {td.agent_id}. "
-                "Keep scope bounded and reversible."
+                "Scope bounded; risk: the agent may fail or stall on this task; "
+                "rollback: unassign and reopen the task, no irreversible side effects "
+                "at dispatch time."
             ),
             max_reroutes=1,
             requirement_refs=[f"task:{td.task_id}", f"agent:{td.agent_id}"],

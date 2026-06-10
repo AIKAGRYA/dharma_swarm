@@ -804,9 +804,25 @@ class ContextCompiler:
         if active_paths:
             candidates.extend(active_paths)
         elif workspace_root and workspace_root.exists():
-            files = [path for path in workspace_root.rglob("*") if path.is_file()]
-            files.sort(key=lambda item: item.stat().st_mtime, reverse=True)
-            candidates.extend(files[:6])
+            # Bounded scan: workspace_root can be the state dir (~1M files).
+            # An unbounded rglob+stat here blocks the event loop for 60-120s,
+            # which the orchestrator tick timeout then cancels mid-dispatch.
+            import stat as _ws_stat
+            import time as _ws_time
+
+            scanned: list[tuple[float, Path]] = []
+            deadline = _ws_time.monotonic() + 2.0
+            for path in workspace_root.rglob("*"):
+                if _ws_time.monotonic() > deadline or len(scanned) >= 4096:
+                    break
+                try:
+                    st = path.stat()
+                except OSError:
+                    continue
+                if _ws_stat.S_ISREG(st.st_mode):
+                    scanned.append((st.st_mtime, path))
+            scanned.sort(key=lambda item: item[0], reverse=True)
+            candidates.extend(path for _, path in scanned[:6])
 
         for path in candidates[:6]:
             try:

@@ -381,7 +381,9 @@ def pulse(config: DaemonConfig | None = None) -> str:
     # Use "sonnet" (not opus) for pulse — heartbeat checks don't need
     # the most expensive model, and opus drains credits fast.
     print(f"[pulse] Thread: {thread} | Executing...")
-    result = run_claude_headless(prompt, model="sonnet")
+    # Non-bare: route through Max-plan OAuth (operator P0.2, 2026-06-10);
+    # bare mode hard-requires ANTHROPIC_API_KEY, which the daemon does not carry.
+    result = run_claude_headless(prompt, model="sonnet", bare=False)
 
     # Record
     tm.record_contribution()
@@ -537,6 +539,7 @@ def _check_and_run_cron_jobs(cfg: DaemonConfig | None = None) -> None:
             result = run_claude_headless(
                 prompt=prompt,
                 model=model,
+                bare=False,
             )
             print(f"[cron] {job_id}: {result[:150].replace(chr(10), ' ')}")
 
