@@ -357,8 +357,10 @@ active_tracks:
         pattern: "test_no_dropoff_sources_remain"
       - id: bypass_allowlist_empty
         kind: file_contains
-        file: scripts/uplift_guards/check_spine_ownership.py
-        pattern: "BYPASS_ALLOWLIST = []"
+        file: scripts/governance/spine_bypass_report.py
+        pattern: "_INTENTIONAL_BYPASS: dict[tuple[str, int], str] = {}"
+        # The real allowlist construct (4 entries today). Passes only when the
+        # dict is drained to literal {} — i.e. zero intentional bypass sites.
       - id: adoption_narrative_docs
         kind: file_exists
         file: docs/architecture/SPINE_ADOPTION_NARRATIVE.md

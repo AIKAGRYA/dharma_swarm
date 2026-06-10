@@ -267,6 +267,15 @@ npm --prefix dashboard run dev
 bash run_operator.sh
 ```
 
+## Model & Key Routing — THE ONE WAY (read before touching any key or model call)
+
+There is exactly one way. Do not invent a second.
+- **Keys:** one home `~/.dharma/agent_keys.env` (sourced everywhere), one tool `dkeys` (`dkeys add VAR=…`, `dkeys test`). Read keys in code only via `dharma_swarm/api_keys.py`.
+- **Model/provider:** one door `runtime_provider.resolve_runtime_provider_config()` → `create_runtime_provider()`, ordered by `model_hierarchy` (most-powerful-first). Live-fallback never blocks on a dead brain.
+- **Anthropic/Claude → Max plan** (`claude_code`), not the metered API. Escape hatch: `DHARMA_FORCE_ANTHROPIC_API=1`.
+- **Rules:** never hardcode a model string; never read a key outside `api_keys.py`; never add a key except via `dkeys add`; new provider = adapter + `DEFAULT_MODELS` entry, no parallel routing.
+- **Full canon + deprecated routes:** [`docs/ops/MODEL_KEY_ROUTING.md`](docs/ops/MODEL_KEY_ROUTING.md).
+
 ## Security Rules
 
 - NEVER hardcode API keys, secrets, or credentials in source files
