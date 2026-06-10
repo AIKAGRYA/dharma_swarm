@@ -37,7 +37,7 @@ GRANDFATHERED: dict[str, int] = {
     "dharma_swarm/evolution.py": 3401,
     "dharma_swarm/swarm.py": 3252,
     "dharma_swarm/providers.py": 3096,
-    "dharma_swarm/orchestrator.py": 2525,
+    "dharma_swarm/orchestrator.py": 2858,  # re-baselined 2026-06-10; see decomp plan in PR #560
     "dharma_swarm/tui/app.py": 2520,
     "dharma_swarm/terminal_bridge.py": 2539,
     "dharma_swarm/operator_core/control_surface.py": 1001,

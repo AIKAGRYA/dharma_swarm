@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, Protocol
+from typing import Any, Protocol, Sequence
 
 from dharma_swarm.spine.receipt import EvidenceReceipt
 
@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 class AsyncDB(Protocol):
     """Minimal async DB interface (matches aiosqlite connection)."""
 
-    async def execute(self, sql: str, parameters: tuple[Any, ...] = ()) -> Any: ...
+    async def execute(self, sql: str, parameters: Sequence[Any] = ()) -> Any: ...
     async def commit(self) -> None: ...
 
 

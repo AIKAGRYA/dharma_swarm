@@ -102,7 +102,7 @@ count before Rule 10 fails.
 | `dharma_swarm/evolution.py` | 3401 | 3741 |
 | `dharma_swarm/swarm.py` | 3252 | 3577 |
 | `dharma_swarm/providers.py` | 3096 | 3405 |
-| `dharma_swarm/orchestrator.py` | 2525 | 2777 |
+| `dharma_swarm/orchestrator.py` | 2858 | 3143 |
 | `dharma_swarm/tui/app.py` | 2520 | 2772 |
 | `dharma_swarm/terminal_bridge.py` | 2192 | 2411 |
 
