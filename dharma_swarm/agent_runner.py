@@ -12,7 +12,6 @@ import logging
 import os
 import re
 import time
-from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
@@ -51,6 +50,7 @@ from dharma_swarm.runtime_fields import (
     runtime_field_manifest_for_agent_config,
 )
 from dharma_swarm.telos_gates import check_with_reflective_reroute
+from dharma_swarm.daemon_config import dharma_state_dir
 
 logger = logging.getLogger(__name__)
 
@@ -939,7 +939,7 @@ def _build_system_prompt(config: AgentConfig) -> str:
     if config.system_prompt and config.provider != ProviderType.CLAUDE_CODE:
         return config.system_prompt
 
-    from dharma_swarm.daemon_config import ROLE_BRIEFINGS, V7_BASE_RULES, dharma_state_dir
+    from dharma_swarm.daemon_config import ROLE_BRIEFINGS, V7_BASE_RULES
 
     if config.system_prompt:
         # CLAUDE_CODE with explicit prompt: use it as base, append context
@@ -1522,7 +1522,6 @@ def _local_tool_workdir(task: Task, config: AgentConfig) -> Path:
 def _resolve_local_tool_path(raw_path: str, *, workdir: Path) -> Path:
     # Normalize ~ and ~/ to the actual home directory
     raw = raw_path.strip()
-    home = str(Path.home())
     if raw.startswith("~/"):
         candidate = Path.home() / raw[2:]
     elif raw.startswith("~"):
@@ -1743,7 +1742,7 @@ class AgentRunner:
         async def remember(key: str, content: str, scope: str = "working", ttl: int | None = None) -> str:
             """Store a memory. Scope: working, short_term, long_term, shared."""
             s = MemoryScope(scope)
-            mem = await mgr.remember(key, content, scope=s, ttl=ttl)
+            await mgr.remember(key, content, scope=s, ttl=ttl)
             return f"Remembered '{key}' in {scope}"
 
         async def recall(query: str, scope: str | None = None, limit: int = 5) -> str:

@@ -1,6 +1,5 @@
 """Tests for dharma_swarm.agent_memory_manager -- SQLite-backed self-managing memory."""
 
-import asyncio
 import importlib
 import sys
 import time
@@ -254,7 +253,7 @@ async def test_get_context_respects_budget(mgr):
     for i in range(50):
         await mgr.remember(
             f"big_item_{i}",
-            f"A very long content string that takes up space " * 10,
+            "A very long content string that takes up space " * 10,
             scope=Scope.WORKING,
         )
 
