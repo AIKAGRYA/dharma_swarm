@@ -271,14 +271,31 @@ class RecognitionEngine:
             return {"status": "error reading cascade history"}
 
     def _read_research(self) -> dict[str, Any]:
-        """Read research state (COLM countdown)."""
-        now = _utc_now()
-        # COLM 2026 deadlines
-        abstract_deadline = datetime(2026, 3, 26, tzinfo=timezone.utc)
-        paper_deadline = datetime(2026, 3, 31, tzinfo=timezone.utc)
+        """Read research deadline state from operator-owned config.
 
+        Deadlines live in ~/.dharma/research_deadlines.json
+        ({"name": ..., "abstract": "YYYY-MM-DD", "paper": "YYYY-MM-DD"}).
+        No file, or deadlines in the past → no countdown signal at all;
+        a hard-coded date here once pinned every agent context to
+        "0d to abstract (crunch)" for months after the deadline passed.
+        """
+        config_path = self._state_dir / "research_deadlines.json"
+        try:
+            raw = json.loads(config_path.read_text())
+            abstract_deadline = datetime.fromisoformat(raw["abstract"]).replace(
+                tzinfo=timezone.utc
+            )
+            paper_deadline = datetime.fromisoformat(raw["paper"]).replace(
+                tzinfo=timezone.utc
+            )
+        except Exception:
+            return {}
+
+        now = _utc_now()
         days_to_abstract = (abstract_deadline - now).days
         days_to_paper = (paper_deadline - now).days
+        if days_to_paper < 0:
+            return {}
 
         return {
             "days_to_abstract": max(0, days_to_abstract),

@@ -569,6 +569,7 @@ def sprint(
         generate_evolved_prompt,
         generate_local_prompt,
         _days_to_colm,
+        _deadline_str,
         _SHARED_DIR,
     )
 
@@ -581,7 +582,7 @@ def sprint(
 
         live = system_state.get("live_signals", {})
         console.print(f"[cyan]Sprint generator — {today}[/cyan]")
-        console.print(f"  COLM abstract: {colm_days} days | paper: {colm_paper} days")
+        console.print(f"  Research deadline: {_deadline_str(colm_days)} (abstract) | {_deadline_str(colm_paper)} (paper)")
         console.print(f"  Morning brief: {'yes' if 'no morning' not in live.get('morning_brief','') else 'none'}")
         console.print(f"  Dream seeds: {'yes' if 'no dream' not in live.get('dream_seeds','') else 'none'}")
         console.print(f"  Sprint handoff: {'yes' if 'no handoff' not in live.get('sprint_handoff','') else 'none'}")

@@ -297,10 +297,16 @@ def test_generate_local_prompt_basic():
         colm_days=15,
     )
     assert "Cycle 5" in prompt
-    assert "COLM deadline: 15 days" in prompt
+    assert "Research deadline: 15 days" in prompt
     assert "Passed: 100" in prompt
     assert "foo.py" in prompt
     assert "Fix flaky test" in prompt
+
+
+def test_generate_local_prompt_no_deadline_renders_none_active():
+    # Regression (H02 P3.3): hard-coded COLM dates reported "0 days" forever.
+    prompt = generate_local_prompt(cycle_number=1)
+    assert "Research deadline: none active" in prompt
 
 
 def test_generate_local_prompt_no_data():

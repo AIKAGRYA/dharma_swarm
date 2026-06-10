@@ -41,14 +41,44 @@ async def test_seed_archived(engine, tmp_path):
 async def test_seed_content_has_sections(engine):
     seed = await engine.synthesize("light")
     assert "## System State" in seed
-    assert "## Research" in seed
+    # No Research section without an operator-declared deadline
+    assert "## Research" not in seed
 
 
 @pytest.mark.asyncio
-async def test_research_signals(engine):
+async def test_research_signals_absent_without_config(engine):
+    # Regression (H02 P3.3): a hard-coded COLM 2026 date pinned every agent
+    # context to "0d to abstract (crunch)" for months after the deadline.
     seed = await engine.synthesize("light")
-    # Should contain COLM countdown
-    assert "abstract" in seed.lower() or "paper" in seed.lower()
+    assert "abstract" not in seed.lower()
+    assert "crunch" not in seed.lower()
+
+
+@pytest.mark.asyncio
+async def test_research_signals_from_operator_config(engine, tmp_path):
+    from datetime import date, timedelta
+
+    future = date.today() + timedelta(days=30)
+    (tmp_path / "research_deadlines.json").write_text(json.dumps({
+        "name": "test-conf",
+        "abstract": (future - timedelta(days=5)).isoformat(),
+        "paper": future.isoformat(),
+    }))
+    seed = await engine.synthesize("light")
+    assert "abstract" in seed.lower()
+    assert "crunch" not in seed.lower()  # 25 days out is not crunch
+
+
+@pytest.mark.asyncio
+async def test_research_signals_expired_config_is_silent(engine, tmp_path):
+    (tmp_path / "research_deadlines.json").write_text(json.dumps({
+        "name": "past-conf",
+        "abstract": "2026-03-26",
+        "paper": "2026-03-31",
+    }))
+    seed = await engine.synthesize("light")
+    assert "abstract" not in seed.lower()
+    assert "crunch" not in seed.lower()
 
 
 @pytest.mark.asyncio

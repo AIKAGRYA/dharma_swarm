@@ -114,6 +114,7 @@ def cmd_sprint(
         generate_evolved_prompt,
         generate_local_prompt,
         _days_to_colm,
+        _deadline_str,
         _SHARED_DIR,
     )
 
@@ -122,7 +123,7 @@ def cmd_sprint(
     colm_days, colm_paper = _days_to_colm()
 
     print(f"[sprint] Generating sprint for {today}")
-    print(f"  COLM: {colm_days}d (abstract) / {colm_paper}d (paper)")
+    print(f"  Research deadline: {_deadline_str(colm_days)} (abstract) / {_deadline_str(colm_paper)} (paper)")
 
     state = gather_system_state()
     live = state.get("live_signals", {})

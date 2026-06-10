@@ -24,18 +24,32 @@ from dharma_swarm.runtime_provider import (
     complete_via_preferred_runtime_providers,
 )
 
-# COLM 2026 deadlines
-_COLM_ABSTRACT_DATE = date(2026, 3, 26)
-_COLM_PAPER_DATE = date(2026, 3, 31)
+def _days_to_colm() -> tuple[int | None, int | None]:
+    """Return (days_to_abstract, days_to_paper), or (None, None) when no
+    active deadline.
 
-
-def _days_to_colm() -> tuple[int, int]:
-    """Return (days_to_abstract, days_to_paper) from today."""
+    Deadlines come from operator-owned ~/.dharma/research_deadlines.json
+    (same source as meta_daemon). Hard-coded COLM 2026 dates here once
+    reported "0 days" for months after the conference passed.
+    """
+    config_path = dharma_state_dir() / "research_deadlines.json"
+    try:
+        raw = json.loads(config_path.read_text())
+        abstract = date.fromisoformat(raw["abstract"])
+        paper = date.fromisoformat(raw["paper"])
+    except Exception:
+        return (None, None)
     today = date.today()
+    if (paper - today).days < 0:
+        return (None, None)
     return (
-        max(0, (_COLM_ABSTRACT_DATE - today).days),
-        max(0, (_COLM_PAPER_DATE - today).days),
+        max(0, (abstract - today).days),
+        max(0, (paper - today).days),
     )
+
+
+def _deadline_str(days: int | None) -> str:
+    return f"{days} days" if days is not None else "none active"
 
 _STATE_DIR = dharma_state_dir()
 _SHARED_DIR = _STATE_DIR / "shared"
@@ -89,7 +103,7 @@ Look across the last {history_depth} evolution cycles. Detect patterns.
 
 **Trajectory analysis**:
 - Which areas are improving? Which are stagnant?
-- Are we approaching any deadlines (COLM: {colm_days} days)?
+- Are we approaching any deadlines (research deadline: {colm_days})?
 - What threads have been neglected for >3 cycles?
 - Are the GRANULAR items serving the META goals, or drifting?
 
@@ -533,7 +547,7 @@ async def generate_evolved_prompt(
     meta = _META_LAYER.format(
         history_depth=history_depth,
         cycle_history=_format_cycle_history(history),
-        colm_days=colm_days,
+        colm_days=_deadline_str(colm_days),
     )
 
     # Build QUALITY layer
@@ -583,7 +597,7 @@ def generate_local_prompt(
     file_signals: str = "",
     prev_todo: str = "",
     cycle_number: int = 0,
-    colm_days: int = 20,
+    colm_days: int | None = None,
     history_depth: int = 5,
 ) -> str:
     """Generate a prompt locally without LLM call (for offline/testing).
@@ -619,7 +633,7 @@ def generate_local_prompt(
     sections = [
         f"# Evolved Prompt -- Cycle {cycle_number}",
         f"Generated: {datetime.now(timezone.utc).isoformat()}",
-        f"COLM deadline: {colm_days} days",
+        f"Research deadline: {_deadline_str(colm_days)}",
         f"Quality verdict: {verdict}",
         "",
         "## GRANULAR (this cycle)",
