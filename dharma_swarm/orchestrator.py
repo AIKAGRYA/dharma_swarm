@@ -2231,6 +2231,23 @@ class Orchestrator:
         # Observable for the verifier + downstream truth packets (no new store).
         self._last_evidence_receipt = receipt
         td.metadata["evidence_receipt_id"] = str(receipt.receipt_id)
+        # Durable evidence: project the receipt onto the existing
+        # delegation_runs row (receipt_json). Best-effort — dispatch must
+        # never fail because evidence persistence failed.
+        try:
+            from dharma_swarm.spine.persistence import persist_receipt_to_store
+
+            lifecycle = getattr(self, "_runtime_lifecycle", None)
+            store = (
+                lifecycle._runtime_state_store() if lifecycle is not None else None
+            )
+            await persist_receipt_to_store(receipt, store)
+        except Exception:
+            logger.debug(
+                "spine: receipt persistence skipped for task %s",
+                td.task_id,
+                exc_info=True,
+            )
         if "exc" in captured:
             raise captured["exc"]
         return captured["result"]

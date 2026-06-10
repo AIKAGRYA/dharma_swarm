@@ -71,6 +71,113 @@ def test_spine_dispatch_failure_reraises_and_records_failed_receipt():
     assert receipt.error_source == "internal_error"
 
 
+def _stub_self_with_store(store):
+    me = types.SimpleNamespace()
+    me._runtime_lifecycle = types.SimpleNamespace(_runtime_state_store=lambda: store)
+    return me
+
+
+def _read_receipt_json(db_path, task_id):
+    import sqlite3
+
+    with sqlite3.connect(db_path) as db:
+        row = db.execute(
+            "SELECT receipt_json FROM delegation_runs WHERE task_id = ?",
+            (task_id,),
+        ).fetchone()
+    return row[0] if row else None
+
+
+def test_spine_dispatch_persists_receipt_json_to_delegation_runs(tmp_path):
+    """The receipt produced by _run_task_via_spine must land durably in
+    delegation_runs.receipt_json via spine.persistence.persist_receipt."""
+    import json
+
+    from dharma_swarm.runtime_state import DelegationRun, RuntimeStateStore
+
+    store = RuntimeStateStore(tmp_path / "runtime.db")
+
+    class Runner:
+        async def run_task(self, task):
+            return "RUN_RESULT"
+
+    async def _run():
+        await store.record_delegation_run(
+            DelegationRun(
+                run_id="run-persist-1",
+                task_id="t-123",
+                assigned_to="agent-1",
+                status="running",
+            )
+        )
+        me = _stub_self_with_store(store)
+        td = _stub_td()
+        result = await Orchestrator._run_task_via_spine(me, Runner(), object(), td, 5.0)
+        return me, result
+
+    me, result = asyncio.run(_run())
+    assert result == "RUN_RESULT"
+    blob = _read_receipt_json(store.db_path, "t-123")
+    assert blob, "receipt_json must be populated on the delegation_runs row"
+    payload = json.loads(blob)
+    assert payload["receipt_id"] == str(me._last_evidence_receipt.receipt_id)
+    assert payload["task_id"] == "t-123"
+    assert payload["status"] == "ok"
+    assert payload["operation"] == "invoke_agent"
+
+
+def test_spine_dispatch_persists_failed_receipt_before_reraise(tmp_path):
+    """Failure path: the failed receipt is persisted, then the exception
+    still propagates to the caller."""
+    import json
+
+    from dharma_swarm.runtime_state import DelegationRun, RuntimeStateStore
+
+    store = RuntimeStateStore(tmp_path / "runtime.db")
+
+    class BoomRunner:
+        async def run_task(self, task):
+            raise RuntimeError("boom")
+
+    async def _run():
+        await store.record_delegation_run(
+            DelegationRun(
+                run_id="run-persist-2",
+                task_id="t-fail",
+                assigned_to="agent-1",
+                status="running",
+            )
+        )
+        me = _stub_self_with_store(store)
+        td = _stub_td(task_id="t-fail")
+        try:
+            await Orchestrator._run_task_via_spine(me, BoomRunner(), object(), td, 5.0)
+        except RuntimeError as exc:
+            return str(exc)
+        return None
+
+    raised = asyncio.run(_run())
+    assert raised == "boom", "exception must still propagate after persistence"
+    blob = _read_receipt_json(store.db_path, "t-fail")
+    assert blob, "failed receipt must still be persisted"
+    payload = json.loads(blob)
+    assert payload["status"] == "failed"
+
+
+def test_spine_dispatch_absent_store_does_not_crash():
+    """No runtime store (None) — dispatch completes; persistence is a no-op."""
+
+    class Runner:
+        async def run_task(self, task):
+            return "RUN_RESULT"
+
+    me = _stub_self_with_store(None)
+    td = _stub_td(task_id="t-no-store")
+    result = asyncio.run(Orchestrator._run_task_via_spine(me, Runner(), object(), td, 5.0))
+    assert result == "RUN_RESULT"
+    assert me._last_evidence_receipt.status == "ok"
+
+
 def test_spine_dispatch_timeout_reraises_and_records_timeout_receipt():
     class SlowRunner:
         async def run_task(self, task):
