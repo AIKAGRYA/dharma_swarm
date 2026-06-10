@@ -2231,6 +2231,26 @@ class Orchestrator:
         # Observable for the verifier + downstream truth packets (no new store).
         self._last_evidence_receipt = receipt
         td.metadata["evidence_receipt_id"] = str(receipt.receipt_id)
+        # Persist to the existing delegation_runs row (Honest Spine v2 Phase A:
+        # persist_receipt previously had zero callers — receipts were
+        # in-memory only). Best-effort: persistence failure never fails
+        # the dispatch.
+        try:
+            store = self._runtime_lifecycle._runtime_state_store()
+            db_path = getattr(store, "db_path", None) if store is not None else None
+            if db_path:
+                import aiosqlite
+
+                from dharma_swarm.spine.persistence import (
+                    ensure_receipt_column,
+                    persist_receipt,
+                )
+
+                async with aiosqlite.connect(db_path) as db:
+                    await ensure_receipt_column(db)
+                    await persist_receipt(receipt, db)
+        except Exception:
+            logger.debug("spine: receipt persistence failed (non-fatal)", exc_info=True)
         if "exc" in captured:
             raise captured["exc"]
         return captured["result"]
@@ -2283,11 +2303,14 @@ class Orchestrator:
                 task=task,
                 status="running",
             )
-            if os.environ.get("DHARMA_SPINE_DISPATCH") == "1":
-                # WS3: route execution through the Runtime Truth Spine's one
-                # blessed path (invoke_agent), emitting exactly one EvidenceReceipt.
-                # Default OFF: when unset, the direct call below is byte-identical
-                # to prior behavior. Preserves timeout + exception semantics.
+            if os.environ.get("DHARMA_SPINE_DISPATCH", "1") != "0":
+                # WS3 + Honest Spine v2 Phase A: route execution through the
+                # Runtime Truth Spine's one blessed path (invoke_agent),
+                # emitting + persisting exactly one EvidenceReceipt per
+                # dispatch. Default ON — honest-receipt machinery that exists
+                # but doesn't run is itself a claims-vs-reality gap. Opt out
+                # with DHARMA_SPINE_DISPATCH=0. Timeout + exception semantics
+                # preserved either way.
                 result = await self._run_task_via_spine(runner, task, td, timeout_seconds)
             else:
                 result = await asyncio.wait_for(
