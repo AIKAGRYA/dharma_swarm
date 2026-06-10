@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from pathlib import Path
+from types import SimpleNamespace
 
 from dharma_swarm.memory_kernel import (
     AdapterMode,
@@ -23,7 +24,10 @@ from dharma_swarm.memory_kernel import (
     WriteMode,
 )
 from dharma_swarm.memory_kernel.adapters import ReadOnlyAdapterConfig
-from scripts.memory_kernel_readiness import main as readiness_cli_main
+from scripts.memory_kernel_readiness import (
+    _strict_gate_failed,
+    main as readiness_cli_main,
+)
 
 
 def _write(path: Path, text: str) -> None:
@@ -158,7 +162,6 @@ def test_readiness_cli_outputs_stable_json_and_strict_exit(
                 str(home),
                 "--require-surface",
                 "home.smriti",
-                "--strict",
                 "--summary-only",
                 "--dry-run",
             ]
@@ -170,6 +173,66 @@ def test_readiness_cli_outputs_stable_json_and_strict_exit(
     assert summary_payload["status"] == "ready"
     assert summary_payload["summary"]["required_ready_count"] == 1
     assert summary_payload["summary"]["degraded_count"] == 0
+
+
+def test_readiness_cli_defaults_to_memory_home_env(
+    capsys,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    home, repo = _fixture_memory_home(tmp_path)
+    monkeypatch.setenv("DHARMA_MEMORY_KERNEL_HOME", str(home))
+
+    assert (
+        readiness_cli_main(
+            [
+                "--repo-root",
+                str(repo),
+                "--require-surface",
+                "home.memory_plane",
+                "--dry-run",
+            ]
+        )
+        == 0
+    )
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["status"] == "ready"
+    assert payload["summary"]["required_ready_count"] == 1
+
+
+def test_strict_cli_gate_requires_m2_warning_free_accounting() -> None:
+    summary = {
+        "surface_count": 81,
+        "accounted_surface_count": 81,
+        "required_surface_count": 7,
+        "required_ready_count": 7,
+        "degraded_count": 0,
+        "missing_adapter_count": 0,
+        "uncovered_count": 0,
+        "total_missing_adapter_count": 0,
+        "total_uncovered_count": 0,
+        "total_warning_count": 0,
+    }
+    ready_report = SimpleNamespace(
+        status="ready",
+        max_ready_tier="m2_strict_read_only_warning_free",
+        summary=summary,
+    )
+    warning_report = SimpleNamespace(
+        status="ready",
+        max_ready_tier="m1_required_semantic_adapters",
+        summary={**summary, "total_warning_count": 1},
+    )
+    unaccounted_report = SimpleNamespace(
+        status="ready",
+        max_ready_tier="m1_required_semantic_adapters",
+        summary={**summary, "accounted_surface_count": 80},
+    )
+
+    assert _strict_gate_failed(ready_report) is False
+    assert _strict_gate_failed(warning_report) is True
+    assert _strict_gate_failed(unaccounted_report) is True
 
 
 def test_absent_optional_lifecycle_surfaces_are_accounted_separately(
@@ -205,6 +268,26 @@ def test_absent_optional_lifecycle_surfaces_are_accounted_separately(
     assert payload["summary"]["unsafe_disabled_count"] == 1
     assert payload["summary"]["accounted_optional_absent_count"] >= 5
     assert payload["summary"]["accounted_optional_lifecycle_count"] >= 10
+
+
+def test_readiness_report_exposes_tiers_without_claiming_full_power(
+    tmp_path: Path,
+) -> None:
+    home, repo = _fixture_memory_home(tmp_path)
+    kernel = _kernel(home, repo)
+
+    payload = kernel.adapter_readiness_report(
+        required_surface_ids=("home.memory_plane", "home.witness")
+    ).to_json()
+    tiers = {tier["tier_id"]: tier for tier in payload["readiness_tiers"]}
+
+    assert payload["max_ready_tier"] == "m1_required_semantic_adapters"
+    assert tiers["m0_accounted_read_only"]["status"] == "ready"
+    assert tiers["m1_required_semantic_adapters"]["status"] == "ready"
+    assert tiers["m2_strict_read_only_warning_free"]["status"] == "blocked"
+    assert tiers["m3_safe_context_preview"]["status"] == "blocked"
+    assert tiers["m4_governed_write_receipts"]["status"] == "blocked"
+    assert tiers["m5_live_promotion_candidate"]["status"] == "blocked"
 
 
 def test_required_lifecycle_surface_remains_strict(

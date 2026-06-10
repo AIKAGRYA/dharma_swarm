@@ -15,10 +15,10 @@ mergeable without broadening any feature scope.
 2. Rebase PR #191 (`feat(knowledge-ops): seed semantic metabolism organ`) on
    the new `main`, resolve DocOps count surfaces, then merge it if the focused
    KnowledgeOps tests and governance gates stay green.
-3. Run an integration pass after #191: `make memory-kernel-readiness`,
-   `make module-budget`, `make docops-integrity`, `make test-hygiene`, and
-   `git diff --check`. Add `make operator-prod-smoke` once the operator
-   control-surface worker has stabilized the fast smoke script.
+3. Run an integration pass after #191 with `make prod-preflight`. This wraps
+   `make memory-kernel-readiness`, `make operator-prod-smoke`,
+   `make docops-integrity`, `make test-hygiene`, `make module-budget`,
+   `git diff --check`, and focused recursive/operator/control-surface tests.
 4. Defer any MemoryKernel-to-KnowledgeOps promotion or write-path integration
    to a follow-up branch. The current landing sequence should stay read-only
    and shadow-mode only.

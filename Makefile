@@ -1,7 +1,7 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts uplift-guards module-budget docops-integrity docops-report memory-kernel-readiness memory-kernel-readiness-strict operator-prod-smoke governance-all go-fmt-check go-test go-vet go-ci
+.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts uplift-guards module-budget docops-integrity docops-report memory-kernel-readiness memory-kernel-readiness-strict operator-prod-smoke prod-preflight governance-all go-fmt-check go-test go-vet go-ci
 
 PYTHON ?= python3
 GO ?= go
@@ -47,6 +47,7 @@ help:
 	@echo "  make memory-kernel-readiness Run read-only MemoryKernel readiness gates"
 	@echo "  make memory-kernel-readiness-strict Require 100% strict MemoryKernel readiness"
 	@echo "  make operator-prod-smoke Run fast read-only operator production smoke"
+	@echo "  make prod-preflight Run release-candidate production preflight"
 	@echo "  make go-ci        Run Go evidence sense-organ fmt/vet/test gates"
 	@echo ""
 
@@ -217,6 +218,9 @@ memory-kernel-readiness-strict:
 
 operator-prod-smoke:
 	$(PYTHON) scripts/operator_prod_smoke.py --repo-root .
+
+prod-preflight:
+	$(PYTHON) scripts/prod_preflight.py --repo-root .
 
 governance-all: semgrep gitleaks test-hygiene test-contracts uplift-guards module-budget docops-integrity
 

@@ -309,6 +309,27 @@ class SmritiAdapter(SQLiteReadOnlyAdapter):
     }
 
 
+class LegacyMemoryDbAdapter(SQLiteReadOnlyAdapter):
+    adapter_name = "legacy_memory_db_adapter"
+    table_atom_types = {
+        "memories": MemoryAtomType.EPISODE,
+        "memory_entries": MemoryAtomType.EPISODE,
+        "sessions": MemoryAtomType.RUNTIME_EVENT,
+        "patterns": MemoryAtomType.FACT,
+        "facts": MemoryAtomType.FACT,
+        "edges": MemoryAtomType.EDGE,
+    }
+
+
+class KaizenOpsAdapter(SQLiteReadOnlyAdapter):
+    adapter_name = "kaizen_ops_adapter"
+    table_atom_types = {
+        "events": MemoryAtomType.RUNTIME_EVENT,
+        "cron_health": MemoryAtomType.RUNTIME_EVENT,
+        "scout_health": MemoryAtomType.RUNTIME_EVENT,
+    }
+
+
 class JsonlReadOnlyAdapter(BaseReadOnlyAdapter):
     adapter_name = "jsonl_read_only"
     read_mode = ReadMode.STREAMING
@@ -397,9 +418,30 @@ class CodexMemoryAdapter(JsonlReadOnlyAdapter):
     atom_type = MemoryAtomType.EXTERNAL_MEMORY
 
 
+class ConversationsAdapter(JsonlReadOnlyAdapter):
+    adapter_name = "conversations_adapter"
+    atom_type = MemoryAtomType.EPISODE
+
+
+class RouterAuditLogAdapter(JsonlReadOnlyAdapter):
+    adapter_name = "router_audit_log_adapter"
+    atom_type = MemoryAtomType.RUNTIME_EVENT
+
+
+class QualityGatesAdapter(JsonlReadOnlyAdapter):
+    adapter_name = "quality_gates_adapter"
+    atom_type = MemoryAtomType.WITNESS_EVENT
+
+
+class EvalsAdapter(JsonlReadOnlyAdapter):
+    adapter_name = "evals_adapter"
+    atom_type = MemoryAtomType.RUNTIME_EVENT
+
+
 class KnowledgeWikiAdapter(BaseReadOnlyAdapter):
     adapter_name = "knowledge_wiki_adapter"
     read_mode = ReadMode.READ_ONLY
+    atom_type = MemoryAtomType.KNOWLEDGE_CARD
 
     def iter_atoms(
         self,
@@ -412,7 +454,7 @@ class KnowledgeWikiAdapter(BaseReadOnlyAdapter):
         if surface_limit <= 0 or not self.path.exists():
             return
         if not (
-            resolved_query.allows_atom_type(MemoryAtomType.KNOWLEDGE_CARD)
+            resolved_query.allows_atom_type(self.atom_type)
             or resolved_query.allows_atom_type(MemoryAtomType.METADATA)
         ):
             return
@@ -435,11 +477,11 @@ class KnowledgeWikiAdapter(BaseReadOnlyAdapter):
                             )
                         )
                     continue
-            if not resolved_query.allows_atom_type(MemoryAtomType.KNOWLEDGE_CARD):
+            if not resolved_query.allows_atom_type(self.atom_type):
                 continue
             atoms.append(
                 self._atom(
-                    MemoryAtomType.KNOWLEDGE_CARD,
+                    self.atom_type,
                     query=resolved_query,
                     content_ref=file_path.as_posix(),
                     content=content,
@@ -456,6 +498,15 @@ class KnowledgeWikiAdapter(BaseReadOnlyAdapter):
             :surface_limit
         ]:
             yield atom
+
+
+class KnowledgeRootAdapter(KnowledgeWikiAdapter):
+    adapter_name = "knowledge_root_adapter"
+
+
+class KnowledgeStagingAdapter(KnowledgeWikiAdapter):
+    adapter_name = "knowledge_staging_adapter"
+    atom_type = MemoryAtomType.SOURCE_CHUNK
 
 
 class ConversationLogMetadataAdapter(BaseReadOnlyAdapter):

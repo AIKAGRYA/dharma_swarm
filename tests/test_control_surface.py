@@ -42,6 +42,7 @@ from dharma_swarm.operator_core.control_surface_memory import (
     memory_kernel_control_rows,
     project_context_canary_report,
 )
+from dharma_swarm.operator_core.control_surface_memory_readiness import burn_in_safety
 
 
 # ---------------------------------------------------------------------------
@@ -453,6 +454,8 @@ class TestMemoryKernelOperatorRows:
         assert "accounted_surface_total" in readiness.raw
         assert "required_accounted_surface_count" in readiness.raw
         assert "required_surface_count" in readiness.raw
+        assert "max_ready_tier" in readiness.raw
+        assert "readiness_tiers" in readiness.raw
 
     def test_preview_rollout_is_blocked_without_strict_readiness(
         self,
@@ -476,6 +479,47 @@ class TestMemoryKernelOperatorRows:
         assert report["projection_kind"] == "synthetic_canary"
         assert report["persistence"] == "projected_not_persisted"
         assert report["hard_failure_count"] >= 1
+
+    def test_preview_burn_in_requires_strict_readiness(self) -> None:
+        readiness = {
+            "contract_present": True,
+            "required_surfaces_accounted": True,
+            "readiness_status": "ready",
+            "strict_ready": False,
+        }
+
+        safety = burn_in_safety(
+            state="preview",
+            invalid=False,
+            rollback_engaged=False,
+            readiness=readiness,
+            context_canary_visible=True,
+        )
+
+        assert safety["burn_in_safe"] is False
+        assert "strict_readiness_ready" in safety["burn_in_required_checks"]
+        assert "context_canary_visible" in safety["burn_in_required_checks"]
+        assert "strict_readiness_ready" in safety["burn_in_blockers"]
+
+    def test_canary_burn_in_requires_strict_readiness_and_canary(self) -> None:
+        readiness = {
+            "contract_present": True,
+            "required_surfaces_accounted": True,
+            "readiness_status": "ready",
+            "strict_ready": False,
+        }
+
+        safety = burn_in_safety(
+            state="canary",
+            invalid=False,
+            rollback_engaged=False,
+            readiness=readiness,
+            context_canary_visible=False,
+        )
+
+        assert safety["burn_in_safe"] is False
+        assert "strict_readiness_ready" in safety["burn_in_blockers"]
+        assert "context_canary_visible" in safety["burn_in_blockers"]
 
 
 # ---------------------------------------------------------------------------

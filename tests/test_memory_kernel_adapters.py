@@ -35,6 +35,15 @@ def _fixture_memory_home(tmp_path: Path) -> tuple[Path, Path]:
     home = tmp_path / "home"
     repo = tmp_path / "repo"
     _sqlite_db(
+        home / ".dharma/db/memory.db",
+        [
+            "CREATE TABLE memory_entries(id INTEGER PRIMARY KEY, content TEXT, timestamp TEXT)",
+            "CREATE TABLE patterns(id INTEGER PRIMARY KEY, fact TEXT, created_at TEXT)",
+            "INSERT INTO memory_entries(content, timestamp) VALUES ('legacy memory', '2026-05-11T00:30:00Z')",
+            "INSERT INTO patterns(fact, created_at) VALUES ('legacy pattern', '2026-05-11T00:31:00Z')",
+        ],
+    )
+    _sqlite_db(
         home / ".dharma/db/memory_plane.db",
         [
             "CREATE TABLE event_log(id INTEGER PRIMARY KEY, payload TEXT, timestamp TEXT, secret_token TEXT)",
@@ -70,8 +79,23 @@ def _fixture_memory_home(tmp_path: Path) -> tuple[Path, Path]:
             "INSERT INTO memories(text, created_at) VALUES ('smriti memory', '2026-05-11T03:00:00Z')",
         ],
     )
+    _sqlite_db(
+        home / ".dharma/kaizen/ops.db",
+        [
+            "CREATE TABLE events(id INTEGER PRIMARY KEY, payload TEXT, timestamp TEXT)",
+            "CREATE TABLE cron_health(id INTEGER PRIMARY KEY, payload TEXT, timestamp TEXT)",
+            "INSERT INTO events(payload, timestamp) VALUES ('kaizen event', '2026-05-11T03:30:00Z')",
+            "INSERT INTO cron_health(payload, timestamp) VALUES ('cron healthy', '2026-05-11T03:31:00Z')",
+        ],
+    )
     _write(home / ".dharma/witness/2026-05-11.jsonl", '{"event": "witnessed", "timestamp": "2026-05-11T04:00:00Z"}\n')
+    _write(home / ".dharma/logs/router/routing_decisions.jsonl", '{"route": "claude", "timestamp": "2026-05-11T04:10:00Z"}\n')
+    _write(home / ".dharma/conversations/2026-05-11.jsonl", '{"content": "conversation event", "timestamp": "2026-05-11T04:20:00Z"}\n')
     _write(home / ".dharma/knowledge/wiki/concept.md", "# Concept\n\nCurated note.\n")
+    _write(home / ".dharma/knowledge/staging/candidate.md", "# Candidate\n\nNeeds review.\n")
+    _write(home / ".dharma/quality_gates/run.jsonl", '{"gate": "pass", "timestamp": "2026-05-11T04:30:00Z"}\n')
+    _write(home / ".dharma/evals/run.jsonl", '{"score": 0.9, "timestamp": "2026-05-11T04:40:00Z"}\n')
+    _write(home / ".dharma/artifacts/secret-report.txt", "do not ingest artifact payload\n")
     _write(home / ".codex/memories/mcp-memory.jsonl", '{"text": "codex memory", "timestamp": "2026-05-11T05:00:00Z"}\n')
     _write(home / ".dharma/conversation_log/2026-05-11.jsonl", '{"content": "private long transcript"}\n')
     return home, repo
@@ -89,11 +113,20 @@ def test_memory_kernel_lists_read_only_m1_adapters(tmp_path: Path) -> None:
     adapter_ids = set(kernel.list_adapter_ids())
 
     assert {
+        "home.memory_db",
         "home.memory_plane",
         "home.runtime_state",
         "home.smriti",
         "home.witness",
+        "home.router_audit_log",
+        "home.conversations",
+        "home.knowledge_root",
+        "home.knowledge_staging",
         "home.knowledge_wiki",
+        "home.quality_gates",
+        "home.evals",
+        "home.artifacts",
+        "home.kaizen_ops",
         "home.codex_memory",
         "home.conversation_log",
     } <= adapter_ids
@@ -112,10 +145,19 @@ def test_memory_kernel_iterates_normalized_atoms_with_authority_labels(tmp_path:
         kernel.iter_memory_atoms(
             surface_ids=(
                 "home.memory_plane",
+                "home.memory_db",
                 "home.runtime_state",
                 "home.smriti",
                 "home.witness",
+                "home.router_audit_log",
+                "home.conversations",
+                "home.knowledge_root",
+                "home.knowledge_staging",
                 "home.knowledge_wiki",
+                "home.quality_gates",
+                "home.evals",
+                "home.artifacts",
+                "home.kaizen_ops",
                 "home.codex_memory",
                 "home.conversation_log",
             ),
@@ -130,6 +172,8 @@ def test_memory_kernel_iterates_normalized_atoms_with_authority_labels(tmp_path:
     assert MemoryAtomType.WITNESS_EVENT in atom_types
     assert MemoryAtomType.KNOWLEDGE_CARD in atom_types
     assert MemoryAtomType.EXTERNAL_MEMORY in atom_types
+    assert MemoryAtomType.RUNTIME_EVENT in atom_types
+    assert MemoryAtomType.METADATA in atom_types
     assert all(atom.surface_id for atom in atoms)
     assert all(atom.authority_level.value in {"low", "medium", "high", "none"} for atom in atoms)
     assert all(atom.canon_risk.value != "unknown" for atom in atoms)
@@ -141,6 +185,113 @@ def test_memory_kernel_iterates_normalized_atoms_with_authority_labels(tmp_path:
     assert all(atom.promotion_allowed is False for atom in atoms)
     assert all(atom.context_admissible is False for atom in atoms)
     assert json.dumps([atom.to_json() for atom in atoms])
+
+
+def test_decision_critical_surfaces_use_bespoke_adapters(tmp_path: Path) -> None:
+    home, repo = _fixture_memory_home(tmp_path)
+    kernel = MemoryKernel(
+        MemoryKernelConfig(
+            census=CensusConfig(repo_root=repo, home=home),
+            adapter=ReadOnlyAdapterConfig(default_limit=10),
+        )
+    )
+    expected_adapter_names = {
+        "home.memory_db": "legacy_memory_db_adapter",
+        "home.router_audit_log": "router_audit_log_adapter",
+        "home.conversations": "conversations_adapter",
+        "home.knowledge_root": "knowledge_root_adapter",
+        "home.knowledge_staging": "knowledge_staging_adapter",
+        "home.quality_gates": "quality_gates_adapter",
+        "home.evals": "evals_adapter",
+        "home.artifacts": "artifacts_metadata_adapter",
+        "home.kaizen_ops": "kaizen_ops_adapter",
+    }
+
+    for surface_id, adapter_name in expected_adapter_names.items():
+        adapter = kernel.get_adapter(surface_id)
+        assert adapter is not None
+        assert adapter.adapter_name == adapter_name
+
+    atoms = list(
+        kernel.iter_memory_atoms(
+            surface_ids=tuple(expected_adapter_names),
+            query=MemoryQuery(
+                limit_total=None,
+                limit_per_surface=10,
+                include_content=True,
+                include_metadata_payloads=True,
+            ),
+        )
+    )
+    by_surface = {atom.surface_id for atom in atoms}
+
+    assert set(expected_adapter_names) <= by_surface
+    assert {
+        atom.atom_type
+        for atom in atoms
+        if atom.surface_id in {"home.router_audit_log", "home.kaizen_ops"}
+    } == {MemoryAtomType.RUNTIME_EVENT}
+    assert any(
+        atom.surface_id == "home.knowledge_staging"
+        and atom.atom_type is MemoryAtomType.SOURCE_CHUNK
+        for atom in atoms
+    )
+    artifact_payload = json.dumps(
+        [atom.to_json() for atom in atoms if atom.surface_id == "home.artifacts"],
+        sort_keys=True,
+    )
+    assert "do not ingest artifact payload" not in artifact_payload
+
+
+def test_decision_critical_adapter_reads_do_not_mutate_sources(tmp_path: Path) -> None:
+    home, repo = _fixture_memory_home(tmp_path)
+    tracked_paths = (
+        home / ".dharma/db/memory.db",
+        home / ".dharma/logs/router/routing_decisions.jsonl",
+        home / ".dharma/conversations/2026-05-11.jsonl",
+        home / ".dharma/knowledge/staging/candidate.md",
+        home / ".dharma/quality_gates/run.jsonl",
+        home / ".dharma/evals/run.jsonl",
+        home / ".dharma/artifacts/secret-report.txt",
+        home / ".dharma/kaizen/ops.db",
+    )
+    before = {
+        path: (path.stat().st_mtime_ns, path.stat().st_size)
+        for path in tracked_paths
+    }
+    kernel = MemoryKernel(
+        MemoryKernelConfig(
+            census=CensusConfig(repo_root=repo, home=home),
+            adapter=ReadOnlyAdapterConfig(default_limit=10),
+        )
+    )
+
+    list(
+        kernel.iter_memory_atoms(
+            surface_ids=(
+                "home.memory_db",
+                "home.router_audit_log",
+                "home.conversations",
+                "home.knowledge_staging",
+                "home.quality_gates",
+                "home.evals",
+                "home.artifacts",
+                "home.kaizen_ops",
+            ),
+            query=MemoryQuery(
+                limit_total=None,
+                limit_per_surface=10,
+                include_content=True,
+                include_metadata_payloads=True,
+            ),
+        )
+    )
+    after = {
+        path: (path.stat().st_mtime_ns, path.stat().st_size)
+        for path in tracked_paths
+    }
+
+    assert after == before
 
 
 def test_memory_kernel_facade_methods_filter_atom_types(tmp_path: Path) -> None:
@@ -201,7 +352,12 @@ def test_jsonl_adapters_are_bounded(tmp_path: Path) -> None:
         )
     )
 
-    atoms = list(kernel.iter_witness_events())
+    atoms = list(
+        kernel.iter_memory_atoms(
+            surface_ids=("home.witness",),
+            atom_types={MemoryAtomType.WITNESS_EVENT},
+        )
+    )
 
     assert len(atoms) == 2
 

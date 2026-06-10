@@ -15,6 +15,8 @@ READINESS_ROW_RAW_FIELDS = (
     "readiness_status",
     "strict_readiness_state",
     "strict_ready",
+    "max_ready_tier",
+    "readiness_tiers",
     "summary",
     "accounted_surface_count",
     "accounted_surface_total",
@@ -34,6 +36,7 @@ ROLLOUT_READINESS_RAW_FIELDS = (
     "readiness_status",
     "strict_readiness_state",
     "strict_ready",
+    "max_ready_tier",
     "accounted_surface_count",
     "accounted_surface_total",
     "accounted_surface_ratio",
@@ -48,8 +51,8 @@ BURN_IN_REQUIRED_CHECKS = {
     "preview": (
         "rollout_state_valid",
         "readiness_contract_present",
-        "required_surfaces_accounted",
-        "readiness_status_ready",
+        "strict_readiness_ready",
+        "context_canary_visible",
         "rollback_available",
     ),
     "canary": (
@@ -120,12 +123,18 @@ def readiness_contract(projection: Any) -> dict[str, Any]:
     warnings = report.get("warnings", ())
     if not isinstance(warnings, (tuple, list)):
         warnings = ()
+    readiness_tiers = report.get("readiness_tiers", ())
+    if not isinstance(readiness_tiers, (tuple, list)):
+        readiness_tiers = ()
+    max_ready_tier = str(report.get("max_ready_tier", "none"))
 
     return {
         "schema_version": str(report.get("schema_version", "")),
         "readiness_status": str(report.get("status", "unavailable")),
         "strict_readiness_state": "strict_ready" if strict_ready else "strict_blocked",
         "strict_ready": strict_ready,
+        "max_ready_tier": max_ready_tier,
+        "readiness_tiers": tuple(readiness_tiers),
         "contract_present": report.get("schema_version") == READINESS_SCHEMA_VERSION,
         "summary": {
             "surface_count": surface_count,

@@ -5,16 +5,20 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 
 from dharma_swarm.memory_kernel import CensusConfig, MemoryKernel, MemoryKernelConfig
 from dharma_swarm.memory_kernel.adapters import ReadOnlyAdapterConfig
 
+MEMORY_HOME_ENV_VAR = "DHARMA_MEMORY_KERNEL_HOME"
+MIN_STRICT_READY_TIER = "m2_strict_read_only_warning_free"
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", type=Path, default=Path("."))
-    parser.add_argument("--home", type=Path, default=Path.home())
+    parser.add_argument("--home", type=Path)
     parser.add_argument("--output-json", type=Path)
     parser.add_argument("--require-surface", action="append", default=[])
     parser.add_argument("--discover", action="store_true")
@@ -31,11 +35,12 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    home = _resolve_home(args.home)
     kernel = MemoryKernel(
         MemoryKernelConfig(
             census=CensusConfig(
                 repo_root=args.repo_root,
-                home=args.home,
+                home=home,
                 include_discovered=args.discover,
                 probe_sqlite_counts=args.probe_counts,
             ),
@@ -83,16 +88,30 @@ def _strict_gate_failed(report) -> bool:
     summary = report.summary
     return (
         report.status != "ready"
+        or getattr(report, "max_ready_tier", "none") != MIN_STRICT_READY_TIER
         or summary.get("required_ready_count", 0)
         != summary.get("required_surface_count", 0)
         or summary.get("degraded_count", 0) != 0
         or summary.get("missing_adapter_count", 0) != 0
         or summary.get("uncovered_count", 0) != 0
+        or summary.get("accounted_surface_count", 0) != summary.get("surface_count", 0)
+        or summary.get("total_missing_adapter_count", 0) != 0
+        or summary.get("total_uncovered_count", 0) != 0
+        or summary.get("total_warning_count", 0) != 0
     )
 
 
 def _resolve_output(path: Path, repo_root: Path) -> Path:
     return path if path.is_absolute() else repo_root / path
+
+
+def _resolve_home(explicit_home: Path | None) -> Path:
+    if explicit_home is not None:
+        return explicit_home
+    configured = os.environ.get(MEMORY_HOME_ENV_VAR, "").strip()
+    if configured:
+        return Path(configured).expanduser()
+    return Path.home()
 
 
 if __name__ == "__main__":
