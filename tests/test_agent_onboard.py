@@ -9,6 +9,7 @@ from __future__ import annotations
 import importlib.util
 import hashlib
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -53,11 +54,13 @@ def test_onboard_renders_required_sections():
     required = [
         "DHARMA SWARM — AGENT ONBOARDING",
         "ACTIVE PORTFOLIO",
+        "PARALLEL WORK LANES",
         "LIVE OPS SNAPSHOT",
         "LIVE OPS COCKPIT",
         "SURFACE MANIFEST HEALTH",
         "BROKEN REGISTER",
         "LIVING AXIOMS",
+        "RECENT TRACK ACTIVITY",
         "TOOLING-FIRST CONTEXT PASS",
         "HYGIENE SYSTEM",
         "ENFORCEMENT",
@@ -99,9 +102,10 @@ def test_onboard_surfaces_ai_hygiene_tranche():
     )
     assert "AI-agent governance" in result.stdout
     assert "AI_AGENT_GOVERNANCE.md" in result.stdout
-    assert "anti_ai_slop_futureproof_deep_dive_2026-06-07.md" in result.stdout
-    assert "anti_ai_slop_control_backlog_2026-06-08.md" in result.stdout
-    assert "anti_ai_slop_scan_snapshot_2026-06-08.json" in result.stdout
+    # Latest-by-glob, so a new dated snapshot never strands the front door.
+    assert "anti_ai_slop_futureproof_deep_dive_" in result.stdout
+    assert "anti_ai_slop_control_backlog_" in result.stdout
+    assert "anti_ai_slop_scan_snapshot_" in result.stdout
     assert "AI-agent review signals" in result.stdout
     assert "AI-A1" in result.stdout
     assert "agent-build-preflight" in result.stdout
@@ -236,17 +240,114 @@ def test_runtime_truth_render_is_read_only(tmp_path, monkeypatch, capsys):
     )
     after = {path: digest(path) for path in owner_files}
     output = capsys.readouterr().out
-    json_lines = [
-        json.loads(line.strip())
-        for line in output.splitlines()
-        if line.strip().startswith("{")
-    ]
 
     assert before == after
     assert "RUNTIME TRUTH PACKETS" in output
     assert "Compact:" in output
-    assert "Machine rows (JSONL):" in output
-    assert rows == json_lines
+    # Full rows live in the machine receipt now; stdout carries one digest
+    # line per packet (the inline JSONL was ~44% of the output's tokens).
+    assert "Packets (full rows in the onboard receipt):" in output
     assert any(row["surface_id"] == "runtime_state.store" for row in rows)
     assert all(row["is_authoritative"] is False for row in rows)
     assert all(row["is_projection"] is True for row in rows)
+
+
+# ---------------------------------------------------------------------------
+# CLI modes and the machine receipt
+# ---------------------------------------------------------------------------
+
+def test_fast_mode_exits_zero_and_skips_slow_sections(tmp_path):
+    result = subprocess.run(
+        [sys.executable, str(ONBOARD_SCRIPT), "--fast"],
+        cwd=REPO_ROOT, capture_output=True, text=True, timeout=30,
+        env={**os.environ, "DHARMA_OPS_DIR": str(tmp_path)},
+    )
+    assert result.returncode == 0
+    assert "skipped — --fast" in result.stdout
+    assert "PARALLEL WORK LANES" in result.stdout
+    # Slow probes must not run in fast mode.
+    assert "DRIFT TRIAGE (skipped — --fast)" in result.stdout
+
+
+def test_json_mode_emits_valid_receipt(tmp_path):
+    result = subprocess.run(
+        [sys.executable, str(ONBOARD_SCRIPT), "--json", "--fast"],
+        cwd=REPO_ROOT, capture_output=True, text=True, timeout=30,
+        env={**os.environ, "DHARMA_OPS_DIR": str(tmp_path)},
+    )
+    assert result.returncode == 0
+    payload = json.loads(result.stdout)
+    assert payload["schema"] == "dharma_swarm.onboard_receipt.v1"
+    assert payload["authority"] == "projection_only"
+    for key in ("repo", "work_lanes", "portfolio", "next_items", "broken_register"):
+        assert key in payload, f"receipt missing key: {key}"
+    # The same payload must land on disk for fleet consumers.
+    receipt = tmp_path / "onboard_receipt.json"
+    assert receipt.exists()
+    on_disk = json.loads(receipt.read_text(encoding="utf-8"))
+    assert on_disk["schema"] == payload["schema"]
+
+
+def test_receipt_is_written_outside_the_repo(tmp_path):
+    subprocess.run(
+        [sys.executable, str(ONBOARD_SCRIPT), "--fast"],
+        cwd=REPO_ROOT, capture_output=True, text=True, timeout=30,
+        env={**os.environ, "DHARMA_OPS_DIR": str(tmp_path)},
+    )
+    assert (tmp_path / "onboard_receipt.json").exists()
+    # Nothing new may appear inside the repo (read-only on owners).
+    status = subprocess.run(
+        ["git", "status", "--porcelain", "reports/", "docs/"],
+        cwd=REPO_ROOT, capture_output=True, text=True, timeout=30,
+    )
+    new_files = [ln for ln in status.stdout.splitlines() if ln.startswith("??")]
+    assert not any("onboard_receipt" in ln for ln in new_files)
+
+
+# ---------------------------------------------------------------------------
+# v2 portfolio correctness (the regressions that shipped silently with #555)
+# ---------------------------------------------------------------------------
+
+def test_collect_next_items_skips_shippable_tracks():
+    """next_items must come from UNSHIPPED tracks — a shippable track's
+    next_items are already-done work and must never be served as guidance."""
+    mod = _load_module()
+    evidence = {
+        "active_tracks": [
+            {"id": "done-track", "shippable": True},
+            {"id": "live-track", "shippable": False},
+        ]
+    }
+    track = {
+        "active_tracks": [
+            {"id": "done-track", "next_items": [{"kind": "code", "what": "already shipped"}]},
+            {"id": "live-track", "next_items": [{"kind": "code", "what": "real next step"}]},
+        ]
+    }
+    items = mod._collect_next_items(evidence, track)
+    whats = [i["what"] for i in items]
+    assert "real next step" in whats
+    assert "already shipped" not in whats
+    assert items[0]["track_id"] == "live-track"
+
+
+def test_collect_next_items_v1_fallback():
+    mod = _load_module()
+    track = {"active_track": {"id": "solo", "next_items": [{"kind": "code", "what": "v1 item"}]}}
+    items = mod._collect_next_items(None, track)
+    assert [i["what"] for i in items] == ["v1 item"]
+
+
+def test_all_track_surfaces_reads_owned_surfaces():
+    """v2 uses `owned_surfaces`; the v1-only `surfaces` read silently killed
+    the RECENT TRACK ACTIVITY section when the portfolio shipped."""
+    mod = _load_module()
+    track = {
+        "active_tracks": [
+            {"id": "a", "owned_surfaces": ["dharma_swarm/spine/**", "scripts/x.py"]},
+            {"id": "b", "surfaces": ["legacy/path.py"], },
+            {"id": "c", "owned_surfaces": ["scripts/x.py"]},  # dedup
+        ]
+    }
+    surfaces = mod._all_track_surfaces(track)
+    assert surfaces == ["dharma_swarm/spine/**", "scripts/x.py", "legacy/path.py"]
