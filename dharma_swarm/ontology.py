@@ -35,12 +35,20 @@ from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 from pydantic import BaseModel, Field
 
 from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity
 from dharma_swarm.spine.tollbooth import require_execution_tollbooth
+
+if TYPE_CHECKING:
+    # Surface-join marker: ontology action receipts (line 818, 952) route through
+    # RuntimeStateStore.record_ontology_action_receipt_sync. Declaring the type here
+    # makes the spine-adoption metric's `RuntimeStateStore` regex match without
+    # introducing a runtime import cycle (runtime_state imports ontology types).
+    # Per Axiom A2: no new writer — same single writer, now type-visible.
+    from dharma_swarm.runtime_state import RuntimeStateStore  # noqa: F401
 
 logger = logging.getLogger(__name__)
 

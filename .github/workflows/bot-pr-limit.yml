@@ -1,10 +1,15 @@
 name: bot-pr-limit
 
-# Enforce a maximum number of open PRs per bot author.
-# Prevents bot integrations from flooding the repo with duplicate or
-# abandoned PRs. Human authors are exempt.
+# Enforce a maximum number of open PRs per intent lane.
 #
-# Threshold: 3 open PRs per bot. Configurable via BOT_PR_LIMIT env var.
+# History: this workflow was originally gated on `contains(login, '[bot]')`,
+# but the dupe-PR spawners (governance/spine-adoption-refresh,
+# docops-autorefresh, verdict/inter_agent) run under human PATs, so the bot
+# filter never matched and the throttle silently did nothing. See #533 (PROD-8).
+#
+# Current model: throttle by **intent** (headRef pattern), not author.
+# Every automation lane that creates PRs declares a headRef prefix and a
+# max-open count below. Human PRs on non-lane branches are unaffected.
 
 on:
   pull_request:
@@ -15,51 +20,79 @@ permissions:
   pull-requests: write
 
 jobs:
-  check-bot-pr-count:
-    name: Bot PR limit
+  check-intent-pr-count:
+    name: Intent PR limit
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    if: contains(github.event.pull_request.user.login, '[bot]')
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GH_REPO: ${{ github.repository }}
-      BOT_PR_LIMIT: "3"
     steps:
-      - name: Count open PRs by this bot
+      - name: Resolve intent from headRef
+        id: intent
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          # Map headRef → (intent key, max open, headRef regex for sibling search).
+          # Add an entry here whenever a new automation lane is created.
+          key=""
+          limit=""
+          pattern=""
+          case "$HEAD_REF" in
+            chore/governance*spine-adoption*)
+              key="spine-adoption-refresh"; limit="1"; pattern="chore/governance.*spine-adoption" ;;
+            chore/docops-autorefresh*)
+              key="docops-autorefresh";     limit="1"; pattern="chore/docops-autorefresh" ;;
+            verdict/inter_agent*)
+              key="verdict-inter-agent";    limit="3"; pattern="verdict/inter_agent" ;;
+            chore/inter-agent*)
+              key="chore-inter-agent";      limit="3"; pattern="chore/inter-agent" ;;
+            chore/spine/*)
+              key="spine-surface-join";     limit="2"; pattern="chore/spine/" ;;
+          esac
+          {
+            echo "key=$key"
+            echo "limit=$limit"
+            echo "pattern=$pattern"
+          } >> "$GITHUB_OUTPUT"
+          if [ -z "$key" ]; then
+            echo "headRef '$HEAD_REF' is not in any automation lane — throttle does not apply."
+          else
+            echo "Intent lane: $key (limit=$limit, pattern=$pattern)"
+          fi
+
+      - name: Count open PRs for this intent
+        if: steps.intent.outputs.key != ''
         id: count
         env:
-          BOT_LOGIN: ${{ github.event.pull_request.user.login }}
           THIS_PR: ${{ github.event.pull_request.number }}
+          PATTERN: ${{ steps.intent.outputs.pattern }}
         run: |
           set -euo pipefail
-          # Count open PRs by this bot author (excluding the current PR
-          # since it may already be counted).
           count="$(gh pr list --repo "$GH_REPO" --state open \
-            --author "$BOT_LOGIN" --json number \
-            --jq "[.[] | select(.number != $THIS_PR)] | length")"
+            --json number,headRefName \
+            --jq "[.[] | select(.number != $THIS_PR and (.headRefName | test(\"$PATTERN\")))] | length")"
           echo "open_count=${count}" >> "$GITHUB_OUTPUT"
-          echo "Bot $BOT_LOGIN has ${count} other open PRs (limit: $BOT_PR_LIMIT)"
+          echo "Intent $PATTERN has ${count} other open PRs."
 
       - name: Fail if over limit
-        if: steps.count.outputs.open_count >= env.BOT_PR_LIMIT
+        if: steps.intent.outputs.key != '' && steps.count.outputs.open_count >= steps.intent.outputs.limit
         env:
-          BOT_LOGIN: ${{ github.event.pull_request.user.login }}
+          KEY:        ${{ steps.intent.outputs.key }}
+          LIMIT:      ${{ steps.intent.outputs.limit }}
+          PATTERN:    ${{ steps.intent.outputs.pattern }}
           OPEN_COUNT: ${{ steps.count.outputs.open_count }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_NUMBER:  ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
-          message="## ⛔ Bot PR limit exceeded
+          message="## ⛔ Intent PR limit exceeded
 
-          **$BOT_LOGIN** already has **$OPEN_COUNT open PRs** (limit: $BOT_PR_LIMIT).
+          Intent lane **\`$KEY\`** (headRef pattern \`$PATTERN\`) already has **$OPEN_COUNT open PRs** (limit: $LIMIT).
 
-          Before opening new PRs, the bot must:
-          1. Close or merge existing open PRs
-          2. Close duplicate/superseded PRs with a link to the successor
+          Close superseded PRs in this intent lane before opening another. See \`docs/governance/PR_QUALITY_GATES.md\` § Intent PR Proliferation Control.
 
-          See \`docs/governance/PR_QUALITY_GATES.md\` § Bot PR Proliferation Control.
-
-          *This check will pass once the bot's open PR count drops to $BOT_PR_LIMIT or below.*"
+          *This check passes once the open count drops to $LIMIT or below.*"
 
           gh pr comment "$PR_NUMBER" --repo "$GH_REPO" --body "$message" || true
-          echo "::error::Bot $BOT_LOGIN has $OPEN_COUNT open PRs, exceeding the limit of $BOT_PR_LIMIT. Close existing PRs before opening new ones."
+          echo "::error::Intent $KEY has $OPEN_COUNT open PRs, exceeding limit $LIMIT."
           exit 1
