@@ -50,8 +50,8 @@ from dharma_swarm.workspace_topology import build_workspace_topology
 from dharma_swarm.operator_core import build_session_catalog, build_session_detail
 from dharma_swarm.operator_core.session_store import SessionStore
 from dharma_swarm.terminal_control import load_terminal_control_state
-from dharma_swarm.terminal_engine.events import ToolCallComplete
-from dharma_swarm.terminal_engine.events import PermissionDecisionEvent, PermissionOutcomeEvent, PermissionResolutionEvent
+from dharma_swarm.tui.engine.events import ToolCallComplete
+from dharma_swarm.tui.engine.events import PermissionDecisionEvent, PermissionOutcomeEvent, PermissionResolutionEvent
 
 def _json_default(value: object) -> object:
     if is_dataclass(value):
@@ -1402,6 +1402,17 @@ class TerminalBridge:
         }
 
     def _build_command_graph_summary(self) -> dict[str, Any]:
+        if system_commands_module is None:
+            # Command modules failed to import (see guarded import at top);
+            # emit the degraded contract instead of crashing on attribute access.
+            return {
+                "count": 0,
+                "async_count": 0,
+                "commands": [],
+                "async_commands": [],
+                "categories": {},
+                "degraded": True,
+            }
         commands = sorted(system_commands_module._ALL_COMMANDS)
         async_commands = sorted(system_commands_module._ASYNC_COMMANDS)
         categories = {
@@ -1422,6 +1433,8 @@ class TerminalBridge:
         }
 
     def _build_command_registry(self) -> dict[str, Any]:
+        if system_commands_module is None:
+            return {"count": 0, "commands": [], "degraded": True}
         descriptions = {
             "status": "Full system status panel",
             "health": "Ecosystem health check",
