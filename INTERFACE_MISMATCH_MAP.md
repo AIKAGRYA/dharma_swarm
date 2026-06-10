@@ -42,6 +42,13 @@
 
 ## Current Live Mismatches
 
+### MM-13 — RESOLVED: WorldModelAgent constructor + method mismatch
+
+**File:** `orchestrate_live.py:1656-1660` ↔ `world_model.py:265`
+**Status:** ✅ RESOLVED (H02 P3.1, branch organ/02-wounds) — the world-model loop called `WorldModelAgent(state_dir=...)` + `initialize()`/`run_cycle()` against a class exposing `(store, search_tool, arxiv_tool)` + `boot()`. 147 crashes on 2026-06-10 alone, then loop abandoned by max-restarts. Loop now constructs `WorldModelStore(base_path=STATE_DIR / "world_model")` with real kwargs and calls `boot()`; `run_cycle()` added to the agent (honest scope: state refresh + versioned snapshot persist; stock research via search tools still unbuilt). Regression test: `tests/test_world_model.py::test_run_cycle_persists_snapshot`.
+
+---
+
 ### MM-02/03 — RESOLVED: PersistentAgent enum deserialization
 
 **File:** `orchestrate_live.py:1361-1366`
