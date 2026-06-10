@@ -878,3 +878,79 @@ def test_extractor_handles_plain_dict_message() -> None:
     assert _extract_openai_compatible_message_text(
         {"content": [{"type": "text", "text": "dict list"}]}
     ) == "dict list"
+
+
+# ---------------------------------------------------------------------------
+# Regression: content-drop on providers_extended (Ollama generate, NVIDIA NIM
+# extended, Moonshot). These parse raw httpx JSON; reasoning-only responses
+# must never collapse to "". Completes the honest-spine-v2 lane's conversion.
+# ---------------------------------------------------------------------------
+
+from dharma_swarm import providers_extended as _pe  # noqa: E402
+
+
+def _fake_httpx_client(payload: dict) -> type:
+    class _Resp:
+        status_code = 200
+        text = ""
+
+        @staticmethod
+        def json() -> dict:
+            return payload
+
+    class _Client:
+        def __init__(self, *args, **kwargs) -> None:
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc) -> None:
+            return None
+
+        async def post(self, *args, **kwargs):
+            return _Resp()
+
+    return _Client
+
+
+def test_extended_ollama_thinking_only_not_dropped(monkeypatch) -> None:
+    payload = {"response": "", "thinking": "reasoned locally",
+               "prompt_eval_count": 1, "eval_count": 2}
+    monkeypatch.setattr(_pe.httpx, "AsyncClient", _fake_httpx_client(payload))
+    provider = _pe.OllamaProvider()
+    req = LLMRequest(messages=[{"role": "user", "content": "hi"}], model="m")
+    resp = asyncio.run(provider.complete(req))
+    assert resp.content == "reasoned locally"
+
+
+def test_extended_ollama_response_still_preferred(monkeypatch) -> None:
+    payload = {"response": "the answer", "thinking": "scratchpad",
+               "prompt_eval_count": 1, "eval_count": 2}
+    monkeypatch.setattr(_pe.httpx, "AsyncClient", _fake_httpx_client(payload))
+    provider = _pe.OllamaProvider()
+    req = LLMRequest(messages=[{"role": "user", "content": "hi"}], model="m")
+    resp = asyncio.run(provider.complete(req))
+    assert resp.content == "the answer"
+
+
+@pytest.mark.parametrize("provider_factory", [
+    lambda: _pe.NVIDIANIMProvider(api_key="test-key"),
+    lambda: _pe.MoonshotProvider(api_key="test-key"),
+])
+def test_extended_dict_provider_reasoning_only_not_dropped(
+    monkeypatch, provider_factory
+) -> None:
+    payload = {
+        "model": "m",
+        "usage": {},
+        "choices": [{
+            "message": {"content": None, "reasoning": "the reasoned answer"},
+            "finish_reason": "stop",
+        }],
+    }
+    monkeypatch.setattr(_pe.httpx, "AsyncClient", _fake_httpx_client(payload))
+    provider = provider_factory()
+    req = LLMRequest(messages=[{"role": "user", "content": "hi"}], model="m")
+    resp = asyncio.run(provider.complete(req))
+    assert resp.content == "the reasoned answer"

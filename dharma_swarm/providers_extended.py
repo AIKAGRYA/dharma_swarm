@@ -83,7 +83,12 @@ class OllamaProvider(LLMProvider):
             data = resp.json()
 
             return LLMResponse(
-                content=data.get("response", ""),
+                # Ollama generate returns {"response": ..., "thinking": ...};
+                # map to the OpenAI-compatible shape so reasoning-only output
+                # is never collapsed to "".
+                content=_extract_openai_compatible_message_text(
+                    {"content": data.get("response"), "reasoning": data.get("thinking")}
+                ),
                 model=model,
                 usage={
                     "input_tokens": data.get("prompt_eval_count", 0),
@@ -149,7 +154,7 @@ class NVIDIANIMProvider(LLMProvider):
             message = choice["message"]
 
             return LLMResponse(
-                content=message.get("content", ""),
+                content=_extract_openai_compatible_message_text(message),
                 model=data.get("model", request.model),
                 usage=data.get("usage", {}),
                 tool_calls=[],
@@ -210,7 +215,7 @@ class MoonshotProvider(LLMProvider):
             message = choice["message"]
 
             return LLMResponse(
-                content=message.get("content", ""),
+                content=_extract_openai_compatible_message_text(message),
                 model=data.get("model", request.model),
                 usage=data.get("usage", {}),
                 tool_calls=[],
