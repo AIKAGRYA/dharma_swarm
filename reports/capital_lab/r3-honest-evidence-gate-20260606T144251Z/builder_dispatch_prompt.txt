@@ -1,0 +1,26 @@
+You are codex_composer, the BUILDER on a dharma autonomy-spine mission. Work only in /Users/dhyana/dharma_capital_lab (branch capital-lab/build).
+
+GOAL: implement dharma_swarm/capital_lab/honest_evidence.py (the R3 "honest-evidence gate" / BS-detector) so that this green-condition passes ALL tests:
+
+  PYTHONPATH=. /Users/dhyana/dharma_swarm/.venv/bin/python -m pytest tests/test_capital_lab_honest_evidence.py -q
+
+SPEC: read reports/capital_lab/r3-honest-evidence-gate-20260606T144251Z/planner_acceptance_contract.md FIRST. It gives the exact required interface and behavioral contract.
+
+HARD RULES:
+- Do NOT edit, weaken, or delete any test file. The tests are the non-gameable spec. If a test seems impossible, record a blocked receipt explaining why — do not change the test.
+- Implement the REAL Bailey & Lopez de Prado Deflated Sharpe Ratio (SR0 grows with n_trials; skew/kurtosis adjustment). No stubs, no hardcoded pass.
+- Use Python venv: /Users/dhyana/dharma_swarm/.venv/bin/python  (the lane has no local .venv). Always prefix test runs with PYTHONPATH=.
+- Scope: only dharma_swarm/capital_lab/honest_evidence.py (and dharma_swarm/capital_lab/__init__.py exports if needed). Keep under 500 lines. fixture/synthetic only. live_readiness=0, no broker, no live keys, no network.
+
+LOOP (iterate until green):
+  1. Read the contract + the test file tests/test_capital_lab_honest_evidence.py.
+  2. Write honest_evidence.py.
+  3. Run: PYTHONPATH=. /Users/dhyana/dharma_swarm/.venv/bin/python -m pytest tests/test_capital_lab_honest_evidence.py -q
+  4. If failures, fix and repeat. Do not stop until all pass.
+  5. Then confirm no regressions: PYTHONPATH=. /Users/dhyana/dharma_swarm/.venv/bin/python -m pytest tests/test_capital_lab_contracts.py tests/test_capital_lab_risk_governor.py tests/test_capital_lab_broker_paper_membrane.py -q
+  6. Then: /Users/dhyana/dharma_swarm/.venv/bin/python -m ruff check dharma_swarm/capital_lab/honest_evidence.py --select F
+
+WHEN GREEN, record the receipt:
+  DHARMA_SWARM_REPO=/Users/dhyana/dharma_capital_lab PYTHONPATH=/Users/dhyana/dharma_capital_lab python3 scripts/runtime/autonomy_spine.py record --mission-id 20260606T144251Z-capital-lab-r3-honest-evidence-gate-keystone-bs--8524e4 --task-id 20260606T144251Z-capital-lab-r3-honest-evidence-gate-keystone-bs--8524e4-t02-builder --agent codex_composer --status completed --evidence "honest_evidence.py green: pytest tests/test_capital_lab_honest_evidence.py all pass" --artifact "dharma_swarm/capital_lab/honest_evidence.py" --test-command "PYTHONPATH=. /Users/dhyana/dharma_swarm/.venv/bin/python -m pytest tests/test_capital_lab_honest_evidence.py -q"
+
+If you cannot reach green, record the same command with --status blocked and a concrete --evidence describing the blocker. No profit/live claims.
