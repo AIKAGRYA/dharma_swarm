@@ -211,6 +211,25 @@ def render_live_ops() -> None:
             print("  NOTE: dashboard prose may lag reality. Trust git log + this command.")
 
 
+def render_runtime_provenance() -> None:
+    section("RUNTIME PROVENANCE — what code the live daemons actually execute")
+    script = REPO_ROOT / "scripts" / "runtime" / "runtime_provenance.py"
+    if not script.exists():
+        print("  MISSING — scripts/runtime/runtime_provenance.py not found")
+        return
+    try:
+        out = subprocess.run(
+            [sys.executable, str(script)],
+            capture_output=True, text=True, timeout=30,
+        )
+        print(out.stdout.rstrip() or "  (no output)")
+        if out.returncode != 0:
+            print("  WARNING: provenance check exited nonzero")
+    except (subprocess.TimeoutExpired, OSError) as exc:
+        print(f"  UNAVAILABLE — {type(exc).__name__}: {exc}")
+    print("  Rule: a fix is not live until the executing worktree contains it.")
+
+
 def render_live_ops_cockpit() -> None:
     section("LIVE OPS COCKPIT — READ-ONLY OPERATIONS CONTROL")
     runbook = REPO_ROOT / "docs/ops/LIVE_OPS_COCKPIT.md"
@@ -910,6 +929,7 @@ def main() -> int:
     render_repo_state()
     render_active_track(evidence, track)
     render_live_ops()
+    render_runtime_provenance()
     render_live_ops_cockpit()
     render_manifest_health()
     render_broken_register()
