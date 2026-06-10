@@ -751,3 +751,21 @@ async def test_pool_remove_dead():
     await pool.remove_dead()
     agents = await pool.list_agents()
     assert len(agents) == 0
+
+
+def test_ambient_seed_prepends_for_non_claude_code_explicit_prompt():
+    # Regression (H02 P3.5): the :939 early return dropped the ambient seed
+    # for every non-CLAUDE_CODE agent with an explicit prompt — ~85% of the
+    # live fleet never received the field. Seed must PREPEND, never replace.
+    from dharma_swarm.agent_runner import _build_system_prompt
+
+    cfg = AgentConfig(
+        name="seed-test",
+        role=AgentRole.CODER,
+        provider=ProviderType.OPENROUTER,
+        model="m",
+        system_prompt="You are a test agent.",
+    )
+    out = _build_system_prompt(cfg)
+    assert "Dharmic Ground" in out
+    assert out.endswith("You are a test agent.")

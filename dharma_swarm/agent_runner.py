@@ -935,8 +935,22 @@ def _build_system_prompt(config: AgentConfig) -> str:
     """Build the system prompt from config, v7 rules, role briefings, and live context."""
     from dharma_swarm.models import ProviderType
 
-    # For non-CLAUDE_CODE providers, explicit system_prompt is final
+    # For non-CLAUDE_CODE providers, explicit system_prompt is final — but the
+    # ambient field PREPENDS, never replaces. This early return previously
+    # dropped the seed for every non-CLAUDE_CODE agent with a prompt (~85% of
+    # the live fleet: all crew spawners pass non-empty prompts), so the field
+    # the architecture assumes agents swim in never reached them (H02 P3.5).
     if config.system_prompt and config.provider != ProviderType.CLAUDE_CODE:
+        try:
+            from dharma_swarm.dharma_attractor import DharmaAttractor
+
+            _seed = DharmaAttractor().ambient_seed()
+            if _seed:
+                return f"{_seed}\n\n{config.system_prompt}"
+        except Exception:
+            logger.debug(
+                "Attractor seed injection failed for %s", config.name, exc_info=True
+            )
         return config.system_prompt
 
     from dharma_swarm.daemon_config import ROLE_BRIEFINGS, V7_BASE_RULES, dharma_state_dir
