@@ -223,7 +223,13 @@ class StrangeLoop:
             else:
                 proposal.gnani_verdict = True  # No Gnani → proceed
         except Exception:
-            proposal.gnani_verdict = True  # Gnani error → proceed
+            # Fail CLOSED (H02 P4.3): a self-mutation must never apply
+            # because the witness errored — hold it like a Gnani HOLD.
+            proposal.gnani_verdict = False
+            self._mutations.append(proposal)
+            self._record_to_memory(proposal, "gnani_error_held")
+            self._save()
+            return "held_by_gnani_error"
 
         # Apply the mutation
         self._apply_mutation(proposal)

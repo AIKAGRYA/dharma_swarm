@@ -278,8 +278,10 @@ async def telos_gated_accept(task: EconomicTask) -> TelosAcceptanceResult:
         )
         gnani_passed = verdict.proceed
     except Exception as exc:
-        logger.debug("Gnani checkpoint failed (non-fatal): %s", exc)
-        gnani_passed = True  # fail-open
+        # Fail CLOSED (H02 P4.3): money is the strongest visheshbhaav
+        # generator — a task must not be accepted because the witness errored.
+        logger.warning("Gnani checkpoint failed — HOLDING acceptance: %s", exc)
+        gnani_passed = False
 
     # 3. Competence check — do we have a cascade domain?
     available_domains = get_registered_domains()

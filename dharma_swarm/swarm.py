@@ -2216,9 +2216,22 @@ class SwarmManager:
                     except Exception as corr_exc:
                         logger.debug("Samvara correction task creation failed: %s", corr_exc)
             except asyncio.TimeoutError:
-                logger.warning("Organism heartbeat timed out after 10s")
+                # Fail CLOSED (H02 P4.3): when the organism cannot be heard,
+                # the witness has not said yes. HOLD suppresses NEW dispatch
+                # only — tick_settle_only keeps settling in-flight work, so
+                # this cannot deadlock; the next healthy heartbeat clears it.
+                gnani_holds = True
+                allow_autonomous_generation = False
+                logger.warning(
+                    "Organism heartbeat timed out after 10s — HOLDING dispatch"
+                    " (slowness is not approval)"
+                )
             except Exception as exc:
-                logger.debug("Organism heartbeat error: %s", exc)
+                gnani_holds = True
+                allow_autonomous_generation = False
+                logger.warning(
+                    "Organism heartbeat error — HOLDING dispatch: %s", exc
+                )
 
         # ── Meta-evolution: observe organism fitness, adapt hyperparameters ──
         if (hasattr(self, "_meta_engine") and self._meta_engine is not None

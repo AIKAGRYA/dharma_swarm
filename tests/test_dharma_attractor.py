@@ -195,12 +195,14 @@ class TestGnaniCheckpoint:
         verdict = attractor.gnani_checkpoint("test proposal")
         assert isinstance(verdict, GnaniVerdict)
 
-    def test_never_fatal_on_error(self):
+    def test_never_fatal_on_error_but_holds(self):
         attractor = DharmaAttractor()
-        # Even with broken internals, should default to PROCEED
+        # Broken internals must not raise — and must not approve either.
+        # Fail direction flipped to CLOSED (H02 P4.3, operator-ratified):
+        # when the checker cannot see, the answer is HOLD.
         with patch.object(attractor, "_deterministic_check", side_effect=RuntimeError("broken")):
             verdict = attractor.gnani_checkpoint("test")
-        assert verdict.proceed is True
+        assert verdict.proceed is False
 
 
 # ---------------------------------------------------------------------------

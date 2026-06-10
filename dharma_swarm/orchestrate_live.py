@@ -630,6 +630,41 @@ async def run_evolution_loop(shutdown_event: asyncio.Event) -> None:
                             if _pending:
                                 _log("evolution", f"Loaded {len(_pending)} pending proposals from consolidation/bridge")
 
+                            # ── The seat (H02 P4, operator-ratified P0.3):
+                            # a LIVE mutation cycle passes the occupied
+                            # checkpoint as its own awaited step (this loop
+                            # has no tick budget). HOLD or any failure-to-see
+                            # demotes the cycle to shadow — the system may
+                            # still look, but not change. Escalation is
+                            # written by the seat itself.
+                            if not _shadow:
+                                try:
+                                    from dharma_swarm.dharma_attractor import (
+                                        SeatedCheckpoint,
+                                    )
+
+                                    _seat_verdict = await SeatedCheckpoint().review(
+                                        "LIVE auto-evolution cycle on source files: "
+                                        f"{[s.name for s in selected]}. "
+                                        f"Fitness avg={avg_fitness:.3f}, "
+                                        f"completions={completions}.",
+                                        exclude_model_tokens=("qwen", "llama"),
+                                        context_label="auto_evolve",
+                                    )
+                                    _seat_ok = bool(_seat_verdict.proceed)
+                                except Exception as _seat_exc:
+                                    _seat_ok = False
+                                    _log(
+                                        "evolution",
+                                        f"Seat unreachable — demoting to shadow: {_seat_exc}",
+                                    )
+                                if not _seat_ok:
+                                    _shadow = True
+                                    _log(
+                                        "evolution",
+                                        "Seat HOLD — live mutation demoted to shadow",
+                                    )
+
                             mode_label = "shadow" if _shadow else "LIVE"
                             _log("evolution", f"Auto-evolve ({mode_label}): {[s.name for s in selected]}")
 
