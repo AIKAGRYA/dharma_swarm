@@ -1,6 +1,14 @@
 """Shared test fixtures for DHARMA SWARM."""
 
 import os
+import tempfile
+
+# Redirect witness writes to a temp dir BEFORE any dharma_swarm import:
+# pytest fixture gate-checks were landing in the production witness stream,
+# where the gate_pressure scanner counted them as real blocks (H02 P3.8).
+os.environ.setdefault(
+    "DHARMA_WITNESS_DIR", tempfile.mkdtemp(prefix="dharma_witness_test_")
+)
 
 import pytest
 try:

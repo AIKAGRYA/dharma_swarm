@@ -57,7 +57,11 @@ __all__ = [
 
 logger = logging.getLogger(__name__)
 
-WITNESS_DIR = Path.home() / ".dharma" / "witness"
+# DHARMA_WITNESS_DIR override exists so test runs do not write fixture
+# gate-checks into the production witness stream — the gate_pressure scanner
+# counts them as real blocks (H02 P3.8: the production file carried
+# destructive-command pytest fixtures from validation runs).
+WITNESS_DIR = Path(os.getenv("DHARMA_WITNESS_DIR") or (Path.home() / ".dharma" / "witness"))
 _GATE_REGISTRY_DIR = Path.home() / ".dharma" / "meta"
 _GATE_PROPOSALS_FILE = _GATE_REGISTRY_DIR / "gate_proposals.jsonl"
 
