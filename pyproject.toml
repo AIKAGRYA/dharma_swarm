@@ -56,8 +56,45 @@ exclude = ["hooks*", "scripts*", "tests*"]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 timeout = 300
+markers = [
+    "slow: long-running tests excluded from smoke runs",
+    "docker: tests requiring a Docker daemon",
+    "network: tests requiring outbound network access",
+]
 filterwarnings = [
     "ignore:'asyncio.get_event_loop_policy' is deprecated and slated for removal in Python 3.16:DeprecationWarning",
     "ignore:'asyncio.set_event_loop_policy' is deprecated and slated for removal in Python 3.16:DeprecationWarning",
     "ignore:`torch.jit.script` is not supported in Python 3.14\\+ and may break\\. Please switch to `torch.compile` or `torch.export`\\.:DeprecationWarning",
 ]
+
+[tool.ruff]
+# Baseline config (Honest Spine v2 Phase 0). Lint rules start narrow and
+# correctness-focused; widen only after the numeric baseline is burned down.
+target-version = "py311"
+line-length = 120
+extend-exclude = ["migration_delta", "feasibility_workspaces", "dashboard", "reports"]
+
+[tool.ruff.lint]
+select = [
+    "F",      # pyflakes — real bugs (undefined names, unused imports)
+    "E9",     # syntax/indentation errors
+    "B",      # bugbear — mutable defaults, dead branches
+    "ASYNC",  # blocking calls / unawaited coroutines in async code
+    "T20",    # print() in library code
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["T20"]
+"scripts/*" = ["T20"]
+"hooks/*" = ["T20"]
+"dharma_swarm/terminal_commands/*" = ["T20"]
+"dharma_swarm/dgc_cli.py" = ["T20"]
+"dharma_swarm/cli.py" = ["T20"]
+
+[tool.coverage.run]
+source = ["dharma_swarm"]
+omit = ["dharma_swarm/tui_legacy.py", "*/__pycache__/*"]
+
+[tool.coverage.report]
+skip_covered = true
+show_missing = true
