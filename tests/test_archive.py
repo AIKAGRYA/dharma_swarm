@@ -600,3 +600,107 @@ async def test_archive_reconfigure_grid_rebuilds_bins(tmp_path):
     assert archive.grid.n_bins == 7
     assert archive.grid.total_bins == 343
     assert archive.grid.occupied_bins == before
+
+
+# ---------------------------------------------------------------------------
+# Fitness boundary (Honest Spine v2 Phase A): fitness-type entries require a
+# real diff + declared authority; tombstoned epoch never enters selection.
+# ---------------------------------------------------------------------------
+
+from dharma_swarm.archive import FitnessAuthorityError  # noqa: E402
+
+
+async def test_fitness_entry_without_diff_rejected(tmp_path):
+    archive = EvolutionArchive(path=tmp_path / "a.jsonl")
+    entry = ArchiveEntry(
+        component="x.py", entry_type="fitness",
+        fitness_authority="eval_harness", diff="",
+    )
+    with pytest.raises(FitnessAuthorityError):
+        await archive.add_entry(entry)
+
+
+async def test_fitness_entry_without_authority_rejected(tmp_path):
+    archive = EvolutionArchive(path=tmp_path / "a.jsonl")
+    entry = ArchiveEntry(
+        component="x.py", entry_type="fitness",
+        diff="--- a/x.py\n+++ b/x.py\n@@ -1 +1 @@\n-a\n+b\n",
+    )
+    with pytest.raises(FitnessAuthorityError):
+        await archive.add_entry(entry)
+
+
+async def test_fitness_entry_with_model_judged_authority_rejected(tmp_path):
+    archive = EvolutionArchive(path=tmp_path / "a.jsonl")
+    entry = ArchiveEntry(
+        component="x.py", entry_type="fitness",
+        fitness_authority="model_confidence",
+        diff="--- a/x.py\n+++ b/x.py\n@@ -1 +1 @@\n-a\n+b\n",
+    )
+    with pytest.raises(FitnessAuthorityError):
+        await archive.add_entry(entry)
+
+
+async def test_unknown_entry_type_rejected(tmp_path):
+    archive = EvolutionArchive(path=tmp_path / "a.jsonl")
+    entry = ArchiveEntry(component="x.py", entry_type="vibes")
+    with pytest.raises(FitnessAuthorityError):
+        await archive.add_entry(entry)
+
+
+async def test_valid_fitness_entry_accepted_and_owns_selection(tmp_path):
+    archive = EvolutionArchive(path=tmp_path / "a.jsonl")
+    legacy = ArchiveEntry(
+        component="x.py", status="applied",
+        fitness=FitnessScore(correctness=1.0),
+    )
+    await archive.add_entry(legacy)
+    real = ArchiveEntry(
+        component="x.py", entry_type="fitness",
+        fitness_authority="eval_harness",
+        diff="--- a/x.py\n+++ b/x.py\n@@ -1 +1 @@\n-a\n+b\n",
+        fitness=FitnessScore(correctness=0.5),
+    )
+    await archive.add_entry(real)
+    best = await archive.get_best(n=5)
+    # Once any authority-backed fitness entry exists, it owns selection —
+    # even though the legacy observation has higher raw fitness.
+    assert [e.id for e in best] == [real.id]
+
+
+async def test_observation_entries_pass_through(tmp_path):
+    archive = EvolutionArchive(path=tmp_path / "a.jsonl")
+    entry = ArchiveEntry(component="x.py", description="watched something")
+    entry_id = await archive.add_entry(entry)
+    assert (await archive.get_entry(entry_id)) is not None
+
+
+async def test_untrusted_epoch_excluded_from_selection(tmp_path):
+    archive = EvolutionArchive(path=tmp_path / "a.jsonl")
+    tombstoned = ArchiveEntry(
+        component="x.py", status="applied", untrusted_epoch=True,
+        fitness=FitnessScore(correctness=1.0),
+    )
+    live = ArchiveEntry(
+        component="x.py", status="applied",
+        fitness=FitnessScore(correctness=0.2),
+    )
+    await archive.add_entry(tombstoned)
+    await archive.add_entry(live)
+    best = await archive.get_best(n=5)
+    assert [e.id for e in best] == [live.id]
+
+
+async def test_legacy_jsonl_lines_load_with_defaults(tmp_path):
+    path = tmp_path / "a.jsonl"
+    legacy_line = ArchiveEntry(component="x.py", status="applied")
+    raw = legacy_line.model_dump()
+    raw.pop("entry_type"); raw.pop("fitness_authority"); raw.pop("untrusted_epoch")
+    import json as _json
+    path.write_text(_json.dumps(raw) + "\n")
+    archive = EvolutionArchive(path=path)
+    await archive.load()
+    loaded = await archive.get_entry(legacy_line.id)
+    assert loaded is not None
+    assert loaded.entry_type == "observation"
+    assert loaded.untrusted_epoch is False

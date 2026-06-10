@@ -39,6 +39,7 @@ async def test_meta_cycle_archives_and_evolves_when_poor(engine_paths, tmp_path,
         meta_archive_path=archive_path,
         n_object_cycles_per_meta=3,
         poor_meta_fitness_threshold=0.5,
+        auto_apply=True,  # explicitly opt in: default is OFF (fitness back-door)
         seed=4,
     )
     initial = meta.meta_params.model_copy(deep=True)
@@ -145,6 +146,7 @@ async def test_observe_cycle_result_applies_bounded_update(
         meta_archive_path=tmp_path / "meta_archive_periodic.jsonl",
         n_object_cycles_per_meta=2,
         poor_meta_fitness_threshold=1.1,
+        auto_apply=True,  # explicitly opt in: default is OFF (fitness back-door)
         max_weight_shift=0.02,
         max_mutation_delta=0.03,
         max_exploration_delta=0.1,

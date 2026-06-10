@@ -36,6 +36,21 @@ _DEFAULT_WEIGHTS: dict[str, float] = {
 
 FITNESS_DIMENSIONS: tuple[str, ...] = tuple(_DEFAULT_WEIGHTS)
 
+# --- Archive fitness boundary (Honest Spine v2 Phase A) ----------------------
+# Forge Council invariant: no model transmutes confidence into fitness.
+# Only these authorities may back a fitness-bearing entry:
+#   eval_harness             — deterministic local verifier (pass/fail receipts)
+#   operator_external_receipt — Guardian-confirmed external ACTED receipt,
+#                               released by explicit operator lease
+FITNESS_AUTHORITIES: tuple[str, ...] = ("eval_harness", "operator_external_receipt")
+
+ENTRY_TYPE_OBSERVATION = "observation"
+ENTRY_TYPE_FITNESS = "fitness"
+
+
+class FitnessAuthorityError(ValueError):
+    """Raised when an entry claims fitness without diff + declared authority."""
+
 
 def _clamp01(value: float) -> float:
     return max(0.0, min(1.0, float(value)))
@@ -170,6 +185,15 @@ class ArchiveEntry(BaseModel):
     # Status
     status: str = "proposed"
     rollback_reason: Optional[str] = None
+
+    # Fitness boundary (Honest Spine v2). Observations are records of activity;
+    # only fitness-type entries participate in selection once any exist, and
+    # they must carry a real diff plus a declared authority.
+    entry_type: str = ENTRY_TYPE_OBSERVATION
+    fitness_authority: Optional[str] = None
+    # Tombstone for the pre-2026-06-10 narrative epoch (11k+ records with no
+    # code change). Untrusted entries never participate in selection.
+    untrusted_epoch: bool = False
 
     # MAP-Elites feature coordinates
     feature_coords: dict[str, float] = Field(default_factory=dict)
@@ -367,11 +391,32 @@ class EvolutionArchive:
     async def add_entry(self, entry: ArchiveEntry) -> str:
         """Add a new entry and persist it.
 
+        Enforces the fitness boundary: a fitness-type entry without a real
+        diff and a declared authority is rejected, never stored. Observation
+        entries pass through (they record activity, not evolution).
+
         Also appends to Merkle log for cryptographic tamper-evidence.
 
         Returns:
             The entry id.
         """
+        if entry.entry_type == ENTRY_TYPE_FITNESS:
+            if not entry.diff.strip():
+                raise FitnessAuthorityError(
+                    "fitness entry rejected: empty diff — evolution that "
+                    "changed nothing cannot carry fitness"
+                )
+            if entry.fitness_authority not in FITNESS_AUTHORITIES:
+                raise FitnessAuthorityError(
+                    f"fitness entry rejected: fitness_authority must be one of "
+                    f"{FITNESS_AUTHORITIES}, got {entry.fitness_authority!r}"
+                )
+        elif entry.entry_type != ENTRY_TYPE_OBSERVATION:
+            raise FitnessAuthorityError(
+                f"unknown entry_type {entry.entry_type!r}; expected "
+                f"{ENTRY_TYPE_FITNESS!r} or {ENTRY_TYPE_OBSERVATION!r}"
+            )
+
         # Get parent's merkle root if this has a parent
         if entry.parent_id:
             parent = self._entries.get(entry.parent_id)
@@ -463,7 +508,16 @@ class EvolutionArchive:
         entries = list(self._entries.values())
         if component:
             entries = [e for e in entries if e.component == component]
-        entries = [e for e in entries if e.status == "applied"]
+        # Tombstoned narrative-epoch records never participate in selection.
+        entries = [e for e in entries if not e.untrusted_epoch]
+        # Once any authority-backed fitness entries exist they own selection;
+        # until then fall back to the legacy status filter so existing
+        # behavior (and the test suite) keeps working during the transition.
+        fitness_entries = [e for e in entries if e.entry_type == ENTRY_TYPE_FITNESS]
+        if fitness_entries:
+            entries = fitness_entries
+        else:
+            entries = [e for e in entries if e.status == "applied"]
         entries.sort(
             key=lambda e: e.fitness.weighted(weights=weights),
             reverse=True,

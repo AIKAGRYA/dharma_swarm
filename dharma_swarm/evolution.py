@@ -1751,6 +1751,13 @@ class DarwinEngine:
                 weighted_fitness,
             )
 
+            # Honest status (Honest Spine v2 Phase A): "applied" previously
+            # meant only "archived after evaluation" — 96% of "applied"
+            # records had no diff. Now: applied requires an actual code
+            # change; everything else is "evaluated". All DarwinEngine
+            # writes are observations until the external-receipt wire
+            # (Phase B) can mint authority-backed fitness entries.
+            honest_status = "applied" if proposal.diff.strip() else "evaluated"
             entry = ArchiveEntry(
                 component=proposal.component,
                 change_type=proposal.change_type,
@@ -1765,7 +1772,8 @@ class DarwinEngine:
                 execution_profile=proposal.execution_profile,
                 evidence_tier=proposal.evidence_tier,
                 promotion_state=proposal.promotion_state,
-                status="applied",
+                entry_type="observation",
+                status=honest_status,
                 gates_passed=(
                     ["ALL"]
                     if proposal.gate_decision != GateDecision.BLOCK.value

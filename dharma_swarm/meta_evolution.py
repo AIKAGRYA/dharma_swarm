@@ -79,7 +79,10 @@ class MetaEvolutionEngine:
         meta_archive_path: Path | None = None,
         n_object_cycles_per_meta: int = 10,
         poor_meta_fitness_threshold: float = 0.7,
-        auto_apply: bool = True,
+        # Honest Spine v2 Phase A: auto-apply of meta-parameters was a fitness
+        # back-door (model-judged trajectories silently retuning the engine).
+        # Default OFF; callers must opt in explicitly.
+        auto_apply: bool = False,
         max_weight_shift: float = 0.08,
         max_mutation_delta: float = 0.05,
         max_exploration_delta: float = 0.25,

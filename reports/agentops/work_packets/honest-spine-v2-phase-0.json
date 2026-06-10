@@ -1,0 +1,81 @@
+{
+  "packet": "honest-spine-v2-phase-0",
+  "lane": "honest-spine-v2",
+  "track_relation": "parallel lane under runtime-truth-reconciliation-2026-06; declared in docs/plans/2026-06-10-honest-spine-v2-decision-memo.md",
+  "owner": "operator (Dhyana) + Fable 5 session agent",
+  "branch": "honest-spine-v2",
+  "worktree": "/Users/dhyana/worktrees/dharma_swarm_honest_spine_v2",
+  "base": "origin/main @ dc72312f0",
+  "date": "2026-06-10",
+  "phase": "0 — truth at the roots",
+  "status": "complete_pending_operator_review",
+  "anti_theater_clause": "this packet certifies only the commits and verifier outputs listed below; it confers no claims about later phases",
+  "commits": [
+    {
+      "sha": "c53f24adc",
+      "what": "pulse: bare-mode ANTHROPIC_API_KEY guard (ported orphaned uncommitted fix from main worktree)"
+    },
+    {
+      "sha": "f98e0e063",
+      "what": "providers: Loop-1 content-drop closed on 7 sibling providers + NVIDIA NIM + providers_extended; 15 regression tests"
+    },
+    {
+      "sha": "7db519da9",
+      "what": "terminal_bridge: was UNIMPORTABLE on main (terminal_engine -> tui.engine); degraded contract added; 3 tests"
+    },
+    {
+      "sha": "8ac7e1fc1",
+      "what": "onboard: RUNTIME PROVENANCE section — daemons report executing branch/commit/dirty count; 5 tests"
+    },
+    {
+      "sha": "ccefdb74a",
+      "what": "tooling: [tool.ruff] + coverage + pytest markers; baseline captured, no autofix"
+    },
+    {
+      "sha": "0075273dd",
+      "what": "instruction layer: CLAUDE.md Reality Check section (VERIFIED/ASPIRATION discipline); Makefile xray/test-smoke/test-all/lint targets restored"
+    }
+  ],
+  "verified_findings": {
+    "debt_plan_false_completions": [
+      "providers-fix marked completed in ~/.cursor/plans/dharma_swarm_debt_audit_89a993cc.plan.md — 7 unfixed sites existed on origin/main",
+      "terminal-bridge-fix marked completed — module was entirely unimportable on origin/main",
+      "phase0 tooling marked completed — no [tool.ruff] existed"
+    ],
+    "runtime_provenance_first_reading": "dashboard_api (pid 2001) and dharma_cron (pid 45075) executing qwen/spine-adoption@1caf91715 with 312 dirty files — live system runs uncommitted code",
+    "ruff_baseline": {
+      "total": 1057,
+      "T201_print_in_library": 401,
+      "F401_unused_import": 287,
+      "F541_fstring_no_placeholder": 88,
+      "ASYNC240_blocking_path_in_async": 48,
+      "ASYNC109_timeout_param": 44,
+      "F841_unused_variable": 37,
+      "F821_undefined_name": 16,
+      "F821_hotpath_sites": [
+        "dharma_swarm/agent_runner.py:886 dharma_state_dir",
+        "dharma_swarm/orchestrate_live.py:538 _evo_allowed",
+        "dharma_swarm/orchestrate_live.py:828 StigmergyStore",
+        "dharma_swarm/orchestrator.py:2502 agent_name",
+        "dharma_swarm/provider_policy.py:377 SwarmExecutionPlan",
+        "dharma_swarm/providers.py:2790 logger"
+      ]
+    },
+    "legacy_queued_for_phase_a_deletion": [
+      "dharma_swarm/terminal_adapters/claude.py — imports nonexistent terminal_engine modules; zero importers outside guarded try/except"
+    ]
+  },
+  "verifiers": {
+    "focused_tests": "tests/test_providers_quality_track.py (46 passed) + tests/test_terminal_bridge_degraded.py (3 passed) + tests/test_runtime_provenance.py (5 passed)",
+    "smoke_suite": "make test-smoke — result recorded in phase_0_smoke field below after run",
+    "governance_hooks": "all pre-commit hooks (contract tests, uplift guards, docops, manifest, gitleaks, semgrep) passed on every commit"
+  },
+  "phase_0_smoke": "PENDING — running at packet write time; operator: re-run `make test-smoke` in the lane worktree to verify",
+  "not_done_in_phase_0": [
+    "~/CLAUDE.md (home-level) consolidation — operator must be present",
+    "ACTIVE_TRACK.yaml updates — operator-owned governance surface",
+    "the 16 F821 fixes — first burn-down item of Phase A CI safety nets",
+    "merging this lane to main — operator gate"
+  ],
+  "next_gate": "operator reviews this packet + lane diff, then approves Phase A (archive boundary + subtraction)"
+}
