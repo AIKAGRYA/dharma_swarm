@@ -1,6 +1,6 @@
 # CI Gates (dharma_swarm)
 
-Phase 2 of the governance install adds three GitHub Actions workflows:
+The governance install uses these GitHub Actions workflows:
 
 | Workflow | File | Triggers | Hard-fail? |
 |---|---|---|---|
@@ -8,6 +8,7 @@ Phase 2 of the governance install adds three GitHub Actions workflows:
 | CodeQL | `.github/workflows/codeql.yml` | PRs to main/promote/governance, weekly schedule | No (observe-only first 2 weeks) |
 | Semgrep | `.github/workflows/semgrep.yml` | PRs, push to main, weekly schedule | Yes on local `.semgrep/` ERRORs; advisory on registry packs |
 | Gitleaks | `.github/workflows/gitleaks.yml` | Push and PR | Yes on any finding |
+| Governed Recursive Preflight | `.github/workflows/governed-recursive-preflight.yml` | PRs to main | Yes on governed recursive + MemoryKernel preflight failure |
 
 The existing `tests.yml` workflow is untouched.
 
@@ -43,6 +44,15 @@ Two modes:
 ### Gitleaks
 Scans full git history (`fetch-depth: 0`). Any finding fails the build.
 Allowlists live in `.gitleaks.toml` (committed at repo root).
+
+### Governed Recursive Preflight
+Runs `python scripts/prod_preflight.py --repo-root . --quick` on PRs to
+`main`. This is the merge-visible gate for the governed recursive proof seam
+and the MemoryKernel readiness path. It uploads
+`reports/prod_preflight/latest.json` as a CI artifact for audit.
+
+This workflow deliberately does not run Semgrep or Gitleaks; those remain
+separate security gates above.
 
 ## Branch protection
 

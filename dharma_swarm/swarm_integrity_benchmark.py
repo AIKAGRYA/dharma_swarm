@@ -460,12 +460,18 @@ def run_swarm_integrity_v1(
     agent_id: str = "swarm_integrity.benchmark",
     trace_id: str | None = None,
     transcript_cases: tuple[SwarmIntegrityTranscriptCase, ...] | None = None,
+    transcript_source: Literal["fixture", "live"] = "fixture",
     record_recursive_receipts: bool = True,
 ) -> SwarmIntegrityReport:
     """Run transcript-shaped integrity fixtures and append audit events."""
 
     log = event_log or EventLog()
     cases = transcript_cases or default_swarm_integrity_v1_transcripts()
+    source_warning = (
+        "live_agent_transcript_integrity_eval"
+        if transcript_source == "live"
+        else "transcript_fixture_benchmark_not_live_agent_eval"
+    )
     run_id = trace_id or f"swarm-integrity-v1-{_new_id()}"
     recursive_recorder = RecursiveDiscoveryRecorder(log)
     results: list[SwarmIntegrityCaseResult] = []
@@ -547,8 +553,8 @@ def run_swarm_integrity_v1(
         ),
         all_passed=all(result.passed for result in results),
         warnings=(
-            "transcript_fixture_benchmark_not_live_agent_eval",
-            "evaluator_lock_hash_is_fixture_until_live_harness",
+            source_warning,
+            *(() if transcript_source == "live" else ("evaluator_lock_hash_is_fixture_until_live_harness",)),
             "mask_can_be_used_only_as_optional_witness_sensor",
         ),
         results=tuple(results),

@@ -1,7 +1,7 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts uplift-guards module-budget docops-integrity docops-report memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-full-power-preflight operator-prod-smoke prod-preflight governance-all go-fmt-check go-test go-vet go-ci
+.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts uplift-guards module-budget docops-integrity docops-report memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-full-power-preflight operator-prod-smoke prod-preflight governed-recursive-proof governance-all go-fmt-check go-test go-vet go-ci
 
 PYTHON ?= python3
 GO ?= go
@@ -16,6 +16,7 @@ GO_WORLD_SIGNAL_INGESTOR_MODULE := tools/world_signal_ingestor_go
 GO_MODULES := $(GO_SDK_MODULE) $(GO_EVIDENCE_MODULE) $(GO_GITHUB_INGESTOR_MODULE) $(GO_WORLD_SIGNAL_INGESTOR_MODULE)
 GO_CACHE_DIR ?= /tmp/dharma-swarm-go-build
 GO_MOD_CACHE_DIR ?= /tmp/dharma-swarm-go-mod
+RECURSIVE_PROOF_DIR ?= reports/recursive_shadow_foundry_local/$(shell date -u +%Y%m%dT%H%M%SZ)
 
 help:
 	@echo ""
@@ -52,6 +53,7 @@ help:
 	@echo "  make memory-kernel-full-power-preflight Run M2-M5 governed live preflight"
 	@echo "  make operator-prod-smoke Run fast read-only operator production smoke"
 	@echo "  make prod-preflight Run release-candidate production preflight"
+	@echo "  make governed-recursive-proof Rerun no-apply recursive proof into a local report dir"
 	@echo "  make go-ci        Run Go evidence sense-organ fmt/vet/test gates"
 	@echo ""
 
@@ -241,6 +243,27 @@ operator-prod-smoke:
 
 prod-preflight:
 	$(PYTHON) scripts/prod_preflight.py --repo-root .
+
+governed-recursive-proof:
+	@mkdir -p "$(RECURSIVE_PROOF_DIR)/events"
+	$(PYTHON) scripts/recursive_shadow_foundry.py \
+		--session-id governed-recursive-proof-local \
+		--task-id governed-recursive-proof \
+		--repo-root . \
+		--event-log-dir "$(RECURSIVE_PROOF_DIR)/events" \
+		--sandbox-root "$(RECURSIVE_PROOF_DIR)/sandboxes" \
+		--archive-path "$(RECURSIVE_PROOF_DIR)/evolution_archive.jsonl" \
+		--variants 10 \
+		--proof-timeout 30 \
+		--report-path "$(RECURSIVE_PROOF_DIR)/run_report.json"
+	$(PYTHON) scripts/swarm_integrity_reports.py \
+		--event-log-dir "$(RECURSIVE_PROOF_DIR)/events" \
+		--output-dir "$(RECURSIVE_PROOF_DIR)" \
+		--session-id governed-recursive-proof-local
+	$(PYTHON) scripts/validate_recursive_proof.py \
+		--proof-dir "$(RECURSIVE_PROOF_DIR)" \
+		--report-json "$(RECURSIVE_PROOF_DIR)/validation_report.json"
+	@printf "Governed recursive proof written to %s\n" "$(RECURSIVE_PROOF_DIR)"
 
 governance-all: semgrep gitleaks test-hygiene test-contracts uplift-guards module-budget docops-integrity
 

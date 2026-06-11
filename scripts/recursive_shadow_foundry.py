@@ -11,6 +11,9 @@ import argparse
 import asyncio
 import json
 from pathlib import Path
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from dharma_swarm.event_log import EventLog
 from dharma_swarm.recursive_discovery import run_shadow_evolution_foundry

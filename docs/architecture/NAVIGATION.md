@@ -153,6 +153,55 @@ Stop the Go track and return to the operator if a Go PR does any of the followin
 
 ---
 
+## Governed Recursive Proof + MemoryKernel Preflight
+
+This seam keeps recursive proof work rerunnable, CI-visible, and bounded by
+human promotion. It is evidence infrastructure, not autonomous
+self-improvement.
+
+Core files:
+
+- `dharma_swarm/recursive_discovery.py` — six receipt types, no-apply foundry, EventLog recorder
+- `dharma_swarm/swarm_integrity_benchmark.py` — Swarm Integrity v0/v1 evaluators
+- `dharma_swarm/assurance/swarm_integrity_transcripts.py` — live-shaped transcript ingestion into v1 cases
+- `dharma_swarm/assurance/recursive_proof_ontology.py` — non-authoritative ontology mirror
+- `scripts/recursive_shadow_foundry.py` — deterministic no-apply variant runner
+- `scripts/swarm_integrity_reports.py` — v0/v1 report writer
+- `scripts/validate_recursive_proof.py` — proof-packet validator
+- `scripts/prod_preflight.py` — MemoryKernel + recursive preflight gate
+
+Commands:
+
+- `make governed-recursive-proof` reruns the no-apply foundry, Swarm Integrity v0/v1, and validator into `reports/recursive_shadow_foundry_local/...`.
+- `python scripts/validate_recursive_proof.py --proof-dir reports/recursive_shadow_foundry` validates the committed reference packet.
+- `python scripts/prod_preflight.py --repo-root . --quick` is the PR-visible governed recursive + MemoryKernel preflight.
+
+Proof artifacts:
+
+- `reports/recursive_shadow_foundry/run_report.json`
+- `reports/recursive_shadow_foundry/evolution_archive.jsonl`
+- `reports/recursive_shadow_foundry/events/recursive_discovery.jsonl`
+- `reports/recursive_shadow_foundry/events/swarm_integrity.jsonl`
+- `reports/recursive_shadow_foundry/swarm_integrity_v0_report.json`
+- `reports/recursive_shadow_foundry/swarm_integrity_v1_report.json`
+
+Allowed claims:
+
+- The proof path is bounded, no-apply, and rerunnable.
+- Recursive receipts can be mirrored into existing ontology object types for audit.
+- Swarm Integrity v1 can score deterministic fixtures and live-shaped transcript evidence.
+- MemoryKernel preflight accounts for readiness through declared gates.
+
+Forbidden claims:
+
+- The system autonomously recursively improves itself.
+- The proof establishes model honesty.
+- Recursive promotion can bypass human review.
+- MemoryKernel readiness authorizes live write-through, prompt injection, canon promotion, or vector rebuilds.
+- This lane proves any CAIS MASK swarm benchmark.
+
+---
+
 ## Core Architecture (dharma_swarm/dharma_swarm/)
 
 ### Layer 0: Schema & Configuration
