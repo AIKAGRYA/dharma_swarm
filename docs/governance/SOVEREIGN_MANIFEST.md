@@ -108,10 +108,10 @@ For machine-readable status, see [`reports/governance/active_track_evidence.md`]
 These are immutable engineering laws for this repository. Violation = architectural regression.
 
 ### A1: NO FLAT-PACKAGE GROWTH
-The `dharma_swarm/` package currently has **398 files at its top level (57.3% of 694 total Python modules)** (V). No new .py file may be added to the top level. New modules must go into an appropriate subdirectory. Existing top-level files will be organized over time.
+The `dharma_swarm/` package currently has **398 files at its top level (57.3% of 695 total Python modules)** (V). No new .py file may be added to the top level. New modules must go into an appropriate subdirectory. Existing top-level files will be organized over time.
 
 ### A2: NO DUPLICATE IMPLEMENTATIONS
-Before creating a new file for routing, bridging, adapting, or orchestrating, check if one already exists. The repo currently has **25 bridge files** (V), **3 model_routing copies** (2 are identical, 1 is different) (V), **5 orchestrator files** (V), **21 adapter files across 8 locations** (V), and **14 router files** (V). Do not add more without deprecating an existing one.
+Before creating a new file for routing, bridging, adapting, or orchestrating, check if one already exists. The repo currently has **25 bridge files** (V), **3 model_routing copies** (2 are identical, 1 is different) (V), **5 orchestrator files** (V), **22 adapter files** (V), and **14 router files** (V). Do not add more without deprecating an existing one.
 
 ### A3: NO UNDOCUMENTED SEAMS
 If your code creates a new interface between domains (a bridge, adapter, or protocol), you must update `NAVIGATION.md` with its purpose, entry point, and boundary constraints. Undocumented seams become invisible coupling.
@@ -143,7 +143,7 @@ The repo has **9 verified circular dependency chains** (V). The worst:
 All 9 cycles were independently confirmed with exact import lines. Most are mitigated by lazy imports but remain architectural debt. **New code must not create circular imports.**
 
 ### A8: FRONTMATTER DISCIPLINE
-Do not inject machine-readable YAML frontmatter into governance or architecture docs unless explicitly requested. Current state: **216 of 771 Markdown files start with YAML frontmatter; 15 of 43 docs/architecture Markdown files do so** (V). Long frontmatter remains an authority/noise risk even when the prose is useful.
+Do not inject machine-readable YAML frontmatter into governance or architecture docs unless explicitly requested. Current state: **218 of 877 Markdown files start with YAML frontmatter; 15 docs/architecture Markdown files do so** (V). Long frontmatter remains an authority/noise risk even when the prose is useful.
 
 ---
 
@@ -153,17 +153,17 @@ These are the ground-truth metrics. All other documents citing different numbers
 
 | Metric | Value | Verification |
 |--------|-------|-------------|
-| Total Python modules | **694** | find dharma_swarm -name "*.py" -type f |
+| Total Python modules | **695** | find dharma_swarm -name "*.py" -type f |
 | Top-level (flat) modules | **398 (57.3%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
-| Total Python LOC | **293,937** | wc -l across dharma_swarm Python modules |
-| Test files | **665** | find tests -name "*.py" -type f |
-| Test functions | **11,287 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Total Python LOC | **294,219** | wc -l across dharma_swarm Python modules |
+| Test files | **667** | find tests -name "*.py" -type f |
+| Test functions | **11,295 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
 | Markdown files | **877** | find . -name "*.md" -type f |
 | Markdown total lines | **219,324** | wc -l across all .md |
 | Bridge files | **25** | find dharma_swarm -name "*bridge*.py" |
-| Adapter files | **21 across 8 locations** | find dharma_swarm -type f \| rg -i "adapter" |
+| Adapter files | **22** | find dharma_swarm -type f \| rg -i "adapter" |
 | Orchestrator files | **5** (6,034 LOC total) | find dharma_swarm -name "*orchestrat*" |
 | Router files | **14** (4,976 LOC total) | find dharma_swarm -type f \| rg -i "rout" |
 | Memory modules | **11** (5,848 LOC) | find dharma_swarm -name "*memory*" |
