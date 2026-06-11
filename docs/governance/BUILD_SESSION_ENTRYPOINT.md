@@ -18,7 +18,7 @@ That command renders the current operating reality (active track, live ops, brok
 
 dharma_swarm is a Python multi-agent orchestration runtime with a typed ontology, an immutable kernel, gated proposal flow, an append-only witness log, and an artifact/value loop. The substrates exist. The current failure mode is that most runtime work bypasses them. Each active build track makes one seam ontology-native end-to-end; the active build portfolio (1–N co-equal, surface-disjoint tracks) is declared in [`ACTIVE_TRACK.yaml`](ACTIVE_TRACK.yaml) and surfaced by `make onboard`. Do not introduce new substrates. Wire existing ones.
 
-Current substrate-nativeness estimate (from audit): **~10–15% of runtime is ontology-native; ~85–90% bypasses substrate.** Each track's goal: bring its seam to 100% native and prove it with tests, surface-disjoint from sibling tracks.
+Substrate-nativeness is a **measured number, not a prose constant** — different measures give different answers (dispatch-site adoption vs. spine-internal coverage), so do not cite a frozen percentage from any doc, including this one. Get the current dispatch-site measure live: `python3 scripts/governance/spine_bypass_report.py` (as of 2026-06-11: 1/7 `.submit()` sites spine-adopted, 5 on the intentional-bypass migration allowlist). Each track's goal: bring its seam to 100% native and prove it with tests, surface-disjoint from sibling tracks.
 
 ---
 
@@ -121,6 +121,43 @@ operator_core read models the reconciliation lane owns.
 - Do not touch the operator_core read-model surfaces owned by the reconciliation lane.
 - Do not add a parallel spine-check CI workflow.
 
+### Runtime Truth Spine — Adoption (god objects flow through invoke_agent)
+
+**Track id:** `runtime-truth-spine-adoption-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-10 (TTL 21 days)
+**Relations:** complements: runtime-truth-reconciliation-2026-06, runtime-truth-nats-2026-06
+**Owns surfaces:** dharma_swarm/spine/**, dharma_swarm/a2a/a2a_bridge.py, dharma_swarm/orchestrator.py, dharma_swarm/agent_runner.py, scripts/uplift_guards/check_spine_ownership.py
+**Moves vital signs:** quality_gates, tool_coverage
+
+spine-adoption ships end-to-end: every production dispatch flows through
+invoke_agent() and emits exactly one EvidenceReceipt. This track migrates
+the god objects (agent_runner.py, orchestrator.py, a2a_bridge.py) onto
+the shipped spine substrate. Target: 3 production callers outside the
+spine package, zero bypass paths. Substrate-nativeness moves toward 30%+.
+
+Ported 2026-06-10 from the v1 declaration (opened 2026-06-06 on the
+qwen/spine-adoption lane, commit c28951d5b, which closed reconciliation
+in v1) into the v2 portfolio while merging origin/main. In the v2
+multi-track model it runs as a co-equal peer of the reconciliation and
+NATS lanes rather than requiring their closure; reconciliation's open
+status is main's standing declaration and is left to the operator.
+
+**Next items:**
+
+- [code] (blocker) Wire a2a_bridge.submit_via_spine into production dispatch (ingest_trishula_inbox bypass at a2a_bridge.py:307 — Slice 2 per scripts/governance/spine_bypass_report.py).
+- [code] (blocker) orchestrator.py dispatch through invoke_agent behind DHARMA_SPINE_DISPATCH (landed via #557; operator confirms one live EvidenceReceipt on a real dispatch = GATE 1).
+- [code] (blocker) Migrate agent_runner.py run_task through invoke_agent(). Largest surface, last.
+- [code] (blocker) Drain the intentional-bypass allowlist (node_gateway submit endpoints, a2a_client._dispatch_local) and enable allow-list-at-zero in uplift_guards CI.
+- [docs] Author docs/architecture/SPINE_ADOPTION_NARRATIVE.md
+
+**Non-goals:**
+
+- Do not create new spine sub-modules. Adopt invoke/receipt/routing/persistence.
+- Do not decompose agent_runner.run_task beyond invoke_agent() routing.
+- Do not change EvidenceReceipt schema; adopt shipped types unchanged.
+- Do not introduce NATS, Redis, or gRPC in this track (transport belongs to the NATS lane).
+- Do not broadly refactor swarm.py, providers.py, or SwarmManager.
+
 ### Cybernetic Loop Closure — wire all 13 loops with receipted closure checks
 
 **Track id:** `loop-closure-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
@@ -198,43 +235,6 @@ runtime-truth rendering or non-goals.
 - Do not mutate owner files; the view writes nothing.
 - Do not duplicate make onboard's state rendering; this is the why/shape layer, onboard remains the state layer.
 - Do not touch operator_core/** or runtime_state.py.
-
-### Runtime Truth Spine — Adoption (god objects flow through invoke_agent)
-
-**Track id:** `runtime-truth-spine-adoption-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
-**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-10 (TTL 21 days)
-**Relations:** complements: runtime-truth-reconciliation-2026-06, runtime-truth-nats-2026-06
-**Owns surfaces:** dharma_swarm/spine/**, dharma_swarm/a2a/a2a_bridge.py, dharma_swarm/orchestrator.py, dharma_swarm/agent_runner.py, scripts/uplift_guards/check_spine_ownership.py
-**Moves vital signs:** quality_gates, tool_coverage
-
-spine-adoption ships end-to-end: every production dispatch flows through
-invoke_agent() and emits exactly one EvidenceReceipt. This track migrates
-the god objects (agent_runner.py, orchestrator.py, a2a_bridge.py) onto
-the shipped spine substrate. Target: 3 production callers outside the
-spine package, zero bypass paths. Substrate-nativeness moves toward 30%+.
-
-Ported 2026-06-10 from the v1 declaration (opened 2026-06-06 on the
-qwen/spine-adoption lane, commit c28951d5b, which closed reconciliation
-in v1) into the v2 portfolio while merging origin/main. In the v2
-multi-track model it runs as a co-equal peer of the reconciliation and
-NATS lanes rather than requiring their closure; reconciliation's open
-status is main's standing declaration and is left to the operator.
-
-**Next items:**
-
-- [code] (blocker) Wire a2a_bridge.submit_via_spine into production dispatch (ingest_trishula_inbox bypass at a2a_bridge.py:307 — Slice 2 per scripts/governance/spine_bypass_report.py).
-- [code] (blocker) orchestrator.py dispatch through invoke_agent behind DHARMA_SPINE_DISPATCH (landed via #557; operator confirms one live EvidenceReceipt on a real dispatch = GATE 1).
-- [code] (blocker) Migrate agent_runner.py run_task through invoke_agent(). Largest surface, last.
-- [code] (blocker) Drain the intentional-bypass allowlist (node_gateway submit endpoints, a2a_client._dispatch_local) and enable allow-list-at-zero in uplift_guards CI.
-- [docs] Author docs/architecture/SPINE_ADOPTION_NARRATIVE.md
-
-**Non-goals:**
-
-- Do not create new spine sub-modules. Adopt invoke/receipt/routing/persistence.
-- Do not decompose agent_runner.run_task beyond invoke_agent() routing.
-- Do not change EvidenceReceipt schema; adopt shipped types unchanged.
-- Do not introduce NATS, Redis, or gRPC in this track (transport belongs to the NATS lane).
-- Do not broadly refactor swarm.py, providers.py, or SwarmManager.
 
 ### Composer Holon Spine Longrun — fable/codex pair over verified command receipts
 

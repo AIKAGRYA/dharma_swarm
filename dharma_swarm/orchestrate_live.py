@@ -30,7 +30,10 @@ import signal
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from dharma_swarm.stigmergy import StigmergyStore
 
 logger = logging.getLogger(__name__)
 
@@ -528,6 +531,26 @@ async def run_evolution_loop(shutdown_event: asyncio.Event) -> None:
                      f"avg={sum(live_fitness_scores)/len(live_fitness_scores):.3f} "
                      f"max={max(live_fitness_scores):.3f}")
 
+            # --- EVAL VERDICT GATE: check overnight verdict before evolving ---
+            # Must be computed BEFORE _auto_evolve_will_run below — it used to
+            # live after it, so the first reference raised NameError (F821).
+            _evo_allowed = True
+            try:
+                import json as _vj
+                _verdict_dir = STATE_DIR / "overnight" / datetime.now(timezone.utc).strftime("%Y-%m-%d")
+                _verdict_file = _verdict_dir / "verdict.json"
+                if _verdict_file.exists():
+                    _vdata = _vj.loads(_verdict_file.read_text())
+                    _v = _vdata.get("verdict", "")
+                    if _v == "rollback":
+                        _evo_allowed = False
+                        _log("evolution", "PAUSED: overnight ROLLBACK verdict — skipping auto_evolve")
+                    elif _v == "hold":
+                        # On HOLD, only allow shadow mode
+                        _log("evolution", "CONSTRAINED: overnight HOLD verdict — forcing shadow mode")
+            except Exception:
+                pass
+
             # Feed meta-evolution with observed fitness.
             # Only submit a synthetic result on cycles where auto_evolve
             # does NOT run (every 3rd cycle calls auto_evolve which feeds
@@ -572,25 +595,8 @@ async def run_evolution_loop(shutdown_event: asyncio.Event) -> None:
             except Exception:
                 pass
 
-            # --- EVAL VERDICT GATE: check overnight verdict before evolving ---
-            _evo_allowed = True
-            try:
-                import json as _vj
-                _verdict_dir = STATE_DIR / "overnight" / datetime.now(timezone.utc).strftime("%Y-%m-%d")
-                _verdict_file = _verdict_dir / "verdict.json"
-                if _verdict_file.exists():
-                    _vdata = _vj.loads(_verdict_file.read_text())
-                    _v = _vdata.get("verdict", "")
-                    if _v == "rollback":
-                        _evo_allowed = False
-                        _log("evolution", "PAUSED: overnight ROLLBACK verdict — skipping auto_evolve")
-                    elif _v == "hold":
-                        # On HOLD, only allow shadow mode
-                        _log("evolution", "CONSTRAINED: overnight HOLD verdict — forcing shadow mode")
-            except Exception:
-                pass
-
             # Auto-evolve: propose improvements via LLM every 3rd cycle
+            # (_evo_allowed computed by the EVAL VERDICT GATE above)
             # Shadow mode controlled by env var (default: ON for safety)
             # Set DHARMA_EVOLUTION_SHADOW=0 + DGC_AUTONOMY_LEVEL>=2 for real mutation
             if cycle_count % 3 == 0 and _evo_allowed:

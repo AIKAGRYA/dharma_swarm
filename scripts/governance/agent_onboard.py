@@ -1085,17 +1085,6 @@ def render_tooling_first() -> None:
         pass
 
 
-def render_model_key_routing() -> None:
-    section("MODEL & KEY ROUTING — THE ONE WAY")
-    print("  Keys:  ONE home ~/.dharma/agent_keys.env  ·  ONE tool: dkeys (add / test / find)")
-    print("         read keys in code ONLY via dharma_swarm/api_keys.py — never os.environ, never project .env")
-    print("  Model: ONE door  runtime_provider.resolve_runtime_provider_config() -> create_runtime_provider()")
-    print("         ordered by model_hierarchy (most-powerful-first); live-fallback never blocks on a dead brain")
-    print("  Claude/Anthropic -> Max plan (claude_code), NOT the metered API   (force API: DHARMA_FORCE_ANTHROPIC_API=1)")
-    print("  Rules: never hardcode a model string; never read a key outside api_keys.py; add keys only via `dkeys add`")
-    print("  Canon: docs/ops/MODEL_KEY_ROUTING.md  (lists the deprecated routes — do not use them)")
-
-
 def render_pr_hygiene(*, net: bool = True) -> list[dict[str, Any]]:
     section("PR HYGIENE — open pull request health")
     # Rule TEXT is owned by the workflows; point, don't paraphrase.
@@ -1238,6 +1227,17 @@ def render_hygiene_system() -> None:
             print(f"  {label}:")
             for pattern in surfaced:
                 print(f"    - {pattern.get('id')}: {pattern.get('title')} ({pattern.get('stage')})")
+
+
+def render_model_key_routing() -> None:
+    section("MODEL & KEY ROUTING — THE ONE WAY")
+    print("  Keys:  ONE home ~/.dharma/agent_keys.env  ·  ONE tool: dkeys (add / test / find)")
+    print("         read keys in code ONLY via dharma_swarm/api_keys.py — never os.environ, never project .env")
+    print("  Model: ONE door  runtime_provider.resolve_runtime_provider_config() -> create_runtime_provider()")
+    print("         ordered by model_hierarchy (most-powerful-first); live-fallback never blocks on a dead brain")
+    print("  Claude/Anthropic -> Max plan (claude_code), NOT the metered API   (force API: DHARMA_FORCE_ANTHROPIC_API=1)")
+    print("  Rules: never hardcode a model string; never read a key outside api_keys.py; add keys only via `dkeys add`")
+    print("  Canon: docs/ops/MODEL_KEY_ROUTING.md  (lists the deprecated routes — do not use them)")
 
 
 def render_enforcement_and_depth() -> None:
@@ -1460,11 +1460,11 @@ def main(argv: list[str] | None = None) -> int:
     render_recent_activity(track)
     render_spine_status()
     rows = render_runtime_truth(evidence, track)
-    render_model_key_routing()
     prs = render_pr_hygiene(net=net)
     render_hygiene_system()
     render_decay_watch()
     render_tooling_first()
+    render_model_key_routing()
     render_enforcement_and_depth()
     if args.fast:
         section("DRIFT TRIAGE (skipped — --fast)")

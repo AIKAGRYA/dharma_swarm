@@ -290,6 +290,118 @@ active_tracks:
         kind: code
         blocker: false
 
+  - id: runtime-truth-spine-adoption-2026-06
+    name: Runtime Truth Spine — Adoption (god objects flow through invoke_agent)
+    status: ACTIVE
+    opened_at: "2026-06-06"
+    verified_at: "2026-06-10"
+    ttl_days: 21
+    owner: "@AmitabhainArunachala"
+    serves: substrate-nativeness
+    complements:
+      - runtime-truth-reconciliation-2026-06
+      - runtime-truth-nats-2026-06
+    owned_surfaces:
+      - dharma_swarm/spine/**
+      - dharma_swarm/a2a/a2a_bridge.py
+      - dharma_swarm/orchestrator.py
+      - dharma_swarm/agent_runner.py
+      - scripts/uplift_guards/check_spine_ownership.py
+    moves_vital_signs:
+      - quality_gates
+      - tool_coverage
+
+    description: |
+      spine-adoption ships end-to-end: every production dispatch flows through
+      invoke_agent() and emits exactly one EvidenceReceipt. This track migrates
+      the god objects (agent_runner.py, orchestrator.py, a2a_bridge.py) onto
+      the shipped spine substrate. Target: 3 production callers outside the
+      spine package, zero bypass paths. Substrate-nativeness moves toward 30%+.
+
+      Ported 2026-06-10 from the v1 declaration (opened 2026-06-06 on the
+      qwen/spine-adoption lane, commit c28951d5b, which closed reconciliation
+      in v1) into the v2 portfolio while merging origin/main. In the v2
+      multi-track model it runs as a co-equal peer of the reconciliation and
+      NATS lanes rather than requiring their closure; reconciliation's open
+      status is main's standing declaration and is left to the operator.
+
+    prerequisites:
+      - id: spine_package_exists
+        kind: file_exists
+        file: dharma_swarm/spine/__init__.py
+      - id: invoke_agent_defined
+        kind: file_contains
+        file: dharma_swarm/spine/invoke.py
+        pattern: "async def invoke_agent"
+
+    completion_criteria:
+      - id: a2a_bridge_calls_spine
+        kind: file_contains
+        file: dharma_swarm/a2a/a2a_bridge.py
+        pattern: '(?m)^\s*from dharma_swarm\.spine'
+      - id: orchestrator_calls_spine
+        kind: file_contains
+        file: dharma_swarm/orchestrator.py
+        pattern: '(?m)^\s*from dharma_swarm\.spine'
+      - id: agent_runner_calls_spine
+        kind: file_contains
+        file: dharma_swarm/agent_runner.py
+        pattern: '(?m)^\s*from dharma_swarm\.spine'
+      - id: dispatch_emits_evidence_receipt
+        kind: file_contains
+        file: tests/test_spine_adoption_dispatch.py
+        pattern: "test_every_dispatch_emits_exactly_one_evidence_receipt"
+      - id: zero_dropoff_sources
+        kind: file_contains
+        file: tests/test_spine_adoption_dispatch.py
+        pattern: "test_no_dropoff_sources_remain"
+      - id: bypass_allowlist_empty
+        kind: file_contains
+        file: scripts/governance/spine_bypass_report.py
+        pattern: '(?m)^_INTENTIONAL_BYPASS: dict\[tuple\[str, int\], str\] = \{\s*\}'
+        # Regex (checker re.search): matches the DRAINED dict only — `= {}` on
+        # one line or `= {\n}` — never the populated multi-line form (5 entries
+        # today). Passes exactly when zero intentional bypass sites remain.
+      - id: adoption_narrative_docs
+        kind: file_exists
+        file: docs/architecture/SPINE_ADOPTION_NARRATIVE.md
+      - id: gate1_witnessed
+        kind: file_exists
+        file: reports/governance/GATE1_WITNESSED.md
+        # Written ONLY by gate1_witness.sh --watch at the moment the operator
+        # observes a live receipt land (count moves; sha16 of the receipt JSON
+        # recorded, checkable against the DB). Wires the non-proxy gate into
+        # completion: the track cannot flip SHIPPABLE on file/test proxies alone.
+
+    non_goals:
+      - Do not create new spine sub-modules. Adopt invoke/receipt/routing/persistence.
+      - Do not decompose agent_runner.run_task beyond invoke_agent() routing.
+      - Do not change EvidenceReceipt schema; adopt shipped types unchanged.
+      - Do not introduce NATS, Redis, or gRPC in this track (transport belongs to the NATS lane).
+      - Do not broadly refactor swarm.py, providers.py, or SwarmManager.
+
+    next_items:
+      - id: 1
+        what: "Wire a2a_bridge.submit_via_spine into production dispatch (ingest_trishula_inbox bypass at a2a_bridge.py:307 — Slice 2 per scripts/governance/spine_bypass_report.py)."
+        kind: code
+        blocker: true
+      - id: 2
+        what: "orchestrator.py dispatch through invoke_agent behind DHARMA_SPINE_DISPATCH (landed via #557; operator confirms one live EvidenceReceipt on a real dispatch = GATE 1)."
+        kind: code
+        blocker: true
+      - id: 3
+        what: "Migrate agent_runner.py run_task through invoke_agent(). Largest surface, last."
+        kind: code
+        blocker: true
+      - id: 4
+        what: "Drain the intentional-bypass allowlist (node_gateway submit endpoints, a2a_client._dispatch_local) and enable allow-list-at-zero in uplift_guards CI."
+        kind: code
+        blocker: true
+      - id: 5
+        what: "Author docs/architecture/SPINE_ADOPTION_NARRATIVE.md"
+        kind: docs
+        blocker: false
+
   - id: loop-closure-2026-06
     name: Cybernetic Loop Closure — wire all 13 loops with receipted closure checks
     status: ACTIVE
@@ -458,118 +570,6 @@ active_tracks:
         kind: test
         blocker: false
 
-
-  - id: runtime-truth-spine-adoption-2026-06
-    name: Runtime Truth Spine — Adoption (god objects flow through invoke_agent)
-    status: ACTIVE
-    opened_at: "2026-06-06"
-    verified_at: "2026-06-10"
-    ttl_days: 21
-    owner: "@AmitabhainArunachala"
-    serves: substrate-nativeness
-    complements:
-      - runtime-truth-reconciliation-2026-06
-      - runtime-truth-nats-2026-06
-    owned_surfaces:
-      - dharma_swarm/spine/**
-      - dharma_swarm/a2a/a2a_bridge.py
-      - dharma_swarm/orchestrator.py
-      - dharma_swarm/agent_runner.py
-      - scripts/uplift_guards/check_spine_ownership.py
-    moves_vital_signs:
-      - quality_gates
-      - tool_coverage
-
-    description: |
-      spine-adoption ships end-to-end: every production dispatch flows through
-      invoke_agent() and emits exactly one EvidenceReceipt. This track migrates
-      the god objects (agent_runner.py, orchestrator.py, a2a_bridge.py) onto
-      the shipped spine substrate. Target: 3 production callers outside the
-      spine package, zero bypass paths. Substrate-nativeness moves toward 30%+.
-
-      Ported 2026-06-10 from the v1 declaration (opened 2026-06-06 on the
-      qwen/spine-adoption lane, commit c28951d5b, which closed reconciliation
-      in v1) into the v2 portfolio while merging origin/main. In the v2
-      multi-track model it runs as a co-equal peer of the reconciliation and
-      NATS lanes rather than requiring their closure; reconciliation's open
-      status is main's standing declaration and is left to the operator.
-
-    prerequisites:
-      - id: spine_package_exists
-        kind: file_exists
-        file: dharma_swarm/spine/__init__.py
-      - id: invoke_agent_defined
-        kind: file_contains
-        file: dharma_swarm/spine/invoke.py
-        pattern: "async def invoke_agent"
-
-    completion_criteria:
-      - id: a2a_bridge_calls_spine
-        kind: file_contains
-        file: dharma_swarm/a2a/a2a_bridge.py
-        pattern: '(?m)^\s*from dharma_swarm\.spine'
-      - id: orchestrator_calls_spine
-        kind: file_contains
-        file: dharma_swarm/orchestrator.py
-        pattern: '(?m)^\s*from dharma_swarm\.spine'
-      - id: agent_runner_calls_spine
-        kind: file_contains
-        file: dharma_swarm/agent_runner.py
-        pattern: '(?m)^\s*from dharma_swarm\.spine'
-      - id: dispatch_emits_evidence_receipt
-        kind: file_contains
-        file: tests/test_spine_adoption_dispatch.py
-        pattern: "test_every_dispatch_emits_exactly_one_evidence_receipt"
-      - id: zero_dropoff_sources
-        kind: file_contains
-        file: tests/test_spine_adoption_dispatch.py
-        pattern: "test_no_dropoff_sources_remain"
-      - id: bypass_allowlist_empty
-        kind: file_contains
-        file: scripts/governance/spine_bypass_report.py
-        pattern: '(?m)^_INTENTIONAL_BYPASS: dict\[tuple\[str, int\], str\] = \{\s*\}'
-        # Regex (checker re.search): matches the DRAINED dict only — `= {}` on
-        # one line or `= {\n}` — never the populated multi-line form (5 entries
-        # today). Passes exactly when zero intentional bypass sites remain.
-      - id: adoption_narrative_docs
-        kind: file_exists
-        file: docs/architecture/SPINE_ADOPTION_NARRATIVE.md
-      - id: gate1_witnessed
-        kind: file_exists
-        file: reports/governance/GATE1_WITNESSED.md
-        # Written ONLY by gate1_witness.sh --watch at the moment the operator
-        # observes a live receipt land (count moves; sha16 of the receipt JSON
-        # recorded, checkable against the DB). Wires the non-proxy gate into
-        # completion: the track cannot flip SHIPPABLE on file/test proxies alone.
-
-    non_goals:
-      - Do not create new spine sub-modules. Adopt invoke/receipt/routing/persistence.
-      - Do not decompose agent_runner.run_task beyond invoke_agent() routing.
-      - Do not change EvidenceReceipt schema; adopt shipped types unchanged.
-      - Do not introduce NATS, Redis, or gRPC in this track (transport belongs to the NATS lane).
-      - Do not broadly refactor swarm.py, providers.py, or SwarmManager.
-
-    next_items:
-      - id: 1
-        what: "Wire a2a_bridge.submit_via_spine into production dispatch (ingest_trishula_inbox bypass at a2a_bridge.py:307 — Slice 2 per scripts/governance/spine_bypass_report.py)."
-        kind: code
-        blocker: true
-      - id: 2
-        what: "orchestrator.py dispatch through invoke_agent behind DHARMA_SPINE_DISPATCH (landed via #557; operator confirms one live EvidenceReceipt on a real dispatch = GATE 1)."
-        kind: code
-        blocker: true
-      - id: 3
-        what: "Migrate agent_runner.py run_task through invoke_agent(). Largest surface, last."
-        kind: code
-        blocker: true
-      - id: 4
-        what: "Drain the intentional-bypass allowlist (node_gateway submit endpoints, a2a_client._dispatch_local) and enable allow-list-at-zero in uplift_guards CI."
-        kind: code
-        blocker: true
-      - id: 5
-        what: "Author docs/architecture/SPINE_ADOPTION_NARRATIVE.md"
-        kind: docs
-        blocker: false
 
   - id: composer-holon-spine-longrun-2026-06
     name: Composer Holon Spine Longrun — fable/codex pair over verified command receipts

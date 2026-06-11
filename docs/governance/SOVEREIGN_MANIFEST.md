@@ -91,6 +91,43 @@ operator_core read models the reconciliation lane owns.
 - Do not touch the operator_core read-model surfaces owned by the reconciliation lane.
 - Do not add a parallel spine-check CI workflow.
 
+### Runtime Truth Spine — Adoption (god objects flow through invoke_agent)
+
+**Track id:** `runtime-truth-spine-adoption-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-10 (TTL 21 days)
+**Relations:** complements: runtime-truth-reconciliation-2026-06, runtime-truth-nats-2026-06
+**Owns surfaces:** dharma_swarm/spine/**, dharma_swarm/a2a/a2a_bridge.py, dharma_swarm/orchestrator.py, dharma_swarm/agent_runner.py, scripts/uplift_guards/check_spine_ownership.py
+**Moves vital signs:** quality_gates, tool_coverage
+
+spine-adoption ships end-to-end: every production dispatch flows through
+invoke_agent() and emits exactly one EvidenceReceipt. This track migrates
+the god objects (agent_runner.py, orchestrator.py, a2a_bridge.py) onto
+the shipped spine substrate. Target: 3 production callers outside the
+spine package, zero bypass paths. Substrate-nativeness moves toward 30%+.
+
+Ported 2026-06-10 from the v1 declaration (opened 2026-06-06 on the
+qwen/spine-adoption lane, commit c28951d5b, which closed reconciliation
+in v1) into the v2 portfolio while merging origin/main. In the v2
+multi-track model it runs as a co-equal peer of the reconciliation and
+NATS lanes rather than requiring their closure; reconciliation's open
+status is main's standing declaration and is left to the operator.
+
+**Next items:**
+
+- [code] (blocker) Wire a2a_bridge.submit_via_spine into production dispatch (ingest_trishula_inbox bypass at a2a_bridge.py:307 — Slice 2 per scripts/governance/spine_bypass_report.py).
+- [code] (blocker) orchestrator.py dispatch through invoke_agent behind DHARMA_SPINE_DISPATCH (landed via #557; operator confirms one live EvidenceReceipt on a real dispatch = GATE 1).
+- [code] (blocker) Migrate agent_runner.py run_task through invoke_agent(). Largest surface, last.
+- [code] (blocker) Drain the intentional-bypass allowlist (node_gateway submit endpoints, a2a_client._dispatch_local) and enable allow-list-at-zero in uplift_guards CI.
+- [docs] Author docs/architecture/SPINE_ADOPTION_NARRATIVE.md
+
+**Non-goals:**
+
+- Do not create new spine sub-modules. Adopt invoke/receipt/routing/persistence.
+- Do not decompose agent_runner.run_task beyond invoke_agent() routing.
+- Do not change EvidenceReceipt schema; adopt shipped types unchanged.
+- Do not introduce NATS, Redis, or gRPC in this track (transport belongs to the NATS lane).
+- Do not broadly refactor swarm.py, providers.py, or SwarmManager.
+
 ### Cybernetic Loop Closure — wire all 13 loops with receipted closure checks
 
 **Track id:** `loop-closure-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
@@ -169,43 +206,6 @@ runtime-truth rendering or non-goals.
 - Do not duplicate make onboard's state rendering; this is the why/shape layer, onboard remains the state layer.
 - Do not touch operator_core/** or runtime_state.py.
 
-### Runtime Truth Spine — Adoption (god objects flow through invoke_agent)
-
-**Track id:** `runtime-truth-spine-adoption-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
-**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-10 (TTL 21 days)
-**Relations:** complements: runtime-truth-reconciliation-2026-06, runtime-truth-nats-2026-06
-**Owns surfaces:** dharma_swarm/spine/**, dharma_swarm/a2a/a2a_bridge.py, dharma_swarm/orchestrator.py, dharma_swarm/agent_runner.py, scripts/uplift_guards/check_spine_ownership.py
-**Moves vital signs:** quality_gates, tool_coverage
-
-spine-adoption ships end-to-end: every production dispatch flows through
-invoke_agent() and emits exactly one EvidenceReceipt. This track migrates
-the god objects (agent_runner.py, orchestrator.py, a2a_bridge.py) onto
-the shipped spine substrate. Target: 3 production callers outside the
-spine package, zero bypass paths. Substrate-nativeness moves toward 30%+.
-
-Ported 2026-06-10 from the v1 declaration (opened 2026-06-06 on the
-qwen/spine-adoption lane, commit c28951d5b, which closed reconciliation
-in v1) into the v2 portfolio while merging origin/main. In the v2
-multi-track model it runs as a co-equal peer of the reconciliation and
-NATS lanes rather than requiring their closure; reconciliation's open
-status is main's standing declaration and is left to the operator.
-
-**Next items:**
-
-- [code] (blocker) Wire a2a_bridge.submit_via_spine into production dispatch (ingest_trishula_inbox bypass at a2a_bridge.py:307 — Slice 2 per scripts/governance/spine_bypass_report.py).
-- [code] (blocker) orchestrator.py dispatch through invoke_agent behind DHARMA_SPINE_DISPATCH (landed via #557; operator confirms one live EvidenceReceipt on a real dispatch = GATE 1).
-- [code] (blocker) Migrate agent_runner.py run_task through invoke_agent(). Largest surface, last.
-- [code] (blocker) Drain the intentional-bypass allowlist (node_gateway submit endpoints, a2a_client._dispatch_local) and enable allow-list-at-zero in uplift_guards CI.
-- [docs] Author docs/architecture/SPINE_ADOPTION_NARRATIVE.md
-
-**Non-goals:**
-
-- Do not create new spine sub-modules. Adopt invoke/receipt/routing/persistence.
-- Do not decompose agent_runner.run_task beyond invoke_agent() routing.
-- Do not change EvidenceReceipt schema; adopt shipped types unchanged.
-- Do not introduce NATS, Redis, or gRPC in this track (transport belongs to the NATS lane).
-- Do not broadly refactor swarm.py, providers.py, or SwarmManager.
-
 ### Composer Holon Spine Longrun — fable/codex pair over verified command receipts
 
 **Track id:** `composer-holon-spine-longrun-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
@@ -256,7 +256,7 @@ For machine-readable status, see [`reports/governance/active_track_evidence.md`]
 These are immutable engineering laws for this repository. Violation = architectural regression.
 
 ### A1: NO FLAT-PACKAGE GROWTH
-The `dharma_swarm/` package currently has **392 files at its top level (58.1% of 675 total Python modules)** (V). No new .py file may be added to the top level. New modules must go into an appropriate subdirectory. Existing top-level files will be organized over time.
+The `dharma_swarm/` package currently has **389 files at its top level (58.7% of 663 total Python modules)** (V). No new .py file may be added to the top level. New modules must go into an appropriate subdirectory. Existing top-level files will be organized over time.
 
 ### A2: NO DUPLICATE IMPLEMENTATIONS
 Before creating a new file for routing, bridging, adapting, or orchestrating, check if one already exists. The repo currently has **26 bridge files** (V), **3 model_routing copies** (2 are identical, 1 is different) (V), **4 orchestrators** (V), **21 adapter files across 8 locations** (V), and **14 router files** (V). Do not add more without deprecating an existing one.
@@ -280,7 +280,7 @@ No single file should exceed 3,000 lines. Current violations (V):
 **148 files exceed 500 lines; 39 exceed 1,000; 7 exceed 3,000** (V). These must be decomposed over time, not grown further.
 
 ### A6: DOCS DECAY -- CHECK BEFORE CITING
-All numerical claims in docs become stale within weeks. Before citing module counts, test counts, or line counts from any doc (including this one), verify against the actual filesystem. See `REPO_GOVERNANCE_AUDIT.md` for the current staleness log. The current DocOps inventory reports **310 Markdown files containing at least one reserved trust-language term** (V). Treat these as authority-scope review candidates, not confirmed repo-wide authority.
+All numerical claims in docs become stale within weeks. Before citing module counts, test counts, or line counts from any doc (including this one), verify against the actual filesystem. See `REPO_GOVERNANCE_AUDIT.md` for the current staleness log. The current DocOps inventory reports **405 Markdown files containing at least one reserved trust-language term** (V). Treat these as authority-scope review candidates, not confirmed repo-wide authority.
 
 ### A7: NO CIRCULAR IMPORTS
 The repo has **9 verified circular dependency chains** (V). The worst:
@@ -291,11 +291,11 @@ The repo has **9 verified circular dependency chains** (V). The worst:
 All 9 cycles were independently confirmed with exact import lines. Most are mitigated by lazy imports but remain architectural debt. **New code must not create circular imports.**
 
 ### A8: FRONTMATTER DISCIPLINE
-Do not inject machine-readable YAML frontmatter into governance or architecture docs unless explicitly requested. Current state: **216 of 771 Markdown files start with YAML frontmatter; 15 of 43 docs/architecture Markdown files do so** (V). Long frontmatter remains an authority/noise risk even when the prose is useful.
+Do not inject machine-readable YAML frontmatter into governance or architecture docs unless explicitly requested. Current state: **219 of 894 Markdown files start with YAML frontmatter; 15 of 43 docs/architecture Markdown files do so** (V). Long frontmatter remains an authority/noise risk even when the prose is useful.
 
 ---
 
-## VERIFIED NUMBERS (2026-06-09 COUNT REFRESH)
+## VERIFIED NUMBERS (2026-06-11 COUNT REFRESH)
 
 These are the ground-truth metrics. All other documents citing different numbers are stale.
 
@@ -303,22 +303,22 @@ These are the ground-truth metrics. All other documents citing different numbers
 |--------|-------|-------------|
 | Total Python modules | **720** | find dharma_swarm -name "*.py" -type f |
 | Top-level (flat) modules | **399 (55.4%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
-| Total Python LOC | **286,515** | wc -l across dharma_swarm Python modules |
+| Total Python LOC | **285,939** | wc -l across dharma_swarm Python modules |
 | Test files | **672** | find tests -name "*.py" -type f |
 | Test functions | **11,280 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
-| Markdown files | **1,019** | find . -name "*.md" -type f |
-| Markdown total lines | **234,830** | wc -l across all .md |
+| Markdown files | **1,020** | find . -name "*.md" -type f |
+| Markdown total lines | **234,906** | wc -l across all .md |
 | Bridge files | **26** | find dharma_swarm -name "*bridge*.py" |
 | Adapter files | **21 across 8 locations** | find dharma_swarm -type f \| rg -i "adapter" |
-| Orchestrator files | **4** (6,034 LOC total) | find dharma_swarm -name "*orchestrat*" |
+| Orchestrator files | **5** | find dharma_swarm -name "*orchestrat*" |
 | Router files | **14** (4,976 LOC total) | find dharma_swarm -type f \| rg -i "rout" |
 | Memory modules | **11** (5,848 LOC) | find dharma_swarm -name "*memory*" |
 | Context modules | **8** (5,828 LOC) | find dharma_swarm -name "*context*" |
 | Provider types (enum) | **18** | models.py ProviderType enum |
 | Provider classes | **19** (including LLMProvider base) | grep "class.*Provider" providers.py |
-| Kernel axioms | **25** (10 original + 15 foundations) | dharma_kernel.py MetaPrinciple enum |
+| Kernel axioms | **26** (10 original + 15 foundations) | dharma_kernel.py MetaPrinciple enum |
 | Telos gates | **11** (2 Tier A, 1 Tier B, 8 Tier C) | telos_gates.py core gates |
 | SQLite-using modules | **49** | grep aiosqlite/sqlite3 |
 | JSONL-writing modules | **126** | grep .jsonl |
@@ -357,6 +357,7 @@ These are the ground-truth metrics. All other documents citing different numbers
   - FORBIDDEN: Must NOT import from Runtime, Intelligence, or Evolution domains
 - **Boundary Status**: **PASS** (V) -- no violations found
 - **Notes for Agents**: `dharma_kernel.py` is SHA-256 signed. Do not modify. Gates are added via `GateRegistry.propose()`, not by editing `telos_gates.py` directly. Parent `~/CLAUDE.md` says "10 axioms" -- this is WRONG; actual count is 25.
+- **Named operator role (merge authority)**: **Merge Master Mike (MMM)** is the registered conditional-merge coordinator agent for this domain. Charter: [`MMM_CHARTER.md`](MMM_CHARTER.md). Operational manual: [`../ops/PR_REVIEW_CONTROL.md`](../ops/PR_REVIEW_CONTROL.md). Registration: [`../../examples/agents/merge_master_mike.registration.json`](../../examples/agents/merge_master_mike.registration.json).
 
 ### Domain 3: Runtime Core (S1 Operations + S2 Coordination)
 
@@ -410,7 +411,7 @@ These are the ground-truth metrics. All other documents citing different numbers
 
 ### Domain 6: Bridges (Integration Layer)
 
-**26 bridge files** (V), **11,910 total LOC** (LOC count pre-holon; 26th = holon_bridge.py, added 2026-06-12 under the composer-holon track surfaces):
+**26 bridge files** (V), **11,910 total LOC**:
 
 | Bridge | Lines | Importers | Status |
 |--------|-------|-----------|--------|

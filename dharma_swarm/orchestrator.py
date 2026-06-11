@@ -2564,7 +2564,7 @@ class Orchestrator:
                 cg.load()
                 quality = min(1.0, len(result or "") / 2000.0)
                 cg.add_edge(
-                    source=f"agent:{agent_name}",
+                    source=f"agent:{td.agent_id}",
                     target=f"task:{task.title[:40]}",
                     edge_type="enables",
                     strength=round(max(0.1, quality), 2),
