@@ -1,5 +1,5 @@
 {
-  "audit_sha": "fc2200758ce608042fe5a68a54a08436b304a483",
+  "audit_sha": "e1b9f839e15a58f980dd54ac1bf8f83119dd2de4",
   "classification_rule": "joined requires all joined evidence patterns; adapter-ready requires all adapter evidence patterns when joined is incomplete; quarantine and legacy require explicit source markers; missing means no tracked surface or insufficient evidence.",
   "classification_vocabulary": [
     "joined",
@@ -11,10 +11,8 @@
   "doc_anchor_status": "ok",
   "metric": "spine_adoption_metric",
   "missing_doc_anchors": [],
-  "source_status": "dirty",
-  "source_status_entries": [
-    " M dharma_swarm/ontology.py"
-  ],
+  "source_status": "clean",
+  "source_status_entries": [],
   "summary": {
     "adapter_ready_count": 3,
     "adoption_pct": 93.8,
@@ -1761,5 +1759,5 @@
       "status": "legacy"
     }
   ],
-  "tracked_file_count": 2924
+  "tracked_file_count": 3022
 }
