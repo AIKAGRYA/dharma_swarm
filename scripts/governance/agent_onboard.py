@@ -306,6 +306,38 @@ def render_repo_state(*, fast: bool = False) -> dict[str, Any]:
     }
 
 
+def render_identity() -> None:
+    """WHY layer — read-only pointers to the identity/vision owners.
+
+    Owners: foundations/THE_ORGANISM.md (identity), docs/vision_maps/NORTH_STAR.md
+    (operator-authored vision). This section renders pointers only; it owns no
+    rules and no state.
+    """
+    section("WHY / IDENTITY (owners: foundations/THE_ORGANISM.md, docs/vision_maps/NORTH_STAR.md)")
+    organism = REPO_ROOT / "foundations/THE_ORGANISM.md"
+    one_line = ""
+    if organism.exists():
+        for line in organism.read_text(encoding="utf-8").splitlines():
+            stripped = line.strip()
+            if stripped.startswith("> **dharma_swarm is"):
+                one_line = stripped.lstrip("> ").strip().strip("*")
+                break
+    if one_line:
+        print(f"  {one_line}")
+    else:
+        print("  (foundations/THE_ORGANISM.md not in this checkout — read NORTH_STAR.md §1)")
+    print("  Read-first (the 10-second map):")
+    for path in (
+        "foundations/THE_ORGANISM.md",
+        "docs/vision_maps/NORTH_STAR.md",
+        "reports/swarm_genome/2026-06-11/SYNTHESIS.md",
+        "docs/MEGAFILE_INDEX.md",
+    ):
+        marker = "" if (REPO_ROOT / path).exists() else "  [MISSING in this checkout]"
+        print(f"    - {path}{marker}")
+    print("  Whole-system view: python3 scripts/governance/orientation_graph.py [--json]  (make orient)")
+
+
 def render_parallel_work_lanes() -> dict[str, Any]:
     """Live git/worktree inventory so 0..N parallel builds can coordinate.
 
@@ -1402,6 +1434,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     repo_state = render_repo_state(fast=args.fast)
+    render_identity()
     render_active_track(evidence, track)
     lanes = render_parallel_work_lanes()
     render_live_ops()
