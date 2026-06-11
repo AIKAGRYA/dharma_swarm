@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-11T08:18:04+09:00",
+  "generated_at": "2026-06-11T15:22:24+00:00",
   "schema_version": 2,
   "active_track_id": "runtime-truth-reconciliation-2026-06",
   "shippable": true,
@@ -95,7 +95,7 @@
     }
   ],
   "portfolio_summary": {
-    "active": 2,
+    "active": 3,
     "max_active": 10,
     "warn_active": 5,
     "shippable": 2
@@ -301,6 +301,78 @@
           "detail": "pattern 'NATS' found in docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md"
         }
       ]
+    },
+    {
+      "id": "loop-closure-2026-06",
+      "name": "Cybernetic Loop Closure \u2014 wire all 13 loops with receipted closure checks",
+      "status": "ACTIVE",
+      "serves": "substrate-nativeness",
+      "complements": [
+        "runtime-truth-reconciliation-2026-06"
+      ],
+      "depends_on": [],
+      "conflicts_with": [],
+      "owned_surfaces": [
+        "reports/loop_closure/**",
+        "CYBERNETIC_LOOP_MAP.md"
+      ],
+      "moves_vital_signs": [
+        "quality_gates",
+        "eval_coverage"
+      ],
+      "verified_at": "2026-06-11",
+      "ttl_days": 21,
+      "owner": "@AmitabhainArunachala",
+      "shippable": false,
+      "prerequisites_ok": true,
+      "completion_progress": {
+        "passed": 3,
+        "total": 5
+      },
+      "criteria": [
+        {
+          "id": "loop_map_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "CYBERNETIC_LOOP_MAP.md present"
+        },
+        {
+          "id": "loop_supervisor_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "dharma_swarm/loop_supervisor.py present"
+        },
+        {
+          "id": "phase0_dossier_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md present"
+        },
+        {
+          "id": "phase0_fresh_status_table",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'Fresh 13-loop status table' found in reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md"
+        },
+        {
+          "id": "one_wire_invariant_stated",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'never let internal artifacts touch archive fitness' found in reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md"
+        },
+        {
+          "id": "loop1_closure_receipt_exists",
+          "kind": "file_exists",
+          "passed": false,
+          "detail": "reports/loop_closure/phase1/LOOP1_CLOSURE_RECEIPT.md MISSING"
+        },
+        {
+          "id": "campaign_retrospective_exists",
+          "kind": "file_exists",
+          "passed": false,
+          "detail": "reports/loop_closure/RETROSPECTIVE.md MISSING"
+        }
+      ]
     }
   ],
   "findings": [
@@ -326,6 +398,12 @@
       "severity": "INFO",
       "check": "track-shippable:runtime-truth-nats-2026-06",
       "message": "[runtime-truth-nats-2026-06] all 2 completion criteria pass \u2014 SHIPPABLE; close it (and optionally open the next).",
+      "criterion_id": null
+    },
+    {
+      "severity": "INFO",
+      "check": "track-in-progress:loop-closure-2026-06",
+      "message": "[loop-closure-2026-06] 3/5 completion criteria pass.",
       "criterion_id": null
     }
   ]
