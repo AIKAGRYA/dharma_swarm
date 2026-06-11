@@ -3,7 +3,7 @@
 **Role:** reference (vision). Operator-authored via interview, 2026-06-11 (locked in same day after a full-day grounding dialogue).
 **Authority:** subordinate to `docs/governance/SOVEREIGN_MANIFEST.md` §Telos Hierarchy and `docs/governance/CANONICAL_DOC_STACK.md`. This file is the *why*; it owns no rules and no state.
 **Subordinates / braids (does not replace):** `foundations/FIVE_FOURTEEN_A.md`, `docs/vision_maps/2026-05-07_operating_company_kernel.md`, `docs/vision_maps/MASTER_2026-05-07_attractor_closure_synthesis.md`, `lodestones/seeds/self_reference_attractor.md`, `docs/governance/VENTURE_CELL_PORTFOLIO.yaml`, `reports/swarm_genome/2026-06-11/SYNTHESIS.md`.
-**Source of words:** the operator (John / Dhyana), interview of 2026-06-11. Nothing below is agent-invented; bracketed pointers ground each claim in its full document.
+**Source of words:** the operator (John / Dhyana), interview of 2026-06-11. Nothing below is agent-invented; bracketed pointers ground each claim in its full document. External-world claims in §5 and §11 carry their own citations (verified 2026-06-11).
 
 ---
 
@@ -90,7 +90,11 @@ when that is what makes the wiring solid.
 
 cofounder.co and Polsia are single-human-run AI systems that build and run
 companies with an army of well-organized agents — this is that, but more
-powerful and more visionary. Palantir is one of the most effective uses of
+powerful and more visionary. (Externally verified 2026-06-11: Polsia raised
+$30M at a $250M post-money valuation, ~$10M ARR, one human, zero employees;
+Cofounder 2 ships a "superoptimizer" manager-agent across
+eng/sales/marketing/design as "infrastructure for the one-person
+billion-dollar company." The era-validity of the model is no longer a bet.) Palantir is one of the most effective uses of
 AI, but for defense; this is a **Palantir for doing good works in the
 world** — shifting the paradigm from trillions of dollars of
 military-industrial complex toward a
@@ -148,7 +152,11 @@ evidence terms (2026-06-11):
    kernel → knowledge ops → thinkodynamic → shakti zeitgeist → venture
    cells → runtime spine → A2A → Palantir-style semantic ontology.
 2. The swarm scores **higher than single models on coding benchmarks** and
-   demonstrates solid evolution of itself.
+   demonstrates solid evolution of itself. (The published bar: Sakana/UBC's
+   Darwin Gödel Machine self-improved 20%→50% on SWE-bench and 14.2%→30.7%
+   on Polyglot via open-ended archive search — arXiv:2505.22954. Note its
+   winning mechanism, an archive of diverse stepping stones, is the same
+   diversity doctrine `CLAUDE.md` already mandates.)
 3. A **full venture-cell build, end to end**, verifiably competitive with
    what is already in the field.
 4. All seeded parts wired in and functioning consistently.
@@ -172,10 +180,38 @@ is canonical until it is **metabolized to main**, and seeds must reach main
 metabolizer is the existing Chetana pattern — ingest → stage → gate →
 promote — applied to canon itself, with freshness labels per the swarm
 genome spec. `git` main is the single ordering authority.
-[`dharma_swarm/chetana/`; `reports/swarm_genome/2026-06-11/SYNTHESIS.md`
+[Chetana lives at `dharma_swarm/chetana/` on the `capital-lab/build`
+extraction branch — itself a seed awaiting metabolism to main, which is the
+rule demonstrating its own necessity; `reports/swarm_genome/2026-06-11/SYNTHESIS.md`
 §Candidate Canonical Artifact Draft]
 
-## 10. Horizons
+## 10. The field — external receipts (2026-06)
+
+Every lane has live external competitors and live external windows; none of
+them hold this system's specific position.
+
+- **Self-evolution:** DGM (Sakana/UBC) proves gated self-modification works
+  on public benchmarks (arXiv:2505.22954). It validates the Darwin lane's
+  thesis and sets the number to beat.
+- **Agent society:** Moltbook (launched 2026-01-28) hosts 2M+ agents in a
+  Reddit-shaped network with no telos and documented toxicity (CISPA study,
+  2026-02). SAB/Dharmic Agora is the dharmic counter-position: gated,
+  lawful, telos-aligned agent society.
+- **Agent trust:** the IETF is drafting the trust layer NOW —
+  ATTP (draft-sharif-attp-01: graduated trust L0–L4, action limits, kill
+  switches, tamper-evident audit), AIP (DIDs + delegation chains),
+  AGTP-TRUST. These standardize identity/limits plumbing; none provide
+  *behavioral* trust — gates as runtime code, Brier-scored self-published
+  misses, receipts of loops closed through reality. That behavioral layer
+  is this repo's 52%-governance-mass position, and the window is open.
+- **Agentic trading:** AIDGE (agent-run fund OS), ENTON (LLM strategy
+  authoring → backtest → deploy), QuantOptimus (LLM trading desk) all exist
+  and sell. None advertise anti-Goodhart gates, Deflated-Sharpe/PBO
+  discipline, or publishing their own misses — exactly the honesty stack
+  `capital_lab` builds. Selling the gated harness (trust-with-receipts as
+  product) is the differentiated wedge.
+
+## 11. Horizons
 
 **90 days:** mostly self-operating; running continuously on local and
 high-power free models; no slop; high-level output; **funds itself totally**;
