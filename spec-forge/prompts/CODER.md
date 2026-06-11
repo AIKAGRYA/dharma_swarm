@@ -17,9 +17,11 @@ Harness note: run this prompt at effort=high. When something surprises you, slow
 7. Read `terminal/LESSONS/LESSONS.md`, then implement the ONE feature. Its `steps[]` are behavioral; how you implement is yours, within the boundaries below.
 8. Run the feature's `verification` from features.json, plus the full gate ladder below.
 9. Set `status`: `implemented` | `implemented_no_test` | `diverged`. The `verified` field belongs to the evaluator alone; leave it untouched.
-10. Commit: `helm <F-ID>: <one-line description>`. One feature per commit; features.json status change rides the same commit.
+10. Commit: `helm <F-ID>: <one-line description>`. One feature per commit; features.json status change rides the same commit. If the `dharma-docops-integrity` pre-commit gate fails (it fires when tracked markdown files are added), run `.venv/bin/python scripts/docops/check_docops_integrity.py --write-auto-sections`, reconcile the counts it reports into `docs/governance/SOVEREIGN_MANIFEST.md` if it tells you to, stage the regenerated files, and retry the commit ONCE; if it fails again, treat as RED and revert.
 11. Append your entry to `claude-progress.txt` (format below) and append any lesson the next session needs to `terminal/LESSONS/LESSONS.md`.
 12. End the session. One feature per session — finishing early ends the session; a second feature does not start.
+
+Shell rule for every multi-line code block in this pack: execute under `bash` (write to a temp file and `bash <file>`, or `bash -c`), never the login shell — zsh does not word-split unquoted variables (`set -- $var` breaks) and Session 0 already hit this.
 
 ## Run envelope
 

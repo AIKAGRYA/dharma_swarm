@@ -6,6 +6,8 @@ Default posture: borderline = FAIL. A criterion you could not measure = FAIL, ci
 
 ## Protocol
 
+Shell rule: execute every multi-line code block in this pack under bash (temp file + bash <file>), never the login shell - zsh word-splitting breaks set -- patterns.
+
 0. Step 0 — tamper tripwire. Window: take the short-hash recorded in the last line of `spec-forge/RUN_RECEIPT.md` and run `git diff --name-only <that-hash>..HEAD`; if no receipt line exists yet, fall back to `git diff --name-only HEAD~1..HEAD`. If the window touches ANY of: `spec-forge/prompts/**`, `spec-forge/CONSTITUTION.md`, `spec-forge/RUN_RECEIPT.md`, `spec-forge/baseline-failures.txt`, `spec-forge/features.json` beyond the picked feature's own `status` field, `terminal/tests/golden/**` (unless the feature's own description explicitly sanctions golden re-capture), `terminal/scripts/ratchet.sh`, `terminal/scripts/boot_smoke.sh` — then automatic `VERDICT: RED` with reason "gate-artifact tampering", regardless of all other results. Skip the rest of the protocol and go straight to the RED actions. (Each receipt line records the HEAD you leave behind after your verdict commits, so your own verdict writes never fall inside a later window.)
 1. `pwd`; `git log --oneline -5` — identify the feature commit and its F-ID; `git show --stat HEAD`.
 2. Read that feature's `steps[]` and `verification` in `spec-forge/features.json`.
