@@ -47,6 +47,9 @@ import {
   workspaceSnapshotToLines,
   workspaceSnapshotToPreview,
 } from "../src/protocol";
+import path from "node:path";
+
+const REPO_ROOT = path.resolve(import.meta.dir, "..", "..");
 
 describe("normalizeCommandName", () => {
   test("strips the slash prefix and trailing arguments", () => {
@@ -1101,7 +1104,7 @@ describe("session payload renderers", () => {
           status: "completed",
           branch_label: "main",
           summary: "stabilize terminal shell",
-          cwd: "/Users/dhyana/dharma_swarm",
+          cwd: REPO_ROOT,
         },
         replay_ok: false,
         replay_issues: ["missing usage event"],
@@ -1195,7 +1198,7 @@ describe("inferSlashCommand", () => {
   });
 
   test("ignores filesystem paths embedded in summaries", () => {
-    expect(inferSlashCommand("wrote snapshot to /Users/dhyana/dharma_swarm/state and then executed /git status")).toBe(
+    expect(inferSlashCommand(`wrote snapshot to ${REPO_ROOT}/state and then executed /git status`)).toBe(
       "/git",
     );
     expect(inferSlashCommand("log saved at /tmp/runtime.log")).toBe("");
@@ -1203,7 +1206,7 @@ describe("inferSlashCommand", () => {
 
   test("ignores leading filesystem paths before the first slash command", () => {
     expect(inferSlashCommand("/tmp/runtime.log captured before executed /runtime status")).toBe("/runtime");
-    expect(inferSlashCommand("/Users/dhyana/dharma_swarm/terminal/src/app.tsx")).toBe("");
+    expect(inferSlashCommand(`${REPO_ROOT}/terminal/src/app.tsx`)).toBe("");
   });
 });
 
@@ -1669,7 +1672,7 @@ describe("eventToTabPatch", () => {
       type: "command.result",
       command: "/git",
       output: `# Workspace X-Ray
-Repo root: /Users/dhyana/dharma_swarm
+Repo root: ${REPO_ROOT}
 Git: main@95210b1 | staged 0 | unstaged 518 | untracked 48`,
     });
 
@@ -1684,7 +1687,7 @@ Git: main@95210b1 | staged 0 | unstaged 518 | untracked 48`,
       payload: {
         version: "v1",
         domain: "workspace_snapshot",
-        repo_root: "/Users/dhyana/dharma_swarm",
+        repo_root: REPO_ROOT,
         git: {
           branch: "main",
           head: "804d5d1",
@@ -1718,7 +1721,7 @@ Git: main@95210b1 | staged 0 | unstaged 518 | untracked 48`,
         snapshot: {
           snapshot_id: "snap-1",
           created_at: "2026-04-04T00:00:00Z",
-          repo_root: "/Users/dhyana/dharma_swarm",
+          repo_root: REPO_ROOT,
           runtime_db: "/Users/dhyana/.dharma/state/runtime.db",
           health: "ok",
           bridge_status: "connected",
@@ -1751,7 +1754,7 @@ Git: main@95210b1 | staged 0 | unstaged 518 | untracked 48`,
     const patches = eventToTabPatch({
       type: "workspace.snapshot.result",
       content: `# Workspace X-Ray
-Repo root: /Users/dhyana/dharma_swarm
+Repo root: ${REPO_ROOT}
 Git: main@95210b1 | staged 0 | unstaged 517 | untracked 46`,
     });
 
@@ -2125,7 +2128,7 @@ describe("sessionBootstrap helpers", () => {
         reason: "plain-language operator command",
       },
       workspace_preview: {
-        "Repo root": "/Users/dhyana/dharma_swarm",
+        "Repo root": REPO_ROOT,
         Branch: "main",
         "Repo risk": "sab_canonical_repo_missing",
         Dirty: "0 staged, 1 unstaged, 0 untracked",
@@ -2161,7 +2164,7 @@ describe("sessionBootstrap helpers", () => {
         reason: "explicit model-routing request",
       },
       workspace_preview: {
-        "Repo root": "/Users/dhyana/dharma_swarm",
+        "Repo root": REPO_ROOT,
         Branch: "main",
         "Repo risk": "stable",
         Dirty: "clean",
@@ -2178,7 +2181,7 @@ describe("sessionBootstrap helpers", () => {
     expect(preview.Intent).toContain("model switch");
     expect(preview.Route).toBe("claude:claude-sonnet-4-5");
     expect(preview.Strategy).toBe("genius");
-    expect(preview["Repo root"]).toBe("/Users/dhyana/dharma_swarm");
+    expect(preview["Repo root"]).toBe(REPO_ROOT);
     expect(preview["Runtime activity"]).toBe("Sessions=4");
     expect(preview["Repo guidance"]).toBe("loaded");
     expect(preview["Session hint"]).toBe("Active thread: terminal-v3");
@@ -2411,7 +2414,7 @@ describe("evolutionSurface helpers", () => {
 describe("workspaceSnapshotToLines", () => {
   test("renders a bounded repo summary with dirty counts, topology warnings, and hotspots", () => {
     const content = `# Workspace X-Ray
-Repo root: /Users/dhyana/dharma_swarm
+Repo root: ${REPO_ROOT}
 Git: main@95210b1 | staged 0 | unstaged 510 | untracked 42
 Git hotspots: terminal (274); .dharma_psmv_hyperfile_branch (142); dharma_swarm (91)
 Git changed paths: terminal/src/protocol.ts; terminal/src/components/Sidebar.tsx; terminal/tests/protocol.test.ts
@@ -2431,7 +2434,7 @@ Git sync: origin/main | ahead 0 | behind 0
     expect(lines).toEqual([
       "# Repo Snapshot",
       "## Git status",
-      "Repo root: /Users/dhyana/dharma_swarm",
+      `Repo root: ${REPO_ROOT}`,
       "Branch: main",
       "Head: 95210b1",
       "Sync: origin/main | ahead 0 | behind 0",
@@ -2490,7 +2493,7 @@ Git sync: origin/main | ahead 0 | behind 0
 describe("workspacePreviewToLines", () => {
   test("renders the same bounded repo transcript from preview fields alone", () => {
     const preview = {
-      "Repo root": "/Users/dhyana/dharma_swarm",
+      "Repo root": REPO_ROOT,
       Branch: "main",
       Head: "95210b1",
       Sync: "origin/main | ahead 0 | behind 0",
@@ -2541,7 +2544,7 @@ describe("workspacePreviewToLines", () => {
     expect(workspacePreviewToLines(preview).map((line) => line.text)).toEqual([
       "# Repo Snapshot",
       "## Git status",
-      "Repo root: /Users/dhyana/dharma_swarm",
+      `Repo root: ${REPO_ROOT}`,
       "Branch: main",
       "Head: 95210b1",
       "Sync: origin/main | ahead 0 | behind 0",
@@ -2602,7 +2605,7 @@ describe("workspaceSnapshotToPreview", () => {
       payload: {
         version: "v1",
         domain: "workspace_snapshot",
-        repo_root: "/Users/dhyana/dharma_swarm",
+        repo_root: REPO_ROOT,
         git: {
           branch: "main",
           head: "95210b1",
@@ -2635,7 +2638,7 @@ describe("workspaceSnapshotToPreview", () => {
               name: "dharma_swarm",
               role: "canonical_core",
               canonical: true,
-              path: "/Users/dhyana/dharma_swarm",
+              path: REPO_ROOT,
               exists: true,
               is_git: true,
               branch: "main...origin/main",
@@ -2686,7 +2689,7 @@ describe("workspaceSnapshotToPreview", () => {
     expect(payload?.domain).toBe("workspace_snapshot");
     const preview = workspacePayloadToPreview(payload!);
 
-    expect(preview["Repo root"]).toBe("/Users/dhyana/dharma_swarm");
+    expect(preview["Repo root"]).toBe(REPO_ROOT);
     expect(preview.Branch).toBe("main");
     expect(preview["Primary changed path"]).toBe("terminal/src/protocol.ts");
     expect(preview["Topology risk"]).toBe("sab_canonical_repo_missing");
@@ -2703,7 +2706,7 @@ describe("workspaceSnapshotToPreview", () => {
       payload: {
         version: "v1",
         domain: "workspace_snapshot",
-        repo_root: "/Users/dhyana/dharma_swarm",
+        repo_root: REPO_ROOT,
         git: {
           branch: "main",
           head: "804d5d19675ddcd904153fa9642de47ce345d95d",
@@ -2736,7 +2739,7 @@ describe("workspaceSnapshotToPreview", () => {
 
   test("preserves all topology warning members in compact repo truth previews from markdown workspace snapshots", () => {
     const content = `# Workspace X-Ray
-Repo root: /Users/dhyana/dharma_swarm
+Repo root: ${REPO_ROOT}
 Git: main@95210b1 | staged 0 | unstaged 510 | untracked 42
 Git hotspots: terminal (274)
 Git changed paths: terminal/src/protocol.ts
@@ -2760,7 +2763,7 @@ Git sync: origin/main | ahead 0 | behind 0
       payload: {
         version: "v1",
         domain: "workspace_snapshot",
-        repo_root: "/Users/dhyana/dharma_swarm",
+        repo_root: REPO_ROOT,
         git: {
           branch: "main",
           head: "95210b1",
@@ -2785,7 +2788,7 @@ Git sync: origin/main | ahead 0 | behind 0
               name: "dharma_swarm",
               role: "canonical_core",
               canonical: true,
-              path: "/Users/dhyana/dharma_swarm",
+              path: REPO_ROOT,
               exists: true,
               is_git: true,
               branch: "main...origin/main",
@@ -2811,7 +2814,7 @@ Git sync: origin/main | ahead 0 | behind 0
 
   test("extracts explicit repo preview fields for the context sidebar", () => {
     const content = `# Workspace X-Ray
-Repo root: /Users/dhyana/dharma_swarm
+Repo root: ${REPO_ROOT}
 Git: main@95210b1 | staged 0 | unstaged 510 | untracked 42
 Git hotspots: terminal (274); .dharma_psmv_hyperfile_branch (142); dharma_swarm (91)
 Git changed paths: terminal/src/protocol.ts; terminal/src/components/Sidebar.tsx; terminal/tests/protocol.test.ts
@@ -2843,7 +2846,7 @@ Workflows: 1
 
     const preview = workspaceSnapshotToPreview(content);
 
-    expect(preview["Repo root"]).toBe("/Users/dhyana/dharma_swarm");
+    expect(preview["Repo root"]).toBe(REPO_ROOT);
     expect(preview.Branch).toBe("main");
     expect(preview.Head).toBe("95210b1");
     expect(preview.Sync).toBe("origin/main | ahead 0 | behind 0");
@@ -2911,7 +2914,7 @@ Workflows: 1
 
   test("shortens full commit hashes parsed from workspace snapshot text", () => {
     const content = `# Workspace X-Ray
-Repo root: /Users/dhyana/dharma_swarm
+Repo root: ${REPO_ROOT}
 Git: main@804d5d19675ddcd904153fa9642de47ce345d95d | staged 0 | unstaged 1 | untracked 0
 Git hotspots: terminal (1)
 Git changed paths: terminal/src/protocol.ts
@@ -2925,7 +2928,7 @@ Git sync: origin/main | ahead 0 | behind 0`;
 
   test("keeps sync fields readable when upstream facts are unavailable", () => {
     const content = `# Workspace X-Ray
-Repo root: /Users/dhyana/dharma_swarm
+Repo root: ${REPO_ROOT}
 Git: (detached)@95210b1 | staged 1 | unstaged 2 | untracked 3
 Git hotspots: terminal (3)
 Git changed paths: terminal/src/protocol.ts
@@ -2969,7 +2972,7 @@ Git sync: detached HEAD
 
   test("parses bracket-style git sync summaries from workspace snapshot text", () => {
     const content = `# Workspace X-Ray
-Repo root: /Users/dhyana/dharma_swarm
+Repo root: ${REPO_ROOT}
 Git: main@804d5d19675ddcd904153fa9642de47ce345d95d | staged 112 | unstaged 545 | untracked 112
 Git hotspots: terminal (281); dharma_swarm (93)
 Git changed paths: terminal/src/components/RepoPane.tsx; terminal/src/components/Sidebar.tsx
@@ -2993,7 +2996,7 @@ Git sync: main...origin/main [ahead 2]
 
   test("parses diverged bracket-style git sync summaries from workspace snapshot text", () => {
     const content = `# Workspace X-Ray
-Repo root: /Users/dhyana/dharma_swarm
+Repo root: ${REPO_ROOT}
 Git: main@804d5d1 | staged 4 | unstaged 5 | untracked 1
 Git hotspots: terminal (6)
 Git changed paths: terminal/src/protocol.ts
@@ -3012,7 +3015,7 @@ Git sync: feature/repo-pane...origin/main [ahead 2, behind 1]`;
 
   test("prefers the warning-bearing peer as the primary topology peer in text workspace snapshots", () => {
     const content = `# Workspace X-Ray
-Repo root: /Users/dhyana/dharma_swarm
+Repo root: ${REPO_ROOT}
 Git: main@95210b1 | staged 1 | unstaged 2 | untracked 3
 Git hotspots: terminal (4)
 Git changed paths: terminal/src/protocol.ts

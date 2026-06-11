@@ -11,6 +11,8 @@ import {
   saveSupervisorRepoPreview,
 } from "../src/persistence";
 
+const REPO_ROOT = path.resolve(import.meta.dir, "..", "..");
+
 const TEMP_DIRS: string[] = [];
 
 afterEach(() => {
@@ -30,7 +32,7 @@ function makeStateDir(): string {
     path.join(stateDir, "run.json"),
     JSON.stringify(
       {
-        repo_root: "/Users/dhyana/dharma_swarm",
+        repo_root: REPO_ROOT,
         updated_at: "2026-03-31T22:46:35.466340+00:00",
         cycle: 3,
         status: "running",
@@ -141,7 +143,7 @@ describe("supervisor control persistence", () => {
       ),
     );
 
-    expect(loadSupervisorControlPreview("/Users/dhyana/dharma_swarm", new Date("2026-04-01T04:00:00Z"))).toMatchObject({
+    expect(loadSupervisorControlPreview(REPO_ROOT, new Date("2026-04-01T04:00:00Z"))).toMatchObject({
       "Verification summary": "tsc=ok | bridge_snapshots=ok | cycle_acceptance=fail",
       "Verification bundle": "tsc=ok | bridge_snapshots=ok | cycle_acceptance=fail",
       "Runtime freshness":
@@ -169,7 +171,7 @@ describe("supervisor control persistence", () => {
       ),
     );
 
-    expect(loadSupervisorControlPreview("/Users/dhyana/dharma_swarm", new Date("2026-04-01T04:00:00Z"))).toMatchObject({
+    expect(loadSupervisorControlPreview(REPO_ROOT, new Date("2026-04-01T04:00:00Z"))).toMatchObject({
       "Verification summary": "tsc=ok | bridge_snapshots=ok | cycle_acceptance=fail",
       "Verification status": "1 failing, 2/3 passing",
       "Verification passing": "tsc, bridge_snapshots",
@@ -299,7 +301,7 @@ describe("supervisor control persistence", () => {
       "/tmp/alt-durable/verification.json",
     );
 
-    expect(loadSupervisorControlPreview("/Users/dhyana/dharma_swarm", new Date("2026-04-01T04:00:00Z"))).toMatchObject({
+    expect(loadSupervisorControlPreview(REPO_ROOT, new Date("2026-04-01T04:00:00Z"))).toMatchObject({
       "Durable state": "/tmp/alt-durable",
       "Verification receipt": "/tmp/alt-durable/verification.json",
     });
@@ -396,7 +398,7 @@ describe("supervisor control persistence", () => {
     rmSync(path.join(stateDir, "verification.json"), {force: true});
     rmSync(path.join(stateDir, "terminal-control-summary.json"), {force: true});
 
-    expect(loadSupervisorControlPreview("/Users/dhyana/dharma_swarm", new Date("2026-04-01T04:00:00Z"))).toMatchObject({
+    expect(loadSupervisorControlPreview(REPO_ROOT, new Date("2026-04-01T04:00:00Z"))).toMatchObject({
       "Runtime DB": "/Users/dhyana/.dharma/state/runtime.db",
       "Session state": "18 sessions | 0 claims | 0 active claims | 0 acked claims",
       "Run state": "0 runs | 0 active runs",
@@ -441,7 +443,7 @@ describe("supervisor control persistence", () => {
     rmSync(path.join(stateDir, "verification.json"), {force: true});
 
     const summary = loadSupervisorControlState();
-    const preview = loadSupervisorControlPreview("/Users/dhyana/dharma_swarm", new Date("2026-04-03T04:00:00Z"));
+    const preview = loadSupervisorControlPreview(REPO_ROOT, new Date("2026-04-03T04:00:00Z"));
 
     expect(summary?.verificationUpdatedAt).toBe("2026-04-03T02:00:00Z");
     expect(preview?.["Verification updated"]).toBe("2026-04-03T02:00:00Z");
@@ -494,7 +496,7 @@ describe("supervisor control persistence", () => {
     writeFileSync(path.join(stateDir, "run.json"), JSON.stringify(run, null, 2));
     rmSync(path.join(stateDir, "terminal-control-summary.json"), {force: true});
 
-    expect(loadSupervisorControlPreview("/Users/dhyana/dharma_swarm", new Date("2026-04-01T04:00:00Z"))).toMatchObject({
+    expect(loadSupervisorControlPreview(REPO_ROOT, new Date("2026-04-01T04:00:00Z"))).toMatchObject({
       "Loop state": "cycle 3 running",
       "Result status": "in_progress",
       Acceptance: "pass",
@@ -516,7 +518,7 @@ describe("supervisor control persistence", () => {
       path.join(stateDir, "run.json"),
       JSON.stringify(
         {
-          repo_root: "/Users/dhyana/dharma_swarm",
+          repo_root: REPO_ROOT,
           updated_at: "2026-04-02T12:00:00Z",
           cycle: 3,
           status: "running",
@@ -556,7 +558,7 @@ describe("supervisor control persistence", () => {
 
     expect(summary).not.toBeNull();
     expect(summary?.continueRequired).toBe(true);
-    expect(loadSupervisorControlPreview("/Users/dhyana/dharma_swarm")?.["Loop decision"]).toBe("continue required");
+    expect(loadSupervisorControlPreview(REPO_ROOT)?.["Loop decision"]).toBe("continue required");
   });
 
   test("round-trips the richer control preview through durable state", () => {
@@ -605,7 +607,7 @@ describe("supervisor control persistence", () => {
       "Durable state": stateDir,
     });
 
-    expect(loadSupervisorControlPreview("/Users/dhyana/dharma_swarm", new Date("2026-04-01T04:00:00Z"))).toEqual({
+    expect(loadSupervisorControlPreview(REPO_ROOT, new Date("2026-04-01T04:00:00Z"))).toEqual({
       "Runtime DB": "/Users/dhyana/.dharma/state/runtime.db",
       "Session state": "18 sessions | 0 claims | 0 active claims | 0 acked claims",
       "Run state": "0 runs | 0 active runs",
@@ -664,13 +666,13 @@ describe("supervisor control persistence", () => {
       ),
     );
 
-    expect(loadSupervisorControlPreview("/Users/dhyana/dharma_swarm", new Date("2026-04-01T04:00:00Z"))?.["Runtime summary"]).toBe(
+    expect(loadSupervisorControlPreview(REPO_ROOT, new Date("2026-04-01T04:00:00Z"))?.["Runtime summary"]).toBe(
       "/Users/dhyana/.dharma/state/runtime.db | 18 sessions | 0 claims | 0 active claims | 0 acked claims | 0 runs | 0 active runs | 7 artifacts | 2 promoted facts | 1 context bundles | 3 operator actions",
     );
-    expect(loadSupervisorControlPreview("/Users/dhyana/dharma_swarm", new Date("2026-04-01T04:00:00Z"))?.["Control pulse preview"]).toBe(
+    expect(loadSupervisorControlPreview(REPO_ROOT, new Date("2026-04-01T04:00:00Z"))?.["Control pulse preview"]).toBe(
       "fresh | in_progress / pass | cycle 3 running | updated 2026-03-31T22:46:35.466340+00:00 | verify tsc=ok | py_compile_bridge=ok | bridge_snapshots=ok | cycle_acceptance=ok",
     );
-    expect(loadSupervisorControlPreview("/Users/dhyana/dharma_swarm", new Date("2026-04-01T04:00:00Z"))?.["Control truth preview"]).toBe(
+    expect(loadSupervisorControlPreview(REPO_ROOT, new Date("2026-04-01T04:00:00Z"))?.["Control truth preview"]).toBe(
       "tsc=ok | py_compile_bridge=ok | bridge_snapshots=ok | cycle_acceptance=ok | cycle 3 running | next Split /runtime and /dashboard control actions into dedicated pane routes.",
     );
   });
@@ -688,7 +690,7 @@ describe("supervisor control persistence", () => {
     };
     writeFileSync(path.join(stateDir, "run.json"), JSON.stringify(run, null, 2));
 
-    expect(loadSupervisorControlPreview("/Users/dhyana/dharma_swarm", new Date("2026-04-01T04:00:00Z"))?.["Control truth preview"]).toBe(
+    expect(loadSupervisorControlPreview(REPO_ROOT, new Date("2026-04-01T04:00:00Z"))?.["Control truth preview"]).toBe(
       "tsc=ok | py_compile_bridge=ok | bridge_snapshots=ok | cycle_acceptance=ok | cycle 3 running | next Split /runtime and /dashboard control actions into dedicated pane routes.",
     );
   });
@@ -897,7 +899,7 @@ describe("supervisor control persistence", () => {
       ),
     );
 
-    expect(loadSupervisorControlPreview("/Users/dhyana/dharma_swarm")).toMatchObject({
+    expect(loadSupervisorControlPreview(REPO_ROOT)).toMatchObject({
       "Verification summary": "tsc=ok | bridge_snapshots=ok | cycle_acceptance=fail",
       "Verification status": "1 failing, 2/3 passing",
       "Verification passing": "tsc, bridge_snapshots",
@@ -925,7 +927,7 @@ describe("supervisor control persistence", () => {
       ),
     );
 
-    expect(loadSupervisorControlPreview("/Users/dhyana/dharma_swarm")).toMatchObject({
+    expect(loadSupervisorControlPreview(REPO_ROOT)).toMatchObject({
       "Verification summary": "tsc=ok | bridge_snapshots=ok | cycle_acceptance=fail",
       "Verification checks": "tsc ok; bridge_snapshots ok; cycle_acceptance fail",
       "Verification status": "1 failing, 2/3 passing",
@@ -942,7 +944,7 @@ describe("supervisor control persistence", () => {
       path.join(stateDir, "run.json"),
       JSON.stringify(
         {
-          repo_root: "/Users/dhyana/dharma_swarm",
+          repo_root: REPO_ROOT,
           updated_at: "2026-04-03T02:16:08Z",
           cycle: 7,
           status: "running",
@@ -988,7 +990,7 @@ describe("supervisor control persistence", () => {
       ),
     );
 
-    expect(loadSupervisorControlPreview("/Users/dhyana/dharma_swarm", new Date("2026-04-03T04:00:00Z"))).toMatchObject({
+    expect(loadSupervisorControlPreview(REPO_ROOT, new Date("2026-04-03T04:00:00Z"))).toMatchObject({
       "Repo/control preview":
         "stale | task terminal-control-surface | progress 2 done, 1 pending of 3 | outcome in_progress/pass | decision continue required | cycle 7 waiting_for_verification | updated 2026-04-03T02:16:08Z | verify tsc=ok | bridge_snapshots=ok | cycle_acceptance=fail | db /Users/dhyana/.dharma/state/runtime.db | activity Sessions=18 Runs=0 ActiveRuns=0 | artifacts Artifacts=7 ContextBundles=1 | next persist pane-ready verification receipts",
       "Active task": "terminal-control-surface",
@@ -1053,7 +1055,7 @@ describe("supervisor control persistence", () => {
     expect(payload.preview_Runtime_summary).toBe(
       "/Users/dhyana/.dharma/state/runtime.db | 20 sessions | 0 claims | 0 active claims | 0 acked claims | 0 active runs | 0 runs total | 0 artifacts | 0 promoted facts | 0 context bundles | 0 operator actions",
     );
-    expect(loadSupervisorControlPreview("/Users/dhyana/dharma_swarm")?.["Runtime summary"]).toBe(
+    expect(loadSupervisorControlPreview(REPO_ROOT)?.["Runtime summary"]).toBe(
       "/Users/dhyana/.dharma/state/runtime.db | 20 sessions | 0 claims | 0 active claims | 0 acked claims | 0 active runs | 0 runs total | 0 artifacts | 0 promoted facts | 0 context bundles | 0 operator actions",
     );
   });
@@ -1096,7 +1098,7 @@ describe("supervisor control persistence", () => {
     expect(payload.preview_Control_pulse_preview).toBe(
       "stale | complete / pass | cycle 4 running | updated 2026-04-01T00:00:00Z | verify tsc=ok | py_compile_bridge=ok | bridge_snapshots=ok | cycle_acceptance=ok",
     );
-    expect(loadSupervisorControlPreview("/Users/dhyana/dharma_swarm", new Date("2026-04-01T04:00:00Z"))?.["Runtime summary"]).toBe(
+    expect(loadSupervisorControlPreview(REPO_ROOT, new Date("2026-04-01T04:00:00Z"))?.["Runtime summary"]).toBe(
       "/Users/dhyana/.dharma/state/runtime.db | 18 sessions | 0 claims | 0 active claims | 0 acked claims | 0 runs | 0 active runs | 7 artifacts | 2 promoted facts | 1 context bundles | 3 operator actions",
     );
   });
@@ -1119,7 +1121,7 @@ describe("supervisor control persistence", () => {
       ),
     );
 
-    expect(loadSupervisorControlPreview("/Users/dhyana/dharma_swarm", new Date("2026-04-01T04:00:00Z"))).toEqual({
+    expect(loadSupervisorControlPreview(REPO_ROOT, new Date("2026-04-01T04:00:00Z"))).toEqual({
       "Runtime DB": "/Users/dhyana/.dharma/state/runtime.db",
       "Runtime activity": "Sessions=18  Claims=0  ActiveClaims=0  AckedClaims=0  Runs=0  ActiveRuns=0",
       "Artifact state": "Artifacts=7  PromotedFacts=2  ContextBundles=1  OperatorActions=3",
@@ -1166,7 +1168,7 @@ describe("supervisor control persistence", () => {
       "Verification checks": "tsc ok; py_compile_bridge ok; bridge_snapshots ok; cycle_acceptance ok",
     });
     saveSupervisorRepoPreview(summary!, {
-      "Repo root": "/Users/dhyana/dharma_swarm",
+      "Repo root": REPO_ROOT,
       Branch: "main",
       Head: "95210b1",
       Upstream: "origin/main",
@@ -1216,7 +1218,7 @@ describe("supervisor control persistence", () => {
     });
 
     expect(loadSupervisorRepoPreview()).toEqual({
-      "Repo root": "/Users/dhyana/dharma_swarm",
+      "Repo root": REPO_ROOT,
       Branch: "main",
       Head: "95210b1",
       Upstream: "origin/main",
@@ -1288,7 +1290,7 @@ describe("supervisor control persistence", () => {
       "Verification bundle": "tsc=ok | py_compile_bridge=ok | bridge_snapshots=ok | cycle_acceptance=ok",
     });
     saveSupervisorRepoPreview(summary!, {
-      "Repo root": "/Users/dhyana/dharma_swarm",
+      "Repo root": REPO_ROOT,
       Branch: "main",
       Head: "95210b1",
       "Branch status": "tracking origin/main in sync",
@@ -1353,7 +1355,7 @@ describe("supervisor control persistence", () => {
     });
 
     saveSupervisorRepoPreview(summary!, {
-      "Repo root": "/Users/dhyana/dharma_swarm",
+      "Repo root": REPO_ROOT,
       Branch: "main",
       Head: "95210b1",
       "Branch status": "tracking origin/main in sync",
@@ -1375,7 +1377,7 @@ describe("supervisor control persistence", () => {
         "change terminal (274); .dharma_psmv_hyperfile_branch (142) | files dgc_cli.py (6908 lines) | deps dharma_swarm.models | inbound 159 | paths terminal/src/protocol.ts",
     });
 
-    expect(loadSupervisorControlPreview("/Users/dhyana/dharma_swarm", new Date("2026-04-01T04:00:00Z"))).toMatchObject({
+    expect(loadSupervisorControlPreview(REPO_ROOT, new Date("2026-04-01T04:00:00Z"))).toMatchObject({
       "Repo/control preview":
         "stale | task terminal-repo-pane | progress 2 done, 1 pending of 3 | outcome in_progress/pass | decision ready to stop | branch main@95210b1 | tracking origin/main in sync | sab_canonical_repo_missing | dharma_swarm (canonical_core, main...origin/main, dirty True) | dirty high (552 local changes) | warn sab_canonical_repo_missing | peer dharma_swarm (canonical_core, main...origin/main, dirty True) | peers dharma_swarm (canonical_core, main...origin/main, dirty True) | drift dharma_swarm track main...origin/main | markers dharma_swarm track main...origin/main | divergence peer dharma_swarm track main...origin/main | hotspot change terminal (274) | path terminal/src/protocol.ts | dep dharma_swarm.models | inbound 159 | cycle 3 running | updated 2026-03-31T22:46:35.466340+00:00 | verify tsc=ok | py_compile_bridge=ok | bridge_snapshots=ok | cycle_acceptance=ok | db /Users/dhyana/.dharma/state/runtime.db | activity Sessions=18 Runs=0 ActiveRuns=0 | artifacts Artifacts=7 ContextBundles=1 | next Split /runtime and /dashboard control actions into dedicated pane routes.",
       "Active task": "terminal-repo-pane",
@@ -1412,7 +1414,7 @@ describe("supervisor control persistence", () => {
       Updated: "2026-03-31T22:46:35.466340+00:00",
     });
     saveSupervisorRepoPreview(summary!, {
-      "Repo root": "/Users/dhyana/dharma_swarm",
+      "Repo root": REPO_ROOT,
       Branch: "main",
       Head: "95210b1",
       "Branch status": "tracking origin/main in sync",
@@ -1431,7 +1433,7 @@ describe("supervisor control persistence", () => {
     });
 
     expect(loadSupervisorRepoPreview()).toEqual({
-      "Repo root": "/Users/dhyana/dharma_swarm",
+      "Repo root": REPO_ROOT,
       Branch: "main",
       Head: "95210b1",
       "Branch status": "tracking origin/main in sync",
@@ -1487,7 +1489,7 @@ describe("supervisor control persistence", () => {
       Updated: "2026-04-03T01:15:00Z",
     });
     saveSupervisorRepoPreview(summary!, {
-      "Repo root": "/Users/dhyana/dharma_swarm",
+      "Repo root": REPO_ROOT,
       Branch: "main",
       Head: "804d5d1",
       "Branch status": "tracking origin/main in sync",
@@ -1544,7 +1546,7 @@ describe("supervisor control persistence", () => {
       Updated: "2026-04-03T01:15:00Z",
     });
     saveSupervisorRepoPreview(summary!, {
-      "Repo root": "/Users/dhyana/dharma_swarm",
+      "Repo root": REPO_ROOT,
       Branch: "main",
       Head: "804d5d1",
       "Branch status": "ahead of origin/main by 2",
@@ -1575,7 +1577,7 @@ describe("supervisor control persistence", () => {
 
     expect(summary).not.toBeNull();
     saveSupervisorRepoPreview(summary!, {
-      "Repo root": "/Users/dhyana/dharma_swarm",
+      "Repo root": REPO_ROOT,
       "Repo/control preview":
         "stale | task terminal-repo-pane | branch main@804d5d1 | tracking origin/main ahead 2 | dirty high (656 local changes) | warn peer_branch_diverged | peer dharma_swarm (canonical_core, main...origin/main, dirty True) | peers dharma_swarm (canonical_core, main...origin/main, dirty True); dgc-core (operator_shell, detached, dirty True) | drift dharma_swarm drift main...origin/main | markers dharma_swarm drift main...origin/main; dgc-core n/a | divergence local +2/-1 | peer dharma_swarm drift main...origin/main | detached dgc-core detached | hotspot change terminal (281) | cycle 8 running | updated 2026-04-03T02:16:08Z | verify tsc=ok | cycle_acceptance=fail",
     });
@@ -1608,7 +1610,7 @@ describe("supervisor control persistence", () => {
       Updated: "2026-04-03T02:16:08Z",
     });
     saveSupervisorRepoPreview(summary!, {
-      "Repo root": "/Users/dhyana/dharma_swarm",
+      "Repo root": REPO_ROOT,
       "Branch status": "tracking origin/main in sync",
       Ahead: "2",
       Behind: "0",
@@ -1665,7 +1667,7 @@ describe("supervisor control persistence", () => {
       Updated: "2026-04-03T02:16:08Z",
     });
     saveSupervisorRepoPreview(summary!, {
-      "Repo root": "/Users/dhyana/dharma_swarm",
+      "Repo root": REPO_ROOT,
       "Branch status": "tracking origin/main ahead 2",
       Ahead: "2",
       Behind: "1",
@@ -1701,7 +1703,7 @@ describe("supervisor control persistence", () => {
       Updated: "2026-04-03T03:00:00Z",
     });
     saveSupervisorRepoPreview(summary!, {
-      "Repo root": "/Users/dhyana/dharma_swarm",
+      "Repo root": REPO_ROOT,
       "Branch status": "tracking origin/main ahead 2",
       Ahead: "2",
       Behind: "0",
@@ -1727,7 +1729,7 @@ describe("supervisor control persistence", () => {
 
     expect(summary).not.toBeNull();
     saveSupervisorRepoPreview(summary!, {
-      "Repo root": "/Users/dhyana/dharma_swarm",
+      "Repo root": REPO_ROOT,
       "Repo/control preview":
         "stale | task terminal-repo-pane | branch main@804d5d1 | tracking origin/main [ahead 2, behind 1] | dirty high (656 local changes) | warn peer_branch_diverged; sab_canonical_repo_missing | peers 2 | divergence local +2/-1 | hotspot change terminal (281) | cycle 8 running | updated 2026-04-03T02:16:08Z | verify tsc=ok | cycle_acceptance=fail",
     });
@@ -1754,7 +1756,7 @@ describe("supervisor control persistence", () => {
       Updated: "2026-04-03T02:16:08Z",
     });
     saveSupervisorRepoPreview(summary!, {
-      "Repo root": "/Users/dhyana/dharma_swarm",
+      "Repo root": REPO_ROOT,
       Branch: "main",
       Head: "804d5d1",
       "Branch status": "tracking origin/main in sync",
@@ -1790,7 +1792,7 @@ describe("supervisor control persistence", () => {
 
     expect(summary).not.toBeNull();
     saveSupervisorRepoPreview(summary!, {
-      "Repo root": "/Users/dhyana/dharma_swarm",
+      "Repo root": REPO_ROOT,
       Branch: "main",
       Head: "95210b1",
       "Topology warnings": "1 (sab_canonical_repo_missing)",
@@ -1806,7 +1808,7 @@ describe("supervisor control persistence", () => {
     });
 
     expect(loadSupervisorRepoPreview()).toEqual({
-      "Repo root": "/Users/dhyana/dharma_swarm",
+      "Repo root": REPO_ROOT,
       Branch: "main",
       Head: "95210b1",
       "Branch divergence": "n/a",
@@ -1855,7 +1857,7 @@ describe("supervisor control persistence", () => {
           snapshot: {
             snapshot_id: "runtime-snap-1",
             created_at: "2026-04-03T02:16:08Z",
-            repo_root: "/Users/dhyana/dharma_swarm",
+            repo_root: REPO_ROOT,
             runtime_db: "/Users/dhyana/.dharma/state/runtime.db",
             health: "degraded",
             bridge_status: "connected",
@@ -1900,7 +1902,7 @@ describe("supervisor control persistence", () => {
       },
     );
 
-    const preview = loadSupervisorControlPreview("/Users/dhyana/dharma_swarm", new Date("2026-04-03T04:00:00Z"));
+    const preview = loadSupervisorControlPreview(REPO_ROOT, new Date("2026-04-03T04:00:00Z"));
     const summaryPayload = JSON.parse(readFileSync(path.join(stateDir, "terminal-control-summary.json"), "utf8")) as Record<string, unknown>;
 
     expect((summaryPayload.runtime_payload as Record<string, unknown>).domain).toBe("runtime_snapshot");
@@ -1949,7 +1951,7 @@ describe("supervisor control persistence", () => {
     saveSupervisorRepoPreview(
       summary!,
       {
-        "Repo root": "/Users/dhyana/dharma_swarm",
+        "Repo root": REPO_ROOT,
         Branch: "stale",
         Head: "deadbee",
         "Branch status": "tracking origin/main in sync",
@@ -1963,7 +1965,7 @@ describe("supervisor control persistence", () => {
         workspacePayload: {
           version: "v1",
           domain: "workspace_snapshot",
-          repo_root: "/Users/dhyana/dharma_swarm",
+          repo_root: REPO_ROOT,
           git: {
             branch: "main",
             head: "804d5d1",
@@ -1991,7 +1993,7 @@ describe("supervisor control persistence", () => {
                 name: "dharma_swarm",
                 role: "canonical_core",
                 canonical: true,
-                path: "/Users/dhyana/dharma_swarm",
+                path: REPO_ROOT,
                 exists: true,
                 is_git: true,
                 branch: "main...origin/main",
@@ -2017,7 +2019,7 @@ describe("supervisor control persistence", () => {
           ],
           largest_python_files: [
             {
-              path: "/Users/dhyana/dharma_swarm/dharma_swarm/dgc_cli.py",
+              path: `${REPO_ROOT}/dharma_swarm/dgc_cli.py`,
               lines: 6908,
               defs: 20,
               classes: 2,
@@ -2034,7 +2036,7 @@ describe("supervisor control persistence", () => {
 
     expect((summaryPayload.workspace_payload as Record<string, unknown>).domain).toBe("workspace_snapshot");
     expect(preview).toMatchObject({
-      "Repo root": "/Users/dhyana/dharma_swarm",
+      "Repo root": REPO_ROOT,
       Branch: "main",
       Head: "804d5d1",
       "Branch status": "ahead of origin/main by 2",
@@ -2090,7 +2092,7 @@ describe("supervisor control persistence", () => {
           snapshot: {
             snapshot_id: "runtime-snap-run-fallback",
             created_at: "2026-04-03T02:16:08Z",
-            repo_root: "/Users/dhyana/dharma_swarm",
+            repo_root: REPO_ROOT,
             runtime_db: "/Users/dhyana/.dharma/state/runtime.db",
             health: "degraded",
             bridge_status: "connected",
@@ -2143,7 +2145,7 @@ describe("supervisor control persistence", () => {
     };
     writeFileSync(path.join(stateDir, "run.json"), JSON.stringify(runPayload, null, 2));
 
-    expect(loadSupervisorControlPreview("/Users/dhyana/dharma_swarm", new Date("2026-04-03T04:00:00Z"))).toMatchObject({
+    expect(loadSupervisorControlPreview(REPO_ROOT, new Date("2026-04-03T04:00:00Z"))).toMatchObject({
       "Loop state": "cycle 19 running",
       "Task progress": "3 done, 1 pending of 4",
       "Active task": "terminal-repo-pane",
@@ -2175,7 +2177,7 @@ describe("supervisor control persistence", () => {
         workspacePayload: {
           version: "v1",
           domain: "workspace_snapshot",
-          repo_root: "/Users/dhyana/dharma_swarm",
+          repo_root: REPO_ROOT,
           git: {
             branch: "main",
             head: "804d5d1",
@@ -2200,7 +2202,7 @@ describe("supervisor control persistence", () => {
                 name: "dharma_swarm",
                 role: "canonical_core",
                 canonical: true,
-                path: "/Users/dhyana/dharma_swarm",
+                path: REPO_ROOT,
                 exists: true,
                 is_git: true,
                 branch: "main...origin/main",
@@ -2223,7 +2225,7 @@ describe("supervisor control persistence", () => {
           language_mix: [{suffix: ".py", count: 420}],
           largest_python_files: [
             {
-              path: "/Users/dhyana/dharma_swarm/dharma_swarm/dgc_cli.py",
+              path: `${REPO_ROOT}/dharma_swarm/dgc_cli.py`,
               lines: 6908,
               defs: 20,
               classes: 2,
@@ -2237,8 +2239,8 @@ describe("supervisor control persistence", () => {
 
     rmSync(path.join(stateDir, "terminal-control-summary.json"), {force: true});
 
-    expect(loadSupervisorRepoPreview("/Users/dhyana/dharma_swarm")).toMatchObject({
-      "Repo root": "/Users/dhyana/dharma_swarm",
+    expect(loadSupervisorRepoPreview(REPO_ROOT)).toMatchObject({
+      "Repo root": REPO_ROOT,
       Branch: "main",
       Head: "804d5d1",
       "Branch status": "ahead of origin/main by 2",

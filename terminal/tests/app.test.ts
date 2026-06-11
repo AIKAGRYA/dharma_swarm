@@ -51,6 +51,9 @@ import {
 import {initialState, reduceApp as baseReduceApp} from "../src/state";
 import type {AppAction, AppState, TabPreview, TranscriptLine} from "../src/types";
 
+const REPO_ROOT = path.resolve(import.meta.dir, "..", "..");
+const REPO_ROOT_COMPACT = REPO_ROOT.length <= 24 ? REPO_ROOT : `${REPO_ROOT.slice(0, 23).trimEnd()}…`;
+
 const TESTS_DIR = path.dirname(fileURLToPath(import.meta.url));
 const TERMINAL_ROOT = path.resolve(TESTS_DIR, "..");
 const TERMINAL_STATE_PATH = path.join(TERMINAL_ROOT, ".dharma-terminal-state.json");
@@ -385,7 +388,7 @@ test("bridge handler suppresses duplicate completed assistant text after streame
 });
 
 const bootstrapWorkspacePreview: TabPreview = {
-  "Repo root": "/Users/dhyana/dharma_swarm",
+  "Repo root": REPO_ROOT,
   Branch: "main",
   Head: "95210b1",
   Upstream: "origin/main",
@@ -554,7 +557,7 @@ function makeSupervisorStateDir(): string {
     path.join(stateDir, "run.json"),
     JSON.stringify(
       {
-        repo_root: "/Users/dhyana/dharma_swarm",
+        repo_root: REPO_ROOT,
         updated_at: "2026-04-01T00:00:00Z",
         cycle: 4,
         status: "running",
@@ -755,7 +758,7 @@ describe("snapshotActionsForBridgeEvent", () => {
     process.env.DHARMA_TERMINAL_SUPERVISOR_STATE_DIR = stateDir;
 
     const sparseRepoPreview: TabPreview = {
-      "Repo root": "/Users/dhyana/dharma_swarm",
+      "Repo root": REPO_ROOT,
       "Branch status": "tracking origin/main ahead 2",
       Sync: "origin/main | ahead 2 | behind 0",
       Ahead: "2",
@@ -1044,7 +1047,7 @@ describe("snapshotActionsForBridgeEvent", () => {
       {id: "refresh-stale-2", kind: "system", text: "still stale after refresh trigger"},
     ]);
     const refreshContent = `# Workspace X-Ray
-Repo root: /Users/dhyana/dharma_swarm
+Repo root: ${REPO_ROOT}
 Git: main@95210b1 | staged 0 | unstaged 517 | untracked 46
 Git hotspots: terminal (281); .dharma_psmv_hyperfile_branch (147); dharma_swarm (93)
 Git changed paths: terminal/src/app.tsx; terminal/tests/app.test.ts; terminal/src/components/RepoPane.tsx
@@ -1076,7 +1079,7 @@ Workflows: 1
     const refreshPayload = {
       version: "v1",
       domain: "workspace_snapshot",
-      repo_root: "/Users/dhyana/dharma_swarm",
+      repo_root: REPO_ROOT,
       git: {
         branch: "main",
         head: "95210b1",
@@ -1095,7 +1098,7 @@ Workflows: 1
             name: "dharma_swarm",
             role: "canonical_core",
             canonical: true,
-            path: "/Users/dhyana/dharma_swarm",
+            path: REPO_ROOT,
             exists: true,
             is_git: true,
             branch: "main...origin/main",
@@ -1142,7 +1145,7 @@ Workflows: 1
     };
 
     const cleanWorkspaceSnapshot = `# Workspace X-Ray
-Repo root: /Users/dhyana/dharma_swarm
+Repo root: ${REPO_ROOT}
 Git: main@95210b1 | staged 0 | unstaged 0 | untracked 0
 Git hotspots: none
 Git changed paths: none
@@ -1256,7 +1259,7 @@ describe("surfaceRefreshActionsForBridgeEvent", () => {
       payload: {
         version: "v1",
         domain: "workspace_snapshot",
-        repo_root: "/Users/dhyana/dharma_swarm",
+        repo_root: REPO_ROOT,
         git: {
           branch: "main",
           head: "804d5d1",
@@ -1281,7 +1284,7 @@ describe("surfaceRefreshActionsForBridgeEvent", () => {
               name: "dharma_swarm",
               role: "canonical_core",
               canonical: true,
-              path: "/Users/dhyana/dharma_swarm",
+              path: REPO_ROOT,
               exists: true,
               is_git: true,
               branch: "main...origin/main",
@@ -1309,7 +1312,7 @@ describe("surfaceRefreshActionsForBridgeEvent", () => {
           snapshot_id: "runtime-sidebar-refresh-1",
           created_at: "2026-04-03T02:16:08Z",
           updated_at: "2026-04-03T02:16:08Z",
-          repo_root: "/Users/dhyana/dharma_swarm",
+          repo_root: REPO_ROOT,
           runtime_db: "/Users/dhyana/.dharma/state/runtime.db",
           health: "ok",
           bridge_status: "connected",
@@ -1408,7 +1411,7 @@ describe("surfaceRefreshActionsForBridgeEvent", () => {
       payload: {
         version: "v1",
         domain: "workspace_snapshot",
-        repo_root: "/Users/dhyana/dharma_swarm",
+        repo_root: REPO_ROOT,
         git: {
           branch: "main",
           head: "95210b1",
@@ -1427,7 +1430,7 @@ describe("surfaceRefreshActionsForBridgeEvent", () => {
               name: "dharma_swarm",
               role: "canonical_core",
               canonical: true,
-              path: "/Users/dhyana/dharma_swarm",
+              path: REPO_ROOT,
               exists: true,
               is_git: true,
               branch: "main...origin/main",
@@ -1466,7 +1469,7 @@ describe("surfaceRefreshActionsForBridgeEvent", () => {
         payload: {
           version: "v1",
           domain: "workspace_snapshot",
-          repo_root: "/Users/dhyana/dharma_swarm",
+          repo_root: REPO_ROOT,
           git: {
             branch: "main",
             head: "95210b1",
@@ -1503,7 +1506,7 @@ describe("surfaceRefreshActionsForBridgeEvent", () => {
     const cleanPayload = {
       version: "v1",
       domain: "workspace_snapshot",
-      repo_root: "/Users/dhyana/dharma_swarm",
+      repo_root: REPO_ROOT,
       git: {
         branch: "main",
         head: "95210b1",
@@ -1522,7 +1525,7 @@ describe("surfaceRefreshActionsForBridgeEvent", () => {
             name: "dharma_swarm",
             role: "canonical_core",
             canonical: true,
-            path: "/Users/dhyana/dharma_swarm",
+            path: REPO_ROOT,
             exists: true,
             is_git: true,
             branch: "main...origin/main",
@@ -1601,7 +1604,7 @@ describe("surfaceRefreshActionsForBridgeEvent", () => {
       snapshot: {
         snapshot_id: "runtime-clean-refresh-1",
         created_at: "2026-04-03T01:00:00Z",
-        repo_root: "/Users/dhyana/dharma_swarm",
+        repo_root: REPO_ROOT,
         runtime_db: "/Users/dhyana/.dharma/state/runtime.db",
         health: "ok",
         bridge_status: "connected",
@@ -1720,7 +1723,7 @@ describe("commandResultActionsForBridgeEvent", () => {
     const bootstrapWorkspacePayload = {
       version: "v1",
       domain: "workspace_snapshot",
-      repo_root: "/Users/dhyana/dharma_swarm",
+      repo_root: REPO_ROOT,
       git: {
         branch: "main",
         head: "95210b1",
@@ -1745,7 +1748,7 @@ describe("commandResultActionsForBridgeEvent", () => {
             name: "dharma_swarm",
             role: "canonical_core",
             canonical: true,
-            path: "/Users/dhyana/dharma_swarm",
+            path: REPO_ROOT,
             exists: true,
             is_git: true,
             branch: "main...origin/main",
@@ -1836,7 +1839,7 @@ describe("commandResultActionsForBridgeEvent", () => {
       snapshot: {
         snapshot_id: "runtime-bootstrap-1",
         created_at: "2026-04-03T02:16:08Z",
-        repo_root: "/Users/dhyana/dharma_swarm",
+        repo_root: REPO_ROOT,
         runtime_db: "/Users/dhyana/.dharma/state/runtime.db",
         health: "ok",
         bridge_status: "connected",
@@ -3002,7 +3005,7 @@ test("operator summary prefers non-placeholder control tab preview values over g
 
     const nextState = applyBridgeEvent(baseState, {
       type: "command.result",
-      summary: "wrote snapshot to /Users/dhyana/dharma_swarm/state and then executed /git status",
+      summary: `wrote snapshot to ${REPO_ROOT}/state and then executed /git status`,
       output: "Repo dirty: 517 unstaged, 47 untracked",
     });
 
@@ -3041,7 +3044,7 @@ test("operator summary prefers non-placeholder control tab preview values over g
     };
 
     const gitOutput = `# Workspace X-Ray
-Repo root: /Users/dhyana/dharma_swarm
+Repo root: ${REPO_ROOT}
 Git: main@95210b1 | staged 0 | unstaged 518 | untracked 48
 Git hotspots: dharma_swarm (301); terminal (284); .dharma_psmv_hyperfile_branch (147)
 Git changed paths: dharma_swarm/terminal_bridge.py; terminal/src/app.tsx; terminal/tests/app.test.ts
@@ -3620,7 +3623,7 @@ Toolchain
       snapshot: {
         snapshot_id: "snap-1",
         created_at: "2026-04-04T00:00:00Z",
-        repo_root: "/Users/dhyana/dharma_swarm",
+        repo_root: REPO_ROOT,
         runtime_db: "/Users/dhyana/.dharma/state/runtime.db",
         health: "ok",
         bridge_status: "connected",
@@ -3834,7 +3837,7 @@ Toolchain
     const payload = {
       version: "v1" as const,
       domain: "workspace_snapshot" as const,
-      repo_root: "/Users/dhyana/dharma_swarm",
+      repo_root: REPO_ROOT,
       git: {
         branch: "main",
         head: "804d5d1",
@@ -4504,7 +4507,7 @@ Toolchain
     };
 
     const gitOutput = `# Workspace X-Ray
-Repo root: /Users/dhyana/dharma_swarm
+Repo root: ${REPO_ROOT}
 Git: main@95210b1 | staged 0 | unstaged 518 | untracked 48
 Git hotspots: dharma_swarm (301); terminal (284); .dharma_psmv_hyperfile_branch (147)
 Git changed paths: dharma_swarm/terminal_bridge.py; terminal/src/app.tsx; terminal/tests/app.test.ts
@@ -4572,7 +4575,7 @@ Workflows: 1
     };
 
     const gitOutput = `# Workspace X-Ray
-Repo root: /Users/dhyana/dharma_swarm
+Repo root: ${REPO_ROOT}
 Git: main@95210b1 | staged 0 | unstaged 518 | untracked 48
 Git hotspots: dharma_swarm (301); terminal (284); .dharma_psmv_hyperfile_branch (147)
 Git changed paths: dharma_swarm/terminal_bridge.py; terminal/src/app.tsx; terminal/tests/app.test.ts
@@ -4628,7 +4631,7 @@ Workflows: 1
     expect(sidebarAfterGit).toContain("Lead path dharma_swarm/terminal_bridge.py");
 
     const refreshContent = `# Workspace X-Ray
-Repo root: /Users/dhyana/dharma_swarm
+Repo root: ${REPO_ROOT}
 Git: main@95210b1 | staged 0 | unstaged 517 | untracked 46
 Git hotspots: terminal (281); .dharma_psmv_hyperfile_branch (147); dharma_swarm (93)
 Git changed paths: terminal/src/app.tsx; terminal/tests/app.test.ts; terminal/src/components/RepoPane.tsx
@@ -4735,7 +4738,7 @@ Workflows: 1
     });
 
     const gitOutput = `# Workspace X-Ray
-Repo root: /Users/dhyana/dharma_swarm
+Repo root: ${REPO_ROOT}
 Git: main@95210b1 | staged 0 | unstaged 518 | untracked 48
 Git hotspots: dharma_swarm (301); terminal (284); .dharma_psmv_hyperfile_branch (147)
 Git changed paths: dharma_swarm/terminal_bridge.py; terminal/src/app.tsx; terminal/tests/app.test.ts
@@ -4798,7 +4801,7 @@ Workflows: 1
     expect(sidebarAfterGit).toContain("Task terminal-repo-pane | 3 done, 1 pending of 4");
 
     const refreshContent = `# Workspace X-Ray
-Repo root: /Users/dhyana/dharma_swarm
+Repo root: ${REPO_ROOT}
 Git: main@95210b1 | staged 0 | unstaged 517 | untracked 46
 Git hotspots: terminal (281); .dharma_psmv_hyperfile_branch (147); dharma_swarm (93)
 Git changed paths: terminal/src/app.tsx; terminal/tests/app.test.ts; terminal/src/components/RepoPane.tsx
@@ -4853,7 +4856,7 @@ Workflows: 1
     expect(sidebarAfterRefresh.some((line) => line.includes("stale transcript that should disappear"))).toBe(false);
 
     const persisted = JSON.parse(readFileSync(path.join(stateDir, "terminal-control-summary.json"), "utf8")) as Record<string, unknown>;
-    expect(persisted.preview_Repo_root).toBe("/Users/dhyana/dharma_swarm");
+    expect(persisted.preview_Repo_root).toBe(REPO_ROOT);
     expect(persisted.preview_Branch).toBe("main");
     expect(persisted.preview_Topology_warnings).toBe("1 (sab_canonical_repo_missing)");
     expect(persisted.preview_Hotspot_summary).toBe(state.liveRepoPreview?.["Hotspot summary"]);
@@ -4866,7 +4869,7 @@ Workflows: 1
       path.join(stateDir, "run.json"),
       JSON.stringify(
         {
-          repo_root: "/Users/dhyana/dharma_swarm",
+          repo_root: REPO_ROOT,
           updated_at: "2026-04-01T00:00:00Z",
           cycle: 6,
           status: "running",
@@ -5026,7 +5029,7 @@ Toolchain
       path.join(stateDir, "run.json"),
       JSON.stringify(
         {
-          repo_root: "/Users/dhyana/dharma_swarm",
+          repo_root: REPO_ROOT,
           updated_at: "2026-04-01T00:00:00Z",
           cycle: 6,
           status: "running",
@@ -5095,7 +5098,7 @@ Toolchain
     });
 
     const refreshContent = `# Workspace X-Ray
-Repo root: /Users/dhyana/dharma_swarm
+Repo root: ${REPO_ROOT}
 Git: main@95210b1 | staged 0 | unstaged 517 | untracked 46
 Git hotspots: terminal (281); .dharma_psmv_hyperfile_branch (147); dharma_swarm (93)
 Git changed paths: terminal/src/app.tsx; terminal/tests/app.test.ts; terminal/src/components/RepoPane.tsx
@@ -5268,7 +5271,7 @@ Toolchain
     expect(visibleSidebarLines.some((line) => line.startsWith("Snapshot hotspots change terminal (281) | path terminal/src/app.tsx"))).toBe(true);
     expect(visibleSidebarLines.some((line) => line.startsWith("Snapshot hotspot summary change terminal (281); .dharma"))).toBe(true);
     expect(visibleSidebarLines.some((line) => line.startsWith("Snapshot truth branch main@95210b1 | dirty staged 0 | unstaged 517"))).toBe(true);
-    expect(visibleSidebarLines.some((line) => line.startsWith("Snapshot focus Root /Users/dhyana/dharma_sw"))).toBe(true);
+    expect(visibleSidebarLines.some((line) => line.startsWith(`Snapshot focus Root ${REPO_ROOT_COMPACT}`))).toBe(true);
     expect(visibleSidebarLines.some((line) => line.startsWith("Snapshot focus ") && line.endsWith("| lead terminal/src/app.tsx"))).toBe(true);
     expect(visibleSidebarLines.some((line) => line.startsWith("Lead peer dharma_swarm (canonical_core, main...origin/main"))).toBe(true);
     expect(visibleSidebarLines.some((line) => line.startsWith("Pressure dharma_swarm Δ563"))).toBe(true);
@@ -6005,7 +6008,7 @@ Toolchain
     });
 
     const gitOutput = `# Workspace X-Ray
-Repo root: /Users/dhyana/dharma_swarm
+Repo root: ${REPO_ROOT}
 Git: main@95210b1 | staged 0 | unstaged 518 | untracked 48
 Git hotspots: dharma_swarm (301); terminal (284)
 Git changed paths: dharma_swarm/terminal_bridge.py; terminal/src/app.tsx
@@ -6521,7 +6524,7 @@ Durable state: /Users/dhyana/.dharma/terminal_supervisor/terminal-20260403T22071
     });
 
     const gitOutput = `# Workspace X-Ray
-Repo root: /Users/dhyana/dharma_swarm
+Repo root: ${REPO_ROOT}
 Git: main@95210b1 | staged 0 | unstaged 518 | untracked 48
 Git hotspots: dharma_swarm (301); terminal (284)
 Git changed paths: dharma_swarm/terminal_bridge.py; terminal/src/app.tsx
@@ -7487,7 +7490,7 @@ describe("surfaceRefreshActionsForBridgeEvent", () => {
     };
 
     const refreshContent = `# Workspace X-Ray
-Repo root: /Users/dhyana/dharma_swarm
+Repo root: ${REPO_ROOT}
 Git: main@95210b1 | staged 0 | unstaged 517 | untracked 46
 Git hotspots: terminal (281); .dharma_psmv_hyperfile_branch (147); dharma_swarm (93)
 Git changed paths: terminal/src/app.tsx; terminal/tests/app.test.ts; terminal/src/components/RepoPane.tsx
@@ -7515,7 +7518,7 @@ Workflows: 1
     const refreshPayload = {
       version: "v1",
       domain: "workspace_snapshot",
-      repo_root: "/Users/dhyana/dharma_swarm",
+      repo_root: REPO_ROOT,
       git: {
         branch: "main",
         head: "95210b1",
@@ -7542,7 +7545,7 @@ Workflows: 1
             name: "dharma_swarm",
             role: "canonical_core",
             canonical: true,
-            path: "/Users/dhyana/dharma_swarm",
+            path: REPO_ROOT,
             exists: true,
             is_git: true,
             branch: "main...origin/main",
@@ -7648,7 +7651,7 @@ Toolchain
         snapshot: {
           snapshot_id: "runtime-1",
           created_at: "2026-04-01T00:00:00Z",
-          repo_root: "/Users/dhyana/dharma_swarm",
+          repo_root: REPO_ROOT,
           runtime_db: "/Users/dhyana/.dharma/state/runtime.db",
           health: "ok",
           bridge_status: "connected",
@@ -7743,7 +7746,7 @@ Toolchain
     const repoRefreshPayload = {
       version: "v1" as const,
       domain: "workspace_snapshot" as const,
-      repo_root: "/Users/dhyana/dharma_swarm",
+      repo_root: REPO_ROOT,
       git: {
         branch: "main",
         head: "95210b1",
@@ -7776,7 +7779,7 @@ Toolchain
             name: "dharma_swarm",
             role: "canonical_core",
             canonical: true,
-            path: "/Users/dhyana/dharma_swarm",
+            path: REPO_ROOT,
             exists: true,
             is_git: true,
             branch: "main...origin/main",
@@ -7835,7 +7838,7 @@ Toolchain
         snapshot: {
           snapshot_id: "runtime-1",
           created_at: "2026-04-01T00:00:00Z",
-          repo_root: "/Users/dhyana/dharma_swarm",
+          repo_root: REPO_ROOT,
           runtime_db: "/Users/dhyana/.dharma/state/runtime.db",
           health: "ok",
           bridge_status: "connected",
@@ -7950,7 +7953,7 @@ Toolchain
           snapshot: {
             snapshot_id: "runtime-nested-refresh-1",
             created_at: "2026-04-03T00:00:00Z",
-            repo_root: "/Users/dhyana/dharma_swarm",
+            repo_root: REPO_ROOT,
             runtime_db: "/Users/dhyana/.dharma/state/runtime.db",
             health: "ok",
             bridge_status: "connected",
@@ -8048,7 +8051,7 @@ Toolchain
         snapshot: {
           snapshot_id: "runtime-generic-verify-1",
           created_at: "2026-04-01T00:00:00Z",
-          repo_root: "/Users/dhyana/dharma_swarm",
+          repo_root: REPO_ROOT,
           runtime_db: "/Users/dhyana/.dharma/state/runtime.db",
           health: "ok",
           bridge_status: "connected",
@@ -8163,7 +8166,7 @@ Toolchain
         snapshot: {
           snapshot_id: "runtime-typed-control-1",
           created_at: "2026-04-04T00:00:00Z",
-          repo_root: "/Users/dhyana/dharma_swarm",
+          repo_root: REPO_ROOT,
           runtime_db: "/Users/dhyana/.dharma/state/runtime.db",
           health: "ok",
           bridge_status: "connected",
@@ -8299,7 +8302,7 @@ Toolchain
         snapshot: {
           snapshot_id: "runtime-compact-supervisor-1",
           created_at: "2026-04-03T00:00:00Z",
-          repo_root: "/Users/dhyana/dharma_swarm",
+          repo_root: REPO_ROOT,
           runtime_db: "/Users/dhyana/.dharma/state/runtime.db",
           health: "ok",
           bridge_status: "connected",
@@ -8369,7 +8372,7 @@ Toolchain
       path.join(stateDir, "run.json"),
       JSON.stringify(
         {
-          repo_root: "/Users/dhyana/dharma_swarm",
+          repo_root: REPO_ROOT,
           updated_at: "2026-04-03T02:00:00Z",
           cycle: 10,
           status: "ready",
@@ -8434,7 +8437,7 @@ Toolchain
       snapshot: {
         snapshot_id: "runtime-direct-clean-1",
         created_at: "2026-04-03T02:00:00Z",
-        repo_root: "/Users/dhyana/dharma_swarm",
+        repo_root: REPO_ROOT,
         runtime_db: "/Users/dhyana/.dharma/state/runtime.db",
         health: "ok",
         bridge_status: "connected",
@@ -8558,7 +8561,7 @@ Toolchain
 
   test("drops stale repo warning and hotspot fields on bootstrap workspace previews", () => {
     const cleanBootstrapWorkspacePreview: TabPreview = {
-      "Repo root": "/Users/dhyana/dharma_swarm",
+      "Repo root": REPO_ROOT,
       Branch: "main",
       Head: "95210b1",
       Upstream: "origin/main",
@@ -8685,7 +8688,7 @@ Toolchain
         snapshot: {
           snapshot_id: "runtime-summary-refresh-1",
           created_at: "2026-04-02T00:00:00Z",
-          repo_root: "/Users/dhyana/dharma_swarm",
+          repo_root: REPO_ROOT,
           runtime_db: "/Users/dhyana/.dharma/state/runtime.db",
           health: "ok",
           bridge_status: "connected",
@@ -8776,7 +8779,7 @@ Toolchain
         snapshot: {
           snapshot_id: "runtime-loop-sync-1",
           created_at: "2026-04-02T00:30:00Z",
-          repo_root: "/Users/dhyana/dharma_swarm",
+          repo_root: REPO_ROOT,
           runtime_db: "/Users/dhyana/.dharma/state/runtime.db",
           health: "ok",
           bridge_status: "connected",
@@ -9604,7 +9607,7 @@ describe("typed session bridge handling", () => {
     handler({
       type: "workspace.snapshot.result",
       content: `# Workspace X-Ray
-Repo root: /Users/dhyana/dharma_swarm
+Repo root: ${REPO_ROOT}
 Git: main@95210b1 | staged 0 | unstaged 517 | untracked 46
 Git hotspots: terminal (281)
 Git changed paths: terminal/src/app.tsx
@@ -9684,7 +9687,7 @@ Git sync: origin/main | ahead 0 | behind 0`,
       payload: {
         version: "v1",
         domain: "workspace_snapshot",
-        repo_root: "/Users/dhyana/dharma_swarm",
+        repo_root: REPO_ROOT,
         git: {
           branch: "main",
           head: "95210b1",
@@ -9703,7 +9706,7 @@ Git sync: origin/main | ahead 0 | behind 0`,
               name: "dharma_swarm",
               role: "canonical_core",
               canonical: true,
-              path: "/Users/dhyana/dharma_swarm",
+              path: REPO_ROOT,
               exists: true,
               is_git: true,
               branch: "main...origin/main",
@@ -9730,7 +9733,7 @@ Git sync: origin/main | ahead 0 | behind 0`,
         snapshot: {
           snapshot_id: "runtime-resync-1",
           created_at: "2026-04-02T00:00:00Z",
-          repo_root: "/Users/dhyana/dharma_swarm",
+          repo_root: REPO_ROOT,
           runtime_db: "/Users/dhyana/.dharma/state/runtime.db",
           health: "ok",
           bridge_status: "connected",
@@ -9930,7 +9933,7 @@ Git sync: origin/main | ahead 0 | behind 0`,
     expect(sent.map((entry) => entry.type)).toContain("workspace.snapshot");
 
     const refreshContent = `# Workspace X-Ray
-Repo root: /Users/dhyana/dharma_swarm
+Repo root: ${REPO_ROOT}
 Git: main@95210b1 | staged 0 | unstaged 517 | untracked 46
 Git hotspots: terminal (281); .dharma_psmv_hyperfile_branch (147); dharma_swarm (93)
 Git changed paths: terminal/src/app.tsx; terminal/tests/app.test.ts; terminal/src/components/RepoPane.tsx
@@ -9962,7 +9965,7 @@ Workflows: 1
     const refreshPayload = {
       version: "v1" as const,
       domain: "workspace_snapshot" as const,
-      repo_root: "/Users/dhyana/dharma_swarm",
+      repo_root: REPO_ROOT,
       git: {
         branch: "main",
         head: "95210b1",
@@ -9995,7 +9998,7 @@ Workflows: 1
             name: "dharma_swarm",
             role: "canonical_core",
             canonical: true,
-            path: "/Users/dhyana/dharma_swarm",
+            path: REPO_ROOT,
             exists: true,
             is_git: true,
             branch: "main...origin/main",
@@ -10073,7 +10076,7 @@ Workflows: 1
       Updated: "2026-04-03T01:15:00Z",
     });
     persistRepoPreview({
-      "Repo root": "/Users/dhyana/dharma_swarm",
+      "Repo root": REPO_ROOT,
       Branch: "main",
       Head: "804d5d1",
       "Branch status": "ahead of origin/main by 2",
@@ -10113,7 +10116,7 @@ Workflows: 1
       Updated: "2026-04-03T01:15:00Z",
     });
     persistRepoPreview({
-      "Repo root": "/Users/dhyana/dharma_swarm",
+      "Repo root": REPO_ROOT,
       Branch: "main",
       Head: "804d5d1",
       "Branch status": "ahead of origin/main by 2",
@@ -10198,7 +10201,7 @@ Workflows: 1
         "stale | task terminal-repo-pane | progress 3 done, 1 pending of 4 | outcome in_progress/fail | decision continue required | branch main@804d5d1 | tracking origin/main ahead 2 | warn sab_canonical_repo_missing | dirty staged 112 | unstaged 545 | untracked 112 | hotspot terminal (281) | path terminal/src/RepoPane.tsx | dep dharma_swarm.models | inbound 159 | cycle 4 running | updated 2026-04-03T01:15:00Z | verify tsc=ok | py_compile_bridge=ok | bridge_snapshots=ok | cycle_acceptance=fail | db /Users/dhyana/.dharma/state/runtime.db | activity Sessions=18 Runs=0 ActiveRuns=0 Claims=0 ActiveClaims=0 AckedClaims=0 | artifacts Artifacts=7 PromotedFacts=2 ContextBundles=1 OperatorActions=3 | next Hydrate control preview from runtime state.",
     });
     persistRepoPreview({
-      "Repo root": "/Users/dhyana/dharma_swarm",
+      "Repo root": REPO_ROOT,
       Branch: "main",
       Head: "804d5d1",
       "Branch status": "tracking origin/main ahead 2",
@@ -10279,7 +10282,7 @@ Workflows: 1
         "stale | task terminal-repo-pane | progress 3 done, 1 pending of 4 | outcome in_progress/fail | decision continue required | branch main@804d5d1 | tracking origin/main ahead 2 | warn sab_canonical_repo_missing | dirty staged 112 | unstaged 545 | untracked 112 | hotspot terminal (281) | path terminal/src/components/RepoPane.tsx | dep dharma_swarm.models | inbound 159 | cycle 5 running | updated 2026-04-03T21:15:00Z | verify tsc=ok | py_compile_bridge=ok | bridge_snapshots=ok | cycle_acceptance=fail | db /Users/dhyana/.dharma/state/runtime.db | next Keep persisted snapshots visible through reconnect.",
     });
     persistRepoPreview({
-      "Repo root": "/Users/dhyana/dharma_swarm",
+      "Repo root": REPO_ROOT,
       Branch: "main",
       Head: "804d5d1",
       "Branch status": "tracking origin/main ahead 2",
@@ -10416,7 +10419,7 @@ Workflows: 1
       Updated: "2026-04-03T01:15:00Z",
     });
     persistRepoPreview({
-      "Repo root": "/Users/dhyana/dharma_swarm",
+      "Repo root": REPO_ROOT,
       Branch: "main",
       Head: "804d5d1",
       "Branch status": "tracking origin/main in sync",
@@ -10496,7 +10499,7 @@ Workflows: 1
       Updated: "2026-04-03T01:15:00Z",
     });
     persistRepoPreview({
-      "Repo root": "/Users/dhyana/dharma_swarm",
+      "Repo root": REPO_ROOT,
       Branch: "main",
       Head: "804d5d1",
       "Branch status": "ahead of origin/main by 2",
@@ -10592,7 +10595,7 @@ Workflows: 1
     handler({
       type: "workspace.snapshot.result",
       content: `# Workspace X-Ray
-Repo root: /Users/dhyana/dharma_swarm
+Repo root: ${REPO_ROOT}
 Git: main@804d5d19675ddcd904153fa9642de47ce345d95d | staged 112 | unstaged 515 | untracked 73
 Git hotspots: terminal (274); .dharma_psmv_hyperfile_branch (142); dharma_swarm (91)
 Git changed paths: terminal/src/app.tsx; terminal/tests/app.test.ts; terminal/src/components/RepoPane.tsx
@@ -10624,7 +10627,7 @@ Git sync: origin/main | ahead 2 | behind 0
         snapshot: {
           snapshot_id: "runtime-refresh-1",
           created_at: "2026-04-03T06:17:11Z",
-          repo_root: "/Users/dhyana/dharma_swarm",
+          repo_root: REPO_ROOT,
           runtime_db: "/Users/dhyana/.dharma/state/runtime.db",
           health: "ok",
           bridge_status: "connected",
@@ -10744,7 +10747,7 @@ Git sync: origin/main | ahead 2 | behind 0
     handler({
       type: "workspace.snapshot.result",
       content: `# Workspace X-Ray
-Repo root: /Users/dhyana/dharma_swarm
+Repo root: ${REPO_ROOT}
 Git: main@804d5d19675ddcd904153fa9642de47ce345d95d | staged 112 | unstaged 515 | untracked 73
 Git hotspots: terminal (274); .dharma_psmv_hyperfile_branch (142); dharma_swarm (91)
 Git changed paths: terminal/src/app.tsx; terminal/tests/app.test.ts; terminal/src/components/RepoPane.tsx
@@ -10797,7 +10800,7 @@ Workflows: 1
       Updated: "2026-04-03T01:15:00Z",
     });
     persistRepoPreview({
-      "Repo root": "/Users/dhyana/dharma_swarm",
+      "Repo root": REPO_ROOT,
       Branch: "main",
       Head: "804d5d1",
       "Branch status": "ahead of origin/main by 2",
@@ -10864,7 +10867,7 @@ Workflows: 1
     handler({
       type: "workspace.snapshot.result",
       content: `# Workspace X-Ray
-Repo root: /Users/dhyana/dharma_swarm
+Repo root: ${REPO_ROOT}
 Git: main@804d5d19675ddcd904153fa9642de47ce345d95d | staged 112 | unstaged 515 | untracked 73
 Git hotspots: terminal (274)
 Git changed paths: terminal/src/app.tsx
@@ -10888,7 +10891,7 @@ Git sync: origin/main | ahead 2 | behind 0`,
         snapshot: {
           snapshot_id: "runtime-sparse-refresh-1",
           created_at: "2026-04-03T06:17:11Z",
-          repo_root: "/Users/dhyana/dharma_swarm",
+          repo_root: REPO_ROOT,
           runtime_db: "/Users/dhyana/.dharma/state/runtime.db",
           health: "ok",
           bridge_status: "connected",
@@ -10926,7 +10929,7 @@ Git sync: origin/main | ahead 2 | behind 0`,
         snapshot: {
           snapshot_id: "runtime-authoritative-refresh-1",
           created_at: "2026-04-03T06:20:00Z",
-          repo_root: "/Users/dhyana/dharma_swarm",
+          repo_root: REPO_ROOT,
           runtime_db: "/Users/dhyana/.dharma/state/runtime.db",
           health: "ok",
           bridge_status: "connected",
@@ -11042,7 +11045,7 @@ Git sync: origin/main | ahead 2 | behind 0`,
       payload: {
         version: "v1",
         domain: "workspace_snapshot",
-        repo_root: "/Users/dhyana/dharma_swarm",
+        repo_root: REPO_ROOT,
         git: {
           branch: "main",
           head: "804d5d19675ddcd904153fa9642de47ce345d95d",
@@ -11077,7 +11080,7 @@ Git sync: origin/main | ahead 2 | behind 0`,
       payload: {
         version: "v1",
         domain: "workspace_snapshot",
-        repo_root: "/Users/dhyana/dharma_swarm",
+        repo_root: REPO_ROOT,
         git: {
           branch: "main",
           head: "804d5d19675ddcd904153fa9642de47ce345d95d",
@@ -11096,7 +11099,7 @@ Git sync: origin/main | ahead 2 | behind 0`,
               name: "dharma_swarm",
               role: "canonical_core",
               canonical: true,
-              path: "/Users/dhyana/dharma_swarm",
+              path: REPO_ROOT,
               exists: true,
               is_git: true,
               branch: "main...origin/main",
