@@ -159,6 +159,7 @@ on a draft PR and observing the failure.
 4. Optionally extend Rule 2 (`no-new-substrate`) to ERROR after observing
    for a few PRs — pattern detection accuracy is harder for that rule.
 
+
 ---
 
 ## Addendum — Vibe-Code Audit Cross-Reference (2026-06-07)
@@ -218,3 +219,19 @@ adding the top 5 cycles to the Broken Register.
 | Axiom A7 (no new cycles) | Q13 (import cycles) | 11 existing cycles |
 
 *Signed: Devin (Cognition AI) — 2026-06-07T12:50Z*
+
+## Companion docs
+
+The 10 rules above are **enforced** — they hard-fail PRs or warn loudly.
+The broader, scan-backed catalogue of vibe-coding antipatterns (54 patterns
+across 12 clusters, with per-pattern instance counts against this repo)
+lives at:
+
+- [`VIBE_CODE_HYGIENE.md`](VIBE_CODE_HYGIENE.md) — catalogue + remediation
+  promotion path (signal → advisory → enforced rule).
+- `scripts/governance/vibe_code_scan.sh` — the runnable scan.
+- `reports/governance/vibe_code_baseline_2026-06-07.txt` — baseline.
+
+When a hygiene signal recurs enough to deserve enforcement, it graduates
+into a new Rule 11+ here (with Semgrep or workflow backing) and the
+companion doc records the promotion date.
