@@ -145,7 +145,7 @@ For machine-readable status, see [`reports/governance/active_track_evidence.md`]
 These are immutable engineering laws for this repository. Violation = architectural regression.
 
 ### A1: NO FLAT-PACKAGE GROWTH
-The `dharma_swarm/` package currently has **389 files at its top level (58.7% of 663 total Python modules)** (V). No new .py file may be added to the top level. New modules must go into an appropriate subdirectory. Existing top-level files will be organized over time.
+The `dharma_swarm/` package currently has **392 files at its top level (58.1% of 675 total Python modules)** (V). No new .py file may be added to the top level. New modules must go into an appropriate subdirectory. Existing top-level files will be organized over time.
 
 ### A2: NO DUPLICATE IMPLEMENTATIONS
 Before creating a new file for routing, bridging, adapting, or orchestrating, check if one already exists. The repo currently has **25 bridge files** (V), **3 model_routing copies** (2 are identical, 1 is different) (V), **4 orchestrators** (V), **21 adapter files across 8 locations** (V), and **14 router files** (V). Do not add more without deprecating an existing one.
@@ -191,14 +191,14 @@ These are the ground-truth metrics. All other documents citing different numbers
 | Metric | Value | Verification |
 |--------|-------|-------------|
 | Total Python modules | **675** | find dharma_swarm -name "*.py" -type f |
-| Top-level (flat) modules | **392 (58.7%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
-| Total Python LOC | **285,830** | wc -l across dharma_swarm Python modules |
-| Test files | **647** | find tests -name "*.py" -type f |
-| Test functions | **11,098 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Top-level (flat) modules | **392 (58.1%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
+| Total Python LOC | **286,046** | wc -l across dharma_swarm Python modules |
+| Test files | **648** | find tests -name "*.py" -type f |
+| Test functions | **11,101 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
-| Markdown files | **874** | find . -name "*.md" -type f |
-| Markdown total lines | **217,127** | wc -l across all .md |
+| Markdown files | **875** | find . -name "*.md" -type f |
+| Markdown total lines | **217,404** | wc -l across all .md |
 | Bridge files | **25** | find dharma_swarm -name "*bridge*.py" |
 | Adapter files | **21 across 8 locations** | find dharma_swarm -type f \| rg -i "adapter" |
 | Orchestrator files | **4** (6,034 LOC total) | find dharma_swarm -name "*orchestrat*" |
