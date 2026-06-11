@@ -1,7 +1,7 @@
 # Track Portfolio Evidence
 
-Generated: 2026-06-11T16:00:29+00:00 (schema v2)
-Active tracks: **4** (warn 5, max 10) — shippable 2
+Generated: 2026-06-12T01:56:56+09:00 (schema v2)
+Active tracks: **5** (warn 5, max 10) — shippable 3
 
 ## Spine coverage
 
@@ -71,6 +71,21 @@ Active tracks: **4** (warn 5, max 10) — shippable 2
   - ✗ `loop1_closure_receipt_exists` (file_exists) — reports/loop_closure/phase1/LOOP1_CLOSURE_RECEIPT.md MISSING
   - ✗ `campaign_retrospective_exists` (file_exists) — reports/loop_closure/RETROSPECTIVE.md MISSING
 
+## `orientation-graph-2026-06` — SHIPPABLE
+
+- serves: `substrate-nativeness` · complements: ['runtime-truth-reconciliation-2026-06'] · depends_on: [] · conflicts_with: []
+- owned_surfaces: ['scripts/governance/orientation_graph.py', 'tests/test_orientation_graph.py']
+- moves_vital_signs: ['quality_gates']
+
+  - ✓ `identity_owner_on_branch` (file_exists) — foundations/THE_ORGANISM.md present
+  - ✓ `vision_owner_on_branch` (file_exists) — docs/vision_maps/NORTH_STAR.md present
+  - ✓ `orientation_graph_exists` (file_exists) — scripts/governance/orientation_graph.py present
+  - ✓ `orientation_packet_defined` (file_contains) — pattern 'class OrientationPacket' found in scripts/governance/orientation_graph.py
+  - ✓ `orientation_read_only_test` (file_contains) — pattern 'test_orientation_graph_render_is_read_only' found in tests/test_orientation_graph.py
+  - ✓ `onboard_identity_render` (file_contains) — pattern 'render_identity' found in scripts/governance/agent_onboard.py
+  - ✓ `make_orient_target` (file_contains) — pattern 'orient:' found in Makefile
+  - ✓ `megafile_points_at_north_star` (file_contains) — pattern 'NORTH_STAR.md' found in docs/MEGAFILE_INDEX.md
+
 ## Findings
 
 - **WARN** `spine-uncovered:research-depth`: Spine objective 'research-depth' has no ACTIVE track serving it (coverage gap).
@@ -79,3 +94,4 @@ Active tracks: **4** (warn 5, max 10) — shippable 2
 - **INFO** `track-shippable:runtime-truth-nats-2026-06`: [runtime-truth-nats-2026-06] all 2 completion criteria pass — SHIPPABLE; close it (and optionally open the next).
 - **INFO** `track-in-progress:runtime-truth-spine-adoption-2026-06`: [runtime-truth-spine-adoption-2026-06] 5/8 completion criteria pass.
 - **INFO** `track-in-progress:loop-closure-2026-06`: [loop-closure-2026-06] 3/5 completion criteria pass.
+- **INFO** `track-shippable:orientation-graph-2026-06`: [orientation-graph-2026-06] all 6 completion criteria pass — SHIPPABLE; close it (and optionally open the next).

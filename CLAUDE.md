@@ -167,6 +167,48 @@ Invariant that must hold throughout:
 - Do not commit provider API keys or any credentials.
 - Do not create a new truth store, receipt system, or state owner; extend loop_supervisor and existing owners.
 
+### Orientation Graph — whole-system view served on token one
+
+**Track id:** `orientation-graph-2026-06` · **Status:** ACTIVE · **Owner:** @devin
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-11 (TTL 21 days)
+**Relations:** complements: runtime-truth-reconciliation-2026-06
+**Owns surfaces:** scripts/governance/orientation_graph.py, tests/test_orientation_graph.py
+**Moves vital signs:** quality_gates
+
+Operator directive 2026-06-11: any agent must see the whole system at
+once — identity (why), organs, active tracks, canon custody, liveness,
+and the broken register — in ~10 seconds, not by grepping prose. This
+track delivers that as a single read-only orientation view.
+
+The track creates NO new truth store and NO authority surface. It
+projects from the existing owners only: foundations/THE_ORGANISM.md
+and docs/vision_maps/NORTH_STAR.md (identity),
+docs/governance/VENTURE_CELL_PORTFOLIO.yaml (organs),
+docs/governance/ACTIVE_TRACK.yaml (tracks),
+docs/docops/assertions.yaml canonical_guard.registered + the worktree
+(custody), the live ops census receipt (liveness), and
+docs/state/BROKEN_REGISTER.md (broken).
+
+Doctrine line that must hold (same as the reconciliation lane's):
+  Read models project truth from owners; they do not become authority.
+
+The one-section identity hook added to agent_onboard.py (a surface the
+reconciliation lane owns) was done under explicit operator instruction
+2026-06-11, is read-only pointers, and does not touch that lane's
+runtime-truth rendering or non-goals.
+
+**Next items:**
+
+- [code] Graph-shaped queries (organ -> tracks -> surfaces -> liveness edges) over the same owners, still read-only.
+- [test] Measure time-to-orientation for a fresh agent (target <10s) and record the receipt.
+
+**Non-goals:**
+
+- Do not create a new daemon, database, vector store, event log, or truth store.
+- Do not mutate owner files; the view writes nothing.
+- Do not duplicate make onboard's state rendering; this is the why/shape layer, onboard remains the state layer.
+- Do not touch operator_core/** or runtime_state.py.
+
 **Recently closed tracks:**
 
 - `runtime-truth-spine-2026-06` — Runtime Truth Spine — one invariant, one invocation path, one receipt (SHIPPED, closed 2026-06-04)

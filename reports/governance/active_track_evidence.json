@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-11T16:00:29+00:00",
+  "generated_at": "2026-06-12T01:56:56+09:00",
   "schema_version": 2,
   "active_track_id": "runtime-truth-reconciliation-2026-06",
   "shippable": true,
@@ -95,10 +95,10 @@
     }
   ],
   "portfolio_summary": {
-    "active": 4,
+    "active": 5,
     "max_active": 10,
     "warn_active": 5,
-    "shippable": 2
+    "shippable": 3
   },
   "spine_objectives": [
     {
@@ -467,6 +467,83 @@
           "detail": "reports/loop_closure/RETROSPECTIVE.md MISSING"
         }
       ]
+    },
+    {
+      "id": "orientation-graph-2026-06",
+      "name": "Orientation Graph \u2014 whole-system view served on token one",
+      "status": "ACTIVE",
+      "serves": "substrate-nativeness",
+      "complements": [
+        "runtime-truth-reconciliation-2026-06"
+      ],
+      "depends_on": [],
+      "conflicts_with": [],
+      "owned_surfaces": [
+        "scripts/governance/orientation_graph.py",
+        "tests/test_orientation_graph.py"
+      ],
+      "moves_vital_signs": [
+        "quality_gates"
+      ],
+      "verified_at": "2026-06-11",
+      "ttl_days": 21,
+      "owner": "@devin",
+      "shippable": true,
+      "prerequisites_ok": true,
+      "completion_progress": {
+        "passed": 6,
+        "total": 6
+      },
+      "criteria": [
+        {
+          "id": "identity_owner_on_branch",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "foundations/THE_ORGANISM.md present"
+        },
+        {
+          "id": "vision_owner_on_branch",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "docs/vision_maps/NORTH_STAR.md present"
+        },
+        {
+          "id": "orientation_graph_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "scripts/governance/orientation_graph.py present"
+        },
+        {
+          "id": "orientation_packet_defined",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'class OrientationPacket' found in scripts/governance/orientation_graph.py"
+        },
+        {
+          "id": "orientation_read_only_test",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'test_orientation_graph_render_is_read_only' found in tests/test_orientation_graph.py"
+        },
+        {
+          "id": "onboard_identity_render",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'render_identity' found in scripts/governance/agent_onboard.py"
+        },
+        {
+          "id": "make_orient_target",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'orient:' found in Makefile"
+        },
+        {
+          "id": "megafile_points_at_north_star",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'NORTH_STAR.md' found in docs/MEGAFILE_INDEX.md"
+        }
+      ]
     }
   ],
   "findings": [
@@ -504,6 +581,12 @@
       "severity": "INFO",
       "check": "track-in-progress:loop-closure-2026-06",
       "message": "[loop-closure-2026-06] 3/5 completion criteria pass.",
+      "criterion_id": null
+    },
+    {
+      "severity": "INFO",
+      "check": "track-shippable:orientation-graph-2026-06",
+      "message": "[orientation-graph-2026-06] all 6 completion criteria pass \u2014 SHIPPABLE; close it (and optionally open the next).",
       "criterion_id": null
     }
   ]

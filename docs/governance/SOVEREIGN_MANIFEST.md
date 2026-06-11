@@ -91,43 +91,6 @@ operator_core read models the reconciliation lane owns.
 - Do not touch the operator_core read-model surfaces owned by the reconciliation lane.
 - Do not add a parallel spine-check CI workflow.
 
-### Runtime Truth Spine — Adoption (god objects flow through invoke_agent)
-
-**Track id:** `runtime-truth-spine-adoption-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
-**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-10 (TTL 21 days)
-**Relations:** complements: runtime-truth-reconciliation-2026-06, runtime-truth-nats-2026-06
-**Owns surfaces:** dharma_swarm/spine/**, dharma_swarm/a2a/a2a_bridge.py, dharma_swarm/orchestrator.py, dharma_swarm/agent_runner.py, scripts/uplift_guards/check_spine_ownership.py
-**Moves vital signs:** quality_gates, tool_coverage
-
-spine-adoption ships end-to-end: every production dispatch flows through
-invoke_agent() and emits exactly one EvidenceReceipt. This track migrates
-the god objects (agent_runner.py, orchestrator.py, a2a_bridge.py) onto
-the shipped spine substrate. Target: 3 production callers outside the
-spine package, zero bypass paths. Substrate-nativeness moves toward 30%+.
-
-Ported 2026-06-10 from the v1 declaration (opened 2026-06-06 on the
-qwen/spine-adoption lane, commit c28951d5b, which closed reconciliation
-in v1) into the v2 portfolio while merging origin/main. In the v2
-multi-track model it runs as a co-equal peer of the reconciliation and
-NATS lanes rather than requiring their closure; reconciliation's open
-status is main's standing declaration and is left to the operator.
-
-**Next items:**
-
-- [code] (blocker) Wire a2a_bridge.submit_via_spine into production dispatch (ingest_trishula_inbox bypass at a2a_bridge.py:307 — Slice 2 per scripts/governance/spine_bypass_report.py).
-- [code] (blocker) orchestrator.py dispatch through invoke_agent behind DHARMA_SPINE_DISPATCH (landed via #557; operator confirms one live EvidenceReceipt on a real dispatch = GATE 1).
-- [code] (blocker) Migrate agent_runner.py run_task through invoke_agent(). Largest surface, last.
-- [code] (blocker) Drain the intentional-bypass allowlist (node_gateway submit endpoints, a2a_client._dispatch_local) and enable allow-list-at-zero in uplift_guards CI.
-- [docs] Author docs/architecture/SPINE_ADOPTION_NARRATIVE.md
-
-**Non-goals:**
-
-- Do not create new spine sub-modules. Adopt invoke/receipt/routing/persistence.
-- Do not decompose agent_runner.run_task beyond invoke_agent() routing.
-- Do not change EvidenceReceipt schema; adopt shipped types unchanged.
-- Do not introduce NATS, Redis, or gRPC in this track (transport belongs to the NATS lane).
-- Do not broadly refactor swarm.py, providers.py, or SwarmManager.
-
 ### Cybernetic Loop Closure — wire all 13 loops with receipted closure checks
 
 **Track id:** `loop-closure-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
@@ -163,6 +126,48 @@ Invariant that must hold throughout:
 - Do not touch the operator_core read-model surfaces owned by the reconciliation lane.
 - Do not commit provider API keys or any credentials.
 - Do not create a new truth store, receipt system, or state owner; extend loop_supervisor and existing owners.
+
+### Orientation Graph — whole-system view served on token one
+
+**Track id:** `orientation-graph-2026-06` · **Status:** ACTIVE · **Owner:** @devin
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-11 (TTL 21 days)
+**Relations:** complements: runtime-truth-reconciliation-2026-06
+**Owns surfaces:** scripts/governance/orientation_graph.py, tests/test_orientation_graph.py
+**Moves vital signs:** quality_gates
+
+Operator directive 2026-06-11: any agent must see the whole system at
+once — identity (why), organs, active tracks, canon custody, liveness,
+and the broken register — in ~10 seconds, not by grepping prose. This
+track delivers that as a single read-only orientation view.
+
+The track creates NO new truth store and NO authority surface. It
+projects from the existing owners only: foundations/THE_ORGANISM.md
+and docs/vision_maps/NORTH_STAR.md (identity),
+docs/governance/VENTURE_CELL_PORTFOLIO.yaml (organs),
+docs/governance/ACTIVE_TRACK.yaml (tracks),
+docs/docops/assertions.yaml canonical_guard.registered + the worktree
+(custody), the live ops census receipt (liveness), and
+docs/state/BROKEN_REGISTER.md (broken).
+
+Doctrine line that must hold (same as the reconciliation lane's):
+  Read models project truth from owners; they do not become authority.
+
+The one-section identity hook added to agent_onboard.py (a surface the
+reconciliation lane owns) was done under explicit operator instruction
+2026-06-11, is read-only pointers, and does not touch that lane's
+runtime-truth rendering or non-goals.
+
+**Next items:**
+
+- [code] Graph-shaped queries (organ -> tracks -> surfaces -> liveness edges) over the same owners, still read-only.
+- [test] Measure time-to-orientation for a fresh agent (target <10s) and record the receipt.
+
+**Non-goals:**
+
+- Do not create a new daemon, database, vector store, event log, or truth store.
+- Do not mutate owner files; the view writes nothing.
+- Do not duplicate make onboard's state rendering; this is the why/shape layer, onboard remains the state layer.
+- Do not touch operator_core/** or runtime_state.py.
 
 **Recently closed tracks:**
 
@@ -227,14 +232,14 @@ These are the ground-truth metrics. All other documents citing different numbers
 | Metric | Value | Verification |
 |--------|-------|-------------|
 | Total Python modules | **675** | find dharma_swarm -name "*.py" -type f |
-| Top-level (flat) modules | **392** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
+| Top-level (flat) modules | **392 (58.1%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
 | Total Python LOC | **285,939** | wc -l across dharma_swarm Python modules |
-| Test files | **648** | find tests -name "*.py" -type f |
-| Test functions | **11,110 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Test files | **649** | find tests -name "*.py" -type f |
+| Test functions | **11,117 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
 | Markdown files | **898** | find . -name "*.md" -type f |
-| Markdown total lines | **221,546** | wc -l across all .md |
+| Markdown total lines | **221,655** | wc -l across all .md |
 | Bridge files | **25** | find dharma_swarm -name "*bridge*.py" |
 | Adapter files | **21 across 8 locations** | find dharma_swarm -type f \| rg -i "adapter" |
 | Orchestrator files | **5** | find dharma_swarm -name "*orchestrat*" |
