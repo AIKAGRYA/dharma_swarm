@@ -1,0 +1,2922 @@
+[
+  {
+    "id": "F-001",
+    "component": "s0-verifiers",
+    "category": "infrastructure",
+    "description": "The test suite shall pass in any checkout path: every hardcoded \"/Users/dhyana/dharma_swarm\" literal in terminal test files (design doc cites 353 across 7 files; baseline a6ad97362 greps 250 across 6 files — the binding criterion is zero remaining, count-agnostic) is replaced with a dynamic REPO_ROOT derived via import.meta.dir, including the resolveSupervisorStateDir run.json.repo_root match against the runtime REPO_ROOT.",
+    "steps": [
+      "Check out the repo at a path other than /Users/dhyana/dharma_swarm (the build worktree ~/dharma_helm_build qualifies)",
+      "Run bun test from terminal/ and observe 527+ pass, 0 fail",
+      "Search tests/ and src/ for the literal string /Users/dhyana/dharma_swarm and observe zero matches",
+      "Boot the app and observe supervisor state resolution succeeds against the checkout's own repo root"
+    ],
+    "verification": "cd ~/dharma_helm_build/terminal && bun test exits 0 with 527+ pass / 0 fail AND grep -r '/Users/dhyana/dharma_swarm' tests src returns no matches",
+    "dependencies": [],
+    "estimated_minutes": 30,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-002",
+    "component": "s0-verifiers",
+    "category": "infrastructure",
+    "description": "A tmux boot-smoke script (L0) shall boot the app hermetically in a disposable tmux session at 80x24 with DHARMA_PYTHON=/nonexistent and a temp DHARMA_TERMINAL_STATE_DIR, poll-until-changed (no fixed-sleep-only race), assert a non-empty frame showing graceful 'backend offline' degradation, and exit the app cleanly via send-keys Ctrl-C.",
+    "steps": [
+      "Run scripts/boot_smoke.sh twice in a row and observe exit 0 both times",
+      "Point the script at a deliberately broken start command and observe exit 1 (negative check)",
+      "Observe the captured frame contains the offline/retrying degradation text rather than a crash"
+    ],
+    "verification": "scripts/boot_smoke.sh exits 0 twice consecutively; exits 1 when the start command is broken; captured frame is non-empty",
+    "dependencies": [],
+    "estimated_minutes": 20,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-003",
+    "component": "s0-hygiene",
+    "category": "infrastructure",
+    "description": "The git-tracked terminal state files shall be removed from tracking: .dharma-terminal-state.json untracked with a .gitignore entry, and the .bak-20260401T2245 copy deleted, so that booting the app produces no tracked-file churn.",
+    "steps": [
+      "Boot the app via the smoke script, then run git status and observe a clean tree",
+      "Run git ls-files terminal/ and observe neither state file is listed"
+    ],
+    "verification": "git ls-files terminal/ | grep dharma-terminal-state returns nothing AND git status is clean after a boot-smoke run",
+    "dependencies": [],
+    "estimated_minutes": 10,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-004",
+    "component": "s0-hygiene",
+    "category": "testing",
+    "description": "Every test and CI/evaluator invocation shall set DHARMA_TERMINAL_STATE_DIR and DHARMA_TERMINAL_SUPERVISOR_STATE_DIR to temp dirs, so no test run writes outside its sandbox.",
+    "steps": [
+      "Run bun test, then run git status and observe zero modified files",
+      "Inspect the shared test setup and observe both env vars are set to mkdtemp-style paths for every suite"
+    ],
+    "verification": "bun test green AND git status clean afterward AND grep shows both DHARMA_TERMINAL_*STATE_DIR vars set in shared test setup",
+    "dependencies": [
+      "F-001"
+    ],
+    "estimated_minutes": 15,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-005",
+    "component": "s0-verifiers",
+    "category": "infrastructure",
+    "description": "A PTY input-probe smoke script shall drive the real app through a pseudo-terminal, send at least 5 keystrokes, and assert they echo in the composer — the green-gate for any future Bun version bump.",
+    "steps": [
+      "Run scripts/pty_smoke.sh and observe exit 0 with the sent characters visible in the captured output",
+      "Run it under the currently installed Bun and observe green"
+    ],
+    "verification": "scripts/pty_smoke.sh exits 0 and its captured output contains the probe string",
+    "dependencies": [
+      "F-002"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-006",
+    "component": "s0-hygiene",
+    "category": "infrastructure",
+    "description": "package.json packageManager shall be re-pinned from bun@1.1.38 to bun@1.3.11 (the installed version), gated on the PTY smoke and full suite staying green.",
+    "steps": [
+      "Read package.json and observe packageManager is bun@1.3.11",
+      "Run bun test and the PTY smoke and observe both green under 1.3.11"
+    ],
+    "verification": "grep '\"packageManager\": \"bun@1.3.11\"' terminal/package.json succeeds AND bun test + scripts/pty_smoke.sh both exit 0",
+    "dependencies": [
+      "F-001",
+      "F-005"
+    ],
+    "estimated_minutes": 10,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-007",
+    "component": "s0-hygiene",
+    "category": "infrastructure",
+    "description": "The EXISTING untracked terminal/bun.lock shall be added to git as-is (the lockfile is already on disk — git add it, do not regenerate or modify it), and a frozen-lockfile install shall succeed from it.",
+    "steps": [
+      "Run git add terminal/bun.lock on the existing file (no regeneration, no modification), then git ls-files terminal/bun.lock and observe it is tracked",
+      "Run bun install --frozen-lockfile in terminal/ and observe success"
+    ],
+    "verification": "git ls-files terminal/bun.lock returns the path AND bun install --frozen-lockfile exits 0",
+    "dependencies": [
+      "F-006"
+    ],
+    "estimated_minutes": 5,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-008",
+    "component": "s0-verifiers",
+    "category": "infrastructure",
+    "description": "A ratchet script shall measure max source-file line count across terminal/src (baseline 4,064 = protocol.ts) and fail with exit 1 on any increase over the recorded baseline; end target is 400 or fewer lines per file.",
+    "steps": [
+      "Run scripts/ratchet.sh and observe it prints the current max-file-lines value and exits 0 at baseline",
+      "Append 50 lines to the largest file, run the ratchet, observe exit 1, then revert"
+    ],
+    "verification": "scripts/ratchet.sh prints max_file_lines=<n> and exits 0 at baseline; exits 1 after an artificial regression",
+    "dependencies": [],
+    "estimated_minutes": 15,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-009",
+    "component": "s0-verifiers",
+    "category": "infrastructure",
+    "description": "The ratchet script shall count identically-named top-level functions duplicated between Sidebar.tsx and RepoPane.tsx (baseline 40) and fail on any increase; end target 0.",
+    "steps": [
+      "Run the ratchet and observe dup_functions=40 reported at baseline",
+      "Add a copy-pasted function name to both files, run the ratchet, observe exit 1, then revert"
+    ],
+    "verification": "scripts/ratchet.sh prints dup_functions=<n> matching a manual count and exits 1 when the count rises",
+    "dependencies": [
+      "F-008"
+    ],
+    "estimated_minutes": 15,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-010",
+    "component": "s0-verifiers",
+    "category": "infrastructure",
+    "description": "The ratchet script shall count Record<string, unknown> occurrences in protocol.ts and its successor protocol/ modules (baseline 97) and fail on any increase; end target 1 or fewer at the single typed ingress.",
+    "steps": [
+      "Run the ratchet and observe record_unknown=97 at baseline",
+      "Add one more Record<string, unknown> to protocol.ts, run the ratchet, observe exit 1, then revert"
+    ],
+    "verification": "scripts/ratchet.sh prints record_unknown=<n> equal to grep -c at baseline and exits 1 on increase",
+    "dependencies": [
+      "F-008"
+    ],
+    "estimated_minutes": 10,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-011",
+    "component": "s0-verifiers",
+    "category": "infrastructure",
+    "description": "Ratchet baselines shall persist in a git-tracked baseline file: any metric regression versus the stored value exits 1; an improvement updates the stored value in the same commit, making every ratchet one-directional.",
+    "steps": [
+      "Improve a metric, run the ratchet, observe the baseline file updated to the better value",
+      "Attempt to regress past the stored value and observe exit 1 even though the old original baseline would have allowed it"
+    ],
+    "verification": "ratchet baseline file is git-tracked; regression vs stored values exits 1; improvement rewrites the stored value",
+    "dependencies": [
+      "F-008",
+      "F-009",
+      "F-010"
+    ],
+    "estimated_minutes": 15,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-012",
+    "component": "s0-verifiers",
+    "category": "infrastructure",
+    "description": "The ratchet script shall enforce the hex-literal law: hex color literals outside theme.ts and ScenicStrip.tsx are banned — colors are consumed via THEME tokens; the counter's end target is 0 violations.",
+    "steps": [
+      "Run the ratchet and observe hex_violations reported with the two allowlisted files excluded",
+      "Add a hardcoded hex to a component, run the ratchet, observe exit 1, then revert"
+    ],
+    "verification": "scripts/ratchet.sh prints hex_violations=<n> and exits 1 when a hex literal is added outside theme.ts/ScenicStrip.tsx",
+    "dependencies": [
+      "F-008"
+    ],
+    "estimated_minutes": 10,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-013",
+    "component": "s0-hygiene",
+    "category": "infrastructure",
+    "description": "An ESLint flat config shall lint terminal/src and terminal/tests with 0 errors (warnings allowed with a documented budget), runnable as bun run lint.",
+    "steps": [
+      "Run bun run lint and observe exit 0 with 0 errors",
+      "Introduce an unused variable, run lint, observe it is reported, then revert"
+    ],
+    "verification": "bun run lint exits 0 with 0 errors on the full tree",
+    "dependencies": [],
+    "estimated_minutes": 25,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-014",
+    "component": "s0-hygiene",
+    "category": "infrastructure",
+    "description": "Prettier shall be configured with a format-check script; the whole terminal/ tree passes bun run format:check.",
+    "steps": [
+      "Run bun run format:check and observe exit 0",
+      "Mis-format one file, observe format:check exit 1, then restore"
+    ],
+    "verification": "bun run format:check exits 0 on the full tree",
+    "dependencies": [
+      "F-013"
+    ],
+    "estimated_minutes": 10,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-015",
+    "component": "s0-verifiers",
+    "category": "infrastructure",
+    "description": "A verify:all script shall chain typecheck, bun test, boot smoke, ratchet, lint, and format-check; it exits nonzero if any sub-gate fails and is the per-commit gate for every subsequent feature.",
+    "steps": [
+      "Run bun run verify:all and observe exit 0 with each sub-gate's result printed",
+      "Break one sub-gate (e.g. a failing test), observe verify:all exits nonzero, then revert"
+    ],
+    "verification": "bun run verify:all exits 0 at a green tree and nonzero when any single sub-gate is broken",
+    "dependencies": [
+      "F-001",
+      "F-002",
+      "F-011",
+      "F-012",
+      "F-013",
+      "F-014"
+    ],
+    "estimated_minutes": 15,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-016",
+    "component": "s0-verifiers",
+    "category": "infrastructure",
+    "description": "A golden-frame capture script shall capture tmux capture-pane text frames of every tab, pane, and overlay at 80x24, 100x30, and 120x40 into tests/golden/<size>/<surface>.txt.",
+    "steps": [
+      "Run scripts/golden_capture.sh and observe one text file per surface per size appears under tests/golden/",
+      "Open three sampled frames and observe they contain the expected surface content (not blank, not error text)"
+    ],
+    "verification": "scripts/golden_capture.sh produces non-empty frames for 3 sizes x all surfaces; file count matches the surface inventory",
+    "dependencies": [
+      "F-002"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-017",
+    "component": "s0-verifiers",
+    "category": "testing",
+    "description": "A baseline golden corpus shall be captured at the current commit and committed under tests/golden/ — the refactor guard for S1-S3: structure-neutral refactors leave frames byte-identical.",
+    "steps": [
+      "Run the capture script at the baseline tree and commit the output",
+      "Re-run capture with no code changes and observe a zero diff (capture is deterministic)"
+    ],
+    "verification": "tests/golden/ committed; a second capture run diffs clean against it",
+    "dependencies": [
+      "F-016"
+    ],
+    "estimated_minutes": 15,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-018",
+    "component": "s0-verifiers",
+    "category": "infrastructure",
+    "description": "A golden-diff checker shall compare freshly captured frames against the committed golden set and exit nonzero on unapproved drift; approval is an explicit re-capture commit, never an in-place edit.",
+    "steps": [
+      "Run scripts/golden_diff.sh on an unchanged tree and observe exit 0",
+      "Change a visible label, run golden_diff, observe exit 1 naming the drifted frame, then revert"
+    ],
+    "verification": "scripts/golden_diff.sh exits 0 on unchanged UI and exits 1 naming the frame on a deliberate visual change",
+    "dependencies": [
+      "F-016",
+      "F-017"
+    ],
+    "estimated_minutes": 15,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-019",
+    "component": "s0-verifiers",
+    "category": "infrastructure",
+    "description": "A truecolor preflight gate shall assert COLORTERM=truecolor reaches the app, tmux RGB terminal-features are on, and a test capture contains 38;2 escape sequences — exiting 1 otherwise, so overnight aesthetic grading never judges quantized colors.",
+    "steps": [
+      "Run scripts/truecolor_preflight.sh in the build tmux environment and observe exit 0",
+      "Run it with COLORTERM stripped and observe exit 1 with a diagnostic naming the missing link"
+    ],
+    "verification": "scripts/truecolor_preflight.sh exits 0 in the run environment and its raw capture evidence contains literal '38;2' sequences",
+    "dependencies": [
+      "F-002"
+    ],
+    "estimated_minutes": 20,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-020",
+    "component": "s0-hygiene",
+    "category": "docs",
+    "description": "terminal/LESSONS/ shall be seeded with the theme law memory file carrying the exact line: 'Read terminal/src/theme.ts before any UI code; never hardcode a hex outside theme.ts and ScenicStrip.tsx.'",
+    "steps": [
+      "Open terminal/LESSONS/LESSONS.md and observe the law line verbatim",
+      "Observe the coder session protocol references terminal/LESSONS/LESSONS.md"
+    ],
+    "verification": "terminal/LESSONS/LESSONS.md exists and contains the law sentence verbatim",
+    "dependencies": [],
+    "estimated_minutes": 5,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-021",
+    "component": "s4-theme",
+    "category": "visual",
+    "description": "The ShellHeader and Operator Summary shall remain on-screen at ALL THREE graded sizes — live calibration found the header scrolled off at 80x24 as well as 120x40: the two-row bordered tab pills (6+ rows of chrome) are replaced by a one-line tab bar at ALL widths. This is grading criterion #1 and lands early. This feature re-captures the golden corpus at all three sizes after the layout change; the re-captured goldens become the new baseline.",
+    "steps": [
+      "Boot the app in tmux at each graded size (80x24, 100x30, 120x40) and capture the frame at each",
+      "Observe ShellHeader, Operator Summary, tab bar, and composer are all present in the single frame at every one of the three sizes with no scrolled-off chrome",
+      "Observe the tab bar occupies exactly one row at 80x24, 100x30, and 120x40",
+      "Re-capture the golden corpus at all three sizes via the capture script and observe the new goldens committed as the baseline"
+    ],
+    "verification": "tmux captures at 80x24, 100x30, and 120x40 each show header + operator summary + composer simultaneously; tab bar is 1 row in captures at all 3 sizes; golden corpus re-captured at all three sizes",
+    "dependencies": [
+      "F-002",
+      "F-016",
+      "F-017"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-022",
+    "component": "s4-theme",
+    "category": "testing",
+    "description": "The compactShell degradation at width <= 90 shall be preserved (currently verified passing): a regression test boots at 80x24 and asserts the compact layout renders after the one-line tab bar change.",
+    "steps": [
+      "Boot at 80x24 and observe the compact shell layout in the captured frame",
+      "Run the suite and observe the compactShell tests stay green"
+    ],
+    "verification": "80x24 capture shows compact layout; compactShell-related tests pass in bun test",
+    "dependencies": [
+      "F-021"
+    ],
+    "estimated_minutes": 15,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-023",
+    "component": "s1-bridge",
+    "category": "docs",
+    "description": "An event-vocabulary inventory of dharma_swarm/terminal_bridge.py shall enumerate every event type it emits (name, payload fields, emit site), written to spec-forge/knowledge/bridge_events.md — the union is typed against reality, not guesses.",
+    "steps": [
+      "Open the inventory doc and observe one entry per emitted event type with payload field lists",
+      "Cross-check: every event-type string emitted in terminal_bridge.py source appears in the doc (grep count equals doc entry count)"
+    ],
+    "verification": "spec-forge/knowledge/bridge_events.md exists; grep of emit sites in terminal_bridge.py yields a type set equal to the doc's entry set",
+    "dependencies": [
+      "F-001",
+      "F-015"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-024",
+    "component": "s1-bridge",
+    "category": "docs",
+    "description": "The inventory shall be extended with every event type emitted by dharma_swarm/terminal_bridge_text.py, in the same name/fields/emit-site format.",
+    "steps": [
+      "Open the inventory and observe a terminal_bridge_text.py section with one entry per emitted type",
+      "Cross-check grep of its emit sites against the doc entries"
+    ],
+    "verification": "bridge_events.md covers terminal_bridge_text.py with entry set equal to its grep'd type set",
+    "dependencies": [
+      "F-023"
+    ],
+    "estimated_minutes": 20,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-025",
+    "component": "s1-bridge",
+    "category": "testing",
+    "description": "A fixture corpus of real bridge JSONL frames shall be committed under tests/fixtures/bridge/ with at least 1 valid fixture per documented event family plus at least 3 malformed frames.",
+    "steps": [
+      "List tests/fixtures/bridge/ and observe one or more fixture files per documented family",
+      "Parse every fixture line as JSON and observe the valid set parses and the malformed set is labeled as such"
+    ],
+    "verification": "fixture files exist for 100% of documented families; a parse script confirms valid fixtures parse and malformed ones are flagged",
+    "dependencies": [
+      "F-023",
+      "F-024"
+    ],
+    "estimated_minutes": 20,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-026",
+    "component": "s1-bridge",
+    "category": "functional",
+    "description": "A BridgeEvent discriminated union shall cover 100% of the inventoried event families (reusing the Canonical* types in types.ts as raw material), with a coverage test mapping every documented family to a union member.",
+    "steps": [
+      "Run typecheck and observe 0 errors with the union in place",
+      "Run the coverage test and observe every family in bridge_events.md maps to exactly one union member"
+    ],
+    "verification": "bun run typecheck green AND the family-coverage test passes with 0 unmapped families",
+    "dependencies": [
+      "F-023",
+      "F-024"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-027",
+    "component": "s1-bridge",
+    "category": "functional",
+    "description": "A runtime validator shall parse raw bridge JSON into BridgeEvent: every valid fixture parses to its typed family; every malformed fixture is rejected with a structured error naming the failed field.",
+    "steps": [
+      "Feed all valid fixtures through the validator and observe typed results for each",
+      "Feed the malformed fixtures and observe structured rejections, no throws that escape"
+    ],
+    "verification": "validator test: 100% of valid fixtures parse, 100% of malformed fixtures rejected with field-level errors",
+    "dependencies": [
+      "F-025",
+      "F-026"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-028",
+    "component": "s1-bridge",
+    "category": "functional",
+    "description": "All bridge events shall flow through one validated ingress where bridge.onEvent lands: downstream code receives typed BridgeEvent only; raw-payload JSON access outside the ingress is retired in favor of the typed union.",
+    "steps": [
+      "Run bun test and observe the suite green with the ingress wired",
+      "Search src/ and observe no JSON.parse of bridge payloads outside the ingress module",
+      "Boot via smoke script and observe normal pane updates through the typed path"
+    ],
+    "verification": "bun test green; grep confirms bridge payload parsing exists only in the ingress module; boot smoke green",
+    "dependencies": [
+      "F-027"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-029",
+    "component": "s1-bridge",
+    "category": "functional",
+    "description": "An unrecognized event type shall become a typed UnknownBridgeEvent plus a log entry — the app continues rendering; a bogus-event injection test shows no crash and no frame corruption.",
+    "steps": [
+      "Inject an event with an unknown type through the ingress in a test and observe an UnknownBridgeEvent result",
+      "Boot the app, inject a bogus event, capture the frame, and observe normal UI"
+    ],
+    "verification": "unknown-event test passes; post-injection tmux capture shows an intact frame and a logged quarantine entry",
+    "dependencies": [
+      "F-028"
+    ],
+    "estimated_minutes": 15,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-030",
+    "component": "s1-bridge",
+    "category": "functional",
+    "description": "Validation failures shall be observable: a counter and last-error summary are exposed in a status/debug surface; injecting a malformed event increments the visible counter.",
+    "steps": [
+      "Inject a malformed event and observe the failure counter increments in state",
+      "Open the debug/status surface and observe the last validation error summary rendered"
+    ],
+    "verification": "test asserts counter increment on malformed input AND the surface renders the count in a captured frame",
+    "dependencies": [
+      "F-028"
+    ],
+    "estimated_minutes": 15,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-031",
+    "component": "s2-protocol",
+    "category": "testing",
+    "description": "tests/app.test.ts (442KB — the choke point) shall be split into per-domain test files with zero tests deleted: total executed test count stays at or above the pre-split count.",
+    "steps": [
+      "Run bun test before the split and record the test count",
+      "Run bun test after the split and observe count >= the recorded value with 0 fail",
+      "Observe tests/app.test.ts is replaced by focused files each under 100KB"
+    ],
+    "verification": "bun test count >= pre-split count, 0 fail; no single app test file exceeds 100KB",
+    "dependencies": [
+      "F-028"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-032",
+    "component": "s2-protocol",
+    "category": "testing",
+    "description": "tests/protocol.test.ts shall be split into per-domain test files mirroring the upcoming protocol/ module boundaries, with zero tests deleted.",
+    "steps": [
+      "Run bun test before and after and observe count is preserved or higher with 0 fail",
+      "Observe one protocol test file per planned domain (workspace, runtime, sessions, approvals, models, tabs...)"
+    ],
+    "verification": "bun test count preserved, 0 fail; protocol tests split into per-domain files",
+    "dependencies": [
+      "F-031"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-033",
+    "component": "s2-protocol",
+    "category": "refactor",
+    "description": "The workspace-snapshot family (workspaceSnapshot*/workspacePayload* functions) shall move from protocol.ts into a dedicated module of 400 or fewer lines with behavior preserved: the full suite and golden frames stay unchanged.",
+    "steps": [
+      "Run bun test and observe 527+ green after the workspace-snapshot extraction",
+      "Run the golden-diff checker and observe zero frame drift",
+      "Observe the new module is 400 lines or fewer and protocol.ts shrank by at least the moved line count minus re-export shims"
+    ],
+    "verification": "bun test green AND golden_diff exits 0 AND wc -l of the new workspace-snapshot module <= 400",
+    "dependencies": [
+      "F-032"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-034",
+    "component": "s2-protocol",
+    "category": "refactor",
+    "description": "The runtime-snapshot family (runtimeSnapshot*/runtimePayload* functions) shall move from protocol.ts into a dedicated module of 400 or fewer lines with behavior preserved: the full suite and golden frames stay unchanged.",
+    "steps": [
+      "Run bun test and observe 527+ green after the runtime-snapshot extraction",
+      "Run the golden-diff checker and observe zero frame drift",
+      "Observe the new module is 400 lines or fewer and protocol.ts shrank by at least the moved line count minus re-export shims"
+    ],
+    "verification": "bun test green AND golden_diff exits 0 AND wc -l of the new runtime-snapshot module <= 400",
+    "dependencies": [
+      "F-033"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-035",
+    "component": "s2-protocol",
+    "category": "refactor",
+    "description": "The activity/event-resolution family (activityEntriesFromEvent, resolveEventOutput/Command/ActionType) shall move from protocol.ts into a dedicated module of 400 or fewer lines with behavior preserved: the full suite and golden frames stay unchanged.",
+    "steps": [
+      "Run bun test and observe 527+ green after the activity/event-resolution extraction",
+      "Run the golden-diff checker and observe zero frame drift",
+      "Observe the new module is 400 lines or fewer and protocol.ts shrank by at least the moved line count minus re-export shims"
+    ],
+    "verification": "bun test green AND golden_diff exits 0 AND wc -l of the new activity/event-resolution module <= 400",
+    "dependencies": [
+      "F-034"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-036",
+    "component": "s2-protocol",
+    "category": "refactor",
+    "description": "The slash-command family (isSlashCommandPrompt, normalizeCommandName, inferSlashCommand, commandTargetTab, resolveCommandTargetPane) shall move from protocol.ts into a dedicated module of 400 or fewer lines with behavior preserved: the full suite and golden frames stay unchanged.",
+    "steps": [
+      "Run bun test and observe 527+ green after the slash-command extraction",
+      "Run the golden-diff checker and observe zero frame drift",
+      "Observe the new module is 400 lines or fewer and protocol.ts shrank by at least the moved line count minus re-export shims"
+    ],
+    "verification": "bun test green AND golden_diff exits 0 AND wc -l of the new slash-command module <= 400",
+    "dependencies": [
+      "F-035"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-037",
+    "component": "s2-protocol",
+    "category": "refactor",
+    "description": "The sessions family (sessionCatalog/Detail/Pane/Bootstrap lines+preview functions) shall move from protocol.ts into a dedicated module of 400 or fewer lines with behavior preserved: the full suite and golden frames stay unchanged.",
+    "steps": [
+      "Run bun test and observe 527+ green after the sessions extraction",
+      "Run the golden-diff checker and observe zero frame drift",
+      "Observe the new module is 400 lines or fewer and protocol.ts shrank by at least the moved line count minus re-export shims"
+    ],
+    "verification": "bun test green AND golden_diff exits 0 AND wc -l of the new sessions module <= 400",
+    "dependencies": [
+      "F-036"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-038",
+    "component": "s2-protocol",
+    "category": "refactor",
+    "description": "The approvals/permissions family (permission* and approvalPane* functions) shall move from protocol.ts into a dedicated module of 400 or fewer lines with behavior preserved: the full suite and golden frames stay unchanged.",
+    "steps": [
+      "Run bun test and observe 527+ green after the approvals/permissions extraction",
+      "Run the golden-diff checker and observe zero frame drift",
+      "Observe the new module is 400 lines or fewer and protocol.ts shrank by at least the moved line count minus re-export shims"
+    ],
+    "verification": "bun test green AND golden_diff exits 0 AND wc -l of the new approvals/permissions module <= 400",
+    "dependencies": [
+      "F-037"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-039",
+    "component": "s2-protocol",
+    "category": "refactor",
+    "description": "The operator/command-graph family (operatorSnapshot* and commandGraph* functions) shall move from protocol.ts into a dedicated module of 400 or fewer lines with behavior preserved: the full suite and golden frames stay unchanged.",
+    "steps": [
+      "Run bun test and observe 527+ green after the operator/command-graph extraction",
+      "Run the golden-diff checker and observe zero frame drift",
+      "Observe the new module is 400 lines or fewer and protocol.ts shrank by at least the moved line count minus re-export shims"
+    ],
+    "verification": "bun test green AND golden_diff exits 0 AND wc -l of the new operator/command-graph module <= 400",
+    "dependencies": [
+      "F-038"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-040",
+    "component": "s2-protocol",
+    "category": "refactor",
+    "description": "The models/routing family (modelPolicy*, agentRoutes*, routingDecisionPayloadFromEvent) shall move from protocol.ts into a dedicated module of 400 or fewer lines with behavior preserved: the full suite and golden frames stay unchanged.",
+    "steps": [
+      "Run bun test and observe 527+ green after the models/routing extraction",
+      "Run the golden-diff checker and observe zero frame drift",
+      "Observe the new module is 400 lines or fewer and protocol.ts shrank by at least the moved line count minus re-export shims"
+    ],
+    "verification": "bun test green AND golden_diff exits 0 AND wc -l of the new models/routing module <= 400",
+    "dependencies": [
+      "F-039"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-041",
+    "component": "s2-protocol",
+    "category": "refactor",
+    "description": "The evolution-surface family (evolutionSurface* functions) shall move from protocol.ts into a dedicated module of 400 or fewer lines with behavior preserved: the full suite and golden frames stay unchanged.",
+    "steps": [
+      "Run bun test and observe 527+ green after the evolution-surface extraction",
+      "Run the golden-diff checker and observe zero frame drift",
+      "Observe the new module is 400 lines or fewer and protocol.ts shrank by at least the moved line count minus re-export shims"
+    ],
+    "verification": "bun test green AND golden_diff exits 0 AND wc -l of the new evolution-surface module <= 400",
+    "dependencies": [
+      "F-040"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-042",
+    "component": "s2-protocol",
+    "category": "refactor",
+    "description": "The tabs/outline family (eventToTabPatch, buildBridgeTabs, buildBridgeOutline, outlineFromTabs) shall move from protocol.ts into a dedicated module of 400 or fewer lines with behavior preserved: the full suite and golden frames stay unchanged.",
+    "steps": [
+      "Run bun test and observe 527+ green after the tabs/outline extraction",
+      "Run the golden-diff checker and observe zero frame drift",
+      "Observe the new module is 400 lines or fewer and protocol.ts shrank by at least the moved line count minus re-export shims"
+    ],
+    "verification": "bun test green AND golden_diff exits 0 AND wc -l of the new tabs/outline module <= 400",
+    "dependencies": [
+      "F-041"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-043",
+    "component": "s2-protocol",
+    "category": "refactor",
+    "description": "After the family extractions, the protocol.ts residue shall be 400 lines or fewer (from 4,064), and every protocol/ module shall also be 400 lines or fewer.",
+    "steps": [
+      "Run wc -l on protocol.ts and every protocol/ module and observe all values <= 400",
+      "Run bun test and golden-diff and observe both green"
+    ],
+    "verification": "wc -l src/protocol.ts <= 400 AND all protocol/ modules <= 400 AND bun test + golden_diff green",
+    "dependencies": [
+      "F-042"
+    ],
+    "estimated_minutes": 20,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-044",
+    "component": "s2-protocol",
+    "category": "refactor",
+    "description": "String-sniff reduction wave 1: the 37 type === \"...\" string-sniffs shall drop to 15 or fewer by narrowing on the typed BridgeEvent union instead of raw strings.",
+    "steps": [
+      "Count type === string-sniffs in protocol modules and observe <= 15",
+      "Run bun test and observe green"
+    ],
+    "verification": "grep -cE 'type === \"' across protocol modules <= 15 AND bun test green",
+    "dependencies": [
+      "F-043"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-045",
+    "component": "s2-protocol",
+    "category": "refactor",
+    "description": "String-sniff reduction final: string-sniffs shall drop to 2 or fewer, surviving only at the validated ingress boundary.",
+    "steps": [
+      "Count string-sniffs and observe <= 2, all inside the ingress module",
+      "Run bun test and observe green"
+    ],
+    "verification": "grep count <= 2 and confined to the ingress module; bun test green",
+    "dependencies": [
+      "F-044"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-046",
+    "component": "s2-protocol",
+    "category": "refactor",
+    "description": "Record<string, unknown> reduction wave 1: occurrences shall drop from 97 to 40 or fewer as extracted modules adopt typed payloads.",
+    "steps": [
+      "Run the ratchet and observe record_unknown <= 40",
+      "Run bun test and observe green"
+    ],
+    "verification": "ratchet record_unknown <= 40 AND bun test green",
+    "dependencies": [
+      "F-043"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-047",
+    "component": "s2-protocol",
+    "category": "refactor",
+    "description": "Record<string, unknown> reduction wave 2: occurrences shall drop to 10 or fewer.",
+    "steps": [
+      "Run the ratchet and observe record_unknown <= 10",
+      "Run bun test and observe green"
+    ],
+    "verification": "ratchet record_unknown <= 10 AND bun test green",
+    "dependencies": [
+      "F-046"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-048",
+    "component": "s2-protocol",
+    "category": "refactor",
+    "description": "Record<string, unknown> final: 1 or fewer occurrence, living only at the single typed ingress.",
+    "steps": [
+      "Run the ratchet and observe record_unknown <= 1",
+      "Observe the surviving occurrence (if any) is in the ingress module",
+      "Run bun test and observe green"
+    ],
+    "verification": "ratchet record_unknown <= 1 confined to ingress; bun test green",
+    "dependencies": [
+      "F-047"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-049",
+    "component": "s2-dedup",
+    "category": "refactor",
+    "description": "Sidebar/RepoPane dedup wave 1: the 40 identically-named copy-pasted functions shall drop to 20 or fewer by extracting shared logic into a single repoDerive module that both components import.",
+    "steps": [
+      "Run the ratchet and observe dup_functions <= 20",
+      "Run bun test and golden-diff and observe both green"
+    ],
+    "verification": "ratchet dup_functions <= 20 AND bun test + golden_diff green",
+    "dependencies": [
+      "F-032"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-050",
+    "component": "s2-dedup",
+    "category": "refactor",
+    "description": "Sidebar/RepoPane dedup final: duplicated top-level functions shall reach 0; all shared derivation lives in repoDerive and is imported by both panes.",
+    "steps": [
+      "Run the ratchet and observe dup_functions=0",
+      "Run bun test and golden-diff and observe both green"
+    ],
+    "verification": "ratchet dup_functions=0 AND bun test + golden_diff green",
+    "dependencies": [
+      "F-049"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-051",
+    "component": "s2-splits",
+    "category": "refactor",
+    "description": "persistence.ts split wave 1: 2,139 lines shall drop to 1,000 or fewer in the main file by extracting cohesive modules, behavior preserved.",
+    "steps": [
+      "Run wc -l and observe persistence main file <= 1000",
+      "Run bun test and observe green"
+    ],
+    "verification": "wc -l persistence main file <= 1000 AND bun test green",
+    "dependencies": [
+      "F-032"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-052",
+    "component": "s2-splits",
+    "category": "refactor",
+    "description": "persistence split final: every persistence module shall be 400 lines or fewer.",
+    "steps": [
+      "Run wc -l on all persistence modules and observe all <= 400",
+      "Run bun test and observe green"
+    ],
+    "verification": "all persistence modules <= 400 lines AND bun test green",
+    "dependencies": [
+      "F-051"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-053",
+    "component": "s2-splits",
+    "category": "refactor",
+    "description": "ControlPane.tsx (1,149 lines) shall be split into modules of 400 or fewer lines with frames unchanged.",
+    "steps": [
+      "Run wc -l on ControlPane and its extracted modules and observe all <= 400",
+      "Run bun test and golden-diff and observe both green"
+    ],
+    "verification": "all ControlPane-derived modules <= 400 lines AND bun test + golden_diff green",
+    "dependencies": [
+      "F-032"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-054",
+    "component": "s2-splits",
+    "category": "refactor",
+    "description": "Sidebar.tsx (2,585 lines baseline) shall reach 400 or fewer lines after dedup, via pane-section extraction with frames unchanged.",
+    "steps": [
+      "Run wc -l on Sidebar.tsx and its extracted modules and observe all <= 400",
+      "Run bun test and golden-diff and observe both green"
+    ],
+    "verification": "Sidebar.tsx and its extracted modules all <= 400 lines AND bun test + golden_diff green",
+    "dependencies": [
+      "F-050"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-055",
+    "component": "s2-splits",
+    "category": "refactor",
+    "description": "RepoPane.tsx (2,323 lines baseline) shall reach 400 or fewer lines after dedup, with frames unchanged.",
+    "steps": [
+      "Run wc -l on RepoPane.tsx and its extracted modules and observe all <= 400",
+      "Run bun test and golden-diff and observe both green"
+    ],
+    "verification": "RepoPane.tsx and its extracted modules all <= 400 lines AND bun test + golden_diff green",
+    "dependencies": [
+      "F-050"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-056",
+    "component": "s3-appshell",
+    "category": "functional",
+    "description": "A declarative keymap dispatch table (mode -> key -> AppAction) shall exist as a typed registry with unit tests; the 46-variant AppAction reducer is kept as-is and receives actions from the table.",
+    "steps": [
+      "Run the keymap unit tests: a (mode,key) lookup returns the documented AppAction",
+      "Observe unknown keys in a mode return no action (no throw)"
+    ],
+    "verification": "keymap unit tests pass covering at least 10 (mode,key) pairs plus 2 unknown-key cases",
+    "dependencies": [
+      "F-043"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-057",
+    "component": "s3-appshell",
+    "category": "refactor",
+    "description": "Global and tab-navigation key handling shall migrate from the 485-line useInput into the keymap table, with key behavior identical in tmux-driven checks.",
+    "steps": [
+      "Drive tab-switch keys via tmux send-keys and observe panes change exactly as before",
+      "Run bun test and observe green"
+    ],
+    "verification": "tmux-driven tab navigation matches pre-change behavior frame-for-frame AND bun test green",
+    "dependencies": [
+      "F-056"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-058",
+    "component": "s3-appshell",
+    "category": "refactor",
+    "description": "Composer/input-mode key handling shall migrate into the keymap table: typing, submit, and cancel behave identically.",
+    "steps": [
+      "Type a message via tmux send-keys, submit, and observe the transcript updates as before",
+      "Run bun test and observe green"
+    ],
+    "verification": "tmux-driven composer journey matches prior behavior AND bun test green",
+    "dependencies": [
+      "F-057"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-059",
+    "component": "s3-appshell",
+    "category": "refactor",
+    "description": "Overlay/modal key handling shall migrate into the keymap table; the residual useInput body shall be 80 lines or fewer (from 485).",
+    "steps": [
+      "Open an overlay, press its keys via tmux, observe identical behavior",
+      "Run wc on the useInput body and observe <= 80 lines",
+      "Run bun test and observe green"
+    ],
+    "verification": "useInput body <= 80 lines AND overlay key journeys unchanged AND bun test green",
+    "dependencies": [
+      "F-058"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-060",
+    "component": "s3-appshell",
+    "category": "refactor",
+    "description": "app.tsx pure-function extraction wave 1: app.tsx shall drop from 3,190 to 2,000 or fewer lines by moving pure functions into modules, frames unchanged.",
+    "steps": [
+      "Run wc -l src/app.tsx and observe <= 2000",
+      "Run bun test and golden-diff and observe both green"
+    ],
+    "verification": "wc -l src/app.tsx <= 2000 AND bun test + golden_diff green",
+    "dependencies": [
+      "F-059"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-061",
+    "component": "s3-appshell",
+    "category": "refactor",
+    "description": "app.tsx extraction wave 2: 1,000 or fewer lines.",
+    "steps": [
+      "Run wc -l src/app.tsx and observe <= 1000",
+      "Run bun test and golden-diff and observe both green"
+    ],
+    "verification": "wc -l src/app.tsx <= 1000 AND bun test + golden_diff green",
+    "dependencies": [
+      "F-060"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-062",
+    "component": "s3-appshell",
+    "category": "refactor",
+    "description": "app.tsx final: 400 or fewer lines, and the global max-file-lines ratchet shall now hold at 400 for every file under terminal/src.",
+    "steps": [
+      "Run wc -l src/app.tsx and observe <= 400",
+      "Run the ratchet and observe max_file_lines <= 400 across all of src",
+      "Run bun test and golden-diff and observe both green"
+    ],
+    "verification": "ratchet max_file_lines <= 400 across src AND bun test + golden_diff green",
+    "dependencies": [
+      "F-061",
+      "F-048",
+      "F-052",
+      "F-053",
+      "F-054",
+      "F-055"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-063",
+    "component": "s3-modes",
+    "category": "functional",
+    "description": "The reducer shall carry a layout-mode field (zen | cockpit | deck-focus:<deck>) settable via a SET_LAYOUT_MODE action, defaulting to zen, with reducer unit tests for every transition.",
+    "steps": [
+      "Dispatch SET_LAYOUT_MODE for each mode in reducer tests and observe the state field updates",
+      "Observe initial state is zen"
+    ],
+    "verification": "reducer tests cover zen->cockpit->deck-focus->zen transitions and the zen default; bun test green",
+    "dependencies": [
+      "F-056"
+    ],
+    "estimated_minutes": 20,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-064",
+    "component": "s3-modes",
+    "category": "functional",
+    "description": "F2 shall toggle zen <-> cockpit via the keymap: pressing F2 in a live tmux session switches the visible layout each press.",
+    "steps": [
+      "Boot in tmux, press F2, capture, and observe the cockpit layout",
+      "Press F2 again, capture, and observe zen restored"
+    ],
+    "verification": "tmux send-keys F2 produces a cockpit frame then a zen frame on successive captures",
+    "dependencies": [
+      "F-056",
+      "F-063"
+    ],
+    "estimated_minutes": 20,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-065",
+    "component": "s3-modes",
+    "category": "functional",
+    "description": "Slash commands /zen, /cockpit, and /deck <name> shall switch layout modes from the composer.",
+    "steps": [
+      "Type /cockpit and observe the cockpit frame",
+      "Type /deck fleet and observe that deck full-screen",
+      "Type /zen and observe zen restored"
+    ],
+    "verification": "each of the three slash commands produces its layout in tmux captures",
+    "dependencies": [
+      "F-063"
+    ],
+    "estimated_minutes": 20,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-066",
+    "component": "s3-modes",
+    "category": "functional",
+    "description": "Natural-language mode switching shall work through the composer: at least 3 phrasings (e.g. 'switch to the funky dashboard') map to SET_LAYOUT_MODE intents, and 2 non-intent control phrases route to chat untouched.",
+    "steps": [
+      "Type each of 3 NL switch phrasings and observe the layout changes",
+      "Type 2 ordinary chat sentences and observe they go to the transcript, not the layout"
+    ],
+    "verification": "3 NL phrasings switch layout in tmux captures; 2 control sentences do not",
+    "dependencies": [
+      "F-063"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-067",
+    "component": "s4-theme",
+    "category": "visual",
+    "description": "Surface tokens shall swap to truecolor with names kept (zero-rename migration): night #10141C NEW app background, indigo #1A2233 EVOLVED raised-surface, harbor #223249 NEW selected/overlay.",
+    "steps": [
+      "Read theme.ts and observe the three exact hex values under the existing token names",
+      "Boot under the truecolor gate and observe the app background renders #10141C via 38;2/48;2 sequences",
+      "Run bun test and observe green"
+    ],
+    "verification": "theme.ts contains night=#10141C, indigo=#1A2233, harbor=#223249 AND raw capture shows the corresponding 48;2 sequences AND bun test green",
+    "dependencies": [
+      "F-019",
+      "F-017",
+      "F-059"
+    ],
+    "estimated_minutes": 20,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-068",
+    "component": "s4-theme",
+    "category": "visual",
+    "description": "Border and text tokens shall swap: river #2D4F67 decorative-border-only (2.13 contrast — never carries meaning), ridge #658594 NEW focused border (4.69), foam #DCD7BA primary text (12.71/10.96), mist #C8C093 (10.02), stone #8992A7 (5.91), ink #727169 decoration-only (3.76 — never information).",
+    "steps": [
+      "Read theme.ts and observe all six exact hex values",
+      "Capture a frame with a focused pane and observe the focused border uses ridge, unfocused decorative borders use river",
+      "Run bun test and observe green"
+    ],
+    "verification": "theme.ts carries the 6 exact hexes; focused-vs-decorative border distinction visible in captures; bun test green",
+    "dependencies": [
+      "F-067"
+    ],
+    "estimated_minutes": 20,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-069",
+    "component": "s4-theme",
+    "category": "visual",
+    "description": "Accent tokens shall swap: wave #7E9CD8 accent-witness (the one decorative chrome accent, 6.70), crest #7FB4CA NEW running/streaming (8.15), parchment #DCA561 accent-seer (8.43), sunlit #E6C384 NEW (10.98), bengara #8F2D12 NEW fill-only.",
+    "steps": [
+      "Read theme.ts and observe the five exact hex values",
+      "Capture a streaming state and observe crest used for the running indicator",
+      "Run bun test and observe green"
+    ],
+    "verification": "theme.ts carries the 5 exact accent hexes AND a streaming capture shows crest on the running indicator AND bun test green",
+    "dependencies": [
+      "F-067"
+    ],
+    "estimated_minutes": 20,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-070",
+    "component": "s4-theme",
+    "category": "visual",
+    "description": "Status tokens shall swap: moss #98BB6C success (8.48), pine #7AA89F done/quiet-ok (6.96), persimmon #FF9E3B warning (8.96), vermilion #FF5D62 danger (6.14), iris #957FB8 spawning (5.27).",
+    "steps": [
+      "Read theme.ts and observe the five exact hex values",
+      "Trigger a warning and a success state and observe persimmon/moss in the captures",
+      "Run bun test and observe green"
+    ],
+    "verification": "theme.ts carries the 5 exact status hexes AND status states render them in captures AND bun test green",
+    "dependencies": [
+      "F-067"
+    ],
+    "estimated_minutes": 15,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-071",
+    "component": "s4-theme",
+    "category": "functional",
+    "description": "An AGENT_STATES map shall be exported with glyph+color pairs — running crest ▶, thinking wave ◉, spawning iris ◌, blocked persimmon ⚠, error vermilion ✖, done moss ✓, idle stone ·, offline ink ○ — and every status render includes the glyph so color is never the sole signal.",
+    "steps": [
+      "Import AGENT_STATES in a test and observe all 8 states carry both glyph and color",
+      "Capture frames showing agent statuses and observe glyphs accompany every colored status"
+    ],
+    "verification": "AGENT_STATES export test passes for all 8 pairs AND captured status rows each contain their glyph",
+    "dependencies": [
+      "F-070",
+      "F-069"
+    ],
+    "estimated_minutes": 20,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-072",
+    "component": "s4-theme",
+    "category": "infrastructure",
+    "description": "The migration rule (gradeable criterion #8) shall be machine-checked in the ratchet: after the value swap, THEME.indigo and THEME.river may appear only as backgroundColor/borderColor — 0 violations.",
+    "steps": [
+      "Run the ratchet and observe migration_rule_violations=0",
+      "Use THEME.river as a text color in a scratch change, run the ratchet, observe exit 1, then revert"
+    ],
+    "verification": "ratchet migration_rule_violations=0 and exits 1 on a planted color-prop misuse",
+    "dependencies": [
+      "F-068"
+    ],
+    "estimated_minutes": 20,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-073",
+    "component": "s4-theme",
+    "category": "visual",
+    "description": "On harbor backgrounds stone shall carry meta text only (4.16 contrast there): selected-row body text renders in foam; a selected row in a list pane demonstrates this.",
+    "steps": [
+      "Select a row in a list pane and capture",
+      "Observe body text of the selected row is foam and only meta/secondary text is stone"
+    ],
+    "verification": "capture of a selected row shows foam body text; a test asserts the selected-row text style mapping",
+    "dependencies": [
+      "F-068"
+    ],
+    "estimated_minutes": 15,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-074",
+    "component": "s4-theme",
+    "category": "visual",
+    "description": "bengara #8F2D12 shall be used as background fill only with foam text on top (5.67 contrast); raw bengara text (2.24) is banned — the ratchet or a test rejects bengara as a foreground color.",
+    "steps": [
+      "Run the check and observe 0 bengara-as-foreground uses",
+      "Plant a bengara text color, observe the check fails, then revert"
+    ],
+    "verification": "automated check reports 0 bengara foreground uses and fails on a planted violation",
+    "dependencies": [
+      "F-069"
+    ],
+    "estimated_minutes": 10,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-075",
+    "component": "s4-theme",
+    "category": "testing",
+    "description": "A WCAG contrast test shall programmatically compute contrast ratios for the full token table against night #10141C and indigo #1A2233 and assert each documented ratio within +/-0.05.",
+    "steps": [
+      "Run the contrast test and observe every token's computed ratio matches its documented value",
+      "Tamper one hex and observe the test fails, then revert"
+    ],
+    "verification": "contrast test green for all documented (token, surface, ratio) triples",
+    "dependencies": [
+      "F-067",
+      "F-068",
+      "F-069",
+      "F-070"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-076",
+    "component": "s4-theme",
+    "category": "visual",
+    "description": "The header shall render a Great-Wave ink-gradient strip ['#003153','#2D4F67','#658594','#7FB4CA','#DCD7BA'] within the 2-row scenic chrome budget; at 80x24 it degrades to a header rule only; the ink-gradient dependency becomes live.",
+    "steps": [
+      "Capture at 120x40 and observe the gradient strip occupying at most 2 rows",
+      "Capture at 80x24 and observe only the header rule (no strip rows)",
+      "Observe ink-gradient is imported by the header component"
+    ],
+    "verification": "captures show <= 2 scenic rows at 120x40 and rule-only at 80x24; ink-gradient appears in the header's imports",
+    "dependencies": [
+      "F-067"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-077",
+    "component": "s4-theme",
+    "category": "visual",
+    "description": "Inline motifs shall use the verified single-width glyph set — ∿ streaming, ≈ syncing, ≋ throughput, braille ⣀⣠⣴⣶⣿ sparklines, ▁▂▃▄▅▆▇█ gauges — with tmux captures showing no column drift where they appear.",
+    "steps": [
+      "Render each motif in its surface and capture at 80x24 and 120x40",
+      "Observe column alignment of bordered panes is intact on every motif row"
+    ],
+    "verification": "captures with motifs show intact pane borders (no off-by-one column drift) at both sizes",
+    "dependencies": [
+      "F-067"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-078",
+    "component": "s4-theme",
+    "category": "infrastructure",
+    "description": "The ambiguous-width wave characters 〜 (U+301C) and ～ (U+FF5E) are banned in src; the ratchet/lint rejects them — motif needs route to the verified single-width set instead.",
+    "steps": [
+      "Run the check and observe 0 occurrences",
+      "Plant one banned character, observe the check fails, then revert"
+    ],
+    "verification": "banned-glyph check reports 0 and fails on a planted U+301C",
+    "dependencies": [
+      "F-008"
+    ],
+    "estimated_minutes": 10,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-079",
+    "component": "s4-theme",
+    "category": "infrastructure",
+    "description": "Dead aesthetic dependencies shall be removed from package.json: cfonts, figlet, ink-big-text, ascii-art, ascii-artist (all unused); install and the full gate stay green.",
+    "steps": [
+      "Read package.json and observe the five packages are gone",
+      "Run bun install then bun run verify:all and observe green"
+    ],
+    "verification": "package.json lacks all 5 packages AND bun install + verify:all exit 0",
+    "dependencies": [
+      "F-015"
+    ],
+    "estimated_minutes": 15,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-080",
+    "component": "s4-theme",
+    "category": "infrastructure",
+    "description": "The orphaned src/assets/hokusai_strip*.ansi files shall be deleted (git-recoverable); no code references remain.",
+    "steps": [
+      "List src/assets and observe no hokusai_strip*.ansi files",
+      "Search src/ for references to the deleted assets and observe none"
+    ],
+    "verification": "ls shows no hokusai_strip*.ansi; grep finds no references; bun test green",
+    "dependencies": [
+      "F-015"
+    ],
+    "estimated_minutes": 5,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-081",
+    "component": "s4-theme",
+    "category": "infrastructure",
+    "description": "ScenicStrip.tsx's 25 hand-tuned constants are the sanctioned art exemption and shall remain byte-identical through the theme migration; the hex-ratchet allowlist contains exactly theme.ts and ScenicStrip.tsx.",
+    "steps": [
+      "Diff ScenicStrip.tsx against the baseline commit and observe zero changes",
+      "Read the ratchet allowlist and observe exactly the two files"
+    ],
+    "verification": "git diff a6ad97362 -- ScenicStrip.tsx is empty AND the ratchet allowlist is exactly {theme.ts, ScenicStrip.tsx}",
+    "dependencies": [
+      "F-012",
+      "F-067"
+    ],
+    "estimated_minutes": 10,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-082",
+    "component": "s4-theme",
+    "category": "testing",
+    "description": "The golden corpus shall be re-captured after the theme migration at all 3 sizes (this is the sanctioned re-capture; evaluator approval recorded in the commit message), and the raw escape capture shall contain 38;2 sequences carrying the new token hexes.",
+    "steps": [
+      "Run the capture script post-theme and commit the new corpus with an approval note",
+      "Inspect raw escape capture and observe 38;2 sequences with values matching the new palette",
+      "Run golden-diff against the new corpus and observe exit 0"
+    ],
+    "verification": "new golden corpus committed; raw capture contains 38;2 with new-palette RGB triples; golden_diff exits 0",
+    "dependencies": [
+      "F-067",
+      "F-068",
+      "F-069",
+      "F-070",
+      "F-071",
+      "F-076",
+      "F-021"
+    ],
+    "estimated_minutes": 20,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-083",
+    "component": "s4-theme",
+    "category": "visual",
+    "description": "Soft-variant tokens (bg #16161D, success #7AA89F — pre-verified) shall be selectable behind an env flag for the morning swap, defaulting OFF.",
+    "steps": [
+      "Boot with the flag set and observe the soft background in the capture",
+      "Boot without the flag and observe the standard night background"
+    ],
+    "verification": "flagged boot renders #16161D background; unflagged boot renders #10141C; bun test green",
+    "dependencies": [
+      "F-082"
+    ],
+    "estimated_minutes": 15,
+    "priority": "P2",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-084",
+    "component": "s5-command",
+    "category": "functional",
+    "description": "A Command type {id, args, gate_class} shall exist with a gate-class taxonomy of reversible and irreversible, and a registry declaring the gate class of every command id.",
+    "steps": [
+      "Run unit tests constructing commands of both gate classes",
+      "Observe the registry rejects an unregistered command id with a structured error"
+    ],
+    "verification": "command type + registry tests pass including the unregistered-id rejection",
+    "dependencies": [
+      "F-082"
+    ],
+    "estimated_minutes": 20,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-085",
+    "component": "s5-command",
+    "category": "functional",
+    "description": "The command engine shall run the pipeline intent -> Command -> telos gate -> execute -> EvidenceReceipt -> projection update, demonstrated with a fake executor in unit tests.",
+    "steps": [
+      "Submit an intent in a test and observe a Command produced, gated, executed, and a receipt emitted",
+      "Observe a gate-denied command produces a denial receipt and no execution"
+    ],
+    "verification": "pipeline tests pass for the executed and denied paths with receipts in both",
+    "dependencies": [
+      "F-084"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-086",
+    "component": "s5-command",
+    "category": "functional",
+    "description": "Every executed command shall produce an EvidenceReceipt {command id, gate verdict, timestamp, outcome} appended to a receipt log that the UI can list — receipts are the audit trail of the helm.",
+    "steps": [
+      "Execute 3 commands and observe 3 receipts in order in the log",
+      "Open the receipts surface and observe the 3 entries rendered with verdicts"
+    ],
+    "verification": "receipt log holds one entry per executed command; the receipts surface renders them in a capture",
+    "dependencies": [
+      "F-085"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-087",
+    "component": "s5-command",
+    "category": "functional",
+    "description": "Gating doctrine shall hold: reversible commands execute instantly and emit a receipt; irreversible commands require confirmation plus a telos gate verdict before execution; a gate denial blocks execution and emits a denial receipt.",
+    "steps": [
+      "Execute a reversible command and observe immediate effect + receipt",
+      "Trigger an irreversible command and observe it waits for confirmation",
+      "Deny at the gate and observe no execution and a denial receipt"
+    ],
+    "verification": "tests cover instant-reversible, confirm-then-execute, and gate-denial paths, all with receipts",
+    "dependencies": [
+      "F-085"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-088",
+    "component": "s5-command",
+    "category": "functional",
+    "description": "A confirm modal shall render for irreversible commands showing the command summary and gate verdict; y confirms, n or Esc cancels with a cancellation receipt.",
+    "steps": [
+      "Trigger an irreversible command and capture the modal with summary + verdict",
+      "Press Esc and observe cancellation with no execution",
+      "Press y on a fresh trigger and observe execution + receipt"
+    ],
+    "verification": "tmux journey: modal renders, Esc cancels, y executes; receipts recorded for both outcomes",
+    "dependencies": [
+      "F-087"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-089",
+    "component": "s5-command",
+    "category": "functional",
+    "description": "A terminal_commands wire contract shall carry commands over the bridge: the TUI sends a command JSONL frame and receives an ack/receipt event back through the typed ingress; the schema is documented in spec-forge/knowledge/.",
+    "steps": [
+      "Send a command frame through the bridge in a test harness and observe a typed receipt event arrives",
+      "Observe the contract doc lists the command and receipt frame shapes"
+    ],
+    "verification": "round-trip test: command frame out, typed receipt event in; contract doc exists with both shapes",
+    "dependencies": [
+      "F-085",
+      "F-028"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-090",
+    "component": "s5-command",
+    "category": "functional",
+    "description": "terminal_bridge.py shall gain a command-execution adapter for the reversible set (within the operator interface plane — orchestrator/swarm/spine files stay untouched): received commands execute and return receipt events.",
+    "steps": [
+      "Send a reversible command (e.g. layout-independent no-op or steer) to the live bridge in a sandboxed run and observe a receipt event",
+      "Run git status on dharma_swarm/ and observe only terminal_bridge*.py and the contract module changed"
+    ],
+    "verification": "bridge round-trip executes a reversible command and returns a receipt; diff confined to the interface plane files",
+    "dependencies": [
+      "F-089"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-091",
+    "component": "s5-command",
+    "category": "functional",
+    "description": "Chat/send shall route through the command engine in zen mode: a composer submission becomes a gated reversible command with a receipt, and the transcript behavior is unchanged for the operator.",
+    "steps": [
+      "Type a chat message and observe the transcript updates as before",
+      "Observe a receipt for the send appears in the receipt log"
+    ],
+    "verification": "tmux chat journey unchanged AND a send receipt exists per message",
+    "dependencies": [
+      "F-085"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-092",
+    "component": "s5-command",
+    "category": "functional",
+    "description": "pin-model and switch-model shall be reversible commands: invoking them updates the model projection target and emits receipts.",
+    "steps": [
+      "Invoke pin-model for a named mission and observe the pin reflected in state and a receipt",
+      "Invoke switch-model and observe the same"
+    ],
+    "verification": "tests show pin/switch update state and emit receipts; bun test green",
+    "dependencies": [
+      "F-085"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-093",
+    "component": "s5-command",
+    "category": "functional",
+    "description": "steer-text-to-mission shall be a reversible command: steering text lands on the named mission's input path via the bridge contract, with a receipt.",
+    "steps": [
+      "Steer a text to a mission in a sandboxed run and observe the bridge frame sent + receipt",
+      "Observe an unknown mission id produces a structured error receipt, not a crash"
+    ],
+    "verification": "steer round-trip test green including the unknown-mission error path",
+    "dependencies": [
+      "F-090"
+    ],
+    "estimated_minutes": 20,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-094",
+    "component": "s5-command",
+    "category": "functional",
+    "description": "approve and deny shall be reversible commands wired to the existing approvals queue surface; each emits a receipt and updates the approvals projection.",
+    "steps": [
+      "Approve a pending item in a sandboxed run and observe queue state change + receipt",
+      "Deny another and observe the same"
+    ],
+    "verification": "approve/deny round-trip tests green with receipts and projection updates",
+    "dependencies": [
+      "F-090"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-095",
+    "component": "s5-command",
+    "category": "functional",
+    "description": "dispatch shall be a reversible command that enqueues via the EXISTING task queue (no new daemons): the queue file gains a well-formed entry and a receipt is emitted.",
+    "steps": [
+      "Dispatch a task in a sandboxed run and observe a valid JSONL entry appended to the queue",
+      "Observe the receipt references the queued task id"
+    ],
+    "verification": "queue file gains a well-formed JSONL entry AND the emitted receipt event validates against the BridgeEvent union created by F-026/F-027 and consumed at the F-028 typed ingress (event families per spec-forge/knowledge/bridge_events.md) AND the receipt carries the task id",
+    "dependencies": [
+      "F-090"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-096",
+    "component": "s5-command",
+    "category": "functional",
+    "description": "Layout and theme operations shall route through the command engine as reversible commands (SET_LAYOUT_MODE et al. emitted as gated commands with receipts), keeping one shape for every operation.",
+    "steps": [
+      "Switch layout via F2/slash/NL and observe receipts for each switch",
+      "Observe the reducer still receives the same actions (behavior unchanged)"
+    ],
+    "verification": "layout switches produce receipts; all S3 mode tests stay green",
+    "dependencies": [
+      "F-085",
+      "F-064",
+      "F-065",
+      "F-066"
+    ],
+    "estimated_minutes": 15,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-097",
+    "component": "s5-command",
+    "category": "functional",
+    "description": "kill-agent and restart-agent shall be registered as irreversible commands (confirm modal + telos gate + receipt); execution remains sandbox-only until the S6 sandbox harness exists — live invocation is refused with a refusal receipt.",
+    "steps": [
+      "Trigger kill-agent and observe the confirm modal + gate path engages",
+      "Confirm against a non-sandbox target and observe a refusal receipt and no execution"
+    ],
+    "verification": "registry marks both irreversible; refusal receipt path test green",
+    "dependencies": [
+      "F-088"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-098",
+    "component": "s5-command",
+    "category": "functional",
+    "description": "budget-edit and loop-config-change shall be registered as irreversible commands with the same confirm + gate + receipt path and the same sandbox-only execution guard.",
+    "steps": [
+      "Trigger budget-edit and observe modal + gate engage",
+      "Observe non-sandbox execution is refused with a receipt"
+    ],
+    "verification": "registry marks both irreversible; modal+gate+refusal tests green",
+    "dependencies": [
+      "F-088"
+    ],
+    "estimated_minutes": 20,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-099",
+    "component": "s5-command",
+    "category": "functional",
+    "description": "NL intents beyond layout shall route to commands: at least 'pin <model> on <mission>' and 'approve <item>' phrasings parse to their commands, with 2 non-command control phrases routing to chat.",
+    "steps": [
+      "Type a pin phrasing and observe the pin command fires with receipt",
+      "Type an approve phrasing and observe the approve command fires",
+      "Type 2 ordinary sentences and observe they go to chat"
+    ],
+    "verification": "2 NL command phrasings fire their commands; 2 control sentences route to chat",
+    "dependencies": [
+      "F-092",
+      "F-094"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-100",
+    "component": "s5-projections",
+    "category": "functional",
+    "description": "A read-only fleet projection shall derive agent list + statuses from the a2a state files and agent identity files (existing owners — no new truth stores), unit-tested against fixture directories.",
+    "steps": [
+      "Point the projection at fixture state/identity dirs and observe the derived fleet roster",
+      "Remove a state file and observe the agent degrades to offline in the projection"
+    ],
+    "verification": "fleet projection tests pass on fixtures including the missing-file offline path",
+    "dependencies": [
+      "F-085"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-101",
+    "component": "s5-projections",
+    "category": "functional",
+    "description": "A read-only missions projection shall derive mission rows from spine EvidenceReceipts and runtime truth packets, unit-tested against fixtures.",
+    "steps": [
+      "Point the projection at fixture receipts/packets and observe derived mission rows with statuses",
+      "Feed a malformed packet and observe it is skipped with a logged note, not a crash"
+    ],
+    "verification": "missions projection tests pass on fixtures including the malformed-packet skip",
+    "dependencies": [
+      "F-085"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-102",
+    "component": "s5-projections",
+    "category": "functional",
+    "description": "A read-only models projection shall combine the model_hierarchy ladder, routing_memory.sqlite3, and dkeys liveness into one model table (read-only consumers of THE ONE WAY — no model strings hardcoded).",
+    "steps": [
+      "Run the projection against the real local sources in a read-only test and observe a populated ladder with liveness flags",
+      "Observe no model name string literals in the projection source (it reads the ladder)"
+    ],
+    "verification": "models projection renders ladder+liveness from live sources; grep finds no hardcoded model ids",
+    "dependencies": [
+      "F-085"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-103",
+    "component": "s5-projections",
+    "category": "functional",
+    "description": "A read-only memory projection shall surface chetana/SMRITI counts (atoms, queues, decay flags as available) for the Memory deck.",
+    "steps": [
+      "Run the projection against fixture or live read-only sources and observe count fields populated",
+      "Observe source unavailability degrades to an 'unavailable' marker, not a crash"
+    ],
+    "verification": "memory projection test green including the source-missing degradation",
+    "dependencies": [
+      "F-085"
+    ],
+    "estimated_minutes": 20,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-104",
+    "component": "s5-projections",
+    "category": "functional",
+    "description": "A read-only approvals projection shall surface the existing approvals queue (pending items, ages, decisions) for the Approvals deck and the approve/deny commands.",
+    "steps": [
+      "Run the projection on a fixture queue and observe pending items with ages",
+      "Approve one via the command and observe the projection updates"
+    ],
+    "verification": "approvals projection test green; command-driven update reflected",
+    "dependencies": [
+      "F-094"
+    ],
+    "estimated_minutes": 20,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-105",
+    "component": "s5-cockpit",
+    "category": "functional",
+    "description": "Cockpit mode shall render the deck bar [1]Bridge [2]Fleet [3]Missions [4]Models [5]Memory [6]Approvals on one line; number keys 1-6 switch the active deck.",
+    "steps": [
+      "Enter cockpit and capture the deck bar with all six labels",
+      "Press 3 and observe Missions becomes active; press 1 and observe Bridge"
+    ],
+    "verification": "deck bar capture shows 6 labels on one line; number-key switching changes the active deck in captures",
+    "dependencies": [
+      "F-064",
+      "F-085"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-106",
+    "component": "s5-cockpit",
+    "category": "functional",
+    "description": "Deck 1's Sakshi pane shall render gates, R_V readout, receipts, and drift indicators from real receipt-log and projection data (no mock content).",
+    "steps": [
+      "Execute 2 commands, open Deck 1, and observe their receipts listed in the Sakshi pane",
+      "Observe gate verdict markers render with AGENT_STATES-style glyph+color pairs"
+    ],
+    "verification": "Sakshi pane capture shows live receipts from this session's commands; no mockContent import in the pane",
+    "dependencies": [
+      "F-086",
+      "F-105"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-107",
+    "component": "s5-cockpit",
+    "category": "functional",
+    "description": "Deck 1's center shall render the Mission River from the missions projection: one row per mission with status glyph, model label, and age.",
+    "steps": [
+      "Boot against fixture missions defined within this feature's own test file and capture Deck 1",
+      "Observe one river row per fixture mission with glyph + model + age columns"
+    ],
+    "verification": "Mission River capture matches the fixture mission set defined within the feature's own test file; no mock data path",
+    "dependencies": [
+      "F-101",
+      "F-105"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-108",
+    "component": "s5-cockpit",
+    "category": "functional",
+    "description": "Deck 1's Drishti pane shall render world radar, leverage, and provider-window summaries from the models projection and available read-only sources.",
+    "steps": [
+      "Open Deck 1 and observe the Drishti pane with provider-window rows from the models projection",
+      "Observe an unavailable source renders its 'unavailable' marker rather than blank space"
+    ],
+    "verification": "Drishti pane capture shows provider windows from live projection data including the degraded-source marker",
+    "dependencies": [
+      "F-102",
+      "F-105"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-109",
+    "component": "s5-cockpit",
+    "category": "functional",
+    "description": "A fleet bar shall render across cockpit mode showing each agent with its AGENT_STATES glyph+color from the fleet projection.",
+    "steps": [
+      "Boot against fixture fleet data defined within this feature's own test file and capture cockpit",
+      "Observe one glyph+name cell per agent with states matching the fixtures"
+    ],
+    "verification": "fleet bar capture matches the fixture roster defined within the feature's own test file, with correct glyphs per state",
+    "dependencies": [
+      "F-100",
+      "F-071",
+      "F-105"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-110",
+    "component": "s5-cockpit",
+    "category": "functional",
+    "description": "A ONE-LAW status line shall render as the single bottom line in cockpit and zen: mode, active deck (cockpit), gate state, and provider summary — exactly one row at every size.",
+    "steps": [
+      "Capture zen and cockpit at 80x24 and 120x40",
+      "Observe exactly one status row in each capture carrying mode + gate + provider fields"
+    ],
+    "verification": "status line is exactly 1 row in all 4 captures with the documented fields",
+    "dependencies": [
+      "F-105"
+    ],
+    "estimated_minutes": 15,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-111",
+    "component": "s5-cockpit",
+    "category": "functional",
+    "description": "Zen mode shall remain the boot default and contain exactly: transcript, composer, and the one thin status line — no deck chrome.",
+    "steps": [
+      "Boot fresh and capture: observe zen layout with the three elements only",
+      "Observe no deck bar or cockpit panes present in the zen frame"
+    ],
+    "verification": "fresh-boot capture shows transcript+composer+status only; layout-mode state is zen",
+    "dependencies": [
+      "F-063",
+      "F-110"
+    ],
+    "estimated_minutes": 20,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-112",
+    "component": "s5-cockpit",
+    "category": "functional",
+    "description": "Deck focus mode shall render any single deck full-screen via /deck <name> or its number key from cockpit, with Esc returning to cockpit.",
+    "steps": [
+      "Run /deck models and observe the Models deck full-screen",
+      "Press Esc and observe cockpit restored"
+    ],
+    "verification": "deck-focus capture shows one deck occupying the full content area; Esc restores cockpit",
+    "dependencies": [
+      "F-105",
+      "F-065"
+    ],
+    "estimated_minutes": 20,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-113",
+    "component": "s5-cockpit",
+    "category": "testing",
+    "description": "Cockpit, zen, and deck-focus golden frames shall be added to the corpus at all 3 sizes and pass the golden-diff gate.",
+    "steps": [
+      "Run the capture script and observe new frames for the three modes at 3 sizes",
+      "Run golden-diff and observe exit 0"
+    ],
+    "verification": "golden corpus contains mode frames at 3 sizes; golden_diff exits 0",
+    "dependencies": [
+      "F-106",
+      "F-107",
+      "F-108",
+      "F-109",
+      "F-110",
+      "F-111",
+      "F-112"
+    ],
+    "estimated_minutes": 15,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-114",
+    "component": "s6-delegation",
+    "category": "functional",
+    "description": "A delegation-tree data model shall derive agent -> subagent trees with model labels and statuses from typed bridge events, unit-tested with fixture event streams.",
+    "steps": [
+      "Feed a fixture fan-out event stream and observe the derived tree with parent/child edges",
+      "Observe each node carries model label + status from the events"
+    ],
+    "verification": "tree-derivation tests pass on fixture streams with correct edges, labels, statuses",
+    "dependencies": [
+      "F-100",
+      "F-101",
+      "F-113"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P1",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-115",
+    "component": "s6-delegation",
+    "category": "e2e",
+    "description": "Dispatching a real fan-out task shall render a live delegation tree (agent -> subagents) with model labels and statuses updating as the run progresses.",
+    "steps": [
+      "Dispatch a real fan-out task via the dispatch command in the sandboxed environment",
+      "Capture frames over the run and observe the tree appear, grow, and reach terminal states with model labels visible"
+    ],
+    "verification": "successive captures show the live tree progressing from spawn to done with model labels per node",
+    "dependencies": [
+      "F-114"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P1",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-116",
+    "component": "s6-delegation",
+    "category": "e2e",
+    "description": "One delegation hop shall cross A2A (hermes inbox task or NATS dispatch) and render in the tree with its EvidenceReceipt linked.",
+    "steps": [
+      "Dispatch a task whose plan includes one A2A hop",
+      "Observe the hop node renders with an A2A marker and its receipt is listed in Sakshi/receipts"
+    ],
+    "verification": "capture shows the A2A hop node AND the receipt log contains the hop's EvidenceReceipt",
+    "dependencies": [
+      "F-115"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P1",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-117",
+    "component": "s6-delegation",
+    "category": "e2e",
+    "description": "Pinning a model mid-flight shall be reflected in the live tree: after pin-model, subsequent nodes for that mission show the pinned model label.",
+    "steps": [
+      "Start a fan-out run, pin a model mid-run via the command",
+      "Observe post-pin nodes carry the pinned label while pre-pin nodes keep their original labels"
+    ],
+    "verification": "captures before/after the pin show the label change on new nodes only; pin receipt recorded",
+    "dependencies": [
+      "F-115",
+      "F-092"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P1",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-118",
+    "component": "s6-delegation",
+    "category": "functional",
+    "description": "The Models deck (Deck 4) shall render the hierarchy ladder with dkeys liveness, racing/EWMA surfaces, and provider windows as visible instrument surfaces from the models projection.",
+    "steps": [
+      "Open Deck 4 and observe ladder rows with liveness markers",
+      "Observe racing/EWMA figures and provider-window state rendered per provider"
+    ],
+    "verification": "Deck 4 capture shows ladder + liveness + EWMA + windows from live projection data",
+    "dependencies": [
+      "F-102",
+      "F-105"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P1",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-119",
+    "component": "s6-routing",
+    "category": "e2e",
+    "description": "Routing-governance E2E (a): a cheap task dispatched through THE ONE WAY shall land on a free-tier provider because the ladder orders it there, and the TUI shall display that provider on the mission row.",
+    "steps": [
+      "Dispatch a cheap task in the sandboxed run",
+      "Observe the resolved provider is free-tier per the ladder AND the mission row displays it"
+    ],
+    "verification": "E2E log shows ladder resolution to free tier AND the capture shows the provider label on the row",
+    "dependencies": [
+      "F-115",
+      "F-118"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P1",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-120",
+    "component": "s6-routing",
+    "category": "e2e",
+    "description": "Routing-governance E2E (b): a pinned mission shall route to its pin — the resolved provider equals the pinned model and the TUI shows it.",
+    "steps": [
+      "Pin a model on a mission, dispatch its task",
+      "Observe resolution honored the pin and the row displays the pinned model"
+    ],
+    "verification": "E2E log shows pin honored AND capture shows the pinned label",
+    "dependencies": [
+      "F-119"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P1",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-121",
+    "component": "s6-routing",
+    "category": "e2e",
+    "description": "Routing-governance E2E (c): with a deliberately dead key, the ladder fallback shall fire AND the TUI shall show the fallback transition on the affected surface.",
+    "steps": [
+      "Configure a dead key for the first-choice provider in the sandbox env",
+      "Dispatch and observe fallback resolution in the log AND a visible fallback indication in the capture"
+    ],
+    "verification": "E2E log shows fallback fired AND capture shows the fallback state on the mission/model surface",
+    "dependencies": [
+      "F-119"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P1",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-122",
+    "component": "s6-routing",
+    "category": "e2e",
+    "description": "Routing-governance E2E (d): one delegation hop shall cross A2A and render — the composite governance journey (dispatch -> ladder -> hop -> receipt -> tree) passes end to end.",
+    "steps": [
+      "Run the composite journey in the sandbox",
+      "Observe ladder resolution, the A2A hop, the receipt, and the rendered tree in one run's evidence"
+    ],
+    "verification": "one run produces: ladder log + A2A hop receipt + tree capture, all consistent",
+    "dependencies": [
+      "F-116",
+      "F-121"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P1",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-123",
+    "component": "s6-sandbox",
+    "category": "infrastructure",
+    "description": "A sandbox swarm harness shall boot a throwaway swarm with its own DHARMA_* state dir and ports and throwaway agents, plus a teardown that removes all sandbox state — destructive E2E runs against THIS, never the live daemon.",
+    "steps": [
+      "Run the sandbox-up script and observe a swarm on isolated dirs/ports with throwaway agents",
+      "Run teardown and observe all sandbox state removed and live ~/.dharma untouched (mtime check)"
+    ],
+    "verification": "sandbox boots isolated (env + port check), teardown leaves no residue, live state dirs unmodified",
+    "dependencies": [
+      "F-114"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P1",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-124",
+    "component": "s6-sandbox",
+    "category": "e2e",
+    "description": "kill-agent shall execute end-to-end against the sandbox: confirm modal -> telos gate -> execution -> the sandbox agent actually terminates -> receipt records the kill.",
+    "steps": [
+      "Trigger kill-agent on a sandbox agent, confirm through modal and gate",
+      "Observe the agent process/state shows terminated in the sandbox and the fleet bar updates to offline",
+      "Observe the receipt with gate verdict in the log"
+    ],
+    "verification": "sandbox agent terminated (process gone), fleet projection shows offline, receipt recorded",
+    "dependencies": [
+      "F-123",
+      "F-097"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P1",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-125",
+    "component": "s6-sandbox",
+    "category": "e2e",
+    "description": "restart-agent shall execute end-to-end against the sandbox with the same gated path; the agent returns to running and the receipt records the restart.",
+    "steps": [
+      "Trigger restart-agent on a sandbox agent and confirm",
+      "Observe the agent cycles to running in the fleet bar and the receipt is recorded"
+    ],
+    "verification": "sandbox agent restarts (state cycle observed), receipt recorded",
+    "dependencies": [
+      "F-124"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P1",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-126",
+    "component": "s6-sandbox",
+    "category": "e2e",
+    "description": "budget-edit shall execute end-to-end against the sandbox: the gated edit lands in the sandbox budget state and the receipt records old -> new values.",
+    "steps": [
+      "Trigger budget-edit with a new value and confirm through modal + gate",
+      "Observe the sandbox budget state file carries the new value and the receipt shows the delta"
+    ],
+    "verification": "sandbox budget state updated; receipt carries old and new values",
+    "dependencies": [
+      "F-123"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P1",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-127",
+    "component": "s6-sandbox",
+    "category": "e2e",
+    "description": "loop-config-change shall execute end-to-end against the sandbox with the gated path and a receipt recording the changed keys.",
+    "steps": [
+      "Trigger a loop-config change and confirm",
+      "Observe the sandbox loop config carries the change and the receipt names the keys"
+    ],
+    "verification": "sandbox loop config updated; receipt names changed keys",
+    "dependencies": [
+      "F-123"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P1",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-128",
+    "component": "s6-sandbox",
+    "category": "functional",
+    "description": "The live-daemon guard shall hold: against any non-sandbox target, irreversible commands refuse execution with a refusal receipt — the operator's live fleet is untouchable; reversible and read-only operations remain available.",
+    "steps": [
+      "Point the TUI at the live daemon (read-only) and trigger kill-agent: observe refusal + receipt, no execution",
+      "Execute a reversible command against live and observe it succeeds",
+      "Verify live agent processes are unchanged after the refusal (process list diff)"
+    ],
+    "verification": "refusal receipt on live irreversible attempt; live process list unchanged; reversible path still works",
+    "dependencies": [
+      "F-123",
+      "F-097"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P1",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-129",
+    "component": "s7-ux",
+    "category": "functional",
+    "description": "A single keybinding registry shall declare every binding (mode, key, action, description); the keymap dispatch table is generated from it, making it the one source for help surfaces.",
+    "steps": [
+      "Inspect the registry and observe every active binding declared with a description",
+      "Run a test asserting the keymap table is derived from the registry (no orphan bindings either way)"
+    ],
+    "verification": "registry<->keymap consistency test green: 0 orphans in both directions",
+    "dependencies": [
+      "F-056",
+      "F-128"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P1",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-130",
+    "component": "s7-ux",
+    "category": "functional",
+    "description": "Pressing ? shall open a help overlay listing real keybindings from the registry (not hardcoded text), scrollable, closed by Esc or ?.",
+    "steps": [
+      "Press ? and capture: observe bindings matching the registry contents",
+      "Press Esc and observe the overlay closes"
+    ],
+    "verification": "help overlay capture content matches the registry's binding list; open/close journey works",
+    "dependencies": [
+      "F-129"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P1",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-131",
+    "component": "s7-ux",
+    "category": "functional",
+    "description": "Each pane shall render per-pane key hints from the registry — at minimum the 3 highest-value bindings for the focused pane.",
+    "steps": [
+      "Focus each major pane and capture",
+      "Observe a hint row per focused pane whose keys exist in the registry"
+    ],
+    "verification": "every major pane's focused capture shows >= 3 registry-backed hints",
+    "dependencies": [
+      "F-129"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P1",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-132",
+    "component": "s7-ux",
+    "category": "functional",
+    "description": "An explicit focus manager shall own pane focus: exactly one focused pane at a time, indicated with the ridge focused-border token; Tab/Shift-Tab cycle focus in a documented order.",
+    "steps": [
+      "Cycle focus with Tab through all panes and capture each step",
+      "Observe exactly one ridge-bordered pane per capture and the documented cycle order"
+    ],
+    "verification": "focus cycle captures show one focused pane each, ridge-bordered, in registry-documented order",
+    "dependencies": [
+      "F-129",
+      "F-068"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P1",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-133",
+    "component": "s7-ux",
+    "category": "functional",
+    "description": "Slash commands shall autocomplete: typing / opens a menu filtered by prefix; Tab/Enter completes; the menu lists every registered slash command.",
+    "steps": [
+      "Type /de and observe the menu narrowed to /deck",
+      "Press Tab and observe completion; Enter executes",
+      "Open bare / and observe the full command list"
+    ],
+    "verification": "autocomplete journey captures: prefix filter, completion, execution, full list",
+    "dependencies": [
+      "F-129"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P1",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-134",
+    "component": "s7-parity1",
+    "category": "e2e",
+    "description": "Parity 1.1 — instant echo under load: with the event stream flooding (>=50 events/s simulated), 20 characters sent via tmux shall all appear in the composer.",
+    "steps": [
+      "Start a simulated event flood",
+      "Send 20 characters via tmux send-keys",
+      "Capture and observe all 20 in the composer in order"
+    ],
+    "verification": "all 20 flood-time keystrokes present and ordered in the composer capture",
+    "dependencies": [
+      "F-132"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P1",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-135",
+    "component": "s7-parity1",
+    "category": "e2e",
+    "description": "Parity 1.2 — multi-line paste: a bracketed paste of a 10-line block shall land intact in the composer with no line lost and no command misfire.",
+    "steps": [
+      "Paste a 10-line block via tmux bracketed paste",
+      "Capture and observe all 10 lines in the composer and no commands executed"
+    ],
+    "verification": "10/10 pasted lines present; receipt log shows no spurious command executions",
+    "dependencies": [
+      "F-132"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P1",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-136",
+    "component": "s7-parity1",
+    "category": "e2e",
+    "description": "Parity 1.3 — input history: Up/Down shall walk through at least the last 20 submitted inputs, restoring each into the composer; Down past the newest restores the empty draft.",
+    "steps": [
+      "Submit 3 distinct messages",
+      "Press Up 3 times and observe each message restored newest-first",
+      "Press Down past the end and observe the empty draft"
+    ],
+    "verification": "history walk captures match the submitted sequence with the draft-restore edge case",
+    "dependencies": [
+      "F-132"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P1",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-137",
+    "component": "s7-parity1",
+    "category": "e2e",
+    "description": "Parity 1.4 — Esc shall cleanly interrupt streaming: the stream stops within one capture interval, the transcript keeps all received tokens, and the composer accepts input immediately.",
+    "steps": [
+      "Start a streaming response, press Esc mid-stream",
+      "Observe streaming stops, partial content remains, and typed characters echo immediately after"
+    ],
+    "verification": "post-Esc captures: stream halted, partial transcript intact, composer responsive",
+    "dependencies": [
+      "F-134"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P1",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-138",
+    "component": "s7-parity1",
+    "category": "e2e",
+    "description": "Parity 1.5 — Ctrl+C shall exit without terminal corruption: the alternate screen is released, the cursor restored, and a subsequent shell command renders normally in the same tmux pane.",
+    "steps": [
+      "Press Ctrl+C in the running app",
+      "Run ls in the same pane and capture",
+      "Observe normal shell output with no leftover UI artifacts or missing cursor"
+    ],
+    "verification": "post-exit capture shows clean shell output in the same pane",
+    "dependencies": [
+      "F-132"
+    ],
+    "estimated_minutes": 20,
+    "priority": "P1",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-139",
+    "component": "s7-parity2",
+    "category": "e2e",
+    "description": "Parity 2.1 — token streaming shall render incrementally: across 3 consecutive captures during one response, the rendered text grows each time (no freeze-then-dump).",
+    "steps": [
+      "Trigger a streaming response",
+      "Capture 3 times at ~1s intervals",
+      "Observe strictly growing rendered content across the captures"
+    ],
+    "verification": "3 successive captures show monotonically growing response text",
+    "dependencies": [
+      "F-132"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P1",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-140",
+    "component": "s7-parity2",
+    "category": "e2e",
+    "description": "Parity 2.2 — markdown and code blocks shall render in the transcript: headings, bold, lists, and fenced code with the parchment/sunlit accent treatment and intact alignment.",
+    "steps": [
+      "Receive a response containing headings, a list, and a fenced code block",
+      "Capture and observe distinct rendering for each element with intact pane borders"
+    ],
+    "verification": "capture shows styled headings/list/code distinct from body text, borders intact",
+    "dependencies": [
+      "F-132",
+      "F-069"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P1",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-141",
+    "component": "s7-parity2",
+    "category": "e2e",
+    "description": "Parity 2.3 — Static-region discipline: a 500-line output shall never wipe scrollback — history is emitted via the static region, the dynamic region never exceeds the viewport, and tmux scrollback contains the full output.",
+    "steps": [
+      "Trigger a 500-line response",
+      "Scroll tmux history and observe the full output present",
+      "Observe the live dynamic region fits within the viewport"
+    ],
+    "verification": "tmux scrollback holds all 500 lines; dynamic region <= viewport height in captures",
+    "dependencies": [
+      "F-139"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P1",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-142",
+    "component": "s7-parity2",
+    "category": "e2e",
+    "description": "Parity 2.4 — transcript stability while streaming: previously rendered transcript lines shall not shift or duplicate between consecutive captures during a stream.",
+    "steps": [
+      "Stream a response while earlier transcript content is visible",
+      "Diff consecutive captures' overlapping regions",
+      "Observe earlier lines byte-stable across captures"
+    ],
+    "verification": "consecutive-capture diff of pre-existing lines is empty during streaming",
+    "dependencies": [
+      "F-139"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P1",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-143",
+    "component": "s7-parity3",
+    "category": "e2e",
+    "description": "Parity 3.1 — flicker gate: a /usr/bin/script raw escape capture over 30s of steady-state operation shall contain no [2K[1A erase-storm patterns.",
+    "steps": [
+      "Record 30s of steady-state operation with /usr/bin/script",
+      "Scan the raw capture for repeated erase-line+cursor-up storm sequences",
+      "Observe zero storm patterns"
+    ],
+    "verification": "raw escape capture scan: 0 erase-storm patterns in steady state",
+    "dependencies": [
+      "F-132"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P1",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-144",
+    "component": "s7-parity3",
+    "category": "e2e",
+    "description": "Parity 3.2 — resize integrity: resizing 80x24 -> 120x40 -> 80x24 shall leave no duplicated UI and no stale artifacts in either direction.",
+    "steps": [
+      "Resize the tmux pane up and capture; resize back down and capture",
+      "Diff each capture against its size's golden frame",
+      "Observe no duplicated chrome or orphaned fragments"
+    ],
+    "verification": "post-resize captures match goldens at both sizes with zero duplicated-UI lines",
+    "dependencies": [
+      "F-132",
+      "F-083"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P1",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-145",
+    "component": "s7-grading",
+    "category": "infrastructure",
+    "description": "The L4 evaluator grading harness shall grade text frames at 3 sizes against the golden corpus using a harsh few-shot rubric, outputting PASS/FAIL per criterion with cited frame lines only (no prose verdicts).",
+    "steps": [
+      "Run the harness on the current build and observe per-criterion PASS/FAIL with line citations",
+      "Feed it a doctored failing frame and observe the relevant criterion flips to FAIL with the offending line cited"
+    ],
+    "verification": "harness output is per-criterion PASS/FAIL + cited lines; planted defect detected",
+    "dependencies": [
+      "F-083",
+      "F-018"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P1",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-146",
+    "component": "s7-grading",
+    "category": "e2e",
+    "description": "Parity contracts 1-4 shall grade green at all 3 sizes through the L4 harness — the composite UX gate for the S7 bar.",
+    "steps": [
+      "Run the grading harness across contracts 1-4 at 80x24, 100x30, 120x40",
+      "Observe PASS on every criterion at every size"
+    ],
+    "verification": "L4 harness: all parity-1..4 criteria PASS at 3 sizes in one run",
+    "dependencies": [
+      "F-134",
+      "F-135",
+      "F-136",
+      "F-137",
+      "F-138",
+      "F-139",
+      "F-140",
+      "F-141",
+      "F-142",
+      "F-143",
+      "F-144",
+      "F-145",
+      "F-130",
+      "F-131",
+      "F-133",
+      "F-066"
+    ],
+    "estimated_minutes": 20,
+    "priority": "P1",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-147",
+    "component": "s8-ci",
+    "category": "infrastructure",
+    "description": "A GitHub Actions workflow shall run verify:all plus the tmux boot smoke on every PR touching terminal/, with Bun pinned to the package.json version.",
+    "steps": [
+      "Open a PR with a trivial terminal/ change and observe the workflow runs verify:all + smoke",
+      "Break a test in a scratch branch and observe the workflow fails"
+    ],
+    "verification": "workflow file present; a test PR shows green run; a planted failure turns it red",
+    "dependencies": [
+      "F-146"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P2",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-148",
+    "component": "s8-ci",
+    "category": "infrastructure",
+    "description": "CI shall enforce the ratchets and golden-diff: any ratchet regression or unapproved frame drift fails the workflow.",
+    "steps": [
+      "Plant a ratchet regression in a scratch branch and observe CI fails naming the metric",
+      "Plant a visual drift and observe golden-diff fails CI"
+    ],
+    "verification": "CI red on planted ratchet regression and on planted frame drift; green otherwise",
+    "dependencies": [
+      "F-147"
+    ],
+    "estimated_minutes": 20,
+    "priority": "P2",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-149",
+    "component": "s8-ci",
+    "category": "testing",
+    "description": "An e2e replay layer (node-pty + xterm-headless or tui-test) shall script one full operator journey — boot, mode switch, command with receipt, exit — replayable headlessly in CI.",
+    "steps": [
+      "Run the replay locally and observe the journey assertions pass",
+      "Run it in CI and observe the same"
+    ],
+    "verification": "replay journey green locally and in CI",
+    "dependencies": [
+      "F-147"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P2",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-150",
+    "component": "s8-polish",
+    "category": "docs",
+    "description": "Operator docs shall cover the three modes, the deck map, the keybinding registry export, the theme law, and verify:all usage, in terminal/README.md or terminal/docs/.",
+    "steps": [
+      "Read the doc and observe sections for modes, decks, keys, theme law, verify:all",
+      "Cross-check the documented keybindings against the registry (no drift)"
+    ],
+    "verification": "doc sections present; documented bindings match the registry export",
+    "dependencies": [
+      "F-130"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P2",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-151",
+    "component": "s8-polish",
+    "category": "docs",
+    "description": "A terminal-v2 tombstone doc shall live in the repo recording the 2026-04-05 Ink 6.8 decision reversal and pointing future agents at terminal/ as canonical (wiki-atom correction stays an operator/morning item).",
+    "steps": [
+      "Read terminal/docs/terminal-v2-tombstone.md and observe the decision history and canonical pointer"
+    ],
+    "verification": "tombstone doc exists naming the abandoned terminal-v2 and the canonical path",
+    "dependencies": [],
+    "estimated_minutes": 10,
+    "priority": "P2",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-152",
+    "component": "s8-polish",
+    "category": "functional",
+    "description": "The Fleet deck (Deck 2) shall render the full fleet projection full-screen: roster, states with glyphs, last-seen ages, inbox depths where available.",
+    "steps": [
+      "Open Deck 2 against fixture fleet data and capture",
+      "Observe roster rows with glyph+state+age columns"
+    ],
+    "verification": "Deck 2 capture matches fixture roster with the documented columns",
+    "dependencies": [
+      "F-110"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P2",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-153",
+    "component": "s8-polish",
+    "category": "functional",
+    "description": "The Missions deck (Deck 3) shall render the missions projection full-screen with per-mission receipts drill-down.",
+    "steps": [
+      "Open Deck 3 and capture the mission table",
+      "Select a mission and observe its receipts listed"
+    ],
+    "verification": "Deck 3 capture shows mission table; selection reveals that mission's receipts",
+    "dependencies": [
+      "F-110"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P2",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-154",
+    "component": "s8-polish",
+    "category": "functional",
+    "description": "The Memory deck (Deck 5) shall render the memory projection full-screen: chetana/SMRITI counts and decay/gap flags as available.",
+    "steps": [
+      "Open Deck 5 and capture",
+      "Observe count fields and degradation markers for unavailable sources"
+    ],
+    "verification": "Deck 5 capture shows memory counts with graceful unavailable markers",
+    "dependencies": [
+      "F-110",
+      "F-103"
+    ],
+    "estimated_minutes": 20,
+    "priority": "P2",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-155",
+    "component": "s8-polish",
+    "category": "functional",
+    "description": "The Approvals deck (Deck 6) shall render the approvals projection full-screen with approve/deny actions wired to the gated commands.",
+    "steps": [
+      "Open Deck 6 against a fixture queue and capture pending items",
+      "Approve one and observe the row updates and a receipt records it"
+    ],
+    "verification": "Deck 6 capture shows queue; approve action updates row + receipt",
+    "dependencies": [
+      "F-110",
+      "F-104"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P2",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-156",
+    "component": "s8-polish",
+    "category": "infrastructure",
+    "description": "Final lock: all ratchets shall sit at end targets (max_file_lines <= 400, dup_functions=0, record_unknown <= 1, hex_violations=0, banned glyphs 0), verify:all green, 527+ tests green, working tree clean — the environment left appropriate for merging to a main branch.",
+    "steps": [
+      "Run bun run verify:all from a clean shell and observe exit 0",
+      "Read the ratchet baseline file and observe every metric at its end target",
+      "Run git status and observe a clean tree"
+    ],
+    "verification": "verify:all exit 0 from a fresh shell; ratchet baselines at end targets; git status clean",
+    "dependencies": [
+      "F-062",
+      "F-146",
+      "F-113"
+    ],
+    "estimated_minutes": 20,
+    "priority": "P2",
+    "status": "not_started",
+    "verified": false
+  }
+]

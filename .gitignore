@@ -66,7 +66,17 @@ dashboard/playwright-report/
 dashboard/playwright/
 dashboard/test-results/
 desktop-shell/src-tauri/target/
-spec-forge/
+# helm build audit trail (2026-06-12)
+!spec-forge/
+spec-forge/*
+!spec-forge/features.json
+!spec-forge/CONSTITUTION.md
+!spec-forge/prompts/
+!spec-forge/baseline-failures.txt
+!spec-forge/truecolor-preflight.txt
+!spec-forge/RUN_RECEIPT.md
+!spec-forge/knowledge/
+!spec-forge/loop.sh
 .superpowers/
 
 # Local agent/tool indexes and runtime traces.
