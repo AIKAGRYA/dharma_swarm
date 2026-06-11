@@ -136,6 +136,7 @@ Health Table]
 | Campaign X-Ray | advisory | HELD (gauntlet 28/100) |
 | Loomwork | media / civil-society Palantir | DESIGN_ONLY |
 | Vwrite | writing master (feeds Darshan) | PROPOSED (design memo) |
+| Dharma Forge / Hydra | reality-reward membrane (anti-theater fitness spine) | STOPPED-HONESTLY (internal packets exhausted 2026-06-02; archive fitness blocked below quorum; see `docs/ops/DHARMA_FORGE_HYDRA_ARCHAEOLOGY_2026-06-11.md`) |
 | SAB Dharmic Agora | propagation basin / agent society | DORMANT (zero sparks) |
 | GAIA reciprocity, Web-4.0 trust | accounting / market position | ENVISIONED |
 | R_V research program | mech interp | OPEN (RESEARCH_PROGRAM.md, 2026-06-03) |
