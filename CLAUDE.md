@@ -21,7 +21,7 @@ If this file disagrees with that output on anything live (track id, prereqs, rec
      Do not hand-edit. Run scripts/governance/render_active_track_includes.py
      after updating the YAML. -->
 
-**Active portfolio:** 3 co-equal track(s) (WIP warn 5, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
+**Active portfolio:** 4 co-equal track(s) (WIP warn 5, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
 
 **Spine objectives (each track serves one):**
 
@@ -130,6 +130,42 @@ status is main's standing declaration and is left to the operator.
 - Do not change EvidenceReceipt schema; adopt shipped types unchanged.
 - Do not introduce NATS, Redis, or gRPC in this track (transport belongs to the NATS lane).
 - Do not broadly refactor swarm.py, providers.py, or SwarmManager.
+
+### Cybernetic Loop Closure — wire all 13 loops with receipted closure checks
+
+**Track id:** `loop-closure-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-11 (TTL 21 days)
+**Relations:** complements: runtime-truth-reconciliation-2026-06
+**Owns surfaces:** reports/loop_closure/**, CYBERNETIC_LOOP_MAP.md
+**Moves vital signs:** quality_gates, eval_coverage
+
+Operator-instructed campaign (2026-06-11 master prompt): wire all 13
+cybernetic loops in CYBERNETIC_LOOP_MAP.md until each runs
+sense->interpret->constrain->act->adapt on real data with receipts to
+its declared owner surface and an automated closure check.
+
+Phase 0 (research dossier, no build code) ships first. Phases proceed
+in dependency-lattice order: Loop 1 trunk (provider chain + dispatch),
+then the fed cascade (6,2,5,9 -> 3,4,7 -> 8,10,11), then Loops 12/13
+gated behind the One Wire external-receipt quorum (N>=5, M>=3).
+
+Invariant that must hold throughout:
+  Internal artifacts never touch archive fitness; only countersigned
+  external acted receipts above quorum do.
+
+**Next items:**
+
+- [code] (blocker) Phase 1a: provider chain hardening — separate failure state classes, fallback ordering, honest smoke receipts (no real key required).
+- [ops] (blocker) Operator escalation: one real provider key (OPENROUTER recommended) to close Loop 1.
+- [code] Phase 1b: Loop 1 closure under orchestrate_live with DHARMA_SPINE_DISPATCH=1, dispatch_dropoff receipted, closure check in make orient.
+
+**Non-goals:**
+
+- Do not weaken, bypass, or hard-code any telos gate to close a loop.
+- Do not let internal artifacts touch archive fitness (One Wire quorum stands).
+- Do not touch the operator_core read-model surfaces owned by the reconciliation lane.
+- Do not commit provider API keys or any credentials.
+- Do not create a new truth store, receipt system, or state owner; extend loop_supervisor and existing owners.
 
 **Recently closed tracks:**
 
@@ -267,15 +303,6 @@ npm --prefix dashboard run dev
 bash run_operator.sh
 ```
 
-## Model & Key Routing — THE ONE WAY (read before touching any key or model call)
-
-There is exactly one way. Do not invent a second.
-- **Keys:** one home `~/.dharma/agent_keys.env` (sourced everywhere), one tool `dkeys` (`dkeys add VAR=…`, `dkeys test`). Read keys in code only via `dharma_swarm/api_keys.py`.
-- **Model/provider:** one door `runtime_provider.resolve_runtime_provider_config()` → `create_runtime_provider()`, ordered by `model_hierarchy` (most-powerful-first). Live-fallback never blocks on a dead brain.
-- **Anthropic/Claude → Max plan** (`claude_code`), not the metered API. Escape hatch: `DHARMA_FORCE_ANTHROPIC_API=1`.
-- **Rules:** never hardcode a model string; never read a key outside `api_keys.py`; never add a key except via `dkeys add`; new provider = adapter + `DEFAULT_MODELS` entry, no parallel routing.
-- **Full canon + deprecated routes:** [`docs/ops/MODEL_KEY_ROUTING.md`](docs/ops/MODEL_KEY_ROUTING.md).
-
 ## Security Rules
 
 - NEVER hardcode API keys, secrets, or credentials in source files
@@ -302,7 +329,7 @@ See `foundations/` for the 10-pillar intellectual genome.
 
 ## CRITICAL: Read Before Any Code Changes
 
-**Build-session entrypoint:** Before any build work, read [`docs/governance/BUILD_SESSION_ENTRYPOINT.md`](docs/governance/BUILD_SESSION_ENTRYPOINT.md) and run `make onboard`. The current build **portfolio** (1–N co-equal active tracks) is declared in [`docs/governance/ACTIVE_TRACK.yaml`](docs/governance/ACTIVE_TRACK.yaml) and rendered by `make onboard` — do not name a track here in prose. Substrate-nativeness is currently estimated at ~10–15% per [`reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md`](reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md). When the operator proposes a new project, **open a new track** in the portfolio (`serves:` a spine objective, `owned_surfaces:`, acceptance criteria) up to the WIP limit — a new project is a new track, not a violation of an existing one.
+**Build-session entrypoint:** Before any build work, read [`docs/governance/BUILD_SESSION_ENTRYPOINT.md`](docs/governance/BUILD_SESSION_ENTRYPOINT.md) and run `make onboard`. The current build **portfolio** (1–N co-equal active tracks) is declared in [`docs/governance/ACTIVE_TRACK.yaml`](docs/governance/ACTIVE_TRACK.yaml) and rendered by `make onboard` — do not name a track here in prose. Substrate-nativeness is a measured number, not a prose constant — run `python3 scripts/governance/spine_bypass_report.py` for the live dispatch-site measure instead of citing any doc's frozen percentage. When the operator proposes a new project, **open a new track** in the portfolio (`serves:` a spine objective, `owned_surfaces:`, acceptance criteria) up to the WIP limit — a new project is a new track, not a violation of an existing one.
 
 **Highest-system map:** Read [`docs/MEGAFILE_INDEX.md`](docs/MEGAFILE_INDEX.md) before treating any large map as canonical. It points to the Attractor Closure synthesis, live ops dashboard, broken register, and missing slots.
 

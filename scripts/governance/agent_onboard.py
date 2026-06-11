@@ -8,8 +8,23 @@ BROKEN_REGISTER.md, SOVEREIGN_MANIFEST.md, git) and renders the current
 truth in one screen.
 
 Usage:
-    python3 scripts/governance/agent_onboard.py
+    python3 scripts/governance/agent_onboard.py            # full picture
+    python3 scripts/governance/agent_onboard.py --fast     # <5s, skips slow probes
+    python3 scripts/governance/agent_onboard.py --json     # machine receipt to stdout
+    python3 scripts/governance/agent_onboard.py --no-net   # skip network (gh) calls
     make onboard
+
+Every run also tees a machine-readable receipt to
+~/.dharma/ops/onboard_receipt.json (override dir: DHARMA_OPS_DIR) so fleet
+agents (hermes-m5, loops, VPS workers) can consume operating reality
+without executing this script. The receipt is a projection, not authority.
+
+Write behavior: this command never writes owner files. When the generated
+evidence (reports/governance/active_track_evidence.json) is missing or
+older than 60 minutes, it invokes check_track_status.py — the evidence
+OWNER — which regenerates the tracked evidence reports (this can dirty
+the working tree, same as the governance loop does). Suppress with
+AGENT_ONBOARD_NO_REFRESH=1 or --fast; force with AGENT_ONBOARD_REFRESH=1.
 
 Exit code: always 0 on stale state. Warnings are surfaced inline. No CI
 gate depends on this command — it is informational. Hard gates live in
@@ -18,9 +33,12 @@ existing CI workflows.
 """
 from __future__ import annotations
 
+import argparse
+import importlib.util
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from collections import Counter
@@ -29,6 +47,11 @@ from pathlib import Path
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+# One explicit path insert so dharma_swarm imports resolve to THIS worktree's
+# package, not whichever checkout an editable install happens to point at.
+# (Previously a hidden insert inside render_manifest_health was load-bearing.)
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 EVIDENCE_JSON = REPO_ROOT / "reports/governance/active_track_evidence.json"
 ACTIVE_TRACK = REPO_ROOT / "docs/governance/ACTIVE_TRACK.yaml"
 LIVE_OPS = REPO_ROOT / "docs/state/LIVE_OPS_DASHBOARD.md"
@@ -39,6 +62,19 @@ SURFACE_MANIFEST = REPO_ROOT / "ACTIVE_SURFACE_MANIFEST.yaml"
 LIVE_OPS_STALE_DAYS = 7
 SURFACE_MANIFEST_STALE_DAYS = 30
 KNOWN_DECAY_THRESHOLD_DAYS = 30
+EVIDENCE_STALE_MINUTES = 60
+
+
+def _ops_dir() -> Path:
+    """Fleet-readable state dir for machine receipts (same home as the
+    live process census receipt this script already reads)."""
+    override = os.environ.get("DHARMA_OPS_DIR")
+    if override:
+        return Path(override).expanduser()
+    return Path.home() / ".dharma" / "ops"
+
+
+ONBOARD_RECEIPT_NAME = "onboard_receipt.json"
 
 # Docs that have repeatedly misled agents in the past. Intentionally short;
 # this is not a place to dump every doc.
@@ -156,7 +192,7 @@ def _lane_family(label: str) -> str:
         return "docops/governance"
     if "capital" in text or "revenue" in text or "cash" in text:
         return "capital/revenue"
-    if "pr" in text or "review" in text or "merge-master" in text:
+    if re.search(r"(?:^|[-_/])pr(?:[-_/\d]|$)", text) or "review" in text or "merge-master" in text:
         return "pr/review/merge"
     if "cleanup" in text or "repair" in text:
         return "cleanup/repair"
@@ -209,12 +245,11 @@ def _work_lane_snapshot() -> dict[str, Any]:
     }
 
 
-
 # ---------------------------------------------------------------------------
 # Section renderers (pure-ish; each returns nothing but prints)
 # ---------------------------------------------------------------------------
 
-def render_repo_state(*, fast: bool = False) -> None:
+def render_repo_state(*, fast: bool = False) -> dict[str, Any]:
     section("DHARMA SWARM — AGENT ONBOARDING")
     branch = git("rev-parse", "--abbrev-ref", "HEAD") or "(detached)"
     sha = git("rev-parse", "--short=10", "HEAD")
@@ -222,13 +257,22 @@ def render_repo_state(*, fast: bool = False) -> None:
     # Divergence from origin/main, if known
     ahead = git("rev-list", "--count", "origin/main..HEAD")
     behind = git("rev-list", "--count", "HEAD..origin/main")
-    dirty_count: int | str
+    dirty_count: int | None
+    dirty_dirs: list[tuple[str, int]] = []
     if fast:
-        dirty_count = "(skipped in fast mode)"
+        dirty_count = None  # git status over a big dirty tree is the slow part
     else:
         dirty = git("status", "--porcelain")
-        dirty_count = len([ln for ln in dirty.splitlines() if ln.strip()])
+        dirty_lines = [ln for ln in dirty.splitlines() if ln.strip()]
+        dirty_count = len(dirty_lines)
+        dir_counts: Counter[str] = Counter()
+        for ln in dirty_lines:
+            rel = ln[3:].strip().strip('"')
+            parent = str(Path(rel).parent)
+            dir_counts[parent] += 1
+        dirty_dirs = dir_counts.most_common(3)
 
+    print(f"Worktree     : {REPO_ROOT}  (this checkout — symbols may be mirrored in sibling worktrees)")
     print(f"Branch       : {branch}")
     print(f"HEAD         : {sha}")
     print(f"Commit       : {head_msg}")
@@ -236,15 +280,101 @@ def render_repo_state(*, fast: bool = False) -> None:
         ahead_n = ahead or "?"
         behind_n = behind or "?"
         print(f"vs origin/main: ahead {ahead_n}, behind {behind_n}")
-    print(f"Dirty files  : {dirty_count}")
-    print(f"Today (UTC)  : {_today().isoformat()}")
+    if dirty_count is None:
+        print("Dirty files  : (skipped — --fast)")
+    else:
+        breakdown = ""
+        if dirty_dirs:
+            breakdown = "  (top: " + ", ".join(f"{d}={n}" for d, n in dirty_dirs) + ")"
+        print(f"Dirty files  : {dirty_count}{breakdown}")
+    print(f"Today (UTC)  : {_today().isoformat()}  (commit timestamps may show local +0900)")
     print()
     print("Remember only: make onboard")
     if dirty_count:
         print("Next command : make agent-build-closeout  # before PR/merge handoff")
-    else:
+    elif dirty_count == 0:
         print("Next command : make agent-build-preflight # before editing")
-    print("If unsure    : rerun make onboard; it repeats the next command")
+    print("If unsure    : rerun make onboard (or --fast); it repeats the next command")
+    return {
+        "worktree": str(REPO_ROOT),
+        "branch": branch,
+        "head": sha,
+        "ahead": ahead or None,
+        "behind": behind or None,
+        "dirty_files": dirty_count,
+        "dirty_top_dirs": dict(dirty_dirs),
+    }
+
+
+def render_parallel_work_lanes() -> dict[str, Any]:
+    """Live git/worktree inventory so 0..N parallel builds can coordinate.
+
+    Completes the intent of commit cf11a80f8 (parallel_lane_policy): the
+    helpers landed there but this render function never did. Reads only
+    git state; owns no fact.
+    """
+    section("PARALLEL WORK LANES — who else is building (owner: git worktree/branches)")
+    snap = _work_lane_snapshot()
+    worktrees = snap.get("worktrees") or []
+    print(f"  Worktrees: {len(worktrees)}  ·  Local branches: {snap.get('local_branch_count', 0)}")
+    here = str(REPO_ROOT)
+    for w in worktrees[:12]:
+        marker = "▶" if str(w.get("path")) == here else " "
+        flags = "".join(
+            tag for tag, on in (
+                (" [detached]", w.get("detached")),
+                (" [locked]", w.get("locked")),
+                (" [prunable]", w.get("prunable")),
+                (" [MISSING]", not w.get("exists")),
+            ) if on
+        )
+        print(f"  {marker} {w.get('basename', '?')}  branch={w.get('branch') or '(none)'}{flags}")
+    if len(worktrees) > 12:
+        print(f"    ... ({len(worktrees) - 12} more — `git worktree list`)")
+    families = snap.get("family_counts") or {}
+    if families:
+        fam = ", ".join(f"{k}={v}" for k, v in sorted(families.items(), key=lambda kv: -kv[1]))
+        print(f"  Lane families: {fam}")
+    recent = snap.get("recent_branches") or []
+    if recent:
+        print("  Most recent branches:")
+        for b in recent[:5]:
+            print(f"    - {b['name']}  ({b['date']})  {b['subject'][:60]}")
+    print("  Before editing a hot-path symbol: it may exist in several worktrees.")
+    print("  Policy: parallel lanes are allowed; non-overlapping surfaces are the boundary.")
+    return {
+        "worktree_count": len(worktrees),
+        "local_branch_count": snap.get("local_branch_count", 0),
+        "worktrees": [
+            {"basename": w.get("basename"), "branch": w.get("branch"),
+             "exists": w.get("exists"), "prunable": w.get("prunable")}
+            for w in worktrees
+        ],
+        "lane_families": dict(families),
+    }
+
+
+def _evidence_age_minutes(evidence: dict[str, Any] | None) -> float | None:
+    """Age of the evidence snapshot in minutes, or None if undatable."""
+    raw = (evidence or {}).get("generated_at")
+    when: datetime | None = None
+    if isinstance(raw, str):
+        try:
+            when = datetime.fromisoformat(raw)
+        except ValueError:
+            when = None
+    if when is None and EVIDENCE_JSON.exists():
+        try:
+            when = datetime.fromtimestamp(EVIDENCE_JSON.stat().st_mtime, tz=timezone.utc)
+        except OSError:
+            return None
+    if when is None:
+        return None
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+    # Clamp: a future generated_at (clock skew) must not render a giant
+    # negative age — treat as 0 (fresh).
+    return max(0.0, (datetime.now(tz=timezone.utc) - when).total_seconds() / 60.0)
 
 
 def render_active_track(evidence: dict[str, Any] | None,
@@ -254,6 +384,14 @@ def render_active_track(evidence: dict[str, Any] | None,
         print("  WARNING: no active_track_evidence.json found.")
         print("  Run: python3 scripts/governance/check_track_status.py")
         return
+
+    age_min = _evidence_age_minutes(evidence)
+    if age_min is not None:
+        if age_min > EVIDENCE_STALE_MINUTES:
+            print(f"  ⚠ Evidence snapshot is {age_min/60:.1f}h old — criteria below may lag reality.")
+            print("    Refresh: python3 scripts/governance/check_track_status.py")
+        else:
+            print(f"  Evidence age: {age_min:.0f}m (fresh)")
 
     # v2: a portfolio of 1..N co-equal active tracks. Render them all, not just
     # the primary — so an agent never reads "there is one active track".
@@ -372,7 +510,6 @@ def render_manifest_health() -> None:
 
     # Try to call manifest_health.build_health_report() if importable
     try:
-        sys.path.insert(0, str(REPO_ROOT))
         from dharma_swarm.manifest_health import build_health_report  # type: ignore
         report = build_health_report()
         entities = report.get("entities", []) if isinstance(report, dict) else []
@@ -385,7 +522,7 @@ def render_manifest_health() -> None:
             for e in [e for e in entities if e.get("status") == "red"][:5]:
                 print(f"    - {e.get('id', '?')}: {e.get('gap', '')}")
     except Exception as exc:  # pragma: no cover — informational only
-        print(f"  (manifest_health unavailable: {type(exc).__name__})")
+        print(f"  (manifest_health unavailable: {type(exc).__name__}: {exc})")
 
 
 def _parse_broken_register() -> dict[str, Any]:
@@ -435,20 +572,66 @@ def render_broken_register() -> None:
             print(f"    - [{it['status_word']}] {it['heading']}")
 
 
+# Fallback only — the live list is parsed from SOVEREIGN_MANIFEST.md at
+# render time so a new/reworded axiom can never drift invisibly here.
+_AXIOM_FALLBACK = [
+    "A1 — No new files at top level of dharma_swarm/",
+    "A2 — No new duplicate bridge/router/adapter/orchestrator",
+    "A3 — Update NAVIGATION.md for any new seam",
+    "A4 — No vibe-coding (find the file before guessing the API)",
+    "A5 — No god objects (files >3000 LOC)",
+    "A6 — Docs decay; verify numbers before citing",
+    "A7 — No new circular imports",
+    "A8 — Frontmatter discipline (no YAML in governance prose)",
+]
+
+
+def _parse_axioms_from_manifest() -> list[str]:
+    manifest = REPO_ROOT / "docs/governance/SOVEREIGN_MANIFEST.md"
+    if not manifest.exists():
+        return []
+    try:
+        text = manifest.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return []
+    found = re.findall(r"(?m)^#{2,4}\s*(A\d+)\s*[:—-]\s*([^\n]+)", text)
+    return [f"{aid} — {title.strip().rstrip('*').strip()}" for aid, title in found]
+
+
 def render_axioms() -> None:
     section("LIVING AXIOMS (owner: docs/governance/SOVEREIGN_MANIFEST.md)")
-    print("  A1 — No new files at top level of dharma_swarm/")
-    print("  A2 — No new duplicate bridge/router/adapter/orchestrator")
-    print("  A3 — Update NAVIGATION.md for any new seam")
-    print("  A4 — No vibe-coding (find the file before guessing the API)")
-    print("  A5 — No god objects (files >3000 LOC)")
-    print("  A6 — Docs decay; verify numbers before citing")
-    print("  A7 — No new circular imports")
-    print("  A8 — Frontmatter discipline (no YAML in governance prose)")
+    axioms = _parse_axioms_from_manifest()
+    if axioms:
+        for line in axioms:
+            print(f"  {line}")
+    else:
+        print("  (could not parse axioms from SOVEREIGN_MANIFEST.md — static fallback,")
+        print("   verify against the manifest before relying on these)")
+        for line in _AXIOM_FALLBACK:
+            print(f"  {line}")
+
+
+def _all_track_surfaces(track: dict[str, Any]) -> list[str]:
+    """Surfaces across ALL active tracks. v2 uses `owned_surfaces`; v1 used
+    `surfaces`. (The v1-only read silently killed this section when the v2
+    portfolio shipped — read both, across the whole portfolio.)"""
+    if not track:
+        return []
+    tracks = track.get("active_tracks") or []
+    if not tracks and track.get("active_track"):
+        tracks = [track["active_track"]]
+    surfaces: list[str] = []
+    for t in tracks:
+        if not isinstance(t, dict):
+            continue
+        for s in (t.get("owned_surfaces") or t.get("surfaces") or []):
+            if s not in surfaces:
+                surfaces.append(s)
+    return surfaces
 
 
 def render_recent_activity(track: dict[str, Any]) -> None:
-    surfaces = (track.get("active_track") or {}).get("surfaces", []) if track else []
+    surfaces = _all_track_surfaces(track)
     if not surfaces:
         return
     section(f"RECENT TRACK ACTIVITY (last 14 days, {len(surfaces)} surfaces)")
@@ -708,37 +891,64 @@ def _runtime_truth_packets(
         )
     )
 
-    packets.append(
-        RuntimeTruthPacket(
-            surface_id="external.keystone_merge",
-            kind="external_truth",
-            observed_at=observed_at,
-            owner_surface="external_operator_state",
-            source_kind="external_gated",
-            source_refs=["external:abduznik/instrumation#98"],
-            authority_state=RuntimeTruthState.PROJECTION_ONLY,
-            external_state=RuntimeTruthState.EXTERNAL_GATED,
-            mutation_state=RuntimeTruthState.NO_MUTATION_OBSERVED,
-            probe_ok=None,
-            missing_machine_fields=[
-                "external_api_probe_result",
-                "proof_json_path",
-                "operator_authority_to_probe_external_state",
-            ],
-            metadata={"no_external_probe_performed": True},
+    # External gates are rendered ONLY if declared in the manifest owner.
+    # (A previous version hardcoded an external PR ref here — a fact owned
+    # by nobody, which violated this script's own doctrine.)
+    for gate in _declared_external_gates():
+        packets.append(
+            RuntimeTruthPacket(
+                surface_id=str(gate.get("surface_id") or "external.undeclared"),
+                kind="external_truth",
+                observed_at=observed_at,
+                owner_surface="ACTIVE_SURFACE_MANIFEST.yaml",
+                source_kind="external_gated",
+                source_refs=[str(gate.get("ref") or "")],
+                authority_state=RuntimeTruthState.PROJECTION_ONLY,
+                external_state=RuntimeTruthState.EXTERNAL_GATED,
+                mutation_state=RuntimeTruthState.NO_MUTATION_OBSERVED,
+                probe_ok=None,
+                missing_machine_fields=[
+                    "external_api_probe_result",
+                    "proof_json_path",
+                    "operator_authority_to_probe_external_state",
+                ],
+                metadata={"no_external_probe_performed": True},
+            )
         )
-    )
     return packets
+
+
+def _declared_external_gates() -> list[dict[str, Any]]:
+    """External truth gates declared in ACTIVE_SURFACE_MANIFEST.yaml
+    (key: external_gates: [{surface_id, ref}, ...]). Undeclared → none."""
+    try:
+        import yaml  # type: ignore
+
+        if not SURFACE_MANIFEST.exists():
+            return []
+        data = yaml.safe_load(SURFACE_MANIFEST.read_text(encoding="utf-8")) or {}
+        gates = data.get("external_gates") or []
+        return [g for g in gates if isinstance(g, dict)]
+    except Exception:
+        return []
 
 
 def render_runtime_truth(
     evidence: dict[str, Any] | None,
     track: dict[str, Any],
 ) -> list[dict[str, Any]]:
-    from dharma_swarm.operator_core.runtime_truth import summarize_runtime_truth_packets
-
     section("RUNTIME TRUTH PACKETS — read-only projection")
-    packets = _runtime_truth_packets(evidence, track)
+    # Guarded like every sibling section: a missing/broken dharma_swarm
+    # install must degrade this section, never break the exit-0 contract.
+    try:
+        from dharma_swarm.operator_core.runtime_truth import (
+            summarize_runtime_truth_packets,
+        )
+
+        packets = _runtime_truth_packets(evidence, track)
+    except Exception as exc:
+        print(f"  (runtime truth unavailable: {type(exc).__name__}: {exc})")
+        return []
     rows = [packet.to_dict() for packet in packets]
     summary = summarize_runtime_truth_packets(packets)
     print("  Doctrine: packets project existing owners; this section is not authority.")
@@ -756,9 +966,18 @@ def render_runtime_truth(
     missing = summary.get("missing") or []
     if missing:
         print(f"  Missing machine fields: {', '.join(str(item) for item in missing)}")
-    print("  Machine rows (JSONL):")
+    # One digest line per packet; the full rows go to the machine receipt
+    # (~/.dharma/ops/onboard_receipt.json) — they were ~44% of the output's
+    # tokens as inline JSONL and no consumer parsed stdout.
+    print("  Packets (full rows in the onboard receipt):")
     for row in rows:
-        print(f"    {json.dumps(row, sort_keys=True)}")
+        anomalies = []
+        for axis in ("heartbeat_state", "progress_state", "completion_state"):
+            val = str(row.get(axis) or "")
+            if val and val not in {"unknown", ""} and ("stalled" in val or "blocked" in val or "not_ready" in val):
+                anomalies.append(f"{axis.removesuffix('_state')}={val}")
+        anomaly_s = ("  ⚠ " + ", ".join(anomalies)) if anomalies else ""
+        print(f"    - {row.get('surface_id')}  [{row.get('kind')}]{anomaly_s}")
     return rows
 
 
@@ -777,24 +996,15 @@ def render_decay_watch() -> None:
 
 def _tool_available(*, which: str | None = None,
                     python_import: str | None = None) -> bool:
-    """Return True if a CLI tool or Python import is reachable."""
+    """Return True if a CLI tool or Python import is reachable.
+    In-process probes (shutil.which / find_spec) — no subprocess spawns."""
     if python_import:
         try:
-            result = subprocess.run(
-                [sys.executable, "-c", f"import {python_import}"],
-                capture_output=True, timeout=10,
-            )
-            return result.returncode == 0
-        except (subprocess.TimeoutExpired, OSError):
+            return importlib.util.find_spec(python_import) is not None
+        except (ImportError, ValueError):
             return False
     if which:
-        try:
-            result = subprocess.run(
-                ["which", which], capture_output=True, timeout=10,
-            )
-            return result.returncode == 0
-        except (subprocess.TimeoutExpired, OSError):
-            return False
+        return shutil.which(which) is not None
     return False
 
 
@@ -822,7 +1032,7 @@ def render_tooling_first() -> None:
     print("  - grimp                                  — import graph / dependency truth")
     print("  - vulture + ruff F401/F811               — dead-code / import rot")
     print("  - lint-imports                           — advisory unless contracts green")
-    print("  - wiki show <topic> / wiki search <term> — 115-article wiki at ~/.dharma/knowledge/wiki/")
+    print("  - wiki show <topic> / wiki search <term> — dharma wiki at ~/.dharma/knowledge/wiki/")
     print("  - memory MCP open_nodes / search_nodes   — cross-session graph (most-skipped tool)")
     print()
     print("  Tool availability on this machine:")
@@ -831,27 +1041,27 @@ def render_tooling_first() -> None:
         mark = "✅" if ok else "❌"
         suffix = "" if ok else f"  (install: {hint})"
         print(f"    {mark} {label}{suffix}")
+    # Worktree truth: which checkout does `import dharma_swarm` actually win?
+    try:
+        spec = importlib.util.find_spec("dharma_swarm")
+        origin = Path(spec.origin).resolve().parent if spec and spec.origin else None
+        if origin is not None:
+            local = (REPO_ROOT / "dharma_swarm").resolve()
+            tag = "this worktree" if origin == local else f"ANOTHER CHECKOUT: {origin}"
+            print(f"  import dharma_swarm resolves to: {tag}")
+    except Exception:
+        pass
 
 
-def render_model_key_routing() -> None:
-    section("MODEL & KEY ROUTING — THE ONE WAY")
-    print("  Keys:  ONE home ~/.dharma/agent_keys.env  ·  ONE tool: dkeys (add / test / find)")
-    print("         read keys in code ONLY via dharma_swarm/api_keys.py — never os.environ, never project .env")
-    print("  Model: ONE door  runtime_provider.resolve_runtime_provider_config() -> create_runtime_provider()")
-    print("         ordered by model_hierarchy (most-powerful-first); live-fallback never blocks on a dead brain")
-    print("  Claude/Anthropic -> Max plan (claude_code), NOT the metered API   (force API: DHARMA_FORCE_ANTHROPIC_API=1)")
-    print("  Rules: never hardcode a model string; never read a key outside api_keys.py; add keys only via `dkeys add`")
-    print("  Canon: docs/ops/MODEL_KEY_ROUTING.md  (lists the deprecated routes — do not use them)")
-
-
-def render_pr_hygiene() -> None:
+def render_pr_hygiene(*, net: bool = True) -> list[dict[str, Any]]:
     section("PR HYGIENE — open pull request health")
-    print("  Rules (see docs/governance/PR_QUALITY_GATES.md):")
-    print("    - Bot authors: max 3 open PRs (enforced by bot-pr-limit.yml)")
-    print("    - Bot PRs: auto-close after 14 days inactivity")
-    print("    - Human PRs: auto-close after 30 days inactivity")
-    print("    - Draft PRs: exempt from auto-close")
-    print("    - Duplicate-intent bot PRs: detected by title-prefix matching")
+    # Rule TEXT is owned by the workflows; point, don't paraphrase.
+    # (A previous hardcoded copy taught the pre-#533 author-based model long
+    # after the workflow had moved to per-intent-lane throttling.)
+    print("  Rule owners (read these, not prose copies):")
+    print("    - Throttling: .github/workflows/bot-pr-limit.yml  (per-INTENT-lane limits, not per-author)")
+    print("    - Stale lifecycle: .github/workflows/stale-pr.yml  (warn → auto-close; drafts exempt)")
+    print("    - Quality gates: docs/governance/PR_QUALITY_GATES.md")
     print()
     print("  Before opening a PR:")
     print("    1. Run: make agent-build-closeout")
@@ -861,24 +1071,44 @@ def render_pr_hygiene() -> None:
     print("    4. Mark WIP/scaffold PRs as drafts; prefix shelved PRs with [SHELVED]")
     print()
 
-    # Attempt to show open PR count if gh is available.
+    if not net:
+        print("  (network skipped — rerun without --fast/--no-net for the live PR list)")
+        return []
+
+    # Live open-PR list — same call the old count used, with enough fields
+    # to prevent duplicate-intent PRs. Repo inferred from cwd, not hardcoded.
+    prs: list[dict[str, Any]] = []
     try:
         result = subprocess.run(
-            ["gh", "pr", "list", "--repo", "AmitabhainArunachala/dharma_swarm",
-             "--state", "open", "--json", "number", "--jq", "length"],
-            capture_output=True, text=True, timeout=15,
+            ["gh", "pr", "list", "--state", "open",
+             "--json", "number,title,author,updatedAt,isDraft", "--limit", "30"],
+            capture_output=True, text=True, timeout=15, cwd=REPO_ROOT,
         )
-        if result.returncode == 0 and result.stdout.strip().isdigit():
-            count = int(result.stdout.strip())
-            print(f"  Current open PRs: {count}")
-            if count > 20:
-                print("  ⚠️  HIGH — consider closing stale/duplicate PRs before adding more")
-            elif count > 10:
-                print("  ⚠  MODERATE — review open PRs for duplicates")
-            else:
-                print("  ✓  Healthy")
-    except (subprocess.TimeoutExpired, OSError, FileNotFoundError):
-        print("  (gh CLI unavailable — cannot check open PR count)")
+        if result.returncode != 0:
+            err = (result.stderr or "").strip().splitlines()
+            print(f"  (gh pr list failed: {err[0] if err else 'unknown error'})")
+            return []
+        prs = json.loads(result.stdout or "[]")
+    except (subprocess.TimeoutExpired, OSError, FileNotFoundError, json.JSONDecodeError) as exc:
+        print(f"  (gh CLI unavailable — cannot check open PRs: {type(exc).__name__})")
+        return []
+
+    count = len(prs)
+    print(f"  Current open PRs: {count}")
+    if count > 20:
+        print("  ⚠️  HIGH — consider closing stale/duplicate PRs before adding more")
+    elif count > 10:
+        print("  ⚠  MODERATE — review open PRs for duplicates")
+    else:
+        print("  ✓  Healthy")
+    for pr in prs[:12]:
+        draft = " [draft]" if pr.get("isDraft") else ""
+        author = (pr.get("author") or {}).get("login", "?")
+        updated = str(pr.get("updatedAt", ""))[:10]
+        print(f"    #{pr.get('number')}{draft}  {str(pr.get('title', ''))[:64]}  ({author}, {updated})")
+    if count > 12:
+        print(f"    ... ({count - 12} more — gh pr list)")
+    return prs
 
 
 def render_hygiene_system() -> None:
@@ -886,14 +1116,33 @@ def render_hygiene_system() -> None:
     root = REPO_ROOT / "docs/governance/hygiene"
     pattern_dir = root / "patterns"
     patterns = []
+    unreadable = 0
     for path in sorted(pattern_dir.glob("*.yaml")):
         if not (path.name.startswith("VC-") or path.name.startswith("AI-")):
             continue
+        # Files carry .yaml extensions but historically hold JSON bodies.
+        # Accept either; never silently drop a hygiene pattern.
         try:
-            payload = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            unreadable += 1
+            continue
+        payload = None
+        try:
+            payload = json.loads(text)
+        except json.JSONDecodeError:
+            try:
+                import yaml  # type: ignore
+
+                payload = yaml.safe_load(text)
+            except Exception:
+                payload = None
+        if not isinstance(payload, dict):
+            unreadable += 1
             continue
         patterns.append(payload)
+    if unreadable:
+        print(f"  ⚠ {unreadable} pattern file(s) unreadable — counts below are incomplete")
 
     stage_counts: dict[str, int] = {}
     namespace_counts: dict[str, int] = {}
@@ -917,9 +1166,16 @@ def render_hygiene_system() -> None:
     latest = baselines[-1].relative_to(REPO_ROOT).as_posix() if baselines else "none yet"
     print(f"  Latest baseline: {latest}")
     print("  AI-agent governance: docs/governance/hygiene/AI_AGENT_GOVERNANCE.md")
-    print("  Deep-dive packet: reports/governance/anti_ai_slop_futureproof_deep_dive_2026-06-07.md")
-    print("  Control backlog: reports/governance/anti_ai_slop_control_backlog_2026-06-08.md")
-    print("  Scan snapshot: reports/governance/anti_ai_slop_scan_snapshot_2026-06-08.json")
+    # Latest dated artifacts by glob, so this section never pins yesterday's
+    # snapshot forever.
+    for label, pattern in (
+        ("Deep-dive packet", "reports/governance/anti_ai_slop_futureproof_deep_dive_*.md"),
+        ("Control backlog", "reports/governance/anti_ai_slop_control_backlog_*.md"),
+        ("Scan snapshot", "reports/governance/anti_ai_slop_scan_snapshot_*.json"),
+    ):
+        matches = sorted(REPO_ROOT.glob(pattern))
+        if matches:
+            print(f"  {label}: {matches[-1].relative_to(REPO_ROOT).as_posix()}")
     print("  Doctrine: AI-* signals are advisory until promoted through LIFECYCLE.md")
     print("  Run: make hygiene-audit   # non-blocking scan")
     print("  Run: make hygiene-check   # generated docs + pattern integrity")
@@ -941,6 +1197,17 @@ def render_hygiene_system() -> None:
                 print(f"    - {pattern.get('id')}: {pattern.get('title')} ({pattern.get('stage')})")
 
 
+def render_model_key_routing() -> None:
+    section("MODEL & KEY ROUTING — THE ONE WAY")
+    print("  Keys:  ONE home ~/.dharma/agent_keys.env  ·  ONE tool: dkeys (add / test / find)")
+    print("         read keys in code ONLY via dharma_swarm/api_keys.py — never os.environ, never project .env")
+    print("  Model: ONE door  runtime_provider.resolve_runtime_provider_config() -> create_runtime_provider()")
+    print("         ordered by model_hierarchy (most-powerful-first); live-fallback never blocks on a dead brain")
+    print("  Claude/Anthropic -> Max plan (claude_code), NOT the metered API   (force API: DHARMA_FORCE_ANTHROPIC_API=1)")
+    print("  Rules: never hardcode a model string; never read a key outside api_keys.py; add keys only via `dkeys add`")
+    print("  Canon: docs/ops/MODEL_KEY_ROUTING.md  (lists the deprecated routes — do not use them)")
+
+
 def render_enforcement_and_depth() -> None:
     section("ENFORCEMENT (run before opening a PR)")
     print("  make agent-build-preflight # onboarding + hygiene integrity at session start")
@@ -951,8 +1218,11 @@ def render_enforcement_and_depth() -> None:
     print("  python3 scripts/governance/render_active_track_includes.py --check")
     section("DEPTH POINTERS (read on demand, not in order)")
     print("  Repo rules & behaviour : CLAUDE.md, AGENTS.md, docs/AGENTS.md")
-    print("  Anti-slop rules        : docs/governance/ANTI_SLOP_RULES.md")
+    print("  Anti-slop rules (10)   : docs/governance/ANTI_SLOP_RULES.md   [enforced]")
     print("  AI-agent hygiene       : docs/governance/hygiene/AI_AGENT_GOVERNANCE.md")
+    print("  Vibe-code hygiene (54) : docs/governance/VIBE_CODE_HYGIENE.md [advisory catalogue]")
+    print("     scan & baseline     : scripts/governance/vibe_code_scan.sh")
+    print("                           reports/governance/vibe_code_baseline_2026-06-07.txt")
     print("  Doc ownership map      : docs/governance/CANONICAL_DOC_STACK.md")
     print("  Architecture/doctrine  : docs/governance/SOVEREIGN_MANIFEST.md, docs/doctrine/")
     print("  Coherence Delta        : docs/governance/COHERENCE_DELTA.md")
@@ -993,9 +1263,19 @@ def _load_evidence() -> dict[str, Any] | None:
     if not EVIDENCE_JSON.exists():
         return None
     try:
-        return json.loads(EVIDENCE_JSON.read_text(encoding="utf-8"))
+        data = json.loads(EVIDENCE_JSON.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
         return None
+    if not isinstance(data, dict):
+        return None
+    # Shape-normalize: a partial write by a parallel check_track_status run
+    # can yield valid JSON with garbage entries — degrade, never crash.
+    tracks = data.get("active_tracks")
+    if isinstance(tracks, list):
+        data["active_tracks"] = [t for t in tracks if isinstance(t, dict)]
+    elif tracks is not None:
+        data["active_tracks"] = []
+    return data
 
 
 def _refresh_evidence() -> None:
@@ -1011,7 +1291,9 @@ def _refresh_evidence() -> None:
 
 
 def _load_track_yaml() -> dict[str, Any]:
-    sys.path.insert(0, str(Path(__file__).parent))
+    here = str(Path(__file__).parent)
+    if here not in sys.path:
+        sys.path.insert(0, here)
     try:
         from check_track_status import load_active_track  # type: ignore
         track = load_active_track(ACTIVE_TRACK) or {}
@@ -1027,41 +1309,141 @@ def _load_track_yaml() -> dict[str, Any]:
         return {}
 
 
+def _collect_next_items(
+    evidence: dict[str, Any] | None,
+    track: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """next_items from the v2 portfolio's UNSHIPPED active tracks.
+
+    The old read used the v1 singular `active_track` (= first track after
+    the v2 shim), which served already-completed work as next steps whenever
+    the first track happened to be shippable. Pull from every active track
+    that still has failing criteria; fall back to v1.
+    """
+    ev_tracks = {
+        t.get("id"): t
+        for t in ((evidence or {}).get("active_tracks") or [])
+        if isinstance(t, dict)
+    }
+    yaml_tracks = (track or {}).get("active_tracks") or []
+    if not yaml_tracks and (track or {}).get("active_track"):
+        yaml_tracks = [track["active_track"]]
+
+    items: list[dict[str, Any]] = []
+    for t in yaml_tracks:
+        if not isinstance(t, dict):
+            continue
+        tid = t.get("id")
+        ev = ev_tracks.get(tid) or {}
+        if ev_tracks and ev.get("shippable"):
+            continue  # done — its next_items are stale by definition
+        for item in t.get("next_items") or []:
+            if isinstance(item, dict):
+                items.append({**item, "track_id": tid})
+    return items
+
+
+def _write_receipt(payload: dict[str, Any]) -> Path | None:
+    """Tee the machine receipt for fleet consumers. Never raises; failure
+    degrades to a printed note. Writes OUTSIDE the repo — onboard stays
+    read-only on owners."""
+    try:
+        ops = _ops_dir()
+        ops.mkdir(parents=True, exist_ok=True)
+        target = ops / ONBOARD_RECEIPT_NAME
+        tmp = target.with_suffix(f".{os.getpid()}.tmp")  # unique per writer: concurrent runs never race on one tmp
+        tmp.write_text(json.dumps(payload, sort_keys=True, indent=1), encoding="utf-8")
+        tmp.replace(target)
+        return target
+    except Exception as exc:  # OSError, or TypeError from an unserializable value
+        # stderr, never stdout: --json consumers must always get clean JSON.
+        print(f"(could not write onboard receipt: {type(exc).__name__}: {exc})", file=sys.stderr)
+        return None
+
+
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        description="Render dharma_swarm operating reality from its owners.")
+    parser.add_argument("--fast", action="store_true",
+                        help="skip slow probes (git status, drift triage, manifest health, network)")
+    parser.add_argument("--json", action="store_true", dest="as_json",
+                        help="print the machine receipt JSON to stdout instead of prose")
+    parser.add_argument("--no-net", action="store_true",
+                        help="skip network calls (gh pr list)")
+    # Deliberate exception to always-exit-0: an UNRECOGNIZED FLAG exits 2
+    # (argparse default, usage on stderr, stdout empty). The exit-0 contract
+    # covers stale STATE; silently proceeding on a typo'd flag would mask
+    # broken automation — e.g. '--fasy' running a 30s full pass as exit 0.
+    args = parser.parse_args(argv)
+    net = not (args.fast or args.no_net)
+
     os.chdir(REPO_ROOT)
-    if os.getenv("AGENT_ONBOARD_REFRESH", "").strip() == "1":
-        _refresh_evidence()
+
+    # Evidence freshness: refresh by default when missing or stale, unless
+    # told not to. AGENT_ONBOARD_REFRESH=1 forces; AGENT_ONBOARD_NO_REFRESH=1
+    # or --fast skips. Freshness must not depend on an external loop being alive.
+    force = os.getenv("AGENT_ONBOARD_REFRESH", "").strip() == "1"
+    skip = args.fast or os.getenv("AGENT_ONBOARD_NO_REFRESH", "").strip() == "1"
     evidence = _load_evidence()
+    age_min = _evidence_age_minutes(evidence)
+    stale = evidence is None or age_min is None or age_min > EVIDENCE_STALE_MINUTES
+    if force or (stale and not skip):
+        _refresh_evidence()
+        evidence = _load_evidence()
     track = _load_track_yaml()
 
-    render_repo_state()
+    if args.as_json:
+        # Machine mode: build the receipt quietly and print it.
+        import contextlib
+        import io
+
+        sink = io.StringIO()
+        with contextlib.redirect_stdout(sink):
+            repo_state = render_repo_state(fast=args.fast)
+            lanes = render_parallel_work_lanes()
+            rows = render_runtime_truth(evidence, track)
+            prs = render_pr_hygiene(net=net)
+        payload = _receipt_payload(repo_state, lanes, rows, prs, evidence, track)
+        _write_receipt(payload)
+        print(json.dumps(payload, sort_keys=True, indent=1))
+        return 0
+
+    repo_state = render_repo_state(fast=args.fast)
     render_active_track(evidence, track)
+    lanes = render_parallel_work_lanes()
     render_live_ops()
     render_live_ops_cockpit()
-    render_manifest_health()
+    if args.fast:
+        section("SURFACE MANIFEST HEALTH (skipped — --fast)")
+        print("  Rerun without --fast for the manifest health report.")
+    else:
+        render_manifest_health()
     render_broken_register()
     render_axioms()
     render_recent_activity(track)
     render_spine_status()
-    render_runtime_truth(evidence, track)
-    render_pr_hygiene()
+    rows = render_runtime_truth(evidence, track)
+    prs = render_pr_hygiene(net=net)
     render_hygiene_system()
     render_decay_watch()
     render_tooling_first()
     render_model_key_routing()
     render_enforcement_and_depth()
-    render_drift_triage()
+    if args.fast:
+        section("DRIFT TRIAGE (skipped — --fast)")
+        print("  Rerun without --fast for the drift triage (the slowest section).")
+    else:
+        render_drift_triage()
 
     section("WHAT TO DO NEXT")
     # Portfolio-aware: an operator proposing a new project should OPEN A TRACK,
     # never be told it "violates the active track".
     active_tracks = (evidence or {}).get("active_tracks") or []
-    block = (track or {}).get("active_track") or {}
-    next_items = block.get("next_items", []) if block else []
+    next_items = _collect_next_items(evidence, track)
     prereqs_ok = bool(evidence and evidence.get("prerequisites_ok"))
     shippable_ids = [t.get("id") for t in active_tracks if t.get("shippable")]
 
@@ -1076,16 +1458,69 @@ def main() -> int:
         print("  (the other active tracks keep running), then run")
         print("  python3 scripts/governance/render_active_track_includes.py")
     if next_items:
-        print("  Or continue an active track — next_items (primary track):")
-        for item in next_items[:5]:
+        print("  Or continue an unshipped active track — next_items:")
+        for item in next_items[:6]:
             tag = " (blocker)" if item.get("blocker") else ""
-            print(f"    - [{item.get('kind', '?')}]{tag} {item.get('what', '')[:80]}")
+            print(f"    - [{item.get('track_id', '?')}] [{item.get('kind', '?')}]{tag} {item.get('what', '')}")
     print()
     print("  Reminder: this command renders the owners; it does not own any fact.")
     print("  When in doubt: trust the filesystem, git log, and ACTIVE_TRACK.yaml.")
 
+    receipt_path = _write_receipt(
+        _receipt_payload(repo_state, lanes, rows, prs, evidence, track))
+    if receipt_path:
+        print(f"  Machine receipt: {receipt_path}  (fleet-readable; also: --json)")
+
     # Informational tool. Always exit 0.
     return 0
+
+
+def _receipt_payload(
+    repo_state: dict[str, Any],
+    lanes: dict[str, Any],
+    rows: list[dict[str, Any]],
+    prs: list[dict[str, Any]],
+    evidence: dict[str, Any] | None,
+    track: dict[str, Any],
+) -> dict[str, Any]:
+    active_tracks = (evidence or {}).get("active_tracks") or []
+    broken = _parse_broken_register()
+    return {
+        "schema": "dharma_swarm.onboard_receipt.v1",
+        "observed_at": _now_iso(),
+        "authority": "projection_only",
+        "repo": repo_state,
+        "work_lanes": lanes,
+        "portfolio": {
+            "summary": (evidence or {}).get("portfolio_summary"),
+            "spine_coverage": (evidence or {}).get("spine_coverage"),
+            "evidence_age_minutes": _evidence_age_minutes(evidence),
+            "tracks": [
+                {
+                    "id": t.get("id"),
+                    "status": t.get("status"),
+                    "serves": t.get("serves"),
+                    "shippable": t.get("shippable"),
+                    "failing_criteria": [
+                        c.get("id")
+                        for c in (t.get("criteria") if isinstance(t.get("criteria"), list) else []) or []
+                        if isinstance(c, dict) and not c.get("passed")
+                    ],
+                }
+                for t in active_tracks
+                if isinstance(t, dict)
+            ],
+        },
+        "next_items": _collect_next_items(evidence, track)[:10],
+        "broken_register": {
+            k: broken.get(k) for k in ("total", "open_count", "closed_count")
+        },
+        "open_prs": [
+            {"number": p.get("number"), "title": p.get("title"),
+             "isDraft": p.get("isDraft")} for p in prs if isinstance(p, dict)
+        ],
+        "runtime_truth_packets": rows,
+    }
 
 
 if __name__ == "__main__":

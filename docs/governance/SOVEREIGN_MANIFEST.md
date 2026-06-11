@@ -18,7 +18,7 @@
      Do not hand-edit. Run scripts/governance/render_active_track_includes.py
      after updating the YAML. -->
 
-**Active portfolio:** 3 co-equal track(s) (WIP warn 5, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
+**Active portfolio:** 4 co-equal track(s) (WIP warn 5, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
 
 **Spine objectives (each track serves one):**
 
@@ -128,6 +128,42 @@ status is main's standing declaration and is left to the operator.
 - Do not introduce NATS, Redis, or gRPC in this track (transport belongs to the NATS lane).
 - Do not broadly refactor swarm.py, providers.py, or SwarmManager.
 
+### Cybernetic Loop Closure — wire all 13 loops with receipted closure checks
+
+**Track id:** `loop-closure-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-11 (TTL 21 days)
+**Relations:** complements: runtime-truth-reconciliation-2026-06
+**Owns surfaces:** reports/loop_closure/**, CYBERNETIC_LOOP_MAP.md
+**Moves vital signs:** quality_gates, eval_coverage
+
+Operator-instructed campaign (2026-06-11 master prompt): wire all 13
+cybernetic loops in CYBERNETIC_LOOP_MAP.md until each runs
+sense->interpret->constrain->act->adapt on real data with receipts to
+its declared owner surface and an automated closure check.
+
+Phase 0 (research dossier, no build code) ships first. Phases proceed
+in dependency-lattice order: Loop 1 trunk (provider chain + dispatch),
+then the fed cascade (6,2,5,9 -> 3,4,7 -> 8,10,11), then Loops 12/13
+gated behind the One Wire external-receipt quorum (N>=5, M>=3).
+
+Invariant that must hold throughout:
+  Internal artifacts never touch archive fitness; only countersigned
+  external acted receipts above quorum do.
+
+**Next items:**
+
+- [code] (blocker) Phase 1a: provider chain hardening — separate failure state classes, fallback ordering, honest smoke receipts (no real key required).
+- [ops] (blocker) Operator escalation: one real provider key (OPENROUTER recommended) to close Loop 1.
+- [code] Phase 1b: Loop 1 closure under orchestrate_live with DHARMA_SPINE_DISPATCH=1, dispatch_dropoff receipted, closure check in make orient.
+
+**Non-goals:**
+
+- Do not weaken, bypass, or hard-code any telos gate to close a loop.
+- Do not let internal artifacts touch archive fitness (One Wire quorum stands).
+- Do not touch the operator_core read-model surfaces owned by the reconciliation lane.
+- Do not commit provider API keys or any credentials.
+- Do not create a new truth store, receipt system, or state owner; extend loop_supervisor and existing owners.
+
 **Recently closed tracks:**
 
 - `runtime-truth-spine-2026-06` — Runtime Truth Spine — one invariant, one invocation path, one receipt (SHIPPED, closed 2026-06-04)
@@ -169,7 +205,7 @@ No single file should exceed 3,000 lines. Current violations (V):
 **148 files exceed 500 lines; 39 exceed 1,000; 7 exceed 3,000** (V). These must be decomposed over time, not grown further.
 
 ### A6: DOCS DECAY -- CHECK BEFORE CITING
-All numerical claims in docs become stale within weeks. Before citing module counts, test counts, or line counts from any doc (including this one), verify against the actual filesystem. See `REPO_GOVERNANCE_AUDIT.md` for the current staleness log. The current DocOps inventory reports **310 Markdown files containing at least one reserved trust-language term** (V). Treat these as authority-scope review candidates, not confirmed repo-wide authority.
+All numerical claims in docs become stale within weeks. Before citing module counts, test counts, or line counts from any doc (including this one), verify against the actual filesystem. See `REPO_GOVERNANCE_AUDIT.md` for the current staleness log. The current DocOps inventory reports **405 Markdown files containing at least one reserved trust-language term** (V). Treat these as authority-scope review candidates, not confirmed repo-wide authority.
 
 ### A7: NO CIRCULAR IMPORTS
 The repo has **9 verified circular dependency chains** (V). The worst:
@@ -180,28 +216,28 @@ The repo has **9 verified circular dependency chains** (V). The worst:
 All 9 cycles were independently confirmed with exact import lines. Most are mitigated by lazy imports but remain architectural debt. **New code must not create circular imports.**
 
 ### A8: FRONTMATTER DISCIPLINE
-Do not inject machine-readable YAML frontmatter into governance or architecture docs unless explicitly requested. Current state: **216 of 771 Markdown files start with YAML frontmatter; 15 of 43 docs/architecture Markdown files do so** (V). Long frontmatter remains an authority/noise risk even when the prose is useful.
+Do not inject machine-readable YAML frontmatter into governance or architecture docs unless explicitly requested. Current state: **219 of 894 Markdown files start with YAML frontmatter; 15 of 43 docs/architecture Markdown files do so** (V). Long frontmatter remains an authority/noise risk even when the prose is useful.
 
 ---
 
-## VERIFIED NUMBERS (2026-06-09 COUNT REFRESH)
+## VERIFIED NUMBERS (2026-06-11 COUNT REFRESH)
 
 These are the ground-truth metrics. All other documents citing different numbers are stale.
 
 | Metric | Value | Verification |
 |--------|-------|-------------|
 | Total Python modules | **675** | find dharma_swarm -name "*.py" -type f |
-| Top-level (flat) modules | **392 (58.7%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
-| Total Python LOC | **285,830** | wc -l across dharma_swarm Python modules |
-| Test files | **647** | find tests -name "*.py" -type f |
-| Test functions | **11,098 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Top-level (flat) modules | **392** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
+| Total Python LOC | **285,939** | wc -l across dharma_swarm Python modules |
+| Test files | **648** | find tests -name "*.py" -type f |
+| Test functions | **11,110 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
-| Markdown files | **876** | find . -name "*.md" -type f |
-| Markdown total lines | **217,487** | wc -l across all .md |
+| Markdown files | **898** | find . -name "*.md" -type f |
+| Markdown total lines | **221,546** | wc -l across all .md |
 | Bridge files | **25** | find dharma_swarm -name "*bridge*.py" |
 | Adapter files | **21 across 8 locations** | find dharma_swarm -type f \| rg -i "adapter" |
-| Orchestrator files | **4** (6,034 LOC total) | find dharma_swarm -name "*orchestrat*" |
+| Orchestrator files | **5** | find dharma_swarm -name "*orchestrat*" |
 | Router files | **14** (4,976 LOC total) | find dharma_swarm -type f \| rg -i "rout" |
 | Memory modules | **11** (5,848 LOC) | find dharma_swarm -name "*memory*" |
 | Context modules | **8** (5,828 LOC) | find dharma_swarm -name "*context*" |
@@ -246,6 +282,7 @@ These are the ground-truth metrics. All other documents citing different numbers
   - FORBIDDEN: Must NOT import from Runtime, Intelligence, or Evolution domains
 - **Boundary Status**: **PASS** (V) -- no violations found
 - **Notes for Agents**: `dharma_kernel.py` is SHA-256 signed. Do not modify. Gates are added via `GateRegistry.propose()`, not by editing `telos_gates.py` directly. Parent `~/CLAUDE.md` says "10 axioms" -- this is WRONG; actual count is 25.
+- **Named operator role (merge authority)**: **Merge Master Mike (MMM)** is the registered conditional-merge coordinator agent for this domain. Charter: [`MMM_CHARTER.md`](MMM_CHARTER.md). Operational manual: [`../ops/PR_REVIEW_CONTROL.md`](../ops/PR_REVIEW_CONTROL.md). Registration: [`../../examples/agents/merge_master_mike.registration.json`](../../examples/agents/merge_master_mike.registration.json).
 
 ### Domain 3: Runtime Core (S1 Operations + S2 Coordination)
 

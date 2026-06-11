@@ -402,6 +402,86 @@ active_tracks:
         kind: docs
         blocker: false
 
+  - id: loop-closure-2026-06
+    name: Cybernetic Loop Closure — wire all 13 loops with receipted closure checks
+    status: ACTIVE
+    opened_at: "2026-06-11"
+    verified_at: "2026-06-11"
+    ttl_days: 21
+    owner: "@AmitabhainArunachala"
+    serves: substrate-nativeness
+    complements:
+      - runtime-truth-reconciliation-2026-06
+    owned_surfaces:
+      - reports/loop_closure/**
+      - CYBERNETIC_LOOP_MAP.md
+    moves_vital_signs:
+      - quality_gates
+      - eval_coverage
+
+    description: |
+      Operator-instructed campaign (2026-06-11 master prompt): wire all 13
+      cybernetic loops in CYBERNETIC_LOOP_MAP.md until each runs
+      sense->interpret->constrain->act->adapt on real data with receipts to
+      its declared owner surface and an automated closure check.
+
+      Phase 0 (research dossier, no build code) ships first. Phases proceed
+      in dependency-lattice order: Loop 1 trunk (provider chain + dispatch),
+      then the fed cascade (6,2,5,9 -> 3,4,7 -> 8,10,11), then Loops 12/13
+      gated behind the One Wire external-receipt quorum (N>=5, M>=3).
+
+      Invariant that must hold throughout:
+        Internal artifacts never touch archive fitness; only countersigned
+        external acted receipts above quorum do.
+
+    prerequisites:
+      - id: loop_map_exists
+        kind: file_exists
+        file: CYBERNETIC_LOOP_MAP.md
+      - id: loop_supervisor_exists
+        kind: file_exists
+        file: dharma_swarm/loop_supervisor.py
+
+    completion_criteria:
+      - id: phase0_dossier_exists
+        kind: file_exists
+        file: reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md
+      - id: phase0_fresh_status_table
+        kind: file_contains
+        file: reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md
+        pattern: "Fresh 13-loop status table"
+      - id: one_wire_invariant_stated
+        kind: file_contains
+        file: reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md
+        pattern: "never let internal artifacts touch archive fitness"
+      - id: loop1_closure_receipt_exists
+        kind: file_exists
+        file: reports/loop_closure/phase1/LOOP1_CLOSURE_RECEIPT.md
+      - id: campaign_retrospective_exists
+        kind: file_exists
+        file: reports/loop_closure/RETROSPECTIVE.md
+
+    non_goals:
+      - Do not weaken, bypass, or hard-code any telos gate to close a loop.
+      - Do not let internal artifacts touch archive fitness (One Wire quorum stands).
+      - Do not touch the operator_core read-model surfaces owned by the reconciliation lane.
+      - Do not commit provider API keys or any credentials.
+      - Do not create a new truth store, receipt system, or state owner; extend loop_supervisor and existing owners.
+
+    next_items:
+      - id: 1
+        what: "Phase 1a: provider chain hardening — separate failure state classes, fallback ordering, honest smoke receipts (no real key required)."
+        kind: code
+        blocker: true
+      - id: 2
+        what: "Operator escalation: one real provider key (OPENROUTER recommended) to close Loop 1."
+        kind: ops
+        blocker: true
+      - id: 3
+        what: "Phase 1b: Loop 1 closure under orchestrate_live with DHARMA_SPINE_DISPATCH=1, dispatch_dropoff receipted, closure check in make orient."
+        kind: code
+        blocker: false
+
 # ---------------------------------------------------------------------------
 # Closed tracks (history, append-only; do not edit prior entries)
 # ---------------------------------------------------------------------------
