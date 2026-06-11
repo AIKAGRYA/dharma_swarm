@@ -108,7 +108,7 @@ For machine-readable status, see [`reports/governance/active_track_evidence.md`]
 These are immutable engineering laws for this repository. Violation = architectural regression.
 
 ### A1: NO FLAT-PACKAGE GROWTH
-The `dharma_swarm/` package currently has **398 files at its top level (57.4% of 693 total Python modules)** (V). No new .py file may be added to the top level. New modules must go into an appropriate subdirectory. Existing top-level files will be organized over time.
+The `dharma_swarm/` package currently has **398 files at its top level (57.3% of 694 total Python modules)** (V). No new .py file may be added to the top level. New modules must go into an appropriate subdirectory. Existing top-level files will be organized over time.
 
 ### A2: NO DUPLICATE IMPLEMENTATIONS
 Before creating a new file for routing, bridging, adapting, or orchestrating, check if one already exists. The repo currently has **25 bridge files** (V), **3 model_routing copies** (2 are identical, 1 is different) (V), **5 orchestrator files** (V), **21 adapter files across 8 locations** (V), and **14 router files** (V). Do not add more without deprecating an existing one.
@@ -153,9 +153,9 @@ These are the ground-truth metrics. All other documents citing different numbers
 
 | Metric | Value | Verification |
 |--------|-------|-------------|
-| Total Python modules | **693** | find dharma_swarm -name "*.py" -type f |
-| Top-level (flat) modules | **398 (57.4%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
-| Total Python LOC | **293,751** | wc -l across dharma_swarm Python modules |
+| Total Python modules | **694** | find dharma_swarm -name "*.py" -type f |
+| Top-level (flat) modules | **398 (57.3%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
+| Total Python LOC | **293,852** | wc -l across dharma_swarm Python modules |
 | Test files | **665** | find tests -name "*.py" -type f |
 | Test functions | **11,282 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
