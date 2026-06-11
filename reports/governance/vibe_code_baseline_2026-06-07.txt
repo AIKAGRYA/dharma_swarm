@@ -1,0 +1,143 @@
+
+[1m=== A. TEST QUALITY ===[0m
+
+  -- A1: Happy-path tunnel vision (positive vs exception assertions) --
+  Positive asserts:  25076
+  Exception asserts: 352
+  Ratio (>15:1 is concerning): 71.2
+
+  -- A2: Assertion-free / trivially-true tests --
+  Trivial-shape assertions: 988
+
+  -- A3: Mock-heavy --
+  Mock references: 1813
+  Integration test files: 19
+
+  -- G4: Sleep in tests --
+  sleep() calls in tests: 71
+
+  -- G2: Skipped tests (workaround accumulation) --
+  Skipped: 8    xfail: 21
+
+[1m=== B. DOCUMENTATION QUALITY ===[0m
+
+  -- B1: README forward-looking language --
+  README forward-looking lines: 0
+
+  -- B2: Docstring inflation --
+  Function defs: 10539
+  Triple-quote occurrences: 9833
+
+  -- B5: Instruction file bloat --
+  CLAUDE.md: 241 lines, 10 imperatives (target <500 lines per file)
+  DEVIN.md: 410 lines, 7 imperatives (target <500 lines per file)
+
+[1m=== C. ARCHITECTURE & STRUCTURE ===[0m
+
+  -- C2: Interface archaeology (versioned/legacy/new/old in class names) --
+  Archaeology-shaped class names: 1
+    dharma_swarm/fractal/fractal_room.py:161:class VentureCellV1(FractalRoom):
+
+  -- C4: God files (top 15 by LOC) --
+      335210 total
+        5173 dharma_swarm/thinkodynamic_director.py
+        4512 dharma_swarm/telos_substrate.py
+        3796 dharma_swarm/runtime_state.py
+        3465 dharma_swarm/evolution.py
+        3355 dharma_swarm/agent_runner.py
+        3227 dharma_swarm/swarm.py
+        3022 dharma_swarm/providers.py
+        2777 dharma_swarm/orchestrator.py
+        2539 dharma_swarm/terminal_bridge.py
+        2520 dharma_swarm/tui/app.py
+        2416 dharma_swarm/ontology.py
+        2272 scripts/runtime/pr_merge_control.py
+        2257 dharma_swarm/orchestrate_live.py
+        2178 dharma_swarm/dgc_cli.py
+        1821 scripts/strange_loop.py
+
+  -- C6: Files with high lateral import count (>20 internal imports) --
+    dharma_swarm/dgc_cli.py: 24 internal imports
+
+  -- J3: Stub leakage (NotImplementedError, TODO-implement, lone pass) --
+  NotImplementedError: 6
+  TODO-implement markers: 3
+
+[1m=== D. PHANTOM DEPENDENCIES ===[0m
+
+  -- D3: Pinning hygiene (requirements*.txt) --
+  ./requirements-dev.txt: 5 deps, 0 unpinned
+  ./requirements-ginko.txt: 4 deps, 0 unpinned
+
+  -- D4: Deprecated API patterns --
+  OpenAI v0 patterns (ChatCompletion/Engine/davinci): 1
+  .query( calls (SQLAlchemy v1 style — verify): 5
+
+[1m=== E. SECURITY ===[0m
+
+  -- E2: Hardcoded credentials (heuristic — verify by hand) --
+  Suspicious literal API_KEY/password assignments: 0
+
+  -- E4: Weak crypto --
+  Weak crypto references (non-checksum): 214
+
+  -- E5: Prompt injection — user input directly in f-string prompts --
+  User-input-in-prompt f-strings: 12
+
+[1m=== F. CONTEXT-WINDOW ARTIFACTS ===[0m
+
+  -- F2: Copy-paste duplication candidates (functions with same name in different files) --
+  Function names defined >5 times across files:
+         63 def _utc_now() -> datetime:
+         40 def _utc_now_iso() -> str:
+         39 def main(argv: list[str] | None = None) -> int:
+         36 def main() -> int:
+         22 def main() -> None:
+         20 def build_parser() -> argparse.ArgumentParser:
+         17 def _new_id() -> str:
+         11 def main():
+         11 def _clamp01(value: float) -> float:
+          9 def _resolve_output(path: Path, repo_root: Path) -> Path:
+
+  -- F5: Naming entropy — single-letter / generic names in non-loop contexts --
+  Generic function names (data/info/stuff/thing/process/handle/do/run): 6
+
+[1m=== G. AGENT-LOOP PATHOLOGIES ===[0m
+
+  -- G1: Recent commit velocity (commits/day, last 14 days) --
+         62 2026-06-05
+          2 2026-06-07
+          1 2026-06-06
+
+  -- G2: Suppression density (# type: ignore / noqa / pylint disable) --
+  Total suppressions: 214
+
+  -- G2: Bare-except / Exception-swallow blocks --
+  Bare/wide excepts: 1999
+
+  -- G5: Fabricated commit messages (low-information shapes) --
+    Low-info commits in last 200: 0
+
+[1m=== H. PERFORMANCE ===[0m
+
+  -- H2: Sync blocking calls inside async functions (heuristic AST scan) --
+  Suspicious sync-in-async sites: 5
+  dharma_swarm/autoresearch_loop.py:507: subprocess.run inside async _revert_module
+  dharma_swarm/review_cycle.py:105: subprocess.run inside async _section_tests
+  dharma_swarm/roaming_dispatch_daemon.py:142: time.sleep inside async run_loop
+  dharma_swarm/thinkodynamic_director.py:1568: subprocess.run inside async invoke_claude_vision
+  dharma_swarm/zeitgeist.py:163: subprocess.run inside async _scan_llm
+
+  -- H3: Round-trip serialization --
+  Round-trip json.loads/json.dumps in one line: 1
+
+[1m=== I. DISTRIBUTED SYSTEMS CORRECTNESS ===[0m
+
+  -- I5: Async error swallowing (except without raise/log) --
+  except blocks followed by bare pass: 397
+
+  -- I4: Unprotected self-state mutations (heuristic) --
+  self.x += pattern occurrences: 87
+  Lock declarations: 22
+
+[1m=== DONE ===[0m
